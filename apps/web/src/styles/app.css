@@ -26,6 +26,11 @@
   --font-weight-normal: 400;
   --text-heading: var(--type-heading);
   --text-heading--line-height: calc(20 / 15);
+  --text-md-h1: var(--type-brand);
+  --text-md-h1--line-height: calc(26 / 18);
+  --container-chat: 47.25rem;
+  --container-chat-gutter: 49.25rem;
+  --container-reply-bubble: 32rem;
   --text-card-title: var(--type-card-title);
   --text-card-title--line-height: calc(21 / 15);
   --text-ui: var(--type-ui);

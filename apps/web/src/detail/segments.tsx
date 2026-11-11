@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { createContext, useContext } from 'react';
+import { createContext, Fragment, type ReactNode, useContext } from 'react';
 import { Link } from 'react-router';
 import { useThreadHref } from '../board/thread-link.js';
 import { type GlyphKind, StatusGlyph } from '../components/status-glyph.js';
@@ -128,46 +128,58 @@ function MentionChip({ seg }: { seg: DocSegment }) {
   );
 }
 
+function decorate(seg: DocSegment, key: number, node: ReactNode): ReactNode {
+  if (seg.em !== true && seg.del !== true) return node;
+  const struck = seg.del === true ? <del className="text-(--text-tertiary)">{node}</del> : node;
+  return seg.em === true ? <em key={key}>{struck}</em> : <Fragment key={key}>{struck}</Fragment>;
+}
+
 export function Segments({ segments, codeClassName }: SegmentsProps) {
   const onPreview = useContext(AttachmentPreviewHandler);
   return (
     <>
       {segments.map((seg, j) =>
-        seg.style === 'mention' ? (
-          <MentionChip key={j} seg={seg} />
-        ) : seg.style === 'attachment' && seg.attachmentKey != null ? (
-          <AttachmentChip
-            key={j}
-            name={seg.text}
-            attachmentKey={seg.attachmentKey}
-            {...(onPreview !== undefined ? { onPreview } : {})}
-          />
-        ) : seg.style === 'anchor' ? (
-          <a
-            key={j}
-            href={seg.href}
-            target="_blank"
-            rel="noreferrer"
-            className={cn(ANCHOR_SKIN, seg.strong === true && 'font-semibold')}
-          >
-            {seg.text}
-          </a>
-        ) : seg.style === 'strong' ? (
-          <strong key={j}>{seg.text}</strong>
-        ) : seg.style != null ? (
-          <code
-            key={j}
-            className={cn(
-              codeClassName,
-              CODE_SKIN[codeClassName],
-              seg.style === 'link' && `${codeClassName}--link`,
-              seg.style === 'link' && CODE_LINK_SKIN,
-            )}
-          >
-            {seg.text}
-          </code>
-        ) : (
-          <span key={j}>{seg.text}</span>
+        decorate(
+          seg,
+          j,
+          seg.style === 'break' ? (
+            <br key={j} />
+          ) : seg.style === 'mention' ? (
+            <MentionChip key={j} seg={seg} />
+          ) : seg.style === 'attachment' && seg.attachmentKey != null ? (
+            <AttachmentChip
+              key={j}
+              name={seg.text}
+              attachmentKey={seg.attachmentKey}
+              {...(onPreview !== undefined ? { onPreview } : {})}
+            />
+          ) : seg.style === 'anchor' ? (
+            <a
+              key={j}
+              href={seg.href}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(ANCHOR_SKIN, seg.strong === true && 'font-semibold')}
+            >
+              {seg.text}
+            </a>
+          ) : seg.style === 'strong' ? (
+            <strong key={j}>{seg.text}</strong>
+          ) : seg.style != null ? (
+            <code
+              key={j}
+              className={cn(
+                codeClassName,
+                CODE_SKIN[codeClassName],
+                seg.style === 'link' && `${codeClassName}--link`,
+                seg.style === 'link' && CODE_LINK_SKIN,
+              )}
+            >
+              {seg.text}
+            </code>
+          ) : (
+            <span key={j}>{seg.text}</span>
+          ),
         ),
       )}
     </>

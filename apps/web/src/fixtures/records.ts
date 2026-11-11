@@ -331,10 +331,12 @@ export interface ResourcesContent {
 
 export interface DocSegment {
   text: string;
-  style?: 'code' | 'link' | 'mention' | 'strong' | 'anchor' | 'attachment';
+  style?: 'code' | 'link' | 'mention' | 'strong' | 'anchor' | 'attachment' | 'break';
   href?: string;
   attachmentKey?: string;
   strong?: boolean;
+  em?: boolean;
+  del?: boolean;
   mentionKind?: 'todo' | 'skill' | 'agent' | 'project' | 'machine';
   mentionId?: string;
 }

@@ -29,7 +29,7 @@ export function SpecBlock({ spec, className, request }: SpecBlockProps) {
     return (
       <section
         className={cn(
-          'spec-block mt-4 mx-4 rounded-lg border border-(--border) bg-(--secondary) px-4 py-3 text-card-title break-words text-(--foreground) [&>*]:max-w-[68ch]',
+          'spec-block mt-4 mx-4 rounded-lg border border-(--border) bg-(--secondary) px-4 py-3 text-card-title break-words text-(--foreground) [&>*:not(.chat-md-block)]:max-w-[68ch] [&>.chat-md-block>*]:max-w-[68ch]',
           className,
         )}
       >
@@ -126,7 +126,7 @@ export function SpecBlock({ spec, className, request }: SpecBlockProps) {
                       : { sourceHref: `#${encodeURIComponent(`request-context-${source.id}`)}` })}
                   />
                 )}
-                <ChatMarkdown text={reply?.body ?? text} conversational />
+                <ChatMarkdown text={reply?.body ?? text} />
               </MessageBody>
             </MessageContent>
           </Message>

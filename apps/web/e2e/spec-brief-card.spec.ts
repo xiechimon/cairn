@@ -157,7 +157,7 @@ test('4b. wide screens line length takes the 68ch cap (same law as the 60–75 c
   expect(Math.abs(capped.maxWidth - capped.zero68)).toBeLessThanOrEqual(2);
 });
 
-test('6. ordered-list numerals are native list markers in claude.ai geometry, and two-digit numbers do not jog the content column', async ({
+test('6. ordered-list numerals are native list markers in the reference geometry, and two-digit numbers do not jog the content column', async ({
   page,
 }) => {
   await stubWorld(page);
@@ -187,8 +187,8 @@ test('6. ordered-list numerals are native list markers in claude.ai geometry, an
     expect(pin.display).toBe('list-item');
     expect(pin.listTag).toBe('OL');
     expect(pin.listStyle).toBe('decimal');
-    expect(Number.parseFloat(pin.listPad)).toBeCloseTo(pin.fontSize * 2, 1);
-    expect(Number.parseFloat(pin.itemPad)).toBeCloseTo(pin.fontSize * 0.5, 1);
+    expect(Number.parseFloat(pin.listPad)).toBe(36);
+    expect(Number.parseFloat(pin.itemPad)).toBe(0);
     expect(pin.markerColor).toBe(pin.textColor);
   }
 

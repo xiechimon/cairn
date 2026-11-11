@@ -79,7 +79,7 @@ describe('the serif voice follows claude.ai (DESIGN.md Typography)', () => {
 
   it('agent replies are sans like the approved chat draft, not the response voice', () => {
     const rows = read('chief/chief-message-rows.tsx');
-    expect(rows).toMatch(/BUBBLE_ROBOT_CLS = [`'][^`']*font-sans/);
+    expect(rows).toMatch(/BUBBLE_WRAP_CLS = [`'][^`']*font-sans/);
     expect(rows).not.toContain('voice-response');
     const transcript = read('detail/transcript.tsx');
     expect(transcript).toMatch(/font-sans[^"]*"\s*data-testid="agent-text"/);

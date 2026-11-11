@@ -3,12 +3,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
-  inlineSegments,
   mapChief,
   mapChiefStream,
   type MessageRow,
 } from '../src/api/mappers.js';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
+import { inlineSegments } from '../src/lib/markdown.js';
 
 const NOW = 1_758_000_000_000;
 

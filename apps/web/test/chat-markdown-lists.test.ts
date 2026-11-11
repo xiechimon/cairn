@@ -1,27 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { nestLists, parseChatMarkdown } from '../src/detail/chat-markdown.js';
+import { type ChatBlock, parseChatMarkdown } from '../src/lib/markdown.js';
 
-type ListBlock = Parameters<typeof nestLists>[0][number];
+type Shape = { ordered: boolean; items: { text: string; children: Shape[] }[] };
 
-function listBlocks(text: string): ListBlock[] {
-  return parseChatMarkdown(text).filter(
-    (block): block is ListBlock => block.kind === 'bullet' || block.kind === 'ordered',
+function shapeOf(blocks: ChatBlock[]): Shape[] {
+  return blocks.flatMap((block) =>
+    block.kind === 'list'
+      ? [
+          {
+            ordered: block.ordered,
+            items: block.items.map((item) => ({
+              text: item.blocks
+                .flatMap((b) => (b.kind === 'para' ? b.segments.map((s) => s.text) : []))
+                .join(''),
+              children: shapeOf(item.blocks),
+            })),
+          },
+        ]
+      : [],
   );
 }
 
-function shape(text: string) {
-  const walk = (lists: ReturnType<typeof nestLists>): unknown[] =>
-    lists.map((list) => ({
-      ordered: list.ordered,
-      items: list.entries.map((entry) => ({
-        text: entry.block.segments.map((seg) => seg.text).join(''),
-        children: walk(entry.children),
-      })),
-    }));
-  return walk(nestLists(listBlocks(text)));
-}
+const shape = (text: string) => shapeOf(parseChatMarkdown(text));
 
-describe('nestLists', () => {
+describe('markdown lists (CommonMark nesting from the parser)', () => {
   it('nests an indented bullet under the ordered item above it and keeps numbering in one list', () => {
     expect(shape('1. one\n   - child\n2. two')).toEqual([
       {
@@ -41,10 +43,9 @@ describe('nestLists', () => {
     ]);
   });
 
-  it('keeps a leading indented item as its own list instead of dropping it', () => {
+  it('keeps a leading indented item in the list that follows it (up to three spaces is the same level)', () => {
     expect(shape('  - deep\n- top')).toEqual([
-      { ordered: false, items: [{ text: 'deep', children: [] }] },
-      { ordered: false, items: [{ text: 'top', children: [] }] },
+      { ordered: false, items: [{ text: 'deep', children: [] }, { text: 'top', children: [] }] },
     ]);
   });
 
@@ -71,5 +72,10 @@ describe('nestLists', () => {
         ],
       },
     ]);
+  });
+
+  it('keeps the start number of an ordered list', () => {
+    const [list] = parseChatMarkdown('3. three\n4. four');
+    expect(list?.kind === 'list' && list.start).toBe(3);
   });
 });

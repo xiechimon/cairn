@@ -40,7 +40,7 @@ import {
   useMessageScroller,
   useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
-import { toastError } from '../components/ui/toaster.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefContent, ChiefStreamItem, Phase } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
@@ -74,7 +74,7 @@ import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
 const SCROLLER_CONTENT_CLS =
-  'mx-auto flex w-full max-w-168 min-w-0 flex-col justify-end gap-0 px-4 pt-8 [overflow-wrap:anywhere]';
+  'mx-auto flex w-full max-w-chat-gutter min-w-0 flex-col justify-end gap-0 px-4 pt-8 [overflow-wrap:anywhere]';
 
 const THREAD_COMPOSER = 'thread';
 
@@ -160,7 +160,7 @@ export function ChiefConversation({
   const questionAttached = useQuestionDockVisible();
   const { t, locale } = useI18n();
   const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
-  const [highlightedSource, setHighlightedSource] = useState<string | null>(null);
+  const [highlightedSource, setHighlightedSource] = useState<ReplyQuoteDraft | null>(null);
   const [previewReply, setPreviewReply] = useState<string | null>(null);
   const composerPlaceholder =
     previewReply ??
@@ -227,18 +227,17 @@ export function ChiefConversation({
     null,
   );
   const [toolsOpen, setToolsOpen] = useState<Set<number>>(() => new Set());
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const copyText = useCallback((key: string, text: string) => {
-    const clip = navigator.clipboard;
-    if (!clip) return;
-    void clip.writeText(text).then(
-      () => {
-        setCopiedKey(key);
-        window.setTimeout(() => setCopiedKey((cur) => (cur === key ? null : cur)), 1500);
-      },
-      () => {},
-    );
-  }, []);
+  const copyText = useCallback(
+    (text: string) => {
+      const clip = navigator.clipboard;
+      if (!clip) return;
+      void clip.writeText(text).then(
+        () => toastSuccess(t('已复制')),
+        () => {},
+      );
+    },
+    [t],
+  );
   const toggleTools = useCallback(
     (i: number) =>
       setToolsOpen((cur) => {
@@ -418,7 +417,7 @@ export function ChiefConversation({
         <ReplyingToBar
           quote={replyQuote.quote}
           onRemove={() => setReplyQuote(null)}
-          onHighlight={(on) => setHighlightedSource(on ? replyQuote.sourceMessageId : null)}
+          onHighlight={(on) => setHighlightedSource(on ? replyQuote : null)}
         />
       )}
       <QueuedCapsules
@@ -476,7 +475,6 @@ export function ChiefConversation({
       index={i}
       replyable={item.kind === 'thread-report' && outstandingReports.has(item.id)}
       runningTool={chief.runningTool}
-      copiedKey={copiedKey}
       onCopy={copyText}
       toolsOpen={toolsOpen}
       onToggleTools={toggleTools}
@@ -521,7 +519,7 @@ export function ChiefConversation({
   const intro = !chief.bound && showBindGate && (
     <div
       data-testid="chief-gate"
-      className="mx-auto mt-4 flex h-14 w-[calc(100%-2rem)] max-w-160 flex-none items-center gap-3 rounded-(--radius-card) bg-(--card) pr-3 pl-4 text-ui text-(--text-secondary) ring-1 ring-(--border)"
+      className="mx-auto mt-4 flex h-14 w-[calc(100%-2rem)] max-w-chat flex-none items-center gap-3 rounded-(--radius-card) bg-(--card) pr-3 pl-4 text-ui text-(--text-secondary) ring-1 ring-(--border)"
     >
       <span>{t('请先在工作路由里配置 Coordinator。')}</span>
       <Button className={`ml-auto cursor-pointer ${DIALOG_PRIMARY_BUTTON}`} onClick={onSettings}>
@@ -613,7 +611,7 @@ export function ChiefConversation({
               <p
                 role="alert"
                 data-testid="chief-composer-error"
-                className={`mx-auto mt-2 mb-0 flex w-[calc(100%-2rem)] max-w-160 max-h-12 items-start gap-1.5 overflow-y-auto text-meta text-destructive`}
+                className={`mx-auto mt-2 mb-0 flex w-[calc(100%-2rem)] max-w-chat max-h-12 items-start gap-1.5 overflow-y-auto text-meta text-destructive`}
               >
                 <TriangleAlert aria-hidden="true" className="size-3.5 flex-none" />
                 {composerError}

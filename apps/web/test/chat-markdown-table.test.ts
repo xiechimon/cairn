@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseChatMarkdown } from '../src/detail/chat-markdown.js';
+import { parseChatMarkdown } from '../src/lib/markdown.js';
 
 function cellTexts(row: { text: string }[][]): string[] {
   return row.map((cell) => cell.map((s) => s.text).join(''));

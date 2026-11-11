@@ -1,6 +1,5 @@
 import type { StepPromptOrigin } from '@cairn/shared';
 import { useEffect, useRef, useState } from 'react';
-import { inlineSegments } from '../api/mappers.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
@@ -17,6 +16,7 @@ import type { RobotPara, TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { Clock, Copy, ExternalLink, FileTab } from '../icons/index.js';
+import { inlineSegments } from '../lib/markdown.js';
 import { ChatMarkdown, TaskCard } from './chat-markdown.js';
 import { Segments } from './segments.js';
 import { shouldExpandLastWork } from './work-expansion.js';
@@ -307,18 +307,23 @@ function Row({
       return (
         <>
           <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
-            <span
-              className="chat-text -mt-px agent-measure min-w-0 font-sans text-ui leading-5.5 break-words text-(--foreground)"
-              data-testid="agent-text"
-            >
-              {item.markdown != null ? (
-                <ChatMarkdown text={item.markdown} />
-              ) : (
-                (item.paragraphs ?? []).map((raw, i) => (
+            {item.markdown != null ? (
+              <div
+                className="chat-text min-w-0 font-sans text-ui leading-5 break-words text-(--foreground)"
+                data-testid="agent-text"
+              >
+                <ChatMarkdown text={item.markdown} bubbles />
+              </div>
+            ) : (
+              <span
+                className="chat-text -mt-px agent-measure min-w-0 font-sans text-ui leading-5.5 break-words text-(--foreground)"
+                data-testid="agent-text"
+              >
+                {(item.paragraphs ?? []).map((raw, i) => (
                   <Para key={i} para={Array.isArray(raw) ? { segments: raw } : raw} gap={i > 0} />
-                ))
-              )}
-            </span>
+                ))}
+              </span>
+            )}
             {item.footer != null && (
               <ActionRow seconds={item.footer.seconds} copy={robotCopyText(item)} t={t} />
             )}

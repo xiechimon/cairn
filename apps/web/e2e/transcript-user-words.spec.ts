@@ -236,8 +236,8 @@ test('5. a one-line message keeps the one-line bubble height (no geometry drift)
     const r = el.getBoundingClientRect();
     return { h: Math.round(r.height), font: getComputedStyle(el).fontSize };
   });
-  expect(box.h).toBeGreaterThanOrEqual(37);
-  expect(box.h).toBeLessThanOrEqual(38);
+  expect(box.h).toBeGreaterThanOrEqual(32);
+  expect(box.h).toBeLessThanOrEqual(33);
   expect(box.font).toBe('14px');
 });
 

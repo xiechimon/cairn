@@ -50,7 +50,11 @@ test('shows the latest reply suggestions under the reply as outlined, keyboard-r
   await expect(page.getByText('suggest_replies')).toHaveCount(0);
   await expect(page.getByTestId('chief-stream').getByTestId('chief-quick-replies')).toHaveCount(1);
   const group = await page.getByTestId('chief-quick-replies').boundingBox();
-  const reply = await page.getByTestId('home-c').getByText('要不要先只看 README？').boundingBox();
+  const reply = await page
+    .getByTestId('home-c')
+    .getByTestId('chief-reply-bubble')
+    .filter({ hasText: '要不要先只看 README？' })
+    .boundingBox();
   expect(group!.y - (reply!.y + reply!.height)).toBeGreaterThanOrEqual(12);
   expect(group!.y - (reply!.y + reply!.height)).toBeLessThanOrEqual(32);
   expect(Math.abs(group!.x - reply!.x)).toBeLessThanOrEqual(2);

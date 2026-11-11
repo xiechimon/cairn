@@ -5,7 +5,7 @@ import type { ChiefContent } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 
 const BANNER_CLS =
-  'mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-160 flex-none items-start gap-2.5 rounded-(--radius-card) bg-card px-3 py-2.5 text-meta leading-5 text-(--text-secondary)';
+  'mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-chat flex-none items-start gap-2.5 rounded-(--radius-card) bg-card px-3 py-2.5 text-meta leading-5 text-(--text-secondary)';
 const LINK_BTN_CLS =
   'h-auto cursor-pointer border-none bg-transparent p-0 text-meta font-normal text-(--text-secondary) underline-offset-2 hover:bg-transparent hover:text-(--foreground) hover:underline dark:hover:bg-transparent';
 

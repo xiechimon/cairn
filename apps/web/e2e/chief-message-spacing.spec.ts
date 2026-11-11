@@ -42,7 +42,9 @@ test('text gaps match the approved chat draft (32px between turns either way) an
     expect(Math.abs(gap - target), `gap after ${TEXTS[index]} is ${gap}`).toBeLessThanOrEqual(5);
   }
   const older = page.getByTestId('home-c').getByTestId('chief-msg').first();
-  const tools = older.locator('[data-testid="chief-msg-tools"], [data-testid="chief-msg-foot"]');
+  const tools = older
+    .locator('[data-testid="chief-msg-tools"], [data-testid="chief-msg-foot"]')
+    .first();
   expect(await tools.evaluate((el) => getComputedStyle(el).position)).toBe('absolute');
 });
 
@@ -53,9 +55,11 @@ test('actions take no height on any message, the latest included', async ({ page
   await expect(messages).toHaveCount(TEXTS.length);
   for (const index of [0, 1, TEXTS.length - 1]) {
     const message = messages.nth(index);
-    const tools = message.locator('[data-testid="chief-msg-tools"], [data-testid="chief-msg-foot"]');
+    const tools = message
+      .locator('[data-testid="chief-msg-tools"], [data-testid="chief-msg-foot"]')
+      .first();
     expect(await tools.evaluate((el) => getComputedStyle(el).position)).toBe('absolute');
-    const body = message.locator('[data-testid="chief-bubble"], [data-slot="bubble-content"]');
+    const body = message.locator('[data-testid="chief-bubble"], [data-slot="reply-blocks"]');
     const messageBox = await message.boundingBox();
     const bodyBox = await body.boundingBox();
     if (messageBox === null || bodyBox === null) throw new Error('no box');

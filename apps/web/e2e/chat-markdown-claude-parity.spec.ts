@@ -37,7 +37,7 @@ async function openChiefReply(page: Page) {
     .first();
 }
 
-test('bullets are native list markers in claude.ai geometry: disc, text colour, 2em list indent, 0.5em item gap', async ({
+test('bullets are native list markers in the reference geometry: disc, text colour, 36px list indent, no item pad', async ({
   page,
 }) => {
   const reply = await openChiefReply(page);
@@ -62,8 +62,8 @@ test('bullets are native list markers in claude.ai geometry: disc, text colour, 
   for (const item of items) {
     expect(item.display).toBe('list-item');
     expect(item.markerColor).toBe(item.textColor);
-    expect(item.listPad).toBeCloseTo(item.fontSize * 2, 1);
-    expect(item.itemPad).toBeCloseTo(item.fontSize * 0.5, 1);
+    expect(item.listPad).toBe(36);
+    expect(item.itemPad).toBe(0);
   }
   const nested = items.find((item) => item.depth === '1');
   expect(nested?.parentList).toBe('OL');

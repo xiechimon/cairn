@@ -114,6 +114,7 @@
   --radius-composer: 14px;
   --radius-tile: 10px;
   --radius-bubble: 18px;
+  --radius-reply: 16px;
   --radius-control: 8px;
   --e1: 0 0 0 1px var(--border);
   --e1-lift: 0 0 0 1px var(--border), var(--shadow-lift);
@@ -282,6 +283,8 @@
   --code-token-punctuation: #d3d7de;
   --code-token-comment: #818898;
   --bubble-fill: #33290f;
+  --reply-bubble-fill: #292929;
+  --reply-bubble-highlight: #353535;
   --code-pill-ring: #333333;
   --tag-ink: 40%;
   --switch-off: #474747;
@@ -414,6 +417,8 @@
   --tag-tint: 12%;
   --code-pill-bg: #f2f2f2;
   --bubble-fill: #f3ead6;
+  --reply-bubble-fill: #f2f2f2;
+  --reply-bubble-highlight: #e5e5e5;
   --code-pill-ring: #e6e6e6;
   --tag-ink: 35%;
   --switch-off: #d1d1d1;

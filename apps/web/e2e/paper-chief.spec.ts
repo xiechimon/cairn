@@ -67,8 +67,11 @@ for (const theme of ['light', 'dark'] as const) {
     win = await openHome(page, THREAD);
     const note = win.getByTestId('chief-stream').getByTestId('chief-note').first();
     await expect(note, 'W5').toHaveCSS('font-size', '13px');
-    const foot = win.getByTestId('chief-msg-foot').first();
-    await expect(foot, 'W5').toHaveCSS('font-size', '13px');
+    const meta = win
+      .getByTestId('chief-msg-foot')
+      .first()
+      .locator('[data-slot="message-toolbar-meta"]');
+    await expect(meta, 'W5').toHaveCSS('font-size', '12px');
     await win.getByTestId('chief-tools-toggle').click();
     const toolRow = win.getByTestId('chief-turn-tools').locator('[data-trace-verb]').first();
     await expect(toolRow, 'W5').toHaveCSS('font-size', '13px');

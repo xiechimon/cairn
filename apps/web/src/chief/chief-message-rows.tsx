@@ -1,6 +1,5 @@
 import { parseReplyQuote } from '@cairn/shared';
 import { cn } from 'cn';
-import { Ellipsis, Reply } from 'lucide-react';
 import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
 import { isUsableTimestamp } from '../board/rel-time.js';
 import { ThreadLink } from '../board/thread-link.js';
@@ -9,19 +8,11 @@ import { LiveRow, LiveSignal, TypingDots } from '../components/chat/live-row.js'
 import { STATUS_REF_CLS, StatusLine } from '../components/chat/status-line.js';
 import { TraceGroup, TraceRows, type TraceStepItem } from '../components/chat/trace-steps.js';
 import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-message-bubble.js';
-import { Bubble, BubbleContent } from '../components/ui/bubble.js';
 import { Button } from '../components/ui/button.js';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
-import { ChatMarkdown, MD_LIST, MD_LIST_ITEM } from '../detail/chat-markdown.js';
+import { ChatMarkdown, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import {
   type TodoGlance,
   TodoGlanceContext,
@@ -36,7 +27,7 @@ import type {
 } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, Copy, FileText, Restore } from '../icons/index.js';
+import { FileText } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
@@ -44,6 +35,7 @@ import { ChiefReportRow } from './chief-report-row.js';
 import { TaskRefRow } from './chief-task-ref-row.js';
 import { taskRefsOf } from './chief-task-refs.js';
 import { isLiveNotice } from './live-notice.js';
+import { MessageToolbar } from './message-toolbar.js';
 import { QuestionAnsweredLine } from './question-answered-line.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
 import {
@@ -58,9 +50,6 @@ import type { ThreadActivity } from './thread-activity.js';
 import { ThreadActivityRow, ThreadEventLine } from './thread-activity-row.js';
 import { ThreadReportReply } from './thread-report-reply.js';
 import { messageStampLabel } from './time-dividers.js';
-
-const MSG_TOOL_BTN_CLS =
-  "size-6 cursor-pointer rounded-none border-none bg-transparent text-(--text-tertiary) hover:bg-(--secondary) hover:text-(--text-secondary) dark:hover:bg-(--secondary) aria-expanded:bg-muted aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
 
 const STAMP_CLS = 'text-caption whitespace-nowrap tabular-nums';
 
@@ -106,8 +95,9 @@ const REPLY_ROW_CLS = 'mt-5 pointer-coarse:mt-7';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
-const BUBBLE_WRAP_CLS = 'w-full max-w-full';
-const BUBBLE_ROBOT_CLS = `w-full border-0 font-sans ${CHAT_BODY_CLS}`;
+const BUBBLE_WRAP_CLS = `w-full max-w-full font-sans ${CHAT_BODY_CLS}`;
+const TRACE_REVEAL =
+  'opacity-0 group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
 const MARKER_ERROR_CLS =
   'my-2.5 flex-col items-start gap-0.5 rounded-(--radius-card) bg-danger-soft px-3 py-2.5 text-left text-meta text-(--destructive)';
 
@@ -301,8 +291,7 @@ interface ChiefStreamRowProps {
   index: number;
   replyable?: boolean;
   runningTool: ChiefContent['runningTool'];
-  copiedKey: string | null;
-  onCopy: (key: string, text: string) => void;
+  onCopy: (text: string) => void;
   toolsOpen: ReadonlySet<number>;
   onToggleTools: (index: number) => void;
   onRewindRequest: (index: number, id: string | null) => void;
@@ -336,70 +325,11 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
   );
 }
 
-function ReplyToolButton({ onClick }: { onClick: () => void }) {
-  const { t } = useI18n();
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className={MSG_TOOL_BTN_CLS}
-      aria-label={t('回复这条')}
-      data-testid="chief-msg-reply"
-      onClick={onClick}
-    >
-      <Reply width={13} height={13} />
-    </Button>
-  );
-}
-
-function MessageMoreMenu({ onRewind }: { onRewind: () => void }) {
-  const { t } = useI18n();
-  return (
-    <DropdownMenu>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={MSG_TOOL_BTN_CLS}
-                  aria-label={t('更多')}
-                  data-testid="chief-msg-more"
-                />
-              }
-            />
-          }
-        >
-          <Ellipsis width={13} height={13} />
-        </TooltipTrigger>
-        <TooltipContent side="bottom" sideOffset={8}>
-          {t('更多')}
-        </TooltipContent>
-      </Tooltip>
-      <DropdownMenuContent align="end" aria-label={t('更多')} className="w-auto min-w-40">
-        <DropdownMenuItem data-action="rewind" onClick={onRewind}>
-          <Restore width={16} height={16} />
-          {t('恢复到此处')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-const MESSAGE_TOOLS_REVEAL =
-  'opacity-0 group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
-
-const messageToolsPlace = (side: 'left' | 'right') =>
-  `absolute top-full z-10 ${side === 'right' ? 'right-0' : 'left-0'}`;
-
 export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
   index: i,
   replyable = false,
   runningTool,
-  copiedKey,
   onCopy,
   toolsOpen,
   onToggleTools,
@@ -411,7 +341,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   const { t } = useI18n();
   const highlightedSource = useContext(ReplySourceHighlightContext);
   const highlight = (id: string | undefined) =>
-    id !== undefined && id === highlightedSource ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {};
+    id !== undefined && id === highlightedSource?.sourceMessageId
+      ? { [REPLY_HIGHLIGHT_ATTR]: '' }
+      : {};
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
   if (item.kind === 'thread-report' || item.kind === 'thread-message')
     return (
@@ -484,6 +416,21 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     const split = splitDraft(shown ?? item.text);
     const sentFiles = parseAttachmentTokens(split.tokens.join('\n'));
     const bubbleText = sentFiles.length > 0 ? split.text.trim() : split.text;
+    const showBubble = bubbleText !== '' || reply != null || sentFiles.length === 0;
+    const userTools = (placement: 'left' | 'below-end', testId: string) => (
+      <MessageToolbar
+        placement={placement}
+        testId={testId}
+        stamp={<MessageStamp createdAt={item.createdAt} fallback={item.at} />}
+        onReply={
+          onReply !== undefined && item.id != null
+            ? () => onReply({ sourceMessageId: item.id ?? '', quote: reply?.body ?? item.text })
+            : undefined
+        }
+        onCopy={() => onCopy(item.text)}
+        onRewind={() => onRewindRequest(i, item.id ?? null)}
+      />
+    );
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message
@@ -494,46 +441,28 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             className="relative max-w-[min(85%,42rem)] flex-none items-end gap-2"
             data-testid="chief-msg-col"
           >
-            {sentFiles.length > 0 && <SentAttachments files={sentFiles} />}
-            {(bubbleText !== '' || reply != null || sentFiles.length === 0) && (
-              <UserMessageBubble
-                data-testid="chief-bubble"
-                data-md={shown != null ? '' : undefined}
-                {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
-                {...highlight(item.id)}
-                className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''}`}
-              >
-                {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
-                {shown != null ? <ChatMarkdown text={bubbleText} conversational /> : bubbleText}
-              </UserMessageBubble>
+            {sentFiles.length > 0 && (
+              <div className="group/reply-block relative max-w-full" data-slot="reply-block">
+                <SentAttachments files={sentFiles} />
+                {!showBubble && userTools('left', 'chief-msg-tools')}
+              </div>
             )}
-            <div
-              className={`${messageToolsPlace('right')} flex items-center gap-1 text-(--text-tertiary) ${MESSAGE_TOOLS_REVEAL}`}
-              data-testid="chief-msg-tools"
-            >
-              <MessageStamp createdAt={item.createdAt} fallback={item.at} />
-              {onReply !== undefined && item.id != null && (
-                <ReplyToolButton
-                  onClick={() =>
-                    onReply({ sourceMessageId: item.id ?? '', quote: reply?.body ?? item.text })
-                  }
-                />
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className={MSG_TOOL_BTN_CLS}
-                aria-label={t('复制')}
-                onClick={() => onCopy(`u${i}`, item.text)}
-              >
-                {copiedKey === `u${i}` ? (
-                  <Check width={13} height={13} />
-                ) : (
-                  <Copy width={13} height={13} />
-                )}
-              </Button>
-              <MessageMoreMenu onRewind={() => onRewindRequest(i, item.id ?? null)} />
-            </div>
+            {showBubble && (
+              <div className="group/reply-block relative max-w-full" data-slot="reply-block">
+                <UserMessageBubble
+                  data-testid="chief-bubble"
+                  data-md={shown != null ? '' : undefined}
+                  {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
+                  {...highlight(item.id)}
+                  className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''}`}
+                >
+                  {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
+                  {shown != null ? <ChatMarkdown text={bubbleText} /> : bubbleText}
+                </UserMessageBubble>
+                {userTools('left', 'chief-msg-tools')}
+              </div>
+            )}
+            {userTools('below-end', 'chief-msg-tools-touch')}
           </MessageContent>
         </Message>
       </MessageScrollerItem>
@@ -609,6 +538,37 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     );
   }
   const tools = turnToolSteps(item.tools);
+  const settled = item.typing !== true;
+  const whole = robotText(item);
+  const fallbackNote =
+    item.fallbackModel != null ? (
+      <span data-testid="chief-fallback-note">
+        {t('由备用模型 {model} 回答', { model: item.fallbackModel })}
+      </span>
+    ) : undefined;
+  const robotTools = (
+    placement: 'right' | 'below-start',
+    quote: string,
+    testId: string,
+    withNote = true,
+  ): ReactNode =>
+    settled ? (
+      <MessageToolbar
+        placement={placement}
+        testId={testId}
+        stamp={<MessageStamp createdAt={item.createdAt} />}
+        note={withNote ? fallbackNote : undefined}
+        onReply={
+          onReply !== undefined && item.id != null
+            ? () => onReply({ sourceMessageId: item.id ?? '', quote })
+            : undefined
+        }
+        onCopy={() => onCopy(quote)}
+      />
+    ) : null;
+  const sourceHighlighted =
+    highlightedSource !== null && highlightedSource.sourceMessageId === item.id;
+  const quoted = highlightedSource?.quote ?? '';
   return (
     <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
       <Message className={REPLY_ROW_CLS} data-testid="chief-msg">
@@ -621,72 +581,61 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               onOpenChange={() => onToggleTools(i)}
               summaryTestId="chief-tools-toggle"
               cardTestId="chief-turn-tools"
-              className={toolsOpen.has(i) ? undefined : MESSAGE_TOOLS_REVEAL}
+              className={toolsOpen.has(i) ? undefined : TRACE_REVEAL}
             />
           )}
-          {item.typing !== true && <TaskRefRows source={item} />}
-          <Bubble variant="ghost" className={BUBBLE_WRAP_CLS}>
-            <BubbleContent
-              className={`${BUBBLE_ROBOT_CLS} ${REPLY_HIGHLIGHT_CLS}`}
-              {...(item.id != null && item.typing !== true ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
-              {...highlight(item.id)}
-            >
-              {item.markdown != null ? (
-                <ChatMarkdown text={item.markdown} conversational />
-              ) : (
-                <>
+          {settled && <TaskRefRows source={item} />}
+          <div
+            className={BUBBLE_WRAP_CLS}
+            data-testid="chief-reply"
+            {...(item.id != null && settled ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
+            {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
+          >
+            {item.markdown != null ? (
+              <ChatMarkdown
+                text={item.markdown}
+                bubbles
+                bubbleTools={(group, n) =>
+                  robotTools(
+                    'right',
+                    group.source,
+                    n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools',
+                  )
+                }
+                highlight={(group) =>
+                  sourceHighlighted &&
+                  (group.source.includes(quoted) || quoted.includes(group.source))
+                }
+              />
+            ) : (
+              <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
+                <div
+                  className={REPLY_BUBBLE_CLS}
+                  data-slot="reply-bubble"
+                  data-testid="chief-reply-bubble"
+                  {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
+                >
                   {(item.paragraphs ?? []).map((p, j) => (
-                    <p key={j} className={j > 0 ? `mt-0.5 ${CHAT_BODY_CLS}` : CHAT_BODY_CLS}>
+                    <p key={j} className={j > 0 ? `mt-1 ${CHAT_BODY_CLS}` : CHAT_BODY_CLS}>
                       <Segments segments={p} />
                     </p>
                   ))}
                   {item.bullets != null && item.bullets.length > 0 && (
-                    <ul className={`mt-0.5 list-disc ${CHAT_BODY_CLS} ${MD_LIST}`}>
+                    <ul className={`mt-1 list-disc ps-9 ${CHAT_BODY_CLS}`}>
                       {item.bullets.map((b, j) => (
-                        <li key={`b${j}`} className={MD_LIST_ITEM}>
+                        <li key={`b${j}`}>
                           <Segments segments={b} />
                         </li>
                       ))}
                     </ul>
                   )}
-                </>
-              )}
-            </BubbleContent>
-          </Bubble>
+                </div>
+                {robotTools('right', whole, 'chief-msg-foot')}
+              </div>
+            )}
+          </div>
           {item.typing === true && <TypingDots className="mt-1" />}
-          {item.typing !== true && (
-            <div
-              className={`${messageToolsPlace('left')} flex items-center gap-2 text-meta text-(--text-tertiary) ${MESSAGE_TOOLS_REVEAL}`}
-              data-testid="chief-msg-foot"
-            >
-              {onReply !== undefined && item.id != null && (
-                <ReplyToolButton
-                  onClick={() =>
-                    onReply({ sourceMessageId: item.id ?? '', quote: robotText(item) })
-                  }
-                />
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className={MSG_TOOL_BTN_CLS}
-                aria-label={t('复制')}
-                onClick={() => onCopy(`r${i}`, robotText(item))}
-              >
-                {copiedKey === `r${i}` ? (
-                  <Check width={13} height={13} />
-                ) : (
-                  <Copy width={13} height={13} />
-                )}
-              </Button>
-              <MessageStamp createdAt={item.createdAt} />
-              {item.fallbackModel != null && (
-                <span data-testid="chief-fallback-note">
-                  {t('由备用模型 {model} 回答', { model: item.fallbackModel })}
-                </span>
-              )}
-            </div>
-          )}
+          {robotTools('below-start', whole, 'chief-msg-tools-touch', false)}
         </MessageContent>
       </Message>
     </MessageScrollerItem>

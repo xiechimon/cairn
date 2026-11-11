@@ -346,7 +346,7 @@ export function HomeC({
   const hero = (
     <header
       data-testid="home-c-hero"
-      className="mx-auto w-[calc(100%-2rem)] max-w-160 flex-none pt-[6vh]"
+      className="mx-auto w-[calc(100%-2rem)] max-w-chat flex-none pt-[6vh]"
     >
       {greeting}
       {since}
@@ -512,7 +512,7 @@ export function HomeC({
     archived === null ? null : (
       <ArchivedProjectBar
         state={archived}
-        className="mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-160"
+        className="mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-chat"
       />
     );
   const handedOver = load === 'ready' && loadingDraft !== '';
@@ -547,7 +547,7 @@ export function HomeC({
               </>
             ) : (
               <>
-                <div className="mx-auto w-[calc(100%-2rem)] max-w-160 flex-none pt-6">
+                <div className="mx-auto w-[calc(100%-2rem)] max-w-chat flex-none pt-6">
                   {projectLinks}
                 </div>
                 <EmptyState
@@ -585,7 +585,7 @@ export function HomeC({
           {banner != null && (
             <div
               data-home-banner=""
-              className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-160 flex-none overflow-y-auto pt-3"
+              className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-chat flex-none overflow-y-auto pt-3"
             >
               {banner}
             </div>

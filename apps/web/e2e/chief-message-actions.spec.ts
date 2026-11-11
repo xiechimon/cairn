@@ -27,7 +27,11 @@ const messageOf = (page: Page, text: string) =>
     .filter({ has: page.getByText(text, { exact: true }) });
 const opacityOf = (locator: Locator) =>
   locator.evaluate((node) => Number(getComputedStyle(node).opacity));
-const tools = (message: Locator) => message.locator('[data-testid="chief-msg-tools"], [data-testid="chief-msg-foot"]');
+const tools = (message: Locator) =>
+  message.locator('[data-testid="chief-msg-tools"], [data-testid="chief-msg-foot"]').first();
+const touchTools = (message: Locator) => message.getByTestId('chief-msg-tools-touch');
+const bubbleOf = (message: Locator) =>
+  message.locator('[data-slot="reply-bubble"], [data-testid="chief-bubble"]').first();
 
 test('older messages show their actions and time only on hover or keyboard focus', async ({
   page,
@@ -43,14 +47,14 @@ test('older messages show their actions and time only on hover or keyboard focus
   await expect.poll(() => opacityOf(tools(olderAnswer))).toBe(0);
   await evidenceShot(page, 'chief-actions-idle.png');
 
-  await olderUser.hover();
+  await bubbleOf(olderUser).hover();
   await expect.poll(() => opacityOf(tools(olderUser))).toBe(1);
   await expect.poll(() => opacityOf(tools(olderAnswer))).toBe(0);
   await evidenceShot(page, 'chief-actions-hover.png');
 
   await page.mouse.move(0, 0);
   await expect.poll(() => opacityOf(tools(olderUser))).toBe(0);
-  await olderAnswer.getByRole('button', { name: '复制' }).focus();
+  await tools(olderAnswer).getByTestId('chief-msg-reply').focus();
   await expect.poll(() => opacityOf(tools(olderAnswer))).toBe(1);
 });
 
@@ -60,7 +64,7 @@ test('the newest message hides its actions until hover, like the others', async 
   await page.mouse.move(0, 0);
   const newest = messageOf(page, 'second answer');
   await expect.poll(() => opacityOf(tools(newest))).toBe(0);
-  await newest.hover();
+  await bubbleOf(newest).hover();
   await expect.poll(() => opacityOf(tools(newest))).toBe(1);
 });
 
@@ -70,7 +74,8 @@ test('touch devices keep the actions of older messages visible', async ({ browse
   await mockHistory(page);
   await page.goto('/app');
   await expect(messageOf(page, 'first question')).toBeVisible();
-  await expect.poll(() => opacityOf(tools(messageOf(page, 'first question')))).toBe(1);
+  await expect(touchTools(messageOf(page, 'first question'))).toBeVisible();
+  await expect(tools(messageOf(page, 'first question'))).toBeHidden();
   await context.close();
 });
 
@@ -90,7 +95,7 @@ test('the reveal is instant: no transition, no delay and no scale', async ({ pag
       };
     });
   expect(await face()).toMatchObject({ duration: '0s', delay: '0s', transform: 'none' });
-  await older.hover();
+  await bubbleOf(older).hover();
   expect(await face()).toMatchObject({ duration: '0s', delay: '0s', transform: 'none' });
 });
 
@@ -114,13 +119,18 @@ test('the action buttons are flat: no shadow at rest, on hover, or after a click
 }) => {
   await mockHistory(page);
   await page.goto('/app');
-  const copy = messageOf(page, 'second answer').getByRole('button', { name: '复制' });
-  const shadow = () => copy.evaluate((node) => getComputedStyle(node).boxShadow);
+  const answer = messageOf(page, 'second answer');
+  await bubbleOf(answer).hover();
+  const reply = tools(answer).getByTestId('chief-msg-reply');
+  const shadow = () => reply.evaluate((node) => getComputedStyle(node).boxShadow);
   expect(await shadow()).toMatch(FLAT);
-  await copy.hover();
+  await reply.hover();
   expect(await shadow()).toMatch(FLAT);
   await page.context().grantPermissions(['clipboard-write', 'clipboard-read']);
-  await copy.click();
+  await tools(answer).getByTestId('chief-msg-more').click();
+  await page.getByRole('menuitem', { name: '复制' }).click();
+  await expect(page.getByText('已复制', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('second answer');
   expect(await shadow()).toMatch(FLAT);
   await evidenceShot(page, 'chief-actions-copied.png');
 });
@@ -128,7 +138,7 @@ test('the action buttons are flat: no shadow at rest, on hover, or after a click
 test('keyboard focus on an action button is an outline, not a glow', async ({ page }) => {
   await mockHistory(page);
   await page.goto('/app');
-  const copy = messageOf(page, 'second answer').getByRole('button', { name: '复制' });
+  const copy = tools(messageOf(page, 'second answer')).getByTestId('chief-msg-reply');
   await page.getByTestId('chief-composer-input').focus();
   for (let n = 0; n < 40 && !(await copy.evaluate((node) => node === document.activeElement)); n++)
     await page.keyboard.press('Shift+Tab');
@@ -150,16 +160,39 @@ test('the message toolbar replies by quoting into the composer and rewinds from 
   await page.goto('/app');
   await expect(messageOf(page, 'second answer')).toBeVisible();
   const older = messageOf(page, 'first answer');
-  await older.hover();
-  await older.getByTestId('chief-msg-reply').click();
+  await bubbleOf(older).hover();
+  await tools(older).getByTestId('chief-msg-reply').click();
   await expect(page.getByTestId('composer-reply-quote')).toContainText('first answer');
   await expect(page.getByTestId('chief-composer-input')).toBeFocused();
 
   const question = messageOf(page, 'first question');
-  await question.hover();
-  await question.getByTestId('chief-msg-more').click();
+  await bubbleOf(question).hover();
+  await tools(question).getByTestId('chief-msg-more').click();
   await page.getByRole('menuitem', { name: '恢复到此处' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
+});
+
+test('the toolbar sits beside the hovered bubble: right of a reply, left of an owner message', async ({
+  page,
+}) => {
+  await mockHistory(page);
+  await page.goto('/app');
+  const answer = messageOf(page, 'first answer');
+  await bubbleOf(answer).hover();
+  const bubble = await bubbleOf(answer).boundingBox();
+  const pill = await tools(answer).locator('[data-slot="message-toolbar-pill"]').boundingBox();
+  expect(bubble && pill && pill.x - (bubble.x + bubble.width)).toBeCloseTo(12, 0);
+  expect(bubble && pill && Math.abs(pill.y + pill.height / 2 - (bubble.y + bubble.height / 2))).toBeLessThanOrEqual(1);
+  const question = messageOf(page, 'first question');
+  await bubbleOf(question).hover();
+  const own = await bubbleOf(question).boundingBox();
+  const ownPill = await tools(question).locator('[data-slot="message-toolbar-pill"]').boundingBox();
+  expect(own && ownPill && own.x - (ownPill.x + ownPill.width)).toBeCloseTo(12, 0);
+  await expect(tools(question).getByTestId('chief-msg-stamp')).toBeVisible();
+  await tools(question).getByTestId('chief-msg-more').click();
+  await expect(page.getByRole('menuitem')).toHaveText(['复制', '恢复到此处']);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menuitem')).toHaveCount(0);
 });
 
 test('on a touch device the toolbar of an older message is reachable without hover', async ({
@@ -171,7 +204,8 @@ test('on a touch device the toolbar of an older message is reachable without hov
   await page.goto('/app');
   const older = messageOf(page, 'first answer');
   await expect(older).toBeVisible();
-  await expect.poll(() => opacityOf(tools(older))).toBe(1);
+  await expect(touchTools(older)).toBeVisible();
+  await expect(touchTools(older).getByTestId('chief-msg-reply')).toBeVisible();
   await context.close();
 });
 
@@ -185,7 +219,7 @@ test.describe('on a touch phone', () => {
       const items = [...document.querySelectorAll('[data-testid="chief-stream"] > *')];
       const found: string[] = [];
       items.forEach((item, index) => {
-        const tools = item.querySelector('[data-testid="chief-msg-tools"], [data-testid="chief-msg-foot"]');
+        const tools = item.querySelector('[data-testid="chief-msg-tools-touch"]');
         const next = items[index + 1];
         if (tools == null || next == null) return;
         const bottom = tools.getBoundingClientRect().bottom;

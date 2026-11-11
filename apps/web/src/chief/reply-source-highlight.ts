@@ -1,6 +1,7 @@
 import { createContext } from 'react';
+import type { ReplyQuoteDraft } from './selection-reply.js';
 
-export const ReplySourceHighlightContext = createContext<string | null>(null);
+export const ReplySourceHighlightContext = createContext<ReplyQuoteDraft | null>(null);
 
 export const REPLY_HIGHLIGHT_ATTR = 'data-reply-highlight';
 

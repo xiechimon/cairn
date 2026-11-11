@@ -240,7 +240,7 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
 
     const final = msgs.nth(1);
     const finalFoot = final.getByTestId('chief-msg-foot');
-    await expect(finalFoot.getByRole('button', { name: '复制' })).toBeVisible();
+    await expect(finalFoot.getByTestId('chief-msg-more')).toBeVisible();
     await expect(finalFoot).not.toContainText('完成');
 
     const typing = msgs.nth(2);
@@ -276,7 +276,7 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(stream.getByTestId('chief-chip-todo')).toHaveCount(1);
     await expect(stream.getByTestId('chief-chip-agent')).toHaveCount(1);
 
-    await expect(stream.getByTestId('chief-msg-tools').getByRole('button')).toHaveCount(2);
+    await expect(stream.getByTestId('chief-msg-tools').getByRole('button')).toHaveCount(1);
   });
 
   test('F-R15: a Coordinator reply carries no identity row (D122)', async ({ page }) => {
@@ -349,9 +349,10 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     const coordinator = await boot(page);
     const firstUser = coordinator.getByTestId('chief-msg').first();
     const tools = firstUser.getByTestId('chief-msg-tools');
-    await expect(tools.getByRole('button', { name: '更多' })).toBeVisible();
-    await expect(tools.getByRole('button', { name: '复制' })).toBeVisible();
-    await tools.getByRole('button', { name: '复制' }).click();
+    await firstUser.getByTestId('chief-bubble').hover();
+    await expect(tools.getByTestId('chief-msg-reply')).toBeVisible();
+    await tools.getByRole('button', { name: '更多' }).click();
+    await page.getByRole('menuitem', { name: '复制' }).click();
     const clip = await page.evaluate(() => navigator.clipboard.readText());
 
     expect(clip).toBe(MD_USER);
@@ -380,8 +381,8 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
       const r = el.getBoundingClientRect();
       return { h: Math.round(r.height), font: getComputedStyle(el).fontSize };
     });
-    expect(geo.h).toBeGreaterThanOrEqual(37);
-    expect(geo.h).toBeLessThanOrEqual(38);
+    expect(geo.h).toBeGreaterThanOrEqual(32);
+    expect(geo.h).toBeLessThanOrEqual(33);
     expect(geo.font).toBe('14px');
 
     const fence = coordinator.getByTestId('chief-bubble').filter({ hasText: 'echo before-and-after' });
@@ -596,7 +597,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     const LONG_CJK =
       '用户只是打了个招呼「你好」，没有具体任务，先不路由到任何看板任务，等下一句话再判断意图，同时留意要不要唤起定时器或者翻既有会话记录';
     const LONG_LATIN =
-      '> The user just said "你好" — pure greeting. No task. I should not route it to the board yet; wait for the next line to tell intent.';
+      '> The user just said "你好" — pure greeting. No task. I should not route it to the board yet; wait for the next line to tell intent, and keep an eye on timers or earlier threads.';
     const state: Parameters<typeof mockChiefLiveApi>[1] = {
       final: false,
       messages: [

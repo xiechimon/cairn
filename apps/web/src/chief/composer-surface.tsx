@@ -56,7 +56,7 @@ const ROUND_HIT_CLS =
   'group/round -m-1.5 size-11 flex-none cursor-pointer rounded-full border-0 bg-transparent p-0 text-foreground hover:bg-transparent dark:hover:bg-transparent aria-expanded:bg-transparent';
 const ROUND_FACE_CLS = 'grid size-8 place-items-center rounded-full';
 const HOME_COMPOSER_CLS =
-  'mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-160 flex-none';
+  'mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-chat flex-none';
 const MENU_CONTENT_CLS = 'w-auto max-w-80 min-w-56';
 const ATTACHED_COMPOSER_CLS =
   'mt-0 shadow-(--shadow-composer-attached) focus-within:shadow-(--shadow-composer-attached-focus)';
