@@ -1,7 +1,7 @@
 import { STOP_MESSAGE } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { expect, test } from 'vitest';
-import { build, message, step, todo } from '../src/db/schema.js';
+import { build, clientMessage, message, step, todo } from '../src/db/schema.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 import { req } from './helpers.js';
 
@@ -102,4 +102,30 @@ test('a crashed start after a stop before the first run does not start another b
   const again = await req(H.s.app, 'POST', '/api/todos/stopped-todo/messages', body);
   expect(await again.json()).toEqual(await retry.json());
   expect(H.s.db.select().from(build).where(eq(build.todoId, 'stopped-todo')).all()).toHaveLength(2);
+});
+
+test('a direct step receipt with the same key does not count as the thread send', async () => {
+  seedGate('confirm', 'shared-build', 'shared-todo');
+  H.s.db
+    .insert(clientMessage)
+    .values({
+      scopeId: 'shared-build',
+      clientMessageId: 'shared-1',
+      response: { delegated: true, delivered: 'revision' },
+      createdAt: 1,
+    })
+    .run();
+  const sent = await req(H.s.app, 'POST', '/api/todos/shared-todo/messages', {
+    content: 'Split the migration',
+    clientMessageId: 'shared-1',
+  });
+  expect(sent.status).toBe(201);
+  expect(
+    H.s.db
+      .select()
+      .from(message)
+      .all()
+      .filter((row) => row.role === 'user')
+      .map((row) => row.content),
+  ).toEqual(['Split the migration']);
 });

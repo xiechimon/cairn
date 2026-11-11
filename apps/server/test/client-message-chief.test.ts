@@ -261,4 +261,22 @@ describe('POST /api/todos/:id/messages with a client message id', () => {
     expect(userMessages()).toHaveLength(1);
     expect(steered('build-a')).toHaveLength(1);
   });
+
+  test('a conversation send with the same key does not swallow the thread send', async () => {
+    seedThread('todo-a', 'build-a');
+    const direct = await req(H.s.app, 'POST', '/api/conversations/build-a/messages', {
+      content: 'direct steer',
+      clientMessageId: 'key-1',
+    });
+    expect(direct.status).toBe(201);
+    const nested = await send('todo-a', { content: 'thread steer', clientMessageId: 'key-1' });
+    expect(nested.status).toBe(201);
+    expect(steered('build-a').map((row) => row.content)).toEqual(['direct steer', 'thread steer']);
+    expect(markers()).toHaveLength(1);
+    const retry = await send('todo-a', { content: 'thread steer', clientMessageId: 'key-1' });
+    expect(retry.status).toBe(201);
+    expect(await retry.json()).toEqual(await nested.json());
+    expect(steered('build-a')).toHaveLength(2);
+    expect(markers()).toHaveLength(1);
+  });
 });

@@ -38,6 +38,10 @@ export type ThreadMessageOrigin = { origin: 'user' } | { origin: 'coordinator'; 
 
 const USER_ORIGIN: ThreadMessageOrigin = { origin: 'user' };
 
+function nestedLedgerId(todoId: string, clientMessageId: string): string {
+  return `nested:${todoId}:${clientMessageId}`;
+}
+
 function excerptOf(content: string): string {
   const flat = tidyText(redactSecrets(content).value as string);
   return flat.length <= THREAD_MESSAGE_EXCERPT_MAX
@@ -92,6 +96,7 @@ async function deliver(
   body: ThreadMessageBody,
   origin: ThreadMessageOrigin,
 ): Promise<{ conversationId: string; delivered: ThreadMessageDelivery }> {
+  const nestedId = nestedLedgerId(row.id, body.clientMessageId);
   const pending = pendingWorkerQuestionIds(deps.db, buildId);
   if (origin.origin === 'coordinator' && pending.length > 0) {
     throw new HttpError(
@@ -104,7 +109,7 @@ async function deliver(
     const sent = await sendBuildSteer(
       deps,
       buildId,
-      { content: body.content, clientMessageId: body.clientMessageId },
+      { content: body.content, clientMessageId: nestedId },
       { human: true, afterTurn: true },
     );
     return { conversationId: sent.conversationId, delivered: sent.delivered };
@@ -113,13 +118,13 @@ async function deliver(
     const sent = await sendBuildSteer(
       deps,
       buildId,
-      { content: body.content, clientMessageId: body.clientMessageId },
+      { content: body.content, clientMessageId: nestedId },
       origin.origin === 'user' ? { human: true } : { human: false, actor: origin.actor },
     );
     return { conversationId: sent.conversationId, delivered: sent.delivered };
   }
   if (row.phase === 'confirm' || row.phase === 'review') {
-    const prior = findClientMessage(deps.db, buildId, body.clientMessageId);
+    const prior = findClientMessage(deps.db, buildId, nestedId);
     await applyBuildStepAction(
       deps,
       buildId,
@@ -127,7 +132,7 @@ async function deliver(
         action: 'revision',
         side: 'plan',
         feedback: body.content,
-        clientMessageId: body.clientMessageId,
+        clientMessageId: nestedId,
       },
       ...stepActionAttribution(origin),
       row.id,
@@ -139,7 +144,7 @@ async function deliver(
     await applyBuildStepAction(
       deps,
       buildId,
-      { action: 'restart', feedback: body.content, clientMessageId: body.clientMessageId },
+      { action: 'restart', feedback: body.content, clientMessageId: nestedId },
       ...stepActionAttribution(origin),
       row.id,
     );
@@ -225,16 +230,21 @@ function recoverRecordedBuildSend(
   origin: ThreadMessageOrigin,
 ): ThreadMessageResult | undefined {
   const builds = deps.db.select({ id: build.id }).from(build).where(eq(build.todoId, row.id)).all();
-  const delivered = builds
-    .map((candidate) =>
-      findClientMessage<{ delivered?: ThreadMessageDelivery; nestedTodoId?: string }>(
+  const ledgerId = nestedLedgerId(row.id, body.clientMessageId);
+  const matched = builds
+    .map((candidate) => ({
+      buildId: candidate.id,
+      receipt: findClientMessage<{ delivered?: ThreadMessageDelivery; nestedTodoId?: string }>(
         deps.db,
         candidate.id,
-        body.clientMessageId,
+        ledgerId,
       ),
-    )
-    .find((receipt) => receipt?.nestedTodoId === row.id)?.delivered;
-  if (delivered === undefined || row.latestBuildId === null) return undefined;
+    }))
+    .find((item) => item.receipt?.nestedTodoId === row.id);
+  const delivered = matched?.receipt?.delivered;
+  if (matched === undefined || delivered === undefined || row.latestBuildId === null)
+    return undefined;
+  if (delivered === 'revision') holdSecondRejectionRework(deps, matched.buildId);
   const sent = { conversationId: row.latestBuildId, delivered };
   try {
     recordInCoordinator(deps, row, body, sent, origin);
