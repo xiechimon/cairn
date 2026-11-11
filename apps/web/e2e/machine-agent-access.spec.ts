@@ -26,6 +26,7 @@ const MACHINE = {
 
 async function open(page: Page, computers: unknown[], machines: unknown[] = [MACHINE]) {
   let rows = computers;
+  let leases = 0;
   await mockLive(page, { threads: [], messages: HISTORY, machines }, (path, route, json) => {
     if (path === '/api/computers' && route.request().method() === 'GET') {
       return json({ computers: rows });
@@ -38,11 +39,17 @@ async function open(page: Page, computers: unknown[], machines: unknown[] = [MAC
     }
     if (path === '/api/teams/t1/computers/comp-1/control') {
       if (route.request().method() === 'DELETE') {
+        const body = route.request().postDataJSON() as { leaseId?: string };
+        if (body.leaseId !== `lease-${leases}`) return json({ error: 'stale lease' }, 409);
         rows = [computer({ controlHolder: 'none' })];
         return json({ released: true });
       }
+      leases += 1;
       rows = [computer({ controlHolder: 'user' })];
-      return json({ leaseId: 'lease-1', expiresAt: Date.now() + 60_000, controlFence: 1 }, 201);
+      return json(
+        { leaseId: `lease-${leases}`, expiresAt: Date.now() + 60_000, controlFence: leases },
+        201,
+      );
     }
     return undefined;
   });
@@ -85,4 +92,19 @@ test('a machine that reports no browser keeps the browser switch disabled', asyn
   await access.getByRole('button', { name: reason }).focus();
   await page.keyboard.press(' ');
   await expect(page.locator('[data-sonner-toast]', { hasText: reason })).toBeVisible();
+});
+
+test('switching desktop control off still releases after another surface replaced the lease', async ({
+  page,
+}) => {
+  const access = await open(page, [computer()]);
+  const desktop = access.getByRole('switch', { name: '桌面控制' });
+  await desktop.click();
+  await expect(desktop).toHaveAttribute('aria-checked', 'true');
+  const replaced = await page.evaluate(() =>
+    fetch('/api/teams/t1/computers/comp-1/control', { method: 'POST' }).then((res) => res.status),
+  );
+  expect(replaced).toBe(201);
+  await desktop.click();
+  await expect(desktop).toHaveAttribute('aria-checked', 'false');
 });

@@ -78,19 +78,20 @@ export function useComputerControl({
   const setHeld = (checked: boolean) => {
     if (teamId === undefined || computer === null || busy) return;
     setBusy(true);
+    const releaseWithFreshLease = () =>
+      acquireComputerControl(teamId, computer.id).then((lease) =>
+        releaseComputerControl(teamId, computer.id, lease.leaseId),
+      );
     const run = checked
       ? acquireComputerControl(teamId, computer.id).then((lease) => {
           setLeaseId(lease.leaseId);
         })
-      : leaseId !== null
-        ? releaseComputerControl(teamId, computer.id, leaseId).then(() => {
-            setLeaseId(null);
-          })
-        : acquireComputerControl(teamId, computer.id).then((lease) =>
-            releaseComputerControl(teamId, computer.id, lease.leaseId).then(() => {
-              setLeaseId(null);
-            }),
-          );
+      : (leaseId !== null
+          ? releaseComputerControl(teamId, computer.id, leaseId).catch(releaseWithFreshLease)
+          : releaseWithFreshLease()
+        ).then(() => {
+          setLeaseId(null);
+        });
     void run
       .then(() => invalidateConverged(qc, { queryKey: ['computers', teamId] }))
       .finally(() => setBusy(false));
