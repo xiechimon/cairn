@@ -71,6 +71,10 @@ test('a retry of revision returns the stored response and does not apply twice',
       .all()
       .filter((row) => row.role === 'user'),
   ).toHaveLength(1);
+  expect(
+    H.s.db.select().from(clientMessage).where(eq(clientMessage.clientMessageId, 'rev-1')).get()
+      ?.response,
+  ).toMatchObject({ conversationId: 'gate-build', delivered: 'revision' });
 });
 
 test('a retry of restart returns the stored response and does not apply twice', async () => {
@@ -102,6 +106,48 @@ test('a crashed start after a stop before the first run does not start another b
   const again = await req(H.s.app, 'POST', '/api/todos/stopped-todo/messages', body);
   expect(await again.json()).toEqual(await retry.json());
   expect(H.s.db.select().from(build).where(eq(build.todoId, 'stopped-todo')).all()).toHaveLength(2);
+});
+
+test('a recovered revision replays the original build, not a later one', async () => {
+  seedGate('confirm', 'revision-old', 'revision-todo-recover');
+  H.s.db
+    .insert(build)
+    .values({
+      id: 'revision-later',
+      todoId: 'revision-todo-recover',
+      withPlan: false,
+      triggerSource: 'user',
+      createdAt: 2,
+    })
+    .run();
+  H.s.db
+    .update(todo)
+    .set({ latestBuildId: 'revision-later', phase: 'building' })
+    .where(eq(todo.id, 'revision-todo-recover'))
+    .run();
+  H.s.db
+    .insert(clientMessage)
+    .values({
+      scopeId: 'revision-old',
+      clientMessageId: 'nested:revision-todo-recover:revision-key',
+      response: {
+        delegated: true,
+        delivered: 'revision',
+        nestedTodoId: 'revision-todo-recover',
+        conversationId: 'revision-old',
+      },
+      createdAt: 1,
+    })
+    .run();
+  const retry = await req(H.s.app, 'POST', '/api/todos/revision-todo-recover/messages', {
+    content: 'Split the migration',
+    clientMessageId: 'revision-key',
+  });
+  expect(retry.status).toBe(201);
+  expect(await retry.json()).toMatchObject({
+    conversationId: 'revision-old',
+    delivered: 'revision',
+  });
 });
 
 test('a recovered restart replays the original conversation, not a later build', async () => {

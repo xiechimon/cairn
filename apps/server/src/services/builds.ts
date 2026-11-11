@@ -1805,6 +1805,7 @@ export async function applyBuildStepAction(
       delegated: true,
       delivered: 'revision',
       ...(nestedTodoId !== undefined ? { nestedTodoId } : {}),
+      conversationId: buildId,
     });
     recordBuildFeedback(
       deps.db,
