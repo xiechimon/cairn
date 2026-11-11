@@ -3,9 +3,15 @@ import { Component, Fragment, type ReactNode } from 'react';
 import { useI18n } from '../i18n/provider.js';
 import { EmptyState } from './empty-state.js';
 
+interface BoundaryProps {
+  children: ReactNode;
+  resetKey?: string;
+}
+
 interface BoundaryState {
   failed: boolean;
   resetKey: number;
+  contextKey?: string;
 }
 
 function BoundaryFallback({ onRetry }: { onRetry: () => void }) {
@@ -22,11 +28,22 @@ function BoundaryFallback({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-export class SubtreeErrorBoundary extends Component<{ children: ReactNode }, BoundaryState> {
+export class SubtreeErrorBoundary extends Component<BoundaryProps, BoundaryState> {
   state: BoundaryState = { failed: false, resetKey: 0 };
 
   static getDerivedStateFromError(): Pick<BoundaryState, 'failed'> {
     return { failed: true };
+  }
+
+  static getDerivedStateFromProps(
+    props: BoundaryProps,
+    state: BoundaryState,
+  ): Partial<BoundaryState> | null {
+    if (props.resetKey === state.contextKey) return null;
+    return {
+      contextKey: props.resetKey,
+      ...(state.failed ? { failed: false, resetKey: state.resetKey + 1 } : {}),
+    };
   }
 
   private retry = (): void => {

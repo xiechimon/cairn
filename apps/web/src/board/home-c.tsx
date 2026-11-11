@@ -111,9 +111,9 @@ function projectHomeSearch(params: URLSearchParams): string {
   return `?${next.toString()}`;
 }
 
-function ConversationBoundary({ children }: { children: ReactNode }) {
+function ConversationBoundary({ children, resetKey }: { children: ReactNode; resetKey: string }) {
   return (
-    <SubtreeErrorBoundary>
+    <SubtreeErrorBoundary resetKey={resetKey}>
       <ChiefScrollProvider>{children}</ChiefScrollProvider>
     </SubtreeErrorBoundary>
   );
@@ -150,6 +150,7 @@ export function HomeC({
     [machines, coordinatorMachineId],
   );
   const threadId = searchParams.get(THREAD_PARAM);
+  const conversationResetKey = `${projectId ?? 'coordinator'}:${searchParams.get('chat') ?? ''}:${threadId ?? ''}`;
   const narrow = useNarrow();
   const showPane = (next: WorkPane | null, state: unknown = location.state) => {
     const params = new URLSearchParams(searchParams);
@@ -529,7 +530,7 @@ export function HomeC({
             </div>
           )}
           <TaskCardContext.Provider value={renderTaskCard}>
-            <ConversationBoundary>
+            <ConversationBoundary resetKey={conversationResetKey}>
               <ChiefConversation
                 chief={{ ...chiefData, stream: conversation }}
                 onSend={

@@ -225,4 +225,35 @@ describe('SubtreeErrorBoundary', () => {
     expect(view.text()).toContain('sibling');
     expect(siblingMounts).toBe(1);
   });
+
+  it('clears a fallback when its context changes and leaves a healthy tree mounted', () => {
+    let fail = true;
+    let mounts = 0;
+    function Child() {
+      useEffect(() => {
+        mounts += 1;
+      }, []);
+      if (fail) throw new Error('stale');
+      return h('span', null, 'ready');
+    }
+    const host = installTestDom();
+    const root = createRoot(host as unknown as HTMLElement);
+    roots.push(root);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const view = (resetKey: string) =>
+      h(I18nProvider, {
+        initialLocale: 'en',
+        children: h(SubtreeErrorBoundary, { resetKey, children: h(Child) }),
+      });
+    flushSync(() => root.render(view('project-a')));
+    expect(host.textContent).toContain('This part failed');
+    flushSync(() => root.render(view('project-a')));
+    expect(host.textContent).toContain('This part failed');
+    fail = false;
+    flushSync(() => root.render(view('coordinator')));
+    expect(host.textContent).toBe('ready');
+    const after = mounts;
+    flushSync(() => root.render(view('project-b')));
+    expect(mounts).toBe(after);
+  });
 });

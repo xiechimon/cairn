@@ -30,8 +30,8 @@ import { SettingsPage } from './settings/settings-page.js';
 import { LegacyModelRoutingRedirect, SettingsRedirect } from './settings/settings-redirect.js';
 
 function RouteBoundary({ children }: { children: ReactNode }) {
-  const { pathname } = useLocation();
-  return <SubtreeErrorBoundary key={pathname}>{children}</SubtreeErrorBoundary>;
+  const { pathname, search } = useLocation();
+  return <SubtreeErrorBoundary resetKey={`${pathname}${search}`}>{children}</SubtreeErrorBoundary>;
 }
 
 export const router = createBrowserRouter([
