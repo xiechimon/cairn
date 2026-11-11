@@ -25,6 +25,18 @@ test('direct settings URLs open the modal on top of the home', async ({ page }) 
   await expect(settings(page)).toHaveCount(0);
 });
 
+test('a legacy settings URL opens the modal over the home and closes to it', async ({ page }) => {
+  for (const legacy of ['/app/resources/machines', '/app/account', '/app/api-keys']) {
+    await page.goto(`${legacy}?${FLEET}`);
+    await expect(settings(page)).toBeVisible();
+    await expect(page.locator('[inert] [data-testid="chief-composer-input"]')).toHaveCount(1);
+    await settings(page).getByRole('button', { name: '关闭设置' }).click();
+    await expect(page).toHaveURL(new RegExp(`/app\\?${FLEET}$`));
+    await expect(settings(page)).toHaveCount(0);
+    await expect(page.getByTestId('chief-composer-input')).toBeVisible();
+  }
+});
+
 test('browser back closes the modal even after switching sections', async ({ page }) => {
   await page.goto(`/app/schedules?${FLEET}`);
   await page.getByTestId('sidebar-settings').click();

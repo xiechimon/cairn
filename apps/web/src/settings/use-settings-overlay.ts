@@ -12,16 +12,33 @@ function currentHistoryIndex(): number | null {
   return typeof index === 'number' ? index : null;
 }
 
+export const SETTINGS_REDIRECT_STATE = { settingsRedirect: true } as const;
+
+function arrivedBySettingsRedirect(location: Location): boolean {
+  const state: unknown = location.state;
+  return (
+    typeof state === 'object' &&
+    state !== null &&
+    'settingsRedirect' in state &&
+    state.settingsRedirect === true
+  );
+}
+
 export function useSettingsOverlay() {
   const location = useLocation();
   const navigate = useNavigate();
   const section = settingsSectionOf(location.pathname);
   const lastPage = useRef<PageEntry | null>(null);
+  const pageBeforeLast = useRef<PageEntry | null>(null);
+  const undoneRedirectKey = useRef<string | null>(null);
   if (section === null) {
-    lastPage.current = {
-      location,
-      historyIndex: currentHistoryIndex(),
-    };
+    if (lastPage.current?.location.key !== location.key) {
+      pageBeforeLast.current = lastPage.current;
+      lastPage.current = { location, historyIndex: currentHistoryIndex() };
+    }
+  } else if (arrivedBySettingsRedirect(location) && undoneRedirectKey.current !== location.key) {
+    undoneRedirectKey.current = location.key;
+    lastPage.current = pageBeforeLast.current;
   }
   const scenario = new URLSearchParams(location.search).get('scenario');
   const pageLocation: Partial<Location> = lastPage.current?.location ?? {
