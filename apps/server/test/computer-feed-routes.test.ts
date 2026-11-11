@@ -11,7 +11,7 @@ import {
   team as teamTable,
   user as userTable,
 } from '../src/db/schema.js';
-import { bootServer, req, type TestServer } from './helpers.js';
+import { bootServer, type TestServer } from './helpers.js';
 
 const FAKE_TOKEN = `ghp_${'a1B2c3D4e5'.repeat(3)}`;
 
@@ -21,8 +21,16 @@ afterEach(() => {
   server = null;
 });
 
+function req(app: TestServer['app'], method: string, path: string, body?: unknown) {
+  return app.request(path, {
+    method,
+    headers: { authorization: 'Bearer computer-feed-owner', 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
 function boot(): TestServer {
-  server = bootServer();
+  server = bootServer({ authToken: 'computer-feed-owner' });
   return server;
 }
 
@@ -191,6 +199,37 @@ describe('computer feed routes', () => {
     expect(
       (await req(s.app, 'PATCH', '/api/computers/missing', { browserEnabled: true })).status,
     ).toBe(404);
+  });
+
+  test('a saved browser preference stays visible after the capability disappears', async () => {
+    const s = boot();
+    s.db
+      .insert(machineTable)
+      .values({
+        id: 'm1',
+        teamId: s.team.id,
+        name: 'name-m1',
+        online: true,
+        lastSeenAt: 1,
+        capabilities: { mcpServers: [], skills: [], browser: true },
+      })
+      .run();
+    addComputer(s, s.team.id, 'c1', 'm1');
+    expect((await req(s.app, 'PATCH', '/api/computers/c1', { browserEnabled: true })).status).toBe(
+      200,
+    );
+    s.db
+      .update(machineTable)
+      .set({ capabilities: { mcpServers: [], skills: [] } })
+      .where(eq(machineTable.id, 'm1'))
+      .run();
+    const listed = await req(s.app, 'GET', '/api/computers');
+    expect(await listed.json()).toMatchObject({
+      computers: [{ id: 'c1', browserEnabled: true }],
+    });
+    expect(s.db.select().from(machineTable).where(eq(machineTable.id, 'm1')).get()).toMatchObject({
+      browserOverride: true,
+    });
   });
 
   test('POST ensures a stopped private computer and sets browserEnabled before any tool call', async () => {

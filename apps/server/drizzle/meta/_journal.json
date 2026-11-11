@@ -1023,6 +1023,13 @@
       "when": 1794414853367,
       "tag": "0149_thin_adam_destine",
       "breakpoints": true
+    },
+    {
+      "idx": 150,
+      "version": "6",
+      "when": 1794415937854,
+      "tag": "0150_stiff_major_mapleleaf",
+      "breakpoints": true
     }
   ]
 }
