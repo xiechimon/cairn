@@ -170,7 +170,7 @@ test('code block stays inside the reply column and long lines scroll inside it',
   expect(geo.radius).toBe('10px');
 });
 
-test('status events are a left-aligned muted line with no rules, and a reply footer never overlaps the reply text', async ({
+test('status events are a centred muted line with no rules, and a reply footer never overlaps the reply text', async ({
   page,
 }) => {
   await page.goto(DONE);
@@ -183,7 +183,7 @@ test('status events are a left-aligned muted line with no rules, and a reply foo
   }));
   expect(rules.before).toBe('none');
   expect(rules.after).toBe('none');
-  expect(rules.align).not.toBe('center');
+  expect(rules.align).toBe('center');
 
   const reply = page
     .locator('[data-row="agent"]')
