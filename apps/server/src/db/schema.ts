@@ -866,6 +866,8 @@ export const machine = sqliteTable(
     maxConcurrentOverridden: bool('maxConcurrentOverridden').notNull().default(false),
     lastSeenAt: epochMs('lastSeenAt'),
     capabilities: json<MachineCapabilities | null>('capabilities'),
+    browserOverride: bool('browserOverride'),
+    desktopOverride: bool('desktopOverride'),
   },
   (t) => [index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt)],
 );

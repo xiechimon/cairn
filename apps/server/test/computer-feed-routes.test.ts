@@ -11,7 +11,7 @@ import {
   team as teamTable,
   user as userTable,
 } from '../src/db/schema.js';
-import { bootServer, req, type TestServer } from './helpers.js';
+import { bootServer, type TestServer } from './helpers.js';
 
 const FAKE_TOKEN = `ghp_${'a1B2c3D4e5'.repeat(3)}`;
 
@@ -21,8 +21,16 @@ afterEach(() => {
   server = null;
 });
 
+function req(app: TestServer['app'], method: string, path: string, body?: unknown) {
+  return app.request(path, {
+    method,
+    headers: { authorization: 'Bearer computer-feed-owner', 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
 function boot(): TestServer {
-  server = bootServer();
+  server = bootServer({ authToken: 'computer-feed-owner' });
   return server;
 }
 

@@ -534,6 +534,17 @@ export function stopStepComputer(
   releaseExecutionLease(db, stepId);
 }
 
+function assertMachineGrant(db: Db, machineId: string, tool: ComputerTool): void {
+  const host = db.select().from(machine).where(eq(machine.id, machineId)).get();
+  if (isComputerBrowserTool(tool)) {
+    if (host?.browserOverride === false) throw new HttpError(403, COMPUTER_BROWSER_DISABLED);
+    if (host?.capabilities?.browser !== true)
+      throw new HttpError(403, COMPUTER_BROWSER_UNAVAILABLE);
+  } else if (host?.desktopOverride === false || host?.capabilities?.computer !== true) {
+    throw new HttpError(403, 'Orb desktop tools are off or unavailable for this machine');
+  }
+}
+
 function selectTarget(
   deps: MachineDeps,
   teamId: string,
@@ -567,6 +578,7 @@ function selectTarget(
   const scopeKey = `chief:${chiefId}`;
   const existing = db.select().from(computer).where(eq(computer.scopeKey, scopeKey)).get();
   if (existing) {
+    assertMachineGrant(db, existing.machineId, tool);
     if (!machineHub.isConnected(existing.machineId)) {
       throw new HttpError(409, COMPUTER_NOT_CONNECTED);
     }
@@ -581,6 +593,7 @@ function selectTarget(
         : COMPUTER_NOT_CONNECTED,
     );
   }
+  assertMachineGrant(db, chosen.id, tool);
   const now = nowMs();
   const id = newRecordId();
   db.insert(computer)
@@ -714,17 +727,6 @@ export async function forwardComputerCall(
     return resultOfRow(existing);
   }
 
-  if (isComputerBrowserTool(tool)) {
-    const scopeKey = `chief:${thread.chiefId}`;
-    const preferred = db.select().from(computer).where(eq(computer.scopeKey, scopeKey)).get();
-    if (preferred === undefined || !preferred.browserEnabled) {
-      throw new HttpError(403, COMPUTER_BROWSER_DISABLED);
-    }
-    const host = db.select().from(machine).where(eq(machine.id, preferred.machineId)).get();
-    if (host?.capabilities?.browser !== true) {
-      throw new HttpError(403, COMPUTER_BROWSER_UNAVAILABLE);
-    }
-  }
   const target = selectTarget(deps, thread.teamId, thread.chiefId, tool);
   const now = nowMs();
   const deadlineAt = now + computerDeadlineMs(tool, body.params);

@@ -9,6 +9,7 @@ import {
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { computer, computerCall, machine } from '../db/schema.js';
+import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
   computerCallOwnerUserId,
@@ -25,18 +26,23 @@ export function clampCommandsLimit(raw: string | undefined): number {
 
 export function listComputers(db: Db, teamId: string, userId: string): ComputerRecord[] {
   return db
-    .select({ row: computer, machineName: machine.name, machineOnline: machine.online })
+    .select({
+      row: computer,
+      host: machine,
+      machineName: machine.name,
+      machineOnline: machine.online,
+    })
     .from(computer)
     .innerJoin(machine, eq(machine.id, computer.machineId))
     .where(privateComputerWhere(teamId, userId))
     .orderBy(computer.createdAt, computer.id)
     .all()
-    .map(({ row, machineName, machineOnline }) => ({
+    .map(({ row, host, machineName, machineOnline }) => ({
       id: row.id,
       scopeKey: row.scopeKey,
       state: row.state,
       controlHolder: row.controlHolder,
-      browserEnabled: row.browserEnabled,
+      browserEnabled: host.browserOverride !== false && host.capabilities?.browser === true,
       machine: { id: row.machineId, name: machineName, online: machineOnline },
     }));
 }
@@ -56,10 +62,14 @@ export function setComputerBrowserEnabled(
 ): ComputerRecord | null {
   const owned = ownedPrivateComputer(db, teamId, userId, computerId);
   if (!owned) return null;
-  if (browserEnabled) {
-    const host = db.select().from(machine).where(eq(machine.id, owned.machineId)).get();
-    if (!machineOffersBrowser(host)) return null;
-  }
+  const host = db.select().from(machine).where(eq(machine.id, owned.machineId)).get();
+  if (browserEnabled && !machineOffersBrowser(host)) return null;
+  if (browserEnabled && host?.browserOverride === false)
+    throw new HttpError(409, 'machine browser grant is off');
+  db.update(machine)
+    .set({ browserOverride: browserEnabled })
+    .where(eq(machine.id, owned.machineId))
+    .run();
   db.update(computer)
     .set({ browserEnabled, updatedAt: nowMs() })
     .where(eq(computer.id, computerId))
@@ -87,6 +97,8 @@ export function ensureComputerBrowserEnabled(
   if (browserEnabled && !machineOffersBrowser(host)) {
     return { ok: false, reason: 'unsupported' };
   }
+  if (browserEnabled && host.browserOverride === false)
+    throw new HttpError(409, 'machine browser grant is off');
   const scopeKey = `chief:${chiefIdFormat(userId, teamId)}`;
   const existing = db.select().from(computer).where(eq(computer.scopeKey, scopeKey)).get();
   const now = nowMs();
@@ -106,6 +118,10 @@ export function ensureComputerBrowserEnabled(
         updatedAt: now,
       })
       .run();
+    db.update(machine)
+      .set({ browserOverride: browserEnabled })
+      .where(eq(machine.id, machineId))
+      .run();
     const created = listComputers(db, teamId, userId).find((row) => row.id === id);
     if (created === undefined) return { ok: false, reason: 'missing_machine' };
     return { ok: true, computer: created };
@@ -113,6 +129,10 @@ export function ensureComputerBrowserEnabled(
   if (existing.machineId !== machineId) {
     return { ok: false, reason: 'machine_mismatch' };
   }
+  db.update(machine)
+    .set({ browserOverride: browserEnabled })
+    .where(eq(machine.id, machineId))
+    .run();
   db.update(computer)
     .set({ browserEnabled, updatedAt: now })
     .where(eq(computer.id, existing.id))

@@ -9833,6 +9833,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "browserOverride": {
+      "type": [
+        "boolean",
+        "null",
+      ],
+    },
     "capabilities": {
       "anyOf": [
         {
@@ -10077,6 +10083,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         "manual",
       ],
       "type": "string",
+    },
+    "desktopOverride": {
+      "type": [
+        "boolean",
+        "null",
+      ],
     },
     "enabledRuntimes": {
       "items": {

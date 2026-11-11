@@ -183,7 +183,18 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     if (!row) throw notFound(`machine ${id}`);
     requireTeam(ctx, row.teamId);
     const body = parseWith(patchMachineBodySchema, await jsonBody(c), 'body');
+    if (body.browserOverride !== undefined || body.desktopOverride !== undefined) {
+      if (!c.get('ownerIdentity')) throw new HttpError(403, 'owner session required');
+      if (
+        (body.browserOverride === true && row.capabilities?.browser !== true) ||
+        (body.desktopOverride === true && row.capabilities?.computer !== true)
+      ) {
+        throw new HttpError(409, 'machine does not report the requested capability');
+      }
+    }
     const patch = {
+      ...(body.browserOverride !== undefined ? { browserOverride: body.browserOverride } : {}),
+      ...(body.desktopOverride !== undefined ? { desktopOverride: body.desktopOverride } : {}),
       ...(body.enabledRuntimes !== undefined ? { enabledRuntimes: body.enabledRuntimes } : {}),
       ...(body.maxConcurrent !== undefined ? machineConcurrencyPatch(row, body.maxConcurrent) : {}),
     };
