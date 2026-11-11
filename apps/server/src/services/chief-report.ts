@@ -13,6 +13,7 @@ import {
   chiefReportContentSchema,
   INTAKE_SOURCE_KIND,
   ISSUE_FENCE_OPEN,
+  isActiveStepStatus,
   quoteIssueLines,
   RESEARCH_INTAKE_ITEM_SOURCE_KIND,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
@@ -187,8 +188,7 @@ function unsettledState(
       const window = reportWindow(rec.createdAt, tz);
       return { kind: 'due', rec, covers: window.covers, start: window.start, end: window.end };
     }
-    if (run !== undefined && ['pending', 'claimed', 'waiting_quota'].includes(run.status))
-      return { kind: 'running' };
+    if (run !== undefined && isActiveStepStatus(run.status)) return { kind: 'running' };
     settleReport(deps, rec, null, now);
     return { kind: 'settled' };
   }

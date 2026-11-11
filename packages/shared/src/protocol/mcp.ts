@@ -1,15 +1,4 @@
 import { z } from 'zod';
-import { BRAND } from '../brand.js';
-
-export const MCP_ENDPOINT_PATH = BRAND.remoteMcpPath;
-
-export const MCP_AUTH_HEADER_FORMAT = 'Authorization: Bearer <apiKey>';
-
-export const MCP_CONFIG_EXAMPLE_CANON = {
-  json: `{"mcpServers":{"${BRAND.cliCommandName}":{"url":"http://127.0.0.1:8787${BRAND.remoteMcpPath}","headers":{"Authorization":"Bearer ${BRAND.apiKeyPrefix}your_key"}}}}`,
-  vsCodeNote:
-    'VS Code uses a servers key instead of mcpServers, with the same url and headers fields. Browser connectors that only support OAuth cannot use a key.',
-} as const;
 
 export const MCP_TOOLS_READ = [
   'Todos',
@@ -55,13 +44,6 @@ export const MCP_CAPABILITY_GROUPS = [
   'Manage lifecycle',
 ] as const;
 
-export const MCP_TRANSPORT_LABELS = {
-  http: '远程（HTTP）',
-  stdio: '本地命令（stdio）',
-} as const;
-
-export const MCP_LIST_EMPTY_COPY =
-  'MCP 服务器为 Agent 提供额外工具，例如工单系统、浏览器、内部 API。授权在每个 Agent 的页面上单独进行。';
 export const MCP_CONNECT_FAILED_CANON = 'connect failed — its tools are unavailable this turn';
 
 export const MCP_NOT_IN_CONFIG_CANON = 'not in local config — its tools are unavailable this turn';

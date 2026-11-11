@@ -86,9 +86,9 @@ Register a machine when you want agents to build on it, or run the server in Doc
 | `apps/server` | Server: Hono REST + SSE + SQLite (package `@xiechimon/cairn` — directory name differs from package name) |
 | `apps/daemon` | Executor daemon (package `@xiechimon/cairn-cli` — directory name differs from package name) |
 | `packages/shared` | Protocol vocabulary, record shapes, brand-slot single source (`@cairn/shared`) |
-| `docs/spec/` | Implementation canon, volumes 00–29 (Chinese) |
+| `docs/spec/` | Implementation canon, volumes 00–30 |
 | `docs/research/` | r1–r15 site inventories and later product research (historical archive) |
-| `scripts/` | Build-time tools (incl. `generate-icons.mjs`) |
+| `scripts/` | Build, CI and ops tooling |
 
 ## Community
 

@@ -1,4 +1,4 @@
-import { conversationBranch } from '@cairn/shared';
+import { ACTIVE_STEP_STATUSES, conversationBranch } from '@cairn/shared';
 import { and, desc, eq, inArray, isNotNull, isNull, like, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, step, threadPr, todo } from '../db/schema.js';
@@ -1048,7 +1048,7 @@ export function createCiPoller(
         and(
           eq(step.buildId, cand.buildId),
           inArray(step.kind, ['review', 'verify']),
-          inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+          inArray(step.status, [...ACTIVE_STEP_STATUSES]),
         ),
       )
       .get();

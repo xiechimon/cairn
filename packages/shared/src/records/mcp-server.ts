@@ -18,6 +18,3 @@ export const mcpServerRecordSchema = z.object({
   updatedAt: epochMs,
 });
 export type McpServerRecord = z.infer<typeof mcpServerRecordSchema>;
-
-export const MCP_SLUG_COPY =
-  '小写字母标识符，将作为工具名前缀（mcp__<标识符>__<工具>），创建后不可修改。';

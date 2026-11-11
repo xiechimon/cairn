@@ -1,4 +1,5 @@
 import {
+  ACTIVE_STEP_STATUSES,
   DEFAULT_AUTONOMY_SETTINGS,
   DEFAULT_SHIP_ROUTE,
   type PatchProjectBody,
@@ -88,8 +89,6 @@ export interface ProjectPatchDeps {
   convHub?: ConversationStreamHub;
   logger?: { info(obj: object, msg: string): void };
 }
-
-const IN_FLIGHT_STEP_STATUSES = ['pending', 'claimed', 'waiting_quota'] as const;
 
 export function setProjectArchived(
   db: Db,
@@ -356,7 +355,7 @@ async function assertNoInFlightBuilds(db: Db, projectId: string): Promise<void> 
   const inflight = db
     .select({ buildId: step.buildId })
     .from(step)
-    .where(and(inArray(step.buildId, buildIds), inArray(step.status, [...IN_FLIGHT_STEP_STATUSES])))
+    .where(and(inArray(step.buildId, buildIds), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
     .all();
   if (inflight.length > 0) {
     throw new HttpError(

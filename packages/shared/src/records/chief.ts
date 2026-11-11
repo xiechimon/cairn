@@ -162,8 +162,6 @@ export const chiefThreadSchema = z.object({
 });
 export type ChiefThread = z.infer<typeof chiefThreadSchema>;
 
-export const CHIEF_ENTITY_REF_SCHEMES = ['agent', 'todo'] as const;
-
 export const patchChiefBodySchema = z
   .object({
     agent: z

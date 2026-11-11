@@ -1,9 +1,11 @@
 import {
+  ACTIVE_STEP_STATUSES,
   CHIEF_TURN_STOPPED_KIND,
   type ChiefOutage,
   type ChiefPendingMessage,
   type ChiefTurnStoppedContent,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
+  UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
 import { and, asc, eq, gt, inArray, lt, notInArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -29,8 +31,6 @@ import { coordinatorProfile } from './routing-rules.js';
 
 type StepRow = typeof step.$inferSelect;
 
-const LIVE_STATUSES = ['pending', 'claimed', 'waiting_quota'] as const;
-
 const STEERED_HOLD = 'steer';
 const STEER_SENT_HOLD = 'steer_sent';
 const STEER_HOLDS = [STEERED_HOLD, STEER_SENT_HOLD];
@@ -53,7 +53,7 @@ function liveChiefSteps(db: Db, threadId: string): StepRow[] {
       and(
         eq(step.buildId, threadId),
         eq(step.kind, 'chief'),
-        inArray(step.status, [...LIVE_STATUSES]),
+        inArray(step.status, [...ACTIVE_STEP_STATUSES]),
       ),
     )
     .orderBy(asc(step.createdAt), sql`rowid`)
@@ -136,7 +136,7 @@ export function chiefOutage(db: Db, chiefId: string): ChiefOutage | null {
       and(
         eq(chiefThread.chiefId, chiefId),
         eq(step.kind, 'chief'),
-        inArray(step.status, ['pending', 'waiting_quota']),
+        inArray(step.status, [...UNSTARTED_STEP_STATUSES]),
       ),
     )
     .orderBy(sql`${step.createdAt} desc`)

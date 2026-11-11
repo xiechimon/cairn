@@ -12,8 +12,6 @@ import {
 import type { ScheduleIssue, ScheduleMergedPull } from './plan.js';
 
 export const SCHEDULE_TIMEOUT_MS = 15_000;
-export const SCHEDULE_ISSUE_PAGES = 6;
-export const SCHEDULE_PULL_PAGES = 4;
 export const SCHEDULE_PER_PAGE = 100;
 export const SCHEDULE_MERGED_PULL_LIMIT = 100;
 export const SCHEDULE_MERGED_PULL_PAGES = Math.ceil(SCHEDULE_MERGED_PULL_LIMIT / SCHEDULE_PER_PAGE);
@@ -43,44 +41,11 @@ export async function collectPages<T>(
   return { ok: true, items, truncated: true };
 }
 
-export interface RawIssueReader {
-  number: number;
-  title: string;
-  body: string;
-}
-
-export function toScheduleIssue(
-  entry: {
-    number: number;
-    title: string;
-    state: 'open' | 'closed';
-    labels: { name: string }[];
-    createdAt: string | null;
-    updatedAt: string | null;
-  },
-  body: string,
-  owner: string,
-  repo: string,
-) {
-  return {
-    number: entry.number,
-    title: entry.title,
-    body,
-    labels: entry.labels.map((l) => l.name),
-    state: entry.state,
-    createdAt: parseTime(entry.createdAt),
-    updatedAt: parseTime(entry.updatedAt),
-    url: `https://github.com/${owner}/${repo}/issues/${entry.number}`,
-  };
-}
-
 export function parseTime(value: string | null): number {
   if (value === null) return 0;
   const at = Date.parse(value);
   return Number.isFinite(at) ? at : 0;
 }
-
-export type ScheduleFetch = FetchLike;
 
 export async function defaultBranchSha(
   fetchImpl: FetchLike,

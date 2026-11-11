@@ -1,4 +1,5 @@
 import {
+  ACTIVE_STEP_STATUSES,
   type CompareFile,
   MERGE_GATE_STATUS_CONTEXT,
   parseGithubIssueSourceRef,
@@ -109,9 +110,7 @@ export async function localGateFacts(
   const inFlight = deps.db
     .select({ id: step.id })
     .from(step)
-    .where(
-      and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'claimed', 'waiting_quota'])),
-    )
+    .where(and(eq(step.buildId, buildId), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
     .all();
   const persisted = deps.db
     .select()

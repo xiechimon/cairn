@@ -1,4 +1,4 @@
-import { CHIEF_NOTICE_KIND, classifyStepFailure } from '@cairn/shared';
+import { CHIEF_NOTICE_KIND, classifyStepFailure, UNSTARTED_STEP_STATUSES } from '@cairn/shared';
 import { and, eq, gt, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { build, chiefMessage, message, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -78,7 +78,7 @@ export function parkFailedBuild(deps: BuildDeps, buildId: string, now = nowMs())
     deps.db
       .update(step)
       .set({ status: 'stopped', finishedAt: now })
-      .where(and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'waiting_quota'])))
+      .where(and(eq(step.buildId, buildId), inArray(step.status, [...UNSTARTED_STEP_STATUSES])))
       .run();
     const inserted = deps.db
       .insert(message)

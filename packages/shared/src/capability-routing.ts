@@ -4,7 +4,6 @@ import type { TaskRequest } from './records/task-request.js';
 
 export const DIFFICULTIES = ['easy', 'standard', 'hard'] as const;
 export type Difficulty = (typeof DIFFICULTIES)[number];
-export const difficultySchema = z.enum(DIFFICULTIES);
 
 export type CandidateHarness = 'claude-code' | 'pi';
 export type CandidateRejection = 'harness-missing' | 'unavailable' | 'quota' | 'no-candidate';

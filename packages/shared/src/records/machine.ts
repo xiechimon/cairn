@@ -32,11 +32,6 @@ export const patchMachineBodySchema = z.object({
 });
 export type PatchMachineBody = z.infer<typeof patchMachineBodySchema>;
 
-export const MACHINE_ADD_DIALOG_COPY = {
-  cloudHint: '在云服务器上运行？改用 API key 注册',
-  getKeyLink: '获取 API key →',
-} as const;
-
 export const evacuateMachineBodySchema = z.object({
   targetMachineId: recordId,
 });

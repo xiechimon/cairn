@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type Database from 'better-sqlite3';
 
@@ -64,14 +64,4 @@ export function exportLegacyTables(
     `${JSON.stringify({ exportedAt: now.getTime(), tables }, null, 2)}\n`,
     'utf8',
   );
-}
-
-export function listLegacyExports(legacyExportDir: string): string[] {
-  try {
-    return readdirSync(legacyExportDir)
-      .filter((f) => /^legacy-export-.+\.json$/.test(f))
-      .sort();
-  } catch {
-    return [];
-  }
 }

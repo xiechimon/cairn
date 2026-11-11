@@ -20,8 +20,6 @@ export const transcriptRowSchema = messageRecordSchema.extend({
 });
 export type TranscriptRow = z.infer<typeof transcriptRowSchema>;
 
-export const SYSTEM_MESSAGE_KINDS = ['machine_selected'] as const;
-
 export const MERGE_ANNOUNCEMENT = '发起了合并';
 
 export const MERGE_HUMAN_ONLY_COPY =

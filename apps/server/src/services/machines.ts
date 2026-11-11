@@ -15,7 +15,12 @@ import type {
   ToolCallRecord,
   TranscriptRow,
 } from '@cairn/shared';
-import { claudeLoginSchema, machineRecordSchema, parseReportedCapabilities } from '@cairn/shared';
+import {
+  claudeLoginSchema,
+  isActiveStepStatus,
+  machineRecordSchema,
+  parseReportedCapabilities,
+} from '@cairn/shared';
 import { and, asc, eq, isNotNull, lt } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { apiKey, build, machine, steerPending, step, stopPending, todo } from '../db/schema.js';
@@ -130,11 +135,7 @@ export function fetchStop(
       .from(step)
       .where(eq(step.id, pending.stepId))
       .get();
-    if (
-      pending.stepId === stepId ||
-      target === undefined ||
-      !['pending', 'claimed', 'waiting_quota'].includes(target.status)
-    ) {
+    if (pending.stepId === stepId || target === undefined || !isActiveStepStatus(target.status)) {
       db.delete(stopPending).where(eq(stopPending.conversationId, pending.conversationId)).run();
     }
   }
