@@ -4,7 +4,8 @@ import { fenceMailText } from '@cairn/shared';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, it, vi } from 'vitest';
-import { restoreInterruptedMailConversations } from '../../src/coordinator/mail-owner.js';
+import { acquireLease } from '../../src/coordinator/lease.js';
+import { restoreInterruptedMailConversation } from '../../src/coordinator/mail-owner.js';
 import {
   chiefMessage,
   coordinatorConversation,
@@ -16,7 +17,7 @@ import { flushRuntimeOtel, shutdownRuntimeOtel } from '../../src/runtime-otel.js
 import { enqueueChiefStep } from '../../src/services/chief.js';
 import { setCoordinatorWake } from '../../src/services/coordinator-context.js';
 import { bootServer, req } from '../helpers.js';
-import { boot, world } from './runner-world.js';
+import { boot, stub, world } from './runner-world.js';
 
 const SECRET = 'MAIL-SECRET-EXCERPT-9f3a';
 const STEER = 'OWNER-STEER-7c2e list the open todos';
@@ -183,7 +184,7 @@ it('restores the persisted owner conversation after an interrupted mail wake', (
         updatedAt: 1,
       })
       .run();
-    restoreInterruptedMailConversations(s.db);
+    restoreInterruptedMailConversation(s.db, 'thread-mail');
     expect(s.db.select().from(coordinatorConversation).get()).toMatchObject({
       conversationId: '3',
       mailOwnerConversationId: null,
@@ -191,6 +192,35 @@ it('restores the persisted owner conversation after an interrupted mail wake', (
   } finally {
     s.dispose();
   }
+});
+
+it('a second instance does not restore a mail conversation while another holds the lease', async () => {
+  const w = await world();
+  w.s.db
+    .insert(coordinatorConversation)
+    .values({
+      threadId: w.threadId,
+      conversationId: '9',
+      mailOwnerConversationId: '3',
+      piVersion: '1.5.0',
+      updatedAt: 1,
+    })
+    .onConflictDoUpdate({
+      target: coordinatorConversation.threadId,
+      set: { conversationId: '9', mailOwnerConversationId: '3' },
+    })
+    .run();
+  acquireLease(w.s.db, w.threadId, 'first-instance');
+  const coordinator = boot(w, stub('ok').faux, { owner: 'second-instance' });
+  coordinator.wake(w.threadId);
+  await coordinator.idle();
+  expect(
+    w.s.db
+      .select()
+      .from(coordinatorConversation)
+      .where(eq(coordinatorConversation.threadId, w.threadId))
+      .get(),
+  ).toMatchObject({ conversationId: '9', mailOwnerConversationId: '3' });
 });
 
 it('exports mail-turn telemetry as ids, rule name and sizes only', async () => {

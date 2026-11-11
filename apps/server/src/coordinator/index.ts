@@ -38,7 +38,7 @@ import {
   scrubProviderError,
 } from './credentials.js';
 import { acquireLease, type Lease, LeaseHeldError } from './lease.js';
-import { restoreInterruptedMailConversations } from './mail-owner.js';
+import { restoreInterruptedMailConversation } from './mail-owner.js';
 import { createMemoryFlush } from './memory-flush.js';
 import {
   COLD_RECENT_EXCHANGES,
@@ -103,7 +103,6 @@ function thinkingLevelOf(value: string | null): ThinkingLevel | null {
 export function startCoordinator(options: CoordinatorOptions): Coordinator {
   const { machine, logger } = options;
   const { db } = machine;
-  restoreInterruptedMailConversations(db);
   let closing = false;
   const owner = options.owner ?? `server-${process.pid}-${randomUUID()}`;
   const serverApi = createCoordinatorServerApi(machine);
@@ -351,6 +350,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     try {
       const lease = acquireLease(db, threadId, owner);
       leases.set(threadId, lease);
+      restoreInterruptedMailConversation(db, threadId);
       return lease;
     } catch (error) {
       if (error instanceof LeaseHeldError) return null;
