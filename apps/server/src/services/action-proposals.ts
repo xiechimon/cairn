@@ -69,7 +69,13 @@ function addSubscriber(
       and(eq(actionSubscriber.proposalId, proposalId), eq(actionSubscriber.threadId, threadId)),
     )
     .get();
-  if (existing) return;
+  if (existing) {
+    tx.update(actionSubscriber)
+      .set({ scopeProjectId })
+      .where(eq(actionSubscriber.id, existing.id))
+      .run();
+    return;
+  }
   tx.insert(actionSubscriber)
     .values({
       id: newRecordId(),

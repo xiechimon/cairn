@@ -117,6 +117,27 @@ describe('action proposals', () => {
     s.dispose();
   });
 
+  test('a repeat from the same thread replaces that subscriber scope', () => {
+    const s = world();
+    const first = propose(s, 'thread-a', 'project-a');
+    const again = propose(s, 'thread-a', null);
+    expect(again).toEqual(first);
+    expect(s.db.select().from(actionSubscriber).all()).toEqual([
+      expect.objectContaining({ threadId: 'thread-a', scopeProjectId: null }),
+    ]);
+    s.db.update(actionProposal).set({ expiresAt: 1 }).run();
+    sweepExpiredActionProposals(s.db, Date.now());
+    expect(dispatchActionWakes(s).delivered).toBe(1);
+    expect(
+      s.db
+        .select()
+        .from(step)
+        .all()
+        .map((row) => row.scopeProjectId),
+    ).toEqual([null]);
+    s.dispose();
+  });
+
   test('a different input supersedes the old proposal and wakes its subscribers', () => {
     const s = world();
     const first = propose(s, 'thread-a', 'project-a', 'old');
