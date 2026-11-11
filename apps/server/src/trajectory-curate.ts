@@ -8,6 +8,7 @@ import {
   type GuardCandidate,
   guardCandidateSchema,
   ISSUE_FENCE_OPEN,
+  MAIL_FENCE_OPEN,
   PROMOTION_MIN_BUILDS,
   SKILL_ENTRY_FILE,
   type SkillDraft,
@@ -134,7 +135,10 @@ export function curateCandidates(
 
   db.transaction((tx) => {
     for (const candidate of candidates) {
-      if (`${candidate.title}\n${candidate.content}`.includes(ISSUE_FENCE_OPEN)) {
+      if (
+        `${candidate.title}\n${candidate.content}`.includes(ISSUE_FENCE_OPEN) ||
+        `${candidate.title}\n${candidate.content}`.includes(MAIL_FENCE_OPEN)
+      ) {
         summary.rejected++;
         continue;
       }
