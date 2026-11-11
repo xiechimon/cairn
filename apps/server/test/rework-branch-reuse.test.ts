@@ -332,7 +332,7 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
     ).toBe(true);
   });
 
-  test('failure mode 5: the probe fails -> fail-open reuse (no blind new branch)', async () => {
+  test('failure mode 5: the probe fails -> 409, no replacement build and no reuse', async () => {
     const fetchMock: FetchLike = (async () => ({
       ok: false,
       status: 500,
@@ -340,9 +340,31 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
       headers: { get: () => null },
     })) as unknown as FetchLike;
     const w = makeWorld({ repoKind: 'github', githubFetch: fetchMock });
+    await expect(restart(w, '再试一次')).rejects.toMatchObject({
+      status: 409,
+      message: `Could not read PR #${PR_NUMBER}. Please retry before continuing this task.`,
+    });
+    expect(buildsOf(w)).toHaveLength(1);
+    expect(todoRowOf(w).latestBuildId).toBe(w.buildId);
+    expect(todoRowOf(w).phase).toBe('failed');
+    expect(stepsOf(w, w.buildId).filter((st) => st.kind === 'plan')).toHaveLength(0);
+    expect(messagesOf(w, w.buildId)).toHaveLength(0);
+  });
+
+  test('a successful read of an open PR reuses the branch', async () => {
+    const fetchMock: FetchLike = (async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ state: 'open', merged: false }),
+      headers: { get: () => null },
+    })) as unknown as FetchLike;
+    const w = makeWorld({ repoKind: 'github', githubFetch: fetchMock });
     await restart(w, '再试一次');
     expect(buildsOf(w)).toHaveLength(1);
+    expect(todoRowOf(w).latestBuildId).toBe(w.buildId);
+    expect(todoRowOf(w).phase).toBe('queued');
     const fresh = stepsOf(w, w.buildId).filter((st) => st.kind === 'plan');
+    expect(fresh).toHaveLength(1);
     expect(fresh[0]!.freshSession).toBe(true);
   });
 
