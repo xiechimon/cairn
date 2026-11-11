@@ -51,6 +51,12 @@ test('shows the latest reply suggestions above the composer as keyboard-reachabl
   const group = await page.getByTestId('chief-quick-replies').boundingBox();
   const composer = await page.getByTestId('home-c').getByTestId('chief-composer-input').boundingBox();
   expect(group!.y + group!.height).toBeLessThanOrEqual(composer!.y);
+  const card = await page.getByTestId('home-c').locator('.chief-composer').boundingBox();
+  expect(card!.y - (group!.y + group!.height)).toBeGreaterThanOrEqual(6);
+  expect(card!.y - (group!.y + group!.height)).toBeLessThanOrEqual(12);
+  const reply = await page.getByTestId('home-c').getByText('要不要先只看 README？').boundingBox();
+  expect(group!.y - (reply!.y + reply!.height)).toBeGreaterThanOrEqual(12);
+  expect(group!.y - (reply!.y + reply!.height)).toBeLessThanOrEqual(32);
   await chips(page).first().focus();
   await expect(chips(page).first()).toBeFocused();
 });
@@ -73,11 +79,41 @@ test('a pending question hides the chips: the question dock wins', async ({ page
   await expect(page.getByTestId('chief-quick-replies')).toHaveCount(0);
 });
 
-test('chips stay hidden while a Coordinator turn is running', async ({ page }) => {
+const STREAM = `/api/conversations/${THREAD.id}/stream`;
+
+async function runningActivity(page: Page, stepId: string) {
+  await expect
+    .poll(() => page.evaluate((u) => window.__es.some((es) => es.url.includes(u)), STREAM))
+    .toBe(true);
+  await page.evaluate(
+    ([u, id]) =>
+      window.__es
+        .find((es) => es.url.includes(u as string))
+        ?.emit({
+          type: 'activity',
+          activity: { stepId: id, at: Date.now(), phase: 'tool', tool: 'bash' },
+        }),
+    [STREAM, stepId] as const,
+  );
+}
+
+test('chips stay while the turn that offered them is still running', async ({ page }) => {
   const running = [{ ...THREAD, activeRun: { phase: 'chief' } }];
   await mockLive(page, state({ threads: running as unknown as MockState['threads'] }));
   await page.goto('/app');
   await expect(page.getByTestId('home-c').getByText('要不要先只看 README？')).toBeVisible();
+  await expect(page.getByTestId('chief-quick-replies')).toHaveCount(0);
+  await runningActivity(page, 's1');
+  await expect(chips(page)).toHaveText(REPLIES);
+});
+
+test('chips hide while a newer Coordinator turn is running', async ({ page }) => {
+  const running = [{ ...THREAD, activeRun: { phase: 'chief' } }];
+  await mockLive(page, state({ threads: running as unknown as MockState['threads'] }));
+  await page.goto('/app');
+  await expect(page.getByTestId('home-c').getByText('要不要先只看 README？')).toBeVisible();
+  await runningActivity(page, 's2');
+  await expect(page.getByTestId('home-c').getByText('正在运行命令')).toBeAttached();
   await expect(page.getByTestId('chief-quick-replies')).toHaveCount(0);
 });
 

@@ -139,8 +139,20 @@ describe('liveQuickReplies lifecycle', () => {
     expect(liveQuickReplies([...TURN, owner('u3', '别的事')], idle)).toEqual([]);
   });
 
-  it('row 3: hidden while a turn is running, including a wake turn prompt row', () => {
+  it('row 3: stays while the same turn is still running', () => {
+    expect(liveQuickReplies(TURN, { running: true, runningStepId: 's1' })).toEqual([
+      '好，等你汇报',
+      '先只看 README',
+    ]);
+  });
+
+  it('row 3: hidden once a newer turn runs, or the running turn is unknown, or its prompt row follows', () => {
     expect(liveQuickReplies(TURN, { running: true })).toEqual([]);
+    expect(liveQuickReplies(TURN, { running: true, runningStepId: null })).toEqual([]);
+    expect(liveQuickReplies(TURN, { running: true, runningStepId: 's2' })).toEqual([]);
+    expect(
+      liveQuickReplies([...TURN, owner('u2', '再看看')], { running: true, runningStepId: 's1' }),
+    ).toEqual([]);
     expect(
       liveQuickReplies([...TURN, owner('user-s2', '[wake:failed] provenance=watch:t\n…')], idle),
     ).toEqual([]);
@@ -148,6 +160,9 @@ describe('liveQuickReplies lifecycle', () => {
 
   it('row 4: hidden while a question is pending, shown again once it is answered', () => {
     expect(liveQuickReplies([...TURN, question('pending')], idle)).toEqual([]);
+    expect(
+      liveQuickReplies([...TURN, question('pending')], { running: true, runningStepId: 's1' }),
+    ).toEqual([]);
     expect(liveQuickReplies([question('pending'), ...TURN], idle)).toEqual([]);
     expect(liveQuickReplies([question('answered'), ...TURN], idle)).toEqual([
       '好，等你汇报',

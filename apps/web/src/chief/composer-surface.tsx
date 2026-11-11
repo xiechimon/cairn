@@ -3,7 +3,6 @@ import { CornerDownLeft } from 'lucide-react';
 import { type ReactNode, type Ref, useCallback, useImperativeHandle } from 'react';
 import { useChief } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { formatClock } from '../components/chat/live-row.js';
 import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
@@ -14,6 +13,7 @@ import {
 } from '../components/ui/dropdown-menu.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
+import type { ChiefContextUsage } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Paperclip, Plus } from '../icons/index.js';
 import { ComposerAttachments } from '../overlay/composer-attachments.js';
@@ -24,7 +24,7 @@ import type { MentionGroups } from '../overlay/mention-token.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import type { ComposerBinding } from './composer-binding.js';
 import {
-  ContextMeterMenuRow,
+  ContextMeterRing,
   contextPercentOf,
   contextResumeOf,
   MOCK_CONTEXT_PERCENT,
@@ -76,8 +76,7 @@ export interface ComposerSurfaceProps {
   menu?: ReactNode;
   canStop: boolean;
   onStop?: (() => void) | undefined;
-  running: boolean;
-  turnElapsed: number | null;
+  context?: ChiefContextUsage | null | undefined;
   threadId?: string | null;
   handleRef?: Ref<ComposerSurfaceHandle>;
 }
@@ -104,16 +103,16 @@ export function ComposerSurface({
   menu,
   canStop,
   onStop,
-  running,
-  turnElapsed,
+  context = null,
   threadId = null,
   handleRef,
 }: ComposerSurfaceProps) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const chiefQ = useChief(teamId, live, threadId);
-  const contextPercent = contextPercentOf(chiefQ.data?.context);
-  const contextResume = contextResumeOf(chiefQ.data?.context);
+  const shownContext = live ? chiefQ.data?.context : context;
+  const contextPercent = contextPercentOf(shownContext);
+  const contextResume = contextResumeOf(shownContext);
   const wire = useComposerWire({
     editable,
     draft: binding.draft,
@@ -327,7 +326,7 @@ export function ComposerSurface({
           accept="text/*,image/*,application/json,application/pdf,application/xml"
         />
       </div>
-      <div className="mt-1.5 flex items-center gap-0.5 px-1">
+      <div className="mt-1 flex items-center gap-0.5 px-1">
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger
@@ -362,13 +361,6 @@ export function ComposerSurface({
               <Paperclip width={16} height={16} />
               {t('添加附件')}
             </DropdownMenuItem>
-            {(!live || contextPercent != null) && (
-              <ContextMeterMenuRow
-                percent={contextPercent ?? MOCK_CONTEXT_PERCENT}
-                mock={contextPercent == null}
-                resume={contextResume}
-              />
-            )}
             {menu != null && (
               <>
                 <DropdownMenuSeparator />
@@ -378,12 +370,13 @@ export function ComposerSurface({
           </DropdownMenuContent>
         </DropdownMenu>
         {tools}
-        {running && turnElapsed != null && (
-          <span
-            className="ml-auto flex h-7 items-center text-meta tabular-nums text-(--text-tertiary)"
-            data-testid="chief-composer-working"
-          >
-            {t('工作中 · {time}', { time: formatClock(turnElapsed) })}
+        {(!live || contextPercent != null) && (
+          <span className="ml-auto flex">
+            <ContextMeterRing
+              percent={contextPercent ?? MOCK_CONTEXT_PERCENT}
+              mock={contextPercent == null}
+              resume={contextResume}
+            />
           </span>
         )}
       </div>

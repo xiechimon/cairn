@@ -388,3 +388,33 @@ test('at phone width the panel overlays without horizontal overflow', async ({ p
     0,
   );
 });
+
+test('one mark holds the left edge: the checkbox when the row has one, its ring in the accent when it waits on the owner, else the status glyph', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  const frame = (title: string) =>
+    panel(page).locator('[data-slot="task-row-frame"]').filter({ hasText: title });
+  const review = frame('Fold finished turns');
+  await expect(review.getByRole('checkbox')).toHaveCount(1);
+  await expect(review.locator('[data-glyph]')).toHaveCount(0);
+  const accent = await page.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--card-button)';
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  });
+  await expect(review.getByRole('checkbox')).toHaveCSS('border-top-color', accent);
+  const running = frame('Push for finished threads');
+  await expect(running.getByRole('checkbox')).not.toHaveCSS('border-top-color', accent);
+  await expect(running.locator('[data-glyph]')).toHaveCount(0);
+  await expect(running).toContainText('进行中');
+  const failed = frame('Rerun the relay probe');
+  await expect(failed.getByRole('checkbox')).toHaveCount(0);
+  await expect(failed.locator('[data-glyph]')).toHaveCount(1);
+  const title = review.locator('[data-slot="task-row-title"]');
+  expect(await title.evaluate((el) => el.getBoundingClientRect().height)).toBe(20);
+  await expect(review.locator('[data-slot="task-row-what"]')).toContainText('到任务里看改动');
+});

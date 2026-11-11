@@ -80,17 +80,15 @@ test('a pending question counts as needs-you on the Tasks toggle and tab title, 
   const stream = page.getByTestId('chief-stream');
   await expect(stream).toContainText('Waiting for your answer');
   await expect(stream).not.toContainText('Working on it');
-  await expect(page.getByTestId('chief-composer-working')).toHaveCount(0);
 });
 
-test('a running turn with no question keeps its elapsed timer and working label', async ({ page }) => {
+test('a running turn with no question keeps its working label', async ({ page }) => {
   await mockLive(page, {
     threads: [running],
     messages: [...HISTORY, { id: 'm7', role: 'user', content: 'Merge it when it is safe', createdAt: 30 }],
     todos: [],
   });
   await page.goto('/app');
-  await expect(page.getByTestId('chief-composer-working')).toBeVisible();
   await expect(page.getByTestId('chief-stream')).not.toContainText('Waiting for your answer');
   await expect(page.getByTestId('chief-stream')).toContainText('Working on it');
 });

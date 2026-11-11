@@ -259,7 +259,7 @@ test('close set: Esc, space, backspace-past-slash, outside click', async ({ page
 
   await input.fill('/');
   await expect(menu).toBeVisible();
-  await page.getByTestId('composer-toolbar').click();
+  await page.mouse.click(700, 120);
   await expect(menu).toBeHidden();
 });
 

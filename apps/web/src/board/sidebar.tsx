@@ -9,7 +9,7 @@ import {
   Server,
   Settings,
 } from 'lucide-react';
-import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { type ReactElement, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate } from 'react-router';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
@@ -152,6 +152,28 @@ function SidebarFooterIcon({
   );
 }
 
+function RailTip({
+  label,
+  hint,
+  icon,
+  children,
+}: {
+  label: string;
+  hint?: ReactNode;
+  icon: ReactNode;
+  children: ReactElement;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={children}>{icon}</TooltipTrigger>
+      <TooltipContent side="right" sideOffset={8}>
+        {label}
+        {hint}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function BoardSidebar({
   collapsed = false,
   onToggle,
@@ -274,90 +296,111 @@ export function BoardSidebar({
     });
     return (
       <aside className="board-sidebar board-sidebar--collapsed relative z-(--z-docked) flex w-10 flex-none flex-col items-center gap-px bg-(--surface-1) pt-2 pb-2">
-        <Button
-          variant="ghost"
-          className={`rail-toggle ${RAIL_ROW} ${RAIL_BTN}`}
-          aria-label={t('展开侧边栏')}
-          onClick={onToggle}
-        >
-          <PanelLeft className={ICON} strokeWidth={STROKE} />
-        </Button>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                className={`${RAIL_ROW} ${RAIL_BTN}`}
-                aria-label={t('搜索')}
-                onClick={onSearch}
-              >
-                <Search className={ICON} strokeWidth={STROKE} />
-              </Button>
-            }
-          />
-          <TooltipContent side="right" sideOffset={8}>
-            <Kbd>⌘K</Kbd>
-          </TooltipContent>
-        </Tooltip>
-        <nav className="mt-2 flex min-h-0 flex-1 flex-col items-center gap-px overflow-y-auto">
-          <Link {...railLink(coordinatorTarget, coordinatorActive, t('Coordinator'))}>
-            <BrandGlyph className={ICON} />
-          </Link>
+        <RailTip label={t('展开侧边栏')} icon={<PanelLeft className={ICON} strokeWidth={STROKE} />}>
           <Button
             variant="ghost"
-            className={`rail-group group mt-2 ${RAIL_ROW} ${RAIL_BTN} ${projectsCollapsed ? 'rail-group--collapsed' : ''}`}
-            aria-label={t(projectsCollapsed ? '展开{label}' : '收起{label}', {
-              label: t('项目'),
-            })}
-            aria-expanded={!projectsCollapsed}
-            onClick={toggleProjects}
+            className={`rail-toggle ${RAIL_ROW} ${RAIL_BTN}`}
+            aria-label={t('展开侧边栏')}
+            onClick={onToggle}
+          />
+        </RailTip>
+        <RailTip
+          label={t('搜索')}
+          hint={<Kbd>⌘K</Kbd>}
+          icon={<Search className={ICON} strokeWidth={STROKE} />}
+        >
+          <Button
+            variant="ghost"
+            className={`${RAIL_ROW} ${RAIL_BTN}`}
+            aria-label={t('搜索')}
+            onClick={onSearch}
+          />
+        </RailTip>
+        <nav className="mt-2 flex min-h-0 flex-1 flex-col items-center gap-px overflow-y-auto">
+          <RailTip label={t('Coordinator')} icon={<BrandGlyph className={ICON} />}>
+            <Link {...railLink(coordinatorTarget, coordinatorActive, t('Coordinator'))} />
+          </RailTip>
+          <RailTip
+            label={t(projectsCollapsed ? '展开{label}' : '收起{label}', { label: t('项目') })}
+            icon={
+              <ChevronDown
+                className="size-3.5 transition-transform duration-150 group-[.rail-group--collapsed]:-rotate-90"
+                strokeWidth={STROKE}
+              />
+            }
           >
-            <ChevronDown
-              className="size-3.5 transition-transform duration-150 group-[.rail-group--collapsed]:-rotate-90"
-              strokeWidth={STROKE}
+            <Button
+              variant="ghost"
+              className={`rail-group group mt-2 ${RAIL_ROW} ${RAIL_BTN} ${projectsCollapsed ? 'rail-group--collapsed' : ''}`}
+              aria-label={t(projectsCollapsed ? '展开{label}' : '收起{label}', {
+                label: t('项目'),
+              })}
+              aria-expanded={!projectsCollapsed}
+              onClick={toggleProjects}
             />
-          </Button>
+          </RailTip>
           {!projectsCollapsed &&
             listed.map((row) => {
               const href = projectHref(row.id);
+              const label = waiting.has(row.id)
+                ? t('{name}：有任务在等你', { name: row.name })
+                : row.name;
               return (
-                <Link
+                <RailTip
                   key={row.id}
-                  {...railLink(
-                    href,
-                    activeProject === row.id,
-                    waiting.has(row.id) ? t('{name}：有任务在等你', { name: row.name }) : row.name,
-                  )}
+                  label={label}
+                  icon={
+                    <>
+                      <ProjectGlyph icon={row.icon} />
+                      {waiting.has(row.id) && (
+                        <span
+                          data-slot="needs-you-dot"
+                          className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)"
+                        />
+                      )}
+                    </>
+                  }
                 >
-                  <ProjectGlyph name={row.name} icon={row.icon} />
-                  {waiting.has(row.id) && (
-                    <span
-                      data-slot="needs-you-dot"
-                      className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)"
-                    />
-                  )}
-                </Link>
+                  <Link {...railLink(href, activeProject === row.id, label)} />
+                </RailTip>
               );
             })}
+          <RailTip label={t('新建项目')} icon={<Plus className={ICON} strokeWidth={STROKE} />}>
+            <Link
+              {...railLink({ pathname: '/app/project/new', search: plain }, false, t('新建项目'))}
+              data-slot="sidebar-new-project"
+            />
+          </RailTip>
         </nav>
         {fleet != null && (
-          <Link
-            {...railLink({ pathname: settingsHref('machines'), search: plain }, false, fleet.title)}
-            data-testid="sidebar-attention"
-            data-fleet={fleet.tone}
+          <RailTip
+            label={fleet.title}
+            icon={
+              <>
+                <Server className={ICON} strokeWidth={STROKE} />
+                {fleet.tone === 'offline' && (
+                  <span className="absolute top-1 right-1 size-1.5 rounded-full bg-destructive" />
+                )}
+              </>
+            }
           >
-            <Server className={ICON} strokeWidth={STROKE} />
-            {fleet.tone === 'offline' && (
-              <span className="absolute top-1 right-1 size-1.5 rounded-full bg-destructive" />
-            )}
-          </Link>
+            <Link
+              {...railLink(
+                { pathname: settingsHref('machines'), search: plain },
+                false,
+                fleet.title,
+              )}
+              data-testid="sidebar-attention"
+              data-fleet={fleet.tone}
+            />
+          </RailTip>
         )}
-        <Link {...railLink(settingsLink.to, false, t('设置'))} data-testid="sidebar-settings">
-          <Settings className={ICON} strokeWidth={STROKE} />
-        </Link>
-        <Link {...railLink(activityLink.to, false, t('活动'))} data-testid="sidebar-activity">
-          <Activity className={ICON} strokeWidth={STROKE} />
-        </Link>
+        <RailTip label={t('设置')} icon={<Settings className={ICON} strokeWidth={STROKE} />}>
+          <Link {...railLink(settingsLink.to, false, t('设置'))} data-testid="sidebar-settings" />
+        </RailTip>
+        <RailTip label={t('活动')} icon={<Activity className={ICON} strokeWidth={STROKE} />}>
+          <Link {...railLink(activityLink.to, false, t('活动'))} data-testid="sidebar-activity" />
+        </RailTip>
       </aside>
     );
   }

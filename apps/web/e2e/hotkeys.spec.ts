@@ -121,6 +121,7 @@ test('the collapsed rail search icon hovers the ⌘K hint', async ({ page }) => 
   await expect(railSearch).toBeVisible();
 
   const hint = page.locator('[data-slot="tooltip-content"]');
+  await page.mouse.move(700, 400);
   await expect(hint).toHaveCount(0);
   await railSearch.hover();
   await expect(hint).toBeVisible();

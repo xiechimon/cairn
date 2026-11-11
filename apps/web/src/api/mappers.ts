@@ -1797,7 +1797,12 @@ export function mapChief(
   }
   chiefStream.push(...(collected?.pending ?? []));
   const quickReplies =
-    active === null ? [] : liveQuickReplies(opts.messages, { running: active.activeRun != null });
+    active === null
+      ? []
+      : liveQuickReplies(opts.messages, {
+          running: active.activeRun != null,
+          runningStepId: opts.activity?.stepId ?? null,
+        });
   return {
     view: 'none',
     bound,

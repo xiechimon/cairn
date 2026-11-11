@@ -24,7 +24,6 @@ import { useLiveData } from '../api/provider.js';
 import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
-import { useLiveSeconds } from '../components/chat/live-row.js';
 import { machineSecondary } from '../components/machine-label.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
@@ -338,15 +337,7 @@ export function ChiefConversation({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   useScrollFade(heroScrollRef, { enabled: heroLayout });
   const canStop = targetPlaceholder === null && chief.running === true && onStop != null;
-  const liveTurn =
-    chief.running === true
-      ? chief.stream?.findLast((item) => item.kind === 'streaming')
-      : undefined;
   const connected = useConnected();
-  const turnTick = useLiveSeconds(liveTurn?.kind === 'streaming' ? liveTurn.startedAt : null);
-  const turnElapsed = questionAttached
-    ? null
-    : (turnTick ?? (liveTurn?.kind === 'streaming' ? liveTurn.seconds : undefined) ?? null);
   const withdraw =
     onWithdraw == null
       ? undefined
@@ -447,7 +438,7 @@ export function ChiefConversation({
         <MessageScrollerItem key={`divider-${chiefStreamRowKey(item, i)}`}>
           <div
             data-testid="chief-time-divider"
-            className="mt-6 text-center text-caption text-(--text-tertiary)"
+            className="mt-5 text-center text-caption text-(--text-tertiary) pointer-coarse:mt-7"
           >
             <time dateTime={new Date(at).toISOString()}>
               {timeDividerLabel(at, clock, locale, t)}
@@ -571,7 +562,7 @@ export function ChiefConversation({
           <>
             <QuickReplies
               replies={chief.quickReplies}
-              hidden={questionAttached || answerActive || !answerHere || chief.running === true}
+              hidden={questionAttached || answerActive || !answerHere}
               onSend={
                 onSend == null
                   ? undefined
@@ -619,8 +610,7 @@ export function ChiefConversation({
               menu={answerActive ? null : composerMenu}
               canStop={canStop}
               onStop={stopTurn}
-              running={chief.running === true}
-              turnElapsed={turnElapsed}
+              context={chief.context}
               threadId={chief.threadId ?? null}
             />
             {answerKey !== null && (
@@ -640,8 +630,7 @@ export function ChiefConversation({
                 above={answerActive ? capsules : null}
                 tools={answerActive ? composerTools : null}
                 menu={answerActive ? composerMenu : null}
-                running={chief.running === true}
-                turnElapsed={turnElapsed}
+                context={chief.context}
                 threadId={chief.threadId ?? null}
               />
             )}

@@ -6,8 +6,7 @@ import { settleTransitions } from './helpers';
 const MINUTE = 60_000;
 const FLAT = /^(none|(rgba\(0, 0, 0, 0\) 0px 0px 0px 0px(, )?)+)$/;
 
-async function mockHistory(page: Page) {
-  const now = Date.now();
+async function mockHistory(page: Page, now = Date.now()) {
   const rows = [
     { id: 'a1', role: 'user', content: 'first question', createdAt: now - 3 * MINUTE },
     { id: 'a2', role: 'assistant', content: 'first answer', createdAt: now - 3 * MINUTE + 1 },
@@ -95,14 +94,18 @@ test('the reveal is instant: no transition, no delay and no scale', async ({ pag
   expect(await face()).toMatchObject({ duration: '0s', delay: '0s', transform: 'none' });
 });
 
-test('each message shows a relative time with the absolute time in its title', async ({ page }) => {
-  await mockHistory(page);
+test('each message shows its clock time with the absolute date and time in its title', async ({
+  page,
+}) => {
+  const now = new Date('2026-11-10T15:00:00').getTime();
+  await page.clock.setFixedTime(now);
+  await mockHistory(page, now);
   await page.goto('/app');
   const stamp = tools(messageOf(page, 'first question')).getByTestId('chief-msg-stamp');
-  await expect(stamp).toHaveText('3 分钟前');
-  await expect(stamp).toHaveAttribute('title', /\d/);
+  await expect(stamp).toHaveText('14:57');
+  await expect(stamp).toHaveAttribute('title', /2026/);
   await expect(tools(messageOf(page, 'second answer')).getByTestId('chief-msg-stamp')).toHaveText(
-    '1 分钟前',
+    '14:59',
   );
 });
 
@@ -170,4 +173,27 @@ test('on a touch device the toolbar of an older message is reachable without hov
   await expect(older).toBeVisible();
   await expect.poll(() => opacityOf(tools(older))).toBe(1);
   await context.close();
+});
+
+test.describe('on a touch phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('the always-visible message tools never overlap the next row', async ({ page }) => {
+    await page.goto('/app?scenario=chief-draft');
+    await expect(page.getByTestId('chief-time-divider')).toBeVisible();
+    const overlaps = await page.evaluate(() => {
+      const items = [...document.querySelectorAll('[data-testid="chief-stream"] > *')];
+      const found: string[] = [];
+      items.forEach((item, index) => {
+        const tools = item.querySelector('[data-testid="chief-msg-tools"], [data-testid="chief-msg-foot"]');
+        const next = items[index + 1];
+        if (tools == null || next == null) return;
+        const bottom = tools.getBoundingClientRect().bottom;
+        const top = (next.firstElementChild ?? next).getBoundingClientRect().top;
+        if (bottom > top) found.push(`${index}: ${bottom} > ${top}`);
+      });
+      return found;
+    });
+    expect(overlaps).toEqual([]);
+  });
 });

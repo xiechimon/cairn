@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { needsTimeDivider, TIME_DIVIDER_GAP_MS, timeDividerLabel } from '../src/chief/time-dividers.js';
+import {
+  messageStampLabel,
+  needsTimeDivider,
+  TIME_DIVIDER_GAP_MS,
+  timeDividerLabel,
+} from '../src/chief/time-dividers.js';
 import { EN } from '../src/i18n/en.js';
 import { type TFunc, translate } from '../src/i18n/translate.js';
 
@@ -27,5 +32,15 @@ describe('timeDividerLabel', () => {
   test('older messages show the date, with the year only outside this year', () => {
     expect(timeDividerLabel(at(2026, 11, 3, 8, 0), now, 'en', en)).toBe('Nov 3 08:00');
     expect(timeDividerLabel(at(2025, 12, 31, 8, 0), now, 'en', en)).toBe('Dec 31, 2025 08:00');
+  });
+});
+
+describe('messageStampLabel', () => {
+  test('a message from today shows only its clock time, as in the chat draft', () => {
+    expect(messageStampLabel(at(2026, 11, 10, 11, 20), now, 'zh', zh)).toBe('11:20');
+  });
+  test('older messages carry the day like the divider', () => {
+    expect(messageStampLabel(at(2026, 11, 9, 23, 5), now, 'zh', zh)).toBe('昨天 23:05');
+    expect(messageStampLabel(at(2026, 11, 3, 8, 0), now, 'en', en)).toBe('Nov 3 08:00');
   });
 });

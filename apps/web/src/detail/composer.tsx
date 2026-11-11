@@ -1,11 +1,19 @@
+import { CornerDownLeft } from 'lucide-react';
 import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { type QueuedCapsule, QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu.js';
 import { Input } from '../components/ui/input.js';
 import { Textarea } from '../components/ui/textarea.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { useI18n } from '../i18n/provider.js';
-import { ArrowUp, Lock, Plus, SearchPlus } from '../icons/index.js';
+import { Lock, Paperclip, Plus, SearchPlus } from '../icons/index.js';
 import { ComposerAttachments } from '../overlay/composer-attachments.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
 import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highlight.js';
@@ -14,16 +22,17 @@ import type { FileMentionEntry, MentionGroups } from '../overlay/mention-token.j
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 
 const COMPOSER_CARD =
-  'composer relative mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-col rounded-(--radius-composer) border-0 px-3.5 pt-3 pb-2.5';
+  'composer relative mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-col rounded-(--radius-composer) border-0 px-2 py-2';
 const COMPOSER_CARD_EDITABLE =
   'bg-background shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)';
 const COMPOSER_CARD_READ_ONLY = 'bg-secondary shadow-(--shadow-composer)';
 const COMPOSER_INPUT =
-  'field-sizing-fixed h-9 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-ui leading-5.5 text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent';
+  'field-sizing-fixed h-7 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-0.5 py-1 font-sans text-ui leading-5 text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent';
 const COMPOSER_TOOL =
-  "flex size-7 cursor-pointer items-center justify-center rounded-(--radius-control) border-none bg-transparent p-0 font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground disabled:pointer-events-auto disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto";
+  "flex size-7 flex-none cursor-pointer items-center justify-center rounded-(--radius-control) border-none bg-transparent p-0 font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground aria-expanded:bg-(--menu-hover) disabled:pointer-events-auto disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto";
 const COMPOSER_SQUARE =
-  "flex size-7 cursor-pointer items-center justify-center rounded-(--radius-control) border-none p-0 [&_svg:not([class*='size-'])]:size-auto";
+  "flex size-7 flex-none cursor-pointer items-center justify-center rounded-(--radius-control) border-none p-0 [&_svg:not([class*='size-'])]:size-auto";
+const MENU_CONTENT_CLS = 'w-auto max-w-80 min-w-56';
 
 interface ComposerProps {
   placeholder: string;
@@ -135,12 +144,57 @@ export function Composer({
 
   const hasContent = draft.trim() !== '' || tokens.length > 0 || pendingAttachments.length > 0;
 
+  const plusMenu = !readOnly && (
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  aria-label={t('更多')}
+                  data-testid="composer-plus"
+                  className={`composer-tool ${COMPOSER_TOOL}`}
+                />
+              }
+            />
+          }
+        >
+          <Plus width={16} height={16} />
+        </TooltipTrigger>
+        <TooltipContent side="top" sideOffset={8}>
+          {t('更多')}
+        </TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent
+        side="top"
+        align="start"
+        sideOffset={6}
+        aria-label={t('更多')}
+        finalFocus={textareaRef}
+        className={MENU_CONTENT_CLS}
+      >
+        <DropdownMenuItem disabled={attaching || !onAttachment} onClick={openFilePicker}>
+          <Paperclip width={16} height={16} />
+          {t('添加附件')}
+        </DropdownMenuItem>
+        {aiReview && (
+          <DropdownMenuItem onClick={onReview}>
+            <SearchPlus width={16} height={16} />
+            {t('审阅')}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div
       className={`${COMPOSER_CARD} ${readOnly ? COMPOSER_CARD_READ_ONLY : COMPOSER_CARD_EDITABLE}`}
       data-testid="composer-card"
     >
-      {editable ? (
+      {editable && (
         <>
           <QueuedCapsules
             messages={queuedMessages ?? []}
@@ -156,10 +210,16 @@ export function Composer({
             pending={pendingAttachments}
             onRemove={removeToken}
           />
-          <div className="relative">
+        </>
+      )}
+      <div className="composer-toolbar flex items-end gap-1" data-testid="composer-toolbar">
+        {plusMenu}
+        {editable ? (
+          <div className="relative min-w-0 flex-1">
             <Textarea
               ref={textareaRef}
               data-compose-target=""
+              aria-label={t(placeholder)}
               className={`composer-placeholder composer-input ${COMPOSER_INPUT} ${MENTION_TEXTAREA_CLS}`}
               placeholder={t(placeholder)}
               value={draft}
@@ -184,42 +244,84 @@ export function Composer({
                 : {})}
             />
             <MentionHighlight text={draft} registry={mentionRegistry} textareaRef={textareaRef} />
+            <MentionInline
+              open={inlineOpen}
+              rows={inlineRows}
+              caret={inlineCaret}
+              query={inlineQuery}
+              highlight={inlineHighlight}
+              onHover={setInlineHighlight}
+              onPick={acceptInlineRow}
+              listboxRef={inlineListboxRef}
+              listboxId={inlineListboxId}
+            />
+            <SlashMenu
+              open={slashOpen}
+              sections={slashSections.map((s) => ({
+                title: s.section === 'builtin' ? t('命令') : t('技能'),
+                rows: s.rows,
+              }))}
+              caret={slashCaret}
+              query={slashQuery}
+              highlight={slashHighlight}
+              onHover={setSlashHighlight}
+              onPick={(row) => acceptSlashRow(row, 'enter')}
+              listboxRef={slashListboxRef}
+              listboxId={slashListboxId}
+            />
           </div>
-          <MentionInline
-            open={inlineOpen}
-            rows={inlineRows}
-            caret={inlineCaret}
-            query={inlineQuery}
-            highlight={inlineHighlight}
-            onHover={setInlineHighlight}
-            onPick={acceptInlineRow}
-            listboxRef={inlineListboxRef}
-            listboxId={inlineListboxId}
-          />
-          <SlashMenu
-            open={slashOpen}
-            sections={slashSections.map((s) => ({
-              title: s.section === 'builtin' ? t('命令') : t('技能'),
-              rows: s.rows,
-            }))}
-            caret={slashCaret}
-            query={slashQuery}
-            highlight={slashHighlight}
-            onHover={setSlashHighlight}
-            onPick={(row) => acceptSlashRow(row, 'enter')}
-            listboxRef={slashListboxRef}
-            listboxId={slashListboxId}
-          />
-        </>
-      ) : (
-        <div
-          className="flex items-center gap-2 px-0.5 pb-2.5 text-ui leading-5.5 text-(--text-secondary)"
-          data-testid="composer-placeholder"
-        >
-          {readOnly && <Lock width={16} height={16} className="flex-none" />}
-          {t(placeholder)}
-        </div>
-      )}
+        ) : (
+          <div
+            className="flex min-h-7 min-w-0 flex-1 items-center gap-2 px-1.5 text-ui leading-5 text-(--text-secondary)"
+            data-testid="composer-placeholder"
+          >
+            {readOnly && <Lock width={16} height={16} className="flex-none" />}
+            {t(placeholder)}
+          </div>
+        )}
+        {!readOnly && (
+          <>
+            {streaming && elapsed != null && (
+              <span
+                className="flex h-7 flex-none items-center px-1 text-meta tabular-nums text-(--text-tertiary)"
+                data-testid="composer-working"
+              >
+                {t('工作中 · {time}', { time: formatClock(elapsed) })}
+              </span>
+            )}
+            {streaming && (
+              <IconTooltip
+                label={t('停止')}
+                trigger={
+                  <Button
+                    variant="ghost"
+                    className={`composer-stop ${COMPOSER_SQUARE} text-foreground hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground`}
+                    onClick={onStop}
+                  />
+                }
+              >
+                <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
+              </IconTooltip>
+            )}
+            <IconTooltip
+              label={t('发送')}
+              trigger={
+                <Button
+                  variant="ghost"
+                  className={`composer-send ${COMPOSER_SQUARE} transition-[background-color,color] duration-(--dur-fast) ease-[cubic-bezier(0.2,0,0,1)] ${
+                    hasContent
+                      ? 'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button) hover:text-(--text-on-accent) dark:hover:bg-(--card-button) dark:hover:text-(--text-on-accent)'
+                      : 'bg-transparent text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-secondary) dark:hover:bg-(--menu-hover) dark:hover:text-(--text-secondary)'
+                  }`}
+                  onClick={send}
+                />
+              }
+            >
+              <CornerDownLeft width={16} height={16} />
+            </IconTooltip>
+          </>
+        )}
+      </div>
       <Input
         ref={fileInputRef}
         type="file"
@@ -228,73 +330,6 @@ export function Composer({
         onChange={onPickFiles}
         accept="text/*,image/*,application/json,application/pdf,application/xml"
       />
-      {!readOnly && (
-        <div
-          className="composer-toolbar -ml-1 flex items-center gap-0.5"
-          data-testid="composer-toolbar"
-        >
-          <IconTooltip
-            label={t('添加附件')}
-            trigger={
-              <Button
-                variant="ghost"
-                className={`composer-tool ${COMPOSER_TOOL}`}
-                disabled={attaching || !onAttachment}
-                onClick={openFilePicker}
-              />
-            }
-          >
-            <Plus width={16} height={16} />
-          </IconTooltip>
-          {aiReview && (
-            <IconTooltip
-              label={t('AI 审核')}
-              trigger={
-                <Button
-                  variant="ghost"
-                  className={`composer-tool ${COMPOSER_TOOL} w-auto gap-1.5 px-2 text-meta`}
-                  onClick={onReview}
-                />
-              }
-            >
-              <SearchPlus width={16} height={16} />
-              {t('审阅')}
-            </IconTooltip>
-          )}
-          <div className="ml-auto flex items-center gap-2">
-            {streaming && elapsed != null && (
-              <span
-                className="text-meta tabular-nums text-(--text-tertiary)"
-                data-testid="composer-working"
-              >
-                {t('工作中 · {time}', { time: formatClock(elapsed) })}
-              </span>
-            )}
-            {streaming && (
-              <Button
-                variant="ghost"
-                className={`composer-stop ${COMPOSER_SQUARE} bg-secondary text-foreground hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground`}
-                aria-label={t('停止')}
-                onClick={onStop}
-              >
-                <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              className={`composer-send ${COMPOSER_SQUARE} transition-[background-color,color] duration-(--dur-fast) ease-[cubic-bezier(0.2,0,0,1)] ${
-                hasContent
-                  ? 'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button) hover:text-(--text-on-accent) dark:hover:bg-(--card-button) dark:hover:text-(--text-on-accent)'
-                  : 'bg-secondary text-(--text-tertiary) hover:bg-secondary hover:text-(--text-tertiary) dark:hover:bg-secondary dark:hover:text-(--text-tertiary)'
-              }`}
-              aria-label={t('发送')}
-              onClick={send}
-            >
-              <ArrowUp width={14} height={14} />
-            </Button>
-          </div>
-        </div>
-      )}
       <SlashHelp
         open={helpOpen}
         onClose={closeHelp}

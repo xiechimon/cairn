@@ -1,7 +1,7 @@
 import { parseReplyQuote } from '@cairn/shared';
 import { Ellipsis, Reply } from 'lucide-react';
 import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
-import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
+import { isUsableTimestamp } from '../board/rel-time.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal, TypingDots } from '../components/chat/live-row.js';
@@ -43,6 +43,7 @@ import { REPLY_SOURCE_ATTR } from './selection-reply-model.js';
 import type { ThreadActivity } from './thread-activity.js';
 import { ThreadActivityRow, ThreadEventLine } from './thread-activity-row.js';
 import { ThreadReportReply } from './thread-report-reply.js';
+import { messageStampLabel } from './time-dividers.js';
 
 const MSG_TOOL_BTN_CLS =
   "size-6 cursor-pointer rounded-none border-none bg-transparent text-(--text-tertiary) hover:bg-(--secondary) hover:text-(--text-secondary) dark:hover:bg-(--secondary) aria-expanded:bg-muted aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
@@ -71,7 +72,7 @@ function MessageStamp({ createdAt, fallback }: { createdAt?: number; fallback?: 
       dateTime={new Date(createdAt).toISOString()}
       title={absolute}
     >
-      {relativeTime(createdAt, Math.max(now, createdAt), t)}
+      {messageStampLabel(createdAt, Math.max(now, createdAt), locale, t)}
     </time>
   );
 }
@@ -85,14 +86,14 @@ const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
 
 const SCROLLER_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
 
-const USER_ROW_CLS = 'mt-6';
-const EVENT_ROW_CLS = 'mt-6';
-const REPLY_ROW_CLS = 'mt-6';
+const USER_ROW_CLS = 'mt-5 pointer-coarse:mt-7';
+const EVENT_ROW_CLS = 'mt-5 pointer-coarse:mt-7';
+const REPLY_ROW_CLS = 'mt-5 pointer-coarse:mt-7';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = 'w-full max-w-full';
-const BUBBLE_ROBOT_CLS = `w-full border-0 voice-response ${CHAT_BODY_CLS}`;
+const BUBBLE_ROBOT_CLS = `w-full border-0 font-sans ${CHAT_BODY_CLS}`;
 const MARKER_ERROR_CLS =
   'my-2.5 flex-col items-start gap-0.5 rounded-(--radius-card) bg-danger-soft px-3 py-2.5 text-left text-meta text-(--destructive)';
 
@@ -159,6 +160,10 @@ function TaskRefRows({ source }: { source: Parameters<typeof taskRefsOf>[0] }) {
           data-testid="chief-task-ref"
           className="ml-1 flex w-fit max-w-full cursor-pointer items-center gap-1.5 text-meta font-medium text-(--foreground) no-underline hover:underline"
         >
+          <span
+            aria-hidden="true"
+            className="size-2.5 flex-none translate-y-1 rounded-tl-md border-t border-l border-(--text-tertiary)"
+          />
           <TodoStatus phase={ref.phase} />
           <span className="min-w-0 truncate">{ref.title ?? `#${ref.seq ?? ''}`}</span>
           <span className="flex-none font-normal text-(--text-tertiary)">

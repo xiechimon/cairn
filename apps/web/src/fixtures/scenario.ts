@@ -1,5 +1,6 @@
 import { accountsDefault, accountsEmpty } from './accounts.js';
 import { activityFixture, activityManyFixture } from './activity.js';
+import { chiefDraft } from './chief-draft.js';
 import { CHIEF_MARK_SCENARIOS } from './chief-mark.js';
 import { chiefQuickReplies } from './chief-quick-replies.js';
 import { demoFixture } from './demo.js';
@@ -367,6 +368,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'chief-code': chiefCode,
       'chief-question': chiefQuestion,
       'chief-quick-replies': chiefQuickReplies,
+      'chief-draft': chiefDraft,
       'secrets-list': secretsList,
       'chief-agent-chip': chiefAgentChip,
       'fab-avatar': chiefFabAvatar,

@@ -25,10 +25,18 @@ import { fleetStatus } from './fleet-status.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
 import { projectStatuses, waitingProjectIds } from './sidebar-projects.js';
 import { needsYouBadge } from './tasks-sections.js';
-import { useNarrow } from './use-narrow.js';
+import { THREAD_PARAM } from './thread-copy.js';
+import { useNarrow, usePanelDocked } from './use-narrow.js';
 import { useTasksView } from './use-tasks-view.js';
+import { PANE_PARAM, paneOf } from './work-panel.js';
 
 export const SIDEBAR_STORAGE_KEY = 'cairn.sidebar-collapsed';
+
+export function sidePanelOpen(pathname: string, search: string): boolean {
+  if (pathname !== '/app') return false;
+  const params = new URLSearchParams(search);
+  return paneOf(params.get(PANE_PARAM)) !== null || params.get(THREAD_PARAM) !== null;
+}
 
 function readCollapsed(storage: Storage | null): boolean {
   try {
@@ -85,6 +93,7 @@ export function AppSidebar({
   const searchResults = useSearchResults(search.query, live && search.open);
   const [collapsed, setCollapsed] = useState(() => readCollapsed(safeLocalStorage()));
   const narrow = useNarrow();
+  const docked = usePanelDocked();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
   const location = useLocation();
@@ -92,13 +101,20 @@ export function AppSidebar({
   useEffect(() => {
     setDrawerOpen(false);
   }, [locationKey]);
+  const panelOpen = docked && sidePanelOpen(location.pathname, location.search);
+  const [panelSeen, setPanelSeen] = useState(panelOpen);
+  const [folded, setFolded] = useState(panelOpen);
+  if (panelSeen !== panelOpen) {
+    setPanelSeen(panelOpen);
+    setFolded(panelOpen);
+  }
+  const railed = collapsed || folded;
   const toggle = useCallback(() => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      safeSetItem(SIDEBAR_STORAGE_KEY, next ? '1' : '0');
-      return next;
-    });
-  }, []);
+    const next = !railed;
+    setFolded(false);
+    setCollapsed(next);
+    safeSetItem(SIDEBAR_STORAGE_KEY, next ? '1' : '0');
+  }, [railed]);
   const resolvedTodos = useMemo(
     () => todos ?? (live ? (todosQ.data ?? []).map(toDisplayTodo) : fixture.todos),
     [todos, live, todosQ.data, fixture.todos],
@@ -193,7 +209,7 @@ export function AppSidebar({
           </Dialog>
         </>
       ) : (
-        <BoardSidebar collapsed={collapsed} onToggle={toggle} {...sidebarProps} />
+        <BoardSidebar collapsed={railed} onToggle={toggle} {...sidebarProps} />
       )}
       {searchPanel && (
         <SearchPanel

@@ -24,15 +24,15 @@ Nothing else stores or clears suggestions. Visibility is derived from the conver
 
 Unchanged endpoints. The row reaches the web in `GET /api/conversations/:id/messages` and on the conversation SSE stream (`convHub.publishMessage`), like a notice. Old clients ignore an unknown system row (`collectChiefStream` skips it). Old servers never write one, so new clients show no chips.
 
-## Reader: `liveQuickReplies(rows, {running})`
+## Reader: `liveQuickReplies(rows, {running, runningStepId})`
 
 Shared pure function, used by the web `mapChief` to set `ChiefContent.quickReplies`. It returns the replies of the newest valid row only when:
 
 | # | Row | Expected | Test |
 |---|---|---|---|
-| 1 | Latest message is the Coordinator's reply from the same turn, turn finished | chips shown | shared `quick-replies.test.ts` "shows…"; e2e "shows chips" |
+| 1 | Latest message is the Coordinator's reply from the same turn, turn finished or still running (owner fidelity pass, 2026-11-11: the chat draft shows the chips while the turn that offered them keeps working) | chips shown | shared `quick-replies.test.ts` "shows…", "same turn is still running"; e2e "shows chips", "chips stay while the turn that offered them is still running" |
 | 2 | Owner sends anything after it (chip or typed; a user row exists after it) | hidden | shared "owner send"; e2e "click sends" |
-| 3 | New turn starts (thread `activeRun` set, or an event-turn prompt row after it) | hidden | shared "new turn"; e2e "hidden while running" |
+| 3 | A newer turn starts: the thread runs (`activeRun` set) and the live step activity names a different step than the row's `stepId`, or names none yet (a wake turn writes its prompt row only when it ends), or an event-turn prompt row follows it | hidden | shared "hidden once a newer turn runs"; server "new event turn"; e2e "chips hide while a newer Coordinator turn is running" |
 | 4 | A question is pending (pending `ask_user_question` row, or the web question dock shows any question) | hidden; dock wins | shared "pending question"; e2e "hidden with question" |
 | 5 | Any non-assistant row after it (notice, thread report, turn error, stop marker) | hidden | shared "later system row" |
 | 6 | Turn produced no reply text (no assistant text after the turn's start) | hidden | shared "no anchor" |

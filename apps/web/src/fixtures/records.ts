@@ -637,6 +637,12 @@ export interface ModelOption {
   liveness?: 'alive' | 'dead' | 'unknown';
 }
 
+export interface ChiefContextUsage {
+  tokens: number;
+  contextWindow: number;
+  resume?: 'warm' | 'cold' | 'compacted' | 'idle';
+}
+
 export interface ChiefContent {
   view: 'settings' | 'none';
   tab?: ChiefSettingsTab;
@@ -657,4 +663,5 @@ export interface ChiefContent {
   fallbackModel?: string;
   hasEarlier?: boolean;
   quickReplies?: string[];
+  context?: ChiefContextUsage;
 }

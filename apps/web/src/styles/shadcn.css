@@ -115,10 +115,10 @@
   --sidebar-w: 248px;
   --chat-max-w: 768px;
   --composer-max-h: 384px;
-  --composer-bottom-gap: 24px;
+  --composer-bottom-gap: 16px;
   --scroll-fade-size: 28px;
   --chat-fade-size: 64px;
-  --chat-end-space: 64px;
+  --chat-end-space: 16px;
   --chat-extra-space: 35vh;
   --type-scale: calc(var(--rem-scale) * 17 / 16);
   --type-page: calc(1.5rem * var(--type-scale));

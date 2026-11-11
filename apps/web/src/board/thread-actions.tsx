@@ -47,17 +47,11 @@ const ACTION_COPY: Record<ThreadActionKind, { reason: string; primary: string }>
   unarchive: { reason: '已归档。', primary: '取消归档' },
 };
 
-export interface ThreadQuickReply {
-  id: 'finish' | 'approve';
-  label: string;
-  run: () => void;
-  disabled: boolean;
-}
+const ACTION_LINK = 'h-7 px-0 text-meta';
 
 export interface ThreadActions {
   card: ReactNode;
   menu: ReactNode;
-  quickReplies: ThreadQuickReply[];
 }
 
 export function useThreadActions({
@@ -170,28 +164,28 @@ export function useThreadActions({
       <div
         data-testid="side-chat-action"
         data-action={kind}
-        className="mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-card) bg-card px-3.5 py-2.5 shadow-(--e1)"
+        className="mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-wrap items-center gap-x-3 gap-y-1 px-1 text-meta"
       >
-        <p className="m-0 min-w-0 flex-1 basis-48 text-meta text-content-secondary">
+        <p className="m-0 min-w-0 flex-1 basis-48 text-content-tertiary">
           {t(ACTION_COPY[kind].reason)}
         </p>
-        <div className="flex flex-none gap-2">
+        <div className="flex flex-none items-center gap-3">
           {kind === 'approve' && onViewPlan !== undefined && (
-            <Button size="sm" variant="outline" onClick={onViewPlan} className="h-7 px-2.5">
+            <Button variant="link" onClick={onViewPlan} className={ACTION_LINK}>
               {t('查看计划')}
             </Button>
           )}
           {canFinishFailed && (
-            <Button size="sm" variant="outline" onClick={openAccept} className="h-7 px-2.5">
+            <Button variant="link" onClick={openAccept} className={ACTION_LINK}>
               {t('完成…')}
             </Button>
           )}
           <Button
-            size="sm"
+            variant="link"
             onClick={runPrimary[kind]}
             disabled={pending || orchestrating}
             data-orchestrating={orchestrating ? 'true' : undefined}
-            className="h-7 px-2.5"
+            className={`${ACTION_LINK} font-medium`}
           >
             {(pending || orchestrating) && <Spinner data-icon="inline-start" />}
             {orchestrating ? t('编排中') : t(ACTION_COPY[kind].primary)}
@@ -279,13 +273,5 @@ export function useThreadActions({
     </>
   );
 
-  const quickReplies: ThreadQuickReply[] = archived
-    ? []
-    : phase === 'review'
-      ? [{ id: 'finish', label: '标记完成', run: openAccept, disabled: pending }]
-      : phase === 'confirm'
-        ? [{ id: 'approve', label: '批准计划', run: approve, disabled: pending }]
-        : [];
-
-  return { card, menu, quickReplies };
+  return { card, menu };
 }

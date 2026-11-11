@@ -306,26 +306,6 @@ function ThreadBody({
           />
         </div>
       )}
-      {actions.quickReplies.length > 0 && (
-        <div
-          data-testid="side-chat-quick"
-          className="mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-wrap gap-1.5"
-        >
-          {actions.quickReplies.map((reply) => (
-            <Button
-              key={reply.id}
-              size="sm"
-              variant="secondary"
-              data-quick={reply.id}
-              disabled={reply.disabled}
-              onClick={reply.run}
-              className="h-7 rounded-full px-3 font-medium"
-            >
-              {t(reply.label)}
-            </Button>
-          ))}
-        </div>
-      )}
       <Composer
         placeholder={
           archived
@@ -333,7 +313,7 @@ function ThreadBody({
             : todo.phase === 'closed'
               ? t('已关闭，不能再回复')
               : chat.started
-                ? t('回复 #{seq}…', { seq: todo.seqNum })
+                ? t('回复这个任务')
                 : t('开始后才能回复 #{seq}', { seq: todo.seqNum })
         }
         aiReview={false}

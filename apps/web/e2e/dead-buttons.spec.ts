@@ -63,7 +63,8 @@ test('composer toolbar drops the `语音输入` button, keeps attachment', async
   await expect(toolbar).toBeVisible();
 
   await expect(toolbar.locator('button[aria-label="语音输入"]')).toHaveCount(0);
-  await expect(toolbar.locator('button[aria-label="添加附件"]')).toBeVisible();
+  await toolbar.locator('button[aria-label="更多"]').click();
+  await expect(page.getByRole('menuitem', { name: '添加附件' })).toBeVisible();
 });
 
 test('api-keys empty state drops the `查看文档` button, keeps `新建密钥` (#307)', async ({ page }) => {

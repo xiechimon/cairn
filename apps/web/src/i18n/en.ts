@@ -323,7 +323,6 @@ export const EN: Record<string, string> = {
   已压实: 'Compacted',
   '{state} · {percent}%（示意）': '{state} · {percent}% (mock)',
   '{state} · {percent}%': '{state} · {percent}%',
-  'AI 审核': 'AI review',
   移除附件: 'Remove attachment',
   '上传中 {percent}%': 'Uploading {percent}%',
   '此任务为只读，请在实时工作区中打开后继续。':
@@ -1511,6 +1510,7 @@ export const EN: Record<string, string> = {
   '没发出去，再试一次。': 'Not sent. Try again.',
   '回复 #{seq}': 'Reply to #{seq}',
   '回复 #{seq}…': 'Reply to #{seq}…',
+  回复这个任务: 'Reply to this task',
   '你直接对 #{n} 说：{excerpt}': 'You told #{n} directly: {excerpt}',
   'Coordinator 直接对 #{n} 说：{excerpt}': 'The Coordinator told #{n} directly: {excerpt}',
   '任务 #{n}': 'Task #{n}',

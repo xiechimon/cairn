@@ -36,18 +36,34 @@ test('a thread with no originating message shows no origin line', async ({ page 
   await expect(page.getByTestId('thread-origin')).toHaveCount(0);
 });
 
-test('the quick reply marks the task done through the same dialog as the action card', async ({
+test('a task waiting for review offers finishing once, as a quiet note above the composer', async ({
   page,
 }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
-  await page.getByTestId('side-chat-quick').getByRole('button', { name: '标记完成' }).click();
+  const note = page.getByTestId('side-chat-action');
+  await expect(note).toHaveAttribute('data-action', 'finish');
+  await expect(page.locator('.side-panel').getByRole('button', { name: /^(完成…|标记完成)$/ })).toHaveCount(1);
+  const face = await note.evaluate((el) => {
+    const button = el.querySelector('button')!;
+    return {
+      shadow: getComputedStyle(el).boxShadow,
+      fill: getComputedStyle(el).backgroundColor,
+      buttonFill: getComputedStyle(button).backgroundColor,
+    };
+  });
+  expect(face).toEqual({
+    shadow: 'none',
+    fill: 'rgba(0, 0, 0, 0)',
+    buttonFill: 'rgba(0, 0, 0, 0)',
+  });
+  await note.getByRole('button', { name: '完成…' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 
-test('a working thread offers no quick replies', async ({ page }) => {
+test('a working thread offers no action note', async ({ page }) => {
   await page.goto(`${HOME}&thread=home-c-working-c`);
   await expect(panel(page)).toBeVisible();
-  await expect(page.getByTestId('side-chat-quick')).toHaveCount(0);
+  await expect(page.getByTestId('side-chat-action')).toHaveCount(0);
 });
 
 test('back returns to the tasks list and close leaves the panel area empty', async ({ page }) => {

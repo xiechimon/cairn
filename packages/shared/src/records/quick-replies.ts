@@ -110,14 +110,14 @@ function hasReplyText(content: unknown): boolean {
 
 export function liveQuickReplies(
   rows: readonly QuickRepliesRow[],
-  state: { running: boolean },
+  state: { running: boolean; runningStepId?: string | null },
 ): string[] {
-  if (state.running) return [];
   if (rows.some(isPendingQuestion)) return [];
   const at = rows.findLastIndex((row) => kindOf(row.content) === QUICK_REPLIES_KIND);
   if (at < 0) return [];
   const content = quickRepliesContentSchema.safeParse(parsedContent(rows[at]?.content));
   if (!content.success) return [];
+  if (state.running && state.runningStepId !== content.data.stepId) return [];
   const after = rows.slice(at + 1);
   if (after.some((row) => row.role !== 'assistant')) return [];
   const turnStart = rows.slice(0, at).findLastIndex((row) => row.role === 'user');

@@ -48,6 +48,7 @@ export function TaskRow({
   onOpen,
 }: TaskRowProps) {
   const linkRoom = prLink != null ? 'pr-16' : undefined;
+  const checkable = check !== undefined && check !== 'none';
   const row = (
     <Button
       variant="ghost"
@@ -56,19 +57,18 @@ export function TaskRow({
       onClick={onOpen}
       className={cn(
         'h-auto w-full items-start justify-start gap-2.5 rounded-(--radius-control) px-2.5 py-2 text-left font-normal whitespace-normal hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)',
-        check !== undefined && 'pl-8',
         menu != null && 'pointer-coarse:pr-12',
       )}
     >
-      <span className="mt-0.75 flex-none">
-        <Glyph glyph={glyph} waiting={waiting} />
+      <span className="mt-0.5 flex size-4 flex-none items-center justify-center">
+        {!checkable && <Glyph glyph={glyph} waiting={waiting} />}
       </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex min-w-0 items-baseline gap-3">
           <span
             data-slot="task-row-title"
             className={cn(
-              'line-clamp-2 min-w-0 flex-1 text-ui leading-5',
+              'min-w-0 flex-1 truncate text-ui leading-5',
               muted ? 'text-content-secondary' : 'font-medium text-foreground',
             )}
           >
@@ -76,7 +76,7 @@ export function TaskRow({
           </span>
           <span
             className={cn(
-              'flex flex-none items-center gap-1.5 text-meta leading-5 text-content-tertiary tabular-nums',
+              'flex flex-none items-center gap-1.5 text-caption leading-5 text-content-tertiary tabular-nums',
               menu != null &&
                 'pointer-fine:group-hover/task:invisible pointer-fine:group-focus-within/task:invisible pointer-fine:group-has-aria-expanded/task:invisible',
             )}
@@ -93,26 +93,26 @@ export function TaskRow({
         </span>
         <span
           data-slot="task-row-what"
-          className={cn('text-meta leading-5 text-content-secondary', where === null && linkRoom)}
+          className={cn(
+            'flex min-w-0 items-baseline gap-1 text-caption leading-4.5 text-content-tertiary',
+            linkRoom,
+          )}
         >
-          <span className={waiting ? `${ACCENT_INK} font-medium` : 'text-content-tertiary'}>
-            {word}
+          <span className="min-w-0 truncate">
+            <span className={waiting ? `${ACCENT_INK} font-medium` : undefined}>{word}</span>
+            {' · '}
+            {what}
           </span>
-          <span className="text-content-tertiary"> · </span>
-          {what}
+          {waiting && where !== null && (
+            <span
+              data-slot="task-row-where"
+              className="flex flex-none items-center gap-0.5 text-content-secondary"
+            >
+              <ArrowRight aria-hidden className="size-3.5" strokeWidth={1.75} />
+              {where}
+            </span>
+          )}
         </span>
-        {where !== null && (
-          <span
-            data-slot="task-row-where"
-            className={cn(
-              'flex items-center gap-1 text-meta leading-5 text-content-secondary',
-              linkRoom,
-            )}
-          >
-            <ArrowRight aria-hidden className="size-3.5 text-content-tertiary" strokeWidth={1.75} />
-            {where}
-          </span>
-        )}
       </span>
     </Button>
   );
@@ -120,12 +120,13 @@ export function TaskRow({
   return (
     <div data-slot="task-row-frame" className="group/task relative">
       {row}
-      {check !== undefined && check !== 'none' && (
+      {checkable && (
         <Checkbox
           aria-label={check.label}
           checked={false}
           onCheckedChange={check.onCheck}
-          className="absolute top-2.5 left-2.5"
+          data-waiting={waiting ? '' : undefined}
+          className="absolute top-2.5 left-2.5 data-waiting:border-(--card-button)"
         />
       )}
       {prLink != null && (
@@ -133,7 +134,7 @@ export function TaskRow({
           number={prLink.number}
           url={prLink.url}
           className={cn(
-            'absolute right-2.5 bottom-2 text-meta leading-5',
+            'absolute right-2.5 bottom-2 text-caption leading-4.5',
             menu != null && 'pointer-coarse:right-12',
           )}
         />

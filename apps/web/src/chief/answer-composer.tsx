@@ -2,6 +2,7 @@ import { type ReactNode, type Ref, useEffect, useRef, useSyncExternalStore } fro
 import { ShortcutHint } from '../components/shortcut-hint.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
+import type { ChiefContextUsage } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { joinDraft, splitDraft } from '../overlay/attachment-paste.js';
 import { keyedBinding } from './composer-binding.js';
@@ -26,8 +27,7 @@ export interface AnswerComposerProps {
   above: ReactNode;
   tools: ReactNode;
   menu?: ReactNode;
-  running: boolean;
-  turnElapsed: number | null;
+  context?: ChiefContextUsage | undefined;
   threadId?: string | null;
   onFocusEnter: () => void;
   onFocusLeave: () => void;
@@ -44,8 +44,7 @@ export function AnswerComposer({
   above,
   tools,
   menu,
-  running,
-  turnElapsed,
+  context,
   threadId = null,
   onFocusEnter,
   onFocusLeave,
@@ -108,8 +107,7 @@ export function AnswerComposer({
       tools={tools}
       menu={menu}
       canStop={false}
-      running={running}
-      turnElapsed={turnElapsed}
+      context={context}
       threadId={threadId}
     />
   );

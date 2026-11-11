@@ -16,7 +16,7 @@ const CONTEXT_RESUME_SHORT: Record<ContextResumeState, string> = {
 };
 
 const METER_BTN_CLS =
-  "size-7 pointer-coarse:size-11 cursor-default rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground [&_svg:not([class*='size-'])]:size-auto";
+  'h-7 w-auto gap-1.5 px-1.5 pointer-coarse:h-11 cursor-default rounded-(--radius-control) text-caption font-normal tabular-nums text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-secondary) dark:hover:bg-(--menu-hover) dark:hover:text-(--text-secondary)';
 
 const VIEW = 24;
 const STROKE = 3;
@@ -91,7 +91,7 @@ function contextMeterLabel(
 function ContextMeterGlyph({ filled }: { filled: number }) {
   const arc = contextMeterArcPath(filled);
   return (
-    <svg viewBox={`0 0 ${VIEW} ${VIEW}`} aria-hidden="true" className="size-4">
+    <svg viewBox={`0 0 ${VIEW} ${VIEW}`} aria-hidden="true" className="size-3.5">
       <circle
         cx={CX}
         cy={CY}
@@ -108,7 +108,6 @@ function ContextMeterGlyph({ filled }: { filled: number }) {
           stroke="currentColor"
           strokeWidth={STROKE}
           strokeLinecap="round"
-          className="text-foreground"
         />
       )}
     </svg>
@@ -145,28 +144,7 @@ export function ContextMeterRing({
       }
     >
       <ContextMeterGlyph filled={filled} />
+      <span aria-hidden="true">{`${filled}%`}</span>
     </IconTooltip>
-  );
-}
-
-export function ContextMeterMenuRow({
-  percent = MOCK_CONTEXT_PERCENT,
-  mock = true,
-  resume = null,
-}: ContextMeterRingProps) {
-  const { t } = useI18n();
-  const filled = clampContextPercent(percent);
-  return (
-    <div
-      role="presentation"
-      data-testid="composer-context-meter"
-      data-mock={mock ? '' : undefined}
-      data-percent={filled}
-      data-resume={resume ?? undefined}
-      className="flex items-center gap-2 px-2.5 py-1.5 text-ui text-(--text-secondary)"
-    >
-      <ContextMeterGlyph filled={filled} />
-      <span>{contextMeterLabel(t, filled, mock, resume)}</span>
-    </div>
   );
 }

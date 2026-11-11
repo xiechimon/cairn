@@ -28,7 +28,7 @@ export function QuickReplies({
     <fieldset
       aria-label={t('建议回复')}
       data-testid="chief-quick-replies"
-      className="mx-auto mb-2.5 flex w-[calc(100%-2rem)] max-w-160 min-w-0 flex-none flex-wrap gap-1.5 border-0 p-0"
+      className="mx-auto flex w-[calc(100%-2rem)] max-w-160 min-w-0 flex-none flex-wrap gap-1.5 border-0 p-0"
     >
       {replies.map((text) => (
         <Button

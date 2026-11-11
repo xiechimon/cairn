@@ -183,6 +183,13 @@ export function HomeC({
   const conversation = stream.filter(
     (item) => !(item.kind === 'question' && item.status === 'pending'),
   );
+  const todoGlances = useMemo(
+    () =>
+      new Map(
+        todos.map((todo) => [todo.id, { phase: todo.phase, seq: todo.seqNum, title: todo.title }]),
+      ),
+    [todos],
+  );
   const scopedTasks = useMemo(() => scopeTasks(tasks, projectId), [tasks, projectId]);
   const badge = needsYouBadge(scopedTasks.entries, scopedTasks.questions);
   const taskById = useMemo(
@@ -544,6 +551,7 @@ export function HomeC({
                 showBindGate={!live}
                 hero={hero}
                 lead={lead}
+                todoGlances={todoGlances}
                 prefill={prefill}
                 placeholder={
                   projectName != null

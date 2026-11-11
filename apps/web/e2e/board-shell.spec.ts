@@ -22,7 +22,7 @@ test('a project filter keeps home and marks the project; an unknown project show
 
 for (const viewport of [{ width: 1440, height: 732 }, { width: 390, height: 844 }]) {
   for (const theme of ['light', 'dark']) {
-    test(`home and detail share a 24px gap from the composer block to the sheet bottom at ${viewport.width}px in ${theme}`, async ({ page }, testInfo) => {
+    test(`home and detail share a 16px gap from the composer block to the sheet bottom at ${viewport.width}px in ${theme}`, async ({ page }, testInfo) => {
       await page.setViewportSize(viewport);
       await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
       const gaps: number[] = [];
@@ -52,8 +52,8 @@ for (const viewport of [{ width: 1440, height: 732 }, { width: 390, height: 844 
         await testInfo.attach(route.name, { path: screenshot, contentType: 'image/png' });
       }
       for (const gap of gaps) {
-        expect.soft(gap).toBeGreaterThanOrEqual(20);
-        expect.soft(gap).toBeCloseTo(24, 0);
+        expect.soft(gap).toBeGreaterThanOrEqual(12);
+        expect.soft(gap).toBeCloseTo(16, 0);
       }
       expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
     });
