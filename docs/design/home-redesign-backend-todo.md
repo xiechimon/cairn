@@ -34,6 +34,13 @@ A box marked **owner route** changes a security surface from `packages/shared/me
 - [ ] G-D. Attachment metadata endpoint, only if a size line is wanted.
 - [ ] G-E. Preview of office documents. Medium, new dependency, owner decision.
 
+## Message first
+
+The owner's rule: what the user sends shows at once; the network works behind it. Most of this is web work; the server parts are listed so nobody assumes they exist.
+
+- [ ] Send without waiting. A message leaves the composer and appears in the conversation the moment it is sent, marked pending; a failure turns the mark into an alert with retry, edit and delete instead of putting the text back in the composer. Today the web awaits the request and keeps the draft on failure. Web: an outbox kept across reloads, ordering against server messages, one retry path. Server: the idempotency ledger already exists (`apps/server/src/services/client-message.ts`, `clientMessageId`); confirm every send route goes through it so a retry never creates a second message, and that a retried send after a server-side success returns the stored response. **Design first** (delivery state: every path that reads or writes it and the behavior on each failure).
+- [ ] Show attachments before they upload. A picked or dropped image, video or file renders from the local copy at once and uploads in the background; a message with attachments still in flight waits in the outbox and sends when they finish, and a failed upload marks the message instead of blocking the composer. Server: resumable or retryable uploads for large files, and video is not an accepted type yet (allowlist in `packages/shared/src/attachment-types.ts`, size limit and quota in `apps/server/src/services/attachments.ts`).
+
 ## Voice input
 
 - [ ] Local transcription for the composer's microphone. The web ships a `VoiceSource` interface with two sources: a fixture source for tests and, as an interim the owner approved, the browser's built-in speech recognition, which sends audio to the browser vendor's service. Replace the interim with a small open-source speech model that runs locally in the background on the daemon or the server, behind the same interface, with the model selectable in settings. Work to do: survey the open-source local speech-recognition options (model size, Chinese and English quality, streaming support, licence, CPU and GPU cost), pick a default, then design the streaming contract (audio format in, interim and final events out, language, auth, errors). The web-side contract is in `docs/design/composer-voice-input.md` once the UI change lands; the trigger phrase that sends (`OK，发送`) is handled in the web. **Design first.**
