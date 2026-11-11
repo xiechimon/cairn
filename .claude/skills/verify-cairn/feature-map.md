@@ -16,12 +16,12 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `providers` | `设置` (Settings) › `模型` (Model) › `模型服务` (Providers) | [Model providers and subscriptions](#providers) |
 | `routing` | `设置` (Settings) › `模型` (Model) › `用量与连接` (Usage & connections) | [Model and work routing](#routing) |
 | `work-routing` | `设置` (Settings) › `模型` (Model) › `规则与策略` (Rules & policies) | [Model and work routing](#routing) |
-| `machines` | `设置` (Settings) › `执行` (Build) › `机器` (Machines) | [Machines](#machines) |
-| `skills` | `设置` (Settings) › `执行` (Build) › `技能` (Skills) | [Skills](#skills) |
-| `mcp` | `设置` (Settings) › `执行` (Build) › `MCP` | [MCP servers](#mcp-servers) |
-| `secrets` | `设置` (Settings) › `安全` › `密钥` (Secrets) | [Secrets](#secrets) |
-| `api-keys` | `设置` (Settings) › `安全` › `API 密钥` (API keys) | [API keys](#api-keys) |
-| `remote` | `设置` (Settings) › `安全` › `远程访问` (Remote access) | [Remote access over the tailnet](#remote-access) |
+| `machines` | `设置` (Settings) › `执行环境` (Execution) › `机器` (Machines) | [Machines](#machines) |
+| `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
+| `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
+| `secrets` | `设置` (Settings) › `安全` (Security) › `密钥` (Secrets) | [Secrets](#secrets) |
+| `api-keys` | `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys) | [API keys](#api-keys) |
+| `remote` | `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access) | [Remote access over the tailnet](#remote-access) |
 
 ## Features
 
@@ -508,7 +508,7 @@ Reach:
 3. `click testid:machine-concurrency-inc`
 
 - Web routes: `/app/resources/machines`, `/app/resources/machines/:id`
-- Settings: `设置` (Settings) › `执行` (Build) › `机器` (Machines)
+- Settings: `设置` (Settings) › `执行环境` (Execution) › `机器` (Machines)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `machine-list`, `machines-scroll`, `resource-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/machines-local-row.md](features/machines-local-row.md), [.claude/skills/verify-cairn/features/machine-concurrency.md](features/machine-concurrency.md)
@@ -589,7 +589,7 @@ Reach:
 3. `click testid:pairing-route-select`
 
 - Web routes: none
-- Settings: `设置` (Settings) › `安全` › `远程访问` (Remote access)
+- Settings: `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `pair-new-device`, `pairing-blocked`, `pairing-route-select`, `remote-routes-empty`, `tailnet-owner-identity`
 - Research: [docs/research/remote-access-tsnet.md](../../../docs/research/remote-access-tsnet.md), [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main)
@@ -647,7 +647,7 @@ Reach:
 2. `click testid:keys-empty`
 
 - Web routes: `/app/api-keys`
-- Settings: `设置` (Settings) › `安全` › `API 密钥` (API keys)
+- Settings: `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `keys-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/api-keys.md](features/api-keys.md)
@@ -826,7 +826,7 @@ Reach:
 2. `click testid:resource-row`
 
 - Web routes: `/app/resources/mcp-servers`
-- Settings: `设置` (Settings) › `执行` (Build) › `MCP`
+- Settings: `设置` (Settings) › `执行环境` (Execution) › `MCP`
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `resource-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/mcp-servers.md](features/mcp-servers.md)
@@ -951,7 +951,7 @@ Reach:
 3. `click testid:secret-scope`
 
 - Web routes: `/app/resources/secrets`
-- Settings: `设置` (Settings) › `安全` › `密钥` (Secrets)
+- Settings: `设置` (Settings) › `安全` (Security) › `密钥` (Secrets)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `resource-empty`, `secret-scope`
 - Research: [docs/research/1775-gateway-prior-art.md](../../../docs/research/1775-gateway-prior-art.md)
@@ -1010,7 +1010,7 @@ Reach:
 2. `click testid:resource-import`
 
 - Web routes: `/app/resources/skills`
-- Settings: `设置` (Settings) › `执行` (Build) › `技能` (Skills)
+- Settings: `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `resource-empty`, `resource-import`
 - Verify recipes: [.claude/skills/verify-cairn/features/skills-page.md](features/skills-page.md), [.claude/skills/verify-cairn/features/skill-import.md](features/skill-import.md), [.claude/skills/verify-cairn/features/skills-injection.md](features/skills-injection.md)
