@@ -32,7 +32,7 @@ A box marked **owner route** changes a security surface from `packages/shared/me
 
 ## Voice input
 
-- [ ] Transcription for the composer's microphone. The UI ships with a `VoiceSource` interface and a fixture source only; on a live stack the microphone is disabled with a reason. Needs a streaming transcription source (server endpoint or daemon side) with interim and final events, language choice, auth and a privacy decision on where audio goes. The contract is in `docs/design/composer-voice-input.md` once the UI change lands. The trigger phrase that sends (`OK，发送`) is handled in the web. **Design first.**
+- [ ] Local transcription for the composer's microphone. The web ships a `VoiceSource` interface with two sources: a fixture source for tests and, as an interim the owner approved, the browser's built-in speech recognition, which sends audio to the browser vendor's service. Replace the interim with a small open-source speech model that runs locally in the background on the daemon or the server, behind the same interface, with the model selectable in settings. Work to do: survey the open-source local speech-recognition options (model size, Chinese and English quality, streaming support, licence, CPU and GPU cost), pick a default, then design the streaming contract (audio format in, interim and final events out, language, auth, errors). The web-side contract is in `docs/design/composer-voice-input.md` once the UI change lands; the trigger phrase that sends (`OK，发送`) is handled in the web. **Design first.**
 
 ## Sidebar and projects
 
