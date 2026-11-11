@@ -21,6 +21,7 @@ import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { MachineAgentAccess } from './machine-agent-access.js';
 import { CONCURRENCY_SOURCE_LABEL, MachineConcurrencySelect } from './machine-concurrency.js';
 import { offlineGuidance } from './machine-offline.js';
 
@@ -310,6 +311,8 @@ export function MachineDetailPane({
           ))}
         </SettingsCard>
       </SettingsSection>
+
+      <MachineAgentAccess machine={machine} coordinator={chief.host} />
 
       {capabilities !== undefined && (
         <SettingsSection testId="machine-capabilities" title={t('能力')}>

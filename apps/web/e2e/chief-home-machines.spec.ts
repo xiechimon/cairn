@@ -58,13 +58,9 @@ test('a row opens that computer in the same panel and the back controls return t
     'aria-selected',
     'true',
   );
-  await expect(panel(page).getByRole('heading', { name: '能力' })).toBeVisible();
-  await expect(panel(page).getByText('辅助功能')).toBeVisible();
-  for (const name of ['桌面控制', '浏览器']) {
-    const toggle = panel(page).getByRole('switch', { name });
-    await expect(toggle).toBeDisabled();
-    await expect(toggle).not.toBeChecked();
-  }
+  await expect(panel(page).getByRole('heading', { name: '能力' })).toHaveCount(0);
+  await expect(panel(page).getByRole('switch')).toHaveCount(0);
+  await expect(panel(page).getByTestId('machine-folders-empty')).toBeVisible();
   await expect(panel(page).getByText('已安装')).toHaveCount(0);
   await expect(panel(page).getByText('未安装')).toHaveCount(0);
   await expect(panel(page).getByRole('heading', { name: '你的电脑' })).toHaveCount(0);
@@ -156,8 +152,7 @@ test('a computer page puts the status under the header and links its settings fr
   await expect(status).toHaveText(/^离线 · 12\d 分钟前检查过$/);
   await expect(status.getByTestId('machine-status-dot')).toHaveAttribute('data-online', 'false');
   await expect(panel(page).locator('[data-panel-head]')).not.toContainText('离线');
-  await expect(panel(page).getByRole('switch')).toHaveCount(2);
-  await expect(panel(page).locator('[data-slot="list-card"]').filter({ has: page.getByRole('switch') })).toHaveCount(1);
+  await expect(panel(page).getByRole('switch')).toHaveCount(0);
   await panel(page).getByRole('link', { name: '编辑' }).click();
   await expect(page).toHaveURL(/\/app\/settings\/machines\?machine=home-c-office/);
 });
@@ -197,7 +192,7 @@ test('the reference detail names the host, lists folders under access, and work 
   const folders = panel(page).getByTestId('machine-folder');
   await expect(folders).toHaveText(['tmp已开放', '~/Code已开放']);
   await expect(folders.first().locator('.font-mono')).toHaveText('tmp');
-  await expect(panel(page).getByRole('switch')).toHaveCount(2);
+  await expect(panel(page).getByRole('switch')).toHaveCount(0);
 
   await panel(page).getByRole('tab', { name: '在这台工作' }).click();
   await expect(panel(page).getByTestId('machine-folder')).toHaveCount(0);
@@ -231,5 +226,6 @@ test('a live computer without the running list falls back to its running count o
   await expect(panel(page).getByTestId('machine-running-empty')).toHaveText('这台电脑上有 2 个任务在跑。');
   await expect(panel(page).getByTestId('machine-running-row')).toHaveCount(0);
   await panel(page).getByRole('tab', { name: 'Agent 的权限' }).click();
-  await expect(panel(page).getByText('Agent 在这台电脑上能用的文件夹')).toHaveCount(0);
+  await expect(panel(page).getByText('Agent 在这台电脑上能用的文件夹')).toBeVisible();
+  await expect(panel(page).getByTestId('machine-folders-empty')).toHaveText('还没有开放任何文件夹');
 });

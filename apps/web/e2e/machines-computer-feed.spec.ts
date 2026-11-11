@@ -507,12 +507,8 @@ test('with a machine listed the panel still shows its card and the screen placeh
   await card.getByRole('tab', { name: 'Agent 的权限' }).click();
   await expect(card.getByText('已安装')).toHaveCount(0);
   await expect(card.getByText('未安装')).toHaveCount(0);
-  await expect(card.getByRole('switch', { name: '桌面控制' })).toBeEnabled();
-  const browser = card.getByRole('switch', { name: '浏览器' });
-  await expect(browser).toBeEnabled();
-  await expect(browser).not.toBeChecked();
-  await browser.click();
-  await expect(browser).toBeChecked();
+  await expect(card.getByRole('switch')).toHaveCount(0);
+  await expect(card.getByRole('heading', { name: '能力' })).toHaveCount(0);
 });
 
 test('with no machines the list is only the add row and the hint', async ({ page }) => {
@@ -546,7 +542,7 @@ test('an offline Coordinator machine reads offline in the chip and the card, wit
   await expect(panel.getByTestId('machine-screen-hint')).toHaveCount(0);
 });
 
-test('the live screen enlarges and becomes interactive after desktop control is on', async ({
+test('the live screen enlarges and becomes interactive once control is taken', async ({
   page,
 }) => {
   const panel = await open(
@@ -556,13 +552,6 @@ test('the live screen enlarges and becomes interactive after desktop control is 
   );
   const card = panel;
   await expect(card.getByTestId('machine-screen-expand')).toBeVisible();
-  await card.getByRole('tab', { name: 'Agent 的权限' }).click();
-  await card.getByRole('switch', { name: '桌面控制' }).click();
-  await expect(card.getByRole('switch', { name: '桌面控制' })).toHaveAttribute(
-    'aria-checked',
-    'true',
-  );
-  await card.getByRole('tab', { name: '在这台工作' }).click();
   await card.getByTestId('machine-screen-expand').click();
   const enlarged = page.getByTestId('machine-screen-enlarged');
   await expect(enlarged).toBeVisible();
@@ -578,7 +567,7 @@ test('the live screen enlarges and becomes interactive after desktop control is 
   await expect(card.getByTestId('machine-screen-expand')).toBeVisible();
 });
 
-test('without a computer row the machine keeps the waiting placeholder and disabled toggles', async ({
+test('without a computer row the machine keeps the waiting placeholder and an empty access tab', async ({
   page,
 }) => {
   const panel = await open(
@@ -590,16 +579,8 @@ test('without a computer row the machine keeps the waiting placeholder and disab
   await expect(card.getByTestId('machine-screen')).toHaveCount(0);
   await expect(card.getByTestId('machine-screen-hint')).toBeVisible();
   await card.getByRole('tab', { name: 'Agent 的权限' }).click();
-  await expect(card.getByRole('switch', { name: '桌面控制' })).toBeDisabled();
-  await expect(card.getByText('已安装')).toHaveCount(0);
-  await expect(card.getByText('未安装')).toHaveCount(0);
-  const desktopReason = 'Coordinator 还没有自己的电脑。第一次需要时会自动开一台。';
-  await card.getByRole('button', { name: desktopReason }).click();
-  await expect(page.locator('[data-sonner-toast]', { hasText: desktopReason })).toBeVisible();
-  const browserReason = '这台机器还不支持浏览器。';
-  await card.getByRole('button', { name: browserReason }).focus();
-  await page.keyboard.press(' ');
-  await expect(page.locator('[data-sonner-toast]', { hasText: browserReason })).toBeVisible();
+  await expect(card.getByRole('switch')).toHaveCount(0);
+  await expect(card.getByTestId('machine-folders-empty')).toBeVisible();
 });
 
 const LONG_OUTPUT = `${'x'.repeat(4000)}\n${'line of output\n'.repeat(300)}`.slice(-4096);

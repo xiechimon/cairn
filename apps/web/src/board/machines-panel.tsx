@@ -1,28 +1,19 @@
 import type { ComputerRecord } from '@cairn/shared';
-import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { Folder, Laptop, MonitorSmartphone, Plus, Server } from 'lucide-react';
-import { type ReactElement, type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactElement, type ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useAuth } from '../api/auth.js';
-import {
-  acquireComputerControl,
-  ensureComputerBrowser,
-  patchComputerBrowser,
-  releaseComputerControl,
-  renewComputerControl,
-} from '../api/computer-screen.js';
 import { useConnected } from '../api/connection-state.js';
 import { useComputers } from '../api/hooks.js';
-import { invalidateConverged } from '../api/invalidate.js';
 import { clockTime } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { useComputerControl } from '../api/use-computer-control.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { ListCard } from '../components/list-card.js';
 import { QueryBoundary, type QueryLike, queryPhase } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
-import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Skeleton } from '../components/ui/skeleton.js';
@@ -36,11 +27,7 @@ import { settingsHref } from '../settings/settings-href.js';
 import { CoordinatorComputer } from './computer-feed.js';
 import { MachineScreenSurface, ScreenPlaceholder } from './computer-screen.js';
 import { machineStateLabel } from './fleet-status.js';
-import {
-  browserCapabilityInstalled,
-  desktopControlInstalled,
-  desktopControlOnline,
-} from './machine-capabilities.js';
+import { desktopControlOnline } from './machine-capabilities.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { useOpenThread } from './thread-link.js';
 import { useProjectNames } from './work-panel.js';
@@ -183,98 +170,26 @@ export function MachineChip({
   );
 }
 
-function CapabilityRow({
-  label,
-  hint,
-  checked,
-  disabled,
-  disabledReason,
-  onCheckedChange,
-}: {
-  label: string;
-  hint: string;
-  checked: boolean;
-  disabled: boolean;
-  disabledReason?: string;
-  onCheckedChange?: (checked: boolean) => void;
-}) {
-  const reason = disabled ? (disabledReason ?? hint) : undefined;
-  return (
-    <div className="flex items-center gap-5 py-2.5 pr-4 pl-5">
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="text-ui text-foreground">{label}</span>
-        <span className="text-meta text-content-tertiary">{hint}</span>
-      </span>
-      <ExplainDisabledToggle disabled={disabled} reason={reason}>
-        <ToggleSwitch
-          checked={checked}
-          disabled={disabled}
-          aria-label={label}
-          title={reason}
-          onCheckedChange={onCheckedChange}
-        />
-      </ExplainDisabledToggle>
-    </div>
-  );
-}
-
 function MachineDetail({
   machine,
   coordinator,
   computer,
-  pinnedElsewhere,
   teamId,
 }: {
   machine: MachineRow;
   coordinator: boolean;
   computer: ComputerRecord | null;
-  pinnedElsewhere: boolean;
   teamId: string | undefined;
 }) {
   const { t } = useI18n();
-  const qc = useQueryClient();
   const online = machine.online === true;
-  const desktopInstalled = desktopControlInstalled(machine, computer);
-  const browserInstalled = browserCapabilityInstalled(machine, computer);
-  const [leaseId, setLeaseId] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [browserBusy, setBrowserBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [expandAfterLease, setExpandAfterLease] = useState(false);
   const [tab, setTab] = useState<DetailTab>('access');
-  const reclaiming = useRef(false);
-  const controlHeld = leaseId !== null || computer?.controlHolder === 'user';
-  const canToggleDesktop =
-    desktopInstalled && online && computer !== null && teamId !== undefined && !busy;
-  const browserEnabled = computer?.browserEnabled === true;
-  const browserPinnedElsewhere = pinnedElsewhere && computer === null;
-  const canToggleBrowser =
-    teamId !== undefined &&
-    machine.id !== undefined &&
-    !browserBusy &&
-    !browserPinnedElsewhere &&
-    (browserInstalled || browserEnabled);
-  const browserHint = browserPinnedElsewhere
-    ? t('浏览器偏好已绑定到另一台机器。')
-    : browserInstalled
-      ? t('让 agent 打开网页、点击和填表。')
-      : browserEnabled
-        ? t('这台机器已不再报告浏览器能力；可关闭已保存的偏好。')
-        : t('这台机器还不支持浏览器。');
-  const desktopBlockedReason = !online
-    ? t('重新连接 {name} 后才能修改它的设置。', { name: machine.name })
-    : computer === null
-      ? coordinator
-        ? t('Coordinator 还没有自己的电脑。第一次需要时会自动开一台。')
-        : t('这台机器还没有电脑记录，等桌面控制上线后才能在这里打开。')
-      : undefined;
+  const control = useComputerControl({ teamId, computer, reclaim: true });
+  const { leaseId, busy } = control;
   const screenLive =
     computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
-
-  useEffect(() => {
-    if (computer?.controlHolder === 'user') return;
-    setLeaseId(null);
-  }, [computer?.controlHolder, computer?.id]);
 
   useEffect(() => {
     if (!screenLive) {
@@ -284,82 +199,10 @@ function MachineDetail({
   }, [screenLive]);
 
   useEffect(() => {
-    if (
-      teamId === undefined ||
-      computer === null ||
-      computer.controlHolder !== 'user' ||
-      leaseId !== null ||
-      reclaiming.current
-    )
-      return;
-    const computerId = computer.id;
-    reclaiming.current = true;
-    setBusy(true);
-    void acquireComputerControl(teamId, computerId)
-      .then((lease) => {
-        setLeaseId(lease.leaseId);
-        return invalidateConverged(qc, { queryKey: ['computers', teamId] });
-      })
-      .finally(() => {
-        reclaiming.current = false;
-        setBusy(false);
-      });
-  }, [teamId, computer?.id, computer?.controlHolder, leaseId, qc, computer]);
-
-  useEffect(() => {
-    if (teamId === undefined || computer === null || leaseId === null) return;
-    const tick = window.setInterval(() => {
-      void renewComputerControl(teamId, computer.id, leaseId).catch(() => {
-        setLeaseId(null);
-      });
-    }, 10 * 60_000);
-    return () => window.clearInterval(tick);
-  }, [teamId, computer, leaseId]);
-
-  useEffect(() => {
     if (!expandAfterLease || leaseId === null) return;
     setExpanded(true);
     setExpandAfterLease(false);
   }, [expandAfterLease, leaseId]);
-
-  const onDesktopToggle = (checked: boolean) => {
-    if (teamId === undefined || computer === null || busy) return;
-    setBusy(true);
-    const run = checked
-      ? acquireComputerControl(teamId, computer.id).then((lease) => {
-          setLeaseId(lease.leaseId);
-        })
-      : leaseId !== null
-        ? releaseComputerControl(teamId, computer.id, leaseId).then(() => {
-            setLeaseId(null);
-          })
-        : acquireComputerControl(teamId, computer.id).then((lease) =>
-            releaseComputerControl(teamId, computer.id, lease.leaseId).then(() => {
-              setLeaseId(null);
-            }),
-          );
-    void run
-      .then(() => invalidateConverged(qc, { queryKey: ['computers', teamId] }))
-      .finally(() => setBusy(false));
-  };
-
-  const onBrowserToggle = (checked: boolean) => {
-    const machineId = machine.id;
-    if (teamId === undefined || machineId === undefined || browserBusy) return;
-    if (browserPinnedElsewhere) return;
-    if (checked && !browserInstalled) return;
-    if (!checked && computer === null) return;
-    const ownedTeamId = teamId;
-    setBrowserBusy(true);
-    const run =
-      computer !== null
-        ? patchComputerBrowser(computer.id, checked)
-        : ensureComputerBrowser(machineId, checked);
-    void run
-      .then(() => invalidateConverged(qc, { queryKey: ['computers', ownedTeamId] }))
-      .catch(() => invalidateConverged(qc, { queryKey: ['computers', ownedTeamId] }))
-      .finally(() => setBrowserBusy(false));
-  };
 
   const openEnlarged = () => {
     if (!screenLive || teamId === undefined || computer === null) return;
@@ -369,16 +212,9 @@ function MachineDetail({
     }
     setExpandAfterLease(true);
     if (busy) return;
-    setBusy(true);
-    void acquireComputerControl(teamId, computer.id)
-      .then((lease) => {
-        setLeaseId(lease.leaseId);
-        return invalidateConverged(qc, { queryKey: ['computers', teamId] });
-      })
-      .catch(() => {
-        setExpandAfterLease(false);
-      })
-      .finally(() => setBusy(false));
+    void control.acquire().catch(() => {
+      setExpandAfterLease(false);
+    });
   };
 
   const screen = screenLive && (
@@ -484,57 +320,35 @@ function MachineDetail({
         </div>
       ) : (
         <div data-testid="machine-access" className="flex flex-col">
-          {machine.folders !== undefined && (
-            <>
-              <SectionLabel className="mt-10">{t('Agent 在这台电脑上能用的文件夹')}</SectionLabel>
-              <ListCard outlined className="flex-none">
-                {machine.folders.length === 0 ? (
-                  <p className="m-0 py-2 pr-4 pl-5 text-ui text-content-tertiary">
-                    {t('还没有开放任何文件夹')}
-                  </p>
-                ) : (
-                  machine.folders.map((folder) => (
-                    <div
-                      key={folder.path}
-                      data-testid="machine-folder"
-                      className="flex h-9 items-center gap-5 pr-5 pl-5"
-                    >
-                      <Folder
-                        aria-hidden="true"
-                        className="size-4.5 flex-none text-content-secondary"
-                      />
-                      <span className="min-w-0 flex-1 truncate font-mono text-ui text-foreground">
-                        {folder.path}
-                      </span>
-                      <span className="flex-none text-meta text-content-tertiary">
-                        {folder.enabled ? t('已开放') : t('未开放')}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </ListCard>
-            </>
-          )}
-          <SectionLabel className={machine.folders === undefined ? 'mt-10' : 'mt-7'}>
-            {t('能力')}
-          </SectionLabel>
+          <SectionLabel className="mt-10">{t('Agent 在这台电脑上能用的文件夹')}</SectionLabel>
           <ListCard outlined className="flex-none">
-            <CapabilityRow
-              label={t('浏览器')}
-              hint={browserHint}
-              checked={browserEnabled}
-              disabled={!canToggleBrowser}
-              disabledReason={browserHint}
-              onCheckedChange={canToggleBrowser ? onBrowserToggle : undefined}
-            />
-            <CapabilityRow
-              label={t('桌面控制')}
-              hint={t('让 agent 操作这台电脑上的应用。macOS 要在辅助功能里授权。')}
-              checked={desktopInstalled && controlHeld}
-              disabled={!canToggleDesktop}
-              disabledReason={desktopBlockedReason}
-              onCheckedChange={canToggleDesktop ? onDesktopToggle : undefined}
-            />
+            {machine.folders === undefined || machine.folders.length === 0 ? (
+              <p
+                data-testid="machine-folders-empty"
+                className="m-0 py-2 pr-4 pl-5 text-ui text-content-tertiary"
+              >
+                {t('还没有开放任何文件夹')}
+              </p>
+            ) : (
+              machine.folders.map((folder) => (
+                <div
+                  key={folder.path}
+                  data-testid="machine-folder"
+                  className="flex h-9 items-center gap-5 pr-5 pl-5"
+                >
+                  <Folder
+                    aria-hidden="true"
+                    className="size-4.5 flex-none text-content-secondary"
+                  />
+                  <span className="min-w-0 flex-1 truncate font-mono text-ui text-foreground">
+                    {folder.path}
+                  </span>
+                  <span className="flex-none text-meta text-content-tertiary">
+                    {folder.enabled ? t('已开放') : t('未开放')}
+                  </span>
+                </div>
+              ))
+            )}
           </ListCard>
         </div>
       )}
@@ -724,9 +538,6 @@ export function MachinesPanel({
             machine={selected}
             coordinator={selected === host}
             computer={computerFor(selected)}
-            pinnedElsewhere={computers.some(
-              (row) => selected.id !== undefined && row.machine.id !== selected.id,
-            )}
             teamId={teamId}
           />
           <div className="mt-7">

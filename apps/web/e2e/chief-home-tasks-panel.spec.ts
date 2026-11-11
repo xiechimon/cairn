@@ -396,6 +396,54 @@ test('Made groups finished work by kind with counts, as horizontal rows of previ
   await expect(madePanel(page)).not.toContainText('Unread dot on threads');
 });
 
+test('a carousel never clips the border of a fully visible card at either edge', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=make-ref&pane=made');
+  const docs = madePanel(page).getByTestId('made-group').first();
+  const scroller = docs.getByTestId('made-carousel');
+  const cards = docs.getByTestId('made-card');
+  const count = await cards.count();
+  const edges = async () => {
+    const frame = await scroller.boundingBox();
+    const boxes = await cards.evaluateAll((els) =>
+      els.map((el) => {
+        const { left, right } = el.getBoundingClientRect();
+        return { left, right };
+      }),
+    );
+    return { frame: frame!, boxes };
+  };
+  const insideFrame = async (index: number) => {
+    const { frame, boxes } = await edges();
+    expect(boxes[index].left).toBeGreaterThanOrEqual(frame.x + 1);
+    expect(boxes[index].right).toBeLessThanOrEqual(frame.x + frame.width - 1);
+  };
+  await expect(docs.getByTestId('made-carousel-prev')).toHaveCount(0);
+  await insideFrame(0);
+  await insideFrame(1);
+  await docs.getByTestId('made-carousel-next').click();
+  await expect(cards.nth(2)).toBeInViewport({ ratio: 0.99 });
+  await expect
+    .poll(async () => {
+      const { frame, boxes } = await edges();
+      return boxes[2].left - frame.x;
+    })
+    .toBeGreaterThanOrEqual(1);
+  await insideFrame(2);
+  await docs.getByTestId('made-carousel-next').click();
+  await expect(docs.getByTestId('made-carousel-next')).toHaveCount(0);
+  await expect
+    .poll(async () => {
+      const { frame, boxes } = await edges();
+      return frame.x + frame.width - boxes[count - 1].right;
+    })
+    .toBeGreaterThanOrEqual(1);
+  await insideFrame(count - 1);
+  await insideFrame(count - 2);
+  expect(await scroller.evaluate((el) => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test('a carousel pages with its arrows and keeps the next page reachable by keyboard', async ({
   page,
 }) => {

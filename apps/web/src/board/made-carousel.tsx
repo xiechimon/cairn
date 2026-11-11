@@ -99,6 +99,7 @@ export function MadeCard({
 
 const PAGER_GUTTER = 16;
 const PAGER_ROOM = 32;
+const EDGE_ROOM = 6;
 
 export function MadeCarousel({
   groupKey,
@@ -117,7 +118,7 @@ export function MadeCarousel({
     const frame = el?.parentElement;
     if (el == null || frame == null) return;
     const prev = el.scrollLeft > 1;
-    const room = frame.clientWidth - PAGER_GUTTER * 2 - (prev ? PAGER_ROOM : 0);
+    const room = frame.clientWidth - (PAGER_GUTTER - EDGE_ROOM) * 2 - (prev ? PAGER_ROOM : 0);
     setEdges({ prev, next: el.scrollLeft + room < el.scrollWidth - 1 });
   }, []);
   useEffect(() => {
@@ -162,7 +163,7 @@ export function MadeCarousel({
         data-next={edges.next || undefined}
         onScroll={measure}
         onFocus={followFocus}
-        className="my-0 mr-4 ml-4 grid list-none auto-cols-[calc((100cqw-var(--spacing)*19)/2)] grid-flow-col gap-3 overflow-x-auto overscroll-x-contain px-px pt-px pb-1 snap-x snap-mandatory data-next:mr-12 data-prev:ml-12 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="-mt-px mr-2.5 mb-0 ml-2.5 grid list-none auto-cols-[calc((100cqw-var(--spacing)*19)/2)] grid-flow-col gap-3 overflow-x-auto overscroll-x-contain scroll-px-1.5 px-1.5 pt-0.5 pb-1 snap-x snap-mandatory data-next:mr-10.5 data-prev:ml-10.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {children}
       </ul>
