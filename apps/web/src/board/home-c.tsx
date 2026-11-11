@@ -20,6 +20,7 @@ import { IconTooltip } from '../components/icon-tooltip.js';
 import type { QueryLike } from '../components/query-state.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
+import { SubtreeErrorBoundary } from '../components/subtree-error-boundary.js';
 import { Button } from '../components/ui/button.js';
 import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -108,6 +109,14 @@ function projectHomeSearch(params: URLSearchParams): string {
   const next = new URLSearchParams(params);
   next.delete('chat');
   return `?${next.toString()}`;
+}
+
+function ConversationBoundary({ children }: { children: ReactNode }) {
+  return (
+    <SubtreeErrorBoundary>
+      <ChiefScrollProvider>{children}</ChiefScrollProvider>
+    </SubtreeErrorBoundary>
+  );
 }
 
 export function HomeC({
@@ -520,7 +529,7 @@ export function HomeC({
             </div>
           )}
           <TaskCardContext.Provider value={renderTaskCard}>
-            <ChiefScrollProvider>
+            <ConversationBoundary>
               <ChiefConversation
                 chief={{ ...chiefData, stream: conversation }}
                 onSend={
@@ -564,7 +573,7 @@ export function HomeC({
                   composerRef.current = node;
                 }}
               />
-            </ChiefScrollProvider>
+            </ConversationBoundary>
           </TaskCardContext.Provider>
         </section>
         {workPanel}

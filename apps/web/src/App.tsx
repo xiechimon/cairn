@@ -1,6 +1,8 @@
-import { createBrowserRouter, Navigate, RouterProvider } from 'react-router';
+import type { ReactNode } from 'react';
+import { createBrowserRouter, Navigate, RouterProvider, useLocation } from 'react-router';
 import { ApiProvider, LiveDataBridge } from './api/provider.js';
 import { ChiefRoot } from './chief/chief-root.js';
+import { SubtreeErrorBoundary } from './components/subtree-error-boundary.js';
 import { Toaster } from './components/ui/toaster.js';
 import { TooltipProvider } from './components/ui/tooltip.js';
 import { I18nProvider } from './i18n/provider.js';
@@ -26,6 +28,11 @@ import { ACTIVITY_PATH } from './search/activity-href.js';
 import { SETTINGS_HREF } from './settings/settings-href.js';
 import { SettingsPage } from './settings/settings-page.js';
 import { LegacyModelRoutingRedirect, SettingsRedirect } from './settings/settings-redirect.js';
+
+function RouteBoundary({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  return <SubtreeErrorBoundary key={pathname}>{children}</SubtreeErrorBoundary>;
+}
 
 export const router = createBrowserRouter([
   {
@@ -66,7 +73,10 @@ export const router = createBrowserRouter([
               },
               { path: `${SETTINGS_HREF}/:section?`, element: <SettingsPage /> },
               { path: '*', element: <Navigate to="/app" replace /> },
-            ],
+            ].map((route) => ({
+              ...route,
+              element: <RouteBoundary>{route.element}</RouteBoundary>,
+            })),
           },
         ],
       },
