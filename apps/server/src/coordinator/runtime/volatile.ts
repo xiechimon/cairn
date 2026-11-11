@@ -1,4 +1,4 @@
-import { dropMailFence, shortEvent, transcriptPromptRowId, withHistoryMarker } from '@cairn/shared';
+import { shortEvent, transcriptPromptRowId, withHistoryMarker } from '@cairn/shared';
 import type { Message } from '@earendil-works/pi-ai';
 import { defineExtension, GenerationTask, hook } from '@earendil-works/pi-durable';
 import { projectColdMessages, projectWarmMessages } from './cold-slim.js';
@@ -96,40 +96,6 @@ export function applyContextProjection(
   return projectWarmMessages(messages);
 }
 
-function dropStoredMailFences(messages: readonly Message[]): Message[] {
-  return messages.map((message): Message => {
-    if (message.role === 'user' && typeof message.content === 'string') {
-      const content = dropMailFence(message.content);
-      return content === message.content ? message : { ...message, content };
-    }
-    if (message.role === 'user' && Array.isArray(message.content)) {
-      return {
-        ...message,
-        content: message.content.map((block) =>
-          block.type === 'text' ? { ...block, text: dropMailFence(block.text) } : block,
-        ),
-      };
-    }
-    if (message.role === 'assistant') {
-      return {
-        ...message,
-        content: message.content.map((block) =>
-          block.type === 'text' ? { ...block, text: dropMailFence(block.text) } : block,
-        ),
-      };
-    }
-    if (message.role === 'toolResult') {
-      return {
-        ...message,
-        content: message.content.map((block) =>
-          block.type === 'text' ? { ...block, text: dropMailFence(block.text) } : block,
-        ),
-      };
-    }
-    return message;
-  });
-}
-
 export function volatileContextExtension(volatile: VolatileContext) {
   return defineExtension({
     name: 'cairn-coordinator-volatile',
@@ -139,9 +105,7 @@ export function volatileContextExtension(volatile: VolatileContext) {
           const conversationId = String(api.conversationId);
           const section = volatile.get(conversationId);
           const shortened = shortenEarlierEvents(request.messages, volatile.step(conversationId));
-          const projected = dropStoredMailFences(
-            applyContextProjection(shortened, volatile.coldSlim(conversationId)),
-          );
+          const projected = applyContextProjection(shortened, volatile.coldSlim(conversationId));
           return {
             messages: section === undefined ? projected : withVolatileSection(projected, section),
           };

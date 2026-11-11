@@ -1656,20 +1656,20 @@ export function upsertChiefMessage(
     createdAt: number;
     projectId?: string | null;
   },
-): void {
-  const content = scrubMailFenceContent(row.content);
+) {
+  const stored = { ...row, content: scrubMailFenceContent(row.content) };
   db.insert(chiefMessage)
     .values({
-      ...row,
-      content,
+      ...stored,
       projectId: row.projectId === undefined ? writingTurnProjectId(db, row) : row.projectId,
     })
     .onConflictDoUpdate({
       target: chiefMessage.id,
-      set: { role: row.role, content, createdAt: row.createdAt },
+      set: { role: stored.role, content: stored.content, createdAt: stored.createdAt },
     })
     .run();
   db.update(chiefThread).set({ updatedAt: nowMs() }).where(eq(chiefThread.id, row.threadId)).run();
+  return stored;
 }
 
 export function notifyChiefTurn(

@@ -21,6 +21,7 @@ import {
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
+import { upsertChiefRow } from '../src/services/machine-deps.js';
 import { executeRelayToolCall, machineAsk } from '../src/services/machine-relay.js';
 import {
   deliverMailEvent,
@@ -358,6 +359,39 @@ describe('mail connector slice 1', () => {
     expect(dropped).not.toContain('SECRET STILL HERE');
     expect(dropped).toContain('before');
     expect(dropped).toContain('after');
+  });
+
+  test('a live subscriber receives the scrubbed mail transcript', () => {
+    const accountId = insertAccount();
+    const eventId = insertEvent(accountId, {
+      status: 'ranked',
+      rank: 'needs_you',
+      ruleName: 'Payroll',
+      excerpt: 'hello',
+    });
+    deliverMailEvent(mailDeps(), eventId);
+    const threadId = s.db.select().from(step).where(eq(step.id, eventId)).get()?.buildId;
+    if (threadId === undefined) throw new Error('mail thread missing');
+    const seen: unknown[] = [];
+    upsertChiefRow(
+      {
+        db: s.db,
+        convHub: {
+          publishMessage(_id: string, row: { content: unknown }) {
+            seen.push(row.content);
+          },
+        } as never,
+      },
+      {
+        id: 'mail-row',
+        threadId,
+        role: 'user',
+        content: `[wake:wake] provenance=mail:${eventId}\n邮件事件 ${eventId}，账户 a，外部编号 e，规则 Payroll。\n${fenceMailText('e', 'SECRET SUBJECT')}`,
+        createdAt: 1,
+      },
+    );
+    expect(JSON.stringify(seen)).not.toContain('SECRET SUBJECT');
+    expect(JSON.stringify(seen)).toContain('Payroll');
   });
 
   test('account transitions follow the machine and a stale generation does not deliver', () => {

@@ -12,6 +12,27 @@ export async function activeConversation(
   return harness.conversation(Number(conversationId) as ConversationId, context);
 }
 
+export async function withRegisteredMailConversation<T>(
+  harness: Harness,
+  context: Context,
+  priorId: string | null,
+  register: (conversationId: string) => void,
+  run: (conversationId: string) => Promise<T>,
+): Promise<T> {
+  const isolated = await harness.createConversation({ ownership: { kind: 'ownerless' } }, context);
+  register(String(isolated.id));
+  try {
+    return await run(String(isolated.id));
+  } finally {
+    if (priorId !== null) {
+      register(priorId);
+    } else {
+      const fresh = await harness.createConversation({ ownership: { kind: 'ownerless' } }, context);
+      register(String(fresh.id));
+    }
+  }
+}
+
 export async function newestEntryId(
   conversation: Conversation,
   context: Context,

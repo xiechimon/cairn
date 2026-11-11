@@ -5,6 +5,10 @@ import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
 import { UserEntry } from '@earendil-works/pi-durable';
 import { afterEach, describe, expect, it } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
+import {
+  activeConversation,
+  withRegisteredMailConversation,
+} from '../../src/coordinator/runtime/conversations.js';
 import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js';
 import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
 import {
@@ -103,51 +107,7 @@ describe('volatile turn context', () => {
 });
 
 describe('a mail wake does not leave fenced text in the next turn', () => {
-  it('keeps the excerpt out of the next normal turn model context', async () => {
-    const dir = makeTestTempDir('coord-mail-isolate-');
-    dirs.push(dir);
-    const requests: string[] = [];
-    const faux = fauxProvider({
-      provider: 'stub',
-      models: [{ id: 'm', contextWindow: 200_000 }],
-      tokensPerSecond: 1e9,
-    });
-    faux.setResponses(
-      Array(4).fill((c: { messages: unknown[] }) => {
-        requests.push(JSON.stringify(c.messages));
-        return fauxAssistantMessage('ok');
-      }),
-    );
-    const models = createCoordinatorModels([faux.provider]);
-    const volatile = createVolatileContext();
-    const harness = await openCoordinatorHarness(join(dir, 's.sqlite'), models.models, ctx, {
-      extensions: [volatileContextExtension(volatile)],
-    });
-    const deps = {
-      harness,
-      models,
-      api: fakeMachineApi(),
-      context: ctx,
-      heartbeatMs: 1000,
-      now: () => 1,
-      conversationGate: createConversationGate(),
-      volatile,
-    };
-    const secret = 'MAIL-SECRET-EXCERPT-9f3a';
-    const mail = `[wake:wake] provenance=mail:evt-1\n邮件事件 evt-1，账户 acc，外部编号 ext，规则 Payroll。\n${fenceMailText('ext', secret)}`;
-    await runCoordinatorTurn(deps, chiefStep('evt-1', mail));
-    await runCoordinatorTurn(deps, chiefStep('next', 'what should I do next'));
-    const root = await harness.root(ctx);
-    const view = await root.context(ctx);
-    const inherited = JSON.stringify(view.messages);
-    expect(requests[0]).toContain(secret);
-    expect(requests[1]).not.toContain(secret);
-    expect(inherited).not.toContain(secret);
-    expect(inherited).not.toContain('【邮件原文');
-    await harness.close(ctx);
-  });
-
-  it('runs the mail wake on the registered conversation the input channel accepts', async () => {
+  it('runs the mail wake on a registered side conversation and restores the owner one', async () => {
     const dir = makeTestTempDir('coord-mail-registered-');
     dirs.push(dir);
     const requests: string[] = [];
@@ -156,21 +116,27 @@ describe('a mail wake does not leave fenced text in the next turn', () => {
       models: [{ id: 'm', contextWindow: 200_000 }],
       tokensPerSecond: 1e9,
     });
-    faux.setResponses(
-      Array(4).fill((c: { messages: unknown[] }) => {
+    faux.setResponses([
+      (c: { messages: unknown[] }) => {
         requests.push(JSON.stringify(c.messages));
         return fauxAssistantMessage('ok');
-      }),
-    );
+      },
+      (c: { messages: unknown[] }) => {
+        requests.push(JSON.stringify(c.messages));
+        return fauxAssistantMessage('echo MAIL-SECRET-EXCERPT-9f3a');
+      },
+      (c: { messages: unknown[] }) => {
+        requests.push(JSON.stringify(c.messages));
+        return fauxAssistantMessage('ok');
+      },
+    ]);
     const models = createCoordinatorModels([faux.provider]);
     const volatile = createVolatileContext();
     let registered = '';
-    const seen: string[] = [];
     const harness = await openCoordinatorHarness(join(dir, 's.sqlite'), models.models, ctx, {
       extensions: [
         coordinatorToolsExtension(fakeMachineApi(), createConversationGate(), {
           beforeTool: async (_signal, conversationId) => {
-            seen.push(conversationId ?? '');
             if (registered !== '' && conversationId !== registered) {
               throw new Error(`unregistered conversation ${conversationId}`);
             }
@@ -190,15 +156,28 @@ describe('a mail wake does not leave fenced text in the next turn', () => {
       conversationGate: createConversationGate(),
       volatile,
     };
+    const owner = registered;
     const secret = 'MAIL-SECRET-EXCERPT-9f3a';
+    await runCoordinatorTurn(deps, chiefStep('owner', 'PRIOR-OWNER'));
     const mail = `[wake:wake] provenance=mail:evt-1\n邮件事件 evt-1，账户 acc，外部编号 ext，规则 Payroll。\n${fenceMailText('ext', secret)}`;
-    await runCoordinatorTurn(deps, chiefStep('evt-1', mail));
-    await runCoordinatorTurn(deps, chiefStep('next', 'what should I do next'));
-    const view = await (await harness.root(ctx)).context(ctx);
-    expect(seen).toContain(registered);
-    expect(seen.every((id) => id === registered)).toBe(true);
-    expect(requests[0]).toContain(secret);
-    expect(JSON.stringify(view.messages)).not.toContain(secret);
+    await withRegisteredMailConversation(
+      harness,
+      ctx,
+      owner,
+      (id) => {
+        registered = id;
+      },
+      (id) => runCoordinatorTurn({ ...deps, conversationId: id }, chiefStep('evt-1', mail)),
+    );
+    expect(registered).toBe(owner);
+    await runCoordinatorTurn({ ...deps, conversationId: owner }, chiefStep('next', 'what next'));
+    const continued = await activeConversation(harness, owner, ctx);
+    const inherited = JSON.stringify((await continued?.context(ctx))?.messages);
+    expect(requests[1]).toContain(secret);
+    expect(requests[1]).not.toContain('PRIOR-OWNER');
+    expect(inherited).toContain('PRIOR-OWNER');
+    expect(inherited).not.toContain(secret);
+    expect(inherited).not.toContain('echo MAIL-SECRET');
     await harness.close(ctx);
   });
 });

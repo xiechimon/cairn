@@ -305,6 +305,16 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           .where(eq(coordinatorConversation.threadId, threadId))
           .run();
       },
+      setConversation: (threadId, conversationId, watermark) => {
+        db.update(coordinatorConversation)
+          .set({
+            conversationId,
+            ...(watermark === null ? {} : { lastMirroredEntryId: watermark }),
+            updatedAt: nowMs(),
+          })
+          .where(eq(coordinatorConversation.threadId, threadId))
+          .run();
+      },
       onReconciled: (threadId, outcome, stale) => {
         logger.info({ threadId, outcome, stale }, 'coordinator store reconciled');
       },

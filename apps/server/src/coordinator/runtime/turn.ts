@@ -253,11 +253,13 @@ export async function runCoordinatorTurn(
       {
         ...api,
         transcriptRow: async (...args) => {
+          if (mailTurn) return;
           await deps.inputs?.barrier();
           await api.inputs?.assertConversation(threadId, conversationKey);
           await api.transcriptRow(...args);
         },
         transcriptDelta: async (...args) => {
+          if (mailTurn) return;
           await deps.inputs?.barrier();
           await api.inputs?.assertConversation(threadId, conversationKey);
           await api.transcriptDelta(...args);
