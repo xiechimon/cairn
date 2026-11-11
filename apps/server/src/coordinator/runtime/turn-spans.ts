@@ -46,8 +46,12 @@ export function emitTurnSpans(
   turn: { threadId: string; stepId: string; provider: string; model: string },
   entries: readonly EntryRecord[],
   now: () => number,
+  redactText = false,
 ): void {
   try {
-    emitCoordinatorTurnSpans(turn, turnSpanRecords(entries, now));
+    emitCoordinatorTurnSpans(
+      { ...turn, ...(redactText ? { redactText: true } : {}) },
+      turnSpanRecords(entries, now),
+    );
   } catch {}
 }

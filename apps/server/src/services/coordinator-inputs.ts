@@ -1,4 +1,4 @@
-import { coordinatorConversationKey } from '@cairn/shared';
+import { coordinatorConversationKey, isMailWakeText } from '@cairn/shared';
 import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
@@ -153,6 +153,7 @@ export function pullCoordinatorInput(
   const target = db.select().from(step).where(eq(step.id, stepId)).get();
   if (target?.kind !== 'chief' || target.machineId !== null || target.status !== 'claimed')
     return null;
+  if (isMailWakeText(target.prompt ?? '')) return null;
   const current = db
     .select()
     .from(coordinatorConversation)

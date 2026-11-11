@@ -178,7 +178,7 @@ export async function runCoordinatorTurn(
     let inFlight = false;
     let steerTask: Promise<void> | null = null;
     const admitted = new Set<string>();
-    if (api.inputs !== undefined) {
+    if (!mailTurn && api.inputs !== undefined) {
       for (const input of await api.inputs.list(claimed.chief.threadId)) {
         if (
           input.stepId !== stepId ||
@@ -195,6 +195,7 @@ export async function runCoordinatorTurn(
       }
     }
     const drainSteers = async () => {
+      if (mailTurn) return;
       while (inFlight && stopping === null && api.steer !== undefined) {
         const steer = await api.steer(stepId, api.inputs === undefined ? undefined : [...admitted]);
         if (steer === null) return;
@@ -225,14 +226,16 @@ export async function runCoordinatorTurn(
         await deps.inputs?.barrier();
       }
     };
-    steerPoll = setInterval(() => {
-      if (!inFlight || steerTask !== null || stopping !== null) return;
-      steerTask = drainSteers()
-        .catch(() => {})
-        .finally(() => {
-          steerTask = null;
-        });
-    }, deps.stopPollMs ?? STOP_POLL_MS);
+    if (!mailTurn) {
+      steerPoll = setInterval(() => {
+        if (!inFlight || steerTask !== null || stopping !== null) return;
+        steerTask = drainSteers()
+          .catch(() => {})
+          .finally(() => {
+            steerTask = null;
+          });
+      }, deps.stopPollMs ?? STOP_POLL_MS);
+    }
     await foldBeforeModelSwitch(
       deps,
       root,
@@ -363,7 +366,7 @@ export async function runCoordinatorTurn(
       } while (cursor !== undefined);
     }
     await mirror.flush(turnEntries);
-    await deps.afterMirror?.();
+    if (!mailTurn) await deps.afterMirror?.();
     const ordered = [...turnEntries].sort((a, b) => Number(a.id) - Number(b.id));
     observation = {
       input: ordered.flatMap((entry) =>
@@ -390,6 +393,7 @@ export async function runCoordinatorTurn(
       { threadId: claimed.chief.threadId, stepId, provider, model: modelId },
       turnEntries,
       deps.now,
+      mailTurn,
     );
     clearInterval(stopPoll);
     if (stopping !== null) {
