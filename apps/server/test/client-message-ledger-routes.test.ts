@@ -104,6 +104,48 @@ test('a crashed start after a stop before the first run does not start another b
   expect(H.s.db.select().from(build).where(eq(build.todoId, 'stopped-todo')).all()).toHaveLength(2);
 });
 
+test('a recovered restart replays the original conversation, not a later build', async () => {
+  seedGate('failed', 'restart-old', 'restart-todo-recover');
+  H.s.db
+    .insert(build)
+    .values({
+      id: 'restart-later',
+      todoId: 'restart-todo-recover',
+      withPlan: false,
+      triggerSource: 'user',
+      createdAt: 2,
+    })
+    .run();
+  H.s.db
+    .update(todo)
+    .set({ latestBuildId: 'restart-later', phase: 'queued' })
+    .where(eq(todo.id, 'restart-todo-recover'))
+    .run();
+  H.s.db
+    .insert(clientMessage)
+    .values({
+      scopeId: 'restart-old',
+      clientMessageId: 'nested:restart-todo-recover:restart-key',
+      response: {
+        delegated: true,
+        delivered: 'restart',
+        nestedTodoId: 'restart-todo-recover',
+        conversationId: 'restart-old',
+      },
+      createdAt: 1,
+    })
+    .run();
+  const retry = await req(H.s.app, 'POST', '/api/todos/restart-todo-recover/messages', {
+    content: 'Retry on the orb machine',
+    clientMessageId: 'restart-key',
+  });
+  expect(retry.status).toBe(201);
+  expect(await retry.json()).toMatchObject({
+    conversationId: 'restart-old',
+    delivered: 'restart',
+  });
+});
+
 test('a direct step receipt with the same key does not count as the thread send', async () => {
   seedGate('confirm', 'shared-build', 'shared-todo');
   H.s.db

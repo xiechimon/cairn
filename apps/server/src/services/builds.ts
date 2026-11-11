@@ -1555,6 +1555,14 @@ export async function applyBuildStepAction(
         : null;
     const afterCommit: (() => void)[] = [];
     const transcriptDeps = { ...deps, afterCommit };
+    const recordRestartConversation = (conversationId: string) => {
+      completeClientMessage(deps.db, buildId, body.clientMessageId, {
+        delegated: true,
+        delivered: 'restart',
+        ...(nestedTodoId !== undefined ? { nestedTodoId } : {}),
+        conversationId,
+      });
+    };
     deps.db.transaction(() => {
       claimClientMessage(deps.db, buildId, body.clientMessageId, {
         delegated: true,
@@ -1651,6 +1659,7 @@ export async function applyBuildStepAction(
         const reusedRow = deps.db.select().from(build).where(eq(build.id, reworkTarget.id)).get();
         if (!reusedRow) throw new Error('build missing after update');
         publishBuild(deps, reusedRow);
+        recordRestartConversation(reworkTarget.id);
         return;
       }
       const priorLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
@@ -1712,6 +1721,7 @@ export async function applyBuildStepAction(
       const newRow = deps.db.select().from(build).where(eq(build.id, newId)).get();
       if (!newRow) throw new Error('build missing after insert');
       publishBuild(deps, newRow);
+      recordRestartConversation(newId);
       return;
     });
     for (const publish of afterCommit) publish();

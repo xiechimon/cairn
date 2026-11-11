@@ -234,18 +234,18 @@ function recoverRecordedBuildSend(
   const matched = builds
     .map((candidate) => ({
       buildId: candidate.id,
-      receipt: findClientMessage<{ delivered?: ThreadMessageDelivery; nestedTodoId?: string }>(
-        deps.db,
-        candidate.id,
-        ledgerId,
-      ),
+      receipt: findClientMessage<{
+        delivered?: ThreadMessageDelivery;
+        nestedTodoId?: string;
+        conversationId?: string;
+      }>(deps.db, candidate.id, ledgerId),
     }))
     .find((item) => item.receipt?.nestedTodoId === row.id);
   const delivered = matched?.receipt?.delivered;
-  if (matched === undefined || delivered === undefined || row.latestBuildId === null)
-    return undefined;
+  const conversationId = matched?.receipt?.conversationId ?? row.latestBuildId;
+  if (matched === undefined || delivered === undefined || conversationId == null) return undefined;
   if (delivered === 'revision') holdSecondRejectionRework(deps, matched.buildId);
-  const sent = { conversationId: row.latestBuildId, delivered };
+  const sent = { conversationId, delivered };
   try {
     recordInCoordinator(deps, row, body, sent, origin);
   } catch (error) {
