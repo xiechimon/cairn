@@ -17,6 +17,7 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
+import type { FetchLike } from '../src/lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import {
   applyBuildStepAction,
@@ -57,6 +58,22 @@ interface World {
   todoId: string;
   buildId: string;
   stepId: string;
+}
+
+const openPullFetch = (async () => ({
+  ok: true,
+  status: 200,
+  json: async () => ({ state: 'open', merged: false }),
+  headers: { get: () => null },
+})) as unknown as FetchLike;
+
+function linkGithubProbe(w: World): void {
+  w.s.db
+    .update(projectTable)
+    .set({ repoKind: 'github', githubRepo: 'octo/demo' })
+    .where(eq(projectTable.id, w.projectId))
+    .run();
+  w.deps = { ...w.deps, githubFetch: openPullFetch };
 }
 
 function openWorld(phase: 'building' | 'confirm' | 'review' = 'building'): World {
@@ -323,6 +340,7 @@ describe('needs you (#1800)', () => {
   test('human recovery checks the actual older PR build before reusing it', async () => {
     const w = openWorld();
     w.s.db.update(buildTable).set({ prNumber: 42 }).where(eq(buildTable.id, w.buildId)).run();
+    linkGithubProbe(w);
     w.s.db
       .insert(stepTable)
       .values({
