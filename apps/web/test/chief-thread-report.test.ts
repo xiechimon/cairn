@@ -59,6 +59,30 @@ describe('chief thread reports and quiet event turns (#1784)', () => {
     expect(translate('en', EN, key, vars)).toBe('Task #9 Repair board counts: Done');
   });
 
+  test('an invisible resumed-turn boundary restores the reply without rendering generated prompt text', () => {
+    const items = mapChiefStream([
+      row('owner', 'user', 'Fix the keyboard'),
+      row('user-failed-wake', 'user', '[wake:failed] provenance=watch:other\nCheck a failure'),
+      row('wake-reply', 'assistant', 'Checking the failure.'),
+      row('user-resumed', 'system', ''),
+      row('resumed-reply', 'assistant', 'Started task 169.'),
+    ]);
+    expect(items.map((item) => item.kind)).toEqual(['user', 'robot']);
+    expect(items[1]).toMatchObject({ markdown: 'Started task 169.' });
+  });
+
+  test('a resumed boundary seals the previous wake task card before the owner reply', () => {
+    const items = mapChiefStream([
+      row('user-wake', 'user', '[wake:failed] provenance=watch:other'),
+      row('created', 'assistant', {
+        kind: 'toolcall', call: { id: 'create', name: 'create_todo', arguments: {}, result: { id: 'todo-1' } },
+      }),
+      row('user-resumed', 'system', ''),
+      row('reply', 'assistant', 'Continuing your answer.'),
+    ]);
+    expect(items.map((item) => item.kind)).toEqual(['task-card', 'robot']);
+  });
+
   test('a timed wake is silent and the next user turn is visible again', () => {
     const items = mapChiefStream([
       row('user-reminder', 'user', '[wake:wake] provenance=wake:w1\nCheck task progress'),

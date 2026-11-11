@@ -1508,6 +1508,17 @@ function collectChiefStream(
   for (const m of messages) {
     while (itemsAt.length < items.length) itemsAt.push(lastAt);
     lastAt = m.createdAt;
+    if (
+      m.role === 'system' &&
+      m.content === '' &&
+      m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
+    ) {
+      eventTurn = false;
+      pendingTools = [];
+      fallback = null;
+      flushCards();
+      continue;
+    }
     if (m.role === 'user' && fallback !== null) {
       const stepOfRow = m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
         ? m.id.slice(TRANSCRIPT_PROMPT_ROW_ID_PREFIX.length)
