@@ -60,7 +60,12 @@ const url = args[1];
 const tail = url.split('?')[0];
 if (url.includes('/check-runs')) { console.log(JSON.stringify({ check_runs: data.checks ?? [] })); process.exit(0); }
 if (url.includes('/comments')) { console.log(JSON.stringify([data.comments ?? []])); process.exit(0); }
-if (url.includes('/timeline')) { console.log(JSON.stringify([data.timeline ?? []])); process.exit(0); }
+if (url.includes('/timeline')) {
+  const number = parseInt(String(url.split('/issues/')[1]), 10);
+  const timeline = (data.timelineByPull && data.timelineByPull[number]) || data.timeline || [];
+  console.log(JSON.stringify([timeline]));
+  process.exit(0);
+}
 if (tail.endsWith('/pulls') && tail.includes('/commits/')) { console.log(JSON.stringify(data.pulls ?? [])); process.exit(0); }
 if (tail.includes('/commits/') && tail.split('/').pop().length === 40) {
   const sha = tail.split('/').pop();
@@ -184,5 +189,113 @@ test('landed skips only when the passed draft checked this commit tree', () => {
     assert.equal(result.status, status, `${name}: ${result.stderr}`);
     assert.equal(result.stdout.trim(), expected, name);
   }
+  releaseTestTempDir(f.dir);
+});
+
+function queueDraft(number, title, body = title, headSha = 'c'.repeat(40)) {
+  return {
+    number,
+    state: 'closed',
+    draft: true,
+    user: { login: 'mergify[bot]' },
+    head: { ref: 'mergify/merge-queue/0123456789', sha: headSha },
+    title,
+    body,
+  };
+}
+
+test('a queue draft landing is audited as the original that had queued', () => {
+  const f = fixture();
+  const sha = 'a'.repeat(40);
+  const result = f.run(sha, {
+    pulls: [
+      queueDraft(
+        3949,
+        'merge queue: merged #3948, #3951: example',
+        'pull_requests:\n  - number: 3948\n  - number: 3951\n',
+      ),
+    ],
+    pull: { number: 3948, merged_at: '2026-11-11T06:13:12Z' },
+    timelineByPull: {
+      3948: [{ event: 'labeled', label: { name: 'queued' }, created_at: '2026-11-11T06:06:06Z' }],
+      3951: [{ event: 'labeled', label: { name: 'queued' }, created_at: '2026-11-11T06:06:06Z' }],
+    },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /#3948 merged through the queue/);
+  assert.match(result.stdout, /#3951 merged through the queue/);
+  assert.doesNotMatch(result.stdout, /#3949/);
+  releaseTestTempDir(f.dir);
+});
+
+test('a pull_requests list without a trailing newline still names every original', () => {
+  const f = fixture();
+  const sha = 'a'.repeat(40);
+  const result = f.run(sha, {
+    pulls: [
+      queueDraft(
+        3949,
+        'merge queue: merged #3948',
+        'pull_requests:\n- number: 3948\n- number: 3951',
+      ),
+    ],
+    pull: { number: 3948, merged_at: '2026-11-11T06:13:12Z' },
+    timelineByPull: {
+      3948: [{ event: 'labeled', label: { name: 'queued' }, created_at: '2026-11-11T06:06:06Z' }],
+      3951: [{ event: 'labeled', label: { name: 'queued' }, created_at: '2026-11-11T06:06:06Z' }],
+    },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /#3948 merged through the queue/);
+  assert.match(result.stdout, /#3951 merged through the queue/);
+  releaseTestTempDir(f.dir);
+});
+
+test('a queue draft landing whose original has no queued label is a violation', () => {
+  const f = fixture();
+  const sha = 'a'.repeat(40);
+  const result = f.run(sha, {
+    pulls: [queueDraft(3949, 'Merge of #3950')],
+    pull: { number: 3950, merged_at: '2026-11-11T06:13:12Z' },
+    timeline: [],
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stdout, /#3950 merged without a queued label/);
+  assert.doesNotMatch(result.stdout, /#3949/);
+  releaseTestTempDir(f.dir);
+});
+
+function draftLanding(sha, { sameTree, headSha = sha }) {
+  const draftSha = 'd'.repeat(40);
+  const tree = 'e'.repeat(40);
+  return {
+    pulls: [queueDraft(3894, 'Merge of #3892', 'Merge of #3892', headSha)],
+    pull: { number: 3892, merged_at: '2026-11-10T09:31:27Z' },
+    comments: [{ user: { login: 'mergify[bot]' }, body: '- ✅ **Passed** · draft #3894' }],
+    drafts: { 3894: { head: { sha: draftSha } } },
+    trees: { [sha]: tree, [draftSha]: sameTree ? tree : 'f'.repeat(40) },
+    checks: requiredChecks.map((name) => ({
+      name,
+      conclusion: 'success',
+      completed_at: '2026-11-10T09:30:52Z',
+    })),
+  };
+}
+
+test('a passed draft whose tree differs from the landed tree does not skip', () => {
+  const f = fixture();
+  const sha = 'a'.repeat(40);
+  const result = f.landed([sha], draftLanding(sha, { sameTree: false }));
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), 'false');
+  releaseTestTempDir(f.dir);
+});
+
+test('a passed draft with an equal tree and checks green before merged_at skips', () => {
+  const f = fixture();
+  const sha = 'a'.repeat(40);
+  const result = f.landed([sha], draftLanding(sha, { sameTree: true, headSha: 'c'.repeat(40) }));
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), 'true');
   releaseTestTempDir(f.dir);
 });
