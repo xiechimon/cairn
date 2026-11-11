@@ -2,11 +2,11 @@ import { cn } from 'cn';
 import { createContext, useContext } from 'react';
 import { Link } from 'react-router';
 import { useThreadHref } from '../board/thread-link.js';
-import { StatusGlyph } from '../components/status-glyph.js';
+import { type GlyphKind, StatusGlyph } from '../components/status-glyph.js';
 import type { DocSegment, Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
-import { PHASE_STATUS, PHASE_UI } from '../phase.js';
+import { ACCENT_INK, PHASE_STATUS, PHASE_UI } from '../phase.js';
 import { AttachmentChip, AttachmentPreviewHandler } from './attachment-chip.js';
 
 const CODE_SKIN: Record<string, string> = {
@@ -37,9 +37,21 @@ export interface TodoGlance {
 
 export const TodoGlanceContext = createContext<ReadonlyMap<string, TodoGlance> | null>(null);
 
+const QUIET_INK = 'text-content-tertiary';
+
+const CONVERSATION_STATUS: Record<Phase, { glyph: GlyphKind; ink: string }> = {
+  ...PHASE_STATUS,
+  planning: { glyph: 'progress', ink: 'text-content-secondary' },
+  building: { glyph: 'progress', ink: 'text-content-secondary' },
+  confirm: { glyph: 'attention', ink: ACCENT_INK },
+  needs_input: { glyph: 'attention', ink: ACCENT_INK },
+  review: { glyph: 'attention', ink: ACCENT_INK },
+  done: { glyph: 'done', ink: QUIET_INK },
+};
+
 export function TodoStatus({ phase }: { phase: Phase }) {
   const { t } = useI18n();
-  const { glyph, ink } = PHASE_STATUS[phase];
+  const { glyph, ink } = CONVERSATION_STATUS[phase];
   return <StatusGlyph kind={glyph} label={t(PHASE_UI[phase].chip)} className={cn('size-3', ink)} />;
 }
 

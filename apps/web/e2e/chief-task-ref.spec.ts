@@ -29,8 +29,9 @@ test('a reply that mentions a task gets a reference row and a status chip that o
   const ref = stream.getByTestId('chief-task-ref');
   await expect(ref).toHaveCount(1);
   await expect(ref).toContainText('Read the cairn repo');
-  await expect(ref.locator('svg[data-glyph]')).toHaveCount(1);
-  await expect(stream.locator('a.mention-chip svg[data-glyph]')).toHaveCount(1);
+  await expect(ref.locator('svg[data-glyph="progress"]')).toHaveCount(1);
+  await expect(ref).toContainText('In progress');
+  await expect(stream.locator('a.mention-chip svg[data-glyph="progress"]')).toHaveCount(1);
   await ref.click();
   await expect(page).toHaveURL(new RegExp(`thread=${TASK.id}`));
 });

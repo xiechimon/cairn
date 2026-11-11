@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { useConnected } from '../../api/connection-state.js';
 import { useI18n } from '../../i18n/provider.js';
 import type { TVars } from '../../i18n/translate.js';
+import { IconTooltip } from '../icon-tooltip.js';
 import { Button } from '../ui/button.js';
 import { TraceTriangle } from './trace-parts.js';
 
@@ -41,6 +42,20 @@ export function LivePulse({ className }: { className?: string }) {
   );
 }
 
+const TYPING_PILL = 'inline-flex w-fit items-center gap-1 rounded-full bg-secondary px-3 py-2.5';
+
+function TypingDotMarks() {
+  return [0, 1, 2].map((n) => (
+    <span
+      key={n}
+      aria-hidden="true"
+      data-testid="typing-dot"
+      style={{ animationDelay: `${n * 0.15}s` }}
+      className="typing-dot block size-1.5 rounded-full bg-(--text-tertiary)"
+    />
+  ));
+}
+
 export function TypingDots({ className }: { className?: string }) {
   const { t } = useI18n();
   return (
@@ -48,18 +63,38 @@ export function TypingDots({ className }: { className?: string }) {
       role="status"
       aria-label={t('正在回复')}
       data-testid="typing-dots"
-      className={`inline-flex w-fit items-center gap-1 rounded-full bg-secondary px-3 py-2.5 ${className ?? ''}`}
+      className={`${TYPING_PILL} ${className ?? ''}`}
     >
-      {[0, 1, 2].map((n) => (
-        <span
-          key={n}
-          aria-hidden="true"
-          data-testid="typing-dot"
-          style={{ animationDelay: `${n * 0.15}s` }}
-          className="typing-dot block size-1.5 rounded-full bg-(--text-tertiary)"
-        />
-      ))}
+      <TypingDotMarks />
     </span>
+  );
+}
+
+function StepsDots({
+  expanded,
+  onToggle,
+  className,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+  className?: string;
+}) {
+  const { t } = useI18n();
+  return (
+    <IconTooltip
+      label={t(expanded ? '收起实时步骤' : '查看步骤')}
+      trigger={
+        <Button
+          variant="ghost"
+          data-testid="typing-dots"
+          aria-expanded={expanded}
+          onClick={onToggle}
+          className={`chat-interaction h-auto min-h-0 cursor-pointer border-0 hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) ${TYPING_PILL} ${className ?? ''}`}
+        />
+      }
+    >
+      <TypingDotMarks />
+    </IconTooltip>
   );
 }
 
@@ -77,6 +112,7 @@ export interface LiveRowProps {
   labelDetail?: { label: string; vars: TVars };
   quiet?: boolean;
   waiting?: boolean;
+  notice?: boolean;
   disclosure?: { expand: string; collapse: string } | null;
   children?: ReactNode;
 }
@@ -88,6 +124,7 @@ export function LiveRow({
   labelDetail,
   quiet = false,
   waiting = false,
+  notice = true,
   disclosure = null,
   children,
 }: LiveRowProps) {
@@ -108,6 +145,37 @@ export function LiveRow({
     </>
   );
   const testid = variant === 'detail' ? 'live-row' : undefined;
+  if (variant === 'chief' && !waiting) {
+    const labelText = t(label, labelVars);
+    return (
+      <div className="flex min-w-0 flex-col">
+        {notice && (
+          <span
+            className={`${HEAD} ${HEAD_SIZE.chief} mb-1`}
+            data-testid="chief-live-notice"
+            title={labelDetail !== undefined ? t(labelDetail.label, labelDetail.vars) : undefined}
+          >
+            <span className="truncate">{labelText}</span>
+          </span>
+        )}
+        {disclosure == null ? (
+          <TypingDots />
+        ) : (
+          <StepsDots expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
+        )}
+        {disclosure != null && expanded && (
+          <div className="mt-1 flex min-w-0 flex-col">
+            {!notice && (
+              <p className={`m-0 ${HEAD} ${HEAD_SIZE.chief}`}>
+                <span className="truncate">{labelText}</span>
+              </p>
+            )}
+            {children}
+          </div>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="flex min-w-0 flex-col">
       {disclosure == null ? (

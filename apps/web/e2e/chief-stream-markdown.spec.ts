@@ -477,7 +477,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
 
     await expect(coordinator.locator('.chief-msg', { hasText: 'todo_write' })).toHaveCount(0);
     const live = coordinator.getByTestId('chief-msg').last();
-    await live.getByRole('button', { name: '展开实时步骤' }).click();
+    await live.getByRole('button', { name: '查看步骤' }).click();
     await expect(live.getByTestId('chief-turn-tools')).toContainText(/正在调用\s*todo_write/);
     await expect(coordinator.getByText('todo_write')).toHaveCount(1);
   });
@@ -509,7 +509,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
 
     const coordinator = page.getByTestId('home-c');
     const live = coordinator.getByTestId('chief-msg').last();
-    await live.getByRole('button', { name: '展开实时步骤' }).click();
+    await live.getByRole('button', { name: '查看步骤' }).click();
     await expect(live.getByTestId('chief-turn-tools')).toContainText(/正在调用\s*Bash ls -la/);
   });
 

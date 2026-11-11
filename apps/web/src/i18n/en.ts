@@ -778,6 +778,7 @@ export const EN: Record<string, string> = {
     'Restore to here? The {n## message after it is removed|# messages after it are removed} and the Coordinator resends from this one as a fresh turn.',
   // #822 在飞存在行展开面：行开关 aria + 正在调用的工具 + 空面 fallback。
   展开实时步骤: 'Show live steps',
+  查看步骤: 'View steps',
   收起实时步骤: 'Hide live steps',
   正在调用: 'Calling',
   '等待 Agent 响应…': 'Waiting for the agent…',

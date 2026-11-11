@@ -32,10 +32,11 @@ import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
-import { PHASE_UI } from '../phase.js';
+import { isInFlightPhase, PHASE_UI } from '../phase.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefReportRow } from './chief-report-row.js';
 import { taskRefsOf } from './chief-task-refs.js';
+import { isLiveNotice } from './live-notice.js';
 import { QuestionAnsweredLine } from './question-answered-line.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
 import type { ReplyQuoteDraft } from './selection-reply.js';
@@ -167,7 +168,7 @@ function TaskRefRows({ source }: { source: Parameters<typeof taskRefsOf>[0] }) {
           <TodoStatus phase={ref.phase} />
           <span className="min-w-0 truncate">{ref.title ?? `#${ref.seq ?? ''}`}</span>
           <span className="flex-none font-normal text-(--text-tertiary)">
-            {`· ${t(PHASE_UI[ref.phase].chip)}`}
+            {`· ${t(isInFlightPhase(ref.phase) ? '进行中' : PHASE_UI[ref.phase].chip)}`}
           </span>
         </ThreadLink>
       ))}
@@ -581,7 +582,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               labelVars={item.labelVars}
               labelDetail={item.labelDetail}
               waiting={item.waiting === true}
-              disclosure={{ expand: '展开实时步骤', collapse: '收起实时步骤' }}
+              notice={isLiveNotice(item.label, item.labelDetail)}
+              disclosure={{ expand: '查看步骤', collapse: '收起实时步骤' }}
             >
               <div data-testid="chief-turn-tools">
                 {liveSteps.length > 0 && <TraceRows density="compact" steps={liveSteps} />}
@@ -613,6 +615,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               onOpenChange={() => onToggleTools(i)}
               summaryTestId="chief-tools-toggle"
               cardTestId="chief-turn-tools"
+              className={toolsOpen.has(i) ? undefined : MESSAGE_TOOLS_REVEAL}
             />
           )}
           {item.typing !== true && <TaskRefRows source={item} />}
