@@ -115,3 +115,49 @@ test('the icon-only header buttons show a tooltip with their name on hover', asy
     await expect(page.locator('[data-slot="tooltip-content"]')).toHaveCount(0);
   }
 });
+
+test('computers share one group, each glyph carries its status dot, and the add row is outlined', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=home-c-machines&pane=machines');
+  const group = panel(page).locator('[data-slot="list-card"]').filter({ hasText: 'xmonsMac' });
+  await expect(group).toHaveCount(1);
+  const rows = group.getByTestId('machine-list-row');
+  await expect(rows).toHaveCount(4);
+  await expect(rows.nth(0)).toContainText('xmonsMac');
+  const dots = group.getByTestId('machine-status-dot');
+  await expect(dots).toHaveCount(4);
+  await expect(dots.nth(0)).toHaveAttribute('data-online', 'true');
+  await expect(dots.nth(1)).toHaveAttribute('data-online', 'false');
+  await expect(dots.nth(2)).toHaveAttribute('data-online', 'true');
+  await expect(dots.nth(3)).toHaveAttribute('data-online', 'false');
+  await expect(rows.nth(3)).toContainText('离线 · 最后在线 2 小时前');
+  await expect(panel(page).getByTestId('machines-add').locator('[data-slot="list-card"]')).toHaveCount(0);
+});
+
+test('a computer page puts the status under the header and links its settings from Edit', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=home-c-machines&pane=machines');
+  await panel(page).getByRole('button', { name: /Office Mac mini/ }).click();
+  const status = panel(page).getByTestId('machine-detail-status');
+  await expect(status).toContainText('离线 · 最后在线 2 小时前');
+  await expect(status.getByTestId('machine-status-dot')).toHaveAttribute('data-online', 'false');
+  await expect(panel(page).locator('[data-panel-head]')).not.toContainText('离线');
+  await expect(panel(page).getByRole('switch')).toHaveCount(2);
+  await expect(panel(page).locator('[data-slot="list-card"]').filter({ has: page.getByRole('switch') })).toHaveCount(1);
+  await panel(page).getByRole('link', { name: '编辑' }).click();
+  await expect(page).toHaveURL(/\/app\/settings\/machines\?machine=home-c-office/);
+});
+
+test('re-checking shows a spinner in place of the label and keeps the button name', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&pane=machines`);
+  const recheck = panel(page).getByTestId('machines-recheck');
+  await expect(recheck).toHaveAccessibleName('再检查一次');
+  await expect(recheck).toHaveAttribute('aria-busy', 'false');
+  await recheck.click();
+  await expect(recheck).toHaveAttribute('aria-busy', 'false');
+  await expect(recheck).toHaveText('再检查一次');
+});

@@ -1,5 +1,6 @@
 import type { ComputerRecord } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
+import { cn } from 'cn';
 import { Laptop, MonitorSmartphone, Plus, Server } from 'lucide-react';
 import { type ReactElement, type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
@@ -24,9 +25,11 @@ import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Skeleton } from '../components/ui/skeleton.js';
+import { Spinner } from '../components/ui/spinner.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight, X } from '../icons/index.js';
+import { settingsHref } from '../settings/settings-href.js';
 import { CoordinatorComputer } from './computer-feed.js';
 import { MachineScreenSurface, ScreenPlaceholder } from './computer-screen.js';
 import { machineStateLabel } from './fleet-status.js';
@@ -46,7 +49,43 @@ export function coordinatorMachine(machines: readonly MachineRow[]): MachineRow 
   );
 }
 
-function MachineStatus({ machine, coordinator }: { machine: MachineRow; coordinator: boolean }) {
+function StatusDot({ online, className }: { online: boolean; className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      data-testid="machine-status-dot"
+      data-online={online}
+      className={cn(
+        'block size-1.5 flex-none rounded-full',
+        online ? 'bg-running' : 'rounded-full border border-content-dim bg-background',
+        className,
+      )}
+    />
+  );
+}
+
+function MachineGlyph({ machine }: { machine: MachineRow }) {
+  const Icon = machine.kind === 'local' ? Laptop : Server;
+  return (
+    <span className="relative flex-none text-content-secondary">
+      <Icon aria-hidden="true" className="size-4.5" />
+      <StatusDot
+        online={machine.online === true}
+        className="absolute -right-0.5 -bottom-0.5 size-2 ring-2 ring-card"
+      />
+    </span>
+  );
+}
+
+function MachineStatus({
+  machine,
+  coordinator,
+  dot = false,
+}: {
+  machine: MachineRow;
+  coordinator: boolean;
+  dot?: boolean;
+}) {
   const { t } = useI18n();
   const online = machine.online === true;
   const seen = online ? '' : relativeTime(machine.lastSeenAt, Date.now(), t);
@@ -57,7 +96,7 @@ function MachineStatus({ machine, coordinator }: { machine: MachineRow; coordina
       : `${t('离线')} · ${t('最后在线 {time}', { time: seen })}`;
   return (
     <span className="flex min-w-0 items-center gap-1.5 text-meta text-content-tertiary">
-      {online && <span aria-hidden="true" className="size-1.5 flex-none rounded-full bg-running" />}
+      {dot && <StatusDot online={online} />}
       <span className="truncate">
         {coordinator ? `${state} · ${t('Coordinator 在这台')}` : state}
       </span>
@@ -404,8 +443,6 @@ function MachineDetail({
           disabledReason={browserHint}
           onCheckedChange={canToggleBrowser ? onBrowserToggle : undefined}
         />
-      </ListCard>
-      <ListCard className="flex-none">
         <CapabilityRow
           label={t('桌面控制')}
           hint={t('让 agent 操作这台电脑上的应用。macOS 要在辅助功能里授权。')}
@@ -431,7 +468,7 @@ function SectionLabel({ children }: { children: ReactNode }) {
 const ROW_CLS =
   'h-auto w-full justify-start gap-3 rounded-none px-3.5 py-3 text-left font-normal whitespace-normal hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 
-function NavRow({
+function NavButton({
   icon,
   onClick,
   children,
@@ -443,11 +480,17 @@ function NavRow({
   render?: ReactElement;
 }) {
   return (
+    <Button variant="ghost" onClick={onClick} render={render} className={ROW_CLS}>
+      <span className="flex-none text-content-secondary">{icon}</span>
+      {children}
+    </Button>
+  );
+}
+
+function NavRow(props: Parameters<typeof NavButton>[0]) {
+  return (
     <ListCard className="flex-none">
-      <Button variant="ghost" onClick={onClick} render={render} className={ROW_CLS}>
-        <span className="flex-none text-content-secondary">{icon}</span>
-        {children}
-      </Button>
+      <NavButton {...props} />
     </ListCard>
   );
 }
@@ -503,12 +546,32 @@ export function MachinesPanel({
           >
             <ChevronLeft aria-hidden="true" />
           </IconTooltip>
-          <div className="flex min-w-0 flex-1 flex-col">
-            <h2 className="m-0 truncate text-ui font-medium text-foreground">{selected.name}</h2>
-            <MachineStatus machine={selected} coordinator={selected === host} />
-          </div>
+          <h2 className="m-0 min-w-0 flex-1 truncate text-ui font-medium text-foreground">
+            {selected.name}
+          </h2>
+          {selected.id !== undefined && (
+            <Button
+              variant="ghost"
+              size="sm"
+              data-testid="machine-edit"
+              render={
+                <Link
+                  to={{
+                    pathname: settingsHref('machines'),
+                    search: new URLSearchParams({ machine: selected.id }).toString(),
+                  }}
+                />
+              }
+              className="h-7 px-2 text-ui font-normal text-foreground"
+            >
+              {t('编辑')}
+            </Button>
+          )}
         </SidePanelHead>
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 pt-3 pb-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 pt-1 pb-4">
+          <div data-testid="machine-detail-status" className="px-1 pb-1">
+            <MachineStatus machine={selected} coordinator={selected === host} dot />
+          </div>
           <MachineDetail
             machine={selected}
             coordinator={selected === host}
@@ -544,46 +607,60 @@ export function MachinesPanel({
           errorTitle={t('电脑没能加载')}
           empty={null}
         >
-          {ordered.map((machine) => (
-            <NavRow
-              key={keyOf(machine)}
-              icon={
-                machine.kind === 'local' ? (
-                  <Laptop aria-hidden="true" className="size-4.5" />
-                ) : (
-                  <Server aria-hidden="true" className="size-4.5" />
-                )
-              }
-              onClick={() => setOpenKey(keyOf(machine))}
-            >
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-ui font-medium text-foreground">{machine.name}</span>
-                <MachineStatus machine={machine} coordinator={machine === host} />
-              </span>
-              <ChevronRight aria-hidden="true" className="size-4 flex-none text-content-dim" />
-            </NavRow>
-          ))}
+          <ListCard className="flex-none">
+            {ordered.map((machine) => (
+              <NavButton
+                key={keyOf(machine)}
+                icon={<MachineGlyph machine={machine} />}
+                onClick={() => setOpenKey(keyOf(machine))}
+              >
+                <span data-testid="machine-list-row" className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-ui font-medium text-foreground">
+                    {machine.name}
+                  </span>
+                  <MachineStatus machine={machine} coordinator={machine === host} />
+                </span>
+                <ChevronRight aria-hidden="true" className="size-4 flex-none text-content-dim" />
+              </NavButton>
+            ))}
+          </ListCard>
         </QueryBoundary>
         <div className="flex items-center justify-between px-1 pb-2 text-meta text-content-tertiary">
           <span>{t('{time} 检查过', { time: clockTime(checkedAt) })}</span>
           <Button
             variant="ghost"
             size="sm"
+            data-testid="machines-recheck"
+            aria-label={t('再检查一次')}
+            aria-busy={checking}
             disabled={checking}
             onClick={recheck}
-            className="h-6.5 text-meta text-foreground"
+            className="h-6.5 min-w-16 text-meta text-foreground disabled:opacity-100"
           >
-            {t('再检查一次')}
+            {checking ? (
+              <Spinner
+                role="presentation"
+                aria-hidden="true"
+                className="size-3.5 text-content-tertiary"
+              />
+            ) : (
+              t('再检查一次')
+            )}
           </Button>
         </div>
-        <NavRow
-          icon={<Plus aria-hidden="true" className="size-4" />}
-          render={<Link to="/app/resources/machines" />}
+        <div
+          data-testid="machines-add"
+          className="flex flex-none flex-col overflow-hidden rounded-(--radius-card) border border-border"
         >
-          <span className="min-w-0 flex-1 truncate text-ui font-medium text-foreground">
-            {t('添加电脑')}
-          </span>
-        </NavRow>
+          <NavButton
+            icon={<Plus aria-hidden="true" className="size-4" />}
+            render={<Link to={settingsHref('machines')} />}
+          >
+            <span className="min-w-0 flex-1 truncate text-ui font-medium text-foreground">
+              {t('添加电脑')}
+            </span>
+          </NavButton>
+        </div>
         {ordered.length <= 1 && machinesPhase !== 'loading' && machinesPhase !== 'error' && (
           <p className="m-0 px-1 text-meta text-content-tertiary">
             {t('没有其他电脑时，任务都在 Coordinator 这台电脑上跑。')}

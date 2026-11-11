@@ -308,6 +308,7 @@ test('Made groups finished work by day, newest first, with the project name on e
   await expect(groups.nth(1)).toContainText('昨天');
   await expect(groups.nth(2)).toContainText('本周');
   await expect(groups.nth(3)).toContainText('更早');
+  await expect(groups.getByTestId('made-group-count')).toHaveText(['1', '1', '2', '1']);
   await expect(groups.nth(0).locator('[data-slot="thread-row"]')).toHaveCount(1);
   await expect(groups.nth(2).locator('[data-slot="thread-row"]')).toHaveCount(2);
   await expect(groups.nth(0)).toContainText('Contributing guide');
@@ -315,6 +316,18 @@ test('Made groups finished work by day, newest first, with the project name on e
   await expect(groups.nth(3)).toContainText('Credential relay');
   await expect(madePanel(page)).not.toContainText('Retired onboarding checklist');
   await expect(madePanel(page).getByTestId('made-archived-note')).toHaveCount(0);
+});
+
+test('Made with many finished items scrolls the list under fixed tabs', async ({ page }) => {
+  await page.goto('/app?scenario=home-c-made-many&pane=made');
+  const rows = madePanel(page).locator('[data-slot="thread-row"]');
+  await expect(rows).toHaveCount(15);
+  const tabs = madePanel(page).getByTestId('made-tabs');
+  await tabs.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  await expect(madePanel(page).getByRole('tab', { name: '全部' })).toBeInViewport();
+  await expect(rows.last()).toBeInViewport();
 });
 
 test('Made search filters by title and project, and Escape clears and closes it', async ({
@@ -361,8 +374,13 @@ test('Made archived tab lists archived finished work and keeps the retention not
 test('Made archived tab says so when nothing is archived', async ({ page }) => {
   await page.goto(`${HOME}&pane=made`);
   await madePanel(page).getByRole('tab', { name: '已归档' }).click();
-  await expect(madePanel(page).getByTestId('made-archived-empty')).toBeVisible();
+  const empty = madePanel(page).getByTestId('made-archived-empty');
+  await expect(empty).toHaveText('还没有已归档的成果');
   await expect(madePanel(page).getByTestId('made-empty')).toHaveCount(0);
+  const note = madePanel(page).getByTestId('made-archived-note');
+  const noteBox = await note.boundingBox();
+  const emptyBox = await empty.boundingBox();
+  expect(noteBox?.y ?? 0).toBeLessThan(emptyBox?.y ?? 0);
 });
 
 test('the composer has no in-progress pill above it', async ({ page }) => {

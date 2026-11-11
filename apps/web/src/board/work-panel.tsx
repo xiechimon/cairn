@@ -99,12 +99,12 @@ export function WorkPanel({
   const emptyView =
     source.length === 0 ? (
       tab === 'archived' ? (
-        <EmptyState
-          testId="made-archived-empty"
-          icon={PackageCheck}
-          title={t('还没有已归档的成果')}
-          className="mt-[10vh]"
-        />
+        <p
+          data-testid="made-archived-empty"
+          className="m-0 px-2.5 pt-3 text-ui text-content-tertiary"
+        >
+          {t('还没有已归档的成果')}
+        </p>
       ) : (
         <EmptyState
           testId="made-empty"
@@ -127,8 +127,11 @@ export function WorkPanel({
     <>
       {groups.map((group) => (
         <section key={group.key} data-testid="made-group" data-group={group.key}>
-          <h3 className="m-0 pt-3.5 pr-2.5 pb-1 pl-8.5 text-meta font-normal text-content-tertiary">
+          <h3 className="m-0 flex items-baseline gap-1.5 pt-3.5 pr-2.5 pb-1 pl-8.5 text-meta font-normal text-content-secondary">
             {t(MADE_GROUP_LABEL[group.key])}
+            <span data-testid="made-group-count" className="text-content-tertiary tabular-nums">
+              {group.items.length}
+            </span>
           </h3>
           <StoneTrail className="px-0 pt-0">
             {group.items.map((todo) => {
@@ -148,14 +151,6 @@ export function WorkPanel({
           </StoneTrail>
         </section>
       ))}
-      {tab === 'archived' && (
-        <p
-          data-testid="made-archived-note"
-          className="m-0 px-2.5 pt-3 text-meta text-content-tertiary"
-        >
-          {t('已归档的成果会一直保留，直到你删除它或它所在的项目。')}
-        </p>
-      )}
     </>
   );
   const body = made.length === 0 ? emptyView : listView;
@@ -197,6 +192,14 @@ export function WorkPanel({
         data-testid="made-tabs"
         className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-1 pb-4"
       >
+        {tab === 'archived' && (
+          <p
+            data-testid="made-archived-note"
+            className="m-0 px-2.5 pt-2 text-meta text-content-tertiary"
+          >
+            {t('已归档的成果会一直保留，直到你删除它或它所在的项目。')}
+          </p>
+        )}
         <QueryBoundary
           query={activeQuery}
           isEmpty={made.length === 0}

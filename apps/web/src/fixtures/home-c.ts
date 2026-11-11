@@ -247,3 +247,67 @@ export const homeCMade: FixtureSet = {
   ],
   now: at(MADE_DAY, 20, 30),
 };
+
+const HOUR_MS = 3_600_000;
+
+export const homeCMachines: FixtureSet = {
+  ...homeC,
+  resources: {
+    skills: [],
+    mcpServers: [],
+    providerSources: [],
+    machines: [
+      ...(homeC.resources?.machines ?? []),
+      {
+        id: 'home-c-studio',
+        kind: 'remote',
+        name: 'studio-linux',
+        online: true,
+        runningSteps: 1,
+        maxConcurrent: 4,
+      },
+      {
+        id: 'home-c-office',
+        kind: 'local',
+        name: 'Office Mac mini',
+        online: false,
+        lastSeenAt: Date.now() - 2 * HOUR_MS,
+        maxConcurrent: 4,
+      },
+    ],
+  },
+};
+
+const MADE_MANY_TITLES = [
+  'Contributing guide',
+  'Repository overview',
+  'Release notes for 0.9',
+  'Relay probe report',
+  'Retry budget table',
+  'Snake web game',
+  'Onboarding checklist',
+  'Queue latency chart',
+  'Settings search index',
+  'Archive toast copy',
+  'Thread unread dot',
+  'Model routing table',
+  'Machine offline banner',
+  'Changelog generator',
+];
+
+export const homeCMadeMany: FixtureSet = {
+  ...homeC,
+  todos: [
+    ...(homeC.todos ?? []),
+    ...MADE_MANY_TITLES.map((title, index) =>
+      madeTodo(
+        `made-many-${index}`,
+        2400 + index,
+        title,
+        index % 3 === 0 ? HOME_C_CRED : PROJECT_ID,
+        at(MADE_DAY, 19, 40) - index * 14 * HOUR_MS,
+      ),
+    ),
+  ],
+  now: at(MADE_DAY, 20, 30),
+};

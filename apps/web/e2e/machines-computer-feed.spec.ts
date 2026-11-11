@@ -515,8 +515,9 @@ test('with a machine listed the panel still shows its card and the screen placeh
 test('with no machines the list is only the add row and the hint', async ({ page }) => {
   const panel = await open(page, { computers: [], commands: [] }, [], false);
   await expect(panel.getByRole('heading', { name: '你的电脑' })).toBeVisible();
-  await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(1);
-  await expect(panel.getByRole('link', { name: '添加电脑' })).toBeVisible();
+  await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(0);
+  await expect(panel.getByTestId('machine-list-row')).toHaveCount(0);
+  await expect(panel.getByTestId('machines-add').getByRole('link', { name: '添加电脑' })).toBeVisible();
   await expect(panel).toContainText('没有其他电脑时，任务都在 Coordinator 这台电脑上跑。');
 });
 
