@@ -21,11 +21,13 @@ const TOOL_BTN_CLS =
 const HOVER_REVEAL =
   'pointer-events-none opacity-0 group-hover/reply-block:pointer-events-auto group-hover/reply-block:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 has-[[aria-expanded=true]]:pointer-events-auto has-[[aria-expanded=true]]:opacity-100 pointer-coarse:hidden';
 
+const TOUCH_REVEAL = 'pointer-coarse:group-data-[tools-open]/message:flex';
+
 const PLACEMENT_CLS: Record<ToolbarPlacement, string> = {
   right: `absolute top-1/2 left-full z-10 -translate-y-1/2 pl-3 ${HOVER_REVEAL}`,
   left: `absolute top-1/2 right-full z-10 -translate-y-1/2 pr-3 ${HOVER_REVEAL}`,
-  'below-start': 'mt-1 hidden pointer-coarse:flex',
-  'below-end': 'mt-1 hidden justify-end self-end pointer-coarse:flex',
+  'below-start': `mt-1 hidden ${TOUCH_REVEAL}`,
+  'below-end': `mt-1 hidden justify-end self-end ${TOUCH_REVEAL}`,
 };
 
 export function MessageToolbar({

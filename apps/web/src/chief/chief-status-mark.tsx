@@ -2,6 +2,7 @@ import { cn } from 'cn';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useConnected } from '../api/connection-state.js';
 import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import type { ChiefContent } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useQuestionDockVisible } from './chief-question-dock.js';
@@ -135,6 +136,40 @@ export function StatusMarkFloat({
   }, [label, announce]);
 
   const visible = pill.label !== '' && (!out || hover);
+  const live = (
+    <span role="status" className="sr-only" data-testid="chief-status-live">
+      {announced === '' ? '' : t(announced)}
+    </span>
+  );
+  if (large) {
+    const name = label === '' ? t('Coordinator') : t(label);
+    return (
+      <div
+        data-testid="chief-status-mark"
+        data-state={id}
+        className={cn('pointer-events-none flex flex-col items-center', className)}
+      >
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <div
+                role="img"
+                aria-label={name}
+                data-slot="status-mark-circle"
+                className="pointer-events-auto grid size-15.5 place-items-center rounded-full bg-popover shadow-(--e2)"
+              />
+            }
+          >
+            <StatusMarkGlyph state={id} className="size-11" />
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={8}>
+            {elapsed == null ? name : `${name} · ${formatClock(elapsed)}`}
+          </TooltipContent>
+        </Tooltip>
+        {live}
+      </div>
+    );
+  }
   return (
     <div
       data-testid="chief-status-mark"
@@ -143,14 +178,11 @@ export function StatusMarkFloat({
     >
       <div
         data-slot="status-mark-circle"
-        className={cn(
-          'pointer-events-auto grid place-items-center rounded-full bg-popover shadow-(--e2)',
-          large ? 'size-15.5' : 'size-11',
-        )}
+        className="pointer-events-auto grid size-11 place-items-center rounded-full bg-popover shadow-(--e2)"
         onPointerEnter={() => setHover(true)}
         onPointerLeave={() => setHover(false)}
       >
-        <StatusMarkGlyph state={id} className={large ? 'size-11' : 'size-8'} />
+        <StatusMarkGlyph state={id} className="size-8" />
       </div>
       <div
         aria-hidden="true"
@@ -169,9 +201,7 @@ export function StatusMarkFloat({
           </span>
         )}
       </div>
-      <span role="status" className="sr-only" data-testid="chief-status-live">
-        {announced === '' ? '' : t(announced)}
-      </span>
+      {live}
     </div>
   );
 }

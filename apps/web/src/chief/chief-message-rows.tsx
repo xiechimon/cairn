@@ -89,9 +89,9 @@ const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
 
 const SCROLLER_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
 
-const USER_ROW_CLS = 'mt-5 pointer-coarse:mt-7';
-const EVENT_ROW_CLS = 'mt-5 pointer-coarse:mt-7';
-const REPLY_ROW_CLS = 'mt-5 pointer-coarse:mt-7';
+const USER_ROW_CLS = 'mt-5';
+const EVENT_ROW_CLS = 'mt-5';
+const REPLY_ROW_CLS = 'mt-5';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 

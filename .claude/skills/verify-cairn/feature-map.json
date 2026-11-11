@@ -1507,7 +1507,7 @@
       "id": "mobile-web",
       "name": "Mobile web and PWA",
       "summary": "The web app installed on a phone: narrow layouts, the service worker and the home-screen app.",
-      "states": "At phone width the Coordinator home has no header bar: a round menu button, the status mark and an avatar-and-Tasks pill float at the top, a floating pill tab bar switches chat, Tasks and results with a round computers button beside it, every side panel is a full-screen tab between them, the composer is one row, the avatar opens the account menu, and the sidebar drawer pushes the conversation back as a dimmed card; settings collapse to a list; the app can be installed to the home screen.",
+      "states": "At phone width the Coordinator home has no header bar: a round menu button, the bare status mark and one round Tasks button with its count badge float at the top, a floating pill tab bar switches chat, Tasks and results with a round computers button beside it, every side panel is a full-screen tab between them, the composer is one row, settings and activity live in the drawer footer, touch message tools appear on a tap, and the sidebar drawer pushes the conversation back as a dimmed card; settings collapse to a list; the app can be installed to the home screen.",
       "centrality": 2,
       "status": "shipped",
       "code": {
@@ -1515,7 +1515,6 @@
           "apps/web/src/pwa/register.tsx",
           "apps/web/src/board/phone-tabs.tsx",
           "apps/web/src/board/narrow-chrome.tsx",
-          "apps/web/src/board/account-menu.tsx",
           "apps/web/src/board/narrow-drawer.ts"
         ]
       },

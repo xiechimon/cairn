@@ -453,7 +453,7 @@ export function ChiefConversation({
         <MessageScrollerItem key={`divider-${chiefStreamRowKey(item, i)}`}>
           <div
             data-testid="chief-time-divider"
-            className="mt-5 text-center text-caption text-(--text-tertiary) pointer-coarse:mt-7"
+            className="mt-5 text-center text-caption text-(--text-tertiary)"
           >
             <time dateTime={new Date(at).toISOString()}>
               {timeDividerLabel(at, clock, locale, t)}

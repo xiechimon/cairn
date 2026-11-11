@@ -6,6 +6,10 @@ import { useI18n } from '../i18n/provider.js';
 import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
 import { PANE_PARAM, type WorkPane } from './work-panel.js';
 
+export const NARROW_FLOAT_CLS = 'pointer-events-auto bg-popover shadow-(--e2)';
+
+export const NARROW_ICON_CLS = 'size-4.5';
+
 export function NeedsYouCount({ count, className }: { count: number; className?: string }) {
   return (
     <span
@@ -72,21 +76,24 @@ export function PhoneTabs({
       <nav
         data-slot="phone-tabs"
         aria-label={t('对话、任务和成果')}
-        className="pointer-events-auto flex h-16.5 max-w-82.5 min-w-0 flex-1 rounded-full bg-popover p-1.5 shadow-(--e2)"
+        className={cn(
+          NARROW_FLOAT_CLS,
+          'flex h-16.5 max-w-82.5 min-w-0 flex-1 rounded-full p-1.25',
+        )}
       >
         <TabLink search={withPane(null)} current={pane === null}>
-          <MessageCircle aria-hidden className="size-4.5" strokeWidth={1.75} />
+          <MessageCircle aria-hidden className={NARROW_ICON_CLS} strokeWidth={1.75} />
           {t('对话')}
         </TabLink>
         <TabLink search={withPane('tasks')} current={pane === 'tasks'}>
           <span className="relative">
-            <ListChecks aria-hidden className="size-4.5" strokeWidth={1.75} />
+            <ListChecks aria-hidden className={NARROW_ICON_CLS} strokeWidth={1.75} />
             {badge > 0 && <NeedsYouCount count={badge} className="-top-2 left-3" />}
           </span>
           {t('任务')}
         </TabLink>
         <TabLink search={withPane('made')} current={pane === 'made'}>
-          <PackageCheck aria-hidden className="size-4.5" strokeWidth={1.75} />
+          <PackageCheck aria-hidden className={NARROW_ICON_CLS} strokeWidth={1.75} />
           {t('成果')}
         </TabLink>
       </nav>

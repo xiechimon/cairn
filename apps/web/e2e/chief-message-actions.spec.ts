@@ -68,14 +68,17 @@ test('the newest message hides its actions until hover, like the others', async 
   await expect.poll(() => opacityOf(tools(newest))).toBe(1);
 });
 
-test('touch devices keep the actions of older messages visible', async ({ browser }) => {
+test('touch devices show no message actions until a bubble is tapped', async ({ browser }) => {
   const context = await browser.newContext({ hasTouch: true, isMobile: true });
   const page = await context.newPage();
   await mockHistory(page);
   await page.goto('/app');
   await expect(messageOf(page, 'first question')).toBeVisible();
-  await expect(touchTools(messageOf(page, 'first question'))).toBeVisible();
-  await expect(tools(messageOf(page, 'first question'))).toBeHidden();
+  for (const text of ['first question', 'first answer', 'second question', 'second answer']) {
+    await expect(touchTools(messageOf(page, text))).toBeHidden();
+    await expect(tools(messageOf(page, text))).toBeHidden();
+  }
+  await expect(page.getByTestId('chief-msg-stamp').filter({ visible: true })).toHaveCount(0);
   await context.close();
 });
 
@@ -195,31 +198,51 @@ test('the toolbar sits beside the hovered bubble: right of a reply, left of an o
   await expect(page.getByRole('menuitem')).toHaveCount(0);
 });
 
-test('on a touch device the toolbar of an older message is reachable without hover', async ({
+test('on a touch device a tap on a bubble shows its toolbar, and a tap elsewhere hides it', async ({
   browser,
 }) => {
-  const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
+  const context = await browser.newContext({
+    hasTouch: true,
+    isMobile: true,
+    viewport: { width: 390, height: 800 },
+  });
   const page = await context.newPage();
   await mockHistory(page);
   await page.goto('/app');
   const older = messageOf(page, 'first answer');
   await expect(older).toBeVisible();
+  await expect(touchTools(older)).toBeHidden();
+  await bubbleOf(older).tap();
   await expect(touchTools(older)).toBeVisible();
   await expect(touchTools(older).getByTestId('chief-msg-reply')).toBeVisible();
+  await expect(touchTools(older).getByTestId('chief-msg-stamp')).toBeVisible();
+  const other = messageOf(page, 'first question');
+  await bubbleOf(other).tap();
+  await expect(touchTools(older)).toBeHidden();
+  await expect(touchTools(other)).toBeVisible();
+  await bubbleOf(other).tap();
+  await expect(touchTools(other)).toBeHidden();
+  await bubbleOf(older).dispatchEvent('contextmenu');
+  await expect(touchTools(older)).toBeVisible();
+  await touchTools(older).getByTestId('chief-msg-reply').tap();
+  await expect(page.getByTestId('composer-reply-quote')).toContainText('first answer');
   await context.close();
 });
 
 test.describe('on a touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  test('the always-visible message tools never overlap the next row', async ({ page }) => {
+  test('an opened message toolbar never overlaps the next row', async ({ page }) => {
     await page.goto('/app?scenario=chief-draft');
-    await expect(page.getByTestId('chief-time-divider')).toBeVisible();
+    await expect(page.getByTestId('chief-time-divider').first()).toBeVisible();
+    const bubbles = page.getByTestId('home-c').getByTestId('chief-bubble');
+    await bubbles.first().tap();
+    await expect(page.getByTestId('chief-msg-tools-touch').filter({ visible: true })).toHaveCount(1);
     const overlaps = await page.evaluate(() => {
       const items = [...document.querySelectorAll('[data-testid="chief-stream"] > *')];
       const found: string[] = [];
       items.forEach((item, index) => {
-        const tools = item.querySelector('[data-testid="chief-msg-tools-touch"]');
+        const tools = item.querySelector('[data-tools-open] [data-testid="chief-msg-tools-touch"]');
         const next = items[index + 1];
         if (tools == null || next == null) return;
         const bottom = tools.getBoundingClientRect().bottom;

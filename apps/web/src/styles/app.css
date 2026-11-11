@@ -547,7 +547,8 @@
 
   html[data-narrow-chrome] {
     --narrow-top: calc(env(safe-area-inset-top) + 5.75rem);
-    --narrow-bottom: calc(max(0.75rem, env(safe-area-inset-bottom)) + 4.125rem);
+    --chat-fade-size: 76px;
+    --narrow-bottom: calc(max(0.75rem, env(safe-area-inset-bottom)) + 4.375rem);
   }
 
   html[data-narrow-chrome] .board-sheet .side-panel {

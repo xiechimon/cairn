@@ -14,6 +14,7 @@ import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversat
 import { TaskCardContext } from '../chief/chief-message-rows.js';
 import { ChiefStatusMark } from '../chief/chief-status-mark.js';
 import { questionDockState } from '../chief/question-dock-state.js';
+import { useTouchMessageTools } from '../chief/touch-message-tools.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
 import { ConversationSkeleton } from '../components/conversation-skeleton.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -238,10 +239,11 @@ export function HomeC({
           facts={taskCardFacts(fullStream ?? [], todoId)}
           now={now}
           onOpen={() => openThread(todoId)}
+          compact={narrow}
         />
       );
     },
-    [taskById, fullStream, openThread, now],
+    [taskById, fullStream, openThread, now, narrow],
   );
   const [questionTarget, setQuestionTarget] = useState<QuestionTarget | null>(null);
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
@@ -280,6 +282,8 @@ export function HomeC({
       setQuestionTarget(null);
     }
   }, [questionTarget, stepKind, focusAt, loadEarlier]);
+  const [section, setSection] = useState<HTMLElement | null>(null);
+  useTouchMessageTools(section);
   const thread = useComposerThreadTarget(scoped);
   const running = scoped.filter(
     (todo) => threadStatus(todo) === 'running' && todo.archivedAt == null,
@@ -576,6 +580,7 @@ export function HomeC({
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="relative flex min-h-0 min-w-0 flex-1">
         <section
+          ref={setSection}
           data-testid="home-c"
           aria-label={t('与 Coordinator 的对话')}
           className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"

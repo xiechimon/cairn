@@ -89,3 +89,29 @@ test('tasks waiting on the owner put no tray above the composer; the greeting co
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
   await expect(page.getByTestId('chief-composer-block').locator('[data-slot="thread-card"]')).toHaveCount(0);
 });
+
+test.describe('at phone width', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('the task card is one line: glyph, title and status word, no age or latest line', async ({
+    page,
+  }) => {
+    await mockLive(page, {
+      threads: [THREAD],
+      messages: MESSAGES,
+      todos: [TASK],
+      tasks: [taskEntry({ section: 'working', title: TASK.title })],
+    });
+    await page.goto('/app');
+    const card = page.getByTestId('chief-stream').locator('[data-slot="task-card"]');
+    await expect(card).toHaveAttribute('data-compact', 'true');
+    await expect(card.locator('[data-slot="task-card-status"]')).toHaveText('In progress');
+    await expect(card.locator('[data-slot="task-card-latest"]')).toHaveCount(0);
+    await expect(card.locator('[data-slot="task-card-age"]')).toHaveCount(0);
+    const box = await card.boundingBox();
+    expect(box!.height).toBeLessThanOrEqual(48);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390 - 16);
+    await card.click();
+    await expect(page).toHaveURL(new RegExp(`thread=${TASK.id}`));
+  });
+});

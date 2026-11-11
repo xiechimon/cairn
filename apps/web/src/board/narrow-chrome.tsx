@@ -4,13 +4,12 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
-import { AccountMenu } from './account-menu.js';
 import { setDrawerOpen, useDrawerOpen } from './narrow-drawer.js';
-import { NeedsYouCount } from './phone-tabs.js';
+import { NARROW_FLOAT_CLS, NARROW_ICON_CLS, NeedsYouCount } from './phone-tabs.js';
 
 const KEYBOARD_MIN_PX = 150;
 
-const FLOAT_CLS = 'pointer-events-auto bg-popover shadow-(--e2)';
+const FLOAT_BUTTON_CLS = `${NARROW_FLOAT_CLS} absolute top-3 size-11.5 rounded-full text-foreground hover:bg-popover dark:hover:bg-popover`;
 
 function editableFocused(): boolean {
   const node = document.activeElement;
@@ -87,41 +86,33 @@ export function NarrowTopControls({
               data-testid="narrow-menu"
               aria-expanded={drawerOpen}
               onClick={() => setDrawerOpen(true)}
-              className={`${FLOAT_CLS} absolute top-2.5 left-4 size-11.5 rounded-full text-foreground hover:bg-popover dark:hover:bg-popover`}
+              className={cn(FLOAT_BUTTON_CLS, 'left-4')}
             />
           }
         >
-          <TextAlignStart aria-hidden className="size-4.5" strokeWidth={1.75} />
+          <TextAlignStart aria-hidden className={NARROW_ICON_CLS} strokeWidth={1.75} />
         </IconTooltip>
         <div className="absolute inset-x-0 top-1">{mark}</div>
-        <div
-          data-testid="narrow-account-pill"
-          data-tasks-open={tasksOpen || undefined}
-          className={cn(
-            FLOAT_CLS,
-            'absolute top-2.5 right-4 flex h-11.5 items-center rounded-full p-1',
-            tasksOpen && 'bg-(--card-button) text-(--text-on-accent)',
-          )}
+        <IconTooltip
+          label={tasksLabel}
+          side="bottom"
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon"
+              data-testid="tasks-toggle"
+              aria-pressed={tasksOpen}
+              onClick={onTasks}
+              className={cn(
+                FLOAT_BUTTON_CLS,
+                'right-4 aria-pressed:bg-(--card-button) aria-pressed:text-(--text-on-accent) dark:aria-pressed:bg-(--card-button)',
+              )}
+            />
+          }
         >
-          <AccountMenu />
-          <IconTooltip
-            label={tasksLabel}
-            side="bottom"
-            trigger={
-              <Button
-                variant="ghost"
-                size="icon"
-                data-testid="tasks-toggle"
-                aria-pressed={tasksOpen}
-                onClick={onTasks}
-                className="relative h-9.5 w-11.5 rounded-full text-foreground hover:bg-transparent aria-pressed:text-(--text-on-accent) dark:hover:bg-transparent"
-              />
-            }
-          >
-            <ListChecks aria-hidden className="size-4.5" strokeWidth={1.75} />
-          </IconTooltip>
-          {badge > 0 && <NeedsYouCount count={badge} className="-top-1.5 -right-1" />}
-        </div>
+          <ListChecks aria-hidden className={NARROW_ICON_CLS} strokeWidth={1.75} />
+          {badge > 0 && <NeedsYouCount count={badge} className="-top-1 -right-1" />}
+        </IconTooltip>
       </div>
     </div>
   );

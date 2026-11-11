@@ -4,7 +4,7 @@ const HOME = '/app?scenario=home-c';
 
 const tabs = (page: Page) => page.getByRole('navigation', { name: '对话、任务和成果' });
 const tab = (page: Page, name: RegExp) => tabs(page).getByRole('link', { name });
-const pill = (page: Page) => page.getByTestId('narrow-account-pill');
+const top = (page: Page) => page.locator('[data-slot="narrow-top"]');
 const box = async (page: Page, testId: string) => {
   const found = await page.getByTestId(testId).first().boundingBox();
   if (found === null) throw new Error(`${testId} has no box`);
@@ -31,12 +31,48 @@ for (const viewport of [
       const markBox = await mark.boundingBox();
       expect(markBox!.width).toBe(62);
       expect(Math.abs(markBox!.x + markBox!.width / 2 - viewport.width / 2)).toBeLessThanOrEqual(1);
-      const right = await box(page, 'narrow-account-pill');
+      expect(menu.y).toBe(12);
+      const right = await box(page, 'tasks-toggle');
+      expect(right.width).toBe(46);
       expect(right.height).toBe(46);
+      expect(right.y).toBe(menu.y);
       expect(Math.round(viewport.width - right.x - right.width)).toBe(16);
-      await expect(pill(page).getByTestId('account-menu-trigger')).toBeVisible();
-      await expect(pill(page).getByTestId('tasks-badge')).toHaveText('3');
+      const radius = (testId: string) =>
+        page.getByTestId(testId).first().evaluate((node) => getComputedStyle(node).borderRadius);
+      expect(await radius('tasks-toggle')).toBe(await radius('narrow-menu'));
+      const shadow = (testId: string) =>
+        page.getByTestId(testId).first().evaluate((node) => getComputedStyle(node).boxShadow);
+      expect(await shadow('tasks-toggle')).toBe(await shadow('narrow-menu'));
+      expect(await shadow('machines-button')).toBe(await shadow('narrow-menu'));
+      expect(
+        await tabs(page).evaluate((node) => getComputedStyle(node).boxShadow),
+      ).toBe(await shadow('narrow-menu'));
+      await expect(page.getByTestId('tasks-toggle').getByTestId('tasks-badge')).toHaveText('3');
       expect(await overflow(page)).toBe(0);
+    });
+
+    test('the top right holds only the tasks button: no avatar or account button', async ({
+      page,
+    }) => {
+      await page.goto(HOME);
+      await expect(page.getByTestId('tasks-toggle')).toHaveCount(1);
+      await expect(top(page).getByRole('button')).toHaveCount(2);
+      await expect(top(page).getByRole('button', { name: '账号' })).toHaveCount(0);
+      await expect(top(page).locator('img')).toHaveCount(0);
+      await expect(page.getByTestId('tasks-toggle')).toHaveAccessibleName('任务，3 件等你');
+    });
+
+    test('the status mark is a bare disc that carries its state in its name, with no label chip', async ({
+      page,
+    }) => {
+      await page.goto(HOME);
+      const mark = top(page).getByTestId('chief-status-mark');
+      await expect(mark).toHaveAttribute('data-state', 'ask');
+      await expect(page.getByTestId('chief-status-pill')).toHaveCount(0);
+      await expect(mark.getByRole('img', { name: '等你确认' })).toBeVisible();
+      const disc = await mark.locator('[data-slot="status-mark-circle"]').boundingBox();
+      const menu = await box(page, 'narrow-menu');
+      expect(disc!.y + disc!.height).toBeLessThanOrEqual(menu.y + menu.height + 10);
     });
 
     test('the tab bar switches panes instantly and keeps the URL of the desktop pane', async ({
@@ -48,12 +84,12 @@ for (const viewport of [
       await tab(page, /任务/).click();
       await expect(page).toHaveURL(/[?&]pane=tasks/);
       await expect(page.getByRole('complementary', { name: '任务' })).toBeVisible();
-      await expect(pill(page)).toHaveAttribute('data-tasks-open', 'true');
+      await expect(page.getByTestId('tasks-toggle')).toHaveAttribute('aria-pressed', 'true');
       await tab(page, /成果/).click();
       await expect(page).toHaveURL(/[?&]pane=made/);
       await expect(page.getByRole('complementary', { name: '成果' })).toBeVisible();
       await expect(tab(page, /成果/)).toHaveAttribute('aria-current', 'page');
-      await expect(pill(page)).not.toHaveAttribute('data-tasks-open', 'true');
+      await expect(page.getByTestId('tasks-toggle')).toHaveAttribute('aria-pressed', 'false');
       await page.getByTestId('machines-button').click();
       await expect(page).toHaveURL(/[?&]pane=machines/);
       await expect(page.getByRole('complementary', { name: '电脑' })).toBeVisible();
@@ -136,18 +172,30 @@ for (const viewport of [
       await expect(drawer).toBeHidden();
     });
 
-    test('the account menu opens from the avatar', async ({ page }) => {
+    test('settings, language and activity stay reachable from the drawer footer', async ({
+      page,
+    }) => {
       await page.goto(HOME);
-      await pill(page).getByTestId('account-menu-trigger').click();
-      const menu = page.getByRole('menu', { name: '账号' });
-      await expect(menu).toBeVisible();
-      for (const item of ['设置', '语言', '活动']) {
-        await expect(menu.getByRole('menuitem', { name: item })).toBeVisible();
-      }
-      const shown = await menu.boundingBox();
-      expect(shown!.x + shown!.width).toBeLessThanOrEqual(viewport.width);
-      await menu.getByRole('menuitem', { name: '设置' }).click();
+      await page.getByTestId('narrow-menu').click();
+      const drawer = page.getByRole('dialog', { name: '侧边栏' });
+      await expect(drawer.getByTestId('sidebar-activity')).toBeVisible();
+      await expect(drawer.getByTestId('sidebar-settings')).toBeVisible();
+      await drawer.getByTestId('sidebar-activity').click();
+      await expect(page).toHaveURL(/\/app\/activity/);
+      await page.goto(HOME);
+      await page.getByTestId('narrow-menu').click();
+      await page.getByRole('dialog', { name: '侧边栏' }).getByTestId('sidebar-settings').click();
       await expect(page).toHaveURL(/\/app\/settings/);
+      await page.goto('/app/settings/account?scenario=home-c');
+      await expect(page.getByRole('combobox', { name: '语言' })).toBeVisible();
+    });
+
+    test('the composer sits 20px above the tab bar', async ({ page }) => {
+      await page.goto('/app?scenario=home-c-empty');
+      const composer = await page.locator('.chief-composer').boundingBox();
+      const bar = await tabs(page).boundingBox();
+      expect(Math.round(bar!.y - (composer!.y + composer!.height))).toBe(20);
+      expect(Math.round(viewport.height - bar!.y - bar!.height)).toBe(12);
     });
 
     test('the composer is one row and stays visible above the keyboard', async ({ page }) => {

@@ -9,7 +9,7 @@ const composer = (page: Page) => page.locator('.chief-composer textarea');
 test.describe('at phone width', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test('Chat and Tasks are bottom tabs, and the only Tasks toggle sits in the top pill', async ({
+  test('Chat and Tasks are bottom tabs, and the only Tasks toggle is the round top-right button', async ({
     page,
   }) => {
     await page.goto(HOME);
@@ -17,7 +17,7 @@ test.describe('at phone width', () => {
     await expect(page.getByTestId('home-c-pane-buttons')).toHaveCount(0);
     await expect(page.getByTestId('tasks-toggle')).toHaveCount(1);
     await expect(
-      page.getByTestId('narrow-account-pill').getByTestId('tasks-toggle'),
+      page.locator('[data-slot="narrow-top"]').getByTestId('tasks-toggle'),
     ).toBeVisible();
     const chat = tabs(page).getByRole('link', { name: '对话' });
     const tasks = tabs(page).getByRole('link', { name: /任务/ });

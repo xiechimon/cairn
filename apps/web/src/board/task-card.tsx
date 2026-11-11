@@ -13,11 +13,13 @@ export function TaskCard({
   facts,
   now,
   onOpen,
+  compact = false,
 }: {
   entry: TaskEntry;
   facts: TaskCardFacts;
   now: number;
   onOpen: () => void;
+  compact?: boolean;
 }) {
   const { t } = useI18n();
   const copy = taskRowCopy(entry);
@@ -29,8 +31,12 @@ export function TaskCard({
       variant="ghost"
       data-slot="task-card"
       data-section={entry.section}
+      data-compact={compact || undefined}
       onClick={onOpen}
-      className="h-auto w-full max-w-120 flex-col items-stretch gap-1 rounded-(--radius-card) bg-card px-3.5 py-3 text-left font-normal whitespace-normal shadow-(--e1) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)"
+      className={cn(
+        'h-auto w-full max-w-120 flex-col items-stretch gap-1 rounded-(--radius-card) bg-card px-3.5 text-left font-normal whitespace-normal shadow-(--e1) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)',
+        compact ? 'w-fit max-w-full py-2.5' : 'py-3',
+      )}
     >
       <span className="flex min-w-0 items-center gap-2.5">
         <StatusGlyph
@@ -63,16 +69,20 @@ export function TaskCard({
             />
           )}
           <span className={cn(copy.waiting && `${ACCENT_INK} font-medium`)}>{t(copy.word)}</span>
-          {facts.updates > 0 && <span>· {t('{n} 次更新', { n: facts.updates })}</span>}
-          <span data-slot="task-card-age">· {relativeTime(entry.todo.phaseAt, now, t)}</span>
+          {!compact && facts.updates > 0 && <span>· {t('{n} 次更新', { n: facts.updates })}</span>}
+          {!compact && (
+            <span data-slot="task-card-age">· {relativeTime(entry.todo.phaseAt, now, t)}</span>
+          )}
         </span>
       </span>
-      <span
-        data-slot="task-card-latest"
-        className="line-clamp-2 pl-6 text-meta text-content-secondary"
-      >
-        {t('最新：{line}', { line: latest })}
-      </span>
+      {!compact && (
+        <span
+          data-slot="task-card-latest"
+          className="line-clamp-2 pl-6 text-meta text-content-secondary"
+        >
+          {t('最新：{line}', { line: latest })}
+        </span>
+      )}
     </Button>
   );
 }
