@@ -1016,6 +1016,13 @@
       "when": 1794305000000,
       "tag": "0148_browser_session",
       "breakpoints": true
+    },
+    {
+      "idx": 149,
+      "version": "6",
+      "when": 1794419742127,
+      "tag": "0149_action_journal",
+      "breakpoints": true
     }
   ]
 }

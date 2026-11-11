@@ -1,4 +1,5 @@
 export * from './access-token-file.js';
+export * from './action-registry.js';
 export * from './agent-backend.js';
 export * from './agent-todo.js';
 export * from './ansi.js';
