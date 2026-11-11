@@ -20,6 +20,7 @@ import { IconTooltip } from '../components/icon-tooltip.js';
 import type { QueryLike } from '../components/query-state.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
+import { SubtreeErrorBoundary } from '../components/subtree-error-boundary.js';
 import { Button } from '../components/ui/button.js';
 import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -110,6 +111,28 @@ function projectHomeSearch(params: URLSearchParams): string {
   return `?${next.toString()}`;
 }
 
+export function conversationBoundaryKey(input: {
+  projectId: string | null;
+  chat: string | null;
+  threadId: string | null;
+  chiefThreadId: string | null;
+}): string {
+  return [
+    input.projectId ?? 'coordinator',
+    input.chat ?? '',
+    input.threadId ?? '',
+    input.chiefThreadId ?? '',
+  ].join(':');
+}
+
+function ConversationBoundary({ children, resetKey }: { children: ReactNode; resetKey: string }) {
+  return (
+    <SubtreeErrorBoundary resetKey={resetKey}>
+      <ChiefScrollProvider>{children}</ChiefScrollProvider>
+    </SubtreeErrorBoundary>
+  );
+}
+
 export function HomeC({
   surface,
   todos,
@@ -157,6 +180,12 @@ export function HomeC({
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
   const [loadingDraft, setLoadingDraft] = useState('');
   const { chiefData } = surface;
+  const conversationResetKey = conversationBoundaryKey({
+    projectId,
+    chat: searchParams.get('chat'),
+    threadId,
+    chiefThreadId: chiefData.threadId ?? null,
+  });
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const loaded = surface.load === 'ready';
   useEffect(() => {
@@ -520,7 +549,7 @@ export function HomeC({
             </div>
           )}
           <TaskCardContext.Provider value={renderTaskCard}>
-            <ChiefScrollProvider>
+            <ConversationBoundary resetKey={conversationResetKey}>
               <ChiefConversation
                 chief={{ ...chiefData, stream: conversation }}
                 onSend={
@@ -564,7 +593,7 @@ export function HomeC({
                   composerRef.current = node;
                 }}
               />
-            </ChiefScrollProvider>
+            </ConversationBoundary>
           </TaskCardContext.Provider>
         </section>
         {workPanel}

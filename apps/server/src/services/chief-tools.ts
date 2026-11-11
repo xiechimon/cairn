@@ -6,6 +6,7 @@ import type {
   UserRecord,
 } from '@cairn/shared';
 import {
+  actionByToolName,
   CHIEF_NOTICE_KIND,
   coordinatorCreateTodoParamsSchema,
   coordinatorUpdateTodoParamsSchema,
@@ -322,12 +323,13 @@ export async function executeChiefTool(
   assertToolNotRemoved(name);
   requireUnarchivedTargets(db, ctx.teamId, name, params);
   if (isRouterTool(name)) return executeRouterTool(deps, ctx, name, params);
-  if (name === 'delete_project') {
+  const action = actionByToolName(name);
+  if (action?.surfaces.includes('coordinator') === true) {
     return json(
       executeAction(
         { db, reposDir: deps.reposDir },
         {
-          id: 'project.delete',
+          id: action.id,
           input: params,
           actor: 'coordinator',
           surface: 'coordinator',

@@ -19,6 +19,8 @@ const NOT_IN_GALLERY: Record<string, string> = {
     'Rendered inside the Queued messages specimen through src/detail/composer.tsx.',
   'shortcut-hint.tsx':
     'Rendered inside the Question card specimen (the Ctrl and return keycaps) and the search panel.',
+  'subtree-error-boundary.tsx':
+    'Class boundary around routes and the conversation. It renders the gallery EmptyState only after a child throws, so a static specimen cannot show it; recovery is covered by error-boundary tests.',
 };
 
 function walk(dir: string): string[] {

@@ -548,17 +548,19 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
 describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription; #2243 +claude_subscription; #2233 +queued_message; #2592 +chief_report +retro_proposal; D75 +computer +computer_call; #2501 +client_message)', () => {
   it('DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796)', () => {
     expect(INTERNAL_ONLY_TABLES).toContain('autonomy_pause');
-    expect(DB_TABLES).toHaveLength(79);
-    expect(DB_TABLES).toContain('hosted_cleanup_outbox');
-    expect(INTERNAL_ONLY_TABLES).toContain('hosted_cleanup_outbox');
-    expect(DB_TABLES).toContain('action_journal');
-    expect(INTERNAL_ONLY_TABLES).toContain('action_journal');
-    expect(DB_TABLES).toContain('action_proposal');
-    expect(INTERNAL_ONLY_TABLES).toContain('action_proposal');
-    expect(DB_TABLES).toContain('action_subscriber');
-    expect(INTERNAL_ONLY_TABLES).toContain('action_subscriber');
-    expect(DB_TABLES).toContain('action_wake_outbox');
-    expect(INTERNAL_ONLY_TABLES).toContain('action_wake_outbox');
+    expect(DB_TABLES).toHaveLength(81);
+    for (const table of [
+      'action_journal',
+      'action_proposal',
+      'action_subscriber',
+      'action_wake_outbox',
+      'hosted_cleanup_outbox',
+      'thread_conversation',
+      'thread_entry',
+    ]) {
+      expect(DB_TABLES).toContain(table);
+      expect(INTERNAL_ONLY_TABLES).toContain(table);
+    }
     expect(DB_TABLES).toContain('coordinator_run');
     expect(INTERNAL_ONLY_TABLES).toContain('coordinator_run');
     expect(DB_TABLES).toContain('coordinator_input');

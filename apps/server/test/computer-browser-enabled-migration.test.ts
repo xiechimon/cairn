@@ -49,3 +49,32 @@ test('computer browserEnabled defaults to false and survives re-migration', () =
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('machine migration maps legacy on to explicit on and false to unset', () => {
+  const sqlite = new Database(':memory:');
+  try {
+    sqlite.exec(
+      'CREATE TABLE machine (id TEXT PRIMARY KEY); CREATE TABLE computer (machineId TEXT, browserEnabled INTEGER);',
+    );
+    sqlite.exec(
+      "INSERT INTO machine VALUES ('on'), ('off'); INSERT INTO computer VALUES ('on', 1), ('off', 0);",
+    );
+    const tag = journal.entries.find((entry) =>
+      readFileSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), 'utf8').includes(
+        'ADD `browserOverride`',
+      ),
+    )!.tag;
+    sqlite.exec(
+      readFileSync(join(MIGRATIONS_FOLDER, `${tag}.sql`), 'utf8').replaceAll(
+        '--> statement-breakpoint',
+        '',
+      ),
+    );
+    expect(sqlite.prepare('SELECT * FROM machine ORDER BY id').all()).toEqual([
+      { id: 'off', browserOverride: null, desktopOverride: null },
+      { id: 'on', browserOverride: 1, desktopOverride: null },
+    ]);
+  } finally {
+    sqlite.close();
+  }
+});

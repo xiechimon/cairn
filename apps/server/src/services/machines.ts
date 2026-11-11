@@ -183,6 +183,8 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     concurrencySource: row.maxConcurrentOverridden ? 'manual' : recommendation.source,
     ...(runningSteps !== undefined ? { runningSteps } : {}),
     capabilities: row.capabilities,
+    browserOverride: row.browserOverride,
+    desktopOverride: row.desktopOverride,
     ...(login.success ? { claudeLogin: login.data } : {}),
   });
 }

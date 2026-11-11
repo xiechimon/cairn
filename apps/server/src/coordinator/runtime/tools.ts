@@ -5,8 +5,8 @@ import {
   COMPUTER_REMOTE_TOOLS,
   coordinatorToolSourceId,
   type MachineAskBody,
-  projectDeleteAction,
   type RemoteToolDef,
+  SLICE1_ACTIONS,
 } from '@cairn/shared';
 import {
   defineExtension,
@@ -184,19 +184,28 @@ export function coordinatorToolsExtension(
     storeId?: () => string | undefined;
   } = {},
 ) {
-  const actionTools: RemoteToolDef[] = [
-    {
-      name: projectDeleteAction.toolName,
-      description: 'Propose deleting a project. The owner confirms before the project is deleted.',
+  const actionCopy: Record<string, string> = {
+    archive_project: 'Archive a project. It stays readable and can be unarchived.',
+    unarchive_project: 'Unarchive a project so it can be changed again.',
+    delete_project: 'Propose deleting a project. The owner confirms before the project is deleted.',
+  };
+  const actionTools: RemoteToolDef[] = SLICE1_ACTIONS.filter((entry) =>
+    entry.surfaces.includes('coordinator'),
+  ).map((entry) => {
+    const description = actionCopy[entry.toolName];
+    if (description === undefined) throw new Error(`no Coordinator copy for ${entry.toolName}`);
+    return {
+      name: entry.toolName,
+      description,
       parameters: {
         type: 'object',
         properties: {
-          projectId: { type: 'string', description: 'Project to delete' },
+          projectId: { type: 'string', description: 'Project id' },
         },
         required: ['projectId'],
       },
-    },
-  ];
+    };
+  });
   const defs =
     options.routerTools === false
       ? [...CHIEF_REMOTE_TOOLS, ...COMPUTER_REMOTE_TOOLS, ...actionTools]

@@ -31,11 +31,15 @@ export const machineRecordSchema = z.object({
   runningSteps: z.number().int().optional(),
   running: z.array(machineRunningThreadSchema).optional(),
   capabilities: machineCapabilitiesSchema.nullish(),
+  browserOverride: z.boolean().nullable().optional(),
+  desktopOverride: z.boolean().nullable().optional(),
   claudeLogin: claudeLoginSchema.optional(),
 });
 export type MachineRecord = z.infer<typeof machineRecordSchema>;
 
 export const patchMachineBodySchema = z.object({
+  browserOverride: z.boolean().nullable().optional(),
+  desktopOverride: z.boolean().nullable().optional(),
   enabledRuntimes: z.array(z.enum(MACHINE_RUNTIMES)).optional(),
   maxConcurrent: z.number().int().min(1).max(16).nullable().optional(),
 });

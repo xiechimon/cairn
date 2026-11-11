@@ -2,7 +2,7 @@
   "version": "6",
   "dialect": "sqlite",
   "id": "476e713a-33ca-4c97-9446-adb7801502dc",
-  "prevId": "e10cc634-5784-4399-802e-4a37d685cd3b",
+  "prevId": "d49f958f-3c82-420a-b1ec-078579cd8f29",
   "tables": {
     "action_journal": {
       "name": "action_journal",
@@ -3871,6 +3871,20 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "browserOverride": {
+          "name": "browserOverride",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "desktopOverride": {
+          "name": "desktopOverride",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -6388,6 +6402,98 @@
         }
       },
       "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "thread_conversation": {
+      "name": "thread_conversation",
+      "columns": {
+        "threadId": {
+          "name": "threadId",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "storeId": {
+          "name": "storeId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "conversationId": {
+          "name": "conversationId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "lastMirroredEntryId": {
+          "name": "lastMirroredEntryId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "thread_entry": {
+      "name": "thread_entry",
+      "columns": {
+        "messageId": {
+          "name": "messageId",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "threadId": {
+          "name": "threadId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "conversationId": {
+          "name": "conversationId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entryId": {
+          "name": "entryId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "thread_entry_thread_idx": {
+          "name": "thread_entry_thread_idx",
+          "columns": [
+            "threadId",
+            "conversationId"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
