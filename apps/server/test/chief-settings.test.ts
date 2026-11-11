@@ -231,15 +231,57 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
       H.teamId,
     );
     expect(prompt).toContain('优先文档 Agent');
-    expect(prompt).toContain('projects:');
-    expect(prompt).toContain('autonomous');
-    expect(prompt).toContain('ADR 0026');
+    expect(prompt).toContain('### 项目');
+    expect(prompt).toContain('自动合并（autonomous）');
     expect(prompt).not.toContain('合并（merge）动作只由人触发');
-    expect(prompt).not.toContain('措辞→spec');
-    expect(prompt).not.toContain('要求：');
     expect(prompt).toContain('你不写任务正文');
     expect(prompt).toContain('摘要标题');
-    expect(prompt).toContain('quotes');
+    expect(prompt).toContain('quotes 填这张卡覆盖的用户原句');
+    expect(prompt).toContain('spec 不添加路由说明');
+    expect(prompt).toContain('先后顺序用 dependsOn 表达');
+  });
+
+  test('systemPrompt is one language and grouped into sections in a fixed order', () => {
+    const prompt = composeChiefSystemPrompt(
+      {
+        db: H.s.db,
+        hub: H.s.hub,
+        machineHub: H.s.machineHub,
+        user: H.s.user,
+        skillsDir: H.s.skillsDir,
+      },
+      H.teamId,
+    );
+    const headings = [
+      '## 章程',
+      '## 工作约定',
+      '### 路由',
+      '### 项目归属',
+      '### 回答',
+      '### 事件回合',
+      '### 记忆',
+      '### 第三方文字',
+      '### 技能',
+      '## 团队',
+      '### 项目',
+      '### 进行中的任务',
+      '### 技能',
+      '## 记忆（团队共用）',
+    ];
+    let from = 0;
+    for (const heading of headings) {
+      const at = prompt.split('\n').indexOf(heading, from);
+      expect(at, heading).toBeGreaterThanOrEqual(from);
+      from = at + 1;
+    }
+    const englishSentences = prompt
+      .split('\n')
+      .filter((line) => /[A-Za-z]{3,}(?: [A-Za-z,;:.'"()-]+){4,}/.test(line));
+    expect(englishSentences).toEqual([]);
+    for (const jargon of ['核销', '围栏', 'wake 轮', '运行位', 'ADR 0026', '配额 100']) {
+      expect(prompt, jargon).not.toContain(jargon);
+    }
+    expect(prompt.match(/save_memory/g)?.length).toBe(2);
   });
 
   test('systemPrompt lists each project with its description and carries the project-attribution rule (#1920)', () => {
@@ -258,7 +300,8 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
       },
       H.teamId,
     );
-    expect(prompt).toContain('"description":"官网 cairn.xmon.me 的静态站点"');
+    expect(prompt).toMatch(/^- demo（id: [^）]+）：官网 cairn\.xmon\.me 的静态站点/m);
+    expect(prompt).not.toContain('"description"');
     expect(prompt).toContain('项目归属');
     expect(prompt).toContain('先查再定');
     expect(prompt).toContain('只列仍然分不出的候选');
@@ -276,10 +319,10 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     };
     const prompt = composeChiefSystemPrompt(deps, H.teamId);
     expect(prompt).toContain('open_thread');
-    expect(prompt).toContain('不选 Agent、不选计划模式');
-    expect(prompt).toContain('thread 自己 plan、写测试、实现、自检');
+    expect(prompt).toContain('plan、写测试、实现、自检都由 thread 自己完成');
+    expect(prompt).toContain('不写方案、不选模型');
     expect(prompt).toContain('message_thread');
-    expect(prompt).toContain('ADR 0026');
+    expect(prompt).toContain('自动合并（autonomous）');
     expect(prompt).not.toContain('withPlan:false');
     expect(prompt).not.toContain('dispatchReason');
     expect(prompt).not.toContain('派发模式（团队设置');
@@ -287,7 +330,7 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     patchChief(deps, H.teamId, { charter: '用户自己的章程' });
     const after = composeChiefSystemPrompt(deps, H.teamId);
     expect(after).toContain('用户自己的章程');
-    expect(after).toContain('不选 Agent、不选计划模式');
+    expect(after).toContain('plan、写测试、实现、自检都由 thread 自己完成');
     expect(after).not.toContain('withPlan:false');
   });
 });

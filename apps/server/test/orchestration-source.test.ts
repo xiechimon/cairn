@@ -334,10 +334,9 @@ describe('B prompt surface: orchestration round splitting discipline (the r14 §
       { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user, skillsDir: s.skillsDir },
       teamId,
     );
-    expect(prompt).toContain('拆分粒度 = 核销次数');
-    expect(prompt).toContain('可独立验收');
-    expect(prompt).toContain('quotes 填这张卡覆盖的主人原句');
-    expect(prompt).not.toContain('原文片段');
+    expect(prompt).toContain('按可独立验收的成果拆，不按执行步骤拆');
+    expect(prompt).toContain('quotes 填这张卡覆盖的用户原句');
+    expect(prompt).toContain('兄弟任务');
     expect(prompt).toContain('open_thread');
     expect(prompt).not.toContain('withPlan:false');
   });

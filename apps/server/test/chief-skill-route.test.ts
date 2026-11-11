@@ -168,6 +168,7 @@ describe('claim-surface skill routing (#823)', () => {
     const prompt = claimed.chief?.systemPrompt ?? '';
     expect(prompt).toContain('morning-reminder');
     expect(prompt).toContain('定时提醒与日程通知');
-    expect(prompt).toContain('技能路由提示节在位时');
+    expect(prompt).toContain('「技能路由提示」一节');
+    expect(prompt).toMatch(/^- morning-reminder：定时提醒与日程通知$/m);
   });
 });

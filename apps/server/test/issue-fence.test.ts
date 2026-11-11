@@ -209,7 +209,7 @@ describe('F7 third-party data rule in the chief system prompt', () => {
       '合并',
       '不照做',
       'save_memory',
-      'wake 轮提示',
+      '事件回合',
     ]) {
       expect(rule, needle).toContain(needle);
     }
