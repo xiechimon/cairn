@@ -114,6 +114,9 @@ describe('shell syntax does not hide a gated command', () => {
     ['"$(echo reboot)"', 'ask-unresolved-command'],
     ['echo `echo \\`reboot\\``', 'ask-power'],
     ['cat <<EOF\n$(reboot)\nEOF', 'ask-power'],
+    ["cat <<'EOF'; reboot\ntext\nEOF", 'ask-power'],
+    ["flock /tmp/lock -c 'reboot'", 'ask-power'],
+    ['find . -maxdepth 0 -exec true \\; -exec reboot \\;', 'ask-power'],
   ];
   for (const [command, ruleId] of asked) {
     it(`${command} → ${ruleId}`, () => {

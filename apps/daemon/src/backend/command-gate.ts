@@ -530,18 +530,19 @@ function maskQuotedHeredocs(source: string): string {
     }
     const delimiter = match[1] ?? match[2] ?? match[3] ?? '';
     const start = index + match.index;
-    const bodyStart = source.indexOf('\n', start);
-    if (bodyStart === -1 || delimiter === '') {
+    const headerEnd = source.indexOf('\n', start);
+    if (headerEnd === -1 || delimiter === '') {
       out += source.slice(index);
       break;
     }
-    const end = source.indexOf(`\n${delimiter}`, bodyStart + 1);
+    out += source.slice(index, headerEnd + 1);
+    const end = source.indexOf(`\n${delimiter}`, headerEnd + 1);
     if (end === -1) {
-      out += source.slice(index, start) + ' '.repeat(source.length - start);
+      out += ' '.repeat(source.length - (headerEnd + 1));
       break;
     }
     const stop = end + 1 + delimiter.length;
-    out += source.slice(index, start) + ' '.repeat(stop - start);
+    out += ' '.repeat(stop - (headerEnd + 1));
     index = stop;
   }
   return out;
@@ -736,18 +737,36 @@ function emitSimple(
     }
     const spec = WRAPPERS[base];
     if (spec) {
+      if (base === 'flock') {
+        for (let at = index + 1; at < words.length; at += 1) {
+          const part = words[at] ?? '';
+          if (part === '-c' || part === '--command') {
+            const script = words[at + 1];
+            if (script) noteScript(script, collected);
+            else collected.unresolved = true;
+          } else if (part.startsWith('--command=')) {
+            noteScript(part.slice('--command='.length), collected);
+          }
+        }
+      }
       const skipped = consumeWrapper(words, index + 1, spec, collected);
       if (skipped.stop) return;
       index = skipped.index;
       continue;
     }
     if (base === 'find') {
-      const execAt = words.findIndex(
-        (part, at) => at > index && (part === '-exec' || part === '-execdir'),
-      );
-      if (execAt !== -1) {
-        const cmd = words.slice(execAt + 1).filter((part) => part !== ';' && part !== '+');
-        if (cmd.length > 0) collected.scripts.push(cmd.join(' '));
+      let at = index + 1;
+      while (at < words.length) {
+        if (words[at] === '-exec' || words[at] === '-execdir') {
+          const cmd = [];
+          at += 1;
+          while (at < words.length && words[at] !== ';' && words[at] !== '+') {
+            cmd.push(words[at] ?? '');
+            at += 1;
+          }
+          if (cmd.length > 0) collected.scripts.push(cmd.join(' '));
+        }
+        at += 1;
       }
     }
     if (base !== '') {
