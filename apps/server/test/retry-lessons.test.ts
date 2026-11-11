@@ -168,7 +168,7 @@ async function restart(w: World, feedback: string) {
   await applyBuildStepAction(w.deps, w.buildId, {
     action: 'restart',
     feedback,
-    clientMessageId: 'cm-1615',
+    clientMessageId: `cm-${newRecordId()}`,
   });
 }
 

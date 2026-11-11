@@ -175,18 +175,23 @@ export function bootServer(
     };
     const app = createApp(appContext, opts.logger);
     const rawRequest = app.request.bind(app);
-    app.request = ((input: Parameters<typeof app.request>[0], init?: RequestInit) => {
+    app.request = ((
+      input: Parameters<typeof app.request>[0],
+      init?: RequestInit,
+      ...rest: unknown[]
+    ) => {
+      const forward = (next: RequestInit | undefined) => rawRequest(input, next, ...(rest as []));
       if (init?.method !== 'POST' || typeof init.body !== 'string' || typeof input !== 'string') {
-        return rawRequest(input, init);
+        return forward(init);
       }
-      if (new Headers(init.headers).get('x-cairn-raw-send') === '1') return rawRequest(input, init);
+      if (new Headers(init.headers).get('x-cairn-raw-send') === '1') return forward(init);
       try {
         const parsed = JSON.parse(init.body) as unknown;
         const stamped = stampPersonSendBody(input.split('?')[0] ?? input, parsed);
-        if (stamped === parsed) return rawRequest(input, init);
-        return rawRequest(input, { ...init, body: JSON.stringify(stamped) });
+        if (stamped === parsed) return forward(init);
+        return forward({ ...init, body: JSON.stringify(stamped) });
       } catch {
-        return rawRequest(input, init);
+        return forward(init);
       }
     }) as typeof app.request;
     try {
