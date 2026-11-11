@@ -15,24 +15,8 @@ Agents must resolve a Codex thread once its finding is fixed (GraphQL `resolveRe
 
 ## Security review (D84 / D88)
 
-The gate reads the `credentials`, `machineAndCommandBoundary` and `externalEntryAuth` categories from `packages/shared/merge-gate-paths.json` in the trusted main checkout. Any changed filename or previous filename matching those patterns requires a separate Codex SECURITY review. Deleted security files and renames out of a security surface remain covered. An incomplete or unavailable PR file list fails the check.
+The live check requires the Codex code review only (ian, 2026-11-06). A security-surface PR follows `AGENTS.md`: run `/security-review`, fix findings or record them in Risk, then enter the queue once required CI passes and the code review has no unresolved P0/P1. Path class does not add `coordinator-hold` and does not send the PR to ian (ian, 2026-11-11).
 
-Only the latest summary marker from `chatgpt-codex-connector[bot]` with GitHub author type Bot is trusted. Its `security_review` must have `commit_sha` equal to the PR head, `status` equal to `completed`, and `has_unresolved_findings` strictly equal to `false`. Missing fields, stale, running, failed, malformed, nonboolean values and explicit unresolved findings fail closed. The explicitly null provider case remains blocked unless D88 below is proven. A newer incomplete summary supersedes an older approval. A completed `code_review` alone cannot qualify these paths.
+The `credentials`, `machineAndCommandBoundary` and `externalEntryAuth` lists in `packages/shared/merge-gate-paths.json` name those surfaces. An incomplete or unavailable PR file list fails the check for every PR.
 
-Both the explicit-false path and D88 receipt path require zero unresolved security threads with known attribution. Every unresolved security finding blocks, including Medium findings, regardless of the built-in `codex-security-review:v1` metadata's `mergeGateEnabled` or `blockingSeverityThreshold`. A clean security review supplements the normal code-review requirement. Request `@codex security review`, fix and resolve every security finding, and ask ian if no security review arrives within 30 minutes. There is no later Claude security rerun.
-
-The sweep re-evaluates security-surface PRs even if their check previously passed, so deploying the stricter policy replaces old approvals and observes subsequent security-state updates. Ordinary PRs retain the existing code-review rules. Draft, closed, queue and non-write-author PR exclusions still apply.
-
-The retired host timer is replaced by Mergify's pinned `check-success = @github-actions/review-gate`.
-
-### D88: explicitly null provider verdict
-
-The normal explicit-false security approval remains supported. Only a current full-head, completed security object whose own `has_unresolved_findings` field is explicitly null can use this exception; absence is preserved as undefined and cannot enter it.
-
-All three proofs are required:
-
-1. The latest trusted Codex state binds the completed, explicitly null security review to this exact full head.
-2. The latest trusted Bot SECURITY receipt has the receipt marker, the SECURITY heading, an explicit clean verdict and exactly one Reviewed commit. GitHub must resolve that commit token to the full current head with no same-named branch or tag alias, and the complete PR commit list must contain exactly one matching commit. Incomplete lists, ambiguous abbreviations, failed resolution, forged or code-only receipts remain blocked.
-3. No unresolved trusted security-review thread remains, at any severity, including outdated and pre-existing findings. Root security-finding markers and the parent review's SECURITY heading identify these threads.
-
-Freshness is conservative: the immutable receipt creation time must be within 60 seconds of the trusted summary's SECURITY completion timestamp, after this PR/summary was created and after every force-push and explicit security-review request. Its update time cannot postdate the summary. The complete force-push timeline and PR commit identity are read from GitHub; if any proof is missing or malformed, the check stays red. Updating an old receipt cannot replace its creation time. A new head requires new security proof; prefix equality alone never grants approval. All normal code-review conditions remain independent.
+The D84/D88 Codex security-review receipt rules are retired. The check does not read `security_review`, does not request `@codex security review`, and does not ask ian when that review is absent.
