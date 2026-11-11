@@ -8,13 +8,14 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
 });
 
-test('the home is one Coordinator conversation: serif greeting, the conversation with task cards, and the composer, with no in-progress pill', async ({
+test('the home is one Coordinator conversation: no greeting once it has messages, the conversation with task cards, and the composer, with no in-progress pill', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
-  const greeting = page.getByTestId('home-c').getByRole('heading', { level: 2 }).first();
-  await expect(greeting).toHaveCSS('font-family', /sourceSerif4/);
-  await expect(page.getByTestId('home-c-since')).toContainText('3 waiting on you · 3 in progress');
+  await expect(page.getByTestId('chief-stream')).toBeVisible();
+  await expect(page.getByTestId('home-c').locator('.voice-greeting')).toHaveCount(0);
+  await expect(page.getByTestId('home-c-since')).toHaveCount(0);
+  await expect(page.getByTestId('tasks-badge')).toHaveText('3');
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
   await expect(page.getByTestId('chief-stream').locator('[data-slot="task-card"]')).toHaveCount(2);
   await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
@@ -62,7 +63,7 @@ test('the sidebar lists project names only, and the project chat filters the tas
   await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}`));
   await expect(page.getByTestId('project-home')).toBeVisible();
   await page.goto(home('home-c', `&project=${PROJECT_ID}&chat=1`));
-  await expect(page.getByTestId('home-c-since')).toContainText('2 waiting on you · 2 in progress');
+  await expect(page.getByTestId('tasks-badge')).toHaveText('2');
   const cards = page.getByTestId('chief-stream').locator('[data-slot="task-card"]');
   await expect(cards).toHaveCount(1);
   await expect(cards).toContainText('Fold finished turns into purpose and duration');

@@ -308,7 +308,7 @@ export function HomeC({
   const hero = (
     <header
       data-testid="home-c-hero"
-      className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-[6vh]"
+      className="mx-auto w-[calc(100%-2rem)] max-w-160 flex-none pt-[6vh]"
     >
       {greeting}
       {since}
@@ -330,10 +330,8 @@ export function HomeC({
     </header>
   );
 
-  const lead = (
-    <section data-testid="home-c-lead" aria-label={t('首页概况')} className="pt-6 pb-8">
-      {greeting}
-      {since}
+  const lead = (projectLinks !== false || chiefData.hasEarlier === true) && (
+    <section data-testid="home-c-lead" aria-label={t('首页概况')} className="pt-2 pb-4">
       {projectLinks}
       {chiefData.hasEarlier === true && (
         <p
@@ -349,11 +347,9 @@ export function HomeC({
   const paneButtons = (
     <header
       data-testid="home-c-pane-buttons"
-      className="flex h-12 flex-none items-center gap-2 pr-3 pl-5 max-[640px]:pl-14"
+      className="flex h-12 flex-none items-center justify-end gap-1 pr-3.5 pl-5 max-[640px]:pl-14"
     >
-      <h1 className="m-0 mr-auto min-w-0 truncate text-ui font-semibold text-foreground">
-        {projectName ?? t('Coordinator')}
-      </h1>
+      <h1 className="sr-only">{projectName ?? t('Coordinator')}</h1>
       {!narrow && (
         <IconTooltip
           label={badge > 0 ? t('任务，{n} 件等你', { n: badge }) : t('任务')}
@@ -361,7 +357,7 @@ export function HomeC({
           trigger={
             <Button
               variant="ghost"
-              size="icon-sm"
+              size="icon"
               data-testid="tasks-toggle"
               aria-pressed={pane === 'tasks' && threadId === null}
               onClick={() => togglePane('tasks')}
@@ -390,7 +386,7 @@ export function HomeC({
         trigger={
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon"
             aria-pressed={pane === 'made' && threadId === null}
             onClick={() => togglePane('made')}
             className="text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
@@ -486,7 +482,7 @@ export function HomeC({
               </>
             ) : (
               <>
-                <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-6">
+                <div className="mx-auto w-[calc(100%-2rem)] max-w-160 flex-none pt-6">
                   {projectLinks}
                 </div>
                 <EmptyState
@@ -522,7 +518,7 @@ export function HomeC({
           {paneButtons}
           <ChiefStatusMark chief={chiefData} />
           {banner != null && (
-            <div className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-182 flex-none overflow-y-auto pt-3">
+            <div className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-160 flex-none overflow-y-auto pt-3">
               {banner}
             </div>
           )}

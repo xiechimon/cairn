@@ -25,9 +25,9 @@ export function SidebarNavRow({
       aria-current={active ? 'page' : undefined}
       data-slot="sidebar-nav-row"
       className={cn(
-        'h-8 w-full justify-start gap-2.5 px-2 text-ui font-normal',
+        'h-9 w-full justify-start gap-2.5 px-2 text-ui font-medium',
         active
-          ? 'bg-(--sidebar-active) font-semibold text-foreground hover:bg-(--sidebar-active) dark:hover:bg-(--sidebar-active)'
+          ? 'bg-(--sidebar-active) text-foreground hover:bg-(--sidebar-active) dark:hover:bg-(--sidebar-active)'
           : 'text-content-secondary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover',
       )}
     >

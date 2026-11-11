@@ -24,7 +24,9 @@ export function formatClock(totalSeconds: number): string {
 }
 
 const HEAD =
-  'flex min-w-0 max-w-full items-center gap-1 overflow-hidden whitespace-nowrap text-ui leading-6 text-(--text-tertiary)';
+  'flex min-w-0 max-w-full items-center gap-1 overflow-hidden whitespace-nowrap text-(--text-tertiary)';
+
+const HEAD_SIZE = { detail: 'text-ui leading-6', chief: 'text-meta leading-5' } as const;
 
 const HEAD_BTN =
   "chat-interaction h-auto min-h-0 w-fit cursor-pointer justify-start rounded-md border-none bg-transparent px-0 py-0.5 text-left font-normal hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
@@ -109,13 +111,13 @@ export function LiveRow({
   return (
     <div className="flex min-w-0 flex-col">
       {disclosure == null ? (
-        <span className={quiet ? 'sr-only' : HEAD} data-testid={testid}>
+        <span className={quiet ? 'sr-only' : `${HEAD} ${HEAD_SIZE[variant]}`} data-testid={testid}>
           {body}
         </span>
       ) : (
         <Button
           variant="ghost"
-          className={`${HEAD} ${HEAD_BTN}`}
+          className={`${HEAD} ${HEAD_SIZE[variant]} ${HEAD_BTN}`}
           data-testid={testid}
           aria-label={t(expanded ? disclosure.collapse : disclosure.expand)}
           aria-expanded={expanded}

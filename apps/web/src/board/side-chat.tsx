@@ -582,7 +582,7 @@ function Head({
       data-testid="side-chat"
       data-todo-id={todoId}
       data-phase={todo?.phase}
-      className="flex flex-none items-start gap-1 border-b border-border py-2.5 pr-2.5 pl-2.5"
+      className="flex flex-none items-start gap-1 py-2.5 pr-2.5 pl-2.5"
     >
       <IconTooltip
         label={t('返回')}
@@ -601,7 +601,7 @@ function Head({
       </IconTooltip>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5 pl-1">
         <div className="flex min-w-0 items-center gap-1">
-          <h2 className="m-0 min-w-0 truncate text-ui font-semibold text-foreground">
+          <h2 className="m-0 line-clamp-2 min-w-0 text-ui font-semibold text-foreground">
             {todo != null ? (
               <>
                 <span className="font-normal text-content-tertiary tabular-nums">
@@ -615,9 +615,15 @@ function Head({
           </h2>
           {titleExtra}
         </div>
-        {children}
+        {changesButton == null ? (
+          children
+        ) : (
+          <div className="flex min-w-0 items-start gap-2">
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">{children}</div>
+            {changesButton}
+          </div>
+        )}
       </div>
-      {changesButton}
       {menu}
       <IconTooltip
         label={t('关闭')}

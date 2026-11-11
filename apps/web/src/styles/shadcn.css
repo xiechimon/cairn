@@ -94,7 +94,7 @@
   --dialog-w-l: 640px;
   --radius-composer: 14px;
   --radius-tile: 10px;
-  --radius-bubble: 12px;
+  --radius-bubble: 18px;
   --radius-control: 8px;
   --e1: 0 0 0 1px var(--border);
   --e2: var(--shadow-floating), inset 0 0 0 1px var(--elevated-ring);
@@ -117,7 +117,8 @@
   --composer-max-h: 384px;
   --composer-bottom-gap: 24px;
   --scroll-fade-size: 28px;
-  --chat-end-space: 160px;
+  --chat-fade-size: 64px;
+  --chat-end-space: 64px;
   --chat-extra-space: 35vh;
   --type-scale: calc(var(--rem-scale) * 17 / 16);
   --type-page: calc(1.5rem * var(--type-scale));
@@ -153,7 +154,7 @@
   --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 6px 18px -2px rgb(0 0 0 / 0.35);
   --composer-ring: rgb(255 255 255 / 0.08);
   --composer-ring-focus: rgb(255 255 255 / 0.16);
-  --composer-drop: 0 4px 20px rgb(0 0 0 / 0.075);
+  --composer-drop: 0 1px 2px rgb(0 0 0 / 0.35);
   --shadow-composer: var(--composer-drop), inset 0 0 0 var(--hairline) var(--composer-ring);
   --shadow-composer-hover: var(--shadow-composer);
   --shadow-composer-focus:
@@ -242,13 +243,7 @@
   --code-token-type: #fbad60;
   --code-token-punctuation: #d3d7de;
   --code-token-comment: #818898;
-  --bubble-base: #262626;
-  --bubble-wash-a: rgb(130 180 111 / 0.16);
-  --bubble-wash-b: rgb(111 147 187 / 0.14);
-  --bubble-wash-c: rgb(154 124 173 / 0.16);
-  --bubble-rim-a: rgb(130 180 111 / 0.55);
-  --bubble-rim-b: rgb(111 147 187 / 0.45);
-  --bubble-rim-c: rgb(154 124 173 / 0.5);
+  --bubble-fill: #33290f;
   --code-pill-ring: #333333;
   --tag-ink: 40%;
   --switch-off: #474747;
@@ -298,7 +293,7 @@
   --panel-shadow-hover: 0 0 0 1px var(--input), 0 8px 20px -4px rgb(29 35 31 / 0.14);
   --composer-ring: rgb(0 0 0 / 0.1);
   --composer-ring-focus: rgb(0 0 0 / 0.2);
-  --composer-drop: 0 4px 20px rgb(0 0 0 / 0.035);
+  --composer-drop: 0 1px 2px rgb(0 0 0 / 0.06);
   --prose-code-surface: rgb(255 255 255 / 0.5);
   --prose-code-line: rgb(0 0 0 / 0.08);
   --prose-code-fill: rgb(0 0 0 / 0.05);
@@ -364,13 +359,7 @@
   --switch-on: var(--card-button);
   --tag-tint: 12%;
   --code-pill-bg: #f2f2f2;
-  --bubble-base: #f0f0f0;
-  --bubble-wash-a: rgb(95 143 79 / 0.13);
-  --bubble-wash-b: rgb(83 121 160 / 0.1);
-  --bubble-wash-c: rgb(122 91 142 / 0.12);
-  --bubble-rim-a: rgb(95 143 79 / 0.45);
-  --bubble-rim-b: rgb(83 121 160 / 0.35);
-  --bubble-rim-c: rgb(122 91 142 / 0.4);
+  --bubble-fill: #f3ead6;
   --code-pill-ring: #e6e6e6;
   --tag-ink: 35%;
   --switch-off: #d1d1d1;

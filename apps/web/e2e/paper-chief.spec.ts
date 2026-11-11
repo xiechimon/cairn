@@ -62,11 +62,11 @@ for (const theme of ['light', 'dark'] as const) {
     await setTheme(page, theme);
     let win = await openHome(page, READY);
     await expect(win.getByTestId('chief-gate'), 'W2: bound has no gate').toHaveCount(0);
-    await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '15px');
+    await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '14px');
 
     win = await openHome(page, THREAD);
     const note = win.getByTestId('chief-stream').getByTestId('chief-note').first();
-    await expect(note, 'W5').toHaveCSS('font-size', '15px');
+    await expect(note, 'W5').toHaveCSS('font-size', '13px');
     const foot = win.getByTestId('chief-msg-foot').first();
     await expect(foot, 'W5').toHaveCSS('font-size', '13px');
     await win.getByTestId('chief-tools-toggle').click();
@@ -136,7 +136,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`question card: card face, status triad, type keys (${theme})`, async ({ page }) => {
     await setTheme(page, theme);
     const win = await openHome(page, QUESTION);
-    const card = await probe(page, 'backgroundColor', 'var(--card)');
+    const card = await probe(page, 'backgroundColor', 'var(--background)');
     const accent = await probe(page, 'color', 'var(--card-button)');
     const ink3 = await probe(page, 'color', 'var(--text-tertiary)');
 

@@ -22,7 +22,7 @@ test('a project filter keeps home and marks the project; an unknown project show
 
 for (const viewport of [{ width: 1440, height: 732 }, { width: 390, height: 844 }]) {
   for (const theme of ['light', 'dark']) {
-    test(`home and detail share a 24px composer gap to the sheet bottom at ${viewport.width}px in ${theme}`, async ({ page }, testInfo) => {
+    test(`home and detail share a 24px gap from the composer block to the sheet bottom at ${viewport.width}px in ${theme}`, async ({ page }, testInfo) => {
       await page.setViewportSize(viewport);
       await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
       const gaps: number[] = [];
@@ -42,7 +42,8 @@ for (const viewport of [{ width: 1440, height: 732 }, { width: 390, height: 844 
             : sheet
               ? sheet.getBoundingClientRect().bottom - Number.parseFloat(getComputedStyle(sheet).borderBottomWidth)
               : window.innerHeight;
-          return floor - element.getBoundingClientRect().bottom;
+          const block = element.matches('.chief-composer') ? element.parentElement ?? element : element;
+          return floor - block.getBoundingClientRect().bottom;
         });
         gaps.push(gap);
         console.log(`${viewport.width}px ${theme} ${route.name}: ${gap}px`);

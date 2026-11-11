@@ -91,7 +91,7 @@ export function MachineChip({
       trigger={
         <Button
           variant="ghost"
-          size="icon-sm"
+          size="icon"
           aria-pressed={open}
           onClick={onToggle}
           data-testid="machines-button"

@@ -22,7 +22,7 @@ test.describe('Coordinator home composer bar', () => {
         cssHeight: getComputedStyle(el).height,
         overflowY: getComputedStyle(el).overflowY,
       }));
-    expect(await face()).toEqual({ cssHeight: '29px', overflowY: 'auto' });
+    expect(await face()).toEqual({ cssHeight: '28px', overflowY: 'auto' });
     await composer.fill(Array.from({ length: 10 }, (_, i) => `line ${i + 1}`).join('\n'));
     await expect.poll(face).toEqual({ cssHeight: '120px', overflowY: 'auto' });
   });

@@ -248,12 +248,14 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(typing.locator('strong')).toHaveText('relay 通道');
   });
 
-  test('F-R6/R8: user row is the gradient bubble with no avatar, chat body scrollable', async ({ page }) => {
+  test('F-R6/R8: user row is the flat sand bubble with no avatar, chat body scrollable', async ({ page }) => {
     const userRow = page.getByTestId('chief-stream').getByTestId('chief-msg').first();
 
     await expect(userRow.locator('img')).toHaveCount(0);
     await expect(userRow.locator('> svg')).toHaveCount(0);
-    await expect(userRow.getByTestId('chief-bubble')).toHaveClass(/bubble-gradient/);
+    const bubble = userRow.getByTestId('chief-bubble');
+    await expect(bubble).toHaveAttribute('data-slot', 'user-bubble');
+    await expect(bubble).toHaveCSS('background-image', 'none');
 
     const overflow = await page
       .getByTestId('chief-body')
@@ -380,7 +382,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     });
     expect(geo.h).toBeGreaterThanOrEqual(37);
     expect(geo.h).toBeLessThanOrEqual(38);
-    expect(geo.font).toBe('15px');
+    expect(geo.font).toBe('14px');
 
     const fence = coordinator.getByTestId('chief-bubble').filter({ hasText: 'echo before-and-after' });
     const pre = fence.getByTestId('md-code-block');

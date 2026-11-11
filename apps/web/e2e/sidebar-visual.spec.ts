@@ -59,7 +59,7 @@ for (const theme of ['light', 'dark'] as const) {
       return { selected: box(selected), plain: box(plain) };
     });
     expect(geo.plain).toEqual(geo.selected);
-    expect(geo.selected).toEqual({ x: 12, w: 224, h: 32, radius: '8px' });
+    expect(geo.selected).toEqual({ x: 12, w: 224, h: 36, radius: '8px' });
   });
 
   test(`selected row = sheet fill + hairline, distinct from hover (${theme})`, async ({

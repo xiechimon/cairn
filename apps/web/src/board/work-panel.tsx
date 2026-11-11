@@ -181,8 +181,9 @@ export function WorkPanel({
         </IconTooltip>
       </SidePanelHead>
       {searching && <MadeSearch value={query} onChange={setQuery} onClose={closeSearch} />}
-      <div className="flex flex-none px-3 pt-3">
+      <div className="flex flex-none px-3 pb-1">
         <SegmentedTabs
+          quiet
           value={tab}
           onChange={setTab}
           label={title}

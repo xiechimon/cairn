@@ -47,18 +47,15 @@ describe('V11 identity carries no colour', () => {
 });
 
 describe('V16 no texture or gradient surfaces', () => {
-  const bubbleUtility = appCss.match(/@utility bubble-gradient \{[\s\S]*?\n\}\n/)?.[0] ?? '';
-
-  test('the owner bubble is the one gradient surface', () => {
-    expect(bubbleUtility).toMatch(/radial-gradient/);
-    expect(appCss.replace(bubbleUtility, '')).not.toMatch(/feTurbulence|radial-gradient|conic-gradient/);
+  test('no surface carries a gradient or a noise texture', () => {
+    expect(appCss).not.toMatch(/feTurbulence|radial-gradient|conic-gradient/);
   });
 
-  test('only user message rows wear the bubble', () => {
-    expect(offenders(/bubble-gradient/).sort()).toEqual([
-      'components/chat/user-message-bubble.tsx',
-      'styles/app.css',
-    ]);
+  test('the user bubble is one flat token fill', () => {
+    const bubble =
+      sourceFiles.find(({ path }) => path === 'components/chat/user-message-bubble.tsx')?.text ?? '';
+    expect(bubble).toMatch(/bg-\(--bubble-fill\)/);
+    expect(offenders(/bubble-gradient|--bubble-(base|wash|rim)/)).toEqual([]);
   });
 });
 
@@ -99,10 +96,10 @@ describe('DESIGN-RULES carries the anti-slop rules', () => {
     },
   );
 
-  test('V3 and V16 name the owner bubble as their one exception', () => {
+  test('V3 and V16 grant the user bubble no gradient exception', () => {
     for (const id of ['V3', 'V16']) {
       const row = rules.split('\n').find((line) => line.startsWith(`| ${id} |`));
-      expect(row).toMatch(/`bubble-gradient`/);
+      expect(row).not.toMatch(/`bubble-gradient`/);
     }
   });
 });

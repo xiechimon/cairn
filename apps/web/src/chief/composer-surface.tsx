@@ -37,13 +37,13 @@ export const PROJECT_CHIP_CLS =
   "h-7 max-w-48 cursor-pointer gap-1.5 rounded-lg border-none bg-transparent px-2 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) data-[set]:bg-(--menu-hover) data-[set]:text-(--foreground) [&_svg:not([class*='size-'])]:size-auto";
 
 const SEND_BTN_CLS =
-  'ml-auto size-7 cursor-pointer rounded-(--radius-control) border-0 bg-secondary text-(--text-tertiary) hover:bg-secondary hover:text-(--text-tertiary) dark:hover:bg-secondary aria-expanded:bg-transparent';
+  'ml-auto size-7 cursor-pointer rounded-(--radius-control) border-0 bg-transparent text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-secondary) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent';
 const SEND_ON_CLS =
   'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button)/90 hover:text-(--text-on-accent) dark:hover:bg-(--card-button)/90 dark:hover:text-(--text-on-accent)';
 const STOP_CLS =
   'text-foreground hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover)';
 const HOME_COMPOSER_CLS =
-  'mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-182 flex-none';
+  'mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-160 flex-none';
 const MENU_CONTENT_CLS = 'w-auto max-w-80 min-w-56';
 const ATTACHED_COMPOSER_CLS =
   'mt-0 shadow-(--shadow-composer-attached) focus-within:shadow-(--shadow-composer-attached-focus)';
@@ -184,7 +184,7 @@ export function ComposerSurface({
     >
       <div
         data-invalid={invalid ? '' : undefined}
-        className={`${active ? 'chief-composer ' : ''}${attached ? ATTACHED_COMPOSER_CLS : FREE_COMPOSER_CLS} data-invalid:ring-1 data-invalid:ring-destructive rounded-b-(--radius-composer) border-0 bg-card px-3.5 py-2.5`}
+        className={`${active ? 'chief-composer ' : ''}${attached ? ATTACHED_COMPOSER_CLS : FREE_COMPOSER_CLS} data-invalid:ring-1 data-invalid:ring-destructive rounded-b-(--radius-composer) border-0 bg-background px-3.5 py-2`}
       >
         {above}
         <ComposerAttachments
@@ -200,7 +200,7 @@ export function ComposerSurface({
               data-compose-target=""
               data-question-answer={active && onAdvance !== undefined ? '' : undefined}
               aria-invalid={invalid ? true : undefined}
-              className={`h-7.25 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 py-1 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary) [&::placeholder]:whitespace-nowrap [&::placeholder]:opacity-0`}
+              className={`h-7 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 py-1 font-sans text-ui leading-5 md:text-ui tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary) [&::placeholder]:whitespace-nowrap [&::placeholder]:opacity-0`}
               readOnly={!editable}
               value={wire.draft}
               onChange={wire.handleChange}
@@ -254,7 +254,7 @@ export function ComposerSurface({
               <span
                 aria-hidden
                 data-testid={active ? 'chief-composer-placeholder' : undefined}
-                className="pointer-events-none absolute inset-x-0 top-0 truncate px-0.5 py-1 font-sans text-card-title tabular-nums text-(--text-tertiary)"
+                className="pointer-events-none absolute inset-x-0 top-0 truncate px-0.5 py-1 font-sans text-ui leading-5 tabular-nums text-(--text-tertiary)"
               >
                 {placeholder}
               </span>

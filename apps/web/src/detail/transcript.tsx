@@ -308,7 +308,7 @@ function Row({
         <>
           <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
             <span
-              className="chat-text -mt-px agent-measure min-w-0 voice-response text-card-title break-words text-(--foreground)"
+              className="chat-text -mt-px agent-measure min-w-0 voice-response text-ui leading-5.5 break-words text-(--foreground)"
               data-testid="agent-text"
             >
               {item.markdown != null ? (
@@ -334,7 +334,7 @@ function Row({
       return (
         <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px agent-measure min-w-0 voice-response text-card-title break-words text-(--foreground)"
+            className="chat-text -mt-px agent-measure min-w-0 voice-response text-ui leading-5.5 break-words text-(--foreground)"
             data-testid="info-report"
           >
             <ChatMarkdown text={item.markdown} />
@@ -344,7 +344,7 @@ function Row({
     case 'thinking':
       return (
         <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
-          <span className="chat-text -mt-px agent-measure min-w-0 text-card-title break-words text-(--foreground)">
+          <span className="chat-text -mt-px agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)">
             <ThinkingRow text={item.text} />
           </span>
         </div>
@@ -450,7 +450,7 @@ function Row({
       return (
         <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px agent-measure min-w-0 text-card-title break-words text-(--foreground)"
+            className="chat-text -mt-px agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
             data-testid="agent-text"
           >
             <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
@@ -534,7 +534,7 @@ function Row({
       return (
         <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
           <span
-            className="chat-text -mt-px agent-measure min-w-0 text-card-title break-words text-(--foreground)"
+            className="chat-text -mt-px agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
             data-testid="agent-text"
           >
             <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
@@ -606,7 +606,7 @@ function FailRow({
   return (
     <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
       <span
-        className="chat-text -mt-px agent-measure min-w-0 text-card-title break-words text-(--foreground)"
+        className="chat-text -mt-px agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
         data-testid="agent-text"
       >
         <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{title}</p>

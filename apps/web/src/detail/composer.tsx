@@ -16,10 +16,10 @@ import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 const COMPOSER_CARD =
   'composer relative mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-col rounded-(--radius-composer) border-0 px-3.5 pt-3 pb-2.5';
 const COMPOSER_CARD_EDITABLE =
-  'bg-(--card) shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)';
+  'bg-background shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)';
 const COMPOSER_CARD_READ_ONLY = 'bg-secondary shadow-(--shadow-composer)';
 const COMPOSER_INPUT =
-  'field-sizing-fixed h-9 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent';
+  'field-sizing-fixed h-9 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-ui leading-5.5 text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent';
 const COMPOSER_TOOL =
   "flex size-7 cursor-pointer items-center justify-center rounded-(--radius-control) border-none bg-transparent p-0 font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground disabled:pointer-events-auto disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto";
 const COMPOSER_SQUARE =
@@ -213,7 +213,7 @@ export function Composer({
         </>
       ) : (
         <div
-          className="flex items-center gap-2 px-0.5 pb-2.5 text-card-title text-(--text-secondary)"
+          className="flex items-center gap-2 px-0.5 pb-2.5 text-ui leading-5.5 text-(--text-secondary)"
           data-testid="composer-placeholder"
         >
           {readOnly && <Lock width={16} height={16} className="flex-none" />}

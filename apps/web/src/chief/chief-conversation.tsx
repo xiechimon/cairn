@@ -72,7 +72,7 @@ import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
 const SCROLLER_CONTENT_CLS =
-  'mx-auto block w-full max-w-190 min-w-0 gap-0 px-4 pt-3.5 [overflow-wrap:anywhere]';
+  'mx-auto flex w-full max-w-168 min-w-0 flex-col justify-end gap-0 px-4 pt-8 [overflow-wrap:anywhere]';
 
 const THREAD_COMPOSER = 'thread';
 
@@ -373,9 +373,6 @@ export function ChiefConversation({
     i,
   }));
   const rows = allRows.filter(({ item }) => item.kind !== 'user' || item.pending == null);
-  const latestMessage = rows.findLast(
-    ({ item }) => item.kind === 'user' || (item.kind === 'robot' && item.typing !== true),
-  );
   const latestUser = rows.findLast(({ item }) => item.kind === 'user');
   const latestUserKey =
     latestUser == null ? null : chiefStreamRowKey(latestUser.item, latestUser.i);
@@ -425,16 +422,21 @@ export function ChiefConversation({
     </>
   );
   const lastUserText = latestUser?.item.kind === 'user' ? latestUser.item.text : null;
-  const retryLastUser =
-    onSend == null || lastUserText === null
-      ? undefined
-      : () => {
-          followSentRef.current = true;
-          Promise.resolve(onSend(lastUserText)).catch((error: unknown) => {
-            followSentRef.current = false;
-            toastError(t('没发出去，再试一次。'), error);
-          });
-        };
+  const resend = useCallback(
+    (text: string) => {
+      if (onSend == null) return;
+      followSentRef.current = true;
+      Promise.resolve(onSend(text)).catch((error: unknown) => {
+        followSentRef.current = false;
+        toastError(t('没发出去，再试一次。'), error);
+      });
+    },
+    [onSend, t],
+  );
+  const retryLastUser = useMemo(
+    () => (onSend == null || lastUserText === null ? undefined : () => resend(lastUserText)),
+    [onSend, lastUserText, resend],
+  );
   const clock = useMinuteClock();
   const dividerClock = { previousAt: null as number | null };
   const streamRow = ({ item, i }: GroupedRow) => {
@@ -464,7 +466,6 @@ export function ChiefConversation({
     <ChiefStreamRow
       item={item}
       index={i}
-      latest={i === latestMessage?.i}
       replyable={item.kind === 'thread-report' && outstandingReports.has(item.id)}
       runningTool={chief.runningTool}
       copiedKey={copiedKey}
@@ -483,7 +484,7 @@ export function ChiefConversation({
   const intro = !chief.bound && showBindGate && (
     <div
       data-testid="chief-gate"
-      className="mx-auto mt-4 flex h-14 w-[calc(100%-2rem)] max-w-182 flex-none items-center gap-3 rounded-(--radius-card) bg-(--card) pr-3 pl-4 text-ui text-(--text-secondary) ring-1 ring-(--border)"
+      className="mx-auto mt-4 flex h-14 w-[calc(100%-2rem)] max-w-160 flex-none items-center gap-3 rounded-(--radius-card) bg-(--card) pr-3 pl-4 text-ui text-(--text-secondary) ring-1 ring-(--border)"
     >
       <span>{t('请先在工作路由里配置 Coordinator。')}</span>
       <Button className={`ml-auto cursor-pointer ${DIALOG_PRIMARY_BUTTON}`} onClick={onSettings}>
@@ -507,7 +508,12 @@ export function ChiefConversation({
         <>
           {intro}
           <MessageScroller className={SCROLLER_ROOT_CLS}>
-            <FadeScrollerViewport reserveEnd ref={viewportRef} data-testid="chief-body">
+            <FadeScrollerViewport
+              reserveEnd
+              ref={viewportRef}
+              data-testid="chief-body"
+              className="chat-fade"
+            >
               <MessageScrollerContent className={SCROLLER_CONTENT_CLS} data-testid="chief-stream">
                 <TodoGlanceContext.Provider value={glances}>
                   {lead}
@@ -566,7 +572,7 @@ export function ChiefConversation({
               <p
                 role="alert"
                 data-testid="chief-composer-error"
-                className={`mx-auto mt-2 mb-0 flex w-[calc(100%-2rem)] max-w-182 max-h-12 items-start gap-1.5 overflow-y-auto text-meta text-destructive`}
+                className={`mx-auto mt-2 mb-0 flex w-[calc(100%-2rem)] max-w-160 max-h-12 items-start gap-1.5 overflow-y-auto text-meta text-destructive`}
               >
                 <TriangleAlert aria-hidden="true" className="size-3.5 flex-none" />
                 {composerError}

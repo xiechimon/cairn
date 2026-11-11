@@ -15,7 +15,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(home.getByTestId('chief-composer-input')).toBeVisible();
     await expect(page.locator('.chief-fab')).toHaveCount(0);
     await expect(page.getByRole('complementary', { name: 'Coordinator' })).toHaveCount(0);
-    const composer = await home.locator('.chief-composer').boundingBox();
+    const composer = await home.getByTestId('chief-composer-block').boundingBox();
     const hero = await page.getByTestId('home-c-hero').boundingBox();
     const viewport = page.viewportSize();
     expect(composer && hero && viewport).toBeTruthy();
@@ -41,7 +41,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     const home = page.getByTestId('home-c');
     await expect(home.getByTestId('chief-stream')).toContainText('看板拖完卡片计数不对');
     await expect(page.getByTestId('home-c-hero')).toHaveCount(0);
-    const composer = await home.locator('.chief-composer').boundingBox();
+    const composer = await home.getByTestId('chief-composer-block').boundingBox();
     const viewport = page.viewportSize();
     expect(composer).not.toBeNull();
     expect(viewport).not.toBeNull();

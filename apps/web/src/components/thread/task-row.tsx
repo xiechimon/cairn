@@ -105,7 +105,7 @@ export function TaskRow({
           <span
             data-slot="task-row-where"
             className={cn(
-              'flex items-center gap-1 text-meta leading-5 font-medium text-foreground',
+              'flex items-center gap-1 text-meta leading-5 text-content-secondary',
               linkRoom,
             )}
           >

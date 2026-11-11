@@ -145,7 +145,7 @@ export function StatusMarkFloat({
         data-testid="chief-status-pill"
         data-visible={visible}
         className={cn(
-          '-mt-1 flex items-center gap-2 rounded-full bg-popover px-3 py-1.5 text-meta font-medium whitespace-nowrap text-foreground shadow-(--e2) transition-[opacity,transform] duration-(--dur-fast) ease-out motion-reduce:transition-none',
+          '-mt-1 flex items-center gap-2 rounded-full bg-popover px-3 py-1 text-meta font-medium whitespace-nowrap text-foreground shadow-(--e2) transition-[opacity,transform] duration-(--dur-fast) ease-out motion-reduce:transition-none',
           !visible && '-translate-y-1 opacity-0',
         )}
       >
@@ -195,7 +195,7 @@ export function ChiefStatusMark({ chief }: { chief: ChiefContent }) {
     <StatusMarkFloat
       view={done && base.id === 'idle' ? DONE_VIEW : base}
       elapsed={elapsed}
-      className="absolute inset-x-0 top-0.5 z-10"
+      className="absolute inset-x-0 top-2.5 z-10"
     />
   );
 }

@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 const DONE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36';
 const CONFIRM = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b';
 
-test('chat body reads at 15px (text-card-title) on the 21/15 type line height', async ({
+test('chat body reads at 14px (text-ui) on a fixed 22px line, as in the approved chat draft', async ({
   page,
 }) => {
   await page.goto(DONE);
@@ -19,9 +19,9 @@ test('chat body reads at 15px (text-card-title) on the 21/15 type line height', 
     (el as HTMLElement).style.fontSize = '';
     return { ...before, scaled };
   });
-  expect(cs.fontSize).toBe('15px');
-  expect(cs.lineHeight).toBe('21px');
-  expect(cs.scaled).toBe('28px');
+  expect(cs.fontSize).toBe('14px');
+  expect(cs.lineHeight).toBe('22px');
+  expect(cs.scaled).toBe('22px');
 });
 
 test('68ch measure cap binds the body text and the centered note', async ({ page }) => {
@@ -77,8 +77,8 @@ test('68ch measure cap binds the body text and the centered note', async ({ page
   expect(note.leftGap).toBe(0);
   expect(note.before).toBe('none');
   expect(note.after).toBe('none');
-  expect(note.fontSize).toBe('15px');
-  expect(note.lineHeight).toBe('21px');
+  expect(note.fontSize).toBe('13px');
+  expect(note.lineHeight).toBe('18px');
   // the capped measure must not push the column into horizontal overflow
   const overflow = await page.evaluate(() => {
     const col = document.querySelector('.side-panel [data-testid="transcript-col"]')!;
@@ -87,18 +87,18 @@ test('68ch measure cap binds the body text and the centered note', async ({ page
   expect(overflow.scroll).toBeLessThanOrEqual(overflow.client + 1);
 });
 
-test('composer placeholder sits at 15px (text-card-title)', async ({ page }) => {
+test('composer placeholder sits at 14px (text-ui)', async ({ page }) => {
   await page.goto('/app?scenario=home-c&thread=home-c-idle');
   const placeholder = page.locator('.side-panel [data-testid="composer-placeholder"]');
-  await expect(placeholder).toHaveCSS('font-size', '15px');
+  await expect(placeholder).toHaveCSS('font-size', '14px');
 });
 
-test('agent text sits at 15px', async ({ page }) => {
+test('agent text sits at 14px', async ({ page }) => {
   await page.goto(CONFIRM);
   await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
   await expect(page.locator('.side-panel [data-testid="agent-text"]').first()).toHaveCSS(
     'font-size',
-    '15px',
+    '14px',
   );
 });
 
@@ -125,7 +125,7 @@ test('bubble / footer keep their own geometry, replies carry no avatar column', 
   });
   expect(geo.bubbleH).toBeGreaterThanOrEqual(37);
   expect(geo.bubbleH).toBeLessThanOrEqual(38);
-  expect(geo.bubbleFont).toBe('15px');
+  expect(geo.bubbleFont).toBe('14px');
   expect(geo.avatars).toBe(0);
   expect(geo.footerPad).toBe('0px');
   expect(geo.userFooterAlign).toBe('flex-end');

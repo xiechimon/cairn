@@ -78,13 +78,14 @@ test('a sent message scrolls into view even when the reader was scrolled up', as
   await expect(home(page).getByText('typing back')).toBeInViewport();
   await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
   await expect(row(page, 'follow me down')).toBeInViewport();
+  await messageOf(page, 'follow me down').getByRole('button', { name: '复制' }).focus();
   await expect
     .poll(() => opacityOf(messageOf(page, 'follow me down').getByTestId('chief-msg-tools')))
     .toBe(1);
   await evidenceShot(page, 'chief-follow-send.png');
 });
 
-test('only the newest message keeps its actions visible; older ones show them on hover', async ({
+test('every message, the newest included, shows its actions only on hover', async ({
   page,
 }) => {
   await mockSlowSend(page, 6);
@@ -99,7 +100,7 @@ test('only the newest message keeps its actions visible; older ones show them on
   const olderFoot = messageOf(page, 'answer 3').getByTestId('chief-msg-foot');
   const olderUserTools = messageOf(page, 'question 4').getByTestId('chief-msg-tools');
 
-  await expect.poll(() => opacityOf(newestFoot)).toBe(1);
+  await expect.poll(() => opacityOf(newestFoot)).toBe(0);
   await expect.poll(() => opacityOf(olderFoot)).toBe(0);
   await expect.poll(() => opacityOf(olderUserTools)).toBe(0);
 
@@ -107,6 +108,8 @@ test('only the newest message keeps its actions visible; older ones show them on
   await expect.poll(() => opacityOf(olderFoot)).toBe(1);
   await messageOf(page, 'question 4').hover();
   await expect.poll(() => opacityOf(olderUserTools)).toBe(1);
+  await messageOf(page, 'answer 5').hover();
+  await expect.poll(() => opacityOf(newestFoot)).toBe(1);
 });
 
 const gapToBottom = (page: Page) =>

@@ -78,7 +78,7 @@ describe('the serif voice follows claude.ai (DESIGN.md Typography)', () => {
   });
 
   it('agent replies are the response voice and user messages are not', () => {
-    expect(read('chief/chief-message-rows.tsx')).toMatch(/BUBBLE_ROBOT_CLS = '[^']*voice-response/);
+    expect(read('chief/chief-message-rows.tsx')).toMatch(/BUBBLE_ROBOT_CLS = [`'][^`']*voice-response/);
     const transcript = read('detail/transcript.tsx');
     expect(transcript).toMatch(/voice-response[^"]*"\s*data-testid="agent-text"/);
     expect(transcript).toMatch(/voice-response[^"]*"\s*data-testid="info-report"/);

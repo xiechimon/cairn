@@ -68,9 +68,9 @@ export function SidebarProjectRow({
       data-slot="sidebar-project-row"
       className={cn(
         'w-full justify-start gap-2.5 px-2 text-ui font-normal',
-        status === null ? 'h-8 pointer-coarse:h-11' : 'h-auto min-h-11 items-start py-1.5',
+        status === null ? 'h-9 pointer-coarse:h-11' : 'h-auto min-h-11 items-start py-1.5',
         active
-          ? 'font-semibold text-foreground hover:bg-sidebar-hover dark:hover:bg-sidebar-hover'
+          ? 'font-medium text-foreground hover:bg-sidebar-hover dark:hover:bg-sidebar-hover'
           : 'text-content-secondary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover',
         nested && 'pl-6',
         menu != null &&

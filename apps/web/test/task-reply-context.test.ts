@@ -46,7 +46,7 @@ describe('task opening history', () => {
     const html = render(request);
     expect(html).toContain('data-role="owner"');
     expect(html).toContain('data-role="coordinator"');
-    expect(html.match(/bubble-gradient/g)).toHaveLength(2);
+    expect(html.match(/data-slot="user-bubble"/g)).toHaveLength(2);
     expect(html).toContain('src="/api/attachments/caret"');
     expect(html).toContain('data-testid="reply-quote"');
     expect(html).toContain('href="#request-context-origin%3Aack"');

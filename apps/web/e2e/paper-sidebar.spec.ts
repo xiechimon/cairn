@@ -106,7 +106,7 @@ test('project rows carry a neutral glyph, no colored tile and no count', async (
   expect(probe.some((r) => r.tile || r.count)).toBe(false);
 });
 
-test('long project names truncate to one 32px line', async ({ page }) => {
+test('long project names truncate to one 36px line', async ({ page }) => {
   await page.goto('/app/schedules?scenario=board-repos');
   const m = await page
     .locator('[data-slot="sidebar-project-row"]')
@@ -123,7 +123,7 @@ test('long project names truncate to one 32px line', async ({ page }) => {
     });
   expect(m.overflow).toBe(true);
   expect(m.ellipsis).toBe('ellipsis');
-  expect(m.rowHeight).toBe(32);
+  expect(m.rowHeight).toBe(36);
 });
 
 test('collapsed rail keeps `Coordinator` with its badge dot and the expand toggle', async ({ page }) => {

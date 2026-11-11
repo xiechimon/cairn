@@ -233,7 +233,7 @@ for (const mask of MASK_CASES) {
           const content = node.querySelector('[data-testid="chief-stream"]') as HTMLElement;
           content.style.paddingBottom = '12px';
         });
-        await expect.poll(read).toEqual({ gap: 12, fade: '28px' });
+        await expect.poll(read).toEqual({ gap: 12, fade: '64px' });
 
         await body.evaluate((node) => {
           const content = node.querySelector('[data-testid="chief-stream"]') as HTMLElement;

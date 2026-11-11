@@ -7,7 +7,7 @@ import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal, TypingDots } from '../components/chat/live-row.js';
 import { STATUS_REF_CLS, StatusLine } from '../components/chat/status-line.js';
 import { TraceGroup, TraceRows, type TraceStepItem } from '../components/chat/trace-steps.js';
-import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
+import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Bubble, BubbleContent } from '../components/ui/bubble.js';
 import { Button } from '../components/ui/button.js';
 import {
@@ -80,20 +80,19 @@ const NO_GLANCES: ReadonlyMap<string, TodoGlance> = new Map();
 
 const TURN_NOTE_CLS = 'px-3 py-2 text-meta leading-5 text-(--text-tertiary)';
 
-const MSG_COL_CLS =
-  'relative min-w-0 flex-1 text-card-title text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!';
+const MSG_COL_CLS = `relative min-w-0 flex-1 ${CHAT_BODY_CLS} text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!`;
 const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
 
 const SCROLLER_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
 
 const USER_ROW_CLS = 'mt-6';
 const EVENT_ROW_CLS = 'mt-6';
-const REPLY_ROW_CLS = 'mt-11';
+const REPLY_ROW_CLS = 'mt-6';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = 'w-full max-w-full';
-const BUBBLE_ROBOT_CLS = 'w-full border-0 voice-response text-card-title';
+const BUBBLE_ROBOT_CLS = `w-full border-0 voice-response ${CHAT_BODY_CLS}`;
 const MARKER_ERROR_CLS =
   'my-2.5 flex-col items-start gap-0.5 rounded-(--radius-card) bg-danger-soft px-3 py-2.5 text-left text-meta text-(--destructive)';
 
@@ -298,7 +297,6 @@ export function chiefStreamRowKey(
 interface ChiefStreamRowProps {
   item: ChiefStreamItem | ThreadActivity;
   index: number;
-  latest: boolean;
   replyable?: boolean;
   runningTool: ChiefContent['runningTool'];
   copiedKey: string | null;
@@ -388,10 +386,8 @@ function MessageMoreMenu({ onRewind }: { onRewind: () => void }) {
   );
 }
 
-const messageToolsReveal = (latest: boolean) =>
-  latest
-    ? 'opacity-100'
-    : 'opacity-0 group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
+const MESSAGE_TOOLS_REVEAL =
+  'opacity-0 group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
 
 const messageToolsPlace = (side: 'left' | 'right') =>
   `absolute top-full z-10 ${side === 'right' ? 'right-0' : 'left-0'}`;
@@ -399,7 +395,6 @@ const messageToolsPlace = (side: 'left' | 'right') =>
 export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
   index: i,
-  latest,
   replyable = false,
   runningTool,
   copiedKey,
@@ -501,7 +496,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               {shown != null ? <ChatMarkdown text={shown} conversational /> : item.text}
             </UserMessageBubble>
             <div
-              className={`${messageToolsPlace('right')} flex items-center gap-1 text-(--text-tertiary) ${messageToolsReveal(latest)}`}
+              className={`${messageToolsPlace('right')} flex items-center gap-1 text-(--text-tertiary) ${MESSAGE_TOOLS_REVEAL}`}
               data-testid="chief-msg-tools"
             >
               <MessageStamp createdAt={item.createdAt} fallback={item.at} />
@@ -626,12 +621,12 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               ) : (
                 <>
                   {(item.paragraphs ?? []).map((p, j) => (
-                    <p key={j} className={j > 0 ? 'mt-0.5 text-card-title' : 'text-card-title'}>
+                    <p key={j} className={j > 0 ? `mt-0.5 ${CHAT_BODY_CLS}` : CHAT_BODY_CLS}>
                       <Segments segments={p} />
                     </p>
                   ))}
                   {item.bullets != null && item.bullets.length > 0 && (
-                    <ul className={`mt-0.5 list-disc text-card-title ${MD_LIST}`}>
+                    <ul className={`mt-0.5 list-disc ${CHAT_BODY_CLS} ${MD_LIST}`}>
                       {item.bullets.map((b, j) => (
                         <li key={`b${j}`} className={MD_LIST_ITEM}>
                           <Segments segments={b} />
@@ -646,9 +641,16 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           {item.typing === true && <TypingDots className="mt-1" />}
           {item.typing !== true && (
             <div
-              className={`${messageToolsPlace('left')} flex items-center gap-2 text-meta text-(--text-tertiary) ${messageToolsReveal(latest)}`}
+              className={`${messageToolsPlace('left')} flex items-center gap-2 text-meta text-(--text-tertiary) ${MESSAGE_TOOLS_REVEAL}`}
               data-testid="chief-msg-foot"
             >
+              {onReply !== undefined && item.id != null && (
+                <ReplyToolButton
+                  onClick={() =>
+                    onReply({ sourceMessageId: item.id ?? '', quote: robotText(item) })
+                  }
+                />
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -662,13 +664,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                   <Copy width={13} height={13} />
                 )}
               </Button>
-              {onReply !== undefined && item.id != null && (
-                <ReplyToolButton
-                  onClick={() =>
-                    onReply({ sourceMessageId: item.id ?? '', quote: robotText(item) })
-                  }
-                />
-              )}
               <MessageStamp createdAt={item.createdAt} />
               {item.fallbackModel != null && (
                 <span data-testid="chief-fallback-note">

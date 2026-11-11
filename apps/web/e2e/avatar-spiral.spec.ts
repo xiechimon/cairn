@@ -28,7 +28,7 @@ test('search drops agent rows; project task rows stay seeded', async ({ page }) 
   await expect(page.locator('.prj-task-avatar img').first()).toHaveAttribute('src', USER_SRC);
 });
 
-test('conversation transcript: replies carry no avatar column, user rows are gradient bubbles', async ({
+test('conversation transcript: replies carry no avatar column, user rows are flat sand bubbles', async ({
   page,
 }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
@@ -36,7 +36,7 @@ test('conversation transcript: replies carry no avatar column, user rows are gra
   await expect(page.locator('.chat-row--user').first()).toBeVisible();
   await expect(page.locator('.chat-avatar')).toHaveCount(0);
   await expect(page.getByTestId('msg-avatar')).toHaveCount(0);
-  await expect(page.getByTestId('user-bubble').first()).toHaveCSS('border-top-left-radius', '12px');
+  await expect(page.getByTestId('user-bubble').first()).toHaveCSS('border-top-left-radius', '18px');
 });
 
 test('account head shares the seeded user src (same identity as the sidebar chip)', async ({

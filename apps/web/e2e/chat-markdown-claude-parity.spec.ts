@@ -189,9 +189,9 @@ test('Coordinator status events are the same left-aligned status line, clear of 
   expect(style.before).toBe('none');
   expect(style.after).toBe('none');
   expect(style.leftGap).toBe(0);
-  expect(style.fontSize).toBe('15px');
-  expect(style.lineHeight).toBe('21px');
-  expect(style.minHeight).toBe('28px');
+  expect(style.fontSize).toBe('13px');
+  expect(style.lineHeight).toBe('18px');
+  expect(style.minHeight).toBe('24px');
 });
 
 test('a wide code line in an agent reply stays inside the transcript row on a phone viewport', async ({

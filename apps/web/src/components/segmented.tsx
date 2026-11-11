@@ -30,6 +30,12 @@ const TRACK_CLS =
 const OPTION_CLS =
   "relative inline-flex h-7 flex-none items-center justify-center gap-1.5 rounded-(--cds-radius-sm) border-0 px-3 py-0 text-ui font-normal whitespace-nowrap text-content-secondary transition-[color,background-color] duration-(--dur-fast) ease-out hover:text-foreground dark:text-content-secondary dark:hover:text-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5";
 
+const QUIET_TRACK_CLS =
+  'inline-flex h-7 w-fit items-center gap-1 bg-transparent p-0 text-content-secondary group-data-horizontal/tabs:h-7';
+
+const QUIET_OPTION_CLS =
+  'rounded-(--cds-radius-md) px-2.5 text-meta data-active:bg-(--sidebar-active) dark:data-active:bg-(--sidebar-active) hover:bg-(--hover-1)';
+
 const OPTION_ICON_CLS = 'w-7 px-0';
 
 const RADIO_BUTTON_NEUTRAL_CLS = 'hover:bg-transparent dark:hover:bg-transparent';
@@ -67,16 +73,18 @@ export function SegmentedTabs<T extends string>({
   className,
   optionHandle,
   slide = false,
+  quiet = false,
 }: SegmentedProps<T> & {
   label?: string;
   slide?: boolean;
+  quiet?: boolean;
 }) {
   return (
     <Tabs className="contents" value={value} onValueChange={(next: unknown) => onChange(next as T)}>
       <TabsList
         aria-label={label}
         data-segmented="track"
-        className={cn(TRACK_CLS, slide && 'relative', className)}
+        className={cn(quiet ? QUIET_TRACK_CLS : TRACK_CLS, slide && 'relative', className)}
       >
         {slide && <TabsIndicator data-segmented="indicator" className={PILL_CLS} />}
         {options.map((option) => (
@@ -90,7 +98,7 @@ export function SegmentedTabs<T extends string>({
             {...option.data}
             className={cn(
               optionClass(option, optionHandle),
-              slide ? OPTION_UNDER_PILL_CLS : OPTION_SELECTED_FACE_CLS,
+              quiet ? QUIET_OPTION_CLS : slide ? OPTION_UNDER_PILL_CLS : OPTION_SELECTED_FACE_CLS,
             )}
           >
             <OptionContent option={option} />

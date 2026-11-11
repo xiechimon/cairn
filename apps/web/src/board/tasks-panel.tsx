@@ -45,12 +45,7 @@ function SectionHeader({ section, count }: { section: TaskSection; count: number
   const { t } = useI18n();
   const accent = isWaiting(section);
   return (
-    <h3
-      className={cn(
-        'm-0 flex h-8 items-center gap-1.5 px-2.5 text-meta font-medium',
-        accent ? 'text-foreground' : 'text-content-tertiary',
-      )}
-    >
+    <h3 className="m-0 flex h-7 items-center gap-1.5 px-2.5 text-caption font-normal text-content-tertiary">
       {t(SECTION_LABEL[section])}
       <span className={cn('tabular-nums', accent ? ACCENT_INK : 'text-content-tertiary')}>
         {count}
@@ -302,8 +297,9 @@ export function TasksPanel({
           }}
         />
       )}
-      <div className="flex flex-none px-3 pt-3">
+      <div className="flex flex-none px-3 pb-1">
         <SegmentedTabs
+          quiet
           value={tab}
           onChange={setTab}
           options={[

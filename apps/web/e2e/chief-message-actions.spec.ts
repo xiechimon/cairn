@@ -55,11 +55,14 @@ test('older messages show their actions and time only on hover or keyboard focus
   await expect.poll(() => opacityOf(tools(olderAnswer))).toBe(1);
 });
 
-test('the newest message keeps its actions visible', async ({ page }) => {
+test('the newest message hides its actions until hover, like the others', async ({ page }) => {
   await mockHistory(page);
   await page.goto('/app');
   await page.mouse.move(0, 0);
-  await expect.poll(() => opacityOf(tools(messageOf(page, 'second answer')))).toBe(1);
+  const newest = messageOf(page, 'second answer');
+  await expect.poll(() => opacityOf(tools(newest))).toBe(0);
+  await newest.hover();
+  await expect.poll(() => opacityOf(tools(newest))).toBe(1);
 });
 
 test('touch devices keep the actions of older messages visible', async ({ browser }) => {

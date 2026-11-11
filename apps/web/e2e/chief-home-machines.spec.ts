@@ -89,14 +89,14 @@ test('with one computer the panel says work runs on the Coordinator machine', as
   await expect(panel(page)).toContainText('没有其他电脑时，任务都在 Coordinator 这台电脑上跑。');
 });
 
-test('at phone width the chip stays an icon and leaves the title whole', async ({ page }) => {
+test('at phone width the chip stays an icon and the title stays for screen readers', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(HOME);
   const box = await chip(page).boundingBox();
   expect(box?.width ?? 0).toBeLessThanOrEqual(60);
   const title = page.getByTestId('home-c').getByRole('heading', { level: 1 });
   await expect(title).toHaveText('Coordinator');
-  expect(await title.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await expect(title).toHaveClass(/sr-only/);
 });
 
 test('the icon-only header buttons show a tooltip with their name on hover', async ({

@@ -162,7 +162,7 @@ export function ChiefQuestionDock({ bound, ownFooter }: { bound: boolean; ownFoo
   const at = clampQuestionIndex(index, pending.length);
   const shown = pending[at];
   const leaving = useLeavingQuestion(shown?.item.requestId);
-  const wrapCls = `${DOCK_CLS} mx-auto mt-2 w-[calc(100%-2rem)] max-w-182`;
+  const wrapCls = `${DOCK_CLS} mx-auto mt-2 w-[calc(100%-2rem)] max-w-160`;
   if (shown === undefined) {
     if (leaving === null) return null;
     return (

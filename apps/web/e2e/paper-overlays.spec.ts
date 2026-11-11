@@ -37,7 +37,7 @@ async function openFromTopbar(page: Page, url: string, name: string) {
 
 async function openDeleteConfirm(page: Page) {
   await page.goto(DETAIL);
-  await page.getByRole('button', { name: '更多' }).click();
+  await page.getByRole('button', { name: '更多操作…' }).click();
   await page.locator('.more-menu-item[data-action="delete"]').click();
   const dialog = page.locator('.delete-confirm');
   await expect(dialog).toBeVisible();
@@ -162,7 +162,7 @@ test('Paper menu: 32px rows, 14px text, 15px icons, 14px panel corners, 4px padd
 }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto(DETAIL);
-  await page.getByRole('button', { name: '更多' }).click();
+  await page.getByRole('button', { name: '更多操作…' }).click();
   const menu = page.locator('.more-menu');
   await expect(menu).toBeVisible();
   await settle(menu);

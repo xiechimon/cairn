@@ -415,11 +415,11 @@ export function BoardSidebar({
       >
         <div
           data-testid="project-group"
-          className="mb-0.5 flex h-6 flex-none items-center pr-1 pl-2.5 text-caption font-medium text-content-tertiary"
+          className="mt-1 mb-0.5 flex h-6 flex-none items-center pr-1 pl-2 text-caption font-normal text-content-tertiary"
         >
           <Button
             variant="ghost"
-            className={`sidebar-group group h-6 cursor-pointer gap-1 rounded-(--radius-control) border-none bg-transparent px-0 text-caption font-medium text-content-tertiary hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent aria-expanded:bg-transparent ${FOCUS} ${
+            className={`sidebar-group group h-6 cursor-pointer gap-1 rounded-(--radius-control) border-none bg-transparent px-0 text-caption font-normal text-content-tertiary hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent aria-expanded:bg-transparent ${FOCUS} ${
               projectsCollapsed ? 'sidebar-group--collapsed' : ''
             }`}
             aria-expanded={!projectsCollapsed}
@@ -428,17 +428,10 @@ export function BoardSidebar({
             {t('项目')}
             <ChevronDown
               aria-hidden
-              className="sidebar-group-chevron size-3.5 text-content-dim transition-transform duration-150 group-[.sidebar-group--collapsed]:-rotate-90"
+              className="sidebar-group-chevron size-3.5 text-content-dim opacity-0 transition-transform duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 group-[.sidebar-group--collapsed]:-rotate-90 group-[.sidebar-group--collapsed]:opacity-100 pointer-coarse:opacity-100"
               strokeWidth={STROKE}
             />
           </Button>
-          <Link
-            className={`ml-auto flex size-6 items-center justify-center rounded-(--radius-control) text-content-tertiary hover:bg-sidebar-hover hover:text-foreground ${FOCUS}`}
-            to={{ pathname: '/app/project/new', search: plain }}
-            aria-label={t('新建项目')}
-          >
-            <Plus className="size-3.5" strokeWidth={STROKE} />
-          </Link>
         </div>
         {!projectsCollapsed && projectsState === 'loading' && (
           <div
@@ -486,6 +479,14 @@ export function BoardSidebar({
             })}
           </>
         )}
+        <Link
+          data-slot="sidebar-new-project"
+          className={`flex h-9 flex-none items-center gap-2.5 rounded-(--radius-control) px-2 text-ui text-content-secondary no-underline hover:bg-sidebar-hover hover:text-foreground pointer-coarse:h-11 ${FOCUS}`}
+          to={{ pathname: '/app/project/new', search: plain }}
+        >
+          <Plus className="size-4 flex-none text-content-tertiary" strokeWidth={STROKE} />
+          {t('新建项目')}
+        </Link>
       </nav>
 
       <div
