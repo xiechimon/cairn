@@ -121,6 +121,7 @@ export function bootServer(
     for (const dir of ownedDirs.splice(0)) releaseTestTempDir(dir);
   };
   const oauthStates: AppContext['oauthStates'] = new Map();
+  const xaiDeviceStates: AppContext['xaiDeviceStates'] = new Map();
   try {
     const appContext: AppContext = {
       remote: {
@@ -146,6 +147,7 @@ export function bootServer(
       uploads: new Map(),
       enrollments: new Map(),
       oauthStates,
+      xaiDeviceStates,
       oauthClient: opts.oauthClient ?? null,
       ...(opts.oauthFetch !== undefined ? { oauthFetch: opts.oauthFetch } : {}),
       ...(opts.providerTestTimeoutMs === undefined
@@ -192,6 +194,7 @@ export function bootServer(
       skillsDir,
       skillSourcesPath,
       oauthStates,
+      xaiDeviceStates,
       svc: {
         db,
         hub,

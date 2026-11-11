@@ -1610,6 +1610,13 @@ export const EN: Record<string, string> = {
   关闭设置: 'Close settings',
   返回设置: 'Back to settings',
   颜色主题: 'Color theme',
+  '用 SuperGrok 登录': 'Sign in with SuperGrok',
+  '在浏览器打开这个链接，输入验证码。': 'Open this link in a browser and enter the code.',
+  'xAI 登录被拒绝。': 'xAI sign-in was denied.',
+  '已有更新的 xAI 凭证，这次登录没有覆盖它。':
+    'A newer xAI credential is already stored. This sign-in did not replace it.',
+  '验证码已过期，请重试。': 'The code expired. Try again.',
+  'xAI 登录失败，请重试。': 'xAI sign-in failed. Try again.',
   找不到这个项目: 'That project is not here',
   '它可能已被删除、改名，或你不在它所属的团队。':
     'It may have been deleted, renamed, or you may not be on its team.',

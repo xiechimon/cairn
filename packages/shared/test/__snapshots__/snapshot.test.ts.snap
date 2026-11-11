@@ -9000,6 +9000,16 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "path": "/api/teams/{id}/providers/oauth/{preset}/authorize",
   },
   {
+    "method": "POST",
+    "note": "SuperGrok device-code start; device_code stays on the server",
+    "path": "/api/teams/{id}/providers/oauth/xai/device",
+  },
+  {
+    "method": "POST",
+    "note": "SuperGrok device-code poll; stores the refresh token, not the access token",
+    "path": "/api/teams/{id}/providers/oauth/xai/device/poll",
+  },
+  {
     "method": "GET",
     "note": "#231 [设计]：收码 → token 密封落 provider 行（02 §8）→ 302 回 providers 页",
     "path": "/api/oauth/callback",

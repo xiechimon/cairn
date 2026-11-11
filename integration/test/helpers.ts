@@ -130,6 +130,7 @@ export async function bootRealServer(opts: {
       uploads: new Map(),
       enrollments: new Map(),
       oauthStates: new Map(),
+      xaiDeviceStates: new Map(),
       oauthClient: null,
       reposDir,
       attachmentsDir,

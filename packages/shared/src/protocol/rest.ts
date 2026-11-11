@@ -243,6 +243,16 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: '#231 [设计]：签发授权 URL（state 入册，TTL 10min 单次核销）',
   },
   {
+    method: 'POST',
+    path: '/api/teams/{id}/providers/oauth/xai/device',
+    note: 'SuperGrok device-code start; device_code stays on the server',
+  },
+  {
+    method: 'POST',
+    path: '/api/teams/{id}/providers/oauth/xai/device/poll',
+    note: 'SuperGrok device-code poll; stores the refresh token, not the access token',
+  },
+  {
     method: 'GET',
     path: '/api/oauth/callback',
     query: ['code', 'state', 'error'],
