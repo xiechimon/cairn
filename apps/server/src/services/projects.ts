@@ -13,7 +13,7 @@ import {
   type ShipRoute,
   shipRouteSchema,
 } from '@cairn/shared';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   build,
@@ -102,46 +102,116 @@ export function setProjectArchived(
   return { ...row, archivedAt };
 }
 
+type ProjectReader = Pick<Db, 'all'>;
+
+function projectRunningWork(db: ProjectReader, projectId: string): string[] {
+  const rows = db.all<{ line: string }>(sql`
+    with project_steps as (
+      select step.* from step
+      left join build on build.id = step.buildId
+      left join todo on todo.id = build.todoId
+      left join chief_thread on chief_thread.id = step.buildId
+      where todo.projectId = ${projectId} or step.scopeProjectId = ${projectId}
+        or chief_thread.projectId = ${projectId}
+    )
+    select line from (
+      select 'step ' || step.id || ' ' || step.status || ' on build ' || step.buildId as line,
+        1 as kind, step.id as sortKey
+      from project_steps as step
+      where step.status in (${sql.join(
+        ACTIVE_STEP_STATUSES.map((status) => sql`${status}`),
+        sql`, `,
+      )})
+      union all
+      select 'branch-sync ' || branch_sync.id || ' ' || branch_sync.status || ' on build ' || branch_sync.buildId,
+        2, branch_sync.id
+      from branch_sync
+      inner join build on build.id = branch_sync.buildId
+      inner join todo on todo.id = build.todoId
+      where todo.projectId = ${projectId} and branch_sync.status in ('pending', 'running')
+      union all
+      select 'chief-thread ' || id, 3, id
+      from chief_thread
+      where projectId = ${projectId} and activeRun is not null
+      union all
+      select 'computer-call ' || computer_call.id || ' ' || computer_call.state || ' on step ' || computer_call.stepId,
+        4, computer_call.id
+      from computer_call
+      inner join project_steps as step on step.id = computer_call.stepId
+      where computer_call.state in ('dispatched', 'running')
+        or (computer_call.state = 'cancelled' and computer_call.finishedAt is null
+          and computer_call.deadlineAt > ${nowMs()})
+      union all
+      select 'computer ' || computer.id || ' ' || computer.state || ' on step ' || computer.executionStepId,
+        5, computer.id
+      from computer
+      inner join project_steps as step on step.id = computer.executionStepId
+      where computer.state in ('starting', 'running')
+      union all
+      select 'autonomous-merge ' || autonomous_merge_admission.buildId || ' pending',
+        6, autonomous_merge_admission.buildId
+      from autonomous_merge_admission
+      inner join build on build.id = autonomous_merge_admission.buildId
+      inner join todo on todo.id = build.todoId
+      where todo.projectId = ${projectId} and autonomous_merge_admission.state = 'pending'
+    )
+    order by kind, sortKey
+  `);
+  return rows.map((row) => row.line);
+}
+
 export function deleteProject(deps: ProjectDeps, id: string): boolean {
-  const { db } = deps;
-  const row = db.select().from(project).where(eq(project.id, id)).get();
-  if (!row) return false;
-  const todoIds = db
-    .select({ id: todo.id })
-    .from(todo)
-    .where(eq(todo.projectId, id))
-    .all()
-    .map((r) => r.id);
-  const buildIds =
-    todoIds.length > 0
-      ? db
-          .select({ id: build.id })
-          .from(build)
-          .where(inArray(build.todoId, todoIds))
-          .all()
-          .map((r) => r.id)
-      : [];
-  db.transaction((tx) => {
-    if (buildIds.length > 0) {
-      tx.delete(stopPending).where(inArray(stopPending.conversationId, buildIds)).run();
-      tx.delete(step).where(inArray(step.buildId, buildIds)).run();
-    }
-    tx.delete(schedule).where(eq(schedule.projectId, id)).run();
-    tx.delete(tag).where(eq(tag.projectId, id)).run();
-    tx.delete(secret).where(eq(secret.projectId, id)).run();
-    if (todoIds.length > 0) tx.delete(todo).where(inArray(todo.id, todoIds)).run();
-    for (const chiefRow of tx.select().from(chief).where(eq(chief.teamId, row.teamId)).all()) {
-      const next = chiefRow.watches.filter((w) => !todoIds.includes(w.todoId));
-      if (next.length !== chiefRow.watches.length) {
-        tx.update(chief).set({ watches: next }).where(eq(chief.id, chiefRow.id)).run();
+  const removed = deps.db.transaction(
+    (tx) => {
+      const row = tx.select().from(project).where(eq(project.id, id)).get();
+      if (!row) return null;
+      const running = projectRunningWork(tx, id);
+      if (running.length > 0) {
+        throw new HttpError(
+          409,
+          `cannot delete project while work is running: ${running.join('; ')}`,
+          'project-running',
+        );
       }
-    }
-    moveProjectMemoriesToTeam(tx, id);
-    tx.update(chiefThread).set({ projectId: null }).where(eq(chiefThread.projectId, id)).run();
-    tx.delete(project).where(eq(project.id, id)).run();
-  });
-  if (row.repoKind === 'hosted' && row.repoName !== null) {
-    removeHostedRepoDir(deps.reposDir, row.teamId, row.repoName);
+      const todoIds = tx
+        .select({ id: todo.id })
+        .from(todo)
+        .where(eq(todo.projectId, id))
+        .all()
+        .map((r) => r.id);
+      const buildIds =
+        todoIds.length > 0
+          ? tx
+              .select({ id: build.id })
+              .from(build)
+              .where(inArray(build.todoId, todoIds))
+              .all()
+              .map((r) => r.id)
+          : [];
+      if (buildIds.length > 0) {
+        tx.delete(stopPending).where(inArray(stopPending.conversationId, buildIds)).run();
+        tx.delete(step).where(inArray(step.buildId, buildIds)).run();
+      }
+      tx.delete(schedule).where(eq(schedule.projectId, id)).run();
+      tx.delete(tag).where(eq(tag.projectId, id)).run();
+      tx.delete(secret).where(eq(secret.projectId, id)).run();
+      if (todoIds.length > 0) tx.delete(todo).where(inArray(todo.id, todoIds)).run();
+      for (const chiefRow of tx.select().from(chief).where(eq(chief.teamId, row.teamId)).all()) {
+        const next = chiefRow.watches.filter((w) => !todoIds.includes(w.todoId));
+        if (next.length !== chiefRow.watches.length) {
+          tx.update(chief).set({ watches: next }).where(eq(chief.id, chiefRow.id)).run();
+        }
+      }
+      moveProjectMemoriesToTeam(tx, id);
+      tx.update(chiefThread).set({ projectId: null }).where(eq(chiefThread.projectId, id)).run();
+      tx.delete(project).where(eq(project.id, id)).run();
+      return row;
+    },
+    { behavior: 'immediate' },
+  );
+  if (removed === null) return false;
+  if (removed.repoKind === 'hosted' && removed.repoName !== null) {
+    removeHostedRepoDir(deps.reposDir, removed.teamId, removed.repoName);
   }
   return true;
 }

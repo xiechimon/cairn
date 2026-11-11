@@ -1,11 +1,17 @@
 import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { MEMORY_INDEX_TITLE, projectRecordSchema, todoRecordSchema } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import Database from 'better-sqlite3';
+import { eq, sql } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { describe, expect, test } from 'vitest';
+import { openDbWithHandle } from '../src/db/client.js';
+import * as schema from '../src/db/schema.js';
 import {
   agentMemory,
   build as buildTable,
   chief,
+  chiefThread,
   plan as planTable,
   project as projectTable,
   step as stepTable,
@@ -14,6 +20,8 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { repoDirFor } from '../src/services/git.js';
+import { stopStepComputer } from '../src/services/machine-computer.js';
+import { deleteProject } from '../src/services/projects.js';
 import { bootServer, insertMachine, postProject, req, seedSessionRoute } from './helpers.js';
 
 async function expectErrorShape(res: Response, status: number): Promise<void> {
@@ -116,6 +124,7 @@ describe('DELETE /api/projects/{id} (#189)', () => {
         updatedAt: Date.now(),
       })
       .run();
+    s.db.update(stepTable).set({ status: 'done', finishedAt: Date.now() }).run();
 
     expect((await req(s.app, 'DELETE', `/api/projects/${projectId}`)).status).toBe(204);
 
@@ -244,5 +253,233 @@ describe('DELETE /api/projects/{id} (#189)', () => {
     }[];
     expect(todos.map((t) => t.id)).toEqual([todoB.id]);
     s.dispose();
+  });
+});
+
+const runningCases = [
+  [
+    'step pending',
+    "insert into step (id, buildId, kind, status, createdAt) values ('work', 'build', 'build', 'pending', 1)",
+  ],
+  [
+    'step claimed',
+    "insert into step (id, buildId, kind, status, createdAt) values ('work', 'build', 'build', 'claimed', 1)",
+  ],
+  [
+    'step waiting_quota',
+    "insert into step (id, buildId, kind, status, createdAt) values ('work', 'build', 'build', 'waiting_quota', 1)",
+  ],
+  [
+    'branch-sync pending',
+    "insert into branch_sync (id, buildId, machineId, teamId, directory, ref, `commit`, status, createdAt) values ('work', 'build', 'machine', :team, '/repo', 'main', 'abc', 'pending', 1)",
+  ],
+  [
+    'branch-sync running',
+    "insert into branch_sync (id, buildId, machineId, teamId, directory, ref, `commit`, status, createdAt) values ('work', 'build', 'machine', :team, '/repo', 'main', 'abc', 'running', 1)",
+  ],
+  [
+    'chief-thread',
+    'update chief_thread set activeRun = \'{"phase":"chief"}\' where id = \'thread\'',
+  ],
+  [
+    'computer-call dispatched',
+    "insert into computer_call (id, teamId, stepId, toolCallId, machineId, tool, replaySafe, params, state, deadlineAt, createdAt) values ('work', :team, 'settled', 'call', 'machine', 'shell', 0, '{}', 'dispatched', 100, 1)",
+  ],
+  [
+    'computer-call running',
+    "insert into computer_call (id, teamId, stepId, toolCallId, machineId, tool, replaySafe, params, state, deadlineAt, createdAt) values ('work', :team, 'settled', 'call', 'machine', 'shell', 0, '{}', 'running', 100, 1)",
+  ],
+  [
+    'computer starting',
+    "insert into computer (id, teamId, scopeKey, machineId, providerRef, state, executionStepId, createdAt, updatedAt) values ('work', :team, 'scope', 'machine', 'orb', 'starting', 'settled', 1, 1)",
+  ],
+  [
+    'computer running',
+    "insert into computer (id, teamId, scopeKey, machineId, providerRef, state, executionStepId, createdAt, updatedAt) values ('work', :team, 'scope', 'machine', 'orb', 'running', 'settled', 1, 1)",
+  ],
+  [
+    'autonomous-merge',
+    "insert into autonomous_merge_admission (buildId, teamId, state, createdAt) values ('build', :team, 'pending', 1)",
+  ],
+] as const;
+
+async function runningWorld() {
+  const s = bootServer();
+  const projectId = await postProject(s.app, 'running');
+  insertMachine(s, { name: 'guard' });
+  s.db.run(sql`update machine set id = 'machine'`);
+  s.db
+    .insert(todoTable)
+    .values({ id: 'todo', teamId: s.team.id, projectId, title: 'task', phaseAt: 1, seqNum: 1 })
+    .run();
+  s.db
+    .insert(buildTable)
+    .values({ id: 'build', todoId: 'todo', withPlan: false, triggerSource: 'user', createdAt: 1 })
+    .run();
+  s.db
+    .insert(stepTable)
+    .values({ id: 'settled', buildId: 'build', kind: 'build', status: 'done', createdAt: 1 })
+    .run();
+  s.db
+    .insert(chiefThread)
+    .values({
+      id: 'thread',
+      chiefId: 'chief',
+      userId: s.user.id,
+      teamId: s.team.id,
+      projectId,
+      title: 'thread',
+      createdAt: 1,
+      updatedAt: 1,
+      sessionId: 'session',
+      sessionOpenedAt: 1,
+    })
+    .run();
+  return { s, projectId };
+}
+
+describe('project deletion running guard', () => {
+  test.each(runningCases)(
+    '%s independently blocks deletion without stopping work',
+    async (kind, statement) => {
+      const { s, projectId } = await runningWorld();
+      s.db.run(sql.raw(statement.replaceAll(':team', `'${s.team.id}'`)));
+      const before = s.db.all(sql`select * from step`);
+      const res = await req(s.app, 'DELETE', `/api/projects/${projectId}`);
+      expect(res.status).toBe(409);
+      const body = (await res.json()) as { error: string; reason: string };
+      expect(body.reason).toBe('project-running');
+      s.db.run(sql`update project set archivedAt = 1 where id = ${projectId}`);
+      expect((await req(s.app, 'DELETE', `/api/projects/${projectId}`)).status).toBe(409);
+      expect(body.error).toContain(kind.split(' ')[0]);
+      expect(body.error).toContain(kind.split(' ')[1] ?? '');
+      expect(s.db.all(sql`select * from step`)).toEqual(before);
+      expect(s.db.select().from(projectTable).all()).toHaveLength(1);
+      const other = await postProject(s.app, 'unrelated');
+      expect((await req(s.app, 'DELETE', `/api/projects/${other}`)).status).toBe(204);
+      const terminal = kind.startsWith('step ')
+        ? "update step set status = 'done'"
+        : kind.startsWith('branch-sync ')
+          ? "update branch_sync set status = 'synced'"
+          : kind === 'chief-thread'
+            ? 'update chief_thread set activeRun = null'
+            : kind.startsWith('computer-call ')
+              ? "update computer_call set state = 'done'"
+              : kind.startsWith('computer ')
+                ? "update computer set state = 'stopped'"
+                : "update autonomous_merge_admission set state = 'merged'";
+      s.db.run(sql.raw(terminal));
+      expect((await req(s.app, 'DELETE', `/api/projects/${projectId}`)).status).toBe(204);
+      s.dispose();
+    },
+  );
+
+  test.each(['unfinished', 'finished', 'expired'] as const)(
+    'cancelled computer call after stop: %s',
+    async (lifecycle) => {
+      const { s, projectId } = await runningWorld();
+      try {
+        const now = Date.now();
+        s.db.run(sql`insert into computer_call
+          (id, teamId, stepId, toolCallId, machineId, tool, replaySafe, params, state, deadlineAt, createdAt)
+          values ('stopping', ${s.team.id}, 'settled', 'call', 'machine', 'shell', 0, '{}',
+            'running', ${now + 60_000}, ${now})`);
+        stopStepComputer(s, 'settled');
+        expect(
+          s.db.get(sql`select state, finishedAt from computer_call where id = 'stopping'`),
+        ).toEqual({ state: 'cancelled', finishedAt: null });
+        if (lifecycle === 'finished') {
+          s.db.run(sql`update computer_call set finishedAt = ${now} where id = 'stopping'`);
+        } else if (lifecycle === 'expired') {
+          s.db.run(sql`update computer_call set deadlineAt = ${now - 1} where id = 'stopping'`);
+        }
+        const response = await req(s.app, 'DELETE', `/api/projects/${projectId}`);
+        expect(response.status).toBe(lifecycle === 'unfinished' ? 409 : 204);
+        if (lifecycle === 'unfinished') {
+          expect(await response.json()).toEqual({
+            error:
+              'cannot delete project while work is running: computer-call stopping cancelled on step settled',
+            reason: 'project-running',
+          });
+          expect(s.db.all(sql`select id from project where id = ${projectId}`)).toHaveLength(1);
+          expect(
+            s.db.get(sql`select state, finishedAt from computer_call where id = 'stopping'`),
+          ).toEqual({ state: 'cancelled', finishedAt: null });
+        }
+      } finally {
+        s.dispose();
+      }
+    },
+  );
+
+  test.each(['scope', 'thread'] as const)(
+    'direct service blocks a chief step linked through %s',
+    async (link) => {
+      const { s, projectId } = await runningWorld();
+      s.db
+        .insert(stepTable)
+        .values({
+          id: 'chief-work',
+          buildId: link === 'thread' ? 'thread' : 'unbound',
+          kind: 'chief',
+          status: 'pending',
+          scopeProjectId: link === 'scope' ? projectId : null,
+          createdAt: 1,
+        })
+        .run();
+      expect(() => deleteProject(s, projectId)).toThrow(/chief-work pending/);
+      s.dispose();
+    },
+  );
+
+  test('settled work allows deletion; response lists multiple blockers', async () => {
+    const { s, projectId } = await runningWorld();
+    for (const [kind, statement] of runningCases) {
+      if (kind === 'step pending' || kind === 'chief-thread') s.db.run(sql.raw(statement));
+    }
+    const res = await req(s.app, 'DELETE', `/api/projects/${projectId}`);
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('step work pending on build build');
+    expect(body.error).toContain('chief-thread thread');
+    s.db.update(stepTable).set({ status: 'done' }).run();
+    s.db.update(chiefThread).set({ activeRun: null }).run();
+    expect(deleteProject(s, projectId)).toBe(true);
+    s.dispose();
+  });
+
+  test('holds a write lock from the first project read through deletion', async () => {
+    const scratch = bootServer();
+    const file = join(scratch.reposDir, 'guard.db');
+    const opened = openDbWithHandle(file);
+    const writer = new Database(file, { timeout: 0 });
+    const reader = new Database(file);
+    let attempts = 0;
+    const db = drizzle(reader, {
+      schema,
+      logger: {
+        logQuery(query) {
+          if (!/^(select|delete)/.test(query) || !query.includes('from "project"')) return;
+          attempts++;
+          expect(() => writer.exec('BEGIN IMMEDIATE')).toThrow(/locked/);
+        },
+      },
+    });
+    const s = bootServer({ db });
+    const projectId = 'lock-project';
+    db.insert(projectTable).values({ id: projectId, teamId: s.team.id, name: 'lock' }).run();
+    attempts = 0;
+    try {
+      expect(deleteProject(s, projectId)).toBe(true);
+      expect(attempts).toBe(2);
+      writer.exec('BEGIN IMMEDIATE; ROLLBACK');
+    } finally {
+      if (writer.inTransaction) writer.exec('ROLLBACK');
+      reader.close();
+      writer.close();
+      opened.close();
+      s.dispose();
+      scratch.dispose();
+    }
   });
 });
