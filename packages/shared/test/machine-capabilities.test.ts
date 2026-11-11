@@ -139,6 +139,12 @@ describe('record additive contract (old server / old daemon parse both ways)', (
       }).capabilities,
     ).toEqual({ mcpServers: ['figma'], skills: [] });
   });
+
+  it('machineRecordSchema: running threads are optional, so an older server record still parses', () => {
+    const running = [{ threadId: 'todo-1', title: 'Thread', projectId: 'project-1', startedAt: 1 }];
+    expect(machineRecordSchema.parse({ ...machineBase, running }).running).toEqual(running);
+    expect(machineRecordSchema.parse(machineBase).running).toBeUndefined();
+  });
 });
 
 describe('queue projection blocked bit (#1251 visible pending reason)', () => {

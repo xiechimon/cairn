@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { MEMORY_INDEX_TITLE, projectRecordSchema, todoRecordSchema } from '@cairn/shared';
 import Database from 'better-sqlite3';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { describe, expect, test } from 'vitest';
 import { openDbWithHandle } from '../src/db/client.js';
@@ -16,6 +16,7 @@ import {
   project as projectTable,
   step as stepTable,
   tag as tagTable,
+  team as teamTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import { repoDirFor } from '../src/services/git.js';
@@ -176,6 +177,57 @@ describe('DELETE /api/projects/{id} (#189)', () => {
     );
     expect(again.repoName).toBe('hosted-repo');
     expect(existsSync(dir)).toBe(true);
+    s.dispose();
+  });
+
+  test('a project of another team -> 404 {error}, still present with its tasks', async () => {
+    const s = bootServer();
+    s.db.insert(teamTable).values({ id: 'team-other', name: 'Other', createdAt: 0 }).run();
+    s.db
+      .insert(projectTable)
+      .values({ id: 'project-other', teamId: 'team-other', name: 'Elsewhere' })
+      .run();
+    s.db
+      .insert(todoTable)
+      .values({
+        id: 'todo-other',
+        teamId: 'team-other',
+        projectId: 'project-other',
+        title: 'Keep me',
+        spec: 'spec',
+        phase: 'todo',
+        phaseAt: Date.now(),
+        seqNum: 1,
+      })
+      .run();
+
+    await expectErrorShape(await req(s.app, 'DELETE', '/api/projects/project-other'), 404);
+    expect(
+      s.db.select().from(projectTable).where(eq(projectTable.id, 'project-other')).all(),
+    ).toHaveLength(1);
+    expect(s.db.select().from(todoTable).where(eq(todoTable.id, 'todo-other')).all()).toHaveLength(
+      1,
+    );
+    s.dispose();
+  });
+
+  test('a project of the caller team is deleted even when another team exists', async () => {
+    const s = bootServer();
+    s.db.insert(teamTable).values({ id: 'team-other', name: 'Other', createdAt: 0 }).run();
+    s.db
+      .insert(projectTable)
+      .values({ id: 'project-other', teamId: 'team-other', name: 'Elsewhere' })
+      .run();
+    const projectId = await postProject(s.app);
+
+    expect((await req(s.app, 'DELETE', `/api/projects/${projectId}`)).status).toBe(204);
+    expect(
+      s.db
+        .select()
+        .from(projectTable)
+        .all()
+        .map((row) => row.id),
+    ).toEqual(['project-other']);
     s.dispose();
   });
 
