@@ -79,3 +79,10 @@ Two-way door for the outbox. The ledger change is two-way if the pending marker 
 - Video. Recommendation: no. 10 MB and a five-minute grant cannot carry it, and the allowlist on main has no video type.
 - Chunked resume. Recommendation: no at this cap. Whole-file retry fits the grant.
 - Edit after the server has accepted the message. Recommendation: no. Withdraw if that route has a withdraw and the turn has not started; otherwise the message stands and the replacement is not sent.
+
+## Open for implementation
+
+These two notes are not settled here. Implementation must close them before the behavior ships. This page does not specify the procedure.
+
+- Row 7 suppression. `messageThreadAsUser` claims after `deliver()` (`apps/server/src/services/thread-message.ts` on `origin/main`). An absent outer ledger row is not proof that no handler is running. Do not treat that as successful suppression.
+- Abandoned `inflightGeneration`. A closed or suspended holder cannot clear the flag. Takeover must not wait forever for that callback.
