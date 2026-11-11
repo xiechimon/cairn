@@ -241,17 +241,21 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/builds/:id/steps', async (c) => {
     const body = parseWith(buildStepActionBodySchema, await jsonBody(c), 'body');
     const buildId = c.req.param('id');
+    const replay = () => {
+      if (body.action === 'revision') holdSecondRejectionRework(svc, buildId);
+      return c.json({ delegated: true }, 202);
+    };
     if ('clientMessageId' in body) {
-      const stored = findClientMessage<{ delegated: true }>(svc.db, buildId, body.clientMessageId);
-      if (stored !== undefined) return c.json(stored, 202);
+      const stored = findClientMessage(svc.db, buildId, body.clientMessageId);
+      if (stored !== undefined) return replay();
     }
     try {
       await applyBuildStepAction(svc, buildId, body);
       if (body.action === 'revision') holdSecondRejectionRework(svc, buildId);
     } catch (err) {
       if (err instanceof ClientMessageConflict && 'clientMessageId' in body) {
-        const raced = findClientMessage<{ delegated: true }>(svc.db, buildId, body.clientMessageId);
-        if (raced !== undefined) return c.json(raced, 202);
+        const raced = findClientMessage(svc.db, buildId, body.clientMessageId);
+        if (raced !== undefined) return replay();
       }
       if (err instanceof PhaseTransitionError) throw conflict(err.message);
       throw err;

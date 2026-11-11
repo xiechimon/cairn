@@ -8751,7 +8751,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
-    "note": "body {content, projectId?, clientMessageId?}; projectId only tags the turn, 409 when that project is archived; a repeated clientMessageId returns the first response and starts no new turn",
+    "note": "body {content, projectId?, clientMessageId}; a missing clientMessageId is 400; projectId only tags the turn, 409 when that project is archived; a repeated clientMessageId returns the first response and starts no new turn",
     "path": "/api/teams/{id}/coordinator/messages",
   },
   {

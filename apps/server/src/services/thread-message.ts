@@ -7,7 +7,7 @@ import {
   type ThreadMessageResult,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
-import { chiefMessage, step, todo } from '../db/schema.js';
+import { build, chiefMessage, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
@@ -216,6 +216,33 @@ function commitStoppedRestart(
   return result;
 }
 
+function recoverRecordedBuildSend(
+  deps: BuildDeps,
+  row: TodoRow,
+  body: ThreadMessageBody,
+  origin: ThreadMessageOrigin,
+): ThreadMessageResult | undefined {
+  const builds = deps.db.select({ id: build.id }).from(build).where(eq(build.todoId, row.id)).all();
+  const delivered = builds
+    .map(
+      (candidate) =>
+        findClientMessage<{ delivered?: ThreadMessageDelivery }>(
+          deps.db,
+          candidate.id,
+          body.clientMessageId,
+        )?.delivered,
+    )
+    .find((value) => value !== undefined);
+  if (delivered === undefined || row.latestBuildId === null) return undefined;
+  const sent = { conversationId: row.latestBuildId, delivered };
+  try {
+    recordInCoordinator(deps, row, body, sent, origin);
+  } catch (error) {
+    return replayAfterConflict<ThreadMessageResult>(deps.db, row.id, body.clientMessageId, error);
+  }
+  return { todoId: row.id, ...sent };
+}
+
 export async function messageThreadAsUser(
   deps: BuildDeps,
   teamId: string,
@@ -238,6 +265,8 @@ export async function messageThreadAsUser(
   }
   const buildId = row.latestBuildId;
   return coalesceClientMessage(deps.db, row.id, body.clientMessageId, async () => {
+    const recovered = recoverRecordedBuildSend(deps, row, body, origin);
+    if (recovered !== undefined) return recovered;
     if (stoppedBeforeFirstRun(deps.db, row)) {
       const stored = findClientMessage<ThreadMessageResult>(deps.db, row.id, body.clientMessageId);
       if (stored !== undefined) return stored;

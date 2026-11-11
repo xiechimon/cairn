@@ -1555,6 +1555,10 @@ export async function applyBuildStepAction(
     const afterCommit: (() => void)[] = [];
     const transcriptDeps = { ...deps, afterCommit };
     deps.db.transaction(() => {
+      claimClientMessage(deps.db, buildId, body.clientMessageId, {
+        delegated: true,
+        delivered: 'restart',
+      });
       const current = getTodo(deps, row.todoId);
       if (
         !current ||
@@ -1566,7 +1570,6 @@ export async function applyBuildStepAction(
           409,
           'Task changed while restart was being prepared; retry from its current state.',
         );
-      claimClientMessage(deps.db, buildId, body.clientMessageId, { delegated: true });
       todoRecord = current;
       if (origin === 'automatic') assertAutomaticRetryAllowed(deps, current.id);
       if (reworkTarget !== null && prClosed === null) {
@@ -1786,7 +1789,10 @@ export async function applyBuildStepAction(
   const afterCommit: (() => void)[] = [];
   const transcriptDeps = { ...deps, afterCommit };
   deps.db.transaction(() => {
-    claimClientMessage(deps.db, buildId, body.clientMessageId, { delegated: true });
+    claimClientMessage(deps.db, buildId, body.clientMessageId, {
+      delegated: true,
+      delivered: 'revision',
+    });
     recordBuildFeedback(
       deps.db,
       buildId,
