@@ -1,8 +1,10 @@
 import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { chiefMessage, message } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
+import { nowMs } from '../src/lib/ids.js';
 import { H, registerChiefHarness, relay, seedMachineReport } from './chief-harness.js';
-import { req } from './helpers.js';
+import { req, startLegacyBuild } from './helpers.js';
 
 registerChiefHarness();
 
@@ -92,5 +94,88 @@ describe('51-vocabulary relay execution surface (02 section 4.3)', () => {
       expect(def.replaySafe).toBe(true);
       expect(await relay(name, {})).toBeDefined();
     }
+  });
+
+  describe('conversation tool team scope', () => {
+    const OTHER_TEAM = 'other-team';
+
+    async function statusOf(call: Promise<unknown>): Promise<number> {
+      try {
+        await call;
+        return 0;
+      } catch (err) {
+        return err instanceof HttpError ? err.status : -1;
+      }
+    }
+
+    async function seedBuildConversation(): Promise<string> {
+      const created = (await (
+        await req(H.s.app, 'POST', `/api/projects/${H.projectId}/todos`, {
+          title: 'probe',
+          spec: 'body',
+        })
+      ).json()) as { id: string };
+      const buildId = startLegacyBuild(H.s, created.id, { withPlan: false });
+      H.s.db
+        .insert(message)
+        .values({
+          id: 'build-msg-1',
+          conversationId: buildId,
+          role: 'assistant',
+          content: 'build transcript line',
+          createdAt: nowMs(),
+        })
+        .run();
+      return buildId;
+    }
+
+    function seedThreadMessage(): void {
+      H.s.db
+        .insert(chiefMessage)
+        .values({
+          id: 'thread-msg-1',
+          threadId: H.threadId,
+          role: 'user',
+          content: 'thread transcript line',
+          createdAt: nowMs(),
+        })
+        .run();
+    }
+
+    test('same-team chief thread is readable', async () => {
+      seedThreadMessage();
+      const page = (await relay('conversation', { conversationId: H.threadId })) as {
+        messages: { id: string }[];
+      };
+      expect(page.messages.map((m) => m.id)).toEqual(['thread-msg-1']);
+    });
+
+    test('chief thread of another team is refused like a missing one', async () => {
+      seedThreadMessage();
+      const crossTeam = await statusOf(
+        relay('conversation', { conversationId: H.threadId }, { teamId: OTHER_TEAM }),
+      );
+      const missing = await statusOf(relay('conversation', { conversationId: 'chief-missing' }));
+      expect(crossTeam).toBe(404);
+      expect(missing).toBe(404);
+    });
+
+    test('same-team build conversation is readable', async () => {
+      const buildId = await seedBuildConversation();
+      const page = (await relay('conversation', { conversationId: buildId })) as {
+        messages: { id: string }[];
+      };
+      expect(page.messages.map((m) => m.id)).toEqual(['build-msg-1']);
+    });
+
+    test('build conversation of another team is refused like a missing one', async () => {
+      const buildId = await seedBuildConversation();
+      const crossTeam = await statusOf(
+        relay('conversation', { conversationId: buildId }, { teamId: OTHER_TEAM }),
+      );
+      const missing = await statusOf(relay('conversation', { conversationId: 'build-missing' }));
+      expect(crossTeam).toBe(404);
+      expect(missing).toBe(404);
+    });
   });
 });
