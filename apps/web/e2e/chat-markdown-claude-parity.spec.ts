@@ -125,8 +125,9 @@ test('code expand opens a dialog with the full code, its own copy and Done, Esca
   await expect(dialog.getByTestId('md-code-dialog-body')).toContainText(
     'curl -s localhost:8787/healthz',
   );
-  const width = await dialog.evaluate((el) => el.getBoundingClientRect().width);
-  expect(width).toBe(890);
+  await expect
+    .poll(() => dialog.evaluate((el) => el.getBoundingClientRect().width))
+    .toBe(890);
   await dialog.getByTestId('md-code-dialog-copy').click();
   await expect(dialog.getByTestId('md-code-done')).toHaveText('完成');
   await page.keyboard.press('Escape');
