@@ -30,6 +30,10 @@ A box marked **owner route** changes a security surface from `packages/shared/me
 - [ ] G-D. Attachment metadata endpoint, only if a size line is wanted.
 - [ ] G-E. Preview of office documents. Medium, new dependency, owner decision.
 
+## Voice input
+
+- [ ] Transcription for the composer's microphone. The UI ships with a `VoiceSource` interface and a fixture source only; on a live stack the microphone is disabled with a reason. Needs a streaming transcription source (server endpoint or daemon side) with interim and final events, language choice, auth and a privacy decision on where audio goes. The contract is in `docs/design/composer-voice-input.md` once the UI change lands. The trigger phrase that sends (`OK，发送`) is handled in the web. **Design first.**
+
 ## Sidebar and projects
 
 - [ ] Refuse to delete a project that has running work, or stop that work first. The archived page now has `Delete all`; archiving does not stop builds or steps and `deleteProject` removes them without a check, so the confirm dialog warns about it.
