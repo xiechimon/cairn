@@ -29,6 +29,7 @@ import {
   CI_POLL_INTERVAL_MS,
   type CiCheckFailure,
   createCiPoller,
+  verdictOfCheckRuns,
 } from '../src/services/ci-loop.js';
 import { DONE_ROW, prClosedUnmergedRow } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
@@ -47,6 +48,37 @@ import {
 
 const disposables: (() => void)[] = [];
 let throttleHome: string;
+
+const checkRun = (
+  name: string,
+  conclusion: string,
+  extra: { id?: number; completedAt?: number } = {},
+) => ({
+  name,
+  status: 'completed',
+  conclusion,
+  outputTitle: null,
+  outputSummary: null,
+  ...extra,
+});
+
+describe('verdictOfCheckRuns ordering', () => {
+  test('an unordered success still passes when a sibling of that name failed', () => {
+    expect(
+      verdictOfCheckRuns([checkRun('check', 'failure'), checkRun('check', 'success')], ['check'])
+        .state,
+    ).toBe('green');
+  });
+
+  test('a newer failure by id still hides an older success', () => {
+    expect(
+      verdictOfCheckRuns([
+        checkRun('lint', 'success', { id: 1, completedAt: 1 }),
+        checkRun('lint', 'failure', { id: 2, completedAt: 2 }),
+      ]).state,
+    ).toBe('red');
+  });
+});
 beforeAll(async () => {
   throttleHome = makeTestTempDir('ci-loop-');
   vi.stubEnv('CAIRN_HOME', throttleHome);

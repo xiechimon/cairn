@@ -112,9 +112,10 @@ function newerCheckRun(candidate: GithubCheckRun, current: GithubCheckRun): bool
   }
   const candidateAt = typeof candidate.completedAt === 'number' ? candidate.completedAt : null;
   const currentAt = typeof current.completedAt === 'number' ? current.completedAt : null;
-  if (candidateAt === null) return false;
-  if (currentAt === null) return true;
-  return candidateAt > currentAt;
+  if (candidateAt !== null && currentAt !== null) return candidateAt > currentAt;
+  if (candidateAt !== null) return true;
+  if (currentAt !== null) return false;
+  return candidate.conclusion === 'success' && current.conclusion !== 'success';
 }
 
 export function latestCompletedCheckRuns(runs: readonly GithubCheckRun[]): GithubCheckRun[] {
