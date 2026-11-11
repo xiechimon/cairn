@@ -71,6 +71,28 @@ it('a rejected ticket resolver retries instead of staying disconnected', async (
   dispose();
 });
 
+it('a failed stream backs off instead of retrying every second', async () => {
+  const dispose = connect(
+    () => Promise.resolve(URL),
+    () => {},
+    () => {},
+    { inFlight: () => false, reconcile: () => {} },
+  );
+  await vi.advanceTimersByTimeAsync(0);
+  expect(FakeEventSource.instances).toHaveLength(1);
+  FakeEventSource.instances[0]?.onerror?.();
+  await vi.advanceTimersByTimeAsync(999);
+  expect(FakeEventSource.instances).toHaveLength(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(FakeEventSource.instances).toHaveLength(2);
+  FakeEventSource.instances[1]?.onerror?.();
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(FakeEventSource.instances).toHaveLength(2);
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(FakeEventSource.instances).toHaveLength(3);
+  dispose();
+});
+
 function openStream(
   guards: StreamGuards,
   onEvent: (ev: Record<string, unknown>) => void = () => {},

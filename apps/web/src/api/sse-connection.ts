@@ -68,7 +68,6 @@ export function connect(
       void resolved.then(
         (url) => {
           if (disposed) return;
-          retryDelay = 1_000;
           attach(url);
         },
         () => scheduleRetry(),
@@ -88,6 +87,7 @@ export function connect(
       else open();
     };
     es.onopen = () => {
+      retryDelay = 1_000;
       if (openedOnce) onResync();
       openedOnce = true;
       lastSeq = 0;
