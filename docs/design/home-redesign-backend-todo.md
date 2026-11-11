@@ -48,6 +48,22 @@ These are the first things the owner wants cairn to do for him. Each needs a des
 - [ ] Job applications in the browser. An MCP-driven flow where the agent uses the owner's own browser session on his computer to search a job site (the owner named Boss Zhipin), open postings, fill application forms from his profile and resume, and submit. Needs: browser control on the owner's machine (the browser capability and `apps/server/src/services/browser-session.ts`, `computer-control.ts` exist; the daemon side and "on by default" are open, see the computers section), a profile and resume store the agent may read, form filling that shows what it will enter, and a confirm-once step before every submit because an application cannot be withdrawn. Risks to decide first: the site's terms and anti-automation checks (captchas, rate limits, account flags), credentials staying in the owner's browser and never in the agent's context, and a daily cap. **Owner route, design first.**
 - [ ] Mail that reaches the owner without polling. The agent is told when new mail arrives in the owner's Gmail and QQ Mail and raises what matters. Needs: a mail connector as an MCP server with push delivery (Gmail supports push through a watch on the mailbox with a Pub/Sub topic and a webhook; QQ Mail offers IMAP, where the push equivalent is a held-open IMAP IDLE connection), a public or tunneled webhook endpoint for the self-hosted server, an inbound event that wakes the Coordinator (the wake mechanism exists), rules for what is worth a notification, and delivery to the owner through the existing push channel (`apps/server/src/services/push.ts`, `notifications.ts`). Credentials: OAuth tokens and app passwords go through the secrets service; mail content is third-party text and must be treated as data, never as instructions. **Owner route, design first.**
 
+## Direction: a general assistant
+
+Owner decision on 2026-11-11: cairn is a general assistant, not only a coding workspace. The review and merge machinery stays as one capability among others and is not the product's pitch. The items below close the gaps against comparable open-source assistants without adding surfaces that repeat each other.
+
+- [ ] One harness. The Coordinator runs on the pi runtime (`apps/server/src/coordinator/runtime/`, `apps/daemon/src/backend/pi.ts`). The owner wants every agent cairn starts, the Coordinator and the threads it opens, to run on that same harness, with Claude Code, Codex and similar tools used only as engines that harness dispatches work to, never as the primary harness. Today a machine can enable `pi`, `claude-code` or `gemini` as a runtime (`MACHINE_RUNTIMES` in `packages/shared/src/records/machine.ts`) and a step runs directly on the chosen one. Needs the owner to confirm the exact rule, then a design for the dispatch protocol and the migration. **Owner route, design first.**
+- [ ] Approvals. One mechanism for any action with an outside effect (send, pay, sign, delete, submit): the agent shows the exact action, the owner answers refuse, allow once or always allow, and the answer is recorded. This is the confirm-once class in `docs/design/ai-native-actions.md`; build it there, not as a second system.
+- [ ] Connectors. Mail and calendar first (see the mail goal above), added as MCP servers the owner connects with his own account, with per-connector grants. `apps/server/src/services/mcp-servers.ts` exists; a connect flow, token storage through the secrets service and a short catalog do not.
+- [ ] Sorting what needs the owner. Incoming items (mail, task reports, questions) ranked into needs you and can wait, with a one-line reason. The needs-you list for tasks exists; extend it rather than add a second inbox.
+- [ ] A daily brief. One message at the start of the day: what needs a decision, what changed, today's calendar, and what could not be checked. Uses the scheduler (`apps/server/src/services/scheduler.ts`) and the connectors; posted once however many devices are open.
+- [ ] Secrets the agent never reads. A masked entry box for site logins whose value goes to the site and never into the conversation; the journal records that a secret was used, not its value.
+- [ ] An outgoing check. Text leaving through a connector is scanned for sensitive data (card numbers, credentials) before it is sent, and held for approval when something is found.
+- [ ] More model sources. Local and OpenAI-compatible endpoints selectable per agent without code changes, through the existing provider configuration.
+- [ ] Clients. Desktop first, then a native iOS app in Swift, Android later (owner decision). The phone reference recording is kept outside the repository because it shows account details.
+
+Not planned: chat-platform entrances such as Slack or Teams, a second task board, a plugin marketplace. Each repeats something cairn already has or serves teams rather than one owner.
+
 ## Practices worth adopting
 
 From a quick search of the code on 2026-11-11, not a full audit; each line says what the search found. Confirm before starting.
@@ -65,9 +81,9 @@ From a quick search of the code on 2026-11-11, not a full audit; each line says 
 
 Already in place, so not listed: rate limiting, offline handling, reduced-motion support, push notifications, server-synced composer drafts, an idempotency ledger for sends, scheduling, OpenTelemetry traces.
 
-## Voice input
+## Voice input (shelved)
 
-- [ ] Local transcription for the composer's microphone. The web ships a `VoiceSource` interface with two sources: a fixture source for tests and, as an interim the owner approved, the browser's built-in speech recognition, which sends audio to the browser vendor's service. Replace the interim with a small open-source speech model that runs locally in the background on the daemon or the server, behind the same interface, with the model selectable in settings. Work to do: survey the open-source local speech-recognition options (model size, Chinese and English quality, streaming support, licence, CPU and GPU cost), pick a default, then design the streaming contract (audio format in, interim and final events out, language, auth, errors). The web-side contract is in `docs/design/composer-voice-input.md` once the UI change lands; the trigger phrase that sends (`OK，发送`) is handled in the web. **Design first.**
+Shelved by the owner on 2026-11-11 for desktop and phone; nothing ships. The reference behavior and the backend contract are kept in `docs/design/composer-voice-input.md` for when it is picked up: a `VoiceSource` interface in the web, the browser's built-in recognition only as an interim, and a small open-source speech model running locally behind the same interface as the target, with the model selectable.
 
 ## Sidebar and projects
 
