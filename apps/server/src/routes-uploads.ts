@@ -3,6 +3,7 @@ import { isInlineAttachment, servedAttachmentMime } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
+import { attachmentDownloadDisposition } from './lib/attachment-disposition.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody } from './routes-helpers.js';
@@ -74,6 +75,7 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/attachments/:id', async (c) => {
     const id = c.req.param('id');
+    const download = c.req.query('download') === '1';
     const { row, absPath } = readAttachment(
       {
         db: ctx.db,
@@ -85,6 +87,9 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
       id,
     );
     const bytes = readFileSync(absPath);
+    const inlineDisposition = isInlineAttachment(row.storageKey, row.mimeType)
+      ? 'inline'
+      : 'attachment';
     return new Response(bytes, {
       status: 200,
       headers: {
@@ -93,9 +98,9 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
         'cache-control': 'private, max-age=300',
         'x-content-type-options': 'nosniff',
         'content-security-policy': "sandbox; default-src 'none'",
-        'content-disposition': isInlineAttachment(row.storageKey, row.mimeType)
-          ? 'inline'
-          : 'attachment',
+        'content-disposition': download
+          ? attachmentDownloadDisposition(row.fileName)
+          : inlineDisposition,
       },
     });
   });

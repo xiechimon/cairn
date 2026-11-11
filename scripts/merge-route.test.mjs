@@ -98,6 +98,14 @@ test('protected paths may enter the queue', (t) => {
   assert.match(result.stdout, /may enter the merge queue/);
 });
 
+test('a security surface may enter the queue', (t) => {
+  const result = route(
+    repoWith(t, { 'apps/server/src/services/secrets.ts': 'export const seal = 1;\n' }),
+  );
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /may enter the merge queue/);
+});
+
 test('a malformed head sha is refused', () => {
   const result = spawnSync(process.execPath, [script, 'HEAD'], { encoding: 'utf8' });
   assert.equal(result.status, 2);

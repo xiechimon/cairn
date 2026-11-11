@@ -1,10 +1,17 @@
-import { useSyncExternalStore } from 'react';
-import { createBrowserRouter, Navigate, type RouteObject, RouterProvider } from 'react-router';
+import { type ReactNode, useSyncExternalStore } from 'react';
+import {
+  createBrowserRouter,
+  Navigate,
+  type RouteObject,
+  RouterProvider,
+  useLocation,
+} from 'react-router';
 import { ApiProvider, LiveDataBridge } from './api/provider.js';
 import { sidePanelOpen } from './board/app-sidebar.js';
 import { THREAD_PARAM } from './board/thread-copy.js';
 import { useNarrow, usePanelDocked } from './board/use-narrow.js';
 import { ChiefRoot } from './chief/chief-root.js';
+import { SubtreeErrorBoundary } from './components/subtree-error-boundary.js';
 import { Toaster } from './components/ui/toaster.js';
 import { TooltipProvider } from './components/ui/tooltip.js';
 import { I18nProvider } from './i18n/provider.js';
@@ -30,6 +37,11 @@ import { ACTIVITY_PATH } from './search/activity-href.js';
 import { SETTINGS_HREF } from './settings/settings-href.js';
 import { LegacyModelRoutingRedirect, SettingsRedirect } from './settings/settings-redirect.js';
 
+function RouteBoundary({ children }: { children: ReactNode }) {
+  const { pathname, search } = useLocation();
+  return <SubtreeErrorBoundary resetKey={`${pathname}${search}`}>{children}</SubtreeErrorBoundary>;
+}
+
 const PAGE_ROUTES: RouteObject[] = [
   { path: '/app', element: <BoardPage /> },
   { path: '/app/todo/:id', element: <TodoRedirect /> },
@@ -54,7 +66,10 @@ const PAGE_ROUTES: RouteObject[] = [
   { path: ROUTING_SETTINGS_HREF, element: <SettingsRedirect section="work-routing" /> },
   { path: `${SETTINGS_HREF}/:section?`, element: null },
   { path: '*', element: <Navigate to="/app" replace /> },
-];
+].map((route) => ({
+  ...route,
+  element: route.element === null ? null : <RouteBoundary>{route.element}</RouteBoundary>,
+}));
 
 export const router = createBrowserRouter([
   {

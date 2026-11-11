@@ -12,7 +12,7 @@
 - Keep GitOps, MCP and LLM provider access behind `apps/daemon/src/backend/`; the one exception is the in-server Coordinator runtime, `apps/server/src/coordinator/runtime/` (D114). Check the seam before moving files or adding dependencies.
 - Never kill another lane's processes; inspect the PID, command and working directory before stopping a process you started.
 - Do not set `TMPDIR` without `CAIRN_HEAVY_SLOTS_DIR`; all lanes must share the heavy-work slot directory.
-- Codex security review is no longer part of the merge route (ian, 2026-11-06): `review-gate` requires the code review only. The security-surface lists below still mark protected paths for routing and ownership.
+- A security-surface PR enters the merge queue with every other green PR (ian, 2026-11-11). Before merging it, run `/security-review`; fix confirmed findings, or record unfixed ones with reasons in Risk. Agents merge it once required CI passes on the head and the Codex cloud review has no unresolved P0/P1. Path class does not add `coordinator-hold`. `review-gate` requires that code review only. `pr-evidence` requires the head-bound disposition line in Merge routes.
 
 Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalEntryAuth` lists in `packages/shared/merge-gate-paths.json`, the one source for protected and auto-merge paths; `apps/server/test/merge-gate-paths-json.test.ts` fails when this list differs):
 
@@ -36,15 +36,15 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 
 ## Merge routes
 
-- Required CI checks must pass on the PR's current head before an agent enables merge; a local pass does not substitute for CI.
-- Agents may enable merge only when `.claude/workflows/pr-gate.js` returns go with `mergedBy: 'auto-merge'`. Protected-path PRs enter the merge queue with every other green PR. Never merge or arm auto-merge on a PR labelled `coordinator-hold`.
+- Required CI checks must pass on the PR's current head before an agent enables merge, and the Codex cloud review on that head must have no unresolved P0/P1; a local pass does not substitute for CI.
+- Agents may enable merge only when `.claude/workflows/pr-gate.js` returns go with `mergedBy: 'auto-merge'`. Protected-path PRs enter the merge queue with every other green PR, including security surfaces and PRs that used to be owner-routed. Path class does not add `coordinator-hold` and does not keep a PR on ian's route. A security surface also needs `/security-review` findings fixed or recorded in Risk, as a line outside fenced code: `Security review (<40-hex head>): fixed` or `Security review (<40-hex head>): recorded`. `pr-evidence` fails without that line, and the queue already requires `pr-evidence`. Never merge or arm auto-merge on a PR labelled `coordinator-hold`.
 - ian may admin-merge. When ian authorizes a named PR on his route in chat, an agent may merge it with `gh pr merge <n> --admin --squash`, whoever opened it, once every required check passes on the current head, `review-gate` included, and the PR body has no unchecked task. Without that per-PR authorization, agents never use `--admin`.
 - The eval ruler is protected so no PR can edit what judges it: `integration/eval/**`, `.claude/hillclimb/**`, the trajectory exporter, its outcome fields and the pack schema (the eval globs in `packages/shared/merge-gate-paths.json`).
 - Agents decide by their own recommendation, say what they chose and why in chat, and continue; ask ian for payments, credentials, intended-behavior or design changes, and decisions explicitly routed to him, and put `coordinator-hold` on the PR while that decision is pending.
 - Before asking ian about a PR with auto-merge armed, disarm it with `gh pr merge <n> --disable-auto`.
 - A PR labelled `coordinator-hold` neither queues nor merges, keeps `pr-evidence` red and has auto-merge disarmed: the coordinator asked for changes or a person's decision is pending. The session that owns it keeps the label on until it has pushed the requested work or ian gave the decision in chat, then asks the coordinator to remove it.
 - Follow `.claude/skills/pr-cairn/SKILL.md` for PR creation and merge mechanics, and `docs/ops/agent-bot-identity.md` for bot versus human identity and merge methods.
-- PRs that `.mergify.yml` admits enter the Mergify merge queue automatically once the `review-gate` check (the Codex cloud review) and `merge-route` pass; stop there and never `gh pr merge` them. Path class does not keep a PR on ian's route.
+- PRs that `.mergify.yml` admits enter the Mergify merge queue automatically once the `review-gate` check (the Codex cloud review) and `merge-route` pass; stop there and never `gh pr merge` them. Path class does not keep a PR on ian's route. A `cairnwright[bot]` author uses the bot queue under the same admission.
 
 ## How to work
 
@@ -62,7 +62,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - UI work under `apps/web/src`: read `apps/web/DESIGN-RULES.md` first (checkable rules), then `apps/web/DESIGN.md` (full reference). Write the brief from `.claude/skills/design-cairn/SKILL.md`, open the reference shots for the surface in `docs/design/references/`, and show a reference-versus-ours row per state in the PR. A new feature on a main surface needs a page draft before code.
 - Verify mechanism changes on compiled output, runtime logs or snapshots; use `.claude/skills/verify-cairn/SKILL.md` for acceptance guidance.
 - Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) reviews every push through the review gate, and that review on the PR head is the required review. Fix confirmed findings, and record unfixed findings with reasons in Risk.
-- Protected paths require Codex cloud code review on the PR head. Canonical security surfaces are covered by that review: no separate security approval is required while the 2026-11-06 ruling holds. Docs-only changes outside protected paths skip code review.
+- Protected paths require Codex cloud code review on the PR head, with no unresolved P0/P1. A security surface also needs `/security-review` findings fixed or recorded in Risk before merge; that does not send the PR to ian. Docs-only changes outside protected paths skip code review.
 - Keep each PR to one self-contained change: aim for under 400 changed lines outside generated files and split anything past 1000 before review. The `pr-size` check fails a PR above 3000 changed lines outside `GENERATED_PATHS` in `scripts/pr-size.mjs`. Measured on 81 merged PRs: median open-to-merge is 18 minutes under 200 lines and 434 minutes over 3000.
 - Branch every PR from `origin/main`. Do not open a PR whose base is another open PR's branch: dependent work waits until its base merges, then branches from the updated `main`. Until then, keep it on a local branch.
 - Design first for a change to persisted state, a wire or step protocol, or concurrency: write a one-page design (states, transitions, every path that reads or writes the state, the behavior on each failure) and get it reviewed by the coordinator before writing code.
@@ -84,7 +84,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - A profile holds no secret value: server names, transports, commands, URLs and environment-variable names only. A strict schema rejects anything else, and a new field needs a reason it cannot carry a credential.
 - A renderer that does not understand a field, or a harness version whose schema is unverified, stops the apply and names the field. Silent loss counts as a defect.
 - Apply never overwrites content it does not manage, never resolves a conflict by recency, and reads the file back after writing.
-- Any machine-level manifest or apply path touches `apps/server/src/routes-machine.ts` or `apps/server/src/services/machine*.ts`, which are owner-routed.
+- Any machine-level manifest or apply path touches `apps/server/src/routes-machine.ts` or `apps/server/src/services/machine*.ts`. Those are security surfaces and merge under Merge routes.
 
 ## Code Review Rules
 

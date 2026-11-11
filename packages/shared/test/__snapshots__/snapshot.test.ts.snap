@@ -8563,6 +8563,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "harness_profile",
   "composer_draft",
   "thread_pr",
+  "thread_conversation",
+  "thread_entry",
   "coordinator_conversation",
   "coordinator_entry",
   "coordinator_input",
@@ -9833,6 +9835,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "browserOverride": {
+      "type": [
+        "boolean",
+        "null",
+      ],
+    },
     "capabilities": {
       "anyOf": [
         {
@@ -10077,6 +10085,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         "manual",
       ],
       "type": "string",
+    },
+    "desktopOverride": {
+      "type": [
+        "boolean",
+        "null",
+      ],
     },
     "enabledRuntimes": {
       "items": {
