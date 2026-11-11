@@ -18,7 +18,7 @@ export interface SettingsNavItem {
   id: string;
   label: string;
   Icon: ComponentType<SVGProps<SVGSVGElement>>;
-  badge?: string;
+  note?: string;
 }
 
 export interface SettingsNavGroup {
@@ -55,6 +55,8 @@ export function SettingsNav({
                   to={hrefFor(item.id)}
                   replace
                   data-settings-section={item.id}
+                  title={item.note}
+                  aria-description={item.note}
                   aria-current={current === item.id ? 'page' : undefined}
                   className={cn(
                     'flex h-7.75 flex-none items-center gap-3.5 rounded-(--radius-control) px-2.5 text-ui no-underline transition-colors duration-(--dur-fast) outline-none focus-visible:ring-2 focus-visible:ring-ring',
@@ -65,16 +67,6 @@ export function SettingsNav({
                 >
                   <item.Icon aria-hidden className="size-5 flex-none" strokeWidth={1.75} />
                   <span className="min-w-0 flex-auto truncate">{item.label}</span>
-                  {item.badge !== undefined && (
-                    <span
-                      className={cn(
-                        'text-caption',
-                        current === item.id ? 'text-foreground' : 'text-content-secondary',
-                      )}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
                 </Link>
               ))}
             </div>
@@ -153,6 +145,8 @@ export function SettingsTabStrip({
             to={hrefFor(item.id)}
             replace
             data-settings-section={item.id}
+            title={item.note}
+            aria-description={item.note}
             aria-current={current === item.id ? 'page' : undefined}
             className={cn(
               'flex h-7.75 flex-none items-center gap-1.5 rounded-(--radius-control) px-2.5 text-ui whitespace-nowrap text-foreground no-underline outline-none focus-visible:ring-2 focus-visible:ring-ring',
@@ -160,16 +154,6 @@ export function SettingsTabStrip({
             )}
           >
             {item.label}
-            {item.badge !== undefined && (
-              <span
-                className={cn(
-                  'text-caption',
-                  current === item.id ? 'text-foreground' : 'text-content-secondary',
-                )}
-              >
-                {item.badge}
-              </span>
-            )}
           </Link>
         ))}
       </div>

@@ -28,6 +28,7 @@ test('the pill fades after a few seconds and the mark stays', async ({ page }) =
   await page.goto('/app?scenario=chief-mark-run');
   const pill = page.getByTestId('chief-status-pill');
   await expect(pill).toHaveAttribute('data-visible', 'true');
+  expect(await pill.evaluate((el) => el.getBoundingClientRect().height)).toBe(34);
   await expect(pill).toHaveAttribute('data-visible', 'false', { timeout: 8000 });
   await expect(page.getByTestId('chief-status-mark').locator('path')).toHaveAttribute('d', /^M/);
   await page.getByTestId('chief-status-mark').locator('svg').hover();

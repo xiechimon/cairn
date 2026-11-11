@@ -29,7 +29,7 @@ export const DIALOG_PANEL_CLS = `grid max-h-[calc(100vh-64px)] max-w-none gap-0 
 export const DIALOG_HEAD_CLS = 'flex items-start gap-3 pt-4 pr-13 pb-1 pl-4';
 
 export const DIALOG_TITLE_CLS =
-  'font-heading text-heading leading-[1.4] font-title text-foreground';
+  'font-heading text-heading leading-[1.4] font-semibold text-foreground';
 
 export const DIALOG_SUBTITLE_CLS = 'mt-0.5 text-meta text-content-tertiary';
 
@@ -226,7 +226,10 @@ export function DialogShell({
             </div>
           )}
         </div>
-        <div data-testid="dialog-body" className={DIALOG_BODY_CLS}>
+        <div
+          data-testid="dialog-body"
+          className={cn(DIALOG_BODY_CLS, (footer != null || hint != null) && 'pb-1')}
+        >
           {children}
         </div>
         {(footer != null || hint != null) && <DialogFootRow hint={hint}>{footer}</DialogFootRow>}

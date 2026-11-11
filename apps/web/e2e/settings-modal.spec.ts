@@ -122,3 +122,12 @@ test('sidebar footer: a green dot and the online count', async ({ page }) => {
   expect(g).toBeGreaterThan(r ?? 0);
   expect(g).toBeGreaterThan(b ?? 0);
 });
+
+test('the machines nav row carries the online count as its description, not as a visible badge', async ({
+  page,
+}) => {
+  await page.goto('/app/settings/appearance?scenario=home-c');
+  const row = settings(page).locator('nav [data-settings-section="machines"]');
+  await expect(row).toHaveText('机器');
+  await expect(row).toHaveAttribute('aria-description', '1/2 台电脑在线');
+});

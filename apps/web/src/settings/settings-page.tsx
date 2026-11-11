@@ -175,7 +175,8 @@ const SECTIONS = GROUPS.flatMap((group) => group.sections);
 
 const SETTINGS_TABS_QUERY = '(max-width: 767px)';
 
-function useMachineBadge(): string | undefined {
+function useMachineNote(): string | undefined {
+  const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const { live, teamId } = useLiveData();
   const machinesQ = useMachines(teamId, live);
@@ -183,7 +184,10 @@ function useMachineBadge(): string | undefined {
     ? (machinesQ.data ?? []).map((m) => m.online)
     : (resolveScenario(searchParams).resources?.machines ?? []).map((m) => m.online === true);
   if (rows.length === 0) return undefined;
-  return `${rows.filter(Boolean).length}/${rows.length}`;
+  return t('{online}/{total} 台电脑在线', {
+    online: rows.filter(Boolean).length,
+    total: rows.length,
+  });
 }
 
 const TABBABLE =
@@ -232,7 +236,7 @@ export function SettingsDialog({
   const navigate = useNavigate();
   const tabs = useMediaQuery(SETTINGS_TABS_QUERY);
   const [matchLabel, setMatchLabel] = useState<string | null>(null);
-  const machineBadge = useMachineBadge();
+  const machineNote = useMachineNote();
   const titleId = useId();
   const section = SECTIONS.find((s) => s.id === sectionParam) ?? null;
   const shown = section ?? SECTIONS[0];
@@ -279,7 +283,7 @@ export function SettingsDialog({
       id: s.id,
       label: t(s.label),
       Icon: s.Icon,
-      ...(s.id === 'machines' && machineBadge !== undefined ? { badge: machineBadge } : {}),
+      ...(s.id === 'machines' && machineNote !== undefined ? { note: machineNote } : {}),
     })),
   }));
   const searchField = (

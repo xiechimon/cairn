@@ -25,7 +25,7 @@ const textBox = async (page: Page, text: string) => {
   return box;
 };
 
-test('text gaps match the approved chat draft (32px between turns either way) and hidden actions take no height', async ({
+test('text gaps match the reference recording (39px between turns either way) and hidden actions take no height', async ({
   page,
 }) => {
   await mockHistory(page);
@@ -38,7 +38,7 @@ test('text gaps match the approved chat draft (32px between turns either way) an
     gaps.push(b.y - (a.y + a.height));
   }
   for (const [index, gap] of gaps.entries()) {
-    const target = 32;
+    const target = 39;
     expect(Math.abs(gap - target), `gap after ${TEXTS[index]} is ${gap}`).toBeLessThanOrEqual(5);
   }
   const older = page.getByTestId('home-c').getByTestId('chief-msg').first();

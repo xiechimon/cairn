@@ -128,6 +128,13 @@ test('code expand opens a dialog with the full code, its own copy and Done, Esca
   await expect
     .poll(() => dialog.evaluate((el) => el.getBoundingClientRect().width))
     .toBe(890);
+  const gap = await dialog.evaluate((el) => {
+    const body = el.querySelector('[data-testid="md-code-dialog-body"]')!.getBoundingClientRect();
+    const done = el.querySelector('[data-testid="md-code-done"]')!.getBoundingClientRect();
+    return done.top - body.bottom;
+  });
+  expect(gap).toBe(16);
+  await expect(dialog.getByRole('heading', { name: 'Sh 代码' })).toHaveCSS('font-weight', '600');
   await dialog.getByTestId('md-code-dialog-copy').click();
   await expect(dialog.getByTestId('md-code-done')).toHaveText('完成');
   await page.keyboard.press('Escape');

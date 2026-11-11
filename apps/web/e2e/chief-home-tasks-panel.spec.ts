@@ -25,7 +25,7 @@ test('the Tasks toggle carries the needs-you count and opens sections in Duet or
   await expect(sections.nth(1)).toContainText('Connect a Claude subscription token');
   await expect(sections.nth(2)).toContainText('Orb canary round 7');
   await expect(sections.nth(2)).toContainText('Rerun the relay probe');
-  await expect(panel(page).getByRole('tab')).toHaveText([/进行中/, /接下来/, /定时/, /已完成/]);
+  await expect(panel(page).getByRole('tab')).toHaveText(['进行中', '接下来', '定时', '已完成']);
   await expect(panel(page)).not.toContainText('Sidebar status groups');
 
   await page.reload();

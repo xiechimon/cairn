@@ -131,8 +131,8 @@ test('bubble / footer keep their own geometry, replies carry no avatar column', 
       userFooterAlign: getComputedStyle(userFooter).justifyContent,
     };
   });
-  expect(geo.bubbleH).toBeGreaterThanOrEqual(32);
-  expect(geo.bubbleH).toBeLessThanOrEqual(33);
+  expect(geo.bubbleH).toBeGreaterThanOrEqual(36);
+  expect(geo.bubbleH).toBeLessThanOrEqual(37);
   expect(geo.bubbleFont).toBe('14px');
   expect(geo.avatars).toBe(0);
   expect(geo.footerPad).toBe('0px');

@@ -189,7 +189,7 @@ export function StatusMarkFloat({
         data-testid="chief-status-pill"
         data-visible={visible}
         className={cn(
-          '-mt-1 flex items-center gap-2 rounded-full bg-popover px-3 py-1 text-meta leading-5 font-medium whitespace-nowrap text-foreground shadow-(--e2) transition-[opacity,transform] duration-(--dur-fast) ease-out motion-reduce:transition-none',
+          '-mt-1 flex items-center gap-2 rounded-full bg-popover px-3 py-1.75 text-meta leading-5 font-medium whitespace-nowrap text-foreground shadow-(--e2) transition-[opacity,transform] duration-(--dur-fast) ease-out motion-reduce:transition-none',
           !visible && '-translate-y-1 opacity-0',
         )}
       >

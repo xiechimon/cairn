@@ -1,9 +1,10 @@
 'use client';
 
-import { CircleCheck, Info, LoaderCircle, OctagonX, TriangleAlert } from 'lucide-react';
+import { Info, LoaderCircle, OctagonX, TriangleAlert, X } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { Toaster as Sonner, type ToasterProps, toast } from 'sonner';
+import { useI18n } from '../../i18n/provider.js';
 
 export function toastError(title: string, error: unknown): void {
   const reason = error instanceof Error && error.message !== '' ? error.message : null;
@@ -32,19 +33,22 @@ function useSonnerTheme(): ToasterProps['theme'] {
 
 function Toaster({ ...props }: ToasterProps) {
   const theme = useSonnerTheme();
+  const { t } = useI18n();
   return (
     <Sonner
       theme={theme}
+      closeButton
       position="top-center"
       offset={{ top: 16 }}
       mobileOffset={{ top: 66, left: 16, right: 16 }}
       className="group"
       icons={{
-        success: <CircleCheck className="size-5 text-running-text" />,
+        success: <Info className="size-5" />,
         info: <Info className="size-5" />,
         warning: <TriangleAlert className="size-5 text-(--badge-attention)" />,
         error: <OctagonX className="size-5 text-destructive" />,
         loading: <LoaderCircle className="size-5 animate-spin motion-reduce:animate-none" />,
+        close: <X className="size-5" />,
       }}
       style={
         {
@@ -55,11 +59,17 @@ function Toaster({ ...props }: ToasterProps) {
         } as CSSProperties
       }
       toastOptions={{
+        closeButtonAriaLabel: t('关闭'),
         classNames: {
-          title: 'text-ui font-medium',
+          toast: 'grid! grid-cols-[auto_1fr_auto]! items-center! gap-x-2! gap-y-2!',
+          icon: 'col-start-1 row-start-1 m-0!',
+          content: 'col-start-2 row-start-1',
+          title: 'text-ui font-normal!',
           description: 'text-meta text-content-secondary',
           actionButton:
-            'bg-transparent! px-2! text-ui! font-medium! text-(--card-button)! hover:bg-accent-hover!',
+            'col-start-2 row-start-2 ms-0! h-7! justify-self-start rounded-lg! bg-secondary! px-2.5! text-ui! font-normal! text-foreground! hover:bg-muted!',
+          closeButton:
+            'static! col-start-3 row-start-1 size-7! transform-none! rounded-lg! border-0! bg-transparent! text-foreground! hover:bg-muted!',
         },
       }}
       {...props}

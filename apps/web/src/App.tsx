@@ -3,7 +3,7 @@ import { createBrowserRouter, Navigate, type RouteObject, RouterProvider } from 
 import { ApiProvider, LiveDataBridge } from './api/provider.js';
 import { sidePanelOpen } from './board/app-sidebar.js';
 import { THREAD_PARAM } from './board/thread-copy.js';
-import { usePanelDocked } from './board/use-narrow.js';
+import { useNarrow, usePanelDocked } from './board/use-narrow.js';
 import { ChiefRoot } from './chief/chief-root.js';
 import { Toaster } from './components/ui/toaster.js';
 import { TooltipProvider } from './components/ui/tooltip.js';
@@ -74,19 +74,23 @@ export const router = createBrowserRouter([
 ]);
 
 const PANEL_TOAST_INSET = 16;
-const THREAD_COMPOSER_CLEARANCE = 112;
+const COMPOSER_CLEARANCE = 112;
 
 function PanelAwareToaster() {
   const location = useSyncExternalStore(router.subscribe, () => router.state.location);
   const docked = usePanelDocked();
-  if (!docked || !sidePanelOpen(location.pathname, location.search)) return <Toaster />;
-  const thread = new URLSearchParams(location.search).get(THREAD_PARAM) !== null;
+  const narrow = useNarrow();
+  if (narrow) return <Toaster />;
+  const panelOnly =
+    docked &&
+    sidePanelOpen(location.pathname, location.search) &&
+    new URLSearchParams(location.search).get(THREAD_PARAM) === null;
   return (
     <Toaster
       position="bottom-right"
       offset={{
         right: PANEL_TOAST_INSET,
-        bottom: thread ? THREAD_COMPOSER_CLEARANCE : PANEL_TOAST_INSET,
+        bottom: panelOnly ? PANEL_TOAST_INSET : COMPOSER_CLEARANCE,
       }}
     />
   );

@@ -258,7 +258,12 @@ function SettingsNavSpecimen() {
               heading: 'Models & accounts',
               items: [
                 { id: 'providers', label: 'Providers', Icon: Layers },
-                { id: 'machines', label: 'Machines', Icon: Server, badge: '4/5' },
+                {
+                  id: 'machines',
+                  label: 'Machines',
+                  Icon: Server,
+                  note: '4 of 5 computers online',
+                },
               ],
             },
           ]}

@@ -167,7 +167,8 @@ test('Rename saves the new name and keeps the input when the save fails', async 
   await openMenu(page, 'dogfood-sandbox');
   await page.getByRole('menuitem', { name: '重命名' }).click();
   const dialog = page.getByRole('dialog', { name: '重命名项目' });
-  await dialog.getByRole('textbox').fill('sandbox');
+  await expect(dialog.getByText('项目名称', { exact: true })).toBeVisible();
+  await dialog.getByRole('textbox', { name: '项目名称' }).fill('sandbox');
   await dialog.getByRole('button', { name: '保存' }).click();
   await expect(page.getByText('无法重命名项目。')).toBeVisible();
   await expect(dialog.getByRole('textbox')).toHaveValue('sandbox');

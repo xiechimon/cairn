@@ -78,7 +78,7 @@ test('sections switch in place, keep their own params, and close goes back to wh
   await expect(settings(page).getByTestId('provider-instance')).toHaveCount(3);
   await navItem(page, 'machines').click();
   await expect(navItem(page, 'machines')).toHaveAttribute('aria-current', 'page');
-  await expect(navItem(page, 'machines')).toContainText('4/5');
+  await expect(navItem(page, 'machines')).toHaveAttribute('aria-description', '4/5 台电脑在线');
   await settings(page).getByRole('button', { name: '关闭设置' }).click();
   await expect(page).toHaveURL(/\/app\?scenario=providers-fleet$/);
 });

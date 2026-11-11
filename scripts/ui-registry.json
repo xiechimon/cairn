@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "58601141bbc0ba5b5727a3858240af3ec53db953",
+    "sha": "ce58c5e9195ae97452d7abe19ae22915f9777c73",
     "date": "2026-11-11"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -70,7 +70,7 @@
     "dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "Paper dialog adapter (apps/web/DESIGN.md 弹窗与菜单) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers. headerAction puts one quiet header action (memory Delete) left of the close button in regular faces.",
-      "hash": "d4b9ed6113ed2eab387afa1e912dfbaf125796c26dd5d20e961d729621345a31"
+      "hash": "c14b46fe9401a80a7eeab6dc4d33d040c079dd3862a59ca803f677bdbba95275"
     },
     "dialog.tsx": {
       "kind": "registry",
@@ -212,7 +212,7 @@
     "toaster.tsx": {
       "kind": "adapter",
       "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts). The official recipe's lucide status icons, tinted with the status tokens, and the popover radius. #2565: toasts anchor top-center (below the narrow menu button on phones), so they never cover navigation or the composer.",
-      "hash": "0070c5cc670d5bc9337272c7e3bb24658648cc1f1b5ab99f917cb77519f8c9ee"
+      "hash": "7528d3707da13872ef4c2ba4ac7f32719699e1cf6ab8f8e20e30498b77566ee1"
     },
     "tooltip.tsx": {
       "kind": "registry",

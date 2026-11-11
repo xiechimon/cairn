@@ -96,10 +96,10 @@ const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
 
 const SCROLLER_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
 
-const USER_ROW_CLS = 'mt-5';
+const USER_ROW_CLS = 'mt-6';
 const RUN_ROW_CLS = 'mt-1';
 const EVENT_ROW_CLS = 'mt-5';
-const REPLY_ROW_CLS = 'mt-5';
+const REPLY_ROW_CLS = 'mt-6';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
@@ -464,10 +464,11 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               <div className="group/reply-block relative max-w-full" data-slot="reply-block">
                 <UserMessageBubble
                   data-testid="chief-bubble"
+                  tail={!joinsNext}
                   data-md={shown != null ? '' : undefined}
                   {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
                   {...highlight(item.id)}
-                  className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''} ${joinsNext ? 'rounded-br-(--radius-bubble)' : ''}`}
+                  className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''}`}
                 >
                   {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
                   {shown != null ? <ChatMarkdown text={bubbleText} /> : bubbleText}

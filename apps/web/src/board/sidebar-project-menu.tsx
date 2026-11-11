@@ -13,7 +13,7 @@ import {
   StickyNote,
   Trash2,
 } from 'lucide-react';
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import { SIDEBAR_ROW_ACTION } from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
 import {
@@ -68,6 +68,7 @@ function NameDialog({
   const { t } = useI18n();
   const [name, setName] = useState(initial);
   const [pending, setPending] = useState(false);
+  const fieldId = useId();
   const trimmed = name.trim();
   const close = () => {
     setName(initial);
@@ -109,13 +110,17 @@ function NameDialog({
       }
     >
       <form id={NAME_FORM} onSubmit={(event) => void submit(event)}>
-        <Input
-          autoFocus
-          aria-label={label}
-          placeholder={label}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
+        <div className="flex flex-col gap-2">
+          <label htmlFor={fieldId} className="text-ui text-foreground">
+            {label}
+          </label>
+          <Input
+            id={fieldId}
+            autoFocus
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </div>
       </form>
     </DialogShell>
   );

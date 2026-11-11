@@ -325,13 +325,7 @@ export function TasksPanel({
           onChange={setTab}
           options={[
             { value: 'active', label: t('进行中') },
-            {
-              value: 'next',
-              label:
-                groups.up_next.length > 0
-                  ? t('接下来 {n}', { n: groups.up_next.length })
-                  : t('接下来'),
-            },
+            { value: 'next', label: t('接下来') },
             { value: 'scheduled', label: t('定时') },
             { value: 'resolved', label: t('已完成') },
           ]}

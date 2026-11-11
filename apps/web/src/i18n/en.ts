@@ -1601,6 +1601,7 @@ export const EN: Record<string, string> = {
   还没上报: 'Not reported yet',
   模型列表: 'Models',
   '已安装，登录状态未知': 'Installed, sign-in unknown',
+  '{online}/{total} 台电脑在线': '{online} of {total#1 computer|# computers} online',
   '{online} 台在线': '{online} online',
   '{online} 在线 · {offline} 离线': '{online} online · {offline} offline',
   '{online} 台在线 · {offline} 台离线（{names}）': '{online} online · {offline} offline ({names})',
@@ -1946,7 +1947,6 @@ export const EN: Record<string, string> = {
   '跟 Coordinator 说一件事，它会在这里出现。':
     'Tell the Coordinator about something and it shows up here.',
   '给 Coordinator 发消息': 'Message the Coordinator',
-  '接下来 {n}': 'Up next {n}',
   接下来没有安排: 'Nothing is lined up next',
   现在没有进行中的任务: 'Nothing is in progress right now',
   还没有完成的任务: 'No finished tasks yet',

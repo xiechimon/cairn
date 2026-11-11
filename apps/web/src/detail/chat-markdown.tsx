@@ -467,7 +467,7 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
         }
       >
         <div
-          className="relative rounded-(--cds-radius-xl) bg-secondary"
+          className="relative rounded-(--cds-radius-xl) border border-border bg-secondary"
           data-testid="md-code-dialog-body"
         >
           <CopyCodeButton
@@ -487,7 +487,7 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
 }
 
 export const REPLY_BUBBLE_CLS =
-  'w-fit max-w-[min(100%,var(--container-reply-bubble))] rounded-(--radius-reply) bg-(--reply-bubble-fill) px-3.5 py-1.5';
+  'w-fit max-w-[min(100%,var(--container-reply-bubble))] rounded-(--radius-reply) bg-(--reply-bubble-fill) px-3.5 py-1.75';
 
 function ReplyGroup({
   group,

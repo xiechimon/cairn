@@ -20,7 +20,7 @@ test('every top-level block of a reply is its own grey bubble; tables and code a
   const bubble = message.getByTestId('chief-reply-bubble').first();
   await expect(bubble).toHaveCSS('border-top-left-radius', '16px');
   await expect(bubble).toHaveCSS('padding-left', '14px');
-  await expect(bubble).toHaveCSS('padding-top', '6px');
+  await expect(bubble).toHaveCSS('padding-top', '7px');
   const boxes = await blocks.evaluateAll((els) => els.map((el) => el.getBoundingClientRect()));
   for (let i = 1; i < boxes.length; i++) {
     const prev = boxes[i - 1];
