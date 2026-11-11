@@ -1477,3 +1477,10 @@ export const threadEntry = sqliteTable(
   },
   (t) => [index('thread_entry_thread_idx').on(t.threadId, t.conversationId)],
 );
+
+export const jobApplication = sqliteTable('job_application', {
+  userId: text('userId')
+    .primaryKey()
+    .references(() => user.id),
+  document: json<Record<string, unknown>>('document').notNull(),
+});
