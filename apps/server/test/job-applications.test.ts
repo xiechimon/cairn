@@ -268,6 +268,22 @@ describe('job application server gate', () => {
     expect(JSON.stringify(previewValues(db, attempt.id))).not.toContain('prefilled');
   });
 
+  test('repeated query values in a different order are a different posting', () => {
+    const { db, userId, teamId } = world();
+    profile(db, userId, teamId);
+    allow(db, userId);
+    const hashFor = (url: string) => {
+      const attempt = openAttempt(db, userId);
+      beginBrowsing(db, attempt.id, HOST, AT);
+      return buildJobPreview(db, attempt.id, { ...FORM, url }, AT).hash;
+    };
+    const forward = hashFor('https://board.example/apply?job=123&job=456');
+    expect(hashFor('https://board.example/apply?job=456&job=123')).not.toBe(forward);
+    expect(hashFor('https://board.example/apply?page=1&job=123&job=456')).toBe(
+      hashFor('https://board.example/apply?job=123&page=1&job=456'),
+    );
+  });
+
   test('ask_user push failure does not confirm', () => {
     const row = world();
     profile(row.db, row.userId, row.teamId);

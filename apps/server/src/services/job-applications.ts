@@ -260,10 +260,9 @@ function canonicalUrl(raw: string): { url: string; host: string; queryDigest: st
     if (parsed.protocol !== 'https:' || parsed.username !== '' || parsed.password !== '')
       return null;
     const queryDigest = sha256Hex(
-      [...parsed.searchParams.entries()]
-        .sort((a, b) => a[0].localeCompare(b[0]) || a[1].localeCompare(b[1]))
-        .map(([key, value]) => `${key}=${value}`)
-        .join('&'),
+      JSON.stringify(
+        [...parsed.searchParams.entries()].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)),
+      ),
     );
     parsed.search = '';
     parsed.hash = '';
