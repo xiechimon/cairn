@@ -1,10 +1,18 @@
 import { z } from 'zod';
 import { claudeLoginSchema } from './claude-login.js';
-import { recordId } from './common.js';
+import { epochMs, recordId } from './common.js';
 import { machineCapabilitiesSchema } from './machine-capabilities.js';
 
 export const MACHINE_RUNTIMES = ['pi', 'claude-code', 'gemini'] as const;
 export type MachineRuntime = (typeof MACHINE_RUNTIMES)[number];
+
+export const machineRunningThreadSchema = z.object({
+  threadId: recordId,
+  title: z.string(),
+  projectId: recordId,
+  startedAt: epochMs,
+});
+export type MachineRunningThread = z.infer<typeof machineRunningThreadSchema>;
 
 export const machineRecordSchema = z.object({
   id: recordId,
@@ -21,6 +29,7 @@ export const machineRecordSchema = z.object({
   concurrencyRange: z.object({ min: z.number().int(), max: z.number().int() }).optional(),
   concurrencySource: z.enum(['measured', 'estimate', 'manual']).optional(),
   runningSteps: z.number().int().optional(),
+  running: z.array(machineRunningThreadSchema).optional(),
   capabilities: machineCapabilitiesSchema.nullish(),
   claudeLogin: claudeLoginSchema.optional(),
 });
