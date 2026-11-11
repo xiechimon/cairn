@@ -1,9 +1,4 @@
 import { execFileSync } from 'node:child_process';
-import { createRequire } from 'node:module';
-
-const { parse: parseYaml } = createRequire(
-  new URL('../../packages/shared/package.json', import.meta.url),
-)('yaml');
 
 const shaPattern = /^[a-f0-9]{40}$/;
 
@@ -84,18 +79,14 @@ function originalNumbers(pull) {
   for (const match of body.matchAll(/Merge of #(\d+(?:\s*,\s*#\d+)*)/gi)) {
     found.push(...listedNumbers(match[1]));
   }
-  const blockAt = body.search(/^pull_requests:/m);
-  if (blockAt >= 0) {
-    try {
-      const doc = parseYaml(body.slice(blockAt));
-      const list = doc?.pull_requests;
-      if (Array.isArray(list)) {
-        for (const item of list) {
-          if (Number.isInteger(item?.number)) found.push(item.number);
-        }
-      }
-    } catch {
-      return [...new Set(found)];
+  const lines = body.split(/\r?\n/);
+  const header = lines.findIndex((line) => line.trim() === 'pull_requests:');
+  if (header >= 0) {
+    for (const line of lines.slice(header + 1)) {
+      if (line.trim() === '') continue;
+      const item = /^\s*-\s+number:\s*(\d+)\s*$/.exec(line);
+      if (!item) break;
+      found.push(Number(item[1]));
     }
   }
   return [...new Set(found)];
