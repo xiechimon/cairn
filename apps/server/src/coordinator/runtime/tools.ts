@@ -5,6 +5,7 @@ import {
   COMPUTER_REMOTE_TOOLS,
   coordinatorToolSourceId,
   type MachineAskBody,
+  projectDeleteAction,
   type RemoteToolDef,
 } from '@cairn/shared';
 import {
@@ -183,10 +184,23 @@ export function coordinatorToolsExtension(
     storeId?: () => string | undefined;
   } = {},
 ) {
+  const actionTools: RemoteToolDef[] = [
+    {
+      name: projectDeleteAction.toolName,
+      description: 'Propose deleting a project. The owner confirms before the project is deleted.',
+      parameters: {
+        type: 'object',
+        properties: {
+          projectId: { type: 'string', description: 'Project to delete' },
+        },
+        required: ['projectId'],
+      },
+    },
+  ];
   const defs =
     options.routerTools === false
-      ? [...CHIEF_REMOTE_TOOLS, ...COMPUTER_REMOTE_TOOLS]
-      : [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS, ...COMPUTER_REMOTE_TOOLS];
+      ? [...CHIEF_REMOTE_TOOLS, ...COMPUTER_REMOTE_TOOLS, ...actionTools]
+      : [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS, ...COMPUTER_REMOTE_TOOLS, ...actionTools];
   return defineExtension({
     name: 'cairn-coordinator-tools',
     hooks: [

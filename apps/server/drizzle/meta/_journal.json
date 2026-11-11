@@ -1018,24 +1018,24 @@
       "breakpoints": true
     },
     {
-      "idx": 149,
-      "version": "6",
-      "when": 1794419742127,
-      "tag": "0149_action_journal",
-      "breakpoints": true
-    },
-    {
       "idx": 150,
       "version": "6",
-      "when": 1794420915522,
-      "tag": "0150_action_proposal",
+      "when": 1794422299798,
+      "tag": "0150_action_journal",
       "breakpoints": true
     },
     {
       "idx": 151,
       "version": "6",
-      "when": 1794421777502,
-      "tag": "0151_hosted_cleanup_outbox",
+      "when": 1794422382015,
+      "tag": "0151_action_proposal",
+      "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "6",
+      "when": 1794422382016,
+      "tag": "0152_hosted_cleanup_outbox",
       "breakpoints": true
     }
   ]
