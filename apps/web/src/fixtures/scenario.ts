@@ -1,5 +1,6 @@
 import { accountsDefault, accountsEmpty } from './accounts.js';
 import { activityFixture, activityManyFixture } from './activity.js';
+import { CHIEF_MARK_SCENARIOS } from './chief-mark.js';
 import { demoFixture } from './demo.js';
 import {
   agentTodoLive,
@@ -368,6 +369,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'chief-agent-chip': chiefAgentChip,
       'fab-avatar': chiefFabAvatar,
       'fab-avatar-override': chiefFabAvatarOverride,
+      ...CHIEF_MARK_SCENARIOS,
     } as Record<string, FixtureSet>)
   : {};
 
