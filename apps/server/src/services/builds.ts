@@ -1822,18 +1822,7 @@ export async function requestMerge(
   if (!todoRow) throw new NotFoundError(`todo ${row.todoId}`);
   if (todoRow.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
   if (todoRow.output === 'info') throw new HttpError(409, INFO_CARD_MERGE_REFUSAL);
-  const inFlight = deps.db
-    .select({ id: step.id })
-    .from(step)
-    .where(
-      and(
-        eq(step.buildId, buildId),
-        eq(step.kind, 'merge'),
-        inArray(step.status, [...ACTIVE_STEP_STATUSES]),
-      ),
-    )
-    .get();
-  if (inFlight) throw new HttpError(409, '这个构建已有一个合并步在排队或在跑，等它结束再发起');
+  assertNoMergeStepInFlight(deps, buildId);
   const projectRow = projectOfTodo(deps.db, todoRow);
   const shipRoute = projectRow === undefined ? DEFAULT_SHIP_ROUTE : projectShipRouteOf(projectRow);
   if (shipRoute === 'local-merge' && projectRow?.repoKind !== 'local') {
@@ -1909,8 +1898,24 @@ export async function requestMerge(
       configuredBaseBranch: projectRow.baseBranch,
     });
   }
+  if (prompt !== undefined) assertNoMergeStepInFlight(deps, buildId);
   enqueueStep(deps, buildId, 'merge', todoRow.teamId, prompt);
   return { delegated: true };
+}
+
+function assertNoMergeStepInFlight(deps: BuildDeps, buildId: string): void {
+  const inFlight = deps.db
+    .select({ id: step.id })
+    .from(step)
+    .where(
+      and(
+        eq(step.buildId, buildId),
+        eq(step.kind, 'merge'),
+        inArray(step.status, [...ACTIVE_STEP_STATUSES]),
+      ),
+    )
+    .get();
+  if (inFlight) throw new HttpError(409, '这个构建已有一个合并步在排队或在跑，等它结束再发起');
 }
 
 export const INFO_CARD_MERGE_REFUSAL =
