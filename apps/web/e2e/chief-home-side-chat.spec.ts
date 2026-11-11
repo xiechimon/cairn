@@ -57,6 +57,8 @@ test('the panel is resizable by keyboard and by drag, shared with Tasks, and rem
 }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
   await expect(handle(page)).toHaveAttribute('aria-valuenow', '420');
+  await handle(page).hover();
+  await expect(page.locator('[data-slot="side-panel-resize-tip"]')).toHaveText('拖动调宽');
   await handle(page).focus();
   await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('ArrowLeft');

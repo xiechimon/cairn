@@ -35,3 +35,13 @@ export function isUsableTimestamp(ts: number | null | undefined, now: number): t
 export function joinMeta(parts: readonly (string | null | undefined)[]): string {
   return parts.filter((part) => part != null && part !== '').join(' · ');
 }
+
+export function shortDate(ts: number | null | undefined, t: TFunc = zhT): string {
+  if (ts == null || !Number.isFinite(ts) || ts <= 0) return '';
+  const local = new Date(ts + TZ_OFFSET);
+  return t('{mo}月{d}日', {
+    mo: local.getUTCMonth() + 1,
+    d: local.getUTCDate(),
+    monthShort: local.toLocaleString('en', { month: 'short', timeZone: 'UTC' }),
+  });
+}

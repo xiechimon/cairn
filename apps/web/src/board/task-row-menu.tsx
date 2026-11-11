@@ -16,6 +16,7 @@ import {
 } from '../components/ui/dropdown-menu.js';
 import { Input } from '../components/ui/input.js';
 import { toastError } from '../components/ui/toaster.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -134,19 +135,28 @@ export function TaskRowMenu({
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              data-testid="task-row-menu-button"
-              className="size-6 text-content-tertiary pointer-coarse:size-11"
-              aria-label={t('{title} 的菜单', { title: todo.title })}
-            />
-          }
-        >
-          <Ellipsis />
-        </DropdownMenuTrigger>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    data-testid="task-row-menu-button"
+                    className="size-6 text-content-tertiary pointer-coarse:size-11"
+                    aria-label={t('{title} 的菜单', { title: todo.title })}
+                  />
+                }
+              />
+            }
+          >
+            <Ellipsis />
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={8}>
+            {t('更多')}
+          </TooltipContent>
+        </Tooltip>
         <KeyedMenuContent
           align="end"
           sideOffset={4}
@@ -168,13 +178,13 @@ export function TaskRowMenu({
             <Pencil />
             {t('重命名')}
           </KeyedMenuItem>
+          <DropdownMenuSeparator />
           {todo.archivedAt == null && (
             <KeyedMenuItem shortcut="A" data-action="archive" onClick={archive}>
               <Archive />
               {t('归档')}
             </KeyedMenuItem>
           )}
-          <DropdownMenuSeparator />
           <KeyedMenuItem
             shortcut="D"
             confirms

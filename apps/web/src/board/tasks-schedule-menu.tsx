@@ -1,5 +1,5 @@
 import type { ScheduleRecord as WireSchedule } from '@cairn/shared';
-import { Ellipsis, Pause, Play, RotateCw } from 'lucide-react';
+import { Ellipsis, History, Pause, Play, RotateCw } from 'lucide-react';
 import { useState } from 'react';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -17,7 +17,9 @@ import type { ScheduleRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Trash2 } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
+import { scheduleCadence, scheduleNext } from '../pages/schedule-summary.js';
 import { scheduleViewState } from '../schedules/schedule-model.js';
+import { relativeTime } from './rel-time.js';
 
 function viewState(schedule: ScheduleRecord) {
   const record: WireSchedule = {
@@ -32,7 +34,15 @@ function viewState(schedule: ScheduleRecord) {
   return scheduleViewState(record);
 }
 
-export function ScheduleRowMenu({ schedule, now }: { schedule: ScheduleRecord; now: number }) {
+export function ScheduleRowMenu({
+  schedule,
+  now,
+  onOpenDetail,
+}: {
+  schedule: ScheduleRecord;
+  now: number;
+  onOpenDetail: () => void;
+}) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
@@ -102,6 +112,21 @@ export function ScheduleRowMenu({ schedule, now }: { schedule: ScheduleRecord; n
           aria-label={t('更多')}
           className="w-auto min-w-40"
         >
+          <div
+            data-slot="schedule-menu-facts"
+            className="flex flex-col px-2.5 pt-1.5 pb-2 text-meta text-content-secondary"
+          >
+            <span>{scheduleCadence(schedule, t)}</span>
+            <span>
+              {enabled ? scheduleNext(schedule, now, t) : (schedule.pausedReason ?? t('已暂停'))}
+            </span>
+            <span>
+              {schedule.lastRunAt == null
+                ? t('还没运行过')
+                : t('上次运行 {age}', { age: relativeTime(schedule.lastRunAt, now, t) })}
+            </span>
+          </div>
+          <DropdownMenuSeparator />
           <KeyedMenuItem
             shortcut="N"
             data-action="run"
@@ -117,6 +142,10 @@ export function ScheduleRowMenu({ schedule, now }: { schedule: ScheduleRecord; n
               {enabled ? t('暂停定时') : t('恢复定时')}
             </KeyedMenuItem>
           )}
+          <KeyedMenuItem shortcut="H" data-action="detail" onClick={onOpenDetail}>
+            <History />
+            {t('查看详情')}
+          </KeyedMenuItem>
           <DropdownMenuSeparator />
           <KeyedMenuItem
             shortcut="D"

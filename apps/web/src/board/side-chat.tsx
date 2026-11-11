@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { ArrowLeft, FileDiff, X } from 'lucide-react';
+import { ChevronLeft, FileDiff, ListChecks, X } from 'lucide-react';
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, usePrs } from '../api/hooks.js';
@@ -43,6 +43,9 @@ import { useThreadMentions } from './use-thread-mentions.js';
 import { PANE_PARAM } from './work-panel.js';
 
 const OVERLAY_QUERY = '(max-width: 1100px)';
+
+export const THREAD_HEAD_BUTTON =
+  'size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-4.5 max-[640px]:size-8';
 
 const OPEN_SURFACE = '.overlay, [role="dialog"], [role="menu"], [role="listbox"]';
 
@@ -306,35 +309,35 @@ function ThreadBody({
           />
         </div>
       )}
-      <Composer
-        placeholder={
-          archived
-            ? t('已归档，取消归档后才能继续')
-            : todo.phase === 'closed'
+      {!archived && (
+        <Composer
+          placeholder={
+            todo.phase === 'closed'
               ? t('已关闭，不能再回复')
               : chat.started
                 ? t('回复这个任务')
                 : t('开始后才能回复 #{seq}', { seq: todo.seqNum })
-        }
-        aiReview={false}
-        streaming={chat.running}
-        workingFor={chat.workingFor}
-        editable={chat.send !== undefined}
-        readOnly={chat.locked}
-        draft={draft}
-        onDraftChange={setDraft}
-        {...(chat.send !== undefined ? { onSend: chat.send } : {})}
-        {...(chat.queue !== undefined ? { onQueue: chat.queue } : {})}
-        {...(chat.stopAndSend !== undefined ? { onStopAndSend: chat.stopAndSend } : {})}
-        {...(chat.stop !== undefined ? { onStop: chat.stop } : {})}
-        {...(chat.attach !== undefined ? { onAttachment: chat.attach } : {})}
-        mentionGroups={mentions.groups}
-        mentionFiles={mentions.files}
-        queuedMessages={chat.queuedMessages}
-        onSendQueuedNow={chat.sendQueuedNow}
-        onRemoveQueued={chat.removeQueued}
-        onEditQueued={chat.editQueued}
-      />
+          }
+          aiReview={false}
+          streaming={chat.running}
+          workingFor={chat.workingFor}
+          editable={chat.send !== undefined}
+          readOnly={chat.locked}
+          draft={draft}
+          onDraftChange={setDraft}
+          {...(chat.send !== undefined ? { onSend: chat.send } : {})}
+          {...(chat.queue !== undefined ? { onQueue: chat.queue } : {})}
+          {...(chat.stopAndSend !== undefined ? { onStopAndSend: chat.stopAndSend } : {})}
+          {...(chat.stop !== undefined ? { onStop: chat.stop } : {})}
+          {...(chat.attach !== undefined ? { onAttachment: chat.attach } : {})}
+          mentionGroups={mentions.groups}
+          mentionFiles={mentions.files}
+          queuedMessages={chat.queuedMessages}
+          onSendQueuedNow={chat.sendQueuedNow}
+          onRemoveQueued={chat.removeQueued}
+          onEditQueued={chat.editQueued}
+        />
+      )}
     </>
   );
 }
@@ -562,7 +565,7 @@ function Head({
       data-testid="side-chat"
       data-todo-id={todoId}
       data-phase={todo?.phase}
-      className="flex flex-none items-start gap-1 py-2.5 pr-2.5 pl-2.5"
+      className="flex flex-none items-start gap-0.5 py-2 pr-3.5 pl-1.5"
     >
       <IconTooltip
         label={t('返回')}
@@ -570,23 +573,28 @@ function Head({
         trigger={
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon"
             data-testid="side-chat-back"
             onClick={onBack}
-            className="text-content-tertiary hover:text-foreground max-[640px]:size-8"
+            className={THREAD_HEAD_BUTTON}
           />
         }
       >
-        <ArrowLeft aria-hidden="true" strokeWidth={1.75} className="size-4" />
+        <ChevronLeft aria-hidden="true" strokeWidth={1.75} />
       </IconTooltip>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5 pl-1">
+      <span
+        aria-hidden="true"
+        data-slot="side-chat-glyph"
+        className="mt-1 ml-1.5 flex size-7 flex-none items-center justify-center rounded-(--cds-radius-md) border border-border"
+      >
+        <ListChecks strokeWidth={1.75} className="size-4 text-content-secondary" />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-2 pl-3">
         <div className="flex min-w-0 items-center gap-1">
-          <h2 className="m-0 line-clamp-2 min-w-0 text-ui font-semibold text-foreground">
+          <h2 className="m-0 line-clamp-2 min-w-0 text-heading font-normal text-foreground">
             {todo != null ? (
               <>
-                <span className="font-normal text-content-tertiary tabular-nums">
-                  #{todo.seqNum}
-                </span>{' '}
+                <span className="text-content-tertiary tabular-nums">#{todo.seqNum}</span>{' '}
                 {todo.title}
               </>
             ) : (
@@ -609,15 +617,10 @@ function Head({
         label={t('关闭')}
         side="bottom"
         trigger={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onClose}
-            className="text-content-tertiary hover:text-foreground max-[640px]:size-8"
-          />
+          <Button variant="ghost" size="icon" onClick={onClose} className={THREAD_HEAD_BUTTON} />
         }
       >
-        <X aria-hidden="true" strokeWidth={1.75} className="size-4" />
+        <X aria-hidden="true" strokeWidth={1.75} />
       </IconTooltip>
     </header>
   );

@@ -61,11 +61,17 @@ test.describe('at phone width', () => {
     await expect(composer(page)).toBeInViewport();
   });
 
-  test('the empty Tasks action closes the sheet and focuses the composer', async ({ page }) => {
+  test('the empty Tasks action opens the add field, and a submitted task lands in the composer', async ({
+    page,
+  }) => {
     await page.goto('/app?scenario=home-c-empty&pane=tasks');
-    await panel(page).getByRole('button', { name: '给 Coordinator 发消息' }).click();
+    await panel(page).getByRole('button', { name: '添加任务' }).click();
+    const input = panel(page).getByTestId('tasks-add-input');
+    await expect(input).toBeFocused();
+    await input.fill('Check the relay probe');
+    await input.press('Enter');
     await expect(panel(page)).toHaveCount(0);
-    await expect(composer(page)).toBeFocused();
+    await expect(composer(page)).toHaveValue('Check the relay probe');
   });
 
   test('drawer project rows carry one status line', async ({ page }) => {

@@ -215,6 +215,11 @@ export const homeCEmpty: FixtureSet = {
   now: r7(9, 0),
 };
 
+export const homeCQuiet: FixtureSet = {
+  ...homeCEmpty,
+  todos: [homeTodo('home-c-quiet-done', 2201, 'Unread dot on threads', 'done', PROJECT_ID)],
+};
+
 const MADE_DAY = '2026-09-24';
 
 function madeTodo(

@@ -35,28 +35,39 @@ test('the Tasks toggle carries the needs-you count and opens sections in Duet or
   await expect(page).not.toHaveURL(/pane=/);
 });
 
-test('every row waiting on the owner says what is waiting and where to act', async ({ page }) => {
+test('rows are one quiet line; a row waiting on the owner adds what waits, and every row describes its status and where to act', async ({
+  page,
+}) => {
   await page.goto(`${HOME}&pane=tasks`);
   const waiting = panel(page).locator('[data-slot="task-row"][data-waiting]');
   await expect(waiting).toHaveCount(3);
   for (const row of await waiting.all()) {
-    await expect(row.locator('[data-slot="task-row-where"]')).toBeVisible();
+    await expect(row.locator('[data-slot="task-row-what"]')).toBeVisible();
+    await expect(row).toHaveAccessibleDescription(/ → /);
     await expect(row).not.toContainText('已就绪，等你审阅');
+    expect(await row.evaluate((el) => el.getBoundingClientRect().height)).toBeLessThanOrEqual(60);
   }
   const question = panel(page)
     .locator('[data-section="needs_input"] [data-slot="task-row"]')
     .first();
   await expect(question).toContainText('Credential relay · #74');
-  await expect(question).toContainText('在问题卡里选');
+  await expect(question).toHaveAccessibleDescription(/在问题卡里选/);
   await expect(
     panel(page).locator('[data-slot="task-row"]').filter({ hasText: 'Connect a Claude' }),
-  ).toContainText('到任务里批准计划');
+  ).toHaveAccessibleDescription(/到任务里批准计划/);
   await expect(
     panel(page).locator('[data-slot="task-row"]').filter({ hasText: 'Fold finished turns' }),
-  ).toContainText('到任务里看改动');
+  ).toHaveAccessibleDescription(/待审阅 · 改动写好了 → 到任务里看改动/);
   const working = panel(page).locator('[data-section="working"] [data-slot="task-row"]');
-  await expect(working.locator('[data-slot="task-row-where"]')).toHaveCount(0);
+  await expect(working.locator('[data-slot="task-row-what"]')).toHaveCount(0);
+  await expect(working.first()).toHaveAccessibleDescription(/^进行中 · /);
+  await expect(working.first()).not.toHaveAccessibleDescription(/→/);
   await expect(working.locator('[data-slot="task-row-running"]')).toHaveCount(3);
+  for (const row of await working.all()) {
+    expect(await row.evaluate((el) => el.getBoundingClientRect().height)).toBeLessThanOrEqual(50);
+  }
+  await working.first().hover();
+  await expect(page.locator('[data-slot="task-row-tooltip"]')).toContainText('进行中 · ');
 });
 
 test('Up next, Scheduled and Done tabs list their own entries', async ({ page }) => {
@@ -71,6 +82,9 @@ test('Up next, Scheduled and Done tabs list their own entries', async ({ page })
   await panel(page).getByRole('tab', { name: '已完成' }).click();
   await expect(panel(page).locator('[data-section="resolved"]')).toContainText(
     'Unread dot on threads',
+  );
+  await expect(panel(page).locator('[data-section="resolved"] [data-slot="task-row"]')).toContainText(
+    /\d+月\d+日/,
   );
   await expect(panel(page).getByRole('link', { name: '管理定时' })).toHaveCount(0);
   await panel(page).getByRole('tab', { name: '进行中' }).click();
@@ -100,6 +114,13 @@ test('the plus button opens an inline add input; Escape closes it; submit hands 
   await panel(page).getByTestId('tasks-new').click();
   await expect(input).toBeFocused();
   await expect(input).toHaveAttribute('placeholder', '添加任务…');
+  const field = panel(page).getByTestId('tasks-add-field');
+  const tabsBox = await panel(page).getByRole('tablist').boundingBox();
+  const fieldBox = await field.boundingBox();
+  expect(fieldBox?.y ?? 0).toBeGreaterThan((tabsBox?.y ?? 0) + (tabsBox?.height ?? 0));
+  expect(fieldBox?.height).toBe(46);
+  await expect(field).not.toHaveCSS('outline-style', 'none');
+  await expect(panel(page).getByTestId('tasks-add-submit')).toBeDisabled();
   await page.keyboard.press('Escape');
   await expect(input).toHaveCount(0);
   await panel(page).getByTestId('tasks-new').click();
@@ -173,9 +194,43 @@ test('a scheduled row menu offers run, pause and delete; delete asks first', asy
   await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('更多');
   await rows.first().getByTestId('schedule-row-menu-button').click();
   const menu = page.getByRole('menu');
-  await expect(menu.getByRole('menuitem')).toHaveText([/立即运行/, /暂停定时/, /删除/]);
+  await expect(menu.locator('[data-slot="schedule-menu-facts"] > span')).toHaveText([
+    /运行一次$/,
+    /^下次 /,
+    '还没运行过',
+  ]);
+  await expect(menu.getByRole('menuitem')).toHaveText([/立即运行/, /暂停定时/, /查看详情/, /删除/]);
   await menu.getByRole('menuitem', { name: /删除/ }).click();
   await expect(page.getByRole('alertdialog')).toBeVisible();
+});
+
+test('the scheduled row menu opens the schedule detail', async ({ page }) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  await panel(page).getByRole('tab', { name: '定时' }).click();
+  const row = panel(page).locator('[data-slot="schedule-row-frame"]').first();
+  await row.hover();
+  await row.getByTestId('schedule-row-menu-button').click();
+  await page.getByRole('menuitem', { name: /查看详情/ }).click();
+  await expect(page.getByTestId('schedule-detail-body')).toBeVisible();
+});
+
+test('the task row menu groups open, move, mark done and rename above a divider, then archive and delete', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  await panel(page).getByRole('tab', { name: /接下来/ }).click();
+  const row = panel(page).locator('[data-slot="task-row-frame"]').filter({ hasText: 'Sidebar status groups' });
+  await row.hover();
+  await row.getByTestId('task-row-menu-button').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('更多');
+  await row.getByTestId('task-row-menu-button').click();
+  const order = await page
+    .getByRole('menu')
+    .locator('[role="menuitem"], [role="separator"]')
+    .evaluateAll((nodes) =>
+      nodes.map((node) => (node.getAttribute('role') === 'separator' ? '|' : node.getAttribute('data-action'))),
+    );
+  expect(order).toEqual(['open', 'move', 'done', 'rename', '|', 'archive', 'delete']);
 });
 
 test('a schedule whose task is running cannot be run again from the menu', async ({ page }) => {
@@ -273,10 +328,30 @@ test('Manage schedules links to the schedules page', async ({ page }) => {
   await expect(page).toHaveURL(/\/app\/schedules/);
 });
 
-test('with no tasks the panel shows one sentence and the toggle has no badge', async ({ page }) => {
+test('with no tasks anywhere the panel centres a first-run note whose button opens the add field, and the toggle has no badge', async ({
+  page,
+}) => {
   await page.goto('/app?scenario=home-c-empty&pane=tasks');
-  await expect(panel(page).getByTestId('tasks-empty')).toBeVisible();
+  const empty = panel(page).getByTestId('tasks-empty');
+  await expect(empty).toBeVisible();
+  await expect(empty.locator('svg')).toHaveCount(0);
   await expect(page.getByTestId('tasks-badge')).toHaveCount(0);
+  await empty.getByRole('button', { name: '添加任务' }).click();
+  await expect(panel(page).getByTestId('tasks-add-input')).toBeFocused();
+});
+
+test('once tasks exist, an empty tab is one left-aligned quiet line under the tabs', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=home-c-quiet&pane=tasks');
+  await expect(panel(page).getByTestId('tasks-empty')).toHaveCount(0);
+  const quiet = panel(page).getByTestId('tasks-quiet');
+  await expect(quiet).toHaveText('现在没有进行中的任务');
+  await expect(quiet).toHaveCSS('text-align', 'start');
+  await panel(page).getByRole('tab', { name: /接下来/ }).click();
+  await expect(quiet).toHaveText('接下来没有安排');
+  await panel(page).getByRole('tab', { name: '已完成' }).click();
+  await expect(panel(page).locator('[data-section="resolved"]')).toContainText('Unread dot on threads');
 });
 
 test('the Made button swaps the panel to finished work', async ({ page }) => {
@@ -472,5 +547,5 @@ test('one mark holds the left edge: the checkbox when the row has one, its ring 
   await expect(failed.locator('[data-glyph]')).toHaveCount(1);
   const title = review.locator('[data-slot="task-row-title"]');
   expect(await title.evaluate((el) => el.getBoundingClientRect().height)).toBe(20);
-  await expect(review.locator('[data-slot="task-row-what"]')).toContainText('到任务里看改动');
+  await expect(review.locator('[data-slot="task-row-what"]')).toHaveText('改动写好了');
 });

@@ -44,7 +44,7 @@ const ACTION_COPY: Record<ThreadActionKind, { reason: string; primary: string }>
   approve: { reason: '计划已就绪。要改计划，直接在下面回复。', primary: '批准计划' },
   finish: { reason: '已就绪，等你审阅。要改，直接在下面回复。', primary: '完成…' },
   retry: { reason: '失败了。可以重试，或在下面回复说明怎么改。', primary: '重试' },
-  unarchive: { reason: '已归档。', primary: '取消归档' },
+  unarchive: { reason: '这个任务已归档。取消归档后才能发消息。', primary: '取消归档' },
 };
 
 const ACTION_LINK = 'h-7 px-0 text-meta';
@@ -160,7 +160,25 @@ export function useThreadActions({
   const canFinishFailed = !archived && phase === 'failed' && chat.buildLegDone;
 
   const card =
-    kind === null ? null : (
+    kind === null ? null : kind === 'unarchive' ? (
+      <div
+        data-testid="side-chat-action"
+        data-action="unarchive"
+        className="mx-4 mb-4 flex flex-none flex-col items-start gap-2 rounded-(--radius-tile) border border-border px-4 py-3"
+      >
+        <p className="m-0 text-ui text-foreground">{t(ACTION_COPY.unarchive.reason)}</p>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={runPrimary.unarchive}
+          disabled={pending}
+          className="h-7.5 px-3 text-ui font-normal"
+        >
+          {pending && <Spinner data-icon="inline-start" />}
+          {t(ACTION_COPY.unarchive.primary)}
+        </Button>
+      </div>
+    ) : (
       <div
         data-testid="side-chat-action"
         data-action={kind}
@@ -201,12 +219,12 @@ export function useThreadActions({
       <Button
         ref={moreRef}
         variant="ghost"
-        size="icon-sm"
+        size="icon"
         aria-label={t('更多操作…')}
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         onClick={() => setMenuOpen(!menuOpen)}
-        className="text-content-tertiary hover:text-foreground max-[640px]:size-8"
+        className="size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-4.5 max-[640px]:size-8"
       >
         <Ellipsis aria-hidden="true" />
       </Button>

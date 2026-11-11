@@ -33,7 +33,7 @@ import {
 } from './composer-thread-target.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
-import { type ComposeState, composeRequest } from './open-composer.js';
+import { composeRequest } from './open-composer.js';
 import { PhoneTabs } from './phone-tabs.js';
 import { TaskCard } from './task-card.js';
 import { taskCardFacts } from './task-card-facts.js';
@@ -427,10 +427,6 @@ export function HomeC({
         onClose={() => showPane(null)}
         onOpenThread={openThread}
         onOpenQuestion={openQuestion}
-        onNewTask={() => {
-          if (!narrow) composerRef.current?.focus();
-          else showPane(null, { compose: Date.now() } satisfies ComposeState);
-        }}
         onAddTask={async (text) => {
           if (surface.onSend == null) setPrefill({ text, key: Date.now() });
           else await surface.onSend(text, projectId);

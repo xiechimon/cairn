@@ -1,3 +1,4 @@
+import { cn } from 'cn';
 import { X } from 'lucide-react';
 import {
   type CSSProperties,
@@ -6,6 +7,7 @@ import {
   type ReactNode,
   type Ref,
   useRef,
+  useState,
   useSyncExternalStore,
 } from 'react';
 import { useI18n } from '../i18n/provider.js';
@@ -20,6 +22,9 @@ import {
   readPanelWidth,
 } from './side-panel-width.js';
 import { Button } from './ui/button.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip.js';
+
+const RESIZE_TIP_DELAY = 600;
 
 const listeners = new Set<() => void>();
 let widthNow: number | null = null;
@@ -58,8 +63,10 @@ function useSidePanelWidth(): number {
 function ResizeHandle({ width }: { width: number }) {
   const { t } = useI18n();
   const drag = useRef<{ x: number; width: number } | null>(null);
+  const [tip, setTip] = useState(false);
   const onPointerDown = (event: PointerEvent<HTMLHRElement>) => {
     if (event.button !== 0) return;
+    setTip(false);
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     drag.current = { x: event.clientX, width };
@@ -90,22 +97,42 @@ function ResizeHandle({ width }: { width: number }) {
     setWidth(next, true);
   };
   return (
-    <hr
-      aria-orientation="vertical"
-      aria-label={t('调整面板宽度')}
-      aria-valuenow={width}
-      aria-valuemin={PANEL_WIDTH_MIN}
-      aria-valuemax={panelWidthMax(viewportWidth())}
-      tabIndex={0}
-      data-testid="side-panel-resize"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-      onDoubleClick={() => setWidth(PANEL_WIDTH_DEFAULT, true)}
-      onKeyDown={onKeyDown}
-      className="absolute inset-y-0 -left-1 z-1 m-0 h-auto w-2 border-0 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-[3px] after:w-0.5 after:bg-transparent after:transition-colors hover:after:bg-(--border) focus-visible:after:bg-(--focus-ring) active:after:bg-(--focus-ring) max-[1100px]:hidden"
-    />
+    <Tooltip open={tip} onOpenChange={(next) => setTip(next && drag.current === null)}>
+      <TooltipTrigger
+        delay={RESIZE_TIP_DELAY}
+        render={
+          <span
+            data-slot="side-panel-resize-zone"
+            className="absolute inset-y-0 -left-1 z-1 w-2 max-[1100px]:hidden"
+          />
+        }
+      >
+        <hr
+          aria-orientation="vertical"
+          aria-label={t('调整面板宽度')}
+          aria-valuenow={width}
+          aria-valuemin={PANEL_WIDTH_MIN}
+          aria-valuemax={panelWidthMax(viewportWidth())}
+          tabIndex={0}
+          data-testid="side-panel-resize"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onDoubleClick={() => setWidth(PANEL_WIDTH_DEFAULT, true)}
+          onKeyDown={onKeyDown}
+          className="absolute inset-0 m-0 h-auto w-2 border-0 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-[3px] after:w-0.5 after:bg-transparent after:transition-colors hover:after:bg-(--border) focus-visible:after:bg-(--focus-ring) active:after:bg-(--focus-ring)"
+        />
+      </TooltipTrigger>
+      <TooltipContent
+        side="left"
+        sideOffset={8}
+        data-slot="side-panel-resize-tip"
+        className="pointer-events-none"
+      >
+        {t('拖动调宽')}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -150,19 +177,26 @@ export function SidePanel({
 export function SidePanelHead({
   closeLabel,
   onClose,
+  className,
+  closeClassName,
   children,
 }: {
   closeLabel: string;
   onClose: () => void;
+  className?: string;
+  closeClassName?: string;
   children: ReactNode;
 }) {
   return (
-    <div data-panel-head="" className="flex h-12 flex-none items-center gap-2 px-4">
+    <div
+      data-panel-head=""
+      className={cn('flex h-12 flex-none items-center gap-2 px-4', className)}
+    >
       {children}
       <Button
         variant="ghost"
         size="icon-sm"
-        className="text-content-secondary hover:text-foreground"
+        className={cn('text-content-secondary hover:text-foreground', closeClassName)}
         aria-label={closeLabel}
         onClick={onClose}
       >
@@ -172,9 +206,20 @@ export function SidePanelHead({
   );
 }
 
-export function SidePanelTitle({ children }: { children: ReactNode }) {
+export function SidePanelTitle({
+  className,
+  children,
+}: {
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <h2 className="m-0 flex min-w-0 flex-1 items-center gap-1.5 truncate text-heading font-normal text-foreground">
+    <h2
+      className={cn(
+        'm-0 flex min-w-0 flex-1 items-center gap-1.5 truncate text-heading font-normal text-foreground',
+        className,
+      )}
+    >
       {children}
     </h2>
   );

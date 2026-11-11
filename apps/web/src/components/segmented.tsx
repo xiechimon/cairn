@@ -52,8 +52,8 @@ const OPTION_UNDER_PILL_CLS =
 const PILL_CLS =
   'pointer-events-none absolute top-(--active-tab-top) left-(--active-tab-left) z-0 h-(--active-tab-height) w-(--active-tab-width) rounded-(--cds-radius-sm) bg-(--seg-active) shadow-xs ring-1 ring-border [transition:left_var(--dur-fast)_ease,top_var(--dur-fast)_ease,width_var(--dur-fast)_ease,height_var(--dur-fast)_ease] motion-reduce:[transition:none]';
 
-function optionClass(option: SegmentedOption<string>, handle?: string) {
-  return cn(OPTION_CLS, option.label === undefined && OPTION_ICON_CLS, OPTION_SELECTED_CLS, handle);
+function optionClass(option: SegmentedOption<string>) {
+  return cn(OPTION_CLS, option.label === undefined && OPTION_ICON_CLS, OPTION_SELECTED_CLS);
 }
 
 function OptionContent({ option }: { option: SegmentedOption<string> }) {
@@ -97,8 +97,9 @@ export function SegmentedTabs<T extends string>({
             data-segmented="option"
             {...option.data}
             className={cn(
-              optionClass(option, optionHandle),
+              optionClass(option),
               quiet ? QUIET_OPTION_CLS : slide ? OPTION_UNDER_PILL_CLS : OPTION_SELECTED_FACE_CLS,
+              optionHandle,
             )}
           >
             <OptionContent option={option} />
@@ -169,9 +170,10 @@ export function SegmentedRadio<T extends string>({
             data-segmented="option"
             {...option.data}
             className={cn(
-              optionClass(option, optionHandle),
+              optionClass(option),
               RADIO_BUTTON_NEUTRAL_CLS,
               OPTION_SELECTED_FACE_CLS,
+              optionHandle,
             )}
             onClick={() => onChange(option.value)}
             onKeyDown={(event) => move(event, index)}

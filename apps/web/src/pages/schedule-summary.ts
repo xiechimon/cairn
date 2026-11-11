@@ -44,18 +44,26 @@ const RUN_WORD: Record<ScheduleRecord['kind'], string> = {
   cron: 'Cron',
 };
 
-export function scheduleSummary(schedule: ScheduleRecord, now: number, t: TFunc): string {
+export function scheduleCadence(schedule: ScheduleRecord, t: TFunc): string {
   const anchor = clockParts(schedule.at, schedule.tz);
   const start =
     schedule.kind === 'cron' ? '' : `${monthDay(anchor, t)} ${anchor.hour}:${anchor.minute} `;
+  return `${start}${t(RUN_WORD[schedule.kind])}`;
+}
+
+export function scheduleNext(schedule: ScheduleRecord, now: number, t: TFunc): string {
   if (schedule.nextRunAt === null || schedule.nextRunAt === 0)
-    return `${start}${t(RUN_WORD[schedule.kind])} · ${t(schedule.kind === 'once' ? 'No upcoming runs' : 'Next run unavailable')}`;
+    return t(schedule.kind === 'once' ? 'No upcoming runs' : 'Next run unavailable');
   const next = clockParts(schedule.nextRunAt, schedule.tz);
   const current = clockParts(now, schedule.tz);
   const today =
     next.year === current.year && next.month === current.month && next.day === current.day;
-  return `${start}${t(RUN_WORD[schedule.kind])} · ${t('下次 {day} {time}', {
+  return t('下次 {day} {time}', {
     day: today ? t('今天') : monthDay(next, t),
     time: `${next.hour}:${next.minute}`,
-  })}`;
+  });
+}
+
+export function scheduleSummary(schedule: ScheduleRecord, now: number, t: TFunc): string {
+  return `${scheduleCadence(schedule, t)} · ${scheduleNext(schedule, now, t)}`;
 }
