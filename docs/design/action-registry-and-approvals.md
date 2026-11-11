@@ -32,14 +32,15 @@ The daemon CLI (`apps/daemon/src/cli.ts`) is machine start, stop, and token. It 
 
 ## State
 
-Three tables, team-scoped, cascade on team delete. No retention TTL in this slice.
+Five tables, team-scoped, cascade on team delete. No retention TTL in this slice.
 
 - Proposal: `pending`, `refused`, `executed`, `failed`, `expired`, `superseded`. No committed `accepted`. Holds the validated input, its hash, `targetId`, `scopeProjectId`, decision (`refuse` | `allow-once` | `always` or empty), and expiry.
 - Subscriber: one row per Coordinator thread waiting on a proposal. Holds `proposalId`, `threadId`, and `wakeStepId` (`wake:` plus proposal id plus thread id). Unique on proposal and thread.
+- Wake outbox: one durable row per subscriber and terminal proposal, with the terminal outcome and delivery state. Unique on proposal and thread.
 - Grant: `active` or revoked (`revokedAt` set, row kept). Unique on team, action, and match hash while active.
 - Journal: append-only. One row per run, undo, or refused undo. A refusal lives on the proposal, not a second copy in the journal.
 
-A pending proposal is unique on team, action, and target. A repeat from any thread returns that row and adds a subscriber. It does not replace the stored input. A new pending proposal for the same target, with a different input hash, marks the old one `superseded` and drops its subscribers.
+A pending proposal is unique on team, action, and target. A repeat from any thread returns that row and adds a subscriber. It does not replace the stored input. A new pending proposal for the same target, with a different input hash, marks the old one `superseded`, writes wake outbox rows for all its subscribers, inserts the replacement, and adds the new subscriber in one transaction. Any failure rolls the entire replacement back; the old proposal and subscribers remain pending.
 
 Expiry is 7 days from insert, not the end of the Coordinator turn. The #3924 proposal says a confirm-once proposal expires with its turn. A turn ends before the owner is back; expiring with the turn would throw away the answer. The disagreement is open below.
 
@@ -58,7 +59,7 @@ stateDiagram-v2
 
 Allow once does not commit `accepted` and then run the handler. The decision, the handler, the journal row, and the hosted-delete outbox row are one transaction. A crash before commit leaves `pending`, so the same answer can be retried. There is no sweep for a half-applied approval.
 
-The Coordinator tool returns `pending` and the proposal id. It does not call `holdForQuestion`. A Coordinator propose without a `threadId` is 400 and writes nothing. Each waiting thread is a subscriber. The answer route wakes every subscriber: `enqueueChiefStep` (`apps/server/src/services/chief.ts`) gets that subscriber's `threadId` and `wakeStepId`, trigger `wake`, provenance `action-proposal:<id>`. It does not add a trigger kind and does not wake a thread that did not subscribe. An owner click has no subscriber and does not wake. Claim: the subscriber row, including `wakeStepId`, exists before the enqueue. Lookup: a step with that id means that subscriber was woken. Completion: inserting that id is the marker; a primary-key conflict is success. Failure: the step is absent, and the next read retries that subscriber's id only.
+The Coordinator tool returns `pending` and the proposal id. It does not call `holdForQuestion`. A Coordinator propose without a `threadId` is 400 and writes nothing. Each waiting thread is a subscriber. Every terminal transition (`refused`, `executed`, `failed`, `expired`, or `superseded`) writes an outbox row for every subscriber in the same transaction as the transition. A durable dispatcher scans undelivered rows on startup and periodically, and retries after failures. It wakes each subscriber with the terminal outcome: `enqueueChiefStep` (`apps/server/src/services/chief.ts`) gets that subscriber's `threadId` and `wakeStepId`, trigger `wake`, provenance `action-proposal:<id>`. It does not add a trigger kind and does not wake a thread that did not subscribe. An owner click has no subscriber and does not wake. Claim: the subscriber row, including `wakeStepId`, exists before the enqueue. Lookup: a step with that id means that subscriber was woken. Completion: inserting that id is the marker; a primary-key conflict is success. A successful insert or primary-key conflict marks the outbox row delivered. A crash after insertion and before marking delivered retries the same id. A missing thread is recorded as an undeliverable terminal outcome for that subscriber without blocking the others; subscribers remain until delivery is accounted for.
 
 The owner's own click is the confirmation. Actor `user` on `project.delete` runs the handler and journals it. It does not insert a proposal, so the person is not asked twice. Actor `coordinator` always proposes.
 
@@ -71,20 +72,20 @@ The owner's own click is the confirmation. Actor `user` on `project.delete` runs
 | Execute, target missing or other team | project row | nothing | 404, no row. Archive already checks team (`routes-projects.ts`); delete does not, and this check closes that gap |
 | Execute, caller surface not listed | registry | nothing | 403, no row. MCP and the daemon CLI hit this |
 | Execute, free, or user on confirm-once | registry, project | project row and one journal row, one transaction. Hosted `project.delete` also writes the outbox row in that transaction | handler error rolls the transaction back and does not call `removeHostedRepoDir` |
-| Execute, coordinator confirm-once | registry, pending proposal, caller thread id | one `pending` row if none exists, plus one subscriber for this thread | no `threadId`: 400, no row. Same input: return the existing id and add the subscriber. Different input: supersede, new proposal, one subscriber. Handler does not run |
+| Execute, coordinator confirm-once | registry, pending proposal, caller thread id | one `pending` row if none exists, plus one subscriber for this thread | no `threadId`: 400, no row. Same input: return the existing id and add the subscriber. Different input: atomically supersede, write old subscribers’ wake outbox rows, insert the new proposal and its subscriber; rollback preserves the old proposal on failure. Handler does not run |
 | Answer, body contains `input` | proposal | nothing | 400. The stored input runs, or nothing runs |
-| Answer, not pending, unknown, or past expiry | proposal | expiry stamp if past `expiresAt` | 409, handler does not run |
-| Answer, refuse | proposal | status `refused`, decision, `decidedBy` | wake still fires; handler does not run |
-| Answer, allow once | proposal, subscribers, stored input | decision, handler, journal, and hosted-delete outbox, one transaction, then `executed` or `failed` | a crash before commit leaves `pending`. Handler throw commits `failed` and the error journal row, no retry |
+| Answer, not pending, unknown, or past expiry | proposal | expiry stamp and subscriber wake outbox rows in one transaction if past `expiresAt` | 409, handler does not run |
+| Answer, refuse | proposal | status `refused`, decision, `decidedBy`, and subscriber wake outbox rows in one transaction | wake still fires; handler does not run |
+| Answer, allow once | proposal, subscribers, stored input | decision, handler, journal, hosted-delete outbox, terminal status, and subscriber wake outbox rows in one transaction | a crash before commit leaves `pending`. Handler throw commits `failed` and the error journal row, no retry |
 | Answer, always | proposal, registry flag | nothing in slice 1 | 409 `standing grant not offered`, proposal stays `pending` |
 | Revoke grant | grant, team | `revokedAt` | owner session only; agent and MCP get 403; other team is 404 |
-| Expiry sweep | pending proposals | `expired` | a failed sweep leaves them pending; the next sweep retries |
+| Expiry sweep | pending proposals and subscribers | `expired` and subscriber wake outbox rows in one transaction | a failed sweep leaves them pending; the next sweep retries |
 | Undo | journal row, inverse, current project | one new journal row, and the inverse write if it still matches | no inverse: 409, no write. State moved: journal `undo-refused`, names the later journal id, does not overwrite |
 | Delete db plus outbox | project, hosted repo name | project rows, one journal row, one outbox row, one transaction | a throw before commit rolls all three back and does not call `removeHostedRepoDir` |
 | Web pending list and journal list | proposals, journal | nothing | empty list |
 | Directory cleanup | outbox row not done, current project rows for that `repoName` | `removeHostedRepoDir` only if no current project owns the name, then outbox done and one journal row | runs only after the delete transaction commits. A current project with that name: no directory removal, outbox marked conflict. A missing directory is success. A failed sweep leaves the outbox row; the next sweep retries. It does not delete the project row again |
 | Create project name | project rows and pending outbox names | hosted `repoName` | a name in a pending outbox is taken, so a recreate during cleanup cannot reuse the path |
-| Coordinator wake | every subscriber, existing step for that `wakeStepId` | one `enqueueChiefStep` per subscriber whose step is absent | no subscribers: no wake. Missing thread: skip that subscriber, wake the others, do not substitute. Insert conflict: that subscriber is delivered. A later read retries only subscribers whose step is absent, and does not run the handler again |
+| Coordinator wake dispatcher | undelivered wake outbox rows and existing steps | one `enqueueChiefStep` per subscriber, then marks delivery | startup and periodic scans retry after a crash; insert conflict is success. Missing thread is recorded as undeliverable without blocking others. The handler never runs again |
 
 The db half of delete still removes todos, builds, steps, and secrets, and it still does not stop running work. That guard is a separate to-do. The proposal text shown to the owner names the project and says running work is removed with it. Slice 1 does not add the guard. `ask_user`, the command gate, `clientMessage`, `skill_audit`, and plan auto-approve do not read or write these tables.
 
@@ -92,7 +93,7 @@ The db half of delete still removes todos, builds, steps, and secrets, and it st
 
 ## Tests the implementation writes first
 
-One test per row above, plus: a registry entry with surface `mcp` or `cli` fails the slice-1 fixture; `delete_project` is absent from `MCP_TOOL_REGISTRY` and `CHIEF_REMOTE_TOOLS`; the owner-only exception list is exact; a journal row never contains a field named `value`, `token`, `secret`, or `password`; two concurrent proposes for one target return one pending id; a rolled-back delete does not remove the hosted directory; a recreate while an outbox row is pending gets a different repo name, and cleanup does not delete that new directory; a Coordinator propose with no `threadId` writes nothing; a second thread on the same target is a subscriber and is woken; an answer wakes every subscriber and no other thread; a crash during allow-once leaves `pending` and a retry runs the handler once; a second read after a landed wake does not insert a second step.
+One test per row above, plus: a registry entry with surface `mcp` or `cli` fails the slice-1 fixture; `delete_project` is absent from `MCP_TOOL_REGISTRY` and `CHIEF_REMOTE_TOOLS`; the owner-only exception list is exact; a journal row never contains a field named `value`, `token`, `secret`, or `password`; two concurrent proposes for one target return one pending id; a rolled-back delete does not remove the hosted directory; a recreate while an outbox row is pending gets a different repo name, and cleanup does not delete that new directory; a Coordinator propose with no `threadId` writes nothing; a second thread on the same target is a subscriber and is woken; an answer wakes every subscriber and no other thread; a crash during allow-once leaves `pending` and a retry runs the handler once; supersede and expiry each deliver their terminal outcome to every subscriber; an injected replacement insert failure rolls back the supersede and retains its subscribers; a crash after terminal commit before dispatch is recovered by the startup sweep; a crash after step insertion before delivery marking retries without inserting a second step.
 
 ## Risks
 
