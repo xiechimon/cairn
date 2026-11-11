@@ -159,6 +159,7 @@ interface TasksPanelProps {
   onOpenThread: (id: string) => void;
   onOpenQuestion: (question: QuestionTarget) => void;
   onAddTask: (text: string) => void | Promise<void>;
+  addBlocked?: string | null;
   query?: QueryLike;
 }
 
@@ -171,6 +172,7 @@ export function TasksPanel({
   onOpenThread,
   onOpenQuestion,
   onAddTask,
+  addBlocked = null,
   query,
 }: TasksPanelProps) {
   const { t } = useI18n();
@@ -287,7 +289,7 @@ export function TasksPanel({
       >
         <SidePanelTitle className={PANEL_TITLE}>{t('任务')}</SidePanelTitle>
         <IconTooltip
-          label={t('新任务')}
+          label={addBlocked ?? t('新任务')}
           side="bottom"
           trigger={
             <Button
@@ -295,7 +297,10 @@ export function TasksPanel({
               size="icon"
               data-testid="tasks-new"
               aria-pressed={adding}
-              onClick={() => setAdding((v) => !v)}
+              aria-disabled={addBlocked !== null || undefined}
+              onClick={() => {
+                if (addBlocked === null) setAdding((v) => !v);
+              }}
               className={`${PANEL_HEAD_BUTTON} aria-pressed:bg-(--hover-1) aria-pressed:text-foreground`}
             />
           }
@@ -324,7 +329,7 @@ export function TasksPanel({
           ]}
         />
       </div>
-      {adding && (
+      {adding && addBlocked === null && (
         <TasksAddInput
           onClose={() => setAdding(false)}
           onSubmit={async (text) => {

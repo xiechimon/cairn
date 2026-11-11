@@ -15,6 +15,11 @@ import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
 import { toastError } from '../components/ui/toaster.js';
 import { markDeleted } from '../fixtures/deletions.js';
+import {
+  fixtureProjects,
+  setFixtureProjectArchived,
+  useFixtureArchiveEdits,
+} from '../fixtures/project-archive-edits.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useTypeToCompose } from '../overlay/hotkeys.js';
@@ -75,6 +80,7 @@ export function AppSidebar({
   const navigate = useNavigate();
   const projectsQ = useProjects(teamId, live);
   const [fixtureEdits, setFixtureEdits] = useState<Record<string, Partial<SidebarProject>>>({});
+  const archiveEdits = useFixtureArchiveEdits();
   const projects: SidebarProject[] | undefined = useMemo(() => {
     if (live) {
       return (projectsQ.data ?? []).map((p) => ({
@@ -86,22 +92,14 @@ export function AppSidebar({
         archivedAt: p.archivedAt,
       }));
     }
-    if (fixture.projectNames == null) return undefined;
-    return Object.entries(fixture.projectNames).map(([id, name]) => ({
-      id,
-      name,
-      group: fixture.projectGroups?.[id] ?? null,
-      ...fixture.projectAvatars?.[id],
-      ...fixtureEdits[id],
+    if (fixture.projectNames == null && fixture.archivedProjects == null) return undefined;
+    return fixtureProjects(fixture, archiveEdits).map((project) => ({
+      ...project,
+      group: fixture.projectGroups?.[project.id] ?? null,
+      ...fixture.projectAvatars?.[project.id],
+      ...fixtureEdits[project.id],
     }));
-  }, [
-    live,
-    projectsQ.data,
-    fixture.projectNames,
-    fixture.projectGroups,
-    fixture.projectAvatars,
-    fixtureEdits,
-  ]);
+  }, [live, projectsQ.data, fixture, fixtureEdits, archiveEdits]);
   const projectsPhase = live
     ? queryPhase(withTeamsFailure(projectsQ, teamsQuery), (projectsQ.data ?? []).length === 0)
     : undefined;
@@ -177,6 +175,11 @@ export function AppSidebar({
           onError: (error) => toastError(t('无法归档项目。'), error),
         },
       ),
+    unarchive: (id) =>
+      mutations.setProjectArchived.mutate(
+        { id, archived: false },
+        { onError: (error) => toastError(t('取消归档失败，请重试。'), error) },
+      ),
     rename: async (id, name) => {
       try {
         await mutations.patchProject.mutateAsync({ id, body: { name } });
@@ -213,11 +216,12 @@ export function AppSidebar({
   const fixtureActions: SidebarProjectActions = {
     move: (id, group) => editFixture(id, { group }),
     archive: (id) => {
-      editFixture(id, { archivedAt: Date.now() });
+      setFixtureProjectArchived(id, Date.now());
       const name = nameOf(id);
-      if (name !== undefined) toastArchived(t, name, () => editFixture(id, { archivedAt: null }));
+      if (name !== undefined) toastArchived(t, name, () => setFixtureProjectArchived(id, null));
       leaveIfOpen(id);
     },
+    unarchive: (id) => setFixtureProjectArchived(id, null),
     rename: async (id, name) => editFixture(id, { name }),
     remove: (id) => {
       markDeleted(id);

@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest';
-import { projectStatuses, sidebarProjects, waitingProjectIds } from '../src/board/sidebar-projects.js';
+import {
+  isProjectFilter,
+  projectStatuses,
+  sidebarProjects,
+  waitingProjectIds,
+} from '../src/board/sidebar-projects.js';
 import type { TaskEntry, TaskSection, TasksView } from '../src/board/tasks-sections.js';
 import { todo } from './helpers.js';
 
@@ -20,6 +25,43 @@ test('archived projects never reach the sidebar, grouped or not', () => {
   ]);
   expect(names(layout.ungrouped)).toEqual(['cairn', 'dogfood-sandbox']);
   expect(layout.groups).toEqual([]);
+});
+
+test('the archived filter lists only archived projects, grouped like active ones', () => {
+  const layout = sidebarProjects(
+    [
+      project('cairn'),
+      project('landing', { archivedAt: 1 }),
+      project('acme-v1', { group: '客户', archivedAt: 2 }),
+      project('acme-web', { group: '客户' }),
+    ],
+    'archived',
+  );
+  expect(names(layout.ungrouped)).toEqual(['landing']);
+  expect(layout.groups.map((group) => [group.name, names(group.projects)])).toEqual([
+    ['客户', ['acme-v1']],
+  ]);
+});
+
+test('the all filter keeps active and archived projects in their places', () => {
+  const layout = sidebarProjects(
+    [
+      project('cairn'),
+      project('landing', { archivedAt: 1 }),
+      project('acme-v1', { group: '客户', archivedAt: 2 }),
+      project('acme-web', { group: '客户' }),
+    ],
+    'all',
+  );
+  expect(names(layout.ungrouped)).toEqual(['cairn', 'landing']);
+  expect(layout.groups.map((group) => [group.name, names(group.projects)])).toEqual([
+    ['客户', ['acme-v1', 'acme-web']],
+  ]);
+});
+
+test('only the three filter names are filters', () => {
+  expect(['active', 'archived', 'all'].every(isProjectFilter)).toBe(true);
+  expect([null, '', 'Archived', 'done'].some(isProjectFilter)).toBe(false);
 });
 
 test('with no group set the projects are flat and no group header exists', () => {

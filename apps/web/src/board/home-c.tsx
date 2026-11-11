@@ -25,6 +25,11 @@ import { Button } from '../components/ui/button.js';
 import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { GitBranch, History, ListLines, Puzzle } from '../icons/index.js';
+import {
+  ARCHIVED_PROJECT_WRITE_REASON,
+  ArchivedProjectBar,
+  type ArchivedProjectState,
+} from './archived-project-bar.js';
 import { ComposerSetupHint } from './composer-setup-hint.js';
 import {
   ComposerThreadTarget,
@@ -107,6 +112,7 @@ interface HomeCProps {
   todosQuery?: QueryLike;
   tasks: TasksView;
   tasksQuery?: QueryLike;
+  archived?: ArchivedProjectState | null;
 }
 
 function projectHomeSearch(params: URLSearchParams): string {
@@ -128,6 +134,7 @@ export function HomeC({
   todosQuery,
   tasks,
   tasksQuery,
+  archived = null,
 }: HomeCProps) {
   const { t, locale } = useI18n();
   const { user, live, teamId, teamsQuery } = useLiveData();
@@ -320,7 +327,7 @@ export function HomeC({
       {greeting}
       {since}
       {projectLinks}
-      {badge === 0 && (
+      {badge === 0 && archived === null && (
         <div data-testid="home-c-starters" className="mt-4 flex flex-wrap gap-2">
           {STARTERS.map(({ label, Icon }) => (
             <SuggestionChip
@@ -427,6 +434,7 @@ export function HomeC({
         onClose={() => showPane(null)}
         onOpenThread={openThread}
         onOpenQuestion={openQuestion}
+        addBlocked={archived === null ? null : t(ARCHIVED_PROJECT_WRITE_REASON)}
         onAddTask={async (text) => {
           if (surface.onSend == null) setPrefill({ text, key: Date.now() });
           else await surface.onSend(text, projectId);
@@ -457,6 +465,13 @@ export function HomeC({
     projectName != null
       ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
       : t('给 Coordinator 发消息');
+  const archivedBar =
+    archived === null ? null : (
+      <ArchivedProjectBar
+        state={archived}
+        className="mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-160"
+      />
+    );
   const handedOver = load === 'ready' && loadingDraft !== '';
   useEffect(() => {
     if (!handedOver) return;
@@ -477,11 +492,15 @@ export function HomeC({
                 <div className="min-h-0 flex-1 overflow-hidden">
                   <ConversationSkeleton />
                 </div>
-                <LoadingComposer
-                  draft={loadingDraft}
-                  onDraftChange={setLoadingDraft}
-                  placeholder={composerPlaceholder}
-                />
+                {archived === null ? (
+                  <LoadingComposer
+                    draft={loadingDraft}
+                    onDraftChange={setLoadingDraft}
+                    placeholder={composerPlaceholder}
+                  />
+                ) : (
+                  archivedBar
+                )}
               </>
             ) : (
               <>
@@ -530,18 +549,21 @@ export function HomeC({
               <ChiefConversation
                 chief={{ ...chiefData, stream: conversation }}
                 onSend={
-                  thread.picked !== null
-                    ? thread.send
-                    : surface.onSend != null
-                      ? (text: string) => surface.onSend?.(text, projectId)
-                      : live
-                        ? undefined
-                        : () => Promise.resolve()
+                  archived !== null
+                    ? undefined
+                    : thread.picked !== null
+                      ? thread.send
+                      : surface.onSend != null
+                        ? (text: string) => surface.onSend?.(text, projectId)
+                        : live
+                          ? undefined
+                          : () => Promise.resolve()
                 }
-                onRewind={surface.onRewind}
-                onWithdraw={surface.onWithdraw}
-                onSteer={surface.onSteer}
-                onStop={surface.onStop}
+                onRewind={archived === null ? surface.onRewind : undefined}
+                onWithdraw={archived === null ? surface.onWithdraw : undefined}
+                onSteer={archived === null ? surface.onSteer : undefined}
+                onStop={archived === null ? surface.onStop : undefined}
+                composerReplacement={archivedBar}
                 earlier={surface.earlier}
                 onSettings={() => surface.setChiefView('settings')}
                 showBindGate={!live}

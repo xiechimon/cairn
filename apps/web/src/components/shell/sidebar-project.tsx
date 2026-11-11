@@ -1,6 +1,6 @@
 import type { ProjectIcon } from '@cairn/shared';
 import { cn } from 'cn';
-import { Box, ChevronDown, ChevronRight, Folder } from 'lucide-react';
+import { Archive, Box, ChevronDown, ChevronRight, Folder } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { PROJECT_ICON_COMPONENTS } from '../../board/project-icon-map.js';
 import { Button } from '../ui/button.js';
@@ -15,6 +15,7 @@ export interface SidebarProjectRowProps {
   place?: TreePlace;
   waiting?: string | null;
   status?: string | null;
+  archived?: string | null;
   onClick?: () => void;
   menu?: ReactNode;
 }
@@ -26,13 +27,16 @@ export const SIDEBAR_ROW_ACTION =
   'size-5.5 rounded-(--cds-radius-md) p-0 text-foreground hover:bg-(--sidebar-press) aria-expanded:bg-(--sidebar-press) dark:hover:bg-(--sidebar-press) pointer-coarse:size-11 [&_svg:not([class*=size-])]:size-4';
 
 const ACTION_SLOT =
-  'absolute top-1/2 right-1 hidden -translate-y-1/2 items-center gap-0.5 group-focus-within/row:inline-flex group-hover/row:inline-flex has-aria-expanded:inline-flex [@media(hover:none)]:inline-flex';
+  'absolute top-1/2 right-1 -translate-y-1/2 items-center gap-0.5 group-focus-within/row:inline-flex group-hover/row:inline-flex has-aria-expanded:inline-flex [@media(hover:none)]:inline-flex';
 
 const REVEAL_PAD =
   'group-focus-within/row:pr-8 group-hover/row:pr-8 group-has-aria-expanded/row:pr-8 [@media(hover:none)]:pr-12';
 
 const HIDE_ON_REVEAL =
   '[@media(hover:hover)]:group-focus-within/row:invisible [@media(hover:hover)]:group-hover/row:invisible [@media(hover:hover)]:group-has-aria-expanded/row:invisible';
+
+const TAG_HIDE_ON_REVEAL =
+  '[@media(hover:hover)]:group-focus-within/row:hidden [@media(hover:hover)]:group-hover/row:hidden [@media(hover:hover)]:group-has-aria-expanded/row:hidden';
 
 const ROW_FILL =
   'group-hover/row:bg-sidebar-hover group-has-aria-expanded/row:bg-sidebar-hover dark:group-hover/row:bg-sidebar-hover';
@@ -93,8 +97,14 @@ export function TreeGuide({ place }: { place: TreePlace }) {
   );
 }
 
-export function SidebarRowActions({ children }: { children: ReactNode }) {
-  return <span className={ACTION_SLOT}>{children}</span>;
+export function SidebarRowActions({
+  children,
+  pinned = false,
+}: {
+  children: ReactNode;
+  pinned?: boolean;
+}) {
+  return <span className={cn(ACTION_SLOT, pinned ? 'inline-flex' : 'hidden')}>{children}</span>;
 }
 
 export function SidebarProjectRow({
@@ -104,6 +114,7 @@ export function SidebarProjectRow({
   place = 'only',
   waiting = null,
   status = null,
+  archived = null,
   onClick,
   menu,
 }: SidebarProjectRowProps) {
@@ -112,15 +123,17 @@ export function SidebarProjectRow({
       variant="ghost"
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
-      aria-description={status ?? undefined}
+      aria-description={status ?? archived ?? undefined}
       data-slot="sidebar-project-row"
+      data-archived={archived != null ? '' : undefined}
       className={cn(
         SIDEBAR_ROW,
         'pr-2 pl-2.5',
         active
           ? 'bg-(--sidebar-active) text-foreground hover:bg-(--sidebar-active) dark:hover:bg-(--sidebar-active)'
           : cn(
-              'text-sidebar-ink hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover',
+              archived != null ? 'text-content-secondary' : 'text-sidebar-ink',
+              'hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover',
               ROW_FILL,
             ),
         menu != null && REVEAL_PAD,
@@ -130,6 +143,18 @@ export function SidebarProjectRow({
       <span className="min-w-0 flex-1 truncate text-left" title={name}>
         {name}
       </span>
+      {archived != null && (
+        <span
+          aria-hidden
+          data-slot="archived-tag"
+          className={cn(
+            'grid size-5.5 flex-none place-items-center rounded-full border border-border text-content-secondary',
+            menu != null && TAG_HIDE_ON_REVEAL,
+          )}
+        >
+          <Archive className="size-3.5" strokeWidth={1.75} />
+        </span>
+      )}
       {waiting != null && (
         <span
           role="img"
@@ -146,13 +171,13 @@ export function SidebarProjectRow({
   return (
     <div className="group/row relative ml-5.5 flex flex-none">
       <TreeGuide place={place} />
-      {status === null ? (
+      {(status ?? archived) === null ? (
         button
       ) : (
         <Tooltip>
           <TooltipTrigger render={button} />
           <TooltipContent side="right" sideOffset={8}>
-            {status}
+            {status ?? archived}
           </TooltipContent>
         </Tooltip>
       )}

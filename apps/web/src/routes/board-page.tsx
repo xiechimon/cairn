@@ -15,6 +15,7 @@ import {
 import { mapMachines, mapSchedules, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { AppSidebar } from '../board/app-sidebar.js';
+import type { ArchivedProjectState } from '../board/archived-project-bar.js';
 import { BackupBanner } from '../board/backup-banner.js';
 import { ClaudeLoginBanner, useClaudeLoginWarnings } from '../board/claude-login-banner.js';
 import { FirstPrCard, firstPrCardInfo } from '../board/first-pr-card.js';
@@ -31,8 +32,15 @@ import { useCloseThread } from '../board/thread-link.js';
 import { useTasksView } from '../board/use-tasks-view.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
+import { toastError } from '../components/ui/toaster.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
+import {
+  fixtureProjects,
+  setFixtureProjectArchived,
+  useFixtureArchiveEdits,
+} from '../fixtures/project-archive-edits.js';
 import { resolveScenario } from '../fixtures/scenario.js';
+import { useI18n } from '../i18n/provider.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';
 
@@ -40,6 +48,8 @@ export function BoardPage() {
   const [searchParams] = useSearchParams();
   const { live, teamId } = useLiveData();
   const fixture = resolveScenario(searchParams);
+  const { t } = useI18n();
+  const archiveEdits = useFixtureArchiveEdits();
   const { surface: chief } = useChiefRoot();
   const { chiefView, setChiefView, chiefData } = chief;
 
@@ -61,13 +71,31 @@ export function BoardPage() {
   const homeProjectId = searchParams.get('project');
   const threadId = searchParams.get(THREAD_PARAM);
   const closeThread = useCloseThread();
-  const homeProjectName =
-    homeProjectId === null
-      ? null
-      : live
-        ? ((projectsQ.data ?? []).find((p) => p.id === homeProjectId)?.name ?? null)
-        : (fixture.projectNames?.[homeProjectId] ?? null);
   const liveProject = live ? (projectsQ.data ?? []).find((p) => p.id === homeProjectId) : undefined;
+  const fixtureProject = live
+    ? undefined
+    : fixtureProjects(fixture, archiveEdits).find((p) => p.id === homeProjectId);
+  const homeProjectName =
+    homeProjectId === null ? null : ((live ? liveProject?.name : fixtureProject?.name) ?? null);
+  const homeArchived =
+    homeProjectId !== null &&
+    (live ? liveProject?.archivedAt != null : fixtureProject?.archivedAt != null);
+  const archivedState: ArchivedProjectState | null =
+    !homeArchived || homeProjectId === null
+      ? null
+      : {
+          pending: mutations.setProjectArchived.isPending,
+          onUnarchive: () => {
+            if (!live) {
+              setFixtureProjectArchived(homeProjectId, null);
+              return;
+            }
+            mutations.setProjectArchived.mutate(
+              { id: homeProjectId, archived: false },
+              { onError: (error) => toastError(t('取消归档失败，请重试。'), error) },
+            );
+          },
+        };
   const homeProject: ProjectHomeProject | null =
     homeProjectId === null || homeProjectName === null
       ? null
@@ -233,6 +261,7 @@ export function BoardPage() {
                 schedules={schedules}
                 now={now}
                 chatHref={projectChatHref}
+                archived={archivedState}
               />
             </div>
           ) : (
@@ -249,6 +278,7 @@ export function BoardPage() {
               todosQuery={live ? todosQ : undefined}
               tasks={tasks}
               tasksQuery={live ? tasksQ : undefined}
+              archived={archivedState}
             />
           )}
         </div>

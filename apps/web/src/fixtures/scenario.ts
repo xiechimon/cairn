@@ -116,6 +116,7 @@ import {
 } from './home-c.js';
 import type { FixtureSet } from './records.js';
 import { RESOURCES } from './resources.js';
+import { sidebarArchived } from './sidebar-archived.js';
 
 export const SCENARIO_PARAM = 'scenario';
 
@@ -386,6 +387,8 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'chief-quick-replies': chiefQuickReplies,
       'chief-draft': chiefDraft,
       'sidebar-ref': sidebarRef,
+      'sidebar-archived': sidebarArchived,
+      'archived-project-view': sidebarArchived,
       'secrets-list': secretsList,
       'chief-agent-chip': chiefAgentChip,
       'fab-avatar': chiefFabAvatar,

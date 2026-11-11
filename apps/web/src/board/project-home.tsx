@@ -19,11 +19,17 @@ import { Greeting } from '../components/stream/greeting.js';
 import { ScheduledTaskRow } from '../components/thread/scheduled-task-row.js';
 import { ThreadRow } from '../components/thread/thread-row.js';
 import { Button } from '../components/ui/button.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import type { ScheduleRecord, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { scheduleSummary } from '../pages/schedule-summary.js';
 import { SECRETS_HREF } from '../resources/secrets-page.js';
 import { ScheduleDetailController } from '../schedules/schedule-detail-dialog.js';
+import {
+  ARCHIVED_PROJECT_WRITE_REASON,
+  ArchivedProjectBar,
+  type ArchivedProjectState,
+} from './archived-project-bar.js';
 import { needsYouThreads } from './needs-you.js';
 import { ProjectAvatar } from './project-avatar.js';
 import { relativeTime } from './rel-time.js';
@@ -65,12 +71,14 @@ export function ProjectHome({
   schedules,
   now,
   chatHref,
+  archived = null,
 }: {
   project: ProjectHomeProject;
   todos: readonly TodoRecord[];
   schedules: readonly ScheduleRecord[];
   now: number;
   chatHref: string;
+  archived?: ArchivedProjectState | null;
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -165,15 +173,19 @@ export function ProjectHome({
                 { value: String(mergedThisWeek), label: t('本周合并') },
               ]}
             />
-            <Button
-              variant="outline"
-              data-testid="project-home-ask"
-              className="mt-5 h-11 w-full max-w-160 justify-start gap-2 rounded-xl bg-card text-ui font-normal text-content-secondary shadow-(--e1)"
-              render={<Link to={chatHref} />}
-            >
-              <MessageSquare aria-hidden="true" className="size-4" />
-              {t('问 Coordinator 关于 {name} 的事…', { name: project.name })}
-            </Button>
+            {archived === null ? (
+              <Button
+                variant="outline"
+                data-testid="project-home-ask"
+                className="mt-5 h-11 w-full max-w-160 justify-start gap-2 rounded-xl bg-card text-ui font-normal text-content-secondary shadow-(--e1)"
+                render={<Link to={chatHref} />}
+              >
+                <MessageSquare aria-hidden="true" className="size-4" />
+                {t('问 Coordinator 关于 {name} 的事…', { name: project.name })}
+              </Button>
+            ) : (
+              <ArchivedProjectBar state={archived} className="mt-5 w-full max-w-160" />
+            )}
             <div className="mt-8 grid grid-cols-[minmax(0,1fr)_20rem] gap-6 max-[960px]:grid-cols-1">
               <section aria-label="Threads">
                 {own.length === 0 ? (
@@ -224,14 +236,36 @@ export function ProjectHome({
                     icon={<BookText className="size-3.5" />}
                     title={t('项目说明')}
                     action={
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        className="text-meta text-content-secondary"
-                        render={<Link to={`/app/project/${project.id}/settings`} />}
-                      >
-                        {t('编辑')}
-                      </Button>
+                      archived === null ? (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          className="text-meta text-content-secondary"
+                          render={<Link to={`/app/project/${project.id}/settings`} />}
+                        >
+                          {t('编辑')}
+                        </Button>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <Button
+                                variant="ghost"
+                                size="xs"
+                                data-testid="project-home-edit-blocked"
+                                aria-disabled
+                                aria-description={t(ARCHIVED_PROJECT_WRITE_REASON)}
+                                className="cursor-not-allowed text-meta text-content-tertiary hover:bg-transparent"
+                              />
+                            }
+                          >
+                            {t('编辑')}
+                          </TooltipTrigger>
+                          <TooltipContent side="top" sideOffset={6}>
+                            {t(ARCHIVED_PROJECT_WRITE_REASON)}
+                          </TooltipContent>
+                        </Tooltip>
+                      )
                     }
                   />
                   {project.instructions != null && project.instructions !== '' ? (

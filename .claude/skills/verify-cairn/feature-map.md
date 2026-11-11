@@ -837,7 +837,7 @@ Reach:
 
 ### projects
 
-**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings, and delete.
+**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings or the sidebar's archived filter, an archived project opened read-only, and delete.
 
 States: A new-project form for a local folder or a GitHub repository, a project home, settings for base branch, concurrency, autonomy and instructions, archived or deleted.
 
@@ -853,7 +853,7 @@ Reach:
 - Web routes: `/app/project/:id`, `/app/project/:id/settings`, `/app/project/:id/tasks`, `/app/project/new`
 - Settings: `设置` (Settings) › `项目`
 - Keyboard shortcuts in its code: `A`, `D`, `G`, `L`, `P`, `R`, `T`
-- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`, `project-home`, `project-home-ask`, `project-home-empty`, `project-home-instructions`, `project-home-links`, `task-card`, `task-meta`, `task-row`, `task-status`
+- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`, `project-home`, `project-home-ask`, `project-home-edit-blocked`, `project-home-empty`, `project-home-instructions`, `project-home-links`, `task-card`, `task-meta`, `task-row`, `task-status`
 - Verify recipes: [.claude/skills/verify-cairn/features/project-new-form.md](features/project-new-form.md), [.claude/skills/verify-cairn/features/github-oauth-picker.md](features/github-oauth-picker.md), [.claude/skills/verify-cairn/features/local-repo-api.md](features/local-repo-api.md)
 - Research: [docs/research/project-coordinators.md](../../../docs/research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
@@ -980,22 +980,25 @@ Reach:
 
 ### sidebar
 
-**Sidebar** (shipped, centrality 3). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu and the machine-status footer.
+**Sidebar** (shipped, centrality 3). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive, delete) and the machine-status footer.
 
-States: Projects under the Coordinator with no group, ungrouped projects then groups in name order, a folded group with its count, an ochre dot on a project with a task waiting on the owner, the open row menu, loading or error rows, and the 48px rail.
+States: Projects under the Coordinator with no group, ungrouped projects then groups in name order, a folded group with its count, an ochre dot on a project with a task waiting on the owner, the open row menu, loading or error rows, the filter on archived (note, archived rows with their groups, back row) or empty archived, the filter on all with archived rows marked, an archived project opened read-only with the unarchive bar, and the 48px rail.
 
 Reach:
 
 1. `open /app`
 2. `click testid:project-group-header`
+3. `click testid:sidebar-project-filter`
+4. `click testid:sidebar-project-filter-archived`
+5. `click testid:archived-project-bar-unarchive`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `project-group-header`, `sidebar-activity`, `sidebar-attention`, `sidebar-footer`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-settings`, `team-row`
-- Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main)
-- Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
+- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-activity`, `sidebar-archived-note`, `sidebar-attention`, `sidebar-footer`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-settings`, `team-row`
+- Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
+- Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
 - Backend design: **gap**: no design for unread and read marks across devices
-- Evidence: `apps/web/e2e/sidebar-nav.spec.ts`, `apps/web/e2e/sidebar-projects.spec.ts`, `apps/web/e2e/sidebar-visual.spec.ts`, `apps/server/test/unread-notifications.test.ts`
+- Evidence: `apps/web/e2e/sidebar-nav.spec.ts`, `apps/web/e2e/sidebar-projects.spec.ts`, `apps/web/e2e/sidebar-visual.spec.ts`, `apps/web/e2e/sidebar-archived.spec.ts`, `apps/server/test/unread-notifications.test.ts`
 
 ### skills
 

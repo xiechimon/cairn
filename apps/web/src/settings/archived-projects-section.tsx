@@ -14,6 +14,7 @@ import {
   SettingsSection,
 } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
+import { fixtureProjects, useFixtureArchiveEdits } from '../fixtures/project-archive-edits.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
@@ -33,13 +34,16 @@ export function ArchivedProjectsSection() {
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
   const mutations = useApiMutations(teamId);
+  const archiveEdits = useFixtureArchiveEdits();
   const [inFlight, setInFlight] = useState<InFlightIds>(() => new Set());
   const archived: ArchivedProject[] = (
     live
       ? (projectsQ.data ?? []).flatMap((p) =>
           p.archivedAt != null ? [{ id: p.id, name: p.name, archivedAt: p.archivedAt }] : [],
         )
-      : (fixture.archivedProjects ?? [])
+      : fixtureProjects(fixture, archiveEdits).flatMap((p) =>
+          p.archivedAt != null ? [{ id: p.id, name: p.name, archivedAt: p.archivedAt }] : [],
+        )
   ).toSorted((a, b) => b.archivedAt - a.archivedAt);
   const now = Date.now();
   const unarchive = (id: string) =>

@@ -1,6 +1,15 @@
 import { BRAND, type ProjectColor, type ProjectIcon } from '@cairn/shared';
 import { cn } from 'cn';
-import { Activity, ChartColumn, PanelLeft, Plus, Search, Server, Settings } from 'lucide-react';
+import {
+  Activity,
+  ChartColumn,
+  ChevronLeft,
+  PanelLeft,
+  Plus,
+  Search,
+  Server,
+  Settings,
+} from 'lucide-react';
 import { type ReactElement, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate } from 'react-router';
 import { BrandGlyph } from '../components/brand-glyph.js';
@@ -26,8 +35,19 @@ import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF } from '../settings/settings-href.js';
 import { fleetSummary } from './fleet-status.js';
 import { coordinatorSearch } from './open-composer.js';
-import { SidebarGroupMenu, SidebarProjectMenu } from './sidebar-project-menu.js';
-import { type ProjectStatus, sidebarProjects } from './sidebar-projects.js';
+import { isArchivedProject } from './project-archive.js';
+import {
+  ProjectFilterMenu,
+  SidebarArchivedProjectMenu,
+  SidebarGroupMenu,
+  SidebarProjectMenu,
+} from './sidebar-project-menu.js';
+import {
+  isProjectFilter,
+  type ProjectFilter,
+  type ProjectStatus,
+  sidebarProjects,
+} from './sidebar-projects.js';
 import { THREAD_PARAM } from './thread-copy.js';
 import { PANE_PARAM } from './work-panel.js';
 
@@ -54,6 +74,7 @@ export interface SidebarProject {
 export interface SidebarProjectActions {
   move: (id: string, group: string | null) => void;
   archive: (id: string) => void;
+  unarchive: (id: string) => void;
   rename: (id: string, name: string) => Promise<void>;
   remove: (id: string) => void;
   renameGroup: (from: string, to: string) => Promise<void>;
@@ -83,6 +104,17 @@ export const GROUP_STORAGE_KEYS = {
   groups: 'cairn.sidebarGroupsCollapsed',
 } as const;
 
+export const PROJECT_FILTER_STORAGE_KEY = 'cairn.sidebarProjectFilter';
+
+function readProjectFilter(storage: Storage | null): ProjectFilter {
+  try {
+    const stored = storage?.getItem(PROJECT_FILTER_STORAGE_KEY);
+    return isProjectFilter(stored) ? stored : 'active';
+  } catch {
+    return 'active';
+  }
+}
+
 const NOTHING_WAITING: ReadonlySet<string> = new Set();
 const NO_STATUSES: ReadonlyMap<string, ProjectStatus> = new Map();
 
@@ -106,6 +138,8 @@ const STROKE = 1.75;
 
 const FOCUS =
   'outline-none focus-visible:[outline:var(--focus-width)_solid_var(--focus-ring)] focus-visible:outline-offset-0';
+
+const SIDEBAR_FOOT_ROW = `ml-5.5 flex h-8.5 flex-none items-center justify-start gap-3 rounded-(--cds-radius-md) pr-2 pl-2.5 text-meta text-sidebar-ink no-underline hover:bg-sidebar-hover hover:text-foreground pointer-coarse:h-11 ${FOCUS}`;
 
 const SEARCH_OPEN_DIM =
   '[html[data-search-open]_&]:bg-transparent [html[data-search-open]_&]:shadow-none [html[data-search-open]_&]:ring-0 [html[data-search-open]_&]:text-content-secondary';
@@ -212,9 +246,10 @@ export function BoardSidebar({
   const projectParam = pathname === '/app' ? baseParams.get('project') : null;
   baseParams.delete('project');
   baseParams.delete('chat');
-  const projectHref = (id: string) => {
+  const projectHref = (id: string, chat = false) => {
     const next = new URLSearchParams(baseParams);
     next.set('project', id);
+    if (chat) next.set('chat', '1');
     return { pathname: '/app', search: `?${next}` };
   };
   const plain = `?${baseParams}`;
@@ -225,17 +260,23 @@ export function BoardSidebar({
   const newProjectTarget = { pathname: '/app/project/new', search: plain };
   const coordinatorTarget = { pathname: '/app', search: coordinatorSearch(search) };
   const allProjects = projects ?? CANON_PROJECTS;
-  const layout = useMemo(
-    () => sidebarProjects(allProjects.filter((row) => !isDeleted(row.id))),
-    [allProjects],
-  );
+  const [filter, setFilter] = useState(() => readProjectFilter(safeLocalStorage()));
+  const chooseFilter = useCallback((next: ProjectFilter) => {
+    setFilter(next);
+    safeSetItem(PROJECT_FILTER_STORAGE_KEY, next);
+  }, []);
+  const present = useMemo(() => allProjects.filter((row) => !isDeleted(row.id)), [allProjects]);
+  const layout = useMemo(() => sidebarProjects(present, filter), [present, filter]);
+  const activeLayout = useMemo(() => sidebarProjects(present), [present]);
   const listed = useMemo(
-    () => [...layout.ungrouped, ...layout.groups.flatMap((group) => group.projects)],
-    [layout],
+    () => [...activeLayout.ungrouped, ...activeLayout.groups.flatMap((group) => group.projects)],
+    [activeLayout],
   );
-  const groupNames = useMemo(() => layout.groups.map((group) => group.name), [layout]);
+  const groupNames = useMemo(() => activeLayout.groups.map((group) => group.name), [activeLayout]);
+  const archivedCount = useMemo(() => present.filter(isArchivedProject).length, [present]);
   const activeProject = allProjects.some((row) => row.id === projectParam) ? projectParam : null;
   const waitingLabel = t('有任务在等你');
+  const archivedLabel = t('已归档');
   const statusText = (id: string) => {
     const status = statuses.get(id);
     if (status === undefined) return waiting.has(id) ? waitingLabel : null;
@@ -244,7 +285,13 @@ export function BoardSidebar({
       : `${t(status.word)} · ${t(status.what.key, status.what.params)}`;
   };
   const projectMenu = (row: SidebarProject) =>
-    actions === undefined ? undefined : (
+    actions === undefined ? undefined : isArchivedProject(row) ? (
+      <SidebarArchivedProjectMenu
+        name={row.name}
+        onUnarchive={() => actions.unarchive(row.id)}
+        onDelete={() => actions.remove(row.id)}
+      />
+    ) : (
       <SidebarProjectMenu
         name={row.name}
         group={row.group ?? null}
@@ -268,9 +315,10 @@ export function BoardSidebar({
         icon={row.icon}
         place={treePlace(index, rows.length)}
         waiting={waiting.has(row.id) ? waitingLabel : null}
-        status={statusText(row.id)}
+        status={isArchivedProject(row) ? null : statusText(row.id)}
+        archived={isArchivedProject(row) ? archivedLabel : null}
         active={activeProject === row.id}
-        onClick={() => navigate(projectHref(row.id))}
+        onClick={() => navigate(projectHref(row.id, isArchivedProject(row)))}
         menu={projectMenu(row)}
       />
     ));
@@ -449,18 +497,34 @@ export function BoardSidebar({
           label={t('Coordinator')}
           active={coordinatorActive}
           onClick={() => navigate(coordinatorTarget)}
+          actionsPinned={filter !== 'active'}
           actions={
-            <SidebarTip label={t('新建项目')}>
-              <Link
-                to={newProjectTarget}
-                aria-label={t('新建项目')}
-                className={`grid place-items-center ${SIDEBAR_ROW_ACTION} ${FOCUS}`}
-              >
-                <Plus strokeWidth={STROKE} />
-              </Link>
-            </SidebarTip>
+            <>
+              <ProjectFilterMenu filter={filter} onFilter={chooseFilter} />
+              {filter !== 'archived' && (
+                <SidebarTip label={t('新建项目')}>
+                  <Link
+                    to={newProjectTarget}
+                    aria-label={t('新建项目')}
+                    className={`grid place-items-center ${SIDEBAR_ROW_ACTION} ${FOCUS}`}
+                  >
+                    <Plus strokeWidth={STROKE} />
+                  </Link>
+                </SidebarTip>
+              )}
+            </>
           }
         />
+        {filter === 'archived' && projectsState === undefined && (
+          <p
+            data-testid="sidebar-archived-note"
+            className="m-0 flex-none pt-0.5 pr-2 pb-1.5 pl-8.5 text-meta text-content-tertiary"
+          >
+            {archivedCount === 0
+              ? t('没有已归档的项目')
+              : t('已归档的项目和它们的对话会一直保留，直到你删除。')}
+          </p>
+        )}
         {projectsState === 'loading' && (
           <div
             data-testid="sidebar-projects-loading"
@@ -508,7 +572,7 @@ export function BoardSidebar({
                 spaced={spaced}
                 onToggle={() => toggleGroup(group.name)}
                 menu={
-                  actions === undefined ? undefined : (
+                  actions === undefined || filter === 'archived' ? undefined : (
                     <SidebarGroupMenu
                       name={group.name}
                       onRename={(next) => actions.renameGroup(group.name, next)}
@@ -521,14 +585,22 @@ export function BoardSidebar({
             </div>
           );
         })}
-        <Link
-          data-slot="sidebar-new-project"
-          className={`ml-5.5 flex h-8.5 flex-none items-center gap-3 rounded-(--cds-radius-md) pr-2 pl-2.5 text-meta text-sidebar-ink no-underline hover:bg-sidebar-hover hover:text-foreground pointer-coarse:h-11 ${FOCUS}`}
-          to={newProjectTarget}
-        >
-          <Plus className={ICON} strokeWidth={STROKE} />
-          {t('新建项目')}
-        </Link>
+        {filter === 'archived' ? (
+          <Button
+            variant="ghost"
+            data-slot="sidebar-filter-back"
+            className={cn(SIDEBAR_FOOT_ROW, 'border-none font-normal dark:hover:bg-sidebar-hover')}
+            onClick={() => chooseFilter('active')}
+          >
+            <ChevronLeft className={ICON} strokeWidth={STROKE} />
+            {t('进行中')}
+          </Button>
+        ) : (
+          <Link data-slot="sidebar-new-project" className={SIDEBAR_FOOT_ROW} to={newProjectTarget}>
+            <Plus className={ICON} strokeWidth={STROKE} />
+            {t('新建项目')}
+          </Link>
+        )}
       </nav>
 
       <div

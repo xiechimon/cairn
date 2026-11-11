@@ -1310,6 +1310,13 @@ export const EN: Record<string, string> = {
   取消归档: 'Unarchive',
   归档于: 'Archived',
   已归档项目: 'Archived projects',
+  筛选项目: 'Filter projects',
+  '筛选项目：{value}': 'Filter projects: {value}',
+  '已归档的项目和它们的对话会一直保留，直到你删除。':
+    'Archived projects and their conversations are kept until you delete them.',
+  '这个项目已归档。取消归档后才能发消息。':
+    'This project is archived. Unarchive it to send messages.',
+  '这个项目已归档。取消归档后才能修改。': 'This project is archived. Unarchive it to make changes.',
   没有已归档的项目: 'No archived projects',
   '在侧栏项目菜单里归档的项目会出现在这里。':
     'Projects you archive from the sidebar project menu appear here.',

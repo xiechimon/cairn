@@ -1538,7 +1538,7 @@
     {
       "id": "projects",
       "name": "Projects",
-      "summary": "Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings, and delete.",
+      "summary": "Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings or the sidebar's archived filter, an archived project opened read-only, and delete.",
       "states": "A new-project form for a local folder or a GitHub repository, a project home, settings for base branch, concurrency, autonomy and instructions, archived or deleted.",
       "centrality": 3,
       "status": "shipped",
@@ -1758,8 +1758,8 @@
     {
       "id": "sidebar",
       "name": "Sidebar",
-      "summary": "The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu and the machine-status footer.",
-      "states": "Projects under the Coordinator with no group, ungrouped projects then groups in name order, a folded group with its count, an ochre dot on a project with a task waiting on the owner, the open row menu, loading or error rows, and the 48px rail.",
+      "summary": "The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive, delete) and the machine-status footer.",
+      "states": "Projects under the Coordinator with no group, ungrouped projects then groups in name order, a folded group with its count, an ochre dot on a project with a task waiting on the owner, the open row menu, loading or error rows, the filter on archived (note, archived rows with their groups, back row) or empty archived, the filter on all with archived rows marked, an archived project opened read-only with the unarchive bar, and the 48px rail.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -1768,7 +1768,8 @@
           "apps/web/src/board/app-sidebar.tsx",
           "apps/web/src/board/sidebar-projects.ts",
           "apps/web/src/board/sidebar-project-menu.tsx",
-          "apps/web/src/components/shell/sidebar-project.tsx"
+          "apps/web/src/components/shell/sidebar-project.tsx",
+          "apps/web/src/board/archived-project-bar.tsx"
         ],
         "server": [
           "apps/server/src/services/notifications.ts"
@@ -1781,15 +1782,20 @@
       },
       "reach": [
         "open /app",
-        "click testid:project-group-header"
+        "click testid:project-group-header",
+        "click testid:sidebar-project-filter",
+        "click testid:sidebar-project-filter-archived",
+        "click testid:archived-project-bar-unarchive"
       ],
       "research": [
-        "docs/research/sidebar-coordinator-icon-2026-11-08.md"
+        "docs/research/sidebar-coordinator-icon-2026-11-08.md",
+        "docs/research/archived-projects-entry-2026-11-09.md"
       ],
       "frontendDesign": [
         "docs/design/references/thread-list-sidebar",
         "docs/design/references/coordinator-chat",
-        "docs/design/claude-ai-spec.md"
+        "docs/design/claude-ai-spec.md",
+        "docs/design/archived-projects-settings.md"
       ],
       "backendDesign": {
         "gap": "no design for unread and read marks across devices"
@@ -1798,6 +1804,7 @@
         "apps/web/e2e/sidebar-nav.spec.ts",
         "apps/web/e2e/sidebar-projects.spec.ts",
         "apps/web/e2e/sidebar-visual.spec.ts",
+        "apps/web/e2e/sidebar-archived.spec.ts",
         "apps/server/test/unread-notifications.test.ts"
       ],
       "batch": "B7"

@@ -77,7 +77,7 @@
 | [Search and activity](#search-and-activity) | 3 | shipped | gap | yes | gap | B7 |
 | [Secrets](#secrets) | 3 | shipped | yes | gap | yes | B10 |
 | [Server backup and deploy status](#server-status) | 3 | shipped | yes | gap | yes | B11 |
-| [Sidebar](#sidebar) | 3 | shipped | yes (not on main) | yes | gap | B7 |
+| [Sidebar](#sidebar) | 3 | shipped | yes | yes | gap | B7 |
 | [Skills](#skills) | 3 | shipped | gap | yes | yes | B9 |
 | [Git release tags](#git-release-tags) | 4 | shipped | yes | n/a | yes |  |
 | [iOS app](#ios-app) | 4 | planned | gap | gap | gap | B12 |
@@ -528,7 +528,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### projects
 
-**Projects** (shipped). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings, and delete.
+**Projects** (shipped). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings or the sidebar's archived filter, an archived project opened read-only, and delete.
 
 - Research: [docs/research/project-coordinators.md](research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](design/archived-projects-settings.md)
@@ -584,10 +584,10 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### sidebar
 
-**Sidebar** (shipped). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu and the machine-status footer.
+**Sidebar** (shipped). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive, delete) and the machine-status footer.
 
-- Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](research/sidebar-coordinator-icon-2026-11-08.md) (not on main)
-- Frontend design: [docs/design/references/thread-list-sidebar](design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](design/references/coordinator-chat), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
+- Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](research/sidebar-coordinator-icon-2026-11-08.md) (not on main), [docs/research/archived-projects-entry-2026-11-09.md](research/archived-projects-entry-2026-11-09.md)
+- Frontend design: [docs/design/references/thread-list-sidebar](design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](design/references/coordinator-chat), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](design/archived-projects-settings.md)
 - Backend design: **gap**: no design for unread and read marks across devices
 
 ### skills

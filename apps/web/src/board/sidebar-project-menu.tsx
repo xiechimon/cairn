@@ -1,3 +1,4 @@
+import { cn } from 'cn';
 import {
   Archive,
   Check,
@@ -6,7 +7,9 @@ import {
   FolderMinus,
   FolderOutput,
   FolderPlus,
+  Funnel,
   Pencil,
+  RotateCcw,
   StickyNote,
   Trash2,
 } from 'lucide-react';
@@ -22,6 +25,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -32,6 +37,7 @@ import { Input } from '../components/ui/input.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
+import { isProjectFilter, PROJECT_FILTERS, type ProjectFilter } from './sidebar-projects.js';
 
 const NAME_FORM = 'sidebar-name-form';
 
@@ -315,5 +321,127 @@ export function SidebarGroupMenu({
         }}
       />
     </>
+  );
+}
+
+export function SidebarArchivedProjectMenu({
+  name,
+  onUnarchive,
+  onDelete,
+}: {
+  name: string;
+  onUnarchive: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useI18n();
+  const [deleting, setDeleting] = useState(false);
+  return (
+    <>
+      <DropdownMenu>
+        <RowMenuTrigger label={t('{name} 的菜单', { name })} />
+        <RowMenuContent>
+          <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onUnarchive}>
+            <RotateCcw />
+            {t('取消归档')}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            className={`${SIDEBAR_MENU_ITEM_CLS} ${DANGER_ITEM_CLS}`}
+            onClick={() => setDeleting(true)}
+          >
+            <Trash2 />
+            {t('删除')}
+          </DropdownMenuItem>
+        </RowMenuContent>
+      </DropdownMenu>
+      <DeleteProjectConfirm
+        projectName={name}
+        open={deleting}
+        onClose={() => setDeleting(false)}
+        onConfirm={() => {
+          setDeleting(false);
+          onDelete();
+        }}
+      />
+    </>
+  );
+}
+
+export const PROJECT_FILTER_LABELS: Record<ProjectFilter, string> = {
+  active: '进行中',
+  archived: '已归档',
+  all: '全部',
+};
+
+export function ProjectFilterMenu({
+  filter,
+  onFilter,
+}: {
+  filter: ProjectFilter;
+  onFilter: (next: ProjectFilter) => void;
+}) {
+  const { t } = useI18n();
+  const label = t('筛选项目');
+  const filtered = filter !== 'active';
+  return (
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  data-testid="sidebar-project-filter"
+                  data-filter={filter}
+                  className={cn(SIDEBAR_ROW_ACTION, filtered && 'bg-(--sidebar-press)')}
+                  aria-label={
+                    filtered
+                      ? t('筛选项目：{value}', { value: t(PROJECT_FILTER_LABELS[filter]) })
+                      : label
+                  }
+                />
+              }
+            >
+              <Funnel />
+            </DropdownMenuTrigger>
+          }
+        />
+        <TooltipContent side="top" sideOffset={6}>
+          {label}
+        </TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent side="bottom" align="end" sideOffset={5} className={SIDEBAR_MENU_CLS}>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger
+            className={`${SIDEBAR_MENU_ITEM_CLS} [&>svg:last-child]:text-content-tertiary`}
+          >
+            <span className="flex-1">{t('状态')}</span>
+            <span className="text-content-tertiary">{t(PROJECT_FILTER_LABELS[filter])}</span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent alignOffset={-7} sideOffset={2} className={SIDEBAR_MENU_CLS}>
+            <DropdownMenuRadioGroup
+              value={filter}
+              onValueChange={(next: unknown) => {
+                if (isProjectFilter(next)) onFilter(next);
+              }}
+            >
+              {PROJECT_FILTERS.map((option) => (
+                <DropdownMenuRadioItem
+                  key={option}
+                  value={option}
+                  closeOnClick
+                  data-testid={`sidebar-project-filter-${option}`}
+                  className={`${SIDEBAR_MENU_ITEM_CLS} pr-8`}
+                >
+                  {t(PROJECT_FILTER_LABELS[option])}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

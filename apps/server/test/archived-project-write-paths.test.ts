@@ -81,6 +81,27 @@ describe('an archived project refuses every todo write path', () => {
     s.dispose();
   });
 
+  test('the project, its tasks and its todo lists stay readable while archived', async () => {
+    const s = world();
+    await archive(s);
+    const projects = (await (await req(s.app, 'GET', '/api/projects')).json()) as {
+      id: string;
+      archivedAt: number | null;
+    }[];
+    expect(projects.find((row) => row.id === PROJECT)?.archivedAt).toEqual(expect.any(Number));
+    const own = (await (await req(s.app, 'GET', `/api/projects/${PROJECT}/todos`)).json()) as {
+      id: string;
+    }[];
+    expect(own.map((row) => row.id)).toEqual([CARD]);
+    const team = (await (await req(s.app, 'GET', '/api/todos')).json()) as { id: string }[];
+    expect(team.map((row) => row.id)).toContain(CARD);
+    const tasks = (await (await req(s.app, 'GET', '/api/tasks')).json()) as {
+      entries: { kind: string; id?: string }[];
+    };
+    expect(tasks.entries.some((entry) => entry.kind === 'todo' && entry.id === CARD)).toBe(true);
+    s.dispose();
+  });
+
   test('moving a todo into an archived project is refused', async () => {
     const s = world();
     s.db.insert(project).values({ id: 'project-archived', teamId: s.team.id, name: 'A' }).run();
