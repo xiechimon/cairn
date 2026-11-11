@@ -103,7 +103,16 @@ import {
   versionMenuV2,
   versionMenuV3,
 } from './fixtures.js';
-import { homeC, homeCEmpty, homeCMachines, homeCMade, homeCMadeMany } from './home-c.js';
+import {
+  homeC,
+  homeCEmpty,
+  homeCMachines,
+  homeCMade,
+  homeCMadeMany,
+  makeRef,
+  sessionsRef,
+  sessionsRefDetail,
+} from './home-c.js';
 import type { FixtureSet } from './records.js';
 import { RESOURCES } from './resources.js';
 
@@ -154,6 +163,9 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'home-c-made': homeCMade,
       'home-c-made-many': homeCMadeMany,
       'home-c-machines': homeCMachines,
+      'sessions-ref': sessionsRef,
+      'sessions-ref-detail': sessionsRefDetail,
+      'make-ref': makeRef,
       'sidebar-thread-statuses': sidebarThreadStatuses,
       'board-inbox': boardInbox,
       'quota-wait': boardQuotaWait,

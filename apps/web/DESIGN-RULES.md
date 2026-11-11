@@ -23,7 +23,7 @@ Each rule has an id. Put the ids you checked in the PR (Proof, reference row). T
 | Id | Rule | Check |
 |---|---|---|
 | C1 | One fact, one wording. A status comes from one selector and is not restated differently elsewhere on the page. A finished thread does not say both "done" and "unverified". | M text of one entity is identical across header, list and footer |
-| C2 | No capability, no placeholder. Do not render a block for a feature that is not available (grey 16:10 preview, `—·—·—`, "coming soon", "ships with X"). Show one line: what is off and the action to turn it on. | M no element text matching `^[\s—·-]+$`; no empty fixed-ratio block |
+| C2 | No capability, no placeholder. Do not render a block for a feature that is not available (grey 16:10 preview, `—·—·—`, "coming soon", "ships with X"). Show one line: what is off and the action to turn it on. One exception copies the reference results panel: a results preview card whose item has no thumbnail shows a quiet typed placeholder (the item's kind glyph on `secondary`), never an empty box (owner, 2026-11-11). | M no element text matching `^[\s—·-]+$`; no empty fixed-ratio block |
 | C3 | Hidden means no space. An element shown on hover or focus takes no layout when hidden (absolute, negative margin, or not rendered). | M gap between consecutive short chat messages is 16 to 24px |
 | C4 | Every icon-only control has a visible tooltip (about 300ms, the next one instant) and an accessible name. | M hover 600ms shows a tooltip; axe `button-name` |
 | C5 | No raw error text reaches the user. Map it to a plain sentence that says what to do next; keep the raw text in a tooltip or the details. No `chief agent not bound (...)`, stack, status code or JSON. | M toast and banner text does not match `\(.*\)$`, `Error:`, `\b[45]\d\d\b` |
@@ -45,7 +45,7 @@ Each rule has an id. Put the ids you checked in the PR (Proof, reference row). T
 | V4 | Not everything is a card. A list is rows in one divided `ListCard`; no card inside a card; one card corner per page (`--radius-card`). | M nested `[data-slot=card]` count is 0 |
 | V5 | Three roles carry colour. Ochre, the one accent, means waiting on you; it also takes the accent roles claude.ai gives its own accent: the keyboard focus ring, a switch that is on and the enabled send button (`docs/design/claude-ai-spec.md`, section 6). Green is a 6px dot for running or online and nothing else. Rust is failure and destructive actions only. Everything else is the ink ladder (slate and per-project hues are retired). Status is icon, color and text, never color alone. Lists and sidebar rows are the exception and follow L1 and L2: one accent only. The one other chromatic mark is the task reference in the Coordinator conversation (its glyph tile and inline chip), which takes the `tint-working` blue, `tint-wait` ochre, `tint-quiet` neutral or `tint-fail` rust of the task's state; blue appears nowhere else. | G `ui-drift-gate`, `test/anti-slop-foundations.test.ts`; H |
 | V6 | One primary action per screen, and it is the `primary` Button. Card actions are text links. | H |
-| V7 | Elevation is `--e1`, `--e2` or `--e3` only; no second ring and no raw `box-shadow`. | G `ui-drift-gate` |
+| V7 | Elevation is `--e1`, `--e1-lift`, `--e2` or `--e3` only; no second ring and no raw `box-shadow`. `--e1-lift` is the `--e1` ring plus a 1px soft drop (`--shadow-lift`) for outlined cards on the page background: the side-panel groups and result preview cards, measured from the reference recording (owner 1:1 pass, 2026-11-11). | G `ui-drift-gate` |
 | V8 | Spacing is on the 4px grid. | G `ui-debt-gate`; M computed margins and paddings are multiples of 4 |
 | V9 | Icons are lucide from the project icon set; never invent an icon name, check that the import exists. Stroke and size are V14. | G `pnpm typecheck` |
 | V21 | No hover shadows or elevation; a hover background covers the whole row, or a whole standalone control, never a band over part of a row or card. | G `ui-drift-gate` G8; M `e2e/paper-hover-bands.spec.ts` |
@@ -71,7 +71,7 @@ Anti-slop rules (audit `docs/research/ui-ux-audit-2026-11-06.md`, section on AI 
 | T4 | Copy is plain. No exclamation mark, emoji or hype word (supercharge, seamless, unlock, magic) in UI strings; a one-sentence title, label or button ends without a period. | M; G `test/unslop-signs.test.ts` | 10 one-sentence titles with a period (4 of 40 captures), 1 `▶` label, 1 hype word; after: 0 |
 
 V22 to V24, T4 and the static half of V3 (gradient text, coloured glow, sparkle icons) adapt the slop signs of unslop by Damir Sokolovsky (github.com/heydamir/unslop, CC BY 4.0); signs that conflict with matching claude.ai, such as a signature colour moment or a world-tinted ramp, are not adopted.
-| V20 | An object list is rows in one card, not a grid of identical cards; a card grid is for true parallel choices only. | H | team page against t3code providers (batch 2) |
+| V20 | An object list is rows in one card, not a grid of identical cards; a card grid is for true parallel choices only. Exception: the results panel shows finished work as one horizontal row of preview cards per kind, as in the reference recording (owner 1:1 pass, 2026-11-11). | H | team page against t3code providers (batch 2) |
 
 ## 3b. Lists and sidebars
 

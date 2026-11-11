@@ -1,12 +1,22 @@
 import { cn } from 'cn';
 import type { ReactNode } from 'react';
 
-export function ListCard({ className, children }: { className?: string; children: ReactNode }) {
+export function ListCard({
+  className,
+  outlined = false,
+  children,
+}: {
+  className?: string;
+  outlined?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div
       data-slot="list-card"
+      data-outlined={outlined || undefined}
       className={cn(
-        'flex flex-col divide-y divide-border overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)',
+        'flex flex-col divide-y divide-border overflow-hidden rounded-(--radius-card)',
+        outlined ? 'bg-background shadow-(--e1-lift)' : 'bg-card shadow-(--e1)',
         className,
       )}
     >

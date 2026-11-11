@@ -68,6 +68,7 @@ async function open(page: Page, feed: Feed, machines: unknown[] = [FEED_MACHINE]
   const panel = page.getByRole('complementary', { name: '电脑' });
   if (detail && machines.length > 0) {
     await panel.locator('[data-slot="list-card"]').first().getByRole('button').click();
+    await panel.getByRole('tab', { name: '在这台工作' }).click();
   }
   return panel;
 }
@@ -396,6 +397,7 @@ test('private REST history disappears at the auth gate and a late old response c
     await page.goto('/app?pane=machines');
     const panel = page.getByRole('complementary', { name: '电脑' });
     await panel.locator('[data-slot="list-card"]').first().getByRole('button').click();
+    await panel.getByRole('tab', { name: '在这台工作' }).click();
     await expect(entries(panel)).toContainText(['first-owner-only']);
     holdFirstHistory = true;
     await emit(page, { type: 'ping', seq: 1 });
@@ -502,6 +504,7 @@ test('with a machine listed the panel still shows its card and the screen placeh
   );
   const card = panel;
   await expect(card.getByTestId('machine-screen')).toBeVisible();
+  await card.getByRole('tab', { name: 'Agent 的权限' }).click();
   await expect(card.getByText('已安装')).toHaveCount(0);
   await expect(card.getByText('未安装')).toHaveCount(0);
   await expect(card.getByRole('switch', { name: '桌面控制' })).toBeEnabled();
@@ -515,7 +518,7 @@ test('with a machine listed the panel still shows its card and the screen placeh
 test('with no machines the list is only the add row and the hint', async ({ page }) => {
   const panel = await open(page, { computers: [], commands: [] }, [], false);
   await expect(panel.getByRole('heading', { name: '你的电脑' })).toBeVisible();
-  await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(0);
+  await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(1);
   await expect(panel.getByTestId('machine-list-row')).toHaveCount(0);
   await expect(panel.getByTestId('machines-add').getByRole('link', { name: '添加电脑' })).toBeVisible();
   await expect(panel).toContainText('没有其他电脑时，任务都在 Coordinator 这台电脑上跑。');
@@ -553,11 +556,13 @@ test('the live screen enlarges and becomes interactive after desktop control is 
   );
   const card = panel;
   await expect(card.getByTestId('machine-screen-expand')).toBeVisible();
+  await card.getByRole('tab', { name: 'Agent 的权限' }).click();
   await card.getByRole('switch', { name: '桌面控制' }).click();
   await expect(card.getByRole('switch', { name: '桌面控制' })).toHaveAttribute(
     'aria-checked',
     'true',
   );
+  await card.getByRole('tab', { name: '在这台工作' }).click();
   await card.getByTestId('machine-screen-expand').click();
   const enlarged = page.getByTestId('machine-screen-enlarged');
   await expect(enlarged).toBeVisible();
@@ -584,6 +589,7 @@ test('without a computer row the machine keeps the waiting placeholder and disab
   const card = panel;
   await expect(card.getByTestId('machine-screen')).toHaveCount(0);
   await expect(card.getByTestId('machine-screen-hint')).toBeVisible();
+  await card.getByRole('tab', { name: 'Agent 的权限' }).click();
   await expect(card.getByRole('switch', { name: '桌面控制' })).toBeDisabled();
   await expect(card.getByText('已安装')).toHaveCount(0);
   await expect(card.getByText('未安装')).toHaveCount(0);

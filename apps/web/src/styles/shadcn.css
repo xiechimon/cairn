@@ -109,6 +109,7 @@
   --radius-bubble: 18px;
   --radius-control: 8px;
   --e1: 0 0 0 1px var(--border);
+  --e1-lift: 0 0 0 1px var(--border), var(--shadow-lift);
   --e2: var(--shadow-floating), inset 0 0 0 1px var(--elevated-ring);
   --e3: var(--shadow-dialog), 0 0 0 1px var(--dialog-ring);
   --panel-shadow: var(--e1);
@@ -155,6 +156,7 @@
   --cds-shadow-lg: 0 4px 12px rgb(0 0 0 / 0.4), 0 24px 48px -12px rgb(0 0 0 / 0.6), var(--top);
   --elevated-ring: rgb(255 255 255 / 0.04);
   --dialog-ring: rgb(255 255 255 / 0.05);
+  --shadow-lift: 0 1px 2px rgb(0 0 0 / 0.24);
   --shadow-floating: 0 2px 6px rgb(0 0 0 / 0.2), 0 8px 24px rgb(0 0 0 / 0.32);
   --shadow-dialog: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.24);
   --shadow-jump: 0 2px 4px rgb(0 0 0 / 0.07), 0 6px 16px rgb(0 0 0 / 0.24);
@@ -306,6 +308,7 @@
   --cds-shadow-lg: 0 4px 12px rgb(29 35 31 / 0.08), 0 24px 48px -12px rgb(29 35 31 / 0.25);
   --elevated-ring: rgb(0 0 0 / 0.06);
   --dialog-ring: rgb(0 0 0 / 0.08);
+  --shadow-lift: 0 1px 2px rgb(0 0 0 / 0.04);
   --shadow-floating: 0 2px 6px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.1);
   --shadow-dialog: 0 1px 2px rgb(0 0 0 / 0.04), 0 2px 8px rgb(0 0 0 / 0.1);
   --shadow-jump: 0 2px 4px rgb(0 0 0 / 0.04), 0 6px 16px rgb(0 0 0 / 0.1);

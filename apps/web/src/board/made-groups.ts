@@ -1,24 +1,22 @@
-import { dayIndex } from './rel-time.js';
+import type { MadeKind, TodoRecord } from '../fixtures/records.js';
 
-export type MadeGroupKey = 'today' | 'yesterday' | 'week' | 'earlier';
+export type MadeGroupKey = MadeKind | 'other';
+
+const GROUP_ORDER: readonly MadeGroupKey[] = ['document', 'design', 'page', 'code', 'other'];
 
 export const MADE_GROUP_LABEL: Record<MadeGroupKey, string> = {
-  today: '今天',
-  yesterday: '昨天',
-  week: '本周',
-  earlier: '更早',
+  document: '文档',
+  design: '设计',
+  page: '网页',
+  code: '代码改动',
+  other: '其他',
 };
 
-const MONDAY_OFFSET = 3;
-const DAYS_PER_WEEK = 7;
-
-export function madeGroupOf(ts: number, now: number): MadeGroupKey {
-  const today = dayIndex(now);
-  const day = dayIndex(ts);
-  if (day >= today) return 'today';
-  if (day === today - 1) return 'yesterday';
-  const weekStart = today - ((today + MONDAY_OFFSET) % DAYS_PER_WEEK);
-  return day >= weekStart ? 'week' : 'earlier';
+export function madeKindOf(todo: Pick<TodoRecord, 'madeKind' | 'output'>): MadeGroupKey {
+  if (todo.madeKind !== undefined) return todo.madeKind;
+  if (todo.output === 'code') return 'code';
+  if (todo.output === 'info') return 'document';
+  return 'other';
 }
 
 export interface MadeGroup<T> {
@@ -26,26 +24,27 @@ export interface MadeGroup<T> {
   items: T[];
 }
 
-export function groupMade<T extends { phaseAt: number }>(
+export function groupMade<T extends Pick<TodoRecord, 'madeKind' | 'output' | 'phaseAt'>>(
   items: readonly T[],
-  now: number,
 ): MadeGroup<T>[] {
-  const groups: MadeGroup<T>[] = [];
+  const byKey = new Map<MadeGroupKey, T[]>();
   for (const item of [...items].sort((a, b) => b.phaseAt - a.phaseAt)) {
-    const key = madeGroupOf(item.phaseAt, now);
-    const last = groups.at(-1);
-    if (last?.key === key) last.items.push(item);
-    else groups.push({ key, items: [item] });
+    const key = madeKindOf(item);
+    byKey.set(key, [...(byKey.get(key) ?? []), item]);
   }
-  return groups;
+  return GROUP_ORDER.flatMap((key) => {
+    const group = byKey.get(key);
+    return group === undefined ? [] : [{ key, items: group }];
+  });
 }
 
 export function matchesMadeQuery(
   title: string,
   projectName: string | undefined,
   query: string,
+  kindLabel = '',
 ): boolean {
   const needle = query.trim().toLowerCase();
   if (needle === '') return true;
-  return `${title}\n${projectName ?? ''}`.toLowerCase().includes(needle);
+  return `${title}\n${projectName ?? ''}\n${kindLabel}`.toLowerCase().includes(needle);
 }

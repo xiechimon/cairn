@@ -47,6 +47,8 @@ export interface BuildRef {
   createdAt: number;
 }
 
+export type MadeKind = 'document' | 'design' | 'page' | 'code';
+
 export interface TodoRecord {
   id: string;
   teamId: string;
@@ -82,6 +84,9 @@ export interface TodoRecord {
   owner?: TodoOwner;
   output?: TodoOutputKind;
   section?: TodoSection | null;
+  madeKind?: MadeKind;
+  previewUrl?: string;
+  visibility?: 'private' | 'team';
   routeOverride?: {
     machineId?: string;
     requiredCapabilities?: {
@@ -243,6 +248,7 @@ export interface FixtureSet {
   chief?: ChiefContent;
   github?: GithubFixture;
   tags?: Array<Pick<TagRecord, 'id' | 'name' | 'color'>>;
+  machinesOpen?: string;
 }
 
 export interface GithubFixture {
@@ -292,6 +298,21 @@ export interface MachineRow {
   concurrencySource?: 'measured' | 'estimate' | 'manual';
   claudeLogin?: ClaudeLogin;
   providers?: MachineProvider[];
+  hostname?: string;
+  folders?: MachineFolder[];
+  runningHere?: MachineRunningThread[];
+}
+
+export interface MachineFolder {
+  path: string;
+  enabled: boolean;
+}
+
+export interface MachineRunningThread {
+  threadId: string;
+  title: string;
+  projectId: string;
+  startedAt: number;
 }
 
 export interface ResourcesContent {

@@ -1,54 +1,33 @@
 import { describe, expect, it } from 'vitest';
-import { groupMade, madeGroupOf, matchesMadeQuery } from '../src/board/made-groups.js';
+import { groupMade, madeKindOf, matchesMadeQuery } from '../src/board/made-groups.js';
 
-const at = (date: string, time: string) => Date.parse(`${date}T${time}+08:00`);
-
-const THURSDAY = at('2026-09-24', '20:30:00');
-
-describe('madeGroupOf', () => {
-  it('puts the same calendar day in today, including just after midnight', () => {
-    expect(madeGroupOf(at('2026-09-24', '00:00:00'), THURSDAY)).toBe('today');
-    expect(madeGroupOf(at('2026-09-24', '20:29:00'), THURSDAY)).toBe('today');
+describe('madeKindOf', () => {
+  it('uses the explicit kind first', () => {
+    expect(madeKindOf({ madeKind: 'design', output: 'code' })).toBe('design');
   });
 
-  it('splits at local midnight, not at 24 hours', () => {
-    const justAfterMidnight = at('2026-09-24', '00:10:00');
-    expect(madeGroupOf(at('2026-09-23', '23:50:00'), justAfterMidnight)).toBe('yesterday');
-    expect(madeGroupOf(at('2026-09-23', '00:00:00'), THURSDAY)).toBe('yesterday');
-    expect(madeGroupOf(at('2026-09-22', '23:59:00'), THURSDAY)).toBe('week');
-  });
-
-  it('keeps Monday of the current week in this week and Sunday before it in earlier', () => {
-    expect(madeGroupOf(at('2026-09-21', '00:00:00'), THURSDAY)).toBe('week');
-    expect(madeGroupOf(at('2026-09-20', '23:59:00'), THURSDAY)).toBe('earlier');
-  });
-
-  it('has no this-week group on a Monday', () => {
-    const monday = at('2026-09-21', '09:00:00');
-    expect(madeGroupOf(at('2026-09-20', '12:00:00'), monday)).toBe('yesterday');
-    expect(madeGroupOf(at('2026-09-19', '12:00:00'), monday)).toBe('earlier');
-  });
-
-  it('treats a timestamp slightly in the future as today', () => {
-    expect(madeGroupOf(THURSDAY + 60_000, THURSDAY)).toBe('today');
+  it('falls back to the deliverable output, then to other', () => {
+    expect(madeKindOf({ output: 'code' })).toBe('code');
+    expect(madeKindOf({ output: 'info' })).toBe('document');
+    expect(madeKindOf({})).toBe('other');
   });
 });
 
 describe('groupMade', () => {
-  it('orders groups newest first and drops empty ones', () => {
+  it('groups by kind in a fixed order, newest first inside each, and drops empty groups', () => {
     const items = [
-      { id: 'old', phaseAt: at('2026-09-10', '10:00:00') },
-      { id: 'new', phaseAt: at('2026-09-24', '19:00:00') },
-      { id: 'mid', phaseAt: at('2026-09-22', '10:00:00') },
-      { id: 'newer', phaseAt: at('2026-09-24', '20:00:00') },
+      { id: 'old-doc', madeKind: 'document' as const, phaseAt: 1 },
+      { id: 'legacy', phaseAt: 5 },
+      { id: 'new-doc', madeKind: 'document' as const, phaseAt: 9 },
+      { id: 'design', madeKind: 'design' as const, phaseAt: 3 },
     ];
-    const groups = groupMade(items, THURSDAY);
-    expect(groups.map((g) => g.key)).toEqual(['today', 'week', 'earlier']);
-    expect(groups[0]?.items.map((i) => i.id)).toEqual(['newer', 'new']);
+    const groups = groupMade(items);
+    expect(groups.map((g) => g.key)).toEqual(['document', 'design', 'other']);
+    expect(groups[0]?.items.map((i) => i.id)).toEqual(['new-doc', 'old-doc']);
   });
 
   it('returns nothing for no items', () => {
-    expect(groupMade([], THURSDAY)).toEqual([]);
+    expect(groupMade([])).toEqual([]);
   });
 });
 
@@ -57,6 +36,11 @@ describe('matchesMadeQuery', () => {
     expect(matchesMadeQuery('Unread dot on threads', 'cairn', 'UNREAD')).toBe(true);
     expect(matchesMadeQuery('Unread dot on threads', 'Credential relay', 'relay')).toBe(true);
     expect(matchesMadeQuery('Unread dot on threads', 'cairn', 'zzz')).toBe(false);
+  });
+
+  it('matches the kind label too', () => {
+    expect(matchesMadeQuery('Design System', 'cairn', '设计', '设计')).toBe(true);
+    expect(matchesMadeQuery('Design System', 'cairn', '文档', '设计')).toBe(false);
   });
 
   it('matches everything for a blank query and tolerates a missing project', () => {

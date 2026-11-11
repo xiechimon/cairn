@@ -9,17 +9,16 @@ import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
-import { StoneTrail } from '../components/stone/stone-group.js';
 import { prByThread } from '../components/thread/pr-panel-model.js';
-import { ThreadRow } from '../components/thread/thread-row.js';
 import { Button } from '../components/ui/button.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { groupMade, MADE_GROUP_LABEL, matchesMadeQuery } from './made-groups.js';
+import { MadeCard, MadeCarousel } from './made-carousel.js';
+import { groupMade, MADE_GROUP_LABEL, madeKindOf, matchesMadeQuery } from './made-groups.js';
 import { MadeSearch } from './made-search.js';
 import { joinMeta, relativeTime } from './rel-time.js';
-import { threadCopy, threadStatus } from './thread-copy.js';
+import { threadStatus } from './thread-copy.js';
 
 export type WorkPane = 'tasks' | 'made' | 'machines';
 
@@ -40,7 +39,7 @@ interface WorkPanelProps {
   todosQuery?: QueryLike;
 }
 
-function useProjectNames(): ReadonlyMap<string, string> {
+export function useProjectNames(): ReadonlyMap<string, string> {
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
   const { search } = useLocation();
@@ -85,8 +84,10 @@ export function WorkPanel({
   const showProject = projectId === null;
   const projectOf = (todo: TodoRecord) =>
     showProject ? projectNames.get(todo.projectId) : undefined;
-  const made = source.filter((todo) => matchesMadeQuery(todo.title, projectOf(todo), query));
-  const groups = groupMade(made, now);
+  const made = source.filter((todo) =>
+    matchesMadeQuery(todo.title, projectOf(todo), query, t(MADE_GROUP_LABEL[madeKindOf(todo)])),
+  );
+  const groups = groupMade(made);
   const activeQuery: QueryLike | undefined =
     tab === 'archived' && connected ? archivedQ : todosQuery;
 
@@ -101,7 +102,7 @@ export function WorkPanel({
       tab === 'archived' ? (
         <p
           data-testid="made-archived-empty"
-          className="m-0 px-2.5 pt-3 text-ui text-content-tertiary"
+          className="m-0 px-4 pt-8 text-ui text-content-tertiary"
         >
           {t('还没有已归档的成果')}
         </p>
@@ -125,30 +126,30 @@ export function WorkPanel({
 
   const listView = (
     <>
-      {groups.map((group) => (
-        <section key={group.key} data-testid="made-group" data-group={group.key}>
-          <h3 className="m-0 flex items-baseline gap-1.5 pt-3.5 pr-2.5 pb-1 pl-8.5 text-meta font-normal text-content-secondary">
+      {groups.map((group, index) => (
+        <section
+          key={group.key}
+          data-testid="made-group"
+          data-group={group.key}
+          className={index === 0 ? 'pt-7' : 'pt-9'}
+        >
+          <h3 className="m-0 flex items-baseline gap-1.5 px-4 pb-1 text-ui font-normal text-foreground">
             {t(MADE_GROUP_LABEL[group.key])}
             <span data-testid="made-group-count" className="text-content-tertiary tabular-nums">
               {group.items.length}
             </span>
           </h3>
-          <StoneTrail className="px-0 pt-0">
-            {group.items.map((todo) => {
-              const pr = prOf.get(todo.id);
-              return (
-                <ThreadRow
-                  key={todo.id}
-                  {...(pr === undefined ? {} : { prLink: { number: pr.number, url: pr.url } })}
-                  title={todo.title}
-                  tone="resolved"
-                  reason={joinMeta([projectOf(todo), t(threadCopy(todo).reason)])}
-                  age={relativeTime(todo.phaseAt, now, t)}
-                  onOpen={() => onOpenThread(todo.id)}
-                />
-              );
-            })}
-          </StoneTrail>
+          <MadeCarousel groupKey={group.key} count={group.items.length}>
+            {group.items.map((todo) => (
+              <MadeCard
+                key={todo.id}
+                todo={todo}
+                meta={joinMeta([relativeTime(todo.phaseAt, now, t), projectOf(todo)])}
+                pr={prOf.get(todo.id)}
+                onOpen={() => onOpenThread(todo.id)}
+              />
+            ))}
+          </MadeCarousel>
         </section>
       ))}
     </>
@@ -164,38 +165,36 @@ export function WorkPanel({
           trigger={
             <Button
               variant="ghost"
-              size="icon"
+              size="icon-sm"
               data-testid="made-search-toggle"
               aria-pressed={searching}
               onClick={toggleSearch}
-              className="size-7.5 text-content-tertiary aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+              className="text-content-secondary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
             />
           }
         >
-          <Search aria-hidden className="size-4" strokeWidth={1.75} />
+          <Search aria-hidden className="size-4.5" strokeWidth={1.75} />
         </IconTooltip>
       </SidePanelHead>
       {searching && <MadeSearch value={query} onChange={setQuery} onClose={closeSearch} />}
-      <div className="flex flex-none px-3 pb-1">
+      <div className="flex flex-none px-4">
         <SegmentedTabs
-          quiet
           value={tab}
           onChange={setTab}
           label={title}
+          className="h-7 p-0.5 group-data-horizontal/tabs:h-7"
+          optionHandle="h-6 px-2.5 text-foreground data-active:font-normal dark:text-foreground"
           options={[
             { value: 'all', label: t('全部'), testId: 'made-tab-all' },
             { value: 'archived', label: t('已归档'), testId: 'made-tab-archived' },
           ]}
         />
       </div>
-      <div
-        data-testid="made-tabs"
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-1 pb-4"
-      >
+      <div data-testid="made-tabs" className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-6">
         {tab === 'archived' && (
           <p
             data-testid="made-archived-note"
-            className="m-0 px-2.5 pt-2 text-meta text-content-tertiary"
+            className="m-0 px-4 pt-5 text-ui text-content-tertiary"
           >
             {t('已归档的成果会一直保留，直到你删除它或它所在的项目。')}
           </p>

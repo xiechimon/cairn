@@ -1,9 +1,9 @@
 import type { ComputerRecord } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
-import { Laptop, MonitorSmartphone, Plus, Server } from 'lucide-react';
+import { Folder, Laptop, MonitorSmartphone, Plus, Server } from 'lucide-react';
 import { type ReactElement, type ReactNode, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { useAuth } from '../api/auth.js';
 import {
   acquireComputerControl,
@@ -20,6 +20,7 @@ import { useLiveData } from '../api/provider.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { ListCard } from '../components/list-card.js';
 import { QueryBoundary, type QueryLike, queryPhase } from '../components/query-state.js';
+import { SegmentedTabs } from '../components/segmented.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
@@ -27,7 +28,9 @@ import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { Spinner } from '../components/ui/spinner.js';
 import type { MachineRow } from '../fixtures/records.js';
+import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import type { TFunc } from '../i18n/translate.js';
 import { ChevronLeft, ChevronRight, X } from '../icons/index.js';
 import { settingsHref } from '../settings/settings-href.js';
 import { CoordinatorComputer } from './computer-feed.js';
@@ -38,7 +41,9 @@ import {
   desktopControlInstalled,
   desktopControlOnline,
 } from './machine-capabilities.js';
-import { relativeTime } from './rel-time.js';
+import { joinMeta, relativeTime } from './rel-time.js';
+import { useOpenThread } from './thread-link.js';
+import { useProjectNames } from './work-panel.js';
 
 export function coordinatorMachine(machines: readonly MachineRow[]): MachineRow | null {
   return (
@@ -57,7 +62,7 @@ function StatusDot({ online, className }: { online: boolean; className?: string 
       data-online={online}
       className={cn(
         'block size-1.5 flex-none rounded-full',
-        online ? 'bg-running' : 'rounded-full border border-content-dim bg-background',
+        online ? 'bg-running' : 'rounded-full border border-content-tertiary bg-background',
         className,
       )}
     />
@@ -67,40 +72,63 @@ function StatusDot({ online, className }: { online: boolean; className?: string 
 function MachineGlyph({ machine }: { machine: MachineRow }) {
   const Icon = machine.kind === 'local' ? Laptop : Server;
   return (
-    <span className="relative flex-none text-content-secondary">
+    <span className="relative flex flex-none text-content-secondary">
       <Icon aria-hidden="true" className="size-4.5" />
       <StatusDot
         online={machine.online === true}
-        className="absolute -right-0.5 -bottom-0.5 size-2 ring-2 ring-card"
+        className="absolute -right-0.5 -bottom-0.5 ring-2 ring-background"
       />
     </span>
   );
 }
 
-function MachineStatus({
+const MINUTE_MS = 60_000;
+const MINUTES_SHOWN = 180;
+
+function checkedAgo(ts: number | null | undefined, now: number, t: TFunc): string {
+  if (ts == null || !Number.isFinite(ts) || ts <= 0) return '';
+  const minutes = Math.floor((now - ts) / MINUTE_MS);
+  if (minutes < 1) return t('刚刚检查过');
+  if (minutes < MINUTES_SHOWN) return t('{n} 分钟前检查过', { n: minutes });
+  return t('{time}检查过', { time: relativeTime(ts, now, t) });
+}
+
+function machineMeta(machine: MachineRow, t: TFunc): string {
+  if (machine.online !== true) return checkedAgo(machine.lastSeenAt, Date.now(), t) || t('离线');
+  if (machine.folders === undefined) return machineStateLabel(machine, t);
+  return joinMeta([t('在线'), t('{n} 个文件夹', { n: machine.folders.length })]);
+}
+
+function MachineDetailStatus({
   machine,
   coordinator,
-  dot = false,
 }: {
   machine: MachineRow;
   coordinator: boolean;
-  dot?: boolean;
 }) {
   const { t } = useI18n();
   const online = machine.online === true;
-  const seen = online ? '' : relativeTime(machine.lastSeenAt, Date.now(), t);
-  const state = online
-    ? machineStateLabel(machine, t)
-    : seen === ''
-      ? t('离线')
-      : `${t('离线')} · ${t('最后在线 {time}', { time: seen })}`;
+  const seen = online ? '' : checkedAgo(machine.lastSeenAt, Date.now(), t);
+  const text = joinMeta([
+    online ? t('在线') : t('离线'),
+    seen,
+    coordinator ? t('Coordinator 在这台') : '',
+  ]);
   return (
-    <span className="flex min-w-0 items-center gap-1.5 text-meta text-content-tertiary">
-      {dot && <StatusDot online={online} />}
-      <span className="truncate">
-        {coordinator ? `${state} · ${t('Coordinator 在这台')}` : state}
-      </span>
-    </span>
+    <div className="flex flex-col gap-2 px-2.5">
+      {machine.hostname !== undefined && (
+        <p data-testid="machine-hostname" className="m-0 text-meta text-content-tertiary">
+          {t('它自称')} <span className="font-mono">{machine.hostname}</span>
+        </p>
+      )}
+      <p
+        data-testid="machine-detail-status"
+        className="m-0 flex min-w-0 items-center gap-1.5 text-meta text-content-tertiary"
+      >
+        <StatusDot online={online} />
+        <span className="truncate">{text}</span>
+      </p>
+    </div>
   );
 }
 
@@ -172,7 +200,7 @@ function CapabilityRow({
 }) {
   const reason = disabled ? (disabledReason ?? hint) : undefined;
   return (
-    <div className="flex items-center gap-3 px-3.5 py-2.5">
+    <div className="flex items-center gap-5 py-2.5 pr-4 pl-5">
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="text-ui text-foreground">{label}</span>
         <span className="text-meta text-content-tertiary">{hint}</span>
@@ -213,6 +241,7 @@ function MachineDetail({
   const [browserBusy, setBrowserBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [expandAfterLease, setExpandAfterLease] = useState(false);
+  const [tab, setTab] = useState<DetailTab>('access');
   const reclaiming = useRef(false);
   const controlHeld = leaseId !== null || computer?.controlHolder === 'user';
   const canToggleDesktop =
@@ -352,145 +381,262 @@ function MachineDetail({
       .finally(() => setBusy(false));
   };
 
+  const screen = screenLive && (
+    <ListCard outlined className="flex-none">
+      {expanded ? (
+        <ScreenPlaceholder online label={t('屏幕已放大')} />
+      ) : (
+        <MachineScreenSurface
+          teamId={teamId}
+          computer={computer}
+          leaseId={leaseId}
+          interactive={false}
+          onExpand={openEnlarged}
+        />
+      )}
+    </ListCard>
+  );
+  const enlarged = expanded && screenLive && computer !== null && teamId !== undefined && (
+    <DialogShell
+      bare
+      open={expanded}
+      onClose={() => setExpanded(false)}
+      title={machine.name}
+      width="min(100vw - 1.5rem, 1280px)"
+      height="min(100dvh - 1.5rem, 900px)"
+      className="flex max-h-[calc(100dvh-1.5rem)] flex-col"
+    >
+      <div className="relative flex shrink-0 items-start gap-3 px-4 pt-4 pr-12 pb-2 sm:px-5 sm:pt-4.5 sm:pr-13">
+        <div className="min-w-0 flex-1">
+          <div className="font-heading text-heading leading-[1.4] font-title text-foreground">
+            {machine.name}
+          </div>
+          <p className="mt-0.5 text-meta text-content-tertiary">
+            {leaseId !== null ? t('在大屏里点击和键入') : t('打开桌面控制后再操作')}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="absolute top-3 right-3 text-content-tertiary hover:text-foreground sm:top-4 sm:right-4"
+          aria-label={t('关闭')}
+          onClick={() => setExpanded(false)}
+        >
+          <X width={16} height={16} />
+        </Button>
+      </div>
+      <div
+        data-testid="machine-screen-enlarged"
+        className="grid min-h-0 flex-1 place-items-center px-2 pb-2 sm:px-3 sm:pb-3"
+        style={{ containerType: 'size' }}
+      >
+        <div
+          className="max-h-full max-w-full"
+          style={{
+            aspectRatio: '16 / 10',
+            width: 'min(100cqw, calc(100cqh * 16 / 10))',
+            height: 'min(100cqh, calc(100cqw * 10 / 16))',
+          }}
+        >
+          <MachineScreenSurface
+            teamId={teamId}
+            computer={computer}
+            leaseId={leaseId}
+            interactive={leaseId !== null}
+            fill
+            autoFocus
+          />
+        </div>
+      </div>
+    </DialogShell>
+  );
+
   return (
     <>
-      {screenLive && (
-        <ListCard className="flex-none">
-          {expanded ? (
-            <ScreenPlaceholder online label={t('屏幕已放大')} />
-          ) : (
-            <MachineScreenSurface
-              teamId={teamId}
-              computer={computer}
-              leaseId={leaseId}
-              interactive={false}
-              onExpand={openEnlarged}
-            />
+      <div className="mt-7 flex flex-none">
+        <SegmentedTabs
+          value={tab}
+          onChange={setTab}
+          label={machine.name}
+          className="h-7 w-full p-0.5 group-data-horizontal/tabs:h-7"
+          optionHandle="h-6 flex-1 text-foreground data-active:font-normal dark:text-foreground"
+          options={[
+            { value: 'work', label: t('在这台工作'), testId: 'machine-tab-work' },
+            { value: 'access', label: t('Agent 的权限'), testId: 'machine-tab-access' },
+          ]}
+        />
+      </div>
+      {tab === 'work' ? (
+        <div data-testid="machine-work" className="flex flex-col gap-3">
+          <RunningHere machine={machine} />
+          {screen}
+          {online && !screenLive && (
+            <p
+              data-testid="machine-screen-hint"
+              className="m-0 flex items-center gap-2 px-2.5 text-meta text-content-tertiary"
+            >
+              <MonitorSmartphone aria-hidden="true" className="size-3.5 flex-none" />
+              {t('未开启桌面控制，开启后这里显示屏幕')}
+            </p>
           )}
-        </ListCard>
+          {coordinator && <CoordinatorComputer />}
+        </div>
+      ) : (
+        <div data-testid="machine-access" className="flex flex-col">
+          {machine.folders !== undefined && (
+            <>
+              <SectionLabel className="mt-10">{t('Agent 在这台电脑上能用的文件夹')}</SectionLabel>
+              <ListCard outlined className="flex-none">
+                {machine.folders.length === 0 ? (
+                  <p className="m-0 py-2 pr-4 pl-5 text-ui text-content-tertiary">
+                    {t('还没有开放任何文件夹')}
+                  </p>
+                ) : (
+                  machine.folders.map((folder) => (
+                    <div
+                      key={folder.path}
+                      data-testid="machine-folder"
+                      className="flex h-9 items-center gap-5 pr-5 pl-5"
+                    >
+                      <Folder
+                        aria-hidden="true"
+                        className="size-4.5 flex-none text-content-secondary"
+                      />
+                      <span className="min-w-0 flex-1 truncate font-mono text-ui text-foreground">
+                        {folder.path}
+                      </span>
+                      <span className="flex-none text-meta text-content-tertiary">
+                        {folder.enabled ? t('已开放') : t('未开放')}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </ListCard>
+            </>
+          )}
+          <SectionLabel className={machine.folders === undefined ? 'mt-10' : 'mt-7'}>
+            {t('能力')}
+          </SectionLabel>
+          <ListCard outlined className="flex-none">
+            <CapabilityRow
+              label={t('浏览器')}
+              hint={browserHint}
+              checked={browserEnabled}
+              disabled={!canToggleBrowser}
+              disabledReason={browserHint}
+              onCheckedChange={canToggleBrowser ? onBrowserToggle : undefined}
+            />
+            <CapabilityRow
+              label={t('桌面控制')}
+              hint={t('让 agent 操作这台电脑上的应用。macOS 要在辅助功能里授权。')}
+              checked={desktopInstalled && controlHeld}
+              disabled={!canToggleDesktop}
+              disabledReason={desktopBlockedReason}
+              onCheckedChange={canToggleDesktop ? onDesktopToggle : undefined}
+            />
+          </ListCard>
+        </div>
       )}
-      {expanded && screenLive && computer !== null && teamId !== undefined && (
-        <DialogShell
-          bare
-          open={expanded}
-          onClose={() => setExpanded(false)}
-          title={machine.name}
-          width="min(100vw - 1.5rem, 1280px)"
-          height="min(100dvh - 1.5rem, 900px)"
-          className="flex max-h-[calc(100dvh-1.5rem)] flex-col"
-        >
-          <div className="relative flex shrink-0 items-start gap-3 px-4 pt-4 pr-12 pb-2 sm:px-5 sm:pt-4.5 sm:pr-13">
-            <div className="min-w-0 flex-1">
-              <div className="font-heading text-heading leading-[1.4] font-title text-foreground">
-                {machine.name}
-              </div>
-              <p className="mt-0.5 text-meta text-content-tertiary">
-                {leaseId !== null ? t('在大屏里点击和键入') : t('打开桌面控制后再操作')}
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="absolute top-3 right-3 text-content-tertiary hover:text-foreground sm:top-4 sm:right-4"
-              aria-label={t('关闭')}
-              onClick={() => setExpanded(false)}
-            >
-              <X width={16} height={16} />
-            </Button>
-          </div>
-          <div
-            data-testid="machine-screen-enlarged"
-            className="grid min-h-0 flex-1 place-items-center px-2 pb-2 sm:px-3 sm:pb-3"
-            style={{ containerType: 'size' }}
-          >
-            <div
-              className="max-h-full max-w-full"
-              style={{
-                aspectRatio: '16 / 10',
-                width: 'min(100cqw, calc(100cqh * 16 / 10))',
-                height: 'min(100cqh, calc(100cqw * 10 / 16))',
-              }}
-            >
-              <MachineScreenSurface
-                teamId={teamId}
-                computer={computer}
-                leaseId={leaseId}
-                interactive={leaseId !== null}
-                fill
-                autoFocus
-              />
-            </div>
-          </div>
-        </DialogShell>
-      )}
-      {online && !screenLive && (
-        <p
-          data-testid="machine-screen-hint"
-          className="m-0 flex items-center gap-2 px-1 text-meta text-content-tertiary"
-        >
-          <MonitorSmartphone aria-hidden="true" className="size-3.5 flex-none" />
-          {t('未开启桌面控制，开启后这里显示屏幕')}
-        </p>
-      )}
-      <SectionLabel>{t('能力')}</SectionLabel>
-      <ListCard className="flex-none">
-        <CapabilityRow
-          label={t('浏览器')}
-          hint={browserHint}
-          checked={browserEnabled}
-          disabled={!canToggleBrowser}
-          disabledReason={browserHint}
-          onCheckedChange={canToggleBrowser ? onBrowserToggle : undefined}
-        />
-        <CapabilityRow
-          label={t('桌面控制')}
-          hint={t('让 agent 操作这台电脑上的应用。macOS 要在辅助功能里授权。')}
-          checked={desktopInstalled && controlHeld}
-          disabled={!canToggleDesktop}
-          disabledReason={desktopBlockedReason}
-          onCheckedChange={canToggleDesktop ? onDesktopToggle : undefined}
-        />
-      </ListCard>
-      {coordinator && <CoordinatorComputer />}
+      {enlarged}
     </>
   );
 }
 
-function SectionLabel({ children }: { children: ReactNode }) {
+type DetailTab = 'work' | 'access';
+
+function RunningHere({ machine }: { machine: MachineRow }) {
+  const { t } = useI18n();
+  const openThread = useOpenThread();
+  const projectNames = useProjectNames();
+  const now = Date.now();
+  const running = machine.runningHere;
+  if (running === undefined || running.length === 0) {
+    const count =
+      machine.online === true && running === undefined ? (machine.runningSteps ?? 0) : 0;
+    return (
+      <p
+        data-testid="machine-running-empty"
+        className="m-0 px-2.5 pt-9 pb-5 text-center text-ui text-content-tertiary"
+      >
+        {count > 0
+          ? t('这台电脑上有 {n} 个任务在跑。', { n: count })
+          : t('这台电脑上现在没有在跑的任务。')}
+      </p>
+    );
+  }
   return (
-    <h3 className="m-0 flex h-8 items-center px-1 text-meta font-medium text-content-tertiary">
+    <div className="flex flex-col">
+      <SectionLabel className="mt-10">{t('正在这台电脑上跑')}</SectionLabel>
+      <ListCard outlined className="flex-none">
+        {running.map((thread) => (
+          <Button
+            key={thread.threadId}
+            variant="ghost"
+            data-testid="machine-running-row"
+            onClick={() => openThread(thread.threadId)}
+            className={ROW_CLS}
+          >
+            <span className="flex size-4.5 flex-none items-center justify-center">
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-running" />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-ui text-foreground">{thread.title}</span>
+              <span className="truncate text-meta text-content-tertiary">
+                {joinMeta([
+                  projectNames.get(thread.projectId),
+                  t('{time}开始', { time: relativeTime(thread.startedAt, now, t) }),
+                ])}
+              </span>
+            </span>
+            <ChevronRight aria-hidden="true" className="size-4 flex-none text-content-tertiary" />
+          </Button>
+        ))}
+      </ListCard>
+    </div>
+  );
+}
+
+function SectionLabel({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <h3 className={cn('m-0 px-2.5 pb-1 text-ui font-normal text-foreground', className)}>
       {children}
     </h3>
   );
 }
 
 const ROW_CLS =
-  'h-auto w-full justify-start gap-3 rounded-none px-3.5 py-3 text-left font-normal whitespace-normal hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
+  'h-auto w-full justify-start gap-5 rounded-none py-2 pr-4 pl-5 text-left font-normal whitespace-normal hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 
-function NavButton({
+const LINE_ROW_CLS = 'h-9 py-0';
+
+function LineRow({
   icon,
+  label,
+  chevron = false,
   onClick,
-  children,
   render,
 }: {
   icon: ReactNode;
+  label: string;
+  chevron?: boolean;
   onClick?: () => void;
-  children: ReactNode;
   render?: ReactElement;
 }) {
   return (
-    <Button variant="ghost" onClick={onClick} render={render} className={ROW_CLS}>
-      <span className="flex-none text-content-secondary">{icon}</span>
-      {children}
-    </Button>
-  );
-}
-
-function NavRow(props: Parameters<typeof NavButton>[0]) {
-  return (
-    <ListCard className="flex-none">
-      <NavButton {...props} />
+    <ListCard outlined className="flex-none">
+      <Button
+        variant="ghost"
+        onClick={onClick}
+        render={render}
+        className={cn(ROW_CLS, LINE_ROW_CLS)}
+      >
+        <span className="flex flex-none text-content-secondary">{icon}</span>
+        <span className="min-w-0 flex-1 truncate text-ui text-foreground">{label}</span>
+        {chevron && (
+          <ChevronRight aria-hidden="true" className="size-4 flex-none text-content-tertiary" />
+        )}
+      </Button>
     </ListCard>
   );
 }
@@ -507,6 +653,7 @@ export function MachinesPanel({
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const auth = useAuth();
+  const { search } = useLocation();
   const computersQ = useComputers(teamId, live && !auth.gateOpen);
   const computers = computersQ.data ?? [];
   const host = coordinatorMachine(machines);
@@ -514,7 +661,9 @@ export function MachinesPanel({
   const machinesPhase = queryPhase(query, machines.length === 0);
   const computerFor = (machine: MachineRow): ComputerRecord | null =>
     computers.find((computer) => computer.machine.id === machine.id) ?? null;
-  const [openKey, setOpenKey] = useState<string | null>(null);
+  const [openKey, setOpenKey] = useState<string | null>(() =>
+    live ? null : (resolveScenario(new URLSearchParams(search)).machinesOpen ?? null),
+  );
   const [checkedAt, setCheckedAt] = useState(() => Date.now());
   const [checking, setChecking] = useState(false);
   const keyOf = (machine: MachineRow) => machine.id ?? machine.name;
@@ -539,14 +688,14 @@ export function MachinesPanel({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="-ml-2 text-content-tertiary"
+                className="-ml-1.5 text-content-secondary hover:text-foreground"
                 onClick={() => setOpenKey(null)}
               />
             }
           >
-            <ChevronLeft aria-hidden="true" />
+            <ChevronLeft aria-hidden="true" className="size-4.5" />
           </IconTooltip>
-          <h2 className="m-0 min-w-0 flex-1 truncate text-ui font-medium text-foreground">
+          <h2 className="m-0 min-w-0 flex-1 truncate text-heading font-normal text-foreground">
             {selected.name}
           </h2>
           {selected.id !== undefined && (
@@ -568,11 +717,10 @@ export function MachinesPanel({
             </Button>
           )}
         </SidePanelHead>
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 pt-1 pb-4">
-          <div data-testid="machine-detail-status" className="px-1 pb-1">
-            <MachineStatus machine={selected} coordinator={selected === host} dot />
-          </div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-6">
+          <MachineDetailStatus machine={selected} coordinator={selected === host} />
           <MachineDetail
+            key={keyOf(selected)}
             machine={selected}
             coordinator={selected === host}
             computer={computerFor(selected)}
@@ -581,13 +729,14 @@ export function MachinesPanel({
             )}
             teamId={teamId}
           />
-          <NavRow
-            icon={<Laptop aria-hidden="true" className="size-4" />}
-            onClick={() => setOpenKey(null)}
-          >
-            <span className="min-w-0 flex-1 truncate text-ui text-foreground">{t('所有电脑')}</span>
-            <ChevronRight aria-hidden="true" className="size-4 flex-none text-content-dim" />
-          </NavRow>
+          <div className="mt-7">
+            <LineRow
+              icon={<Laptop aria-hidden="true" className="size-4.5" />}
+              label={t('所有电脑')}
+              chevron
+              onClick={() => setOpenKey(null)}
+            />
+          </div>
         </div>
       </SidePanel>
     );
@@ -598,7 +747,7 @@ export function MachinesPanel({
       <SidePanelHead closeLabel={t('关闭')} onClose={onClose}>
         <SidePanelTitle>{t('电脑')}</SidePanelTitle>
       </SidePanelHead>
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 pt-1 pb-4">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-1 pb-6">
         <SectionLabel>{t('你的电脑')}</SectionLabel>
         <QueryBoundary
           query={query}
@@ -607,25 +756,30 @@ export function MachinesPanel({
           errorTitle={t('电脑没能加载')}
           empty={null}
         >
-          <ListCard className="flex-none">
+          <ListCard outlined className="flex-none">
             {ordered.map((machine) => (
-              <NavButton
+              <Button
                 key={keyOf(machine)}
-                icon={<MachineGlyph machine={machine} />}
+                variant="ghost"
                 onClick={() => setOpenKey(keyOf(machine))}
+                className={ROW_CLS}
               >
+                <MachineGlyph machine={machine} />
                 <span data-testid="machine-list-row" className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-ui font-medium text-foreground">
-                    {machine.name}
+                  <span className="truncate text-ui text-foreground">{machine.name}</span>
+                  <span className="truncate text-meta text-content-tertiary">
+                    {machineMeta(machine, t)}
                   </span>
-                  <MachineStatus machine={machine} coordinator={machine === host} />
                 </span>
-                <ChevronRight aria-hidden="true" className="size-4 flex-none text-content-dim" />
-              </NavButton>
+                <ChevronRight
+                  aria-hidden="true"
+                  className="size-4 flex-none text-content-tertiary"
+                />
+              </Button>
             ))}
           </ListCard>
         </QueryBoundary>
-        <div className="flex items-center justify-between px-1 pb-2 text-meta text-content-tertiary">
+        <div className="flex h-13 flex-none items-center justify-between pr-2 pl-4 text-meta text-content-tertiary">
           <span>{t('{time} 检查过', { time: clockTime(checkedAt) })}</span>
           <Button
             variant="ghost"
@@ -635,7 +789,7 @@ export function MachinesPanel({
             aria-busy={checking}
             disabled={checking}
             onClick={recheck}
-            className="h-6.5 min-w-16 text-meta text-foreground disabled:opacity-100"
+            className="h-7 min-w-16 px-2 text-ui font-normal text-foreground disabled:opacity-100"
           >
             {checking ? (
               <Spinner
@@ -648,21 +802,15 @@ export function MachinesPanel({
             )}
           </Button>
         </div>
-        <div
-          data-testid="machines-add"
-          className="flex flex-none flex-col overflow-hidden rounded-(--radius-card) border border-border"
-        >
-          <NavButton
-            icon={<Plus aria-hidden="true" className="size-4" />}
+        <div data-testid="machines-add" className="mt-7">
+          <LineRow
+            icon={<Plus aria-hidden="true" className="size-4.5" />}
+            label={t('添加电脑')}
             render={<Link to={settingsHref('machines')} />}
-          >
-            <span className="min-w-0 flex-1 truncate text-ui font-medium text-foreground">
-              {t('添加电脑')}
-            </span>
-          </NavButton>
+          />
         </div>
         {ordered.length <= 1 && machinesPhase !== 'loading' && machinesPhase !== 'error' && (
-          <p className="m-0 px-1 text-meta text-content-tertiary">
+          <p className="m-0 px-2.5 pt-3 text-meta text-content-tertiary">
             {t('没有其他电脑时，任务都在 Coordinator 这台电脑上跑。')}
           </p>
         )}

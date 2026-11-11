@@ -23,7 +23,7 @@ export function MadeSearch({
     onClose();
   };
   return (
-    <div className="flex flex-none px-3 pt-3">
+    <div className="flex flex-none px-4 pb-3">
       <Input
         ref={ref}
         data-testid="made-search"

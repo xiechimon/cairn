@@ -298,43 +298,81 @@ test('Made shows an empty state when nothing has finished', async ({ page }) => 
 
 const MADE = '/app?scenario=home-c-made&pane=made';
 
-test('Made groups finished work by day, newest first, with the project name on each row', async ({
+test('Made groups finished work by kind with counts, as horizontal rows of preview cards', async ({
   page,
 }) => {
-  await page.goto(MADE);
+  await page.goto('/app?scenario=make-ref&pane=made');
   const groups = madePanel(page).getByTestId('made-group');
-  await expect(groups).toHaveCount(4);
-  await expect(groups.nth(0)).toContainText('今天');
-  await expect(groups.nth(1)).toContainText('昨天');
-  await expect(groups.nth(2)).toContainText('本周');
-  await expect(groups.nth(3)).toContainText('更早');
-  await expect(groups.getByTestId('made-group-count')).toHaveText(['1', '1', '2', '1']);
-  await expect(groups.nth(0).locator('[data-slot="thread-row"]')).toHaveCount(1);
-  await expect(groups.nth(2).locator('[data-slot="thread-row"]')).toHaveCount(2);
-  await expect(groups.nth(0)).toContainText('Contributing guide');
-  await expect(groups.nth(0)).toContainText('cairn');
-  await expect(groups.nth(3)).toContainText('Credential relay');
-  await expect(madePanel(page)).not.toContainText('Retired onboarding checklist');
-  await expect(madePanel(page).getByTestId('made-archived-note')).toHaveCount(0);
+  await expect(groups).toHaveCount(3);
+  await expect(groups.locator('h3')).toHaveText(['文档6', '设计3', '其他1']);
+  await expect(groups.nth(0).getByTestId('made-card')).toHaveCount(6);
+  const first = groups.nth(0).getByTestId('made-card').first();
+  await expect(first).toContainText('发布会演讲稿');
+  await expect(first.getByTestId('made-card-meta')).toHaveText('18 小时前 · cairn');
+  await expect(first).toContainText('仅自己可见');
+  await expect(first.locator('img')).toHaveCount(1);
+  const other = groups.nth(2).getByTestId('made-card').first();
+  await expect(other.getByTestId('made-card-placeholder')).toBeVisible();
+  await expect(other.locator('img')).toHaveCount(0);
+  const box = await first.boundingBox();
+  const second = await groups.nth(0).getByTestId('made-card').nth(1).boundingBox();
+  expect(Math.abs((box?.y ?? 0) - (second?.y ?? 1))).toBeLessThan(1);
+  expect(box?.height).toBe(144);
+  await expect(madePanel(page)).not.toContainText('Unread dot on threads');
 });
 
-test('Made with many finished items scrolls the list under fixed tabs', async ({ page }) => {
+test('a carousel pages with its arrows and keeps the next page reachable by keyboard', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=make-ref&pane=made');
+  const docs = madePanel(page).getByTestId('made-group').first();
+  const cards = docs.getByTestId('made-card');
+  await expect(docs.getByTestId('made-carousel-prev')).toHaveCount(0);
+  await expect(cards.nth(2)).not.toBeInViewport({ ratio: 0.9 });
+  await docs.getByTestId('made-carousel-next').click();
+  await expect(cards.nth(2)).toBeInViewport({ ratio: 0.99 });
+  await expect(docs.getByTestId('made-carousel-prev')).toBeVisible();
+  await docs.getByTestId('made-carousel-next').click();
+  await expect(cards.nth(5)).toBeInViewport({ ratio: 0.9 });
+  await expect(docs.getByTestId('made-carousel-next')).toHaveCount(0);
+  await docs.getByTestId('made-carousel-prev').click();
+  await expect(cards.nth(2)).toBeInViewport({ ratio: 0.99 });
+  await docs.getByTestId('made-carousel-prev').click();
+  await expect(docs.getByTestId('made-carousel-prev')).toHaveCount(0);
+  await expect(cards.nth(0)).toBeInViewport({ ratio: 0.9 });
+  await cards.nth(0).getByRole('button').focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  await expect(cards.nth(2).getByRole('button')).toBeFocused();
+  await expect(cards.nth(2)).toBeInViewport({ ratio: 0.9 });
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/[?&]thread=ref-doc-2/);
+});
+
+test('Made search also matches the kind and keeps the matching group', async ({ page }) => {
+  await page.goto('/app?scenario=make-ref&pane=made');
+  await madePanel(page).getByRole('button', { name: '搜索成果' }).click();
+  await madePanel(page).getByTestId('made-search').fill('设计');
+  await expect(madePanel(page).getByTestId('made-group').locator('h3')).toHaveText(['设计3']);
+});
+
+test('Made with many finished items scrolls the groups under fixed tabs', async ({ page }) => {
   await page.goto('/app?scenario=home-c-made-many&pane=made');
-  const rows = madePanel(page).locator('[data-slot="thread-row"]');
-  await expect(rows).toHaveCount(15);
+  const cards = madePanel(page).getByTestId('made-card');
+  await expect(cards).toHaveCount(15);
   const tabs = madePanel(page).getByTestId('made-tabs');
   await tabs.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
   await expect(madePanel(page).getByRole('tab', { name: '全部' })).toBeInViewport();
-  await expect(rows.last()).toBeInViewport();
+  await expect(madePanel(page).getByTestId('made-group').last()).toBeInViewport();
 });
 
 test('Made search filters by title and project, and Escape clears and closes it', async ({
   page,
 }) => {
   await page.goto(MADE);
-  const rows = madePanel(page).locator('[data-slot="thread-row"]');
+  const rows = madePanel(page).getByTestId('made-card');
   await expect(rows).toHaveCount(5);
   await expect(madePanel(page).getByTestId('made-search')).toHaveCount(0);
   await madePanel(page).getByRole('button', { name: '搜索成果' }).click();
@@ -361,7 +399,7 @@ test('Made archived tab lists archived finished work and keeps the retention not
   const tabs = madePanel(page).getByTestId('made-tabs');
   await expect(tabs).toBeVisible();
   await madePanel(page).getByRole('tab', { name: '已归档' }).click();
-  const rows = madePanel(page).locator('[data-slot="thread-row"]');
+  const rows = madePanel(page).getByTestId('made-card');
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('Retired onboarding checklist');
   await expect(madePanel(page).getByTestId('made-archived-note')).toHaveText(

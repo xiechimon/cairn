@@ -311,3 +311,139 @@ export const homeCMadeMany: FixtureSet = {
   ],
   now: at(MADE_DAY, 20, 30),
 };
+
+const MINUTE_MS = 60_000;
+
+export const sessionsRef: FixtureSet = {
+  ...homeC,
+  resources: {
+    skills: [],
+    mcpServers: [],
+    providerSources: [],
+    machines: [
+      {
+        id: 'ref-macbook',
+        kind: 'local',
+        name: '工作室的 MacBook Air',
+        hostname: 'studio-mbp-01',
+        online: true,
+        runningSteps: 2,
+        maxConcurrent: 8,
+        folders: [
+          { path: 'tmp', enabled: true },
+          { path: '~/Code', enabled: true },
+        ],
+        runningHere: [
+          {
+            threadId: 'home-c-working-a',
+            title: 'Push for finished threads',
+            projectId: PROJECT_ID,
+            startedAt: Date.now() - 12 * MINUTE_MS,
+          },
+          {
+            threadId: 'home-c-working-c',
+            title: 'Orb canary round 7',
+            projectId: HOME_C_CRED,
+            startedAt: Date.now() - 41 * MINUTE_MS,
+          },
+        ],
+      },
+      {
+        id: 'ref-huihui',
+        kind: 'local',
+        name: '办公室 Mac mini',
+        hostname: 'huihui-mbp',
+        online: false,
+        lastSeenAt: Date.now() - 114 * MINUTE_MS,
+        maxConcurrent: 4,
+        folders: [{ path: '~/Projects', enabled: false }],
+        runningHere: [],
+      },
+    ],
+  },
+};
+
+export const sessionsRefDetail: FixtureSet = { ...sessionsRef, machinesOpen: 'ref-macbook' };
+
+const PREVIEW_INK = 'rgb(38 38 38)';
+const PREVIEW_LINE = 'rgb(214 214 214)';
+const PREVIEW_FILL = 'rgb(236 236 236)';
+
+function svgPreview(body: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="260" viewBox="0 0 400 260"><rect width="400" height="260" fill="rgb(255 255 255)"/>${body}</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function docPreview(title: string): string {
+  const lines = [70, 92, 114, 136, 158]
+    .map(
+      (y, i) =>
+        `<rect x="36" y="${y}" width="${i % 2 === 0 ? 300 : 240}" height="8" rx="4" fill="${PREVIEW_LINE}"/>`,
+    )
+    .join('');
+  return svgPreview(
+    `<text x="36" y="44" font-family="sans-serif" font-size="20" font-weight="600" fill="${PREVIEW_INK}">${title}</text>${lines}`,
+  );
+}
+
+function designPreview(): string {
+  return svgPreview(
+    `<circle cx="80" cy="96" r="44" fill="${PREVIEW_FILL}"/><rect x="150" y="52" width="88" height="88" rx="18" fill="${PREVIEW_FILL}"/><polyline points="270,140 300,96 330,112 364,52" fill="none" stroke="${PREVIEW_LINE}" stroke-width="4"/>`,
+  );
+}
+
+function refMade(
+  id: string,
+  seqNum: number,
+  title: string,
+  madeKind: TodoRecord['madeKind'],
+  phaseAt: number,
+  previewUrl?: string,
+): TodoRecord {
+  return {
+    ...madeTodo(id, seqNum, title, PROJECT_ID, phaseAt),
+    ...(madeKind === undefined ? {} : { madeKind }),
+    ...(previewUrl === undefined ? {} : { previewUrl }),
+    visibility: 'private',
+  };
+}
+
+const REF_DOCS = [
+  '发布会演讲稿（15 分钟）与时长分配',
+  '产品路线图梳理（负责人速读版）',
+  'cairn 贡献指南',
+  '仓库结构总览',
+  '0.9 版本发布说明',
+  '中继探针复盘报告',
+];
+
+const REF_DESIGNS = ['卡片质感原型 + 自动更新', 'Design System', '设置页搜索草图'];
+
+export const makeRef: FixtureSet = {
+  ...homeC,
+  todos: [
+    ...(homeC.todos ?? []).filter((todo) => todo.phase !== 'done'),
+    ...REF_DOCS.map((title, index) =>
+      refMade(
+        `ref-doc-${index}`,
+        2500 + index,
+        title,
+        'document',
+        at(MADE_DAY, 2, 30) - index * 3 * HOUR_MS,
+        index < 4 ? docPreview(title) : undefined,
+      ),
+    ),
+    ...REF_DESIGNS.map((title, index) =>
+      refMade(
+        `ref-design-${index}`,
+        2520 + index,
+        title,
+        'design',
+        at('2026-09-17', 15, 0) - index * HOUR_MS,
+        index < 2 ? designPreview() : undefined,
+      ),
+    ),
+    refMade('ref-other', 2530, '手帐模板', undefined, at('2026-09-20', 10, 0)),
+  ],
+  now: at(MADE_DAY, 20, 30),
+};

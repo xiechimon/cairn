@@ -157,16 +157,16 @@ export function SidePanelHead({
   children: ReactNode;
 }) {
   return (
-    <div data-panel-head="" className="flex h-12 flex-none items-center gap-1 pr-2.5 pl-4">
+    <div data-panel-head="" className="flex h-12 flex-none items-center gap-2 px-4">
       {children}
       <Button
         variant="ghost"
         size="icon-sm"
-        className="text-content-tertiary"
+        className="text-content-secondary hover:text-foreground"
         aria-label={closeLabel}
         onClick={onClose}
       >
-        <X aria-hidden strokeWidth={1.75} className="size-4" />
+        <X aria-hidden strokeWidth={1.75} className="size-4.5" />
       </Button>
     </div>
   );
@@ -174,7 +174,7 @@ export function SidePanelHead({
 
 export function SidePanelTitle({ children }: { children: ReactNode }) {
   return (
-    <h2 className="m-0 flex min-w-0 flex-1 items-center gap-1.5 truncate text-ui font-semibold text-foreground">
+    <h2 className="m-0 flex min-w-0 flex-1 items-center gap-1.5 truncate text-heading font-normal text-foreground">
       {children}
     </h2>
   );

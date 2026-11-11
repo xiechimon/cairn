@@ -30,7 +30,8 @@ test('the chip opens a list with one row per computer, the Coordinator machine f
   const rows = panel(page).getByRole('button', { name: /xmonsMac|omarchy/ });
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toContainText('xmonsMac');
-  await expect(rows.nth(0)).toContainText('在线 · 2/8 在跑 · Coordinator 在这台');
+  await expect(rows.nth(0)).toContainText('在线 · 2/8 在跑');
+  await expect(rows.nth(0)).not.toContainText('Coordinator');
   await expect(rows.nth(1)).toContainText('omarchy');
   await expect(rows.nth(1)).toContainText('离线');
   await expect(panel(page).getByRole('switch')).toHaveCount(0);
@@ -49,7 +50,14 @@ test('a row opens that computer in the same panel and the back controls return t
   await panel(page).getByRole('button', { name: /xmonsMac/ }).click();
   await expect(page).toHaveURL(/[?&]pane=machines/);
   await expect(panel(page).getByRole('heading', { name: 'xmonsMac' })).toBeVisible();
-  await expect(panel(page)).toContainText('在线 · 2/8 在跑 · Coordinator 在这台');
+  await expect(panel(page).getByTestId('machine-detail-status')).toHaveText(
+    '在线 · Coordinator 在这台',
+  );
+  await expect(panel(page).getByTestId('machine-hostname')).toHaveCount(0);
+  await expect(panel(page).getByRole('tab', { name: 'Agent 的权限' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(panel(page).getByRole('heading', { name: '能力' })).toBeVisible();
   await expect(panel(page).getByText('辅助功能')).toBeVisible();
   for (const name of ['桌面控制', '浏览器']) {
@@ -131,8 +139,12 @@ test('computers share one group, each glyph carries its status dot, and the add 
   await expect(dots.nth(1)).toHaveAttribute('data-online', 'false');
   await expect(dots.nth(2)).toHaveAttribute('data-online', 'true');
   await expect(dots.nth(3)).toHaveAttribute('data-online', 'false');
-  await expect(rows.nth(3)).toContainText('离线 · 最后在线 2 小时前');
-  await expect(panel(page).getByTestId('machines-add').locator('[data-slot="list-card"]')).toHaveCount(0);
+  await expect(rows.nth(3)).toContainText(/^Office Mac mini12\d 分钟前检查过$/);
+  await expect(group).toHaveAttribute('data-outlined', 'true');
+  await expect(panel(page).getByTestId('machines-add').locator('[data-slot="list-card"]')).toHaveAttribute(
+    'data-outlined',
+    'true',
+  );
 });
 
 test('a computer page puts the status under the header and links its settings from Edit', async ({
@@ -141,7 +153,7 @@ test('a computer page puts the status under the header and links its settings fr
   await page.goto('/app?scenario=home-c-machines&pane=machines');
   await panel(page).getByRole('button', { name: /Office Mac mini/ }).click();
   const status = panel(page).getByTestId('machine-detail-status');
-  await expect(status).toContainText('离线 · 最后在线 2 小时前');
+  await expect(status).toHaveText(/^离线 · 12\d 分钟前检查过$/);
   await expect(status.getByTestId('machine-status-dot')).toHaveAttribute('data-online', 'false');
   await expect(panel(page).locator('[data-panel-head]')).not.toContainText('离线');
   await expect(panel(page).getByRole('switch')).toHaveCount(2);
@@ -160,4 +172,64 @@ test('re-checking shows a spinner in place of the label and keeps the button nam
   await recheck.click();
   await expect(recheck).toHaveAttribute('aria-busy', 'false');
   await expect(recheck).toHaveText('再检查一次');
+});
+
+const REF = '/app?scenario=sessions-ref&pane=machines';
+
+test('the reference list shows folder counts online and the minutes since the last check offline', async ({
+  page,
+}) => {
+  await page.goto(REF);
+  const rows = panel(page).getByTestId('machine-list-row');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toHaveText('工作室的 MacBook Air在线 · 2 个文件夹');
+  await expect(rows.nth(1)).toHaveText(/^办公室 Mac mini11[45] 分钟前检查过$/);
+  await expect(panel(page).getByRole('button', { name: /云|cloud/i })).toHaveCount(0);
+});
+
+test('the reference detail names the host, lists folders under access, and work here opens running threads', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=sessions-ref-detail&pane=machines');
+  await expect(panel(page).getByRole('heading', { name: '工作室的 MacBook Air' })).toBeVisible();
+  await expect(panel(page).getByTestId('machine-hostname')).toHaveText('它自称 studio-mbp-01');
+  await expect(panel(page).getByTestId('machine-detail-status')).toHaveText('在线 · Coordinator 在这台');
+  const folders = panel(page).getByTestId('machine-folder');
+  await expect(folders).toHaveText(['tmp已开放', '~/Code已开放']);
+  await expect(folders.first().locator('.font-mono')).toHaveText('tmp');
+  await expect(panel(page).getByRole('switch')).toHaveCount(2);
+
+  await panel(page).getByRole('tab', { name: '在这台工作' }).click();
+  await expect(panel(page).getByTestId('machine-folder')).toHaveCount(0);
+  const running = panel(page).getByTestId('machine-running-row');
+  await expect(running).toHaveCount(2);
+  await expect(running.nth(0)).toContainText('Push for finished threads');
+  await expect(running.nth(0)).toContainText('cairn · 12 分钟前开始');
+  await running.nth(0).click();
+  await expect(page).toHaveURL(/[?&]thread=home-c-working-a/);
+});
+
+test('an offline reference computer says nothing runs there and shows its folders as off', async ({
+  page,
+}) => {
+  await page.goto(REF);
+  await panel(page).getByRole('button', { name: /办公室 Mac mini/ }).click();
+  await expect(panel(page).getByTestId('machine-detail-status')).toHaveText(/^离线 · 11[45] 分钟前检查过$/);
+  await expect(panel(page).getByTestId('machine-folder')).toHaveText(['~/Projects未开放']);
+  await panel(page).getByRole('tab', { name: '在这台工作' }).click();
+  await expect(panel(page).getByTestId('machine-running-empty')).toHaveText(
+    '这台电脑上现在没有在跑的任务。',
+  );
+});
+
+test('a live computer without the running list falls back to its running count on work here', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&pane=machines`);
+  await panel(page).getByRole('button', { name: /xmonsMac/ }).click();
+  await panel(page).getByRole('tab', { name: '在这台工作' }).click();
+  await expect(panel(page).getByTestId('machine-running-empty')).toHaveText('这台电脑上有 2 个任务在跑。');
+  await expect(panel(page).getByTestId('machine-running-row')).toHaveCount(0);
+  await panel(page).getByRole('tab', { name: 'Agent 的权限' }).click();
+  await expect(panel(page).getByText('Agent 在这台电脑上能用的文件夹')).toHaveCount(0);
 });
