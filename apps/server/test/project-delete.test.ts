@@ -19,6 +19,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { repoDirFor } from '../src/services/git.js';
+import { stopStepComputer } from '../src/services/machine-computer.js';
 import { deleteProject } from '../src/services/projects.js';
 import { bootServer, insertMachine, postProject, req, seedSessionRoute } from './helpers.js';
 
@@ -318,6 +319,44 @@ describe('project deletion running guard', () => {
       s.db.run(sql.raw(terminal));
       expect((await req(s.app, 'DELETE', `/api/projects/${projectId}`)).status).toBe(204);
       s.dispose();
+    },
+  );
+
+  test.each(['unfinished', 'finished', 'expired'] as const)(
+    'cancelled computer call after stop: %s',
+    async (lifecycle) => {
+      const { s, projectId } = await runningWorld();
+      try {
+        const now = Date.now();
+        s.db.run(sql`insert into computer_call
+          (id, teamId, stepId, toolCallId, machineId, tool, replaySafe, params, state, deadlineAt, createdAt)
+          values ('stopping', ${s.team.id}, 'settled', 'call', 'machine', 'shell', 0, '{}',
+            'running', ${now + 60_000}, ${now})`);
+        stopStepComputer(s, 'settled');
+        expect(
+          s.db.get(sql`select state, finishedAt from computer_call where id = 'stopping'`),
+        ).toEqual({ state: 'cancelled', finishedAt: null });
+        if (lifecycle === 'finished') {
+          s.db.run(sql`update computer_call set finishedAt = ${now} where id = 'stopping'`);
+        } else if (lifecycle === 'expired') {
+          s.db.run(sql`update computer_call set deadlineAt = ${now - 1} where id = 'stopping'`);
+        }
+        const response = await req(s.app, 'DELETE', `/api/projects/${projectId}`);
+        expect(response.status).toBe(lifecycle === 'unfinished' ? 409 : 204);
+        if (lifecycle === 'unfinished') {
+          expect(await response.json()).toEqual({
+            error:
+              'cannot delete project while work is running: computer-call stopping cancelled on step settled',
+            reason: 'project-running',
+          });
+          expect(s.db.all(sql`select id from project where id = ${projectId}`)).toHaveLength(1);
+          expect(
+            s.db.get(sql`select state, finishedAt from computer_call where id = 'stopping'`),
+          ).toEqual({ state: 'cancelled', finishedAt: null });
+        }
+      } finally {
+        s.dispose();
+      }
     },
   );
 

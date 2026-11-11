@@ -139,6 +139,8 @@ function projectRunningWork(db: ProjectReader, projectId: string): string[] {
       from computer_call
       inner join project_steps as step on step.id = computer_call.stepId
       where computer_call.state in ('dispatched', 'running')
+        or (computer_call.state = 'cancelled' and computer_call.finishedAt is null
+          and computer_call.deadlineAt > ${nowMs()})
       union all
       select 'computer ' || computer.id || ' ' || computer.state || ' on step ' || computer.executionStepId,
         5, computer.id
