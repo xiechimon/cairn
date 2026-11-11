@@ -395,7 +395,7 @@ export function CreateProviderDialog({
                 disabled={xaiSignInPending === true || onXaiSignIn == null}
                 onClick={onXaiSignIn}
               >
-                {t('用 SuperGrok 登录')}
+                {PROVIDER_XAI_PRESET.oauthLabel}
               </Button>
               {xaiDevice != null && (
                 <FieldDescription>
