@@ -1037,6 +1037,13 @@
       "when": 1794422961790,
       "tag": "0151_mail_connector",
       "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "6",
+      "when": 1794432652146,
+      "tag": "0152_mail_owner_conversation",
+      "breakpoints": true
     }
   ]
 }

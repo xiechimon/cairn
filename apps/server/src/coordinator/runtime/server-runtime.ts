@@ -46,7 +46,12 @@ export interface ServerRuntimeConfig {
   stopPollMs?: number;
   factsFor(threadId: string): ReconcileFacts;
   recordConversation?(threadId: string, conversationId: string, entryId: number): void;
-  setConversation?(threadId: string, conversationId: string, watermark: string | null): void;
+  setConversation?(
+    threadId: string,
+    conversationId: string,
+    watermark: string | null,
+    restoreOwnerId: string | null,
+  ): void;
   memoryFlush?(threadId: string): MemoryFlush | null;
   onInputError?(threadId: string, error: unknown): void;
   onReconciled?(threadId: string, outcome: ReconcileOutcome, stale: string[]): void;
@@ -286,7 +291,8 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
           await current.harness,
           context,
           prior.conversationId,
-          (id) => config.setConversation?.(threadId, id, prior.lastMirroredEntryId),
+          (id, restoreOwnerId) =>
+            config.setConversation?.(threadId, id, prior.lastMirroredEntryId, restoreOwnerId),
           run,
         );
       } finally {

@@ -983,6 +983,7 @@ export const coordinatorConversation = sqliteTable('coordinator_conversation', {
   storeId: text('storeId'),
   threadId: text('threadId').primaryKey(),
   conversationId: text('conversationId').notNull(),
+  mailOwnerConversationId: text('mailOwnerConversationId'),
   lastMirroredEntryId: text('lastMirroredEntryId'),
   lastColdSlimAt: epochMs('lastColdSlimAt'),
   lastColdSlimStepId: text('lastColdSlimStepId'),

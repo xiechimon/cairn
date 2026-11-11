@@ -16,19 +16,19 @@ export async function withRegisteredMailConversation<T>(
   harness: Harness,
   context: Context,
   priorId: string | null,
-  register: (conversationId: string) => void,
+  register: (conversationId: string, restoreOwnerId: string | null) => void,
   run: (conversationId: string) => Promise<T>,
 ): Promise<T> {
   const isolated = await harness.createConversation({ ownership: { kind: 'ownerless' } }, context);
-  register(String(isolated.id));
+  register(String(isolated.id), priorId);
   try {
     return await run(String(isolated.id));
   } finally {
     if (priorId !== null) {
-      register(priorId);
+      register(priorId, null);
     } else {
       const fresh = await harness.createConversation({ ownership: { kind: 'ownerless' } }, context);
-      register(String(fresh.id));
+      register(String(fresh.id), null);
     }
   }
 }

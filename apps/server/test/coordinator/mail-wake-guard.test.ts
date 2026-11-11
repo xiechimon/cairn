@@ -4,6 +4,7 @@ import { fenceMailText } from '@cairn/shared';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, it, vi } from 'vitest';
+import { restoreInterruptedMailConversations } from '../../src/coordinator/mail-owner.js';
 import {
   chiefMessage,
   coordinatorConversation,
@@ -14,7 +15,7 @@ import {
 import { flushRuntimeOtel, shutdownRuntimeOtel } from '../../src/runtime-otel.js';
 import { enqueueChiefStep } from '../../src/services/chief.js';
 import { setCoordinatorWake } from '../../src/services/coordinator-context.js';
-import { req } from '../helpers.js';
+import { bootServer, req } from '../helpers.js';
 import { boot, world } from './runner-world.js';
 
 const SECRET = 'MAIL-SECRET-EXCERPT-9f3a';
@@ -104,6 +105,9 @@ it('runs an owner steer that arrives during a mail wake on the restored owner tu
     });
     coordinator.wake(w.threadId);
     expect(await until(() => mailStarted)).toBe(true);
+    const during = w.s.db.select().from(coordinatorConversation).get();
+    expect(during?.conversationId).not.toBe(owner?.conversationId);
+    expect(during?.mailOwnerConversationId).toBe(owner?.conversationId);
 
     const sent = await req(w.s.app, 'POST', `/api/conversations/${w.threadId}/messages`, {
       content: STEER,
@@ -129,6 +133,7 @@ it('runs an owner steer that arrives during a mail wake on the restored owner tu
     );
     const restored = w.s.db.select().from(coordinatorConversation).get();
     expect(restored?.conversationId).toBe(owner?.conversationId);
+    expect(restored?.mailOwnerConversationId).toBeNull();
     const steerStep = w.s.db
       .select()
       .from(step)
@@ -163,6 +168,29 @@ afterEach(async () => {
   const open = collector;
   collector = undefined;
   if (open !== undefined) await new Promise<void>((resolve) => open.close(() => resolve()));
+});
+
+it('restores the persisted owner conversation after an interrupted mail wake', () => {
+  const s = bootServer();
+  try {
+    s.db
+      .insert(coordinatorConversation)
+      .values({
+        threadId: 'thread-mail',
+        conversationId: '9',
+        mailOwnerConversationId: '3',
+        piVersion: '1.5.0',
+        updatedAt: 1,
+      })
+      .run();
+    restoreInterruptedMailConversations(s.db);
+    expect(s.db.select().from(coordinatorConversation).get()).toMatchObject({
+      conversationId: '3',
+      mailOwnerConversationId: null,
+    });
+  } finally {
+    s.dispose();
+  }
 });
 
 it('exports mail-turn telemetry as ids, rule name and sizes only', async () => {
