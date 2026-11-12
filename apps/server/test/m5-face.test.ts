@@ -1,5 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import {
   conversationStreamEventSchema,
   machineRecordSchema,
@@ -446,6 +447,53 @@ describe('SPA static same-origin hosting (02/A1)', () => {
 
       const traversal = await req(s.app, 'GET', '/%2e%2e%2f%2e%2e%2fpackage.json');
       expect(traversal.status).toBe(404);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('compressible files are gzipped for clients that accept it and served verbatim otherwise', async () => {
+    const { s } = await setupWorld({ webDir });
+    const source = `console.log(${JSON.stringify('x'.repeat(4096))})`;
+    writeFileSync(join(webDir, 'assets', 'big.js'), source);
+    writeFileSync(join(webDir, 'big.png'), Buffer.alloc(4096, 1));
+    try {
+      const gzipped = await s.app.request('/assets/big.js', {
+        headers: { 'accept-encoding': 'gzip' },
+      });
+      expect(gzipped.status).toBe(200);
+      expect(gzipped.headers.get('content-encoding')).toBe('gzip');
+      expect(gzipped.headers.get('vary')).toContain('Accept-Encoding');
+      const wire = Buffer.from(await gzipped.arrayBuffer());
+      expect(wire.byteLength).toBeLessThan(source.length);
+      expect(gunzipSync(wire).toString('utf8')).toBe(source);
+
+      const plain = await s.app.request('/assets/big.js');
+      expect(plain.headers.get('content-encoding')).toBeNull();
+      expect(await plain.text()).toBe(source);
+
+      const image = await s.app.request('/big.png', { headers: { 'accept-encoding': 'gzip' } });
+      expect(image.headers.get('content-encoding')).toBeNull();
+      expect((await image.arrayBuffer()).byteLength).toBe(4096);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('hashed assets cache as immutable, other files for an hour, the SPA shell never', async () => {
+    const { s } = await setupWorld({ webDir });
+    try {
+      const asset = await req(s.app, 'GET', '/assets/app.js');
+      expect(asset.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+
+      const manifest = await req(s.app, 'GET', '/manifest.webmanifest');
+      expect(manifest.headers.get('cache-control')).toBe('public, max-age=3600');
+
+      const root = await req(s.app, 'GET', '/');
+      expect(root.headers.get('cache-control')).toBe('no-cache');
+
+      const missingAsset = await req(s.app, 'GET', '/assets/gone.js');
+      expect(missingAsset.headers.get('cache-control')).toBe('no-cache');
     } finally {
       s.dispose();
     }
