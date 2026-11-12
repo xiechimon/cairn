@@ -21,10 +21,16 @@ Not promised: that the bound upstream keeps the value to itself (decision 2), th
 
 Source observations on `78ff80e`:
 
-- A local Orb guest is created with `--network none` (`apps/daemon/src/orb/podman.ts`) or on the proxy-only nspawn zone. Its only way out is the host egress relay (`scripts/ops/orb/egress-relay.mjs`), which runs under its own unit outside the guest, resolves names itself, refuses private and loopback addresses and identifies each client guest from the peer credential of its connection.
+- A local Orb guest is created with `--network none` (`apps/daemon/src/orb/podman.ts`) or on the proxy-only nspawn zone (`scripts/ops/orb/cairn-orb.nspawn`). Its only way out is the host egress relay (`scripts/ops/orb/egress-relay.mjs`), which runs under its own unit outside the guest, resolves names itself and refuses private and loopback addresses.
+- The relay knows which guest is calling only on its Unix socket listener, where it reads the peer credential and maps the caller's cgroup to a guest (`identityFromCgroup`, which recognizes `libpod-*` scopes only). That is the podman backend with an egress socket. An nspawn guest, the default backend, reaches the relay over TCP on the zone bridge, and a TCP client has an empty identity. A source address on that bridge is chosen by the guest and is not an identity.
 - `runStep`, the secret vault and `get_secret` run inside the guest (`apps/daemon/src/orb/worker.ts`). The guest has no server credential: every machine call, `token` included, goes through `RelayMachineServer` in the host daemon (`apps/daemon/src/orb/relay.ts`, `ORB_STEP_METHODS`).
 
 So two processes already sit outside the guest on every path a secret takes: the host daemon between the server and the guest, and the relay between the guest and the network. The design changes what each lets through. It adds no new isolation mechanism.
+
+**Guest identity is a precondition.** A grant is matched only on a connection that carries a peer-credential identity. A connection without one, every TCP client included, never has a placeholder substituted and stays the opaque tunnel it is today. A backend therefore counts as an isolated surface for `http` secrets only when its guests reach the gateway over the socket listener:
+
+- podman with an egress socket: has it today.
+- nspawn: does not have it today. The gateway PR adds it the same way: the relay socket is bound into the guest through the existing per-guest runtime bind, a loopback forwarder inside the guest replaces the bridge address in the proxy variables, and the cgroup parser also recognizes the guest's `systemd-nspawn@cairn-orb-*` unit. The prototype must show on a real host that guest A cannot obtain guest B's identity (connecting from another guest, from a process that moved cgroups inside the guest, and over the TCP listener). Until that evidence exists the daemon asks for nspawn steps with `host`, and their `http` secrets are withheld.
 
 A remote sandbox (`openRelayStream` providers) does not send its traffic through the host relay. It counts as a host step here.
 
@@ -53,7 +59,7 @@ httpSecrets?: Array<{
 }>
 ```
 
-The token request gains `surface: 'orb' | 'host'` (absent means `host`). The server fills `httpSecrets` only when all three hold: the machine declared the `secretGateway` capability, the request says `orb`, and the step is one that gets team secrets today. In every other case an `http` secret is left out of the response entirely and its name is listed in `withheldSecrets: string[]`. It is never moved into `secrets`.
+The token request gains `surface: 'orb' | 'host'` (absent means `host`). The host daemon says `orb` only for a backend that meets the guest identity precondition above. The server fills `httpSecrets` only when all three hold: the machine declared the `secretGateway` capability, the request says `orb`, and the step is one that gets team secrets today. In every other case an `http` secret is left out of the response entirely and its name is listed in `withheldSecrets: string[]`. It is never moved into `secrets`.
 
 An older daemon sends no surface and declares no capability, so it receives no `http` value; an older server sends no `httpSecrets`, and the new daemon treats that as none. Neither direction can deliver an `http` value as plaintext.
 
@@ -107,7 +113,7 @@ One test per row.
 
 | Failure | Behavior |
 |---|---|
-| Machine lacks the capability, or the step runs on the host or in a remote sandbox | value withheld, name in `withheldSecrets`, tool explains; the step still runs |
+| Machine lacks the capability, or the step runs on the host, in a remote sandbox or on a backend without an authenticated guest identity | value withheld, name in `withheldSecrets`, tool explains; the step still runs |
 | Gateway unreachable or registration refused when the Orb step asks for its token | the token call fails and the step fails with a named error; no fallback to plaintext |
 | Gateway exits during a step | grant gone; the placeholder reaches the upstream unsubstituted or the connection is refused; the daemon writes one system row to the transcript; no re-registration in that step |
 | Host daemon exits during a step | admin connection closes, grant revoked, guest connections to that origin closed |
@@ -115,19 +121,20 @@ One test per row.
 | Guest client does not trust the step certificate, or pins its own | TLS fails in the client; no direct route exists to fall back to |
 | Authority, SNI and Host disagree; duplicate or caller-supplied bound header; redirect to another origin | request refused, or forwarded without substitution where the brief says so; one audit line with the reason and no value |
 | Another guest presents a valid placeholder | no grant for that guest identity; treated as an unknown string |
+| A guest connects over the TCP listener, or its cgroup maps to no known guest | no identity, so no grant can match; opaque tunnel, nothing substituted |
 
 ## Prototype (decision 4)
 
-Before the gateway PR, on a real Orb host, two throwaway data planes behind the same admin contract: Envoy with a header-mutation filter, and the existing relay extended with `node:tls` termination, `node:http` parsing and a maintained X.509 library for leaf certificates (no hand-written TLS, HTTP or ASN.1). Each runs the brief's failure inventory rows for direct disclosure, wrong location, SNI and Host mismatch, redirect, cross-step access, revoke on disconnect and certificate failure, with real headers captured at a controlled upstream. The result table and the choice are added to this document. Criteria, in order: inventory rows passed, privileged surface added to the host, install and upgrade footprint in `scripts/ops/orb`, added latency.
+Before the gateway PR, on a real Orb host, two throwaway data planes behind the same admin contract: Envoy with a header-mutation filter, and the existing relay extended with `node:tls` termination, `node:http` parsing and a maintained X.509 library for leaf certificates (no hand-written TLS, HTTP or ASN.1). Each runs the brief's failure inventory rows for direct disclosure, wrong location, SNI and Host mismatch, redirect, cross-step access, revoke on disconnect and certificate failure, with real headers captured at a controlled upstream. The same run carries the nspawn identity tests from the precondition above, for both data planes. The result table and the choice are added to this document. Criteria, in order: inventory rows passed, privileged surface added to the host, install and upgrade footprint in `scripts/ops/orb`, added latency.
 
 ## Change sequence
 
-Each is one PR from `origin/main`, written test-first from the tables above. PRs 1, 2 and 5 touch security surfaces and merge on Ian's route with `/security-review`.
+Each is one PR from `origin/main`, written test-first from the tables above. PRs 1, 2 and 5 touch security surfaces: each runs `/security-review`, carries the head-bound `Security review (<head>): fixed` or `recorded` line in Risk, and then enters the merge queue like any other green PR.
 
 1. Schema columns, policy validation and the API, with every secret still `plaintext`. No behavior change.
 2. Wire fields, the `secretGateway` capability and the server's surface rule. No daemon declares the capability yet, so an `http` secret is withheld everywhere.
 3. Prototype scripts and the result table (no product code).
-4. The chosen gateway, the admin socket and the host install units.
-5. Host daemon registration and revoke; guest placeholders and the tool text; the daemon declares the capability when the gateway answers.
+4. The chosen gateway, the admin socket, the host install units and, if the prototype proved it, the nspawn socket path and identity.
+5. Host daemon registration and revoke; guest placeholders and the tool text; the daemon declares the capability when the gateway answers and asks with `orb` only for a backend with an authenticated guest identity.
 6. Settings page: delivery choice, origin and header fields, the legacy label and the echo limitation. Feature-map row and design brief first.
 7. Acceptance run on a real Orb host for every inventory row in scope, with captured upstream headers and model-facing artifacts.
