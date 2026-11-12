@@ -1,11 +1,11 @@
 # GitHub emulator evidence
 
-Exercise GitHub-facing features without GitHub credentials. This case runs the D109 PrWatch service against a stateful local emulate.dev process and records real HTTP traffic and SQLite transitions. GitHub remains an emulated boundary in the PR card.
+Exercise GitHub-facing features without GitHub credentials. This case runs the PrWatch service against a stateful local emulate.dev process and records real HTTP traffic and SQLite transitions. GitHub remains an emulated boundary in the PR card.
 
 ## Sub-features
 
 - API base: `CAIRN_GITHUB_API_BASE_URL` changes server GitHub REST/GraphQL helpers, feedback reads, branch reads and autonomy requests. Unset or empty retains `https://api.github.com`. HTTP(S), optional path prefix and trailing slash are supported; URL credentials, queries and fragments are rejected.
-- D109: create a PR and two completed checks, sweep the real poller, and assert one SQLite `thread_pr` row with one passed and one failed check.
+- Create a PR and two completed checks, sweep the real poller, and assert one SQLite `thread_pr` row with one passed and one failed check.
 - Feedback: create a changes-requested review and read it through `githubPrFeedback`. PrWatch itself uses local `gate_verdict` rows for review verdicts; this case preserves that contract.
 - Merge: call Cairn's SHA-bound squash helper, sweep to `merged`, and verify subsequent sweeps stop reading. A missing PR leaves the recorded row intact.
 - Picker: read the seeded repository through `githubUserRepos`.

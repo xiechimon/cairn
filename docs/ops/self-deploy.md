@@ -35,6 +35,6 @@ systemctl --user daemon-reload
 systemctl --user enable --now cairn-server.service cairn-daemon.service cairn-self-deploy.timer
 ```
 
-The Coordinator runs inside `cairn-server.service` (D114), so a deploy needs no unit of its own; see the Coordinator section of `docs/ops/control-plane-omarchy.md`.
+The Coordinator runs inside `cairn-server.service`, so a deploy needs no unit of its own; see the Coordinator section of `docs/ops/control-plane-omarchy.md`.
 
 Deploy one SHA by hand with `scripts/ops/deploy-self.sh <sha>`; roll back by deploying the previous SHA, or by restoring a `stopped-*.db` snapshot with both units stopped.
