@@ -62,12 +62,11 @@ GITHUB_REPOSITORY=owner/repository node scripts/coordinator-merge.mjs 123 124
 
 For each PR it polls up to 90 times, 60 seconds apart (`COORDINATOR_MERGE_ITERATIONS`, `COORDINATOR_MERGE_INTERVAL_MS`). Each iteration reads the current head; a `gh` or network error, or an empty head, retries on the next iteration and never changes state. It merges only when all of these hold on the current head:
 
-- The newest `review-gate` check run from GitHub Actions on the head succeeded. Check runs from other apps are ignored; a failed run stops the helper with a nonzero exit, and one still in progress keeps it waiting.
 - Every `gh` call targets the repository named by `GITHUB_REPOSITORY` (`-R`), whatever `GH_REPO` or the checkout says.
 - At least 4 required checks are present and every one is success or skipped.
 - No `autonomy-paused` issue is open. A failed marker lookup counts as paused.
 
-The squash merge uses the first commit's subject plus ` (#n)`, the first commit's body plus every `closes|fixes|resolves #N` line from all commits that the body does not already contain, and `--match-head-commit <head>`. It then prints the PR state and merge SHA. If the head moves after a pass, the next iteration waits for the new head's `review-gate` check. Exit is nonzero if any PR is blocked, times out, or fails to merge.
+The squash merge uses the first commit's subject plus ` (#n)`, the first commit's body plus every `closes|fixes|resolves #N` line from all commits that the body does not already contain, and `--match-head-commit <head>`. It then prints the PR state and merge SHA. If the head moves between the checks and the merge, the next iteration judges the new head. No review verdict or label is read. Exit is nonzero if any PR times out or fails to merge.
 
 ```sh
 node --test scripts/coordinator-merge.test.mjs

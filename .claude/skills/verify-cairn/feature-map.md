@@ -104,7 +104,7 @@ Reach:
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-dispatch-judgment.md](features/chief-dispatch-judgment.md)
 - Research: [docs/research/cairn-dogfood-feasibility-2026-11-06.md](../../../docs/research/cairn-dogfood-feasibility-2026-11-06.md), [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md), [docs/research/r15-agent-responsibility-default.md](../../../docs/research/r15-agent-responsibility-default.md)
 - Frontend design: n/a: dispatch shows as threads and report rows inside the Coordinator chat
-- Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/spec/21-single-machine-orchestration-defaults.md](../../../docs/spec/21-single-machine-orchestration-defaults.md)
+- Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md)
 - Evidence: `apps/server/test/chief-dispatch.test.ts`, `integration/test/chief-dispatch-policy-binding.test.ts`, `apps/server/test/agent-removal.test.ts`
 
 ### daily-report
@@ -161,14 +161,14 @@ Reach:
 - Verify recipes: [.claude/skills/verify-cairn/features/local-daemon-executor.md](features/local-daemon-executor.md)
 - Research: [docs/research/1607-acp-execution-surface.md](../../../docs/research/1607-acp-execution-surface.md), [docs/research/r4-foundation.md](../../../docs/research/r4-foundation.md), [docs/research/r10-multica-runtime.md](../../../docs/research/r10-multica-runtime.md), [docs/research/r11-runtime-gap.md](../../../docs/research/r11-runtime-gap.md), [docs/research/herdr-multica-parity.md](../../../docs/research/herdr-multica-parity.md)
 - Frontend design: n/a: harness choice surfaces through routing settings and the thread's model line
-- Backend design: [docs/spec/17-dual-runtime-execution-surface.md](../../../docs/spec/17-dual-runtime-execution-surface.md), [docs/spec/24-run-brief-written-to-worktree-file.md](../../../docs/spec/24-run-brief-written-to-worktree-file.md), [docs/spec/26-pi-session-runtime-and-trust-surface.md](../../../docs/spec/26-pi-session-runtime-and-trust-surface.md)
+- Backend design: [docs/spec/17-dual-runtime-execution-surface.md](../../../docs/spec/17-dual-runtime-execution-surface.md), [docs/design/runtime-memory-out-of-tree.md](../../../docs/design/runtime-memory-out-of-tree.md), [docs/spec/26-pi-session-runtime-and-trust-surface.md](../../../docs/spec/26-pi-session-runtime-and-trust-surface.md)
 - Evidence: `apps/daemon/test/acp.test.ts`, `apps/daemon/test/runner-runtime.test.ts`, `integration/test/pi-session-policy.test.ts`
 
 ### memory
 
-**Memory** (shipped, centrality 1). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. D123 plans direct in-place edits of MEMORY.md and memory files.
+**Memory** (shipped, centrality 1). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. A design plans direct in-place edits of MEMORY.md and memory files.
 
-States: Shipped: Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete. Planned D123 replacement: input, working, applied, awaiting input, partial, stopped, error and offline; page and focused-file composers.
+States: Shipped: Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete. Planned replacement: input, working, applied, awaiting input, partial, stopped, error and offline; page and focused-file composers.
 
 Reach:
 
@@ -296,7 +296,7 @@ Reach:
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `chief-question`, `chief-question-chips`, `chief-question-error`, `chief-question-input-*`, `chief-question-option-*`, `chief-question-submit`, `chief-question-text`, `chief-question-tools`, `chief-question-tools-touch`
-- Research: **gap**: the Codex CLI and t3code question patterns behind D85 and D119 were never written up
+- Research: **gap**: the Codex CLI and t3code question patterns were never written up
 - Frontend design: [docs/design/qcard-variants/README.md](../../../docs/design/qcard-variants/README.md) (not on main), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
 - Backend design: **gap**: no design for the question lifecycle: parking, late answers, cancel and resume
 - Evidence: `apps/web/e2e/chief-home-questions.spec.ts`, `apps/server/test/chief-questions.test.ts`, `apps/web/test/question-lifecycle.test.ts`
@@ -380,7 +380,7 @@ Reach:
 - Test ids in its code: none
 - Research: [docs/research/machine-execution-plane.md](../../../docs/research/machine-execution-plane.md), [docs/research/r13-multica-runtime-verify.md](../../../docs/research/r13-multica-runtime-verify.md)
 - Frontend design: n/a: a protocol between server and daemon with no user surface
-- Backend design: [docs/spec/02-architecture-parity.md](../../../docs/spec/02-architecture-parity.md), [docs/research/2513-tla-statecharts.md](../../../docs/research/2513-tla-statecharts.md)
+- Backend design: [docs/research/2513-tla-statecharts.md](../../../docs/research/2513-tla-statecharts.md)
 - Evidence: `apps/server/test/machine-pool-claim.test.ts`, `apps/server/test/machine-zombie-claim.test.ts`, `apps/daemon/test/machine-claim.test.ts`
 
 ### thread-pr-panel
@@ -442,12 +442,12 @@ Reach:
 - Verify recipes: [.claude/skills/verify-cairn/features/board-new-task.md](features/board-new-task.md), [.claude/skills/verify-cairn/features/agent-detail.md](features/agent-detail.md)
 - Research: [docs/research/r12-save-and-start-behavior.md](../../../docs/research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/research/duet-proactive-coordinator.md](../../../docs/research/duet-proactive-coordinator.md)
 - Frontend design: [docs/design/references/thread-review](../../../docs/design/references/thread-review), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
-- Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](../../../docs/spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/spec/24-run-brief-written-to-worktree-file.md](../../../docs/spec/24-run-brief-written-to-worktree-file.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md)
+- Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](../../../docs/spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/design/runtime-memory-out-of-tree.md](../../../docs/design/runtime-memory-out-of-tree.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md)
 - Evidence: `apps/web/e2e/detail-continue-thread.spec.ts`, `apps/web/e2e/detail-archive.spec.ts`, `apps/server/test/snooze.test.ts`, `apps/server/test/archive.test.ts`, `apps/server/test/tasks.test.ts`
 
 ### desktop-app
 
-**Desktop app** (planned, centrality 2). D45 and D100: a web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.
+**Desktop app** (planned, centrality 2). A web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.
 
 
 - Web routes: none
@@ -537,7 +537,7 @@ Reach:
 
 ### own-key-sandboxes
 
-**Own-key cloud sandboxes** (partial, centrality 2). D101 execution target: orbs on E2B or Daytona with the user's own key, called outbound by the daemon.
+**Own-key cloud sandboxes** (partial, centrality 2). Execution target: orbs on E2B or Daytona with the user's own key, called outbound by the daemon.
 
 States: Not exposed in the UI yet; the daemon selects E2B when configured.
 
@@ -734,7 +734,7 @@ Reach:
 - Verify recipes: [.claude/skills/verify-cairn/features/mentions.md](features/mentions.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md), [.claude/skills/verify-cairn/features/hotkeys.md](features/hotkeys.md)
 - Research: **gap**: no note comparing composers in claude.ai, Amp and t3code
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat)
-- Backend design: **gap**: no design for server drafts (D110) and named prompts
+- Backend design: **gap**: no design for server drafts  and named prompts
 - Evidence: `apps/web/e2e/composer-slash.spec.ts`, `apps/web/e2e/chief-draft-persist.spec.ts`, `apps/server/test/composer-drafts.test.ts`
 
 ### coordinator-mcp
@@ -752,7 +752,7 @@ Reach:
 - Test ids in its code: none
 - Research: **gap**: the t3code comparison of plan §21 is not in the repository
 - Frontend design: n/a: an API for other harnesses with no page
-- Backend design: [docs/spec/02-architecture-parity.md](../../../docs/spec/02-architecture-parity.md)
+- Backend design: [docs/research/desktop-mobile-mcp-forms-2026-11-08.md](../../../docs/research/desktop-mobile-mcp-forms-2026-11-08.md)
 - Evidence: `apps/server/test/mcp-face.test.ts`, `integration/test/m4b-mcp-e2e.test.ts`
 
 ### git-hosting
@@ -910,7 +910,7 @@ Reach:
 - Web routes: `/app/schedules`
 - Keyboard shortcuts in its code: `D`
 - Test ids in its code: `schedule-detail-body`, `schedules-error`, `schedules-loading`
-- Research: **gap**: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model behind D56
+- Research: **gap**: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model
 - Frontend design: **gap**: the schedules page and detail dialog have no design
 - Backend design: **gap**: no design for due events, missed runs and continue-thread schedules
 - Evidence: `apps/web/e2e/schedules-live.spec.ts`, `apps/server/test/schedules.test.ts`, `apps/server/test/due-events.test.ts`
@@ -1041,13 +1041,13 @@ Reach:
 
 ### ios-app
 
-**iOS app** (planned, centrality 4). D22: a native phone app with Live Activities, forked from Optio or t3code when the time comes.
+**iOS app** (planned, centrality 4). A native phone app with Live Activities, forked from Optio or t3code when the time comes.
 
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: none
-- Research: **gap**: the Optio and t3code comparison of D22 has not been done
+- Research: **gap**: the Optio and t3code comparison has not been done
 - Frontend design: **gap**: not designed
 - Backend design: **gap**: not designed
 - Evidence: none
