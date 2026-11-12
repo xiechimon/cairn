@@ -69,6 +69,54 @@ export function fenceMailText(label: string, text: string): string {
   return `${MAIL_FENCE_OPEN} · ${safe}】${MAIL_FENCE_NOTE}\n${quoteIssueLines(neutralizeIssueAttachmentTokens(text))}\n${MAIL_FENCE_CLOSE} · ${safe}】`;
 }
 
+const MAIL_WAKE_RE = /^\[wake:\w+\] provenance=mail:\S+/;
+
+export function isMailWakeText(text: string): boolean {
+  return MAIL_WAKE_RE.test(text);
+}
+
+function mailFenceSpan(text: string, open: number): { end: number } | null {
+  let offset = open;
+  const lines = text.slice(open).split('\n');
+  for (let i = 1; i < lines.length; i++) {
+    offset += (lines[i - 1]?.length ?? 0) + 1;
+    const line = lines[i] ?? '';
+    if (!line.startsWith(MAIL_FENCE_CLOSE)) continue;
+    const endMark = line.indexOf('】');
+    if (endMark < 0) return null;
+    return { end: offset + endMark + 1 };
+  }
+  return null;
+}
+
+export function dropMailFence(text: string): string {
+  let out = text;
+  for (;;) {
+    const open = out.indexOf(MAIL_FENCE_OPEN);
+    if (open < 0) return out;
+    const span = mailFenceSpan(out, open);
+    if (span === null) return out;
+    out = `${out.slice(0, open)}${out.slice(span.end)}`.replace(/\n{3,}/g, '\n\n');
+  }
+}
+
+export function mailFenceBlock(text: string): string | null {
+  const open = text.indexOf(MAIL_FENCE_OPEN);
+  if (open < 0) return null;
+  const span = mailFenceSpan(text, open);
+  return span === null ? null : text.slice(open, span.end);
+}
+
+export function mailSharedTranscript(text: string): string {
+  if (!isMailWakeText(text)) return dropMailFence(text);
+  const marker = text.match(/\n*\[history id: [^\]\s]+\]\s*$/);
+  const body = marker === null ? text : text.slice(0, marker.index);
+  const lines = body.split('\n');
+  const ids = lines.find((line) => line.startsWith('邮件事件 ')) ?? '';
+  const head = [lines[0] ?? '', ids].filter((line) => line !== '').join('\n');
+  return dropMailFence(marker === null ? head : `${head}\n\n${marker[0].trim()}`);
+}
+
 export function thirdPartyFenceAt(text: string): { at: number; open: string } | null {
   const hits = [ISSUE_FENCE_OPEN, MAIL_FENCE_OPEN]
     .map((open) => ({ at: text.indexOf(open), open }))

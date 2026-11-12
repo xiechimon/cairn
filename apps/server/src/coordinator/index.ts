@@ -38,6 +38,7 @@ import {
   scrubProviderError,
 } from './credentials.js';
 import { acquireLease, type Lease, LeaseHeldError } from './lease.js';
+import { settleInterruptedMailConversation } from './mail-owner.js';
 import { createMemoryFlush } from './memory-flush.js';
 import {
   COLD_RECENT_EXCHANGES,
@@ -302,6 +303,17 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       recordConversation: (threadId, conversationId, entryId) => {
         db.update(coordinatorConversation)
           .set({ conversationId, lastMirroredEntryId: String(entryId), updatedAt: nowMs() })
+          .where(eq(coordinatorConversation.threadId, threadId))
+          .run();
+      },
+      setConversation: (threadId, conversationId, watermark, restoreOwnerId) => {
+        db.update(coordinatorConversation)
+          .set({
+            conversationId,
+            mailOwnerConversationId: restoreOwnerId,
+            ...(watermark === null ? {} : { lastMirroredEntryId: watermark }),
+            updatedAt: nowMs(),
+          })
           .where(eq(coordinatorConversation.threadId, threadId))
           .run();
       },
@@ -611,6 +623,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       if (closing) return;
       dirty.delete(threadId);
       if (heldLease(threadId) === null) return;
+      settleInterruptedMailConversation(db, threadId);
       if (!runtime.isOpen(threadId)) migrateUnfetchedCoordinatorInputs(db, threadId, owner);
       const pending = db
         .select()

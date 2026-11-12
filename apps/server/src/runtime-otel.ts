@@ -2,11 +2,14 @@ import {
   chatAttributes,
   chiefTurnErrorContentSchema,
   coordinatorTurnAttributes,
+  dropMailFence,
   executeToolAttributes,
   GENAI_OPERATION,
+  isMailWakeText,
   LANGFUSE_ATTR,
   langfuseEnvironmentAttributes,
   langfuseTraceAttributes,
+  mailFenceBlock,
   type OtelObservation,
   observationAttributes,
   otelEnvironment,
@@ -96,6 +99,80 @@ function stepFailureReason(db: Db, row: typeof step.$inferSelect): string | unde
   return otelErrorMessage(recorded?.lastRunError);
 }
 
+const MAIL_PROVENANCE = /provenance=(mail:[A-Za-z0-9_-]+)/;
+const MAIL_IDS = /邮件事件 ([^，\s]+)，账户 ([^，\s]+)，外部编号 ([^，\s]+)，规则 ([^。\n]+)。/;
+
+function decodeObservation(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('[') && !trimmed.startsWith('{')) return value;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return value;
+  }
+}
+
+function collectText(value: unknown, out: string[]): void {
+  if (typeof value === 'string') {
+    out.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectText(item, out);
+    return;
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const item of Object.values(value as Record<string, unknown>)) collectText(item, out);
+  }
+}
+
+function observationTexts(value: unknown): string[] {
+  const texts: string[] = [];
+  collectText(decodeObservation(value), texts);
+  return texts;
+}
+
+function mailTurnTelemetry(
+  input: unknown,
+  output: unknown,
+): {
+  provenance: string;
+  eventId?: string;
+  accountId?: string;
+  externalId?: string;
+  rule?: string;
+  promptChars: number;
+  excerptChars: number;
+  replyChars: number;
+} | null {
+  const texts = observationTexts(input);
+  const joined = texts.join('\n');
+  const provenance = MAIL_PROVENANCE.exec(joined)?.[1];
+  if (provenance === undefined && !texts.some((text) => isMailWakeText(text))) return null;
+  const ids = MAIL_IDS.exec(joined);
+  const fence =
+    texts.map((text) => mailFenceBlock(text)).find((block) => block !== null) ??
+    mailFenceBlock(joined);
+  const reply = observationTexts(output).join('');
+  return {
+    provenance: provenance ?? 'mail:',
+    ...(ids?.[1] === undefined ? {} : { eventId: ids[1] }),
+    ...(ids?.[2] === undefined ? {} : { accountId: ids[2] }),
+    ...(ids?.[3] === undefined ? {} : { externalId: ids[3] }),
+    ...(ids?.[4] === undefined ? {} : { rule: ids[4] }),
+    promptChars: dropMailFence(joined).length,
+    excerptChars: fence?.length ?? 0,
+    replyChars: reply.length,
+  };
+}
+
+function redactMailObservation(observation: OtelObservation): OtelObservation {
+  const mail = mailTurnTelemetry(observation.input, observation.output);
+  if (mail === null) return observation;
+  return { input: mail, output: { replyChars: mail.replyChars } };
+}
+
 export function emitRuntimeStepSpan(
   db: Db,
   stepId: string,
@@ -164,7 +241,7 @@ export function emitRuntimeStepSpan(
             : [];
         });
   const payload = isTurn
-    ? observation
+    ? redactMailObservation(observation)
     : {
         input: transcript.filter((entry) => entry.role === 'user'),
         output: transcript.filter((entry) => entry.role === 'assistant').slice(-1),
@@ -298,19 +375,33 @@ function jsonText(value: unknown): string {
 }
 
 export function emitCoordinatorTurnSpans(
-  turn: { threadId: string; stepId: string; provider: string; model: string },
+  turn: {
+    threadId: string;
+    stepId: string;
+    provider: string;
+    model: string;
+    redactText?: boolean;
+  },
   records: readonly CoordinatorTurnSpanRecord[],
   env: NodeJS.ProcessEnv = process.env,
 ): void {
   const target = runtimeTarget(env);
   if (target === null || records.length === 0) return;
   const environment = otelEnvironment(env);
+  const mail =
+    turn.redactText === true ||
+    records.some(
+      (record) => record.kind === 'chat' && mailTurnTelemetry(record.input, record.output) !== null,
+    );
   const parent = {
     traceId: otlpTraceIdOfStep({ kind: 'chief', buildId: turn.threadId, stepId: turn.stepId }),
     spanId: otlpStepSpanIdOfBuild(turn.threadId, turn.stepId),
   };
   const spans: CairnSpan[] = records.map((record): CairnSpan => {
     if (record.kind === 'chat') {
+      const observation = mail
+        ? redactMailObservation({ input: record.input, output: record.output })
+        : record;
       return {
         parent,
         name: `chat ${record.model}`.trim(),
@@ -318,7 +409,7 @@ export function emitCoordinatorTurnSpans(
         startMs: record.at,
         endMs: record.at,
         attributes: {
-          ...observationAttributes(record),
+          ...observationAttributes(observation),
           ...chatAttributes(
             {
               provider: record.provider,
@@ -338,10 +429,14 @@ export function emitCoordinatorTurnSpans(
           ...langfuseEnvironmentAttributes(environment),
         },
         ...(record.finishReason === 'error'
-          ? { error: otelErrorMessage(record.errorMessage) ?? 'error' }
+          ? {
+              error: mail ? 'mail turn error' : (otelErrorMessage(record.errorMessage) ?? 'error'),
+            }
           : {}),
       };
     }
+    const argumentText = jsonText(record.arguments);
+    const resultText = jsonText(record.result);
     return {
       parent,
       name: `execute_tool ${record.name}`,
@@ -352,8 +447,8 @@ export function emitCoordinatorTurnSpans(
         ...executeToolAttributes({
           name: record.name,
           callId: record.id,
-          arguments: jsonText(record.arguments),
-          result: jsonText(record.result),
+          arguments: mail ? JSON.stringify({ chars: argumentText.length }) : argumentText,
+          result: mail ? JSON.stringify({ chars: resultText.length }) : resultText,
         }),
         ...langfuseEnvironmentAttributes(environment),
       },
