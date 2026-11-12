@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -6,13 +6,11 @@ import type {
   AgentBackend,
   AgentSessionHandle,
   AgentTokenUsage,
-  AnswerDeliveryVia,
   BoundGitCredentials,
   ClaimedStep,
   CommitIdentity,
   DeliveredImage,
   LocalToolDef,
-  MachineAskBody,
   MachineDoneBody,
   MachineHeartbeatBody,
   PreparedWorkspace,
@@ -75,6 +73,7 @@ import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { z } from 'zod';
 import { createActivityTracker } from './activity.js';
 import { AgentTodoReporter, parseAgentTodoText } from './agent-todo.js';
+import { AskChannel } from './ask-channel.js';
 import { prepareFileAttachment } from './attach-file.js';
 import { SessionNotResumableError } from './backend/errors.js';
 import { notInConfigLine, resolveMcpEndpoints } from './backend/mcp-config.js';
@@ -933,50 +932,11 @@ async function runClaimedStep(
       );
     }
   }
-  const askAbort = new AbortController();
+  const askChannel = new AskChannel({ client, stepId, log: (message) => logger.step(message) });
   const telemetry =
     deps.otel != null
       ? deps.otel.contextFor(claimed.step.buildId, stepId, claimed.step.kind)
       : undefined;
-  let askKeepAlive: (() => void) | null = null;
-  const answeredPolls = new Set<string>();
-  const ackAnswers = async (answerIds: readonly string[], via: AnswerDeliveryVia) => {
-    if (answerIds.length === 0) return;
-    await client.steerAck?.(stepId, { answerIds: [...answerIds], via }).catch((err: unknown) => {
-      logger.step(`answer ack failed: ${err instanceof Error ? err.message : String(err)}`);
-    });
-  };
-  const runAskChannel = async (params: Record<string, unknown>): Promise<string> => {
-    if (client.askUser === undefined) throw new Error('ask channel unavailable');
-    const requestId = `ask-${randomUUID()}`;
-    const keepAlive = setInterval(() => askKeepAlive?.(), 30_000);
-    keepAlive.unref?.();
-    try {
-      const response = await client.askUser(
-        stepId,
-        {
-          requestId,
-          questions: (params.questions ?? []) as MachineAskBody['questions'],
-          ...(typeof params.provenance === 'string' ? { provenance: params.provenance } : {}),
-        },
-        { signal: askAbort.signal },
-      );
-      if (response.status === 'answered' && !askAbort.signal.aborted) {
-        answeredPolls.add(requestId);
-      }
-      return JSON.stringify(response);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return JSON.stringify({
-        status: 'cancelled',
-        requestId,
-        answers: null,
-        reason: `ask channel aborted: ${msg}`,
-      });
-    } finally {
-      clearInterval(keepAlive);
-    }
-  };
   const skillInjection: { facts: SkillInjectionFacts | null } = { facts: null };
   const stepGitEnv: Record<string, string> =
     repo?.kind === 'github' && creds.git !== null
@@ -1038,7 +998,7 @@ async function runClaimedStep(
       ? {
           remoteTools,
           executeRemoteTool: (name, params) => {
-            if (name === 'ask_user' && client.askUser) return runAskChannel(params);
+            if (name === 'ask_user' && askChannel.available) return askChannel.ask(params);
             if (name === 'attach_file' && !isChief) {
               const prepared = prepareFileAttachment(
                 cwd,
@@ -1318,11 +1278,11 @@ async function runClaimedStep(
     durationCapIsAbsolute: absoluteDurationCapMs !== null,
     progressExtendsDuration: isBuildStepKind(claimed.step.kind) && absoluteDurationCapMs === null,
     onTrip: () => {
-      askAbort.abort();
+      askChannel.abort();
       void handle?.stop();
     },
   });
-  askKeepAlive = () => watchdog.keepAlive();
+  askChannel.keepAlive = () => watchdog.keepAlive();
   let lastRowCreatedAt = 0;
   const rowCreatedAt = (): number => {
     lastRowCreatedAt = Math.max(now(), lastRowCreatedAt + 1);
@@ -1519,16 +1479,11 @@ async function runClaimedStep(
       for await (const ev of credentialSafeEvents(handle.events, () => credentialValues)) {
         if (!promptDelivered) {
           promptDelivered = true;
-          await ackAnswers(claimed.answerIds ?? [], 'session-start');
+          await askChannel.ackAnswers(claimed.answerIds ?? [], 'session-start');
         }
         if (ev.type === 'toolcall_end') {
           watchdog.noteToolCall(ev.call.id, ev.call.result === undefined);
-          if (ev.call.result !== undefined && answeredPolls.size > 0) {
-            const result = JSON.stringify(ev.call.result);
-            const reached = [...answeredPolls].filter((id) => result.includes(id));
-            for (const id of reached) answeredPolls.delete(id);
-            await ackAnswers(reached, 'poll');
-          }
+          if (ev.call.result !== undefined) await askChannel.ackPollsReachedBy(ev.call.result);
         }
         watchdog.noteEvent();
         activity.noteEvent();
@@ -1784,7 +1739,7 @@ async function runClaimedStep(
   thinkingDeltas.flush();
   if (opts.env?.CAIRN_ORB !== '1') clearInterval(heartbeat);
   watchdog.stop();
-  askAbort.abort();
+  askChannel.abort();
   const timeoutText = watchdog.message();
   if (timeoutText !== null) {
     lastError = combineTimeoutWithRootCause(timeoutText, lastError ?? lastModelError);
