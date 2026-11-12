@@ -3,7 +3,7 @@
 ## Safety
 
 - This repository is public: never commit secrets, credentials, internal addresses, personal information or quota details.
-- Never force push, use `--no-verify`, bypass hooks with `core.hooksPath`, or run `git reset --hard`, `git clean`, `git stash` or `git checkout .`.
+- Never force push, use `--no-verify`, bypass hooks with `core.hooksPath`, or run `git reset --hard`, `git clean`, `git stash` or `git checkout .`. The one exception is the pre-merge review gate (`.claude/workflows/pr-gate.js`, `docs/pr-review.md`): its evidence check runs in its own worktree and sets `core.hooksPath=/dev/null` so a hook shipped in the reviewed tree cannot run with the reviewer's credentials.
 - Stage only your own changes with explicit paths; never use `git add -A` or `git add .`.
 - Agent sessions on a host with the App key commit and push only as the App: `~/.cairn/tools/app-token/as-bot.sh git commit ...` and `as-bot.sh git push origin HEAD:<branch>`, and open PRs with `as-bot.sh gh pr create`. A Claude Code cloud session has no App key and commits with plain git as its own identity, `Claude <noreply@anthropic.com>` (`cloudAgents` in `packages/shared/commit-identity.json`, ian 2026-11-10). Only commits ian types himself carry his identity; the hooks and the `commit-author` check enforce that file.
 - Confirm lockfile changes with ian before committing `pnpm-lock.yaml`; authorized changes require `CAIRN_ALLOW_LOCKFILE_CHANGE=1`.
