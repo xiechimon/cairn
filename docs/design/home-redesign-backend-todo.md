@@ -102,7 +102,7 @@ Shelved by the owner on 2026-11-11 for desktop and phone; nothing ships. The ref
 ## Verification still owed
 
 - [ ] Run the redesigned home on a live stack: a real model calling `suggest_replies`, attachments end to end, the computers panel against a real machine.
-- [ ] Regenerate the gallery snapshot baselines from the CI artifacts.
+- [x] Regenerate the gallery snapshot baselines from the CI artifacts. Taken from the failing `e2e (2)` job of run 43169514533 on head `5dfa8403f`. The cited run 43097060208 is not on GitHub.
 
 ## Decided not to build
 
