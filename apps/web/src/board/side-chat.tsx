@@ -22,8 +22,8 @@ import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
-import { EngineCard } from './engine-card.js';
-import type { EngineRunView } from './engine-run.js';
+import { EngineCard, EngineRawView, EngineRunRow, EngineRunTail } from './engine-card.js';
+import { type EngineRunView, engineTranscript } from './engine-run.js';
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { STATUS_WORDS } from './status-words.js';
@@ -168,7 +168,12 @@ function SourceLine({
   );
 }
 
-type ThreadView = 'chat' | 'changes';
+type ThreadView = 'chat' | 'changes' | 'raw' | 'engine';
+
+const ENGINE_DRAFT =
+  typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('engine');
+const ENGINE_AS_ROW = ENGINE_DRAFT === 'row';
+const ENGINE_AS_CARD = ENGINE_DRAFT !== 'row' && ENGINE_DRAFT !== 'inline';
 
 function ChangesView({ chat, now }: { chat: ThreadChat; now: number }) {
   const { t } = useI18n();
@@ -251,6 +256,8 @@ function ThreadBody({
   actions,
   view,
   onViewChanges,
+  onViewRaw,
+  onViewEngine,
   now,
   updates,
   origin,
@@ -265,6 +272,8 @@ function ThreadBody({
   actions: ThreadActions;
   view: ThreadView;
   onViewChanges: () => void;
+  onViewRaw: () => void;
+  onViewEngine: () => void;
   now: number;
   updates: ThreadUpdates | null;
   origin: ThreadOrigin | null;
@@ -287,11 +296,19 @@ function ThreadBody({
   return (
     <>
       {chat.wire?.sourceKind != null && <SourceLine wire={chat.wire} onLeave={onClose} />}
-      {view === 'changes' ? (
+      {view === 'raw' && engine !== undefined ? (
+        <EngineRawView run={engine.run} />
+      ) : view === 'changes' ? (
         <ChangesView chat={chat} now={now} />
       ) : (
         <TranscriptColumn
-          transcript={chat.transcript}
+          transcript={
+            engine === undefined || ENGINE_AS_CARD || (ENGINE_AS_ROW && view !== 'engine')
+              ? chat.transcript
+              : view === 'engine'
+                ? engineTranscript(engine.run)
+                : [...chat.transcript, ...engineTranscript(engine.run)]
+          }
           liveStep={null}
           agent={null}
           onOpenPlan={onOpenPlan}
@@ -310,12 +327,24 @@ function ThreadBody({
             chat.changes.status === 'error' ? (
               <>
                 {engine?.controls}
-                {engine !== undefined && (
+                {engine !== undefined && ENGINE_AS_CARD && (
                   <EngineCard
                     run={engine.run}
                     actions={engine.actions}
                     className={engine.controls != null ? 'mt-2' : undefined}
                   />
+                )}
+                {engine !== undefined && !ENGINE_AS_CARD && (
+                  <>
+                    {ENGINE_AS_ROW && view !== 'engine' && (
+                      <EngineRunRow run={engine.run} onOpen={onViewEngine} />
+                    )}
+                    <EngineRunTail
+                      run={engine.run}
+                      actions={engine.actions}
+                      {...(ENGINE_AS_ROW && view !== 'engine' ? {} : { onViewRaw })}
+                    />
+                  </>
                 )}
                 {(chat.changes.status === 'ready' || chat.changes.status === 'error') && (
                   <ChangesCard changes={chat.changes} onOpen={onViewChanges} />
@@ -424,7 +453,7 @@ export function SideChat({
   const [chosenView, setView] = useState<ThreadView>(
     searchParams.get(VIEW_PARAM) === 'changes' ? 'changes' : 'chat',
   );
-  const view = chat.changes.status === 'none' ? 'chat' : chosenView;
+  const view = chosenView === 'changes' && chat.changes.status === 'none' ? 'chat' : chosenView;
   const showsChanges = view === 'changes';
   const Stage = chat.engineStage;
   const thread = (engine: EngineRunView | undefined) =>
@@ -546,8 +575,14 @@ function ReadyThread({
       <Head
         todoId={todo.id}
         todo={todo}
-        onBack={view === 'changes' ? () => onView('chat') : onClose}
-        backLabel={view === 'changes' ? t('返回对话') : t('返回')}
+        onBack={
+          view === 'raw' && ENGINE_AS_ROW
+            ? () => onView('engine')
+            : view !== 'chat'
+              ? () => onView('chat')
+              : onClose
+        }
+        backLabel={view !== 'chat' ? t('返回对话') : t('返回')}
         onClose={onCloseAll}
         menu={actions.menu}
         titleExtra={<ThreadAutomations key={todo.id} todo={todo} now={now} />}
@@ -574,6 +609,8 @@ function ReadyThread({
         actions={actions}
         view={view}
         onViewChanges={() => onView('changes')}
+        onViewRaw={() => onView('raw')}
+        onViewEngine={() => onView('engine')}
         now={now}
         updates={updates}
         origin={origin}

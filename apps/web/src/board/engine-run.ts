@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from 'react';
 import type { ActionStep } from '../components/chat/trace-steps.js';
-import type { DiffFile, TodoRecord } from '../fixtures/records.js';
+import type { DiffFile, TodoRecord, TranscriptItem, WorkStep } from '../fixtures/records.js';
 import type { TaskItem } from '../lib/markdown.js';
 
 export type EngineRunState = 'running' | 'waiting' | 'finished' | 'failed' | 'taken_over';
@@ -107,4 +107,98 @@ export function engineTraceStep(event: Extract<EngineEvent, { kind: 'read' | 'ru
         output: event.output,
         secs: event.seconds,
       };
+}
+
+const settled = { error: false, running: false, unfinished: false } as const;
+
+function engineWorkStep(event: Exclude<EngineEvent, { kind: 'text' | 'question' }>): WorkStep {
+  switch (event.kind) {
+    case 'read':
+      return {
+        kind: 'call',
+        id: event.id,
+        action: 'read',
+        label: 'read',
+        target: event.path,
+        output: null,
+        seconds: event.seconds,
+        ...settled,
+      };
+    case 'edit': {
+      const lines = event.file.hunks.flatMap((hunk) => hunk.lines);
+      return {
+        kind: 'call',
+        id: event.id,
+        action: 'edit',
+        label: 'edit',
+        target: event.file.path,
+        diff: { added: event.file.added, removed: event.file.removed ?? 0 },
+        changes: {
+          added: lines.filter((line) => line.kind === 'add').map((line) => line.text),
+          removed: lines.filter((line) => line.kind === 'del').map((line) => line.text),
+        },
+        output: null,
+        seconds: null,
+        ...settled,
+      };
+    }
+    case 'run':
+      return {
+        kind: 'call',
+        id: event.id,
+        action: 'run',
+        label: 'bash',
+        command: event.command,
+        output: event.output.length > 0 ? event.output.join('\n') : null,
+        seconds: event.seconds,
+        error: event.exit !== null && event.exit !== 0,
+        running: event.exit === null,
+        unfinished: false,
+      };
+    case 'unknown':
+      return {
+        kind: 'call',
+        id: event.id,
+        action: 'tool',
+        label: event.type,
+        target: event.type,
+        output: event.payload,
+        seconds: null,
+        ...settled,
+      };
+  }
+}
+
+export function enginePendingQuestion(
+  run: EngineRun,
+): Extract<EngineEvent, { kind: 'question' }> | null {
+  const last = run.events.at(-1);
+  return last?.kind === 'question' && last.answer === null ? last : null;
+}
+
+export function engineTranscript(run: EngineRun): TranscriptItem[] {
+  const items: TranscriptItem[] = [];
+  if (run.plan.length > 0) items.push({ kind: 'agent-todo', items: run.plan });
+  const pending = enginePendingQuestion(run);
+  let steps: WorkStep[] = [];
+  const flush = (id: string) => {
+    if (steps.length === 0) return;
+    items.push({ kind: 'work', id: `engine-work-${id}`, steps });
+    steps = [];
+  };
+  for (const event of run.events) {
+    if (event === pending) continue;
+    if (event.kind === 'text' || event.kind === 'question') {
+      flush(event.id);
+      items.push({ kind: 'robot', id: event.id, markdown: event.text });
+      if (event.kind === 'question')
+        items.push({
+          kind: 'note',
+          id: `${event.id}-answer`,
+          text: event.answer === 'allowed' ? '已允许这一次' : '已拒绝',
+        });
+    } else steps.push(engineWorkStep(event));
+  }
+  flush('end');
+  return items;
 }

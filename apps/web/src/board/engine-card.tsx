@@ -1,4 +1,5 @@
 import { cn } from 'cn';
+import { ChevronRight } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { REPLY_CHIP_CLS } from '../chief/quick-replies.js';
 import { TypingDots } from '../components/chat/live-row.js';
@@ -16,7 +17,7 @@ import {
   DIALOG_TEXT_BUTTON,
   DialogShell,
 } from '../components/ui/dialog-shell.js';
-import { ChatMarkdown, TaskCard } from '../detail/chat-markdown.js';
+import { ChatMarkdown, REPLY_BUBBLE_CLS, TaskCard } from '../detail/chat-markdown.js';
 import { DiffFileBlock } from '../detail/docpane.js';
 import { formatWorkDuration } from '../detail/work-trace.js';
 import { useScrollFade } from '../hooks/use-scroll-fade.js';
@@ -31,6 +32,7 @@ import {
   engineCanTakeOver,
   engineCost,
   engineEarlierCount,
+  enginePendingQuestion,
   enginePlanItems,
   engineTraceStep,
 } from './engine-run.js';
@@ -279,7 +281,15 @@ function Conversation({
   );
 }
 
-function RawOutput({ text }: { text: string }) {
+export function EngineRawView({ run }: { run: EngineRun }) {
+  return (
+    <div data-testid="engine-raw-view" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <RawOutput text={run.rawOutput} fill />
+    </div>
+  );
+}
+
+function RawOutput({ text, fill = false }: { text: string; fill?: boolean }) {
   const { t } = useI18n();
   const scroller = useStickToEnd<HTMLPreElement>();
   return (
@@ -288,10 +298,199 @@ function RawOutput({ text }: { text: string }) {
       role="log"
       aria-label={t('原始输出')}
       data-testid="engine-raw"
-      className="scroll-fade max-h-96 px-3 py-3 text-foreground"
+      className={cn(
+        'scroll-fade text-foreground',
+        fill ? 'max-h-none min-h-0 flex-1 px-4 py-3' : 'max-h-96 px-3 py-3',
+      )}
     >
       <span className="block">{text}</span>
     </TraceOutput>
+  );
+}
+
+function TakeOverDialog({
+  open,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <DialogShell
+      title={t('接管这次运行')}
+      open={open}
+      onClose={onClose}
+      size="s"
+      footer={
+        <>
+          <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onClose}>
+            {t('取消')}
+          </Button>
+          <Button
+            className={DIALOG_PRIMARY_BUTTON}
+            data-testid="engine-take-over-confirm"
+            onClick={() => {
+              onClose();
+              onConfirm();
+            }}
+          >
+            {t('接管')}
+          </Button>
+        </>
+      }
+    >
+      <p className="m-0 text-ui text-foreground">
+        {t('终端接入后，接管会让引擎停下，把它的终端交给你直接操作；交还后它从你停下的地方继续。')}
+      </p>
+      <p className="m-0 mt-2 text-ui text-(--text-secondary)">
+        {t('终端还没有接入：现在接管只把这次运行标记为由你处理，随时可以交还。')}
+      </p>
+    </DialogShell>
+  );
+}
+
+const ROW_DOT: Record<EngineRunState, string> = STATE_DOT;
+
+export function EngineRunRow({ run, onOpen }: { run: EngineRun; onOpen: () => void }) {
+  const { t } = useI18n();
+  const doing = run.plan.find((step) => step.state === 'doing');
+  const detail =
+    run.state === 'running' || run.state === 'taken_over'
+      ? (doing?.text ?? null)
+      : run.elapsedSeconds === null
+        ? null
+        : formatWorkDuration(run.elapsedSeconds);
+  return (
+    <TraceCard className="mt-5 w-fit max-w-full">
+      <Button
+        variant="ghost"
+        data-testid="engine-row"
+        data-state={run.state}
+        aria-description={t('查看运行过程')}
+        onClick={onOpen}
+        className="h-10 max-w-full justify-start gap-2 border-0 px-3 text-ui font-normal text-foreground hover:bg-(--menu-hover) pointer-coarse:h-11 dark:hover:bg-(--menu-hover)"
+      >
+        <span
+          aria-hidden="true"
+          className={cn('size-1.5 flex-none rounded-full', ROW_DOT[run.state])}
+        />
+        <span className="flex-none">{run.engine}</span>
+        <span className="flex-none text-(--text-secondary)">
+          {t(ENGINE_STATE_WORDS[run.state])}
+        </span>
+        {detail !== null && (
+          <span className="min-w-0 truncate text-meta text-content-tertiary">{detail}</span>
+        )}
+        <ChevronRight aria-hidden="true" className="size-4 flex-none text-(--text-tertiary)" />
+      </Button>
+    </TraceCard>
+  );
+}
+
+const TAIL_LINK =
+  'h-6 min-h-0 flex-none rounded-(--radius-control) px-1.5 text-meta font-normal text-(--text-secondary)';
+
+export function EngineRunTail({
+  run,
+  actions,
+  onViewRaw,
+}: {
+  run: EngineRun;
+  actions?: EngineRunActions;
+  onViewRaw?: () => void;
+}) {
+  const { t } = useI18n();
+  const [confirming, setConfirming] = useState(false);
+  const { choice } = run;
+  const question = enginePendingQuestion(run);
+  return (
+    <>
+      {question !== null && (
+        <div data-testid="engine-question" data-answer="pending" className="mt-5">
+          <div
+            className={cn('w-fit max-w-full text-ui leading-5 text-foreground', REPLY_BUBBLE_CLS)}
+          >
+            {question.text}
+          </div>
+          {actions !== undefined && run.state !== 'taken_over' && (
+            <fieldset
+              aria-label={t('回答引擎')}
+              className="m-0 mt-3 flex min-w-0 flex-wrap gap-3 border-0 p-0 pb-0.5"
+            >
+              <Button
+                variant="ghost"
+                className={REPLY_CHIP_CLS}
+                onClick={() => actions.answer(question.id, 'allowed')}
+              >
+                {t('允许这一次')}
+              </Button>
+              <Button
+                variant="ghost"
+                className={REPLY_CHIP_CLS}
+                onClick={() => actions.answer(question.id, 'refused')}
+              >
+                {t('拒绝')}
+              </Button>
+            </fieldset>
+          )}
+        </div>
+      )}
+      {onViewRaw !== undefined && (
+        <div
+          data-testid="engine-tail"
+          data-state={run.state}
+          className="mt-4 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-meta leading-5 text-content-tertiary"
+        >
+          <span data-testid="engine-choice" className="min-w-0">
+            {joinMeta([
+              run.elapsedSeconds === null ? null : formatWorkDuration(run.elapsedSeconds),
+              engineCost(run.costUsd),
+              t(ENGINE_CHOICE_WORDS.modelTier[choice.modelTier]),
+              t(ENGINE_CHOICE_WORDS.effort[choice.effort]),
+              choice.reason,
+            ])}
+          </span>
+          <span className="flex flex-none items-center">
+            <Button
+              variant="ghost"
+              data-testid="engine-view-raw"
+              className={TAIL_LINK}
+              onClick={onViewRaw}
+            >
+              {t('原始输出')}
+            </Button>
+            {actions !== undefined && run.state === 'taken_over' && (
+              <Button
+                variant="ghost"
+                data-testid="engine-hand-back"
+                className={TAIL_LINK}
+                onClick={actions.handBack}
+              >
+                {t('交还')}
+              </Button>
+            )}
+            {actions !== undefined && engineCanTakeOver(run.state) && (
+              <Button
+                variant="ghost"
+                data-testid="engine-take-over"
+                className={TAIL_LINK}
+                onClick={() => setConfirming(true)}
+              >
+                {t('接管')}
+              </Button>
+            )}
+          </span>
+        </div>
+      )}
+      <TakeOverDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={() => actions?.takeOver()}
+      />
+    </>
   );
 }
 
@@ -385,42 +584,11 @@ export function EngineCard({
           <RawOutput text={run.rawOutput} />
         )}
       </TraceCard>
-      <DialogShell
-        title={t('接管这次运行')}
+      <TakeOverDialog
         open={confirming}
         onClose={() => setConfirming(false)}
-        size="s"
-        footer={
-          <>
-            <Button
-              variant="ghost"
-              className={DIALOG_TEXT_BUTTON}
-              onClick={() => setConfirming(false)}
-            >
-              {t('取消')}
-            </Button>
-            <Button
-              className={DIALOG_PRIMARY_BUTTON}
-              data-testid="engine-take-over-confirm"
-              onClick={() => {
-                setConfirming(false);
-                actions?.takeOver();
-              }}
-            >
-              {t('接管')}
-            </Button>
-          </>
-        }
-      >
-        <p className="m-0 text-ui text-foreground">
-          {t(
-            '终端接入后，接管会让引擎停下，把它的终端交给你直接操作；交还后它从你停下的地方继续。',
-          )}
-        </p>
-        <p className="m-0 mt-2 text-ui text-(--text-secondary)">
-          {t('终端还没有接入：现在接管只把这次运行标记为由你处理，随时可以交还。')}
-        </p>
-      </DialogShell>
+        onConfirm={() => actions?.takeOver()}
+      />
     </>
   );
 }
