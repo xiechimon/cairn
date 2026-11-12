@@ -45,6 +45,7 @@ Environment (defaults in brackets):
   CAIRN_DEPLOY_NOTIFY [$CAIRN_DEPLOY_STATE/notify.sh]
   CAIRN_DEPLOY_NOTIFY_TIMEOUT [5]
   CAIRN_GH_WRAPPER [~/.cairn/tools/app-token/as-bot.sh]
+  CAIRN_DEPLOY_TOKEN_FILE [~/.cairn/token]
 EOF
   exit 2
 }
@@ -64,6 +65,7 @@ KEEP_SNAPSHOTS="${CAIRN_DEPLOY_KEEP_SNAPSHOTS:-10}"
 NOTIFY_HOOK="${CAIRN_DEPLOY_NOTIFY:-$STATE/notify.sh}"
 NOTIFY_TIMEOUT="${CAIRN_DEPLOY_NOTIFY_TIMEOUT:-5}"
 STEP_WAIT_SECONDS="${CAIRN_DEPLOY_STEP_WAIT_SECONDS:-1800}"
+TOKEN_FILE="${CAIRN_DEPLOY_TOKEN_FILE:-$HOME/.cairn/token}"
 HOST_TOOLS_ROOT="${CAIRN_HOST_TOOLS_ROOT:-$HOME/.cairn/tools}"
 HOST_LANES_ROOT="${CAIRN_HOST_LANES_ROOT:-$HOME/lanes}"
 HOST_BIN_ROOT="${CAIRN_HOST_BIN_ROOT:-$HOME/.local/bin}"
@@ -118,9 +120,20 @@ echo $$ >"$LOCK/pid"
 RUNTIME=daemon
 LEASE_OWNER=""
 
+owner_token() {
+  [ -r "$TOKEN_FILE" ] || return 0
+  sed -nE 's/^[[:space:]]*CAIRN_TOKEN[[:space:]]*=[[:space:]]*//p' "$TOKEN_FILE" | head -n1 |
+    sed -E "s/[[:space:]]+$//; s/^\"(.*)\"$/\\1/; s/^'(.*)'$/\\1/"
+}
+
 lease_request() {
-  curl -sS --noproxy '*' --max-time 10 -o "$STATE/lease-response" -w '%{http_code}' \
-    -H "Origin: $HEALTH_URL" -H 'Content-Type: application/json' "$@" "$HEALTH_URL/api/server/deploy/lease"
+  local token
+  token="$(owner_token)"
+  token="${token//\\/\\\\}"
+  token="${token//\"/\\\"}"
+  { [ -z "$token" ] || printf 'header = "Authorization: Bearer %s"\n' "$token"; } |
+    curl -sS --noproxy '*' --max-time 10 -K - -o "$STATE/lease-response" -w '%{http_code}' \
+      -H "Origin: $HEALTH_URL" -H 'Content-Type: application/json' "$@" "$HEALTH_URL/api/server/deploy/lease"
 }
 
 resume_claims() {
@@ -762,7 +775,12 @@ assert_deployable
 assert_hold
 classify_runtime
 if [ "$RUNTIME" = daemon ]; then
-  [ "$(lease_request)" = 200 ] || refuse "server lacks the deployment lease endpoint; bootstrap server-only first"
+  LEASE_PROBE_STATUS="$(lease_request)" || true
+  case "$LEASE_PROBE_STATUS" in
+    200) ;;
+    401 | 403) refuse "server rejected the deployment lease request (HTTP $LEASE_PROBE_STATUS); the owner token is read from $TOKEN_FILE" ;;
+    *) refuse "server lacks the deployment lease endpoint (HTTP $LEASE_PROBE_STATUS); bootstrap server-only first" ;;
+  esac
 fi
 
 log "rehearsing migrations of $TARGET"
