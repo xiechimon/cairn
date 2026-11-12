@@ -88,6 +88,7 @@ import type {
   UsageCostContent,
   WorkStep,
 } from '../fixtures/records.js';
+import { dateTimeFormat } from '../lib/date-format.js';
 import { inlineSegments } from '../lib/markdown.js';
 import { activityLabel } from './activity.js';
 import type { MachineProvider } from './claude-accounts.js';
@@ -252,7 +253,7 @@ export function mapUsageCost(cost: UsageCost | undefined): UsageCostContent | nu
 }
 
 export function clockTime(ms: number): string {
-  return new Intl.DateTimeFormat('zh-CN', {
+  return dateTimeFormat('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
