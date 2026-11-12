@@ -167,6 +167,7 @@ import { ensurePullClosesTaskIssue } from './pr-closing-line.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
+import { holdSecondRejectionRework } from './research-stuck.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import { assertAutomaticRetryAllowed, parkFailedBuild, retryIsParked } from './retry-parking.js';
 import { policyForStep, profileForStep, routeForStep } from './routing-rules.js';
@@ -280,6 +281,7 @@ interface BuildSteerOptions {
   actor?: string;
   schedule?: { id: string; createdBy: string; at: number };
   answer?: QuestionAnswer;
+  beforeCommit?: () => void;
 }
 
 function continuationTodo(
@@ -499,6 +501,13 @@ export async function sendBuildSteer(
           })
           .run();
       }
+      const result = {
+        conversationId: targetBuildId,
+        message: messageRow,
+        delivered: running ? ('steer' as const) : ('new-turn' as const),
+      };
+      completeClientMessage(db, conversationId, body.clientMessageId, result);
+      continuationOptions.beforeCommit?.();
       if (todoRow) {
         if (
           !continuationOptions.schedule &&
@@ -566,13 +575,11 @@ export async function sendBuildSteer(
           .set({ conversationId: targetBuildId })
           .where(eq(queuedMessage.conversationId, conversationId))
           .run();
-      const result = {
+      return {
         conversationId: targetBuildId,
         message: messageRow,
         delivered: running ? ('steer' as const) : ('new-turn' as const),
       };
-      completeClientMessage(db, conversationId, body.clientMessageId, result);
-      return result;
     });
   } catch (error) {
     return replayAfterConflict<BuildSteerResult>(db, conversationId, body.clientMessageId, error);
@@ -1508,7 +1515,14 @@ export async function applyBuildStepAction(
     | { action: 'restart'; feedback: string; clientMessageId: string },
   actor?: string,
   origin: 'person' | 'automatic' = 'person',
+  beforeCommit?: () => void,
 ): Promise<void> {
+  if (
+    (body.action === 'revision' || body.action === 'restart') &&
+    findClientMessage(deps.db, buildId, body.clientMessageId) !== undefined
+  ) {
+    return;
+  }
   const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (!row) throw new NotFoundError(`build ${buildId}`);
   assertSplitProposalExecutable(row.errorMessage);
@@ -1548,7 +1562,19 @@ export async function applyBuildStepAction(
         : null;
     const afterCommit: (() => void)[] = [];
     const transcriptDeps = { ...deps, afterCommit };
+    const recordRestartConversation = (conversationId: string) => {
+      completeClientMessage(deps.db, buildId, body.clientMessageId, {
+        delegated: true,
+        delivered: 'restart',
+        conversationId,
+      });
+      beforeCommit?.();
+    };
     deps.db.transaction(() => {
+      claimClientMessage(deps.db, buildId, body.clientMessageId, {
+        delegated: true,
+        delivered: 'restart',
+      });
       const current = getTodo(deps, row.todoId);
       if (
         !current ||
@@ -1611,6 +1637,7 @@ export async function applyBuildStepAction(
           : reworkTarget.withPlan
             ? 'plan'
             : 'build';
+        recordRestartConversation(reworkTarget.id);
         enqueueStep(
           deps,
           reworkTarget.id,
@@ -1684,6 +1711,7 @@ export async function applyBuildStepAction(
         });
       }
       const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
+      recordRestartConversation(newId);
       enqueueStep(
         deps,
         newId,
@@ -1775,41 +1803,55 @@ export async function applyBuildStepAction(
   if (todoRecord.phase !== 'confirm' && todoRecord.phase !== 'review') {
     throw new HttpError(409, `revision 仅在待确认/审核关口允许，当前相位 ${todoRecord.phase}`);
   }
-  recordBuildFeedback(
-    deps.db,
-    buildId,
-    'revision',
-    todoRecord.phase === 'confirm' ? 'plan' : 'build',
-    body.feedback,
-    actorName,
-  );
-  insertMessageRow(deps, buildId, {
-    id: newRecordId(),
-    role: 'user',
-    content: body.feedback,
-    createdAt: nowMs(),
-  });
-  if (todoRecord.phase === 'review' && buildRunsSession(deps, buildId)) {
-    deps.db.update(build).set({ prevPhase: 'review' }).where(eq(build.id, buildId)).run();
-    setTodoPhase(deps, todoRecord.id, 'queued');
-    enqueueStep(
-      deps,
+  const revising = todoRecord;
+  const afterCommit: (() => void)[] = [];
+  const transcriptDeps = { ...deps, afterCommit };
+  deps.db.transaction(() => {
+    claimClientMessage(deps.db, buildId, body.clientMessageId, {
+      delegated: true,
+      delivered: 'revision',
+      conversationId: buildId,
+    });
+    recordBuildFeedback(
+      deps.db,
       buildId,
-      'session',
-      todoRecord.teamId,
-      `${SESSION_REWORK_BRIEF}\n\n${body.feedback}`,
-      false,
-      origin === 'person',
-      { kind: 'rework' },
+      'revision',
+      revising.phase === 'confirm' ? 'plan' : 'build',
+      body.feedback,
+      actorName,
     );
-    return;
-  }
-  setTodoPhase(deps, todoRecord.id, 'planning');
-  const replanPrompt =
-    todoRecord.phase === 'review'
-      ? buildReviewRejectPrompt(body.feedback)
-      : buildReplanPrompt(body.feedback);
-  enqueueStep(deps, buildId, 'plan', todoRecord.teamId, replanPrompt, false, origin === 'person');
+    insertMessageRow(transcriptDeps, buildId, {
+      id: newRecordId(),
+      role: 'user',
+      content: body.feedback,
+      createdAt: nowMs(),
+    });
+    beforeCommit?.();
+    if (revising.phase === 'review' && buildRunsSession(deps, buildId)) {
+      deps.db.update(build).set({ prevPhase: 'review' }).where(eq(build.id, buildId)).run();
+      setTodoPhase(deps, revising.id, 'queued');
+      enqueueStep(
+        deps,
+        buildId,
+        'session',
+        revising.teamId,
+        `${SESSION_REWORK_BRIEF}\n\n${body.feedback}`,
+        false,
+        origin === 'person',
+        { kind: 'rework' },
+      );
+      holdSecondRejectionRework(deps, buildId);
+      return;
+    }
+    setTodoPhase(deps, revising.id, 'planning');
+    const replanPrompt =
+      revising.phase === 'review'
+        ? buildReviewRejectPrompt(body.feedback)
+        : buildReplanPrompt(body.feedback);
+    enqueueStep(deps, buildId, 'plan', revising.teamId, replanPrompt, false, origin === 'person');
+    holdSecondRejectionRework(deps, buildId);
+  });
+  for (const publish of afterCommit) publish();
 }
 
 function restoreFailedReview(deps: BuildDeps, row: BuildRow): void {
