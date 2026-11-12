@@ -1,6 +1,7 @@
 import { EngineCard } from '../board/engine-card.js';
 import type { EngineRun, EngineRunActions } from '../board/engine-run.js';
 import { ENGINE_SCRIPTS, engineRunAt } from '../fixtures/engine-runs.js';
+import { ProductProviders } from './product-providers.js';
 import { Section, Specimen } from './specimen.js';
 
 const ACTIONS: EngineRunActions = {
@@ -13,9 +14,11 @@ const { running, failed } = ENGINE_SCRIPTS;
 
 function Card({ run }: { run: EngineRun }) {
   return (
-    <div className="w-full max-w-97">
-      <EngineCard run={run} actions={ACTIONS} className="mt-0" />
-    </div>
+    <ProductProviders>
+      <div className="w-full max-w-97">
+        <EngineCard run={run} actions={ACTIONS} className="mt-0" />
+      </div>
+    </ProductProviders>
   );
 }
 
