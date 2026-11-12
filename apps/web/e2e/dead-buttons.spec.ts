@@ -223,7 +223,7 @@ test('account drops the `更换` button, keeps the avatar head (#306 wontfix shi
 }) => {
   await page.goto('/app/account?scenario=13');
   await expect(page.locator('.account-swap')).toHaveCount(0);
-  await expect(page.locator('.account-avatar img')).toBeVisible();
+  await expect(page.locator('.account-avatar [data-slot="avatar"]')).toBeVisible();
 });
 
 test('transcript work summary collapses and re-expands call rows', async ({ page }) => {
