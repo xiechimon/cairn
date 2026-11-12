@@ -321,63 +321,60 @@ export function Composer({
               {t(placeholder)}
             </div>
           )}
-          {!readOnly && (
-            <>
-              {streaming && !hasContent ? (
-                <IconTooltip
-                  label={t('停止')}
-                  trigger={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        'composer-stop',
-                        narrow ? ROUND_HIT_CLS : cn(SEND_BTN_CLS, STOP_CLS),
-                      )}
-                      onClick={onStop}
-                    />
-                  }
-                >
-                  {narrow ? (
-                    <span className={`${ROUND_FACE_CLS} bg-(--hover-1)`}>
-                      <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
-                    </span>
-                  ) : (
+          {!readOnly &&
+            (streaming && !hasContent ? (
+              <IconTooltip
+                label={t('停止')}
+                trigger={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      'composer-stop',
+                      narrow ? ROUND_HIT_CLS : cn(SEND_BTN_CLS, STOP_CLS),
+                    )}
+                    onClick={onStop}
+                  />
+                }
+              >
+                {narrow ? (
+                  <span className={`${ROUND_FACE_CLS} bg-(--hover-1)`}>
                     <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
-                  )}
-                </IconTooltip>
-              ) : (
-                <IconTooltip
-                  label={t('发送')}
-                  trigger={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        'composer-send',
-                        narrow ? ROUND_HIT_CLS : cn(SEND_BTN_CLS, hasContent && SEND_ON_CLS),
-                      )}
-                      onClick={send}
-                    />
-                  }
-                >
-                  {narrow ? (
-                    <span
-                      className={cn(
-                        ROUND_FACE_CLS,
-                        'bg-(--hover-1)',
-                        hasContent ? 'text-foreground' : 'text-content-tertiary',
-                      )}
-                    >
-                      <ArrowUp width={20} height={20} />
-                    </span>
-                  ) : (
-                    <CornerDownLeft width={20} height={20} />
-                  )}
-                </IconTooltip>
-              )}
-            </>
-          )}
+                  </span>
+                ) : (
+                  <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
+                )}
+              </IconTooltip>
+            ) : (
+              <IconTooltip
+                label={t('发送')}
+                trigger={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      'composer-send',
+                      narrow ? ROUND_HIT_CLS : cn(SEND_BTN_CLS, hasContent && SEND_ON_CLS),
+                    )}
+                    onClick={send}
+                  />
+                }
+              >
+                {narrow ? (
+                  <span
+                    className={cn(
+                      ROUND_FACE_CLS,
+                      'bg-(--hover-1)',
+                      hasContent ? 'text-foreground' : 'text-content-tertiary',
+                    )}
+                  >
+                    <ArrowUp width={20} height={20} />
+                  </span>
+                ) : (
+                  <CornerDownLeft width={20} height={20} />
+                )}
+              </IconTooltip>
+            ))}
         </div>
         <Input
           ref={fileInputRef}
