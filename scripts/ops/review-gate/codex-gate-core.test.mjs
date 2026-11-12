@@ -11,6 +11,7 @@ import {
   decide,
   deferredIssue,
   LIMIT_RETRY_AFTER_MS,
+  lastBlockedSha,
   markDeferrals,
   markPreExisting,
   parseState,
@@ -654,6 +655,136 @@ test('the third blocked head asks to reconsider the approach and labels the PR o
   });
   assert.equal(repeat.addHuman, undefined);
   assert.match(repeat.title, /reconsider the approach/);
+});
+
+const sinceQuiet = [{ filename: 'src/a.ts', patch: '@@ -1,1 +1,2 @@\n ctx\n+added' }];
+const sinceTouch = [{ filename: 'src/a.ts', patch: PATCH }];
+const atRound = (others, sinceFiles) => ({ others, marked: false, sinceFiles });
+
+test('lastBlockedSha is the newest actions marker other than the current head', () => {
+  const marker = (sha, id, at) => ({
+    id,
+    user: { login: 'github-actions[bot]' },
+    body: `${blockMarker(sha)}\n`,
+    created_at: at,
+  });
+  const comments = [
+    marker(OTHER, 1, '2026-01-01T00:00:01Z'),
+    marker('e'.repeat(40), 2, '2026-01-01T00:00:03Z'),
+    marker(SHA, 3, '2026-01-01T00:00:04Z'),
+    {
+      id: 4,
+      user: { login: 'mallory' },
+      body: blockMarker('f'.repeat(40)),
+      created_at: '2026-01-01T00:00:05Z',
+    },
+  ];
+  assert.equal(lastBlockedSha(comments, SHA), 'e'.repeat(40));
+  assert.equal(lastBlockedSha(comments, 'e'.repeat(40)), SHA);
+});
+
+test('rounds 1 and 2 still block a P1 outside the since-block diff', () => {
+  const old = located('P1', { line: 50 });
+  for (const others of [0, 1]) {
+    const result = decide(pr, done, [old], noRetries, false, null, atRound(others, sinceQuiet));
+    assert.equal(result.conclusion, 'failure');
+    assert.equal(result.addHuman, undefined);
+    assert.equal(result.carried, undefined);
+  }
+});
+
+test('from round 3 a P1 on lines unchanged since the last blocked head does not block', () => {
+  const result = decide(
+    pr,
+    done,
+    [located('P1', { line: 50 })],
+    noRetries,
+    false,
+    null,
+    atRound(BLOCK_ROUND_CAP - 1, sinceQuiet),
+  );
+  assert.equal(result.conclusion, 'success');
+  assert.equal(result.addHuman, true);
+  assert.match(result.summary, /bug class/);
+  assert.match(result.summary, /reconsider the approach/);
+  assert.match(result.carried, /pre-existing in this PR, record in Risk/);
+  assert.match(result.carried, /discussion_rP1/);
+});
+
+test('from round 3 a P1 on a line changed since the last blocked head still blocks', () => {
+  const result = decide(
+    pr,
+    done,
+    [located('P1', { line: 11 })],
+    noRetries,
+    false,
+    null,
+    atRound(BLOCK_ROUND_CAP - 1, sinceTouch),
+  );
+  assert.equal(result.conclusion, 'failure');
+  assert.match(result.title, /reconsider the approach/);
+  assert.match(result.summary, /bug class/);
+  assert.equal(result.carried, undefined);
+});
+
+test('a P0 on lines unchanged since the last blocked head still blocks', () => {
+  const result = decide(
+    pr,
+    done,
+    [located('P0', { line: 50 })],
+    noRetries,
+    false,
+    null,
+    atRound(BLOCK_ROUND_CAP - 1, sinceQuiet),
+  );
+  assert.equal(result.conclusion, 'failure');
+  assert.match(result.summary, /discussion_rP0/);
+  assert.equal(result.carried, undefined);
+});
+
+test('a carried P1 still fails when its deferral does not name an issue', () => {
+  const missing = located('P1', {
+    line: 50,
+    deferral: 'deferred to #9, which is not an issue in this repository',
+  });
+  const waived = located('P1', {
+    line: 50,
+    deferral: 'deferred to #9, but a P0/P1 finding must be fixed',
+  });
+  assert.equal(
+    decide(pr, done, [missing], noRetries, false, null, atRound(BLOCK_ROUND_CAP - 1, sinceQuiet))
+      .conclusion,
+    'failure',
+  );
+  assert.equal(
+    decide(pr, done, [waived], noRetries, false, null, atRound(BLOCK_ROUND_CAP - 1, sinceQuiet))
+      .conclusion,
+    'success',
+  );
+});
+
+test('from round 3 an unanchored thread on an unchanged file does not block', () => {
+  const quiet = decide(
+    pr,
+    done,
+    [thread('P1', { path: 'src/untouched.ts' })],
+    noRetries,
+    false,
+    null,
+    atRound(BLOCK_ROUND_CAP - 1, sinceQuiet),
+  );
+  assert.equal(quiet.conclusion, 'success');
+  assert.match(quiet.carried, /pre-existing in this PR, record in Risk/);
+  const moved = decide(
+    pr,
+    done,
+    [thread('P1', { path: 'src/a.ts' })],
+    noRetries,
+    false,
+    null,
+    atRound(BLOCK_ROUND_CAP - 1, sinceQuiet),
+  );
+  assert.equal(moved.conclusion, 'failure');
 });
 
 test('a pass reports the blocked heads before it', () => {
