@@ -25,6 +25,7 @@ import {
 } from './chief-questions.js';
 import { executeChiefTool, executeWorkerMemoryTool } from './chief-tools.js';
 import { steeredMessageScopes } from './chief-turns.js';
+import { captureToolBoundary, isCaptureTool, openTurnCapture } from './coordinator-turn-capture.js';
 import { projectOfTodo } from './git.js';
 import { resolveProjectGithubLabelIds } from './github-labels.js';
 import { forwardComputerCall } from './machine-computer.js';
@@ -155,7 +156,8 @@ export async function executeRelayToolCall(
   if (!threadRow) throw new NotFoundError(`chief thread ${threadId}`);
   const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
   if (!chiefRow) throw new NotFoundError(`chief ${threadRow.chiefId}`);
-  return executeChiefTool(
+  const captured = isCaptureTool(name) ? openTurnCapture(stepId) : undefined;
+  const result = await executeChiefTool(
     {
       db: deps.db,
       hub: deps.hub,
@@ -188,6 +190,10 @@ export async function executeRelayToolCall(
     name,
     params,
   );
+  if (captured !== undefined)
+    if (captured !== undefined && isCaptureTool(name))
+      captureToolBoundary(deps.db, stepId, threadRow.teamId, name, toolCallId, params, result);
+  return result;
 }
 
 export function steeredFromAnotherScope(deps: MachineDeps, row: typeof step.$inferSelect): boolean {

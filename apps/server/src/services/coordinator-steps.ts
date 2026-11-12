@@ -25,6 +25,7 @@ import { CHIEF_DIGEST_SYSTEM_PROMPT, isChiefDigestStep } from './chief-digest.js
 import { cancelPendingQuestions } from './chief-questions.js';
 import { recordChiefStop, steeredMessageScopes } from './chief-turns.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
+import { openTurnCapture, sealCoordinatorTurnSnapshot } from './coordinator-turn-capture.js';
 import {
   isChiefConversation,
   type MachineDeps,
@@ -71,6 +72,7 @@ export function claimPendingChiefStep(
       ),
     )
     .run();
+  if (res.changes > 0) openTurnCapture(stepRow.id);
   return res.changes > 0;
 }
 
@@ -136,6 +138,12 @@ export function finishCoordinatorTurn(
   observation?: OtelObservation,
 ): void {
   const { db } = deps;
+  try {
+    const teamId = stepTeamId(deps, stepRow);
+    if (teamId !== null) sealCoordinatorTurnSnapshot(db, stepRow, teamId, outcome.status, nowMs());
+  } catch {
+    // Snapshot failure must never fail the turn; absence is authoritative.
+  }
   db.update(step)
     .set({
       status:
