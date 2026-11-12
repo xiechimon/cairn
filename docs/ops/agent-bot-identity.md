@@ -77,8 +77,8 @@ Commits are not signed: no path creates commits through the GitHub API, so there
 
 Every PR merges by squash; the squash commit is authored by the PR opener, so App-opened PRs land on main as `cairnwright[bot]`.
 
-- Both paths require a pr-gate go with `mergedBy: 'auto-merge'` (path class does not route to ian), no unchecked tasks anywhere in the body and no `coordinator-hold` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.
-- A protected-path or security-surface PR, including one that used to be owner-routed and one opened by `cairnwright[bot]`, uses that same queue. Path class does not add `coordinator-hold`. A security surface also needs `/security-review` findings fixed or recorded in Risk before merge, and required CI plus a Codex cloud review with no unresolved P0/P1 on the head. `pr-evidence` fails a security-surface head that lacks `Security review (<sha>): fixed` or `Security review (<sha>): recorded`.
+- Queue-routed PRs require a pr-gate go with `mergedBy: 'auto-merge'`. Owner-routed PRs follow the authorized admin-merge path instead. Either way, require no unchecked tasks anywhere in the body and no `coordinator-hold` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.
+- Other protected paths use that same queue, including one opened by `cairnwright[bot]`. CI and merge machinery, the eval ruler, and the credentials, machine and external-entry lists go to ian and do not add `coordinator-hold`. A security surface also needs `/security-review` findings fixed or recorded in Risk before merge, and required CI plus a Codex cloud review with no unresolved P0/P1 on the head. `pr-evidence` fails a security-surface head that lacks `Security review (<sha>): fixed` or `Security review (<sha>): recorded`.
 
 The regular GitHub user `cairnwright` is no longer used by anything; whether to keep or delete it is ian's decision.
 
@@ -90,7 +90,7 @@ The regular GitHub user `cairnwright` is no longer used by anything; whether to 
 
 ## Code Owners review
 
-`.github/CODEOWNERS` sets the owner of `integration/eval/**`, `.claude/hillclimb/**`, and the CODEOWNERS file itself to `@xiechimon`. Path class does not route those PRs to ian or add `coordinator-hold` (ian, 2026-11-11). The eval ruler stays protected so no PR can edit what judges it (`AGENTS.md`, "Merge routes"). pr-gate runs the origin/main copy, so a PR cannot edit the gate that judges it.
+`.github/CODEOWNERS` names `@xiechimon` for CI and merge machinery, the eval ruler, the credentials, machine and external-entry lists, and the CODEOWNERS file itself. Those classes also route to ian (`AGENTS.md`, "Merge routes"). Path class does not add `coordinator-hold`. GitHub enforces the file only when "Require review from Code Owners" is on. pr-gate runs the origin/main copy, so a PR cannot edit the gate that judges it.
 
 "Require review from Code Owners" is to be enabled only after the App can open PRs. Reason: if the PR author is xiechimon, ian cannot approve his own PR, and the owner in CODEOWNERS is also xiechimon — once enabled, PRs touching these paths would never obtain a valid code-owner review. For PRs opened by the App the author is `cairnwright[bot]`, which ian can approve. App-opened PRs were measured working on 2026-10-25.
 

@@ -28,6 +28,7 @@ import {
   requireTeam,
   svcOf,
 } from './routes-helpers.js';
+import { answerProposal } from './services/action-proposals.js';
 import { executeAction } from './services/action-registry.js';
 import { patchAutonomy, readAutonomy } from './services/autonomy-gates.js';
 import { toBuildRecord } from './services/builds.js';
@@ -290,5 +291,27 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
       },
     );
     return c.body(null, 204);
+  });
+
+  app.post('/api/actions/proposals/:id/answer', async (c) => {
+    const body = await jsonBody(c);
+    if (body !== null && typeof body === 'object' && 'input' in body) {
+      throw new HttpError(400, 'answer must not include input');
+    }
+    const decision = (body as { decision?: unknown } | null)?.decision;
+    if (decision !== 'refuse' && decision !== 'allow-once' && decision !== 'always') {
+      throw new HttpError(400, 'invalid decision');
+    }
+    return c.json(
+      answerProposal(
+        { db: ctx.db, reposDir: ctx.reposDir },
+        {
+          proposalId: c.req.param('id'),
+          teamId: ctx.team.id,
+          decision,
+          decidedBy: ctx.user.id,
+        },
+      ),
+    );
   });
 }

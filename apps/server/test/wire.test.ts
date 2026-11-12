@@ -50,6 +50,7 @@ const INFERRED_ROUTES = [
   'PUT /api/prompts/{id}',
   'DELETE /api/prompts/{id}',
   'DELETE /api/projects/{id}',
+  'POST /api/actions/proposals/{id}/answer',
   'DELETE /api/schedules/{id}',
   'POST /api/schedules/{id}/run',
   'DELETE /api/teams/{id}/providers/{pid}',

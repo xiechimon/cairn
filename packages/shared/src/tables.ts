@@ -1,5 +1,9 @@
 export const DB_TABLES = [
   'action_journal',
+  'action_proposal',
+  'action_subscriber',
+  'action_wake_outbox',
+  'hosted_cleanup_outbox',
   'user',
   'team',
   'job_application',
@@ -88,6 +92,10 @@ export const JOIN_ONLY_TABLES = ['todo_tag', 'todo_github_label'] as const;
 
 export const INTERNAL_ONLY_TABLES = [
   'action_journal',
+  'action_proposal',
+  'action_subscriber',
+  'action_wake_outbox',
+  'hosted_cleanup_outbox',
   'mail_account',
   'mail_event',
   'mail_rule',

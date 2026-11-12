@@ -120,6 +120,41 @@ describe('the schema and migration journal (the 01 §6 list)', () => {
     }
   });
 
+  test('upgrades a database that already applied 0152_action_journal', () => {
+    const journal = JSON.parse(
+      readFileSync(resolve(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
+    ) as { entries: { tag: string; when: number }[] };
+    const tip = journal.entries.findIndex((entry) => entry.tag === '0152_action_journal');
+    if (tip < 0) throw new Error('0152_action_journal missing');
+    const applied = journal.entries.slice(0, tip + 1);
+    const directory = makeTestTempDir('cairn-migration-0151-');
+    const sqlite = new Database(':memory:');
+    try {
+      mkdirSync(resolve(directory, 'meta'));
+      writeFileSync(
+        resolve(directory, 'meta/_journal.json'),
+        JSON.stringify({ ...journal, entries: applied }),
+      );
+      for (const entry of applied)
+        copyFileSync(
+          resolve(MIGRATIONS_FOLDER, `${entry.tag}.sql`),
+          resolve(directory, `${entry.tag}.sql`),
+        );
+      const db = drizzle(sqlite);
+      migrate(db, { migrationsFolder: directory });
+      migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+      const names = db.all(sql`SELECT name FROM sqlite_master WHERE type = 'table'`) as {
+        name: string;
+      }[];
+      expect(names.map((row) => row.name)).toEqual(
+        expect.arrayContaining(['action_proposal', 'action_subscriber', 'hosted_cleanup_outbox']),
+      );
+    } finally {
+      sqlite.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   test('the migrations apply cleanly to an in-memory db', () => {
     expect(() => openMemoryDb()).not.toThrow();
   });

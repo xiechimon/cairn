@@ -1484,6 +1484,83 @@ export const actionJournal = sqliteTable(
   ],
 );
 
+export const actionProposal = sqliteTable(
+  'action_proposal',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    actionId: text('actionId').notNull(),
+    targetId: text('targetId').notNull(),
+    inputJson: text('inputJson').notNull(),
+    inputHash: text('inputHash').notNull(),
+    status: text('status')
+      .$type<'pending' | 'refused' | 'executed' | 'failed' | 'expired' | 'superseded'>()
+      .notNull(),
+    decision: text('decision').$type<'refuse' | 'allow-once' | 'always' | null>(),
+    expiresAt: epochMs('expiresAt').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    decidedBy: text('decidedBy'),
+    decidedAt: epochMs('decidedAt'),
+  },
+  (t) => [
+    uniqueIndex('action_proposal_pending_idx')
+      .on(t.teamId, t.actionId, t.targetId)
+      .where(sql`${t.status} = 'pending'`),
+    index('action_proposal_expiry_idx').on(t.status, t.expiresAt),
+  ],
+);
+
+export const actionSubscriber = sqliteTable(
+  'action_subscriber',
+  {
+    id: text('id').primaryKey(),
+    proposalId: text('proposalId')
+      .notNull()
+      .references(() => actionProposal.id, { onDelete: 'cascade' }),
+    threadId: text('threadId').notNull(),
+    wakeStepId: text('wakeStepId').notNull(),
+    scopeProjectId: text('scopeProjectId'),
+  },
+  (t) => [uniqueIndex('action_subscriber_proposal_thread_idx').on(t.proposalId, t.threadId)],
+);
+
+export const actionWakeOutbox = sqliteTable(
+  'action_wake_outbox',
+  {
+    id: text('id').primaryKey(),
+    proposalId: text('proposalId')
+      .notNull()
+      .references(() => actionProposal.id, { onDelete: 'cascade' }),
+    threadId: text('threadId').notNull(),
+    outcome: text('outcome').notNull(),
+    state: text('state').$type<'pending' | 'delivered' | 'undeliverable'>().notNull(),
+  },
+  (t) => [uniqueIndex('action_wake_outbox_proposal_thread_idx').on(t.proposalId, t.threadId)],
+);
+
+export const hostedCleanupOutbox = sqliteTable(
+  'hosted_cleanup_outbox',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    projectId: text('projectId').notNull(),
+    repoName: text('repoName').notNull(),
+    state: text('state').$type<'pending' | 'retrying' | 'conflict' | 'done'>().notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: epochMs('nextAttemptAt').notNull(),
+    lastError: text('lastError'),
+  },
+  (t) => [
+    uniqueIndex('hosted_cleanup_unresolved_idx')
+      .on(t.teamId, t.repoName)
+      .where(sql`${t.state} != 'done'`),
+  ],
+);
+
 export const threadConversation = sqliteTable('thread_conversation', {
   threadId: text('threadId').primaryKey(),
   storeId: text('storeId').notNull(),

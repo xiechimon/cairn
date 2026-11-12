@@ -30,6 +30,8 @@ jobs:
       HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
       FAILED_SHA: ${{ github.event.workflow_run.head_sha }}
       RUN_URL: ${{ github.event.workflow_run.html_url }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+      RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -43,6 +45,9 @@ jobs:
             fi
             if [ "$CONCLUSION" = success ]; then
               node scripts/autonomy-brake.mjs resume
+              exit 0
+            fi
+            if [ "$RUN_ATTEMPT" = 1 ] && node scripts/autonomy-brake.mjs rerun-failed --run "$RUN_ID" --sha "$FAILED_SHA"; then
               exit 0
             fi
             node scripts/autonomy-brake.mjs pause --reason "Main CI failed at $FAILED_SHA: $RUN_URL"
