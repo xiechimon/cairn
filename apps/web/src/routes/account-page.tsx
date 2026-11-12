@@ -85,7 +85,7 @@ export function AccountPage() {
           avatar={
             <SeededAvatar
               className="size-14"
-              name={user.displayName}
+              name={userName}
               src={user.avatarUrl}
               fallback="/avatar-user.png"
             />

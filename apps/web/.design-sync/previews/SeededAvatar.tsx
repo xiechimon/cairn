@@ -16,10 +16,3 @@ export const Sizes = () => (
     <SeededAvatar name="Implementer" fallback="I" className="size-10" />
   </div>
 );
-
-export const Busy = () => (
-  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-    <SeededAvatar name="Implementer" fallback="I" busy />
-    <SeededAvatar name="Reviewer" fallback="R" busy />
-  </div>
-);
