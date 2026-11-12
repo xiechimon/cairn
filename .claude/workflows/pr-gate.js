@@ -16,18 +16,14 @@ export const meta = {
 // go is false), and the verdict carries the SHA it was made on.
 // The caller merges only when go is true and headSha equals the PR head.
 // Run the copy from origin/main, not the PR's working tree, so a PR cannot
-// edit the gate that judges it. An edit of this file enters the queue with
-// every other green PR; path class does not send it to the user.
+// edit the gate that judges it. CI and merge machinery, the eval ruler, and
+// the credentials, machine, and external-entry lists return mergedBy user.
+// Every other path may auto-merge. Path class does not add coordinator-hold.
 
 const REPO = 'xiechimon/cairn'
 // 5 reviewers + 4 skeptics stays under the 10-agent guideline.
 const MAX_SKEPTICS = 4
 
-// Path class, including a protected path or a security surface, does not
-// route to the user and does not require coordinator-hold (ian, 2026-11-11).
-// A green review-gate with no unresolved P0/P1, the required checks, and the
-// absence of coordinator-hold admit the PR. This script runs from origin/main,
-// so a PR cannot edit the copy that judges it.
 // Size never routes or blocks (D68): the review gate judges one problem per PR.
 // pr-gate runs 3, 4 and 5 each found another agent-steering or gate file that a
 // list of names missed (AGENTS.override.md, .pi/skills, nested .claude/).
