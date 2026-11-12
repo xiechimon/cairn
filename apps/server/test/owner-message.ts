@@ -2,13 +2,13 @@ import type { Db } from '../src/db/client.js';
 import { chiefMessage } from '../src/db/schema.js';
 import { newRecordId, nowMs } from '../src/lib/ids.js';
 
-let clock = 0;
+let lastCreatedAt = 0;
 
 export function seedOwnerMessage(db: Db, threadId: string, content: string): string {
   const id = newRecordId();
-  clock += 1;
+  lastCreatedAt = Math.max(nowMs(), lastCreatedAt + 1);
   db.insert(chiefMessage)
-    .values({ id, threadId, role: 'user', content, projectId: null, createdAt: nowMs() + clock })
+    .values({ id, threadId, role: 'user', content, projectId: null, createdAt: lastCreatedAt })
     .run();
   return id;
 }
