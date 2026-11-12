@@ -21,6 +21,7 @@ import { addChiefWatch } from '../src/services/chief.js';
 import { answerQuestion, createOrGetQuestion } from '../src/services/chief-questions.js';
 import { confirmBuild } from '../src/services/chief-tools.js';
 import { createScheduler } from '../src/services/scheduler.js';
+import { queueTaskMessage, readQueuedMessages } from '../src/services/task-message-queue.js';
 import { getTodo } from '../src/services/todos.js';
 import {
   bootServer,
@@ -210,6 +211,26 @@ describe('#1791 server auto-confirm after plan step', () => {
       createScheduler(w.s.svc, { tickMs: 15_000 }).tick(Date.now() + 600_000);
       expect(w.todoRow().phase).toBe('confirm');
       expect(w.messagesOf(buildId).some((m) => m.content === CONFIRM_ANNOUNCEMENT)).toBe(false);
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('a message queued while the plan is written is delivered to planning before any build step starts', async () => {
+    const w = await setupWorld();
+    try {
+      const buildId = w.startBuild();
+      const planStep = await w.claim();
+      await queueTaskMessage(w.s.svc, buildId, 'Use the existing parser instead.');
+      await w.uploadPlan(planStep.step.id, GOOD_PLAN);
+      await w.done(planStep.step.id, { status: 'success', sessionId: 'psac-queued' });
+      const steps = w.s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();
+      expect(steps.filter((st) => st.kind === 'build')).toHaveLength(0);
+      expect(w.messagesOf(buildId).some((m) => m.content === CONFIRM_ANNOUNCEMENT)).toBe(false);
+      expect(readQueuedMessages(w.s.db, buildId)).toHaveLength(0);
+      expect(
+        w.messagesOf(buildId).some((m) => m.content === 'Use the existing parser instead.'),
+      ).toBe(true);
     } finally {
       w.s.dispose();
     }

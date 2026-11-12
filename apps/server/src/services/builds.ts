@@ -3052,6 +3052,13 @@ function planAutoConfirmation(deps: Pick<BuildDeps, 'db'>, buildId: string): Pla
       .some((row) => askQuestionContentOf(row.content)?.status === 'pending');
   if (pendingQuestion)
     return { eligible: false, reason: 'A pending Chief question requires a user answer' };
+  const queuedFeedback = deps.db
+    .select({ id: queuedMessage.id })
+    .from(queuedMessage)
+    .where(and(eq(queuedMessage.conversationId, buildId), isNull(queuedMessage.error)))
+    .get();
+  if (queuedFeedback !== undefined)
+    return { eligible: false, reason: 'A queued user message is waiting for the planning turn' };
   return {
     eligible: true,
     planId: latestPlan.id,
