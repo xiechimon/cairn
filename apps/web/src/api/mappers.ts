@@ -65,6 +65,7 @@ import { STATUS_WORDS } from '../board/status-words.js';
 import type {
   BranchInfoContent,
   ChiefContent,
+  ChiefContextUsage,
   ChiefStreamItem,
   ChiefToolRow,
   DiffFile,
@@ -169,6 +170,17 @@ function rowProject(row: MessageRow): { projectId?: string | null } {
   return row.projectId === undefined ? {} : { projectId: row.projectId };
 }
 
+export function threadContextOf(source: unknown): ChiefContextUsage | null {
+  if (source == null || typeof source !== 'object') return null;
+  const context = (source as { context?: unknown }).context;
+  if (context == null || typeof context !== 'object') return null;
+  const { tokens, contextWindow } = context as { tokens?: unknown; contextWindow?: unknown };
+  if (typeof tokens !== 'number' || typeof contextWindow !== 'number') return null;
+  if (!Number.isFinite(tokens) || !Number.isFinite(contextWindow) || contextWindow <= 0)
+    return null;
+  return { tokens, contextWindow };
+}
+
 export function toDisplayTodo(w: WireTodo): DisplayTodo {
   return {
     id: w.id,
@@ -201,6 +213,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     sourceKind: w.sourceKind,
     sourceRef: w.sourceRef,
     usageCost: w.usageCost,
+    context: threadContextOf(w),
     owner: w.owner,
     output: w.output,
     section: w.section ?? null,

@@ -36,7 +36,7 @@ import { TaskRefRow } from './chief-task-ref-row.js';
 import { taskRefsOf } from './chief-task-refs.js';
 import { isLiveNotice } from './live-notice.js';
 import { MessageToolbar } from './message-toolbar.js';
-import { QuestionAnsweredLine } from './question-answered-line.js';
+import { QuestionAnsweredLine, QuestionAsked } from './question-answered-line.js';
 import { answerLines } from './question-lifecycle.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
 import {
@@ -509,14 +509,38 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     );
   if (item.kind === 'question' && item.status === 'pending') return null;
   if (item.kind === 'question') {
-    const answers = answerLines(item);
-    if (answers.length > 0)
+    if (item.status === 'cancelled')
       return (
         <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
+          <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
+            <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
+              <QuestionAnsweredLine item={item} />
+            </MessageContent>
+          </Message>
+        </MessageScrollerItem>
+      );
+    const answers = answerLines(item);
+    return (
+      <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
+        <Message
+          className={joinsPrev ? RUN_ROW_CLS : REPLY_ROW_CLS}
+          data-testid="chief-msg"
+          data-run={joinsPrev ? 'last' : undefined}
+        >
+          <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
+            <QuestionAsked item={item} onCopy={onCopy} />
+            {answers.length === 0 && (
+              <div className="mt-2">
+                <QuestionAnsweredLine item={item} />
+              </div>
+            )}
+          </MessageContent>
+        </Message>
+        {answers.length > 0 && (
           <Message
-            className={`${joinsPrev ? RUN_ROW_CLS : USER_ROW_CLS} justify-end`}
+            className={`${USER_ROW_CLS} justify-end`}
             data-testid="chief-msg"
-            data-run={runAttr(joinsPrev, joinsNext)}
+            data-run={joinsNext ? 'first' : undefined}
           >
             <MessageContent
               className="relative max-w-[min(85%,42rem)] flex-none items-end gap-2"
@@ -532,15 +556,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               </UserMessageBubble>
             </MessageContent>
           </Message>
-        </MessageScrollerItem>
-      );
-    return (
-      <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
-          <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-            <QuestionAnsweredLine item={item} />
-          </MessageContent>
-        </Message>
+        )}
       </MessageScrollerItem>
     );
   }

@@ -4,6 +4,7 @@ import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { contextPercentOf } from '../chief/context-meter-ring.js';
 import { REPLY_SOURCE_ATTR } from '../chief/selection-reply-model.js';
 import { TraceCard } from '../components/chat/trace-parts.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -547,8 +548,14 @@ function ReadyThread({
         onOpenPlan={openPlan}
         onClose={onClose}
         usage={
-          usage.hasRuns && threadUsageShown(usage.summary, usage.state)
-            ? { summary: usage.summary, state: usage.state, onRetry: usage.retry }
+          (usage.hasRuns && threadUsageShown(usage.summary, usage.state)) ||
+          contextPercentOf(todo.context) !== null
+            ? {
+                summary: usage.summary,
+                state: usage.state,
+                onRetry: usage.retry,
+                context: todo.context,
+              }
             : null
         }
       />

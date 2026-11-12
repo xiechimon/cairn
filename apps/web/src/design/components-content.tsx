@@ -444,7 +444,7 @@ export function TraceSection() {
     <Section
       id="trace"
       title="Trace"
-      lede="The agent's narration stays body text. Tool activity folds into one grey summary line ending in a triangle; open it for a hairline card with one 36px row per action: a quiet verb, the target in medium weight, and the result at the end. A row opens to its command and output. Never hand-write tool rows."
+      lede="The agent's narration stays body text. Tool activity folds into one quiet summary row: a 16px state glyph, the work in the secondary ink and a 16px chevron that turns when open; open it for a hairline card with one 36px row per action: a quiet verb, the target in medium weight, and the result at the end. A row opens to its command and output. Never hand-write tool rows."
     >
       <Specimen
         id="trace-states"

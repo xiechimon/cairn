@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChiefDigestRow } from '../chief/chief-digest-row.js';
 import { ChiefIdentity } from '../chief/chief-identity.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from '../chief/chief-outage-banner.js';
-import { QuestionAnsweredLine } from '../chief/question-answered-line.js';
+import { QuestionAnsweredLine, QuestionAsked } from '../chief/question-answered-line.js';
 import { QuestionChips } from '../chief/question-chips.js';
 import { answerLines } from '../chief/question-lifecycle.js';
 import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
@@ -30,7 +30,8 @@ export function ProductChiefSection() {
         id="question-chips"
         title="Question chips"
         note={
-          last ?? 'QuestionChips: a chip answers, digits pick, the composer types a free answer'
+          last ??
+          'QuestionChips: a chip answers, digits pick, the composer types a free answer; answered, the questions stay as reply bubbles above one owner bubble'
         }
         stage="canvas"
         className="flex-col"
@@ -50,7 +51,8 @@ export function ProductChiefSection() {
           </div>
         </Labeled>
         <Labeled label="Answered">
-          <div className="w-160">
+          <div className="flex w-160 flex-col gap-6">
+            <QuestionAsked item={QUESTION_ANSWERED} />
             <div className="flex justify-end">
               <UserMessageBubble className="w-fit max-w-full whitespace-pre-line">
                 {answerLines(QUESTION_ANSWERED).join('\n')}

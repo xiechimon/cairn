@@ -25,6 +25,7 @@ import {
   type TodoOutputKind,
   type TodoOwner,
   type TodoSection,
+  type TokenUsage,
   type UsageCost,
 } from '@cairn/shared';
 import type { MachineProvider } from '../api/claude-accounts.js';
@@ -80,6 +81,7 @@ export interface TodoRecord {
   sourceKind?: string | null;
   sourceRef?: string | null;
   usageCost?: UsageCost;
+  context?: ChiefContextUsage | null;
   verified?: boolean;
   owner?: TodoOwner;
   output?: TodoOutputKind;
@@ -520,6 +522,7 @@ export interface DetailContent {
   planDiff?: PlanDiffContent;
   compareTarget?: PlanDiffContent;
   revision?: RevisionStep;
+  usage?: { rows: TokenUsage[]; machines: string[] };
 }
 
 export interface PlanVersion {

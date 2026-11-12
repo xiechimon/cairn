@@ -9,6 +9,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
+import { useApiMutations, useProjects } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
 import { QuestionScopeContext } from '../chief/chief-question.js';
@@ -52,6 +53,7 @@ import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { NarrowTopControls, useNarrowChrome } from './narrow-chrome.js';
 import { composeRequest } from './open-composer.js';
 import { PhoneTabs } from './phone-tabs.js';
+import { splitProjectsByArchive } from './project-archive.js';
 import { TasksPanel } from './tasks-panel.js';
 import {
   needsYouBadge,
@@ -180,6 +182,11 @@ export function HomeC({
   );
   const threadId = searchParams.get(THREAD_PARAM);
   const narrow = useNarrow();
+  const { createTodo } = useApiMutations(teamId);
+  const projectsQuery = useProjects(teamId, live);
+  const activeProjects = splitProjectsByArchive(projectsQuery.data ?? []).active;
+  const saveProjectId =
+    projectId ?? (activeProjects.length === 1 ? (activeProjects[0]?.id ?? null) : null);
   const showPane = (next: WorkPane | null, state: unknown = location.state) => {
     const params = withoutFileTarget(new URLSearchParams(searchParams));
     params.delete(THREAD_PARAM);
@@ -452,9 +459,14 @@ export function HomeC({
         onOpenQuestion={openQuestion}
         addBlocked={archived === null ? null : t(ARCHIVED_PROJECT_WRITE_REASON)}
         onAddTask={async (text) => {
+          if (live && saveProjectId !== null) {
+            await createTodo.mutateAsync({ projectId: saveProjectId, spec: text });
+            return 'saved';
+          }
           if (surface.onSend == null) setPrefill({ text, key: Date.now() });
           else await surface.onSend(text, projectId);
           if (narrow) showPane(null);
+          return 'sent';
         }}
         query={tasksQuery}
       />

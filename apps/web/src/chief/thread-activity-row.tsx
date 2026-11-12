@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from 'react';
 import { reportStatusWord } from '../board/status-words.js';
 import { ThreadLink } from '../board/thread-link.js';
-import { TraceTriangle } from '../components/chat/trace-parts.js';
+import { TraceChevron } from '../components/chat/trace-parts.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
 import { FileText } from '../icons/index.js';
@@ -21,7 +21,7 @@ const EVENT_CLS =
   'flex min-h-6 min-w-0 items-start gap-1.5 text-meta leading-5 text-(--text-tertiary)';
 const ICON_CLS = 'flex-none text-(--text-tertiary)';
 const TOGGLE_CLS =
-  "-my-0.5 size-6 min-h-0 flex-none cursor-pointer justify-center rounded-md border-0 bg-transparent p-0 text-meta font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
+  "-my-0.5 size-6 min-h-0 flex-none cursor-pointer justify-center rounded-(--radius-control) border-0 bg-transparent p-0 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent aria-expanded:hover:bg-(--menu-hover) dark:aria-expanded:hover:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
 const REF_CLS = 'cursor-pointer hover:text-(--foreground) hover:underline';
 const EVENT_LIST_CLS = 'mt-0.5 ml-5 flex min-w-0 flex-col gap-0.5 border-s border-(--border) ps-3';
 
@@ -142,7 +142,7 @@ export function ThreadActivityRow({ activity }: { activity: ThreadActivity }) {
           onClick={() => setOpen(!open)}
           data-testid="thread-activity-toggle"
         >
-          <TraceTriangle open={open} />
+          <TraceChevron open={open} />
         </Button>
       </div>
       {open && (

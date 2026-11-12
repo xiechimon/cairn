@@ -26,8 +26,14 @@ export function TasksAddInput({
     if (trimmed === '' || sending) return;
     setSending(true);
     onSubmit(trimmed)
-      .catch((error: unknown) => toastError(t('任务没有发出，请重试。'), error))
-      .finally(() => setSending(false));
+      .then(
+        () => setText(''),
+        (error: unknown) => toastError(t('任务没有添加上，请重试。'), error),
+      )
+      .finally(() => {
+        setSending(false);
+        ref.current?.focus();
+      });
   };
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Escape') return;
@@ -36,13 +42,18 @@ export function TasksAddInput({
     onClose();
   };
   return (
-    <form onSubmit={submit} className="flex flex-none px-2 pt-1 pb-1">
+    <form onSubmit={submit} className="flex flex-none px-2">
       <div
         data-testid="tasks-add-field"
-        className="flex h-11.5 min-w-0 flex-1 items-center gap-3 rounded-(--radius-tile) bg-(--hover-1) pr-1.5 pl-2 focus-within:[outline:var(--focus-width)_solid_var(--focus-ring)]"
+        className="flex h-10.5 min-w-0 flex-1 items-center gap-4 rounded-(--radius-tile) border border-transparent bg-(--hover-1) pr-1.5 pl-2.5 focus-within:[outline:var(--focus-width)_solid_var(--focus-ring)]"
       >
-        <span className="flex size-7 flex-none items-center justify-center rounded-(--cds-radius-md) bg-(--sidebar-active)">
-          <ListChecks aria-hidden className="size-5 text-content-secondary" strokeWidth={1.75} />
+        <span className="flex size-7 flex-none items-center justify-center">
+          <span
+            data-slot="tasks-add-tile"
+            className="flex size-6 items-center justify-center rounded-(--cds-radius-md) bg-(--sidebar-active)"
+          >
+            <ListChecks aria-hidden className="size-4 text-content-secondary" strokeWidth={1.75} />
+          </span>
         </span>
         <Input
           ref={ref}
@@ -65,11 +76,11 @@ export function TasksAddInput({
               size="icon"
               data-testid="tasks-add-submit"
               disabled={trimmed === '' || sending}
-              className="size-8 flex-none text-content-secondary"
+              className="size-7 flex-none text-foreground disabled:text-content-tertiary disabled:opacity-100"
             />
           }
         >
-          <ArrowUp aria-hidden className="size-5.5" strokeWidth={1.75} />
+          <ArrowUp aria-hidden className="size-5" strokeWidth={1.75} />
         </IconTooltip>
       </div>
     </form>

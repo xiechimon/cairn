@@ -193,7 +193,7 @@ test('a row opens its thread in the side chat', async ({ page }) => {
   await expect(page.getByTestId('side-chat')).toContainText('Orb canary round 7');
 });
 
-test('the plus button opens an inline add input; Escape closes it; submit hands the text to the composer', async ({
+test('the plus button opens an inline add input; Escape closes it; without a server to save to, submit hands the text to the composer', async ({
   page,
 }) => {
   await page.goto(`${HOME}&pane=tasks`);
@@ -206,7 +206,7 @@ test('the plus button opens an inline add input; Escape closes it; submit hands 
   const tabsBox = await panel(page).getByRole('tablist').boundingBox();
   const fieldBox = await field.boundingBox();
   expect(fieldBox?.y ?? 0).toBeGreaterThan((tabsBox?.y ?? 0) + (tabsBox?.height ?? 0));
-  expect(fieldBox?.height).toBe(46);
+  expect(fieldBox?.height).toBe(42);
   await expect(field).not.toHaveCSS('outline-style', 'none');
   await expect(panel(page).getByTestId('tasks-add-submit')).toBeDisabled();
   await page.keyboard.press('Escape');

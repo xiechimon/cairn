@@ -33,6 +33,7 @@ interface SetupOptions {
   currentCost?: number;
   teams?: 'error' | 'empty';
   machinesError?: boolean;
+  context?: { tokens: number; contextWindow: number } | null;
 }
 
 async function setup(page: Page, options: SetupOptions = {}) {
@@ -41,8 +42,9 @@ async function setup(page: Page, options: SetupOptions = {}) {
     localStorage.setItem('cairn.locale', 'en');
     if (localStorage.getItem('cairn-theme') === null) localStorage.setItem('cairn-theme', 'dark');
   });
+  const sent = options.context === undefined ? {} : { context: options.context };
   await mockLive(page, {
-    threads: [], messages: [], todos: [TASK_WITH_HISTORY],
+    threads: [], messages: [], todos: [{ ...TASK_WITH_HISTORY, ...sent }],
     machines: [{ id: 'machine-1', name: 'omarchy', online: true }, { id: 'machine-2', name: 'Mac', online: true }],
   }, (path, _route, json) => {
     if (path === '/api/teams' && options.teams === 'error') return json({ error: 'teams failed' }, 500);
@@ -52,6 +54,7 @@ async function setup(page: Page, options: SetupOptions = {}) {
       await options.todoDelay;
       return json({
       ...TASK_WITH_HISTORY,
+      ...(options.context === undefined ? {} : { context: options.context }),
       usageCost: {
         ...TASK_WITH_HISTORY.usageCost,
         output: 2 + ((options.threadTotal ?? 4) - 4),
@@ -86,6 +89,13 @@ const usage = (page: Page) => page.getByTestId('thread-usage');
 const stat = (page: Page, index: number) => usage(page).getByTestId('thread-usage-stats').locator('dd').nth(index);
 const cost = (page: Page) => stat(page, 0);
 const tokens = (page: Page) => stat(page, 1);
+const ringFace = (page: Page) =>
+  ring(page).evaluate((button) => ({
+    label: (button as HTMLElement).innerText.trim(),
+    arcs: button.querySelectorAll('svg path').length,
+    tracks: button.querySelectorAll('svg circle').length,
+    percent: button.getAttribute('data-percent'),
+  }));
 const openUsage = async (page: Page) => {
   await expect(page.getByTestId('side-chat')).toBeVisible();
   await ring(page).click();
@@ -104,7 +114,11 @@ test(`usage opens from the ring in the composer tool row (${theme})`, async ({ p
   await expect(page.getByRole('menuitem', { name: /Usage/ })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(ring(page)).toHaveAccessibleName('Thread usage');
-  await expect(ring(page)).toHaveText('2.5k');
+  await expect(ring(page)).toHaveAttribute('data-state', 'ready');
+  expect(await ringFace(page)).toEqual({ label: '', arcs: 0, tracks: 1, percent: null });
+  await ring(page).hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('$4.00 · Tokens: 2.5k');
+  await page.mouse.move(0, 0);
   const row = await page.evaluate(() => {
     const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
     const card = box('.side-panel [data-testid="composer-card"]');
@@ -125,6 +139,7 @@ test(`usage opens from the ring in the composer tool row (${theme})`, async ({ p
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
   await expect(ring(page)).toHaveAttribute('aria-expanded', 'true');
   await expect(usage(page)).toContainText('90%');
+  await expect(usage(page).locator('dt')).toHaveText(['Cost', 'Tokens', 'Cache hit', 'Models', 'Machines']);
   await expect(usage(page)).toContainText('provider/model-a');
   await expect(usage(page)).toContainText('provider/model-b');
   await expect(usage(page)).toContainText('omarchy');
@@ -147,6 +162,45 @@ test(`usage opens from the ring in the composer tool row (${theme})`, async ({ p
 });
 
 }
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`the ring reads the thread's context window like the main composer's ring, and usage stays in its popover (${theme})`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
+    await setup(page, { context: { tokens: 62_000, contextWindow: 200_000 } });
+    await page.goto('/app?thread=todo-1');
+    await expect(page.getByTestId('side-chat')).toBeVisible();
+    await expect(ring(page)).toHaveAttribute('data-state', 'ready');
+    await expect(ring(page)).toHaveAccessibleName('Context 31%');
+    await expect(ring(page)).toHaveAccessibleDescription('Thread usage');
+    expect(await ringFace(page)).toEqual({ label: '31%', arcs: 1, tracks: 1, percent: '31' });
+    const type = await ring(page).evaluate((button) => {
+      const cs = getComputedStyle(button);
+      const glyph = button.querySelector('svg')!.getBoundingClientRect();
+      return { size: cs.fontSize, height: Math.round(button.getBoundingClientRect().height), glyph: Math.round(glyph.width) };
+    });
+    expect(type).toEqual({ size: '12px', height: 28, glyph: 14 });
+    await ring(page).hover();
+    await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('Context 31% · $4.00 · Tokens: 2.5k');
+    await openUsage(page);
+    await expect(usage(page).locator('dt')).toHaveText(['Context', 'Cost', 'Tokens', 'Cache hit', 'Models', 'Machines']);
+    await expect(stat(page, 0)).toHaveText('31% · 62k / 200k');
+    await expect(stat(page, 1)).toHaveText('$4.00');
+    await expect(stat(page, 2)).toHaveText('2.5k');
+    await expect(ring(page)).not.toContainText('2.5k');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await evidencePanelShot(page, `thread-usage-context-${theme}.png`, usage(page));
+  });
+}
+
+test('a context reading the server sends as null or without a window draws the bare ring, never a number', async ({ page }) => {
+  await setup(page, { context: null });
+  await page.goto('/app?thread=todo-1');
+  await expect(ring(page)).toHaveAttribute('data-state', 'ready');
+  await expect(ring(page)).toHaveAccessibleName('Thread usage');
+  expect(await ringFace(page)).toEqual({ label: '', arcs: 0, tracks: 1, percent: null });
+  await openUsage(page);
+  await expect(usage(page).locator('dt').first()).toHaveText('Cost');
+});
 
 test('a thread that has not started has no usage ring or usage request', async ({ page }) => {
   const requested = await setup(page);
@@ -191,7 +245,7 @@ test('a pending run never appears as a partial thread total', async ({ page }) =
   await page.goto('/app?thread=todo-1');
   await openUsage(page);
   await expect(usage(page)).toHaveAttribute('data-state', 'loading');
-  await expect(ring(page)).not.toContainText('1.3k');
+  await expect(ring(page)).toHaveText('');
   await expect(usage(page)).not.toContainText('1.3k');
   await expect(cost(page)).toHaveText('—');
   release();
@@ -304,7 +358,7 @@ test('finishing a step refreshes whole-thread cost and current-run tokens withou
   release();
   await expect(usage(page)).toHaveAttribute('data-state', 'ready');
   await expect(tokens(page)).toHaveText('2.6k');
-  await expect(ring(page)).toHaveText('2.6k');
+  await expect(ring(page)).toHaveText('');
   await expect(cost(page)).toHaveText('$7.00');
   expect(requested.filter((path) => path.includes('build-old'))).toHaveLength(1);
   expect(requested.filter((path) => path.includes('build-1'))).toHaveLength(2);

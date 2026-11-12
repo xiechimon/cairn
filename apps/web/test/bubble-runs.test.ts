@@ -49,7 +49,36 @@ describe('bubbleRuns', () => {
     expect(runs).toEqual([{ joinsPrev: false, joinsNext: false }]);
   });
 
-  it('an answered question is an owner bubble and joins the owner run around it', () => {
+  it('an answered question opens as a Coordinator bubble and closes as the owner bubble', () => {
+    const answered = {
+      kind: 'question' as const,
+      requestId: 'q1',
+      status: 'answered' as const,
+      questions: [],
+      answers: [{ header: 'Theme', choices: ['Dark'] }],
+    };
+    const runs = bubbleRuns(
+      rows([
+        { kind: 'robot', paragraphs: [], seconds: '' },
+        answered,
+        { kind: 'user', text: 'a' },
+        { kind: 'robot', paragraphs: [], seconds: '' },
+        { ...answered, status: 'cancelled' },
+        { kind: 'user', text: 'b' },
+      ]),
+      null,
+    );
+    expect(runs).toEqual([
+      { joinsPrev: false, joinsNext: true },
+      { joinsPrev: true, joinsNext: true },
+      { joinsPrev: true, joinsNext: false },
+      { joinsPrev: false, joinsNext: false },
+      { joinsPrev: false, joinsNext: false },
+      { joinsPrev: false, joinsNext: false },
+    ]);
+  });
+
+  it('an owner message before an answered question does not join it, and one with no answer text closes no run', () => {
     const answered = {
       kind: 'question' as const,
       requestId: 'q1',
@@ -61,18 +90,11 @@ describe('bubbleRuns', () => {
       rows([
         { kind: 'user', text: 'a' },
         answered,
-        { kind: 'robot', paragraphs: [], seconds: '' },
-        { ...answered, status: 'cancelled' },
+        { ...answered, answers: null },
         { kind: 'user', text: 'b' },
       ]),
       null,
     );
-    expect(runs).toEqual([
-      { joinsPrev: false, joinsNext: true },
-      { joinsPrev: true, joinsNext: false },
-      { joinsPrev: false, joinsNext: false },
-      { joinsPrev: false, joinsNext: false },
-      { joinsPrev: false, joinsNext: false },
-    ]);
+    expect(runs.map((run) => run.joinsPrev)).toEqual([false, false, false, false]);
   });
 });

@@ -39,6 +39,19 @@ export function formatWorkDuration(seconds: number | null): string {
   return `${Math.floor(rounded / 60)}m ${rounded % 60}s`;
 }
 
+export function workPurposes(steps: readonly WorkStep[], running: boolean, t: TFunc): string[] {
+  const purposes = steps.flatMap((step) => {
+    if (step.kind !== 'call' || step.command === undefined || step.description === undefined)
+      return [];
+    if (running && !step.running) return [];
+    const purpose = (step.localized === true ? t(step.description) : step.description).trim();
+    return purpose === '' || purpose === (step.command.split('\n')[0] ?? '').trim()
+      ? []
+      : [purpose];
+  });
+  return [...new Set(purposes)];
+}
+
 function stepTarget(step: Extract<WorkStep, { kind: 'call' }>): string {
   if (step.description !== undefined) return step.description;
   return (step.command ?? step.target ?? '').split('\n')[0] ?? '';
@@ -212,12 +225,18 @@ export function WorkTrace({
   counts.read = readPaths.size;
   counts.edit = editPaths.size;
   const { text, failed } = traceSummary(t, counts, running);
+  const purposes = workPurposes(item.steps, running, t);
   return (
     <div className="my-2 min-w-0" data-testid="work-block">
       <div className="flex items-center gap-1">
         <TraceGroupSummary
           data-testid="work-summary"
-          summary={text}
+          summary={purposes.length > 0 ? purposes.join(t('，')) : text}
+          more={
+            !running && purposes.length > 0 && item.steps.length > purposes.length
+              ? t('· {n} 步', { n: item.steps.length })
+              : null
+          }
           summaryTitle={failed === null ? text : `${text} ${failed}`}
           failed={failed}
           open={expanded}

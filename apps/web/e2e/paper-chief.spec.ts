@@ -72,7 +72,13 @@ for (const theme of ['light', 'dark'] as const) {
       .first()
       .locator('[data-slot="message-toolbar-meta"]');
     await expect(meta, 'W5').toHaveCSS('font-size', '12px');
-    await win.getByTestId('chief-tools-toggle').click();
+    const toolsToggle = win.getByTestId('chief-tools-toggle');
+    await expect(toolsToggle.locator('[data-trace-summary]'), 'W5').toHaveCSS('font-size', '14px');
+    await expect(toolsToggle.locator('svg[data-glyph="done"]'), 'W5').toHaveCount(1);
+    await expect(toolsToggle.locator('svg[data-trace-triangle="closed"]'), 'W5').toHaveCSS('rotate', 'none');
+    await toolsToggle.click();
+    await expect(toolsToggle.locator('svg[data-trace-triangle="open"]'), 'W5').toHaveCSS('rotate', '90deg');
+    expect((await toolsToggle.boundingBox())?.height, 'W5').toBe(28);
     const toolRow = win.getByTestId('chief-turn-tools').locator('[data-trace-verb]').first();
     await expect(toolRow, 'W5').toHaveCSS('font-size', '13px');
   });
@@ -158,6 +164,9 @@ for (const theme of ['light', 'dark'] as const) {
       await probe(page, 'backgroundColor', 'var(--bubble-fill)'),
     );
     await expect(win.getByTestId('chief-question-line'), 'Q1').toHaveCount(0);
+    const asked = win.locator('[data-testid="chief-question-asked"][data-request-id="q-answered"]');
+    await expect(asked.getByTestId('chief-reply-bubble'), 'Q1').toHaveText('先做哪一端？');
+    await expect(asked.getByTestId('chief-reply-bubble'), 'Q1').toHaveCSS('background-color', fill);
 
     await expect(pending.getByTestId('chief-question-text'), 'Q2').toHaveCSS('font-size', '14px');
     await expect(pending.getByTestId('chief-question-option-0-0'), 'Q2').toHaveCSS(

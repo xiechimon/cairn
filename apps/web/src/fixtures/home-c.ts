@@ -1,3 +1,4 @@
+import type { TokenUsage } from '@cairn/shared';
 import { boardDefault } from './board.js';
 import { chiefDefault } from './chief.js';
 import { at, PROJECT_ID, probeTodo, r7 } from './core.js';
@@ -36,6 +37,28 @@ function homeTodo(
     projectId,
     latestBuildId: phase === 'todo' ? null : `build-${id}`,
     ...SERVER_SECTION[phase],
+  };
+}
+
+function usageRow(
+  buildId: string,
+  input: number,
+  output: number,
+  cacheRead: number,
+  costTotal: number,
+): TokenUsage {
+  return {
+    buildId,
+    model: 'anthropic/claude-sonnet-5-5',
+    input,
+    output,
+    cacheRead,
+    cacheWrite: 0,
+    costInput: null,
+    costOutput: null,
+    costCacheRead: null,
+    costCacheWrite: null,
+    costTotal,
   };
 }
 
@@ -173,7 +196,10 @@ export const homeC: FixtureSet = {
     homeTodo('home-c-working-a', 2302, 'Push for finished threads', 'building', PROJECT_ID),
     homeTodo('home-c-working-b', 2303, 'Serif greeting fix', 'planning', PROJECT_ID),
     askedIn(
-      homeTodo('home-c-working-c', 75, 'Orb canary round 7', 'building', HOME_C_CRED),
+      {
+        ...homeTodo('home-c-working-c', 75, 'Orb canary round 7', 'building', HOME_C_CRED),
+        context: { tokens: 62_000, contextWindow: 200_000 },
+      },
       'home-c-ask-orb',
       'Run the orb canary until it passes, then send the first real ticket through cairn.',
     ),
@@ -186,8 +212,20 @@ export const homeC: FixtureSet = {
     'home-c-review': detailReview({ userMenuOpen: false, changesExpanded: false }).detail ?? {
       transcript: [],
     },
-    'home-c-working-a': detailBuilding(true).detail ?? { transcript: [] },
-    'home-c-working-c': { transcript: [{ kind: 'streaming', label: '处理中...' }] },
+    'home-c-working-a': {
+      ...(detailBuilding(true).detail ?? { transcript: [] }),
+      usage: {
+        rows: [usageRow('build-home-c-working-a', 38_000, 9_400, 310_000, 0.86)],
+        machines: ['omarchy'],
+      },
+    },
+    'home-c-working-c': {
+      transcript: [{ kind: 'streaming', label: '处理中...' }],
+      usage: {
+        rows: [usageRow('build-home-c-working-c', 21_000, 6_200, 184_000, 0.47)],
+        machines: ['omarchy'],
+      },
+    },
   },
   schedules: [
     scheduleOnce,

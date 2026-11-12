@@ -410,6 +410,28 @@ export const chiefQuestion: FixtureSet = {
         answers: [{ header: '目标平台', choices: ['桌面浏览器'] }],
       },
       {
+        kind: 'question',
+        id: 'q-answered-group',
+        requestId: 'q-answered-group',
+        status: 'answered',
+        questions: [
+          {
+            header: '棋盘',
+            question: '棋盘做多大？',
+            options: [{ label: '20 × 20' }, { label: '30 × 30' }],
+          },
+          {
+            header: '撞墙',
+            question: '撞到墙算结束，还是从另一边穿出来？',
+            options: [{ label: '撞墙就结束' }, { label: '从另一边穿出来' }],
+          },
+        ],
+        answers: [
+          { header: '棋盘', choices: ['20 × 20'] },
+          { header: '撞墙', choices: ['撞墙就结束'] },
+        ],
+      },
+      {
         kind: 'robot',
         paragraphs: [[{ text: '好，先做桌面端。难度还需要你定两件事：' }]],
         seconds: '12s',

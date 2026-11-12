@@ -9,11 +9,16 @@ export interface BubbleRun {
 
 type Author = 'user' | 'robot' | null;
 
-function authorOf(item: GroupedRow['item']): Author {
+function opensAs(item: GroupedRow['item']): Author {
   if (item.kind === 'user') return 'user';
-  if (item.kind === 'question' && answerLines(item).length > 0) return 'user';
   if (item.kind === 'robot') return 'robot';
+  if (item.kind === 'question' && item.status === 'answered') return 'robot';
   return null;
+}
+
+function closesAs(item: GroupedRow['item']): Author {
+  if (item.kind === 'question') return answerLines(item).length > 0 ? 'user' : null;
+  return opensAs(item);
 }
 
 function opensWithTools(item: GroupedRow['item']): boolean {
@@ -26,12 +31,12 @@ export function bubbleRuns(rows: readonly GroupedRow[], previousAt: number | nul
     const at = 'createdAt' in item && typeof item.createdAt === 'number' ? item.createdAt : null;
     const divided = at !== null && needsTimeDivider(clock, at);
     if (at !== null) clock = at;
-    const author = authorOf(item);
+    const author = opensAs(item);
     const before = rows[n - 1]?.item;
     return (
       author !== null &&
       before !== undefined &&
-      authorOf(before) === author &&
+      closesAs(before) === author &&
       !divided &&
       !opensWithTools(item)
     );

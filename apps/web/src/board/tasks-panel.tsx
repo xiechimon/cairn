@@ -43,6 +43,8 @@ import { canMarkDone, useMarkDone } from './use-mark-done.js';
 
 export type TasksTab = 'active' | 'next' | 'scheduled' | 'resolved';
 
+export type TaskAddOutcome = 'saved' | 'sent';
+
 export const PANEL_HEAD = 'h-13 gap-0.5 pr-4 pl-4';
 export const PANEL_HEAD_BUTTON = 'size-9 text-foreground [&_svg]:size-5.5';
 export const PANEL_TITLE = 'text-heading font-normal';
@@ -169,7 +171,7 @@ interface TasksPanelProps {
   onClose: () => void;
   onOpenThread: (id: string) => void;
   onOpenQuestion: (question: QuestionTarget) => void;
-  onAddTask: (text: string) => void | Promise<void>;
+  onAddTask: (text: string) => Promise<TaskAddOutcome>;
   addBlocked?: string | null;
   query?: QueryLike;
 }
@@ -231,7 +233,7 @@ export function TasksPanel({
   const count = (section: ActiveSection) =>
     groups[section].length + (section === 'needs_input' ? questions.length : 0);
   const empty =
-    entries.length === 0 && questions.length === 0 ? (
+    entries.length === 0 && questions.length === 0 && !adding ? (
       <div
         data-testid="tasks-empty"
         className="mt-16 flex flex-col items-center gap-3 px-6 text-center"
@@ -344,8 +346,8 @@ export function TasksPanel({
         <TasksAddInput
           onClose={() => setAdding(false)}
           onSubmit={async (text) => {
-            await onAddTask(text);
-            setAdding(false);
+            if ((await onAddTask(text)) === 'saved') setTab('next');
+            else setAdding(false);
           }}
         />
       )}

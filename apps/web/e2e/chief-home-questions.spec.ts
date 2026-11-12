@@ -74,6 +74,17 @@ async function focusQuestion(page: Page, header: string) {
 }
 const NONE = { ...TWO, messages: TWO.messages.slice(0, 1) };
 
+const exchange = (page: Page) =>
+  page
+    .getByTestId('chief-stream')
+    .locator('[data-testid="chief-question-asked"] [data-slot="reply-bubble"], [data-question-answer]')
+    .evaluateAll((nodes) =>
+      nodes.map(
+        (node) =>
+          `${node.hasAttribute('data-question-answer') ? 'answer' : 'asked'}:${(node as HTMLElement).innerText}`,
+      ),
+    );
+
 test('a pending question is its text and outlined chips at the end of the conversation, with nothing docked above the composer (D119)', async ({
   page,
 }) => {
@@ -171,6 +182,12 @@ test('a chip answers at once and the badge drops; the next question takes its pl
   const answers = page.getByTestId('chief-stream').locator('[data-question-answer]');
   await expect(answers).toHaveText(['Claude subscription', 'Send it to ian']);
   await expect(page.getByTestId('chief-stream').getByTestId('chief-question-line')).toHaveCount(0);
+  expect(await exchange(page)).toEqual([
+    'asked:relay-186 cannot run glm-5.3-flash. Which model?',
+    'answer:Claude subscription',
+    'asked:This touches a protected path. Who merges it?',
+    'answer:Send it to ian',
+  ]);
   await expect(page).toHaveTitle('Cairn');
 });
 
@@ -414,6 +431,7 @@ test('a multi-question request sends nothing and starts no turn until its last q
   await expect(stream.getByTestId('chief-bubble')).toHaveCount(bubblesBefore);
   await expect(stream.locator('[data-question-answer]')).toHaveCount(0);
   await expect(stream.getByTestId('chief-question-line')).toHaveCount(0);
+  await expect(stream.getByTestId('chief-question-asked')).toHaveCount(0);
   await page.getByTestId('chief-question-submit').click();
   await expect.poll(() => posts.length).toBe(1);
   expect(posts[0]?.path).toContain('/questions/ask-0000000a/answer');
@@ -449,6 +467,29 @@ test('a multi-question request sends nothing and starts no turn until its last q
   expect(looks[1]?.slot).toBe('user-bubble');
   expect(looks[1]?.right).toBe(0);
   expect(posts).toHaveLength(1);
+  expect(await exchange(page)).toEqual(['asked:Which theme?', 'asked:Which sections?', 'answer:Dark\nDetails']);
+  const asked = stream.locator('[data-testid="chief-question-asked"][data-request-id="ask-0000000a"]');
+  await expect(asked).toHaveCount(1);
+  const kept = await asked.evaluate((block) => {
+    const probe = document.createElement('div');
+    probe.style.backgroundColor = 'var(--reply-bubble-fill)';
+    document.body.append(probe);
+    const fill = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const bubbles = [...block.querySelectorAll<HTMLElement>('[data-testid="chief-reply-bubble"]')];
+    const boxes = bubbles.map((bubble) => bubble.getBoundingClientRect());
+    const answer = document.querySelector('[data-question-answer="ask-0000000a"]')!.getBoundingClientRect();
+    const column = block.closest('[data-testid="chief-msg"]')!.getBoundingClientRect();
+    return {
+      fills: bubbles.map((bubble) => getComputedStyle(bubble).backgroundColor === fill),
+      heights: boxes.map((box) => Math.round(box.height)),
+      left: boxes.map((box) => Math.round(box.left - column.left)),
+      between: Math.round(boxes[1]!.top - boxes[0]!.bottom),
+      toAnswer: Math.round(answer.top - boxes[1]!.bottom),
+      chips: block.querySelectorAll('button[data-testid^="chief-question-option"]').length,
+    };
+  });
+  expect(kept).toEqual({ fills: [true, true], heights: [34, 34], left: [0, 0], between: 4, toAnswer: 24, chips: 0 });
   await page.screenshot({ path: test.info().outputPath('answered-request.png') });
 });
 
