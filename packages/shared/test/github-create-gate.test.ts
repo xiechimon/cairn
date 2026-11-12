@@ -10,6 +10,8 @@ import {
   parseGithubCreateRateLimit,
 } from '../src/github-create-gate.js';
 
+const isRoot = process.getuid?.() === 0;
+
 test('reservations respect spacing and a rolling hourly cap', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'github-create-'));
   let now = 1000;
@@ -69,28 +71,31 @@ test('an abandoned lock fails closed instead of waiting forever', async () => {
   }
 });
 
-test('an unwritable gate directory fails with a typed error naming the directory and the remedy', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'github-create-readonly-'));
-  const directory = join(home, 'github-create');
-  await mkdir(directory);
-  await chmod(directory, 0o500);
-  try {
-    const failure = await acquireGithubCreateSlot({ directory, lockTimeoutMs: 100 }).then(
-      () => null,
-      (error: unknown) => error,
-    );
-    expect(failure).toBeInstanceOf(GithubCreateGateNotWritableError);
-    const message = (failure as GithubCreateGateNotWritableError).message;
-    expect(message).toContain(directory);
-    expect(message).toMatch(/not writable/);
-    expect(message).toMatch(/chmod|remove/);
-  } finally {
-    await chmod(directory, 0o700);
-    await rm(home, { recursive: true, force: true });
-  }
-});
+test.skipIf(isRoot)(
+  'an unwritable gate directory fails with a typed error naming the directory and the remedy',
+  async () => {
+    const home = await mkdtemp(join(tmpdir(), 'github-create-readonly-'));
+    const directory = join(home, 'github-create');
+    await mkdir(directory);
+    await chmod(directory, 0o500);
+    try {
+      const failure = await acquireGithubCreateSlot({ directory, lockTimeoutMs: 100 }).then(
+        () => null,
+        (error: unknown) => error,
+      );
+      expect(failure).toBeInstanceOf(GithubCreateGateNotWritableError);
+      const message = (failure as GithubCreateGateNotWritableError).message;
+      expect(message).toContain(directory);
+      expect(message).toMatch(/not writable/);
+      expect(message).toMatch(/chmod|remove/);
+    } finally {
+      await chmod(directory, 0o700);
+      await rm(home, { recursive: true, force: true });
+    }
+  },
+);
 
-test('a gate directory under an unwritable parent fails the same way', async () => {
+test.skipIf(isRoot)('a gate directory under an unwritable parent fails the same way', async () => {
   const home = await mkdtemp(join(tmpdir(), 'github-create-readonly-parent-'));
   const directory = join(home, 'github-create');
   await chmod(home, 0o500);

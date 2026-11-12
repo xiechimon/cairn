@@ -233,6 +233,13 @@ const sql = (query) => execFileSync('sqlite3', ['${db}', query], { encoding: 'ut
 let status = 200;
 let row = JSON.parse(sql("select json_object('owner',owner,'status',status,'expiresAt',expiresAt) from deploy_lease where id='server'") || '{"owner":null,"status":"accepting","expiresAt":0}');
 if (existsSync('${fake}/lease-unsupported')) status = 404;
+else if (
+  existsSync('${fake}/lease-owner-token') &&
+  !readFileSync(0, 'utf8').includes(
+    'header = "Authorization: Bearer ' + readFileSync('${fake}/lease-owner-token', 'utf8') + '"',
+  )
+)
+  status = 401;
 else if (method === 'DELETE' && existsSync('${fake}/lease-delete-fail')) status = 503;
 else if (method === 'DELETE' && row.owner === JSON.parse(value('--data-binary')).owner) {
   row = { ...row, status: 'accepting', expiresAt: 0 };
@@ -1144,6 +1151,33 @@ test('daemon changes fail closed against a server without lease support', () => 
   assert.equal(result.status, 2, result.stderr);
   assert.match(result.stderr, /lease endpoint/);
   assert.equal(f.log('systemctl.log'), '');
+});
+
+test('daemon changes present the owner token from the token file to a server that requires it', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'lease-owner-token'), 'owner-secret');
+  mkdirSync(join(f.dir, '.cairn'), { recursive: true });
+  writeFileSync(join(f.dir, '.cairn', 'token'), '# access token\nCAIRN_TOKEN="owner-secret"\n');
+  const target = pushTarget(f);
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), target);
+  assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
+});
+
+test('daemon changes name the rejected owner token instead of a missing lease endpoint', () => {
+  for (const tokenFile of [null, 'CAIRN_TOKEN=stale\n']) {
+    const f = fixture();
+    writeFileSync(join(f.fake, 'lease-owner-token'), 'owner-secret');
+    const path = join(f.dir, 'elsewhere-token');
+    if (tokenFile !== null) writeFileSync(path, tokenFile);
+    const result = f.run(DEPLOY, [pushTarget(f)], { CAIRN_DEPLOY_TOKEN_FILE: path });
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /rejected the deployment lease request \(HTTP 401\)/);
+    assert.ok(result.stderr.includes(path), result.stderr);
+    assert.doesNotMatch(result.stderr, /lease endpoint/);
+    assert.equal(f.log('systemctl.log'), '');
+  }
 });
 
 test('bounded drain timeout resumes claims without stopping services and names starvation in the lag alarm', () => {

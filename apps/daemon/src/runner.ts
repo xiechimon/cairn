@@ -102,6 +102,7 @@ import {
   prepareCredentialSessionUpload,
 } from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
+import { DeltaRelay } from './delta-relay.js';
 import { buildExecutorRecord } from './executor-record.js';
 import {
   GitPushHookError,
@@ -1406,51 +1407,25 @@ async function runClaimedStep(
     lastRowCreatedAt = Math.max(now(), lastRowCreatedAt + 1);
     return lastRowCreatedAt;
   };
-  let deltaBuf = '';
-  let deltaTimer: NodeJS.Timeout | null = null;
-  const flushDeltasNow = async (): Promise<void> => {
-    if (deltaTimer !== null) {
-      clearTimeout(deltaTimer);
-      deltaTimer = null;
-    }
-    const text = deltaBuf;
-    deltaBuf = '';
-    if (text === '') return;
-    try {
-      await client.transcriptDelta(stepId, text);
-    } catch (err: unknown) {
+  const textDeltas = new DeltaRelay({
+    flushMs: TRANSCRIPT_DELTA_FLUSH_MS,
+    send: (text) => client.transcriptDelta(stepId, text),
+    onError: (err) =>
       logger.step(
         `transcript delta relay failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-  };
-  const flushDeltas = (): void => {
-    void flushDeltasNow();
-  };
-  let thinkingBuf = '';
-  let thinkingTimer: NodeJS.Timeout | null = null;
-  const flushThinkingNow = async (): Promise<void> => {
-    if (thinkingTimer !== null) {
-      clearTimeout(thinkingTimer);
-      thinkingTimer = null;
-    }
-    const text = thinkingBuf;
-    thinkingBuf = '';
-    if (text === '' || client.thinkingDelta === undefined) return;
-    try {
-      await client.thinkingDelta(stepId, text);
-    } catch (err: unknown) {
+      ),
+  });
+  const thinkingDeltas = new DeltaRelay({
+    flushMs: TRANSCRIPT_DELTA_FLUSH_MS,
+    send: (text) => client.thinkingDelta?.(stepId, text),
+    onError: (err) =>
       logger.step(
         `thinking delta relay failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-  };
-  const flushThinking = (): void => {
-    void flushThinkingNow();
-  };
+      ),
+  });
   const emitSegment = async (seg: SealedSegment): Promise<void> => {
-    await flushThinkingNow();
-    await flushDeltasNow();
+    await thinkingDeltas.flushNow();
+    await textDeltas.flushNow();
     sealedInMessage = true;
     messageSeq += 1;
     const row = {
@@ -1609,16 +1584,8 @@ async function runClaimedStep(
       zeroProgressRetries = 0;
       retryStorm = false;
       usage = [];
-      if (thinkingTimer !== null) {
-        clearTimeout(thinkingTimer);
-        thinkingTimer = null;
-      }
-      thinkingBuf = '';
-      if (deltaTimer !== null) {
-        clearTimeout(deltaTimer);
-        deltaTimer = null;
-      }
-      deltaBuf = '';
+      thinkingDeltas.discard();
+      textDeltas.discard();
     }
     if (stop.request !== null) break;
     activity.setPhase('starting', pass > 0 ? { resetLive: true } : undefined);
@@ -1627,8 +1594,8 @@ async function runClaimedStep(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (await retryWithoutImages(message)) continue;
-      flushDeltas();
-      flushThinking();
+      textDeltas.flush();
+      thinkingDeltas.flush();
       clearCredentials(creds);
       await failStep(deps, heartbeat, stepId, message);
       return;
@@ -1680,11 +1647,7 @@ async function runClaimedStep(
             sawProgress = true;
             zeroProgressRetries = 0;
             activity.setPhase('responding');
-            deltaBuf += ev.text;
-            if (deltaTimer === null) {
-              deltaTimer = setTimeout(flushDeltas, TRANSCRIPT_DELTA_FLUSH_MS);
-              deltaTimer.unref?.();
-            }
+            textDeltas.push(ev.text);
             const sealedText = segments.append('text', ev.text);
             if (sealedText !== null) await emitSegment(sealedText);
             break;
@@ -1694,11 +1657,7 @@ async function runClaimedStep(
             sawProgress = true;
             zeroProgressRetries = 0;
             activity.setPhase('thinking');
-            thinkingBuf += ev.text;
-            if (thinkingTimer === null) {
-              thinkingTimer = setTimeout(flushThinking, TRANSCRIPT_DELTA_FLUSH_MS);
-              thinkingTimer.unref?.();
-            }
+            thinkingDeltas.push(ev.text);
             const sealedThinking = segments.append('thinking', ev.text);
             if (sealedThinking !== null) await emitSegment(sealedThinking);
             break;
@@ -1940,8 +1899,8 @@ async function runClaimedStep(
   }
   deps.sessionHandles?.delete(stepId);
   await sealSegment();
-  flushDeltas();
-  flushThinking();
+  textDeltas.flush();
+  thinkingDeltas.flush();
   if (opts.env?.CAIRN_ORB !== '1') clearInterval(heartbeat);
   if (watchdog) clearTimeout(watchdog);
   if (bodyTimeout) clearTimeout(bodyTimeout);
