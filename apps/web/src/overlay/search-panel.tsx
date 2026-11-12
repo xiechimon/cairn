@@ -128,7 +128,6 @@ function TodoRow({
             <span className="max-w-32 truncate">{projectName}</span>
           </>
         )}
-        <span className="tabular-nums">#{todo.seqNum}</span>
       </span>
     </Button>
   );
@@ -315,7 +314,6 @@ export function SearchPanel({
         {activeContext != null && (
           <div className="flex flex-none px-3.5 pt-3" data-testid="search-context">
             <span className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-(--cds-radius-md) bg-secondary pr-1 pl-2 text-meta text-content-secondary">
-              <span className="flex-none tabular-nums">#{activeContext.seqNum}</span>
               <span className="truncate">{activeContext.title}</span>
               <button
                 type="button"

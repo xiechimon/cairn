@@ -41,7 +41,6 @@ export function threadTargetsOf(todos: readonly TodoRecord[]): ThreadTarget[] {
 
 export interface PickedThread {
   todoId: string;
-  seq: number;
   title: string;
 }
 
@@ -58,11 +57,11 @@ export function useComposerThreadTarget(todos: readonly TodoRecord[]) {
     picked === null ? null : (targets.find((c) => c.todo.id === picked.todoId) ?? null);
   const unreachable =
     picked !== null && target === null
-      ? t('#{seq} 现在收不了消息。改回 Coordinator，或换一个 thread。', { seq: picked.seq })
+      ? t('「{title}」现在收不了消息。改回 Coordinator，或换一个 thread。', { title: picked.title })
       : null;
   const pick = (todoId: string | null) => {
     const next = targets.find((c) => c.todo.id === todoId)?.todo;
-    const value = next == null ? null : { todoId: next.id, seq: next.seqNum, title: next.title };
+    const value = next == null ? null : { todoId: next.id, title: next.title };
     pickedRef.current = value;
     setPicked(value);
     setFailed(null);
@@ -74,7 +73,7 @@ export function useComposerThreadTarget(todos: readonly TodoRecord[]) {
       return;
     }
     const todoId = target.todo.id;
-    const seq = target.todo.seqNum;
+    const title = target.todo.title;
     setFailed(null);
     try {
       await mutations.messageThread.mutateAsync({
@@ -84,7 +83,8 @@ export function useComposerThreadTarget(todos: readonly TodoRecord[]) {
       });
       sendKey.settle();
     } catch (error) {
-      if (pickedRef.current?.todoId === todoId) setFailed(t('没发给 #{seq}，再试一次。', { seq }));
+      if (pickedRef.current?.todoId === todoId)
+        setFailed(t('没发给「{title}」，再试一次。', { title }));
       throw error;
     }
   };
@@ -94,10 +94,7 @@ export function useComposerThreadTarget(todos: readonly TodoRecord[]) {
     pick,
     send,
     error: unreachable ?? failed,
-    placeholder:
-      target === null
-        ? unreachable
-        : t(THREAD_REPLY_HINT[target.delivery], { seq: target.todo.seqNum }),
+    placeholder: target === null ? unreachable : t(THREAD_REPLY_HINT[target.delivery]),
   };
 }
 
@@ -129,7 +126,7 @@ function ThreadTargetRadios({
         </DropdownMenuRadioItem>
         {targets.map(({ todo }) => (
           <DropdownMenuRadioItem key={todo.id} value={todo.id} closeOnClick className={ITEM_CLS}>
-            <OptionText title={`#${todo.seqNum} ${todo.title}`} hint={t(threadCopy(todo).reason)} />
+            <OptionText title={todo.title} hint={t(threadCopy(todo).reason)} />
           </DropdownMenuRadioItem>
         ))}
       </DropdownMenuRadioGroup>
@@ -169,7 +166,7 @@ export function ComposerThreadTarget({ targets, picked, composerRef, onPick }: T
               variant="ghost"
               data-testid="composer-thread-target"
               data-set=""
-              aria-label={t('正在对 #{seq} 说', { seq: picked.seq })}
+              aria-label={t('正在对「{title}」说', { title: picked.title })}
               disabled={uploading}
               title={uploading ? t('附件上传中') : undefined}
               className={PROJECT_CHIP_CLS}
@@ -177,7 +174,7 @@ export function ComposerThreadTarget({ targets, picked, composerRef, onPick }: T
           }
         >
           <GitBranch width={16} height={16} />
-          <span className="truncate">{`#${picked.seq} ${picked.title}`}</span>
+          <span className="truncate">{picked.title}</span>
           <ChevronDown width={12} height={12} />
         </DropdownMenuTrigger>
         <DropdownMenuContent

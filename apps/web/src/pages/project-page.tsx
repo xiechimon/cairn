@@ -6,7 +6,7 @@ import { useGithubConnection, useProjects, useTodos } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useOpenComposer } from '../board/open-composer.js';
-import { joinMeta, relativeTime } from '../board/rel-time.js';
+import { relativeTime } from '../board/rel-time.js';
 import { threadHrefFrom } from '../board/thread-copy.js';
 import { EmptyState } from '../components/empty-state.js';
 import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
@@ -274,7 +274,7 @@ function TasksPane({
                   {todo.title}
                 </Link>
                 <span data-testid="task-meta" className="truncate text-meta text-content-tertiary">
-                  {joinMeta([`#${todo.seqNum}`, relativeTime(todo.phaseAt, now, t)])}
+                  {relativeTime(todo.phaseAt, now, t)}
                 </span>
               </span>
               <TaskStatus phase={todo.phase} />
@@ -310,7 +310,7 @@ function TasksPane({
                 {todo.title}
               </Link>
               <span data-testid="task-meta" className="text-meta text-content-tertiary">
-                {joinMeta([`#${todo.seqNum}`, relativeTime(todo.phaseAt, now, t)])}
+                {relativeTime(todo.phaseAt, now, t)}
               </span>
             </Card>
           ))}
