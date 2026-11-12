@@ -42,7 +42,7 @@ export function TaskRefRow({ taskRef, elbow = true }: { taskRef: TaskRef; elbow?
           </svg>
         )}
         <TodoStatusTile phase={taskRef.phase} />
-        <span className="min-w-0 truncate">{taskRef.title ?? `#${taskRef.seq ?? ''}`}</span>
+        <span className="min-w-0 truncate">{taskRef.title ?? t('任务')}</span>
         {unread && (
           <span
             role="img"

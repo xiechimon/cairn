@@ -316,7 +316,12 @@ export const PLAN_DOC: DocBlock[] = [
     kind: 'bullet',
     segments: [
       { text: 'Keep the badge hidden while ' },
-      { text: '#44', style: 'mention', mentionKind: 'todo', mentionId: 'gallery-44' },
+      {
+        text: 'Fix the stale branch badge on cards',
+        style: 'mention',
+        mentionKind: 'todo',
+        mentionId: 'gallery-44',
+      },
       { text: ' is still building' },
     ],
   },
