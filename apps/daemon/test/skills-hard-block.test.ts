@@ -316,7 +316,7 @@ describe('buildClaudeSdkOptions permission mode by execution place', () => {
 });
 
 describe('buildClaudeSdkOptions (spec 14 §post-ruling scope 1/2: settingSources + deny hard block)', () => {
-  test("settingSources always pinned to ['user','project','local'] ('project' = the brief-bearing slot, spec 24)", () => {
+  test("settingSources always pinned to ['user','project','local'] ('project' = the brief-bearing slot)", () => {
     const opts = buildClaudeSdkOptions(baseParts());
     expect(opts.settingSources).toEqual(['user', 'project', 'local']);
     expect(CLAUDE_SETTING_SOURCES).toContain('project');

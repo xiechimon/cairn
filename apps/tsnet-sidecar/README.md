@@ -1,6 +1,6 @@
 # tsnet-sidecar
 
-Go sidecar that joins the owner's tailnet with Tailscale `tsnet` (pinned in `go.mod`) and proxies tailnet and Funnel connections to the cairn server. Design: `docs/research/remote-access-tsnet.md` (D103).
+Go sidecar that joins the owner's tailnet with Tailscale `tsnet` (pinned in `go.mod`) and proxies tailnet and Funnel connections to the cairn server. Design: `docs/research/remote-access-tsnet.md`.
 
 ```sh
 CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o tsnet-sidecar .

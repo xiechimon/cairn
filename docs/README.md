@@ -6,8 +6,8 @@ This directory holds two kinds of things: **long-lived documents** (specs, decis
 
 | Directory / file | Content |
 |---|---|
-| `spec/` | Numbered specs (test layering, PR process, etc.); the canonical text of the engineering rules |
-| `cairn-plan.md` | Owner decision table (`D…` rows). Git-tracked public source of truth; no secrets. Ticket plans stay in `plans/` |
+| `spec/` | Numbered specs that still govern current behavior. The numbering skips retired volumes; `docs/spec/README.md` lists what was removed and where the live contract moved |
+| `cairn-plan.md` | Retired. Decisions are written where an agent reads them; do not cite `D…` ids |
 | `getting-started.md` | Run the server, enroll a machine, Docker, deploy publicly, build from source |
 | `configuration.md` | Every server and daemon environment variable |
 | `privacy.md` | What Cairn sends (nothing) and what the optional first-PR discussion prompt does and does not carry |
@@ -24,5 +24,5 @@ This directory holds two kinds of things: **long-lived documents** (specs, decis
 
 | Directory | Content | Discipline |
 |---|---|---|
-| `verify/<ticket>/` | Optional verification archives (screenshots, probe output, mechanism diagrams) | When archived, lands with its PR; a weekly run removes folders older than 14 days from `main` and records their last commit in `verify/pruned.json` (`git show <sha>:docs/verify/<ticket>/`). Merged PR bodies keep working because their raw links pin a commit. Decision: ADR 0022 (removed; see the git history at 608eabac0) |
+| `verify/<ticket>/` | Optional verification archives (screenshots, probe output, mechanism diagrams) | Historical. The weekly prune that removed folders older than 14 days last ran on 2026-10-26; do not treat a folder here as current, and do not add one. New evidence goes to `.claude/verify-evidence/` and is archived with `vp.mjs archive` only when a reviewer needs it. Merged PR bodies keep working because their raw links pin a commit. |
 | `research/` | Research notes archived per ticket (`r*.md`, measurement records) | Archived once written. Cite them as historical material; do not read them as current specs |

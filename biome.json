@@ -67,7 +67,7 @@
             "patterns": [
               {
                 "group": ["@earendil-works/*", "@earendil-works/*/*"],
-                "message": "Seam discipline (01 §5/§7.3): pi packages are consumed only in apps/daemon/src/backend/ (behind the AgentBackend seam) and apps/server/src/coordinator/runtime/ (the in-server Coordinator, D114); other modules import the seam interface from @cairn/shared."
+                "message": "Seam discipline: pi packages are consumed only in apps/daemon/src/backend/ (behind the AgentBackend seam) and apps/server/src/coordinator/runtime/ (the in-server Coordinator); other modules import the seam interface from @cairn/shared."
               },
               {
                 "group": [
@@ -75,7 +75,7 @@
                   "@modelcontextprotocol/sdk/*",
                   "@modelcontextprotocol/sdk/*/*"
                 ],
-                "message": "Seam discipline (00/D4, 01 §7.3): the MCP SDK is consumed only by services/mcp-face.ts on the server and src/backend/ on the daemon."
+                "message": "Seam discipline: the MCP SDK is consumed only by services/mcp-face.ts on the server and src/backend/ on the daemon."
               },
               {
                 "group": [
@@ -101,7 +101,7 @@
               },
               {
                 "group": ["**/legacy/agent-layer/*"],
-                "message": "Seam discipline (D60): the legacy agent-layer resolver is imported only by the boot migration in apps/server/src/db/client.ts and by its tests; delete the module once 0116 has been live for a release."
+                "message": "Seam discipline: the legacy agent-layer resolver is imported only by the boot migration in apps/server/src/db/client.ts and by its tests; delete the module once 0116 has been live for a release."
               },
               {
                 "group": ["@opentelemetry/*", "@opentelemetry/*/*", "@langfuse/*"],
@@ -112,7 +112,7 @@
               "cron-parser": "Seam discipline (01 §3/§7.3): cron-parser is consumed only through the Scheduler seam (the scheduling loop in 02 §9.2).",
               "simple-git": "Seam discipline (01 §3/S10, §7.3): GitOps uses a thin wrapper around system git; simple-git is prohibited.",
               "isomorphic-git": "Seam discipline (01 §3/S10, §7.3): GitOps uses a thin wrapper around system git; isomorphic-git is prohibited (no http-backend/worktree support).",
-              "e2b": "Seam discipline (D101): the E2B SDK is consumed only through the thin bridge module apps/daemon/src/orb/e2b-client.ts."
+              "e2b": "Seam discipline: the E2B SDK is consumed only through the thin bridge module apps/daemon/src/orb/e2b-client.ts."
             }
           }
         }
@@ -237,7 +237,7 @@
                 "patterns": [
                   {
                     "group": ["@earendil-works/*", "@earendil-works/*/*"],
-                    "message": "Seam discipline (01 §5/§7.3): pi packages are consumed only in apps/daemon/src/backend/ (behind the AgentBackend seam) and apps/server/src/coordinator/runtime/ (the in-server Coordinator, D114); other modules import the seam interface from @cairn/shared."
+                    "message": "Seam discipline: pi packages are consumed only in apps/daemon/src/backend/ (behind the AgentBackend seam) and apps/server/src/coordinator/runtime/ (the in-server Coordinator); other modules import the seam interface from @cairn/shared."
                   },
                   {
                     "group": [
@@ -245,7 +245,7 @@
                       "@modelcontextprotocol/sdk/*",
                       "@modelcontextprotocol/sdk/*/*"
                     ],
-                    "message": "Seam discipline (00/D4, 01 §7.3): the MCP SDK is consumed only by services/mcp-face.ts on the server and src/backend/ on the daemon."
+                    "message": "Seam discipline: the MCP SDK is consumed only by services/mcp-face.ts on the server and src/backend/ on the daemon."
                   },
                   {
                     "group": [
@@ -271,7 +271,7 @@
                   },
                   {
                     "group": ["**/legacy/agent-layer/*"],
-                    "message": "Seam discipline (D60): the legacy agent-layer resolver is imported only by the boot migration in apps/server/src/db/client.ts and by its tests; delete the module once 0116 has been live for a release."
+                    "message": "Seam discipline: the legacy agent-layer resolver is imported only by the boot migration in apps/server/src/db/client.ts and by its tests; delete the module once 0116 has been live for a release."
                   },
                   {
                     "group": ["@opentelemetry/*", "@opentelemetry/*/*", "@langfuse/*"],
@@ -291,7 +291,7 @@
                   "cron-parser": "Seam discipline (01 §3/§7.3): cron-parser is consumed only through the Scheduler seam (the scheduling loop in 02 §9.2).",
                   "simple-git": "Seam discipline (01 §3/S10, §7.3): GitOps uses a thin wrapper around system git; simple-git is prohibited.",
                   "isomorphic-git": "Seam discipline (01 §3/S10, §7.3): GitOps uses a thin wrapper around system git; isomorphic-git is prohibited (no http-backend/worktree support).",
-                  "e2b": "Seam discipline (D101): the E2B SDK is consumed only through the thin bridge module apps/daemon/src/orb/e2b-client.ts."
+                  "e2b": "Seam discipline: the E2B SDK is consumed only through the thin bridge module apps/daemon/src/orb/e2b-client.ts."
                 }
               }
             }
