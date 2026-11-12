@@ -44,6 +44,52 @@ const projectView = z.object({
   archivedAt: z.number().nullable(),
 });
 
+const todoClosure = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  title: z.string(),
+  spec: z.string(),
+  phase: z.string(),
+  phaseAt: z.number(),
+  archivedAt: z.number().nullable(),
+  seqNum: z.number(),
+  orderIndex: z.number(),
+  blockedBy: z.array(z.string()).nullable(),
+  latestBuildId: z.string().nullable(),
+  sourceKind: z.string().nullable(),
+  sourceRef: z.string().nullable(),
+  request: z.unknown().nullable(),
+  output: z.string(),
+});
+
+const threadClosure = z.object({
+  id: z.string(),
+  todoId: z.string(),
+  withPlan: z.boolean(),
+  prevPhase: z.string().nullable(),
+  triggerSource: z.string(),
+  planDocId: z.string().nullable(),
+  errorMessage: z.string().nullable(),
+  prUrl: z.string().nullable(),
+  prNumber: z.number().nullable(),
+  diffHash: z.string().nullable(),
+  reportAttachmentId: z.string().nullable(),
+  stop: z.unknown().nullable(),
+  reportLine: z.string().nullable(),
+  createdAt: z.number(),
+});
+
+const visibleClosure = z.object({
+  id: z.string(),
+  ownership: z
+    .object({
+      owner: z.string(),
+      reason: z.string(),
+    })
+    .nullable(),
+  blocks: z.boolean(),
+});
+
 const claimView = z.object({
   systemPrompt: z.string(),
   instruction: z.string().nullable(),
@@ -54,7 +100,9 @@ const claimView = z.object({
   thinkingLevel: z.string().nullable(),
   volatileText: z.string().nullable(),
   projects: z.array(projectView),
-  initialTodoIds: z.array(z.string()),
+  initialTodos: z.array(todoClosure),
+  initialThreads: z.array(threadClosure),
+  initialVisible: z.array(visibleClosure),
 });
 
 const snapshotPayload = z.object({
