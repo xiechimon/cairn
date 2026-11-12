@@ -330,6 +330,8 @@ export const EN: Record<string, string> = {
   '没能复制，再试一次': 'Could not copy. Try again',
   正在加载文件: 'Loading the file',
   文件没能加载: 'The file did not load',
+  查看源码: 'View source',
+  查看渲染效果: 'View rendered',
   '无法预览，下载查看': 'No preview. Download to view',
   '图片没能加载，下载查看': 'The image did not load. Download to view',
   '只显示前 {n} 行，下载查看完整文件': 'Showing lines 1 to {n}. Download for the full file',

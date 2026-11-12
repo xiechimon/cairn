@@ -76,6 +76,11 @@ export function filePreviewKind(key: string): FilePreviewKind {
   return TEXT_EXTS.has(ext) ? 'text' : 'other';
 }
 
+export function isMarkdownFile(key: string): boolean {
+  const ext = extOf(key);
+  return ext === 'md' || ext === 'markdown';
+}
+
 export function attachmentUrl(key: string): string {
   return `/api/attachments/${encodeURIComponent(attachmentIdFromKey(key))}`;
 }

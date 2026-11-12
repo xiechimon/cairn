@@ -709,7 +709,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `attachment-pending`, `chief-sent-attachment`, `chief-sent-attachments`, `composer-attachments`, `file-preview-broken`, `file-preview-copy`, `file-preview-download`, `file-preview-image`, `file-preview-name`, `file-preview-panel`, `file-preview-pdf`, `file-preview-text`, `file-preview-truncated`, `file-preview-unsupported`
+- Test ids in its code: `attachment-pending`, `chief-sent-attachment`, `chief-sent-attachments`, `composer-attachments`, `file-preview-broken`, `file-preview-copy`, `file-preview-download`, `file-preview-image`, `file-preview-markdown`, `file-preview-name`, `file-preview-panel`, `file-preview-pdf`, `file-preview-source-toggle`, `file-preview-text`, `file-preview-truncated`, `file-preview-unsupported`
 - Verify recipes: [.claude/skills/verify-cairn/features/attachments.md](features/attachments.md)
 - Research: [docs/research/file-preview-reference-2026-11-11.md](../../../docs/research/file-preview-reference-2026-11-11.md)
 - Frontend design: [docs/design/references/coordinator-chat/claude-duet-composer-attachment.jpg](../../../docs/design/references/coordinator-chat/claude-duet-composer-attachment.jpg), [docs/design/references/coordinator-chat/claude-duet-file-preview-panel.jpg](../../../docs/design/references/coordinator-chat/claude-duet-file-preview-panel.jpg), [docs/design/references/coordinator-chat/claude-duet-sent-attachment-uploading.jpg](../../../docs/design/references/coordinator-chat/claude-duet-sent-attachment-uploading.jpg)
