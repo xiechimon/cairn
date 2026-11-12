@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Check, Copy, Download, FileText, ImageOff } from 'lucide-react';
+import { Check, Code, Copy, Download, Eye, FileText, ImageOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
 import { useLiveData } from '../api/provider.js';
@@ -10,9 +10,10 @@ import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-pan
 import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
 import { attachmentIdFromKey } from '../detail/attachment-chip.js';
+import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { attachmentUrl, type FileTarget, filePreviewKind } from './file-pane.js';
+import { attachmentUrl, type FileTarget, filePreviewKind, isMarkdownFile } from './file-pane.js';
 
 export const FILE_PREVIEW_MAX_LINES = 5000;
 
@@ -70,13 +71,43 @@ function FileTextView({ text }: { text: string }) {
         <span aria-hidden className="h-2 border-r border-(--border)" />
         <span aria-hidden className="h-2" />
       </div>
-      {lines.length > shown.length && (
-        <p
-          data-testid="file-preview-truncated"
-          className="m-0 px-1 pt-2 text-meta text-content-tertiary"
-        >
-          {t('只显示前 {n} 行，下载查看完整文件', { n: FILE_PREVIEW_MAX_LINES })}
-        </p>
+      {truncatedNote(
+        shown.length,
+        lines.length,
+        t('只显示前 {n} 行，下载查看完整文件', { n: FILE_PREVIEW_MAX_LINES }),
+      )}
+    </div>
+  );
+}
+
+function truncatedNote(shown: number, total: number, label: string) {
+  if (total <= shown) return null;
+  return (
+    <p
+      data-testid="file-preview-truncated"
+      className="m-0 px-1 pt-2 text-meta text-content-tertiary"
+    >
+      {label}
+    </p>
+  );
+}
+
+function FileMarkdownView({ text }: { text: string }) {
+  const { t } = useI18n();
+  const lines = fileLines(text);
+  const shown = lines.slice(0, FILE_PREVIEW_MAX_LINES);
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pt-2 pb-4">
+      <div
+        data-testid="file-preview-markdown"
+        className="mx-auto w-full max-w-chat min-w-0 px-3 py-2 text-ui leading-5 text-foreground [overflow-wrap:anywhere]"
+      >
+        <ChatMarkdown text={shown.join('\n')} />
+      </div>
+      {truncatedNote(
+        shown.length,
+        lines.length,
+        t('只显示前 {n} 行，下载查看完整文件', { n: FILE_PREVIEW_MAX_LINES }),
       )}
     </div>
   );
@@ -141,6 +172,8 @@ export function FilePreviewPanel({ target, onClose }: { target: FileTarget; onCl
       : url);
   const download = () => downloadFile(downloadHref, target.name);
   const [copied, setCopied] = useState(false);
+  const [showSource, setShowSource] = useState(false);
+  const markdown = kind === 'text' && isMarkdownFile(target.key);
   useEffect(() => {
     if (!copied) return;
     const timer = window.setTimeout(() => setCopied(false), COPIED_MS);
@@ -165,7 +198,11 @@ export function FilePreviewPanel({ target, onClose }: { target: FileTarget; onCl
         errorTitle={t('文件没能加载')}
         className="px-2"
       >
-        <FileTextView text={text ?? ''} />
+        {markdown && !showSource ? (
+          <FileMarkdownView text={text ?? ''} />
+        ) : (
+          <FileTextView text={text ?? ''} />
+        )}
       </QueryBoundary>
     ) : kind === 'image' ? (
       <FileImageView key={url} name={target.name} src={fixture?.src ?? url} onDownload={download} />
@@ -199,6 +236,28 @@ export function FilePreviewPanel({ target, onClose }: { target: FileTarget; onCl
             {target.name}
           </span>
         </SidePanelTitle>
+        {markdown && (
+          <IconTooltip
+            label={showSource ? t('查看渲染效果') : t('查看源码')}
+            side="bottom"
+            trigger={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                data-testid="file-preview-source-toggle"
+                disabled={text === undefined}
+                onClick={() => setShowSource((current) => !current)}
+                className={HEAD_BTN_CLS}
+              />
+            }
+          >
+            {showSource ? (
+              <Eye aria-hidden className="size-5.5" />
+            ) : (
+              <Code aria-hidden className="size-5.5" />
+            )}
+          </IconTooltip>
+        )}
         <IconTooltip
           label={copied ? t('已复制') : t('复制')}
           side="bottom"

@@ -37,6 +37,34 @@ const LONG_LOG = Array.from({ length: 240 }, (_, i) => LOG_LINES[i % LOG_LINES.l
   '\n',
 );
 
+const NOTES_MD = [
+  '# 发布检查清单',
+  '',
+  '这次发布前要确认三件事，详见 [发布流程](https://example.com/release)。',
+  '',
+  '## 必做',
+  '',
+  '- 跑完 `pnpm prepush`',
+  '- 合并前确认 CI 全绿',
+  '- 通知值班同学',
+  '',
+  '### 进度',
+  '',
+  '- [x] 迁移脚本已评审',
+  '- [ ] 回滚演练',
+  '',
+  '| 环境 | 状态 |',
+  '| --- | --- |',
+  '| staging | 已部署 |',
+  '| production | 等待中 |',
+  '',
+  '```sh',
+  'pnpm --filter @cairn/web build',
+  '```',
+  '',
+  '> 出问题先回滚，再排查。',
+].join('\n');
+
 const IMAGE_SRC = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600"><rect width="960" height="600" fill="#f4f1ea"/><rect x="0" y="0" width="220" height="600" fill="#e8e3d8"/><rect x="24" y="32" width="120" height="14" rx="7" fill="#b9b1a1"/><rect x="24" y="80" width="172" height="28" rx="6" fill="#d6cfc0"/><rect x="24" y="124" width="140" height="12" rx="6" fill="#c9c1b1"/><rect x="24" y="152" width="156" height="12" rx="6" fill="#c9c1b1"/><rect x="300" y="420" width="580" height="96" rx="16" fill="#ffffff" stroke="#d6cfc0"/><rect x="560" y="80" width="320" height="44" rx="22" fill="#e9c9a8"/><rect x="300" y="160" width="360" height="88" rx="18" fill="#ffffff" stroke="#e1dbcf"/><rect x="324" y="186" width="250" height="12" rx="6" fill="#b9b1a1"/><rect x="324" y="212" width="190" height="12" rx="6" fill="#c9c1b1"/></svg>',
 )}`;
@@ -83,6 +111,23 @@ const EMPTY_TEXT_TURN: ChiefStreamItem[] = [
 
 export const CHIEF_FILES_SCENARIOS: Record<string, FixtureSet> = {
   'chief-files': filesScenario(EMPTY_TEXT_TURN, { 'att-test-txt': { text: '' } }),
+  'chief-files-markdown': filesScenario(
+    [
+      {
+        kind: 'user',
+        id: 'files-notes',
+        text: `![release-notes.md](attachment:${TEAM}/att-release-notes.md)\n帮我看下这份清单`,
+        markdown: `![release-notes.md](attachment:${TEAM}/att-release-notes.md)\n帮我看下这份清单`,
+      },
+      {
+        kind: 'robot',
+        id: 'files-notes-answer',
+        markdown: '清单齐了，回滚演练还没做。',
+        seconds: '',
+      },
+    ],
+    { 'att-release-notes': { text: NOTES_MD } },
+  ),
   'chief-files-image': filesScenario(
     [
       {

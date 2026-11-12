@@ -90,6 +90,55 @@ test('the file panel deep-links, copies the text, downloads with the name and cl
   await expect(page).not.toHaveURL(/fileName=/);
 });
 
+test('a Markdown file renders as a document, the toggle shows the source and copy keeps the source', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto(
+    '/app?scenario=chief-files-markdown&pane=file&file=team-files/att-release-notes.md&fileName=release-notes.md',
+  );
+  const panel = page.getByTestId('file-preview-panel');
+  const rendered = panel.getByTestId('file-preview-markdown');
+  await expect(rendered.getByRole('heading', { name: '发布检查清单', level: 1 })).toBeVisible();
+  await expect(rendered.getByRole('heading', { name: '必做', level: 2 })).toBeVisible();
+  await expect(rendered.getByTestId('md-list-bullet').getByTestId('md-item-bullet')).toHaveCount(3);
+  await expect(rendered.getByTestId('md-table')).toBeVisible();
+  await expect(rendered.getByTestId('md-code-block')).toBeVisible();
+  const link = rendered.getByRole('link', { name: '发布流程' });
+  await expect(link).toHaveAttribute('target', '_blank');
+  await expect(panel.getByTestId('file-preview-text')).toHaveCount(0);
+  const box = await rendered.boundingBox();
+  const panelBox = await panel.boundingBox();
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(
+    (panelBox?.x ?? 0) + (panelBox?.width ?? 0),
+  );
+
+  await panel.getByTestId('file-preview-copy').click();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toContain('# 发布检查清单');
+  expect(copied).toContain('- 跑完 `pnpm prepush`');
+
+  const toggle = panel.getByTestId('file-preview-source-toggle');
+  await toggle.click();
+  await expect(rendered).toHaveCount(0);
+  await expect(panel.getByTestId('file-preview-text')).toContainText('# 发布检查清单');
+  await expect(panel.getByRole('link', { name: '下载' })).toHaveAttribute(
+    'download',
+    'release-notes.md',
+  );
+  await toggle.click();
+  await expect(panel.getByTestId('file-preview-markdown')).toBeVisible();
+});
+
+test('a plain text file keeps the line view and has no source toggle', async ({ page }) => {
+  await page.goto(TEXT_DEEP_LINK);
+  const panel = page.getByTestId('file-preview-panel');
+  await expect(panel.getByTestId('file-preview-text')).toBeVisible();
+  await expect(panel.getByTestId('file-preview-markdown')).toHaveCount(0);
+  await expect(panel.getByTestId('file-preview-source-toggle')).toHaveCount(0);
+});
+
 test('the file panel shows images fitted and a quiet download state for other types', async ({
   page,
 }) => {
