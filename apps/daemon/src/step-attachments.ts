@@ -244,3 +244,18 @@ function withMimeExt(fileName: string, mimeType: string): string {
   const stem = lastDot > 0 ? base.slice(0, lastDot) : base;
   return `${stem}.${wantExt}`;
 }
+
+export async function resolveStepImagesOrRaw(
+  opts: ResolveStepImagesOpts,
+): Promise<ResolvedStepImages> {
+  try {
+    return await resolveStepImages(opts);
+  } catch (err) {
+    opts.log(
+      `attachment resolve failed (delivering raw text): ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+    return { text: opts.text, images: [], skippedNoVision: 0 };
+  }
+}
