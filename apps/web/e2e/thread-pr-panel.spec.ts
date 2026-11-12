@@ -285,7 +285,8 @@ test('the same PR reaches the Tasks list and the finish dialog', async ({ page }
   await page.goto('/app?pane=tasks');
   await expect(page.getByTestId('work-prs').locator('[data-slot="pr-list-row"]')).toContainText('#42');
   await page.goto('/app?thread=todo-1');
-  await page.getByRole('button', { name: 'Finish…' }).click();
+  await page.getByTestId('side-chat').getByRole('button', { name: 'More actions…' }).click();
+  await page.getByRole('menuitem', { name: 'Complete' }).click();
   await expect(page.getByTestId('accept-dialog-pr').getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
 });
 

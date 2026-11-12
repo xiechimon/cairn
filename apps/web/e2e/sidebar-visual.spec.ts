@@ -214,6 +214,7 @@ test('the row menu matches the reference metrics and order', async ({ page }) =>
   const menu = page.locator('[data-slot="dropdown-menu-content"]');
   await expect(menu.getByRole('menuitem')).toHaveText([
     '重命名',
+    '项目主页',
     '任务',
     '项目设置',
     '项目说明',
@@ -253,7 +254,7 @@ test('the row menu matches the reference metrics and order', async ({ page }) =>
   expect(m.menu.width).toBe(168);
   expect(m.radius).toBe('10px');
   expect(m.padding).toBe('6px');
-  expect(m.itemHeights).toEqual([27, 27, 27, 27, 27, 27, 27]);
+  expect(m.itemHeights).toEqual([27, 27, 27, 27, 27, 27, 27, 27]);
   expect(m.itemRadius).toBe('6px');
   expect(m.icon).toEqual([20, 10]);
   expect(m.font).toBe('13px');
