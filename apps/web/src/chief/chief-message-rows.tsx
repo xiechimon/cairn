@@ -13,6 +13,7 @@ import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
+import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import {
   type TodoGlance,
@@ -24,7 +25,6 @@ import type { ChiefSegment, ChiefStreamItem, ChiefToolRow } from '../fixtures/re
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { FileText } from '../icons/index.js';
-import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefReportRow } from './chief-report-row.js';
@@ -181,7 +181,11 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
               data-testid="chief-chip-agent"
               className={`${CHIP_INLINE_CLS} bg-(--seg-active) text-(--text-secondary)`}
             >
-              <img src={spiralAvatarUrl(s.agent)} alt="" className="size-3 rounded-full" />
+              <SeededAvatar
+                name={s.agent}
+                fallback="/avatar-robot-1.svg"
+                className="size-3 after:hidden"
+              />
               {s.agent}
             </span>
           );
