@@ -17,7 +17,7 @@
     <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-SQLite-173a2f?style=flat-square">
   </p>
 
-  <p><b>你跟一个 Coordinator 说要做什么，agent 在你自己的机器上分 thread 隔离干活，没有证据就不合并。</b></p>
+  <p><b>Cairn 是自托管的通用助理：你跟一个 Coordinator 说要做什么，agent 在你自己的机器上分 thread 隔离干活。</b></p>
 
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="site/img/hero-dark.webp">

@@ -68,7 +68,7 @@ Owner decision on 2026-11-11: cairn is a general assistant, not only a coding wo
 - [ ] Secrets the agent never reads. A masked entry box for site logins whose value goes to the site and never into the conversation; the journal records that a secret was used, not its value.
 - [ ] An outgoing check. Text leaving through a connector is scanned for sensitive data (card numbers, credentials) before it is sent, and held for approval when something is found.
 - [ ] More model sources. Local and OpenAI-compatible endpoints selectable per agent without code changes, through the existing provider configuration.
-- [ ] Clients. Desktop first, then a native iOS app in Swift, Android later (owner decision). The phone reference recording is kept outside the repository because it shows account details.
+- [ ] Clients. The web app is settled first, then a native iOS app in Swift; client work does not run in parallel with web polish (owner decision, 2026-11-12). The earlier decision read "desktop first, then iOS, Android later"; the 2026-11-12 decision did not restate where desktop sits. The phone reference recording is kept outside the repository because it shows account details.
 
 Not planned: chat-platform entrances such as Slack or Teams, a second task board, a plugin marketplace. Each repeats something cairn already has or serves teams rather than one owner.
 
