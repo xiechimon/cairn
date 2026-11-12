@@ -11,7 +11,7 @@ export const admitLabel = 'queue-admit';
 const batchHeadRe = '^B[0-9]+/';
 const batchSize = { min: 1, max: 4 };
 const batchWait = '0 s';
-const checkRetries = 1;
+const checkRetries = 0;
 const parallelChecks = 3;
 const scopes = {
   web: ['apps/web/**/*'],

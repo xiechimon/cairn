@@ -61,7 +61,7 @@ for (const [name, author, method] of [
     for (const check of ['pr-evidence', 'merge-route'])
       assert.doesNotMatch(merge, new RegExp(check));
     assert.match(merge, new RegExp(`merge_method: ${method}\\n`));
-    assert.match(merge, /max_checks_retries: 1$/m);
+    assert.match(merge, /max_checks_retries: 0$/m);
   });
 
 test('neither queue caps commit count, and both fast-forward the tested draft commit', () => {
