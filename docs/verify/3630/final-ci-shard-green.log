@@ -1,8 +1,0 @@
-Supervised Vitest: the exact 22 files from failing integration shard 4, --maxWorkers=4.
-The short cache alias resolves into the lane scratch directory on disk.
-Supervisor exit: 0; no survivors.
- Test Files  22 passed (22)
-      Tests  297 passed (297)
-   Start at  05:53:58
-   Duration  133.50s (tests 87%, import 10%, transform 3%)
-

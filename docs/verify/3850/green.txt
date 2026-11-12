@@ -1,4 +1,0 @@
-Command: pnpm exec vitest run apps/server/test/coordinator-turn-snapshot.test.ts apps/server/test/migration-journal-order.test.ts apps/server/test/schema.test.ts apps/server/test/due-events.test.ts packages/shared/test/snapshot.test.ts packages/shared/test/vocabulary.test.ts --maxWorkers=4
- Test Files  6 passed (6)
-      Tests  151 passed (151)
-   Duration  3.50s (transform 43%, tests 29%, import 27%, setup 1%)
