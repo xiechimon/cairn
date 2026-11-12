@@ -193,7 +193,7 @@ it('drains a pending mail receipt before restoring the owner conversation', asyn
       stepId: 'mail-step-gone',
       kind: 'initial',
       ownerMessageIds: [],
-      content: 'mail',
+      content: 'MAIL-CRASH-EXCERPT-4c91',
       conversationId: coordinatorConversationKey(storeId, '9'),
       state: 'pending',
       createdAt: 1,
@@ -205,6 +205,9 @@ it('drains a pending mail receipt before restoring the owner conversation', asyn
   expect(
     w.s.db.select().from(coordinatorInput).where(eq(coordinatorInput.id, 'mail-receipt')).get(),
   ).toMatchObject({ state: 'released' });
+  expect(JSON.stringify(w.s.db.select().from(chiefMessage).all())).not.toContain(
+    'MAIL-CRASH-EXCERPT-4c91',
+  );
   expect(
     w.s.db
       .select()

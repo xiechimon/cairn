@@ -2,7 +2,6 @@ import { coordinatorConversationKey } from '@cairn/shared';
 import { and, eq, isNotNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { coordinatorConversation, coordinatorInput } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { releaseCoordinatorInput } from '../services/coordinator-inputs.js';
 
@@ -26,19 +25,10 @@ function registeredConversationId(row: { storeId: string | null; conversationId:
     : coordinatorConversationKey(row.storeId, row.conversationId);
 }
 
-export async function settleInterruptedMailConversation(
-  db: Db,
-  threadId: string,
-  recover: () => Promise<void>,
-): Promise<void> {
+export function settleInterruptedMailConversation(db: Db, threadId: string): void {
   const row = interruptedMail(db, threadId);
   if (row === undefined) return;
   const isolated = registeredConversationId(row);
-  try {
-    await recover();
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-  }
   for (const input of db
     .select()
     .from(coordinatorInput)

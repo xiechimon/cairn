@@ -623,7 +623,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       if (closing) return;
       dirty.delete(threadId);
       if (heldLease(threadId) === null) return;
-      await settleInterruptedMailConversation(db, threadId, () => runtime.recoverThread(threadId));
+      settleInterruptedMailConversation(db, threadId);
       if (!runtime.isOpen(threadId)) migrateUnfetchedCoordinatorInputs(db, threadId, owner);
       const pending = db
         .select()
