@@ -1,12 +1,33 @@
 import type { Context, Hono } from 'hono';
+import { z } from 'zod';
 import type { AppContext } from './context.js';
-import { HttpError } from './lib/errors.js';
+import { HttpError, parseWith } from './lib/errors.js';
 import {
   isJobOwnerCaller,
   setJobCapLimit,
   writeJobHost,
   writeOwnerProfile,
 } from './services/job-applications.js';
+
+const hostBodySchema = z.object({
+  host: z.string(),
+  status: z.enum(['allowed', 'refused']),
+});
+const profileBodySchema = z.object({
+  fields: z.unknown().optional(),
+  resumeAttachmentId: z.unknown().optional(),
+});
+const capBodySchema = z.object({
+  limit: z.number(),
+});
+
+async function jobBody(c: Context): Promise<unknown> {
+  try {
+    return await c.req.json();
+  } catch {
+    return null;
+  }
+}
 
 function requireJobOwner(c: Context, authToken: string | null): void {
   if (!isJobOwnerCaller(c.get('pairedDeviceId'), c.get('ownerIdentity'), authToken)) {
@@ -17,16 +38,13 @@ function requireJobOwner(c: Context, authToken: string | null): void {
 export function registerJobApplicationRoutes(app: Hono, ctx: AppContext): void {
   app.put('/api/job-applications/hosts', async (c) => {
     requireJobOwner(c, ctx.authToken);
-    const body = (await c.req.json()) as { host?: unknown; status?: unknown };
-    if ((body.status !== 'allowed' && body.status !== 'refused') || typeof body.host !== 'string') {
-      throw new HttpError(400, 'invalid host');
-    }
+    const body = parseWith(hostBodySchema, await jobBody(c), 'body');
     writeJobHost(ctx.db, 'owner', ctx.user.id, body.host, body.status);
     return c.json({ host: body.host, status: body.status });
   });
   app.put('/api/job-applications/profile', async (c) => {
     requireJobOwner(c, ctx.authToken);
-    const body = (await c.req.json()) as { fields?: unknown; resumeAttachmentId?: unknown };
+    const body = parseWith(profileBodySchema, await jobBody(c), 'body');
     const saved = writeOwnerProfile(ctx.db, 'owner', {
       userId: ctx.user.id,
       teamId: ctx.team.id,
@@ -38,8 +56,7 @@ export function registerJobApplicationRoutes(app: Hono, ctx: AppContext): void {
   });
   app.put('/api/job-applications/cap', async (c) => {
     requireJobOwner(c, ctx.authToken);
-    const body = (await c.req.json()) as { limit?: unknown };
-    if (typeof body.limit !== 'number') throw new HttpError(400, 'invalid cap');
+    const body = parseWith(capBodySchema, await jobBody(c), 'body');
     setJobCapLimit(ctx.db, 'owner', ctx.user.id, Date.now(), body.limit);
     return c.json({ limit: body.limit });
   });

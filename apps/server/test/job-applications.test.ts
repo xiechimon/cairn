@@ -2,7 +2,7 @@ import { CHIEF_TOOL_NAMES, MCP_TOOL_REGISTRY } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { openMemoryDb } from '../src/db/client.js';
-import { chief, chiefMessage, chiefThread } from '../src/db/schema.js';
+import { chief, chiefMessage, chiefThread, jobApplication } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { HttpError } from '../src/lib/errors.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
@@ -673,4 +673,69 @@ describe('job application server gate', () => {
       ),
     ).toMatchObject({ status: 'submitting', clicked: false });
   });
+
+  test('a late delivery commits the timeout settlement before rejecting', () => {
+    const row = prepared();
+    recordOwnerAnswer(row.db, 'owner', row.questionId, {
+      questionId: row.questionId,
+      choices: [JOB_SUBMIT_AFFIRMATIVE],
+    });
+    answerAndReserve(
+      row.db,
+      row.attemptId,
+      { questionId: row.questionId, choices: [JOB_SUBMIT_AFFIRMATIVE] },
+      FORM,
+      AT,
+    );
+    const late = AT + JOB_PREVIEW_TTL_MS + 1;
+    expect(statusOf(() => recordDelivery(row.db, row.attemptId, 'delivered', late))).toBe(409);
+    const doc = storedDoc(row.db, row.userId);
+    expect(doc.attempts[row.attemptId]).toMatchObject({ status: 'blocked', delivery: 'unknown' });
+    expect(doc.caps['2026-11-11']).toMatchObject({ reserved: 0, counted: 1 });
+  });
+
+  test('beginBrowsing settles an abandoned submit before checking the cap', () => {
+    const row = prepared();
+    recordOwnerAnswer(row.db, 'owner', row.questionId, {
+      questionId: row.questionId,
+      choices: [JOB_SUBMIT_AFFIRMATIVE],
+    });
+    answerAndReserve(
+      row.db,
+      row.attemptId,
+      { questionId: row.questionId, choices: [JOB_SUBMIT_AFFIRMATIVE] },
+      FORM,
+      AT,
+    );
+    const late = AT + JOB_PREVIEW_TTL_MS + 1;
+    const next = openAttempt(row.db, row.userId);
+    beginBrowsing(row.db, next.id, HOST, late);
+    const doc = storedDoc(row.db, row.userId);
+    expect(doc.attempts[row.attemptId]).toMatchObject({ status: 'blocked', delivery: 'unknown' });
+    expect(doc.caps['2026-11-11']).toMatchObject({ reserved: 0, counted: 1 });
+  });
+
+  test('job application writes reject malformed and null JSON with 400', async () => {
+    const ownerToken = 'owner-token-job-json';
+    const server = bootServer({ authToken: ownerToken });
+    const headers = { authorization: `Bearer ${ownerToken}`, 'content-type': 'application/json' };
+    for (const path of [
+      '/api/job-applications/hosts',
+      '/api/job-applications/profile',
+      '/api/job-applications/cap',
+    ]) {
+      const malformed = await server.app.request(path, { method: 'PUT', headers, body: '{' });
+      expect(malformed.status, path).toBe(400);
+      const empty = await server.app.request(path, { method: 'PUT', headers, body: 'null' });
+      expect(empty.status, path).toBe(400);
+    }
+  });
 });
+
+function storedDoc(db: ReturnType<typeof world>['db'], userId: string) {
+  const row = db.select().from(jobApplication).where(eq(jobApplication.userId, userId)).get();
+  return row?.document as unknown as {
+    attempts: Record<string, { status: string; delivery: string | null }>;
+    caps: Record<string, { reserved: number; counted: number }>;
+  };
+}

@@ -237,8 +237,12 @@ export function beginBrowsing(
   now: number,
 ): { status: string } {
   const { userId, doc } = found(db, attemptId);
+  settleAbandoned(doc, now);
   const attempt = doc.attempts[attemptId];
-  if (attempt?.status !== 'reading') throw new HttpError(409, 'attempt is not reading');
+  if (attempt?.status !== 'reading') {
+    save(db, userId, doc);
+    throw new HttpError(409, 'attempt is not reading');
+  }
   const normalized = hostOf(host);
   const cap = capOf(doc, dayOf(now));
   const blocked = doc.hosts[normalized] !== 'allowed' || cap.counted + cap.reserved >= cap.limit;
@@ -588,12 +592,18 @@ export function recordDelivery(
   outcome: 'delivered' | 'unknown',
   _now: number,
 ) {
-  return db.transaction(() => {
+  const inFlight = db.transaction(() => {
     const { userId, doc } = found(db, attemptId);
     settleAbandoned(doc, _now);
+    save(db, userId, doc);
+    const attempt = doc.attempts[attemptId];
+    return attempt !== undefined && attempt.status === 'submitting' && attempt.capDay !== null;
+  });
+  if (!inFlight) throw new HttpError(409, 'submit is not in flight');
+  return db.transaction(() => {
+    const { userId, doc } = found(db, attemptId);
     const attempt = doc.attempts[attemptId];
     if (attempt === undefined || attempt.status !== 'submitting' || attempt.capDay === null) {
-      save(db, userId, doc);
       throw new HttpError(409, 'submit is not in flight');
     }
     const cap = doc.caps[attempt.capDay];
