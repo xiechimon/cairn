@@ -238,11 +238,11 @@ export function openSecretValues(
     ...projectRows,
     ...granted.filter((r) => r.projectId !== null),
   ]) {
-    if (row.valueCipher === null || isMailSecretName(row.name) || linked.has(row.id)) continue;
     if (row.delivery === 'http') {
       delete values[row.name];
       continue;
     }
+    if (row.valueCipher === null || isMailSecretName(row.name) || linked.has(row.id)) continue;
     values[row.name] = deps.box.open(row.valueCipher);
   }
   return values;
