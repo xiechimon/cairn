@@ -752,7 +752,7 @@ Reach:
 - Test ids in its code: none
 - Research: **gap**: the t3code comparison of plan §21 is not in the repository
 - Frontend design: n/a: an API for other harnesses with no page
-- Backend design: **gap**: no design for the MCP transport, authentication and tool semantics
+- Backend design: [docs/design/runtime-memory-out-of-tree.md](../../../docs/design/runtime-memory-out-of-tree.md)
 - Evidence: `apps/server/test/mcp-face.test.ts`, `integration/test/m4b-mcp-e2e.test.ts`
 
 ### git-hosting

@@ -22,7 +22,7 @@
 | research, frontend design and backend design all present or not applicable | 23 |
 | Research gaps | 14 |
 | Frontend design gaps | 19 |
-| Backend design gaps | 20 |
+| Backend design gaps | 19 |
 | notes cited but not on main | 21 |
 
 ## Coverage
@@ -65,7 +65,7 @@
 | [Appearance and visual system](#appearance) | 3 | shipped | yes (not on main) | yes | n/a |  |
 | [Attachments](#attachments) | 3 | shipped | yes | yes | yes |  |
 | [Composer](#composer) | 3 | shipped | gap | yes | gap | B8 |
-| [Coordinator over MCP](#coordinator-mcp) | 3 | shipped | gap | n/a | gap | B11 |
+| [Coordinator over MCP](#coordinator-mcp) | 3 | shipped | gap | n/a | yes | B11 |
 | [Built-in git hosting](#git-hosting) | 3 | shipped | gap | n/a | gap | B11 |
 | [GitHub connection and issues](#github) | 3 | shipped | yes | yes | yes |  |
 | [Harness profile](#harness-profile) | 3 | partial | yes (not on main) | gap | yes | B9 |
@@ -184,7 +184,7 @@ Small surfaces that work today without research or design: the Coordinator MCP f
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Coordinator over MCP](#coordinator-mcp) | 3 | Research: the t3code comparison of plan §21 is not in the repository<br>Backend design: no design for the MCP transport, authentication and tool semantics |
+| [Coordinator over MCP](#coordinator-mcp) | 3 | Research: the t3code comparison of plan §21 is not in the repository |
 | [Built-in git hosting](#git-hosting) | 3 | Research: no note on serving git over HTTP versus other transports<br>Backend design: no design for auth, repository layout and failure modes |
 | [Server backup and deploy status](#server-status) | 3 | Frontend design: the banners have no design |
 
@@ -492,7 +492,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 - Research: **gap**: the t3code comparison of plan §21 is not in the repository
 - Frontend design: n/a: an API for other harnesses with no page
-- Backend design: **gap**: no design for the MCP transport, authentication and tool semantics
+- Backend design: [docs/design/runtime-memory-out-of-tree.md](design/runtime-memory-out-of-tree.md)
 
 ### git-hosting
 
