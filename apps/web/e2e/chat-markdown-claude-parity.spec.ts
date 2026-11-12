@@ -194,7 +194,7 @@ test('code block stays inside the reply column and long lines scroll inside it',
   expect(geo.radius).toBe('10px');
 });
 
-test('status events are a centred muted line with no rules, and a reply footer never overlaps the reply text', async ({
+test('status events are a centred muted line with no rules, and a reply has no footer row: its tools show beside the bubble on hover', async ({
   page,
 }) => {
   await page.goto(DONE);
@@ -213,12 +213,12 @@ test('status events are a centred muted line with no rules, and a reply footer n
     .locator('[data-row="agent"]')
     .filter({ hasText: 'git merge origin/main' })
     .first();
-  const overlap = await reply.evaluate((row) => {
-    const text = row.querySelector('[data-testid="agent-text"]')!.getBoundingClientRect();
-    const footer = row.querySelector('[data-testid="msg-actions"]')!.getBoundingClientRect();
-    return { textBottom: text.bottom, footerTop: footer.top };
-  });
-  expect(overlap.footerTop).toBeGreaterThanOrEqual(overlap.textBottom);
+  await expect(reply.getByTestId('msg-actions')).toHaveCount(0);
+  const block = reply.locator('[data-slot="reply-block"]').first();
+  const tools = block.getByTestId('msg-tools');
+  await expect(tools).toHaveCSS('opacity', '0');
+  await block.hover();
+  await expect(tools).toHaveCSS('opacity', '1');
 });
 
 test('Coordinator status events are the same left-aligned status line, clear of the reply footer above', async ({
