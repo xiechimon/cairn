@@ -154,4 +154,37 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     expect(width).toBeLessThanOrEqual(390);
     await evidenceShot(page, 'home-chat-phone.png');
   });
+
+  test('switching from a project back to the Coordinator lands at the newest message', async ({
+    page,
+  }) => {
+    const minute = 60_000;
+    const long = '这一段写得足够长，好让整段对话超过一屏。'.repeat(6);
+    const projectTurns: Row[] = Array.from({ length: 8 }, (_, i) => [
+      { id: `pu${i}`, role: 'user', content: `cairn 第 ${i} 问`, createdAt: (1 + i * 2) * minute, projectId: 'proj-1' },
+      { id: `pa${i}`, role: 'assistant', content: `cairn 第 ${i} 答。\n\n${long}`, createdAt: (2 + i * 2) * minute },
+    ]).flat();
+    const coordinatorTurns: Row[] = Array.from({ length: 30 }, (_, i) => [
+      { id: `u${i}`, role: 'user', content: `第 ${i} 个问题`, createdAt: (20 + i * 2) * minute, projectId: null },
+      {
+        id: `a${i}`,
+        role: 'assistant',
+        content: `第 ${i} 个回答。\n\n${long}`,
+        createdAt: (21 + i * 2) * minute,
+      },
+    ]).flat();
+    await mockLive(page, { threads: [THREAD], messages: [...projectTurns, ...coordinatorTurns] });
+    await page.goto('/app');
+    const sidebar = page.locator('[data-slot="sidebar-nav-row"], [data-slot="sidebar-project-row"]');
+    const newest = page.getByTestId('chief-stream').getByText('第 29 个回答');
+    await expect(newest).toBeInViewport();
+    await sidebar.filter({ hasText: 'cairn' }).click();
+    await expect(page.getByTestId('chief-stream').getByText('cairn 第 7 答')).toBeInViewport();
+    await page.getByTestId('chief-body').hover();
+    await page.mouse.wheel(0, -400);
+    await expect(page.getByTestId('jump-to-latest')).toHaveAttribute('data-active', 'true');
+    await sidebar.filter({ hasText: 'Coordinator' }).click();
+    await expect(newest).toBeInViewport();
+    await expect(page.getByTestId('jump-to-latest')).toHaveAttribute('data-active', 'false');
+  });
 });

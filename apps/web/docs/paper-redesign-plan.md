@@ -24,7 +24,7 @@ Change only tokens, not components. After the merge, the light theme's backgroun
 ## PR 2 · Font-size tokens + arbitrary-value ratchet
 
 - Add the six font-size keys to the `@theme inline` block of `src/styles/app.css`: `text-page`(18) / `text-heading`(16) / `text-card-title`(14) / `text-ui`(13.5) / `text-meta`(12) / `text-caption`(11.5), multiplied by the existing `--rem-scale` (density switching keeps working); add `font-heading` = `var(--font-source-serif)`. The 14px tier is not called `text-card`: shadcn's `--color-card` already occupies that class name (Tailwind would emit a color).
-- Add a third ledger to `scripts/ui-debt-gate.mjs`: occurrence counts of `text-[Npx]` and spacing-class `-[Npx]` arbitrary values (today about 179 font sizes + 273 spacings), frozen into `scripts/ui-debt-baseline.json`, only allowed to go down (reusing the existing D3 mechanism).
+- Add a third ledger to `scripts/ui-debt-gate.mjs`: occurrence counts of `text-[Npx]` and spacing-class `-[Npx]` arbitrary values (today about 179 font sizes + 273 spacings), frozen into `scripts/ui-debt-baseline.json`, only allowed to go down (reusing the existing decrease-only ledger).
 - No page changes; this just stops drift from growing. Each later PR converts the arbitrary values in its own area to tokens and re-freezes the baseline as it goes.
 
 ## PR 3 · Task cards and board columns
