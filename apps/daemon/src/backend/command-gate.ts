@@ -363,6 +363,10 @@ function isParameterHead(word: string): boolean {
   return /^\$[A-Za-z_]/.test(word);
 }
 
+function hasCommandGlob(word: string): boolean {
+  return /[*?[]/.test(word);
+}
+
 function isRedirect(op: string): boolean {
   return (
     op === '>' ||
@@ -626,11 +630,14 @@ function consumeWrapper(
         index += 1;
         continue;
       }
-      if (spec.values.includes(name) && eq === -1) index += 1;
+      if (spec.values.includes(name) && eq === -1) {
+        collected.unresolved = true;
+        index += 1;
+        continue;
+      }
       index += 1;
       continue;
     }
-    let consumeNext = false;
     for (let letter = 1; letter < word.length; letter += 1) {
       const name = word[letter] ?? '';
       if (spec.lookup && (name === 'v' || name === 'V')) {
@@ -654,12 +661,11 @@ function consumeWrapper(
         return { index, stop: true };
       }
       if (spec.values.includes(name)) {
-        if (letter === word.length - 1) consumeNext = true;
+        collected.unresolved = true;
         break;
       }
     }
     index += 1;
-    if (consumeNext) index += 1;
   }
   if (lookup || noCommand) return { index, stop: true };
   if (spec.skipOperand && index < words.length && !(words[index] ?? '').startsWith('-')) index += 1;
@@ -752,10 +758,19 @@ function emitSimple(
       index = skipped.index;
       continue;
     }
+    if (hasCommandGlob(word)) {
+      collected.unresolved = true;
+      return;
+    }
     if (base === 'find') {
       let at = index + 1;
       while (at < words.length) {
-        if (words[at] === '-exec' || words[at] === '-execdir') {
+        if (
+          words[at] === '-exec' ||
+          words[at] === '-execdir' ||
+          words[at] === '-ok' ||
+          words[at] === '-okdir'
+        ) {
           const cmd = [];
           at += 1;
           while (at < words.length && words[at] !== ';' && words[at] !== '+') {
@@ -832,13 +847,22 @@ function collectCommands(entries: readonly ShellParseEntry[]): CollectedCommands
         continue;
       }
       if (op === '<(' || op === '>(') {
+        const head = commandBasename(words[0] ?? '');
+        if (SHELLS.has(head) || head === 'source' || head === '.') collected.unresolved = true;
         index = absorbNested(entries, index + 1, collected);
         continue;
       }
       if (op && isRedirect(op)) {
+        const head = commandBasename(words[0] ?? '');
+        const shellInput = SHELLS.has(head) || head === 'source' || head === '.';
         index += 1;
         const target = entries[index];
-        if (target && entryWord(target) !== undefined) index += 1;
+        const targetWord = target ? entryWord(target) : undefined;
+        if (targetWord !== undefined) index += 1;
+        if (shellInput) {
+          if (op === '<<<' && targetWord) collected.scripts.push(targetWord);
+          else collected.unresolved = true;
+        }
         continue;
       }
       const word = entryWord(entry);
