@@ -10,6 +10,7 @@ function fixture(t, data = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'brake-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const log = join(dir, 'calls');
+  writeFileSync(log, '');
   writeFileSync(join(dir, 'data'), JSON.stringify(data));
   writeFileSync(
     join(dir, 'gh'),
@@ -40,6 +41,7 @@ else if (path.includes('/actions/workflows/')) console.log(JSON.stringify([{work
 else if (path.includes('/labels?')) console.log(JSON.stringify([d.labels ?? []]));
 else if (path.includes('/pulls?')) console.log(JSON.stringify([d.pulls ?? []]));
 else if (path.includes('/check-runs')) console.log(JSON.stringify([{check_runs:d.latestFailure && path.includes(d.main) ? [{id:1,name:'check',conclusion:'success',status:'completed',app:{slug:'github-actions'}},{id:2,name:'check',conclusion:'failure',status:'completed',app:{slug:'github-actions'}}] : [{id:1,name:'check', conclusion: path.includes(d.green) ? 'success':(d.nonGreen ?? 'failure'),status:'completed',app:{slug:'github-actions'}}]}]));
+else if (path.includes('/comments') && !args.includes('--input')) { const number = path.split('/issues/')[1]?.split('/')[0]; console.log(JSON.stringify([(d.comments && d.comments[number]) || []])); }
 else if(path.endsWith('/commits')) console.log(JSON.stringify([d.commits]));
 else if(path.includes('/pulls/')) console.log(JSON.stringify(d.pr));
 else if(path.includes('/branches/main')) console.log(JSON.stringify({commit:{sha:d.main}}));
@@ -434,3 +436,232 @@ for (const operation of ['marker', 'rerun'])
       1,
     );
   });
+
+const runId = '43087659803';
+const runSha = 'a'.repeat(40);
+const failedRun = {
+  id: Number(runId),
+  run_attempt: 1,
+  head_sha: runSha,
+  conclusion: 'failure',
+  status: 'completed',
+};
+function mergify(state, reason, created_at = '2026-11-11T19:42:24Z', login = 'mergify[bot]') {
+  return {
+    user: { login },
+    created_at,
+    body: `<!---\n-*- Mergify Payload -*-\n${JSON.stringify({ version: 1, state, dequeue_reason: reason })}\n-*- Mergify Payload End -*-\n-->`,
+  };
+}
+const brakeReason = { code: 'CHECKS_FAILED', checks: ['autonomy-brake'], checks_count: 1 };
+function dequeuedPull(number = 7) {
+  return {
+    number,
+    head: { sha: 'b'.repeat(40) },
+    auto_merge: null,
+    labels: [{ name: 'dequeued' }],
+  };
+}
+
+test('rerun-failed reruns failed jobs once and does not open a marker', (t) => {
+  const f = fixture(t, { confirmedRun: failedRun });
+  const r = f.run(['rerun-failed', '--run', runId, '--sha', runSha]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(f.calls(), new RegExp(`"run","rerun","${runId}","--failed","--repo","owner/repo"`));
+  assert.doesNotMatch(f.calls(), /\/issues/);
+  assert.match(r.stdout, /reran failed jobs/);
+});
+test('rerun-failed does not rerun a run that already succeeded', (t) => {
+  const f = fixture(t, {
+    confirmedRun: { ...failedRun, run_attempt: 2, conclusion: 'success' },
+  });
+  const r = f.run(['rerun-failed', '--run', runId, '--sha', runSha]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(f.calls(), /"rerun"/);
+});
+test('rerun-failed leaves an in-progress later attempt alone', (t) => {
+  const f = fixture(t, {
+    confirmedRun: { ...failedRun, run_attempt: 2, status: 'in_progress', conclusion: null },
+  });
+  const r = f.run(['rerun-failed', '--run', runId, '--sha', runSha]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(f.calls(), /"rerun"/);
+});
+test('rerun-failed refuses a later failed attempt without rerunning', (t) => {
+  const f = fixture(t, { confirmedRun: { ...failedRun, run_attempt: 2 } });
+  const r = f.run(['rerun-failed', '--run', runId, '--sha', runSha]);
+  assert.equal(r.status, 1);
+  assert.doesNotMatch(f.calls(), /"rerun"/);
+  assert.match(r.stderr, /attempt 2/);
+});
+test('rerun-failed fails when the rerun command fails', (t) => {
+  const f = fixture(t, {
+    confirmedRun: failedRun,
+    responses: { rerun: [{ error: 'no failed jobs' }] },
+  });
+  const r = f.run(['rerun-failed', '--run', runId, '--sha', runSha]);
+  assert.equal(r.status, 1);
+  assert.match(f.calls(), /"rerun"/);
+  assert.match(r.stderr, /no failed jobs/);
+});
+test('rerun-failed rejects a run whose SHA does not match', (t) => {
+  const f = fixture(t, { confirmedRun: { ...failedRun, head_sha: 'c'.repeat(40) } });
+  const r = f.run(['rerun-failed', '--run', runId, '--sha', runSha]);
+  assert.equal(r.status, 1);
+  assert.doesNotMatch(f.calls(), /"rerun"/);
+  assert.match(r.stderr, /SHA mismatch/);
+});
+for (const args of [
+  ['rerun-failed', '--run', '0', '--sha', runSha],
+  ['rerun-failed', '--run', runId, '--sha', 'abc'],
+])
+  test(`rerun-failed rejects ${args.join(' ')}`, (t) => {
+    const f = fixture(t, { confirmedRun: failedRun });
+    const r = f.run(args);
+    assert.equal(r.status, 1);
+    assert.doesNotMatch(f.calls(), /"rerun"/);
+  });
+
+test('unpaused sweep requeues a PR dequeued only for the autonomy brake', (t) => {
+  const f = fixture(t, {
+    pulls: [dequeuedPull()],
+    comments: { 7: [mergify('dequeued', brakeReason)] },
+  });
+  const r = f.run(['sweep']);
+  assert.equal(r.status, 0, r.stderr);
+  const calls = f.calls();
+  assert.match(calls, /@mergifyio requeue/);
+  assert.match(calls, /issues\/7\/labels\/dequeued/);
+  assert.match(calls, /"DELETE"/);
+  assert.match(r.stdout, /#7: requeued/);
+  assert.ok(calls.indexOf('statuses/') < calls.indexOf('@mergifyio requeue'));
+  assert.ok(calls.indexOf('@mergifyio requeue') < calls.indexOf('labels/dequeued'));
+});
+test('paused sweep does not requeue a brake dequeue', (t) => {
+  const f = fixture(t, {
+    issues: [{ number: 5 }],
+    pulls: [dequeuedPull()],
+    comments: { 7: [mergify('dequeued', brakeReason)] },
+  });
+  const r = f.run(['sweep']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(f.calls(), /requeue|labels\/dequeued|\/comments/);
+});
+for (const reason of [
+  { code: 'CHECKS_FAILED', checks: ['check'] },
+  { code: 'CHECKS_FAILED', checks: ['autonomy-brake', 'check'] },
+  { code: 'CONFLICT_WITH_BASE_BRANCH', checks: ['autonomy-brake'] },
+  { code: 'CHECKS_FAILED', checks: [] },
+])
+  test(`sweep leaves a dequeue that is not only the brake: ${reason.code} ${reason.checks.join('+') || 'none'}`, (t) => {
+    const f = fixture(t, {
+      pulls: [dequeuedPull()],
+      comments: { 7: [mergify('dequeued', reason)] },
+    });
+    const r = f.run(['sweep']);
+    assert.equal(r.status, 0, r.stderr);
+    assert.doesNotMatch(f.calls(), /requeue|"DELETE"/);
+  });
+test('a forged Mergify payload does not requeue', (t) => {
+  const f = fixture(t, {
+    pulls: [dequeuedPull()],
+    comments: { 7: [mergify('dequeued', brakeReason, '2026-11-11T19:42:24Z', 'xiechimon')] },
+  });
+  const r = f.run(['sweep']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(f.calls(), /requeue|"DELETE"/);
+});
+test('a newer Mergify state than dequeued does not requeue', (t) => {
+  const f = fixture(t, {
+    pulls: [dequeuedPull()],
+    comments: {
+      7: [
+        mergify('dequeued', brakeReason, '2026-11-11T19:42:24Z'),
+        mergify('waiting', null, '2026-11-11T19:50:00Z'),
+      ],
+    },
+  });
+  const r = f.run(['sweep']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(f.calls(), /requeue|"DELETE"/);
+});
+test('a malformed latest Mergify payload does not requeue or fail the sweep', (t) => {
+  const f = fixture(t, {
+    pulls: [dequeuedPull()],
+    comments: {
+      7: [
+        {
+          user: { login: 'mergify[bot]' },
+          created_at: '2026-11-11T19:42:24Z',
+          body: '<!---\n-*- Mergify Payload -*-\n{not-json\n-*- Mergify Payload End -*-\n-->',
+        },
+      ],
+    },
+  });
+  const r = f.run(['sweep']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(f.calls(), /requeue|"DELETE"/);
+});
+test('an existing requeue comment is not repeated and the label is still removed', (t) => {
+  const f = fixture(t, {
+    pulls: [dequeuedPull()],
+    comments: {
+      7: [
+        mergify('dequeued', brakeReason, '2026-11-11T19:42:24Z'),
+        {
+          user: { login: 'xiechimon' },
+          created_at: '2026-11-11T19:48:00Z',
+          body: '@mergifyio requeue\n',
+        },
+      ],
+    },
+  });
+  const r = f.run(['sweep']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(f.calls(), /@mergifyio requeue/);
+  assert.match(f.calls(), /"DELETE"/);
+  assert.match(r.stdout, /#7: requeued/);
+});
+test('a requeue comment failure still lets the next PR through', (t) => {
+  const f = fixture(t, {
+    pulls: [dequeuedPull(7), dequeuedPull(8)],
+    comments: {
+      7: [mergify('dequeued', brakeReason)],
+      8: [mergify('dequeued', brakeReason)],
+    },
+    responses: { 'repos/owner/repo/issues/7/comments': [{ error: 'comment failed' }] },
+  });
+  const r = f.run(['sweep']);
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /#7: failed/);
+  assert.match(r.stdout, /#8: requeued/);
+  assert.match(f.calls(), /issues\/8\/comments/);
+});
+test('resume requeues a PR the brake dequeued after main is green', (t) => {
+  const f = fixture(t, {
+    issues: [{ number: 5, body: autoBody }],
+    main,
+    ciRuns: greenCi(),
+    pulls: [dequeuedPull()],
+    comments: { 7: [mergify('dequeued', brakeReason)] },
+    runs: [],
+  });
+  const r = f.run(['resume']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /#5: resumed/);
+  assert.match(r.stdout, /#7: requeued/);
+  assert.match(f.calls(), /@mergifyio requeue/);
+});
+test('a manual pause is not a resume and does not requeue', (t) => {
+  const f = fixture(t, {
+    issues: [{ number: 5, body: 'I want to stop merging today.' }],
+    main,
+    ciRuns: greenCi(),
+    pulls: [dequeuedPull()],
+    comments: { 7: [mergify('dequeued', brakeReason)] },
+  });
+  const r = f.run(['resume']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /manual marker kept/);
+  assert.doesNotMatch(f.calls(), /requeue|"DELETE"/);
+});
