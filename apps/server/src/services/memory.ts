@@ -774,14 +774,11 @@ function rewrittenMemoryIndex(
   );
 }
 
-export function rewriteMemoryReferences(
+function scopeIndexes(
   tx: MemoryTx,
   owner: Pick<MemoryRow, 'agentId' | 'teamId' | 'projectId' | 'independent'>,
-  changes: MemoryFileChange[],
-  now = nowMs(),
-): void {
-  if (changes.length === 0) return;
-  const indexes = tx
+) {
+  return tx
     .select()
     .from(agentMemory)
     .where(
@@ -797,11 +794,43 @@ export function rewriteMemoryReferences(
     )
     .all()
     .filter(indexRow);
-  for (const index of indexes) {
+}
+
+export function rewriteMemoryReferences(
+  tx: MemoryTx,
+  owner: Pick<MemoryRow, 'agentId' | 'teamId' | 'projectId' | 'independent'>,
+  changes: MemoryFileChange[],
+  now = nowMs(),
+): void {
+  if (changes.length === 0) return;
+  for (const index of scopeIndexes(tx, owner)) {
     const content = rewrittenMemoryIndex(index, changes);
     if (content !== index.content)
       tx.update(agentMemory)
         .set({ content, updatedAt: Math.max(now, index.updatedAt + 1) })
+        .where(eq(agentMemory.id, index.id))
+        .run();
+  }
+}
+
+function dropGeneratedMemoryReferences(tx: MemoryTx, file: MemoryRow): void {
+  const link = `](${encodeURIComponent(file.title)})`;
+  const pointer = `（记忆文件：${file.title.replace(/[\r\n]+/g, ' ')}）`;
+  const generated = (line: string) =>
+    line.startsWith('- ') &&
+    (line.endsWith(pointer) ||
+      (line.startsWith('- [') &&
+        line.endsWith(link) &&
+        !line.slice(3, -link.length).includes('](')));
+  for (const index of scopeIndexes(tx, file)) {
+    if (encodedIndex(index)) continue;
+    const content = index.content
+      .split('\n')
+      .filter((line) => !generated(line))
+      .join('\n');
+    if (content !== index.content)
+      tx.update(agentMemory)
+        .set({ content, updatedAt: Math.max(nowMs(), index.updatedAt + 1) })
         .where(eq(agentMemory.id, index.id))
         .run();
   }
@@ -1098,6 +1127,8 @@ export function deleteMemoryEntry(
         : undefined;
     if (physical !== undefined && indexRow(physical))
       throw new HttpError(400, 'memory index is managed; delete a fact ID from memories');
+    if (physical?.layer === 'searchable' && physical.supersededBy === null)
+      dropGeneratedMemoryReferences(tx, physical);
     const removed =
       indexed !== undefined
         ? 1
