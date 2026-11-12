@@ -110,7 +110,7 @@ test('agent text sits at 14px', async ({ page }) => {
   );
 });
 
-test('bubble / footer keep their own geometry, replies carry no avatar column', async ({ page }) => {
+test('the bubble keeps its geometry, tools sit beside it with no footer row, replies carry no avatar column', async ({ page }) => {
   await page.goto(DONE);
   await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
   await page.locator('.side-panel [data-testid=\"transcript-col\"]').waitFor();
@@ -118,25 +118,27 @@ test('bubble / footer keep their own geometry, replies carry no avatar column', 
     const bubble = document.querySelector('.side-panel [data-testid="user-bubble"]')!;
     const avatars = document.querySelectorAll('.side-panel [data-testid="msg-avatar"]').length;
     const userItem = bubble.closest('[data-slot="message-scroller-item"]')!;
-    const userFooter = userItem.querySelector('[data-testid="msg-actions"]')!;
-    const footer = [...document.querySelectorAll('.side-panel [data-testid="msg-actions"]')].find(
-      (el) => !userItem.contains(el),
-    )!;
+    const userTools = userItem.querySelector('[data-testid="msg-tools"]')!;
+    const replyTools = [...document.querySelectorAll('.side-panel [data-row="agent"] [data-testid="msg-tools"]')][0]!;
+    const replyBubble = replyTools.parentElement!.firstElementChild!;
     const b = bubble.getBoundingClientRect();
     return {
       bubbleH: Math.round(b.height),
       bubbleFont: getComputedStyle(bubble).fontSize,
       avatars,
-      footerPad: getComputedStyle(footer).paddingLeft,
-      userFooterAlign: getComputedStyle(userFooter).justifyContent,
+      footers: userItem.querySelectorAll('[data-testid="msg-actions"]').length,
+      userToolsLeftOfBubble: userTools.getBoundingClientRect().right <= b.left + 1,
+      replyToolsRightOfBubble:
+        replyTools.getBoundingClientRect().left >= replyBubble.getBoundingClientRect().right - 1,
     };
   });
   expect(geo.bubbleH).toBeGreaterThanOrEqual(36);
   expect(geo.bubbleH).toBeLessThanOrEqual(37);
   expect(geo.bubbleFont).toBe('14px');
   expect(geo.avatars).toBe(0);
-  expect(geo.footerPad).toBe('0px');
-  expect(geo.userFooterAlign).toBe('flex-end');
+  expect(geo.footers).toBe(0);
+  expect(geo.userToolsLeftOfBubble).toBe(true);
+  expect(geo.replyToolsRightOfBubble).toBe(true);
 });
 
 test('turn boundary is air, not a rule: no divider between a user turn and the agent row', async ({
@@ -167,12 +169,12 @@ test('turn boundary is air, not a rule: no divider between a user turn and the a
         const prev = item.previousElementSibling;
         return (
           item.querySelector('[data-row="agent"]') != null &&
-          prev?.lastElementChild?.getAttribute('data-testid') === 'msg-actions'
+          prev?.querySelector('[data-testid="user-bubble"]') != null
         );
       })
       .map((item) => {
         const row = item.querySelector('[data-row="agent"]')!;
-        const prev = item.previousElementSibling!.lastElementChild!;
+        const prev = item.previousElementSibling!.querySelector('[data-testid="user-bubble"]')!;
         const cs = getComputedStyle(row);
         const rect = row.getBoundingClientRect();
         return {

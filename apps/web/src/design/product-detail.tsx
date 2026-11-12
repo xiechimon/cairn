@@ -120,13 +120,12 @@ function ComposerSpecimen() {
           />
         </div>
       </Cell>
-      <Cell label="Agent running: timer and stop beside send; sending queues the message">
+      <Cell label="Agent running: stop beside send; sending queues the message">
         <div className="w-160 pt-2">
           <Composer
             placeholder={PHASE_UI.building.placeholder ?? ''}
             aiReview={false}
             streaming
-            workingFor={{ seconds: 72 }}
             editable
             mentionGroups={MENTION_GROUPS}
             onQueue={(text) => setSent((all) => [...all, `queued: ${text}`])}
@@ -363,7 +362,6 @@ export function ProductDetailSection() {
             placeholder={PHASE_UI.building.placeholder ?? ''}
             aiReview={false}
             streaming
-            workingFor={{ seconds: 72 }}
             editable
             queuedMessages={queued}
             onSendQueuedNow={(id) => settle(`send now ${id}`)}
