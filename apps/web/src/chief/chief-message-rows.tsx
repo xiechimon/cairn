@@ -1,5 +1,4 @@
 import { parseReplyQuote } from '@cairn/shared';
-import { cn } from 'cn';
 import { CircleAlert } from 'lucide-react';
 import { type CSSProperties, memo, type ReactNode, useContext } from 'react';
 import { isUsableTimestamp } from '../board/rel-time.js';
@@ -13,18 +12,16 @@ import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
-import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import {
+  TaskMentionAsLinkContext,
+  TaskMentionLink,
   type TodoGlance,
   TodoGlanceContext,
-  TodoStatus,
-  taskChipClass,
 } from '../detail/segments.js';
 import type { ChiefSegment, ChiefStreamItem, ChiefToolRow } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
-import { FileText } from '../icons/index.js';
 import { dateTimeFormat } from '../lib/date-format.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
@@ -102,11 +99,8 @@ const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 const BUBBLE_WRAP_CLS = `w-full max-w-full font-sans ${CHAT_BODY_CLS}`;
 const MARKER_ERROR_CLS = 'my-2.5 gap-1.5 text-meta text-(--destructive)';
 
-const CHIP_INLINE_CLS =
-  'mx-0.5 inline-flex items-center gap-1 rounded-(--cds-radius-sm) px-1.5 py-px align-[1px] font-sans text-meta';
-
 function segmentsText(segments: ChiefSegment[]): string {
-  return segments.map((s) => (s.todo != null ? `#${s.todo}` : (s.agent ?? s.text ?? ''))).join('');
+  return segments.map((s) => (s.todo != null ? `#${s.todo}` : (s.text ?? ''))).join('');
 }
 
 function robotText(item: {
@@ -120,34 +114,16 @@ function robotText(item: {
   return lines.join('\n');
 }
 
-function TodoSegmentChip({ seq }: { seq: number }) {
+function TodoSegmentLink({ seq }: { seq: number }) {
   const { t } = useI18n();
   const glances = useContext(TodoGlanceContext);
   const known = [...(glances ?? [])].find(([, glance]) => glance.seq === seq);
-  const chip = (
-    <>
-      {known !== undefined ? (
-        <TodoStatus phase={known[1].phase} />
-      ) : (
-        <FileText width={11} height={11} />
-      )}
-      <span className="max-w-48 truncate">{known?.[1].title ?? t('任务')}</span>
-    </>
-  );
-  const cls = `${CHIP_INLINE_CLS} bg-secondary text-content-secondary`;
   return known === undefined ? (
-    <span data-testid="chief-chip-todo" className={cls}>
-      {chip}
-    </span>
+    <span>{t('任务')}</span>
   ) : (
-    <ThreadLink
-      todoId={known[0]}
-      data-testid="chief-chip-todo"
-      data-phase={known[1].phase}
-      className={cn(cls, taskChipClass(known[1].phase))}
-    >
-      {chip}
-    </ThreadLink>
+    <TaskMentionLink todoId={known[0]} phase={known[1].phase}>
+      {known[1].title ?? t('任务')}
+    </TaskMentionLink>
   );
 }
 
@@ -174,22 +150,7 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
   return (
     <>
       {segments.map((s, i) => {
-        if (s.todo != null) return <TodoSegmentChip key={i} seq={s.todo} />;
-        if (s.agent != null)
-          return (
-            <span
-              key={i}
-              data-testid="chief-chip-agent"
-              className={`${CHIP_INLINE_CLS} bg-(--seg-active) text-(--text-secondary)`}
-            >
-              <SeededAvatar
-                name={s.agent}
-                fallback="/avatar-robot-1.svg"
-                className="size-3 after:hidden"
-              />
-              {s.agent}
-            </span>
-          );
+        if (s.todo != null) return <TodoSegmentLink key={i} seq={s.todo} />;
         if (s.code)
           return (
             <code
@@ -626,21 +587,23 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
           >
             {item.markdown != null ? (
-              <ChatMarkdown
-                text={item.markdown}
-                bubbles
-                bubbleTools={(group, n) =>
-                  robotTools(
-                    'right',
-                    group.source,
-                    n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools',
-                  )
-                }
-                highlight={(group) =>
-                  sourceHighlighted &&
-                  (group.source.includes(quoted) || quoted.includes(group.source))
-                }
-              />
+              <TaskMentionAsLinkContext.Provider value>
+                <ChatMarkdown
+                  text={item.markdown}
+                  bubbles
+                  bubbleTools={(group, n) =>
+                    robotTools(
+                      'right',
+                      group.source,
+                      n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools',
+                    )
+                  }
+                  highlight={(group) =>
+                    sourceHighlighted &&
+                    (group.source.includes(quoted) || quoted.includes(group.source))
+                  }
+                />
+              </TaskMentionAsLinkContext.Provider>
             ) : (
               <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
                 <div

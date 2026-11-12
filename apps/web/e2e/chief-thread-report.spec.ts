@@ -108,7 +108,7 @@ test('a prose attachment citation in a notice renders as a chip', async ({ page 
   const report = notice.getByRole('link', { name: '完整报告' });
   await expect(report).toHaveAttribute('href', '/api/attachments/hg4lgHMHQLnQBHR3CImra');
   await expect(notice).not.toContainText('attachment:');
-  await expect(notice.locator('.mention-chip--todo')).toHaveText('Markdown preview');
+  await expect(notice.locator('a[data-slot="task-mention"]')).toHaveText('Markdown preview');
   await expect(notice).not.toContainText('#173');
   const unchanged = stream.getByTestId('chief-msg').nth(1);
   await expect(unchanged.getByRole('link', { name: 'docs' })).toHaveAttribute(
