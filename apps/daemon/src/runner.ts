@@ -117,7 +117,7 @@ import type { DaemonLogger } from './log.js';
 import { isTransientUploadError, type MachineApi, MachineApiError } from './machine-client.js';
 import { extractReviewVerdict } from './review-findings.js';
 import { buildSecretTool } from './secret-channel.js';
-import { type SealedSegment, SegmentBuffer, segmentContent } from './segment.js';
+import { type SealedSegment, SegmentEmitter, segmentContent } from './segment.js';
 import { readSessionJsonlForUpload } from './session-jsonl.js';
 import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
@@ -1355,8 +1355,6 @@ async function runClaimedStep(
     },
   });
   askKeepAlive = () => watchdog.keepAlive();
-  const segments = new SegmentBuffer();
-  let sealedInMessage = false;
   let lastRowCreatedAt = 0;
   const rowCreatedAt = (): number => {
     lastRowCreatedAt = Math.max(now(), lastRowCreatedAt + 1);
@@ -1381,7 +1379,6 @@ async function runClaimedStep(
   const emitSegment = async (seg: SealedSegment): Promise<void> => {
     await thinkingDeltas.flushNow();
     await textDeltas.flushNow();
-    sealedInMessage = true;
     messageSeq += 1;
     const row = {
       id: `msg-${stepId}-${messageSeq}`,
@@ -1400,30 +1397,7 @@ async function runClaimedStep(
       if (items !== null) reportAgentTodo(items);
     }
   };
-  const sealSegment = async (): Promise<void> => {
-    const seg = segments.seal();
-    if (seg !== null) await emitSegment(seg);
-  };
-  const sealFromContent = async (content: unknown): Promise<void> => {
-    const blocks = Array.isArray(content) ? content : [content];
-    for (const block of blocks) {
-      if (typeof block === 'string') {
-        const sealedText = segments.append('text', block);
-        if (sealedText !== null) await emitSegment(sealedText);
-        continue;
-      }
-      if (block === null || typeof block !== 'object') continue;
-      const b = block as { type?: string; text?: string; thinking?: string };
-      const sealed =
-        b.type === 'thinking' && typeof b.thinking === 'string'
-          ? segments.replace('thinking', b.thinking)
-          : b.type === 'text' && typeof b.text === 'string'
-            ? segments.append('text', b.text)
-            : null;
-      if (sealed !== null) await emitSegment(sealed);
-    }
-    await sealSegment();
-  };
+  const segments = new SegmentEmitter(emitSegment);
   let handle: AgentSessionHandle | null = null;
   sessionOpts.onClaudeRateLimit = (notice) => {
     const machineId = claimed.step.machineId;
@@ -1597,8 +1571,7 @@ async function runClaimedStep(
             zeroProgressRetries = 0;
             activity.setPhase('responding');
             textDeltas.push(ev.text);
-            const sealedText = segments.append('text', ev.text);
-            if (sealedText !== null) await emitSegment(sealedText);
+            await segments.append('text', ev.text);
             break;
           }
           case 'thinking_delta': {
@@ -1607,15 +1580,13 @@ async function runClaimedStep(
             zeroProgressRetries = 0;
             activity.setPhase('thinking');
             thinkingDeltas.push(ev.text);
-            const sealedThinking = segments.append('thinking', ev.text);
-            if (sealedThinking !== null) await emitSegment(sealedThinking);
+            await segments.append('thinking', ev.text);
             break;
           }
           case 'thinking': {
             watchdog.noteProgress();
             activity.setPhase('thinking');
-            const sealedFull = segments.replace('thinking', ev.text);
-            if (sealedFull !== null) await emitSegment(sealedFull);
+            await segments.replace('thinking', ev.text);
             break;
           }
           case 'toolcall_end': {
@@ -1639,7 +1610,7 @@ async function runClaimedStep(
             if (ev.call.name && CHANGE_TOOLS.has(ev.call.name.toLowerCase())) {
               sawChangeTool = true;
             }
-            await sealSegment();
+            await segments.seal();
             if (ev.call.result === undefined) {
               const skillName = skillCallName(ev.call);
               activity.toolStarted(
@@ -1713,14 +1684,7 @@ async function runClaimedStep(
               });
               break;
             }
-            const hadRows = sealedInMessage;
-            sealedInMessage = false;
-            const trailing = segments.seal();
-            if (hadRows || trailing !== null) {
-              if (trailing !== null) await emitSegment(trailing);
-            } else {
-              await sealFromContent(ev.message.content);
-            }
+            await segments.endAssistantMessage(ev.message.content);
             break;
           }
           case 'error':
@@ -1847,7 +1811,7 @@ async function runClaimedStep(
     break;
   }
   deps.sessionHandles?.delete(stepId);
-  await sealSegment();
+  await segments.seal();
   textDeltas.flush();
   thinkingDeltas.flush();
   if (opts.env?.CAIRN_ORB !== '1') clearInterval(heartbeat);
