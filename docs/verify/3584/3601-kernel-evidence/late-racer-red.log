@@ -1,0 +1,71 @@
+✖ simultaneous reclaim of one dead holder: exactly one process inherits the slot (5062.425888ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5113.871198
+
+✖ failing tests:
+
+test at scripts/heavy-slots.test.mjs:337:1
+✖ simultaneous reclaim of one dead holder: exactly one process inherits the slot (5062.425888ms)
+  AssertionError [ERR_ASSERTION]: round 0: NONE
+  |NONE
+  |node:fs:1931
+    binding.unlink(getValidatedPath(path));
+            ^
+
+  Error: ENOENT: no such file or directory, unlink '/tmp/heavy-slots-test-lHCdRA/locks-0/slot-1.lock.reclaiming'
+      at unlinkSync (node:fs:1931:11)
+      at claim (file://<checkout>/scripts/heavy-slots.mjs:260:66)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async acquireSlot (file://<checkout>/scripts/heavy-slots.mjs:288:14)
+      at async file://<checkout>/[eval1]:5:15 {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'unlink',
+    path: '/tmp/heavy-slots-test-lHCdRA/locks-0/slot-1.lock.reclaiming'
+  }
+
+  Node.js v24.14.0
+  |SLOT 1
+  [heavy-slots] acquired slot 1/1
+  |node:fs:1931
+    binding.unlink(getValidatedPath(path));
+            ^
+
+  Error: ENOENT: no such file or directory, unlink '/tmp/heavy-slots-test-lHCdRA/locks-0/slot-1.lock.reclaiming'
+      at unlinkSync (node:fs:1931:11)
+      at claim (file://<checkout>/scripts/heavy-slots.mjs:260:66)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async acquireSlot (file://<checkout>/scripts/heavy-slots.mjs:288:14)
+      at async file://<checkout>/[eval1]:5:15 {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'unlink',
+    path: '/tmp/heavy-slots-test-lHCdRA/locks-0/slot-1.lock.reclaiming'
+  }
+
+  Node.js v24.14.0
+  |NONE
+  |NONE
+  |SLOT 1
+  [heavy-slots] acquired slot 1/1
+
+
+  2 !== 1
+
+      at TestContext.<anonymous> (file://<checkout>/scripts/heavy-slots.test.mjs:366:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

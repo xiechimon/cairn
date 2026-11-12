@@ -1,0 +1,14 @@
+✔ screenshot fixture ports follow concurrent leases (default) (638.614224ms)
+✔ screenshot fixture ports follow concurrent leases (custom) (634.445382ms)
+✔ screenshot -trip ports follow concurrent leases (default) (636.328206ms)
+✔ screenshot -trip ports follow concurrent leases (custom) (679.630892ms)
+✔ screenshot -live ports follow concurrent leases (default) (680.4341ms)
+✔ screenshot -live ports follow concurrent leases (custom) (682.594467ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4011.939764

@@ -1,0 +1,9 @@
+[heavy-slots] acquired slot 1/2
+
+ RUN  v5.0.1 <checkout>
+
+
+ Test Files  1 passed (1)
+      Tests  49 passed (49)
+   Start at  01:32:11
+   Duration  878ms (import 48%, worker 28%, transform 22%, tests 3%)

@@ -1,0 +1,33 @@
+✖ simultaneous reclaim of one dead holder: exactly one process inherits the slot (46.918331ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 142.219272
+
+✖ failing tests:
+
+test at scripts/heavy-slots.test.mjs:337:1
+✖ simultaneous reclaim of one dead holder: exactly one process inherits the slot (46.918331ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + '/tmp/3601-host-slots'
+  - '/tmp/heavy-slots-test-0V2tDT/locks-0'
+          ^
+
+      at TestContext.<anonymous> (file://<checkout>/scripts/heavy-slots.test.mjs:352:14)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '/tmp/3601-host-slots',
+    expected: '/tmp/heavy-slots-test-0V2tDT/locks-0',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

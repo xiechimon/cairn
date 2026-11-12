@@ -1,0 +1,14 @@
+✔ anonymous enrollment confirmation with server authentication enabled (63.073993ms)
+✔ read-only MCP key can obtain a machine token (31.396068ms)
+✔ publicly derived attachment signature permits a write outside the attachment directory (27.891987ms)
+✔ team secret plaintext reaches the model-facing tool result (0.407394ms)
+✔ MCP rejects missing keys and calls outside the granted tool set (36.084471ms)
+✔ machine bearer token file inherits a world-readable umask (0.848298ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 172.116302

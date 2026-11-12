@@ -1,0 +1,8 @@
+{
+  "issue": 2291,
+  "surface": "browser with mocked API",
+  "providerMode": "not exercised",
+  "result": "1 passed",
+  "assertion": "Existing key flow submits registry grant labels for the documented Thread tools",
+  "limits": "Does not establish a real model or harness session"
+}
