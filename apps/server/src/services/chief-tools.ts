@@ -726,6 +726,18 @@ export async function executeChiefTool(
       const existing = listSecrets(keysvc, ctx.teamId).find(
         (s) => s.name === name && s.projectId === projectId,
       );
+      if (
+        listSecrets(keysvc, ctx.teamId).some(
+          (s) =>
+            s.name === name &&
+            s.delivery === 'http' &&
+            (s.projectId === null || projectId === null || s.projectId === projectId),
+        )
+      )
+        throw new HttpError(
+          400,
+          `secret ${name} uses http delivery and can only be changed in settings`,
+        );
       const value = str(params, 'value');
       const description = optStr(params, 'description') ?? null;
       if (existing) {
