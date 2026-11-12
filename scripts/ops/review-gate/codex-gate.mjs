@@ -222,7 +222,7 @@ function graphql(query, fields) {
   ghJson(args);
 }
 
-function recordCarried(repo, number, pr, threads, result, sha) {
+function recordCarried(repo, number, threads, result, sha) {
   if (result.recordIncomplete) throw new Error('A carried review thread cannot be recorded');
   const listed = result.recordThreads ?? [];
   if (listed.length === 0) return;
@@ -242,15 +242,19 @@ function recordCarried(repo, number, pr, threads, result, sha) {
   }
   if (selected.length === 0) return;
   const reply = carriedReply(sha);
+  const current = ghJson(['api', `repos/${repo}/pulls/${number}`]);
+  if (current.head?.sha !== sha) return;
   const nextBody = withCarriedFindings(
-    pr.body,
+    current.body,
     selected.map((thread) => thread.url),
   );
-  if (nextBody !== (pr.body ?? ''))
+  if (nextBody !== (current.body ?? ''))
     ghWrite('PATCH', `repos/${repo}/pulls/${number}`, { body: nextBody });
   for (const thread of selected) {
+    if (ghJson(['api', `repos/${repo}/pulls/${number}`]).head?.sha !== sha) return;
     if (!(thread.commentBodies ?? []).some((body) => body.trim() === reply))
       graphql(REPLY_MUTATION, { id: thread.id, body: reply });
+    if (ghJson(['api', `repos/${repo}/pulls/${number}`]).head?.sha !== sha) return;
     graphql(RESOLVE_MUTATION, { id: thread.id });
   }
 }
@@ -334,7 +338,7 @@ function evaluate(repo, number) {
     )
   )
     ghWrite('POST', `repos/${repo}/issues/${number}/comments`, { body: result.carried });
-  recordCarried(repo, number, pr, threads, result, sha);
+  recordCarried(repo, number, threads, result, sha);
   writeCheck(repo, sha, check, result, stateEntry?.comment.html_url);
 
   const stalled = pr.labels.some((label) => label.name === STALL_LABEL);

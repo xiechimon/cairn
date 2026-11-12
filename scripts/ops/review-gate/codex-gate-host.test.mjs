@@ -29,7 +29,10 @@ if (issue) {
   if (found === 'error') process.exit(2);
   process.stdout.write((found ? 'HTTP/2.0 200 OK\\r\\nContent-Type: application/json\\r\\n\\r\\n' : 'HTTP/2.0 404 Not Found\\r\\n\\r\\n') + JSON.stringify(found ?? { message: 'Not Found' }));
   if (!found) process.exit(1);
-} else if (/api repos\\/o\\/r\\/pulls\\/7$/.test(joined)) out(world.pr);
+} else if (/api repos\\/o\\/r\\/pulls\\/7$/.test(joined)) {
+  const reads = fs.readFileSync(process.env.FAKE_LOG, 'utf8').split('\\n').filter((line) => line.includes('"repos/o/r/pulls/7"') && !line.includes('--method')).length;
+  out(reads > 1 && world.prAfter ? world.prAfter : world.pr);
+}
 else if (joined.includes('--slurp') && joined.includes('/pulls/7/files')) out(world.filePages ?? [world.files ?? []]);
 else if (joined.includes('--slurp') && joined.includes('repos/o/r/pulls?')) out([world.pulls]);
 else if (joined.includes('--slurp') && joined.includes('/git/matching-refs/')) out([world.matchingRefs ?? []]);
@@ -902,6 +905,36 @@ test('a rerun does not duplicate the carried reply, resolve or PR body line', ()
   assert.equal(namedCalls(again, 'addPullRequestReviewThreadReply').length, 0);
   assert.equal(namedCalls(again, 'resolveReviewThread').length, 0);
   assert.equal(pullPatches(again).length, 0);
+});
+
+test('a moved head is not resolved from the stale carried classification', () => {
+  const carried = finding('P1', 'PRRT_carried', 11, '50');
+  const out = run(
+    round3World([carried], {
+      prAfter: { ...basePr, head: { sha: 'e'.repeat(40), ref: 'feature/x' } },
+    }),
+  );
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(namedCalls(out, 'resolveReviewThread').length, 0);
+  assert.equal(namedCalls(out, 'addPullRequestReviewThreadReply').length, 0);
+  assert.equal(pullPatches(out).length, 0);
+});
+
+test('a carried finding is appended to the PR body read just before the update', () => {
+  const carried = finding('P1', 'PRRT_carried', 11, '50');
+  const out = run(
+    round3World([carried], {
+      pr: { ...basePr, body: 'stale description' },
+      prAfter: { ...basePr, body: 'kept edit' },
+    }),
+  );
+  assert.equal(out.result.status, 0, out.result.stderr);
+  const patches = pullPatches(out);
+  assert.equal(patches.length, 1);
+  const body = out.body(patches[0]).body;
+  assert.match(body, /kept edit/);
+  assert.doesNotMatch(body, /stale description/);
+  assert.match(body, /discussion_r50/);
 });
 
 test('a pre-existing P1 before round 3 is not resolved by the gate', () => {

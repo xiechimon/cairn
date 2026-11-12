@@ -994,6 +994,10 @@ test('carried findings stay in one details block and do not repeat a URL', async
     core.withCarriedFindings('keep', ['https://github.com/o/r/pull/1#discussion_r9</details>']),
     'keep',
   );
+  const longer = core.withCarriedFindings('', ['https://github.com/o/r/pull/1#discussion_r12345']);
+  const both = core.withCarriedFindings(longer, ['https://github.com/o/r/pull/1#discussion_r1234']);
+  assert.match(both, /^- https:\/\/github.com\/o\/r\/pull\/1#discussion_r12345$/m);
+  assert.match(both, /^- https:\/\/github.com\/o\/r\/pull\/1#discussion_r1234$/m);
 });
 
 test('an open P1 that also carries a deferral reply is counted once, as an open finding', () => {

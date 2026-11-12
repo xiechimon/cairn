@@ -372,6 +372,15 @@ export function carriedReply(sha) {
   return `Recorded as pre-existing in this PR's Risk by review-gate at ${short}; not blocking.`;
 }
 
+function listedCarriedUrls(block) {
+  const found = new Set();
+  for (const line of String(block).split('\n')) {
+    const url = /^- (https:\/\/\S+)$/.exec(line)?.[1];
+    if (THREAD_URL.test(url)) found.add(url);
+  }
+  return found;
+}
+
 export function withCarriedFindings(body, urls) {
   const text = typeof body === 'string' ? body : '';
   const fresh = [];
@@ -383,7 +392,8 @@ export function withCarriedFindings(body, urls) {
   }
   if (fresh.length === 0) return text;
   const match = CARRIED_BLOCK.exec(text);
-  const missing = fresh.filter((url) => !match?.[0].includes(url));
+  const known = match ? listedCarriedUrls(match[0]) : new Set();
+  const missing = fresh.filter((url) => !known.has(url));
   if (missing.length === 0) return text;
   const lines = missing.map((url) => `- ${url}`).join('\n');
   if (!match) {
