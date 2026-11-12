@@ -52,6 +52,48 @@ export function decide(worktree, prs, now, facts) {
   return verdict;
 }
 
+export function followMain({ branch, trackedChanges, ahead, behind }) {
+  if (behind === 0) return { action: 'none' };
+  if (branch !== 'main')
+    return { action: 'keep', reason: branch ? `on branch ${branch}` : 'detached HEAD' };
+  if (trackedChanges > 0) return { action: 'keep', reason: `${trackedChanges} tracked changes` };
+  if (ahead > 0) return { action: 'keep', reason: `${ahead} local commits not on origin/main` };
+  return { action: 'fast-forward' };
+}
+
+function syncMainCheckout(repo, dryRun) {
+  const read = (...args) =>
+    spawnSync('git', ['--no-optional-locks', '-C', repo, ...args], { encoding: 'utf8' }).stdout;
+  const [ahead, behind] = read('rev-list', '--left-right', '--count', 'HEAD...origin/main')
+    .trim()
+    .split(/\s+/)
+    .map(Number);
+  if (!(behind > 0)) return;
+  const plan = followMain({
+    branch: read('branch', '--show-current').trim() || null,
+    trackedChanges: read('status', '--porcelain', '--untracked-files=no')
+      .split('\n')
+      .filter(Boolean).length,
+    ahead,
+    behind,
+  });
+  if (plan.action === 'fast-forward' && dryRun) {
+    console.log(`main checkout: would fast-forward to ${read('rev-parse', 'origin/main').trim()}`);
+    return;
+  }
+  if (plan.action === 'fast-forward') {
+    const merge = spawnSync('git', ['-C', repo, 'merge', '--ff-only', '--quiet', 'origin/main'], {
+      encoding: 'utf8',
+    });
+    if (merge.status === 0) {
+      console.log(`main checkout: fast-forwarded to ${read('rev-parse', 'HEAD').trim()}`);
+      return;
+    }
+    plan.reason = merge.stderr.trim().split('\n')[0];
+  }
+  console.log(`main checkout: ${behind} commits behind origin/main, kept: ${plan.reason}`);
+}
+
 function linkedWorktrees(repo) {
   const entries = [];
   let current = null;
@@ -155,6 +197,7 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
     );
     process.exit(1);
   }
+  syncMainCheckout(repo, dryRun);
   spawnSync('git', ['-C', repo, 'worktree', 'prune'], { stdio: 'ignore' });
   const counts = { removed: 0, kept: 0, failed: 0 };
   const worktrees = linkedWorktrees(repo);

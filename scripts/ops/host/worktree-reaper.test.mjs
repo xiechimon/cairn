@@ -13,7 +13,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { makeTestTempDir } from '../../test-tmpdir.mjs';
-import { decide } from './tools/worktree-reaper.mjs';
+import { decide, followMain } from './tools/worktree-reaper.mjs';
 
 const SCRIPT = join(import.meta.dirname, 'tools/worktree-reaper.mjs');
 const NOW = Date.parse('2026-11-08T12:00:00Z');
@@ -344,4 +344,76 @@ test('an open PR list that reaches the limit removes nothing', () => {
   assert.equal(run.status, 1);
   assert.match(run.stderr, /open PR list reached the limit of 1000/);
   assert.equal(existsSync(trees.merged.path), true);
+});
+
+test('the main checkout follows origin/main only as a clean fast-forward from main', () => {
+  const current = { branch: 'main', trackedChanges: 0, ahead: 0, behind: 3 };
+  assert.deepEqual(followMain(current), { action: 'fast-forward' });
+  assert.deepEqual(followMain({ ...current, behind: 0 }), { action: 'none' });
+  const cases = [
+    [{ branch: 'wip/main-checkout' }, 'on branch wip/main-checkout'],
+    [{ branch: null }, 'detached HEAD'],
+    [{ trackedChanges: 32 }, '32 tracked changes'],
+    [{ ahead: 2 }, '2 local commits not on origin/main'],
+  ];
+  for (const [state, reason] of cases)
+    assert.deepEqual(followMain({ ...current, ...state }), { action: 'keep', reason });
+});
+
+function advanceOrigin(dir) {
+  const pusher = join(dir, 'pusher');
+  git(dir, 'clone', '-q', '-b', 'main', join(dir, 'origin.git'), pusher);
+  writeFileSync(join(pusher, 'newer.txt'), 'newer');
+  git(pusher, 'add', 'newer.txt');
+  git(pusher, 'commit', '-q', '-m', 'newer');
+  git(pusher, 'push', '-q', 'origin', 'main');
+  return git(pusher, 'rev-parse', 'HEAD');
+}
+
+test('a reaper run fast-forwards a main checkout that has only untracked files', () => {
+  const { repo, env, dir } = fixture(fixturePrs);
+  const newer = advanceOrigin(dir);
+  writeFileSync(join(repo, 'scratch.env'), 'untracked');
+  const before = git(repo, 'rev-parse', 'HEAD');
+  const dry = spawnSync(process.execPath, [SCRIPT, '--repo', repo, '--dry-run'], {
+    env,
+    encoding: 'utf8',
+  });
+  assert.match(dry.stdout, new RegExp(`main checkout: would fast-forward to ${newer}`));
+  assert.equal(git(repo, 'rev-parse', 'HEAD'), before);
+  const run = spawnSync(process.execPath, [SCRIPT, '--repo', repo], { env, encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, new RegExp(`main checkout: fast-forwarded to ${newer}`));
+  assert.equal(git(repo, 'rev-parse', 'HEAD'), newer);
+  assert.equal(existsSync(join(repo, 'newer.txt')), true);
+  assert.equal(existsSync(join(repo, 'scratch.env')), true);
+});
+
+test('a reaper run leaves a main checkout that is off main, edited or ahead where it is', () => {
+  const stale = [
+    [
+      (repo) => git(repo, 'switch', '-q', '-c', 'wip/main-checkout'),
+      /kept: on branch wip\/main-checkout/,
+    ],
+    [(repo) => writeFileSync(join(repo, '.gitignore'), 'edited\n'), /kept: 1 tracked changes/],
+    [
+      (repo) => git(repo, 'commit', '-q', '--allow-empty', '-m', 'local'),
+      /kept: 1 local commits not on origin\/main/,
+    ],
+  ];
+  for (const [drift, reason] of stale) {
+    const { repo, env, dir } = fixture(fixturePrs);
+    advanceOrigin(dir);
+    drift(repo);
+    const before = git(repo, 'rev-parse', 'HEAD');
+    const run = spawnSync(process.execPath, [SCRIPT, '--repo', repo, '--dry-run'], {
+      env,
+      encoding: 'utf8',
+    });
+    assert.equal(run.status, 0, run.stderr);
+    assert.match(run.stdout, /main checkout: 1 commits behind origin\/main, /);
+    assert.match(run.stdout, reason);
+    assert.equal(git(repo, 'rev-parse', 'HEAD'), before);
+    assert.equal(existsSync(join(repo, 'newer.txt')), false);
+  }
 });
