@@ -4,6 +4,7 @@ import {
   chmodSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   realpathSync,
   rmSync,
   utimesSync,
@@ -360,11 +361,12 @@ test('the main checkout follows origin/main only as a clean fast-forward from ma
     assert.deepEqual(followMain({ ...current, ...state }), { action: 'keep', reason });
 });
 
-function advanceOrigin(dir) {
+function advanceOrigin(dir, file = 'newer.txt') {
   const pusher = join(dir, 'pusher');
   git(dir, 'clone', '-q', '-b', 'main', join(dir, 'origin.git'), pusher);
-  writeFileSync(join(pusher, 'newer.txt'), 'newer');
-  git(pusher, 'add', 'newer.txt');
+  mkdirSync(join(pusher, file, '..'), { recursive: true });
+  writeFileSync(join(pusher, file), 'newer');
+  git(pusher, 'add', '-f', file);
   git(pusher, 'commit', '-q', '-m', 'newer');
   git(pusher, 'push', '-q', 'origin', 'main');
   return git(pusher, 'rev-parse', 'HEAD');
@@ -416,4 +418,17 @@ test('a reaper run leaves a main checkout that is off main, edited or ahead wher
     assert.equal(git(repo, 'rev-parse', 'HEAD'), before);
     assert.equal(existsSync(join(repo, 'newer.txt')), false);
   }
+});
+
+test('a reaper run never replaces an ignored local file with a newly tracked one', () => {
+  const { repo, env, dir } = fixture(fixturePrs);
+  advanceOrigin(dir, 'node_modules/local.js');
+  mkdirSync(join(repo, 'node_modules'), { recursive: true });
+  writeFileSync(join(repo, 'node_modules/local.js'), 'mine');
+  const before = git(repo, 'rev-parse', 'HEAD');
+  const run = spawnSync(process.execPath, [SCRIPT, '--repo', repo], { env, encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, /main checkout: 1 commits behind origin\/main, kept: /);
+  assert.equal(git(repo, 'rev-parse', 'HEAD'), before);
+  assert.equal(readFileSync(join(repo, 'node_modules/local.js'), 'utf8'), 'mine');
 });

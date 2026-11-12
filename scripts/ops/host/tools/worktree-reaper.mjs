@@ -82,9 +82,13 @@ function syncMainCheckout(repo, dryRun) {
     return;
   }
   if (plan.action === 'fast-forward') {
-    const merge = spawnSync('git', ['-C', repo, 'merge', '--ff-only', '--quiet', 'origin/main'], {
-      encoding: 'utf8',
-    });
+    const merge = spawnSync(
+      'git',
+      ['-C', repo, 'merge', '--ff-only', '--no-overwrite-ignore', '--quiet', 'origin/main'],
+      {
+        encoding: 'utf8',
+      },
+    );
     if (merge.status === 0) {
       console.log(`main checkout: fast-forwarded to ${read('rev-parse', 'HEAD').trim()}`);
       return;
