@@ -1072,6 +1072,13 @@
       "when": 1794462531881,
       "tag": "0156_mail_owner_conversation",
       "breakpoints": true
+    },
+    {
+      "idx": 157,
+      "version": "6",
+      "when": 1794476268348,
+      "tag": "0157_after_stop_phase",
+      "breakpoints": true
     }
   ]
 }

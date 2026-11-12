@@ -1,7 +1,11 @@
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { type MachineDoneBody, STOP_MESSAGE } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { type Db, openDb } from '../src/db/client.js';
 import {
   build as buildTable,
   machine as machineTable,
@@ -18,6 +22,7 @@ import {
 } from '../src/services/builds.js';
 import { type ChiefToolDeps, transitionTodos } from '../src/services/chief-tools.js';
 import { claimStep, finishStep } from '../src/services/machines.js';
+import { RETRY_PARKED_MARK } from '../src/services/retry-parking.js';
 import { bootServer, req, seedSessionRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
@@ -45,8 +50,9 @@ function makeWorld(opts: {
   stepKind?: 'plan' | 'build' | 'merge' | 'review';
   claimedAgo?: number;
   machineOnline?: boolean;
+  db?: Db;
 }): World {
-  const s = bootServer();
+  const s = bootServer(opts.db ? { db: opts.db } : {});
   disposables.push(() => s.dispose());
   const base = Date.now();
   const teamId = s.team.id;
@@ -518,5 +524,111 @@ describe('#1453 other shapes of the same race', () => {
     await expect(report(w, { status: 'success', hasChanges: true })).resolves.toBeUndefined();
     expect(stepStatus(w)).toBe('done');
     expect(todoPhase(w)).toBe('done');
+  });
+});
+
+describe('the phase reserved for after a stop lives on the build row', () => {
+  const reservedPhase = (w: World, db: Db = w.s.db) =>
+    db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()!.afterStopPhase;
+  const fileWorld = (opts: Parameters<typeof makeWorld>[0]) => {
+    const dir = makeTestTempDir('cairn-after-stop-');
+    disposables.push(() => rmSync(dir, { recursive: true, force: true }));
+    const dbPath = join(dir, 'cairn.db');
+    return { w: makeWorld({ ...opts, db: openDb(dbPath) }), dbPath };
+  };
+  const restarted = (dbPath: string) => {
+    const s = bootServer({ db: openDb(dbPath) });
+    disposables.push(() => s.dispose());
+    return s;
+  };
+
+  test('stop-and-done on a claimed step: a server restarted on the same database still lands done when the stop report arrives', async () => {
+    const { w, dbPath } = fileWorld({
+      phase: 'building',
+      stepStatus: 'claimed',
+      stepKind: 'build',
+    });
+    const res = await req(w.s.app, 'POST', `/api/todos/${w.todoId}/stop-and-done`, {});
+    expect(((await res.json()) as { state: string }).state).toBe('stopping');
+    expect(reservedPhase(w)).toBe('done');
+    expect(todoPhase(w)).toBe('building');
+
+    const after = restarted(dbPath);
+    applyStoppedStep(after.svc, w.stepId);
+    expect(todoPhase(w)).toBe('done');
+    expect(reservedPhase(w, after.db)).toBeNull();
+  });
+
+  test('stop-and-done on a claimed step: a restarted server still lands done when the step finishes before the stop reaches it', async () => {
+    const { w, dbPath } = fileWorld({
+      phase: 'building',
+      stepStatus: 'claimed',
+      stepKind: 'build',
+    });
+    await req(w.s.app, 'POST', `/api/todos/${w.todoId}/stop-and-done`, {});
+
+    const after = restarted(dbPath);
+    await finishStep(machineDepsOf(after), w.machineId, w.stepId, {
+      status: 'success',
+      hasChanges: true,
+    });
+    expect(stepStatus(w)).toBe('done');
+    expect(todoPhase(w)).toBe('done');
+    expect(reservedPhase(w, after.db)).toBeNull();
+  });
+
+  test('closing a running card reserves keep, and the stop report clears it without moving the card', async () => {
+    const w = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
+    expect(
+      (await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'closed' })).status,
+    ).toBe(200);
+    expect(reservedPhase(w)).toBe('keep');
+    applyStoppedStep(w.s.svc, w.stepId);
+    expect(todoPhase(w)).toBe('closed');
+    expect(reservedPhase(w)).toBeNull();
+  });
+
+  test('a later reservation replaces an earlier one, in either order', async () => {
+    const keepThenDone = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
+    await req(keepThenDone.s.app, 'PATCH', `/api/todos/${keepThenDone.todoId}`, {
+      phase: 'closed',
+    });
+    prepareStopForDone(keepThenDone.s.svc, keepThenDone.todoId, {
+      actor: 'person',
+      reason: 'test stop',
+    });
+    expect(reservedPhase(keepThenDone)).toBe('done');
+
+    const doneThenKeep = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
+    prepareStopForDone(doneThenKeep.s.svc, doneThenKeep.todoId, {
+      actor: 'person',
+      reason: 'test stop',
+    });
+    await req(doneThenKeep.s.app, 'PATCH', `/api/todos/${doneThenKeep.todoId}`, {
+      phase: 'closed',
+    });
+    expect(reservedPhase(doneThenKeep)).toBe('keep');
+  });
+
+  test('a stop that lands on a pending step leaves no reservation behind', () => {
+    const w = makeWorld({ phase: 'queued', stepStatus: 'pending' });
+    expect(prepareStopForDone(w.s.svc, w.todoId, { actor: 'person', reason: 'test stop' })).toEqual(
+      { state: 'ready' },
+    );
+    expect(reservedPhase(w)).toBeNull();
+  });
+
+  test('a parked build settles its step and drops the reservation', () => {
+    const w = makeWorld({ phase: 'building', stepStatus: 'claimed', stepKind: 'build' });
+    prepareStopForDone(w.s.svc, w.todoId, { actor: 'person', reason: 'test stop' });
+    w.s.db
+      .update(buildTable)
+      .set({ errorMessage: `${RETRY_PARKED_MARK} waiting for a person` })
+      .where(eq(buildTable.id, w.buildId))
+      .run();
+    applyStoppedStep(w.s.svc, w.stepId);
+    expect(stepStatus(w)).toBe('stopped');
+    expect(reservedPhase(w)).toBeNull();
+    expect(todoPhase(w)).toBe('failed');
   });
 });
