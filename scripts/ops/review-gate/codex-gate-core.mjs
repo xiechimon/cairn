@@ -602,8 +602,10 @@ export function decide(
   const narrowed = capped && sinceFiles !== null;
   const blocking = narrowed ? open.filter((thread) => blocksOnNewDiff(thread, sinceFiles)) : open;
   const carriedRound = narrowed ? open.filter((thread) => !blocking.includes(thread)) : [];
+  const waived = (thread) =>
+    carriedRound.includes(thread) && String(thread.deferral).includes('must be fixed');
   const invalid = threads.filter(
-    (thread) => thread.deferral && !blocking.includes(thread) && !carriedRound.includes(thread),
+    (thread) => thread.deferral && !blocking.includes(thread) && !waived(thread),
   );
   const carried = carriedNote(preExistingThreads(threads));
   const blockedHeads = rounds.others + (rounds.marked ? 1 : 0);

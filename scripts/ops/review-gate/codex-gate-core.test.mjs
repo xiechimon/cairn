@@ -742,6 +742,27 @@ test('a P0 on lines unchanged since the last blocked head still blocks', () => {
   assert.equal(result.carried, undefined);
 });
 
+test('a carried P1 still fails when its deferral does not name an issue', () => {
+  const missing = located('P1', {
+    line: 50,
+    deferral: 'deferred to #9, which is not an issue in this repository',
+  });
+  const waived = located('P1', {
+    line: 50,
+    deferral: 'deferred to #9, but a P0/P1 finding must be fixed',
+  });
+  assert.equal(
+    decide(pr, done, [missing], noRetries, false, null, atRound(BLOCK_ROUND_CAP - 1, sinceQuiet))
+      .conclusion,
+    'failure',
+  );
+  assert.equal(
+    decide(pr, done, [waived], noRetries, false, null, atRound(BLOCK_ROUND_CAP - 1, sinceQuiet))
+      .conclusion,
+    'success',
+  );
+});
+
 test('from round 3 an unanchored thread on an unchanged file does not block', () => {
   const quiet = decide(
     pr,
