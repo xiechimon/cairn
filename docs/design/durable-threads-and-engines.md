@@ -97,6 +97,15 @@ Proposal:
 - Migration of threads that run directly on `claude-code` today.
 - Whether the router and a thread are the same harness with different models and tools, or two configurations of one runtime.
 
+## Decisions taken on 2026-11-12
+
+Decided on 2026-11-12: proposed by Claude at ian's delegation and confirmed by ian the same day.
+
+- **Phases stay on the task.** A task's phase still changes only through the server's transition table; the thread is the session that does the work. The plan, build, review and verify steps become dispatches inside the thread. The confirm phase appears only in plan-first mode or when the plan contains an action that cannot be undone. The merge gate applies only when the output is code.
+- **Billing of a thread's own turns.** They use the Coordinator's connection until a separate `thread` route is set, and the cost shows in the thread. This answers the billing half of the third open question above.
+- **Cutover.** A Claude Code step that is running at the switch runs to its end. This answers the migration question above.
+- **The engine view.** It is read-only first. Takeover is built last, and once it exists it may spend ian's own subscription quota.
+
 ## Order of work
 
 1. Thread as a durable pi session with the Coordinator's context and memory handling, doing its own steps. No engines yet.
