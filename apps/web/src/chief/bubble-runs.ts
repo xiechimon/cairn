@@ -1,3 +1,4 @@
+import { answerLines } from './question-lifecycle.js';
 import type { GroupedRow } from './thread-activity.js';
 import { needsTimeDivider } from './time-dividers.js';
 
@@ -10,6 +11,7 @@ type Author = 'user' | 'robot' | null;
 
 function authorOf(item: GroupedRow['item']): Author {
   if (item.kind === 'user') return 'user';
+  if (item.kind === 'question' && answerLines(item).length > 0) return 'user';
   if (item.kind === 'robot') return 'robot';
   return null;
 }

@@ -1,18 +1,12 @@
 import { Ban, CircleCheck } from 'lucide-react';
 import { useI18n } from '../i18n/provider.js';
 import type { ChiefQuestionItem } from './question-chips.js';
-import { answerSummary } from './question-lifecycle.js';
 
 export function QuestionAnsweredLine({ item }: { item: ChiefQuestionItem }) {
   const { t } = useI18n();
   const cancelled = item.status === 'cancelled';
   const Icon = cancelled ? Ban : CircleCheck;
-  const summary = answerSummary(item);
-  const text = cancelled
-    ? t('已取消提问')
-    : summary === ''
-      ? t('已回答')
-      : t('已回答：{summary}', { summary });
+  const text = cancelled ? t('已取消提问') : t('已回答');
   return (
     <p
       data-testid="chief-question-line"

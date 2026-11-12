@@ -127,7 +127,7 @@ Layout of the Tasks surface, same on all three clients:
 
 - A task opens as a sub-thread: web `?thread=<todoId>` in the main pane (existing, Read, `thread-link.tsx`); iOS a pushed full-screen view (existing, Read, `ThreadScreens.swift`); desktop the same web route.
 - Header: back, title, status word from `section` and the reason, `…` menu (Duet, Seen). Body: the owner's verbatim request as the first block (`coordinator-routes-verbatim.md`), then the task conversation and inline cards (question, plan approval, PR).
-- In the Coordinator conversation, a task card shows title, status word, `N updates` and the latest step, and opens the sub-thread (Duet, Seen). The card replaces today's plain "created task" line.
+- In the Coordinator conversation, a task card shows title, status word, `N updates` and the latest step, and opens the sub-thread (Duet, Seen). The card replaces today's plain "created task" line. Superseded 2026-11-12 (owner): the card repeated the task reference row and is gone; the reference row above the reply is the task's one mark in the conversation (`apps/web/DESIGN.md`, Coordinator chat).
 
 ### 2.6 Layout sketches
 

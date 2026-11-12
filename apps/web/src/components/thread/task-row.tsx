@@ -1,7 +1,7 @@
 import { cn } from 'cn';
 import { type ReactNode, useId } from 'react';
-import { ACCENT_INK } from '../../phase.js';
 import { BrandGlyph } from '../brand-glyph.js';
+import { IconTooltip } from '../icon-tooltip.js';
 import { type GlyphKind, StatusGlyph } from '../status-glyph.js';
 import { Button } from '../ui/button.js';
 import { Checkbox } from '../ui/checkbox.js';
@@ -19,20 +19,22 @@ export interface TaskRowProps {
   age: string;
   date?: string;
   waiting: boolean;
-  running: boolean;
   muted?: boolean;
   prLink?: { number: number; url: string };
   check?: { label: string; onCheck: () => void } | 'none';
+  why?: string;
   menu?: ReactNode;
   onOpen?: () => void;
 }
 
 const ROW_DESCRIPTION_DELAY = 600;
 
-function Glyph({ glyph, waiting }: { glyph: TaskRowGlyph; waiting: boolean }) {
-  const ink = waiting ? ACCENT_INK : 'text-content-tertiary';
-  if (glyph === 'question') return <BrandGlyph className={cn('size-4 flex-none', ink)} />;
-  return <StatusGlyph kind={glyph} className={ink} />;
+const LEAD_BOX = 'flex size-7 flex-none items-center justify-center';
+
+function Glyph({ glyph }: { glyph: TaskRowGlyph }) {
+  if (glyph === 'question')
+    return <BrandGlyph className="size-4 flex-none text-content-tertiary" />;
+  return <StatusGlyph kind={glyph} className="text-content-tertiary" />;
 }
 
 export function TaskRow({
@@ -44,17 +46,17 @@ export function TaskRow({
   age,
   date,
   waiting,
-  running,
   muted = false,
   prLink,
   check,
+  why,
   menu,
   onOpen,
 }: TaskRowProps) {
   const descriptionId = useId();
   const checkable = check !== undefined && check !== 'none';
   const status = `${word} · ${what}${waiting && where !== null ? ` → ${where}` : ''}${age === '' ? '' : ` · ${age}`}`;
-  const trailing = running || (date !== undefined && date !== '');
+  const dated = date !== undefined && date !== '';
   const row = (
     <Tooltip>
       <TooltipTrigger
@@ -74,14 +76,8 @@ export function TaskRow({
           />
         }
       >
-        <span
-          data-slot="task-row-lead"
-          className={cn(
-            'flex size-7 flex-none items-center justify-center rounded-(--radius-control)',
-            !checkable && 'bg-(--hover-1)',
-          )}
-        >
-          {!checkable && <Glyph glyph={glyph} waiting={waiting} />}
+        <span data-slot="task-row-lead" className={LEAD_BOX}>
+          {!checkable && why === undefined && <Glyph glyph={glyph} />}
         </span>
         <span className="flex min-h-7 min-w-0 flex-1 flex-col justify-center">
           <span className="flex min-w-0 items-center gap-3">
@@ -94,21 +90,14 @@ export function TaskRow({
             >
               {title}
             </span>
-            {trailing && (
+            {dated && (
               <span
                 className={cn(
-                  'flex flex-none items-center gap-1.5 text-caption leading-5 text-content-tertiary tabular-nums',
+                  'flex-none text-caption leading-5 text-content-tertiary tabular-nums',
                   menu != null &&
                     'pointer-fine:group-hover/task:invisible pointer-fine:group-focus-within/task:invisible pointer-fine:group-has-aria-expanded/task:invisible',
                 )}
               >
-                {running && (
-                  <span
-                    aria-hidden
-                    data-slot="task-row-running"
-                    className="size-1.5 rounded-full bg-running"
-                  />
-                )}
                 {date}
               </span>
             )}
@@ -144,6 +133,25 @@ export function TaskRow({
           data-waiting={waiting ? '' : undefined}
           className="absolute top-3.5 left-4 data-waiting:border-(--card-button)"
         />
+      )}
+      {!checkable && why !== undefined && (
+        <IconTooltip
+          label={why}
+          trigger={
+            <Button
+              variant="ghost"
+              tabIndex={-1}
+              data-slot="task-row-why"
+              onClick={onOpen}
+              className={cn(
+                LEAD_BOX,
+                'absolute top-2 left-2.5 rounded-(--radius-control) p-0 hover:bg-transparent dark:hover:bg-transparent',
+              )}
+            />
+          }
+        >
+          <Glyph glyph={glyph} />
+        </IconTooltip>
       )}
       {prLink != null && (
         <PrLink

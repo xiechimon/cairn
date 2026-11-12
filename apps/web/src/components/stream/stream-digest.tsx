@@ -12,7 +12,7 @@ export interface DigestRow {
 }
 
 const ROW =
-  'flex h-8.5 w-full items-center gap-2 rounded-lg px-2.5 text-left text-ui text-content-secondary';
+  'flex h-8.5 w-full items-center gap-2 rounded-lg px-2.5 text-left text-ui text-foreground';
 
 export function StreamDigest({ rows, className }: { rows: DigestRow[]; className?: string }) {
   const visible = rows.filter((row) => row.count > 0);

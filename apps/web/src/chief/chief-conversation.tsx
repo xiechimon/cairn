@@ -60,6 +60,7 @@ import {
   ChiefOutageBanner,
 } from './chief-outage-banner.js';
 import { ChiefQuestion, useAnswerKey, useQuestionPending } from './chief-question.js';
+import { foldTaskCards } from './chief-task-refs.js';
 import { serverDraftBinding } from './composer-binding.js';
 import { composerMode } from './composer-mode.js';
 import { ComposerSurface, type ComposerSurfaceHandle } from './composer-surface.js';
@@ -449,7 +450,11 @@ export function ChiefConversation({
   );
   const clock = useMinuteClock();
   const dividerClock = { previousAt: null as number | null };
-  const streamRow = ({ item, i }: GroupedRow, run: BubbleRun | undefined) => {
+  const streamRow = (
+    { item, i }: GroupedRow,
+    run: BubbleRun | undefined,
+    startedTasks: readonly string[] | undefined,
+  ) => {
     const at = 'createdAt' in item && typeof item.createdAt === 'number' ? item.createdAt : null;
     const divider =
       at !== null && needsTimeDivider(dividerClock.previousAt, at) ? (
@@ -468,11 +473,16 @@ export function ChiefConversation({
     return (
       <Fragment key={chiefStreamRowKey(item, i)}>
         {divider}
-        {row(item, i, run)}
+        {row(item, i, run, startedTasks)}
       </Fragment>
     );
   };
-  const row = (item: GroupedRow['item'], i: number, run: BubbleRun | undefined) => (
+  const row = (
+    item: GroupedRow['item'],
+    i: number,
+    run: BubbleRun | undefined,
+    startedTasks: readonly string[] | undefined,
+  ) => (
     <ChiefStreamRow
       item={item}
       index={i}
@@ -487,6 +497,7 @@ export function ChiefConversation({
       onReply={onSend != null && composerReplacement == null ? stageReply : undefined}
       joinsPrev={run?.joinsPrev === true}
       joinsNext={run?.joinsNext === true}
+      {...(startedTasks !== undefined ? { startedTasks } : {})}
     />
   );
   const keepsOwnRow = (item: ChiefStreamItem) =>
@@ -515,11 +526,14 @@ export function ChiefConversation({
     />
   );
   const renderRows = (list: StreamRow[]) => {
-    const grouped = groupThreadEvents(list, keepsOwnRow);
+    const { rows: grouped, startedBy } = foldTaskCards(
+      groupThreadEvents(list, keepsOwnRow),
+      glances,
+    );
     const runs = bubbleRuns(grouped, dividerClock.previousAt);
     return grouped.map((entry, n) => (
       <Fragment key={chiefStreamRowKey(entry.item, entry.i)}>
-        {streamRow(entry, runs[n])}
+        {streamRow(entry, runs[n], startedBy.get(entry.item))}
         {quickAfter !== undefined && entry.item === quickAfter && quickReplies}
       </Fragment>
     ));

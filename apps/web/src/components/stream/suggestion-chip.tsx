@@ -11,7 +11,7 @@ export function SuggestionChip({
       variant="ghost"
       data-slot="suggestion-chip"
       className={cn(
-        'h-7 rounded-lg px-2.5 text-ui font-normal text-content-secondary hover:bg-menu-hover hover:text-foreground dark:hover:bg-menu-hover',
+        'h-7 rounded-lg px-2.5 text-ui font-normal text-foreground hover:bg-menu-hover dark:hover:bg-menu-hover',
         className,
       )}
       {...props}

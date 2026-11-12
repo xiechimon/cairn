@@ -140,7 +140,6 @@ for (const theme of ['light', 'dark'] as const) {
     await setTheme(page, theme);
     const win = await openHome(page, QUESTION);
     const fill = await probe(page, 'backgroundColor', 'var(--reply-bubble-fill)');
-    const ink3 = await probe(page, 'color', 'var(--text-tertiary)');
 
     const pending = win.locator('[data-testid="chief-question-chips"][data-status="pending"]');
     await pending.scrollIntoViewIfNeeded();
@@ -151,10 +150,14 @@ for (const theme of ['light', 'dark'] as const) {
       'rgba(0, 0, 0, 0)',
     );
 
-    const done = win.locator('[data-testid="chief-question-line"][data-status="answered"]');
-    await expect(done, 'Q1').toContainText('已回答');
-    await expect(done.locator('svg'), 'Q1').toHaveCount(1);
-    await expect(done, 'Q1').toHaveCSS('color', ink3);
+    const done = win.locator('[data-slot="user-bubble"][data-question-answer="q-answered"]');
+    await expect(done, 'Q1').toHaveText('桌面浏览器');
+    await expect(done.locator('svg'), 'Q1').toHaveCount(0);
+    await expect(done, 'Q1').toHaveCSS(
+      'background-color',
+      await probe(page, 'backgroundColor', 'var(--bubble-fill)'),
+    );
+    await expect(win.getByTestId('chief-question-line'), 'Q1').toHaveCount(0);
 
     await expect(pending.getByTestId('chief-question-text'), 'Q2').toHaveCSS('font-size', '14px');
     await expect(pending.getByTestId('chief-question-option-0-0'), 'Q2').toHaveCSS(

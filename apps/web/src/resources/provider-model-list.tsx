@@ -138,7 +138,7 @@ export function ProviderModelChips({
             {canAddTyped && (
               <Button
                 variant="ghost"
-                className="h-8 w-full justify-start gap-2 rounded-md px-2 text-ui font-normal text-content-secondary hover:bg-secondary"
+                className="h-8 w-full justify-start gap-2 rounded-md px-2 text-ui font-normal text-foreground hover:bg-secondary"
                 onClick={() => add(typed)}
               >
                 <PlusSmall className="size-5" />

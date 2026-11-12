@@ -98,7 +98,7 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
         <div className="flex flex-col gap-1.5">
           <label
             htmlFor="apikey-git-access"
-            className="inline-flex cursor-pointer items-center gap-2 text-ui text-content-secondary"
+            className="inline-flex cursor-pointer items-center gap-2 text-ui text-foreground"
           >
             <Checkbox
               id="apikey-git-access"
@@ -110,7 +110,7 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
           </label>
           <label
             htmlFor="apikey-mcp-access"
-            className="inline-flex cursor-pointer items-center gap-2 text-ui text-content-secondary"
+            className="inline-flex cursor-pointer items-center gap-2 text-ui text-foreground"
           >
             <Checkbox
               id="apikey-mcp-access"
@@ -120,7 +120,7 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
             />
             {t('MCP 访问（MCP 客户端接入）')}
           </label>
-          <div className="inline-flex items-center gap-2 text-ui text-content-secondary">
+          <div className="inline-flex items-center gap-2 text-ui text-foreground">
             <Checkbox
               checked={machineAccess}
               onCheckedChange={setMachineAccess}

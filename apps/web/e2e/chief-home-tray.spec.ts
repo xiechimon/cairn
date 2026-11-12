@@ -126,12 +126,13 @@ test('a single question has no progress bar', async ({ page }) => {
   await expect(page.getByTestId('chief-question-prev')).toHaveCount(0);
 });
 
-test('a chip answer removes the question and leaves a one-line summary in the conversation', async ({ page }) => {
+test('a chip answer removes the question and leaves the answer as one owner bubble in the conversation', async ({ page }) => {
   const { answered } = await openWithQuestion(page);
   await page.getByTestId('chief-question-option-0-0').click();
   await expect.poll(() => answered.length).toBe(1);
   await expect(page.getByTestId('chief-question')).toHaveCount(0);
-  const line = page.getByTestId('chief-stream').getByTestId('chief-question-line');
-  await expect(line).toHaveText('Answered: Wait for CI');
+  const stream = page.getByTestId('chief-stream');
+  await expect(stream.locator('[data-slot="user-bubble"][data-question-answer]')).toHaveText('Wait for CI');
+  await expect(stream.getByTestId('chief-question-line')).toHaveCount(0);
   await expect(page).toHaveTitle('Cairn');
 });

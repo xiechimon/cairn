@@ -1,6 +1,6 @@
 import { parseReplyQuote } from '@cairn/shared';
 import { cn } from 'cn';
-import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
+import { type CSSProperties, memo, type ReactNode, useContext } from 'react';
 import { isUsableTimestamp } from '../board/rel-time.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
@@ -37,6 +37,7 @@ import { taskRefsOf } from './chief-task-refs.js';
 import { isLiveNotice } from './live-notice.js';
 import { MessageToolbar } from './message-toolbar.js';
 import { QuestionAnsweredLine } from './question-answered-line.js';
+import { answerLines } from './question-lifecycle.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
 import {
   REPLY_HIGHLIGHT_ATTR,
@@ -157,9 +158,15 @@ function TodoSegmentChip({ seq }: { seq: number }) {
   );
 }
 
-function TaskRefRows({ source }: { source: Parameters<typeof taskRefsOf>[0] }) {
+function TaskRefRows({
+  source,
+  started,
+}: {
+  source: Parameters<typeof taskRefsOf>[0];
+  started: readonly string[];
+}) {
   const glances = useContext(TodoGlanceContext);
-  const refs = taskRefsOf(source, glances ?? NO_GLANCES);
+  const refs = taskRefsOf(source, glances ?? NO_GLANCES, started);
   if (refs.length === 0) return null;
   return (
     <div className="mb-2 flex flex-col gap-0.5" data-testid="chief-task-refs">
@@ -217,9 +224,7 @@ function turnToolSteps(tools: ChiefToolRow[] | undefined, runningVerb?: string):
   });
 }
 
-export const TaskCardContext = createContext<((todoId: string) => ReactNode) | null>(null);
-
-function TaskCardRow({
+function TaskStartedRow({
   todoId,
   seq,
   title,
@@ -230,17 +235,22 @@ function TaskCardRow({
 }) {
   const { t } = useI18n();
   const glance = useContext(TodoGlanceContext)?.get(todoId);
-  const card = useContext(TaskCardContext)?.(todoId);
-  const shownSeq = glance?.seq ?? seq;
-  const shownTitle = glance?.title ?? title;
-  if (card != null) {
+  if (glance !== undefined) {
     return (
       <MessageScrollerItem
         style={SCROLLER_ITEM_STYLE}
-        data-testid="chief-task-card"
+        data-testid="chief-task-started"
         className={EVENT_ROW_CLS}
       >
-        {card}
+        <TaskRefRow
+          elbow={false}
+          taskRef={{
+            todoId,
+            seq: glance.seq ?? seq,
+            title: glance.title ?? title,
+            phase: glance.phase,
+          }}
+        />
       </MessageScrollerItem>
     );
   }
@@ -248,10 +258,10 @@ function TaskCardRow({
     <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
       <StatusLine testId="chief-task-created">
         {t('已建任务')}{' '}
-        <ThreadLink todoId={todoId} className={STATUS_REF_CLS} data-phase={glance?.phase}>
-          {shownSeq != null ? `#${shownSeq}` : t('任务')}
+        <ThreadLink todoId={todoId} className={STATUS_REF_CLS}>
+          {seq != null ? `#${seq}` : t('任务')}
         </ThreadLink>
-        {shownTitle != null ? ` ${shownTitle}` : null}
+        {title != null ? ` ${title}` : null}
       </StatusLine>
     </MessageScrollerItem>
   );
@@ -308,7 +318,11 @@ interface ChiefStreamRowProps {
   onRetry?: (() => void) | undefined;
   joinsPrev?: boolean;
   joinsNext?: boolean;
+  startedTasks?: readonly string[];
 }
+
+const NO_STARTED_TASKS: readonly string[] = [];
+const NO_TEXT = {};
 
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
   const { t } = useI18n();
@@ -349,6 +363,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   onRetry,
   joinsPrev = false,
   joinsNext = false,
+  startedTasks = NO_STARTED_TASKS,
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
   const highlightedSource = useContext(ReplySourceHighlightContext);
@@ -402,7 +417,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     );
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
   if (item.kind === 'task-card')
-    return <TaskCardRow todoId={item.todoId} seq={item.seq} title={item.title} />;
+    return <TaskStartedRow todoId={item.todoId} seq={item.seq} title={item.title} />;
   if (item.kind === 'digest')
     return <ChiefDigestRow reason={item.reason} madeAt={item.madeAt} items={item.items} />;
   if (item.kind === 'daily-report') return <ChiefReportRow report={item.report} />;
@@ -493,7 +508,32 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   if (item.kind === 'question' && item.status === 'pending') return null;
-  if (item.kind === 'question')
+  if (item.kind === 'question') {
+    const answers = answerLines(item);
+    if (answers.length > 0)
+      return (
+        <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
+          <Message
+            className={`${joinsPrev ? RUN_ROW_CLS : USER_ROW_CLS} justify-end`}
+            data-testid="chief-msg"
+            data-run={runAttr(joinsPrev, joinsNext)}
+          >
+            <MessageContent
+              className="relative max-w-[min(85%,42rem)] flex-none items-end gap-2"
+              data-testid="chief-msg-col"
+            >
+              <UserMessageBubble
+                data-testid="chief-bubble"
+                data-question-answer={item.requestId}
+                tail={!joinsNext}
+                className="w-fit max-w-full [overflow-wrap:anywhere] whitespace-pre-line"
+              >
+                {answers.join('\n')}
+              </UserMessageBubble>
+            </MessageContent>
+          </Message>
+        </MessageScrollerItem>
+      );
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
@@ -503,6 +543,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         </Message>
       </MessageScrollerItem>
     );
+  }
   if (item.kind === 'streaming') {
     const callRunning = item.tools?.some((tool) => tool.running === true) === true;
     const liveSteps: TraceStepItem[] = [
@@ -602,7 +643,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               className={toolsOpen.has(i) ? undefined : TRACE_REVEAL}
             />
           )}
-          {settled && <TaskRefRows source={item} />}
+          <TaskRefRows source={settled ? item : NO_TEXT} started={startedTasks} />
           <div
             className={BUBBLE_WRAP_CLS}
             data-testid="chief-reply"

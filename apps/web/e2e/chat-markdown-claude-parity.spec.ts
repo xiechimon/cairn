@@ -90,18 +90,42 @@ test('code block header is always visible with the language, expand and copy, an
     const h = head.getBoundingClientRect();
     const c = el.querySelector('[data-testid="md-code-copy"]')!.getBoundingClientRect();
     const x = el.querySelector('[data-testid="md-code-expand"]')!.getBoundingClientRect();
+    const glyphs = [...head.querySelectorAll('svg')].map((svg) => {
+      const box = svg.getBoundingClientRect();
+      return { width: box.width, height: box.height, ink: getComputedStyle(svg).color };
+    });
+    const label = head.querySelector('[data-testid="md-code-lang"]') as HTMLElement;
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--text-secondary)';
+    el.append(probe);
+    const secondaryInk = getComputedStyle(probe).color;
+    probe.remove();
     return {
       head: h.height,
       rule: getComputedStyle(head).borderBottomWidth,
       size: c.width,
       pitch: c.left - x.left,
       right: b.right - c.right,
+      glyphs,
+      bodyInk: getComputedStyle(el.querySelector('pre')!).color,
+      labelInk: getComputedStyle(label).color,
+      secondaryInk,
+      labelSize: getComputedStyle(label).fontSize,
+      labelLeft: label.getBoundingClientRect().left - b.left,
     };
   });
   expect(geo.head).toBe(40);
   expect(geo.rule).toBe('1px');
   expect(geo.size).toBe(32);
   expect(geo.pitch).toBe(32);
+  expect(geo.right).toBe(7);
+  expect(geo.glyphs).toEqual([
+    { width: 16, height: 16, ink: geo.bodyInk },
+    { width: 16, height: 16, ink: geo.bodyInk },
+  ]);
+  expect(geo.labelInk).toBe(geo.secondaryInk);
+  expect(geo.labelSize).toBe('12px');
+  expect(geo.labelLeft).toBe(21);
 
   await copy.hover();
   await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('复制');

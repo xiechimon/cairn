@@ -62,12 +62,86 @@ test('rows are one quiet line; a row waiting on the owner adds what waits, and e
   await expect(working.locator('[data-slot="task-row-what"]')).toHaveCount(0);
   await expect(working.first()).toHaveAccessibleDescription(/^进行中 · /);
   await expect(working.first()).not.toHaveAccessibleDescription(/→/);
-  await expect(working.locator('[data-slot="task-row-running"]')).toHaveCount(3);
+  await expect(panel(page).locator('[data-slot="task-row-running"]')).toHaveCount(0);
   for (const row of await working.all()) {
     expect(await row.evaluate((el) => el.getBoundingClientRect().height)).toBeLessThanOrEqual(50);
   }
   await working.first().hover();
   await expect(page.locator('[data-slot="task-row-tooltip"]')).toContainText('进行中 · ');
+});
+
+test('every row leads with the same 28px box and no tile: a checkbox when it can be marked done, else one quiet glyph that says why', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  const frames = panel(page).locator('[data-slot="task-row-frame"]');
+  await expect(frames).toHaveCount(7);
+  const leads = await frames.evaluateAll((rows) =>
+    rows.map((row) => {
+      const frame = row.getBoundingClientRect();
+      const lead = row.querySelector('[data-slot="task-row-lead"]')!;
+      const box = lead.getBoundingClientRect();
+      const mark = (row.querySelector('[data-slot="checkbox"]') ??
+        row.querySelector('[data-slot="task-row-why"] svg'))!;
+      const markBox = mark.getBoundingClientRect();
+      const why = row.querySelector('[data-slot="task-row-why"]');
+      return {
+        kind: mark.getAttribute('data-slot') === 'checkbox' ? 'check' : 'glyph',
+        lead: [box.left - frame.left, box.top - frame.top, box.width, box.height],
+        leadFill: getComputedStyle(lead).backgroundColor,
+        whyFill: why === null ? null : getComputedStyle(why).backgroundColor,
+        mark: [
+          markBox.left + markBox.width / 2 - frame.left,
+          markBox.top + markBox.height / 2 - frame.top,
+          markBox.width,
+          markBox.height,
+        ],
+        ink: mark.tagName === 'svg' ? getComputedStyle(mark).color : null,
+      };
+    }),
+  );
+  expect(leads.map((lead) => lead.kind)).toEqual([
+    'check', 'glyph', 'check', 'glyph', 'check', 'check', 'check',
+  ]);
+  const tertiary = await page.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--text-tertiary)';
+    document.body.append(probe);
+    const ink = getComputedStyle(probe).color;
+    probe.remove();
+    return ink;
+  });
+  for (const lead of leads) {
+    expect(lead.lead).toEqual([11, 9, 28, 28]);
+    expect(lead.leadFill).toBe('rgba(0, 0, 0, 0)');
+    expect(lead.mark).toEqual([24, 22, 16, 16]);
+    if (lead.kind === 'glyph') {
+      expect(lead.whyFill).toBe('rgba(0, 0, 0, 0)');
+      expect(lead.ink).toBe(tertiary);
+    }
+  }
+  const question = frames.filter({ hasText: 'Credential relay · #74' });
+  await expect(question.locator('[data-slot="checkbox"]')).toHaveCount(0);
+  await question.locator('[data-slot="task-row-why"]').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText(
+    'Coordinator 在问你，到对话里回答',
+  );
+  await page.mouse.move(1, 1);
+  const failed = frames.filter({ hasText: 'Rerun the relay probe' });
+  await expect(failed.locator('svg[data-glyph="failed"]')).toHaveCount(1);
+  await expect(failed.locator('[data-slot="task-row-why"]')).toHaveAccessibleName(
+    '运行失败了，先重跑才能完成',
+  );
+  await failed.locator('[data-slot="task-row-why"]').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText(
+    '运行失败了，先重跑才能完成',
+  );
+  await expect(failed.locator('[data-slot="task-row-why"]')).toHaveCSS(
+    'background-color',
+    'rgba(0, 0, 0, 0)',
+  );
+  await failed.locator('[data-slot="task-row-why"]').click();
+  await expect(page).toHaveURL(/thread=home-c-failed/);
 });
 
 test('Up next, Scheduled and Done tabs list their own entries', async ({ page }) => {

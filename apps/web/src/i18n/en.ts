@@ -119,8 +119,6 @@ export const EN: Record<string, string> = {
   换项目: 'Move project',
   已转给任务: 'Passed to task',
   已建任务: 'Created task',
-  '{n} 次更新': 'updates: {n}',
-  '最新：{line}': 'Latest: {line}',
   '任务 #{n} {title}：{status}': 'Task #{n} {title}: {status}',
   审阅中: 'In review',
   定时: 'Schedules',
@@ -611,6 +609,10 @@ export const EN: Record<string, string> = {
   '从 GitHub issue 建任务': 'New task from GitHub issue',
   打开: 'Open',
   已关闭: 'Closed',
+  '运行失败了，先重跑才能完成': 'The run failed; rerun it before marking it done',
+  '已归档，不能标记完成': 'Archived, so it cannot be marked done',
+  'Coordinator 在问你，到对话里回答':
+    'A question from the Coordinator; answer it in the conversation',
   'issue 列表加载失败': 'Failed to load issues',
   '这个状态下没有 issue': 'No issues in this state',
   上一页: 'Previous page',
@@ -1365,7 +1367,6 @@ export const EN: Record<string, string> = {
   '提交回答失败，草稿还在，请再试一次。':
     'Could not send your answer. Your draft is still here. Try Submit again.',
   已回答: 'Answered',
-  '已回答：{summary}': 'Answered: {summary}',
   在等你回答: 'Waiting for your answer',
   更多操作: 'More actions',
   等待你的回复: 'Waiting for your reply',

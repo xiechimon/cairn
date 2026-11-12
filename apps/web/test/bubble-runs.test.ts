@@ -48,4 +48,31 @@ describe('bubbleRuns', () => {
     const runs = bubbleRuns(rows([{ kind: 'user', text: 'a', createdAt: 3 * HOUR }]), 0);
     expect(runs).toEqual([{ joinsPrev: false, joinsNext: false }]);
   });
+
+  it('an answered question is an owner bubble and joins the owner run around it', () => {
+    const answered = {
+      kind: 'question' as const,
+      requestId: 'q1',
+      status: 'answered' as const,
+      questions: [],
+      answers: [{ header: 'Theme', choices: ['Dark'] }],
+    };
+    const runs = bubbleRuns(
+      rows([
+        { kind: 'user', text: 'a' },
+        answered,
+        { kind: 'robot', paragraphs: [], seconds: '' },
+        { ...answered, status: 'cancelled' },
+        { kind: 'user', text: 'b' },
+      ]),
+      null,
+    );
+    expect(runs).toEqual([
+      { joinsPrev: false, joinsNext: true },
+      { joinsPrev: true, joinsNext: false },
+      { joinsPrev: false, joinsNext: false },
+      { joinsPrev: false, joinsNext: false },
+      { joinsPrev: false, joinsNext: false },
+    ]);
+  });
 });

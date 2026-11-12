@@ -20,9 +20,9 @@ export function awaitingStream(
   );
 }
 
-export function answerSummary(item: ChiefQuestionItem): string {
+export function answerLines(item: Pick<ChiefQuestionItem, 'status' | 'answers'>): string[] {
+  if (item.status !== 'answered') return [];
   return (item.answers ?? [])
     .map((answer) => (answer.choices ?? []).join('、') || (answer.text ?? '').trim())
-    .filter((part) => part !== '')
-    .join('；');
+    .filter((part) => part !== '');
 }

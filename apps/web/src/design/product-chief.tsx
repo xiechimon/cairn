@@ -4,6 +4,8 @@ import { ChiefIdentity } from '../chief/chief-identity.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from '../chief/chief-outage-banner.js';
 import { QuestionAnsweredLine } from '../chief/question-answered-line.js';
 import { QuestionChips } from '../chief/question-chips.js';
+import { answerLines } from '../chief/question-lifecycle.js';
+import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
 import {
   DIGEST_ITEMS,
@@ -49,7 +51,11 @@ export function ProductChiefSection() {
         </Labeled>
         <Labeled label="Answered">
           <div className="w-160">
-            <QuestionAnsweredLine item={QUESTION_ANSWERED} />
+            <div className="flex justify-end">
+              <UserMessageBubble className="w-fit max-w-full whitespace-pre-line">
+                {answerLines(QUESTION_ANSWERED).join('\n')}
+              </UserMessageBubble>
+            </div>
           </div>
         </Labeled>
         <Labeled label="Cancelled">

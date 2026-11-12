@@ -134,7 +134,7 @@ export function SidebarProjectRow({
         active
           ? 'bg-(--sidebar-active) text-foreground hover:bg-(--sidebar-active) dark:hover:bg-(--sidebar-active)'
           : cn(
-              archived != null ? 'text-content-secondary' : 'text-sidebar-ink',
+              archived != null ? 'text-content-secondary' : 'text-foreground',
               'hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover',
               ROW_FILL,
             ),

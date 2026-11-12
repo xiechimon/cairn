@@ -100,7 +100,7 @@ export function ProjectIconPicker({
             variant="ghost"
             disabled={icon == null && color == null}
             onClick={() => onChange({ icon: null, color: null })}
-            className="h-8 w-full justify-start px-2.5 text-ui font-normal text-content-secondary hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)"
+            className="h-8 w-full justify-start px-2.5 text-ui font-normal text-foreground hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)"
           >
             {t('重置图标')}
           </Button>

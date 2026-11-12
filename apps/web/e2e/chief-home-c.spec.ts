@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
 });
 
-test('the home is one Coordinator conversation: no greeting once it has messages, the conversation with task cards, and the composer, with no in-progress pill', async ({
+test('the home is one Coordinator conversation: no greeting once it has messages, the conversation with task references, and the composer, with no in-progress pill', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
@@ -17,7 +17,11 @@ test('the home is one Coordinator conversation: no greeting once it has messages
   await expect(page.getByTestId('home-c-since')).toHaveCount(0);
   await expect(page.getByTestId('tasks-badge')).toHaveText('3');
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
-  await expect(page.getByTestId('chief-stream').locator('[data-slot="task-card"]')).toHaveCount(2);
+  await expect(page.getByTestId('chief-stream').getByTestId('chief-task-ref')).toHaveText([
+    /^Orb canary round 7/,
+    /^Fold finished turns into purpose and duration/,
+  ]);
+  await expect(page.getByTestId('chief-stream').locator('[data-slot="task-card"]')).toHaveCount(0);
   await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
   await expect(page.getByTestId('chief-stream').getByTestId('chief-question')).toBeVisible();
   await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question')).toHaveCount(0);
@@ -54,7 +58,7 @@ test('the Tasks panel lists running threads and a running row opens its thread',
   await expect(page.getByTestId('side-chat')).toContainText('Push for finished threads');
 });
 
-test('the sidebar lists project names only, and the project chat filters the task cards and the conversation', async ({
+test('the sidebar lists project names only, and the project chat filters the task references and the conversation', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
@@ -64,9 +68,9 @@ test('the sidebar lists project names only, and the project chat filters the tas
   await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}&chat=1`));
   await expect(page.getByTestId('project-home')).toHaveCount(0);
   await expect(page.getByTestId('tasks-badge')).toHaveText('2');
-  const cards = page.getByTestId('chief-stream').locator('[data-slot="task-card"]');
-  await expect(cards).toHaveCount(1);
-  await expect(cards).toContainText('Fold finished turns into purpose and duration');
+  const refs = page.getByTestId('chief-stream').getByTestId('chief-task-ref');
+  await expect(refs).toHaveCount(1);
+  await expect(refs).toContainText('Fold finished turns into purpose and duration');
   await expect(page.getByTestId('chief-stream')).not.toContainText('Run the orb canary until it passes');
   await expect(page.getByTestId('chief-stream')).toContainText('Fold finished turns before review');
   await expect(composer(page)).toHaveAttribute('placeholder', /in cairn|Type your own answer/);

@@ -109,7 +109,7 @@ for (const theme of ['light', 'dark'] as const) {
           await page.goto('/app?scenario=home-c&thread=home-c-review');
           await expect(page.getByTestId('side-chat-action')).toBeVisible();
         }
-        const clipped = await page.locator('[data-slot="thread-card"], [data-slot="task-card"], .chief-composer, .side-panel .composer, [data-testid="side-chat-action"], .side-panel [data-trace-card]').evaluateAll((nodes) => {
+        const clipped = await page.locator('[data-slot="thread-card"], [data-testid="chief-task-ref"], .chief-composer, .side-panel .composer, [data-testid="side-chat-action"], .side-panel [data-trace-card]').evaluateAll((nodes) => {
           const failures: string[] = [];
           for (const node of nodes) {
             const box = node.getBoundingClientRect();

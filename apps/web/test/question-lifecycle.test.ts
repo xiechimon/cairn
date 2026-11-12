@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
-import { answerSummary, awaitingStream } from '../src/chief/question-lifecycle.js';
+import { answerLines, awaitingStream } from '../src/chief/question-lifecycle.js';
 
 type Question = Extract<ChiefStreamItem, { kind: 'question' }>;
 
@@ -42,12 +42,12 @@ describe('a pending question stops the conversation saying it is working', () =>
   });
 });
 
-describe('the answered question becomes one line', () => {
-  test('a chosen option reads as the summary', () => {
-    expect(answerSummary(question())).toBe('After CI is green');
+describe('the answered question becomes the lines of one owner bubble', () => {
+  test('a chosen option is the one line', () => {
+    expect(answerLines(question())).toEqual(['After CI is green']);
   });
 
-  test('several questions join with a separator, free text counts', () => {
+  test('several questions give one line each, free text counts', () => {
     const item = question({
       questions: [
         { header: 'A', question: 'a?', options: [{ label: 'x' }] },
@@ -58,11 +58,16 @@ describe('the answered question becomes one line', () => {
         { header: 'B', text: 'later' },
       ],
     });
-    expect(answerSummary(item)).toBe('x、y；later');
+    expect(answerLines(item)).toEqual(['x、y', 'later']);
   });
 
-  test('missing or empty answers summarize to an empty string', () => {
-    expect(answerSummary(question({ answers: null }))).toBe('');
-    expect(answerSummary(question({ answers: [{ header: 'Merge' }] }))).toBe('');
+  test('missing or empty answers give no lines', () => {
+    expect(answerLines(question({ answers: null }))).toEqual([]);
+    expect(answerLines(question({ answers: [{ header: 'Merge' }] }))).toEqual([]);
+  });
+
+  test('a pending or cancelled question gives no lines, whatever it holds', () => {
+    expect(answerLines(question({ status: 'pending' }))).toEqual([]);
+    expect(answerLines(question({ status: 'cancelled' }))).toEqual([]);
   });
 });

@@ -368,16 +368,16 @@
     },
     {
       "id": "needs-you",
-      "name": "Task cards and needs-you",
-      "summary": "A task the Coordinator creates shows as a card in the conversation with its status, update count and latest line; the Tasks toggle carries the needs-you count.",
-      "states": "A card per created task after the reply that announced it (waiting, working, resolved); a one-line link when the Tasks read no longer lists the task; no tray above the composer.",
+      "name": "Task references and needs-you",
+      "summary": "A task the Coordinator creates or mentions shows as one reference row above the reply, tinted by its status, and opens the task panel; the Tasks toggle carries the needs-you count.",
+      "states": "One reference row per task per reply (working, waiting, resolved, failed tint; unread dot); a lone row without a connector when the turn has no reply yet; a one-line link when the page no longer knows the task; no tray above the composer.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/board/needs-you.ts",
-          "apps/web/src/board/task-card.tsx",
-          "apps/web/src/board/task-card-facts.ts"
+          "apps/web/src/chief/chief-task-ref-row.tsx",
+          "apps/web/src/chief/chief-task-refs.ts"
         ],
         "server": [
           "apps/server/src/services/needs-you.ts"
@@ -390,7 +390,7 @@
       },
       "reach": [
         "open /app",
-        "click testid:chief-task-card"
+        "click testid:chief-task-ref"
       ],
       "research": [
         "docs/research/link-roundup-2026-11-01.md",

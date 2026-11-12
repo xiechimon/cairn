@@ -364,7 +364,7 @@ function CodeLines({ lines, text }: { lines: CodeToken[][] | null; text: string 
 }
 
 const CODE_BTN_CLS =
-  "size-8 flex-none cursor-pointer rounded-(--radius-control) text-content-tertiary transition-none hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
+  'size-8 flex-none cursor-pointer rounded-(--radius-control) text-foreground transition-none hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 
 function useCopied(text: string) {
   const [copied, setCopied] = useState(false);
@@ -403,7 +403,7 @@ function CopyCodeButton({
         />
       }
     >
-      {copied ? <Check width={22} height={22} /> : <Copy width={22} height={22} />}
+      {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
     </IconTooltip>
   );
 }
@@ -420,7 +420,7 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
     >
       <div className="flex h-10 items-center gap-0 border-b border-border pr-1.5 pl-5">
         <span
-          className="min-w-0 flex-1 truncate font-sans text-code-lang text-content-tertiary"
+          className="min-w-0 flex-1 truncate font-sans text-code-lang text-content-secondary"
           data-testid="md-code-lang"
         >
           {lang}
@@ -437,7 +437,7 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
             />
           }
         >
-          <ChiefExpand width={22} height={22} />
+          <ChiefExpand className="size-4" />
         </IconTooltip>
         <CopyCodeButton text={text} testId="md-code-copy" />
       </div>

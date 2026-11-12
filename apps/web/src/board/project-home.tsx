@@ -55,7 +55,7 @@ function CardHead({ icon, title, action }: { icon: ReactNode; title: string; act
       <span aria-hidden="true" className="text-content-tertiary">
         {icon}
       </span>
-      <h3 className="m-0 mr-auto text-meta font-medium text-content-secondary">{title}</h3>
+      <h3 className="m-0 mr-auto text-meta font-medium text-foreground">{title}</h3>
       {action}
     </div>
   );

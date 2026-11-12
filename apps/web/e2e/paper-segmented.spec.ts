@@ -82,7 +82,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect(first.value.trackBg).toBe('rgb(242, 242, 242)');
       expect(first.value.selectedBg).toBe('rgb(255, 255, 255)');
       expect(first.value.selectedInk).toBe('rgb(10, 10, 10)');
-      expect(first.value.idleInk).toBe('rgb(79, 79, 79)');
+      expect(first.value.idleInk).toBe('rgb(58, 58, 58)');
     }
     for (const { name, value } of faces.slice(1)) {
       const { trackHeight, optionHeight, ...rest } = value;

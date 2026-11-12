@@ -159,7 +159,9 @@ test('a chip answers at once and the badge drops; the next question takes its pl
   await question.getByTestId('chief-question-option-0-0').click();
   await expect.poll(() => answered.length).toBe(2);
   await expect(question).toHaveCount(0);
-  await expect(page.getByTestId('chief-stream').getByTestId('chief-question-line')).toHaveCount(2);
+  const answers = page.getByTestId('chief-stream').locator('[data-question-answer]');
+  await expect(answers).toHaveText(['Claude subscription', 'Send it to ian']);
+  await expect(page.getByTestId('chief-stream').getByTestId('chief-question-line')).toHaveCount(0);
   await expect(page).toHaveTitle('Cairn');
 });
 
@@ -401,6 +403,7 @@ test('a multi-question request sends nothing and starts no turn until its last q
   await page.waitForTimeout(500);
   expect(posts.map((post) => post.path)).toEqual([]);
   await expect(stream.getByTestId('chief-bubble')).toHaveCount(bubblesBefore);
+  await expect(stream.locator('[data-question-answer]')).toHaveCount(0);
   await expect(stream.getByTestId('chief-question-line')).toHaveCount(0);
   await page.getByTestId('chief-question-submit').click();
   await expect.poll(() => posts.length).toBe(1);
@@ -411,10 +414,32 @@ test('a multi-question request sends nothing and starts no turn until its last q
       { header: 'Sections', choices: ['Details'] },
     ],
   });
-  const line = stream.getByTestId('chief-question-line');
-  await expect(line).toHaveCount(1);
-  await expect(line).toHaveText('已回答：Dark；Details');
-  await expect(stream.getByTestId('chief-bubble')).toHaveCount(bubblesBefore);
+  const answerBubble = stream.locator('[data-question-answer]');
+  await expect(answerBubble).toHaveCount(1);
+  await expect(answerBubble).toHaveAttribute('data-question-answer', 'ask-0000000a');
+  expect(await answerBubble.evaluate((el) => (el as HTMLElement).innerText)).toBe('Dark\nDetails');
+  await expect(stream.getByTestId('chief-question-line')).toHaveCount(0);
+  await expect(stream.getByTestId('chief-bubble')).toHaveCount(bubblesBefore + 1);
+  const looks = await stream.getByTestId('chief-bubble').evaluateAll((bubbles) =>
+    bubbles.map((bubble) => {
+      const cs = getComputedStyle(bubble);
+      const column = bubble.closest('[data-testid="chief-msg"]')!.getBoundingClientRect();
+      return {
+        slot: bubble.getAttribute('data-slot'),
+        fill: cs.backgroundColor,
+        ink: cs.color,
+        radius: cs.borderTopLeftRadius,
+        padding: cs.padding,
+        font: `${cs.fontSize}/${cs.lineHeight}`,
+        right: Math.round(column.right - bubble.getBoundingClientRect().right),
+      };
+    }),
+  );
+  expect(looks).toHaveLength(2);
+  expect(looks[1]).toEqual(looks[0]);
+  expect(looks[1]?.slot).toBe('user-bubble');
+  expect(looks[1]?.right).toBe(0);
+  expect(posts).toHaveLength(1);
   await page.screenshot({ path: test.info().outputPath('answered-request.png') });
 });
 

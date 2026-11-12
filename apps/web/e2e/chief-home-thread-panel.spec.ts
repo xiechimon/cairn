@@ -78,21 +78,24 @@ test('back returns to the tasks list and close leaves the panel area empty', asy
   await expect(page.getByRole('complementary', { name: '任务' })).toHaveCount(0);
 });
 
-test('an unread thread shows a dot on its task card, and opening the thread clears it', async ({
+test('an unread thread shows a dot on its task reference, and opening the thread clears it', async ({
   page,
 }) => {
   await page.goto('/app?scenario=home-c-unread');
-  const card = page.locator('[data-slot="task-card"]').filter({ hasText: 'Orb canary round 7' });
-  await expect(card.locator('[data-slot="task-card-unread"]')).toBeVisible();
+  const stream = page.getByTestId('chief-stream');
+  const ref = stream.getByTestId('chief-task-ref').filter({ hasText: 'Orb canary round 7' });
+  await expect(ref).toHaveCount(1);
+  await expect(ref.locator('[data-slot="task-ref-unread"]')).toBeVisible();
+  await expect(ref.locator('[data-slot="task-ref-unread"]')).toHaveAccessibleName('有新动态');
   await expect(
-    page
-      .locator('[data-slot="task-card"]')
+    stream
+      .getByTestId('chief-task-ref')
       .filter({ hasText: 'Fold finished turns' })
-      .locator('[data-slot="task-card-unread"]'),
+      .locator('[data-slot="task-ref-unread"]'),
   ).toHaveCount(0);
-  await card.click();
+  await ref.click();
   await expect(page.getByTestId('side-chat')).toBeVisible();
-  await expect(card.locator('[data-slot="task-card-unread"]')).toHaveCount(0);
+  await expect(ref.locator('[data-slot="task-ref-unread"]')).toHaveCount(0);
 });
 
 test('the panel width is resizable and remembered', async ({ page }) => {

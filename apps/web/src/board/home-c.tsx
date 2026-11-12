@@ -11,7 +11,6 @@ import {
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
-import { TaskCardContext } from '../chief/chief-message-rows.js';
 import { QuestionScopeContext } from '../chief/chief-question.js';
 import { ChiefStatusMark } from '../chief/chief-status-mark.js';
 import { questionDockState } from '../chief/question-dock-state.js';
@@ -53,8 +52,6 @@ import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { NarrowTopControls, useNarrowChrome } from './narrow-chrome.js';
 import { composeRequest } from './open-composer.js';
 import { PhoneTabs } from './phone-tabs.js';
-import { TaskCard } from './task-card.js';
-import { taskCardFacts } from './task-card-facts.js';
 import { TasksPanel } from './tasks-panel.js';
 import {
   needsYouBadge,
@@ -270,27 +267,6 @@ export function HomeC({
   );
   const scopedTasks = useMemo(() => scopeTasks(tasks, projectId), [tasks, projectId]);
   const badge = needsYouBadge(scopedTasks.entries, scopedTasks.questions);
-  const taskById = useMemo(
-    () => new Map(tasks.entries.map((entry) => [entry.todo.id, entry])),
-    [tasks.entries],
-  );
-  const fullStream = chiefData.stream;
-  const renderTaskCard = useCallback(
-    (todoId: string) => {
-      const entry = taskById.get(todoId);
-      if (entry === undefined) return null;
-      return (
-        <TaskCard
-          entry={entry}
-          facts={taskCardFacts(fullStream ?? [], todoId)}
-          now={now}
-          onOpen={() => openThread(todoId)}
-          compact={narrow}
-        />
-      );
-    },
-    [taskById, fullStream, openThread, now, narrow],
-  );
   const [questionTarget, setQuestionTarget] = useState<QuestionTarget | null>(null);
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const questionView: QuestionThreadView = {
@@ -582,69 +558,67 @@ export function HomeC({
               {banner}
             </div>
           )}
-          <TaskCardContext.Provider value={renderTaskCard}>
-            <OpenFileContext.Provider value={openFile}>
-              <ConversationBoundary resetKey={conversationResetKey}>
-                <ChiefConversation
-                  chief={{
-                    ...chiefData,
-                    stream: conversation,
-                    ...(quickReplies !== undefined ? { quickReplies } : { quickReplies: [] }),
-                  }}
-                  onSend={
-                    archived !== null
-                      ? undefined
-                      : thread.picked !== null
-                        ? thread.send
-                        : surface.onSend != null
-                          ? (text: string) => surface.onSend?.(text, projectId)
-                          : live
-                            ? undefined
-                            : () => Promise.resolve()
-                  }
-                  onRewind={archived === null ? surface.onRewind : undefined}
-                  onWithdraw={archived === null ? surface.onWithdraw : undefined}
-                  onSteer={archived === null ? surface.onSteer : undefined}
-                  onStop={archived === null ? surface.onStop : undefined}
-                  composerReplacement={archivedBar}
-                  earlier={surface.earlier}
-                  onSettings={() => surface.setChiefView('settings')}
-                  showBindGate={!live}
-                  hero={hero}
-                  todoGlances={todoGlances}
-                  prefill={prefill}
-                  placeholder={
-                    projectName != null
-                      ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
-                      : t('给 Coordinator 发消息')
-                  }
-                  composerError={thread.error}
-                  targetPlaceholder={thread.placeholder}
-                  composerMenu={
-                    <ComposerThreadTargetMenu
+          <OpenFileContext.Provider value={openFile}>
+            <ConversationBoundary resetKey={conversationResetKey}>
+              <ChiefConversation
+                chief={{
+                  ...chiefData,
+                  stream: conversation,
+                  ...(quickReplies !== undefined ? { quickReplies } : { quickReplies: [] }),
+                }}
+                onSend={
+                  archived !== null
+                    ? undefined
+                    : thread.picked !== null
+                      ? thread.send
+                      : surface.onSend != null
+                        ? (text: string) => surface.onSend?.(text, projectId)
+                        : live
+                          ? undefined
+                          : () => Promise.resolve()
+                }
+                onRewind={archived === null ? surface.onRewind : undefined}
+                onWithdraw={archived === null ? surface.onWithdraw : undefined}
+                onSteer={archived === null ? surface.onSteer : undefined}
+                onStop={archived === null ? surface.onStop : undefined}
+                composerReplacement={archivedBar}
+                earlier={surface.earlier}
+                onSettings={() => surface.setChiefView('settings')}
+                showBindGate={!live}
+                hero={hero}
+                todoGlances={todoGlances}
+                prefill={prefill}
+                placeholder={
+                  projectName != null
+                    ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
+                    : t('给 Coordinator 发消息')
+                }
+                composerError={thread.error}
+                targetPlaceholder={thread.placeholder}
+                composerMenu={
+                  <ComposerThreadTargetMenu
+                    targets={thread.targets}
+                    picked={thread.picked}
+                    onPick={thread.pick}
+                  />
+                }
+                composerTools={
+                  <>
+                    <ComposerThreadTarget
                       targets={thread.targets}
                       picked={thread.picked}
+                      composerRef={composerRef}
                       onPick={thread.pick}
                     />
-                  }
-                  composerTools={
-                    <>
-                      <ComposerThreadTarget
-                        targets={thread.targets}
-                        picked={thread.picked}
-                        composerRef={composerRef}
-                        onPick={thread.pick}
-                      />
-                      <ComposerSetupHint />
-                    </>
-                  }
-                  composerRef={(node) => {
-                    composerRef.current = node;
-                  }}
-                />
-              </ConversationBoundary>
-            </OpenFileContext.Provider>
-          </TaskCardContext.Provider>
+                    <ComposerSetupHint />
+                  </>
+                }
+                composerRef={(node) => {
+                  composerRef.current = node;
+                }}
+              />
+            </ConversationBoundary>
+          </OpenFileContext.Provider>
         </section>
         {workPanel}
       </div>

@@ -38,7 +38,7 @@
 | [Harness dispatch](#harness-dispatch) | 1 | shipped | yes | n/a | yes |  |
 | [Memory](#memory) | 1 | shipped | yes | yes (not on main) | yes |  |
 | [Evidence-bound merge gate](#merge-gate) | 1 | shipped | yes | gap | yes | B3 |
-| [Task cards and needs-you](#needs-you) | 1 | shipped | yes | yes | gap | B2 |
+| [Task references and needs-you](#needs-you) | 1 | shipped | yes | yes | gap | B2 |
 | [Per-task orb isolation](#orb-isolation) | 1 | partial | yes | gap | yes | B4 |
 | [Plans, approval and review](#plans-and-review) | 1 | shipped | yes | gap | yes | B3 |
 | [Phone push](#push-notifications) | 1 | shipped | gap | gap | gap | B2 |
@@ -94,7 +94,7 @@ The attention surfaces of the phase 1 graduation criteria: the needs-you tray, q
 | Feature | Centrality | Missing |
 |---|---|---|
 | [Daily report and retro](#daily-report) | 1 | Frontend design: the report row and retro proposal card have no design<br>Backend design: no design for report content, timing, quiet rules and retro proposal storage |
-| [Task cards and needs-you](#needs-you) | 1 | Backend design: no design for which records enter the tray, their order and when they leave |
+| [Task references and needs-you](#needs-you) | 1 | Backend design: no design for which records enter the tray, their order and when they leave |
 | [Phone push](#push-notifications) | 1 | Research: no prior-art note on agent notifications and push delivery<br>Frontend design: the notify banner, device switch and push copy have no design<br>Backend design: no design for subscriptions, presence suppression, receipts and the three push states |
 | [Question cards](#questions) | 1 | Research: the Codex CLI and t3code question patterns behind D85 and D119 were never written up<br>Backend design: no design for the question lifecycle: parking, late answers, cancel and resume |
 
@@ -271,7 +271,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### needs-you
 
-**Task cards and needs-you** (shipped). A task the Coordinator creates shows as a card in the conversation with its status, update count and latest line; the Tasks toggle carries the needs-you count.
+**Task references and needs-you** (shipped). A task the Coordinator creates or mentions shows as one reference row above the reply, tinted by its status, and opens the task panel; the Tasks toggle carries the needs-you count.
 
 - Research: [docs/research/link-roundup-2026-11-01.md](research/link-roundup-2026-11-01.md), [docs/research/ui-ux-audit-2026-11-06.md](research/ui-ux-audit-2026-11-06.md) (not on main), [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
 - Frontend design: [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)

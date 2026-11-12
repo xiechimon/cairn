@@ -11,6 +11,7 @@ import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
+import type { GlyphKind } from '../components/status-glyph.js';
 import { PrList } from '../components/thread/pr-list.js';
 import { prByThread } from '../components/thread/pr-panel-model.js';
 import { TaskRow } from '../components/thread/task-row.js';
@@ -77,7 +78,7 @@ function TasksPrList({
   const [, setSearchParams] = useSearchParams();
   return (
     <section data-testid="work-prs" className="flex flex-col pt-1">
-      <h3 className="m-0 flex h-8 items-center gap-2 px-2.5 text-meta font-medium text-content-secondary">
+      <h3 className="m-0 flex h-8 items-center gap-2 px-2.5 text-meta font-medium text-foreground">
         {t('拉取请求')}
         <span className="font-normal text-content-tertiary tabular-nums">{prs.length}</span>
       </h3>
@@ -110,6 +111,13 @@ function TasksPrList({
   );
 }
 
+function unfinishableLead(todo: TaskEntry['todo']): { glyph: GlyphKind; why: string } {
+  if (todo.phase === 'failed') return { glyph: 'failed', why: '运行失败了，先重跑才能完成' };
+  if (todo.phase === 'closed') return { glyph: 'closed', why: '已关闭' };
+  if (todo.phase === 'done') return { glyph: 'done', why: '已完成' };
+  return { glyph: 'todo', why: '已归档，不能标记完成' };
+}
+
 function PanelTaskRow({
   entry,
   pr,
@@ -125,22 +133,23 @@ function PanelTaskRow({
   const { markDone, dialogs } = useMarkDone(entry.todo);
   const copy: TaskRowCopy = taskRowCopy(entry, pr);
   const open = () => onOpenThread(entry.todo.id);
+  const unfinishable = canMarkDone(entry.todo) ? null : unfinishableLead(entry.todo);
   return (
     <>
       <TaskRow
         {...(pr === undefined ? {} : { prLink: { number: pr.number, url: pr.url } })}
         title={entry.todo.title}
-        glyph={glyphOf(entry)}
+        glyph={unfinishable?.glyph ?? glyphOf(entry)}
+        {...(unfinishable === null ? {} : { why: t(unfinishable.why) })}
         word={t(copy.word)}
         what={t(copy.what.key, copy.what.params)}
         where={copy.where === null ? null : t(copy.where)}
         age={relativeTime(entry.todo.phaseAt, now, t)}
         {...(entry.section === 'resolved' ? { date: shortDate(entry.todo.phaseAt, t) } : {})}
         waiting={copy.waiting}
-        running={copy.running}
         muted={entry.section === 'resolved'}
         check={
-          canMarkDone(entry.todo)
+          unfinishable === null
             ? { label: t('标记完成：{title}', { title: entry.todo.title }), onCheck: markDone }
             : 'none'
         }
@@ -208,7 +217,7 @@ export function TasksPanel({
       where={questionCopy.where === null ? null : t(questionCopy.where)}
       age={relativeTime(question.createdAt, now, t)}
       waiting
-      running={false}
+      why={t('Coordinator 在问你，到对话里回答')}
       check="none"
       onOpen={() => {
         if (questionDockState.uploading()) {

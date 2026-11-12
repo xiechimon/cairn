@@ -15,7 +15,7 @@ import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 
 const CARD_CLS =
-  'mb-3 flex flex-col gap-3 rounded-(--radius-card) border border-border bg-card px-3.5 py-3 text-ui leading-6 text-content-secondary';
+  'mb-3 flex flex-col gap-3 rounded-(--radius-card) border border-border bg-card px-3.5 py-3 text-ui leading-6 text-foreground';
 const SECTION_CLS = 'grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5';
 const LABEL_CLS = 'truncate pt-px text-meta text-content-tertiary';
 const REF_CLS = 'text-foreground hover:underline';
