@@ -75,8 +75,6 @@ export const EN: Record<string, string> = {
   正在推送: 'Pushing',
   '正在调用 {n} 个工具': 'Calling {n#1 tool|# tools}',
   '（{n} 个失败）': '({n} failed)',
-  '已工作 {n} 分钟': 'Worked for {n#1 minute|# minutes}',
-  '工作中 · {time}': 'Working · {time}',
   思考了: 'Thought',
   读取了: 'Read',
   搜索了: 'Searched',

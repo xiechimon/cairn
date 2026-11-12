@@ -137,6 +137,12 @@ export async function openReplySteps(page: Page, reply: Locator): Promise<void> 
   await page.getByTestId('chief-msg-steps').click();
 }
 
+export async function copyFromRowTools(page: Page, block: Locator): Promise<void> {
+  await block.hover();
+  await block.getByTestId('msg-tools').getByTestId('chief-msg-more').click();
+  await page.getByTestId('chief-msg-copy').click();
+}
+
 export async function stubCoordinatorChief(page: Page, teamId: string, userId: string) {
   await page.route(`**/api/teams/${teamId}/chief`, (route) =>
     route.fulfill({

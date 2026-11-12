@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useTouchMessageTools } from '../chief/touch-message-tools.js';
 import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
@@ -79,6 +80,8 @@ function TranscriptColumnInner({
   const { scrollToEnd } = useMessageScroller();
   useImperativeHandle(handleRef, () => ({ scrollToEnd: () => void scrollToEnd() }), [scrollToEnd]);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const [rows, setRows] = useState<HTMLDivElement | null>(null);
+  useTouchMessageTools(rows);
   const anchoredKey = useRef<string | undefined>(undefined);
   const [openedKey, setOpenedKey] = useState<string | undefined>(undefined);
   const anchor = running === undefined || !settled ? null : openingAnchor(running, transcript);
@@ -101,9 +104,10 @@ function TranscriptColumnInner({
         data-testid="transcript-col"
         className={VIEWPORT_CLS}
       >
-        <MessageScrollerContent className={CONTENT_CLS}>
+        <MessageScrollerContent ref={setRows} className={CONTENT_CLS}>
           {lead}
           <Transcript
+            key={threadKey}
             transcript={transcript}
             liveStep={liveStep}
             agent={agent}
