@@ -16,6 +16,7 @@ const CODE_PATHS = [
   '.claude/skills/*/vp-registry.json',
   '.claude/skills/*/SKILL.md',
   '.claude/hillclimb',
+  'docs/lessons',
 ];
 const SELF = [':!scripts/evidence-prune.mjs', ':!scripts/evidence-prune.test.mjs'];
 const FOLDER_REF = /docs\/verify\/([A-Za-z0-9_-]+)/g;

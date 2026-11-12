@@ -1,0 +1,6 @@
+$ python3 docs/verify/2081/review-preflight.py /tmp/cairn-1623-final-independent-pass.json --head 60aaf07a741186378cf027d635462157ee9ad755 --digest pd2:cf55062632e67915d21d1d9848543ce603966234994037855835a58b7ec88b41 --writer-family GPT --bundle /tmp/cairn-1623-final-review-bundle.txt --source-root <checkout> --github-pr /tmp/cairn-2084-rest-current.json --github-files /tmp/2081-partial-files.json
+BLOCK: GitHub file count differs from the captured PR
+BLOCK: GitHub file paths differ from the local base-to-head comparison
+BLOCK: Supplied digest differs from captured GitHub patch
+BLOCK: Review digest differs from the current patch
+exit=1
