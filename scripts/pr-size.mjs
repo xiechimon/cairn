@@ -35,11 +35,12 @@ const TEST_PATHS = [
 
 const isGenerated = (path) => GENERATED_PATHS.some((glob) => matchesGlob(path, glob));
 const isTest = (path) => TEST_PATHS.some((re) => re.test(path));
+export const countsTowardSize = (path) => !isGenerated(path) && !isTest(path);
 const changedLines = (file) => file.additions + file.deletions;
 const sum = (rows) => rows.reduce((total, file) => total + changedLines(file), 0);
 
 export function sizeOf(files) {
-  const kept = files.filter((f) => !isGenerated(f.filename) && !isTest(f.filename));
+  const kept = files.filter((f) => countsTowardSize(f.filename));
   const lines = kept.length > 0 ? sum(kept) : sum(files);
   const { name, color } = SIZE_LABELS.find((entry) => lines <= entry.max);
   return { lines, label: name, color };

@@ -192,7 +192,7 @@ A PR that changes `apps/web/src` adds a reference table under Proof, one row per
 
 ## Review
 
-Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) reviews every push through the review gate. Never write `@codex` in a PR body: Codex reads it as a task request, answers that the repository has no environment, and skips the automatic review. Fix confirmed findings and record skipped ones with reasons under Review.
+`pnpm prepush` runs one diff-only review (`scripts/prepush-review.mjs`) when the committed diff touches a protected or owner-routed path or exceeds 300 counted lines. Fix each finding it prints, or answer it with a `Pre-push-review-answer: <path>: <bug-class>: <reason>` trailer on a commit in the push, and list its `count: N` line plus each answer under Review. Do not run `codex exec` or `claude -p`. Codex cloud code review (`chatgpt-codex-connector[bot]`) reviews every push through the review gate and remains the required review. Never write `@codex` in a PR body: Codex reads it as a task request, answers that the repository has no environment, and skips the automatic review. Fix confirmed findings and record skipped ones with reasons under Review.
 
 ## Mechanics
 

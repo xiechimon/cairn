@@ -445,6 +445,7 @@ test('documentation skips code checks, unknown paths fail closed', () => {
     ['node', 'scripts/english-only-gate.mjs'],
     ['node', 'scripts/public-content-gate.mjs'],
     ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons.md', 'AGENTS.md'],
+    ['node', 'scripts/prepush-review.mjs'],
   ]);
   assert.deepEqual(prepushPlan(['docs/lessons.md'], 'ci'), [
     ['node', 'scripts/english-only-gate.mjs'],
@@ -567,6 +568,7 @@ test('lesson entries use the same document checks as other Markdown', () => {
         ['node', 'scripts/english-only-gate.mjs'],
         ['node', 'scripts/public-content-gate.mjs'],
         ['node', 'scripts/doc-reader-tests.mjs', path],
+        ...(mode === 'local' ? [['node', 'scripts/prepush-review.mjs']] : []),
       ]);
 });
 

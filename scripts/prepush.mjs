@@ -15,6 +15,8 @@ export const prepushModules = [
   'scripts/public-content-allowlist.json',
   'scripts/journal-newline-gate.mjs',
   'scripts/scrub-git-env.mjs',
+  'scripts/prepush-review.mjs',
+  'scripts/pr-size.mjs',
 ];
 
 export const ciOnlyScripts = {
@@ -33,6 +35,7 @@ export const selfTests = [
   'scripts/ops/push-worker.test.mjs',
   'scripts/prepush.test.mjs',
   'scripts/prepush-refuse-main.test.mjs',
+  'scripts/prepush-review.test.mjs',
   'scripts/heavy-slots.test.mjs',
   'scripts/test-admission.test.mjs',
   'scripts/owned-process.test.mjs',
@@ -52,11 +55,14 @@ export const selfTests = [
 
 const selfTest = ['node', '--test', ...selfTests];
 
+const prepushReview = ['node', 'scripts/prepush-review.mjs'];
+
 export const localOnly = [
   ['node', 'scripts/comment-discipline-gate.mjs'],
   ['node', 'scripts/ui-registry-gate.mjs'],
   ['node', 'scripts/ui-consumer-shape-gate.mjs'],
   ['node', 'scripts/lint-warning-cap.mjs'],
+  prepushReview,
 ];
 
 const SOURCE_TREES = /^(apps|packages|integration)\//;
@@ -138,7 +144,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
   if (codePaths.length === 0 && !forceFull) {
     const checks = [language, publicContent];
     checks.push(['node', 'scripts/doc-reader-tests.mjs', ...docPaths]);
-    return checks;
+    return mode === 'local' ? [...checks, prepushReview] : checks;
   }
   const required = [
     language,
