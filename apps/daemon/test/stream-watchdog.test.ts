@@ -1,5 +1,14 @@
+import { STREAM_TIMEOUTS_MS } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { type StreamTimeoutArm, StreamWatchdog } from '../src/stream-watchdog.js';
+import {
+  resolveStreamLimits,
+  STREAM_DURATION_CAP_DEFAULT_MS,
+  STREAM_DURATION_CAP_ENV,
+  STREAM_FIRST_EVENT_ENV,
+  STREAM_IDLE_ENV,
+  type StreamTimeoutArm,
+  StreamWatchdog,
+} from '../src/stream-watchdog.js';
 
 const timeouts = { first: 100, idle: 200, body: 1000 };
 
@@ -101,5 +110,66 @@ describe('StreamWatchdog', () => {
     watchdog.stop();
     vi.advanceTimersByTime(10_000);
     expect(trips).toEqual([]);
+  });
+});
+
+describe('resolveStreamLimits', () => {
+  test('falls back to the shared defaults', () => {
+    expect(resolveStreamLimits({}, {})).toEqual({
+      timeouts: {
+        first: STREAM_TIMEOUTS_MS.streamFirstEvent,
+        idle: STREAM_TIMEOUTS_MS.streamIdle,
+        body: STREAM_TIMEOUTS_MS.streamBodyTimeout,
+      },
+      durationCapMs: STREAM_DURATION_CAP_DEFAULT_MS,
+      durationCapIsAbsolute: false,
+    });
+  });
+
+  test('uses the overrides when the environment sets nothing', () => {
+    expect(resolveStreamLimits({ timeouts, durationCapMs: 5000 }, {})).toEqual({
+      timeouts,
+      durationCapMs: 5000,
+      durationCapIsAbsolute: false,
+    });
+  });
+
+  test('the environment wins over the overrides and makes the duration cap absolute', () => {
+    const limits = resolveStreamLimits(
+      { timeouts, durationCapMs: 5000 },
+      {
+        [STREAM_FIRST_EVENT_ENV]: '300',
+        [STREAM_IDLE_ENV]: '400',
+        [STREAM_DURATION_CAP_ENV]: '900',
+      },
+    );
+    expect(limits).toEqual({
+      timeouts: { first: 300, idle: 400, body: 1000 },
+      durationCapMs: 900,
+      durationCapIsAbsolute: true,
+    });
+  });
+
+  test('the body timeout is never shorter than a first-event or idle value from the environment', () => {
+    expect(resolveStreamLimits({ timeouts }, { [STREAM_IDLE_ENV]: '4000' }).timeouts).toEqual({
+      first: 100,
+      idle: 4000,
+      body: 4000,
+    });
+    expect(
+      resolveStreamLimits({ timeouts }, { [STREAM_FIRST_EVENT_ENV]: '3000' }).timeouts,
+    ).toEqual({ first: 3000, idle: 200, body: 3000 });
+  });
+
+  test('ignores environment values that are not positive numbers', () => {
+    const limits = resolveStreamLimits(
+      { timeouts, durationCapMs: 5000 },
+      {
+        [STREAM_FIRST_EVENT_ENV]: 'twenty minutes',
+        [STREAM_IDLE_ENV]: '0',
+        [STREAM_DURATION_CAP_ENV]: '-5',
+      },
+    );
+    expect(limits).toEqual({ timeouts, durationCapMs: 5000, durationCapIsAbsolute: false });
   });
 });
