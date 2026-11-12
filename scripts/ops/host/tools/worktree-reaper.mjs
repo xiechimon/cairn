@@ -69,6 +69,30 @@ function linkedWorktrees(repo) {
   return entries.slice(1);
 }
 
+function listPrs(repo, state) {
+  const list = spawnSync(
+    'gh',
+    [
+      'pr',
+      'list',
+      '--state',
+      state,
+      '--limit',
+      PR_LIMIT,
+      '--json',
+      'number,state,headRefName,headRefOid,mergedAt,closedAt',
+    ],
+    { cwd: repo, encoding: 'utf8' },
+  );
+  if (list.status !== 0) {
+    console.error(
+      `worktree-reaper: gh pr list failed, removing nothing: ${(list.stderr ?? '').trim()}`,
+    );
+    process.exit(1);
+  }
+  return JSON.parse(list.stdout);
+}
+
 function dirty(path) {
   const status = spawnSync(
     'git',
@@ -114,27 +138,14 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
       : argv[repoAt + 1],
   );
   const dryRun = argv.includes('--dry-run');
-  const list = spawnSync(
-    'gh',
-    [
-      'pr',
-      'list',
-      '--state',
-      'all',
-      '--limit',
-      PR_LIMIT,
-      '--json',
-      'number,state,headRefName,headRefOid,mergedAt,closedAt',
-    ],
-    { cwd: repo, encoding: 'utf8' },
-  );
-  if (list.status !== 0) {
+  const open = listPrs(repo, 'open');
+  if (open.length >= Number(PR_LIMIT)) {
     console.error(
-      `worktree-reaper: gh pr list failed, removing nothing: ${(list.stderr ?? '').trim()}`,
+      `worktree-reaper: open PR list reached the limit of ${PR_LIMIT}, removing nothing`,
     );
     process.exit(1);
   }
-  const prs = JSON.parse(list.stdout);
+  const prs = [...open, ...listPrs(repo, 'all')];
   const fetch = spawnSync('git', ['-C', repo, 'fetch', '--prune', '--quiet', 'origin'], {
     encoding: 'utf8',
   });

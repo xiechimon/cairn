@@ -170,6 +170,7 @@ function fixture(prs) {
     holder: join(repo, '.claude/worktrees/holder'),
     fresh: join(repo, '.claude/worktrees/fresh'),
     local: join(repo, '.claude/worktrees/local'),
+    old: join(repo, '.claude/worktrees/old'),
     named: join(dir, 'cache/named-assets'),
     foreign: join(dir, '.t3/worktrees/cairn/foreign'),
   };
@@ -192,8 +193,8 @@ function fixture(prs) {
   git(repo, 'worktree', 'add', '-q', '-b', 'fix/inner', inner);
   writeFileSync(join(inner, 'unsaved.txt'), 'wip');
   trees.inner = { path: inner, head: git(inner, 'rev-parse', 'HEAD') };
-  git(repo, 'push', '-q', 'origin', 'main', 'fix/named:pr-assets/named', 'fix/fresh');
-  for (const name of ['named', 'baseline', 'local']) {
+  git(repo, 'push', '-q', 'origin', 'main', 'fix/named:pr-assets/named', 'fix/fresh', 'fix/old');
+  for (const name of ['named', 'baseline', 'local', 'old']) {
     const gitDir = git(trees[name].path, 'rev-parse', '--absolute-git-dir');
     const then = new Date(Date.now() - 4 * 24 * 60 * 60_000);
     for (const file of ['HEAD', 'index', 'logs/HEAD'])
@@ -203,9 +204,20 @@ function fixture(prs) {
   git(trees.moved.path, 'commit', '-q', '--allow-empty', '-m', 'after the PR');
   const bin = join(dir, 'bin');
   mkdirSync(bin);
-  writeFileSync(join(bin, 'gh'), `#!/bin/sh\ncat ${JSON.stringify(join(dir, 'prs.json'))}\n`);
+  writeFileSync(
+    join(bin, 'gh'),
+    `#!/bin/sh\ncase "$*" in\n*"--state open"*) cat ${JSON.stringify(join(dir, 'open.json'))} ;;\n*) cat ${JSON.stringify(join(dir, 'prs.json'))} ;;\nesac\n`,
+  );
   chmodSync(join(bin, 'gh'), 0o755);
-  writeFileSync(join(dir, 'prs.json'), JSON.stringify(prs(trees)));
+  const listed = prs(trees);
+  writeFileSync(
+    join(dir, 'prs.json'),
+    JSON.stringify(listed.filter((entry) => !entry.pastTheListLimit)),
+  );
+  writeFileSync(
+    join(dir, 'open.json'),
+    JSON.stringify(listed.filter((entry) => entry.state === 'OPEN')),
+  );
   return {
     dir,
     repo,
@@ -230,6 +242,15 @@ const fixturePrs = (trees) => [
   pr({ number: 6, headRefName: 'fix/outside', headRefOid: trees.outside.head }),
   pr({ number: 7, headRefName: 'fix/holder', headRefOid: trees.holder.head }),
   pr({ number: 8, headRefName: 'fix/foreign', headRefOid: trees.foreign.head }),
+  pr({
+    number: 9,
+    headRefName: 'fix/old',
+    headRefOid: trees.old.head,
+    state: 'OPEN',
+    mergedAt: null,
+    closedAt: null,
+    pastTheListLimit: true,
+  }),
 ];
 
 test('the reaper removes only the reapable tree and leaves every other one intact', {
@@ -269,6 +290,7 @@ test('the reaper removes only the reapable tree and leaves every other one intac
     /kept .*\/fresh: no PR for fix\/fresh and the tree changed less than 3 days ago/,
   );
   assert.match(run.stdout, /kept .*\/local: no PR for fix\/local and HEAD is on no remote branch/);
+  assert.match(run.stdout, /kept .*\/old: PR #9 is open/);
   assert.match(run.stdout, /kept .*\/holder: contains worktree .*\/inner/);
   assert.match(run.stdout, /kept .*\/foreign: managed by T3 Code/);
   assert.doesNotMatch(run.stdout, new RegExp(`(kept|removed) ${repo}[:( ]`));
@@ -283,6 +305,7 @@ test('the reaper removes only the reapable tree and leaves every other one intac
     'inner',
     'fresh',
     'local',
+    'old',
     'foreign',
   ])
     assert.equal(existsSync(trees[name].path), true, name);
@@ -306,5 +329,19 @@ test('a failing fetch removes nothing', () => {
   const run = spawnSync(process.execPath, [SCRIPT, '--repo', repo], { env, encoding: 'utf8' });
   assert.equal(run.status, 1);
   assert.match(run.stderr, /git fetch failed/);
+  assert.equal(existsSync(trees.merged.path), true);
+});
+
+test('an open PR list that reaches the limit removes nothing', () => {
+  const { repo, trees, env, dir } = fixture(fixturePrs);
+  writeFileSync(
+    join(dir, 'open.json'),
+    JSON.stringify(
+      Array.from({ length: 1000 }, (_, at) => pr({ number: at + 100, state: 'OPEN' })),
+    ),
+  );
+  const run = spawnSync(process.execPath, [SCRIPT, '--repo', repo], { env, encoding: 'utf8' });
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /open PR list reached the limit of 1000/);
   assert.equal(existsSync(trees.merged.path), true);
 });
