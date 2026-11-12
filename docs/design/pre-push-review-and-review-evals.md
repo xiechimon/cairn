@@ -25,7 +25,7 @@ Counted lines are `scripts/pr-size.mjs` lines: additions plus deletions, tests a
 | #3974 | 356 | no | 4 |
 | #3981 #3979 #3987 #3997 #3992 #3994 #3989 | 104, 124, 309, 408, 584, 747, 802 | yes (drizzle or credentials) | 0, 0, 0, 5, 2, 3, 7 |
 
-N=300 is the gap above the docs cluster (max 265) and below the only non-protected multi-round code PR (#3974, 356 counted, 4 failed heads). N=400 would miss that PR. N=100 would review every design doc; those rounds were implementation notes, not code defects. The path trigger already covers the seven security diffs, including #3981 at 104 counted lines. Five of the 13 would not be reviewed. That is the point.
+N=300 is the gap above the docs cluster (max 265) and below the only non-protected multi-round code PR (#3974, 356 counted, 4 failed heads). N=400 would miss that PR. N=100 would review every design doc; those rounds were implementation notes, not code defects. The path trigger already covers the seven protected diffs, including #3981 at 104 counted lines. Five of the 13 would not be reviewed. That is the point.
 
 Send only the counted diff, protected and security hunks first, after `redactSecrets`. Cap input at 24,000 tokens (about 20 tokens per counted line, derived, plus an 800-token prompt). Tonight's largest triggered diff is 802 counted lines, about 17,000 tokens, so the cap covers that night unless lines are unusually long. Over the cap, send a prefix and print `truncated`. A `count: 0` on a truncated diff is not full coverage and does not block. Output cap 1,500 tokens. Time cap 90 seconds, a kill in this step, not the 15-minute node-test timeout.
 
@@ -62,7 +62,7 @@ Dataset `review-incidents`, written only by the host. Item input is the `reviewe
 
 Pending items never become dataset items. Same rule as `integration/eval/failure-replay`. New queue `review-incidents`, not the failure-replay queue. The collector runs `redactSecrets` before it enqueues or writes a dataset item. Intake does not commit cases into `integration/eval/` from the timer. A human PR does that, as the failure-replay README already requires.
 
-Experiment, later slice, not this one: `dataset.runExperiment` on the pinned version. The task is the review prompt under test, tools off, expected output not in the prompt. Evaluators are local functions, not an LLM judge. Recall: items with at least one finding on the expected path whose line overlaps the expected range, over items that have a location. False positive: a finding that is not a hit, or any finding on a queue-confirmed clean control, as a count and as a rate. A rate alone hides a flood. Run it on the host before a review-system PR merges. Not a required check until a later design says so. Not in CI.
+Experiment, later slice, not this one: `dataset.runExperiment` on the pinned version. The task is the review prompt under test, tools off, expected output not in the prompt. Evaluators are local functions, not an LLM judge. Recall: items with at least one finding on the expected path whose line overlaps the expected range, over items that have a location. An unmatched finding on an incident item is not a false positive: the label is one location, not an exhaustive list, so a second real defect must not count against the reviewer. False positives are findings on queue-confirmed clean controls only, reported as a count and as a rate. A rate alone hides a flood. An unmatched finding becomes a false positive only after a human labels that item exhaustive and still unmatched. Run it on the host before a review-system PR merges. Not a required check until a later design says so. Not in CI.
 
 Comment outcomes, weekly, from `gh` review threads. One score per comment, id derived from the comment node id so a re-run does not duplicate (same idea as shadow's stable score id). Name `review.outcome`. Value, from reply text, not a re-read of the diff: `fixed` (names a commit), `rejected` (not a bug, or recorded and not fixed), `intentional` (by design), `did-not-matter` (resolved with no reply, outdated, or no code change and none of the other labels). Weekly aggregates on one trace per ISO week: `review.revert_rate` (revert commits on main divided by merge commits, 7 days) and `review.cycles_to_pass` (median of review-gate failed heads before the first green, the research note's method). These scores do not gate merge.
 
@@ -70,12 +70,12 @@ Scripts. `scripts/review-metrics.mjs` collects candidates, enqueues, and posts t
 
 ## What is protected, and what is not owner-routed
 
-Observed in `AGENTS.md` on this branch: path class does not keep a PR on ian's route and does not add `coordinator-hold`. Protected paths enter the queue with every other green PR. "Require review from Code Owners" is not enabled (`docs/ops/agent-bot-identity.md`). So none of the paths below are owner-routed. They are still protected, and two are security surfaces.
+Observed in `AGENTS.md` on this branch: path class does not keep a PR on ian's route and does not add `coordinator-hold`. Protected paths enter the queue with every other green PR. "Require review from Code Owners" is not enabled (`docs/ops/agent-bot-identity.md`). So none of the paths below are owner-routed. They are still protected. None of them is a security surface. `scripts/security-review-disposition.mjs` builds that list only from `credentials`, `machineAndCommandBoundary`, and `externalEntryAuth`. `releaseAndControlPlane` is protected, not that list.
 
 | Future path | Class | What the PR needs |
 | --- | --- | --- |
 | `scripts/prepush-review.mjs`, `scripts/prepush.mjs`, `AGENTS.md`, `.claude/skills/pr-cairn/SKILL.md` | `protected` | Codex review, no unresolved P0/P1 |
-| `scripts/ops/review-gate/REVIEW.md`, `scripts/ops/systemd/cairn-review-metrics.*` | `protected` and `humanQueue.releaseAndControlPlane` (`scripts/ops/**`) | that, plus `Security review (<head sha>): fixed` or `recorded` outside a fence |
+| `scripts/ops/review-gate/REVIEW.md`, `scripts/ops/systemd/cairn-review-metrics.*` | `protected` (`scripts/ops/**` is also `humanQueue.releaseAndControlPlane`) | Codex review, no unresolved P0/P1. Not a security surface, so no disposition line |
 | `integration/eval/review/experiment.mjs` | eval ruler (`integration/eval/**`) and `CODEOWNERS` `@xiechimon` | must not share a PR with a review-behavior change |
 | this file, `docs/design/*.md` | `autoMerge` (`docs/**/*.md`) | this PR only; it edits no gate |
 
