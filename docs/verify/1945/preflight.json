@@ -1,0 +1,14 @@
+{
+  "source_revision": "b80e55d85a4b320e05bfbf12084aa3fb8540d2ea",
+  "runner_issue_1943_state": "OPEN",
+  "comparison_issue_1944_state": "OPEN",
+  "prompt_set_switch": false,
+  "prompt_set_module": false,
+  "comparison_cli": false,
+  "relay_url_configured": false,
+  "relay_key_in_environment": false,
+  "v19450_absent": true,
+  "v19451_absent": true,
+  "live_requests_sent": 0,
+  "live_results_produced": 0
+}

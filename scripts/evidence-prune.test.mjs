@@ -93,6 +93,8 @@ test('keeps folders that code, CI or scripts reference, matching whole folder na
       'docs/verify/1262/row.txt': 'x',
       'docs/verify/1104/drive.mjs': 'x',
       'docs/verify/1033/drive.mjs': 'x',
+      'docs/verify/1777/execution.md': 'x',
+      '.claude/hillclimb/README.md': '[run](../../docs/verify/1777/execution.md)\n',
       '.claude/skills/verify-x/vp-registry.json': '{"script":"docs/verify/1104/drive.mjs"}\n',
       '.claude/skills/verify-x/SKILL.md': 'node docs/verify/1033/drive.mjs\n',
       '.claude/skills/verify-x/scripts/drive.mjs': "join(REPO, 'docs/verify/1262/row.txt')\n",
@@ -108,6 +110,7 @@ test('keeps folders that code, CI or scripts reference, matching whole folder na
     assert.equal(repo.has('docs/verify/1262/row.txt'), true);
     assert.equal(repo.has('docs/verify/1104/drive.mjs'), true);
     assert.equal(repo.has('docs/verify/1033/drive.mjs'), true);
+    assert.equal(repo.has('docs/verify/1777/execution.md'), true);
     assert.equal(repo.has('docs/verify/1404'), false);
     assert.equal(repo.has('docs/verify/900'), false);
     assert.deepEqual(Object.keys(repo.ledger()), ['900', '1404']);
