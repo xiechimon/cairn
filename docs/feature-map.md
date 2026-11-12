@@ -22,7 +22,7 @@
 | research, frontend design and backend design all present or not applicable | 23 |
 | Research gaps | 14 |
 | Frontend design gaps | 19 |
-| Backend design gaps | 19 |
+| Backend design gaps | 20 |
 | notes cited but not on main | 21 |
 
 ## Coverage
@@ -65,7 +65,7 @@
 | [Appearance and visual system](#appearance) | 3 | shipped | yes (not on main) | yes | n/a |  |
 | [Attachments](#attachments) | 3 | shipped | yes | yes | yes |  |
 | [Composer](#composer) | 3 | shipped | gap | yes | gap | B8 |
-| [Coordinator over MCP](#coordinator-mcp) | 3 | shipped | gap | n/a | yes | B11 |
+| [Coordinator over MCP](#coordinator-mcp) | 3 | shipped | gap | n/a | gap | B11 |
 | [Built-in git hosting](#git-hosting) | 3 | shipped | gap | n/a | gap | B11 |
 | [GitHub connection and issues](#github) | 3 | shipped | yes | yes | yes |  |
 | [Harness profile](#harness-profile) | 3 | partial | yes (not on main) | gap | yes | B9 |
@@ -97,7 +97,7 @@ The attention surfaces of the phase 1 graduation criteria: the needs-you tray, q
 | [Daily report and retro](#daily-report) | 1 | Frontend design: the report row and retro proposal card have no design<br>Backend design: no design for report content, timing, quiet rules and retro proposal storage |
 | [Task references and needs-you](#needs-you) | 1 | Backend design: no design for which records enter the tray, their order and when they leave |
 | [Phone push](#push-notifications) | 1 | Research: no prior-art note on agent notifications and push delivery<br>Frontend design: the notify banner, device switch and push copy have no design<br>Backend design: no design for subscriptions, presence suppression, receipts and the three push states |
-| [Question cards](#questions) | 1 | Research: the Codex CLI and t3code question patterns behind D85 and D119 were never written up<br>Backend design: no design for the question lifecycle: parking, late answers, cancel and resume |
+| [Question cards](#questions) | 1 | Research: the Codex CLI and t3code question patterns were never written up<br>Backend design: no design for the question lifecycle: parking, late answers, cancel and resume |
 
 ### B3 · Thread control and the merge decision
 
@@ -111,7 +111,7 @@ What a user can do to a running thread and how the gate verdict shows: steer, qu
 
 ### B4 · Execution isolation: orbs, the agent's computer, own-key sandboxes
 
-The per-task orb differentiator and the execution targets of D101: how a user sees and chooses where a thread runs, the agent's own computer and its screen, and E2B or Daytona with the user's key. Land the coordinator-computer note, then write the backend design and the machine-page and screen designs.
+The per-task orb differentiator and the execution targets : how a user sees and chooses where a thread runs, the agent's own computer and its screen, and E2B or Daytona with the user's key. Land the coordinator-computer note, then write the backend design and the machine-page and screen designs.
 
 | Feature | Centrality | Missing |
 |---|---|---|
@@ -145,7 +145,7 @@ Scheduled tasks, the search syntax with the activity view, and the sidebar with 
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Scheduled tasks](#schedules) | 3 | Research: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model behind D56<br>Frontend design: the schedules page and detail dialog have no design<br>Backend design: no design for due events, missed runs and continue-thread schedules |
+| [Scheduled tasks](#schedules) | 3 | Research: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model<br>Frontend design: the schedules page and detail dialog have no design<br>Backend design: no design for due events, missed runs and continue-thread schedules |
 | [Search and activity](#search-and-activity) | 3 | Research: no note on Amp's search syntax and activity filters<br>Backend design: no design for the search syntax, index and ranking |
 | [Sidebar](#sidebar) | 3 | Backend design: no design for unread and read marks across devices |
 
@@ -155,7 +155,7 @@ Everything typed or attached before a message is sent: mentions, slash commands,
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Composer](#composer) | 3 | Research: no note comparing composers in claude.ai, Amp and t3code<br>Backend design: no design for server drafts (D110) and named prompts |
+| [Composer](#composer) | 3 | Research: no note comparing composers in claude.ai, Amp and t3code<br>Backend design: no design for server drafts  and named prompts |
 
 ### B9 · Execution settings: skills, MCP, harness profile, quota wait
 
@@ -184,17 +184,17 @@ Small surfaces that work today without research or design: the Coordinator MCP f
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Coordinator over MCP](#coordinator-mcp) | 3 | Research: the t3code comparison of plan §21 is not in the repository |
+| [Coordinator over MCP](#coordinator-mcp) | 3 | Research: the t3code comparison of plan §21 is not in the repository<br>Backend design: no design for the MCP transport, authentication and tool semantics |
 | [Built-in git hosting](#git-hosting) | 3 | Research: no note on serving git over HTTP versus other transports<br>Backend design: no design for auth, repository layout and failure modes |
 | [Server backup and deploy status](#server-status) | 3 | Frontend design: the banners have no design |
 
 ### B12 · Phase 3: iOS app
 
-Work for after phase 2 graduates: the native iOS app of D22. Research and design only when phase 2 is close.
+Work for after phase 2 graduates: the native iOS app . Research and design only when phase 2 is close.
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [iOS app](#ios-app) | 4 | Research: the Optio and t3code comparison of D22 has not been done<br>Frontend design: not designed<br>Backend design: not designed |
+| [iOS app](#ios-app) | 4 | Research: the Optio and t3code comparison has not been done<br>Frontend design: not designed<br>Backend design: not designed |
 
 ## Research and design links
 
@@ -228,7 +228,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 - Research: [docs/research/cairn-dogfood-feasibility-2026-11-06.md](research/cairn-dogfood-feasibility-2026-11-06.md), [docs/research/capability-routing-2026-11-06.md](research/capability-routing-2026-11-06.md), [docs/research/r14-orchestration-parent-card.md](research/r14-orchestration-parent-card.md), [docs/research/r15-agent-responsibility-default.md](research/r15-agent-responsibility-default.md)
 - Frontend design: n/a: dispatch shows as threads and report rows inside the Coordinator chat
-- Backend design: [docs/research/capability-routing-2026-11-06.md](research/capability-routing-2026-11-06.md), [docs/spec/21-single-machine-orchestration-defaults.md](spec/21-single-machine-orchestration-defaults.md)
+- Backend design: [docs/research/capability-routing-2026-11-06.md](research/capability-routing-2026-11-06.md), [CONTEXT.md](../CONTEXT.md)
 
 ### daily-report
 
@@ -252,11 +252,11 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 - Research: [docs/research/1607-acp-execution-surface.md](research/1607-acp-execution-surface.md), [docs/research/r4-foundation.md](research/r4-foundation.md), [docs/research/r10-multica-runtime.md](research/r10-multica-runtime.md), [docs/research/r11-runtime-gap.md](research/r11-runtime-gap.md), [docs/research/herdr-multica-parity.md](research/herdr-multica-parity.md)
 - Frontend design: n/a: harness choice surfaces through routing settings and the thread's model line
-- Backend design: [docs/spec/17-dual-runtime-execution-surface.md](spec/17-dual-runtime-execution-surface.md), [docs/spec/24-run-brief-written-to-worktree-file.md](spec/24-run-brief-written-to-worktree-file.md), [docs/spec/26-pi-session-runtime-and-trust-surface.md](spec/26-pi-session-runtime-and-trust-surface.md)
+- Backend design: [docs/spec/17-dual-runtime-execution-surface.md](spec/17-dual-runtime-execution-surface.md), [docs/design/runtime-memory-out-of-tree.md](design/runtime-memory-out-of-tree.md), [docs/spec/26-pi-session-runtime-and-trust-surface.md](spec/26-pi-session-runtime-and-trust-surface.md)
 
 ### memory
 
-**Memory** (shipped). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. D123 plans direct in-place edits of MEMORY.md and memory files.
+**Memory** (shipped). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. A design plans direct in-place edits of MEMORY.md and memory files.
 
 - Research: [docs/research/personal-agent-memory-2026-11-07.md](research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](research/memory-2026-11-08.md), [docs/research/memory-inplace-edit-2026-11-09.md](research/memory-inplace-edit-2026-11-09.md)
 - Frontend design: [docs/design/memory-inplace-edit.md](design/memory-inplace-edit.md) (not on main)
@@ -306,7 +306,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 **Question cards** (shipped). Questions from the Coordinator or a thread appear as answerable cards above the composer, stay parked quietly, and keep per-question drafts.
 
-- Research: **gap**: the Codex CLI and t3code question patterns behind D85 and D119 were never written up
+- Research: **gap**: the Codex CLI and t3code question patterns were never written up
 - Frontend design: [docs/design/qcard-variants/README.md](design/qcard-variants/README.md) (not on main), [docs/design/pilot-coordinator-chat-2026-11-06.md](design/pilot-coordinator-chat-2026-11-06.md) (not on main)
 - Backend design: **gap**: no design for the question lifecycle: parking, late answers, cancel and resume
 
@@ -340,7 +340,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 - Research: [docs/research/machine-execution-plane.md](research/machine-execution-plane.md), [docs/research/r13-multica-runtime-verify.md](research/r13-multica-runtime-verify.md)
 - Frontend design: n/a: a protocol between server and daemon with no user surface
-- Backend design: [docs/spec/02-architecture-parity.md](spec/02-architecture-parity.md), [docs/research/2513-tla-statecharts.md](research/2513-tla-statecharts.md)
+- Backend design: [docs/research/2513-tla-statecharts.md](research/2513-tla-statecharts.md)
 
 ### thread-pr-panel
 
@@ -364,11 +364,11 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 - Research: [docs/research/r12-save-and-start-behavior.md](research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main), [docs/research/duet-proactive-coordinator.md](research/duet-proactive-coordinator.md)
 - Frontend design: [docs/design/references/thread-review](design/references/thread-review), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
-- Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/spec/24-run-brief-written-to-worktree-file.md](spec/24-run-brief-written-to-worktree-file.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
+- Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/design/runtime-memory-out-of-tree.md](design/runtime-memory-out-of-tree.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
 
 ### desktop-app
 
-**Desktop app** (planned). D45 and D100: a web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.
+**Desktop app** (planned). A web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.
 
 - Research: [docs/research/desktop-app-stack-2026-11-08.md](research/desktop-app-stack-2026-11-08.md) (not on main)
 - Frontend design: **gap**: no design for the tray, window and install flow
@@ -408,7 +408,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### own-key-sandboxes
 
-**Own-key cloud sandboxes** (partial). D101 execution target: orbs on E2B or Daytona with the user's own key, called outbound by the daemon.
+**Own-key cloud sandboxes** (partial). Execution target: orbs on E2B or Daytona with the user's own key, called outbound by the daemon.
 
 - Research: **gap**: no note comparing E2B and Daytona against the dispatch contract
 - Frontend design: **gap**: no design for adding a sandbox provider and its key
@@ -484,7 +484,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 - Research: **gap**: no note comparing composers in claude.ai, Amp and t3code
 - Frontend design: [docs/design/claude-ai-spec.md](design/claude-ai-spec.md), [docs/design/references/coordinator-chat](design/references/coordinator-chat)
-- Backend design: **gap**: no design for server drafts (D110) and named prompts
+- Backend design: **gap**: no design for server drafts  and named prompts
 
 ### coordinator-mcp
 
@@ -492,7 +492,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 - Research: **gap**: the t3code comparison of plan §21 is not in the repository
 - Frontend design: n/a: an API for other harnesses with no page
-- Backend design: [docs/spec/02-architecture-parity.md](spec/02-architecture-parity.md)
+- Backend design: **gap**: no design for the MCP transport, authentication and tool semantics
 
 ### git-hosting
 
@@ -554,7 +554,7 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 **Scheduled tasks** (shipped). Recurring work that starts or continues threads on a schedule, with run-now and a project schedule.
 
-- Research: **gap**: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model behind D56
+- Research: **gap**: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model
 - Frontend design: **gap**: the schedules page and detail dialog have no design
 - Backend design: **gap**: no design for due events, missed runs and continue-thread schedules
 
@@ -608,9 +608,9 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 
 ### ios-app
 
-**iOS app** (planned). D22: a native phone app with Live Activities, forked from Optio or t3code when the time comes.
+**iOS app** (planned). A native phone app with Live Activities, forked from Optio or t3code when the time comes.
 
-- Research: **gap**: the Optio and t3code comparison of D22 has not been done
+- Research: **gap**: the Optio and t3code comparison has not been done
 - Frontend design: **gap**: not designed
 - Backend design: **gap**: not designed
 
