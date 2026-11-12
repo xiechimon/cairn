@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { HISTORY, mockLive, PROJECT } from './chief-home-mock';
 
 const HOME = '/app?scenario=home-c';
 
@@ -228,4 +229,34 @@ test('a live computer without the running list falls back to its running count o
   await panel(page).getByRole('tab', { name: 'Agent 的权限' }).click();
   await expect(panel(page).getByText('Agent 在这台电脑上能用的文件夹')).toBeVisible();
   await expect(panel(page).getByTestId('machine-folders-empty')).toHaveText('还没有开放任何文件夹');
+});
+
+test('a live computer lists the threads the server reports running on it', async ({ page }) => {
+  const startedAt = Date.now() - 20 * 60_000;
+  await mockLive(page, {
+    threads: [],
+    messages: HISTORY,
+    machines: [
+      {
+        id: 'm1',
+        name: 'omarchy',
+        online: true,
+        kind: 'remote',
+        enabledRuntimes: ['pi'],
+        runningSteps: 2,
+        running: [
+          { threadId: 'todo-1', title: 'Orb canary round 7', projectId: PROJECT.id, startedAt },
+          { threadId: 'todo-2', title: 'Serif greeting fix', projectId: PROJECT.id, startedAt },
+        ],
+      },
+    ],
+  });
+  await page.goto('/app?pane=machines');
+  await panel(page).getByRole('button', { name: /omarchy/ }).click();
+  await panel(page).getByRole('tab', { name: '在这台工作' }).click();
+  const running = panel(page).getByTestId('machine-running-row');
+  await expect(running).toHaveCount(2);
+  await expect(running.first()).toContainText('Orb canary round 7');
+  await expect(running.first()).toContainText('cairn');
+  await expect(panel(page).getByTestId('machine-running-empty')).toHaveCount(0);
 });
