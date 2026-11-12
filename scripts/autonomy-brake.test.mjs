@@ -464,7 +464,7 @@ function dequeuedPull(number = 7) {
 }
 
 test('rerun-failed reruns failed jobs once and does not open a marker', (t) => {
-  const f = fixture(t, { confirmedRun: failedRun });
+  const f = fixture(t, { confirmedRun: failedRun, main: runSha });
   const r = f.run(['rerun-failed', '--run', runId, '--sha', runSha]);
   assert.equal(r.status, 0, r.stderr);
   assert.match(f.calls(), new RegExp(`"run","rerun","${runId}","--failed","--repo","owner/repo"`));
@@ -494,9 +494,17 @@ test('rerun-failed refuses a later failed attempt without rerunning', (t) => {
   assert.doesNotMatch(f.calls(), /"rerun"/);
   assert.match(r.stderr, /attempt 2/);
 });
+test('rerun-failed does not rerun a stale SHA after main has moved', (t) => {
+  const f = fixture(t, { confirmedRun: failedRun, main: 'd'.repeat(40) });
+  const r = f.run(['rerun-failed', '--run', runId, '--sha', runSha]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(f.calls(), /"rerun"/);
+  assert.match(r.stdout, /not rerunning/);
+});
 test('rerun-failed fails when the rerun command fails', (t) => {
   const f = fixture(t, {
     confirmedRun: failedRun,
+    main: runSha,
     responses: { rerun: [{ error: 'no failed jobs' }] },
   });
   const r = f.run(['rerun-failed', '--run', runId, '--sha', runSha]);

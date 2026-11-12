@@ -263,6 +263,12 @@ function rerunFailed(runId, sha) {
     }
     throw new Error(`Run ${runId} attempt ${current.run_attempt} failed`);
   }
+  const mainSha = api(`repos/${repo}/branches/main`).commit?.sha;
+  if (!shaPattern.test(mainSha ?? '')) throw new Error('Main SHA is missing');
+  if (mainSha !== sha) {
+    console.log(`autonomy: not rerunning ${runId}; main is ${mainSha}`);
+    return;
+  }
   try {
     execFileSync('gh', ['run', 'rerun', runId, '--failed', '--repo', repo], {
       encoding: 'utf8',
