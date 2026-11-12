@@ -261,6 +261,41 @@ export function blockRounds(comments, sha) {
   return { others: heads.size - (heads.has(sha) ? 1 : 0), marked: heads.has(sha) };
 }
 
+export function lastBlockedSha(comments, sha) {
+  let latest = null;
+  for (const comment of comments) {
+    if (comment.user?.login !== ACTIONS_LOGIN) continue;
+    const match = BLOCK_MARKER_RE.exec(comment.body ?? '');
+    if (!match || match[1] === sha) continue;
+    const stamp = stampOf(comment);
+    const ordered = Number.isFinite(stamp.time) ? stamp : { time: 0, id: stamp.id };
+    if (!latest || stampOrder(ordered, latest.stamp) >= 0)
+      latest = { sha: match[1], stamp: ordered };
+  }
+  return latest?.sha ?? null;
+}
+
+const currentAnchor = (thread) =>
+  !thread.isOutdated &&
+  thread.diffSide === 'RIGHT' &&
+  typeof thread.path === 'string' &&
+  Number.isInteger(thread.line);
+
+function blocksOnNewDiff(thread, files) {
+  if (badgeOf(thread.body) === 'P0') return true;
+  const file = files.find(
+    (item) => item.filename === thread.path || item.previous_filename === thread.path,
+  );
+  if (!currentAnchor(thread)) return Boolean(file);
+  if (!file) return false;
+  if (typeof file.patch !== 'string') return true;
+  const touched = touchedLinesOf(file.patch);
+  const last = thread.line;
+  const first = thread.startLine ?? last;
+  for (let line = first; line <= last; line += 1) if (touched.has(line)) return true;
+  return false;
+}
+
 export function retryMarker(sha, k) {
   return `<!-- review-gate-retry:${sha}:${k} -->`;
 }
@@ -320,6 +355,24 @@ function carriedNote(carried) {
       `- ${badgeOf(thread.body)} ${threadTitle(thread.body).replace(/^P[0-3]\s+/, '')}: ${thread.url}`,
   );
   return `\n\nNot blocking, because the flagged lines predate this PR; file a follow-up issue instead:\n\n${lines.join('\n')}`;
+}
+
+export function carriedMarker(sha) {
+  return `<!-- review-gate-carried:${sha} -->`;
+}
+
+function carriedListing(threads) {
+  const lines = threads.map(
+    (thread) =>
+      `- ${badgeOf(thread.body)} ${threadTitle(thread.body)
+        .replace(/^P[0-3]\s+/, '')
+        .replace(/@/g, '')}: ${thread.url}`,
+  );
+  return `These findings are pre-existing in this PR, record in Risk:\n\n${lines.join('\n')}`;
+}
+
+function roundNote(round) {
+  return `Review block round ${round} (cap ${BLOCK_ROUND_CAP}), reconsider the approach: stop fixing findings one line at a time. Name the bug class behind them, fix every instance, or change the approach; the PR is labelled \`${HUMAN_LABEL}\` for a human. From this round a P1 blocks only on lines changed since the last blocked head. Other open P1 threads are pre-existing in this PR, record in Risk. A P0 anywhere still blocks.`;
 }
 
 const SECURITY_RECEIPT_HEADER = /^#{2,3} (?:🛡️ )?Codex Security Review\s*$/m;
@@ -542,22 +595,44 @@ export function decide(
       ...(pending ? {} : { retry: retryMarker(sha, k) }),
     };
   }
-  const blocking = blockingThreads(threads);
-  const invalid = threads.filter((thread) => thread.deferral && !blocking.includes(thread));
+  const open = blockingThreads(threads);
+  const round = rounds.others + 1;
+  const capped = round >= BLOCK_ROUND_CAP;
+  const sinceFiles = Array.isArray(rounds.sinceFiles) ? rounds.sinceFiles : null;
+  const narrowed = capped && sinceFiles !== null;
+  const blocking = narrowed ? open.filter((thread) => blocksOnNewDiff(thread, sinceFiles)) : open;
+  const carriedRound = narrowed ? open.filter((thread) => !blocking.includes(thread)) : [];
+  const invalid = threads.filter(
+    (thread) => thread.deferral && !blocking.includes(thread) && !carriedRound.includes(thread),
+  );
   const carried = carriedNote(preExistingThreads(threads));
   const blockedHeads = rounds.others + (rounds.marked ? 1 : 0);
+  const human = capped && !rounds.marked ? { addHuman: true } : {};
+  const record =
+    carriedRound.length > 0
+      ? { carried: `${carriedMarker(sha)}\n${carriedListing(carriedRound)}` }
+      : {};
   if (blocking.length === 0 && invalid.length === 0)
     return {
       status: 'completed',
       conclusion: 'success',
-      title: `No open P0/P1 Codex findings for ${short(sha)}`,
-      summary: `Codex reviewed this head and no unresolved P0 or P1 thread remains.${
+      summary: `${
+        carriedRound.length > 0
+          ? 'Codex reviewed this head. Open P1 threads on lines unchanged since the last blocked head do not block.'
+          : 'Codex reviewed this head and no unresolved P0 or P1 thread remains.'
+      }${
         blockedHeads > 0 ? ` Cycles to pass: ${blockedHeads} blocked head(s) before this one.` : ''
-      }${carried}`,
+      }${carried}${narrowed ? `\n\n${roundNote(round)}` : ''}${
+        carriedRound.length > 0 ? `\n\n${carriedListing(carriedRound)}` : ''
+      }`,
+      title:
+        carriedRound.length > 0
+          ? `No blocking P0/P1 on the new diff; round ${round}, reconsider the approach`
+          : `No open P0/P1 Codex findings for ${short(sha)}`,
       removeStall: true,
+      ...human,
+      ...record,
     };
-  const round = rounds.others + 1;
-  const capped = round >= BLOCK_ROUND_CAP;
   const counts = [
     blocking.length > 0 ? `${blocking.length} open P0/P1 Codex findings` : '',
     invalid.length > 0 ? `${invalid.length} invalid deferrals` : '',
@@ -569,11 +644,16 @@ export function decide(
     conclusion: 'failure',
     title: capped ? `${counts}; round ${round}, reconsider the approach` : counts,
     summary: `${
-      capped
-        ? `Review block round ${round} (cap ${BLOCK_ROUND_CAP}): stop fixing findings one line at a time. Name the bug class behind them, fix every instance, or change the approach; the PR is labelled \`${HUMAN_LABEL}\` for a human. The check stays red until the threads are resolved.\n\n`
-        : ''
-    }${blockedSummary(blocking, invalid)}${carried}`,
+      narrowed
+        ? `${roundNote(round)}\n\n`
+        : capped
+          ? `Review block round ${round} (cap ${BLOCK_ROUND_CAP}): stop fixing findings one line at a time. Name the bug class behind them, fix every instance, or change the approach; the PR is labelled \`${HUMAN_LABEL}\` for a human. The check stays red until the threads are resolved.\n\n`
+          : ''
+    }${blockedSummary(blocking, invalid)}${carried}${
+      carriedRound.length > 0 ? `\n\n${carriedListing(carriedRound)}` : ''
+    }`,
     ...(rounds.marked ? {} : { block: blockMarker(sha) }),
-    ...(capped && !rounds.marked ? { addHuman: true } : {}),
+    ...human,
+    ...record,
   };
 }

@@ -1,14 +1,18 @@
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import {
+  ACTIONS_LOGIN,
   attemptStart,
+  BLOCK_ROUND_CAP,
   blockingThreads,
   blockRounds,
+  carriedMarker,
   decide,
   deferredIssue,
   deferredThreads,
   GATE_CHECK,
   HUMAN_LABEL,
+  lastBlockedSha,
   markDeferrals,
   markPreExisting,
   preExistingThreads,
@@ -173,6 +177,33 @@ function writeCheck(repo, sha, newest, result, detailsUrl) {
   else ghWrite('POST', `repos/${repo}/check-runs`, payload);
 }
 
+function loadSinceFiles(repo, base, head) {
+  if (!/^[0-9a-f]{40}$/.test(base ?? '') || !/^[0-9a-f]{40}$/.test(head)) return null;
+  try {
+    const comparison = ghJson(['api', `repos/${repo}/compare/${base}...${head}`]);
+    const files = comparison.files;
+    if (
+      comparison.behind_by !== 0 ||
+      !Array.isArray(files) ||
+      files.length >= 300 ||
+      !files.every(
+        (file) =>
+          file &&
+          typeof file.filename === 'string' &&
+          (file.patch == null || typeof file.patch === 'string') &&
+          (file.previous_filename == null || typeof file.previous_filename === 'string'),
+      )
+    ) {
+      console.error('review-gate: compare is not a straight-line diff; round 3 keeps blocking');
+      return null;
+    }
+    return files;
+  } catch (error) {
+    console.error(`review-gate: compare failed; round 3 keeps blocking (${error.message})`);
+    return null;
+  }
+}
+
 function evaluate(repo, number) {
   const pr = ghJson(['api', `repos/${repo}/pulls/${number}`]);
   const skip = shouldSkip(pr);
@@ -209,6 +240,12 @@ function evaluate(repo, number) {
   const retries = retryStatus(comments, sha, stateEntry?.comment ?? null);
   const start = attemptStart(comments, stateEntry, sha);
   const lastActivity = Math.max(check ? Date.parse(check.started_at) : 0, start?.time ?? 0);
+  const rounds = blockRounds(comments, sha);
+  const reviewed = stateEntry?.state?.commitSha === sha && stateEntry.state.status === 'completed';
+  const sinceFiles =
+    reviewed && rounds.others + 1 >= BLOCK_ROUND_CAP
+      ? loadSinceFiles(repo, lastBlockedSha(comments, sha), sha)
+      : null;
   const result = decide(
     pr,
     stateEntry?.state ?? null,
@@ -221,7 +258,7 @@ function evaluate(repo, number) {
       sinceRequestMs: start ? Date.now() - start.time : 0,
       idleMs: lastActivity > 0 ? Date.now() - lastActivity : 0,
     },
-    blockRounds(comments, sha),
+    { ...rounds, sinceFiles },
   );
   console.log(
     `PR #${number} ${sha.slice(0, 7)}: ${result.status} ${result.conclusion ?? ''} ${result.title}`,
@@ -238,6 +275,14 @@ function evaluate(repo, number) {
     ghWrite('POST', `repos/${repo}/issues/${number}/comments`, {
       body: `${result.block}\nReview-gate: ${result.title}`,
     });
+  if (
+    result.carried &&
+    !comments.some(
+      (comment) =>
+        comment.user?.login === ACTIONS_LOGIN && comment.body?.startsWith(carriedMarker(sha)),
+    )
+  )
+    ghWrite('POST', `repos/${repo}/issues/${number}/comments`, { body: result.carried });
   writeCheck(repo, sha, check, result, stateEntry?.comment.html_url);
 
   const stalled = pr.labels.some((label) => label.name === STALL_LABEL);

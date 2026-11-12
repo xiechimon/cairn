@@ -42,6 +42,7 @@ else if (joined.includes('HEAD_REF_FORCE_PUSHED_EVENT')) {
   out({ data: { repository: { pullRequest: { reviewThreads: {
     nodes: world.threads, pageInfo: { hasNextPage: false, endCursor: null } } } } } });
 } else if (joined.includes('/check-runs?')) out({ check_runs: world.checkRuns });
+else if (/api repos\\/o\\/r\\/compare\\/[0-9a-f]+\\.\\.\\.[0-9a-f]+$/.test(joined)) out(world.compare ?? { behind_by: 0, files: [] });
 else out({});
 `;
 
@@ -579,20 +580,95 @@ test('the same finding on an added line blocks and records the block once', () =
   assert.equal(repeat.commentPosts.length, 0);
 });
 
-test('the third blocked head labels the PR review-gate-human while the check stays red', () => {
-  const prior = ['1', '2'].map((digit) =>
-    actionsComment(`<!-- review-gate-block:${digit.repeat(40)} -->\nx`),
-  );
-  const out = run({
-    comments: [stateComment(SHA, 'completed'), ...prior],
-    threads: [thread('P1', { path: null, line: null })],
+const priorBlocks = ['1', '2'].map((digit, index) =>
+  actionsComment(
+    `<!-- review-gate-block:${digit.repeat(40)} -->\nx`,
+    `2026-01-01T00:0${index + 2}:00Z`,
+  ),
+);
+const round3 = (threads, compare) =>
+  run({
+    comments: [stateComment(SHA, 'completed'), ...priorBlocks],
+    threads,
+    files: [{ filename: 'src/a.ts', patch: '@@ -9,1 +9,3 @@\n ctx\n+added\n+added2' }],
+    compare,
     checkRuns: [ownRun()],
   });
+const quietCompare = {
+  behind_by: 0,
+  files: [{ filename: 'src/a.ts', patch: '@@ -1,1 +1,2 @@\n ctx\n+other' }],
+};
+const touchedCompare = {
+  behind_by: 0,
+  files: [{ filename: 'src/a.ts', patch: '@@ -9,1 +9,3 @@\n ctx\n+added\n+added2' }],
+};
+
+test('round 2 does not consult the compare and still blocks', () => {
+  const out = run({
+    comments: [stateComment(SHA, 'completed'), priorBlocks[0]],
+    threads: [thread('P1')],
+    files: [{ filename: 'src/a.ts', patch: '@@ -9,1 +9,3 @@\n ctx\n+added\n+added2' }],
+    compare: quietCompare,
+    checkRuns: [ownRun()],
+  });
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure');
+  assert.ok(!out.calls.some((call) => call.args.join(' ').includes('/compare/')));
+});
+
+test('from round 3 a P1 on lines unchanged since the last blocked head does not block', () => {
+  const out = round3([thread('P1')], quietCompare);
+  assert.equal(out.result.status, 0, out.result.stderr);
   const body = out.body(out.checkWrites[0]);
-  assert.equal(body.conclusion, 'failure');
-  assert.match(body.output.title, /reconsider the approach/);
+  assert.equal(body.conclusion, 'success');
+  assert.match(body.output.summary, /bug class/);
+  assert.match(body.output.summary, /reconsider the approach/);
   assert.equal(out.labelAdds.length, 1);
   assert.deepEqual(out.body(out.labelAdds[0]).labels, ['review-gate-human']);
+  assert.equal(out.commentPosts.length, 1);
+  assert.match(out.body(out.commentPosts[0]).body, /pre-existing in this PR, record in Risk/);
+  assert.match(
+    out.calls.map((call) => call.args.join(' ')).join('\n'),
+    new RegExp(`compare/${'2'.repeat(40)}\\.\\.\\.${SHA}`),
+  );
+  const repeat = run({
+    comments: [
+      stateComment(SHA, 'completed'),
+      ...priorBlocks,
+      actionsComment(out.body(out.commentPosts[0]).body, '2026-01-01T00:04:00Z'),
+    ],
+    threads: [thread('P1')],
+    files: [{ filename: 'src/a.ts', patch: '@@ -9,1 +9,3 @@\n ctx\n+added\n+added2' }],
+    compare: quietCompare,
+    checkRuns: [ownRun()],
+    pr: { ...basePr, labels: [{ name: 'review-gate-human' }] },
+  });
+  assert.equal(repeat.commentPosts.length, 0);
+  assert.equal(repeat.labelAdds.length, 0);
+});
+
+test('from round 3 a P1 on a newly changed line still blocks', () => {
+  const out = round3([thread('P1')], touchedCompare);
+  assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure');
+  assert.match(out.body(out.checkWrites[0]).output.title, /reconsider the approach/);
+  assert.match(out.body(out.commentPosts[0]).body, new RegExp(`review-gate-block:${SHA}`));
+});
+
+test('from round 3 a P0 on an old line still blocks', () => {
+  const out = round3([thread('P0')], quietCompare);
+  assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure');
+  assert.match(out.body(out.checkWrites[0]).output.summary, /discussion_rP0/);
+});
+
+test('from round 3 an unanchored thread on an unchanged file does not block', () => {
+  const out = round3([thread('P1', { path: 'src/untouched.ts', line: null })], quietCompare);
+  assert.equal(out.body(out.checkWrites[0]).conclusion, 'success');
+  assert.match(out.body(out.commentPosts[0]).body, /pre-existing in this PR, record in Risk/);
+});
+
+test('a diverged compare does not narrow a round-3 P1', () => {
+  const out = round3([thread('P1')], { ...quietCompare, behind_by: 1 });
+  assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure');
 });
 
 test('incomplete PR file pagination cannot preserve a previous successful check', () => {
