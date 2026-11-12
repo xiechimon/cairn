@@ -9,10 +9,9 @@ const IDENTITY_CLS = 'inline-flex items-center gap-1.5 self-start text-inherit n
 
 interface ChiefIdentityProps {
   agent: NonNullable<ChiefContent['agent']>;
-  busy?: boolean;
 }
 
-export function ChiefIdentity({ agent, busy = false }: ChiefIdentityProps) {
+export function ChiefIdentity({ agent }: ChiefIdentityProps) {
   const { search } = useLocation();
   const face = (
     <>
@@ -22,7 +21,6 @@ export function ChiefIdentity({ agent, busy = false }: ChiefIdentityProps) {
           name={agent.displayName}
           src={agent.avatarUrl}
           fallback="/avatar-robot-1.svg"
-          busy={busy}
         />
       </span>
       <span className="text-meta leading-4 font-normal text-(--text-secondary)">
