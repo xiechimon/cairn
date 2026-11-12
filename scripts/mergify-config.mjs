@@ -19,6 +19,40 @@ const scopes = {
 };
 const barrierFiles = ['packages/**/*'];
 
+const ownerSecurity = ['credentials', 'machineAndCommandBoundary', 'externalEntryAuth'];
+
+export function ownerRouteGlobs(gatePaths) {
+  const named = gatePaths?.ownerRoute ?? {};
+  const queue = gatePaths?.humanQueue ?? {};
+  return [
+    ...(named.ciAndMergeMachinery ?? []),
+    ...(named.evalRuler ?? []),
+    ...ownerSecurity.flatMap((key) => queue[key] ?? []),
+  ];
+}
+
+function globToMergify(glob) {
+  const tail = glob.endsWith('/**');
+  const body = tail ? glob.slice(0, -3) : glob;
+  let re = '';
+  for (let i = 0; i < body.length; i += 1) {
+    const ch = body[i];
+    if (ch === '*' && body[i + 1] === '*') {
+      re += '.*';
+      i += 1;
+    } else if (ch === '*') {
+      re += '[^/]*';
+    } else {
+      re += ch.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+    }
+  }
+  return `${re}${tail ? '(?:/.*)?' : ''}`;
+}
+
+export function ownerRouteAdmission(globs) {
+  return `(?i)^(?:${globs.map(globToMergify).join('|')})$`;
+}
+
 function queueLimits(source, gatePaths) {
   if (!source.includes('function globToRegExp'))
     throw new Error('pr-gate.js no longer has globToRegExp');
@@ -42,6 +76,8 @@ export function mergifyConfig(prGateSource, gatePaths) {
     '      - -draft',
     "      - '#review-threads-unresolved = 0'",
     '      - -label = coordinator-hold',
+    '      - -label = owner-route',
+    `      - '-files ~= ${ownerRouteAdmission(ownerRouteGlobs(gatePaths))}'`,
     '      - or:',
     `          - -head ~= ${batchHeadRe}`,
     `          - label = ${admitLabel}`,

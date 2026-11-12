@@ -15,7 +15,7 @@ test('merge instructions require the pr-gate auto-merge verdict', () => {
       guidance
         .split('\n')
         .includes(
-          `- Both paths require a pr-gate go with \`mergedBy: 'auto-merge'\` (path class does not route to ian), ${tasks} and no \`coordinator-hold\` label. After merging, verify the resulting main commit's author and its \`commit-author\` Actions result.`,
+          `- Both paths require a pr-gate go with \`mergedBy: 'auto-merge'\` (only CI and merge machinery, the eval ruler, and the credentials, machine and external-entry lists route to ian), ${tasks} and no \`coordinator-hold\` label. After merging, verify the resulting main commit's author and its \`commit-author\` Actions result.`,
         ),
       file,
     );
@@ -25,16 +25,17 @@ test('merge instructions require the pr-gate auto-merge verdict', () => {
   assert.ok(retro.includes("mergedBy: 'auto-merge'"), '.claude/skills/retro-cairn/SKILL.md');
   const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
   assert.match(agents, /pr-gate[^\n]*go[^\n]*`mergedBy: 'auto-merge'`/);
-  assert.match(agents, /Protected-path PRs enter the merge queue/);
+  assert.match(agents, /other protected paths, enters the merge queue/);
   assert.match(agents, /Protected paths require Codex cloud code review on the PR head/);
   assert.ok(!agents.includes('codex exec` from Claude'));
 });
 
-test('security surfaces merge on the queue after a recorded security review', () => {
+test('security surfaces need a recorded review and the three lists route to ian', () => {
   const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
   assert.match(agents, /\/security-review/);
   assert.match(agents, /fixed or recorded/);
   assert.match(agents, /`pr-evidence` fails without that line/);
+  assert.match(agents, /route to ian/);
   assert.match(agents, /does not add `coordinator-hold`/);
   assert.match(agents, /cairnwright\[bot\]` author uses the bot queue/);
   assert.doesNotMatch(agents, /Codex `security_review` state on the exact head/);

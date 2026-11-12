@@ -53,7 +53,7 @@ function gatePathsHelp() {
 // named like the directory, so a symlink named .claude or scripts is protected
 // (run 10). AUTO_MERGE and EVIDENCE_RE get neither: a path that looks like
 // product source or evidence only through Unicode folding or a symlink stays
-// outside the set. Path class does not route to the user.
+// outside the set.
 function globToRegExp(glob, { protect = false } = {}) {
   const tail = protect && glob.endsWith('/**')
   const g = tail ? glob.slice(0, -3) : glob
@@ -78,6 +78,32 @@ const SCRIPT_SHA256 = 'fde93dec0355f8a54419143f3f001a527bc3383868e1c5943b0917664
 const PROTECTED_RE = PROTECTED.map((glob) => globToRegExp(glob, { protect: true }))
 const AUTO_MERGE_RE = AUTO_MERGE.map(globToRegExp)
 const isProtected = (f) => PROTECTED_RE.some((re) => re.test(f))
+const OWNER_SECURITY = ['credentials', 'machineAndCommandBoundary', 'externalEntryAuth']
+function ownerRouteClasses(gatePaths) {
+  const named = gatePaths?.ownerRoute
+  if (!named || typeof named !== 'object')
+    throw new Error(`pr-gate: args.gatePaths.ownerRoute must name the owner-route classes; ${gatePathsHelp()}`)
+  const queue = gatePaths?.humanQueue
+  if (!queue || typeof queue !== 'object')
+    throw new Error(`pr-gate: args.gatePaths.humanQueue must be an object; ${gatePathsHelp()}`)
+  return [
+    ['ci and merge machinery', requireGlobs(named.ciAndMergeMachinery, 'ownerRoute.ciAndMergeMachinery')],
+    ['eval ruler', requireGlobs(named.evalRuler, 'ownerRoute.evalRuler')],
+    ...OWNER_SECURITY.map((key) => [key, requireGlobs(queue[key], `humanQueue.${key}`)]),
+  ]
+}
+const OWNER_ROUTE = ownerRouteClasses(args?.gatePaths).map(([label, globs]) => [
+  label,
+  globs.map((glob) => globToRegExp(glob, { protect: true })),
+])
+function ownerRouteReasons(files) {
+  const reasons = []
+  for (const [label, res] of OWNER_ROUTE) {
+    const hit = files.filter((file) => res.some((re) => re.test(file)))
+    if (hit.length > 0) reasons.push(`owner route (${label}): ${hit.join(', ')}`)
+  }
+  return reasons
+}
 const EVIDENCE_RE = globToRegExp('docs/verify/**')
 
 // Without --no-renames a rename lists only its new name, so a protected file
@@ -346,7 +372,7 @@ const protectedPaths = [
     ...reviewed.flatMap((r) => r.review.protectedPaths ?? []),
   ]),
 ]
-const humanReasons = []
+const humanReasons = ownerRouteReasons([...new Set([...changedFiles, ...unlistedFiles])])
 const checked = Object.fromEntries(reviewed.map((r) => [r.key, r.review.checked]))
 const gatePathsMatch = safety?.gatePathsMatch === true
 if (!gatePathsMatch) log('the safety reviewer did not confirm that gatePaths equals origin/main:packages/shared/merge-gate-paths.json')
