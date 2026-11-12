@@ -53,7 +53,7 @@ export function DialogFootRow({ hint, children }: { hint?: ReactNode; children?:
 }
 
 export const DIALOG_PRIMARY_BUTTON =
-  'rounded-md text-ui disabled:bg-secondary disabled:text-content-secondary disabled:opacity-100';
+  'rounded-md text-ui disabled:bg-secondary/50 disabled:text-content-dim disabled:opacity-100';
 
 export const DIALOG_TEXT_BUTTON =
   'gap-1.5 rounded-md bg-secondary px-3 text-ui font-normal text-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] disabled:text-content-tertiary disabled:opacity-100 dark:hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)]';

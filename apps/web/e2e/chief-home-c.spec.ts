@@ -73,10 +73,12 @@ test('the sidebar lists project names only, and the project chat filters the tas
   await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('cairn');
 });
 
-test('a project link lands on that project home', async ({ page }) => {
+test('a project link lands on that project conversation', async ({ page }) => {
   await page.goto(`/app/project/${PROJECT_ID}?scenario=home-c`);
-  await expect(page).toHaveURL(new RegExp(`/app\\?.*project=${PROJECT_ID}`));
-  await expect(page.getByTestId('project-home')).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/app\\?scenario=home-c&project=${PROJECT_ID}&chat=1$`));
+  await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('cairn');
+  await expect(composer(page)).toBeVisible();
+  await expect(page.getByTestId('project-home')).toHaveCount(0);
 });
 
 test('a first run greets and offers starters, with nothing pinned', async ({ page }) => {

@@ -159,6 +159,53 @@ const openMenu = async (page: Page, name: string) => {
   await page.getByRole('button', { name: `${name} 的菜单` }).click();
 };
 
+for (const theme of ['light', 'dark'] as const) {
+  test(`a disabled Save is paler than the Cancel pill in fill and label (${theme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: theme });
+    await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
+    await open(page, [PROJECT]);
+    await openMenu(page, 'cairn');
+    await page.getByRole('menuitem', { name: '重命名' }).click();
+    const dialog = page.getByRole('dialog', { name: '重命名项目' });
+    const save = dialog.getByRole('button', { name: '保存' });
+    await expect(save).toBeDisabled();
+    const look = await dialog.evaluate((el) => {
+      const token = (name: string, alpha = '') => {
+        const probe = document.createElement('span');
+        probe.style.color =
+          alpha === '' ? `var(${name})` : `color-mix(in oklab, var(${name}) ${alpha}, transparent)`;
+        document.body.append(probe);
+        const value = getComputedStyle(probe).color;
+        probe.remove();
+        return value;
+      };
+      const [cancel, save] = [...el.querySelectorAll('[data-testid="dialog-foot"] button')].map(
+        (button) => getComputedStyle(button),
+      );
+      return {
+        cancelFill: cancel!.backgroundColor,
+        cancelInk: cancel!.color,
+        saveFill: save!.backgroundColor,
+        saveInk: save!.color,
+        saveOpacity: save!.opacity,
+        secondary: token('--secondary'),
+        halfSecondary: token('--secondary', '50%'),
+        foreground: token('--foreground'),
+        dim: token('--text-dim'),
+      };
+    });
+    expect(look.cancelFill).toBe(look.secondary);
+    expect(look.cancelInk).toBe(look.foreground);
+    expect(look.saveFill).toBe(look.halfSecondary);
+    expect(look.saveInk).toBe(look.dim);
+    expect(look.saveOpacity).toBe('1');
+    expect(look.saveFill).not.toBe(look.cancelFill);
+    expect(look.saveInk).not.toBe(look.cancelInk);
+  });
+}
+
 test('Rename saves the new name and keeps the input when the save fails', async ({ page }) => {
   const projects = [PROJECT, project('proj-2', 'dogfood-sandbox')];
   const patches: { id: string; body: unknown }[] = [];

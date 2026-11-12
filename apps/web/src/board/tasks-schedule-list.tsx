@@ -1,6 +1,6 @@
 import { Clock } from 'lucide-react';
 import { useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useSchedules } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { QueryBoundary } from '../components/query-state.js';
@@ -41,12 +41,14 @@ export function TasksScheduleList({ projectId, now }: { projectId: string | null
         loadingLabel={t('正在加载定时')}
         errorTitle={t('定时没能加载')}
         empty={
-          <p
-            data-testid="tasks-schedules-empty"
-            className="m-0 px-2.5 py-2 text-ui text-content-tertiary"
-          >
-            {t('还没有定时任务')}
-          </p>
+          <div className="flex flex-col items-start gap-3 px-2.5 py-2">
+            <p data-testid="tasks-schedules-empty" className="m-0 text-ui text-content-tertiary">
+              {t('还没有定时任务')}
+            </p>
+            <Button variant="secondary" size="sm" render={<Link to="/app/schedules" />}>
+              {t('管理定时')}
+            </Button>
+          </div>
         }
       >
         <section

@@ -336,6 +336,39 @@ test('Manage schedules sits in the schedule row menu and opens the schedules pag
   await expect(page).toHaveURL(/\/app\/schedules/);
 });
 
+test('an empty scheduled tab says so and offers one grey pill to the schedules page', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=home-c-empty&pane=tasks');
+  await panel(page).getByRole('tab', { name: '定时' }).click();
+  await expect(panel(page).getByTestId('tasks-schedules-empty')).toHaveText('还没有定时任务');
+  await expect(panel(page).locator('[data-slot="schedule-row"]')).toHaveCount(0);
+  const manage = panel(page).getByRole('link', { name: '管理定时' });
+  await expect(manage).toHaveCount(1);
+  const pill = await manage.evaluate((el) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--secondary)';
+    document.body.append(probe);
+    const secondary = getComputedStyle(probe).color;
+    probe.remove();
+    const cs = getComputedStyle(el);
+    const note = document.querySelector('[data-testid="tasks-schedules-empty"]')!;
+    return {
+      fill: cs.backgroundColor,
+      secondary,
+      height: el.getBoundingClientRect().height,
+      below: el.getBoundingClientRect().top - note.getBoundingClientRect().bottom,
+      left: el.getBoundingClientRect().left - note.getBoundingClientRect().left,
+    };
+  });
+  expect(pill.fill).toBe(pill.secondary);
+  expect(pill.height).toBe(28);
+  expect(pill.below).toBe(12);
+  expect(pill.left).toBe(0);
+  await manage.click();
+  await expect(page).toHaveURL(/\/app\/schedules/);
+});
+
 test('with no tasks anywhere the panel centres a first-run note whose button opens the add field, and the toggle has no badge', async ({
   page,
 }) => {

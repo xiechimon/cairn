@@ -254,7 +254,7 @@ export function BoardPage() {
                 projectHref={(id) => {
                   const params = new URLSearchParams(searchParams);
                   params.set('project', id);
-                  params.delete('chat');
+                  params.set('chat', '1');
                   params.delete(THREAD_PARAM);
                   return `/app?${params.toString()}`;
                 }}
