@@ -37,6 +37,10 @@ So two processes already sit outside the guest on every path a secret takes: the
 
 **Where the listener lives.** In a dedicated host directory per guest that only the gateway writes. The guest gets that directory, not the socket file, as a read-only bind. The guest's runtime bind is writable from inside the guest on both backends, so a host process creating sockets there would be exposed to path swaps; the dedicated directory avoids that class instead of defending against it. Today's podman egress boundary is already a dedicated directory (`inspectEgressBoundary`), and the guest path `/run/cairn-egress/egress.sock` stays the same. The prototype confirms that a guest can connect to a socket in a read-only directory bind.
 
+A directory bind makes the boundary check decide which host files a guest can read. `inspectEgressBoundary` allows exactly one entry today, the socket, and runs on every spawn, a resume included; it becomes an exact list with a test: the socket, the certificate and the bundle, regular files only, no links. Its owner rule stays, which means the gateway runs under the daemon's uid, as the trust assumption already implies.
+
+Which kind of egress mount a guest gets comes from install configuration, as `CAIRN_ORB_EGRESS_SOCKET` does today, never from whether the gateway answers at that moment: a fallback to the shared socket would change the mount source, fail `egressMatches` and recreate the guest each time availability flips. The admin socket is socket-activated, so creating a guest does not depend on the gateway process already running.
+
 | Listener state | Entered when | Left when |
 |---|---|---|
 | none | initial | the host daemon asks the gateway to create the guest's directory and listener, before `podman create` (the bind source must exist then) or before the nspawn guest starts |
@@ -141,7 +145,7 @@ Request rules, which are the test list for the gateway PR:
 
 Key custody: the interception CA key is generated in memory when the gateway starts and is never written to disk. The gateway units set `LimitCORE=0` and run without an inspector; neither `egress-relay.service` nor `cairn-orb-egress.service` sets that today.
 
-Trust in the guest: the gateway writes its CA certificate, and a bundle file holding the system roots plus that certificate, into the guest's listener directory. The CA is new on every gateway start, so both files are rewritten at each step start. Only a step that received a placeholder gets the variables: `NODE_EXTRA_CA_CERTS` set to the certificate, and `SSL_CERT_FILE`, `CURL_CA_BUNDLE`, `REQUESTS_CA_BUNDLE` and `GIT_SSL_CAINFO` set to the bundle, because those four replace the system bundle and a stale file would break every HTTPS client in the guest. This is a new mechanism on the Orb step path.
+Trust in the guest: the gateway writes its CA certificate, and a bundle file holding the system roots plus that certificate, into the guest's listener directory. The CA is new on every gateway start, so both files are rewritten at each step start. Only a step that received a placeholder gets the variables: `NODE_EXTRA_CA_CERTS` set to the certificate, and `SSL_CERT_FILE`, `CURL_CA_BUNDLE`, `REQUESTS_CA_BUNDLE` and `GIT_SSL_CAINFO` set to the bundle, because those four replace the system bundle. A stale bundle still holds the system roots, so only intercepted connections fail; a missing file would break every HTTPS client in the guest. This is a new mechanism on the Orb step path.
 
 Audit: the guest-side audit line is written by the guest and can be forged. The gateway writes its own record for every registration, substitution and refusal (step, secret id, origin, header name, decision, reason; never a value or header content) to its unit journal, and sends refusals over the admin connection to the host daemon, which adds a system row to the step's transcript from outside the guest.
 
@@ -180,7 +184,8 @@ One test per row.
 |---|---|
 | Machine lacks the capability or is not an `orb` executor, or the step runs on the host | value withheld, name in `withheldSecrets`, tool explains; the step still runs |
 | Gateway unreachable or registration refused when the Orb step asks for its token | the token call fails and the step fails with a named error; no fallback to plaintext |
-| Gateway exits during a step | grant gone and the guest's egress stops until the gateway is back; after the restart ordinary egress resumes through the re-created listener, the placeholder is an unknown string and the step's CA files are stale, so requests to the bound origin fail; the daemon writes one system row to the transcript; no re-registration in that step |
+| Gateway exits during a step | grant gone and the guest's egress stops until the gateway is back; after the restart ordinary egress resumes through the re-created listener; there is no grant, so the bound origin is tunnelled, not intercepted, and the upstream receives the placeholder and rejects it; the daemon writes one system row to the transcript; no re-registration in that step |
+| Gateway does not answer when a guest is created | with a gateway-configured install every Orb step needs the listener, with or without an `http` secret; socket activation starts the gateway, and if it still fails the guest is not created and the step fails with a named error; no fallback to the shared socket |
 | Host daemon exits during a step | admin connection closes, grant revoked, guest connections to that origin closed |
 | Policy edited, secret re-bound or deleted during a step | at the next token response the relay revokes the grant and issues no new placeholder; a step that never refreshes keeps its grant until it ends; stopping the step revokes at once |
 | A token request for a step that is not `claimed` | `withheldSecrets` only |
