@@ -76,7 +76,9 @@ import {
   tasksQuerySchema,
 } from '@cairn/shared';
 import {
+  type InfiniteData,
   keepPreviousData,
+  type QueryClient,
   useInfiniteQuery,
   useMutation,
   useQueries,
@@ -248,6 +250,22 @@ export function useConversationMessages(
     [query.data],
   );
   return { query, messages, newest: query.data?.pages[0] };
+}
+
+type MessagePages = InfiniteData<ConversationMessagesResponse, string | null>;
+
+export async function keepNewestMessagesPage(
+  queryClient: QueryClient,
+  conversationId: string,
+): Promise<void> {
+  const queryKey = ['messages', conversationId, 'pages'];
+  if ((queryClient.getQueryData<MessagePages>(queryKey)?.pages.length ?? 0) <= 1) return;
+  await queryClient.cancelQueries({ queryKey, exact: true });
+  queryClient.setQueryData<MessagePages>(queryKey, (data) =>
+    data === undefined || data.pages.length <= 1
+      ? data
+      : { pages: data.pages.slice(0, 1), pageParams: data.pageParams.slice(0, 1) },
+  );
 }
 
 export const usePlans = (buildId: string | null | undefined, enabled: boolean) =>

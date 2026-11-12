@@ -5,8 +5,7 @@ description: Use when a task, brief or PR touches apps/web/src (new screen, UI f
 
 # design-cairn: UI work in cairn
 
-Read `apps/web/DESIGN-RULES.md` first (rules with ids), then `apps/web/DESIGN.md` for tokens and components. Reference screenshots live in `docs/design/references/<surface>/`; `docs/design/references/README.md` maps each surface to its shots. Decision D120, 2026-11-06.
-
+Read `apps/web/DESIGN-RULES.md` first (rules with ids), then `apps/web/DESIGN.md` for tokens and components. Reference screenshots live in `docs/design/references/<surface>/`; `docs/design/references/README.md` maps each surface to its shots.
 | Surface | Reference product |
 |---|---|
 | Coordinator chat | Claude.ai |

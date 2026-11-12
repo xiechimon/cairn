@@ -61,7 +61,7 @@ The map does not write implementation details, only user paths, stable handles, 
 
 ## Features
 
-- [GitHub emulator](./github-emulator.md): D109 poller, checks, review feedback and merge over real loopback HTTP.
+- [GitHub emulator](./github-emulator.md): PR-watch poller, checks, review feedback and merge over real loopback HTTP.
 
 - [Control Glass five journeys](./glass-journeys.md) new task, dispatch to chief, review diff, request changes, merge. One-shot script `node .cursor/skills/verify-cairn/scripts/glass.mjs`.
 - [New task (workbench)](./board-new-task.md) workbench shell rendering (4 columns since #351), new-task dialog, automatic default-project creation when none, persistence triple truth.

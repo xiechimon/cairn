@@ -59,6 +59,6 @@ Whether any sweeper repairs "step done but phase not advanced" or "building with
 ## Fix slices (one problem per PR)
 
 1. `effect` outbox table, after-commit executor, sweeper and per-kind failure counter (reports a kind only after three consecutive failures); first adopter: phase fan-out (rows 3, 4) with kill-between tests.
-2. Atomic hops: rows 5 and 7 (`chief.ts`, `chief-questions.ts`), then rows 2 and 3 in `builds.ts` once the D60 build-flow work no longer owns that file.
+2. Atomic hops: rows 5 and 7 (`chief.ts`, `chief-questions.ts`), then rows 2 and 3 in `builds.ts` once the routing-rules build-flow work no longer owns that file.
 3. Idempotency keys for Coordinator tool effects (rows 1, 6, 8) after the Coordinator tool changes land.
 4. Durable steer and stop re-fetch (rows 10 to 12).
