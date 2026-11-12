@@ -679,7 +679,7 @@ by a capability makes the generator fail.
 
 | Capability | Eval flow | Cases | Latest score | Date | Model | Status |
 |---|---|---|---|---|---|---|
-| dispatch | `chief-dispatch` | 64 | 29/30 (96.7%) | 2026-10-26 | `glm-5.3` | scored |
+| dispatch | `chief-dispatch` | 64 | 29/30 (96.7%) | 2026-11-09 | `glm-5.3` | scored |
 | memory use | `memory-regression` | 21 |  |  |  | built-not-run |
 | project routing | `project-routing` | 16 |  |  |  | built-not-run |
 | learn from correction | `learn` | 10 |  |  |  | built-not-run |

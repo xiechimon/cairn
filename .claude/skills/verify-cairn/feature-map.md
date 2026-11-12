@@ -139,7 +139,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `engine-card`, `engine-choice`, `engine-diff`, `engine-edit`, `engine-events`, `engine-hand-back`, `engine-plan`, `engine-question`, `engine-raw`, `engine-state`, `engine-take-over`, `engine-take-over-confirm`, `engine-text`, `engine-typing`, `engine-unknown`, `engine-unknown-payload`
+- Test ids in its code: `engine-card`, `engine-choice`, `engine-diff`, `engine-earlier`, `engine-edit`, `engine-events`, `engine-hand-back`, `engine-plan`, `engine-question`, `engine-raw`, `engine-state`, `engine-take-over`, `engine-take-over-confirm`, `engine-text`, `engine-typing`, `engine-unknown`, `engine-unknown-payload`
 - Research: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md)
 - Frontend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/references/thread-review](../../../docs/design/references/thread-review)
 - Backend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/home-redesign-backend-todo.md](../../../docs/design/home-redesign-backend-todo.md)
