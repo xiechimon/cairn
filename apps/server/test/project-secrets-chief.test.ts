@@ -44,4 +44,62 @@ describe('the Coordinator secret tools respect secret scope (D74 P5)', () => {
     expect(listSecrets(deps(), H.teamId)).toEqual([]);
     expect(team.id).not.toBe(projectSecret.id);
   });
+
+  const policy = {
+    origin: 'https://api.example.com',
+    header: 'Authorization',
+    template: 'Bearer {secret}',
+  };
+
+  test('set_secret refuses to change an http secret', async () => {
+    const http = createSecret(deps(), {
+      teamId: H.teamId,
+      name: 'TOKEN',
+      value: 'owner-value',
+      delivery: 'http',
+      http: policy,
+    });
+    await expect(relay('set_secret', { name: 'TOKEN', value: 'model-value' })).rejects.toThrow(
+      /settings/,
+    );
+    expect(listSecrets(deps(), H.teamId)).toEqual([
+      expect.objectContaining({ id: http.id, delivery: 'http', policyRevision: 1 }),
+    ]);
+  });
+
+  test('set_secret refuses a project row that would shadow an http team secret', async () => {
+    createSecret(deps(), {
+      teamId: H.teamId,
+      name: 'TOKEN',
+      value: 'owner-value',
+      delivery: 'http',
+      http: policy,
+    });
+    await expect(
+      relay('set_secret', { name: 'TOKEN', value: 'model-value', projectId: H.projectId }),
+    ).rejects.toThrow(/settings/);
+    expect(listSecrets(deps(), H.teamId)).toHaveLength(1);
+  });
+
+  test('set_secret refuses a team row that an http project secret would shadow', async () => {
+    createSecret(deps(), {
+      teamId: H.teamId,
+      name: 'TOKEN',
+      value: 'owner-value',
+      projectId: H.projectId,
+      delivery: 'http',
+      http: policy,
+    });
+    await expect(relay('set_secret', { name: 'TOKEN', value: 'model-value' })).rejects.toThrow(
+      /settings/,
+    );
+    expect(listSecrets(deps(), H.teamId)).toHaveLength(1);
+  });
+
+  test('set_secret still creates and updates plaintext secrets', async () => {
+    const created = (await relay('set_secret', { name: 'PLAIN', value: 'a' })) as {
+      delivery: string;
+    };
+    expect(created.delivery).toBe('plaintext');
+  });
 });

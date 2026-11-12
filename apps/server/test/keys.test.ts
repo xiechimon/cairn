@@ -199,9 +199,12 @@ describe('secret surface (team secrets, r2 section 6.3 + 02 section 8 write-only
     expect(list).toHaveLength(1);
     expect(secretRecordSchema.safeParse(list[0]).success).toBe(true);
     expect(Object.keys(list[0] as object).sort()).toEqual([
+      'delivery',
       'description',
+      'http',
       'id',
       'name',
+      'policyRevision',
       'projectId',
       'teamId',
     ]);
