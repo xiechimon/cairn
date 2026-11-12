@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -79,13 +79,10 @@ test('pr-evidence keeps no concurrency group (a cancelled newest suite blocked P
   assert.doesNotMatch(readFileSync(join(WORKFLOWS, 'pr-evidence.yml'), 'utf8'), /^concurrency:/m);
 });
 
-test('review-gate and autonomy-brake keep their own groups without cancelling', () => {
+test('autonomy-brake keeps its own group without cancelling', () => {
   assert.match(
     readFileSync(join(WORKFLOWS, 'autonomy-brake.yml'), 'utf8'),
     /cancel-in-progress: false/,
   );
-  assert.match(
-    readFileSync(join(WORKFLOWS, 'review-gate.yml'), 'utf8'),
-    /cancel-in-progress: false/,
-  );
+  assert.equal(existsSync(join(WORKFLOWS, 'review-gate.yml')), false);
 });
