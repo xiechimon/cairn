@@ -14,6 +14,8 @@ on:
       pr:
         description: PR number to re-evaluate
         required: true
+  repository_dispatch:
+    types: [review-gate-recheck]
 
 permissions: {}
 
@@ -29,7 +31,7 @@ jobs:
       pull-requests: write
       issues: write
     concurrency:
-      group: review-gate-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr || 'sweep' }}
+      group: review-gate-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr || github.event.client_payload.pr || 'sweep' }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -43,4 +45,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           COMMAND: ${{ github.event_name == 'schedule' && 'sweep' || 'evaluate' }}
           REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr || github.event.client_payload.pr }}

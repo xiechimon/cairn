@@ -852,6 +852,29 @@ test('the review-gate job token has pull-requests write for thread reply and res
   assert.match(job, /pull-requests: write/);
 });
 
+test("a review-gate-recheck repository_dispatch evaluates the PR in client_payload.pr in that PR's group", () => {
+  const workflow = readFileSync(
+    fileURLToPath(new URL('../../../.github/workflows/review-gate.yml', import.meta.url)),
+    'utf8',
+  );
+  assert.match(workflow, /\n {2}repository_dispatch:\n {4}types: \[review-gate-recheck\]\n/);
+  assert.match(workflow, /\n {2}schedule:\n {4}- cron: '\*\/10 \* \* \* \*'\n/);
+  const pr = 'inputs.pr || github.event.client_payload.pr';
+  assert.ok(
+    workflow.includes(
+      `group: review-gate-\${{ github.event.pull_request.number || github.event.issue.number || ${pr} || 'sweep' }}`,
+    ),
+  );
+  assert.ok(
+    workflow.includes(
+      `PR_NUMBER: \${{ github.event.pull_request.number || github.event.issue.number || ${pr} }}`,
+    ),
+  );
+  assert.ok(
+    workflow.includes(`COMMAND: \${{ github.event_name == 'schedule' && 'sweep' || 'evaluate' }}`),
+  );
+});
+
 test('from round 3 a carried Codex P1 is replied and resolved once; blocking P1, P0 and human threads are not', () => {
   const splitCompare = {
     behind_by: 0,
