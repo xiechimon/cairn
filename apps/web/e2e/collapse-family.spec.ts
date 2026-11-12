@@ -3,56 +3,37 @@ import { expect, type Page, test } from '@playwright/test';
 const projectRows = (page: Page) => page.locator('[data-slot="sidebar-project-row"]');
 const skills = (page: Page) => page.getByRole('complementary').getByRole('link', { name: '技能' });
 
-test('sidebar group collapse hides sub-rows, flips aria, survives reload', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+test('an owner group folds to its count, flips aria and survives reload', async ({ page }) => {
+  await page.goto('/app?scenario=sidebar-ref');
 
-  const header = page.locator('.sidebar-group', { hasText: '项目' });
+  const header = page.getByTestId('project-group-header').filter({ hasText: '客户' });
   await expect(header).toHaveAttribute('aria-expanded', 'true');
-  await expect(projectRows(page)).toHaveCount(1);
+  await expect(projectRows(page)).toHaveCount(4);
+  await expect(page.getByRole('complementary').getByText('项目', { exact: true })).toHaveCount(0);
 
   await header.click();
   await expect(header).toHaveAttribute('aria-expanded', 'false');
-  await expect(projectRows(page)).toHaveCount(0);
-  // chevron tracks the collapse: down open, right collapsed
-  await expect
-    .poll(() =>
-      page
-        .locator('.sidebar-group--collapsed .sidebar-group-chevron')
-        .first()
-        .evaluate((el) => getComputedStyle(el).rotate),
-    )
-    .toBe('-90deg');
-
+  await expect(projectRows(page)).toHaveText(['cairn', 'r3-lifecycle']);
+  await expect(header.locator('[data-slot="group-count"]')).toHaveText('2');
   await expect(page.getByRole('link', { name: '新建项目' })).toBeVisible();
-
   await expect(skills(page)).toHaveCount(0);
 
   await page.reload();
-  await expect(page.locator('.sidebar-group', { hasText: '项目' })).toHaveAttribute(
-    'aria-expanded',
-    'false',
-  );
-  await expect(projectRows(page)).toHaveCount(0);
+  await expect(page.getByTestId('project-group-header')).toHaveAttribute('aria-expanded', 'false');
+  await expect(projectRows(page)).toHaveCount(2);
 
-  // expand again and that sticks too
-  await page.locator('.sidebar-group', { hasText: '项目' }).click();
+  await page.getByTestId('project-group-header').click();
   await page.reload();
-  await expect(projectRows(page)).toHaveCount(1);
+  await expect(projectRows(page)).toHaveCount(4);
 });
 
-test('rail project group collapse hides member rows and survives reload', async ({ page }) => {
+test('the rail lists every project with no fold of its own', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.goto('/app?scenario=03');
+  await page.goto('/app?scenario=sidebar-ref');
 
-  await expect(page.locator('.rail-row [data-slot="project-glyph"]')).toBeVisible();
+  await expect(page.locator('.rail-row [data-slot="project-glyph"]')).toHaveCount(4);
   await expect(page.locator('.rail-row[aria-label="技能"]')).toHaveCount(0);
-
-  await page.locator('.rail-group[aria-label="收起项目"]').click();
-  await expect(page.locator('.rail-row [data-slot="project-glyph"]')).toHaveCount(0);
-
-  await page.reload();
-  await expect(page.locator('.rail-group[aria-label="展开项目"]')).toBeVisible();
-  await expect(page.locator('.rail-row [data-slot="project-glyph"]')).toHaveCount(0);
+  await expect(page.locator('.rail-group')).toHaveCount(0);
 });
 
 test('resources live in settings, not the sidebar', async ({ page }) => {

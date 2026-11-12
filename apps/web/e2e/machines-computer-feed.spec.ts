@@ -37,7 +37,9 @@ interface Feed {
   holdCommands?: Promise<void>;
 }
 
-async function open(page: Page, feed: Feed, machines: unknown[] = []) {
+const FEED_MACHINE = { id: 'm1', name: 'omarchy', online: true, kind: 'remote', runningSteps: 0 };
+
+async function open(page: Page, feed: Feed, machines: unknown[] = [FEED_MACHINE], detail = true) {
   await mockLive(page, { threads: [], messages: HISTORY, machines }, (path, route, json) => {
     if (path === '/api/computers' && route.request().method() === 'GET') {
       return json({ computers: feed.computers });
@@ -63,7 +65,12 @@ async function open(page: Page, feed: Feed, machines: unknown[] = []) {
     return undefined;
   });
   await page.goto('/app?pane=machines');
-  return page.getByRole('complementary', { name: '电脑' });
+  const panel = page.getByRole('complementary', { name: '电脑' });
+  if (detail && machines.length > 0) {
+    await panel.locator('[data-slot="list-card"]').first().getByRole('button').click();
+    await panel.getByRole('tab', { name: '在这台工作' }).click();
+  }
+  return panel;
 }
 
 async function emit(page: Page, event: unknown) {
@@ -372,7 +379,7 @@ test('private REST history disappears at the auth gate and a late old response c
     if (cookie.includes('cairn_auth=scope-first')) return 'first';
     return 'none';
   };
-  await mockLive(page, { threads: [], messages: HISTORY, machines: [] }, (path, route, json) => {
+  await mockLive(page, { threads: [], messages: HISTORY, machines: [FEED_MACHINE] }, (path, route, json) => {
     const request = route.request();
     if (path === '/api/auth/bootstrap' && request.method() === 'POST') {
       return route.fulfill({
@@ -423,6 +430,8 @@ test('private REST history disappears at the auth gate and a late old response c
   try {
     await page.goto('/app?pane=machines');
     const panel = page.getByRole('complementary', { name: '电脑' });
+    await panel.locator('[data-slot="list-card"]').first().getByRole('button').click();
+    await panel.getByRole('tab', { name: '在这台工作' }).click();
     await expect(entries(panel)).toContainText(['first-owner-only']);
     holdFirstHistory = true;
     await emit(page, { type: 'ping', seq: 1 });
@@ -531,17 +540,22 @@ test('with a machine listed the panel still shows its card and the screen placeh
       },
     ],
   );
-  await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(2);
-  const card = panel.locator('[data-slot="list-card"]').nth(1);
+  const card = panel;
   await expect(card.getByTestId('machine-screen')).toBeVisible();
+  await card.getByRole('tab', { name: 'Agent 的权限' }).click();
   await expect(card.getByText('已安装')).toHaveCount(0);
   await expect(card.getByText('未安装')).toHaveCount(0);
-  await expect(card.getByRole('switch', { name: '桌面控制' })).toBeEnabled();
-  const browser = card.getByRole('switch', { name: '浏览器' });
-  await expect(browser).toBeEnabled();
-  await expect(browser).not.toBeChecked();
-  await browser.click();
-  await expect(browser).toBeChecked();
+  await expect(card.getByRole('switch')).toHaveCount(0);
+  await expect(card.getByRole('heading', { name: '能力' })).toHaveCount(0);
+});
+
+test('with no machines the list is only the add row and the hint', async ({ page }) => {
+  const panel = await open(page, { computers: [], commands: [] }, [], false);
+  await expect(panel.getByRole('heading', { name: '你的电脑' })).toBeVisible();
+  await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(1);
+  await expect(panel.getByTestId('machine-list-row')).toHaveCount(0);
+  await expect(panel.getByTestId('machines-add').getByRole('link', { name: '添加电脑' })).toBeVisible();
+  await expect(panel).toContainText('没有其他电脑时，任务都在 Coordinator 这台电脑上跑。');
 });
 
 test('an offline Coordinator machine reads offline in the chip and the card, with no running count', async ({
@@ -551,19 +565,22 @@ test('an offline Coordinator machine reads offline in the chip and the card, wit
     page,
     { computers: [], commands: [] },
     [{ id: 'm1', name: 'omarchy', online: false, runningSteps: 3 }],
+    false,
   );
   const chip = page.getByTestId('machines-button');
   await expect(chip).toHaveAccessibleName(/omarchy/);
   await expect(chip).toHaveAccessibleName(/离线/);
   await expect(chip).not.toHaveAccessibleName(/在跑/);
-  await expect(page.getByTestId('machines-online-dot')).toHaveCount(0);
-  const card = panel.locator('[data-slot="list-card"]').nth(0);
-  await expect(card).toContainText('离线');
-  await expect(card.getByTestId('machine-screen')).toHaveCount(0);
-  await expect(card.getByTestId('machine-screen-hint')).toHaveCount(0);
+  await expect(chip.locator('span')).toHaveCount(0);
+  const row = panel.locator('[data-slot="list-card"]').first();
+  await expect(row).toContainText('离线');
+  await expect(row).not.toContainText('在跑');
+  await row.getByRole('button').click();
+  await expect(panel.getByTestId('machine-screen')).toHaveCount(0);
+  await expect(panel.getByTestId('machine-screen-hint')).toHaveCount(0);
 });
 
-test('the live screen enlarges and becomes interactive after desktop control is on', async ({
+test('the live screen enlarges and becomes interactive once control is taken', async ({
   page,
 }) => {
   const panel = await open(
@@ -571,13 +588,8 @@ test('the live screen enlarges and becomes interactive after desktop control is 
     { computers: [computer()], commands: [command(1)] },
     [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
   );
-  const card = panel.locator('[data-slot="list-card"]').nth(1);
+  const card = panel;
   await expect(card.getByTestId('machine-screen-expand')).toBeVisible();
-  await card.getByRole('switch', { name: '桌面控制' }).click();
-  await expect(card.getByRole('switch', { name: '桌面控制' })).toHaveAttribute(
-    'aria-checked',
-    'true',
-  );
   await card.getByTestId('machine-screen-expand').click();
   const enlarged = page.getByTestId('machine-screen-enlarged');
   await expect(enlarged).toBeVisible();
@@ -593,7 +605,7 @@ test('the live screen enlarges and becomes interactive after desktop control is 
   await expect(card.getByTestId('machine-screen-expand')).toBeVisible();
 });
 
-test('without a computer row the machine keeps the waiting placeholder and disabled toggles', async ({
+test('without a computer row the machine keeps the waiting placeholder and an empty access tab', async ({
   page,
 }) => {
   const panel = await open(
@@ -601,27 +613,21 @@ test('without a computer row the machine keeps the waiting placeholder and disab
     { computers: [], commands: [] },
     [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
   );
-  const card = panel.locator('[data-slot="list-card"]').nth(0);
+  const card = panel;
   await expect(card.getByTestId('machine-screen')).toHaveCount(0);
   await expect(card.getByTestId('machine-screen-hint')).toBeVisible();
-  await expect(card.getByRole('switch', { name: '桌面控制' })).toBeDisabled();
-  await expect(card.getByText('已安装')).toHaveCount(0);
-  await expect(card.getByText('未安装')).toHaveCount(0);
-  const desktopReason = 'Coordinator 还没有自己的电脑。第一次需要时会自动开一台。';
-  await card.getByRole('button', { name: desktopReason }).click();
-  await expect(page.locator('[data-sonner-toast]', { hasText: desktopReason })).toBeVisible();
-  const browserReason = '这台机器还不支持浏览器。';
-  await card.getByRole('button', { name: browserReason }).focus();
-  await page.keyboard.press(' ');
-  await expect(page.locator('[data-sonner-toast]', { hasText: browserReason })).toBeVisible();
+  await card.getByRole('tab', { name: 'Agent 的权限' }).click();
+  await expect(card.getByRole('switch')).toHaveCount(0);
+  await expect(card.getByTestId('machine-folders-empty')).toBeVisible();
 });
 
 const LONG_OUTPUT = `${'x'.repeat(4000)}\n${'line of output\n'.repeat(300)}`.slice(-4096);
 
 const MACHINE = { id: 'm1', name: 'omarchy', online: true, kind: 'remote', maxConcurrent: 4, runningSteps: 1 };
 
-const SHOT_SCENES: Record<string, { feed: Feed; expand: number | null; machines?: unknown[] }> = {
+const SHOT_SCENES: Record<string, { feed: Feed; expand: number | null; machines?: unknown[]; detail?: boolean }> = {
   machines: { feed: HISTORY_FEED, expand: null, machines: [MACHINE] },
+  list: { feed: HISTORY_FEED, expand: null, machines: [MACHINE], detail: false },
   empty: { feed: { computers: [], commands: [] }, expand: null },
   history: { feed: HISTORY_FEED, expand: 1 },
   offline: {
@@ -642,12 +648,12 @@ const SHOT_SCENES: Record<string, { feed: Feed; expand: number | null; machines?
 
 for (const theme of ['light', 'dark'] as const) {
   for (const width of [1280, 390]) {
-    for (const [scene, { feed, expand, machines }] of Object.entries(SHOT_SCENES)) {
+    for (const [scene, { feed, expand, machines, detail }] of Object.entries(SHOT_SCENES)) {
       test(`screenshots ${scene} ${theme} ${width}`, async ({ page }) => {
         test.skip(!SHOTS, 'screenshots only on request');
         await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
         await page.setViewportSize({ width, height: 900 });
-        const panel = await open(page, feed, machines);
+        const panel = await open(page, feed, machines, detail);
         if (expand !== null) {
           await entries(panel).nth(expand).getByRole('button', { name: '输出' }).click();
         }

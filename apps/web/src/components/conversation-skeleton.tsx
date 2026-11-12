@@ -9,7 +9,7 @@ export function ConversationSkeleton({ className }: { className?: string }) {
     <div
       data-testid="conversation-skeleton"
       aria-busy="true"
-      className={`mx-auto flex w-[calc(100%-2rem)] max-w-182 flex-col gap-8 pt-[10vh] ${className ?? ''}`}
+      className={`mx-auto flex w-[calc(100%-2rem)] max-w-chat flex-col gap-8 pt-[10vh] ${className ?? ''}`}
     >
       <span role="status" className="sr-only">
         {t('正在加载对话')}

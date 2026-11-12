@@ -59,11 +59,24 @@ function expectOneCardShape(p: CardProbe) {
   ).not.toContain('名称');
 }
 
+function expectFlatRowsShape(p: CardProbe) {
+  expect(p.hiddenChildren, 'F2: hidden sibling in the rows').toBe(0);
+  for (const row of p.rows) expect(row.top).toBe('0px');
+  expect(p.rows.at(-1)?.bottom.startsWith('0px'), 'no divider under the last row').toBe(true);
+  for (const row of p.rows.slice(0, -1)) {
+    expect(row.bottom, '1px divider in --border between rows').toBe(`1px ${p.border}`);
+  }
+  for (const row of p.rows) expect(row.bg, 'F5: row fill').toBe('rgba(0, 0, 0, 0)');
+  expect(p.cardBg, 'flat rows carry no card fill').toBe('rgba(0, 0, 0, 0)');
+  expect(p.cardShadow, 'flat rows carry no ring').toBe('none');
+  expect(p.rows.map((r) => r.label)).not.toContain('名称');
+}
+
 function headerName(page: Page, scope: string) {
   return page.locator(`${scope} .settings-header h2`);
 }
 
-test('account: two equal 52px rows, dividers between rows only, name above the card', async ({
+test('account: two equal 54px flat rows, dividers between rows only, name above the rows', async ({
   page,
 }) => {
   await page.goto('/app/account?scenario=13');
@@ -74,8 +87,8 @@ test('account: two equal 52px rows, dividers between rows only, name above the c
   expect(
     p.rows.map((r) => r.h),
     'F1: equal row heights',
-  ).toEqual([52, 52]);
-  expectOneCardShape(p);
+  ).toEqual([54, 54]);
+  expectFlatRowsShape(p);
   await expect(headerName(page, '[data-route="account"]')).toHaveText('Xmon Dai');
 
   // The header sits above the card, not inside it.
@@ -92,5 +105,5 @@ test('account: editing the name keeps the card untouched (no row appears)', asyn
   await expect(page.locator('.account-header').getByRole('textbox')).toBeFocused();
   const p = await probe(page.locator('.account-card'));
   expect(p.rows).toHaveLength(2);
-  expectOneCardShape(p);
+  expectFlatRowsShape(p);
 });

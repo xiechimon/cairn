@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   CHIEF_REMOTE_TOOLS,
+  CHIEF_REPLY_TOOLS,
   CHIEF_ROUTER_TOOLS,
   COMPUTER_REMOTE_TOOLS,
   coordinatorToolSourceId,
@@ -207,8 +208,14 @@ export function coordinatorToolsExtension(
   });
   const defs =
     options.routerTools === false
-      ? [...CHIEF_REMOTE_TOOLS, ...COMPUTER_REMOTE_TOOLS, ...actionTools]
-      : [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS, ...COMPUTER_REMOTE_TOOLS, ...actionTools];
+      ? [...CHIEF_REMOTE_TOOLS, ...CHIEF_REPLY_TOOLS, ...COMPUTER_REMOTE_TOOLS, ...actionTools]
+      : [
+          ...CHIEF_REMOTE_TOOLS,
+          ...CHIEF_ROUTER_TOOLS,
+          ...CHIEF_REPLY_TOOLS,
+          ...COMPUTER_REMOTE_TOOLS,
+          ...actionTools,
+        ];
   return defineExtension({
     name: 'cairn-coordinator-tools',
     hooks: [

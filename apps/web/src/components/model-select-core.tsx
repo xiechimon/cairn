@@ -155,7 +155,7 @@ export function ModelPickRow({
           data-testid="model-pick-check"
           className={cn(skin.check, 'group-aria-selected:text-(--spot-text-on-tint)')}
         >
-          <Check width={14} height={14} />
+          <Check width={16} height={16} />
         </span>
       )}
     </Button>
@@ -218,7 +218,7 @@ export function ModelPickList({
     <div className="flex min-h-0 flex-col gap-1">
       {searchOpen && (
         <div className={cn(SEARCH_BOX_CLS, 'mx-3')}>
-          <Search width={14} height={14} />
+          <Search width={16} height={16} />
           <Input
             ref={inputRef}
             className={SEARCH_INPUT_CLASS}

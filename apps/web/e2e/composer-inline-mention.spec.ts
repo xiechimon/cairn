@@ -480,7 +480,8 @@ test('geometry: the listbox sits above the composer, left-anchored and list-widt
   const cb = composerBox as { x: number; y: number; width: number; height: number };
   expect(lb.y + lb.height).toBeLessThanOrEqual(cb.y);
   expect(lb.width).toBeLessThanOrEqual(Math.min(480, cb.width) + 1);
-  expect(Math.abs(lb.x - cb.x)).toBeLessThanOrEqual(8);
+  const fieldBox = (await input.boundingBox()) as { x: number };
+  expect(Math.abs(lb.x - fieldBox.x)).toBeLessThanOrEqual(8);
 });
 
 const FILES = [

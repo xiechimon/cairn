@@ -1,4 +1,4 @@
-import { House, ListChecks, MessageSquareWarning, PackageCheck, Settings2 } from 'lucide-react';
+import { ListChecks, MessageSquareWarning, PackageCheck } from 'lucide-react';
 import {
   type ReactNode,
   useCallback,
@@ -8,11 +8,14 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
+import { useApiMutations, useProjects } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
-import { TaskCardContext } from '../chief/chief-message-rows.js';
+import { QuestionScopeContext } from '../chief/chief-question.js';
+import { ChiefStatusMark } from '../chief/chief-status-mark.js';
 import { questionDockState } from '../chief/question-dock-state.js';
+import { useTouchMessageTools } from '../chief/touch-message-tools.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
 import { ConversationSkeleton } from '../components/conversation-skeleton.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -25,14 +28,32 @@ import { Button } from '../components/ui/button.js';
 import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { GitBranch, History, ListLines, Puzzle } from '../icons/index.js';
+import {
+  ARCHIVED_PROJECT_WRITE_REASON,
+  ArchivedProjectBar,
+  type ArchivedProjectState,
+} from './archived-project-bar.js';
 import { ComposerSetupHint } from './composer-setup-hint.js';
-import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
+import {
+  ComposerThreadTarget,
+  ComposerThreadTargetMenu,
+  useComposerThreadTarget,
+} from './composer-thread-target.js';
+import {
+  FILE_NAME_PARAM,
+  FILE_PARAM,
+  type FileTarget,
+  fileTargetOf,
+  OpenFileContext,
+  withoutFileTarget,
+} from './file-pane.js';
+import { FilePreviewPanel } from './file-preview-panel.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
-import { type ComposeState, composeRequest } from './open-composer.js';
+import { NarrowTopControls, useNarrowChrome } from './narrow-chrome.js';
+import { composeRequest } from './open-composer.js';
 import { PhoneTabs } from './phone-tabs.js';
-import { TaskCard } from './task-card.js';
-import { taskCardFacts } from './task-card-facts.js';
+import { splitProjectsByArchive } from './project-archive.js';
 import { TasksPanel } from './tasks-panel.js';
 import {
   needsYouBadge,
@@ -103,12 +124,7 @@ interface HomeCProps {
   todosQuery?: QueryLike;
   tasks: TasksView;
   tasksQuery?: QueryLike;
-}
-
-function projectHomeSearch(params: URLSearchParams): string {
-  const next = new URLSearchParams(params);
-  next.delete('chat');
-  return `?${next.toString()}`;
+  archived?: ArchivedProjectState | null;
 }
 
 export function conversationBoundaryKey(input: {
@@ -146,6 +162,7 @@ export function HomeC({
   todosQuery,
   tasks,
   tasksQuery,
+  archived = null,
 }: HomeCProps) {
   const { t, locale } = useI18n();
   const { user, live, teamId, teamsQuery } = useLiveData();
@@ -165,14 +182,33 @@ export function HomeC({
   );
   const threadId = searchParams.get(THREAD_PARAM);
   const narrow = useNarrow();
+  const { createTodo } = useApiMutations(teamId);
+  const projectsQuery = useProjects(teamId, live);
+  const activeProjects = splitProjectsByArchive(projectsQuery.data ?? []).active;
+  const saveProjectId =
+    projectId ?? (activeProjects.length === 1 ? (activeProjects[0]?.id ?? null) : null);
   const showPane = (next: WorkPane | null, state: unknown = location.state) => {
-    const params = new URLSearchParams(searchParams);
+    const params = withoutFileTarget(new URLSearchParams(searchParams));
     params.delete(THREAD_PARAM);
     params.delete(VIEW_PARAM);
     if (next === null) params.delete(PANE_PARAM);
     else params.set(PANE_PARAM, next);
     setSearchParams(params, { replace: true, state });
   };
+  const fileTarget = pane === 'file' ? fileTargetOf(searchParams) : null;
+  const openFile = useCallback(
+    (target: FileTarget) =>
+      setSearchParams((prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete(THREAD_PARAM);
+        params.delete(VIEW_PARAM);
+        params.set(PANE_PARAM, 'file');
+        params.set(FILE_PARAM, target.key);
+        params.set(FILE_NAME_PARAM, target.name);
+        return params;
+      }),
+    [setSearchParams],
+  );
   const togglePane = (next: WorkPane) => {
     showPane(pane === next && threadId === null ? null : next);
   };
@@ -207,28 +243,37 @@ export function HomeC({
   const conversation = stream.filter(
     (item) => !(item.kind === 'question' && item.status === 'pending'),
   );
+  const questionScope = useMemo(
+    () =>
+      projectId === null
+        ? null
+        : new Set(
+            stream.flatMap((item) =>
+              item.kind === 'question' && item.status === 'pending' ? [item.requestId] : [],
+            ),
+          ),
+    [stream, projectId],
+  );
+  const quickOwner = useMemo(() => {
+    const full = chiefData.stream ?? [];
+    const at = full.findLastIndex((item) => item.kind === 'robot' && item.typing !== true);
+    if (at < 0 || full.slice(at).some((item) => item.kind === 'user')) return undefined;
+    return full[at];
+  }, [chiefData.stream]);
+  const quickReplies =
+    quickOwner !== undefined && stream.includes(quickOwner) ? chiefData.quickReplies : undefined;
+  const scopeQuestions = (node: ReactNode) => (
+    <QuestionScopeContext.Provider value={questionScope}>{node}</QuestionScopeContext.Provider>
+  );
+  const todoGlances = useMemo(
+    () =>
+      new Map(
+        todos.map((todo) => [todo.id, { phase: todo.phase, seq: todo.seqNum, title: todo.title }]),
+      ),
+    [todos],
+  );
   const scopedTasks = useMemo(() => scopeTasks(tasks, projectId), [tasks, projectId]);
   const badge = needsYouBadge(scopedTasks.entries, scopedTasks.questions);
-  const taskById = useMemo(
-    () => new Map(tasks.entries.map((entry) => [entry.todo.id, entry])),
-    [tasks.entries],
-  );
-  const fullStream = chiefData.stream;
-  const renderTaskCard = useCallback(
-    (todoId: string) => {
-      const entry = taskById.get(todoId);
-      if (entry === undefined) return null;
-      return (
-        <TaskCard
-          entry={entry}
-          facts={taskCardFacts(fullStream ?? [], todoId)}
-          now={now}
-          onOpen={() => openThread(todoId)}
-        />
-      );
-    },
-    [taskById, fullStream, openThread, now],
-  );
   const [questionTarget, setQuestionTarget] = useState<QuestionTarget | null>(null);
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const questionView: QuestionThreadView = {
@@ -238,6 +283,7 @@ export function HomeC({
     loadingEarlier: surface.earlier?.loading === true,
     failedEarlier: surface.earlier?.failed === true,
     dismissing: questionDockState.isDismissing,
+    shown: questionScope,
   };
   const openQuestion = (target: QuestionTarget) => {
     const step = questionOpenStep(target, questionView);
@@ -257,8 +303,7 @@ export function HomeC({
     if (questionTarget === null) return;
     if (stepKind === 'focus') {
       questionDockState.setFocus(focusAt);
-      if (questionDockState.isCollapsed(questionTarget.requestId))
-        questionDockState.toggleCollapsed(questionTarget.requestId);
+      questionDockState.reveal();
       setQuestionTarget(null);
     } else if (stepKind === 'load-earlier') {
       loadEarlier?.();
@@ -266,6 +311,8 @@ export function HomeC({
       setQuestionTarget(null);
     }
   }, [questionTarget, stepKind, focusAt, loadEarlier]);
+  const [section, setSection] = useState<HTMLElement | null>(null);
+  useTouchMessageTools(section);
   const thread = useComposerThreadTarget(scoped);
   const running = scoped.filter(
     (todo) => threadStatus(todo) === 'running' && todo.archivedAt == null,
@@ -293,51 +340,14 @@ export function HomeC({
     </p>
   );
 
-  const projectLinks = projectId !== null && (
-    <nav
-      data-testid="home-c-project-links"
-      aria-label={t('项目')}
-      className="mt-2 -ml-2.5 flex gap-1"
-    >
-      <Button
-        variant="ghost"
-        size="sm"
-        className="text-meta text-content-secondary"
-        render={<Link to={{ pathname: '/app', search: projectHomeSearch(searchParams) }} />}
-      >
-        <House aria-hidden="true" className="size-3.5" />
-        {t('项目主页')}
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="text-meta text-content-secondary"
-        render={<Link to={`/app/project/${projectId}/tasks`} />}
-      >
-        <ListChecks aria-hidden="true" className="size-3.5" />
-        {t('任务')}
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="text-meta text-content-secondary"
-        render={<Link to={`/app/project/${projectId}/settings`} />}
-      >
-        <Settings2 aria-hidden="true" className="size-3.5" />
-        {t('项目设置')}
-      </Button>
-    </nav>
-  );
-
   const hero = (
     <header
       data-testid="home-c-hero"
-      className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-[6vh]"
+      className="mx-auto w-[calc(100%-2rem)] max-w-chat flex-none pt-[6vh]"
     >
       {greeting}
       {since}
-      {projectLinks}
-      {badge === 0 && (
+      {badge === 0 && archived === null && (
         <div data-testid="home-c-starters" className="mt-4 flex flex-wrap gap-2">
           {STARTERS.map(({ label, Icon }) => (
             <SuggestionChip
@@ -354,67 +364,50 @@ export function HomeC({
     </header>
   );
 
-  const lead = (
-    <section data-testid="home-c-lead" aria-label={t('首页概况')} className="pt-6 pb-8">
-      {greeting}
-      {since}
-      {projectLinks}
-      {chiefData.hasEarlier === true && (
-        <p
-          data-testid="home-c-earlier"
-          className="m-0 mt-8 text-center text-caption text-content-dim"
-        >
-          {t('往上滑看更早的对话')}
-        </p>
-      )}
-    </section>
-  );
-
-  const paneButtons = (
+  const heading = <h1 className="sr-only">{projectName ?? t('Coordinator')}</h1>;
+  const paneButtons = narrow ? (
+    heading
+  ) : (
     <header
       data-testid="home-c-pane-buttons"
-      className="flex h-12 flex-none items-center gap-2 pr-3 pl-5 max-[640px]:pl-14"
+      className="flex h-12 flex-none items-center justify-end gap-1 pr-3.5 pl-5"
     >
-      <h1 className="m-0 mr-auto min-w-0 truncate text-ui font-semibold text-foreground">
-        {projectName ?? t('Coordinator')}
-      </h1>
-      {!narrow && (
-        <IconTooltip
-          label={badge > 0 ? t('任务，{n} 件等你', { n: badge }) : t('任务')}
-          side="bottom"
-          trigger={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              data-testid="tasks-toggle"
-              aria-pressed={pane === 'tasks' && threadId === null}
-              onClick={() => togglePane('tasks')}
-              className="relative text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+      {heading}
+      <IconTooltip
+        label={badge > 0 ? t('任务，{n} 件等你', { n: badge }) : t('任务')}
+        side="bottom"
+        trigger={
+          <Button
+            variant="ghost"
+            size="icon"
+            data-testid="tasks-toggle"
+            aria-pressed={pane === 'tasks' && threadId === null}
+            onClick={() => togglePane('tasks')}
+            className="relative text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+          />
+        }
+      >
+        <ListChecks aria-hidden="true" />
+        {badge > 0 && (
+          <>
+            <span
+              aria-hidden="true"
+              data-slot="needs-you-dot"
+              className="absolute top-1 right-1 size-1.75 rounded-full bg-(--count-badge)"
             />
-          }
-        >
-          <ListChecks aria-hidden="true" />
-          {badge > 0 && (
-            <>
-              <span
-                aria-hidden="true"
-                data-slot="needs-you-dot"
-                className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)"
-              />
-              <span data-testid="tasks-badge" className="sr-only">
-                {badge}
-              </span>
-            </>
-          )}
-        </IconTooltip>
-      )}
+            <span data-testid="tasks-badge" className="sr-only">
+              {badge}
+            </span>
+          </>
+        )}
+      </IconTooltip>
       <IconTooltip
         label={t('成果')}
         side="bottom"
         trigger={
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon"
             aria-pressed={pane === 'made' && threadId === null}
             onClick={() => togglePane('made')}
             className="text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
@@ -427,17 +420,33 @@ export function HomeC({
         machines={computers}
         open={pane === 'machines' && threadId === null}
         onToggle={() => togglePane('machines')}
-        loading={machinesQuery?.isPending === true}
       />
     </header>
   );
 
-  const phoneTabs = narrow && threadId === null && (
-    <PhoneTabs tasksOpen={pane === 'tasks'} badge={badge} />
+  const phoneChrome = narrow && (
+    <NarrowChrome
+      mark={loaded ? <ChiefStatusMark chief={chiefData} large className="" /> : null}
+      pane={pane}
+      badge={badge}
+      onTasks={() => togglePane('tasks')}
+      computers={
+        <MachineChip
+          round
+          machines={computers}
+          open={pane === 'machines' && threadId === null}
+          onToggle={() => togglePane('machines')}
+        />
+      }
+    />
   );
 
   const workPanel =
-    threadId !== null ? null : pane === 'machines' ? (
+    threadId !== null ? null : pane === 'file' ? (
+      fileTarget !== null && (
+        <FilePreviewPanel key={fileTarget.key} target={fileTarget} onClose={() => showPane(null)} />
+      )
+    ) : pane === 'machines' ? (
       <MachinesPanel machines={computers} onClose={() => showPane(null)} query={machinesQuery} />
     ) : pane === 'tasks' ? (
       <TasksPanel
@@ -448,14 +457,16 @@ export function HomeC({
         onClose={() => showPane(null)}
         onOpenThread={openThread}
         onOpenQuestion={openQuestion}
-        onNewTask={() => {
-          if (!narrow) composerRef.current?.focus();
-          else showPane(null, { compose: Date.now() } satisfies ComposeState);
-        }}
+        addBlocked={archived === null ? null : t(ARCHIVED_PROJECT_WRITE_REASON)}
         onAddTask={async (text) => {
+          if (live && saveProjectId !== null) {
+            await createTodo.mutateAsync({ projectId: saveProjectId, spec: text });
+            return 'saved';
+          }
           if (surface.onSend == null) setPrefill({ text, key: Date.now() });
           else await surface.onSend(text, projectId);
           if (narrow) showPane(null);
+          return 'sent';
         }}
         query={tasksQuery}
       />
@@ -463,6 +474,7 @@ export function HomeC({
       pane !== null && (
         <WorkPanel
           todos={scoped}
+          projectId={projectId}
           now={now}
           onClose={() => showPane(null)}
           onOpenThread={openThread}
@@ -480,7 +492,14 @@ export function HomeC({
   const composerPlaceholder =
     projectName != null
       ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
-      : t('跟 Coordinator 说点什么，或描述一个新任务…');
+      : t('给 Coordinator 发消息');
+  const archivedBar =
+    archived === null ? null : (
+      <ArchivedProjectBar
+        state={archived}
+        className="mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-chat"
+      />
+    );
   const handedOver = load === 'ready' && loadingDraft !== '';
   useEffect(() => {
     if (!handedOver) return;
@@ -488,7 +507,7 @@ export function HomeC({
     setLoadingDraft('');
   }, [handedOver, loadingDraft]);
   if (load !== 'ready') {
-    return (
+    return scopeQuestions(
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="relative flex min-h-0 min-w-0 flex-1">
           <section
@@ -501,83 +520,100 @@ export function HomeC({
                 <div className="min-h-0 flex-1 overflow-hidden">
                   <ConversationSkeleton />
                 </div>
-                <LoadingComposer
-                  draft={loadingDraft}
-                  onDraftChange={setLoadingDraft}
-                  placeholder={composerPlaceholder}
-                />
+                {archived === null ? (
+                  <LoadingComposer
+                    draft={loadingDraft}
+                    onDraftChange={setLoadingDraft}
+                    placeholder={composerPlaceholder}
+                  />
+                ) : (
+                  archivedBar
+                )}
               </>
             ) : (
-              <>
-                <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-6">
-                  {projectLinks}
-                </div>
-                <EmptyState
-                  testId="home-c-error"
-                  icon={MessageSquareWarning}
-                  title={t('对话加载失败')}
-                  description={t('对话记录还在，重试一下。')}
-                  action={{
-                    label: t('重试'),
-                    onClick:
-                      teamId === undefined ? () => void teamsQuery?.refetch() : surface.retry,
-                  }}
-                  className="mt-[12vh]"
-                />
-              </>
+              <EmptyState
+                testId="home-c-error"
+                icon={MessageSquareWarning}
+                title={t('对话加载失败')}
+                description={t('对话记录还在，重试一下。')}
+                action={{
+                  label: t('重试'),
+                  onClick: teamId === undefined ? () => void teamsQuery?.refetch() : surface.retry,
+                }}
+                className="mt-[12vh]"
+              />
             )}
           </section>
           {workPanel}
         </div>
-        {phoneTabs}
-      </div>
+        {phoneChrome}
+      </div>,
     );
   }
 
-  return (
+  return scopeQuestions(
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="relative flex min-h-0 min-w-0 flex-1">
         <section
+          ref={setSection}
           data-testid="home-c"
           aria-label={t('与 Coordinator 的对话')}
           className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
         >
           {paneButtons}
+          {!narrow && <ChiefStatusMark chief={chiefData} />}
           {banner != null && (
-            <div className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-182 flex-none overflow-y-auto pt-3">
+            <div
+              data-home-banner=""
+              className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-chat flex-none overflow-y-auto pt-3"
+            >
               {banner}
             </div>
           )}
-          <TaskCardContext.Provider value={renderTaskCard}>
+          <OpenFileContext.Provider value={openFile}>
             <ConversationBoundary resetKey={conversationResetKey}>
               <ChiefConversation
-                chief={{ ...chiefData, stream: conversation }}
+                chief={{
+                  ...chiefData,
+                  stream: conversation,
+                  ...(quickReplies !== undefined ? { quickReplies } : { quickReplies: [] }),
+                }}
                 onSend={
-                  thread.picked !== null
-                    ? thread.send
-                    : surface.onSend != null
-                      ? (text: string) => surface.onSend?.(text, projectId)
-                      : live
-                        ? undefined
-                        : () => Promise.resolve()
+                  archived !== null
+                    ? undefined
+                    : thread.picked !== null
+                      ? thread.send
+                      : surface.onSend != null
+                        ? (text: string) => surface.onSend?.(text, projectId)
+                        : live
+                          ? undefined
+                          : () => Promise.resolve()
                 }
-                onRewind={surface.onRewind}
-                onWithdraw={surface.onWithdraw}
-                onSteer={surface.onSteer}
-                onStop={surface.onStop}
+                onRewind={archived === null ? surface.onRewind : undefined}
+                onWithdraw={archived === null ? surface.onWithdraw : undefined}
+                onSteer={archived === null ? surface.onSteer : undefined}
+                onStop={archived === null ? surface.onStop : undefined}
+                composerReplacement={archivedBar}
                 earlier={surface.earlier}
                 onSettings={() => surface.setChiefView('settings')}
                 showBindGate={!live}
                 hero={hero}
-                lead={lead}
+                todoGlances={todoGlances}
                 prefill={prefill}
                 placeholder={
                   projectName != null
                     ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
-                    : t('跟 Coordinator 说点什么，或描述一个新任务…')
+                    : t('给 Coordinator 发消息')
                 }
                 composerError={thread.error}
                 targetPlaceholder={thread.placeholder}
+                composerMenu={
+                  <ComposerThreadTargetMenu
+                    targets={thread.targets}
+                    picked={thread.picked}
+                    onPick={thread.pick}
+                  />
+                }
                 composerTools={
                   <>
                     <ComposerThreadTarget
@@ -594,11 +630,33 @@ export function HomeC({
                 }}
               />
             </ConversationBoundary>
-          </TaskCardContext.Provider>
+          </OpenFileContext.Provider>
         </section>
         {workPanel}
       </div>
-      {phoneTabs}
-    </div>
+      {phoneChrome}
+    </div>,
+  );
+}
+
+function NarrowChrome({
+  mark,
+  pane,
+  badge,
+  onTasks,
+  computers,
+}: {
+  mark: ReactNode;
+  pane: WorkPane | null;
+  badge: number;
+  onTasks: () => void;
+  computers: ReactNode;
+}) {
+  const keyboardOpen = useNarrowChrome();
+  return (
+    <>
+      <NarrowTopControls mark={mark} tasksOpen={pane === 'tasks'} badge={badge} onTasks={onTasks} />
+      {!keyboardOpen && <PhoneTabs pane={pane} badge={badge} computers={computers} />}
+    </>
   );
 }

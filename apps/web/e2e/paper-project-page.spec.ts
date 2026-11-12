@@ -98,7 +98,10 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(meta, 'T4').toHaveCSS('font-size', '13px');
     await expect(meta, 'T4').toHaveCSS('color', ink3);
 
-    await expect(rows.nth(1).getByRole('link'), 'T5').toHaveCSS('color', ink3);
+    await expect(rows.nth(1).getByRole('link'), 'T5: a settled title steps to ink-2, never to meta ink').toHaveCSS(
+      'color',
+      await resolveColor(page, 'var(--text-secondary)'),
+    );
 
     await page.locator('.prj-tasks-view-btn').nth(1).click();
     const card = page.getByTestId('task-card').first();

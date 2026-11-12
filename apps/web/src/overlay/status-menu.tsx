@@ -64,7 +64,7 @@ export function StatusMenu({ phase, elapsed, onMoveBack, onMarkDone }: StatusMen
                 <span className="ml-auto text-meta text-content-tertiary tabular-nums">
                   {elapsed}
                 </span>
-                <Check aria-hidden="true" className="size-4 flex-none text-foreground" />
+                <Check aria-hidden="true" className="size-5 flex-none text-foreground" />
               </>
             )}
           </div>

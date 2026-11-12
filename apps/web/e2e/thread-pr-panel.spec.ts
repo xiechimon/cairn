@@ -285,7 +285,8 @@ test('the same PR reaches the Tasks list and the finish dialog', async ({ page }
   await page.goto('/app?pane=tasks');
   await expect(page.getByTestId('work-prs').locator('[data-slot="pr-list-row"]')).toContainText('#42');
   await page.goto('/app?thread=todo-1');
-  await page.getByRole('button', { name: 'Finish…' }).click();
+  await page.getByTestId('side-chat').getByRole('button', { name: 'More actions…' }).click();
+  await page.getByRole('menuitem', { name: 'Complete' }).click();
   await expect(page.getByTestId('accept-dialog-pr').getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
 });
 
@@ -297,7 +298,7 @@ test('a task row in the Tasks panel links its PR beside the row', async ({ page 
   const row = page.locator('[data-slot="task-row-frame"]').filter({ hasText: REVIEW_TASK.title });
   await expect(row.getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
   await evidencePanelShot(page, 'tasks-row-pr-link-light.png', page.locator('.side-panel'));
-  await row.getByRole('button').click();
+  await row.locator('[data-slot="task-row"]').click();
   await expect(page).toHaveURL(/[?&]thread=todo-1/);
 });
 

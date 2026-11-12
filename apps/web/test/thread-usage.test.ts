@@ -1,7 +1,9 @@
 import type { TokenUsage } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { threadContextOf } from '../src/api/mappers.js';
 import {
   type ThreadUsageSummary,
+  threadContextReading,
   threadUsageBuildIds,
   threadUsageCaption,
   threadUsageSummary,
@@ -101,9 +103,9 @@ describe('threadUsageCaption', () => {
     ...patch,
   });
 
-  test('joins only the facts that are known, with no dash placeholders', () => {
-    expect(threadUsageCaption(summary(), t)).toBe('$1.25 · Token 数：2.5k · provider/model-a');
-    expect(threadUsageCaption(summary({ cost: '—' }), t)).toBe('Token 数：2.5k · provider/model-a');
+  test('joins only the cost and the token total that are known, with no dash placeholders', () => {
+    expect(threadUsageCaption(summary(), t)).toBe('$1.25 · Token 数：2.5k');
+    expect(threadUsageCaption(summary({ cost: '—' }), t)).toBe('Token 数：2.5k');
     expect(threadUsageCaption(summary({ tokens: '—', models: [] }), t)).toBe('$1.25');
   });
 
@@ -113,9 +115,35 @@ describe('threadUsageCaption', () => {
     expect(caption).not.toContain('—');
   });
 
-  test('counts several models instead of listing them', () => {
-    expect(threadUsageCaption(summary({ models: ['a', 'b'] }), t)).toBe(
-      '$1.25 · Token 数：2.5k · 2 个模型',
-    );
+  test('models stay in the popover, however many there are', () => {
+    expect(threadUsageCaption(summary({ models: ['a', 'b'] }), t)).toBe('$1.25 · Token 数：2.5k');
+  });
+});
+
+describe('thread context usage', () => {
+  test('a todo that carries the Coordinator-shaped context keeps it', () => {
+    expect(threadContextOf({ context: { tokens: 62_000, contextWindow: 200_000, resume: 'warm' } })).toEqual({
+      tokens: 62_000,
+      contextWindow: 200_000,
+    });
+  });
+
+  test('a todo without the field, or with an unusable one, has no context', () => {
+    expect(threadContextOf({})).toBeNull();
+    expect(threadContextOf({ context: null })).toBeNull();
+    expect(threadContextOf({ context: { tokens: 10 } })).toBeNull();
+    expect(threadContextOf({ context: { tokens: 10, contextWindow: 0 } })).toBeNull();
+    expect(threadContextOf({ context: { tokens: '10', contextWindow: 200_000 } })).toBeNull();
+  });
+
+  test('the popover row reads the share, then the tokens over the window', () => {
+    expect(threadContextReading({ tokens: 62_000, contextWindow: 200_000 })).toBe('31% · 62k / 200k');
+    expect(threadContextReading({ tokens: 500, contextWindow: 200_000 })).toBe('0% · 500 / 200k');
+  });
+
+  test('no context leaves the row out instead of printing a placeholder', () => {
+    expect(threadContextReading(null)).toBe('');
+    expect(threadContextReading(undefined)).toBe('');
+    expect(threadContextReading({ tokens: 10, contextWindow: 0 })).toBe('');
   });
 });

@@ -62,14 +62,23 @@ for (const theme of ['light', 'dark'] as const) {
     await setTheme(page, theme);
     let win = await openHome(page, READY);
     await expect(win.getByTestId('chief-gate'), 'W2: bound has no gate').toHaveCount(0);
-    await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '15px');
+    await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '14px');
 
     win = await openHome(page, THREAD);
     const note = win.getByTestId('chief-stream').getByTestId('chief-note').first();
-    await expect(note, 'W5').toHaveCSS('font-size', '15px');
-    const foot = win.getByTestId('chief-msg-foot').first();
-    await expect(foot, 'W5').toHaveCSS('font-size', '13px');
-    await win.getByTestId('chief-tools-toggle').click();
+    await expect(note, 'W5').toHaveCSS('font-size', '13px');
+    const meta = win
+      .getByTestId('chief-msg-foot')
+      .first()
+      .locator('[data-slot="message-toolbar-meta"]');
+    await expect(meta, 'W5').toHaveCSS('font-size', '12px');
+    const toolsToggle = win.getByTestId('chief-tools-toggle');
+    await expect(toolsToggle.locator('[data-trace-summary]'), 'W5').toHaveCSS('font-size', '14px');
+    await expect(toolsToggle.locator('svg[data-glyph="done"]'), 'W5').toHaveCount(1);
+    await expect(toolsToggle.locator('svg[data-trace-triangle="closed"]'), 'W5').toHaveCSS('rotate', 'none');
+    await toolsToggle.click();
+    await expect(toolsToggle.locator('svg[data-trace-triangle="open"]'), 'W5').toHaveCSS('rotate', '90deg');
+    expect((await toolsToggle.boundingBox())?.height, 'W5').toBe(28);
     const toolRow = win.getByTestId('chief-turn-tools').locator('[data-trace-verb]').first();
     await expect(toolRow, 'W5').toHaveCSS('font-size', '13px');
   });
@@ -133,35 +142,33 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.locator('.settings-card').getByText(/暂无跟进事项/), 'S3').toBeVisible();
   });
 
-  test(`question card: card face, status triad, type keys (${theme})`, async ({ page }) => {
+  test(`question chips: reply bubble face, quiet header, chip type (${theme})`, async ({ page }) => {
     await setTheme(page, theme);
     const win = await openHome(page, QUESTION);
-    const card = await probe(page, 'backgroundColor', 'var(--card)');
-    const accent = await probe(page, 'color', 'var(--card-button)');
-    const ink3 = await probe(page, 'color', 'var(--text-tertiary)');
+    const fill = await probe(page, 'backgroundColor', 'var(--reply-bubble-fill)');
 
-    const pending = win.locator('[data-testid="chief-question-card"][data-status="pending"]');
+    const pending = win.locator('[data-testid="chief-question-chips"][data-status="pending"]');
     await pending.scrollIntoViewIfNeeded();
-    await expect(pending, 'Q1').toHaveCSS('border-top-left-radius', await token(page, '--radius-composer'));
-    await expect(pending, 'Q1').toHaveCSS('background-color', card);
-    const waiting = pending.getByTestId('chief-question-status');
-    await expect(waiting, 'Q1').toHaveClass(/sr-only/);
-    await pending.getByTestId('chief-question-collapse').click();
-    await expect(waiting, 'Q1').toHaveText('待你决定');
-    await expect(waiting.locator('svg'), 'Q1').toHaveCount(1);
-    await expect(waiting, 'Q1').toHaveCSS('color', accent);
-    await pending.getByTestId('chief-question-collapse').click();
+    await expect(pending.getByTestId('chief-question-text'), 'Q1').toHaveCSS('background-color', fill);
+    await expect(pending.getByTestId('chief-question-header'), 'Q1').toHaveCount(0);
+    await expect(pending.getByTestId('chief-question-option-0-0'), 'Q1').toHaveCSS(
+      'background-color',
+      'rgba(0, 0, 0, 0)',
+    );
 
-    const done = win.locator('[data-testid="chief-question-line"][data-status="answered"]');
-    await expect(done, 'Q1').toContainText('已回答');
-    await expect(done.locator('svg'), 'Q1').toHaveCount(1);
-    await expect(done, 'Q1').toHaveCSS('color', ink3);
+    const done = win.locator('[data-slot="user-bubble"][data-question-answer="q-answered"]');
+    await expect(done, 'Q1').toHaveText('桌面浏览器');
+    await expect(done.locator('svg'), 'Q1').toHaveCount(0);
+    await expect(done, 'Q1').toHaveCSS(
+      'background-color',
+      await probe(page, 'backgroundColor', 'var(--bubble-fill)'),
+    );
+    await expect(win.getByTestId('chief-question-line'), 'Q1').toHaveCount(0);
+    const asked = win.locator('[data-testid="chief-question-asked"][data-request-id="q-answered"]');
+    await expect(asked.getByTestId('chief-reply-bubble'), 'Q1').toHaveText('先做哪一端？');
+    await expect(asked.getByTestId('chief-reply-bubble'), 'Q1').toHaveCSS('background-color', fill);
 
     await expect(pending.getByTestId('chief-question-text'), 'Q2').toHaveCSS('font-size', '14px');
-    await expect(pending.getByTestId('chief-question-position'), 'Q2').toHaveCSS(
-      'font-size',
-      '12px',
-    );
     await expect(pending.getByTestId('chief-question-option-0-0'), 'Q2').toHaveCSS(
       'font-size',
       '14px',

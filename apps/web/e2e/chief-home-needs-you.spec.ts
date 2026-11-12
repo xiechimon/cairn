@@ -58,18 +58,17 @@ test('two pending decisions are answered one at a time above the composer; the r
   });
   await page.goto('/app');
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
-  await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
-  const panel = page.getByTestId('chief-question-dock');
-  const card = panel.getByTestId('chief-question-card');
-  await expect(card.getByTestId('chief-question-status')).toHaveText('待你决定');
+  await expect(page.getByTestId('chief-question-text')).toContainText('Which model?');
+  const panel = page.getByTestId('chief-question');
+  const card = panel.getByTestId('chief-question-chips');
+  await expect(panel).toHaveAccessibleName('待回答的提问');
   await expect(card.getByTestId('chief-question-option-0-0')).toContainText('Claude subscription');
-  await expect(card.getByTestId('chief-question-option-0-0')).toContainText('（推荐）');
-  await expect(card.getByTestId('chief-question-option-0-0')).toContainText('Verified');
+  await expect(card.getByTestId('chief-question-option-0-0')).toHaveAttribute('data-recommended', '');
+  await expect(card.getByTestId('chief-question-option-0-0')).toHaveAccessibleDescription('推荐 · Verified');
   await expect(card.getByTestId('chief-question-option-0-1')).toContainText('wokey');
   await expect(card.getByTestId('chief-question-other-0')).toHaveCount(0);
-  await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '输入你自己的回答，或留空使用选中的选项');
+  await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '输入你自己的回答…');
   await card.getByTestId('chief-question-option-0-0').click();
-  await page.getByTestId('chief-question-primary').click();
   await expect.poll(() => answered.length).toBe(1);
   expect(answered[0]).toEqual({
     requestId: 'ask-0000000a',
@@ -99,7 +98,7 @@ test('own words: the composer text is the answer', async ({ page }) => {
     },
   );
   await page.goto('/app');
-  const card = page.getByTestId('chief-question-dock').getByTestId('chief-question-card');
+  const card = page.getByTestId('chief-question').getByTestId('chief-question-chips');
   await expect(card).toBeVisible();
   await page.getByTestId('chief-composer-input').fill('Use the metered key this once');
   await page.getByTestId('chief-question-primary').click();
@@ -108,7 +107,7 @@ test('own words: the composer text is the answer', async ({ page }) => {
     .toEqual([{ answers: [{ header: 'Model · #74', choices: ['Use the metered key this once'] }] }]);
 });
 
-test('the question dock steps between pending questions', async ({ page }) => {
+test('pending questions show one at a time and the tasks panel rows move between them', async ({ page }) => {
   await mockLive(page, {
     threads: [THREAD],
     messages: [
@@ -124,13 +123,15 @@ test('the question dock steps between pending questions', async ({ page }) => {
     todos: [],
   });
   await page.goto('/app');
-  const dock = page.getByTestId('chief-question-dock');
+  const dock = page.getByTestId('chief-question');
   await expect(dock.getByTestId('chief-question-text')).toContainText('Which model?');
-  await expect(page.getByTestId('chief-question-prev')).toBeDisabled();
-  await page.getByTestId('chief-question-next').click();
-  await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 2');
+  await expect(dock.getByTestId('chief-question-text')).toHaveCount(1);
+  await page.getByTestId('home-c').getByRole('button', { name: /^任务/ }).first().click();
+  const rows = page
+    .getByRole('complementary', { name: '任务' })
+    .locator('[data-section="needs_input"] [data-slot="task-row"]');
+  await rows.filter({ hasText: 'Merge · #2271' }).click();
   await expect(dock.getByTestId('chief-question-text')).toContainText('Who merges it?');
-  await expect(page.getByTestId('chief-question-next')).toBeDisabled();
-  await page.getByTestId('chief-question-prev').click();
+  await rows.filter({ hasText: 'Model · #74' }).click();
   await expect(dock.getByTestId('chief-question-text')).toContainText('Which model?');
 });

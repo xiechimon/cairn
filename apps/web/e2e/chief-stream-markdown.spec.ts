@@ -240,7 +240,7 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
 
     const final = msgs.nth(1);
     const finalFoot = final.getByTestId('chief-msg-foot');
-    await expect(finalFoot.getByRole('button', { name: '复制' })).toBeVisible();
+    await expect(finalFoot.getByTestId('chief-msg-more')).toBeVisible();
     await expect(finalFoot).not.toContainText('完成');
 
     const typing = msgs.nth(2);
@@ -248,12 +248,14 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(typing.locator('strong')).toHaveText('relay 通道');
   });
 
-  test('F-R6/R8: user row is the gradient bubble with no avatar, chat body scrollable', async ({ page }) => {
+  test('F-R6/R8: user row is the flat sand bubble with no avatar, chat body scrollable', async ({ page }) => {
     const userRow = page.getByTestId('chief-stream').getByTestId('chief-msg').first();
 
     await expect(userRow.locator('img')).toHaveCount(0);
     await expect(userRow.locator('> svg')).toHaveCount(0);
-    await expect(userRow.getByTestId('chief-bubble')).toHaveClass(/bubble-gradient/);
+    const bubble = userRow.getByTestId('chief-bubble');
+    await expect(bubble).toHaveAttribute('data-slot', 'user-bubble');
+    await expect(bubble).toHaveCSS('background-image', 'none');
 
     const overflow = await page
       .getByTestId('chief-body')
@@ -274,7 +276,7 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(stream.getByTestId('chief-chip-todo')).toHaveCount(1);
     await expect(stream.getByTestId('chief-chip-agent')).toHaveCount(1);
 
-    await expect(stream.getByTestId('chief-msg-tools').getByRole('button')).toHaveCount(2);
+    await expect(stream.getByTestId('chief-msg-tools').getByRole('button')).toHaveCount(1);
   });
 
   test('F-R15: a Coordinator reply carries no identity row (D122)', async ({ page }) => {
@@ -340,16 +342,44 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     await expect(page).toHaveURL(/[?&]thread=t16/);
   });
 
-  test('F-R15: copy payload = markdown source (not rendered output); the two-button row (copy/restore) is unaffected', async ({
+  test('a progress checklist keeps the sub-steps, paragraphs and code under each item', async ({ page }) => {
+    await stubEventSource(page);
+    await stubCdnAvatar(page);
+    await mockChiefLiveApi(page, {
+      final: true,
+      messages: [
+        {
+          id: 'm9',
+          role: 'assistant',
+          content:
+            '- [x] Build\n  - Lint passed\n- [~] Deploy\n  - Run migrations\n  - Restart services\n\n  Waiting on the staging window.\n\n  ```sh\n  pnpm migrate\n  ```',
+          createdAt: 9,
+        },
+      ],
+    });
+    await page.goto('/app?chief=chief-bbb');
+    const card = page.getByTestId('home-c').getByTestId('md-tasks');
+    await expect(card.getByTestId('md-task')).toHaveCount(2);
+    const [build, deploy] = [card.getByTestId('md-task').nth(0), card.getByTestId('md-task').nth(1)];
+    await expect(build.getByTestId('md-task-children')).toContainText('Lint passed');
+    const children = deploy.getByTestId('md-task-children');
+    await expect(children).toContainText('Run migrations');
+    await expect(children).toContainText('Restart services');
+    await expect(children).toContainText('Waiting on the staging window.');
+    await expect(children.getByTestId('md-code')).toContainText('pnpm migrate');
+  });
+
+  test('F-R15: copy payload = markdown source (not rendered output); the tool row (reply/copy/more) is unaffected', async ({
     page,
   }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     const coordinator = await boot(page);
     const firstUser = coordinator.getByTestId('chief-msg').first();
     const tools = firstUser.getByTestId('chief-msg-tools');
-    await expect(tools.getByRole('button')).toHaveCount(2);
-    await expect(tools.getByRole('button', { name: '恢复到此处' })).toBeVisible();
-    await tools.getByRole('button', { name: '复制' }).click();
+    await firstUser.getByTestId('chief-bubble').hover();
+    await expect(tools.getByTestId('chief-msg-reply')).toBeVisible();
+    await tools.getByRole('button', { name: '更多' }).click();
+    await page.getByRole('menuitem', { name: '复制' }).click();
     const clip = await page.evaluate(() => navigator.clipboard.readText());
 
     expect(clip).toBe(MD_USER);
@@ -378,9 +408,8 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
       const r = el.getBoundingClientRect();
       return { h: Math.round(r.height), font: getComputedStyle(el).fontSize };
     });
-    expect(geo.h).toBeGreaterThanOrEqual(37);
-    expect(geo.h).toBeLessThanOrEqual(38);
-    expect(geo.font).toBe('15px');
+    expect(geo.h).toBe(36);
+    expect(geo.font).toBe('14px');
 
     const fence = coordinator.getByTestId('chief-bubble').filter({ hasText: 'echo before-and-after' });
     const pre = fence.getByTestId('md-code-block');
@@ -475,7 +504,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
 
     await expect(coordinator.locator('.chief-msg', { hasText: 'todo_write' })).toHaveCount(0);
     const live = coordinator.getByTestId('chief-msg').last();
-    await live.getByRole('button', { name: '展开实时步骤' }).click();
+    await live.getByRole('button', { name: '查看步骤' }).click();
     await expect(live.getByTestId('chief-turn-tools')).toContainText(/正在调用\s*todo_write/);
     await expect(coordinator.getByText('todo_write')).toHaveCount(1);
   });
@@ -507,7 +536,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
 
     const coordinator = page.getByTestId('home-c');
     const live = coordinator.getByTestId('chief-msg').last();
-    await live.getByRole('button', { name: '展开实时步骤' }).click();
+    await live.getByRole('button', { name: '查看步骤' }).click();
     await expect(live.getByTestId('chief-turn-tools')).toContainText(/正在调用\s*Bash ls -la/);
   });
 
@@ -594,7 +623,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     const LONG_CJK =
       '用户只是打了个招呼「你好」，没有具体任务，先不路由到任何看板任务，等下一句话再判断意图，同时留意要不要唤起定时器或者翻既有会话记录';
     const LONG_LATIN =
-      '> The user just said "你好" — pure greeting. No task. I should not route it to the board yet; wait for the next line to tell intent.';
+      '> The user just said "你好" — pure greeting. No task. I should not route it to the board yet; wait for the next line to tell intent, and keep an eye on timers or earlier threads.';
     const state: Parameters<typeof mockChiefLiveApi>[1] = {
       final: false,
       messages: [

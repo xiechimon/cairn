@@ -1,6 +1,6 @@
 import type { SVGProps } from 'react';
 
-export function Paperclip({ width = 18, height = 18, ...props }: SVGProps<SVGSVGElement>) {
+export function Paperclip({ width = 22, height = 22, ...props }: SVGProps<SVGSVGElement>) {
   return (
     <svg
       aria-hidden="true"

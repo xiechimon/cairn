@@ -46,6 +46,8 @@ for (const width of [1440, 375]) {
       expect(await scroller.evaluate((el) => el.scrollLeft)).toBe(0);
       for (const button of await page.getByTestId('home-c').locator('button').all()) {
         if (!(await button.isVisible()) || !(await button.isEnabled()) || await button.getAttribute('aria-hidden') === 'true') continue;
+        const block = button.locator('xpath=ancestor::*[@data-slot="reply-block"][1]');
+        if ((await block.count()) > 0) await block.hover({ position: { x: 4, y: 4 } });
         await button.hover();
         await expect(button).toHaveCSS('transition-duration', '0s');
         await expect(button).toHaveCSS('box-shadow', 'none');

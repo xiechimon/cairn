@@ -158,6 +158,13 @@ export const useTodos = (teamId: string | undefined, enabled: boolean) =>
     enabled: enabled && teamId !== undefined,
   });
 
+export const useArchivedTodos = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['todos', teamId, 'archived'],
+    queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}&archived=1`),
+    enabled: enabled && teamId !== undefined,
+  });
+
 export const useTasks = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['tasks', teamId],
@@ -667,6 +674,15 @@ export function useApiMutations(teamId: string | undefined) {
         };
       }) => api.patch<TodoRecord>(`/api/todos/${input.id}`, input.body),
       onSuccess: invalidateAll,
+    }),
+    stopAndDoneTodo: useMutation({
+      mutationFn: (id: string) =>
+        api.post<{ state: 'stopping' | 'done'; todo: TodoRecord }>(
+          `/api/todos/${id}/stop-and-done`,
+          {},
+        ),
+      onSuccess: invalidateAll,
+      onError: invalidateAll,
     }),
     resetTodo: useMutation({
       mutationFn: (input: { id: string; expectedPhase: string; expectedBuildId: string | null }) =>

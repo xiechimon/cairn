@@ -41,7 +41,7 @@ export function StoneGroup({
         <span className="font-normal text-content-tertiary tabular-nums">{count}</span>
         <ChevronDown
           className={cn(
-            'ml-auto size-3.5 text-content-tertiary transition-transform duration-(--dur-fast)',
+            'ml-auto size-4 text-content-tertiary transition-transform duration-(--dur-fast)',
             collapsed && '-rotate-90',
           )}
         />

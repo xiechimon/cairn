@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isValidFileName } from '../src/api/attachments.js';
-import { parseChatMarkdown } from '../src/detail/chat-markdown.js';
+import { parseChatMarkdown } from '../src/lib/markdown.js';
 import {
   createPastedNameCounter,
   filesFromClipboardData,

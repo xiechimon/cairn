@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router';
 import { type SettingsSectionId, settingsHref } from './settings-href.js';
+import { SETTINGS_REDIRECT_STATE } from './use-settings-overlay.js';
 
 const LEGACY_ACCOUNT_PARAMS = ['tab', 'vendor'];
 
@@ -16,7 +17,13 @@ export function legacyAccountsSearch(search: string): string {
 
 export function SettingsRedirect({ section }: { section: SettingsSectionId }) {
   const { search, hash } = useLocation();
-  return <Navigate to={{ pathname: settingsHref(section), search, hash }} replace />;
+  return (
+    <Navigate
+      to={{ pathname: settingsHref(section), search, hash }}
+      state={SETTINGS_REDIRECT_STATE}
+      replace
+    />
+  );
 }
 
 export function opensLegacyAccounts(params: URLSearchParams): boolean {
@@ -36,6 +43,7 @@ export function LegacyModelRoutingRedirect() {
           : legacyAccountsSearch(search),
         hash,
       }}
+      state={SETTINGS_REDIRECT_STATE}
       replace
     />
   );

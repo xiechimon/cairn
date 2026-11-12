@@ -174,12 +174,16 @@ test('work groups consecutive thinking and calls, with only the last block expan
   await stubWorld(page);
   const summaries = page.getByTestId('work-summary');
   await expect(summaries).toHaveCount(2);
-  await expect(summaries.first()).toContainText('思考 1 次');
-  await expect(summaries.first()).toContainText('读了 1 个文件');
-  await expect(summaries.first()).toContainText('搜索 1 次');
-  await expect(summaries.first()).toContainText('跑了 1 条命令');
-  await expect(summaries.first()).toContainText('改了 2 个文件');
-  await expect(summaries.first()).toContainText('调用 1 个工具');
+  const words = summaries.first().locator('[data-trace-summary]');
+  await expect(words).toHaveText('Find readiness checks，Verify changes');
+  await expect(summaries.first().locator('[data-trace-more]')).toHaveText('· 7 步');
+  await expect(summaries.first().locator('[data-trace-failed]')).toHaveText('（1 个失败）');
+  await expect(summaries.first()).toHaveAttribute('data-trace-state', 'failed');
+  for (const count of ['思考 1 次', '读了 1 个文件', '搜索 1 次', '跑了 1 条命令', '改了 2 个文件', '调用 1 个工具'])
+    await expect(words).toHaveAttribute('title', new RegExp(count));
+  await expect(summaries.last().locator('[data-trace-summary]')).toHaveText('Check formatting');
+  await expect(summaries.last().locator('[data-trace-more]')).toHaveCount(0);
+  await expect(summaries.last()).toHaveAttribute('data-trace-state', 'running');
   await expect(summaries.first()).toHaveAttribute('aria-expanded', 'false');
   await expect(summaries.last()).toHaveAttribute('aria-expanded', 'true');
   await summaries.first().click();

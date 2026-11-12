@@ -5,7 +5,7 @@ import type { ChiefContent } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 
 const BANNER_CLS =
-  'mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-182 flex-none items-start gap-2.5 rounded-(--radius-card) bg-card px-3 py-2.5 text-meta leading-5 text-(--text-secondary)';
+  'mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-chat flex-none items-start gap-2.5 rounded-(--radius-card) bg-card px-3 py-2.5 text-meta leading-5 text-(--text-secondary)';
 const LINK_BTN_CLS =
   'h-auto cursor-pointer border-none bg-transparent p-0 text-meta font-normal text-(--text-secondary) underline-offset-2 hover:bg-transparent hover:text-(--foreground) hover:underline dark:hover:bg-transparent';
 
@@ -49,7 +49,7 @@ export function ChiefOutageBanner({
       data-testid="chief-outage"
       className={`${BANNER_CLS} shadow-(--e1) ${open ? 'max-sm:flex-wrap' : 'max-sm:items-center'}`}
     >
-      <CircleAlert aria-hidden="true" className="mt-0.5 size-4.5 flex-none text-(--card-button)" />
+      <CircleAlert aria-hidden="true" className="mt-0.5 size-5.5 flex-none text-(--card-button)" />
       <span className={`min-w-0 flex-1 ${open ? 'max-sm:basis-full' : ''}`}>
         <b className="block text-ui font-semibold text-(--foreground)">
           {t('Coordinator 暂时不可用')}
@@ -91,7 +91,7 @@ export function ChiefFallbackBanner({
       data-testid="chief-fallback-banner"
       className={`${BANNER_CLS} items-center shadow-(--e1)`}
     >
-      <Info aria-hidden="true" className="size-4.5 flex-none text-icon" />
+      <Info aria-hidden="true" className="size-5.5 flex-none text-icon" />
       <span className="min-w-0 flex-1">
         {t('Coordinator 的主模型暂时用不了，这次改用备用模型 {model} 回复，判断可能没那么准。', {
           model,
@@ -114,7 +114,7 @@ export function ChiefConnectionBanner() {
       data-testid="connection-lost"
       className={`${BANNER_CLS} items-center shadow-(--e1)`}
     >
-      <WifiOff aria-hidden="true" className="size-4.5 flex-none text-(--card-button)" />
+      <WifiOff aria-hidden="true" className="size-5.5 flex-none text-(--card-button)" />
       <span className="min-w-0 flex-1">
         <b className="block text-ui font-semibold text-(--foreground)">
           {t('连接断开，正在重连…')}

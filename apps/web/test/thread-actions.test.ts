@@ -8,8 +8,11 @@ describe('the side chat action card', () => {
   it('offers the next step for each phase that waits on a person', () => {
     expect(threadActionOf(todo({ phase: 'todo' }), false)).toBe('start');
     expect(threadActionOf(todo({ phase: 'confirm' }), false)).toBe('approve');
-    expect(threadActionOf(todo({ phase: 'review' }), false)).toBe('finish');
     expect(threadActionOf(todo({ phase: 'failed' }), false)).toBe('retry');
+  });
+
+  it('leaves finishing a reviewed thread to the more menu', () => {
+    expect(threadActionOf(todo({ phase: 'review' }), false)).toBeNull();
   });
 
   it('shows nothing while the thread works or is finished', () => {

@@ -47,7 +47,7 @@ export function NoticeBanner({
       )}
       {...rest}
     >
-      <Icon aria-hidden="true" className={cn('mt-0.5 size-4.5 flex-none', TONE_INK[tone])} />
+      <Icon aria-hidden="true" className={cn('mt-0.5 size-5.5 flex-none', TONE_INK[tone])} />
       <div className="min-w-0 flex-1">
         <div className="text-ui font-semibold text-foreground">{title}</div>
         {body != null && (

@@ -4,6 +4,7 @@ export * from './agent-backend.js';
 export * from './agent-todo.js';
 export * from './ansi.js';
 export * from './attachment-token.js';
+export * from './attachment-types.js';
 export * from './blocker-handoff.js';
 export * from './blocker-handoff-record.js';
 export * from './brand.js';

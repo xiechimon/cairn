@@ -1,5 +1,5 @@
-import { Archive, CircleStop, Route, Undo2 } from 'lucide-react';
-import type { ComponentProps } from 'react';
+import { Archive, CircleStop, Pencil, Route, Undo2 } from 'lucide-react';
+import type { ComponentProps, ReactNode } from 'react';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { DropdownMenu, DropdownMenuSeparator } from '../components/ui/dropdown-menu.js';
 import { useI18n } from '../i18n/provider.js';
@@ -18,6 +18,8 @@ interface MoreMenuProps {
   onReject?: () => void;
   onDiscard?: () => void;
   onRouteOverride?: () => void;
+  onRename?: () => void;
+  moveSub?: ReactNode;
   anchor?: ComponentProps<typeof KeyedMenuContent>['anchor'];
 }
 
@@ -36,6 +38,8 @@ export function MoreMenu({
   onReject,
   onDiscard,
   onRouteOverride,
+  onRename,
+  moveSub,
   anchor,
 }: MoreMenuProps) {
   const { t } = useI18n();
@@ -52,6 +56,19 @@ export function MoreMenu({
       disabled: !canComplete,
       onClick: onComplete,
     },
+    ...(onRename !== undefined
+      ? [
+          {
+            key: 'rename',
+            shortcut: 'N',
+            label: t('重命名'),
+            Icon: Pencil,
+            action: 'rename',
+            disabled: false,
+            onClick: onRename,
+          },
+        ]
+      : []),
     ...(onReject !== undefined
       ? [
           {
@@ -185,6 +202,7 @@ export function MoreMenu({
             <row.Icon />
             {row.label}
           </KeyedMenuItem>,
+          row.key === 'complete' && moveSub,
         ])}
       </KeyedMenuContent>
     </DropdownMenu>

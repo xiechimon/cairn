@@ -40,7 +40,13 @@ const needsInput = (n: number) =>
     section: 'needs_input',
   });
 
-test('a task the Coordinator created shows as a card after its reply, with status, updates and the latest line', async ({
+const MENTIONING = MESSAGES.map((message) =>
+  message.id === 'm3'
+    ? { ...message, content: `Created [#${TASK.seqNum}](todo:${TASK.id}) in cairn and forwarded your words.` }
+    : message,
+);
+
+test('a task the Coordinator created is one reference row above the reply that announced it, with no card', async ({
   page,
 }) => {
   await mockLive(page, {
@@ -51,25 +57,109 @@ test('a task the Coordinator created shows as a card after its reply, with statu
   });
   await page.goto('/app');
   const stream = page.getByTestId('chief-stream');
-  const card = stream.locator('[data-slot="task-card"]');
-  await expect(card).toHaveCount(1);
-  await expect(card.locator('[data-slot="task-card-title"]')).toHaveText(TASK.title);
-  await expect(card.locator('[data-slot="task-card-status"]')).toHaveText(/^In progress\s*· updates: 2\s*· 12m ago$/);
-  await expect(card.locator('[data-slot="task-card-latest"]')).toHaveText(
-    'Latest: prepush has the check; CI is next',
-  );
-  const reply = stream.getByText('Created #9 in cairn and forwarded your words.');
-  const replyBox = await reply.boundingBox();
-  const cardBox = await card.boundingBox();
-  expect(cardBox!.y).toBeGreaterThan(replyBox!.y);
-  await card.click();
+  const reply = stream
+    .getByTestId('chief-msg')
+    .filter({ hasText: 'Created #9 in cairn and forwarded your words.' });
+  const ref = stream.getByTestId('chief-task-ref');
+  await expect(ref).toHaveCount(1);
+  await expect(reply.getByTestId('chief-task-ref')).toHaveCount(1);
+  await expect(ref).toHaveText(new RegExp(`^${TASK.title}`));
+  await expect(ref).toHaveAttribute('data-phase', 'building');
+  await expect(ref.locator('svg[data-glyph="progress"]')).toHaveCount(1);
+  await expect(ref).toHaveAccessibleName(new RegExp(`${TASK.title}.*Running`));
+  await expect(ref.locator('[data-slot="task-ref-elbow"]')).toHaveCount(1);
+  await expect(stream.locator('[data-slot="task-card"]')).toHaveCount(0);
+  await expect(stream.getByTestId('chief-task-card')).toHaveCount(0);
+  await expect(stream.getByTestId('chief-task-started')).toHaveCount(0);
+  await expect(stream.getByTestId('chief-task-created')).toHaveCount(0);
+  await expect(stream).not.toContainText('Latest:');
+  await expect(stream).not.toContainText('updates:');
+  const refBox = await ref.boundingBox();
+  const bubbleBox = await reply.getByTestId('chief-reply-bubble').boundingBox();
+  expect(bubbleBox!.y - (refBox!.y + refBox!.height)).toBe(8);
+  await ref.click();
   await expect(page).toHaveURL(new RegExp(`thread=${TASK.id}`));
 });
 
-test('a created task the Tasks read no longer lists falls back to a one-line link', async ({ page }) => {
-  await mockLive(page, { threads: [THREAD], messages: MESSAGES, todos: [TASK], tasks: [] });
+test('a reply that both mentions and created a task shows exactly one reference for it', async ({
+  page,
+}) => {
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: MENTIONING,
+    todos: [TASK],
+    tasks: [taskEntry({ section: 'working', title: TASK.title })],
+  });
   await page.goto('/app');
   const stream = page.getByTestId('chief-stream');
+  const reply = stream.getByTestId('chief-msg').filter({ hasText: 'in cairn and forwarded your words.' });
+  await expect(reply.locator('a.mention-chip--todo')).toHaveCount(1);
+  await expect(reply.getByTestId('chief-task-refs')).toHaveCount(1);
+  await expect(reply.getByTestId('chief-task-ref')).toHaveCount(1);
+  await expect(stream.getByTestId('chief-task-ref')).toHaveCount(1);
+  await expect(stream.getByTestId('chief-task-started')).toHaveCount(0);
+  await expect(stream.locator('[data-slot="task-card"]')).toHaveCount(0);
+});
+
+test('two tasks created in one turn get one reference each on that reply', async ({ page }) => {
+  const second = { ...TASK, id: 'todo-2', seqNum: 10, title: 'Rotate the relay token', phase: 'review' };
+  const createdSecond = {
+    ...created,
+    id: 'm2b',
+    content: {
+      ...created.content,
+      call: {
+        ...created.content.call,
+        id: 'call-create-second',
+        arguments: { ...created.content.call.arguments, title: second.title },
+        result: [{ type: 'text', text: JSON.stringify({ id: second.id, seqNum: 10, title: second.title }) }],
+      },
+    },
+  };
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [MENTIONING[0]!, created, createdSecond, ...MENTIONING.slice(2)],
+    todos: [TASK, second],
+    tasks: [],
+  });
+  await page.goto('/app');
+  const stream = page.getByTestId('chief-stream');
+  const refs = stream.getByTestId('chief-task-ref');
+  await expect(refs).toHaveCount(2);
+  await expect(refs.nth(0)).toHaveText(new RegExp(`^${TASK.title}`));
+  await expect(refs.nth(1)).toHaveText(new RegExp(`^${second.title}`));
+  await expect(refs.nth(1)).toHaveAttribute('data-phase', 'review');
+  await expect(stream.getByTestId('chief-task-refs')).toHaveCount(1);
+});
+
+test('a task created in a turn with no reply yet stands as one reference chip without a connector', async ({
+  page,
+}) => {
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [MESSAGES[0]!, created],
+    todos: [TASK],
+    tasks: [],
+  });
+  await page.goto('/app');
+  const stream = page.getByTestId('chief-stream');
+  const row = stream.getByTestId('chief-task-started');
+  await expect(row).toHaveCount(1);
+  const ref = row.getByTestId('chief-task-ref');
+  await expect(ref).toHaveCount(1);
+  await expect(stream.getByTestId('chief-task-ref')).toHaveCount(1);
+  await expect(ref).toHaveText(new RegExp(`^${TASK.title}`));
+  await expect(ref.locator('[data-slot="task-ref-elbow"]')).toHaveCount(0);
+  await expect(ref.locator('svg[data-glyph="progress"]')).toHaveCount(1);
+  await ref.click();
+  await expect(page).toHaveURL(new RegExp(`thread=${TASK.id}`));
+});
+
+test('a created task the page no longer knows falls back to a one-line link', async ({ page }) => {
+  await mockLive(page, { threads: [THREAD], messages: MESSAGES, todos: [], tasks: [] });
+  await page.goto('/app');
+  const stream = page.getByTestId('chief-stream');
+  await expect(stream.getByTestId('chief-task-ref')).toHaveCount(0);
   await expect(stream.locator('[data-slot="task-card"]')).toHaveCount(0);
   await expect(stream.getByTestId('chief-task-created')).toHaveText(`Created task #${TASK.seqNum} ${TASK.title}`);
 });
@@ -88,4 +178,30 @@ test('tasks waiting on the owner put no tray above the composer; the greeting co
   await expect(page.getByTestId('home-c-since')).toContainText('2 waiting on you');
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
   await expect(page.getByTestId('chief-composer-block').locator('[data-slot="thread-card"]')).toHaveCount(0);
+});
+
+test.describe('at phone width', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('the task reference is one line inside the column: tile and title, and it opens the task', async ({
+    page,
+  }) => {
+    await mockLive(page, {
+      threads: [THREAD],
+      messages: MESSAGES,
+      todos: [TASK],
+      tasks: [taskEntry({ section: 'working', title: TASK.title })],
+    });
+    await page.goto('/app');
+    const stream = page.getByTestId('chief-stream');
+    const ref = stream.getByTestId('chief-task-ref');
+    await expect(ref).toHaveCount(1);
+    await expect(stream.locator('[data-slot="task-card"]')).toHaveCount(0);
+    await expect(ref).toHaveText(new RegExp(`^${TASK.title}`));
+    const box = await ref.boundingBox();
+    expect(box!.height).toBe(20);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390 - 16);
+    await ref.click();
+    await expect(page).toHaveURL(new RegExp(`thread=${TASK.id}`));
+  });
 });

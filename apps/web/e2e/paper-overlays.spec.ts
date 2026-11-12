@@ -37,7 +37,7 @@ async function openFromTopbar(page: Page, url: string, name: string) {
 
 async function openDeleteConfirm(page: Page) {
   await page.goto(DETAIL);
-  await page.getByRole('button', { name: '更多' }).click();
+  await page.getByRole('button', { name: '更多操作…' }).click();
   await page.locator('.more-menu-item[data-action="delete"]').click();
   const dialog = page.locator('.delete-confirm');
   await expect(dialog).toBeVisible();
@@ -129,8 +129,8 @@ test('split footer: hint left, actions right, no band fill', async ({ page }) =>
   if (dialogBox == null || footBox == null || hintBox == null || doneBox == null) {
     throw new Error('footer geometry missing');
   }
-  expect(hintBox.x - dialogBox.x).toBe(20);
-  expect(dialogBox.x + dialogBox.width - (doneBox.x + doneBox.width)).toBe(20);
+  expect(hintBox.x - dialogBox.x).toBe(16);
+  expect(dialogBox.x + dialogBox.width - (doneBox.x + doneBox.width)).toBe(16);
   expect(doneBox.height).toBe(32);
   await expect(done).toHaveAttribute('data-variant', 'default');
   await evidenceShot(page, 'machine-dialog-split-footer.png');
@@ -157,12 +157,12 @@ test('footer stays on screen on a short viewport; only the body scrolls', async 
   expect(overflow).toBe(true);
 });
 
-test('Paper menu: 32px rows, 14px text, 15px icons, 14px panel corners, 4px padding', async ({
+test('Paper menu: 32px rows, 14px text, 18px icons, 14px panel corners, 4px padding', async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto(DETAIL);
-  await page.getByRole('button', { name: '更多' }).click();
+  await page.getByRole('button', { name: '更多操作…' }).click();
   const menu = page.locator('.more-menu');
   await expect(menu).toBeVisible();
   await settle(menu);
@@ -178,7 +178,7 @@ test('Paper menu: 32px rows, 14px text, 15px icons, 14px panel corners, 4px padd
     expect((await row.boundingBox())?.height).toBe(32);
     await expect(row).toHaveCSS('font-size', '14px');
     const icon = await row.locator('svg').first().boundingBox();
-    expect(icon?.width).toBe(15);
+    expect(icon?.width).toBe(18);
   }
   const copy = menu.locator('.more-menu-item', { hasText: '复制链接' });
   await copy.hover();
@@ -199,7 +199,7 @@ test('provider picker: grouped rows, search hides empty groups', async ({ page }
   await expect(dialog.getByRole('group', { name: '订阅登录' }).locator('[data-preset-id]')).toHaveCount(2);
   const codex = dialog.locator('[data-preset-id="openai-codex"]');
   await expect(codex).toBeDisabled();
-  await expect(codex).toHaveCSS('color', await resolveColor(page, '#6b6b6b'));
+  await expect(codex).toHaveCSS('color', await resolveColor(page, '#545454'));
   await evidenceShot(page, 'provider-picker.png');
 
   await dialog.getByLabel('搜索服务商...').fill('cloudflare');

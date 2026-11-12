@@ -1,7 +1,5 @@
 import { type ReactNode, type Ref, useEffect, useRef, useSyncExternalStore } from 'react';
-import { ShortcutHint } from '../components/shortcut-hint.js';
-import { Button } from '../components/ui/button.js';
-import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
+import type { ChiefContextUsage } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { joinDraft, splitDraft } from '../overlay/attachment-paste.js';
 import { keyedBinding } from './composer-binding.js';
@@ -18,35 +16,35 @@ const NO_MENTIONS = { todo: [], agent: [], project: [], skill: [], machine: [] }
 export interface AnswerComposerProps {
   answerKey: string;
   active: boolean;
-  attached: boolean;
   invalid: boolean;
   onAttachment?: ((files: File[]) => string[] | Promise<string[]>) | undefined;
   composerRef?: ((node: HTMLTextAreaElement | null) => void) | undefined;
   handleRef?: Ref<ComposerSurfaceHandle>;
   above: ReactNode;
   tools: ReactNode;
-  running: boolean;
-  turnElapsed: number | null;
+  menu?: ReactNode;
+  context?: ChiefContextUsage | undefined;
   threadId?: string | null;
   onFocusEnter: () => void;
   onFocusLeave: () => void;
+  dropActive?: boolean;
 }
 
 export function AnswerComposer({
   answerKey,
   active,
-  attached,
   invalid,
   onAttachment,
   composerRef,
   handleRef,
   above,
   tools,
-  running,
-  turnElapsed,
+  menu,
+  context,
   threadId = null,
   onFocusEnter,
   onFocusLeave,
+  dropActive = false,
 }: AnswerComposerProps) {
   const { t } = useI18n();
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
@@ -84,30 +82,25 @@ export function AnswerComposer({
       onAttachment={attach}
       mentionGroups={NO_MENTIONS}
       onAdvance={advance}
-      primary={
-        <Button
-          data-testid={active ? 'chief-question-primary' : undefined}
-          className={`${DIALOG_PRIMARY_BUTTON} ml-auto`}
-          disabled={primary?.enabled !== true}
-          onClick={advance}
-        >
-          {primary?.last === true ? t('提交回答') : t('下一步')}
-          <ShortcutHint keys={['mod', 'enter']} className="pointer-coarse:hidden ml-1" />
-        </Button>
-      }
+      send={{
+        label: primary?.last === false ? t('下一步') : t('提交回答'),
+        testId: active ? 'chief-question-primary' : '',
+        enabled: primary?.enabled === true,
+        onClick: advance,
+      }}
       active={active}
-      attached={attached}
       onFocusEnter={onFocusEnter}
       onFocusLeave={onFocusLeave}
-      placeholder={t('输入你自己的回答，或留空使用选中的选项')}
+      placeholder={t('输入你自己的回答…')}
       invalid={invalid}
       composerRef={composerRef}
       above={above}
       tools={tools}
+      menu={menu}
       canStop={false}
-      running={running}
-      turnElapsed={turnElapsed}
+      context={context}
       threadId={threadId}
+      dropActive={dropActive}
     />
   );
 }

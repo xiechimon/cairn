@@ -131,7 +131,45 @@ async function stubLiveDetail(page: Page) {
   });
 }
 
-test('CDS composer: multi-line draft grows the card and text clears the toolbar', async ({
+async function geometry(page: Page) {
+  return page.evaluate(() => {
+    const cardEl = document.querySelector('.side-panel [data-testid="composer-card"]')!;
+    const ta = cardEl.querySelector('textarea')!.getBoundingClientRect();
+    const send = cardEl.querySelector('.composer-send')!.getBoundingClientRect();
+    const card = cardEl.getBoundingClientRect();
+    const plus = document
+      .querySelector('.side-panel [data-testid="composer-plus"]')!
+      .getBoundingClientRect();
+    return {
+      cardHeight: card.height,
+      clearOfSend: ta.right <= send.left,
+      plusInCard: cardEl.querySelector('[data-testid="composer-plus"]') !== null,
+      plusBelowCard: Math.round(plus.top - card.bottom),
+      plusInset: Math.round(plus.left - card.left),
+      bottomsAligned: Math.abs(ta.bottom - send.bottom) <= 1,
+    };
+  });
+}
+
+test('CDS composer: one line at rest, like the main composer', async ({ page }) => {
+  await stubLiveDetail(page);
+  await page.goto(`/app/todo/${CARD_ID}`);
+  const card = page.locator('.side-panel [data-testid="composer-card"]');
+  await expect(card.locator('textarea')).toBeVisible();
+  await expect(card.locator('textarea')).toHaveAttribute('placeholder', /回复这个任务|开始后才能回复/);
+  const geom = await geometry(page);
+  expect(Math.round(geom.cardHeight)).toBe(46);
+  expect(geom).toMatchObject({
+    clearOfSend: true,
+    plusInCard: false,
+    plusBelowCard: 6,
+    plusInset: 6,
+    bottomsAligned: true,
+  });
+  await evidencePanelShot(page, 'one-line.png', card);
+});
+
+test('CDS composer: a multi-line draft grows the card and the text never runs under the controls', async ({
   page,
 }) => {
   await stubLiveDetail(page);
@@ -139,84 +177,25 @@ test('CDS composer: multi-line draft grows the card and text clears the toolbar'
   const card = page.locator('.side-panel [data-testid="composer-card"]');
   const input = card.locator('textarea');
   await expect(input).toBeVisible();
-
-  const emptyHeight = await card.evaluate((el) => el.getBoundingClientRect().height);
-  expect(Math.round(emptyHeight)).toBe(86);
-
   await input.fill('line one\nline two\nline three');
-  await expect(input).toHaveValue('line one\nline two\nline three');
-
-  const geom = await page.evaluate(() => {
-    const cardEl = document.querySelector('[data-testid="composer-card"]')!;
-    const ta = cardEl.querySelector('textarea')!;
-    const toolbar = cardEl.querySelector('[data-testid="composer-toolbar"]')!;
-    const taRect = ta.getBoundingClientRect();
-    const paddingBottom = Number.parseFloat(getComputedStyle(ta).paddingBottom);
-    return {
-      cardHeight: cardEl.getBoundingClientRect().height,
-      contentBottom: taRect.bottom - paddingBottom,
-      toolbarTop: toolbar.getBoundingClientRect().top,
-    };
+  await expect.poll(async () => (await geometry(page)).cardHeight).toBeGreaterThan(44);
+  expect(await geometry(page)).toMatchObject({
+    clearOfSend: true,
+    plusInCard: false,
+    plusBelowCard: 6,
+    bottomsAligned: true,
   });
-
-  expect(geom.cardHeight).toBeGreaterThan(86);
-  expect(geom.contentBottom).toBeLessThanOrEqual(geom.toolbarTop);
   await evidencePanelShot(page, 'after.png', card);
 });
 
-test('CDS composer: a wrapped single paragraph also clears the toolbar', async ({ page }) => {
+test('CDS composer: a wrapped paragraph grows the card at a narrow width', async ({ page }) => {
   await stubLiveDetail(page);
   await page.goto(`/app/todo/${CARD_ID}`);
   const card = page.locator('.side-panel [data-testid="composer-card"]');
   const input = card.locator('textarea');
   await expect(input).toBeVisible();
-
   await input.fill('wrap '.repeat(80).trim());
-
-  const geom = await page.evaluate(() => {
-    const cardEl = document.querySelector('[data-testid="composer-card"]')!;
-    const ta = cardEl.querySelector('textarea')!;
-    const toolbar = cardEl.querySelector('[data-testid="composer-toolbar"]')!;
-    const taRect = ta.getBoundingClientRect();
-    return {
-      cardHeight: cardEl.getBoundingClientRect().height,
-      contentBottom: taRect.bottom - Number.parseFloat(getComputedStyle(ta).paddingBottom),
-      toolbarTop: toolbar.getBoundingClientRect().top,
-    };
-  });
-
-  expect(geom.cardHeight).toBeGreaterThan(86);
-  expect(geom.contentBottom).toBeLessThanOrEqual(geom.toolbarTop);
-});
-
-test('CDS composer: a width change that wraps the draft re-reserves toolbar clearance', async ({
-  page,
-}) => {
-  await stubLiveDetail(page);
-  await page.goto(`/app/todo/${CARD_ID}`);
-  const card = page.locator('.side-panel [data-testid="composer-card"]');
-  const input = card.locator('textarea');
-  await expect(input).toBeVisible();
-
-  const wideWidth = await input.evaluate((el) => el.clientWidth);
-  const words = Math.floor((wideWidth - 20) / 38);
-  await input.fill('wrap '.repeat(words).trim());
-  const wide = await card.evaluate((el) => el.getBoundingClientRect().height);
-  expect(Math.round(wide)).toBe(86);
-
+  await expect.poll(async () => (await geometry(page)).cardHeight).toBeGreaterThan(44);
   await page.setViewportSize({ width: 360, height: 732 });
-
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const cardEl = document.querySelector('.side-panel [data-testid="composer-card"]')!;
-        const ta = cardEl.querySelector('textarea')!;
-        const toolbar = cardEl.querySelector('[data-testid="composer-toolbar"]')!;
-        const linesWrapped = ta.scrollHeight > 60;
-        return !linesWrapped || ta.getBoundingClientRect().bottom <= toolbar.getBoundingClientRect().top;
-      }),
-    )
-    .toBe(true);
-  const narrow = await card.evaluate((el) => el.getBoundingClientRect().height);
-  expect(narrow).toBeGreaterThan(86);
+  await expect.poll(async () => (await geometry(page)).clearOfSend).toBe(true);
 });

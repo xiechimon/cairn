@@ -1,4 +1,4 @@
-import { CalendarClock } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useSchedules } from '../api/hooks.js';
@@ -41,33 +41,41 @@ export function TasksScheduleList({ projectId, now }: { projectId: string | null
         loadingLabel={t('正在加载定时')}
         errorTitle={t('定时没能加载')}
         empty={
-          <p
-            data-testid="tasks-schedules-empty"
-            className="m-0 px-2.5 py-2 text-meta text-content-tertiary"
-          >
-            {t('还没有定时任务')}
-          </p>
+          <div className="flex flex-col items-start gap-3 px-2.5 py-2">
+            <p data-testid="tasks-schedules-empty" className="m-0 text-ui text-content-tertiary">
+              {t('还没有定时任务')}
+            </p>
+            <Button variant="secondary" size="sm" render={<Link to="/app/schedules" />}>
+              {t('管理定时')}
+            </Button>
+          </div>
         }
       >
-        <section data-testid="tasks-section" data-section="scheduled" className="flex flex-col">
+        <section
+          data-testid="tasks-section"
+          data-section="scheduled"
+          className="flex flex-col gap-0.5"
+        >
           {rows.map((row) => (
-            <div key={row.id} data-slot="schedule-row-frame" className="group/task relative">
+            <div
+              key={row.id}
+              data-slot="schedule-row-frame"
+              className="group/task relative rounded-(--radius-tile) hover:bg-(--menu-hover) has-aria-expanded:bg-(--menu-hover)"
+            >
               <Button
                 variant="ghost"
                 data-slot="schedule-row"
                 onClick={() => setSelected(row)}
-                className="h-auto w-full items-start justify-start gap-2.5 rounded-(--radius-control) px-2.5 py-2 text-left font-normal whitespace-normal hover:bg-(--menu-hover) pointer-coarse:pr-12 dark:hover:bg-(--menu-hover)"
+                className="h-auto w-full items-start justify-start gap-4 rounded-(--radius-tile) py-2 pr-11 pl-2.5 text-left font-normal whitespace-normal hover:bg-transparent pointer-coarse:pr-12 dark:hover:bg-transparent"
               >
-                <CalendarClock
-                  aria-hidden
-                  className="mt-0.75 size-3.5 flex-none text-content-tertiary"
-                  strokeWidth={1.75}
-                />
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="line-clamp-2 text-ui leading-5 font-medium text-foreground">
+                <span className="flex size-7 flex-none items-center justify-center rounded-(--radius-control) bg-(--hover-1)">
+                  <Clock aria-hidden className="size-4 text-content-tertiary" strokeWidth={1.75} />
+                </span>
+                <span className="flex min-h-7 min-w-0 flex-1 flex-col justify-center">
+                  <span className="truncate text-ui leading-5 text-foreground">
                     {row.todo.title}
                   </span>
-                  <span className="text-meta leading-5 text-content-tertiary">
+                  <span className="truncate text-meta leading-4.5 text-content-tertiary">
                     {row.enabled === false
                       ? (row.pausedReason ?? t('已暂停'))
                       : scheduleSummary(row, now, t)}
@@ -76,23 +84,14 @@ export function TasksScheduleList({ projectId, now }: { projectId: string | null
               </Button>
               <div
                 data-slot="schedule-row-menu"
-                className="absolute top-1.5 right-1.5 opacity-0 group-focus-within/task:opacity-100 group-hover/task:opacity-100 has-aria-expanded:opacity-100 pointer-coarse:top-0 pointer-coarse:right-0 pointer-coarse:opacity-100"
+                className="absolute top-3 right-2 opacity-0 group-focus-within/task:opacity-100 group-hover/task:opacity-100 has-aria-expanded:opacity-100 pointer-coarse:top-0 pointer-coarse:right-0 pointer-coarse:opacity-100"
               >
-                <ScheduleRowMenu schedule={row} now={now} />
+                <ScheduleRowMenu schedule={row} now={now} onOpenDetail={() => setSelected(row)} />
               </div>
             </div>
           ))}
         </section>
       </QueryBoundary>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="mt-1 gap-1.5 self-start text-meta text-content-secondary"
-        render={<Link to="/app/schedules" />}
-      >
-        <CalendarClock aria-hidden className="size-3.5" strokeWidth={1.75} />
-        {t('管理定时')}
-      </Button>
       <ScheduleDetailController schedule={selected} now={now} onClose={() => setSelected(null)} />
     </>
   );

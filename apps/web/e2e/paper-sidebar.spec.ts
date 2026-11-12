@@ -9,10 +9,10 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
 });
 
-test('four parts stack top to bottom in a 248px sidebar', async ({ page }) => {
+test('brand row, Coordinator, projects and footer stack top to bottom in a 220px sidebar', async ({ page }) => {
   await page.goto('/app/schedules?scenario=01');
   const aside = sidebar(page);
-  expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(248);
+  expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(220);
 
   const team = page.getByTestId('team-row');
   await expect(team.getByTestId('brand-mark')).toHaveCount(0);
@@ -42,7 +42,7 @@ test('four parts stack top to bottom in a 248px sidebar', async ({ page }) => {
   const order = [
     await top(page, '[data-testid="team-row"]'),
     await aside.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).evaluate((el) => el.getBoundingClientRect().top),
-    await top(page, '[data-testid="project-group"]'),
+    await top(page, 'aside [data-slot="sidebar-project-row"]'),
     await top(page, '[data-testid="sidebar-footer"]'),
   ];
   expect([...order].sort((a, b) => a - b)).toEqual(order);
@@ -106,7 +106,7 @@ test('project rows carry a neutral glyph, no colored tile and no count', async (
   expect(probe.some((r) => r.tile || r.count)).toBe(false);
 });
 
-test('long project names truncate to one 32px line', async ({ page }) => {
+test('long project names truncate to one 34px line', async ({ page }) => {
   await page.goto('/app/schedules?scenario=board-repos');
   const m = await page
     .locator('[data-slot="sidebar-project-row"]')
@@ -123,19 +123,19 @@ test('long project names truncate to one 32px line', async ({ page }) => {
     });
   expect(m.overflow).toBe(true);
   expect(m.ellipsis).toBe('ellipsis');
-  expect(m.rowHeight).toBe(32);
+  expect(m.rowHeight).toBe(34);
 });
 
 test('collapsed rail keeps `Coordinator` with its badge dot and the expand toggle', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app/schedules?scenario=01');
   const aside = sidebar(page);
-  expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(40);
+  expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(48);
   const home = aside.getByRole('link', { name: /Coordinator/ });
   await expect(home).toBeVisible();
   await home.click();
   await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(home).toHaveAttribute('aria-current', 'page');
   await aside.getByRole('button', { name: '展开侧边栏' }).click();
-  expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(248);
+  expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(220);
 });

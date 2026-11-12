@@ -18,7 +18,7 @@ export function PaperRoot({
   }, [theme]);
   return (
     <I18nProvider initialLocale={locale}>
-      <div className={`${theme === 'light' ? 'light ' : ''}bg-background text-foreground font-sans antialiased`} style={{ padding: 16, minHeight: '100%' }}>
+      <div className={`${theme === 'light' ? 'light ' : ''}bg-background text-foreground font-sans`} style={{ padding: 16, minHeight: '100%' }}>
         {children}
       </div>
     </I18nProvider>

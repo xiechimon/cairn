@@ -6,7 +6,7 @@ const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks';
 const ROUTING_POLICIES = '/app/settings/work-routing?scenario=routing-settings';
 const ACCEPT = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34';
 
-const BADGES = '/app?scenario=home-c&pane=machines';
+const BADGES = '/design.html';
 const SCHEDULES = '/app/schedules?scenario=r3-92';
 
 interface FocusInfo {
@@ -176,7 +176,8 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
 
   test('checkbox, switch, and badge use the global outline', async ({ page }) => {
     await themed(page, 'dark', ACCEPT);
-    await page.getByTestId('side-chat-action').getByRole('button', { name: '完成…' }).click();
+    await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
+    await page.getByRole('menuitem', { name: '完成' }).click();
     const checkbox = page.getByRole('dialog', { name: '完成任务' }).locator('[data-slot="checkbox"]');
     await expect(checkbox).toBeVisible();
     await focusKeyboard(checkbox);

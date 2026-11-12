@@ -129,7 +129,7 @@ export function questionRowCopy(): TaskRowCopy {
   return {
     word: '待回答',
     what: { key: 'Coordinator 建任务前先问你' },
-    where: '在问题卡里选',
+    where: '在对话里回答',
     waiting: true,
     running: false,
   };
@@ -215,6 +215,7 @@ export interface QuestionThreadView {
   loadingEarlier: boolean;
   failedEarlier: boolean;
   dismissing: (requestId: string) => boolean;
+  shown?: ReadonlySet<string> | null;
 }
 
 export type QuestionOpenStep =
@@ -234,9 +235,13 @@ export function questionOpenStep(
   if (pending.some((question) => question.requestId === target.requestId)) {
     if (view.dismissing(target.requestId)) return { kind: 'missing' };
     const at = pending
-      .filter((question) => !view.dismissing(question.requestId))
+      .filter(
+        (question) =>
+          !view.dismissing(question.requestId) &&
+          (view.shown == null || view.shown.has(question.requestId)),
+      )
       .findIndex((question) => question.requestId === target.requestId);
-    return { kind: 'focus', at };
+    return at < 0 ? { kind: 'missing' } : { kind: 'focus', at };
   }
   if (!view.hasEarlier || view.failedEarlier) return { kind: 'missing' };
   return view.loadingEarlier ? { kind: 'wait' } : { kind: 'load-earlier' };

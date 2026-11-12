@@ -83,6 +83,31 @@ test.describe('select text in a Coordinator message, then Reply', () => {
     await evidenceShot(page, 'sent-with-quote.png');
   });
 
+  test('the staged quote is one line in the composer with its own placeholder, Escape cancels it and hovering marks the source', async ({
+    page,
+  }) => {
+    await openChat(page);
+    const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+    await selectIn(page, 'm6', '已经补给它了');
+    await page.getByTestId('selection-reply').click();
+    const bar = page.getByTestId('composer-reply-bar');
+    await expect(bar).toBeVisible();
+    await expect(bar).toHaveCSS('height', '28px');
+    await expect(page.getByTestId('chief-composer-placeholder')).toHaveText('回复这条消息');
+    const inCard = await bar.evaluate((el) => el.closest('.chief-composer') !== null);
+    expect(inCard).toBe(true);
+    const source = page.locator('[data-reply-source="m6"]');
+    await expect(source).not.toHaveAttribute('data-reply-highlight', '');
+    await bar.hover();
+    await expect(source).toHaveAttribute('data-reply-highlight', '');
+    await page.mouse.move(0, 0);
+    await expect(source).not.toHaveAttribute('data-reply-highlight', '');
+    await input.focus();
+    await input.press('Escape');
+    await expect(bar).toHaveCount(0);
+    await expect(page.getByTestId('chief-composer-placeholder')).not.toHaveText('回复这条消息');
+  });
+
   test('a removed quote is not sent', async ({ page }) => {
     const { sent } = await openChat(page);
     await selectIn(page, 'm3', '正在跑');
@@ -110,7 +135,7 @@ test.describe('select text in a Coordinator message, then Reply', () => {
     await selectIn(page, 'm6', '已经补给它了');
     await expect(bar).toBeVisible();
     await page.keyboard.press('Enter');
-    await expect(page.getByTestId('composer-reply-quote')).toHaveText('已经补给它了');
+    await expect(page.getByTestId('composer-reply-quote')).toHaveText('回复：已经补给它了');
   });
 
   test('the bar stays away from selections it cannot quote, and leaves on collapse', async ({
@@ -245,7 +270,7 @@ test.describe('a staged or queued quote keeps its source', () => {
     await expect(held).toContainText('补完记得跑一下 e2e');
     await expect(held).not.toContainText('<!--');
     await held.getByRole('button', { name: '撤回' }).click();
-    await expect(page.getByTestId('composer-reply-quote')).toHaveText(LAST_REPLY);
+    await expect(page.getByTestId('composer-reply-quote')).toHaveText(`回复：${LAST_REPLY}`);
     const input = home.getByTestId('chief-composer-input');
     await expect(input).toHaveValue('补完记得跑一下 e2e');
     await input.press('Enter');
@@ -278,34 +303,31 @@ test.describe('a staged or queued quote keeps its source', () => {
       return json({});
     });
     await page.goto('/app');
-    await expect(page.getByTestId('chief-question-dock')).toBeVisible();
+    await expect(page.getByTestId('chief-question')).toBeVisible();
     const home = page.getByTestId('home-c');
     const input = home.getByTestId('chief-composer-input');
     const answerComposer = page.getByTestId('chief-question-primary');
-    const dockSubmit = page
-      .getByTestId('chief-question-dock')
-      .getByRole('button', { name: '提交回答' });
-    const expectOneAnswerPath = async (owner: 'answer composer' | 'question card') => {
-      await expect(owner === 'answer composer' ? answerComposer : dockSubmit).toBeVisible();
-      await expect(owner === 'answer composer' ? dockSubmit : answerComposer).toHaveCount(0);
+    const chip = page.getByTestId('chief-question').getByTestId('chief-question-option-0-1');
+    const expectOneAnswerPath = async (owner: 'answer composer' | 'question chips') => {
+      await expect(chip).toBeEnabled();
+      if (owner === 'answer composer') await expect(answerComposer).toBeVisible();
+      else await expect(answerComposer).toHaveCount(0);
     };
     await expectOneAnswerPath('answer composer');
     await selectIn(page, 'm6', '已经补给它了');
     await page.getByTestId('selection-reply').click();
-    await expectOneAnswerPath('question card');
+    await expectOneAnswerPath('question chips');
     await input.fill('先别合');
-    await expectOneAnswerPath('question card');
+    await expectOneAnswerPath('question chips');
     await input.fill('');
     await expect(page.getByTestId('composer-reply-quote')).toBeVisible();
     await expect(input).toBeVisible();
-    await expectOneAnswerPath('question card');
-    await page.getByTestId('chief-question-option-0-1').click();
-    await expect(dockSubmit).toBeEnabled();
+    await expectOneAnswerPath('question chips');
     await page.getByTestId('composer-reply-quote-remove').click();
     await expectOneAnswerPath('answer composer');
     await selectIn(page, 'm6', '已经补给它了');
     await page.getByTestId('selection-reply').click();
-    await expectOneAnswerPath('question card');
+    await expectOneAnswerPath('question chips');
     await input.fill('补充一句');
     await input.press('Enter');
     await expect.poll(() => sent.at(-1)).toBe(

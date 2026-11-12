@@ -11,6 +11,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -103,55 +104,81 @@ export function useComposerThreadTarget(todos: readonly TodoRecord[]) {
 const COORDINATOR_VALUE = '';
 const ITEM_CLS = 'h-auto min-h-8 items-start py-1.5';
 
-export function ComposerThreadTarget({
-  targets,
-  picked,
-  composerRef,
-  onPick,
-}: {
+interface ThreadTargetProps {
   targets: readonly ThreadTarget[];
   picked: PickedThread | null;
   composerRef: RefObject<HTMLTextAreaElement | null>;
   onPick: (todoId: string | null) => void;
-}) {
+}
+
+function ThreadTargetRadios({
+  targets,
+  picked,
+  onPick,
+}: Pick<ThreadTargetProps, 'targets' | 'picked' | 'onPick'>) {
+  const { t } = useI18n();
+  return (
+    <DropdownMenuGroup>
+      <DropdownMenuLabel>{t('发给谁')}</DropdownMenuLabel>
+      <DropdownMenuRadioGroup
+        value={picked?.todoId ?? COORDINATOR_VALUE}
+        onValueChange={(next) => onPick(next === COORDINATOR_VALUE ? null : String(next))}
+      >
+        <DropdownMenuRadioItem value={COORDINATOR_VALUE} closeOnClick className={ITEM_CLS}>
+          <OptionText title={t('Coordinator')} hint={t('默认，由它安排')} />
+        </DropdownMenuRadioItem>
+        {targets.map(({ todo }) => (
+          <DropdownMenuRadioItem key={todo.id} value={todo.id} closeOnClick className={ITEM_CLS}>
+            <OptionText title={`#${todo.seqNum} ${todo.title}`} hint={t(threadCopy(todo).reason)} />
+          </DropdownMenuRadioItem>
+        ))}
+      </DropdownMenuRadioGroup>
+    </DropdownMenuGroup>
+  );
+}
+
+export function ComposerThreadTargetMenu({
+  targets,
+  picked,
+  onPick,
+}: Omit<ThreadTargetProps, 'composerRef'>) {
+  useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
+  const { t } = useI18n();
+  if (picked === null && targets.length === 0) return null;
+  if (questionDockState.uploading())
+    return (
+      <DropdownMenuItem disabled title={t('附件上传中')}>
+        <MessageSquare width={20} height={20} />
+        {t('对某个 thread 说')}
+      </DropdownMenuItem>
+    );
+  return <ThreadTargetRadios targets={targets} picked={picked} onPick={onPick} />;
+}
+
+export function ComposerThreadTarget({ targets, picked, composerRef, onPick }: ThreadTargetProps) {
   const { t } = useI18n();
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const uploading = questionDockState.uploading();
-  if (picked === null && targets.length === 0) return null;
-  const trigger =
-    picked === null ? (
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label={t('对某个 thread 说')}
-        disabled={uploading}
-        title={uploading ? t('附件上传中') : undefined}
-        className={TOOL_BTN_CLS}
-      />
-    ) : (
-      <Button
-        variant="ghost"
-        data-testid="composer-thread-target"
-        data-set=""
-        aria-label={t('正在对 #{seq} 说', { seq: picked.seq })}
-        disabled={uploading}
-        title={uploading ? t('附件上传中') : undefined}
-        className={PROJECT_CHIP_CLS}
-      />
-    );
+  if (picked === null) return null;
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger render={trigger}>
-          {picked === null ? (
-            <MessageSquare width={16} height={16} />
-          ) : (
-            <>
-              <GitBranch width={14} height={14} />
-              <span className="truncate">{`#${picked.seq} ${picked.title}`}</span>
-              <ChevronDown width={12} height={12} />
-            </>
-          )}
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              data-testid="composer-thread-target"
+              data-set=""
+              aria-label={t('正在对 #{seq} 说', { seq: picked.seq })}
+              disabled={uploading}
+              title={uploading ? t('附件上传中') : undefined}
+              className={PROJECT_CHIP_CLS}
+            />
+          }
+        >
+          <GitBranch width={16} height={16} />
+          <span className="truncate">{`#${picked.seq} ${picked.title}`}</span>
+          <ChevronDown width={12} height={12} />
         </DropdownMenuTrigger>
         <DropdownMenuContent
           side="top"
@@ -160,50 +187,25 @@ export function ComposerThreadTarget({
           finalFocus={composerRef}
           className="w-auto max-w-80 min-w-60"
         >
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>{t('发给谁')}</DropdownMenuLabel>
-            <DropdownMenuRadioGroup
-              value={picked?.todoId ?? COORDINATOR_VALUE}
-              onValueChange={(next) => onPick(next === COORDINATOR_VALUE ? null : String(next))}
-            >
-              <DropdownMenuRadioItem value={COORDINATOR_VALUE} closeOnClick className={ITEM_CLS}>
-                <OptionText title={t('Coordinator')} hint={t('默认，由它安排')} />
-              </DropdownMenuRadioItem>
-              {targets.map(({ todo }) => (
-                <DropdownMenuRadioItem
-                  key={todo.id}
-                  value={todo.id}
-                  closeOnClick
-                  className={ITEM_CLS}
-                >
-                  <OptionText
-                    title={`#${todo.seqNum} ${todo.title}`}
-                    hint={t(threadCopy(todo).reason)}
-                  />
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuGroup>
+          <ThreadTargetRadios targets={targets} picked={picked} onPick={onPick} />
         </DropdownMenuContent>
       </DropdownMenu>
-      {picked !== null && (
-        <IconTooltip
-          label={t('改回对 Coordinator 说')}
-          trigger={
-            <Button
-              variant="ghost"
-              size="icon"
-              className={TOOL_BTN_CLS}
-              onClick={() => {
-                onPick(null);
-                composerRef.current?.focus();
-              }}
-            />
-          }
-        >
-          <X width={14} height={14} />
-        </IconTooltip>
-      )}
+      <IconTooltip
+        label={t('改回对 Coordinator 说')}
+        trigger={
+          <Button
+            variant="ghost"
+            size="icon"
+            className={TOOL_BTN_CLS}
+            onClick={() => {
+              onPick(null);
+              composerRef.current?.focus();
+            }}
+          />
+        }
+      >
+        <X width={16} height={16} />
+      </IconTooltip>
     </>
   );
 }

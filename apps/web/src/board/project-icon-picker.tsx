@@ -55,7 +55,7 @@ export function ProjectIconPicker({
         <div className="relative px-1.5 pt-1.5 pb-1">
           <Search
             aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-3.5 size-3.5 -translate-y-1/2 text-content-tertiary"
+            className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-content-tertiary"
           />
           <Input
             aria-label={t('搜索图标')}
@@ -85,7 +85,7 @@ export function ProjectIconPicker({
                   FOCUS,
                 )}
               >
-                <Icon className="size-4" />
+                <Icon className="size-5" />
               </Button>
             );
           })}
@@ -100,7 +100,7 @@ export function ProjectIconPicker({
             variant="ghost"
             disabled={icon == null && color == null}
             onClick={() => onChange({ icon: null, color: null })}
-            className="h-8 w-full justify-start px-2.5 text-ui font-normal text-content-secondary hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)"
+            className="h-8 w-full justify-start px-2.5 text-ui font-normal text-foreground hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)"
           >
             {t('重置图标')}
           </Button>

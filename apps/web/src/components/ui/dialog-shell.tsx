@@ -26,19 +26,19 @@ export function dialogWidth(size: DialogSize): string {
 
 export const DIALOG_PANEL_CLS = `grid max-h-[calc(100vh-64px)] max-w-none gap-0 overflow-hidden p-0 text-ui text-popover-foreground sm:max-w-none ${DIALOG_FACE}`;
 
-export const DIALOG_HEAD_CLS = 'flex items-start gap-3 pt-4.5 pr-13 pb-1 pl-5';
+export const DIALOG_HEAD_CLS = 'flex items-start gap-3 pt-4 pr-13 pb-1 pl-4';
 
 export const DIALOG_TITLE_CLS =
-  'font-heading text-heading leading-[1.4] font-title text-foreground';
+  'font-heading text-heading leading-[1.4] font-semibold text-foreground';
 
 export const DIALOG_SUBTITLE_CLS = 'mt-0.5 text-meta text-content-tertiary';
 
 export const DIALOG_CLOSE_CLS =
   'absolute top-4 right-4 text-content-tertiary hover:text-foreground';
 
-export const DIALOG_BODY_CLS = 'min-h-0 overflow-y-auto px-5 pt-3 pb-4';
+export const DIALOG_BODY_CLS = 'min-h-0 overflow-y-auto px-4 pt-3 pb-4';
 
-export const DIALOG_FOOT_CLS = 'flex items-center gap-3 px-5 pt-3 pb-4';
+export const DIALOG_FOOT_CLS = 'flex items-center gap-3 px-4 pt-3 pb-4';
 
 export const DIALOG_HINT_CLS =
   'flex min-w-0 items-center gap-1.5 text-meta text-content-tertiary [&_svg]:size-3 [&_svg]:flex-none';
@@ -53,10 +53,10 @@ export function DialogFootRow({ hint, children }: { hint?: ReactNode; children?:
 }
 
 export const DIALOG_PRIMARY_BUTTON =
-  'rounded-md text-ui disabled:bg-secondary disabled:text-content-secondary disabled:opacity-100';
+  'rounded-md text-ui disabled:bg-primary disabled:text-primary-foreground disabled:opacity-40';
 
 export const DIALOG_TEXT_BUTTON =
-  'gap-1.5 px-3 text-ui font-normal text-content-secondary disabled:text-content-tertiary disabled:opacity-100';
+  'gap-1.5 rounded-md bg-secondary px-3 text-ui font-medium text-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] disabled:text-content-tertiary disabled:opacity-100 dark:hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)]';
 
 export const PICKER_ROW_SELECTED =
   'bg-card shadow-xs ring-1 ring-border hover:bg-card dark:hover:bg-card';
@@ -194,7 +194,7 @@ export function DialogShell({
         showCloseButton={false}
         aria-label={title}
         data-size={size}
-        style={{ width: dialogWidth(size) }}
+        style={{ width: width ?? dialogWidth(size) }}
         className={cn(
           DIALOG_PANEL_CLS,
           footer != null || hint != null
@@ -226,7 +226,10 @@ export function DialogShell({
             </div>
           )}
         </div>
-        <div data-testid="dialog-body" className={DIALOG_BODY_CLS}>
+        <div
+          data-testid="dialog-body"
+          className={cn(DIALOG_BODY_CLS, (footer != null || hint != null) && 'pb-1')}
+        >
           {children}
         </div>
         {(footer != null || hint != null) && <DialogFootRow hint={hint}>{footer}</DialogFootRow>}
@@ -234,7 +237,7 @@ export function DialogShell({
           render={<Button variant="ghost" size="icon-sm" className={DIALOG_CLOSE_CLS} />}
           aria-label={t('关闭')}
         >
-          <X width={16} height={16} />
+          <X width={20} height={20} />
         </DialogClose>
       </DialogContent>
     </Dialog>

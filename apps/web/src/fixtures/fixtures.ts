@@ -24,6 +24,7 @@ export {
   chiefDefault,
   chiefGated,
   chiefMarkdown,
+  chiefMarkdownRef,
   chiefQuestion,
   chiefReady,
   chiefScrollLong,

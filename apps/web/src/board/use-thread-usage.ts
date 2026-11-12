@@ -1,15 +1,19 @@
 import type { StepJournalRow, TokenUsage } from '@cairn/shared';
 import { useQueries } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router';
 import { api } from '../api/client.js';
 import { useMachines, useTeams } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import type { TodoRecord } from '../fixtures/records.js';
+import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { threadUsageBuildIds, threadUsageSummary } from './thread-usage-model.js';
 
 export function useThreadUsage(todo: TodoRecord) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
+  const [searchParams] = useSearchParams();
+  const seeded = live ? undefined : resolveScenario(searchParams).details?.[todo.id]?.usage;
   const buildIds = threadUsageBuildIds(todo);
   const usageQueries = useQueries({
     queries: buildIds.map((buildId) => ({
@@ -50,8 +54,8 @@ export function useThreadUsage(todo: TodoRecord) {
     (id) => machinesQuery.data?.find((machine) => machine.id === id)?.name ?? t('未知机器'),
   );
   const summary = threadUsageSummary(
-    usageComplete ? usageQueries.flatMap((query) => query.data ?? []) : null,
-    machineNames,
+    usageComplete ? usageQueries.flatMap((query) => query.data ?? []) : (seeded?.rows ?? null),
+    seeded?.machines ?? machineNames,
   );
   const state: 'ready' | 'loading' | 'error' =
     !live || !hasRuns

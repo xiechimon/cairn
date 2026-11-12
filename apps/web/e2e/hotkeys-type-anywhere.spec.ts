@@ -81,7 +81,7 @@ async function mockPendingQuestion(page: Page) {
   });
 }
 
-test('a pending question card takes digits when nothing is focused and leaves a typed composer alone', async ({
+test('pending question chips take digits when nothing is focused and leaves a typed composer alone', async ({
   page,
 }) => {
   await mockPendingQuestion(page);

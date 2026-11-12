@@ -62,7 +62,8 @@ test('a long Coordinator history opens on its newest page, at the newest message
   await expect(row(page, 'answer 249')).toBeInViewport();
   await expect(row(page, 'question 150')).toHaveCount(1);
   await expect(row(page, 'question 148')).toHaveCount(0);
-  await expect(page.getByTestId('home-c-earlier')).toHaveText('往上滑看更早的对话');
+  await expect(page.getByTestId('home-c-lead')).toHaveCount(0);
+  await expect(page.getByTestId('home-c')).not.toContainText('往上滑看更早的对话');
   expect(requested).toEqual([null]);
   await evidenceShot(page, 'opens-at-newest.png');
 });
@@ -81,7 +82,6 @@ test('scrolling to the top loads the older page and keeps the reading position',
   await offsetOf(page, 'question 50', true);
   await expect(row(page, 'question 0')).toHaveCount(1);
   expect(requested).toEqual([null, 'h-0150', 'h-0050']);
-  await expect(page.getByTestId('home-c-earlier')).toHaveCount(0);
 });
 
 test('a newest page too short to fill the view keeps loading older pages until history ends', async ({
@@ -93,7 +93,6 @@ test('a newest page too short to fill the view keeps loading older pages until h
   await expect(row(page, 'question 0')).toHaveCount(1);
   expect(requested).toEqual([null, 'h-0006', 'h-0003']);
   await expect(row(page, 'question 8')).toBeInViewport();
-  await expect(page.getByTestId('home-c-earlier')).toHaveCount(0);
 });
 
 test('a failing older page is not retried on its own while the reader stays at the top', async ({

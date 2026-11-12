@@ -199,7 +199,10 @@ test('an archived thread locks the composer; unarchive restores it without chang
 }) => {
   const { actions, revisions, unexpected } = await setup(page, 'confirm', 123);
   await page.goto('/app/todo/todo-archive');
-  await expect(page.locator('[data-testid="side-chat-action"][data-action="unarchive"]')).toBeVisible();
+  const bar = page.locator('[data-testid="side-chat-action"][data-action="unarchive"]');
+  await expect(bar).toBeVisible();
+  await expect(bar).toContainText('这个任务已归档。取消归档后才能发消息。');
+  await expect(page.locator('.side-panel').getByTestId('composer-card')).toHaveCount(0);
   await expect(page.locator('.side-panel textarea')).toHaveCount(0);
   await page.locator('[data-testid="side-chat-action"][data-action="unarchive"]').getByRole('button', { name: '取消归档' }).click();
   await expect(page.locator('.side-panel textarea')).toBeVisible();
@@ -225,7 +228,21 @@ test('archive toast Undo restores the composer immediately', async ({
     await unarchiveAllowed;
     await route.fallback();
   });
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByText('已归档「Archive probe」')).toBeVisible();
+  const toaster = page.locator('[data-sonner-toaster]');
+  await expect(toaster).toHaveAttribute('data-y-position', 'bottom');
+  await expect(toaster).toHaveAttribute('data-x-position', 'right');
+  const toast = page.locator('[data-sonner-toast]').first();
+  await expect(toast).toHaveAttribute('data-mounted', 'true');
+  const panelBox = await page.locator('.side-panel').boundingBox();
+  const barBox = await page.getByTestId('side-chat-action').boundingBox();
+  await expect
+    .poll(async () => {
+      const box = await toast.boundingBox();
+      return (box?.x ?? 0) >= (panelBox?.x ?? Number.POSITIVE_INFINITY) && (box?.y ?? 0) + (box?.height ?? 0) <= (barBox?.y ?? 0);
+    })
+    .toBe(true);
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
   try {
     await expect(page.locator('.side-panel textarea')).toBeVisible();
   } finally {

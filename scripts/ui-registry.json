@@ -1,14 +1,14 @@
 {
   "frozenFrom": {
-    "sha": "e349e08f81370b3ed23e7dbb3bdfb59a5ca3b7f2",
-    "date": "2026-11-09"
+    "sha": "fc0187b690c0b25cad3fa5417e3150a72888fb90",
+    "date": "2026-11-12"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
     "alert-dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide. Paper face shared with DialogShell (S width by default, same head/body/split footer). Optional finalFocus forwards the Base UI focus target so memory deletion can return to a surviving row or its stable summary after the refreshed list settles (#3666).",
-      "hash": "c4a87d5e2d622a8c54390f11b2751bb3ccf8c4d739d3e0addece5e758fbae0fa"
+      "hash": "2c8962d80ffebbf1a6d5938cf136c90f88d82d7ce269199ab2f50993ccdf9eab"
     },
     "alert-dialog.tsx": {
       "kind": "registry",
@@ -46,7 +46,7 @@
       "upstreamItem": "button",
       "status": "deviated",
       "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer. Link targets (a render element carrying href or to) go through useRender instead of the Base UI button primitive, so they keep link semantics and never claim nativeButton or role=button; nativeButton=false would turn them into role=button and break link queries. Owner hover policy: pressed buttons stay flat and color transitions exclude box-shadow.",
-      "hash": "8b64311a7995b43251cfba06ccab90751422146af2fd5477396aef965802fb7c"
+      "hash": "3948d37410d638eeaec4f4ceb2a204481297d385b4dcf511aaf05493c351bcb4"
     },
     "card.tsx": {
       "kind": "registry",
@@ -70,7 +70,7 @@
     "dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "Paper dialog adapter (apps/web/DESIGN.md 弹窗与菜单) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers. headerAction puts one quiet header action (memory Delete) left of the close button in regular faces.",
-      "hash": "4b60463023e748c87fe54f9cd7a3f43ec0430c5ad3ebd561144390190fa018cf"
+      "hash": "593f7ed7f96cc3f4f359befe63c362a7a618987b2d8bdebfddb20b3e87f88d4b"
     },
     "dialog.tsx": {
       "kind": "registry",
@@ -130,7 +130,7 @@
     "menu.ts": {
       "kind": "adapter",
       "reason": "Shared Paper menu classes (surface, item, indicator, separator) consumed by dropdown-menu.tsx and the hand-built menus outside components/ui, so every menu uses one padding token and the concentric --radius-menu-item.",
-      "hash": "8a1fbe09e916d3d14a403d5f4ee58b230fc453b3e56c5a8da3a66b9dc6fd8d74"
+      "hash": "46bf678e0254c78594a66f51b30670dd6f1e645b67f257a9b0b2c1d105379a79"
     },
     "message-scroller.tsx": {
       "kind": "registry",
@@ -196,7 +196,7 @@
       "upstreamItem": "tabs",
       "status": "deviated",
       "reason": "#644 TabsIndicator zero-chrome pass-through (Base UI writes active-tab geometry into inline custom properties; pill shape carried by consumer CSS) — retention deferred to #1009 chief-face construction (#982 verdict). Segmented/bare handwritten skin variants retired per #991; default/line = the upstream native data-[variant] mechanism.",
-      "hash": "779b8d6eb7967e69f92aab3771ac37073849e3ca328b91a1a80beaffeecd09e5"
+      "hash": "9eb43914b674c514dae090a3e6ffa89bd2a2366b5edccd40ccee8a4658fd0ffe"
     },
     "tag-chip.tsx": {
       "kind": "adapter",
@@ -212,7 +212,7 @@
     "toaster.tsx": {
       "kind": "adapter",
       "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts). The official recipe's lucide status icons, tinted with the status tokens, and the popover radius. #2565: toasts anchor top-center (below the narrow menu button on phones), so they never cover navigation or the composer.",
-      "hash": "b312face1c10d4306d8fba3c7875b9b83c588dbecca95de3c09e7a828db85001"
+      "hash": "19027b9f5c82de70da0aa91a7110a23498dd66ee0c37e7f92a2ee5e5a04dc045"
     },
     "tooltip.tsx": {
       "kind": "registry",

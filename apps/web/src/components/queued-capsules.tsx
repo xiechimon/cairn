@@ -103,7 +103,7 @@ export function QueuedCapsules({
               className="flex w-full flex-col gap-1"
             >
               <div className={`${CAPSULE_CLS} w-full bg-card inset-ring-(--focus-ring)`}>
-                <Clock width={14} height={14} className="flex-none text-content-tertiary" />
+                <Clock width={16} height={16} className="flex-none text-content-tertiary" />
                 <Input
                   ref={(node) => node?.focus({ preventScroll: true })}
                   aria-label={t('编辑排队消息')}
@@ -168,8 +168,8 @@ export function QueuedCapsules({
             className={`${CAPSULE_CLS} ${failed ? CAPSULE_FAILED_CLS : CAPSULE_QUEUED_CLS}`}
           >
             <Clock
-              width={14}
-              height={14}
+              width={16}
+              height={16}
               className={`flex-none ${failed ? 'text-destructive' : 'text-content-tertiary'}`}
             />
             {onEdit && !failed ? (

@@ -37,7 +37,7 @@ async function openChiefReply(page: Page) {
     .first();
 }
 
-test('bullets are native list markers in claude.ai geometry: disc, text colour, 2em list indent, 0.5em item gap', async ({
+test('bullets are native list markers in the reference geometry: disc, text colour, 36px list indent, no item pad', async ({
   page,
 }) => {
   const reply = await openChiefReply(page);
@@ -62,8 +62,8 @@ test('bullets are native list markers in claude.ai geometry: disc, text colour, 
   for (const item of items) {
     expect(item.display).toBe('list-item');
     expect(item.markerColor).toBe(item.textColor);
-    expect(item.listPad).toBeCloseTo(item.fontSize * 2, 1);
-    expect(item.itemPad).toBeCloseTo(item.fontSize * 0.5, 1);
+    expect(item.listPad).toBe(36);
+    expect(item.itemPad).toBe(0);
   }
   const nested = items.find((item) => item.depth === '1');
   expect(nested?.parentList).toBe('OL');
@@ -73,7 +73,7 @@ test('bullets are native list markers in claude.ai geometry: disc, text colour, 
   );
 });
 
-test('code block copy sits in the block header, hidden at rest, shown on block hover and on keyboard focus, and copies the code', async ({
+test('code block header is always visible with the language, expand and copy, and copy copies the code', async ({
   page,
 }) => {
   const reply = await openChiefReply(page);
@@ -81,37 +81,92 @@ test('code block copy sits in the block header, hidden at rest, shown on block h
   const copy = block.getByTestId('md-code-copy');
   await expect(block.getByTestId('md-code-lang')).toHaveText('sh');
   await page.mouse.move(1, 1);
-  await expect(copy).toHaveCSS('opacity', '0');
-
-  await block.hover();
+  await expect(copy).toBeVisible();
   await expect(copy).toHaveCSS('opacity', '1');
-  await expect(copy).toHaveCSS('transition-duration', '0s');
-  const placement = await block.evaluate((el) => {
+  await expect(block.getByTestId('md-code-expand')).toBeVisible();
+  const geo = await block.evaluate((el) => {
     const b = el.getBoundingClientRect();
+    const head = el.firstElementChild!;
+    const h = head.getBoundingClientRect();
     const c = el.querySelector('[data-testid="md-code-copy"]')!.getBoundingClientRect();
-    return { right: b.right - c.right, top: c.top - b.top, size: c.width };
+    const x = el.querySelector('[data-testid="md-code-expand"]')!.getBoundingClientRect();
+    const glyphs = [...head.querySelectorAll('svg')].map((svg) => {
+      const box = svg.getBoundingClientRect();
+      return { width: box.width, height: box.height, ink: getComputedStyle(svg).color };
+    });
+    const label = head.querySelector('[data-testid="md-code-lang"]') as HTMLElement;
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--text-secondary)';
+    el.append(probe);
+    const secondaryInk = getComputedStyle(probe).color;
+    probe.remove();
+    return {
+      head: h.height,
+      rule: getComputedStyle(head).borderBottomWidth,
+      size: c.width,
+      pitch: c.left - x.left,
+      right: b.right - c.right,
+      glyphs,
+      bodyInk: getComputedStyle(el.querySelector('pre')!).color,
+      labelInk: getComputedStyle(label).color,
+      secondaryInk,
+      labelSize: getComputedStyle(label).fontSize,
+      labelLeft: label.getBoundingClientRect().left - b.left,
+    };
   });
-  expect(placement.size).toBe(28);
-  expect(placement.right).toBeGreaterThanOrEqual(8);
-  expect(placement.right).toBeLessThanOrEqual(9);
-  expect(placement.top).toBeGreaterThanOrEqual(10);
-  expect(placement.top).toBeLessThanOrEqual(11);
+  expect(geo.head).toBe(40);
+  expect(geo.rule).toBe('1px');
+  expect(geo.size).toBe(32);
+  expect(geo.pitch).toBe(32);
+  expect(geo.right).toBe(7);
+  expect(geo.glyphs).toEqual([
+    { width: 16, height: 16, ink: geo.bodyInk },
+    { width: 16, height: 16, ink: geo.bodyInk },
+  ]);
+  expect(geo.labelInk).toBe(geo.secondaryInk);
+  expect(geo.labelSize).toBe('12px');
+  expect(geo.labelLeft).toBe(21);
 
   await copy.hover();
-  await expect(copy).toHaveCSS('box-shadow', 'none');
-  await expect(copy).toHaveCSS('border-top-left-radius', '8px');
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('复制');
   await expect(copy).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-
-  await page.mouse.move(1, 1);
-  await copy.focus();
-  await expect(copy).toBeFocused();
-  await expect(copy).toHaveCSS('opacity', '1');
 
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await copy.click();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
     'curl -s localhost:8787/healthz',
   );
+});
+
+test('code expand opens a dialog with the full code, its own copy and Done, Escape returns focus to the expand button', async ({
+  page,
+}) => {
+  const reply = await openChiefReply(page);
+  const expand = reply.getByTestId('md-code-block').getByTestId('md-code-expand');
+  await expand.click();
+  const dialog = page.getByRole('dialog', { name: 'Sh 代码' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByTestId('md-code-dialog-body')).toContainText(
+    'curl -s localhost:8787/healthz',
+  );
+  await expect
+    .poll(() => dialog.evaluate((el) => el.getBoundingClientRect().width))
+    .toBe(890);
+  const gap = await dialog.evaluate((el) => {
+    const body = el.querySelector('[data-testid="md-code-dialog-body"]')!.getBoundingClientRect();
+    const done = el.querySelector('[data-testid="md-code-done"]')!.getBoundingClientRect();
+    return done.top - body.bottom;
+  });
+  expect(gap).toBe(16);
+  await expect(dialog.getByRole('heading', { name: 'Sh 代码' })).toHaveCSS('font-weight', '600');
+  await dialog.getByTestId('md-code-dialog-copy').click();
+  await expect(dialog.getByTestId('md-code-done')).toHaveText('完成');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(expand).toBeFocused();
+  await expand.click();
+  await page.getByTestId('md-code-done').click();
+  await expect(dialog).toHaveCount(0);
 });
 
 test('code block stays inside the reply column and long lines scroll inside it', async ({
@@ -134,12 +189,12 @@ test('code block stays inside the reply column and long lines scroll inside it',
   expect(geo.inside).toBe(true);
   expect(geo.scroller).toBe('auto');
   expect(geo.whiteSpace).toBe('pre');
-  expect(geo.fontSize).toBe('14px');
-  expect(geo.lineHeight).toBe('22.75px');
-  expect(geo.radius).toBe('12px');
+  expect(geo.fontSize).toBe('13px');
+  expect(geo.lineHeight).toBe('20px');
+  expect(geo.radius).toBe('10px');
 });
 
-test('status events are a left-aligned muted line with no rules, and a reply footer never overlaps the reply text', async ({
+test('status events are a centred muted line with no rules, and a reply footer never overlaps the reply text', async ({
   page,
 }) => {
   await page.goto(DONE);
@@ -152,7 +207,7 @@ test('status events are a left-aligned muted line with no rules, and a reply foo
   }));
   expect(rules.before).toBe('none');
   expect(rules.after).toBe('none');
-  expect(rules.align).not.toBe('center');
+  expect(rules.align).toBe('center');
 
   const reply = page
     .locator('[data-row="agent"]')
@@ -189,9 +244,9 @@ test('Coordinator status events are the same left-aligned status line, clear of 
   expect(style.before).toBe('none');
   expect(style.after).toBe('none');
   expect(style.leftGap).toBe(0);
-  expect(style.fontSize).toBe('15px');
-  expect(style.lineHeight).toBe('21px');
-  expect(style.minHeight).toBe('28px');
+  expect(style.fontSize).toBe('13px');
+  expect(style.lineHeight).toBe('18px');
+  expect(style.minHeight).toBe('24px');
 });
 
 test('a wide code line in an agent reply stays inside the transcript row on a phone viewport', async ({

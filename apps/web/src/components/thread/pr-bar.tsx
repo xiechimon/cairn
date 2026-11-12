@@ -86,13 +86,13 @@ export function PrBar({
         className,
       )}
     >
-      <GitPullRequest className="size-3.5 flex-none text-content-secondary" />
+      <GitPullRequest className="size-4 flex-none text-content-secondary" />
       <span className="text-content-secondary tabular-nums">#{number}</span>
       <span className="min-w-0 truncate font-mono text-content-secondary">{branch}</span>
       <span className="ml-auto flex flex-none items-center gap-2">
         {merged ? (
           <span className="inline-flex h-6.5 items-center gap-1.5 px-1 text-meta font-medium text-content-secondary">
-            <StatusGlyph kind="done" className="size-3.5 text-running" />
+            <StatusGlyph kind="done" className="size-4 text-running" />
             Merged
           </span>
         ) : (
@@ -114,7 +114,7 @@ export function PrBar({
                   )}
                 />
                 {CI_LABEL[ci.state]}
-                <ChevronDown className="size-3.5" />
+                <ChevronDown className="size-4" />
               </PopoverTrigger>
               <PopoverContent side="top" align="end" className="w-75 gap-0.5 p-2.5">
                 <div className="flex items-baseline justify-between px-1 py-1.5 text-ui">

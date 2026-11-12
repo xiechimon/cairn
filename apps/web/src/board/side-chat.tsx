@@ -1,17 +1,22 @@
 import { cn } from 'cn';
-import { FileDiff, X } from 'lucide-react';
+import { ChevronLeft, FileDiff, ListChecks, X } from 'lucide-react';
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { contextPercentOf } from '../chief/context-meter-ring.js';
+import { REPLY_SOURCE_ATTR } from '../chief/selection-reply-model.js';
+import { TraceCard } from '../components/chat/trace-parts.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { SidePanel } from '../components/side-panel.js';
-import { ToneGlyph } from '../components/stone/tone-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { toastError } from '../components/ui/toaster.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { Composer } from '../detail/composer.js';
 import { DocPane } from '../detail/docpane.js';
+import { taskStatusInk } from '../detail/segments.js';
 import { SourceIssueLine } from '../detail/source-issue.js';
 import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
@@ -23,13 +28,32 @@ import { STATUS_WORDS } from './status-words.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
 import type { ThreadChanges } from './thread-changes.js';
-import { threadCopy, threadStatus, threadTone, VIEW_PARAM } from './thread-copy.js';
+import { THREAD_PARAM, threadCopy, threadStatus, VIEW_PARAM } from './thread-copy.js';
+import { ThreadLead } from './thread-lead.js';
+import {
+  type ThreadChatStream,
+  type ThreadOrigin,
+  type ThreadUpdates,
+  threadOrigin,
+  threadPurpose,
+  threadUpdates,
+} from './thread-panel-model.js';
 import { ThreadPrPanel } from './thread-pr-panel.js';
-import { ThreadUsageFooter } from './thread-usage-footer.js';
+import {
+  ThreadUsageDetails,
+  ThreadUsageRing,
+  type ThreadUsageView,
+  threadUsageShown,
+} from './thread-usage-ring.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
 import { useThreadMentions } from './use-thread-mentions.js';
+import { useThreadUsage } from './use-thread-usage.js';
+import { PANE_PARAM } from './work-panel.js';
 
 const OVERLAY_QUERY = '(max-width: 1100px)';
+
+export const THREAD_HEAD_BUTTON =
+  'size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-5.5 max-[640px]:size-8';
 
 const OPEN_SURFACE = '.overlay, [role="dialog"], [role="menu"], [role="listbox"]';
 
@@ -38,20 +62,37 @@ function StatusLine({
   machineName,
   now,
   waitingOnChecks,
+  updates,
+  originText,
 }: {
   todo: TodoRecord;
   machineName: string | null;
   now: number;
   waitingOnChecks: boolean;
+  updates: ThreadUpdates | null;
+  originText: string | null;
 }) {
   const { t } = useI18n();
-  const meta = joinMeta([machineName, relativeTime(todo.phaseAt, now, t)]);
+  const needsYou = threadStatus(todo) === 'needs-you';
+  const stated = threadPurpose(todo);
+  const purpose = stated === originText?.trim() ? '' : stated;
+  const meta =
+    needsYou && updates !== null
+      ? t('{n} 条更新', { n: updates.lines.length })
+      : purpose !== ''
+        ? purpose
+        : joinMeta([machineName, relativeTime(todo.phaseAt, now, t)]);
   return (
     <p
       data-testid="side-chat-status"
-      className="m-0 flex min-w-0 items-center gap-1.5 pl-5 text-meta text-content-tertiary"
+      className="m-0 flex min-w-0 items-center gap-1 text-meta text-content-tertiary"
     >
-      <span className="flex-none font-medium text-content-secondary">
+      <span
+        className={cn(
+          'flex-none',
+          todo.quotaWait == null ? taskStatusInk(todo.phase) : 'text-content-secondary',
+        )}
+      >
         {todo.quotaWait != null
           ? t('等额度')
           : waitingOnChecks
@@ -76,7 +117,12 @@ function Unavailable({ chat }: { chat: ThreadChat }) {
       data-state={chat.load}
       className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center"
     >
-      <p className="m-0 text-ui text-content-tertiary">
+      <p
+        className={cn(
+          'm-0 text-ui',
+          chat.load === 'loading' ? 'text-content-tertiary' : 'text-foreground',
+        )}
+      >
         {chat.load === 'loading'
           ? t('加载中…')
           : chat.load === 'error'
@@ -132,7 +178,12 @@ function ChangesView({ chat, now }: { chat: ThreadChat; now: number }) {
         data-state={changes.status}
         className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center"
       >
-        <p className="m-0 text-ui text-content-tertiary">
+        <p
+          className={cn(
+            'm-0 text-ui',
+            changes.status === 'loading' ? 'text-content-tertiary' : 'text-foreground',
+          )}
+        >
           {changes.status === 'loading' ? t('加载中…') : t('变更加载失败')}
         </p>
         {changes.status === 'error' && (
@@ -163,39 +214,32 @@ function ChangesView({ chat, now }: { chat: ThreadChat; now: number }) {
   );
 }
 
-function ChangesButton({
-  changes,
-  active,
-  onToggle,
-}: {
-  changes: ThreadChanges;
-  active: boolean;
-  onToggle: () => void;
-}) {
+function ChangesCard({ changes, onOpen }: { changes: ThreadChanges; onOpen: () => void }) {
   const { t } = useI18n();
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      aria-pressed={active}
-      aria-label={active ? t('返回对话') : t('查看变更')}
-      data-testid="side-chat-changes"
-      onClick={onToggle}
-      className={cn(
-        'h-7 gap-1 px-1.5 text-meta text-content-secondary max-[640px]:h-8',
-        active && 'bg-(--menu-hover) text-foreground',
-      )}
-    >
-      <FileDiff aria-hidden="true" strokeWidth={1.75} className="size-3.5" />
-      {changes.status === 'ready' && (
-        <>
-          <span className="text-(--diff-add-fg) tabular-nums">+{changes.added}</span>
-          {changes.removed > 0 && (
-            <span className="text-destructive tabular-nums">−{changes.removed}</span>
-          )}
-        </>
-      )}
-    </Button>
+    <TraceCard className="mt-5 w-fit max-w-full">
+      <Button
+        variant="ghost"
+        data-testid="side-chat-changes"
+        data-state={changes.status}
+        aria-description={t('查看变更')}
+        onClick={onOpen}
+        className="h-10 max-w-full justify-start gap-2 border-0 px-3 text-ui font-normal text-foreground hover:bg-(--menu-hover) pointer-coarse:h-11 dark:hover:bg-(--menu-hover)"
+      >
+        <FileDiff aria-hidden="true" className="size-5 flex-none text-content-secondary" />
+        <span className="min-w-0 truncate">
+          {changes.status === 'ready'
+            ? t('改动 {n} 个文件', { n: changes.fileCount })
+            : t('变更加载失败')}
+        </span>
+        {changes.status === 'ready' && (
+          <span className="flex flex-none gap-2 pl-2 text-meta tabular-nums">
+            <span className="text-(--diff-add-fg)">+{changes.added}</span>
+            {changes.removed > 0 && <span className="text-destructive">−{changes.removed}</span>}
+          </span>
+        )}
+      </Button>
+    </TraceCard>
   );
 }
 
@@ -204,17 +248,27 @@ function ThreadBody({
   todo,
   actions,
   view,
+  onViewChanges,
   now,
+  updates,
+  origin,
+  onJumpToOrigin,
   onOpenPlan,
   onClose,
+  usage,
 }: {
   chat: ThreadChat;
   todo: TodoRecord;
   actions: ThreadActions;
   view: ThreadView;
+  onViewChanges: () => void;
   now: number;
+  updates: ThreadUpdates | null;
+  origin: ThreadOrigin | null;
+  onJumpToOrigin: () => void;
   onOpenPlan: (() => void) | undefined;
   onClose: () => void;
+  usage: ThreadUsageView | null;
 }) {
   const { t } = useI18n();
   const mentions = useThreadMentions(todo.projectId);
@@ -237,8 +291,20 @@ function ThreadBody({
           liveStep={null}
           agent={null}
           onOpenPlan={onOpenPlan}
-          spec={todo.spec.trim() !== '' && !chat.hasEarlier ? todo.spec : undefined}
-          request={todo.request}
+          lead={
+            <ThreadLead
+              todo={todo}
+              showSpec={!chat.hasEarlier}
+              updates={updates}
+              origin={origin}
+              onJumpToOrigin={onJumpToOrigin}
+            />
+          }
+          result={
+            chat.changes.status === 'ready' || chat.changes.status === 'error' ? (
+              <ChangesCard changes={chat.changes} onOpen={onViewChanges} />
+            ) : undefined
+          }
           hasEarlier={chat.hasEarlier}
           {...(chat.earlier !== undefined ? { earlier: chat.earlier } : {})}
           autoScroll={chat.transcript.length > 0}
@@ -269,35 +335,41 @@ function ThreadBody({
           />
         </div>
       )}
-      <Composer
-        placeholder={
-          archived
-            ? t('已归档，取消归档后才能继续')
-            : todo.phase === 'closed'
+      {!archived && (
+        <Composer
+          placeholder={
+            todo.phase === 'closed'
               ? t('已关闭，不能再回复')
               : chat.started
-                ? t('回复 #{seq}…', { seq: todo.seqNum })
+                ? t('回复这个任务')
                 : t('开始后才能回复 #{seq}', { seq: todo.seqNum })
-        }
-        aiReview={false}
-        streaming={chat.running}
-        workingFor={chat.workingFor}
-        editable={chat.send !== undefined}
-        readOnly={chat.locked}
-        draft={draft}
-        onDraftChange={setDraft}
-        {...(chat.send !== undefined ? { onSend: chat.send } : {})}
-        {...(chat.queue !== undefined ? { onQueue: chat.queue } : {})}
-        {...(chat.stopAndSend !== undefined ? { onStopAndSend: chat.stopAndSend } : {})}
-        {...(chat.stop !== undefined ? { onStop: chat.stop } : {})}
-        {...(chat.attach !== undefined ? { onAttachment: chat.attach } : {})}
-        mentionGroups={mentions.groups}
-        mentionFiles={mentions.files}
-        queuedMessages={chat.queuedMessages}
-        onSendQueuedNow={chat.sendQueuedNow}
-        onRemoveQueued={chat.removeQueued}
-        onEditQueued={chat.editQueued}
-      />
+          }
+          aiReview={false}
+          streaming={chat.running}
+          workingFor={chat.workingFor}
+          editable={chat.send !== undefined}
+          readOnly={chat.locked}
+          draft={draft}
+          onDraftChange={setDraft}
+          {...(chat.send !== undefined ? { onSend: chat.send } : {})}
+          {...(chat.queue !== undefined ? { onQueue: chat.queue } : {})}
+          {...(chat.stopAndSend !== undefined ? { onStopAndSend: chat.stopAndSend } : {})}
+          {...(chat.stop !== undefined ? { onStop: chat.stop } : {})}
+          {...(chat.attach !== undefined ? { onAttachment: chat.attach } : {})}
+          mentionGroups={mentions.groups}
+          mentionFiles={mentions.files}
+          queuedMessages={chat.queuedMessages}
+          onSendQueuedNow={chat.sendQueuedNow}
+          onRemoveQueued={chat.removeQueued}
+          onEditQueued={chat.editQueued}
+          {...(usage !== null
+            ? {
+                meter: <ThreadUsageRing key={todo.id} {...usage} />,
+                menuMeter: <ThreadUsageDetails {...usage} className="px-2.5 py-2" />,
+              }
+            : {})}
+        />
+      )}
     </>
   );
 }
@@ -306,17 +378,30 @@ export function SideChat({
   todoId,
   listed,
   now,
+  chatStream,
   onClose,
 }: {
   todoId: string;
   listed: TodoRecord | undefined;
   now: number;
+  chatStream?: ThreadChatStream;
   onClose: () => void;
 }) {
   const { t } = useI18n();
   const chat = useThreadChat(todoId, listed);
   const todo = chat.todo;
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const closeAll = () =>
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete(THREAD_PARAM);
+        params.delete(VIEW_PARAM);
+        params.delete(PANE_PARAM);
+        return params;
+      },
+      { replace: true },
+    );
   const [chosenView, setView] = useState<ThreadView>(
     searchParams.get(VIEW_PARAM) === 'changes' ? 'changes' : 'chat',
   );
@@ -355,7 +440,12 @@ export function SideChat({
   }, [onClose, showsChanges]);
 
   return (
-    <SidePanel ref={panelRef} label={todo?.title ?? t('任务')} onDismiss={onClose}>
+    <SidePanel
+      ref={panelRef}
+      label={todo?.title ?? t('任务')}
+      onDismiss={onClose}
+      testId="side-chat-panel"
+    >
       {todo != null && chat.load === 'ready' ? (
         <ReadyThread
           todo={todo}
@@ -363,11 +453,13 @@ export function SideChat({
           now={now}
           view={view}
           onView={setView}
+          chatStream={chatStream}
           onClose={onClose}
+          onCloseAll={closeAll}
         />
       ) : (
         <>
-          <Head todoId={todoId} todo={null} onClose={onClose} />
+          <Head todoId={todoId} todo={null} onBack={onClose} onClose={closeAll} />
           <Unavailable chat={chat} />
         </>
       )}
@@ -381,49 +473,61 @@ function ReadyThread({
   now,
   view,
   onView,
+  chatStream,
   onClose,
+  onCloseAll,
 }: {
   todo: TodoRecord;
   chat: ThreadChat;
   now: number;
   view: ThreadView;
   onView: (view: ThreadView) => void;
+  chatStream: ThreadChatStream | undefined;
   onClose: () => void;
+  onCloseAll: () => void;
 }) {
   const { t } = useI18n();
   const [planOpen, setPlanOpen] = useState(false);
   const openPlan = chat.planDoc !== undefined ? () => setPlanOpen(true) : undefined;
+  const usage = useThreadUsage(todo);
   const actions = useThreadActions({ todo, chat, onGone: onClose, onViewPlan: openPlan });
   const { live, teamId } = useLiveData();
   const prs = usePrs(teamId, todo.id, live);
   const prRows = prs.data ?? [];
+  const updates = threadUpdates(todo, chat.transcript);
+  const origin = threadOrigin(todo.request, chatStream);
+  const jumpToOrigin = () => {
+    if (origin === null) return;
+    const selector = `[data-testid="home-c"] [${REPLY_SOURCE_ATTR}="${CSS.escape(origin.messageId)}"]`;
+    if (window.matchMedia(OVERLAY_QUERY).matches) onClose();
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const target = document.querySelector(selector);
+        if (target === null) toastError(t('主对话里没有加载这条消息'), null);
+        else target.scrollIntoView({ block: 'center' });
+      }),
+    );
+  };
   return (
     <>
       <Head
         todoId={todo.id}
         todo={todo}
-        onClose={onClose}
+        onBack={view === 'changes' ? () => onView('chat') : onClose}
+        backLabel={view === 'changes' ? t('返回对话') : t('返回')}
+        onClose={onCloseAll}
         menu={actions.menu}
         titleExtra={<ThreadAutomations key={todo.id} todo={todo} now={now} />}
-        {...(chat.changes.status !== 'none'
-          ? {
-              changesButton: (
-                <ChangesButton
-                  changes={chat.changes}
-                  active={view === 'changes'}
-                  onToggle={() => onView(view === 'changes' ? 'chat' : 'changes')}
-                />
-              ),
-            }
-          : {})}
+        tooltip={`#${todo.seqNum} ${todo.title}`}
       >
         <StatusLine
           todo={todo}
           machineName={chat.machineName}
           now={now}
           waitingOnChecks={chat.waitingOnChecks}
+          updates={updates}
+          originText={origin?.text ?? null}
         />
-        <ThreadUsageFooter key={todo.id} todo={todo} />
       </Head>
       <ThreadPrPanel
         status={prs.status}
@@ -436,9 +540,24 @@ function ReadyThread({
         todo={todo}
         actions={actions}
         view={view}
+        onViewChanges={() => onView('changes')}
         now={now}
+        updates={updates}
+        origin={origin}
+        onJumpToOrigin={jumpToOrigin}
         onOpenPlan={openPlan}
         onClose={onClose}
+        usage={
+          (usage.hasRuns && threadUsageShown(usage.summary, usage.state)) ||
+          contextPercentOf(todo.context) !== null
+            ? {
+                summary: usage.summary,
+                state: usage.state,
+                onRetry: usage.retry,
+                context: todo.context,
+              }
+            : null
+        }
       />
       <DialogShell
         open={planOpen}
@@ -465,58 +584,91 @@ function ReadyThread({
 function Head({
   todoId,
   todo,
+  onBack,
   onClose,
   menu,
-  changesButton,
+  backLabel,
   titleExtra,
+  tooltip,
   children,
 }: {
   todoId: string;
   todo: TodoRecord | null;
+  onBack: () => void;
   onClose: () => void;
   menu?: ReactNode;
-  changesButton?: ReactNode;
+  backLabel?: string;
   titleExtra?: ReactNode;
+  tooltip?: string;
   children?: ReactNode;
 }) {
   const { t } = useI18n();
+  const title = (
+    <h2
+      aria-label={todo != null ? `#${todo.seqNum} ${todo.title}` : undefined}
+      className="m-0 min-w-0 truncate text-ui leading-5 font-normal text-foreground"
+    >
+      {todo != null ? todo.title : t('任务')}
+    </h2>
+  );
   return (
     <header
       data-testid="side-chat"
       data-todo-id={todoId}
       data-phase={todo?.phase}
-      className="flex flex-none flex-col gap-0.5 border-b border-border pt-2.5 pr-2.5 pb-2.5 pl-4"
+      className="flex min-h-17 flex-none items-center gap-0.5 py-3.5 pr-3.5 pl-1"
     >
-      <div className="flex min-w-0 items-center gap-1">
-        {todo != null && <ToneGlyph tone={threadTone(todo)} className="size-3.5 flex-none" />}
-        <div className="ml-0.5 flex min-w-0 flex-1 items-center gap-1">
-          <h2 className="m-0 min-w-0 truncate text-ui font-semibold text-foreground">
-            {todo != null ? (
-              <>
-                <span className="font-normal text-content-tertiary tabular-nums">
-                  #{todo.seqNum}
-                </span>{' '}
-                {todo.title}
-              </>
-            ) : (
-              t('任务')
-            )}
-          </h2>
+      <IconTooltip
+        label={backLabel ?? t('返回')}
+        side="bottom"
+        trigger={
+          <Button
+            variant="ghost"
+            size="icon"
+            data-testid="side-chat-back"
+            onClick={onBack}
+            className={THREAD_HEAD_BUTTON}
+          />
+        }
+      >
+        <ChevronLeft aria-hidden="true" />
+      </IconTooltip>
+      <span
+        aria-hidden="true"
+        data-slot="side-chat-glyph"
+        className="ml-1.5 flex size-6 flex-none items-center justify-center rounded-(--cds-radius-md) bg-background shadow-(--e1-lift)"
+      >
+        <ListChecks className="size-4 text-content-secondary" />
+      </span>
+      <div
+        data-slot="side-chat-titles"
+        className="flex min-w-0 flex-1 flex-col gap-0.5 pr-1 pl-2.5"
+      >
+        <div className="flex min-w-0 items-center gap-1.5">
+          {tooltip === undefined ? (
+            title
+          ) : (
+            <Tooltip>
+              <TooltipTrigger delay={600} render={title} />
+              <TooltipContent side="bottom" align="start" sideOffset={6}>
+                {tooltip}
+              </TooltipContent>
+            </Tooltip>
+          )}
           {titleExtra}
         </div>
-        {changesButton}
-        {menu}
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t('关闭')}
-          onClick={onClose}
-          className="text-content-tertiary hover:text-foreground max-[640px]:size-8"
-        >
-          <X aria-hidden="true" strokeWidth={1.75} className="size-4" />
-        </Button>
+        {children}
       </div>
-      {children}
+      {menu}
+      <IconTooltip
+        label={t('关闭')}
+        side="bottom"
+        trigger={
+          <Button variant="ghost" size="icon" onClick={onClose} className={THREAD_HEAD_BUTTON} />
+        }
+      >
+        <X aria-hidden="true" />
+      </IconTooltip>
     </header>
   );
 }

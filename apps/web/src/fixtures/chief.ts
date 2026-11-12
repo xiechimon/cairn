@@ -280,6 +280,81 @@ export const chiefMarkdown: FixtureSet = {
   },
 };
 
+const CHIEF_MD_REF_REPLY = [
+  '这是一段测试用的 Markdown：',
+  '',
+  '# 一级标题',
+  '',
+  '## 二级标题',
+  '',
+  '**粗体**、*斜体*、~~删除线~~、`行内代码`',
+  '',
+  '| 名称 | 数量 | 状态 |',
+  '| --- | ---: | --- |',
+  '| 苹果 | 3 | 有货 |',
+  '| 香蕉 | 12 | 缺货 |',
+  '',
+  '- 无序列表一',
+  '- 无序列表二',
+  '  - 嵌套项',
+  '',
+  '1. 有序列表一',
+  '2. 有序列表二',
+  '',
+  '> 这是一段引用',
+  '',
+  '[链接示例](https://example.com)',
+  '',
+  '```python',
+  'from collections import Counter',
+  '',
+  'counts = Counter(text.split())',
+  '```',
+  '',
+  '- [ ] 未完成',
+  '- [x] 已完成',
+].join('\n');
+
+export const chiefMarkdownRef: FixtureSet = {
+  todos: [legacyReview, legacyDone],
+  now: r7(14, 52),
+  chief: {
+    view: 'none',
+    bound: true,
+    modelSlot: 'claude-sonnet-5 · 默认',
+    threadTitle: '输出表格和其他 Markdown…',
+    stream: [
+      {
+        kind: 'user',
+        id: 'md-ref-ask',
+        text: '给我展示你的所有功能',
+        createdAt: r7(14, 50),
+      },
+      {
+        kind: 'robot',
+        id: 'md-ref-intro',
+        markdown:
+          '我在这里帮你把事情办完，发消息给我就行。\n- 在 cairn 仓库里修 bug、写功能、开 PR\n- 调研一个问题，或为会议和决定做准备\n- 做个小页面或看板，比如 cairn 的 PR 进度\n\n连上邮箱、日历或 Linear，我还能帮你盯回复和项目进度。',
+        seconds: '6s',
+        createdAt: r7(14, 50) + 20_000,
+      },
+      {
+        kind: 'user',
+        id: 'md-ref-user',
+        text: '输出表格，还有其他的一些markdown，我来测试',
+        createdAt: r7(14, 52),
+      },
+      {
+        kind: 'robot',
+        id: 'md-ref-reply',
+        markdown: CHIEF_MD_REF_REPLY,
+        seconds: '9s',
+        createdAt: r7(14, 52) + 30_000,
+      },
+    ],
+  },
+};
+
 const CHIEF_CODE_REPLY = [
   '读取记录的函数如下：',
   '',
@@ -333,6 +408,28 @@ export const chiefQuestion: FixtureSet = {
           },
         ],
         answers: [{ header: '目标平台', choices: ['桌面浏览器'] }],
+      },
+      {
+        kind: 'question',
+        id: 'q-answered-group',
+        requestId: 'q-answered-group',
+        status: 'answered',
+        questions: [
+          {
+            header: '棋盘',
+            question: '棋盘做多大？',
+            options: [{ label: '20 × 20' }, { label: '30 × 30' }],
+          },
+          {
+            header: '撞墙',
+            question: '撞到墙算结束，还是从另一边穿出来？',
+            options: [{ label: '撞墙就结束' }, { label: '从另一边穿出来' }],
+          },
+        ],
+        answers: [
+          { header: '棋盘', choices: ['20 × 20'] },
+          { header: '撞墙', choices: ['撞墙就结束'] },
+        ],
       },
       {
         kind: 'robot',

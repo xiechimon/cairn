@@ -34,15 +34,15 @@ export function BulkBar({
     >
       <b className="mr-1 font-semibold">{count} selected</b>
       <Button variant="ghost" onClick={onResolve} className={ACTION_CLS}>
-        <Check className="size-3.5" />
+        <Check className="size-4" />
         Resolve
       </Button>
       <Button variant="ghost" onClick={onSnooze} className={ACTION_CLS}>
-        <AlarmClockOff className="size-3.5" />
+        <AlarmClockOff className="size-4" />
         Snooze
       </Button>
       <Button variant="ghost" onClick={onArchive} className={ACTION_CLS}>
-        <Archive className="size-3.5" />
+        <Archive className="size-4" />
         Archive
       </Button>
       <Button
@@ -52,7 +52,7 @@ export function BulkBar({
         onClick={onClear}
         className={ACTION_CLS}
       >
-        <X className="size-3.5" />
+        <X className="size-4" />
       </Button>
     </div>
   );

@@ -1,9 +1,7 @@
 import type { ChiefStreamItem } from '../fixtures/records.js';
-import type { ChiefQuestionItem } from './chief-question-card.js';
+import type { ChiefQuestionItem } from './question-chips.js';
 
 export const AWAITING_ANSWER_LABEL = '在等你回答';
-
-export const QUESTION_FADE_MS = 200;
 
 export function awaitingStream(
   stream: readonly ChiefStreamItem[],
@@ -22,22 +20,9 @@ export function awaitingStream(
   );
 }
 
-export function answerSummary(item: ChiefQuestionItem): string {
+export function answerLines(item: Pick<ChiefQuestionItem, 'status' | 'answers'>): string[] {
+  if (item.status !== 'answered') return [];
   return (item.answers ?? [])
     .map((answer) => (answer.choices ?? []).join('、') || (answer.text ?? '').trim())
-    .filter((part) => part !== '')
-    .join('；');
-}
-
-export function leavingQuestion(
-  requestId: string | null,
-  stream: readonly ChiefStreamItem[],
-): ChiefQuestionItem | null {
-  if (requestId === null) return null;
-  return (
-    stream.find(
-      (item): item is ChiefQuestionItem =>
-        item.kind === 'question' && item.requestId === requestId && item.status !== 'pending',
-    ) ?? null
-  );
+    .filter((part) => part !== '');
 }

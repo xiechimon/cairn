@@ -1,6 +1,15 @@
-import type { ReactNode } from 'react';
-import { createBrowserRouter, Navigate, RouterProvider, useLocation } from 'react-router';
+import { type ReactNode, useSyncExternalStore } from 'react';
+import {
+  createBrowserRouter,
+  Navigate,
+  type RouteObject,
+  RouterProvider,
+  useLocation,
+} from 'react-router';
 import { ApiProvider, LiveDataBridge } from './api/provider.js';
+import { sidePanelOpen } from './board/app-sidebar.js';
+import { THREAD_PARAM } from './board/thread-copy.js';
+import { useNarrow, usePanelDocked } from './board/use-narrow.js';
 import { ChiefRoot } from './chief/chief-root.js';
 import { SubtreeErrorBoundary } from './components/subtree-error-boundary.js';
 import { Toaster } from './components/ui/toaster.js';
@@ -26,13 +35,41 @@ import { MachineAuthorizePage } from './routes/machine-authorize-page.js';
 import { TodoRedirect } from './routes/todo-redirect.js';
 import { ACTIVITY_PATH } from './search/activity-href.js';
 import { SETTINGS_HREF } from './settings/settings-href.js';
-import { SettingsPage } from './settings/settings-page.js';
 import { LegacyModelRoutingRedirect, SettingsRedirect } from './settings/settings-redirect.js';
 
 function RouteBoundary({ children }: { children: ReactNode }) {
   const { pathname, search } = useLocation();
   return <SubtreeErrorBoundary resetKey={`${pathname}${search}`}>{children}</SubtreeErrorBoundary>;
 }
+
+const PAGE_ROUTES: RouteObject[] = [
+  { path: '/app', element: <BoardPage /> },
+  { path: '/app/todo/:id', element: <TodoRedirect /> },
+  { path: '/app/schedules', element: <SchedulesPage /> },
+  { path: ACTIVITY_PATH, element: <ActivityPage /> },
+  { path: '/app/project/new', element: <ProjectNewPage /> },
+  { path: '/app/project/:id', element: <ProjectHomeRedirect /> },
+  { path: '/app/project/:id/tasks', element: <ProjectTasksPage /> },
+  { path: '/app/project/:id/settings', element: <ProjectSettingsPage /> },
+  { path: '/app/team', element: <SettingsRedirect section="work-routing" /> },
+  { path: `${SETTINGS_HREF}/team`, element: <SettingsRedirect section="work-routing" /> },
+  { path: '/app/account', element: <SettingsRedirect section="account" /> },
+  { path: '/app/api-keys', element: <SettingsRedirect section="api-keys" /> },
+  { path: SKILLS_HREF, element: <SettingsRedirect section="skills" /> },
+  { path: MCP_HREF, element: <SettingsRedirect section="mcp" /> },
+  { path: SECRETS_HREF, element: <SettingsRedirect section="secrets" /> },
+  { path: MACHINES_HREF, element: <SettingsRedirect section="machines" /> },
+  { path: `${MACHINES_HREF}/:id`, element: <MachineDetailRedirect /> },
+  { path: '/app/machines/authorize', element: <MachineAuthorizePage /> },
+  { path: PROVIDERS_HREF, element: <SettingsRedirect section="providers" /> },
+  { path: MODEL_ROUTING_HREF, element: <LegacyModelRoutingRedirect /> },
+  { path: ROUTING_SETTINGS_HREF, element: <SettingsRedirect section="work-routing" /> },
+  { path: `${SETTINGS_HREF}/:section?`, element: null },
+  { path: '*', element: <Navigate to="/app" replace /> },
+].map((route) => ({
+  ...route,
+  element: route.element === null ? null : <RouteBoundary>{route.element}</RouteBoundary>,
+}));
 
 export const router = createBrowserRouter([
   {
@@ -42,47 +79,37 @@ export const router = createBrowserRouter([
         element: <PwaBridge />,
         children: [
           {
-            element: <ChiefRoot />,
-            children: [
-              { path: '/app', element: <BoardPage /> },
-              { path: '/app/todo/:id', element: <TodoRedirect /> },
-              { path: '/app/schedules', element: <SchedulesPage /> },
-              { path: ACTIVITY_PATH, element: <ActivityPage /> },
-              { path: '/app/project/new', element: <ProjectNewPage /> },
-              { path: '/app/project/:id', element: <ProjectHomeRedirect /> },
-              { path: '/app/project/:id/tasks', element: <ProjectTasksPage /> },
-              { path: '/app/project/:id/settings', element: <ProjectSettingsPage /> },
-              { path: '/app/team', element: <SettingsRedirect section="work-routing" /> },
-              {
-                path: `${SETTINGS_HREF}/team`,
-                element: <SettingsRedirect section="work-routing" />,
-              },
-              { path: '/app/account', element: <SettingsRedirect section="account" /> },
-              { path: '/app/api-keys', element: <SettingsRedirect section="api-keys" /> },
-              { path: SKILLS_HREF, element: <SettingsRedirect section="skills" /> },
-              { path: MCP_HREF, element: <SettingsRedirect section="mcp" /> },
-              { path: SECRETS_HREF, element: <SettingsRedirect section="secrets" /> },
-              { path: MACHINES_HREF, element: <SettingsRedirect section="machines" /> },
-              { path: `${MACHINES_HREF}/:id`, element: <MachineDetailRedirect /> },
-              { path: '/app/machines/authorize', element: <MachineAuthorizePage /> },
-              { path: PROVIDERS_HREF, element: <SettingsRedirect section="providers" /> },
-              { path: MODEL_ROUTING_HREF, element: <LegacyModelRoutingRedirect /> },
-              {
-                path: ROUTING_SETTINGS_HREF,
-                element: <SettingsRedirect section="work-routing" />,
-              },
-              { path: `${SETTINGS_HREF}/:section?`, element: <SettingsPage /> },
-              { path: '*', element: <Navigate to="/app" replace /> },
-            ].map((route) => ({
-              ...route,
-              element: <RouteBoundary>{route.element}</RouteBoundary>,
-            })),
+            element: <ChiefRoot routes={PAGE_ROUTES} />,
+            children: [{ path: '*', element: null }],
           },
         ],
       },
     ],
   },
 ]);
+
+const PANEL_TOAST_INSET = 16;
+const COMPOSER_CLEARANCE = 112;
+
+function PanelAwareToaster() {
+  const location = useSyncExternalStore(router.subscribe, () => router.state.location);
+  const docked = usePanelDocked();
+  const narrow = useNarrow();
+  if (narrow) return <Toaster />;
+  const panelOnly =
+    docked &&
+    sidePanelOpen(location.pathname, location.search) &&
+    new URLSearchParams(location.search).get(THREAD_PARAM) === null;
+  return (
+    <Toaster
+      position="bottom-right"
+      offset={{
+        right: PANEL_TOAST_INSET,
+        bottom: panelOnly ? PANEL_TOAST_INSET : COMPOSER_CLEARANCE,
+      }}
+    />
+  );
+}
 
 export function App() {
   return (
@@ -92,7 +119,7 @@ export function App() {
           <RouterProvider router={router} />
           <TokenGate />
         </TooltipProvider>
-        <Toaster />
+        <PanelAwareToaster />
       </I18nProvider>
     </ApiProvider>
   );

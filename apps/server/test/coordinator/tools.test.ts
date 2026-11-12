@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   ASK_REQUEST_ID_PATTERN,
   CHIEF_REMOTE_TOOLS,
+  CHIEF_REPLY_TOOLS,
   CHIEF_ROUTER_TOOLS,
   COMPUTER_REMOTE_TOOLS,
 } from '@cairn/shared';
@@ -62,7 +63,12 @@ describe('coordinator tools', () => {
   it('offers every Coordinator tool with its replay rule from the shared definitions', () => {
     const extension = coordinatorToolsExtension(fakeMachineApi(), createStepGate());
     const tools = extension.tools ?? [];
-    const defs = [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS, ...COMPUTER_REMOTE_TOOLS];
+    const defs = [
+      ...CHIEF_REMOTE_TOOLS,
+      ...CHIEF_ROUTER_TOOLS,
+      ...CHIEF_REPLY_TOOLS,
+      ...COMPUTER_REMOTE_TOOLS,
+    ];
     const actionNames = ['archive_project', 'unarchive_project'];
     expect(tools.map((t) => t.name).sort()).toEqual(
       [...defs.map((t) => t.name), ...actionNames].sort(),

@@ -209,7 +209,7 @@ export function MachineRowView({
               aria-hidden
               strokeWidth={1.75}
               className={cn(
-                'size-3.5 flex-none text-content-tertiary transition-transform duration-(--dur-fast)',
+                'size-4 flex-none text-content-tertiary transition-transform duration-(--dur-fast)',
                 expanded && 'rotate-90',
               )}
             />

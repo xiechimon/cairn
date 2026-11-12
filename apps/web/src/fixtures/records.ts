@@ -25,6 +25,7 @@ import {
   type TodoOutputKind,
   type TodoOwner,
   type TodoSection,
+  type TokenUsage,
   type UsageCost,
 } from '@cairn/shared';
 import type { MachineProvider } from '../api/claude-accounts.js';
@@ -46,6 +47,8 @@ export interface BuildRef {
   buildId: string;
   createdAt: number;
 }
+
+export type MadeKind = 'document' | 'design' | 'page' | 'code';
 
 export interface TodoRecord {
   id: string;
@@ -78,10 +81,14 @@ export interface TodoRecord {
   sourceKind?: string | null;
   sourceRef?: string | null;
   usageCost?: UsageCost;
+  context?: ChiefContextUsage | null;
   verified?: boolean;
   owner?: TodoOwner;
   output?: TodoOutputKind;
   section?: TodoSection | null;
+  madeKind?: MadeKind;
+  previewUrl?: string;
+  visibility?: 'private' | 'team';
   routeOverride?: {
     machineId?: string;
     requiredCapabilities?: {
@@ -238,11 +245,14 @@ export interface FixtureSet {
   apiKeys?: ApiKeysContent;
   resources?: ResourcesContent;
   projectNames?: Record<string, string>;
+  projectGroups?: Record<string, string>;
   archivedProjects?: Array<{ id: string; name: string; archivedAt: number }>;
   projectAvatars?: Record<string, { icon?: ProjectIcon; color?: ProjectColor }>;
   chief?: ChiefContent;
   github?: GithubFixture;
   tags?: Array<Pick<TagRecord, 'id' | 'name' | 'color'>>;
+  machinesOpen?: string;
+  attachments?: Record<string, { text?: string; src?: string }>;
 }
 
 export interface GithubFixture {
@@ -292,6 +302,21 @@ export interface MachineRow {
   concurrencySource?: 'measured' | 'estimate' | 'manual';
   claudeLogin?: ClaudeLogin;
   providers?: MachineProvider[];
+  hostname?: string;
+  folders?: MachineFolder[];
+  runningHere?: MachineRunningThread[];
+}
+
+export interface MachineFolder {
+  path: string;
+  enabled: boolean;
+}
+
+export interface MachineRunningThread {
+  threadId: string;
+  title: string;
+  projectId: string;
+  startedAt: number;
 }
 
 export interface ResourcesContent {
@@ -308,10 +333,12 @@ export interface ResourcesContent {
 
 export interface DocSegment {
   text: string;
-  style?: 'code' | 'link' | 'mention' | 'strong' | 'anchor' | 'attachment';
+  style?: 'code' | 'link' | 'mention' | 'strong' | 'anchor' | 'attachment' | 'break';
   href?: string;
   attachmentKey?: string;
   strong?: boolean;
+  em?: boolean;
+  del?: boolean;
   mentionKind?: 'todo' | 'skill' | 'agent' | 'project' | 'machine';
   mentionId?: string;
 }
@@ -495,6 +522,7 @@ export interface DetailContent {
   planDiff?: PlanDiffContent;
   compareTarget?: PlanDiffContent;
   revision?: RevisionStep;
+  usage?: { rows: TokenUsage[]; machines: string[] };
 }
 
 export interface PlanVersion {
@@ -637,6 +665,12 @@ export interface ModelOption {
   liveness?: 'alive' | 'dead' | 'unknown';
 }
 
+export interface ChiefContextUsage {
+  tokens: number;
+  contextWindow: number;
+  resume?: 'warm' | 'cold' | 'compacted' | 'idle';
+}
+
 export interface ChiefContent {
   view: 'settings' | 'none';
   tab?: ChiefSettingsTab;
@@ -656,4 +690,12 @@ export interface ChiefContent {
   outage?: { reason: 'quota' | 'capacity'; model: string | null; retryAt: number | null };
   fallbackModel?: string;
   hasEarlier?: boolean;
+  quickReplies?: string[];
+  context?: ChiefContextUsage;
+  composerFiles?: ComposerFileSeed[];
+}
+
+export interface ComposerFileSeed {
+  name: string;
+  state: 'ready' | 'uploading' | 'error';
 }

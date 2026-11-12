@@ -157,11 +157,11 @@ function ScheduleForm({
     >
       <div ref={bodyRef} tabIndex={-1} className="flex flex-col gap-3 outline-none">
         <div className="sched-form-row flex h-8 items-center justify-between gap-3 rounded-md border border-border bg-card px-3 shadow-xs dark:bg-input/30">
-          <span className="text-ui text-content-secondary">{t('项目')}</span>
+          <span className="text-ui text-foreground">{t('项目')}</span>
           <span className="min-w-0 truncate text-ui text-foreground">{repo}</span>
         </div>
         <div className="sched-form-row flex h-8 items-center justify-between gap-3 rounded-md border border-border bg-card px-3 shadow-xs dark:bg-input/30">
-          <span className="text-ui text-content-secondary">{t('任务')}</span>
+          <span className="text-ui text-foreground">{t('任务')}</span>
           <span className="min-w-0 truncate text-ui text-foreground">
             {todo === undefined ? '—' : `#${todo.seqNum} ${todo.title}`}
           </span>
@@ -325,7 +325,7 @@ export function SchedulesPage() {
               else setFixtureFormOpen(true);
             }}
           >
-            <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
+            <Plus aria-hidden strokeWidth={1.75} className="size-4" />
             {t('新建')}
           </Button>
         )

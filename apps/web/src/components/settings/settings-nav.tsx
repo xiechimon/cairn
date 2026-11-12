@@ -1,16 +1,24 @@
 import { cn } from 'cn';
-import { Search } from 'lucide-react';
-import type { ComponentType, ReactNode, Ref, SVGProps } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  type ComponentType,
+  Fragment,
+  type ReactNode,
+  type SVGProps,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Link, type To } from 'react-router';
 import { useI18n } from '../../i18n/provider.js';
-import { Input } from '../ui/input.js';
-import { Kbd } from '../ui/kbd.js';
+import { IconTooltip } from '../icon-tooltip.js';
+import { Button } from '../ui/button.js';
 
 export interface SettingsNavItem {
   id: string;
   label: string;
   Icon: ComponentType<SVGProps<SVGSVGElement>>;
-  badge?: string;
+  note?: string;
 }
 
 export interface SettingsNavGroup {
@@ -22,102 +30,148 @@ export function SettingsNav({
   groups,
   current,
   hrefFor,
-  query,
-  onQuery,
-  searchRef,
-  top,
+  search,
 }: {
   groups: SettingsNavGroup[];
   current: string | null;
   hrefFor: (id: string) => To;
-  query: string;
-  onQuery: (next: string) => void;
-  searchRef?: Ref<HTMLInputElement>;
-  top?: ReactNode;
+  search: ReactNode;
 }) {
   const { t } = useI18n();
-  const needle = query.trim().toLowerCase();
-  const visible = groups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter(
-        (item) => needle === '' || item.label.toLowerCase().includes(needle),
-      ),
-    }))
-    .filter((group) => group.items.length > 0);
   return (
-    <nav aria-label={t('设置分区')} className="flex h-full min-h-0 flex-col gap-3 px-2 py-3">
-      {top}
-      <div
-        data-testid="settings-search"
-        className="flex h-8 flex-none items-center gap-2 rounded-(--radius-control) px-2.5 text-content-tertiary transition-colors duration-(--dur-fast) focus-within:bg-sidebar-hover focus-within:ring-1 focus-within:ring-(--focus-ring) hover:bg-sidebar-hover"
-      >
-        <Search aria-hidden className="size-4 flex-none" strokeWidth={1.75} />
-        <Input
-          ref={searchRef}
-          aria-label={t('搜索设置')}
-          aria-keyshortcuts="/"
-          className="h-full flex-auto border-0 bg-transparent px-0 py-0 text-ui outline-hidden text-foreground shadow-none placeholder:text-content-secondary focus-visible:border-0 focus-visible:ring-0 md:text-ui dark:bg-transparent"
-          placeholder={t('搜索')}
-          value={query}
-          onChange={(event) => onQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Escape') return;
-            if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
-            event.stopPropagation();
-            onQuery('');
-            event.currentTarget.blur();
-          }}
-        />
-        <Kbd
-          data-testid="settings-search-hint"
-          className="h-5 flex-none bg-transparent px-1.5 text-caption font-normal text-content-tertiary ring-1 ring-border max-md:hidden"
-        >
-          /
-        </Kbd>
-      </div>
-      <div className="flex min-h-0 flex-auto flex-col gap-4 overflow-y-auto">
-        {visible.length === 0 && (
-          <p className="m-0 px-2.5 text-meta text-content-tertiary">{t('没有匹配的设置')}</p>
-        )}
-        {visible.map((group) => (
-          <div key={group.heading ?? group.items[0]?.id} className="flex flex-col gap-px">
-            {group.heading !== null && (
-              <span className="px-2.5 pt-1 pb-1 text-caption font-medium text-content-tertiary">
-                {group.heading}
-              </span>
+    <nav aria-label={t('设置分区')} className="flex h-full min-h-0 flex-col gap-3 px-4 py-4">
+      {search}
+      <div className="flex min-h-0 flex-auto flex-col overflow-y-auto">
+        {groups.map((group, index) => (
+          <Fragment key={group.heading ?? group.items[0]?.id}>
+            {index > 0 && (
+              <hr aria-hidden className="mx-3 my-3.5 flex-none border-0 border-t border-border" />
             )}
-            {group.items.map((item) => (
-              <Link
-                key={item.id}
-                to={hrefFor(item.id)}
-                replace
-                data-settings-section={item.id}
-                aria-current={current === item.id ? 'page' : undefined}
-                className={cn(
-                  'flex h-8 items-center gap-2.5 rounded-(--radius-control) px-2.5 text-ui no-underline transition-colors duration-(--dur-fast) outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  current === item.id
-                    ? 'bg-(--sidebar-active) font-medium text-foreground'
-                    : 'text-content-secondary hover:bg-sidebar-hover hover:text-foreground',
-                )}
-              >
-                <item.Icon aria-hidden className="size-4 flex-none" strokeWidth={1.75} />
-                <span className="min-w-0 flex-auto truncate">{item.label}</span>
-                {item.badge !== undefined && (
-                  <span
-                    className={cn(
-                      'text-caption',
-                      current === item.id ? 'text-foreground' : 'text-content-secondary',
-                    )}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-              </Link>
-            ))}
-          </div>
+            <div className="flex flex-col gap-0.5">
+              {group.heading !== null && <span className="sr-only">{group.heading}</span>}
+              {group.items.map((item) => (
+                <Link
+                  key={item.id}
+                  to={hrefFor(item.id)}
+                  replace
+                  data-settings-section={item.id}
+                  title={item.note}
+                  aria-description={item.note}
+                  aria-current={current === item.id ? 'page' : undefined}
+                  className={cn(
+                    'flex h-7.75 flex-none items-center gap-3.5 rounded-(--radius-control) px-2.5 text-ui no-underline transition-colors duration-(--dur-fast) outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    current === item.id
+                      ? 'bg-(--sidebar-active) text-foreground'
+                      : 'text-foreground hover:bg-sidebar-hover',
+                  )}
+                >
+                  <item.Icon aria-hidden className="size-5 flex-none" strokeWidth={1.75} />
+                  <span className="min-w-0 flex-auto truncate">{item.label}</span>
+                </Link>
+              ))}
+            </div>
+          </Fragment>
         ))}
       </div>
+    </nav>
+  );
+}
+
+export function SettingsTabStrip({
+  groups,
+  current,
+  hrefFor,
+}: {
+  groups: SettingsNavGroup[];
+  current: string | null;
+  hrefFor: (id: string) => To;
+}) {
+  const { t } = useI18n();
+  const scroller = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ start: false, end: false });
+  const items = groups.flatMap((group) => group.items);
+  const measure = () => {
+    const el = scroller.current;
+    if (el === null) return;
+    setEdges({
+      start: el.scrollLeft > 1,
+      end: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
+    });
+  };
+  useEffect(() => {
+    measure();
+    const el = scroller.current;
+    el?.querySelector('[aria-current="page"]')?.scrollIntoView({
+      inline: 'center',
+      block: 'nearest',
+    });
+    const observer = new ResizeObserver(measure);
+    if (el !== null) observer.observe(el);
+    return () => observer.disconnect();
+  }, [current]);
+  const scrollBy = (direction: 1 | -1) => {
+    const el = scroller.current;
+    el?.scrollBy({ left: direction * el.clientWidth * 0.7, behavior: 'smooth' });
+  };
+  return (
+    <nav
+      aria-label={t('设置分区')}
+      className="relative flex h-10 flex-none items-center gap-1 px-4"
+    >
+      {edges.start && (
+        <IconTooltip
+          label={t('向左滚动')}
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="-ml-2 flex-none"
+              onClick={() => scrollBy(-1)}
+            />
+          }
+        >
+          <ChevronLeft />
+        </IconTooltip>
+      )}
+      <div
+        ref={scroller}
+        data-testid="settings-tabs"
+        onScroll={measure}
+        className="flex min-w-0 flex-auto items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {items.map((item) => (
+          <Link
+            key={item.id}
+            to={hrefFor(item.id)}
+            replace
+            data-settings-section={item.id}
+            title={item.note}
+            aria-description={item.note}
+            aria-current={current === item.id ? 'page' : undefined}
+            className={cn(
+              'flex h-7.75 flex-none items-center gap-1.5 rounded-(--radius-control) px-2.5 text-ui whitespace-nowrap text-foreground no-underline outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              current === item.id ? 'bg-(--sidebar-active)' : 'hover:bg-sidebar-hover',
+            )}
+          >
+            {item.label}
+          </Link>
+        ))}
+      </div>
+      {edges.end && (
+        <IconTooltip
+          label={t('向右滚动')}
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="-mr-2 flex-none"
+              onClick={() => scrollBy(1)}
+            />
+          }
+        >
+          <ChevronRight />
+        </IconTooltip>
+      )}
     </nav>
   );
 }

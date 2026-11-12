@@ -267,7 +267,7 @@ function TasksPane({
                 <Link
                   className={cn(
                     "prj-task-link truncate text-ui no-underline after:absolute after:inset-0 after:content-['']",
-                    isSettled(todo.phase) ? 'text-content-tertiary' : 'text-foreground',
+                    isSettled(todo.phase) ? 'text-content-secondary' : 'text-foreground',
                   )}
                   to={threadHrefFrom(todo.id, search)}
                 >
@@ -302,7 +302,7 @@ function TasksPane({
                 className={cn(
                   "prj-task-link line-clamp-2 text-card-title no-underline after:absolute after:inset-0 after:content-['']",
                   isSettled(todo.phase)
-                    ? 'font-normal text-content-tertiary'
+                    ? 'font-normal text-content-secondary'
                     : 'font-medium text-foreground',
                 )}
                 to={threadHrefFrom(todo.id, search)}

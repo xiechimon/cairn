@@ -17,7 +17,7 @@ export function PlanApproval({ approved, approvedText, onApprove, onEdit }: Plan
         data-approved=""
         className="m-0 flex items-center gap-2 text-ui text-content-tertiary"
       >
-        <Spinner className="size-4" />
+        <Spinner className="size-5" />
         {approvedText}
       </p>
     );
@@ -25,7 +25,7 @@ export function PlanApproval({ approved, approvedText, onApprove, onEdit }: Plan
   return (
     <div data-slot="plan-approval" className="flex flex-wrap gap-2">
       <Button size="sm" onClick={onApprove} className="h-6.5 px-2.25 text-meta">
-        <Check className="size-3.5" />
+        <Check className="size-4" />
         Approve plan
       </Button>
       <Button

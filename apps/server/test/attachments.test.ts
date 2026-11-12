@@ -9,7 +9,7 @@ import { signAttachmentGrant } from '../src/lib/attachments-token.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
 import { TEAM_ATTACHMENTS_QUOTA_BYTES } from '../src/services/attachment-gc.js';
-import { uploadFile } from '../src/services/attachments.js';
+import { readAttachmentMeta, uploadFile } from '../src/services/attachments.js';
 import { executeChiefTool, executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import { bootServer, postProject, req } from './helpers.js';
 
@@ -108,10 +108,6 @@ describe('attachments -- grant side', () => {
   test.each([
     { body: {}, label: 'empty body' },
     { body: { kind: 'attachment' }, label: 'missing fileName/mimeType/size' },
-    {
-      body: { kind: 'attachment', fileName: 'x.md', mimeType: 'text/markdown', size: 0 },
-      label: 'size=0',
-    },
     {
       body: { kind: 'attachment', fileName: 'x.md', mimeType: 'text/markdown', size: -1 },
       label: 'negative size',
@@ -669,6 +665,21 @@ describe('attachments -- read side', () => {
 });
 
 describe('attachments — chief-tools / mcp-face tool', () => {
+  test.each([
+    ['config.yaml', 'application/yaml'],
+    ['table.csv', 'application/vnd.ms-excel'],
+  ])('a text extension uploaded as %s (%s) reads back as utf8', async (fileName, mimeType) => {
+    const s = bootServer();
+    try {
+      const { id } = await uploadOne(s, fileName, mimeType, new TextEncoder().encode('a: 1'));
+      const out = readAttachmentMeta({ db: s.db, attachmentsDir: s.attachmentsDir }, s.team.id, id);
+      expect(out.encoding).toBe('utf8');
+      expect(out.content).toBe('a: 1');
+    } finally {
+      s.dispose();
+    }
+  });
+
   test('chief-tools attachment text/* → utf8', async () => {
     const s = bootServer();
     try {

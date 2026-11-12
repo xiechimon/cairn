@@ -259,7 +259,6 @@ export function TraceGroup({
         failed={failed}
         open={open}
         running={running}
-        compact={density === 'compact'}
         data-testid={summaryTestId}
         onClick={() => {
           const next = !open;

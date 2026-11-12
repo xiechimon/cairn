@@ -1,19 +1,24 @@
 import { parseReplyQuote } from '@cairn/shared';
-import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
-import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
+import { cn } from 'cn';
+import { type CSSProperties, memo, type ReactNode, useContext } from 'react';
+import { isUsableTimestamp } from '../board/rel-time.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
-import { LivePulse, LiveRow, LiveSignal } from '../components/chat/live-row.js';
+import { LiveRow, LiveSignal, TypingDots } from '../components/chat/live-row.js';
 import { STATUS_REF_CLS, StatusLine } from '../components/chat/status-line.js';
 import { TraceGroup, TraceRows, type TraceStepItem } from '../components/chat/trace-steps.js';
-import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
-import { Bubble, BubbleContent } from '../components/ui/bubble.js';
+import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
-import { ChatMarkdown, MD_LIST, MD_LIST_ITEM } from '../detail/chat-markdown.js';
-import { TodoGlanceContext } from '../detail/segments.js';
+import { ChatMarkdown, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
+import {
+  type TodoGlance,
+  TodoGlanceContext,
+  TodoStatus,
+  taskChipClass,
+} from '../detail/segments.js';
 import type {
   ChiefContent,
   ChiefSegment,
@@ -22,19 +27,30 @@ import type {
 } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, Copy, FileText, Restore } from '../icons/index.js';
+import { FileText } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
+import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefReportRow } from './chief-report-row.js';
-import { QuestionAnsweredLine } from './question-answered-line.js';
+import { TaskRefRow } from './chief-task-ref-row.js';
+import { taskRefsOf } from './chief-task-refs.js';
+import { isLiveNotice } from './live-notice.js';
+import { MessageToolbar } from './message-toolbar.js';
+import { QuestionAnsweredLine, QuestionAsked } from './question-answered-line.js';
+import { answerLines } from './question-lifecycle.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
+import {
+  REPLY_HIGHLIGHT_ATTR,
+  REPLY_HIGHLIGHT_CLS,
+  ReplySourceHighlightContext,
+} from './reply-source-highlight.js';
+import type { ReplyQuoteDraft } from './selection-reply.js';
 import { REPLY_SOURCE_ATTR } from './selection-reply-model.js';
+import { SentAttachments } from './sent-attachments.js';
 import type { ThreadActivity } from './thread-activity.js';
 import { ThreadActivityRow, ThreadEventLine } from './thread-activity-row.js';
 import { ThreadReportReply } from './thread-report-reply.js';
-
-const MSG_TOOL_BTN_CLS =
-  "size-6 cursor-pointer rounded-none border-none bg-transparent text-(--text-tertiary) hover:bg-(--secondary) hover:text-(--text-secondary) dark:hover:bg-(--secondary) aria-expanded:bg-muted aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
+import { messageStampLabel } from './time-dividers.js';
 
 const STAMP_CLS = 'text-caption whitespace-nowrap tabular-nums';
 
@@ -60,27 +76,37 @@ function MessageStamp({ createdAt, fallback }: { createdAt?: number; fallback?: 
       dateTime={new Date(createdAt).toISOString()}
       title={absolute}
     >
-      {relativeTime(createdAt, Math.max(now, createdAt), t)}
+      {messageStampLabel(createdAt, Math.max(now, createdAt), locale, t)}
     </time>
   );
 }
 
+function runAttr(joinsPrev: boolean, joinsNext: boolean): string | undefined {
+  if (joinsPrev && joinsNext) return 'middle';
+  if (joinsPrev) return 'last';
+  if (joinsNext) return 'first';
+  return undefined;
+}
+
+const NO_GLANCES: ReadonlyMap<string, TodoGlance> = new Map();
+
 const TURN_NOTE_CLS = 'px-3 py-2 text-meta leading-5 text-(--text-tertiary)';
 
-const MSG_COL_CLS =
-  'relative min-w-0 flex-1 text-card-title text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!';
+const MSG_COL_CLS = `relative min-w-0 flex-1 ${CHAT_BODY_CLS} text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!`;
 const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
 
 const SCROLLER_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
 
 const USER_ROW_CLS = 'mt-6';
-const EVENT_ROW_CLS = 'mt-6';
-const REPLY_ROW_CLS = 'mt-11';
+const RUN_ROW_CLS = 'mt-1';
+const EVENT_ROW_CLS = 'mt-5';
+const REPLY_ROW_CLS = 'mt-6';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
-const BUBBLE_WRAP_CLS = 'w-full max-w-full';
-const BUBBLE_ROBOT_CLS = 'w-full border-0 voice-response text-card-title';
+const BUBBLE_WRAP_CLS = `w-full max-w-full font-sans ${CHAT_BODY_CLS}`;
+const TRACE_REVEAL =
+  'opacity-0 group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
 const MARKER_ERROR_CLS =
   'my-2.5 flex-col items-start gap-0.5 rounded-(--radius-card) bg-danger-soft px-3 py-2.5 text-left text-meta text-(--destructive)';
 
@@ -102,21 +128,60 @@ function robotText(item: {
   return lines.join('\n');
 }
 
+function TodoSegmentChip({ seq }: { seq: number }) {
+  const glances = useContext(TodoGlanceContext);
+  const known = [...(glances ?? [])].find(([, glance]) => glance.seq === seq);
+  const chip = (
+    <>
+      {known !== undefined ? (
+        <TodoStatus phase={known[1].phase} />
+      ) : (
+        <FileText width={11} height={11} />
+      )}
+      {seq}
+    </>
+  );
+  const cls = `${CHIP_INLINE_CLS} bg-secondary text-content-secondary`;
+  return known === undefined ? (
+    <span data-testid="chief-chip-todo" className={cls}>
+      {chip}
+    </span>
+  ) : (
+    <ThreadLink
+      todoId={known[0]}
+      data-testid="chief-chip-todo"
+      data-phase={known[1].phase}
+      className={cn(cls, taskChipClass(known[1].phase))}
+    >
+      {chip}
+    </ThreadLink>
+  );
+}
+
+function TaskRefRows({
+  source,
+  started,
+}: {
+  source: Parameters<typeof taskRefsOf>[0];
+  started: readonly string[];
+}) {
+  const glances = useContext(TodoGlanceContext);
+  const refs = taskRefsOf(source, glances ?? NO_GLANCES, started);
+  if (refs.length === 0) return null;
+  return (
+    <div className="mb-2 flex flex-col gap-0.5" data-testid="chief-task-refs">
+      {refs.map((ref) => (
+        <TaskRefRow key={ref.todoId} taskRef={ref} />
+      ))}
+    </div>
+  );
+}
+
 function Segments({ segments }: { segments: ChiefSegment[] }) {
   return (
     <>
       {segments.map((s, i) => {
-        if (s.todo != null)
-          return (
-            <span
-              key={i}
-              data-testid="chief-chip-todo"
-              className={`${CHIP_INLINE_CLS} bg-secondary text-content-secondary`}
-            >
-              <FileText width={11} height={11} />
-              {s.todo}
-            </span>
-          );
+        if (s.todo != null) return <TodoSegmentChip key={i} seq={s.todo} />;
         if (s.agent != null)
           return (
             <span
@@ -159,9 +224,7 @@ function turnToolSteps(tools: ChiefToolRow[] | undefined, runningVerb?: string):
   });
 }
 
-export const TaskCardContext = createContext<((todoId: string) => ReactNode) | null>(null);
-
-function TaskCardRow({
+function TaskStartedRow({
   todoId,
   seq,
   title,
@@ -172,17 +235,22 @@ function TaskCardRow({
 }) {
   const { t } = useI18n();
   const glance = useContext(TodoGlanceContext)?.get(todoId);
-  const card = useContext(TaskCardContext)?.(todoId);
-  const shownSeq = glance?.seq ?? seq;
-  const shownTitle = glance?.title ?? title;
-  if (card != null) {
+  if (glance !== undefined) {
     return (
       <MessageScrollerItem
         style={SCROLLER_ITEM_STYLE}
-        data-testid="chief-task-card"
+        data-testid="chief-task-started"
         className={EVENT_ROW_CLS}
       >
-        {card}
+        <TaskRefRow
+          elbow={false}
+          taskRef={{
+            todoId,
+            seq: glance.seq ?? seq,
+            title: glance.title ?? title,
+            phase: glance.phase,
+          }}
+        />
       </MessageScrollerItem>
     );
   }
@@ -190,10 +258,10 @@ function TaskCardRow({
     <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
       <StatusLine testId="chief-task-created">
         {t('已建任务')}{' '}
-        <ThreadLink todoId={todoId} className={STATUS_REF_CLS} data-phase={glance?.phase}>
-          {shownSeq != null ? `#${shownSeq}` : t('任务')}
+        <ThreadLink todoId={todoId} className={STATUS_REF_CLS}>
+          {seq != null ? `#${seq}` : t('任务')}
         </ThreadLink>
-        {shownTitle != null ? ` ${shownTitle}` : null}
+        {title != null ? ` ${title}` : null}
       </StatusLine>
     </MessageScrollerItem>
   );
@@ -239,15 +307,22 @@ export function chiefStreamRowKey(
 interface ChiefStreamRowProps {
   item: ChiefStreamItem | ThreadActivity;
   index: number;
-  latest: boolean;
   replyable?: boolean;
   runningTool: ChiefContent['runningTool'];
-  copiedKey: string | null;
-  onCopy: (key: string, text: string) => void;
+  onCopy: (text: string) => void;
   toolsOpen: ReadonlySet<number>;
   onToggleTools: (index: number) => void;
   onRewindRequest: (index: number, id: string | null) => void;
+  onReply?: ((draft: ReplyQuoteDraft) => void) | undefined;
+  entering?: boolean;
+  onRetry?: (() => void) | undefined;
+  joinsPrev?: boolean;
+  joinsNext?: boolean;
+  startedTasks?: readonly string[];
 }
+
+const NO_STARTED_TASKS: readonly string[] = [];
+const NO_TEXT = {};
 
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
   const { t } = useI18n();
@@ -274,27 +349,28 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
   );
 }
 
-const messageToolsReveal = (latest: boolean) =>
-  latest
-    ? 'opacity-100'
-    : 'opacity-0 group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
-
-const messageToolsPlace = (side: 'left' | 'right') =>
-  `absolute top-full z-10 ${side === 'right' ? 'right-0' : 'left-0'}`;
-
 export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
   index: i,
-  latest,
   replyable = false,
   runningTool,
-  copiedKey,
   onCopy,
   toolsOpen,
   onToggleTools,
   onRewindRequest,
+  onReply,
+  entering = false,
+  onRetry,
+  joinsPrev = false,
+  joinsNext = false,
+  startedTasks = NO_STARTED_TASKS,
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
+  const highlightedSource = useContext(ReplySourceHighlightContext);
+  const highlight = (id: string | undefined) =>
+    id !== undefined && id === highlightedSource?.sourceMessageId
+      ? { [REPLY_HIGHLIGHT_ATTR]: '' }
+      : {};
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
   if (item.kind === 'thread-report' || item.kind === 'thread-message')
     return (
@@ -322,15 +398,26 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'error')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
-        <Marker role="alert" className={MARKER_ERROR_CLS}>
-          <MarkerContent>{t('Coordinator 本轮执行失败')}</MarkerContent>
-          <span className="mt-0.5 block break-all text-(--text-tertiary)">{item.text}</span>
+        <Marker role="alert" className={MARKER_ERROR_CLS} title={item.text}>
+          <MarkerContent data-testid="chief-turn-error">
+            {t('Coordinator 这一轮没有完成。')}
+          </MarkerContent>
+          {onRetry !== undefined && (
+            <Button
+              variant="ghost"
+              data-testid="chief-turn-retry"
+              className="h-7 cursor-pointer px-0 text-meta font-medium text-(--destructive) hover:bg-transparent hover:underline dark:hover:bg-transparent"
+              onClick={onRetry}
+            >
+              {t('重试')}
+            </Button>
+          )}
         </Marker>
       </MessageScrollerItem>
     );
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
   if (item.kind === 'task-card')
-    return <TaskCardRow todoId={item.todoId} seq={item.seq} title={item.title} />;
+    return <TaskStartedRow todoId={item.todoId} seq={item.seq} title={item.title} />;
   if (item.kind === 'digest')
     return <ChiefDigestRow reason={item.reason} madeAt={item.madeAt} items={item.items} />;
   if (item.kind === 'daily-report') return <ChiefReportRow report={item.report} />;
@@ -353,50 +440,58 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'user') {
     const reply = parseReplyQuote(item.text);
     const shown = reply?.body ?? item.markdown;
+    const split = splitDraft(shown ?? item.text);
+    const sentFiles = parseAttachmentTokens(split.tokens.join('\n'));
+    const bubbleText = sentFiles.length > 0 ? split.text.trim() : split.text;
+    const showBubble = bubbleText !== '' || reply != null || sentFiles.length === 0;
+    const userTools = (placement: 'left' | 'below-end', testId: string) => (
+      <MessageToolbar
+        placement={placement}
+        testId={testId}
+        stamp={<MessageStamp createdAt={item.createdAt} fallback={item.at} />}
+        onReply={
+          onReply !== undefined && item.id != null
+            ? () => onReply({ sourceMessageId: item.id ?? '', quote: reply?.body ?? item.text })
+            : undefined
+        }
+        onCopy={() => onCopy(item.text)}
+        onRewind={() => onRewindRequest(i, item.id ?? null)}
+      />
+    );
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message className={`${USER_ROW_CLS} justify-end`} data-testid="chief-msg">
+        <Message
+          className={`${joinsPrev ? RUN_ROW_CLS : USER_ROW_CLS} justify-end ${entering ? 'message-enter' : ''}`}
+          data-testid="chief-msg"
+          data-run={runAttr(joinsPrev, joinsNext)}
+        >
           <MessageContent
-            className="relative max-w-[min(85%,42rem)] flex-none items-end gap-0"
+            className="relative max-w-[min(85%,42rem)] flex-none items-end gap-2"
             data-testid="chief-msg-col"
           >
-            <UserMessageBubble
-              data-testid="chief-bubble"
-              data-md={shown != null ? '' : undefined}
-              {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
-              className={`w-fit max-w-full [overflow-wrap:anywhere] ${shown != null ? BUBBLE_MD_CLS : ''}`}
-            >
-              {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
-              {shown != null ? <ChatMarkdown text={shown} conversational /> : item.text}
-            </UserMessageBubble>
-            <div
-              className={`${messageToolsPlace('right')} flex items-center gap-1 text-(--text-tertiary) ${messageToolsReveal(latest)}`}
-              data-testid="chief-msg-tools"
-            >
-              <MessageStamp createdAt={item.createdAt} fallback={item.at} />
-              <Button
-                variant="ghost"
-                size="icon"
-                className={MSG_TOOL_BTN_CLS}
-                aria-label={t('复制')}
-                onClick={() => onCopy(`u${i}`, item.text)}
-              >
-                {copiedKey === `u${i}` ? (
-                  <Check width={13} height={13} />
-                ) : (
-                  <Copy width={13} height={13} />
-                )}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={MSG_TOOL_BTN_CLS}
-                aria-label={t('恢复到此处')}
-                onClick={() => onRewindRequest(i, item.id ?? null)}
-              >
-                <Restore width={13} height={13} />
-              </Button>
-            </div>
+            {sentFiles.length > 0 && (
+              <div className="group/reply-block relative max-w-full" data-slot="reply-block">
+                <SentAttachments files={sentFiles} />
+                {!showBubble && userTools('left', 'chief-msg-tools')}
+              </div>
+            )}
+            {showBubble && (
+              <div className="group/reply-block relative max-w-full" data-slot="reply-block">
+                <UserMessageBubble
+                  data-testid="chief-bubble"
+                  tail={!joinsNext}
+                  data-md={shown != null ? '' : undefined}
+                  {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
+                  {...highlight(item.id)}
+                  className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''}`}
+                >
+                  {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
+                  {shown != null ? <ChatMarkdown text={bubbleText} /> : bubbleText}
+                </UserMessageBubble>
+                {userTools('left', 'chief-msg-tools')}
+              </div>
+            )}
+            {userTools('below-end', 'chief-msg-tools-touch')}
           </MessageContent>
         </Message>
       </MessageScrollerItem>
@@ -413,16 +508,58 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   if (item.kind === 'question' && item.status === 'pending') return null;
-  if (item.kind === 'question')
+  if (item.kind === 'question') {
+    if (item.status === 'cancelled')
+      return (
+        <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
+          <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
+            <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
+              <QuestionAnsweredLine item={item} />
+            </MessageContent>
+          </Message>
+        </MessageScrollerItem>
+      );
+    const answers = answerLines(item);
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
+        <Message
+          className={joinsPrev ? RUN_ROW_CLS : REPLY_ROW_CLS}
+          data-testid="chief-msg"
+          data-run={joinsPrev ? 'last' : undefined}
+        >
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-            <QuestionAnsweredLine item={item} />
+            <QuestionAsked item={item} onCopy={onCopy} />
+            {answers.length === 0 && (
+              <div className="mt-2">
+                <QuestionAnsweredLine item={item} />
+              </div>
+            )}
           </MessageContent>
         </Message>
+        {answers.length > 0 && (
+          <Message
+            className={`${USER_ROW_CLS} justify-end`}
+            data-testid="chief-msg"
+            data-run={joinsNext ? 'first' : undefined}
+          >
+            <MessageContent
+              className="relative max-w-[min(85%,42rem)] flex-none items-end gap-2"
+              data-testid="chief-msg-col"
+            >
+              <UserMessageBubble
+                data-testid="chief-bubble"
+                data-question-answer={item.requestId}
+                tail={!joinsNext}
+                className="w-fit max-w-full [overflow-wrap:anywhere] whitespace-pre-line"
+              >
+                {answers.join('\n')}
+              </UserMessageBubble>
+            </MessageContent>
+          </Message>
+        )}
       </MessageScrollerItem>
     );
+  }
   if (item.kind === 'streaming') {
     const callRunning = item.tools?.some((tool) => tool.running === true) === true;
     const liveSteps: TraceStepItem[] = [
@@ -451,7 +588,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               labelVars={item.labelVars}
               labelDetail={item.labelDetail}
               waiting={item.waiting === true}
-              disclosure={{ expand: '展开实时步骤', collapse: '收起实时步骤' }}
+              notice={isLiveNotice(item.label, item.labelDetail)}
+              disclosure={{ expand: '查看步骤', collapse: '收起实时步骤' }}
             >
               <div data-testid="chief-turn-tools">
                 {liveSteps.length > 0 && <TraceRows density="compact" steps={liveSteps} />}
@@ -471,9 +609,44 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     );
   }
   const tools = turnToolSteps(item.tools);
+  const settled = item.typing !== true;
+  const whole = robotText(item);
+  const fallbackNote =
+    item.fallbackModel != null ? (
+      <span data-testid="chief-fallback-note">
+        {t('由备用模型 {model} 回答', { model: item.fallbackModel })}
+      </span>
+    ) : undefined;
+  const robotTools = (
+    placement: 'right' | 'below-start',
+    quote: string,
+    testId: string,
+    withNote = true,
+  ): ReactNode =>
+    settled ? (
+      <MessageToolbar
+        placement={placement}
+        testId={testId}
+        stamp={<MessageStamp createdAt={item.createdAt} />}
+        note={withNote ? fallbackNote : undefined}
+        onReply={
+          onReply !== undefined && item.id != null
+            ? () => onReply({ sourceMessageId: item.id ?? '', quote })
+            : undefined
+        }
+        onCopy={() => onCopy(quote)}
+      />
+    ) : null;
+  const sourceHighlighted =
+    highlightedSource !== null && highlightedSource.sourceMessageId === item.id;
+  const quoted = highlightedSource?.quote ?? '';
   return (
     <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-      <Message className={REPLY_ROW_CLS} data-testid="chief-msg">
+      <Message
+        className={joinsPrev ? RUN_ROW_CLS : REPLY_ROW_CLS}
+        data-testid="chief-msg"
+        data-run={runAttr(joinsPrev, joinsNext)}
+      >
         <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
           {tools.length > 0 && (
             <TraceGroup
@@ -483,62 +656,61 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               onOpenChange={() => onToggleTools(i)}
               summaryTestId="chief-tools-toggle"
               cardTestId="chief-turn-tools"
+              className={toolsOpen.has(i) ? undefined : TRACE_REVEAL}
             />
           )}
-          <Bubble variant="ghost" className={BUBBLE_WRAP_CLS}>
-            <BubbleContent
-              className={BUBBLE_ROBOT_CLS}
-              {...(item.id != null && item.typing !== true ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
-            >
-              {item.markdown != null ? (
-                <ChatMarkdown text={item.markdown} conversational />
-              ) : (
-                <>
+          <TaskRefRows source={settled ? item : NO_TEXT} started={startedTasks} />
+          <div
+            className={BUBBLE_WRAP_CLS}
+            data-testid="chief-reply"
+            {...(item.id != null && settled ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
+            {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
+          >
+            {item.markdown != null ? (
+              <ChatMarkdown
+                text={item.markdown}
+                bubbles
+                bubbleTools={(group, n) =>
+                  robotTools(
+                    'right',
+                    group.source,
+                    n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools',
+                  )
+                }
+                highlight={(group) =>
+                  sourceHighlighted &&
+                  (group.source.includes(quoted) || quoted.includes(group.source))
+                }
+              />
+            ) : (
+              <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
+                <div
+                  className={REPLY_BUBBLE_CLS}
+                  data-slot="reply-bubble"
+                  data-testid="chief-reply-bubble"
+                  {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
+                >
                   {(item.paragraphs ?? []).map((p, j) => (
-                    <p key={j} className={j > 0 ? 'mt-0.5 text-card-title' : 'text-card-title'}>
+                    <p key={j} className={j > 0 ? `mt-1 ${CHAT_BODY_CLS}` : CHAT_BODY_CLS}>
                       <Segments segments={p} />
                     </p>
                   ))}
                   {item.bullets != null && item.bullets.length > 0 && (
-                    <ul className={`mt-0.5 list-disc text-card-title ${MD_LIST}`}>
+                    <ul className={`mt-1 list-disc ps-9 ${CHAT_BODY_CLS}`}>
                       {item.bullets.map((b, j) => (
-                        <li key={`b${j}`} className={MD_LIST_ITEM}>
+                        <li key={`b${j}`}>
                           <Segments segments={b} />
                         </li>
                       ))}
                     </ul>
                   )}
-                </>
-              )}
-            </BubbleContent>
-          </Bubble>
-          {item.typing === true && <LivePulse className="mt-1 ml-0.5" />}
-          {item.typing !== true && (
-            <div
-              className={`${messageToolsPlace('left')} flex items-center gap-2 text-meta text-(--text-tertiary) ${messageToolsReveal(latest)}`}
-              data-testid="chief-msg-foot"
-            >
-              <Button
-                variant="ghost"
-                size="icon"
-                className={MSG_TOOL_BTN_CLS}
-                aria-label={t('复制')}
-                onClick={() => onCopy(`r${i}`, robotText(item))}
-              >
-                {copiedKey === `r${i}` ? (
-                  <Check width={13} height={13} />
-                ) : (
-                  <Copy width={13} height={13} />
-                )}
-              </Button>
-              <MessageStamp createdAt={item.createdAt} />
-              {item.fallbackModel != null && (
-                <span data-testid="chief-fallback-note">
-                  {t('由备用模型 {model} 回答', { model: item.fallbackModel })}
-                </span>
-              )}
-            </div>
-          )}
+                </div>
+                {robotTools('right', whole, 'chief-msg-foot')}
+              </div>
+            )}
+          </div>
+          {item.typing === true && <TypingDots className="mt-1" />}
+          {robotTools('below-start', whole, 'chief-msg-tools-touch', false)}
         </MessageContent>
       </Message>
     </MessageScrollerItem>

@@ -1,5 +1,7 @@
 import { pairingLink } from '@cairn/shared';
 import { useId, useState } from 'react';
+import { StatusMarkFloat } from '../chief/chief-status-mark.js';
+import { STATUS_MARK_IDS, STATUS_MARK_LABELS } from '../chief/status-mark.js';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { JumpToLatestButton } from '../components/chat/jump-to-latest.js';
@@ -308,6 +310,23 @@ export function StreamSection() {
         </Cell>
       </Specimen>
       <Specimen
+        id="status-mark"
+        title="Status mark"
+        note="One hand-drawn line on a quiet disc at the top of the Coordinator conversation; the old line erases along its path, the new one draws in; the pill fades after a few seconds"
+        code={`<ChiefStatusMark chief={chiefData} />`}
+      >
+        {STATUS_MARK_IDS.map((id) => (
+          <Cell key={id} label={id}>
+            <div className="w-36 pb-1">
+              <StatusMarkFloat
+                view={{ id, label: STATUS_MARK_LABELS[id], announce: false }}
+                pinned
+              />
+            </div>
+          </Cell>
+        ))}
+      </Specimen>
+      <Specimen
         id="agent-transcript"
         title="Agent transcript"
         note="Thoughts fold, runs show the exit code, edits show the diff size"
@@ -338,7 +357,7 @@ export function StreamSection() {
                 </MessageScrollerContent>
               </FadeScrollerViewport>
               <JumpToLatestButton aria-label="Jump to latest">
-                <ArrowDown width={16} height={16} />
+                <ArrowDown width={20} height={20} />
               </JumpToLatestButton>
             </MessageScroller>
           </MessageScrollerProvider>

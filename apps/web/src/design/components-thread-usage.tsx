@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { ThreadUsageDisclosure } from '../board/thread-usage-footer.js';
 import type { ThreadUsageSummary } from '../board/thread-usage-model.js';
+import { ThreadUsageDetails, ThreadUsageRing } from '../board/thread-usage-ring.js';
 import { Section, Specimen } from './specimen.js';
 
 const SUMMARY: ThreadUsageSummary = {
@@ -11,40 +11,43 @@ const SUMMARY: ThreadUsageSummary = {
   machines: ['omarchy', 'Mac'],
 };
 
+const CONTEXT = { tokens: 62_000, contextWindow: 200_000 };
+
 export function ThreadUsageSection() {
   const [retryState, setRetryState] = useState<'ready' | 'error'>('error');
   return (
     <Section
       id="thread-usage"
       title="Thread usage"
-      lede="A quiet disclosure under the thread header meta opens into totals across every run. Unknown prices and unavailable duration stay blank; models and machines remain readable in the expanded view."
+      lede="The ring in the thread composer's tool row is the context ring of the main composer: its label and arc are the share of the context window in use. It opens the totals across every run. Without a context reading it is the bare ring with no number."
     >
-      <Specimen id="collapsed-thread-usage" title="Collapsed thread usage" stage="canvas">
-        <div className="w-full max-w-105">
-          <ThreadUsageDisclosure
+      <Specimen id="thread-usage-ring" title="Thread usage ring" stage="canvas">
+        <div className="flex w-full max-w-105 justify-end gap-6">
+          <ThreadUsageRing
             summary={SUMMARY}
             state="ready"
+            context={CONTEXT}
             onRetry={() => setRetryState('ready')}
           />
+          <ThreadUsageRing summary={SUMMARY} state="ready" onRetry={() => setRetryState('ready')} />
         </div>
       </Specimen>
-      <Specimen id="expanded-thread-usage" title="Expanded thread usage" stage="canvas">
-        <div className="w-full max-w-105">
-          <ThreadUsageDisclosure
+      <Specimen id="expanded-thread-usage" title="Thread usage details" stage="canvas">
+        <div className="w-full max-w-72">
+          <ThreadUsageDetails
             summary={SUMMARY}
             state="ready"
+            context={CONTEXT}
             onRetry={() => setRetryState('ready')}
-            defaultOpen
           />
         </div>
       </Specimen>
       <Specimen id="unpriced-thread-usage" title="Unpriced thread usage" stage="canvas">
-        <div className="w-full max-w-105">
-          <ThreadUsageDisclosure
+        <div className="w-full max-w-72">
+          <ThreadUsageDetails
             summary={{ ...SUMMARY, cost: '—' }}
             state="ready"
             onRetry={() => setRetryState('ready')}
-            defaultOpen
           />
         </div>
       </Specimen>
@@ -53,17 +56,16 @@ export function ThreadUsageSection() {
         title="Loading and failed thread usage"
         stage="canvas"
       >
-        <div className="flex w-full max-w-105 flex-col gap-4">
-          <ThreadUsageDisclosure
+        <div className="flex w-full max-w-72 flex-col gap-6">
+          <ThreadUsageDetails
             summary={{ ...SUMMARY, tokens: '—', cached: '—', models: [], machines: [] }}
             state="loading"
             onRetry={() => setRetryState('ready')}
           />
-          <ThreadUsageDisclosure
+          <ThreadUsageDetails
             summary={SUMMARY}
             state={retryState}
             onRetry={() => setRetryState('ready')}
-            defaultOpen
           />
         </div>
       </Specimen>

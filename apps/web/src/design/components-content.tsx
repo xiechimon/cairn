@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
 import { ProjectNotFound, ProjectsFailed } from '../board/project-not-found.js';
 import { ChiefIdentity } from '../chief/chief-identity.js';
+import { MessageToolbar } from '../chief/message-toolbar.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { StatusLine } from '../components/chat/status-line.js';
 import { TraceGroup, type TraceStep, TraceSteps } from '../components/chat/trace-steps.js';
@@ -43,17 +44,8 @@ import {
   TraceLine,
   TraceTitle,
 } from '../components/ui/trace.js';
-import {
-  Copy,
-  FileText,
-  Key,
-  Lock,
-  Paperclip,
-  Restore,
-  Server,
-  SquarePen,
-  X,
-} from '../icons/index.js';
+import { ChatMarkdown } from '../detail/chat-markdown.js';
+import { FileText, Key, Lock, Paperclip, Server, SquarePen, X } from '../icons/index.js';
 import { ChipProblems, QueryChip, SyntaxHelp } from '../search/query-chip.js';
 import { splitQuery } from '../search/search-query.js';
 import { SEED_TRANSCRIPT } from './agent-transcript.js';
@@ -204,7 +196,7 @@ export function SettingsSection() {
             sub="Owner · signed in with GitHub"
             action={
               <Button variant="outline" className="h-8 gap-1.5 px-3 text-ui">
-                <SquarePen className="size-4" />
+                <SquarePen className="size-5" />
                 Edit name
               </Button>
             }
@@ -295,7 +287,7 @@ export function ConversationSection() {
       <Specimen
         id="turns"
         title="Turns"
-        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <UserMessageBubble>…</UserMessageBubble>\n  </MessageContent>\n</Message>\n<Message><MessageContent>{agent && <ChiefIdentity … />}<TraceGroup … />…reply text</MessageContent></Message>\n<StatusLine>Plan approved</StatusLine>`}
+        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <UserMessageBubble>…</UserMessageBubble>\n  </MessageContent>\n</Message>\n<Message><MessageContent>{agent && <ChiefIdentity … />}<TraceGroup … /><ChatMarkdown bubbles bubbleTools={…} /></MessageContent></Message>\n<StatusLine>Plan approved</StatusLine>`}
       >
         <div className="mx-auto flex w-full max-w-170 flex-col gap-4">
           <Message className="justify-end">
@@ -306,35 +298,27 @@ export function ConversationSection() {
               <UserMessageBubble className="w-fit max-w-full">
                 Why does pnpm install fail in CI?
               </UserMessageBubble>
-              <div className="mt-1 flex items-center gap-1 text-content-tertiary">
-                <span className="mr-1.5 text-caption tabular-nums">10:42</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-6 border-none bg-transparent text-content-tertiary"
-                  aria-label="Copy"
-                >
-                  <Copy width={13} height={13} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-6 border-none bg-transparent text-content-tertiary"
-                  aria-label="Restore to here"
-                >
-                  <Restore width={13} height={13} />
-                </Button>
-              </div>
             </MessageContent>
           </Message>
           <Message>
             <MessageContent className="gap-0">
-              <Bubble variant="ghost">
-                <BubbleContent className="text-card-title">
-                  The last commit bumped a version in package.json without updating the lockfile, so
-                  the frozen install fails. I will run the install locally and commit the lockfile.
-                </BubbleContent>
-              </Bubble>
+              <div className="text-ui leading-5">
+                <ChatMarkdown
+                  bubbles
+                  text={
+                    'The last commit bumped a version in package.json without updating the lockfile.\n\n- the frozen install fails\n- I will commit the lockfile\n\n> Hover a bubble for Reply and More.'
+                  }
+                  bubbleTools={() => (
+                    <MessageToolbar
+                      placement="right"
+                      testId="turn-reply-tools"
+                      stamp="10:43"
+                      onReply={() => {}}
+                      onCopy={() => {}}
+                    />
+                  )}
+                />
+              </div>
             </MessageContent>
           </Message>
           <Message>
@@ -460,7 +444,7 @@ export function TraceSection() {
     <Section
       id="trace"
       title="Trace"
-      lede="The agent's narration stays body text. Tool activity folds into one grey summary line ending in a triangle; open it for a hairline card with one 36px row per action: a quiet verb, the target in medium weight, and the result at the end. A row opens to its command and output. Never hand-write tool rows."
+      lede="The agent's narration stays body text. Tool activity folds into one quiet summary row: a 16px state glyph, the work in the secondary ink and a 16px chevron that turns when open; open it for a hairline card with one 36px row per action: a quiet verb, the target in medium weight, and the result at the end. A row opens to its command and output. Never hand-write tool rows."
     >
       <Specimen
         id="trace-states"

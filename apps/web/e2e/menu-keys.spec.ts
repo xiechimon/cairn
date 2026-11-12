@@ -24,7 +24,7 @@ async function expectFocusWithin(locator: Locator) {
 
 async function openMoreMenu(page: Page) {
   await page.goto(DETAIL);
-  await page.getByRole('button', { name: '更多' }).click();
+  await page.getByRole('button', { name: '更多操作…' }).click();
   await expect(moreMenu(page)).toBeVisible();
   await expectFocusWithin(moreMenu(page));
 }
@@ -84,7 +84,7 @@ test('a letter that no row owns neither moves focus nor reaches the global hotke
   await page.keyboard.press('ArrowDown');
   const focused = await page.evaluate(() => document.activeElement?.textContent);
   await page.keyboard.press('q');
-  await page.keyboard.press('n');
+  await page.keyboard.press('z');
   await expect(moreMenu(page)).toBeVisible();
   expect(await page.evaluate(() => document.activeElement?.textContent)).toBe(focused);
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -108,7 +108,7 @@ test('arrow keys, Enter and Escape keep working in a keyed menu', async ({ page 
   await page.keyboard.press('Escape');
   await expect(moreMenu(page)).toBeHidden();
 
-  await page.getByRole('button', { name: '更多' }).click();
+  await page.getByRole('button', { name: '更多操作…' }).click();
   await expect(moreMenu(page)).toBeVisible();
   await expectFocusWithin(moreMenu(page));
   await page.keyboard.press('End');

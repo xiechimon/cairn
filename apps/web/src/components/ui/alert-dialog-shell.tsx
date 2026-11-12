@@ -94,7 +94,7 @@ export function AlertDialogShell({
             aria-label={t('关闭')}
             onClick={onClose}
           >
-            <X width={16} height={16} />
+            <X width={20} height={20} />
           </AlertDialogPrimitive.Close>
         </AlertDialogPrimitive.Popup>
       </AlertDialogPrimitive.Portal>

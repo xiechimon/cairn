@@ -1,22 +1,25 @@
 import type { PrPanelRow } from '@cairn/shared';
 import { cn } from 'cn';
-import { ListChecks, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { toast } from 'sonner';
 import { usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { EmptyState } from '../components/empty-state.js';
+import { questionDockState } from '../chief/question-dock-state.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
+import type { GlyphKind } from '../components/status-glyph.js';
 import { PrList } from '../components/thread/pr-list.js';
 import { prByThread } from '../components/thread/pr-panel-model.js';
 import { TaskRow } from '../components/thread/task-row.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
 import { ACCENT_INK } from '../phase.js';
-import { relativeTime } from './rel-time.js';
+import { relativeTime, shortDate } from './rel-time.js';
+import { TaskRowMenu } from './task-row-menu.js';
 import { TasksAddInput } from './tasks-add-input.js';
 import { TasksScheduleList } from './tasks-schedule-list.js';
 import {
@@ -36,19 +39,24 @@ import {
   taskRowCopy,
 } from './tasks-sections.js';
 import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
+import { canMarkDone, useMarkDone } from './use-mark-done.js';
 
 export type TasksTab = 'active' | 'next' | 'scheduled' | 'resolved';
+
+export type TaskAddOutcome = 'saved' | 'sent';
+
+export const PANEL_HEAD = 'h-13 gap-0.5 pr-4 pl-4';
+export const PANEL_HEAD_BUTTON = 'size-9 text-foreground [&_svg]:size-5.5';
+export const PANEL_TITLE = 'text-heading font-normal';
+const PANEL_TABS = 'h-7.5 gap-0.5 group-data-horizontal/tabs:h-7.5';
+const PANEL_TAB =
+  'h-7.5 px-2.5 text-ui text-foreground data-active:font-normal dark:text-foreground';
 
 function SectionHeader({ section, count }: { section: TaskSection; count: number }) {
   const { t } = useI18n();
   const accent = isWaiting(section);
   return (
-    <h3
-      className={cn(
-        'm-0 flex h-8 items-center gap-1.5 px-2.5 text-meta font-medium',
-        accent ? 'text-foreground' : 'text-content-tertiary',
-      )}
-    >
+    <h3 className="m-0 flex h-8 items-center gap-2 px-2.5 text-ui font-normal text-foreground">
       {t(SECTION_LABEL[section])}
       <span className={cn('tabular-nums', accent ? ACCENT_INK : 'text-content-tertiary')}>
         {count}
@@ -72,7 +80,7 @@ function TasksPrList({
   const [, setSearchParams] = useSearchParams();
   return (
     <section data-testid="work-prs" className="flex flex-col pt-1">
-      <h3 className="m-0 flex h-8 items-center gap-2 px-2.5 text-meta font-medium text-content-secondary">
+      <h3 className="m-0 flex h-8 items-center gap-2 px-2.5 text-meta font-medium text-foreground">
         {t('拉取请求')}
         <span className="font-normal text-content-tertiary tabular-nums">{prs.length}</span>
       </h3>
@@ -105,6 +113,56 @@ function TasksPrList({
   );
 }
 
+function unfinishableLead(todo: TaskEntry['todo']): { glyph: GlyphKind; why: string } {
+  if (todo.phase === 'failed') return { glyph: 'failed', why: '运行失败了，先重跑才能完成' };
+  if (todo.phase === 'closed') return { glyph: 'closed', why: '已关闭' };
+  if (todo.phase === 'done') return { glyph: 'done', why: '已完成' };
+  return { glyph: 'todo', why: '已归档，不能标记完成' };
+}
+
+function PanelTaskRow({
+  entry,
+  pr,
+  now,
+  onOpenThread,
+}: {
+  entry: TaskEntry;
+  pr: PrPanelRow | undefined;
+  now: number;
+  onOpenThread: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  const { markDone, dialogs } = useMarkDone(entry.todo);
+  const copy: TaskRowCopy = taskRowCopy(entry, pr);
+  const open = () => onOpenThread(entry.todo.id);
+  const unfinishable = canMarkDone(entry.todo) ? null : unfinishableLead(entry.todo);
+  return (
+    <>
+      <TaskRow
+        {...(pr === undefined ? {} : { prLink: { number: pr.number, url: pr.url } })}
+        title={entry.todo.title}
+        glyph={unfinishable?.glyph ?? glyphOf(entry)}
+        {...(unfinishable === null ? {} : { why: t(unfinishable.why) })}
+        word={t(copy.word)}
+        what={t(copy.what.key, copy.what.params)}
+        where={copy.where === null ? null : t(copy.where)}
+        age={relativeTime(entry.todo.phaseAt, now, t)}
+        {...(entry.section === 'resolved' ? { date: shortDate(entry.todo.phaseAt, t) } : {})}
+        waiting={copy.waiting}
+        muted={entry.section === 'resolved'}
+        check={
+          unfinishable === null
+            ? { label: t('标记完成：{title}', { title: entry.todo.title }), onCheck: markDone }
+            : 'none'
+        }
+        menu={<TaskRowMenu todo={entry.todo} onOpen={open} onMarkDone={markDone} />}
+        onOpen={open}
+      />
+      {dialogs}
+    </>
+  );
+}
+
 interface TasksPanelProps {
   entries: readonly TaskEntry[];
   questions: readonly StandaloneQuestion[];
@@ -113,8 +171,8 @@ interface TasksPanelProps {
   onClose: () => void;
   onOpenThread: (id: string) => void;
   onOpenQuestion: (question: QuestionTarget) => void;
-  onNewTask: () => void;
-  onAddTask: (text: string) => void | Promise<void>;
+  onAddTask: (text: string) => Promise<TaskAddOutcome>;
+  addBlocked?: string | null;
   query?: QueryLike;
 }
 
@@ -126,8 +184,8 @@ export function TasksPanel({
   onClose,
   onOpenThread,
   onOpenQuestion,
-  onNewTask,
   onAddTask,
+  addBlocked = null,
   query,
 }: TasksPanelProps) {
   const { t } = useI18n();
@@ -141,26 +199,15 @@ export function TasksPanel({
   );
   const prOf = prByThread(prs);
   const say = (phrase: Phrase) => t(phrase.key, phrase.params);
-  const row = (entry: TaskEntry) => {
-    const pr = prOf.get(entry.todo.id);
-    const copy: TaskRowCopy = taskRowCopy(entry, pr);
-    return (
-      <TaskRow
-        key={entry.todo.id}
-        {...(pr === undefined ? {} : { prLink: { number: pr.number, url: pr.url } })}
-        title={entry.todo.title}
-        glyph={glyphOf(entry)}
-        word={t(copy.word)}
-        what={say(copy.what)}
-        where={copy.where === null ? null : t(copy.where)}
-        age={relativeTime(entry.todo.phaseAt, now, t)}
-        waiting={copy.waiting}
-        running={copy.running}
-        muted={entry.section === 'resolved'}
-        onOpen={() => onOpenThread(entry.todo.id)}
-      />
-    );
-  };
+  const row = (entry: TaskEntry) => (
+    <PanelTaskRow
+      key={entry.todo.id}
+      entry={entry}
+      pr={prOf.get(entry.todo.id)}
+      now={now}
+      onOpenThread={onOpenThread}
+    />
+  );
   const questionCopy = questionRowCopy();
   const questionRows = questions.map((question) => (
     <TaskRow
@@ -172,26 +219,37 @@ export function TasksPanel({
       where={questionCopy.where === null ? null : t(questionCopy.where)}
       age={relativeTime(question.createdAt, now, t)}
       waiting
-      running={false}
-      onOpen={() => onOpenQuestion(question)}
+      why={t('Coordinator 在问你，到对话里回答')}
+      check="none"
+      onOpen={() => {
+        if (questionDockState.uploading()) {
+          toast(t('附件上传中'));
+          return;
+        }
+        onOpenQuestion(question);
+      }}
     />
   ));
   const count = (section: ActiveSection) =>
     groups[section].length + (section === 'needs_input' ? questions.length : 0);
   const empty =
-    entries.length === 0 && questions.length === 0 ? (
-      <EmptyState
-        testId="tasks-empty"
-        icon={ListChecks}
-        title={t('现在没有任务')}
-        description={t('跟 Coordinator 说一件事，它会在这里出现。')}
-        action={{ label: t('给 Coordinator 发消息'), onClick: onNewTask }}
-        className="mt-6"
-      />
+    entries.length === 0 && questions.length === 0 && !adding ? (
+      <div
+        data-testid="tasks-empty"
+        className="mt-16 flex flex-col items-center gap-3 px-6 text-center"
+      >
+        <p className="m-0 text-ui text-content-secondary">{t('现在没有任务')}</p>
+        <p className="m-0 text-meta text-content-secondary">
+          {t('跟 Coordinator 说一件事，它会在这里出现。')}
+        </p>
+        <Button variant="secondary" size="sm" onClick={() => setAdding(true)}>
+          {t('添加任务')}
+        </Button>
+      </div>
     ) : null;
   const activeCount = ACTIVE_SECTIONS.reduce((sum, section) => sum + count(section), 0);
   const quiet = (text: string) => (
-    <p data-testid="tasks-quiet" className="m-0 px-2.5 py-2 text-meta text-content-tertiary">
+    <p data-testid="tasks-quiet" className="m-0 px-2.5 py-2 text-ui text-content-tertiary">
       {text}
     </p>
   );
@@ -207,7 +265,7 @@ export function TasksPanel({
             key={section}
             data-testid="tasks-section"
             data-section={section}
-            className="flex flex-col"
+            className="flex flex-col gap-0.5"
           >
             <SectionHeader section={section} count={n} />
             {section === 'needs_input' && questionRows}
@@ -229,7 +287,8 @@ export function TasksPanel({
     groups[section].length === 0 ? (
       quiet(emptyText)
     ) : (
-      <section data-testid="tasks-section" data-section={section} className="flex flex-col">
+      <section data-testid="tasks-section" data-section={section} className="flex flex-col gap-0.5">
+        <SectionHeader section={section} count={groups[section].length} />
         {groups[section].map(row)}
       </section>
     );
@@ -241,10 +300,15 @@ export function TasksPanel({
         : listOf('resolved', t('还没有完成的任务'));
   return (
     <SidePanel label={t('任务')} onDismiss={onClose} phoneTab>
-      <SidePanelHead closeLabel={t('关闭')} onClose={onClose}>
-        <SidePanelTitle>{t('任务')}</SidePanelTitle>
+      <SidePanelHead
+        closeLabel={t('关闭')}
+        onClose={onClose}
+        className={PANEL_HEAD}
+        closeClassName={PANEL_HEAD_BUTTON}
+      >
+        <SidePanelTitle className={PANEL_TITLE}>{t('任务')}</SidePanelTitle>
         <IconTooltip
-          label={t('新任务')}
+          label={addBlocked ?? t('新任务')}
           side="bottom"
           trigger={
             <Button
@@ -252,41 +316,41 @@ export function TasksPanel({
               size="icon"
               data-testid="tasks-new"
               aria-pressed={adding}
-              onClick={() => setAdding((v) => !v)}
-              className="size-7.5 text-content-tertiary aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+              aria-disabled={addBlocked !== null || undefined}
+              onClick={() => {
+                if (addBlocked === null) setAdding((v) => !v);
+              }}
+              className={`${PANEL_HEAD_BUTTON} aria-pressed:bg-(--hover-1) aria-pressed:text-foreground`}
             />
           }
         >
-          <Plus aria-hidden className="size-4" strokeWidth={1.75} />
+          <Plus aria-hidden className="size-5.5" strokeWidth={1.75} />
         </IconTooltip>
       </SidePanelHead>
-      {adding && (
-        <TasksAddInput
-          onClose={() => setAdding(false)}
-          onSubmit={async (text) => {
-            await onAddTask(text);
-            setAdding(false);
-          }}
-        />
-      )}
-      <div className="flex flex-none px-3 pt-3">
+      <div className="flex flex-none px-2 pb-2">
         <SegmentedTabs
+          quiet
+          className={PANEL_TABS}
+          optionHandle={PANEL_TAB}
           value={tab}
           onChange={setTab}
           options={[
             { value: 'active', label: t('进行中') },
-            {
-              value: 'next',
-              label:
-                groups.up_next.length > 0
-                  ? t('接下来 {n}', { n: groups.up_next.length })
-                  : t('接下来'),
-            },
+            { value: 'next', label: t('接下来') },
             { value: 'scheduled', label: t('定时') },
             { value: 'resolved', label: t('已完成') },
           ]}
         />
       </div>
+      {adding && addBlocked === null && (
+        <TasksAddInput
+          onClose={() => setAdding(false)}
+          onSubmit={async (text) => {
+            if ((await onAddTask(text)) === 'saved') setTab('next');
+            else setAdding(false);
+          }}
+        />
+      )}
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pt-2 pb-4">
         {tab === 'scheduled' ? (
           <TasksScheduleList projectId={projectId} now={now} />

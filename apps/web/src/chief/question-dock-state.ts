@@ -1,5 +1,4 @@
 import { toast } from 'sonner';
-import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 
 type Listener = () => void;
 
@@ -12,28 +11,13 @@ export type QuestionPrimary = {
 
 const DISMISS_UNDO_MS = 5000;
 
-const COLLAPSED_KEY = 'cairn-question-collapsed';
-
-function loadCollapsed(): Set<string> {
-  try {
-    const parsed: unknown = JSON.parse(safeLocalStorage()?.getItem(COLLAPSED_KEY) ?? '[]');
-    return new Set(Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : []);
-  } catch {
-    return new Set();
-  }
-}
-
-const collapsed = loadCollapsed();
-
-function saveCollapsed(): void {
-  safeSetItem(COLLAPSED_KEY, JSON.stringify([...collapsed]));
-}
 const dismissing = new Map<string, ReturnType<typeof setTimeout>>();
 const listeners = new Set<Listener>();
 let version = 0;
 let primary: QuestionPrimary | null = null;
 let focusIndex = 0;
 let uploads = 0;
+let reveals = 0;
 const answers = new Map<string, string>();
 const closed = new Set<string>();
 
@@ -76,7 +60,7 @@ export const questionDockState = {
     return focusIndex;
   },
   setFocus(next: number): void {
-    if (next === focusIndex) return;
+    if (next === focusIndex || uploads > 0) return;
     focusIndex = next;
     emit();
   },
@@ -118,17 +102,11 @@ export const questionDockState = {
     primary = null;
     emit();
   },
-  isCollapsed(requestId: string): boolean {
-    return collapsed.has(requestId);
+  reveals(): number {
+    return reveals;
   },
-  toggleCollapsed(requestId: string): void {
-    if (!collapsed.delete(requestId)) collapsed.add(requestId);
-    saveCollapsed();
-    emit();
-  },
-  forgetCollapsed(requestId: string): void {
-    if (!collapsed.delete(requestId)) return;
-    saveCollapsed();
+  reveal(): void {
+    reveals += 1;
     emit();
   },
   isDismissing(requestId: string): boolean {

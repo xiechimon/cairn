@@ -1,6 +1,7 @@
 import type { TokenUsage } from '@cairn/shared';
-import { formatUsd, mapTokenUsage } from '../api/mappers.js';
-import type { TodoRecord } from '../fixtures/records.js';
+import { formatTokens, formatUsd, mapTokenUsage } from '../api/mappers.js';
+import { contextPercentOf } from '../chief/context-meter-ring.js';
+import type { ChiefContextUsage, TodoRecord } from '../fixtures/records.js';
 import type { TFunc } from '../i18n/translate.js';
 
 export interface ThreadUsageSummary {
@@ -43,11 +44,12 @@ export function threadUsageCaption(summary: ThreadUsageSummary, t: TFunc): strin
   const parts = [
     summary.cost === UNKNOWN ? null : summary.cost,
     summary.tokens === UNKNOWN ? null : t('Token 数：{tokens}', { tokens: summary.tokens }),
-    summary.models.length === 0
-      ? null
-      : summary.models.length === 1
-        ? summary.models[0]
-        : t('{n} 个模型', { n: summary.models.length }),
-  ].filter((part): part is string => part !== null && part !== undefined);
+  ].filter((part) => part !== null);
   return parts.length === 0 ? t('用量暂不可用') : parts.join(' · ');
+}
+
+export function threadContextReading(context: ChiefContextUsage | null | undefined): string {
+  const percent = contextPercentOf(context);
+  if (context == null || percent === null) return '';
+  return `${percent}% · ${formatTokens(context.tokens)} / ${formatTokens(context.contextWindow)}`;
 }

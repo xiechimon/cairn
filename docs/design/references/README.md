@@ -44,6 +44,9 @@ Layout, status and task parts (Claude Duet desktop app, light, 1878px), added 20
 | `claude-duet-task-thread-ready-for-review.jpg` | task ready for review | Status line `Ready for review · 1 update`, a `Decisions and updates` block on top, every step ticked and one waiting on the user |
 | `claude-duet-tasks-panel.jpg` | tasks panel | Tabs for active, up next, scheduled and resolved; rows with a checkbox and a row menu; an add control in the header |
 | `claude-duet-channel-icon-picker.jpg` | icon picker | Icon and colour choice for a channel. Not adopted: sidebar rows stay neutral (L1, L3) |
+| `claude-duet-composer-attachment.jpg` | file attached in the composer, remove hovered | A 122px tile at the top left of the composer card (name up to four lines, outlined kind pill, no size line), a round remove control on its corner and a dark tooltip that names the file; added 2026-11-11 from the second recording |
+| `claude-duet-sent-attachment-uploading.jpg` | just sent, upload settling | The attachment is its own card above the user bubble, right-aligned with it; while the upload settles the card is a grey block with the name in a lighter ink |
+| `claude-duet-file-preview-panel.jpg` | file open in the right-hand panel | The panel takes the side-panel slot and folds the sidebar; header with the file name, copy, download and close; the text in a light rounded box with a line-number gutter; an empty file shows a single line `1` |
 
 Not captured: the sessions and work panels (the frames carried device and account names across most of the panel), dark theme, narrow widths.
 

@@ -114,29 +114,17 @@ test('3. image attachments constrained by thumbnails — no longer naked origina
   expect(maxWidth).toBe('100%');
 });
 
-test('4. brief-card recipe = framed content box (1px border / rounded-lg / surface-secondary background)', async ({
+test('4. the task description reads as plain conversation text, not a framed card (thread panel 1:1 pass)', async ({
   page,
 }) => {
   await stubWorld(page);
   await page.goto(`/app/todo/${BRIEF_ID}`);
-  const card = page.locator('.spec-block');
-  const cs = await card.evaluate((el) => {
+  const block = page.locator('.spec-block');
+  const cs = await block.evaluate((el) => {
     const s = getComputedStyle(el);
-    return {
-      borderTop: s.borderTopWidth,
-      borderColor: s.borderTopColor,
-      radius: s.borderRadius,
-      bg: s.backgroundColor,
-      fontSize: s.fontSize,
-    };
+    return { borderTop: s.borderTopWidth, bg: s.backgroundColor, fontSize: s.fontSize };
   });
-  expect(cs.borderTop).toBe('1px');
-
-  expect(cs.radius).toBe('8px');
-
-  expect(cs.bg).toBe('rgb(38, 38, 38)');
-  expect(cs.borderColor).toBe('rgba(255, 255, 255, 0.1)');
-  expect(cs.fontSize).toBe('15px');
+  expect(cs).toEqual({ borderTop: '0px', bg: 'rgba(0, 0, 0, 0)', fontSize: '14px' });
 });
 
 test('4b. wide screens line length takes the 68ch cap (same law as the 60–75 character band in #470)', async ({ page }) => {
@@ -157,7 +145,7 @@ test('4b. wide screens line length takes the 68ch cap (same law as the 60–75 c
   expect(Math.abs(capped.maxWidth - capped.zero68)).toBeLessThanOrEqual(2);
 });
 
-test('6. ordered-list numerals are native list markers in claude.ai geometry, and two-digit numbers do not jog the content column', async ({
+test('6. ordered-list numerals are native list markers in the reference geometry, and two-digit numbers do not jog the content column', async ({
   page,
 }) => {
   await stubWorld(page);
@@ -187,8 +175,8 @@ test('6. ordered-list numerals are native list markers in claude.ai geometry, an
     expect(pin.display).toBe('list-item');
     expect(pin.listTag).toBe('OL');
     expect(pin.listStyle).toBe('decimal');
-    expect(Number.parseFloat(pin.listPad)).toBeCloseTo(pin.fontSize * 2, 1);
-    expect(Number.parseFloat(pin.itemPad)).toBeCloseTo(pin.fontSize * 0.5, 1);
+    expect(Number.parseFloat(pin.listPad)).toBe(36);
+    expect(Number.parseFloat(pin.itemPad)).toBe(0);
     expect(pin.markerColor).toBe(pin.textColor);
   }
 

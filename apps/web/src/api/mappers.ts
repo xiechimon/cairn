@@ -37,6 +37,7 @@ import {
   GATE_ANNOUNCEMENTS,
   GIT_CREDENTIAL_ROW_KIND,
   infoReportMessageSchema,
+  liveQuickReplies,
   MODEL_SOURCE_RUNTIME_LABELS,
   orchestratePromptHeadOf,
   PLAN_SECTIONS,
@@ -44,6 +45,7 @@ import {
   resolvedBuildPrNumber,
   reviewVerdictSchema,
   reworkNoteWithoutReason,
+  SUGGEST_REPLIES_TOOL_NAME,
   type SystemRow,
   stripAnsiEscapes,
   stripSkillRouteSection,
@@ -63,6 +65,7 @@ import { STATUS_WORDS } from '../board/status-words.js';
 import type {
   BranchInfoContent,
   ChiefContent,
+  ChiefContextUsage,
   ChiefStreamItem,
   ChiefToolRow,
   DiffFile,
@@ -71,7 +74,6 @@ import type {
   ScheduleRecord as DisplaySchedule,
   TodoRecord as DisplayTodo,
   DocBlock,
-  DocSegment,
   MachineRow,
   McpRow,
   ModelOption,
@@ -85,6 +87,7 @@ import type {
   UsageCostContent,
   WorkStep,
 } from '../fixtures/records.js';
+import { inlineSegments } from '../lib/markdown.js';
 import { activityLabel } from './activity.js';
 import type { MachineProvider } from './claude-accounts.js';
 import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
@@ -167,6 +170,17 @@ function rowProject(row: MessageRow): { projectId?: string | null } {
   return row.projectId === undefined ? {} : { projectId: row.projectId };
 }
 
+export function threadContextOf(source: unknown): ChiefContextUsage | null {
+  if (source == null || typeof source !== 'object') return null;
+  const context = (source as { context?: unknown }).context;
+  if (context == null || typeof context !== 'object') return null;
+  const { tokens, contextWindow } = context as { tokens?: unknown; contextWindow?: unknown };
+  if (typeof tokens !== 'number' || typeof contextWindow !== 'number') return null;
+  if (!Number.isFinite(tokens) || !Number.isFinite(contextWindow) || contextWindow <= 0)
+    return null;
+  return { tokens, contextWindow };
+}
+
 export function toDisplayTodo(w: WireTodo): DisplayTodo {
   return {
     id: w.id,
@@ -199,6 +213,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     sourceKind: w.sourceKind,
     sourceRef: w.sourceRef,
     usageCost: w.usageCost,
+    context: threadContextOf(w),
     owner: w.owner,
     output: w.output,
     section: w.section ?? null,
@@ -378,104 +393,6 @@ export function pillOf(call: ToolCallRecord): string {
           ? args.command
           : '';
   return primary === '' ? call.name : `${call.name} ${primary}`;
-}
-
-const LINK_LABEL = /\[([^\]\n]*)\]\(/g;
-const MENTION_TARGET = /^(agent|skill|project|machine|todo):([A-Za-z0-9_-]+)$/;
-const WEB_TARGET = /^https?:\/\/\S+$/;
-const ATTACHMENT_TARGET = /^attachment:([A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.[a-z0-9]{1,8})$/;
-
-function linkDestinationEnd(text: string, from: number): number {
-  let depth = 0;
-  for (let at = from; at < text.length; at++) {
-    const char = text[at];
-    if (char === '\\') at++;
-    else if (char === '(') depth++;
-    else if (char === ')') {
-      if (depth === 0) return at;
-      depth--;
-    } else if (char === undefined || /\s/.test(char)) return -1;
-  }
-  return -1;
-}
-
-export function inlineSegments(text: string): DocSegment[] {
-  const out: DocSegment[] = [];
-  const parts = text.split(/`([^`]+)`/g);
-
-  let delimiters = 0;
-  for (let i = 0; i < parts.length; i += 2) {
-    delimiters += (parts[i] ?? '').split('**').length - 1;
-  }
-  let budget = delimiters - (delimiters % 2);
-  let strong = false;
-
-  const pushRun = (frag: string): void => {
-    if (frag === '') return;
-    const pushText = (slice: string): void => {
-      if (slice === '') return;
-      out.push(strong ? { text: slice, style: 'strong' } : { text: slice });
-    };
-    let cursor = 0;
-    LINK_LABEL.lastIndex = 0;
-    for (;;) {
-      const m = LINK_LABEL.exec(frag) as RegExpExecArray | null;
-      if (m === null) break;
-      const close = linkDestinationEnd(frag, m.index + m[0].length);
-      if (close < 0) continue;
-      const label = m[1] ?? '';
-      const target = frag.slice(m.index + m[0].length, close).replace(/\\([!-/:-@[-`{-~])/g, '$1');
-      const mention = MENTION_TARGET.exec(target);
-      const attachment = ATTACHMENT_TARGET.exec(target);
-      if (label === '' && attachment === null) continue;
-      if (mention === null && attachment === null && !WEB_TARGET.test(target)) continue;
-      const bang = attachment !== null && frag[m.index - 1] === '!';
-      pushText(frag.slice(cursor, bang ? m.index - 1 : m.index));
-      const key = attachment?.[1] ?? '';
-      out.push(
-        mention !== null
-          ? {
-              text: label,
-              style: 'mention',
-              mentionKind: mention[1] as 'agent' | 'skill' | 'project' | 'machine' | 'todo',
-              mentionId: mention[2],
-            }
-          : attachment !== null
-            ? {
-                text: label !== '' ? label : key.slice(key.lastIndexOf('/') + 1),
-                style: 'attachment',
-                attachmentKey: key,
-                ...(strong ? { strong: true } : {}),
-              }
-            : { text: label, style: 'anchor', href: target, ...(strong ? { strong: true } : {}) },
-      );
-      cursor = close + 1;
-      LINK_LABEL.lastIndex = cursor;
-    }
-    if (cursor < frag.length) pushText(frag.slice(cursor));
-  };
-
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i] ?? '';
-    if (part === '') continue;
-    if (i % 2 === 1) {
-      out.push({ text: part, style: 'code' });
-      continue;
-    }
-    let rest = part;
-    while (rest !== '') {
-      const at = budget > 0 ? rest.indexOf('**') : -1;
-      if (at < 0) {
-        pushRun(rest);
-        break;
-      }
-      pushRun(rest.slice(0, at));
-      rest = rest.slice(at + 2);
-      budget -= 1;
-      strong = !strong;
-    }
-  }
-  return out.length > 0 ? out : [{ text }];
 }
 
 function planSectionHead(line: string): { label: string; rest: string } | null {
@@ -1607,6 +1524,7 @@ function collectChiefStream(
       }
     }
     const call = toolCallOfContent(m.content);
+    if (call?.name === SUGGEST_REPLIES_TOOL_NAME) continue;
     if (call !== null) {
       const created = createdTodoOf(call);
       if (created !== null)
@@ -1791,6 +1709,13 @@ export function mapChief(
       waitingTurn = { messageId: asked.id, text: asked.markdown ?? asked.text };
   }
   chiefStream.push(...(collected?.pending ?? []));
+  const quickReplies =
+    active === null
+      ? []
+      : liveQuickReplies(opts.messages, {
+          running: active.activeRun != null,
+          runningStepId: opts.activity?.stepId ?? null,
+        });
   return {
     view: 'none',
     bound,
@@ -1826,6 +1751,7 @@ export function mapChief(
     ...(opts.draft !== undefined ? { draft: opts.draft } : {}),
     ...(env.outage != null ? { outage: env.outage } : {}),
     ...(active?.fallbackModel != null ? { fallbackModel: active.fallbackModel } : {}),
+    ...(quickReplies.length > 0 ? { quickReplies } : {}),
   };
 }
 

@@ -85,9 +85,10 @@ async function clearance(page: Page, scope: ReturnType<Surface['scope']>) {
     const composer = root.querySelector('.chief-composer');
     const body = root.querySelector('[data-testid="chief-body"]');
     if (!last || !composer || !body) throw new Error('chat surfaces missing');
-    const fade = Number.parseFloat(getComputedStyle(body).getPropertyValue('--scroll-fade-size'));
+    const fade = Number.parseFloat((body as HTMLElement).style.getPropertyValue('--scroll-fade-bottom')) || 0;
+    const next = composer;
     return {
-      room: composer.getBoundingClientRect().top - fade - last.getBoundingClientRect().bottom,
+      room: next.getBoundingClientRect().top - fade - last.getBoundingClientRect().bottom,
       gap: body.scrollHeight - body.scrollTop - body.clientHeight,
     };
   });
@@ -96,6 +97,7 @@ async function clearance(page: Page, scope: ReturnType<Surface['scope']>) {
 async function expectClear(page: Page, scope: ReturnType<Surface['scope']>) {
   await expect.poll(async () => (await clearance(page, scope)).gap).toBeLessThanOrEqual(2);
   await expect.poll(async () => (await clearance(page, scope)).room).toBeGreaterThanOrEqual(0);
+  expect((await clearance(page, scope)).room).toBeLessThanOrEqual(40);
 }
 
 for (const viewport of VIEWPORTS) {
@@ -231,9 +233,10 @@ for (const mask of MASK_CASES) {
 
         await body.evaluate((node) => {
           const content = node.querySelector('[data-testid="chief-stream"]') as HTMLElement;
-          content.style.paddingBottom = '12px';
+          content.style.paddingBottom = '40px';
         });
-        await expect.poll(read).toEqual({ gap: 12, fade: '28px' });
+        await expect.poll(async () => (await read()).fade).toBe('64px');
+        expect((await read()).gap).toBeGreaterThan(2);
 
         await body.evaluate((node) => {
           const content = node.querySelector('[data-testid="chief-stream"]') as HTMLElement;

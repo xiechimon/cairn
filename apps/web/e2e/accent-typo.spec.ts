@@ -48,7 +48,7 @@ for (const theme of ['light', 'dark'] as const) {
       return {
         marks: row.querySelectorAll('[data-testid="brand-mark"], .sidebar-brand-mark').length,
         family: cs.fontFamily,
-        serifLoaded: document.fonts.check('500 20px "sourceSerif4"'),
+        serifLoaded: document.fonts.check('500 18px "sourceSerif4"'),
         size: cs.fontSize,
         weight: cs.fontWeight,
         tracking: cs.letterSpacing,
@@ -63,15 +63,15 @@ for (const theme of ['light', 'dark'] as const) {
     expect(m.marks).toBe(0);
     expect(m.family).toContain('sourceSerif4');
     expect(m.serifLoaded).toBe(true);
-    expect(m.size).toBe('20px');
+    expect(m.size).toBe('18px');
     expect(m.weight).toBe('500');
     expect(m.tracking).toBe('normal');
-    expect(m.lineHeight).toBe('20px');
+    expect(m.lineHeight).toBe('18px');
     expect(m.nameText).toBe('Cairn');
     expect(m.nameHref).toBeNull();
-    expect(m.toggle).toEqual({ x: 0, w: 28, h: 28 });
-    expect(m.icon).toEqual({ w: 18, h: 18 });
-    expect(m.gap).toBe(4);
+    expect(m.toggle).toEqual({ x: 2, w: 28, h: 28 });
+    expect(m.icon).toEqual({ w: 22, h: 22 });
+    expect(m.gap).toBe(3);
   });
 
   test(`page shell back chevron hover shows no background change (${theme})`, async ({ page }) => {

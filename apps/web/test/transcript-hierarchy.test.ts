@@ -1,7 +1,8 @@
 import type { BuildRecord } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { shouldExpandLastWork } from '../src/detail/work-expansion.js';
-import { inlineSegments, type MessageRow, mapTranscript } from '../src/api/mappers.js';
+import { type MessageRow, mapTranscript } from '../src/api/mappers.js';
+import { inlineSegments } from '../src/lib/markdown.js';
 import type { TranscriptItem } from '../src/fixtures/records.js';
 import { NOW, todo } from './helpers.js';
 

@@ -21,12 +21,15 @@ test('an unknown project id shows the not-found page, not the Coordinator home',
   await expect(page.getByTestId('project-home')).toHaveCount(0);
 });
 
-test('close names are suggested and a suggestion opens that project home', async ({ page }) => {
+test('close names are suggested and a suggestion opens that project conversation', async ({
+  page,
+}) => {
   await page.goto('/app?scenario=home-c&project=cairn-old');
   await expect(suggestions(page)).toHaveCount(1);
   await page.getByRole('link', { name: 'cairn', exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`project=${KNOWN_ID}`));
-  await expect(page.getByTestId('project-home')).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`project=${KNOWN_ID}&chat=1$`));
+  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeVisible();
+  await expect(page.getByTestId('project-home')).toHaveCount(0);
   await expect(notFound(page)).toHaveCount(0);
 });
 
