@@ -24,26 +24,32 @@ const HOVER_REVEAL =
 const TOUCH_REVEAL = 'pointer-coarse:group-data-[tools-open]/message:flex';
 
 const PLACEMENT_CLS: Record<ToolbarPlacement, string> = {
-  right: `absolute top-1/2 left-full z-10 -translate-y-1/2 pl-3 ${HOVER_REVEAL}`,
-  left: `absolute top-1/2 right-full z-10 -translate-y-1/2 pr-3 ${HOVER_REVEAL}`,
+  right: `absolute top-1/2 left-full z-10 -translate-y-1/2 pl-3 data-clamped:top-0 ${HOVER_REVEAL}`,
+  left: `absolute top-1/2 right-full z-10 -translate-y-1/2 pr-3 data-clamped:top-0 ${HOVER_REVEAL}`,
   'below-start': `mt-1 hidden ${TOUCH_REVEAL}`,
   'below-end': `mt-1 hidden justify-end self-end ${TOUCH_REVEAL}`,
 };
 
-function clipEdges(node: HTMLElement): { left: number; right: number } {
-  let left = 0;
-  let right = document.documentElement.clientWidth;
+const EDGE_GAP = 8;
+
+function clipEdges(node: HTMLElement): { left: number; right: number; top: number } {
+  let left = EDGE_GAP;
+  let right = document.documentElement.clientWidth - EDGE_GAP;
+  let top = 0;
   for (let up = node.parentElement; up !== null; up = up.parentElement) {
     const style = getComputedStyle(up);
-    if (style.overflowX === 'visible' && style.overflowY === 'visible') continue;
+    const clipsOverflow = style.overflowX !== 'visible' || style.overflowY !== 'visible';
+    const paintsInside =
+      style.contentVisibility === 'auto' || /paint|content|strict/.test(style.contain);
+    if (!clipsOverflow && !paintsInside) continue;
     const box = up.getBoundingClientRect();
-    left = Math.max(left, box.left);
-    right = Math.min(right, box.right);
+    const inset = clipsOverflow ? EDGE_GAP : 0;
+    left = Math.max(left, box.left + inset);
+    right = Math.min(right, box.right - inset);
+    if (style.overflowY !== 'visible' || paintsInside) top = Math.max(top, box.top);
   }
-  return { left, right };
+  return { left, right, top };
 }
-
-const EDGE_GAP = 8;
 
 function useKeepInside(placement: ToolbarPlacement) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -57,11 +63,13 @@ function useKeepInside(placement: ToolbarPlacement) {
       const edges = clipEdges(node);
       const shiftFor = (box: DOMRect) =>
         placement === 'right'
-          ? Math.min(0, edges.right - EDGE_GAP - box.right)
-          : Math.max(0, edges.left + EDGE_GAP - box.left);
+          ? Math.min(0, edges.right - box.right)
+          : Math.max(0, edges.left - box.left);
       if (shiftFor(node.getBoundingClientRect()) === 0) return;
       node.dataset.clamped = '';
-      node.style.transform = `translateX(${shiftFor(node.getBoundingClientRect())}px)`;
+      const onEdge = node.getBoundingClientRect();
+      const drop = Math.max(0, edges.top - onEdge.top);
+      node.style.transform = `translate(${shiftFor(onEdge)}px, ${drop}px)`;
     };
     block.addEventListener('pointerenter', fit);
     block.addEventListener('focusin', fit);
@@ -171,15 +179,16 @@ export function MessageToolbar({
       </DropdownMenu>
     </div>
   );
-  const meta = (
-    <span
-      className="flex items-center gap-2 text-caption whitespace-nowrap text-(--text-tertiary) group-data-clamped/toolbar:rounded-(--radius-control) group-data-clamped/toolbar:bg-popover group-data-clamped/toolbar:px-1.5 group-data-clamped/toolbar:py-0.5 group-data-clamped/toolbar:shadow-(--e2)"
-      data-slot="message-toolbar-meta"
-    >
-      {stamp}
-      {note}
-    </span>
-  );
+  const meta =
+    stamp == null && note == null ? null : (
+      <span
+        className="flex items-center gap-2 text-caption whitespace-nowrap text-(--text-tertiary) group-data-clamped/toolbar:rounded-(--radius-control) group-data-clamped/toolbar:bg-popover group-data-clamped/toolbar:px-1.5 group-data-clamped/toolbar:py-0.5 group-data-clamped/toolbar:shadow-(--e2)"
+        data-slot="message-toolbar-meta"
+      >
+        {stamp}
+        {note}
+      </span>
+    );
   return (
     <div
       ref={keepInside}
