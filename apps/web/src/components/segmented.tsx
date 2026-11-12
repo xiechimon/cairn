@@ -26,13 +26,13 @@ interface SegmentedProps<T extends string> {
 }
 
 const TRACK_CLS =
-  'inline-flex h-8 w-fit items-center justify-center gap-0.5 rounded-md bg-secondary p-0.5 text-content-secondary group-data-horizontal/tabs:h-8';
+  'inline-flex h-8 w-fit items-center justify-center gap-0.5 rounded-md bg-secondary p-0.5 text-foreground group-data-horizontal/tabs:h-8';
 
 const OPTION_CLS =
-  "relative inline-flex h-7 flex-none items-center justify-center gap-1.5 rounded-(--cds-radius-sm) border-0 px-3 py-0 text-ui font-normal whitespace-nowrap text-content-secondary transition-[color,background-color] duration-(--dur-fast) ease-out hover:text-foreground dark:text-content-secondary dark:hover:text-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
+  "relative inline-flex h-7 flex-none items-center justify-center gap-1.5 rounded-(--cds-radius-sm) border-0 px-3 py-0 text-ui font-normal whitespace-nowrap text-foreground transition-[color,background-color] duration-(--dur-fast) ease-out dark:text-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
 
 const QUIET_TRACK_CLS =
-  'inline-flex h-7 w-fit items-center gap-1 bg-transparent p-0 text-content-secondary group-data-horizontal/tabs:h-7';
+  'inline-flex h-7 w-fit items-center gap-1 bg-transparent p-0 text-foreground group-data-horizontal/tabs:h-7';
 
 const QUIET_OPTION_CLS =
   'rounded-(--cds-radius-md) px-2.5 text-meta data-active:bg-(--sidebar-active) dark:data-active:bg-(--sidebar-active) hover:bg-(--hover-1)';
@@ -41,8 +41,7 @@ const OPTION_ICON_CLS = 'w-7 px-0';
 
 const RADIO_BUTTON_NEUTRAL_CLS = 'hover:bg-transparent dark:hover:bg-transparent';
 
-const OPTION_SELECTED_CLS =
-  'data-active:font-medium data-active:text-foreground dark:data-active:text-foreground';
+const OPTION_SELECTED_CLS = 'data-active:font-medium';
 
 const OPTION_SELECTED_FACE_CLS =
   'data-active:bg-(--seg-active) data-active:shadow-xs data-active:ring-1 data-active:ring-border dark:data-active:bg-(--seg-active) group-data-[variant=default]/tabs-list:data-active:shadow-xs';

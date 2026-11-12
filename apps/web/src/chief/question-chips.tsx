@@ -46,7 +46,6 @@ export interface QuestionChipsProps {
 
 const PICKED_CHIP_CLS =
   'aria-pressed:bg-(--menu-hover) aria-pressed:border-(--text-tertiary) dark:aria-pressed:bg-(--menu-hover)';
-const RECOMMENDED_CHIP_CLS = 'border-transparent bg-(--menu-hover) dark:bg-(--menu-hover)';
 
 type Question = ChiefQuestionItem['questions'][number];
 
@@ -382,12 +381,7 @@ export function QuestionChips({
                   aria-pressed={selected}
                   aria-describedby={describedBy}
                   data-recommended={recommended ? '' : undefined}
-                  className={cn(
-                    REPLY_CHIP_CLS,
-                    PICKED_CHIP_CLS,
-                    recommended && RECOMMENDED_CHIP_CLS,
-                    'gap-1.5',
-                  )}
+                  className={cn(REPLY_CHIP_CLS, PICKED_CHIP_CLS, 'gap-1.5')}
                   onClick={() => choose(oi)}
                 >
                   {multi && selected && <Check aria-hidden className="size-4" />}

@@ -108,8 +108,17 @@ test('a pending question is its text and outlined chips at the end of the conver
   await expect(recommended).not.toContainText('推荐');
   await expect(recommended).not.toContainText('Verified');
   await expect(recommended).toHaveAccessibleDescription('推荐 · Verified');
-  await expect(recommended).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(question.getByTestId('chief-question-option-0-1')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  const other = question.getByTestId('chief-question-option-0-1');
+  await page.mouse.move(0, 0);
+  for (const chip of [recommended, other]) {
+    await expect(chip).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(chip).toHaveCSS('box-shadow', 'none');
+    await expect(chip).toHaveCSS('border-top-width', '1px');
+  }
+  const [firstBorder, otherBorder] = await Promise.all(
+    [recommended, other].map((chip) => chip.evaluate((el) => getComputedStyle(el).borderTopColor)),
+  );
+  expect(firstBorder).toBe(otherBorder);
   await recommended.hover();
   await expect(page.locator('[data-slot="tooltip-content"]')).toContainText('推荐 · Verified');
   await expect(page.locator('[data-slot="tooltip-content"]')).toContainText('1');

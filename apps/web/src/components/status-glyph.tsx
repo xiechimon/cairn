@@ -33,13 +33,15 @@ export function StatusGlyph({
   kind,
   label,
   className,
+  outlined = false,
 }: {
   kind: GlyphKind;
   label?: string;
   className?: string;
+  outlined?: boolean;
 }) {
   const maskId = useId();
-  const cut = CUT[kind];
+  const cut = outlined && kind === 'failed' ? undefined : CUT[kind];
   const pie = PIE[kind];
   return (
     <svg
@@ -103,6 +105,15 @@ export function StatusGlyph({
             />
           )}
           {pie != null && <path d={pie} fill="currentColor" />}
+          {outlined && kind === 'failed' && (
+            <path
+              d={CUT.failed}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          )}
         </>
       )}
     </svg>

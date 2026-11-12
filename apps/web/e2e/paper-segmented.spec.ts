@@ -76,13 +76,13 @@ for (const theme of ['light', 'dark'] as const) {
     expect(first.value.selectedRing).toBe(true);
     expect(first.value.selectedWeight).toBe('500');
     expect(first.value.idleBg).toBe('rgba(0, 0, 0, 0)');
-    expect(first.value.idleInk).not.toBe(first.value.selectedInk);
+    expect(first.value.idleInk).toBe(first.value.selectedInk);
     expect(first.value.selectedBg).not.toBe(first.value.trackBg);
     if (theme === 'light') {
       expect(first.value.trackBg).toBe('rgb(242, 242, 242)');
       expect(first.value.selectedBg).toBe('rgb(255, 255, 255)');
       expect(first.value.selectedInk).toBe('rgb(10, 10, 10)');
-      expect(first.value.idleInk).toBe('rgb(58, 58, 58)');
+      expect(first.value.idleInk).toBe('rgb(10, 10, 10)');
     }
     for (const { name, value } of faces.slice(1)) {
       const { trackHeight, optionHeight, ...rest } = value;
@@ -184,3 +184,31 @@ test('radio group: arrow keys move focus and select, roving tabindex follows', a
   await page.keyboard.press('ArrowRight');
   await expect(group.getByRole('radio', { name: '单次' })).toHaveAttribute('aria-checked', 'true');
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`${theme}: Tasks panel tabs read in the primary ink, the selected one keeps its fill`, async ({
+    page,
+  }) => {
+    await themed(page, theme, '/app?scenario=home-c&pane=tasks');
+    const track = page.locator('[data-segmented="track"]').first();
+    await expect(track).toBeVisible();
+    await page.mouse.move(0, 0);
+    const read = await track.evaluate((el) => {
+      const foreground = getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim();
+      const probe = document.createElement('span');
+      probe.style.color = foreground;
+      document.body.appendChild(probe);
+      const ink = getComputedStyle(probe).color;
+      probe.remove();
+      const selected = getComputedStyle(el.querySelector('[data-segmented="option"][data-active]')!);
+      const idle = [...el.querySelectorAll('[data-segmented="option"]:not([data-active])')].map(
+        (o) => getComputedStyle(o).color,
+      );
+      return { ink, selectedBg: selected.backgroundColor, selectedInk: selected.color, idle };
+    });
+    expect(read.idle).toHaveLength(3);
+    for (const ink of read.idle) expect(ink).toBe(read.ink);
+    expect(read.selectedInk).toBe(read.ink);
+    expect(read.selectedBg).not.toBe('rgba(0, 0, 0, 0)');
+  });
+}

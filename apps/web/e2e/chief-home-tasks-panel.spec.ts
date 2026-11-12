@@ -129,6 +129,23 @@ test('every row leads with the same 28px box and no tile: a checkbox when it can
   await page.mouse.move(1, 1);
   const failed = frames.filter({ hasText: 'Rerun the relay probe' });
   await expect(failed.locator('svg[data-glyph="failed"]')).toHaveCount(1);
+  const mark = failed.locator('svg[data-glyph="failed"]');
+  expect(await mark.evaluate((svg) => (svg as SVGElement).getBoundingClientRect().width)).toBe(16);
+  expect(
+    await mark.evaluate((svg) =>
+      [...svg.querySelectorAll('circle, path')].map((el) => getComputedStyle(el).fill),
+    ),
+  ).toEqual(['none', 'none']);
+  expect(await mark.evaluate((svg) => getComputedStyle(svg).color)).toBe(
+    await failed.locator('[data-slot="task-row-title"]').evaluate((el) => {
+      const probe = document.createElement('span');
+      probe.className = 'text-content-tertiary';
+      document.body.appendChild(probe);
+      const ink = getComputedStyle(probe).color;
+      probe.remove();
+      return ink;
+    }),
+  );
   await expect(failed.locator('[data-slot="task-row-why"]')).toHaveAccessibleName(
     '运行失败了，先重跑才能完成',
   );

@@ -11,20 +11,17 @@ const CLEAR = 'rgba(0, 0, 0, 0)';
 const bg = (loc: Locator) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
 const ink = (loc: Locator) => loc.evaluate((el) => getComputedStyle(el).color);
 
-/** Unselected option: no box at rest or under hover, ink steps to the
- *  selected option's ink. The pointer moves off first: after `themed()`
- *  reloads, it still rests where the previous leg hovered, so the option
- *  would start :hover and read the hover ink as its rest ink (#1427). */
-async function expectInkStep(idle: Locator, selected: Locator) {
+async function expectSharedInk(idle: Locator, selected: Locator) {
   await idle.page().mouse.move(0, 0);
   await expect.poll(() => idle.evaluate((el) => el.matches(':hover'))).toBe(false);
   await settleTransitions(idle.page());
   const rest = await ink(idle);
   const target = await ink(selected);
-  expect(rest).not.toBe(target);
+  expect(rest).toBe(target);
   expect(await bg(idle)).toBe(CLEAR);
   await idle.hover();
-  await expect.poll(() => ink(idle)).toBe(target);
+  await settleTransitions(idle.page());
+  expect(await ink(idle)).toBe(target);
   expect(await bg(idle)).toBe(CLEAR);
 }
 
@@ -33,14 +30,14 @@ async function themed(page: Page, theme: 'dark' | 'light', url: string) {
   await page.goto(url);
 }
 
-test('task layout: unselected hover steps the chip ink — dark + light', async ({ page }) => {
+test('task layout: unselected chip reads in the selected ink, hover keeps it — dark + light', async ({ page }) => {
   await page.goto(`${PROJ}?scenario=r2-24b`);
   const files = page.getByRole('tab', { name: '网格视图' });
   const tasks = page.getByRole('tab', { name: '列表视图' });
-  await expectInkStep(files, tasks);
+  await expectSharedInk(files, tasks);
 
   await themed(page, 'light', `${PROJ}?scenario=r2-24b`);
-  await expectInkStep(
+  await expectSharedInk(
     page.getByRole('tab', { name: '网格视图' }),
     page.getByRole('tab', { name: '列表视图' }),
   );
@@ -117,7 +114,7 @@ test('task layout click swaps rows and cards', async ({ page }) => {
   await expect(page.getByTestId('task-row')).toHaveCount(2);
 });
 
-test('sched freq: the chosen radio reads against the track, hover steps the rest ink', async ({
+test('sched freq: the chosen radio reads against the track, hover keeps the rest ink', async ({
   page,
 }) => {
   await page.goto('/app/schedules?scenario=r3-92');
@@ -127,29 +124,31 @@ test('sched freq: the chosen radio reads against the track, hover steps the rest
 
   expect(await bg(active)).toBe(CARD_DARK);
   expect(await bg(group)).not.toBe(CARD_DARK);
-  await expectInkStep(weekly, active);
+  await expectSharedInk(weekly, active);
 
   await themed(page, 'light', '/app/schedules?scenario=r3-92');
   const lightGroup = page.getByRole('radiogroup', { name: '频率' });
   const lightActive = lightGroup.getByRole('radio', { checked: true });
   expect(await bg(lightActive)).toBe(CARD_LIGHT);
-  await expectInkStep(lightGroup.getByRole('radio', { name: '每周' }), lightActive);
+  await expectSharedInk(lightGroup.getByRole('radio', { name: '每周' }), lightActive);
 });
 
-test('tasks view toggle: hover steps the unselected ink (dark)', async ({ page }) => {
+test('tasks view toggle: the unselected ink is the selected ink under hover (dark)', async ({ page }) => {
   await page.goto(`${PROJ}?scenario=prj-tasks`);
-  await expectInkStep(
+  await expectSharedInk(
     page.locator('.prj-tasks-view-btn[aria-label="网格视图"]'),
     page.locator('.prj-tasks-view-btn[aria-selected="true"]'),
   );
 });
 
-test('chief tabs: hover steps the ink, click swaps the view', async ({ page }) => {
+test('chief tabs: hover keeps the ink, click swaps the view', async ({ page }) => {
   await themed(page, 'light', '/app?scenario=101');
   const charter = page.getByRole('tab', { name: '章程' });
+  await page.mouse.move(0, 0);
   const idleInk = await ink(charter);
   await charter.hover();
-  await expect.poll(() => ink(charter)).not.toBe(idleInk);
+  await settleTransitions(page);
+  expect(await ink(charter)).toBe(idleInk);
   expect(await bg(charter)).toBe(CLEAR);
   await charter.click();
   await expect(charter).toHaveAttribute('aria-selected', 'true');

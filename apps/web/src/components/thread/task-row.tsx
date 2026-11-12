@@ -34,7 +34,7 @@ const LEAD_BOX = 'flex size-7 flex-none items-center justify-center';
 function Glyph({ glyph }: { glyph: TaskRowGlyph }) {
   if (glyph === 'question')
     return <BrandGlyph className="size-4 flex-none text-content-tertiary" />;
-  return <StatusGlyph kind={glyph} className="text-content-tertiary" />;
+  return <StatusGlyph kind={glyph} outlined className="text-content-tertiary" />;
 }
 
 export function TaskRow({
