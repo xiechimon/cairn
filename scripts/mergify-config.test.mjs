@@ -162,5 +162,11 @@ test('no tracked code or workflow posts a Mergify command; the queue conditions 
         !path.startsWith('docs/'),
     );
   const posting = sources.filter((path) => /@mergifyio\s+[a-z]/.test(readFileSync(path, 'utf8')));
-  assert.deepEqual(posting, []);
+  assert.deepEqual(posting, ['scripts/autonomy-brake.mjs']);
+  assert.deepEqual(
+    [...readFileSync('scripts/autonomy-brake.mjs', 'utf8').matchAll(/@mergifyio\s+([a-z]+)/g)].map(
+      (match) => match[1],
+    ),
+    ['requeue', 'requeue'],
+  );
 });
