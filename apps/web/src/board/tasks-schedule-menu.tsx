@@ -155,12 +155,7 @@ export function ScheduleRowMenu({
       <DeleteConfirm
         open={confirmingDelete}
         title={t('确定删除该定时？此操作不可撤销。')}
-        summary={
-          <>
-            <span className="text-(--text-tertiary)">#{schedule.todo.seqNum}</span>
-            {schedule.todo.title}
-          </>
-        }
+        summary={schedule.todo.title}
         ariaLabel={t('删除定时')}
         onClose={() => setConfirmingDelete(false)}
         onConfirm={remove}

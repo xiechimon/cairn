@@ -12,20 +12,19 @@ import {
 export type ThreadReplyDelivery = 'steer' | 'revision' | 'restart';
 
 export const THREAD_REPLY_HINT: Record<ThreadReplyDelivery, string> = {
-  steer: '直接发给 #{seq}，插进它这一轮。',
-  revision: '作为改计划的意见发给 #{seq}，不算批准。',
-  restart: '#{seq} 会带着这句话重跑。',
+  steer: '直接发给这个任务，插进它这一轮。',
+  revision: '作为改计划的意见发给这个任务，不算批准。',
+  restart: '这个任务会带着这句话重跑。',
 };
 
 export interface ThreadReplyProps {
-  seq: number;
   delivery: ThreadReplyDelivery;
   onSend: (text: string) => Promise<void>;
   autoFocus?: boolean;
   className?: string;
 }
 
-export function ThreadReply({ seq, delivery, onSend, autoFocus, className }: ThreadReplyProps) {
+export function ThreadReply({ delivery, onSend, autoFocus, className }: ThreadReplyProps) {
   const { t } = useI18n();
   const [draft, setDraft] = useState('');
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
@@ -52,10 +51,10 @@ export function ThreadReply({ seq, delivery, onSend, autoFocus, className }: Thr
 
   const note =
     state === 'sent'
-      ? t('已发给 #{seq}。', { seq })
+      ? t('已发出。')
       : state === 'failed'
         ? t('没发出去，再试一次。')
-        : t(THREAD_REPLY_HINT[delivery], { seq });
+        : t(THREAD_REPLY_HINT[delivery]);
 
   return (
     <InputGroup
@@ -66,8 +65,8 @@ export function ThreadReply({ seq, delivery, onSend, autoFocus, className }: Thr
       )}
     >
       <InputGroupTextarea
-        aria-label={t('回复 #{seq}', { seq })}
-        placeholder={t('回复 #{seq}…', { seq })}
+        aria-label={t('回复这个任务')}
+        placeholder={t('回复这个任务…')}
         rows={1}
         autoFocus={autoFocus}
         readOnly={state === 'sending' || state === 'sent'}

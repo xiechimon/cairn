@@ -53,7 +53,7 @@ for (const [label, phase, verified] of [
     await page.goto('/app');
     const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     const marker = stream.getByTestId('thread-report-marker');
-    await expect(marker).toHaveText(`任务 #9 Repair board counts：${STATUS[label]}`);
+    await expect(marker).toHaveText(`Repair board counts：${STATUS[label]}`);
     await expect(marker.getByRole('link')).toHaveAttribute('href', `/app?thread=${TASK.id}`);
     await expect(stream.getByTestId('chief-bubble')).toHaveCount(1);
     await expect(stream).not.toContainText('[wake:');
@@ -108,7 +108,8 @@ test('a prose attachment citation in a notice renders as a chip', async ({ page 
   const report = notice.getByRole('link', { name: '完整报告' });
   await expect(report).toHaveAttribute('href', '/api/attachments/hg4lgHMHQLnQBHR3CImra');
   await expect(notice).not.toContainText('attachment:');
-  await expect(notice.getByRole('link', { name: '#173' })).toBeVisible();
+  await expect(notice.locator('a[data-slot="task-mention"]')).toHaveText('Markdown preview');
+  await expect(notice).not.toContainText('#173');
   const unchanged = stream.getByTestId('chief-msg').nth(1);
   await expect(unchanged.getByRole('link', { name: 'docs' })).toHaveAttribute(
     'href',
@@ -208,9 +209,9 @@ test('a needs-you report shows the thread own line and answers the question thro
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
   const marker = stream.getByTestId('thread-report-marker');
   await expect(marker).toHaveAttribute('data-phase', 'needs-you');
-  await expect(marker).toHaveText('任务 #9 Add an export：待你决定Which export format?');
+  await expect(marker).toHaveText('Add an export：待你决定Which export format?');
   await stream.getByTestId('thread-report-reply').getByRole('button', { name: '回复' }).click();
-  await page.getByRole('textbox', { name: '回复 #9' }).fill('JSON please');
+  await page.getByRole('textbox', { name: '回复这个任务' }).fill('JSON please');
   await page.keyboard.press('Enter');
   await expect.poll(() => sent).toHaveLength(1);
   expect(sent[0]).toMatchObject({ content: 'JSON please' });
@@ -293,7 +294,7 @@ test('user relay markers stay hidden while Coordinator messages remain visible',
   await page.goto('/app');
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
   await expect(stream.getByTestId('thread-activity')).toHaveCount(0);
-  await expect(stream.getByTestId('thread-message-marker')).toHaveText('Coordinator 直接对 #9 说：Use CSV instead');
+  await expect(stream.getByTestId('thread-message-marker')).toHaveText(`Coordinator 直接对 ${TASK.title} 说：Use CSV instead`);
   await expect(stream).not.toContainText('JSON please');
   await expect(stream.getByTestId('chief-bubble')).toHaveText('Add an export');
 });
@@ -305,14 +306,18 @@ test('events about one thread coalesce, repeated statuses dedupe, another thread
     id: string,
     content: Record<string, unknown>,
     createdAt: number,
-    thread = { todoId: TASK.id, seqNum: TASK.seqNum },
+    thread = { todoId: TASK.id, seqNum: TASK.seqNum, title: TASK.title },
   ) => ({
     id,
     role: 'system',
-    content: JSON.stringify({ ...thread, title: TASK.title, ...content }),
+    content: JSON.stringify({ ...thread, ...content }),
     createdAt,
   });
-  const message = (id: string, createdAt: number, thread?: { todoId: string; seqNum: number }) =>
+  const message = (
+    id: string,
+    createdAt: number,
+    thread?: { todoId: string; seqNum: number; title: string },
+  ) =>
     event(
       id,
       { kind: 'thread-message', excerpt: id, delivered: 'steer', conversationId: 'build-1', by: 'coordinator' },
@@ -329,7 +334,7 @@ test('events about one thread coalesce, repeated statuses dedupe, another thread
       message('two', 21),
       review('r1', 22),
       review('r2', 23),
-      message('elsewhere', 24, { todoId: 'other-todo', seqNum: 3 }),
+      message('elsewhere', 24, { todoId: 'other-todo', seqNum: 3, title: 'Trim the log' }),
     ],
     todos: [],
   });
@@ -337,10 +342,10 @@ test('events about one thread coalesce, repeated statuses dedupe, another thread
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
   const group = stream.getByTestId('thread-activity');
   await expect(group).toHaveCount(1);
-  await expect(group.getByTestId('thread-activity-summary')).toHaveText(`任务 #9 · 2 次追问 · 审阅中`);
+  await expect(group.getByTestId('thread-activity-summary')).toHaveText(`${TASK.title} · 2 次追问 · 审阅中`);
   await group.getByTestId('thread-activity-toggle').click();
   await expect(group.getByTestId('thread-activity-event')).toHaveCount(3);
-  await expect(stream.getByTestId('thread-message-marker')).toHaveText('Coordinator 直接对 #3 说：elsewhere');
+  await expect(stream.getByTestId('thread-message-marker')).toHaveText('Coordinator 直接对 Trim the log 说：elsewhere');
   const box = await group.getByTestId('thread-activity-summary').boundingBox();
   const chat = await stream.boundingBox();
   if (box === null || chat === null) throw new Error('no box');

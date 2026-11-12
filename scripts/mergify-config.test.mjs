@@ -121,12 +121,12 @@ test('no review verdict, review thread count or hold label decides queue entry',
   }
 });
 
-test('only writers may dequeue by command; no workflow bot is granted it', () => {
+test('only writers may dequeue by command; the workflow bot may only requeue, for the autonomy brake', () => {
   assert.match(
     config,
-    /commands_restrictions:\n {2}dequeue:\n {4}conditions:\n {6}- sender-permission >= write\nmerge_queue:/,
+    /commands_restrictions:\n {2}dequeue:\n {4}conditions:\n {6}- sender-permission >= write\n {2}requeue:\n {4}conditions:\n {6}- or:\n {10}- sender-permission >= write\n {10}- sender = github-actions\[bot\]\nmerge_queue:/,
   );
-  assert.doesNotMatch(config, /github-actions\[bot\]/);
+  assert.equal(config.match(/github-actions\[bot\]/g)?.length, 1);
 });
 
 test('both queues size batches dynamically from one to four pull requests', () => {
