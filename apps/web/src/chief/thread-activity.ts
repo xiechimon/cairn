@@ -15,7 +15,7 @@ export interface ThreadActivity {
   kind: 'thread-activity';
   id: string;
   todoId: string;
-  seqNum: number;
+  title: string;
   events: ThreadEventItem[];
 }
 
@@ -25,7 +25,7 @@ export interface GroupedRow {
 }
 
 export interface ActivitySummary {
-  seqNum: number;
+  title: string;
   messages: number;
   status: StatusWord | null;
 }
@@ -68,7 +68,7 @@ export function groupThreadEvents(
       kind: 'thread-activity',
       id: item.id,
       todoId: item.todoId,
-      seqNum: item.seqNum,
+      title: item.title,
       events: [item],
     };
     open = { activity };
@@ -80,7 +80,7 @@ export function groupThreadEvents(
 export function activitySummary(activity: ThreadActivity): ActivitySummary {
   const latestReport = activity.events.findLast((event) => event.kind === 'thread-report');
   return {
-    seqNum: activity.seqNum,
+    title: activity.title,
     messages: activity.events.filter((event) => event.kind === 'thread-message').length,
     status: latestReport?.kind === 'thread-report' ? reportStatusWord(latestReport) : null,
   };

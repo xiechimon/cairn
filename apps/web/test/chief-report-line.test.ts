@@ -42,7 +42,7 @@ function render(item: Record<string, unknown>): string {
 describe('thread report rows with the session line', () => {
   test('a report row renders the line next to the status', () => {
     const html = render({ ...REPORT, id: 'r1', line: 'Waiting on the export format' });
-    expect(plain(html)).toContain('Task #3 Export');
+    expect(plain(html)).toContain('Export: In review');
     expect(html).toContain('Waiting on the export format');
   });
 
@@ -53,7 +53,7 @@ describe('thread report rows with the session line', () => {
 
   test('an older row without a line renders as before', () => {
     const html = render({ ...REPORT, id: 'r2' });
-    expect(plain(html)).toContain('Task #3 Export');
+    expect(plain(html)).toContain('Export: In review');
     expect(html).not.toContain('ml-1.5');
   });
 
@@ -71,7 +71,8 @@ describe('thread report rows with the session line', () => {
 
   test('a needs-you report says the thread needs you and keeps its line', () => {
     const html = render({ ...REPORT, phase: 'needs-you', id: 'r3', line: 'Which export format?' });
-    expect(plain(html)).toContain('Task #3 Export: Needs you');
+    expect(plain(html)).toContain('Export: Needs you');
+    expect(plain(html)).not.toContain('#3');
     expect(html).toContain('Which export format?');
     expect(html).toContain('data-phase="needs-you"');
     expect(html).not.toContain('thread-report-reply');
@@ -79,10 +80,10 @@ describe('thread report rows with the session line', () => {
 
   test('done and failed reports carry the same line next to their status', () => {
     const done = render({ ...REPORT, phase: 'done', id: 'r4', line: 'Shipped the export' });
-    expect(plain(done)).toContain('Task #3 Export: Done');
+    expect(plain(done)).toContain('Export: Done');
     expect(done).toContain('Shipped the export');
     const failed = render({ ...REPORT, phase: 'failed', id: 'r5', line: 'Tests would not pass' });
-    expect(plain(failed)).toContain('Task #3 Export: Failed');
+    expect(plain(failed)).toContain('Export: Failed');
     expect(failed).toContain('Tests would not pass');
   });
 

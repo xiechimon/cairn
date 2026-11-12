@@ -335,7 +335,7 @@ test.describe('push notification click loop (XMON-106)', () => {
     const calls = await page.evaluate(() => window.__swNotifs);
 
     expect(calls[0].title).toBe('构建待审核');
-    expect(calls[0].options.body).toBe('#42 修一下按钮');
+    expect(calls[0].options.body).toBe('修一下按钮');
     expect(calls[0].options.tag).toBe('u1:todo-x');
     expect(calls[0].options.data).toEqual({ href: '/app?thread=todo-x' });
 

@@ -101,7 +101,8 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(chip.getByRole('img', { name: '执行中' })).toBeVisible();
     const handoff = stream.getByTestId('chief-handoff');
     await expect(handoff).toContainText('已转给任务');
-    await expect(handoff).toContainText('#9');
+    await expect(handoff).toContainText('修复看板拖拽后计数不刷新');
+    await expect(handoff).not.toContainText('#9');
     const handoffLine = await handoff.evaluate((el) => ({
       align: getComputedStyle(el).textAlign,
       rule: getComputedStyle(el, '::before').content,
@@ -110,7 +111,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
         el.firstElementChild!.getBoundingClientRect().left - el.getBoundingClientRect().left,
     }));
     expect(handoffLine).toEqual({ align: 'left', rule: 'none', chips: 0, leftGap: 0 });
-    await expect(handoff.getByRole('link', { name: '#9' })).toHaveAttribute('data-phase', 'building');
+    await expect(handoff.getByRole('link', { name: '修复看板拖拽后计数不刷新' })).toHaveAttribute('data-phase', 'building');
     await expect(stream.getByTestId('chief-turn-tools')).toHaveCount(0);
     await openReplySteps(page, stream.getByTestId('chief-msg').filter({ hasText: '已经补给它了' }));
     await expect(stream.getByTestId('chief-turn-tools').first()).toBeVisible();
