@@ -1,6 +1,4 @@
 import { createContext, useContext, useEffect, useId, useRef, useSyncExternalStore } from 'react';
-import { useSearchParams } from 'react-router';
-import { THREAD_PARAM } from '../board/thread-copy.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { useI18n } from '../i18n/provider.js';
 import { useOptionalChiefRoot } from './chief-root.js';
@@ -72,8 +70,6 @@ function QuestionError({ draftKey }: { draftKey: string }) {
 export function ChiefQuestion({ bound }: { bound: boolean }) {
   const { t } = useI18n();
   const root = useOptionalChiefRoot();
-  const [searchParams] = useSearchParams();
-  const numberKeys = bound && searchParams.get(THREAD_PARAM) === null;
   const pending = useShownQuestions();
   const index = questionDockState.focus();
   useSyncExternalStore(
@@ -114,7 +110,6 @@ export function ChiefQuestion({ bound }: { bound: boolean }) {
           key={shown.item.requestId}
           item={shown.item}
           draftKey={key}
-          numberKeys={numberKeys}
           bound={bound}
           onAnswer={(input) =>
             root?.surface.onAnswerQuestion?.({ ...input, threadId: shown.conversationId })

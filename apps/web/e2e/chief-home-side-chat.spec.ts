@@ -22,9 +22,8 @@ test('a task row opens its thread beside the Coordinator, and going back returns
   await expect(page).toHaveURL(/[?&]thread=home-c-working-a/);
   await expect(page).toHaveURL(/\/app\?/);
   await expect(sideChat(page).locator('h2')).toHaveText('Push for finished threads');
-  await expect(sideChat(page).locator('h2')).toHaveAccessibleName(
-    '#2302 Push for finished threads',
-  );
+  await expect(sideChat(page).locator('h2')).toHaveAccessibleName('Push for finished threads');
+  await expect(sideChat(page)).not.toContainText('#2302');
   await expect(page.getByTestId('side-chat-status')).toContainText('运行中');
   await expect(page.getByTestId('transcript-col')).toBeVisible();
   await expect(page.getByTestId('home-c')).toBeVisible();
@@ -98,7 +97,7 @@ test('the panel is resizable by keyboard and by drag, shared with Tasks, and rem
 test('a thread that has not started says so and takes no message', async ({ page }) => {
   await page.goto(`${HOME}&thread=home-c-idle`);
   await expect(page.locator('.side-panel').getByTestId('composer-placeholder')).toHaveText(
-    '开始后才能回复 #2240',
+    '开始后才能回复',
   );
   await expect(page.locator('.side-panel textarea')).toHaveCount(0);
 });

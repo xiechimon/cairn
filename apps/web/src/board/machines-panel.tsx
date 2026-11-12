@@ -79,10 +79,13 @@ function checkedAgo(ts: number | null | undefined, now: number, t: TFunc): strin
   return t('{time}检查过', { time: relativeTime(ts, now, t) });
 }
 
-function machineMeta(machine: MachineRow, t: TFunc): string {
-  if (machine.online !== true) return checkedAgo(machine.lastSeenAt, Date.now(), t) || t('离线');
-  if (machine.folders === undefined) return machineStateLabel(machine, t);
-  return joinMeta([t('在线'), t('{n} 个文件夹', { n: machine.folders.length })]);
+function machineMeta(machine: MachineRow, now: number, t: TFunc): string {
+  if (machine.online !== true) {
+    const seen = machine.lastSeenAt ?? 0;
+    return seen > 0 ? joinMeta([t('离线'), relativeTime(seen, now, t)]) : t('离线');
+  }
+  const running = machine.runningSteps ?? 0;
+  return running === 0 ? t('空闲') : t('{n} 个在跑', { n: running });
 }
 
 function MachineDetailStatus({
@@ -570,7 +573,7 @@ export function MachinesPanel({
                 <span data-testid="machine-list-row" className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-ui text-foreground">{machine.name}</span>
                   <span className="truncate text-meta text-content-tertiary">
-                    {machineMeta(machine, t)}
+                    {machineMeta(machine, Date.now(), t)}
                   </span>
                 </span>
                 <ChevronRight

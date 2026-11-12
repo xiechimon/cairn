@@ -40,7 +40,6 @@ import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 
 const COMPOSER_FIELD =
   'composer relative flex flex-col rounded-(--radius-composer) border-0 data-drop-target:ring-2 data-drop-target:ring-(--focus-ring)';
-const SEND_PRESSED_CLS = 'hover:bg-(--card-button) dark:hover:bg-(--card-button)';
 const COMPOSER_FIELD_READ_ONLY = 'bg-secondary shadow-(--shadow-composer)';
 const COMPOSER_INPUT =
   'field-sizing-fixed h-7 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none rounded-none border-none bg-transparent px-0.5 py-1 font-sans text-ui leading-5 md:text-ui text-(--foreground) tabular-nums shadow-none transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent';
@@ -369,13 +368,7 @@ export function Composer({
                     size="icon"
                     className={cn(
                       'composer-send',
-                      narrow
-                        ? ROUND_HIT_CLS
-                        : cn(
-                            SEND_BTN_CLS,
-                            hasContent && SEND_ON_CLS,
-                            hasContent && SEND_PRESSED_CLS,
-                          ),
+                      narrow ? ROUND_HIT_CLS : cn(SEND_BTN_CLS, hasContent && SEND_ON_CLS),
                     )}
                     onClick={send}
                   />
@@ -385,9 +378,8 @@ export function Composer({
                   <span
                     className={cn(
                       ROUND_FACE_CLS,
-                      hasContent
-                        ? 'bg-(--card-button) text-(--text-on-accent)'
-                        : 'bg-(--hover-1) text-content-tertiary',
+                      'bg-(--hover-1)',
+                      hasContent ? 'text-foreground' : 'text-content-tertiary',
                     )}
                   >
                     <ArrowUp width={20} height={20} />
