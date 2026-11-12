@@ -261,61 +261,34 @@ describe('#1470 the chief envelope context.tokens: only this chief own threads a
   });
 });
 
-describe('#1470 save_memory: projectId / sourceTodoId are team-checked', () => {
-  test.each([
-    ['projectId 他队', { projectId: PROJ_B }, `project ${PROJ_B}`],
-    ['projectId 不存在', { projectId: MISSING }, `project ${MISSING}`],
-    ['sourceTodoId 他队', { sourceTodoId: TASK_B }, `todo ${TASK_B}`],
-  ])('U5 chief %s → 404，不落库', async (_label, extra, message) => {
-    const before = memoryCount();
-    const err = await rejection(relay('save_memory', { title: 't', content: 'c', ...extra }));
-    expect(err.status).toBe(404);
-    expect(err.message).toBe(message);
-    expect(memoryCount()).toBe(before);
-  });
-
-  const workerCtx = () => ({
-    teamId: H.teamId,
-    agentId: AGENT_ID,
-    sourceName: null,
-    todoId: OWN_TASK,
-    projectId: H.projectId,
-    buildId: OWN_BUILD,
-    attachmentsDir: H.s.attachmentsDir,
-  });
-
-  test.each([
-    ['projectId 他队', { projectId: PROJ_B }, `project ${PROJ_B}`],
-    ['sourceTodoId 他队', { sourceTodoId: TASK_B }, `todo ${TASK_B}`],
-  ])('U5 worker %s → 404，不落库', async (_label, extra, message) => {
-    const before = memoryCount();
+describe('memory document scopes are team checked and provenance cannot be overridden', () => {
+  test.each([PROJ_B, MISSING])(
+    'foreign or missing scope %s returns 404 with no write',
+    async (scope) => {
+      const before = memoryCount();
+      const err = await rejection(relay('save_memory', { scope, file: 't', content: 'c' }));
+      expect(err.status).toBe(404);
+      expect(memoryCount()).toBe(before);
+    },
+  );
+  test('worker cannot inject arbitrary provenance', async () => {
     const err = await rejection(
-      executeWorkerMemoryTool(H.s.db, workerCtx(), 'save_memory', {
-        title: 't',
-        content: 'c',
-        ...extra,
-      }),
+      executeWorkerMemoryTool(
+        H.s.db,
+        {
+          teamId: H.teamId,
+          agentId: AGENT_ID,
+          sourceName: null,
+          todoId: OWN_TASK,
+          projectId: H.projectId,
+          buildId: OWN_BUILD,
+          attachmentsDir: H.s.attachmentsDir,
+        },
+        'save_memory',
+        { scope: H.projectId, file: 't', content: 'c', sourceTodoId: TASK_B },
+      ),
     );
-    expect(err.status).toBe(404);
-    expect(err.message).toBe(message);
-    expect(memoryCount()).toBe(before);
-  });
-
-  test('U7 own-team projects store as usual (chief explicit projectId, worker default context)', async () => {
-    const chief = (await relay('save_memory', {
-      title: 't',
-      content: 'c',
-      projectId: H.projectId,
-      sourceTodoId: OWN_TASK,
-    })) as { projectId: string };
-    expect(chief.projectId).toBe(H.projectId);
-    const worker = JSON.parse(
-      await executeWorkerMemoryTool(H.s.db, workerCtx(), 'save_memory', {
-        title: 'w',
-        content: 'worker-owned',
-      }),
-    ) as { projectId: string; sourceTodoId: string };
-    expect(worker).toMatchObject({ projectId: H.projectId, sourceTodoId: OWN_TASK });
+    expect(err.status).toBe(400);
   });
 });
 
