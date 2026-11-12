@@ -293,18 +293,29 @@ describe('computerImageOffersBrowser', () => {
 
   test('false when the marker has no pinned agent-browser line', () => {
     const root = testTempDir('orb-browser-marker-');
-    const dir = join(root, 'var/lib/machines/cairn-orb-computer/etc');
+    const dir = join(root, 'var/lib/cairn-orb');
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'cairn-orb-computer-image'), 'recipe=abc\npackages=chromium\n');
+    writeFileSync(join(dir, 'computer-image'), 'recipe=abc\npackages=chromium\n');
     expect(computerImageOffersBrowser({ root })).toBe(false);
   });
 
-  test('true only when the marker pins the expected agent-browser version', () => {
+  test('a marker only inside the root-only machines directory does not count', () => {
     const root = testTempDir('orb-browser-marker-');
     const dir = join(root, 'var/lib/machines/cairn-orb-computer/etc');
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, 'cairn-orb-computer-image'),
+      `recipe=abc\npackages=chromium\nagent-browser=${PINNED_AGENT_BROWSER_VERSION}\n`,
+    );
+    expect(computerImageOffersBrowser({ root })).toBe(false);
+  });
+
+  test('true only when the published marker pins the expected agent-browser version', () => {
+    const root = testTempDir('orb-browser-marker-');
+    const dir = join(root, 'var/lib/cairn-orb');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'computer-image'),
       `recipe=abc\npackages=chromium\nagent-browser=${PINNED_AGENT_BROWSER_VERSION}\n`,
     );
     expect(computerImageOffersBrowser({ root })).toBe(true);

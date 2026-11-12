@@ -480,8 +480,8 @@ use the authorize URL for the separate enrollment.
 
 `CAIRN_COMPUTER=orb` gives a host-executor daemon the Coordinator computer
 without moving builds into Orbs. The daemon then reports the `computer`
-capability, and `browser` when the `cairn-orb-computer` image carries the
-pinned agent-browser marker. Any other non-empty value stops the daemon at
+capability, and `browser` when `/var/lib/cairn-orb/computer-image` pins the
+expected agent-browser version. Any other non-empty value stops the daemon at
 startup. A daemon with `CAIRN_EXECUTOR=orb` and the nspawn runtime already has
 the computer and ignores this switch.
 
@@ -687,6 +687,12 @@ and egress behavior on omarchy. The macOS backend-user canary remains outside
 this item's scope.
 
 ## Coordinator computer image
+
+`build-computer-image.sh` copies the image's completion marker to
+`/var/lib/cairn-orb/computer-image` (mode 0644), also on a run that reports
+`0 changes`. `/var/lib/machines` is root-only, so this copy is the only marker
+the daemon user can read; a host built before the copy existed reports no
+`browser` capability until the script runs again.
 
 `install-host.sh` also runs `build-computer-image.sh` after the base image. It
 snapshots `cairn-orb-base` into `cairn-orb-computer` and installs

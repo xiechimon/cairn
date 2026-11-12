@@ -19,26 +19,8 @@ export function computerMachinesDir(root = process.env.CAIRN_ORB_ROOT ?? ''): st
   return root === '' ? '/var/lib/machines' : join(root, 'var/lib/machines');
 }
 
-export function computerImageMarkerPath(
-  name: string,
-  root = process.env.CAIRN_ORB_ROOT ?? '',
-): string {
-  return join(computerMachinesDir(root), name, 'etc', 'cairn-orb-computer-image');
-}
-
-export function readComputerImageMarker(
-  name: string,
-  options: {
-    root?: string;
-    readFileSync?: (path: string, encoding: 'utf8') => string;
-  } = {},
-): string | null {
-  const root = options.root ?? process.env.CAIRN_ORB_ROOT ?? '';
-  try {
-    return (options.readFileSync ?? readFileSync)(computerImageMarkerPath(name, root), 'utf8');
-  } catch {
-    return null;
-  }
+export function computerImagePublishedMarkerPath(root = process.env.CAIRN_ORB_ROOT ?? ''): string {
+  return join(root === '' ? '/' : root, 'var/lib/cairn-orb/computer-image');
 }
 
 export function computerImageOffersBrowser(
@@ -50,8 +32,16 @@ export function computerImageOffersBrowser(
 ): boolean {
   const version =
     options.version ?? process.env.CAIRN_AGENT_BROWSER_VERSION ?? PINNED_AGENT_BROWSER_VERSION;
-  const text = readComputerImageMarker(COMPUTER_TEMPLATE, options);
-  return text?.split('\n').includes(`agent-browser=${version}`) === true;
+  let text: string;
+  try {
+    text = (options.readFileSync ?? readFileSync)(
+      computerImagePublishedMarkerPath(options.root),
+      'utf8',
+    );
+  } catch {
+    return false;
+  }
+  return text.split('\n').includes(`agent-browser=${version}`);
 }
 
 const computerStateSchema = z.array(
