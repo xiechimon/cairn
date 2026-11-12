@@ -313,7 +313,8 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     expect(stream.types.has('step')).toBe(true);
     stream.stop();
 
-    await page.getByTestId('side-chat-action').getByRole('button').last().click();
+    await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
+    await page.getByRole('menuitem', { name: '完成' }).click();
     const accept = page.getByRole('dialog', { name: '完成任务' });
     await pexpect(accept.getByRole('button', { name: '完成' })).toBeVisible();
     await accept.getByRole('button', { name: '完成' }).click();
