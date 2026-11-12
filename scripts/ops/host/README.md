@@ -19,7 +19,7 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 | `tools/app-token/as-bot.sh` | every bot caller below, and agent sessions | Runs one `gh` or `git` command with a 1h App installation token in that process only, after `as-bot-policy.mjs` approves it (see below). Git runs as `cairnwright[bot]` for author and committer, and `git commit` adds the `CAIRN_COAUTHOR` trailer |
 | `tools/app-token/bot-identity.mjs` | `as-bot.sh`, `lanes/sign-commits.sh` | Prints the bot name, its noreply email and the owner co-author trailer from `commit-identity.json`, which deploy installs from `packages/shared/` |
 | `tools/app-token/token.mjs` | `as-bot.sh` | Mints the installation token from `~/.cairn/cairn-bot.json`; holds no secret and reads the key from the path in that file |
-| `tools/merge-pr.sh` | called by `overnight/driver.sh`, `rearm-automerge.sh` | Leaves a queue-route PR to Mergify; squash-merges an owner-route PR with the human login, pinned to the head whose `review-gate` check passed |
+| `tools/merge-pr.sh` | called by `overnight/driver.sh`, `rearm-automerge.sh` | Leaves a routed PR to Mergify; squash-merges a `lane/*` PR with the human login, pinned to the head it read; refuses a head whose `merge-route` check failed. It reads no review verdict and no hold label |
 | `tools/rearm-automerge.sh` | called by `overnight/driver.sh` | Disarms and re-arms auto-merge on bot PRs whose merge state changed |
 | `tools/overnight/driver.sh` | `cairn-overnight.service` | Per-lane loop: rebase, sign, push, open PRs, fix red CI, merge |
 | `tools/overnight/surface-stuck-rebase.sh` | called by `overnight/driver.sh` | When a lane's rebase worker has failed 3 times on one head, labels the PR `stale-pr` and comments the files `git merge-tree` reports as conflicting with main (the issue when there is no PR), once per head, instead of the driver skipping the lane silently |
@@ -89,9 +89,9 @@ Measured with `grep -rn as-bot` over `~/.cairn/tools`, `~/lanes/*.sh` and `~/.co
 | `tools/schedule/issue-schedule.mjs` | `gh issue create|edit|comment|pin` | allowed |
 | `tools/rearm-automerge.sh` | `gh pr merge --disable-auto` | allowed |
 | `tools/weekly/evidence-prune.sh` | `git fetch`, `git commit`, `git push -u origin <branch>`, `gh pr create`, `gh pr comment` (it arms `gh pr merge --squash --auto --match-head-commit <sha>` as the human login, not through `as-bot.sh`) | allowed |
-| `tools/merge-pr.sh` | none: it squash-merges owner-route PRs with `gh pr merge <n> --squash --match-head-commit <sha>` as the human login | not through `as-bot.sh` |
+| `tools/merge-pr.sh` | none: it squash-merges `lane/*` PRs with `gh pr merge <n> --squash --match-head-commit <sha>` as the human login | not through `as-bot.sh` |
 
-Merge decision (C1 session, after the review gate found that a PASS comment can be forged through `gh pr comment`, which the bot may run): the bot never merges. Merge authorization uses the human login (`docs/ops/agent-bot-identity.md`): `merge-pr.sh` squash-merges owner-route PRs with plain `gh`, pinned to the head it read before its gate checks; for a lane or protected PR it requires the `review-gate` commit status on that head to be `success` and created by the gate's login (`xiechimon`), never a PR comment, because the bot can post comments, and `evidence-prune.sh` arms its auto-merge with plain `gh`. `as-bot-callers.test.mjs` runs both scripts through the real `as-bot.sh` and policy. The policy has no override switch.
+Merge decision (C1 session, after the review gate found that a PASS comment can be forged through `gh pr comment`, which the bot may run): the bot never merges. Merge authorization uses the human login (`docs/ops/agent-bot-identity.md`): `merge-pr.sh` squash-merges `lane/*` PRs with plain `gh`, pinned to the head it read, and reads no review verdict (ian, 2026-11-12), and `evidence-prune.sh` arms its auto-merge with plain `gh`. `as-bot-callers.test.mjs` runs both scripts through the real `as-bot.sh` and policy. The policy has no override switch.
 
 ## Test temp storage (#1954)
 
