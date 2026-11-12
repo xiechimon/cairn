@@ -170,7 +170,7 @@ for (const valid of [false, true])
     });
     assert.equal(f.result.status, valid ? 0 : 1, f.result.stderr);
     const disarm = readFileSync('.github/workflows/pr-evidence.yml', 'utf8')
-      .split('      - name: Mark the decision pending and disarm auto-merge')[1]
+      .split('      - name: Disarm auto-merge while the autonomy brake is on')[1]
       .split('        run: |\n')[1]
       .replace(/^ {10}/gm, '');
     const r = spawnSync('bash', ['-e', '-c', disarm], {
@@ -192,7 +192,8 @@ test('required check shape retains unconditional job, trigger coverage, and brak
   assert.ok(
     text.indexOf('name: Check the autonomy brake') < text.indexOf('name: Check PR body evidence'),
   );
-  assert.match(text, /hold\.flag.*autonomy-paused\.flag/);
+  assert.match(text, /if \[ ! -f autonomy-paused\.flag \]; then/);
+  assert.doesNotMatch(text, /hold\.flag|coordinator-hold/);
 });
 
 test('paused schedule sweeps and workflow permissions and triggers retain the outage path', (t) => {

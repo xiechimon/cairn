@@ -2,6 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { HISTORY, mockLive, PROJECT } from './chief-home-mock';
 
 const HOME = '/app?scenario=home-c';
+const MIDDAY_IN_BEIJING = Date.UTC(2026, 10, 12, 4);
 
 const chip = (page: Page) => page.getByTestId('machines-button');
 const panel = (page: Page) => page.getByRole('complementary', { name: '电脑' });
@@ -124,6 +125,7 @@ test('the icon-only header buttons show a tooltip with their name on hover', asy
 test('computers share one group, each glyph carries its status dot, and the add row is outlined', async ({
   page,
 }) => {
+  await page.clock.setFixedTime(MIDDAY_IN_BEIJING);
   await page.goto('/app?scenario=home-c-machines&pane=machines');
   const group = panel(page).locator('[data-slot="list-card"]').filter({ hasText: 'xmonsMac' });
   await expect(group).toHaveCount(1);
@@ -175,6 +177,7 @@ const REF = '/app?scenario=sessions-ref&pane=machines';
 test('the reference list says what runs on an online computer and how long an offline one has been away', async ({
   page,
 }) => {
+  await page.clock.setFixedTime(MIDDAY_IN_BEIJING);
   await page.goto(REF);
   const rows = panel(page).getByTestId('machine-list-row');
   await expect(rows).toHaveCount(2);

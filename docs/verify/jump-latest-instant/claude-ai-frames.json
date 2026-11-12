@@ -1,7 +1,0 @@
-{
-  "source": "claude.ai conversation, Chrome, 1840x884 viewport, scroller scrollHeight 4994 / clientHeight 884, button aria-label 'Scroll to bottom'",
-  "method": "scroll listener plus requestAnimationFrame probe armed before button.click(); the browser pane throttled rAF to roughly 16fps, so this is not a 60fps capture",
-  "scrollEvents": [{ "t": 9.1, "scrollTop": 4110, "gap": 0, "note": "from scrollTop 0 in a single scroll event: instant, no smooth animation" }],
-  "buttonStyle": { "transition": "opacity 0.2s, border-color 0.2s", "boxShadow": "shadow-md" },
-  "note": "claude.ai lands instantly but fades the button over 0.2s; cairn hides it with no transition"
-}

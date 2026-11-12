@@ -1,6 +1,0 @@
-Mac API check against https://omarchy.tailac09a9.ts.net
-anon GET /api/teams 401
-POST /api/remote/pair 201
-GET /api/teams with device session 200
-POST /api/remote/pairing with device session 403
-GET /api/teams after revoke 401

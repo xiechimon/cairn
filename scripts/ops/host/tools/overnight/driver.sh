@@ -82,10 +82,6 @@ MD
     log "#$n opened PR #$pr"
   fi
   grep -qx "$n" $ST/hold && { log "#$n on hold, no auto-merge"; continue; }
-  if true; then
-    gate=$(gh api "repos/$R/commits/$(git rev-parse HEAD)/check-runs?check_name=review-gate&filter=latest&per_page=100" --jq '[.check_runs[] | select(.app.slug == "github-actions")] | sort_by(.id) | last | .conclusion // ""')
-    [ "$gate" = success ] || { log "#$n PR #$pr waiting for the review-gate check"; continue; }
-  fi
   if out=$(~/.cairn/tools/merge-pr.sh $pr --auto 2>&1); then log "#$n PR #$pr auto-merge on"; else log "#$n PR #$pr auto-merge failed: ${out:0:120}"; fi
 done
 

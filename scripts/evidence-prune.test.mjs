@@ -91,6 +91,14 @@ test('keeps folders that code, CI or scripts reference, matching whole folder na
       'docs/verify/14040/a.txt': 'x',
       'docs/verify/900/a.txt': 'x',
       'docs/verify/1262/row.txt': 'x',
+      'docs/verify/1104/drive.mjs': 'x',
+      'docs/verify/1033/drive.mjs': 'x',
+      'docs/verify/1777/execution.md': 'x',
+      'docs/verify/2081/review-preflight.py': 'x',
+      'docs/lessons/2081-review.md': 'run docs/verify/2081/review-preflight.py\n',
+      '.claude/hillclimb/README.md': '[run](../../docs/verify/1777/execution.md)\n',
+      '.claude/skills/verify-x/vp-registry.json': '{"script":"docs/verify/1104/drive.mjs"}\n',
+      '.claude/skills/verify-x/SKILL.md': 'node docs/verify/1033/drive.mjs\n',
       '.claude/skills/verify-x/scripts/drive.mjs': "join(REPO, 'docs/verify/1262/row.txt')\n",
       '.claude/skills/verify-x/changelog/a.md': 'docs/verify/900/\n',
       '.github/workflows/ci.yml': 'run: node --test docs/verify/1542/reach.test.mjs\n',
@@ -102,6 +110,10 @@ test('keeps folders that code, CI or scripts reference, matching whole folder na
     assert.equal(repo.has('docs/verify/1542/reach.test.mjs'), true);
     assert.equal(repo.has('docs/verify/14040/a.txt'), true);
     assert.equal(repo.has('docs/verify/1262/row.txt'), true);
+    assert.equal(repo.has('docs/verify/1104/drive.mjs'), true);
+    assert.equal(repo.has('docs/verify/1033/drive.mjs'), true);
+    assert.equal(repo.has('docs/verify/1777/execution.md'), true);
+    assert.equal(repo.has('docs/verify/2081/review-preflight.py'), true);
     assert.equal(repo.has('docs/verify/1404'), false);
     assert.equal(repo.has('docs/verify/900'), false);
     assert.deepEqual(Object.keys(repo.ledger()), ['900', '1404']);
@@ -137,6 +149,25 @@ test('merges into an existing ledger with sorted keys and honours --days', () =>
     assert.equal(repo.has('docs/verify/XMON-9'), false);
     assert.deepEqual(Object.keys(repo.ledger()), ['7', 'XMON-9']);
     assert.equal(repo.ledger()['XMON-9'], sha);
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('keeps the folders a recorded decision retains as historical evidence', () => {
+  const repo = fixture();
+  try {
+    repo.commit(daysAgo(30), {
+      'docs/verify/2101/README.md': 'x',
+      'docs/verify/2136/README.md': 'x',
+      'docs/verify/2102/README.md': 'x',
+    });
+    const result = repo.run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(repo.has('docs/verify/2101/README.md'), true);
+    assert.equal(repo.has('docs/verify/2136/README.md'), true);
+    assert.equal(repo.has('docs/verify/2102'), false);
+    assert.deepEqual(Object.keys(repo.ledger()), ['2102']);
   } finally {
     repo.cleanup();
   }

@@ -39,10 +39,7 @@ function writeExecutable(path, content) {
   chmodSync(path, 0o755);
 }
 
-function mergePr(
-  t,
-  { opener, route, gate = 'success', labelsReadError = false, labels = [], ref = 'feature/x' },
-) {
+function mergePr(t, { opener, route, labelsReadError = false, labels = [], ref = 'feature/x' }) {
   const home = mkdtempSync(join(tmpdir(), 'merge-pr-queue-'));
   t.after(() => rmSync(home, { recursive: true, force: true }));
   const calls = join(home, 'calls');
@@ -51,7 +48,7 @@ function mergePr(
     join(home, 'gh-data.json'),
     JSON.stringify({
       labelsReadError,
-      checks: { 'merge-route': route, 'review-gate': gate },
+      checks: { 'merge-route': route },
       view: {
         headRefName: ref,
         labels: labels.map((name) => ({ name })),
@@ -88,35 +85,32 @@ function mergePr(
     labelled: recorded.some((c) => c[0] === 'gh' && c[1] === 'pr' && c[2] === 'edit'),
     commented: recorded.some((c) => c[0] === 'gh' && c[1] === 'pr' && c[2] === 'comment'),
     merged: recorded.some((c) => c.includes('merge')),
+    readReviewGate: recorded.some((c) => c.some((arg) => arg.includes('check_name=review-gate'))),
   };
 }
 
-for (const [name, route] of [
-  ['a protected PR whose labels cannot be read', 'failure'],
-  ['an unprotected PR whose labels cannot be read', 'success'],
-])
-  test(`${name} is refused, failing closed on the hold check`, (t) => {
-    const result = mergePr(t, { opener: 'xiechimon', route, labelsReadError: true });
-    assert.notEqual(result.status, 0);
-    assert.equal(result.merged, false);
-    assert.match(result.stderr, /could not read its labels/);
-  });
+test('a routed PR whose labels cannot be read is refused, failing closed on the dequeue check', (t) => {
+  const result = mergePr(t, { opener: 'xiechimon', route: 'success', labelsReadError: true });
+  assert.notEqual(result.status, 0);
+  assert.equal(result.merged, false);
+  assert.match(result.stderr, /could not read its labels/);
+});
 
-for (const [name, route, opener] of [
-  ['an unprotected human-opened', 'success', 'xiechimon'],
-  ['a protected', 'failure', 'xiechimon'],
-  ['a bot-opened', 'success', 'app/cairnwright'],
+for (const [name, opener] of [
+  ['a human-opened', 'xiechimon'],
+  ['a bot-opened', 'app/cairnwright'],
 ])
-  test(`${name} PR carrying coordinator-hold is never merged`, (t) => {
-    const result = mergePr(t, { opener, route, labels: ['coordinator-hold'] });
-    assert.notEqual(result.status, 0);
+  test(`${name} PR carrying coordinator-hold is left to Mergify like any other`, (t) => {
+    const result = mergePr(t, { opener, route: 'success', labels: ['coordinator-hold'] });
+    assert.equal(result.status, 0, result.stderr);
     assert.equal(result.merged, false);
-    assert.match(result.stderr, /coordinator-hold/);
+    assert.match(result.stdout, /Mergify queues it automatically/);
   });
 
 test('an unprotected human-opened PR is left to Mergify without a label, comment or merge', (t) => {
-  const result = mergePr(t, { opener: 'xiechimon', route: 'success', gate: 'in_progress' });
+  const result = mergePr(t, { opener: 'xiechimon', route: 'success' });
   assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.readReviewGate, false);
   assert.equal(result.labelled, false);
   assert.equal(result.commented, false);
   assert.equal(result.merged, false);
@@ -138,19 +132,12 @@ test('an unprotected bot-opened PR is left to Mergify like any other PR', (t) =>
   assert.match(result.stdout, /Mergify queues it automatically/);
 });
 
-for (const gate of ['failure', 'in_progress', null])
-  test(`a protected PR whose review-gate check is ${gate ?? 'missing'} is never merged`, (t) => {
-    const result = mergePr(t, { opener: 'xiechimon', route: 'failure', gate });
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /review-gate check/);
-    assert.equal(result.commented, false);
-    assert.equal(result.merged, false);
-  });
-
-test('a protected PR with a passing review-gate check merges', (t) => {
+test('a PR whose merge-route check failed is never merged: a failed router is not a route', (t) => {
   const result = mergePr(t, { opener: 'xiechimon', route: 'failure' });
-  assert.equal(result.status, 0, result.stderr);
-  assert.ok(result.merged);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /merge-route check for a{40} failed/);
+  assert.equal(result.commented, false);
+  assert.equal(result.merged, false);
 });
 
 for (const route of ['in_progress', null])
@@ -169,14 +156,10 @@ test('a PR Mergify dequeued is left for a human', (t) => {
   assert.equal(result.merged, false);
 });
 
-test('a lane PR keeps its review requirement and is never left to Mergify', (t) => {
-  const result = mergePr(t, {
-    opener: 'xiechimon',
-    route: 'success',
-    gate: 'failure',
-    ref: 'lane/12',
-  });
-  assert.notEqual(result.status, 0);
+test('a lane PR is squash-merged directly, with no review-gate check read', (t) => {
+  const result = mergePr(t, { opener: 'xiechimon', route: 'success', ref: 'lane/12' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.readReviewGate, false);
   assert.equal(result.commented, false);
-  assert.equal(result.merged, false);
+  assert.ok(result.merged);
 });
