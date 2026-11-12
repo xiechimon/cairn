@@ -45,11 +45,11 @@
       ]
     },
     {
-      "name": "#2167 coordinator-hold is the only hold label",
+      "name": "#2167 no label holds a PR; a draft waits for a decision",
       "run": [
         "node",
         "-e",
-        "const s=require('fs').readFileSync('AGENTS.md','utf8');const bad=[];\nif(s.includes('needs-decision'))bad.push('AGENTS.md still names the retired needs-decision label');\nif(!/put `coordinator-hold` on the PR while that decision is pending/.test(s))bad.push('AGENTS.md must hold a PR with coordinator-hold while a decision is pending');\nif(bad.length){console.error(bad.join('\\n'));process.exit(1)}"
+        "const s=require('fs').readFileSync('AGENTS.md','utf8');const bad=[];\nif(s.includes('needs-decision'))bad.push('AGENTS.md still names the retired needs-decision label');\nif(s.includes('coordinator-hold'))bad.push('AGENTS.md still names the retired coordinator-hold label');\nif(!/keep the PR a draft while that decision is pending/.test(s))bad.push('AGENTS.md must keep a PR a draft while a decision is pending');\nif(bad.length){console.error(bad.join('\\n'));process.exit(1)}"
       ]
     }
   ],

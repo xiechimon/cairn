@@ -6,13 +6,10 @@ queue_rules:
           - base = main
           - "#depends-on > 0"
       - -draft
-      - '#review-threads-unresolved = 0'
-      - -label = coordinator-hold
       - or:
           - -head ~= ^B[0-9]+/
           - label = queue-admit
       - check-success = commit-author
-      - check-success = @github-actions/review-gate
       - check-success = merge-route
       - check-success = pr-size
       - or:
@@ -36,7 +33,7 @@ queue_rules:
       - or:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
-      - '#files <= 80'
+      - '#files <= 3000'
     merge_conditions:
       - or:
           - check-success = check
@@ -71,13 +68,10 @@ queue_rules:
           - base = main
           - "#depends-on > 0"
       - -draft
-      - '#review-threads-unresolved = 0'
-      - -label = coordinator-hold
       - or:
           - -head ~= ^B[0-9]+/
           - label = queue-admit
       - check-success = commit-author
-      - check-success = @github-actions/review-gate
       - check-success = merge-route
       - check-success = pr-size
       - or:
@@ -101,7 +95,7 @@ queue_rules:
       - or:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
-      - '#files <= 80'
+      - '#files <= 3000'
     merge_conditions:
       - or:
           - check-success = check

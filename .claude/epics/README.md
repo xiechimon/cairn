@@ -45,7 +45,7 @@ A closed-not-planned issue is never done. For compatibility, v1 also accepts
 a closing commit reachable from main without a PR.
 
 Unfinished items marked `humanHeld`, carrying an owner-wait label, or linked
-to an open PR carrying `coordinator-hold`, `waits-ian`, or `ready-for-human` are
+to an open draft PR or one carrying `waits-ian` or `ready-for-human` are
 `humanHeld`. Their dependents are `blocked` transitively. Other unfinished
 items with unfinished dependencies are also `blocked`; unrelated items with
 satisfied dependencies stay `ready`. Completed items do not remain held.

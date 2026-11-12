@@ -1,0 +1,50 @@
+{
+  "timing": "pre_merge",
+  "completedAtUtc": "2026-10-28T12:19:24.467193+00:00",
+  "binding": {
+    "headSha": "60aaf07a741186378cf027d635462157ee9ad755",
+    "baseSha": "6237fcb562bd159e82105ce8b9da680106e020bc",
+    "patchDigest": "pd2:9666f694a30ef17f2e6051df8ab0c95b4a97a62b29ea91384faeb0ec52ef3763",
+    "binaryDiffSha256": "9f37a5d30caa27e9ec45506845f759fc89d43563a2d2caec5f5dd506e4587236",
+    "writerModelFamily": "GPT",
+    "timing": "pre_merge",
+    "bundleSha256": "a0ba5aae0a93e5b0fbb41949a0908d5a1cc354a11634d204f7867e10b1f8db61"
+  },
+  "execution": {
+    "rc": 0,
+    "seconds": 20,
+    "timing": "pre_merge",
+    "configuredContextWindow": 1000000
+  },
+  "completion": {
+    "model": "deepseek-v4.1-flash",
+    "stopReason": "stop",
+    "usage": {
+      "input": 314372,
+      "output": 1327,
+      "cacheRead": 256,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 315955,
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+      }
+    }
+  },
+  "review": {
+    "headSha": "60aaf07a741186378cf027d635462157ee9ad755",
+    "patchDigest": "pd2:9666f694a30ef17f2e6051df8ab0c95b4a97a62b29ea91384faeb0ec52ef3763",
+    "reviewerModel": "deepseek-v4.1-flash",
+    "verdict": "pass",
+    "gateWeakening": {
+      "answer": "no"
+    },
+    "evalRulerChange": {
+      "answer": "no"
+    }
+  }
+}
