@@ -151,7 +151,7 @@ pnpm traj:failure-replay --intake --in /tmp/failure-replay-candidates.jsonl \
 ```
 
 Pending candidates never enter `integration/eval/`. The intake PR still needs a
-human merge (ADR 0025).
+human merge.
 
 ## Pushing trajectory packs (#1570)
 

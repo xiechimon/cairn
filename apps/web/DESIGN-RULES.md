@@ -1,6 +1,6 @@
 # Cairn UI rules for agents
 
-Short, checkable rules for any change under `apps/web/src`. `DESIGN.md` is the full reference for tokens, components and motion; this file is what you read first and what a reviewer checks against. Decision: D120 (2026-11-06). Evidence behind it: `docs/research/ai-frontend-quality-2026-11-06.md` and `docs/research/ui-ux-audit-2026-11-06.md`.
+Short, checkable rules for any change under `apps/web/src`. `DESIGN.md` is the full reference for tokens, components and motion; this file is what you read first and what a reviewer checks against. Evidence behind it: `docs/research/ai-frontend-quality-2026-11-06.md` and `docs/research/ui-ux-audit-2026-11-06.md`.
 
 Each rule has an id. Put the ids you checked in the PR (Proof, reference row). The Check column says how a violation is found:
 
@@ -108,8 +108,8 @@ Source: the owner's reference-versus-ours review of the sidebar (#3144, 2026-11-
 ## 5. Using the rules
 
 - Briefs for UI work come from `.claude/skills/design-cairn/SKILL.md`; the brief lists the rule ids that apply and the reference shots.
-- The look-and-feel assertions come from the `M` rows. They run next to axe in the CI screenshot job (D117, branch `ops/pr-evidence-standard`, PR #3134 and its follow-up). That job owns the Playwright code; this file only supplies the ids. An assertion message starts with the rule id (`C3: ...`) so a failure points here.
-- Rollout (D120): the assertions run non-blocking for 2 weeks from the day the job first reports on `main`, then become blocking together with the axe condition. Record the start date in the plan decision table when the job lands.
+- The look-and-feel assertions come from the `M` rows. They run next to axe in the CI screenshot job (PR #3134 and its follow-up). That job owns the Playwright code; this file only supplies the ids. An assertion message starts with the rule id (`C3: ...`) so a failure points here.
+- Rollout: the assertions run non-blocking for 2 weeks from the day the job first reports on `main`, then become blocking together with the axe condition. Record the start date in the PR that makes them blocking.
 - A rule enters this file after the A/B check in `docs/design/rule-ab.md`, or when it copies a measured value from `DESIGN.md` or an audit finding. A rule that stops changing output is deleted.
 - A review finding that can be measured becomes an `M` rule with an assertion; one that is taste becomes an `H` rule with a reference shot. Fixing the one page is not enough.
 

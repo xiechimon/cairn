@@ -1,6 +1,6 @@
-# Server backup and recovery (ADR 0016 ruling 5, #1151, #2163)
+# Server backup and recovery (#1151, #2163)
 
-The server's SQLite database is the source of truth for todos, threads and review records, and the attachments directory holds the files those records point to. ADR 0016 ruling 5 requires an hourly off-site copy of both (RPO 1 hour). This page is the runbook for that backup: the script `scripts/ops/backup-server-db.sh`, the live setup on omarchy, the receiver on dmit, and recovery.
+The server's SQLite database is the source of truth for todos, threads and review records, and the attachments directory holds the files those records point to. The backup is an hourly off-site copy of both (RPO 1 hour). This page is the runbook for that backup: the script `scripts/ops/backup-server-db.sh`, the live setup on omarchy, the receiver on dmit, and recovery.
 
 What is not in the backup:
 
@@ -43,7 +43,7 @@ The server runs on omarchy as user `ian`, with data in `/mnt/fast/cairn/server` 
 
 ```ini
 [Unit]
-Description=Cairn server DB and attachments backup (ADR 0016 ruling 5)
+Description=Cairn server DB and attachments backup
 Documentation=https://github.com/xiechimon/cairn/blob/main/docs/ops-db-backup.md
 
 [Service]
