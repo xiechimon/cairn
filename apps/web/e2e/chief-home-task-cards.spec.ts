@@ -161,7 +161,7 @@ test('a created task the page no longer knows falls back to a one-line link', as
   const stream = page.getByTestId('chief-stream');
   await expect(stream.getByTestId('chief-task-ref')).toHaveCount(0);
   await expect(stream.locator('[data-slot="task-card"]')).toHaveCount(0);
-  await expect(stream.getByTestId('chief-task-created')).toHaveText(`Created task #${TASK.seqNum} ${TASK.title}`);
+  await expect(stream.getByTestId('chief-task-created')).toHaveText(`Created task ${TASK.title}`);
 });
 
 test('tasks waiting on the owner put no tray above the composer; the greeting count is the Tasks badge', async ({

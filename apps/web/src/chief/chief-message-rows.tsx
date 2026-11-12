@@ -121,6 +121,7 @@ function robotText(item: {
 }
 
 function TodoSegmentChip({ seq }: { seq: number }) {
+  const { t } = useI18n();
   const glances = useContext(TodoGlanceContext);
   const known = [...(glances ?? [])].find(([, glance]) => glance.seq === seq);
   const chip = (
@@ -130,7 +131,7 @@ function TodoSegmentChip({ seq }: { seq: number }) {
       ) : (
         <FileText width={11} height={11} />
       )}
-      {seq}
+      <span className="max-w-48 truncate">{known?.[1].title ?? t('任务')}</span>
     </>
   );
   const cls = `${CHIP_INLINE_CLS} bg-secondary text-content-secondary`;
@@ -251,9 +252,8 @@ function TaskStartedRow({
       <StatusLine testId="chief-task-created">
         {t('已建任务')}{' '}
         <ThreadLink todoId={todoId} className={STATUS_REF_CLS}>
-          {seq != null ? `#${seq}` : t('任务')}
+          {title ?? t('任务')}
         </ThreadLink>
-        {title != null ? ` ${title}` : null}
       </StatusLine>
     </MessageScrollerItem>
   );
@@ -267,7 +267,7 @@ function HandoffRow({ todoId }: { todoId: string }) {
       <StatusLine testId="chief-handoff">
         {t('已转给任务')}{' '}
         <ThreadLink todoId={todoId} className={STATUS_REF_CLS} data-phase={glance?.phase}>
-          {glance?.seq != null ? `#${glance.seq}` : t('任务')}
+          {glance?.title ?? t('任务')}
         </ThreadLink>
       </StatusLine>
     </MessageScrollerItem>
@@ -329,7 +329,7 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
               <span key={todo.id}>
                 {n === 0 ? ' ' : '、'}
                 <ThreadLink todoId={todo.id} className={STATUS_REF_CLS}>
-                  {`#${todo.seq} ${todo.title}`}
+                  {todo.title}
                 </ThreadLink>
               </span>
             ))}

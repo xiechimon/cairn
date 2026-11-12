@@ -185,7 +185,7 @@ test('sched card `更多` opens a menu and deletes the row through the confirm (
   const confirm = page.getByRole('alertdialog');
   await expect(confirm).toBeVisible();
   await expect(confirm).toContainText('确定删除该定时？此操作不可撤销。');
-  await expect(confirm).toContainText('#1');
+  await expect(confirm).not.toContainText('#1');
   await confirm.getByRole('button', { name: '删除' }).click();
   await expect(confirm).toBeHidden();
   await expect(page.locator('.sched-card')).toHaveCount(0);

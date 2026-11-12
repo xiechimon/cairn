@@ -773,7 +773,7 @@ test('targeting a thread turns the composer back into a normal send and leaves t
   const composer = page.getByTestId('chief-composer-input');
   await expect(page.getByTestId('chief-question-primary')).toBeVisible();
   await page.locator('[data-testid="composer-plus"]:visible').click();
-  await page.getByRole('menuitemradio').filter({ hasText: '#9' }).click();
+  await page.getByRole('menuitemradio').filter({ hasText: TASK.title }).click();
   await expect(page.getByTestId('chief-question-primary')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '发送' })).toBeVisible();
   await expect(composer).not.toHaveAttribute('placeholder', '输入你自己的回答…');
@@ -804,7 +804,7 @@ test('with a thread targeted, digits type, page switches and a chip answer leave
   await page.goto('/app');
   const composer = page.getByTestId('chief-composer-input');
   await page.locator('[data-testid="composer-plus"]:visible').click();
-  await page.getByRole('menuitemradio').filter({ hasText: '#9' }).click();
+  await page.getByRole('menuitemradio').filter({ hasText: TASK.title }).click();
   await expect(page.getByRole('menu')).toHaveCount(0);
   await composer.click();
   await expect(composer).toBeFocused();
@@ -957,7 +957,7 @@ test('answer drafts per request and the thread draft stay separate through every
     page.getByTestId('chief-question').getByTestId(`chief-question-option-0-${n}`);
   const toThread = async () => {
     await page.locator('[data-testid="composer-plus"]:visible').click();
-    await page.getByRole('menuitemradio').filter({ hasText: '#9' }).click();
+    await page.getByRole('menuitemradio').filter({ hasText: TASK.title }).click();
     await expect(page.getByRole('menu')).toHaveCount(0);
   };
   const toCoordinator = async () => {
