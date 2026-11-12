@@ -717,7 +717,6 @@ const SKILL_INJECT_TRANSCRIPT: TranscriptItem[] = [
 
 const SKILL_INJECT_ZERO_TRANSCRIPT: TranscriptItem[] = [
   { kind: 'run', at: '13:35', machine: 'xmonsMac-3574' },
-  { kind: 'injected-skills', skills: [] },
   {
     kind: 'user',
     text: '把首页轮播图换成静态图',

@@ -126,7 +126,6 @@ function ComposerSpecimen() {
             placeholder={PHASE_UI.building.placeholder ?? ''}
             aiReview={false}
             streaming
-            workingFor={{ seconds: 72 }}
             editable
             mentionGroups={MENTION_GROUPS}
             onQueue={(text) => setSent((all) => [...all, `queued: ${text}`])}
@@ -363,7 +362,6 @@ export function ProductDetailSection() {
             placeholder={PHASE_UI.building.placeholder ?? ''}
             aiReview={false}
             streaming
-            workingFor={{ seconds: 72 }}
             editable
             queuedMessages={queued}
             onSendQueuedNow={(id) => settle(`send now ${id}`)}

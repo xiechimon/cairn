@@ -76,7 +76,6 @@ export const EN: Record<string, string> = {
   '正在调用 {n} 个工具': 'Calling {n#1 tool|# tools}',
   '（{n} 个失败）': '({n} failed)',
   '已工作 {n} 分钟': 'Worked for {n#1 minute|# minutes}',
-  '工作中 · {time}': 'Working · {time}',
   思考了: 'Thought',
   读取了: 'Read',
   搜索了: 'Searched',
@@ -895,7 +894,6 @@ export const EN: Record<string, string> = {
   '挡下：{n}': 'Blocked: {n}',
   // #1106 dispatch skill injection: detail-face lookup row (reasons ride as
   // server data, not t() keys — same law as note #634).
-  '未注入技能（任务文本未命中任何技能）': 'No skills injected (task text matched none)',
   // #1288：模型活性标注——dead 模型置灰 +「已下架」（不隐藏）。
   已下架: 'Delisted',
   [PROBE_TOOL_CALL_LABEL]: `Calling tool: ${PROBE_TOOL_PILLS[1]}`,
