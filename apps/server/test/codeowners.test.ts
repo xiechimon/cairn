@@ -102,6 +102,29 @@ describe('.github/CODEOWNERS', () => {
   test('CODEOWNERS itself is also owned by @xiechimon, removing an entry needs human review', () => {
     expect(ownersOf(rules, '.github/CODEOWNERS')).toEqual([OWNER]);
   });
+
+  test('each owner-route class names @xiechimon', () => {
+    const paths = JSON.parse(read('packages/shared/merge-gate-paths.json')) as {
+      ownerRoute: { ciAndMergeMachinery: string[]; evalRuler: string[] };
+      humanQueue: Record<string, string[]>;
+    };
+    const securityKeys = ['credentials', 'machineAndCommandBoundary', 'externalEntryAuth'] as const;
+    const security = securityKeys.flatMap((key) => {
+      const globs = paths.humanQueue[key];
+      expect(globs, key).toEqual(expect.any(Array));
+      return globs ?? [];
+    });
+    const globs = [
+      ...paths.ownerRoute.ciAndMergeMachinery,
+      ...paths.ownerRoute.evalRuler,
+      ...security,
+    ];
+    const sample = (glob: string) =>
+      glob.endsWith('/**')
+        ? `${glob.slice(0, -3)}/owner-route.txt`
+        : glob.replaceAll('*', 'sample');
+    for (const glob of globs) expect(ownersOf(rules, sample(glob)), glob).toEqual([OWNER]);
+  });
 });
 
 describe('docs/ops/agent-bot-identity.md', () => {

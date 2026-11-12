@@ -477,16 +477,21 @@ for (const [name, data] of [
     { numstat: '0\t1\tapps/web/src/page.test.ts\n', deleted: 'apps/web/src/page.test.ts\n' },
   ],
   ['binary source', { numstat: '-\t-\tapps/web/src/page.ts\n' }],
-  [
-    'security surface beside an oversize patch',
-    { numstat: `401\t400\tapps/web/src/page.ts\n1\t0\tapps/server/src/services/secrets.ts\n` },
-  ],
 ])
   test(`path class does not owner-route ${name}`, (t) => {
     const f = fixture(t, data);
     assert.equal(f.queues.length, 1, f.result.stdout);
     assert.doesNotMatch(f.result.stdout, /owner-route/);
   });
+
+test('a security surface beside an oversize patch routes to the owner', (t) => {
+  const f = fixture(t, {
+    numstat: `401\t400\tapps/web/src/page.ts\n1\t0\tapps/server/src/services/secrets.ts\n`,
+  });
+  assert.equal(f.queues.length, 0, f.result.stdout);
+  assert.match(f.result.stdout, /owner-route/);
+  assert.match(f.result.stdout, /credentials/);
+});
 for (const data of [{ gitError: true }, { policy: 'invalid policy' }, { numstat: 'invalid' }])
   test('unavailable owner routing fails closed', (t) => {
     const f = fixture(t, data);

@@ -16,14 +16,30 @@ const routing = between('const safety = reviewed.find', 'const checked =');
 const gatePaths = JSON.parse(readFileSync('packages/shared/merge-gate-paths.json', 'utf8'));
 const sandbox = { timeout: 1000, contextCodeGeneration: { strings: false, wasm: false } };
 
-const decide = ({ changedFiles, linesChanged = 1, binaryFiles = [], deletedFiles = [] }) =>
+const decide = ({
+  changedFiles,
+  linesChanged = 1,
+  binaryFiles = [],
+  deletedFiles = [],
+  unlisted = [],
+}) =>
   runInNewContext(
     `${constants}
 const matchedProtected = changedFiles.filter(isProtected);
-const reviewed = [];
+const reviewed = unlisted.length
+  ? [{ key: 'safety', review: { changedFiles: [...changedFiles, ...unlisted], deletedFiles: [], binaryFiles: [] } }]
+  : [];
 ${routing}
 ;({ humanReasons, size: typeof sizeReview })`,
-    { args: { gatePaths }, changedFiles, deletedFiles, binaryFiles, linesChanged },
+    {
+      args: { gatePaths },
+      changedFiles,
+      deletedFiles,
+      binaryFiles,
+      linesChanged,
+      unlisted,
+      log: () => {},
+    },
     sandbox,
   );
 const route = (input) => Array.from(decide(input).humanReasons);
@@ -36,16 +52,65 @@ test('a large patch neither routes to the owner nor reports a size review (D68)'
   assert.equal(decision.size, 'undefined');
 });
 
-test('a large patch touching a security surface does not route to the owner', () => {
-  for (const surface of [
-    'apps/server/src/services/secrets.ts',
-    'apps/server/src/routes-machine.ts',
-    'apps/daemon/src/backend/command-gate.ts',
-    'apps/server/src/services/mcp-face.ts',
-  ]) {
-    const reasons = route({ changedFiles: [...sourceFiles(41), surface], linesChanged: 900 });
-    assert.deepEqual(reasons, []);
+const sampleOf = (glob) =>
+  glob.endsWith('/**') ? `${glob.slice(0, -3)}/owner-route.txt` : glob.replaceAll('*', 'sample');
+
+const ownerClasses = () => {
+  const named = gatePaths.ownerRoute;
+  const queue = gatePaths.humanQueue;
+  return {
+    'ci and merge machinery': named.ciAndMergeMachinery,
+    'eval ruler': named.evalRuler,
+    credentials: queue.credentials,
+    machineAndCommandBoundary: queue.machineAndCommandBoundary,
+    externalEntryAuth: queue.externalEntryAuth,
+  };
+};
+
+test('each owner-route class routes to the owner and names the class', () => {
+  for (const [label, globs] of Object.entries(ownerClasses())) {
+    for (const glob of globs) {
+      const path = sampleOf(glob);
+      assert.deepEqual(route({ changedFiles: [path] }), [`owner route (${label}): ${path}`], glob);
+    }
   }
+});
+
+test('a non-sensitive path still auto-merges, including other protected paths', () => {
+  for (const path of [
+    'apps/web/src/a.ts',
+    'scripts/x.mjs',
+    'docs/spec/28.md',
+    'apps/server/src/db/client.ts',
+    'scripts/ops/deploy-self.sh',
+    'apps/server/src/services/harness-eval-sample.ts',
+    '.github/CODEOWNERS',
+    'README.md',
+    'scripts/ops/review-gate-extra/foo.mjs',
+  ])
+    assert.deepEqual(route({ changedFiles: [path] }), [], path);
+});
+
+test('a sensitive file beside product source routes only for that file', () => {
+  assert.deepEqual(
+    route({
+      changedFiles: [...sourceFiles(41), 'apps/server/src/services/secrets.ts'],
+      linesChanged: 900,
+    }),
+    ['owner route (credentials): apps/server/src/services/secrets.ts'],
+  );
+});
+
+test('owner-route matching folds case', () => {
+  const path = 'apps/server/src/services/Secrets.ts';
+  assert.deepEqual(route({ changedFiles: [path] }), [`owner route (credentials): ${path}`]);
+});
+
+test('a sensitive file the caller omitted still routes to the owner', () => {
+  assert.deepEqual(
+    route({ changedFiles: ['apps/web/src/a.ts'], unlisted: ['apps/server/src/lib/keys.ts'] }),
+    ['owner route (credentials): apps/server/src/lib/keys.ts'],
+  );
 });
 
 test('binary files outside docs/verify do not route to the owner', () => {
