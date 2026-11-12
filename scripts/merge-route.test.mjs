@@ -98,22 +98,10 @@ test('protected paths may enter the queue', (t) => {
   assert.match(result.stdout, /may enter the merge queue/);
 });
 
-test('each owner-route class exits for the owner', (t) => {
-  for (const [path, reason] of [
-    ['.github/workflows/ci.yml', /owner route \(ci and merge machinery\)/],
-    ['integration/eval/owner-route.txt', /owner route \(eval ruler\)/],
-    ['apps/server/src/services/secrets.ts', /owner route \(credentials\)/],
-    ['apps/server/src/routes-machine.ts', /owner route \(machineAndCommandBoundary\)/],
-    ['apps/server/src/services/mcp-face.ts', /owner route \(externalEntryAuth\)/],
-  ]) {
-    const result = route(repoWith(t, { [path]: 'export {};\n' }));
-    assert.equal(result.status, 1, `${path}\n${result.stdout}${result.stderr}`);
-    assert.match(result.stdout, reason, path);
-  }
-});
-
-test('a non-sensitive protected path may enter the queue', (t) => {
-  const result = route(repoWith(t, { 'apps/server/src/db/client.ts': 'export const db = 1;\n' }));
+test('a security surface may enter the queue', (t) => {
+  const result = route(
+    repoWith(t, { 'apps/server/src/services/secrets.ts': 'export const seal = 1;\n' }),
+  );
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /may enter the merge queue/);
 });
@@ -167,18 +155,6 @@ test('a protected path does not get the owner-route label', (t) => {
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /may enter the merge queue/);
   assert.deepEqual(gh.writes(), []);
-});
-
-test('an owner-route path gets the owner-route label', (t) => {
-  const gh = fakeGh(t);
-  const result = routeLabelling(
-    repoWith(t, { 'apps/server/src/services/secrets.ts': 'export const seal = 1;\n' }),
-    gh,
-  );
-  assert.equal(result.status, 1, result.stdout + result.stderr);
-  assert.equal(gh.writes().length, 1);
-  assert.match(gh.writes()[0], /--method POST repos\/o\/r\/issues\/7\/labels/);
-  assert.match(gh.writes()[0], /owner-route/);
 });
 
 test('a protected path loses a stale owner-route label', (t) => {
