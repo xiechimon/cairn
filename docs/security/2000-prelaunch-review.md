@@ -4,6 +4,8 @@ Reviewed 2026-10-27 for [#2000](https://github.com/xiechimon/cairn/issues/2000),
 
 ## Result
 
+Status on 2026-11-12: #2053, #2054, #2055, #2056 and #2057 are closed by merged fixes. #1775 is closed by its research PR #2029 only: `get_secret` still returns the plaintext value to the model, so the team-secret finding below stands. The rest of this report describes the checkout reviewed on 2026-10-27.
+
 The reviewed checkout has unresolved authentication, credential, and upload findings. This review does not establish readiness for untrusted installations. Five new issues track remediation or decisions. The existing #1775 tracks team-secret disclosure. No product behavior changes in this delivery.
 
 "Source observation" means code read in this checkout. "Runtime observation" means a probe executed during this review. "Inference" identifies consequences that the probes do not demonstrate directly. Severity is a triage judgment, not a CVSS score.
