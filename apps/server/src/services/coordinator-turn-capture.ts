@@ -54,6 +54,7 @@ const claimView = z.object({
   thinkingLevel: z.string().nullable(),
   volatileText: z.string().nullable(),
   projects: z.array(projectView),
+  initialTodoIds: z.array(z.string()),
 });
 
 const snapshotPayload = z.object({

@@ -20,6 +20,7 @@ import {
   coordinatorInput,
   project,
   step,
+  todo,
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { isChiefDigestStep } from '../services/chief-digest.js';
@@ -422,6 +423,12 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       'coordinator memory injected',
     );
     captureClaimInputs(row.id, {
+      initialTodoIds: db
+        .select({ id: todo.id })
+        .from(todo)
+        .where(eq(todo.teamId, threadRow.teamId))
+        .all()
+        .map((t) => t.id),
       projects: db
         .select()
         .from(project)

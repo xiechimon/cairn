@@ -50,6 +50,7 @@ function sealedRow(overrides: Partial<SealedRow> = {}): SealedRow {
       modelId: 'm',
       thinkingLevel: null,
       volatileText: null,
+      initialTodoIds: [],
       projects: [
         {
           id: 'p0',
@@ -84,6 +85,7 @@ function sealedRow(overrides: Partial<SealedRow> = {}): SealedRow {
 it('keeps the sealed payload contract aligned with the server capture schema', () => {
   const payload = JSON.parse(sealedRow().payload as string) as { claim: Record<string, unknown> };
   expect(Object.keys(payload.claim).sort()).toEqual([
+    'initialTodoIds',
     'instruction',
     'memories',
     'modelId',
@@ -130,20 +132,35 @@ it('rejects every ineligible snapshot state fail-closed', () => {
     ['redacted required input', { redactionCount: 2 }, /incomplete: snapshot required redaction/],
     ['no instruction', {}, /incomplete: snapshot has no submitted instruction/],
   ];
+  const defaultClaim = JSON.parse(sealedRow().payload as string).claim;
   for (const [name, overrides, pattern] of cases) {
-    const row =
-      name === 'no instruction'
-        ? sealedRow({
-            payload: JSON.stringify({
-              claim: {
-                ...JSON.parse(sealedRow().payload as string).claim,
-                instruction: null,
-              },
-              toolViews: [],
-            }),
-          })
-        : sealedRow(overrides);
-    if (name === 'no instruction') {
+    const patchedPayloads = ['no instruction', 'pre-existing todos', 'tool views without closure'];
+    const row = sealedRow(
+      patchedPayloads.includes(name)
+        ? {
+            ...overrides,
+            payload: JSON.stringify(
+              name === 'no instruction'
+                ? { claim: { ...defaultClaim, instruction: null }, toolViews: [] }
+                : name === 'pre-existing todos'
+                  ? { claim: { ...defaultClaim, initialTodoIds: ['todo-1'] }, toolViews: [] }
+                  : {
+                      claim: defaultClaim,
+                      toolViews: [
+                        {
+                          callId: 'c1',
+                          tool: 'projects',
+                          params: {},
+                          preCallTodos: [],
+                          result: [],
+                        },
+                      ],
+                    },
+            ),
+          }
+        : overrides,
+    );
+    if (patchedPayloads.includes(name)) {
       row.digest = createHash('sha256')
         .update(canonical(JSON.parse(row.payload as string)))
         .digest('hex');

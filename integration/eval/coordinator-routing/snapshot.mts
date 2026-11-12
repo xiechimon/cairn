@@ -29,6 +29,7 @@ const sealedSnapshot = z.strictObject({
         })
         .strict(),
     ),
+    initialTodoIds: z.array(z.string()),
   }),
   toolViews: z.array(
     z.object({
@@ -85,6 +86,10 @@ export function snapshotToReplayInput(rawRow: {
   if (!parsed.success) throw new Error('incomplete: snapshot payload schema mismatch');
   if (parsed.data.claim.instruction === null)
     throw new Error('incomplete: snapshot has no submitted instruction');
+  if (parsed.data.claim.initialTodoIds.length > 0)
+    throw new Error('incomplete: snapshot carries pre-existing todos without a full closure');
+  if (parsed.data.toolViews.length > 0)
+    throw new Error('incomplete: snapshot carries tool views without a full closure');
   const input = replayInput.safeParse({
     request: parsed.data.claim.instruction,
     projects: parsed.data.claim.projects,
