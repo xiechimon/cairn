@@ -254,6 +254,12 @@ export function HomeC({
     threadId,
     chiefThreadId: chiefData.threadId ?? null,
   });
+  const channelKey = conversationBoundaryKey({
+    projectId,
+    chat: null,
+    threadId: null,
+    chiefThreadId: chiefData.threadId ?? null,
+  });
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const loaded = surface.load === 'ready';
   useEffect(() => {
@@ -621,7 +627,7 @@ export function HomeC({
             </div>
           )}
           <OpenFileContext.Provider value={openFile}>
-            <ConversationBoundary resetKey={conversationResetKey}>
+            <ConversationBoundary key={channelKey} resetKey={conversationResetKey}>
               <ChiefConversation
                 chief={{
                   ...chiefData,

@@ -287,7 +287,7 @@ function ThreadBody({
         <ChangesView chat={chat} now={now} />
       ) : (
         <TranscriptColumn
-          transcript={chat.transcript}
+          transcript={chat.transcript.filter((item) => item.kind !== 'plan')}
           liveStep={null}
           agent={null}
           onOpenPlan={onOpenPlan}

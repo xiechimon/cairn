@@ -1,4 +1,5 @@
 import { type AskUserAnswer, type TranscriptRow, transcriptRowSchema } from '@cairn/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   useCallback,
   useEffect,
@@ -13,6 +14,7 @@ import { toast } from 'sonner';
 import { activityStore } from '../api/activity.js';
 import { isCoordinatorNotReady, toastCoordinatorNotReady } from '../api/coordinator-not-ready.js';
 import {
+  keepNewestMessagesPage,
   useApiMutations,
   useChief,
   useChiefThreads,
@@ -152,10 +154,32 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     setChiefView,
     place,
   ]);
-  const { query: chiefMessagesQ, messages: chiefMessages } = useConversationMessages(
+  const channel = new URLSearchParams(search).get('project');
+  const [shownChannel, setShownChannel] = useState(channel);
+  const [newestPageOnly, setNewestPageOnly] = useState(false);
+  if (shownChannel !== channel) {
+    setShownChannel(channel);
+    setNewestPageOnly(channel === null);
+  }
+  const { query: chiefMessagesQ, messages: loadedChiefMessages } = useConversationMessages(
     live ? (activeThread?.id ?? null) : null,
     live,
   );
+  const newestPage = chiefMessagesQ.data?.pages[0];
+  const chiefMessages = useMemo(
+    () => (newestPageOnly ? (newestPage?.messages ?? []) : loadedChiefMessages),
+    [newestPageOnly, newestPage, loadedChiefMessages],
+  );
+  const queryClient = useQueryClient();
+  const activeThreadId = live ? (activeThread?.id ?? null) : null;
+  useEffect(() => {
+    if (!newestPageOnly) return;
+    const trimmed =
+      activeThreadId === null
+        ? Promise.resolve()
+        : keepNewestMessagesPage(queryClient, activeThreadId);
+    void trimmed.finally(() => setNewestPageOnly(false));
+  }, [newestPageOnly, activeThreadId, queryClient]);
   const streamHandlers = useMemo(
     () => ({
       onMessage: (row: TranscriptRow) => {
@@ -167,7 +191,6 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     [t],
   );
   useConversationStream(live ? (activeThread?.id ?? undefined) : undefined, live, streamHandlers);
-  const activeThreadId = live ? (activeThread?.id ?? null) : null;
   const knownChiefIds = useMemo(() => new Set(chiefMessages.map((m) => m.id)), [chiefMessages]);
   const liveText = useSyncExternalStore(liveTextStore.subscribe, () =>
     activeThreadId !== null ? liveTextStore.getVisible(activeThreadId, knownChiefIds) : '',

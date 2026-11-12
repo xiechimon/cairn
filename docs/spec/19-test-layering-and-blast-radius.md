@@ -17,7 +17,7 @@ Measurement environment: this worktree, pnpm cold-installed, no concurrent e2e. 
 | web e2e full (fixture build + preview + playwright) | **154.3s** | 617 cases / 83 specs all passed | **+3.38GB / +44 processes** (watermark 94 processes / 3.02GB → peak 138 / 6.40GB) |
 | vitest light (all packages' colocated unit tests) | 40.1s | — | single process 336MB |
 | vitest integration (real server + daemon + Chromium) | 124.1s | 58 cases / 19 files | sampling peak +2.3GB / +28 processes |
-| verify-pacman live probes | not measured | — | ticket-level acceptance probes, not in the development loop (see the responsibility table) |
+| verify-cairn live probes | not measured | — | ticket-level acceptance probes, not in the development loop (see the responsibility table) |
 
 CI side (step breakdown of the green run 37098721348): check job 7.4min, among which **the e2e step 223s is the largest single item**; vitest light 45s, integration 112s, typecheck 7s. The three layers' "run it all once" local time shares: e2e 48% / integration 39% / light 13% — the weight really is on the browser layer and the stack layer.
 
@@ -29,8 +29,8 @@ CI side (step breakdown of the green run 37098721348): check job 7.4min, among w
 |---|---|---|---|
 | **unit** | vitest projects, each package colocated `test/`, pure functions / schema / mapper | **CI required check**; run related tests by hand during development | `pnpm test`; affected surface `pnpm exec vitest run --changed` |
 | **stack integration** | vitest `integration` project: in-process real server + daemon + Chromium walking the full chain | **CI required check**; run related tests by hand when changing the server / daemon / shared contract surface | `VITEST_PROJECT_SET=integration pnpm test` |
-| **web e2e** | playwright fixture surface: 83 specs / 617 cases, UI behavior and geometry | **development runs the affected surface**; **the full set goes to CI (4 shards)**; local full only when a final review really needs it | affected surface `pnpm --filter @pacman/web e2e:affected`; full `pnpm --filter @pacman/web e2e` |
-| **verify-pacman** | isolated live stack (8791/5273 + independent CAIRN_HOME) walking real user paths | **ticket-level acceptance** (proof before delivery that "it really runs", not daily regression) | `.claude/skills/verify-pacman/SKILL.md` |
+| **web e2e** | playwright fixture surface: 83 specs / 617 cases, UI behavior and geometry | **development runs the affected surface**; **the full set goes to CI (4 shards)**; local full only when a final review really needs it | affected surface `pnpm --filter @cairn/web e2e:affected`; full `pnpm --filter @cairn/web e2e` |
+| **verify-cairn** | isolated live stack (8791/5273 + independent CAIRN_HOME) walking real user paths | **ticket-level acceptance** (proof before delivery that "it really runs", not daily regression) | `.claude/skills/verify-cairn/SKILL.md` |
 
 One-sentence memory: **prepush runs fast checks, CI owns suite results, development uses related tests by hand, live probes provide ticket-level acceptance.**
 
@@ -38,7 +38,7 @@ One-sentence memory: **prepush runs fast checks, CI owns suite results, developm
 
 Mechanism (`scripts/e2e-affected.mjs`, after selecting specs it runs through the **standard fixture-build config** — measured fixture build only ~1s (vite 8), all the speed comes from the selection itself (full 617 cases vs a single domain's dozens), fidelity identical to CI, no independent fast-channel config needed, and token-gate needs no special handling (its self-start server serves exactly the dist the webServer just built):
 
-- **Selection**: no args = all change paths of the worktree + branch vs `origin/main`; explicit paths = `pnpm --filter @pacman/web e2e:affected -- <paths>`; `--dry-run` only prints the selection result.
+- **Selection**: no args = all change paths of the worktree + branch vs `origin/main`; explicit paths = `pnpm --filter @cairn/web e2e:affected -- <paths>`; `--dry-run` only prints the selection result.
 - **Mapping**: the spec family = the e2e filename prefix (`chief-`, `sidebar-`…); source path → family goes through `scripts/e2e-affected.mjs`'s table (directory-level mostly, `src/board/sidebar.tsx`, `src/routes/*` and other file-level overrides). **Conservative over-inclusion**: running one extra spec only costs seconds, missing one reads as a false green — the mapping table prefers over-inclusion, and it is a **signal not a guarantee**: the only complete gate is the CI full run.
 - **Shared surface → full fallback**: `src/ui` `src/styles` `src/i18n` `src/api` `src/fixtures` `App.tsx` `main.tsx` `theme.ts` `phase.ts`, playwright/vite configs, `e2e/evidence.ts` `e2e/png.ts`, the runner itself (`scripts/e2e-affected*.mjs`, `scripts/heavy-slots.mjs`, `scripts/timed-partition.mjs`), unmapped `apps/web/**` paths — these changes' honest affected surface is all specs.
 - **web unit-test layer → no e2e selected** (#1455): `apps/web/test/**` and `apps/web/vitest.config.ts` belong only to vitest, they do not enter the playwright-hosted fixture build, and e2e does not import them — the affected surface is empty, coverage carried by `pnpm exec vitest run --changed origin/main` (without a ref it only looks at uncommitted changes, committed unit tests get missed, see the `--changed` section below). `apps/web/DESIGN.md` (imported by the design gallery) selects the design specs, `apps/web/COMPONENTS.md` none; other unmapped `apps/web/**` still fall back to the full set.
@@ -63,7 +63,7 @@ Maintenance rule: when adding a spec, if its prefix is in no family and it is no
 
 `.github/workflows/ci.yml`: e2e extracted from the check job into an independent `e2e` job, `strategy.matrix` 4 shards, `--shard=i/4` (playwright splits precisely by case, **union = the full 83 specs**), `fail-fast: false` (one shard red does not mask the rest). The chromium install moves with it (no more apt ffmpeg install: no shard calls system ffmpeg, that step once stuck for 42 minutes); the check job no longer installs the browser surface. Benefit: e2e (223s serial step) leaves the check job's critical path, one shard ≈ setup + build + 1/4 of the cases; the check job keeps drizzle / typecheck / vitest×2 / lint. Each shard owns its runner, token-gate and webServer work on their own dist, the "same runner mutual dist writes" constraint disappears with the job boundary.
 
-**Are the shards really splitting (#765 criterion)**: `pnpm --filter @pacman/web e2e -- --shard=i/4` this writing **does not split** — pnpm forwards `--` verbatim to the script, playwright receives a `--` positional argument, `--shard` swallowed, the four shards each run the full set (run 37134551409: four jobs all print `Running 688 tests`, the same probe spec red in all four; single shard 4m03–5m32). Dropping the `--` is the real forwarding: `pnpm --filter @pacman/web e2e --shard=i/4` (measured 173/171/… cases/shard, union = the full 688 cases / 90 specs). The criterion stays on the job logs: each shard's `Running N tests` sum = the full set and non-overlapping.
+**Are the shards really splitting (#765 criterion)**: `pnpm --filter @cairn/web e2e -- --shard=i/4` this writing **does not split** — pnpm forwards `--` verbatim to the script, playwright receives a `--` positional argument, `--shard` swallowed, the four shards each run the full set (run 37134551409: four jobs all print `Running 688 tests`, the same probe spec red in all four; single shard 4m03–5m32). Dropping the `--` is the real forwarding: `pnpm --filter @cairn/web e2e --shard=i/4` (measured 173/171/… cases/shard, union = the full 688 cases / 90 specs). The criterion stays on the job logs: each shard's `Running N tests` sum = the full set and non-overlapping.
 
 The other half of "coverage undiminished" is in the **merge gate**: branch protection's required contexts reference `e2e-gate` (the aggregate job needing all shards, stable context name) rather than per-shard names — if the list hardcodes the matrix cardinality, a future shard-count change silently mismatches, the new shard does not block merge.
 
@@ -80,16 +80,16 @@ The aggregate job itself has a criterion (#762): must be `if: always()` and expl
 
 ## pi Cheap Structural Gate Comparative Assessment (assess + propose, this ticket does not land)
 
-| pi's gate | pacman current | Assessment |
+| pi's gate | cairn current | Assessment |
 |---|---|---|
 | pinned-deps (dependencies fully pinned) | pnpm catalog + `--frozen-lockfile` (CI) + the pre-commit lockfile gate | **equivalent already exists**, shape different (pi has no workspace catalog so it needs a script to pin) |
 | runtime-deps (forbid runtime deps at build time) | biome `noRestrictedImports` seam discipline (backend/MCP/LLP seams) | **equivalent already exists** (the lint surface is stronger: directly locks import paths) |
 | ts-imports (relative import style unified) | biome organizeImports | covered, not a risk surface |
 | entry-graphs (the browser bundle must not pull node-only modules) | single browser app (apps/web), the vite build itself is this gate | **low value not proposed**: pi's risk exists only in its multi-package published browser/node dual shape |
 | shrinkwrap / install-lock (published artifact reproducible install) | CI's `pack-smoke` job (#264) smoke-tests the main-package tarball | **equivalent already exists** |
-| hermetic test environment (test.sh: empty env + temp HOME + zero credentials) | partially equivalent: stack-integration/token-gate each `mkdtemp` + independent `CAIRN_HOME`; but the full vitest still inherits the machine env | **the only one worth proposing**: local tests may read the real `~/.pacman` / credentials causing false green/false red. Propose a later single ticket: a local `test:hermetic` wrapper (empty env + temp HOME). CI is naturally hermetic, no change needed |
+| hermetic test environment (test.sh: empty env + temp HOME + zero credentials) | partially equivalent: stack-integration/token-gate each `mkdtemp` + independent `CAIRN_HOME`; but the full vitest still inherits the machine env | **the only one worth proposing**: local tests may read the real `~/.cairn` / credentials causing false green/false red. Propose a later single ticket: a local `test:hermetic` wrapper (empty env + temp HOME). CI is naturally hermetic, no change needed |
 
-Conclusion: five of the six already have a different-shaped pacman equivalent, copying verbatim is duplicate construction; the only worthwhile addition is the hermetic environment, and it should be a separate ticket (the change surface is every test's startup mode, not mixed into this ticket).
+Conclusion: five of the six already have a different-shaped cairn equivalent, copying verbatim is duplicate construction; the only worthwhile addition is the hermetic environment, and it should be a separate ticket (the change surface is every test's startup mode, not mixed into this ticket).
 
 ## Acceptance Cross-Reference (#693 list → landing spot)
 
