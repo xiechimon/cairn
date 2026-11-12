@@ -33,15 +33,25 @@ Source observations on `5bad9a5`:
 
 So two processes already sit outside the guest on every path a secret takes: the host daemon between the server and the guest, and the relay between the guest and the network. The design changes what each lets through. It adds no new isolation mechanism.
 
-**Guest identity is a precondition, and the identity is the listener.** Today's identity (`unixClientIdentity`) reads the peer pid at connect time and `/proc/<pid>/cgroup` later, returns `'unknown'` on any failure, and is shared by every client when the peer-credential addon did not load. That is good enough for connection limits and not for authorization: a reused pid would attribute a connection to another guest. The gateway therefore does not authorize by cgroup lookup. It opens one listener socket per guest, placed in that guest's private runtime bind and nowhere else, and a grant matches only connections accepted on its guest's listener. No `/proc` read, no parser, no race.
+**Guest identity is a precondition, and the identity is the listener.** Today's identity (`unixClientIdentity`) reads the peer pid at connect time and `/proc/<pid>/cgroup` later, returns `'unknown'` on any failure, and is shared by every client when the peer-credential addon did not load. That is good enough for connection limits and not for authorization: a reused pid would attribute a connection to another guest. The gateway therefore does not authorize by cgroup lookup. It opens one listener socket per guest and a grant matches only connections accepted on its guest's listener. No `/proc` read, no parser, no race.
+
+**Where the listener lives.** In a dedicated host directory per guest that only the gateway writes. The guest gets that directory, not the socket file, as a read-only bind. The guest's runtime bind is writable from inside the guest on both backends, so a host process creating sockets there would be exposed to path swaps; the dedicated directory avoids that class instead of defending against it. Today's podman egress boundary is already a dedicated directory (`inspectEgressBoundary`), and the guest path `/run/cairn-egress/egress.sock` stays the same. The prototype confirms that a guest can connect to a socket in a read-only directory bind.
+
+| Listener state | Entered when | Left when |
+|---|---|---|
+| none | initial | the host daemon asks the gateway to create the guest's directory and listener, before `podman create` (the bind source must exist then) or before the nspawn guest starts |
+| listening | the gateway has bound the socket | the guest is removed (the daemon asks the gateway to drop it), or the gateway exits |
+| gone after a gateway exit | the gateway process ended | the gateway starts and re-creates the listener of every guest directory it finds; the daemon re-announces its guests when the admin socket answers again |
+
+A listener lives as long as its guest and carries the guest's ordinary egress; a grant lives only as long as a step. Revoke never removes a listener. Because the bind is a directory, a socket re-created at the same path after a gateway restart is visible in a running guest, so ordinary egress comes back without recreating the guest; grants do not come back.
 
 - The shared socket listener and the TCP listener stay as they are for ordinary egress and never substitute anything. An identity of `''` or `'unknown'` can neither register nor match a grant.
-- podman with an egress socket: the host daemon already binds a socket path into the guest; the gateway PR makes that path the guest's own listener.
+- podman with an egress socket: the gateway PR makes the bound directory the guest's own listener directory. The egress mount source of an existing guest changes with that, `egressMatches` fails, and `spawnContainer` removes and recreates the container from its snapshot, or from the base image when there is none. That is a one-time effect on persisted guest state at upgrade.
 - podman with `egress: 'none'`: no path to the gateway exists. It counts as a host step.
-- nspawn, the default backend: guests reach the relay over TCP on the zone bridge today. The gateway PR gives each guest a listener in its runtime bind and a loopback forwarder inside the guest that the proxy variables point to. Until the prototype shows that on a real host, the daemon asks for nspawn steps with `host` and their `http` secrets are withheld.
+- nspawn, the default backend: guests reach the relay over TCP on the zone bridge today. The gateway PR gives each guest the same read-only listener directory and a loopback forwarder inside the guest that the proxy variables point to. Until the prototype shows that on a real host, the daemon asks for nspawn steps with `host` and their `http` secrets are withheld.
 - A remote sandbox (`openRelayStream` providers, whose `kind` is also `'orb'`) does not send its traffic through the host relay. It counts as a host step.
 
-The prototype's identity tests: guest A connecting to guest B's listener path (must not exist in A), a guest connecting over the shared socket and over TCP, and a guest whose listener was removed after revoke.
+The prototype's identity tests: guest A connecting to guest B's listener path (must not exist in A), a guest connecting over the shared socket and over TCP, a guest that keeps using a placeholder after its grant was revoked, and ordinary egress of a running guest after a gateway restart.
 
 ## Persisted state
 
@@ -55,7 +65,7 @@ The prototype's identity tests: guest A connecting to guest B's listener path (m
 | `httpTemplate` | text, null unless `http` | Header value with one `{secret}` slot, for example `Bearer {secret}` |
 | `policyRevision` | integer, not null, default 1 | Incremented by every write to the four columns above or to the value |
 
-The migration only adds columns; every existing row becomes `plaintext` at revision 1 and no cipher text is touched. A table `CHECK` holds the invariant for every writer: `http` implies the three policy columns are non-null, `plaintext` implies they are null.
+The migration only adds columns; every existing row becomes `plaintext` at revision 1 and no cipher text is touched. The one other effect on persisted state is the one-time recreation of existing podman guests when their egress mount changes (see the listener section). A table `CHECK` holds the invariant for every writer: `http` implies the three policy columns are non-null, `plaintext` implies they are null.
 
 Validation, run on every write, a rename included:
 
@@ -67,7 +77,7 @@ Validation, run on every write, a rename included:
 
 **Who may write the policy.** Whoever can write `httpOrigin` can read the value out by pointing the secret at a host they control, so:
 
-- `delivery`, `httpOrigin`, `httpHeader` and `httpTemplate` are written only by the settings routes (`POST` and `PATCH /api/teams/:id/secrets`). The Coordinator's `set_secret` tool never creates or changes an `http` secret, neither value nor policy, and returns an error that points to settings. A value that passed through `set_secret` has been in a model context and in chat history, so it cannot be an `http` secret in the promised sense. `delete_secrets` may delete one.
+- `delivery`, `httpOrigin`, `httpHeader` and `httpTemplate` are written only by the settings routes (`POST` and `PATCH /api/teams/:id/secrets`). These routes are owner-only already (`OWNER_ONLY_PATTERNS` in `lib/token-auth.ts`), so a paired device is refused there. The Coordinator's `set_secret` tool never creates or changes an `http` secret, neither value nor policy, and returns an error that points to settings. It also refuses when any row of that name which the new row would shadow, or be shadowed by, is `http` (the team row and that project's row): otherwise a project-scoped `plaintext` row would silently replace a gateway-delivered secret for steps in the project. A value that passed through `set_secret` has been in a model context and in chat history, so it cannot be an `http` secret in the promised sense. `delete_secrets` may delete one.
 - **The value is bound to its target.** A write that changes the origin, header or template of an `http` secret, or sets it back to `plaintext`, must carry a new value in the same request. The stored value is never carried over to a new target. `plaintext` to `http` may keep the value. The settings page asks for the value again on such an edit.
 - Project override: `openSecretValues` lets a project-scoped row replace a granted team row of the same name. The policy that applies is the effective row's, and `id` and `revision` in `httpSecrets` are that row's. A project row can be created only through the same settings routes when it is `http`.
 
@@ -106,7 +116,7 @@ A grant is the gateway's permission to substitute one secret for one guest. It l
 | active | registration accepted; gateway returns a fresh random placeholder | any revoke cause |
 | revoked | connection closed, or reconcile found the secret absent or at another revision | never; a later step creates a new grant and a new placeholder |
 
-The host daemon registers over an admin Unix socket. A podman guest runs with `--userns=keep-id`, so its agent user is the daemon's host uid and a peer-uid check does not tell them apart; what keeps a guest out is the mount namespace. The socket's directory is added to `isForbiddenMountSource` with a test, and as a second check the gateway refuses an admin peer on a guest listener's cgroup. The admin protocol is write-only: no operation returns a value or lists grants. One connection per step; **a grant never outlives that connection.** Registration is keyed by `(guest listener, step id, secret id)`.
+The host daemon registers over an admin Unix socket. A podman guest runs with `--userns=keep-id`, so its agent user is the daemon's host uid and a peer-uid check does not tell them apart; what keeps a guest out is the mount namespace. The socket's directory is added to `isForbiddenMountSource` with a test, and as a second check the gateway refuses an admin peer whose own cgroup is a guest's. The admin protocol is write-only: no operation returns a value or lists grants. One connection per step; **a grant never outlives that connection.** Registration is keyed by `(guest listener, step id, secret id)`.
 
 **Reconcile on every token response.** The only second `token` call in a step is the App-credential refresh, which exists only for App credentials and reads only `.git`; the vault is built once. So the relay reconciles each token response against the step's grants: the same secret at the same revision keeps its grant and placeholder; a secret that is absent or whose revision changed has its grant revoked at once and gets no new placeholder in that step, and `get_secret` then explains that the secret changed during the step.
 
@@ -131,7 +141,7 @@ Request rules, which are the test list for the gateway PR:
 
 Key custody: the interception CA key is generated in memory when the gateway starts and is never written to disk. The gateway units set `LimitCORE=0` and run without an inspector; neither `egress-relay.service` nor `cairn-orb-egress.service` sets that today.
 
-Trust in the guest: the gateway CA certificate is written to the guest's runtime bind together with a bundle file holding the system roots plus that certificate. The step environment sets `NODE_EXTRA_CA_CERTS` to the certificate, and `SSL_CERT_FILE`, `CURL_CA_BUNDLE`, `REQUESTS_CA_BUNDLE` and `GIT_SSL_CAINFO` to the bundle, because those four replace the system bundle. This is a new mechanism on the Orb step path.
+Trust in the guest: the gateway writes its CA certificate, and a bundle file holding the system roots plus that certificate, into the guest's listener directory. The CA is new on every gateway start, so both files are rewritten at each step start. Only a step that received a placeholder gets the variables: `NODE_EXTRA_CA_CERTS` set to the certificate, and `SSL_CERT_FILE`, `CURL_CA_BUNDLE`, `REQUESTS_CA_BUNDLE` and `GIT_SSL_CAINFO` set to the bundle, because those four replace the system bundle and a stale file would break every HTTPS client in the guest. This is a new mechanism on the Orb step path.
 
 Audit: the guest-side audit line is written by the guest and can be forged. The gateway writes its own record for every registration, substitution and refusal (step, secret id, origin, header name, decision, reason; never a value or header content) to its unit journal, and sends refusals over the admin connection to the host daemon, which adds a system row to the step's transcript from outside the guest.
 
@@ -144,7 +154,7 @@ One test per row.
 | 1 | `createSecret` through `POST /api/teams/:id/secrets`, settings page | seals the value | also validates and stores the policy |
 | 1a | `updateSecret` through `PATCH /api/teams/:id/secrets/:sid` | renames, reseals | validates on every write, rename included; a target change or a switch to `plaintext` without a new value is refused; any policy or value write bumps `policyRevision` |
 | 1b | `DELETE /api/teams/:id/secrets/:sid` | deletes | unchanged; running steps are covered by reconcile and the bound |
-| 1c | Coordinator `set_secret` (`services/chief-tools.ts`) | creates or updates by name, value from the model | refuses when the existing row is `http`; can only create `plaintext`; never writes policy columns |
+| 1c | Coordinator `set_secret` (`services/chief-tools.ts`) | creates or updates by name, value from the model | refuses when the existing row, or any same-name row it would shadow or be shadowed by, is `http` (one test for the project case); can only create `plaintext`; never writes policy columns |
 | 1d | Coordinator `delete_secrets` | deletes by name or id | unchanged |
 | 1e | Project override in `openSecretValues` | project row replaces the team row of the same name | the effective row's delivery, policy, id and revision apply |
 | 1f | Mail-account link (`linkedMailSecretIds`) | links a secret to an account | refuses an `http` secret |
@@ -170,7 +180,7 @@ One test per row.
 |---|---|
 | Machine lacks the capability or is not an `orb` executor, or the step runs on the host | value withheld, name in `withheldSecrets`, tool explains; the step still runs |
 | Gateway unreachable or registration refused when the Orb step asks for its token | the token call fails and the step fails with a named error; no fallback to plaintext |
-| Gateway exits during a step | grant gone; the placeholder reaches the upstream unsubstituted or the connection is refused; the daemon writes one system row to the transcript; no re-registration in that step |
+| Gateway exits during a step | grant gone and the guest's egress stops until the gateway is back; after the restart ordinary egress resumes through the re-created listener, the placeholder is an unknown string and the step's CA files are stale, so requests to the bound origin fail; the daemon writes one system row to the transcript; no re-registration in that step |
 | Host daemon exits during a step | admin connection closes, grant revoked, guest connections to that origin closed |
 | Policy edited, secret re-bound or deleted during a step | at the next token response the relay revokes the grant and issues no new placeholder; a step that never refreshes keeps its grant until it ends; stopping the step revokes at once |
 | A token request for a step that is not `claimed` | `withheldSecrets` only |
