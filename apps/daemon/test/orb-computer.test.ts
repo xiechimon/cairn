@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
@@ -13,11 +13,7 @@ import { NspawnOrbProvider, type OrbCommandRunner } from '../src/orb/provider.js
 import { rejectGuestExec } from './orb-fake.js';
 import { testTempDir } from './test-temp-dir.js';
 
-function writeMarker(machinesRoot: string, name: string, text: string): void {
-  const dir = join(machinesRoot, name, 'etc');
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'cairn-orb-computer-image'), text);
-}
+const PINNED_MARKER = `recipe=abc\npackages=chromium\nagent-browser=${PINNED_AGENT_BROWSER_VERSION}\n`;
 
 function fixture(
   options: {
@@ -30,16 +26,12 @@ function fixture(
 ) {
   const stopping = new Map<string, number>();
   const runtimeRoot = testTempDir('orb-computer-run-');
-  const machinesRoot = testTempDir('orb-computer-machines-');
+  const imageMarkerPath = join(testTempDir('orb-computer-marker-'), 'computer-image');
   const stateFile = join(testTempDir('orb-computer-state-'), 'computers.json');
   const commands: string[][] = [];
   const images = new Set<string>(['cairn-orb-base', 'cairn-orb-computer']);
   const machines = new Set<string>();
-  writeMarker(
-    machinesRoot,
-    'cairn-orb-computer',
-    `recipe=abc\npackages=chromium\nagent-browser=${PINNED_AGENT_BROWSER_VERSION}\n`,
-  );
+  writeFileSync(imageMarkerPath, PINNED_MARKER);
   const runner: OrbCommandRunner = async (argv) => {
     rejectGuestExec(argv);
     commands.push([...argv]);
@@ -48,14 +40,6 @@ function fixture(
       if (options.failClone) return { code: 1, stdout: '', stderr: 'clone failed' };
       const target = argv[3] ?? '';
       images.add(target);
-      writeMarker(
-        machinesRoot,
-        target,
-        readFileSync(
-          join(machinesRoot, 'cairn-orb-computer', 'etc', 'cairn-orb-computer-image'),
-          'utf8',
-        ),
-      );
     }
     if (verb === 'remove') {
       images.delete(name ?? '');
@@ -93,7 +77,7 @@ function fixture(
   const computers = new ComputerOrbs({
     runner,
     runtimeRoot,
-    machinesRoot,
+    imageMarkerPath,
     stateFile,
     runtimeDirectoryTimeoutMs: 50,
     now: () => now,
@@ -105,7 +89,7 @@ function fixture(
     commands,
     machines,
     images,
-    machinesRoot,
+    imageMarkerPath,
     stateFile,
     runner,
     runtimeRoot,
@@ -153,38 +137,61 @@ describe('computer Orbs', () => {
   });
 
   test('an existing stopped computer is started again without cloning, so its home survives', async () => {
-    const { computers, commands, machines, images, machinesRoot } = fixture();
-    const name = computerMachineName('chief:c1');
-    images.add(name);
-    writeMarker(
-      machinesRoot,
-      name,
-      readFileSync(
-        join(machinesRoot, 'cairn-orb-computer', 'etc', 'cairn-orb-computer-image'),
-        'utf8',
-      ),
-    );
+    const { computers, commands, machines } = fixture();
     await computers.ensure('chief:c1');
     machines.clear();
     await computers.ensure('chief:c1');
-    expect(commands.filter((c) => c[1] === 'clone')).toEqual([]);
+    expect(commands.filter((c) => c[1] === 'clone')).toHaveLength(1);
     expect(commands.filter((c) => c[1] === 'start')).toHaveLength(2);
   });
 
-  test('a clone whose image marker lags the template is removed and recloned before start', async () => {
-    const { computers, commands, images, machines, machinesRoot } = fixture();
+  test('a clone made from an older template marker is removed and recloned before start', async () => {
+    const { computers, commands, machines, imageMarkerPath } = fixture();
     const name = computerMachineName('chief:c1');
-    images.add(name);
-    writeMarker(machinesRoot, name, 'recipe=old\npackages=chromium\n');
-    machines.add(name);
+    writeFileSync(imageMarkerPath, 'recipe=old\npackages=chromium\n');
     await computers.ensure('chief:c1');
+    writeFileSync(imageMarkerPath, PINNED_MARKER);
+    await computers.ensure('chief:c1');
+    expect(machines.has(name)).toBe(true);
     expect(commands.filter((c) => c[1] === 'remove')).toEqual([['machinectl', 'remove', name]]);
     expect(commands.filter((c) => c[1] === 'clone')).toEqual([
       ['machinectl', 'clone', 'cairn-orb-computer', name],
+      ['machinectl', 'clone', 'cairn-orb-computer', name],
     ]);
-    expect(
-      readFileSync(join(machinesRoot, name, 'etc', 'cairn-orb-computer-image'), 'utf8'),
-    ).toContain(`agent-browser=${PINNED_AGENT_BROWSER_VERSION}`);
+  });
+
+  test('a clone the daemon never recorded a marker for is recloned once, then kept', async () => {
+    const { computers, commands, images, machines } = fixture();
+    const name = computerMachineName('chief:c1');
+    images.add(name);
+    machines.add(name);
+    await computers.ensure('chief:c1');
+    machines.clear();
+    await computers.ensure('chief:c1');
+    expect(commands.filter((c) => c[1] === 'remove')).toEqual([['machinectl', 'remove', name]]);
+    expect(commands.filter((c) => c[1] === 'clone')).toHaveLength(1);
+  });
+
+  test('the recorded marker survives a daemon restart, so a current clone is not recloned', async () => {
+    const first = fixture();
+    await first.computers.ensure('chief:c1');
+    const restarted = new ComputerOrbs({
+      runner: first.runner,
+      runtimeRoot: first.runtimeRoot,
+      imageMarkerPath: first.imageMarkerPath,
+      stateFile: first.stateFile,
+      runtimeDirectoryTimeoutMs: 50,
+    });
+    await restarted.ensure('chief:c1');
+    expect(first.commands.filter((c) => c[1] === 'clone')).toHaveLength(1);
+  });
+
+  test('without a readable template marker an existing clone is kept', async () => {
+    const { computers, commands, images, imageMarkerPath } = fixture();
+    rmSync(imageMarkerPath);
+    images.add(computerMachineName('chief:c1'));
+    await computers.ensure('chief:c1');
+    expect(commands.filter((c) => c[1] === 'remove' || c[1] === 'clone')).toEqual([]);
   });
 
   test('a failed clone is reported and nothing is recorded or started', async () => {
