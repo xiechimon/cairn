@@ -18,7 +18,9 @@ import {
   coordinatorConversation,
   coordinatorEntry,
   coordinatorInput,
+  project,
   step,
+  todo,
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { isChiefDigestStep } from '../services/chief-digest.js';
@@ -27,6 +29,7 @@ import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
 import { migrateUnfetchedCoordinatorInputs } from '../services/coordinator-input-upgrade.js';
 import { coordinatorInputIsLive } from '../services/coordinator-inputs.js';
 import { chiefTurnContext, claimPendingChiefStep } from '../services/coordinator-steps.js';
+import { captureClaimInputs } from '../services/coordinator-turn-capture.js';
 import { serverTakesTurn } from '../services/machine-claim.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
 import { stepScopeProjectId } from '../services/picked-project.js';
@@ -431,6 +434,37 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       },
       'coordinator memory injected',
     );
+    captureClaimInputs(row.id, {
+      initialTodoIds: db
+        .select({ id: todo.id })
+        .from(todo)
+        .where(eq(todo.teamId, threadRow.teamId))
+        .all()
+        .map((t) => t.id),
+      projects: db
+        .select()
+        .from(project)
+        .where(eq(project.teamId, threadRow.teamId))
+        .all()
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description ?? null,
+          repoKind: p.repoKind ?? null,
+          archivedAt: p.archivedAt ?? null,
+        })),
+      systemPrompt: context.systemPrompt,
+      instruction:
+        row.prompt === null || context.trigger === 'user'
+          ? row.prompt
+          : withHistoryMarker(row.prompt, eventRowId),
+      trigger: context.trigger,
+      memories: context.memories.map((m) => `- ${m.title}：${m.content}`),
+      provider: providers.router.provider,
+      modelId: providers.router.modelId,
+      thinkingLevel: thinkingLevelOf(providers.router.thinkingLevel),
+      volatileText: volatileParts.length === 0 ? null : volatileParts.join('\n\n'),
+    });
     return {
       claimed: {
         step: {

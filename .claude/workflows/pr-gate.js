@@ -24,11 +24,11 @@ const REPO = 'xiechimon/cairn'
 const MAX_SKEPTICS = 4
 
 // Path class, including a protected path or a security surface, does not
-// route to the user and does not require coordinator-hold (ian, 2026-11-11).
-// A green review-gate with no unresolved P0/P1, the required checks, and the
-// absence of coordinator-hold admit the PR. This script runs from origin/main,
-// so a PR cannot edit the copy that judges it.
-// Size never routes or blocks (D68): the review gate judges one problem per PR.
+// route to the user (ian, 2026-11-11). The required checks on a head that is
+// not a draft admit the PR; no review verdict or label holds it (ian,
+// 2026-11-12). This script runs from origin/main, so a PR cannot edit the
+// copy that judges it.
+// Size never routes or blocks (D68).
 // pr-gate runs 3, 4 and 5 each found another agent-steering or gate file that a
 // list of names missed (AGENTS.override.md, .pi/skills, nested .claude/).
 // Matching ignores case (APFS); globToRegExp says which matches fold Unicode.
