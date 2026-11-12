@@ -1,4 +1,0 @@
-{"phase":"before server start","rows":[{"turnId":"expired-proof","status":"unusable","reason":"capture_not_implemented"},{"turnId":"fresh-proof","status":"unusable","reason":"capture_not_implemented"}]}
-{"request": "GET /api/server/deploy", "status": 200, "body": {"deployed": null}}
-{"phase":"after real scheduler startup","rows":[{"turnId":"fresh-proof","status":"unusable","reason":"capture_not_implemented"}],"job":{"kind":"coordinator-snapshot-gc","intervalMs":86400000,"attempts":0,"lastError":null,"dueAt":1794372876600}}
-{"phase":"real server restart","job":{"kind":"coordinator-snapshot-gc","intervalMs":86400000,"attempts":0,"lastError":null,"dueAt":1794372876600},"deadlineUnchanged":true}

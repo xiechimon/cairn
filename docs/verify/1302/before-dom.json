@@ -1,8 +1,0 @@
-{
-  "tag": "SPAN",
-  "text": "默认",
-  "className": "agent-thinking text-sm text-foreground",
-  "role": null,
-  "rowButtons": 0,
-  "patchesAfterClick": []
-}
