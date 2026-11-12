@@ -76,7 +76,6 @@ export function mergifyConfig(prGateSource, gatePaths) {
     '      - -draft',
     "      - '#review-threads-unresolved = 0'",
     '      - -label = coordinator-hold',
-    '      - -label = owner-route',
     `      - '-files ~= ${ownerRouteAdmission(ownerRouteGlobs(gatePaths))}'`,
     '      - or:',
     `          - -head ~= ${batchHeadRe}`,

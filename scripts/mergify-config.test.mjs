@@ -41,7 +41,7 @@ function admissionPattern(queue) {
 test('owner-route classes stay out of the queue and a non-sensitive path does not', () => {
   for (const name of ['default', 'bot']) {
     const [queue] = rules[name].split('    merge_conditions:\n');
-    assert.match(queue, /- -label = owner-route\n/, name);
+    assert.doesNotMatch(queue, /-label = owner-route/, name);
     const pattern = admissionPattern(queue);
     for (const path of [
       '.github/workflows/ci.yml',
@@ -92,7 +92,7 @@ for (const [name, author, method] of [
     assert.doesNotMatch(queue, /status-success = review-gate/);
     assert.match(queue, /- check-success = merge-route\n/);
     assert.doesNotMatch(queue, /check-skipped = merge-route/);
-    assert.match(queue, /- -label = owner-route\n/);
+    assert.doesNotMatch(queue, /-label = owner-route/);
     for (const check of ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence', 'gates'])
       assert.match(queue, new RegExp(`check-success = ${check}\\n`), check);
     for (const check of ['check', 'pack-smoke', 'e2e-gate', 'gates'])
