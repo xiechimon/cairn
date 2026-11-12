@@ -553,7 +553,6 @@ export interface ChiefSegment {
   text: string;
   code?: boolean;
   todo?: number;
-  agent?: string;
   strong?: boolean;
 }
 
