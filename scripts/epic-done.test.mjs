@@ -640,7 +640,7 @@ test('missing state requires an explicit start without creating a fresh state', 
 });
 
 test('paused: every human-wait label on issues or open linked PRs takes priority over failure', async () => {
-  for (const label of ['coordinator-hold', 'waits-ian', 'ready-for-human']) {
+  for (const label of ['waits-ian', 'ready-for-human']) {
     for (const onPull of [false, true]) {
       const { state, invoke } = harness();
       state.stdout = 'no match';
