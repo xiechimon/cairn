@@ -342,7 +342,7 @@ function ThreadBody({
               ? t('已关闭，不能再回复')
               : chat.started
                 ? t('回复这个任务')
-                : t('开始后才能回复 #{seq}', { seq: todo.seqNum })
+                : t('开始后才能回复')
           }
           aiReview={false}
           streaming={chat.running}
@@ -518,7 +518,7 @@ function ReadyThread({
         onClose={onCloseAll}
         menu={actions.menu}
         titleExtra={<ThreadAutomations key={todo.id} todo={todo} now={now} />}
-        tooltip={`#${todo.seqNum} ${todo.title}`}
+        tooltip={todo.title}
       >
         <StatusLine
           todo={todo}
@@ -564,7 +564,7 @@ function ReadyThread({
         onClose={() => setPlanOpen(false)}
         size="l"
         title={t('方案')}
-        subtitle={`#${todo.seqNum} ${todo.title}`}
+        subtitle={todo.title}
       >
         <div data-testid="side-chat-plan" className="flex h-[min(70vh,720px)] min-h-0 flex-col">
           <DocPane
@@ -604,10 +604,7 @@ function Head({
 }) {
   const { t } = useI18n();
   const title = (
-    <h2
-      aria-label={todo != null ? `#${todo.seqNum} ${todo.title}` : undefined}
-      className="m-0 min-w-0 truncate text-ui leading-5 font-normal text-foreground"
-    >
+    <h2 className="m-0 min-w-0 truncate text-ui leading-5 font-normal text-foreground">
       {todo != null ? todo.title : t('任务')}
     </h2>
   );

@@ -487,7 +487,6 @@ export function ChiefConversation({
       item={item}
       index={i}
       replyable={item.kind === 'thread-report' && outstandingReports.has(item.id)}
-      runningTool={chief.runningTool}
       onCopy={copyText}
       toolsOpen={toolsOpen}
       onToggleTools={toggleTools}

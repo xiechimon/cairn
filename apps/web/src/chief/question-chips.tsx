@@ -6,7 +6,6 @@ import {
   type ReactNode,
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -17,7 +16,7 @@ import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { toastSuccess } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
-import { REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
+import { REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { MessageToolbar } from './message-toolbar.js';
@@ -39,7 +38,6 @@ export interface QuestionChipsProps {
   item: ChiefQuestionItem;
   onAnswer?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
   onCancel?: (requestId: string) => void;
-  numberKeys?: boolean;
   draftKey?: string;
   bound?: boolean;
 }
@@ -48,13 +46,6 @@ const PICKED_CHIP_CLS =
   'aria-pressed:bg-(--menu-hover) aria-pressed:border-(--text-tertiary) dark:aria-pressed:bg-(--menu-hover)';
 
 type Question = ChiefQuestionItem['questions'][number];
-
-function digitsReachChips(target: HTMLElement): boolean {
-  if (target.isContentEditable) return false;
-  if (target instanceof HTMLTextAreaElement && target.hasAttribute('data-compose-target'))
-    return target.hasAttribute('data-question-answer') && target.value === '';
-  return !/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
-}
 
 export function recommendedFirst(question: Question): Question {
   return {
@@ -106,7 +97,6 @@ export function QuestionChips({
   item,
   onAnswer,
   onCancel,
-  numberKeys = false,
   draftKey,
   bound = false,
 }: QuestionChipsProps) {
@@ -212,35 +202,6 @@ export function QuestionChips({
     );
   };
 
-  useLayoutEffect(() => {
-    if (!pending || question === undefined || question.options.length === 0) return;
-    const max = question.options.length;
-    const handler = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing || e.keyCode === 229) return;
-      const block = blockRef.current;
-      if (block?.checkVisibility() !== true) return;
-      const target = e.target;
-      if (!(target instanceof HTMLElement) || !digitsReachChips(target)) return;
-      const inBlock = block.contains(target);
-      const inAnswer = bound && target.hasAttribute('data-question-answer');
-      if (!inBlock && !inAnswer && !numberKeys) return;
-      if (
-        !inBlock &&
-        target.closest('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')
-      )
-        return;
-      if (!/^[1-9]$/.test(e.key)) return;
-      const n = Number(e.key);
-      if (n > max) return;
-      e.preventDefault();
-      if (e.repeat) return;
-      if (question.multiSelect !== true) setTextAt(step, '');
-      commit(applyQuestionPick(drafts, step, question, n - 1), step);
-    };
-    window.addEventListener('keydown', handler, true);
-    return () => window.removeEventListener('keydown', handler, true);
-  }, [pending, numberKeys, bound, step, question, drafts]);
-
   const typedText = textAt(step);
   const typedPicks = draft?.kind === 'choices' ? draft.picked.length : 0;
   useEffect(() => {
@@ -317,7 +278,7 @@ export function QuestionChips({
         data-tools-root=""
         className="group/message flex max-w-full min-w-0 flex-col items-start"
       >
-        <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
+        <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
           <ChipTip tip={question.header === '' ? null : question.header}>
             <div
               data-testid="chief-question-text"
@@ -356,15 +317,6 @@ export function QuestionChips({
           const tipText = [recommended ? t('推荐') : null, description]
             .filter((part) => part !== null)
             .join(' · ');
-          const tip =
-            tipText === '' && oi >= 9 ? null : (
-              <span className="flex items-center gap-2">
-                <span>{tipText === '' ? option.label : tipText}</span>
-                {oi < 9 && (
-                  <kbd className="font-sans text-(--text-tertiary) tabular-nums">{oi + 1}</kbd>
-                )}
-              </span>
-            );
           const describedBy = tipText === '' ? undefined : `${baseId}-o${oi}`;
           return (
             <Fragment key={oi}>
@@ -373,7 +325,7 @@ export function QuestionChips({
                   {tipText}
                 </span>
               )}
-              <ChipTip tip={tip}>
+              <ChipTip tip={tipText === '' ? null : tipText}>
                 <Button
                   variant="ghost"
                   data-testid={`chief-question-option-${step}-${oi}`}

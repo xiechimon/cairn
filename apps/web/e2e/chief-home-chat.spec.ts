@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { HISTORY, mockLive, type Row, THREAD } from './chief-home-mock';
 import { evidenceShot } from './evidence';
-import { pressOpenCoordinator } from './helpers.js';
+import { openReplySteps, pressOpenCoordinator } from './helpers.js';
 
 test.describe('home is one continuous Coordinator chat (T1)', () => {
   test('a fresh home shows the greeting, the composer and the running count, and no floating Coordinator', async ({
@@ -111,8 +111,8 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     }));
     expect(handoffLine).toEqual({ align: 'left', rule: 'none', chips: 0, leftGap: 0 });
     await expect(handoff.getByRole('link', { name: '#9' })).toHaveAttribute('data-phase', 'building');
-    const expand = stream.getByTestId('chief-tools-toggle').first();
-    await expand.click();
+    await expect(stream.getByTestId('chief-turn-tools')).toHaveCount(0);
+    await openReplySteps(page, stream.getByTestId('chief-msg').filter({ hasText: '已经补给它了' }));
     await expect(stream.getByTestId('chief-turn-tools').first()).toBeVisible();
     await evidenceShot(page, 'home-chat.png');
     await page.reload();

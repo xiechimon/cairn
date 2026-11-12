@@ -40,7 +40,6 @@ export function ProductChiefSection() {
           <div className="w-160">
             <QuestionChips
               item={QUESTION_PENDING}
-              numberKeys
               onAnswer={({ answers }) =>
                 setLast(
                   `Answered: ${answers.map((a) => a.choices?.join(' + ') ?? a.text).join(' / ')}`,
