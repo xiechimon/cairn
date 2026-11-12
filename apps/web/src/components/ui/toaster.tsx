@@ -43,12 +43,12 @@ function Toaster({ ...props }: ToasterProps) {
       mobileOffset={{ top: 66, left: 16, right: 16 }}
       className="group"
       icons={{
-        success: <Info className="size-5" />,
-        info: <Info className="size-5" />,
+        success: <Info className="size-5 text-content-secondary" />,
+        info: <Info className="size-5 text-content-secondary" />,
         warning: <TriangleAlert className="size-5 text-(--badge-attention)" />,
         error: <OctagonX className="size-5 text-destructive" />,
         loading: <LoaderCircle className="size-5 animate-spin motion-reduce:animate-none" />,
-        close: <X className="size-5" />,
+        close: <X className="size-4" />,
       }}
       style={
         {
@@ -61,13 +61,14 @@ function Toaster({ ...props }: ToasterProps) {
       toastOptions={{
         closeButtonAriaLabel: t('关闭'),
         classNames: {
-          toast: 'grid! grid-cols-[auto_1fr_auto]! items-center! gap-x-2! gap-y-2!',
+          toast:
+            'grid! grid-cols-[auto_1fr_auto]! items-center! gap-x-2.5! gap-y-2! border-0! p-4! font-sans! shadow-(--shadow-popover)!',
           icon: 'col-start-1 row-start-1 m-0!',
           content: 'col-start-2 row-start-1',
-          title: 'text-ui font-normal!',
+          title: 'text-ui font-medium! text-foreground!',
           description: 'text-meta text-content-secondary',
           actionButton:
-            'col-start-2 row-start-2 ms-0! h-7! justify-self-start rounded-lg! bg-secondary! px-2.5! text-ui! font-normal! text-foreground! hover:bg-muted!',
+            'col-start-2 row-start-2 ms-0! h-7! justify-self-start rounded-lg! bg-secondary! px-2.5! text-ui! font-medium! text-foreground! hover:bg-muted!',
           closeButton:
             'static! col-start-3 row-start-1 size-7! transform-none! rounded-lg! border-0! bg-transparent! text-foreground! hover:bg-muted!',
         },

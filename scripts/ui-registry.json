@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "ce58c5e9195ae97452d7abe19ae22915f9777c73",
-    "date": "2026-11-11"
+    "sha": "c0f72b8447e92550c62b269d2af253c16d9a1978",
+    "date": "2026-11-12"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -212,7 +212,7 @@
     "toaster.tsx": {
       "kind": "adapter",
       "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts). The official recipe's lucide status icons, tinted with the status tokens, and the popover radius. #2565: toasts anchor top-center (below the narrow menu button on phones), so they never cover navigation or the composer.",
-      "hash": "7528d3707da13872ef4c2ba4ac7f32719699e1cf6ab8f8e20e30498b77566ee1"
+      "hash": "19027b9f5c82de70da0aa91a7110a23498dd66ee0c37e7f92a2ee5e5a04dc045"
     },
     "tooltip.tsx": {
       "kind": "registry",
