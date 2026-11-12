@@ -174,8 +174,6 @@ export function sealCoordinatorTurnSnapshot(
           payload: null,
         })
         .run();
-    } catch {
-      // Absence is authoritative; snapshot failure must never fail the turn.
-    }
+    } catch {}
   }
 }

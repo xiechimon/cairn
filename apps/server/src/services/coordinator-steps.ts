@@ -141,9 +141,7 @@ export function finishCoordinatorTurn(
   try {
     const teamId = stepTeamId(deps, stepRow);
     if (teamId !== null) sealCoordinatorTurnSnapshot(db, stepRow, teamId, outcome.status, nowMs());
-  } catch {
-    // Snapshot failure must never fail the turn; absence is authoritative.
-  }
+  } catch {}
   db.update(step)
     .set({
       status:
