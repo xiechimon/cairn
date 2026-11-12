@@ -5,7 +5,6 @@ import { dirname, join, resolve } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
-  AgentTodoItem,
   AgentTokenUsage,
   AnswerDeliveryVia,
   BoundGitCredentials,
@@ -75,7 +74,7 @@ import {
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { z } from 'zod';
 import { createActivityTracker } from './activity.js';
-import { parseAgentTodoText } from './agent-todo.js';
+import { AgentTodoReporter, parseAgentTodoText } from './agent-todo.js';
 import { prepareFileAttachment } from './attach-file.js';
 import { SessionNotResumableError } from './backend/errors.js';
 import { notInConfigLine, resolveMcpEndpoints } from './backend/mcp-config.js';
@@ -86,6 +85,7 @@ import {
   collectVisibleSkillNames,
   piWorktreeSkillDirs,
   type SkillsCatalogOpts,
+  withSkillDispatchDirectives,
 } from './backend/skills.js';
 import { createVerificationClone } from './backend/verification-clone.js';
 import { prepareWebTools } from './backend/web-search.js';
@@ -438,31 +438,15 @@ async function runClaimedStep(
   });
   activity.setPhase('preparing');
 
-  let agentTodoRelayWarned = false;
-  let lastAgentTodo: AgentTodoItem[] | null = null;
-  const reportAgentTodo = (items: readonly AgentTodoItem[]): void => {
-    if (items.length === 0) return;
-    if (
-      lastAgentTodo !== null &&
-      lastAgentTodo.length === items.length &&
-      lastAgentTodo.every((it, i) => {
-        const next = items[i];
-        return next !== undefined && it.text === next.text && it.state === next.state;
-      })
-    ) {
-      return;
-    }
-    lastAgentTodo = items.map((it) => ({ ...it }));
-    client.agentTodo?.(stepId, { items: items.map((it) => ({ ...it })) })?.catch((err: unknown) => {
-      if (agentTodoRelayWarned) return;
-      agentTodoRelayWarned = true;
+  const agentTodo = new AgentTodoReporter({
+    send: (items) => client.agentTodo?.(stepId, { items }),
+    onFirstError: (err) =>
       logger.step(
         `agent todo relay failed (suppressed until next step): ${
           err instanceof Error ? err.message : String(err)
         }`,
-      );
-    });
-  };
+      ),
+  });
 
   const isChief = claimed.step.kind === 'chief';
   const isReview = claimed.step.kind === 'review';
@@ -942,27 +926,11 @@ async function runClaimedStep(
     });
     localToolDefs.push(skillLoadTool);
     if (deliveryPrompt !== null) {
-      const visibleNames = collectVisibleSkillNames(skillScanOpts);
-      const slashPattern = /\b\/([a-z][a-z0-9-]*)\b/g;
-      const matched: string[] = [];
-      let m = slashPattern.exec(deliveryPrompt);
-      while (m !== null) {
-        const name = m[1] ?? '';
-        if (visibleNames.has(name)) {
-          matched.push(name);
-        } else {
-          logger.skills(`unknown-dispatch: ${name}`);
-        }
-        m = slashPattern.exec(deliveryPrompt);
-      }
-      if (matched.length > 0) {
-        const uniqueMatched = [...new Set(matched)];
-        const directives = uniqueMatched
-          .map((n) => `Before proceeding, use the Skill tool to load "${n}".`)
-          .join('\n');
-        deliveryPrompt = `${directives}\n\n${deliveryPrompt}`;
-        logger.skills(`dispatch: ${uniqueMatched.map((n) => `/${n}`).join(', ')}`);
-      }
+      deliveryPrompt = withSkillDispatchDirectives(
+        deliveryPrompt,
+        collectVisibleSkillNames(skillScanOpts),
+        (msg) => logger.skills(msg),
+      );
     }
   }
   const askAbort = new AbortController();
@@ -1394,7 +1362,7 @@ async function runClaimedStep(
     }
     if (seg.kind === 'text') {
       const items = parseAgentTodoText(seg.text);
-      if (items !== null) reportAgentTodo(items);
+      if (items !== null) agentTodo.report(items);
     }
   };
   const segments = new SegmentEmitter(emitSegment);
@@ -1622,7 +1590,7 @@ async function runClaimedStep(
               const skillFact = classifySkillFact(ev.call);
               if (skillFact !== null) activity.noteSkill(skillFact);
             }
-            if (ev.call.todo !== undefined) reportAgentTodo(ev.call.todo);
+            if (ev.call.todo !== undefined) agentTodo.report(ev.call.todo);
             transcript.upsert({
               id: ev.call.id,
               role: 'assistant',
