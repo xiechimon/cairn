@@ -168,6 +168,11 @@ export function disarmAutoMerge(pr) {
 
 function sweep(paused) {
   let failed = false;
+  let windows;
+  const pauseHistory = () => {
+    windows ??= pauseWindows();
+    return windows;
+  };
   for (const pr of pages(`repos/${repo}/pulls?state=open&per_page=100`).flat()) {
     const errors = [];
     let allowed = !paused;
@@ -218,7 +223,7 @@ function sweep(paused) {
     }
     if (!paused && published) {
       try {
-        requeueBrakeDequeue(pr);
+        requeueBrakeDequeue(pr, pauseHistory);
       } catch (error) {
         errors.push(error);
       }
@@ -281,7 +286,35 @@ function rerunFailed(runId, sha) {
   console.log(`autonomy: reran failed jobs of ${runId}`);
 }
 
-function requeueBrakeDequeue(pr) {
+const pauseWindows = () =>
+  pages(`repos/${repo}/issues?state=all&labels=autonomy-paused&per_page=100`)
+    .flat()
+    .filter((issue) => !issue.pull_request)
+    .map((issue) => ({
+      from: Date.parse(issue.created_at),
+      to: issue.closed_at ? Date.parse(issue.closed_at) : Number.POSITIVE_INFINITY,
+    }));
+
+const pauseChecks = new Set(['autonomy-brake', 'pr-evidence']);
+
+function dequeuedByPause(state, windows) {
+  if (state?.state !== 'dequeued' || state.dequeue_reason?.code !== 'CHECKS_FAILED') return false;
+  const checks = state.dequeue_reason.checks;
+  if (Array.isArray(checks) && checks.length && checks.every((check) => check === 'autonomy-brake'))
+    return true;
+  if (checks !== undefined && !(Array.isArray(checks) && checks.every((c) => pauseChecks.has(c))))
+    return false;
+  const leftAt = Date.parse(state.left_at ?? '');
+  return (
+    Number.isFinite(leftAt) &&
+    windows().some((window) => window.from <= leftAt && leftAt <= window.to)
+  );
+}
+
+const disallowed = (comment) =>
+  comment.user?.login === 'mergify[bot]' && /Command disallowed/.test(comment.body ?? '');
+
+function requeueBrakeDequeue(pr, windows) {
   if (!pr.labels?.some((label) => label.name === 'dequeued')) return;
   const comments = pages(`repos/${repo}/issues/${pr.number}/comments?per_page=100`).flat();
   let latest;
@@ -291,27 +324,19 @@ function requeueBrakeDequeue(pr) {
     if (state === undefined) continue;
     latest = { state, created_at: comment.created_at };
   }
-  const checks = latest?.state?.dequeue_reason?.checks;
-  if (
-    latest?.state?.state !== 'dequeued' ||
-    latest.state.dequeue_reason?.code !== 'CHECKS_FAILED' ||
-    !Array.isArray(checks) ||
-    !checks.length ||
-    checks.some((check) => check !== 'autonomy-brake')
-  )
-    return;
+  if (!latest || !dequeuedByPause(latest.state, windows)) return;
   const asked = comments.some(
-    (comment) =>
+    (comment, index) =>
       comment.body?.trim() === '@mergifyio requeue' &&
       latest.created_at &&
-      comment.created_at >= latest.created_at,
+      comment.created_at >= latest.created_at &&
+      !comments.slice(index + 1).some(disallowed),
   );
-  if (!asked) api(`repos/${repo}/issues/${pr.number}/comments`, { body: '@mergifyio requeue' });
-  try {
-    api(`repos/${repo}/issues/${pr.number}/labels/dequeued`, undefined, 'DELETE');
-  } catch (error) {
-    if (!/HTTP 404/.test(`${error.stderr ?? ''}\n${error.message}`)) throw error;
+  if (asked) {
+    console.log(`#${pr.number}: requeue already asked`);
+    return;
   }
+  api(`repos/${repo}/issues/${pr.number}/comments`, { body: '@mergifyio requeue' });
   console.log(`#${pr.number}: requeued`);
 }
 
