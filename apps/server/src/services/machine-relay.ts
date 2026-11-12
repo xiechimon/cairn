@@ -25,7 +25,12 @@ import {
 } from './chief-questions.js';
 import { executeChiefTool, executeWorkerMemoryTool } from './chief-tools.js';
 import { steeredMessageScopes } from './chief-turns.js';
-import { captureToolBoundary, isCaptureTool, openTurnCapture } from './coordinator-turn-capture.js';
+import {
+  capturePreCallWorld,
+  captureToolResult,
+  isCaptureTool,
+  openTurnCapture,
+} from './coordinator-turn-capture.js';
 import { projectOfTodo } from './git.js';
 import { resolveProjectGithubLabelIds } from './github-labels.js';
 import { forwardComputerCall } from './machine-computer.js';
@@ -156,43 +161,53 @@ export async function executeRelayToolCall(
   if (!threadRow) throw new NotFoundError(`chief thread ${threadId}`);
   const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
   if (!chiefRow) throw new NotFoundError(`chief ${threadRow.chiefId}`);
-  const captured = isCaptureTool(name) ? openTurnCapture(stepId) : undefined;
-  const result = await executeChiefTool(
-    {
-      db: deps.db,
-      hub: deps.hub,
-      machineHub: deps.machineHub,
-      box: deps.box,
-      githubAppTokenSocket: deps.githubAppTokenSocket,
-      githubAppIdentity: deps.githubAppIdentity,
-      user: deps.user,
-      vapidKeys: deps.vapidKeys,
-      reposDir: deps.reposDir,
-      workspacesDir: deps.workspacesDir,
-      attachmentsDir: deps.attachmentsDir,
-      skillsDir: deps.skillsDir,
-      ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
-      ...(deps.mcpConfigPath !== undefined ? { mcpConfigPath: deps.mcpConfigPath } : {}),
-      ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
-    },
-    {
-      teamId: threadRow.teamId,
-      userId: threadRow.userId,
-      chiefId: chiefRow.id,
-      threadId,
-      chiefAgentId: coordinatorProfile(deps.db, threadRow.teamId)?.id ?? null,
-      conversationId: threadId,
-      turnPrompt: row.prompt,
-      turnMessageIds: row.ownerMessageIds ?? [],
-      turnScopeProjectId: stepScopeProjectId(row),
-      turnScopeMixed: steeredFromAnotherScope(deps, row),
-    },
-    name,
-    params,
-  );
-  if (captured !== undefined)
-    if (captured !== undefined && isCaptureTool(name))
-      captureToolBoundary(deps.db, stepId, threadRow.teamId, name, toolCallId, params, result);
+  const tool = isCaptureTool(name) ? name : undefined;
+  const captured = tool !== undefined ? openTurnCapture(stepId) : undefined;
+  if (captured !== undefined && tool !== undefined)
+    capturePreCallWorld(deps.db, stepId, threadRow.teamId, tool, toolCallId, params);
+  let result: string;
+  try {
+    result = await executeChiefTool(
+      {
+        db: deps.db,
+        hub: deps.hub,
+        machineHub: deps.machineHub,
+        box: deps.box,
+        githubAppTokenSocket: deps.githubAppTokenSocket,
+        githubAppIdentity: deps.githubAppIdentity,
+        user: deps.user,
+        vapidKeys: deps.vapidKeys,
+        reposDir: deps.reposDir,
+        workspacesDir: deps.workspacesDir,
+        attachmentsDir: deps.attachmentsDir,
+        skillsDir: deps.skillsDir,
+        ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
+        ...(deps.mcpConfigPath !== undefined ? { mcpConfigPath: deps.mcpConfigPath } : {}),
+        ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
+      },
+      {
+        teamId: threadRow.teamId,
+        userId: threadRow.userId,
+        chiefId: chiefRow.id,
+        threadId,
+        chiefAgentId: coordinatorProfile(deps.db, threadRow.teamId)?.id ?? null,
+        conversationId: threadId,
+        turnPrompt: row.prompt,
+        turnMessageIds: row.ownerMessageIds ?? [],
+        turnScopeProjectId: stepScopeProjectId(row),
+        turnScopeMixed: steeredFromAnotherScope(deps, row),
+      },
+      name,
+      params,
+    );
+  } catch (error) {
+    if (captured !== undefined && tool !== undefined)
+      captureToolResult(stepId, tool, {
+        toolError: error instanceof Error ? error.message : String(error),
+      });
+    throw error;
+  }
+  if (captured !== undefined && tool !== undefined) captureToolResult(stepId, tool, result);
   return result;
 }
 

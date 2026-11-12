@@ -16,6 +16,10 @@ export const COORDINATOR_SNAPSHOT_MAX_CALL_VIEWS = 128;
 export const CAPTURE_TOOLS = ['projects', 'create_todo'] as const;
 export type CaptureTool = (typeof CAPTURE_TOOLS)[number];
 
+export function isCaptureTool(name: string): name is CaptureTool {
+  return (CAPTURE_TOOLS as readonly string[]).includes(name);
+}
+
 const todoView = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -36,51 +40,48 @@ const snapshotPayload = z.object({
   toolViews: z.array(toolView),
 });
 
-export interface TurnCapture {
-  readonly stepId: string;
-  toolViews: z.infer<typeof toolView>[];
+interface OpenToolView {
+  callId: string;
+  tool: CaptureTool;
+  params: Record<string, unknown>;
+  preCallTodos: z.infer<typeof todoView>[];
+}
+
+interface TurnCaptureState {
+  open: OpenToolView[];
+  views: z.infer<typeof toolView>[];
   recordCount: number;
+  overLimit: boolean;
 }
 
-export function isCaptureTool(name: string): name is CaptureTool {
-  return (CAPTURE_TOOLS as readonly string[]).includes(name);
-}
+const liveCaptures = new Map<string, TurnCaptureState>();
 
-const liveCaptures = new Map<string, TurnCapture>();
-
-export function openTurnCapture(stepId: string): TurnCapture {
+export function openTurnCapture(stepId: string): TurnCaptureState {
   const existing = liveCaptures.get(stepId);
   if (existing) return existing;
-  const capture: TurnCapture = { stepId, toolViews: [], recordCount: 0 };
+  const capture: TurnCaptureState = { open: [], views: [], recordCount: 0, overLimit: false };
   liveCaptures.set(stepId, capture);
   return capture;
 }
 
-export function takeTurnCapture(stepId: string): TurnCapture | undefined {
+export function takeTurnCapture(stepId: string): TurnCaptureState | undefined {
   const capture = liveCaptures.get(stepId);
   liveCaptures.delete(stepId);
   return capture;
 }
 
-export function captureToolBoundary(
+export function capturePreCallWorld(
   db: Db,
   stepId: string,
   teamId: string,
   tool: CaptureTool,
   callId: string | undefined,
   params: Record<string, unknown>,
-  result: unknown,
 ): void {
   const capture = liveCaptures.get(stepId);
   if (capture === undefined) return;
-  if (capture.toolViews.length >= COORDINATOR_SNAPSHOT_MAX_CALL_VIEWS) {
-    capture.toolViews.push({
-      callId: callId ?? '',
-      tool,
-      params,
-      preCallTodos: [],
-      result: { overLimit: true },
-    });
+  if (capture.views.length + capture.open.length >= COORDINATOR_SNAPSHOT_MAX_CALL_VIEWS) {
+    capture.overLimit = true;
     return;
   }
   const preCallTodos = db
@@ -95,14 +96,23 @@ export function captureToolBoundary(
       phase: row.phase,
       archivedAt: row.archivedAt ?? null,
     }));
+  if (capture.recordCount + preCallTodos.length > COORDINATOR_SNAPSHOT_MAX_RECORDS) {
+    capture.overLimit = true;
+    return;
+  }
   capture.recordCount += preCallTodos.length;
-  capture.toolViews.push({
-    callId: callId ?? '',
-    tool,
-    params,
-    preCallTodos,
-    result,
-  });
+  capture.open.push({ callId: callId ?? '', tool, params, preCallTodos });
+}
+
+export function captureToolResult(stepId: string, tool: CaptureTool, result: unknown): void {
+  const capture = liveCaptures.get(stepId);
+  if (capture === undefined) return;
+  const open = capture.open.pop();
+  if (open === undefined || open.tool !== tool) {
+    if (open !== undefined) capture.open.push(open);
+    return;
+  }
+  capture.views.push({ ...open, result });
 }
 
 function canonical(value: unknown): string {
@@ -141,9 +151,8 @@ export function sealCoordinatorTurnSnapshot(
     expiresAt: capturedAt + 30 * 86_400_000,
   };
   try {
-    if (capture.recordCount > COORDINATOR_SNAPSHOT_MAX_RECORDS)
-      throw new Error('record limit exceeded');
-    const parsed = snapshotPayload.parse({ toolViews: capture.toolViews });
+    if (capture.overLimit) throw new Error('capture view or record limit crossed');
+    const parsed = snapshotPayload.parse({ toolViews: capture.views });
     const redacted = redactSecrets(parsed);
     const payloadText = JSON.stringify(redacted.value);
     if (Buffer.byteLength(payloadText, 'utf8') > COORDINATOR_SNAPSHOT_PAYLOAD_MAX_BYTES)

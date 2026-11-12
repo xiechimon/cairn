@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
 import { otlpTraceIdOfTurn } from '@cairn/shared/otel';
+import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import type { Db } from '../../src/db/client.js';
-import { coordinatorTurnSnapshot, step, todo } from '../../src/db/schema.js';
-import { boot, stub, world } from './runner-world.js';
+import { coordinatorTurnSnapshot, project, step, todo } from '../../src/db/schema.js';
+import { boot, stub, type World, world } from './runner-world.js';
 
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
@@ -23,6 +24,27 @@ function snapshotRow(db: Db, turnId: string) {
     .from(coordinatorTurnSnapshot)
     .where(eq(coordinatorTurnSnapshot.turnId, turnId))
     .get();
+}
+
+function toolThenCreateTodo(w: World) {
+  w.s.db.insert(project).values({ id: 'p0', teamId: w.teamId, name: 'docs' }).run();
+  const faux = fauxProvider({ provider: 'stub', models: [{ id: 'm', contextWindow: 200_000 }] });
+  faux.setResponses(
+    Array(8).fill((c: { messages: { role: string }[] }) => {
+      const last = c.messages.at(-1);
+      if (last?.role === 'toolResult') return fauxAssistantMessage('created');
+      return fauxAssistantMessage(
+        [
+          fauxToolCall('create_todo', {
+            projectId: 'p0',
+            quotes: ['create a task'],
+          }),
+        ],
+        { stopReason: 'toolUse' },
+      );
+    }),
+  );
+  return { faux };
 }
 
 describe('coordinator turn snapshot writer', () => {
@@ -67,7 +89,7 @@ describe('coordinator turn snapshot writer', () => {
 
   it('records tool-boundary views for create_todo with pre-call world and committed effects', async () => {
     const w = await world('please create a task');
-    const { faux } = stub('created');
+    const { faux } = toolThenCreateTodo(w);
     const coordinator = boot(w, faux);
     coordinator.wake(w.threadId);
     await coordinator.idle();
@@ -75,15 +97,15 @@ describe('coordinator turn snapshot writer', () => {
     const row = snapshotRow(w.s.db, w.stepId);
     expect(row?.status).toBe('sealed');
     const payload = JSON.parse(row?.payload ?? 'null');
-    const todosBefore = w.s.db.select().from(todo).all().length;
     const calls = payload?.toolViews ?? [];
     const createCall = calls.find((c: { tool: string }) => c.tool === 'create_todo');
-    if (createCall !== undefined) {
-      expect(calls.length).toBeLessThanOrEqual(128);
-      expect(createCall.preCallTodos).toHaveLength(todosBefore - 1);
-      expect(createCall.committedEffects.todoIds).toHaveLength(1);
-      expect(createCall.params).toBeDefined();
-    }
+    expect(createCall).toBeDefined();
+    expect(calls.length).toBeLessThanOrEqual(128);
+    expect(createCall.preCallTodos).toHaveLength(0);
+    const created = w.s.db.select().from(todo).all();
+    expect(created).toHaveLength(1);
+    const result = JSON.parse(String(createCall.result)) as { id: string };
+    expect(result.id).toBe(created[0]?.id);
   });
 
   it('marks a turn unusable instead of truncating when payload bounds are exceeded', async () => {
