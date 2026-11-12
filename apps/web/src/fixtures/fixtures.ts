@@ -100,8 +100,6 @@ export {
   reusePanel15,
   revisionChain,
   revisionStreaming,
-  skillInject,
-  skillInjectZero,
   skillsRouting,
   versionCompareWithChanges,
   versionMenuV2,
