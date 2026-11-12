@@ -44,7 +44,7 @@ The deployed watcher cannot bootstrap its own replacement: its existing runner b
 | Retain operator hold | Explicit maintenance exclusion has a different purpose from accidental idle starvation. | Existing hold removal procedure. |
 | Stop on deadline | No safe guarantee exists for unbounded work without checkpoints. | A later reviewed checkpoint design. |
 
-Implementation: Codex `gpt-6.1-sol`. Required review: Coordinator design review before lifecycle code; Codex cloud code review bound to the PR head. Add `coordinator-hold` if machine dispatch paths change. Run red-first regressions on current main, targeted Vitest with `--maxWorkers=4`, lint, typecheck, spec parsing and prepush. Validate real restart survival and the failure/resume path before rollout.
+Implementation: Codex `gpt-6.1-sol`. Required review: Coordinator design review before lifecycle code. Run red-first regressions on current main, targeted Vitest with `--maxWorkers=4`, lint, typecheck, spec parsing and prepush. Validate real restart survival and the failure/resume path before rollout.
 
 ## 6. Delivery
 
