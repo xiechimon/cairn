@@ -2355,9 +2355,9 @@
       "frontendDesign": {
         "na": "an API for other harnesses with no page"
       },
-      "backendDesign": {
-        "gap": "no design for the MCP endpoint, tool surface, grants, authentication and failure behavior"
-      },
+      "backendDesign": [
+        "docs/research/desktop-mobile-mcp-forms-2026-11-08.md"
+      ],
       "evidence": [
         "apps/server/test/mcp-face.test.ts",
         "integration/test/m4b-mcp-e2e.test.ts"

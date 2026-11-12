@@ -752,7 +752,7 @@ Reach:
 - Test ids in its code: none
 - Research: **gap**: the t3code comparison of plan §21 is not in the repository
 - Frontend design: n/a: an API for other harnesses with no page
-- Backend design: **gap**: no design for the MCP endpoint, tool surface, grants, authentication and failure behavior
+- Backend design: [docs/research/desktop-mobile-mcp-forms-2026-11-08.md](../../../docs/research/desktop-mobile-mcp-forms-2026-11-08.md)
 - Evidence: `apps/server/test/mcp-face.test.ts`, `integration/test/m4b-mcp-e2e.test.ts`
 
 ### git-hosting
