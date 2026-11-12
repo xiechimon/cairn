@@ -20,6 +20,11 @@ A box marked **owner route** changes a security surface from `packages/shared/me
 - [ ] G2. Report, store and enforce the folders an agent may use on a machine. Large. **Owner route, design first.**
 - [ ] Agent browser and desktop use on by default. The panel no longer shows the two switches; the owner wants both open by default. Today the browser capability is off per computer and desktop control is a lease the user takes. Needs a default, a place to turn it off, and the daemon side. **Design first.**
 
+## Task thread and Tasks panel
+
+- [ ] Context usage for a task thread. The thread composer's ring means the same as the Coordinator's: context-window usage. Nothing the web receives for a task carries it: `GET /api/builds/:id/usage` returns cumulative token rows and the `token_usage` table has no context column. The web reads an optional `context: { tokens, contextWindow } | null` on the todo record, the shape `GET /api/teams/:teamId/chief` already uses, and shows a bare ring without it. Needs: the field on `GET /api/todos/:id` (and the task list entries), the shared todo schema, and storing the latest run's last-turn context tokens; the daemon's pi backend reports `contextTokens` per turn but it is stored only for the Coordinator (`chief_turn_usage`).
+- [ ] A saved-for-later task without choosing a project. The Tasks panel's add field creates a task in phase `todo` through `POST /api/projects/:id/todos`. With two or more projects and none chosen the web cannot file it and falls back to sending the text to the Coordinator. Needs a team-level create or a default project. Also confirm when creating a task opens a GitHub issue (`createAutonomousTodo` calls `planSelfIssue`); a note saved for later should not.
+
 ## Results panel
 
 - [ ] G5. A result kind finer than code or document (design, page). Small for the field, medium for reliable classification.
