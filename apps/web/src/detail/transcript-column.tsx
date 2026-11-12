@@ -104,6 +104,7 @@ function TranscriptColumnInner({
         <MessageScrollerContent className={CONTENT_CLS}>
           {lead}
           <Transcript
+            key={threadKey}
             transcript={transcript}
             liveStep={liveStep}
             agent={agent}
