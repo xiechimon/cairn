@@ -2,8 +2,8 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { useConnected } from '../../api/connection-state.js';
 import { useI18n } from '../../i18n/provider.js';
 import type { TVars } from '../../i18n/translate.js';
-import { IconTooltip } from '../icon-tooltip.js';
 import { Button } from '../ui/button.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.js';
 import { TraceTriangle } from './trace-parts.js';
 
 export function useLiveSeconds(startedAt: number | null | undefined): number | null {
@@ -79,34 +79,6 @@ export function TypingDots({
   );
 }
 
-function StepsDots({
-  expanded,
-  onToggle,
-  className,
-}: {
-  expanded: boolean;
-  onToggle: () => void;
-  className?: string;
-}) {
-  const { t } = useI18n();
-  return (
-    <IconTooltip
-      label={t(expanded ? '收起实时步骤' : '查看步骤')}
-      trigger={
-        <Button
-          variant="ghost"
-          data-testid="typing-dots"
-          aria-expanded={expanded}
-          onClick={onToggle}
-          className={`chat-interaction h-auto min-h-0 cursor-pointer border-0 hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) ${TYPING_PILL} ${className ?? ''}`}
-        />
-      }
-    >
-      <TypingDotMarks />
-    </IconTooltip>
-  );
-}
-
 export function LiveSignal({ at, className }: { at?: number | null; className: string }) {
   const { t } = useI18n();
   const secs = useLiveSeconds(at ?? null);
@@ -156,33 +128,16 @@ export function LiveRow({
   const testid = variant === 'detail' ? 'live-row' : undefined;
   if (variant === 'chief' && !waiting) {
     const labelText = t(label, labelVars);
+    if (!notice) return <TypingDots label={labelText} />;
     return (
-      <div className="flex min-w-0 flex-col">
-        {notice && (
-          <span
-            className={`${HEAD} ${HEAD_SIZE.chief} mb-1`}
-            data-testid="chief-live-notice"
-            title={labelDetail !== undefined ? t(labelDetail.label, labelDetail.vars) : undefined}
-          >
-            <span className="truncate">{labelText}</span>
-          </span>
-        )}
-        {disclosure == null ? (
-          <TypingDots />
-        ) : (
-          <StepsDots expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
-        )}
-        {disclosure != null && expanded && (
-          <div className="mt-1 flex min-w-0 flex-col">
-            {!notice && (
-              <p className={`m-0 ${HEAD} ${HEAD_SIZE.chief}`}>
-                <span className="truncate">{labelText}</span>
-              </p>
-            )}
-            {children}
-          </div>
-        )}
-      </div>
+      <Tooltip>
+        <TooltipTrigger render={<span className="w-fit" />}>
+          <TypingDots label={labelText} />
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start" sideOffset={6} data-testid="chief-live-notice">
+          {labelDetail !== undefined ? t(labelDetail.label, labelDetail.vars) : labelText}
+        </TooltipContent>
+      </Tooltip>
     );
   }
   return (

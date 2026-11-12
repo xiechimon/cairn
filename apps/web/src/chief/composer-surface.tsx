@@ -48,8 +48,7 @@ export const PROJECT_CHIP_CLS =
 
 export const SEND_BTN_CLS =
   'ml-auto size-7 cursor-pointer rounded-(--radius-control) border-0 bg-transparent text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-secondary) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent';
-export const SEND_ON_CLS =
-  'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button)/90 hover:text-(--text-on-accent) dark:hover:bg-(--card-button)/90 dark:hover:text-(--text-on-accent)';
+export const SEND_ON_CLS = 'text-foreground hover:text-foreground dark:hover:text-foreground';
 export const STOP_CLS =
   'text-foreground hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover)';
 export const ROUND_HIT_CLS =
@@ -449,9 +448,8 @@ export function ComposerSurface({
                 <span
                   className={cn(
                     ROUND_FACE_CLS,
-                    hasDraft
-                      ? 'bg-(--card-button) text-(--text-on-accent)'
-                      : 'bg-(--hover-1) text-content-tertiary',
+                    'bg-(--hover-1)',
+                    hasDraft ? 'text-foreground' : 'text-content-tertiary',
                   )}
                 >
                   <ArrowUp width={20} height={20} />

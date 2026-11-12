@@ -284,17 +284,8 @@ export function StreamSection() {
         <Cell label="detail: in the task transcript">
           <LiveRow variant="detail" label="Running tests" />
         </Cell>
-        <Cell label="Coordinator: under a reply, click to expand">
-          <LiveRow
-            variant="chief"
-            label="Planning the next step"
-            disclosure={{ expand: 'Show details', collapse: 'Hide details' }}
-          >
-            <p className="m-0 mt-2 max-w-100 text-meta text-content-tertiary">
-              Reading the failing log, then deciding between regenerating the lockfile and pinning
-              the dependency.
-            </p>
-          </LiveRow>
+        <Cell label="Coordinator: typing dots only">
+          <LiveRow variant="chief" label="Planning the next step" />
         </Cell>
         <Cell label="the open group is the live row">
           <div className="w-100">

@@ -1,7 +1,7 @@
 import { cn } from 'cn';
 import { Ban, CircleCheck } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
-import { REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
+import { REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
 import { MessageToolbar } from './message-toolbar.js';
 import type { ChiefQuestionItem } from './question-chips.js';
@@ -49,11 +49,7 @@ export function QuestionAsked({
           </div>
         );
         return (
-          <div
-            key={n}
-            className="group/reply-block relative w-fit max-w-full"
-            data-slot="reply-block"
-          >
+          <div key={n} className={REPLY_BLOCK_CLS} data-slot="reply-block">
             {question.header === '' ? (
               bubble
             ) : (

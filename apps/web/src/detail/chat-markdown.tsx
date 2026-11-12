@@ -488,6 +488,8 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
 
 export const REPLY_BUBBLE_CLS =
   'w-fit max-w-[min(100%,var(--container-reply-bubble))] rounded-(--radius-reply) bg-(--reply-bubble-fill) px-3.5 py-1.75';
+export const REPLY_BLOCK_CLS =
+  'group/reply-block relative w-fit max-w-[min(100%,var(--container-reply-bubble))]';
 
 function ReplyGroup({
   group,
@@ -500,7 +502,7 @@ function ReplyGroup({
 }) {
   return (
     <div
-      className="group/reply-block relative w-fit max-w-full"
+      className={group.bubble ? REPLY_BLOCK_CLS : 'group/reply-block relative w-fit max-w-full'}
       data-slot="reply-block"
       data-bubble={group.bubble ? 'true' : 'false'}
     >

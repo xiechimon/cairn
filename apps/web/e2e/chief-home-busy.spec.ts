@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
-import { verticalGap } from './helpers.js';
+import { openReplySteps, verticalGap } from './helpers.js';
 
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: 'ian', avatarUrl: null };
@@ -454,7 +454,8 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
     const home = page.getByTestId('home-c');
     const reply = home.getByTestId('chief-msg').filter({ hasText: '已派发 #9。' });
     await expect(reply).toHaveCount(1);
-    await reply.getByTestId('chief-tools-toggle').click();
+    await expect(reply.getByTestId('chief-turn-tools')).toHaveCount(0);
+    await openReplySteps(page, reply);
     await evidenceShot(page, 'tools-once.png');
     const question = home.getByTestId('chief-msg').filter({ hasText: '？' }).first();
     expect(await verticalGap(page, question, reply)).toBeLessThan(48);
