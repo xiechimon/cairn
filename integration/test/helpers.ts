@@ -28,6 +28,7 @@ import { ConversationStreamHub, TeamStreamHub } from '../../apps/server/src/serv
 import { MachineWakeHub } from '../../apps/server/src/services/machine-wake-hub.js';
 import { createScheduler } from '../../apps/server/src/services/scheduler.js';
 import { setTodoPhase } from '../../apps/server/src/services/todos.js';
+import { stampPersonSendBody } from '../../apps/server/test/helpers.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../scripts/test-tmpdir.mjs';
 
 export const AGENT_ID = 'agent-it-1';
@@ -296,10 +297,11 @@ export async function api(
   path: string,
   body?: unknown,
 ): Promise<{ status: number; body: unknown }> {
+  const stamped = method === 'POST' ? stampPersonSendBody(path, body) : body;
   const res = await fetch(`${url}${path}`, {
     method,
-    headers: body !== undefined ? { 'content-type': 'application/json' } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    headers: stamped !== undefined ? { 'content-type': 'application/json' } : undefined,
+    body: stamped !== undefined ? JSON.stringify(stamped) : undefined,
   });
   const text = await res.text();
   return { status: res.status, body: text === '' ? null : (JSON.parse(text) as unknown) };

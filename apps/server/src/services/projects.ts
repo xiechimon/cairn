@@ -39,6 +39,7 @@ import type { OAuthClientConfig } from './oauth.js';
 import { insertMessageRow } from './transcript.js';
 
 type ProjectRow = typeof project.$inferSelect;
+type ProjectTx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 export function projectMergeConfigOf(row: ProjectRow): ProjectMergeConfig {
   const raw = row.autonomy as (typeof row.autonomy & Partial<ProjectMergeConfig>) | null;
@@ -160,7 +161,11 @@ function projectRunningWork(db: ProjectReader, projectId: string): string[] {
   return rows.map((row) => row.line);
 }
 
-export function deleteProject(deps: ProjectDeps, id: string): boolean {
+export function deleteProject(
+  deps: ProjectDeps,
+  id: string,
+  beforeCommit?: (tx: ProjectTx, row: ProjectRow) => void,
+): boolean {
   const removed = deps.db.transaction(
     (tx) => {
       const row = tx.select().from(project).where(eq(project.id, id)).get();
@@ -205,6 +210,7 @@ export function deleteProject(deps: ProjectDeps, id: string): boolean {
       moveProjectMemoriesToTeam(tx, id);
       tx.update(chiefThread).set({ projectId: null }).where(eq(chiefThread.projectId, id)).run();
       tx.delete(project).where(eq(project.id, id)).run();
+      beforeCommit?.(tx, row);
       return row;
     },
     { behavior: 'immediate' },

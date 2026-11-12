@@ -180,14 +180,14 @@ export const chiefSendMessageBodySchema = z.object({
   threadId: z.string().nullable(),
   content: z.string().min(1),
   projectId: z.string().min(1).nullish(),
-  clientMessageId: z.string().min(1).max(200).optional(),
+  clientMessageId: z.string().min(1).max(200),
 });
 export type ChiefSendMessageBody = z.infer<typeof chiefSendMessageBodySchema>;
 
 export const coordinatorSendBodySchema = z.object({
   content: z.string().refine((s) => s.trim() !== '', 'content is blank'),
   projectId: z.string().min(1).nullish(),
-  clientMessageId: z.string().min(1).max(200).optional(),
+  clientMessageId: z.string().min(1).max(200),
 });
 export type CoordinatorSendBody = z.infer<typeof coordinatorSendBodySchema>;
 
