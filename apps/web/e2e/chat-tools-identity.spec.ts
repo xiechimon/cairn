@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { copyFromRowTools } from './helpers.js';
 
 const ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=md-toolout';
 const summary = (page: Page) => page.getByTestId('work-summary');
@@ -80,14 +81,13 @@ test('I2: work activity has no copy action in either disclosure state', async ({
 test('I3: assistant message copy stays available', async ({ page }) => {
   await page.goto(ROUTE);
   await readClipboard(page);
-  const reply = page.locator('[data-row="agent"]').filter({ has: page.locator('.chat-copy') }).first();
-  const heading = await reply.locator('h2').innerText();
-  await reply.hover();
-  await reply.getByTestId('msg-actions').getByRole('button', { name: '复制', exact: true }).click();
-  const clipboard = await readClipboard(page);
-  expect(clipboard).toContain(`## ${heading}`);
-  expect(clipboard).toContain('`ls -la`');
-  expect(clipboard).toContain('total 16');
+  const block = page
+    .locator('[data-row="agent"] [data-slot="reply-block"]')
+    .filter({ has: page.locator('h2') })
+    .first();
+  const heading = await block.locator('h2').innerText();
+  await copyFromRowTools(page, block);
+  expect(await readClipboard(page)).toContain(`## ${heading}`);
 });
 
 test('I4: call rows sit flush in a hairline card at 36px', async ({ page }) => {

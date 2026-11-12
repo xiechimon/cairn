@@ -168,11 +168,7 @@ function fireDesktopNotification(record: NotificationRecord): void {
               : record.type === 'no_machine'
                 ? t('没有机器能跑')
                 : record.entityRef.title;
-  const body =
-    record.snippet ??
-    (record.entityRef.seqNum !== null
-      ? `#${record.entityRef.seqNum} ${record.entityRef.title}`
-      : record.entityRef.title);
+  const body = record.snippet ?? record.entityRef.title;
   const href = notificationHref(record);
   void showViaServiceWorker(title, body, record.id, href).then((shown) => {
     if (shown) return;

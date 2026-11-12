@@ -13,6 +13,7 @@ import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
+import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import {
   type TodoGlance,
@@ -25,7 +26,6 @@ import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { FileText } from '../icons/index.js';
 import { dateTimeFormat } from '../lib/date-format.js';
-import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefReportRow } from './chief-report-row.js';
@@ -121,6 +121,7 @@ function robotText(item: {
 }
 
 function TodoSegmentChip({ seq }: { seq: number }) {
+  const { t } = useI18n();
   const glances = useContext(TodoGlanceContext);
   const known = [...(glances ?? [])].find(([, glance]) => glance.seq === seq);
   const chip = (
@@ -130,7 +131,7 @@ function TodoSegmentChip({ seq }: { seq: number }) {
       ) : (
         <FileText width={11} height={11} />
       )}
-      {seq}
+      <span className="max-w-48 truncate">{known?.[1].title ?? t('任务')}</span>
     </>
   );
   const cls = `${CHIP_INLINE_CLS} bg-secondary text-content-secondary`;
@@ -181,7 +182,11 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
               data-testid="chief-chip-agent"
               className={`${CHIP_INLINE_CLS} bg-(--seg-active) text-(--text-secondary)`}
             >
-              <img src={spiralAvatarUrl(s.agent)} alt="" className="size-3 rounded-full" />
+              <SeededAvatar
+                name={s.agent}
+                fallback="/avatar-robot-1.svg"
+                className="size-3 after:hidden"
+              />
               {s.agent}
             </span>
           );
@@ -247,9 +252,8 @@ function TaskStartedRow({
       <StatusLine testId="chief-task-created">
         {t('已建任务')}{' '}
         <ThreadLink todoId={todoId} className={STATUS_REF_CLS}>
-          {seq != null ? `#${seq}` : t('任务')}
+          {title ?? t('任务')}
         </ThreadLink>
-        {title != null ? ` ${title}` : null}
       </StatusLine>
     </MessageScrollerItem>
   );
@@ -263,7 +267,7 @@ function HandoffRow({ todoId }: { todoId: string }) {
       <StatusLine testId="chief-handoff">
         {t('已转给任务')}{' '}
         <ThreadLink todoId={todoId} className={STATUS_REF_CLS} data-phase={glance?.phase}>
-          {glance?.seq != null ? `#${glance.seq}` : t('任务')}
+          {glance?.title ?? t('任务')}
         </ThreadLink>
       </StatusLine>
     </MessageScrollerItem>
@@ -325,7 +329,7 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
               <span key={todo.id}>
                 {n === 0 ? ' ' : '、'}
                 <ThreadLink todoId={todo.id} className={STATUS_REF_CLS}>
-                  {`#${todo.seq} ${todo.title}`}
+                  {todo.title}
                 </ThreadLink>
               </span>
             ))}
