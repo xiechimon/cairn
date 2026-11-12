@@ -31,7 +31,6 @@ function LiveThreadReportReply({ todoId }: { todoId: string }) {
       </Button>
       {open && (
         <ThreadReply
-          seq={todo.seqNum}
           delivery={replyDeliveryOf(todo.phase) ?? 'steer'}
           onSend={send}
           autoFocus

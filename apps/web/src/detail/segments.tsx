@@ -40,6 +40,8 @@ export interface TodoGlance {
 
 export const TodoGlanceContext = createContext<ReadonlyMap<string, TodoGlance> | null>(null);
 
+const TASK_NUMBER_LABEL = /^#\d+$/;
+
 type StatusTone = 'working' | 'wait' | 'quiet' | 'fail';
 
 const TONE_CLASS: Record<StatusTone, { ink: string; tile: string; chip: string }> = {
@@ -126,12 +128,15 @@ export function TodoStatusTile({ phase }: { phase: Phase }) {
 }
 
 function MentionChip({ seg }: { seg: DocSegment }) {
+  const { t } = useI18n();
   const glances = useContext(TodoGlanceContext);
   const href = mentionHref(seg, useThreadHref());
   const className = mentionChipClass(seg.mentionKind);
   const todoId = seg.mentionKind === 'todo' ? seg.mentionId : undefined;
   const glance = todoId != null ? glances?.get(todoId) : undefined;
   const phase = glance?.phase;
+  const label =
+    todoId != null && TASK_NUMBER_LABEL.test(seg.text) ? (glance?.title ?? t('任务')) : seg.text;
   return href != null ? (
     <Link
       className={cn(className, phase != null ? taskChipClass(phase) : 'cursor-pointer')}
@@ -139,10 +144,10 @@ function MentionChip({ seg }: { seg: DocSegment }) {
       data-phase={phase}
     >
       {phase != null && <TodoStatus phase={phase} />}
-      {seg.text}
+      <span className="max-w-48 truncate">{label}</span>
     </Link>
   ) : (
-    <span className={className}>{seg.text}</span>
+    <span className={className}>{label}</span>
   );
 }
 

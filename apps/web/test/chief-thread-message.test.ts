@@ -46,17 +46,17 @@ describe('direct thread messages in the Coordinator conversation', () => {
   });
 
   test('the marker label has a Chinese source and an English translation', () => {
-    const key = '你直接对 #{n} 说：{excerpt}';
-    const vars = { n: 7, excerpt: 'Split it' };
-    expect(translate('zh', EN, key, vars)).toBe('你直接对 #7 说：Split it');
-    expect(translate('en', EN, key, vars)).toBe('You told #7 directly: Split it');
+    const key = '你直接对 {n} 说：{excerpt}';
+    const vars = { n: 'Export', excerpt: 'Split it' };
+    expect(translate('zh', EN, key, vars)).toBe('你直接对 Export 说：Split it');
+    expect(translate('en', EN, key, vars)).toBe('You told Export directly: Split it');
   });
 
   test('a coordinator-origin marker uses the Coordinator label, not the user label', () => {
-    const key = 'Coordinator 直接对 #{n} 说：{excerpt}';
-    const vars = { n: 7, excerpt: 'Split it' };
-    expect(translate('zh', EN, key, vars)).toBe('Coordinator 直接对 #7 说：Split it');
-    expect(translate('en', EN, key, vars)).toBe('The Coordinator told #7 directly: Split it');
+    const key = 'Coordinator 直接对 {n} 说：{excerpt}';
+    const vars = { n: 'Export', excerpt: 'Split it' };
+    expect(translate('zh', EN, key, vars)).toBe('Coordinator 直接对 Export 说：Split it');
+    expect(translate('en', EN, key, vars)).toBe('The Coordinator told Export directly: Split it');
   });
 });
 
