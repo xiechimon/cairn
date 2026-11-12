@@ -1,6 +1,6 @@
 # Team secret gateway: research and decision brief
 
-Date: 2026-10-27. Issue: #1775. Status: awaiting Ian's design decision; no product implementation is authorized by this note.
+Date: 2026-10-27. Issue: #1775. Status: Ian answered the four questions at the end on 2026-11-12; the answers and the implementation design are in [the secret gateway design](../design/secret-gateway.md). This note stays as the research record and authorizes no product implementation by itself.
 
 ## Problem and concrete trace
 
