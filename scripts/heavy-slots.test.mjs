@@ -18,6 +18,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import {
   foreignPortHolderReport,
+  probeAnswers,
   skipsQueue,
   slotCount,
   slotLockDir,
@@ -406,6 +407,42 @@ test('two killed holders and several waiters: stale entries are reclaimed withou
   }
 });
 
+const UNTIL_REFUSED = `
+  const { createConnection } = require('node:net');
+  const attempt = () => {
+    const connection = createConnection(process.argv[1]);
+    connection.once('connect', () => {
+      connection.destroy();
+      setTimeout(attempt, 5);
+    });
+    connection.once('error', () => process.exit(0));
+  };
+  attempt();
+`;
+
+test('a probe whose listener closes before accepting it reads as gone', {
+  skip: process.platform !== 'linux',
+}, async () => {
+  const { dir, cleanup } = sandbox(1);
+  try {
+    const probe = join(dir, 'probe.sock');
+    const listener = watch(process.execPath, [
+      '-e',
+      `require('node:net').createServer().listen(${JSON.stringify(probe)}, () => {
+          process.stdout.write('READY');
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
+        });`,
+    ]);
+    await until(listener, 'out', /READY/);
+    const answer = probeAnswers(probe);
+    listener.child.kill('SIGKILL');
+    execFileSync(process.execPath, ['-e', UNTIL_REFUSED, probe]);
+    assert.equal(await answer, false);
+  } finally {
+    cleanup();
+  }
+});
+
 test('run wrapper: with 2 slots and 4 jobs at most 2 run at once and all pass', async () => {
   const { dir, env, cleanup } = sandbox(2);
   try {
@@ -421,7 +458,7 @@ test('run wrapper: with 2 slots and 4 jobs at most 2 run at once and all pass', 
       watch(process.execPath, [cli, 'run', '--', process.execPath, '-e', job], { env }),
     );
     const codes = await Promise.all(jobs.map((j) => j.exited));
-    assert.deepEqual(codes, [0, 0, 0, 0]);
+    assert.deepEqual(codes, [0, 0, 0, 0], jobs.map((j) => j.out + j.err).join('|'));
     const active = new Set();
     let peak = 0;
     for (const line of readFileSync(events, 'utf8').trim().split('\n')) {
