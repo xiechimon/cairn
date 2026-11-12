@@ -21,12 +21,12 @@ test('negative control: a limit changed in merge-gate-paths.json changes .mergif
   assert.notEqual(mergifyConfig(prGate, changed), config);
 });
 
-test('the queue starts a batch immediately, admits 80 files, and accepts a stack dependency', () => {
-  assert.equal(gatePaths.limits.maxQueueFiles, 80);
+test('the queue starts a batch immediately, admits 3000 files, and accepts a stack dependency', () => {
+  assert.equal(gatePaths.limits.maxQueueFiles, 3000);
   assert.match(config, /batch_max_wait_time: 0 s\n/);
   for (const name of ['default', 'bot']) {
     const [queue] = rules[name].split('    merge_conditions:\n');
-    assert.match(queue, /- '#files <= 80'\n/, name);
+    assert.match(queue, /- '#files <= 3000'\n/, name);
     assert.doesNotMatch(queue, /#added-lines|#deleted-lines/, name);
     assert.match(queue, /- or:\n {10}- base = main\n {10}- "#depends-on > 0"\n/, name);
   }

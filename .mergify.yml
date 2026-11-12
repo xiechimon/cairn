@@ -36,7 +36,7 @@ queue_rules:
       - or:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
-      - '#files <= 80'
+      - '#files <= 3000'
     merge_conditions:
       - or:
           - check-success = check
@@ -101,7 +101,7 @@ queue_rules:
       - or:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
-      - '#files <= 80'
+      - '#files <= 3000'
     merge_conditions:
       - or:
           - check-success = check
