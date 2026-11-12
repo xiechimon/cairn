@@ -111,6 +111,66 @@ describe('chief outbox', () => {
     expect(calls[1]?.entry.key).toBe('key-2');
   });
 
+  test('a first message that failed keeps its key when its conversation has appeared since', async () => {
+    const box = outbox();
+    const { calls, deliver } = gate();
+    box.enqueue({ threadId: null, projectId: null, text: 'hello' }, deliver);
+    await flush();
+    calls[0]?.reject(new Error('response lost'));
+    await flush();
+    box.discard('key-1');
+    box.enqueue({ threadId: 't1', projectId: null, text: 'hello' }, deliver);
+    await flush();
+    expect(calls[1]?.entry).toMatchObject({ key: 'key-1', threadId: 't1' });
+  });
+
+  test('sending an edited message retires the failed one, so its old text later gets a new key', async () => {
+    const box = outbox();
+    const { calls, deliver } = gate();
+    box.enqueue({ threadId: 't1', projectId: null, text: 'hello' }, deliver);
+    await flush();
+    calls[0]?.reject(new Error('response lost'));
+    await flush();
+    box.discard('key-1');
+    box.enqueue({ threadId: 't1', projectId: null, text: 'hello there' }, deliver);
+    await flush();
+    calls[1]?.resolve({ threadId: 't1', messageId: 'm1' });
+    await flush();
+    box.enqueue({ threadId: 't1', projectId: null, text: 'hello' }, deliver);
+    await flush();
+    expect(calls.map((call) => call.entry.key)).toEqual(['key-1', 'key-2', 'key-3']);
+  });
+
+  test('a send in another conversation neither takes nor retires the failed message key', async () => {
+    const box = outbox();
+    const { calls, deliver } = gate();
+    box.enqueue({ threadId: 't1', projectId: null, text: 'hello' }, deliver);
+    await flush();
+    calls[0]?.reject(new Error('refused'));
+    await flush();
+    box.discard('key-1');
+    box.enqueue({ threadId: 't2', projectId: null, text: 'hello' }, deliver);
+    await flush();
+    calls[1]?.resolve({ threadId: 't2', messageId: 'm1' });
+    await flush();
+    box.enqueue({ threadId: 't1', projectId: null, text: 'hello' }, deliver);
+    await flush();
+    expect(calls.map((call) => call.entry.key)).toEqual(['key-1', 'key-2', 'key-1']);
+  });
+
+  test('the same text for another project is a new message with a new key', async () => {
+    const box = outbox();
+    const { calls, deliver } = gate();
+    box.enqueue({ threadId: 't1', projectId: 'p1', text: 'hello' }, deliver);
+    await flush();
+    calls[0]?.reject(new Error('refused'));
+    await flush();
+    box.discard('key-1');
+    box.enqueue({ threadId: 't1', projectId: 'p2', text: 'hello' }, deliver);
+    await flush();
+    expect(calls[1]?.entry.key).toBe('key-2');
+  });
+
   test('discard leaves a message that is still sending in place', async () => {
     const box = outbox();
     const { deliver } = gate();

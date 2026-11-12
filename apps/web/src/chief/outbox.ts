@@ -40,9 +40,7 @@ export function createOutbox(
   mintKey: () => string = () => crypto.randomUUID(),
 ): Outbox {
   let list: readonly OutboxEntry[] = [];
-  const returnedKeys = new Map<string, string>();
-  const signature = (send: { threadId: string | null; projectId: string | null; text: string }) =>
-    [send.threadId ?? '', send.projectId ?? '', send.text].join('\n');
+  let returned: readonly OutboxEntry[] = [];
   let tail: Promise<void> = Promise.resolve();
   const listeners = new Set<() => void>();
   const replace = (next: readonly OutboxEntry[]) => {
@@ -83,9 +81,13 @@ export function createOutbox(
     },
     entries: () => list,
     enqueue(input, deliver) {
-      const returned = returnedKeys.get(signature(input));
-      returnedKeys.delete(signature(input));
-      const key = returned ?? mintKey();
+      const replaced = returned.filter(
+        (entry) => entry.threadId === null || entry.threadId === input.threadId,
+      );
+      returned = returned.filter((entry) => !replaced.includes(entry));
+      const key =
+        replaced.find((entry) => entry.text === input.text && entry.projectId === input.projectId)
+          ?.key ?? mintKey();
       replace([...list, { ...input, key, state: 'sending', messageId: null, createdAt: now() }]);
       dispatch(key, deliver);
       return key;
@@ -93,7 +95,7 @@ export function createOutbox(
     discard(key) {
       const entry = list.find((candidate) => candidate.key === key);
       if (entry?.state !== 'failed') return null;
-      returnedKeys.set(signature(entry), entry.key);
+      returned = [...returned, entry];
       replace(list.filter((candidate) => candidate.key !== key));
       return entry;
     },
