@@ -1,3 +1,4 @@
+import { liveQuickReplies, QUICK_REPLIES_KIND, quickRepliesRowId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { chiefMessage, step } from '../src/db/schema.js';
@@ -203,6 +204,34 @@ describe('Coordinator resume boundaries from the historical task 169 sequence', 
     expect(result.messages.findIndex((row) => row.id === 'user-resumed')).toBeLessThan(
       result.messages.findIndex((row) => row.id === 'resumed-reply'),
     );
+  });
+
+  test('same-millisecond quick replies follow their invisible turn boundary', () => {
+    seedResume();
+    H.s.db
+      .insert(chiefMessage)
+      .values({
+        id: quickRepliesRowId('resumed'),
+        threadId: H.threadId,
+        role: 'system',
+        content: JSON.stringify({
+          kind: QUICK_REPLIES_KIND,
+          stepId: 'resumed',
+          replies: ['Go on'],
+        }),
+        createdAt: 300,
+      })
+      .run();
+    const result = page();
+    expect(result.messages.map((row) => row.id)).toEqual([
+      'owner',
+      'user-failed-wake',
+      'wake-reply',
+      'user-resumed',
+      quickRepliesRowId('resumed'),
+      'resumed-reply',
+    ]);
+    expect(liveQuickReplies(result.messages, { running: false })).toEqual(['Go on']);
   });
 
   test('a different project step cannot reset a filtered conversation wake', () => {
