@@ -1,3 +1,5 @@
+import { STREAM_TIMEOUTS_MS } from '@cairn/shared';
+
 export type StreamTimeoutArm = 'first' | 'idle' | 'body' | 'duration';
 
 export interface StreamTimeouts {
@@ -20,6 +22,46 @@ export function streamTimeoutMessage(
           : timeouts.durationCap;
   const label = arm === 'duration' ? 'cap' : arm;
   return `stream timeout (arm=${arm}, ${label}=${value}ms)`;
+}
+
+export const STREAM_DURATION_CAP_DEFAULT_MS = 3_600_000;
+
+export const STREAM_DURATION_CAP_ENV = 'CAIRN_STREAM_DURATION_CAP_MS';
+export const STREAM_IDLE_ENV = 'CAIRN_STREAM_IDLE_MS';
+export const STREAM_FIRST_EVENT_ENV = 'CAIRN_STREAM_FIRST_EVENT_MS';
+
+function positiveMs(raw: string | undefined): number | null {
+  if (raw === undefined) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+export interface StreamLimits {
+  timeouts: StreamTimeouts;
+  durationCapMs: number;
+  durationCapIsAbsolute: boolean;
+}
+
+export function resolveStreamLimits(
+  overrides: { timeouts?: StreamTimeouts; durationCapMs?: number },
+  env: NodeJS.ProcessEnv = process.env,
+): StreamLimits {
+  const envFirstMs = positiveMs(env[STREAM_FIRST_EVENT_ENV]);
+  const envIdleMs = positiveMs(env[STREAM_IDLE_ENV]);
+  const envDurationCapMs = positiveMs(env[STREAM_DURATION_CAP_ENV]);
+  return {
+    timeouts: {
+      first: envFirstMs ?? overrides.timeouts?.first ?? STREAM_TIMEOUTS_MS.streamFirstEvent,
+      idle: envIdleMs ?? overrides.timeouts?.idle ?? STREAM_TIMEOUTS_MS.streamIdle,
+      body: Math.max(
+        overrides.timeouts?.body ?? STREAM_TIMEOUTS_MS.streamBodyTimeout,
+        envFirstMs ?? 0,
+        envIdleMs ?? 0,
+      ),
+    },
+    durationCapMs: envDurationCapMs ?? overrides.durationCapMs ?? STREAM_DURATION_CAP_DEFAULT_MS,
+    durationCapIsAbsolute: envDurationCapMs !== null,
+  };
 }
 
 export interface StreamWatchdogOptions {

@@ -1,8 +1,0 @@
-{
-  "providerMode": "synthetic machine report; no model call",
-  "failedBuilds": 1,
-  "stepStatus": "failed",
-  "needsYou": true,
-  "coordinatorNotices": 1,
-  "reason": "Task parked: model unavailable (glm-5.3). Update model routing before retrying."
-}
