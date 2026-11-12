@@ -18,7 +18,7 @@ interface ReplayFixture {
 }
 
 const FIXTURE_PATH = join(import.meta.dirname, 'fixtures/1583-2026-10-23-open.json');
-const REPORT_PATH = join(import.meta.dirname, '../../../docs/verify/1583/replay-report.json');
+const REPORT_PATH = join(import.meta.dirname, 'fixtures/1583-replay-report.json');
 const CUTOFF = '2026-10-23T10:56:00Z';
 const MAIN_SHA_PREFIX = '1442c6af';
 
@@ -108,7 +108,7 @@ describe('replay of the 2026-10-23 manual sweep (#1583)', () => {
     }
   });
 
-  test('the replay is deterministic and writes the report JSON under docs/verify/1583', () => {
+  test('the replay is deterministic and writes the report JSON beside the fixture', () => {
     const first = replay();
     const second = replay();
     expect(second.groups).toEqual(first.groups);

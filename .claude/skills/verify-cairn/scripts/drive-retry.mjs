@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-const require = createRequire(new URL('../../../integration/package.json', import.meta.url));
+const require = createRequire(new URL('../../../../integration/package.json', import.meta.url));
 const loader = require.resolve('tsx/cli');
 const out = resolve(process.argv[2] ?? process.env.VERIFY_EVIDENCE_DIR);
 const flow = mkdtempSync(join(tmpdir(), 'cairn-retry-proof-'));

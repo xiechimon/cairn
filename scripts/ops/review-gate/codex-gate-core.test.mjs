@@ -878,7 +878,7 @@ test('every canonical security pattern is covered without expanding to other hum
 });
 
 const receiptFixture = JSON.parse(
-  readFileSync(new URL('../../../docs/verify/D88/receipt-fixture.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('./receipt-fixture.json', import.meta.url), 'utf8'),
 );
 function receiptDecision(fixture, threads = []) {
   const state = parseState(fixture.evidence.comments[0].body, 'security_review');

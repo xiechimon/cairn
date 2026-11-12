@@ -20,7 +20,7 @@ const WEB = `http://127.0.0.1:${stack.webPort ?? process.env.VERIFY_WEB_PORT ?? 
 const HOME_DIR = stack.homeDir ?? join(RUN_DIR, 'home');
 const DB_PATH = join(HOME_DIR, 'server', 'server.db');
 const POLLUTED_ROW_FILE =
-  process.env.POLLUTED_ROW_FILE ?? join(SCRIPT_REPO, 'docs/verify/1262/row-from-user-db.txt');
+  process.env.POLLUTED_ROW_FILE ?? join(SCRIPT_REPO, '.claude/skills/verify-cairn/fixtures/1262-row-from-user-db.txt');
 const require2 = createRequire(join(REPO, 'apps/server/package.json'));
 const ts = new Date().toISOString().replace(/[:.]/g, '-');
 const EVIDENCE =

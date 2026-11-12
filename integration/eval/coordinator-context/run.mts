@@ -49,7 +49,7 @@ const { values: args } = parseArgs({
     arms: { type: 'string', default: 'a0,a1,b1,b2' },
     live: { type: 'string', default: String(RECALL_TURN - SEEDED_TURNS - 1) },
     budgetUsd: { type: 'string', default: '4.5' },
-    out: { type: 'string', default: 'docs/verify/2522/raw' },
+    out: { type: 'string', default: 'integration/eval/coordinator-context/raw' },
     inputBudget: { type: 'string', default: '64000' },
     contextWindow: { type: 'string', default: '1000000' },
   },

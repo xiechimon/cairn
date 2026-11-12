@@ -32,9 +32,7 @@
         "body": "<!-- codex-review-receipt:v1 -->\n\n### \ud83d\udee1\ufe0f Codex Security Review\n\nSecurity review completed. No security issues were found in this pull request.\n\n**Reviewed commit:** `7cd6bab608`"
       }
     ],
-    "commits": [
-      "7cd6bab60852464407b68314c733029e48476946"
-    ],
+    "commits": ["7cd6bab60852464407b68314c733029e48476946"],
     "resolvedSha": "7cd6bab60852464407b68314c733029e48476946",
     "forcePushes": [],
     "refMatches": []
