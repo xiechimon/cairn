@@ -346,7 +346,6 @@ function ThreadBody({
           }
           aiReview={false}
           streaming={chat.running}
-          workingFor={chat.workingFor}
           editable={chat.send !== undefined}
           readOnly={chat.locked}
           draft={draft}
