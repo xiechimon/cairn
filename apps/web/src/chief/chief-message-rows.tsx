@@ -39,10 +39,10 @@ import { ReplyQuoteBlock } from './reply-quote-block.js';
 import {
   REPLY_HIGHLIGHT_ATTR,
   REPLY_HIGHLIGHT_CLS,
+  REPLY_SOURCE_ATTR,
+  type ReplyQuoteDraft,
   ReplySourceHighlightContext,
 } from './reply-source-highlight.js';
-import type { ReplyQuoteDraft } from './selection-reply.js';
-import { REPLY_SOURCE_ATTR } from './selection-reply-model.js';
 import { SentAttachments } from './sent-attachments.js';
 import type { ThreadActivity } from './thread-activity.js';
 import { ThreadActivityRow, ThreadEventLine } from './thread-activity-row.js';

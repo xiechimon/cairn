@@ -3,6 +3,7 @@ import { reportStatusWord } from '../board/status-words.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { TraceChevron } from '../components/chat/trace-parts.js';
 import { Button } from '../components/ui/button.js';
+import { REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
 import { FileText } from '../icons/index.js';
 import {
@@ -15,15 +16,15 @@ import {
 const REF_MARK = '\u0001';
 const REF_PATTERN = `#${REF_MARK}`;
 
-const ROW_CLS =
-  'flex min-h-6 min-w-0 items-center gap-1.5 text-meta leading-5 text-(--text-tertiary)';
-const EVENT_CLS =
-  'flex min-h-6 min-w-0 items-start gap-1.5 text-meta leading-5 text-(--text-tertiary)';
+const BUBBLE_CLS = `${REPLY_BUBBLE_CLS} min-w-0 text-ui leading-5 text-(--foreground)`;
+const ROW_CLS = 'flex min-w-0 items-center gap-1.5';
+const EVENT_CLS = `${BUBBLE_CLS} flex items-start gap-1.5`;
 const ICON_CLS = 'flex-none text-(--text-tertiary)';
 const TOGGLE_CLS =
   "-my-0.5 size-6 min-h-0 flex-none cursor-pointer justify-center rounded-(--radius-control) border-0 bg-transparent p-0 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent aria-expanded:hover:bg-(--menu-hover) dark:aria-expanded:hover:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
 const REF_CLS = 'cursor-pointer hover:text-(--foreground) hover:underline';
-const EVENT_LIST_CLS = 'mt-0.5 ml-5 flex min-w-0 flex-col gap-0.5 border-s border-(--border) ps-3';
+const EVENT_LIST_CLS =
+  'mt-1 mb-0.5 ml-5 flex min-w-0 flex-col gap-0.5 border-s border-(--border) ps-3';
 
 function useRefSentence() {
   const { t } = useI18n();
@@ -95,7 +96,7 @@ function ExpandedEvent({ item }: { item: ThreadEventItem }) {
         });
   return (
     <div
-      className="min-w-0 truncate text-meta leading-5 text-(--text-tertiary)"
+      className="min-w-0 truncate text-meta leading-5 text-(--text-secondary)"
       data-testid="thread-activity-event"
       title={body}
     >
@@ -128,7 +129,7 @@ export function ThreadActivityRow({ activity }: { activity: ThreadActivity }) {
   if (activity.events.length === 1 && only !== undefined) return <ThreadEventLine item={only} />;
   const summary = activitySummary(activity);
   return (
-    <div className="flex min-w-0 flex-col" data-testid="thread-activity">
+    <div className={`${BUBBLE_CLS} flex flex-col`} data-testid="thread-activity">
       <div className={ROW_CLS}>
         <FileText width={16} height={16} className={ICON_CLS} />
         <span className="min-w-0 truncate" data-testid="thread-activity-summary">

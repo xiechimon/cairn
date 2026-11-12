@@ -44,7 +44,7 @@
 | [Phone push](#push-notifications) | 1 | shipped | gap | gap | gap | B2 |
 | [Question cards](#questions) | 1 | shipped | gap | yes (not on main) | gap | B2 |
 | [Model and work routing](#routing) | 1 | shipped | yes | yes | yes |  |
-| [Selection reply](#selection-reply) | 1 | shipped | yes | yes | yes |  |
+| [Reply quote](#selection-reply) | 1 | shipped | yes | yes | yes |  |
 | [Steer, queue and stop](#steer-queue-stop) | 1 | shipped | gap | gap | gap | B3 |
 | [Machine work protocol](#step-claim) | 1 | shipped | yes | n/a | yes |  |
 | [Thread PR panel and auto-fix](#thread-pr-panel) | 1 | shipped | yes | yes | yes |  |
@@ -320,7 +320,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### selection-reply
 
-**Selection reply** (shipped). Select text in a Coordinator message and press Reply to quote it above the composer; the sent message carries the quote and its source message id.
+**Reply quote** (shipped). Press Reply in a Coordinator message's hover tools to quote it above the composer; the sent message carries the quote and its source message id. Selecting text shows no reply bar.
 
 - Research: [docs/research/selection-reply-2026-11-08.md](research/selection-reply-2026-11-08.md)
 - Frontend design: [docs/design/selection-reply-2026-11-08.md](design/selection-reply-2026-11-08.md)

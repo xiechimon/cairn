@@ -275,7 +275,6 @@ export const EN: Record<string, string> = {
   暂无: 'None',
   审阅: 'Review',
   回复: 'Reply',
-  选中文字的操作: 'Selection actions',
   移除引用: 'Remove quote',
   方案: 'Plan',
   分支: 'Branch',
