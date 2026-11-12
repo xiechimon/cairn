@@ -31,7 +31,8 @@ if (response) {
 if (path === 'graphql') {
  if(args.includes('pullRequestId=bad')) process.exit(1);
  console.log(JSON.stringify({data:{disablePullRequestAutoMerge:{pullRequest:{number:1}}}}));
-} else if (path.includes('/issues?')) console.log(JSON.stringify([d.issues ?? []]));
+} else if (path.includes('/issues?state=all')) console.log(JSON.stringify([d.pauseHistory ?? []]));
+else if (path.includes('/issues?')) console.log(JSON.stringify([d.issues ?? []]));
 else if (path.includes('/issues/') && args.includes('PATCH')) { d.issues = []; fs.writeFileSync(process.env.DATA, JSON.stringify(d)); console.log('{}'); }
 else if (path.endsWith('/rerun') && d.rerunError) { console.error(d.rerunError); process.exit(1); }
 else if (path.includes('/actions/runs/') && !path.endsWith('/rerun')) console.log(JSON.stringify(d.confirmedRun ?? {}));
@@ -539,11 +540,9 @@ test('unpaused sweep requeues a PR dequeued only for the autonomy brake', (t) =>
   assert.equal(r.status, 0, r.stderr);
   const calls = f.calls();
   assert.match(calls, /@mergifyio requeue/);
-  assert.match(calls, /issues\/7\/labels\/dequeued/);
-  assert.match(calls, /"DELETE"/);
+  assert.doesNotMatch(calls, /"DELETE"/);
   assert.match(r.stdout, /#7: requeued/);
   assert.ok(calls.indexOf('statuses/') < calls.indexOf('@mergifyio requeue'));
-  assert.ok(calls.indexOf('@mergifyio requeue') < calls.indexOf('labels/dequeued'));
 });
 test('paused sweep does not requeue a brake dequeue', (t) => {
   const f = fixture(t, {
@@ -610,7 +609,7 @@ test('a malformed latest Mergify payload does not requeue or fail the sweep', (t
   assert.equal(r.status, 0, r.stderr);
   assert.doesNotMatch(f.calls(), /requeue|"DELETE"/);
 });
-test('an existing requeue comment is not repeated and the label is still removed', (t) => {
+test('an existing requeue comment is not repeated', (t) => {
   const f = fixture(t, {
     pulls: [dequeuedPull()],
     comments: {
@@ -627,7 +626,83 @@ test('an existing requeue comment is not repeated and the label is still removed
   const r = f.run(['sweep']);
   assert.equal(r.status, 0, r.stderr);
   assert.doesNotMatch(f.calls(), /@mergifyio requeue/);
-  assert.match(f.calls(), /"DELETE"/);
+  assert.doesNotMatch(f.calls(), /"DELETE"/);
+  assert.match(r.stdout, /#7: requeue already asked/);
+});
+const pauseReason = { code: 'CHECKS_FAILED', label: 'checks failed', message: 'failing checks' };
+function leftQueue(left_at, reason = pauseReason) {
+  const comment = mergify('dequeued', reason, '2026-11-12T17:50:49Z');
+  comment.body = comment.body.replace(
+    '"state":"dequeued"',
+    `"state":"dequeued","left_at":"${left_at}"`,
+  );
+  return comment;
+}
+const pauseHistory = [
+  { number: 4139, created_at: '2026-11-12T17:49:06Z', closed_at: '2026-11-12T17:59:00Z' },
+];
+test('#4125: a PR that left the queue while a pause marker was open is requeued, with no checks field in the payload', (t) => {
+  const f = fixture(t, {
+    pauseHistory,
+    pulls: [dequeuedPull()],
+    comments: { 7: [leftQueue('2026-11-12T17:50:48.387023+00:00')] },
+  });
+  const r = f.run(['sweep']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(f.calls(), /@mergifyio requeue/);
+  assert.match(r.stdout, /#7: requeued/);
+});
+test('#4125: a pause dequeue that names pr-evidence is requeued', (t) => {
+  const f = fixture(t, {
+    pauseHistory,
+    pulls: [dequeuedPull()],
+    comments: {
+      7: [leftQueue('2026-11-12T17:53:27Z', { ...pauseReason, checks: ['pr-evidence'] })],
+    },
+  });
+  const r = f.run(['sweep']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(f.calls(), /@mergifyio requeue/);
+});
+for (const [name, left, reason] of [
+  ['left the queue before the pause', '2026-11-12T17:40:00Z', pauseReason],
+  ['left the queue after the pause ended', '2026-11-12T18:10:00Z', pauseReason],
+  ['failed CI during the pause', '2026-11-12T17:51:00Z', { ...pauseReason, checks: ['check'] }],
+  ['has no left_at', 'not-a-time', pauseReason],
+])
+  test(`#4125: a dequeue that ${name} is not requeued`, (t) => {
+    const f = fixture(t, {
+      pauseHistory,
+      pulls: [dequeuedPull()],
+      comments: { 7: [leftQueue(left, reason)] },
+    });
+    const r = f.run(['sweep']);
+    assert.equal(r.status, 0, r.stderr);
+    assert.doesNotMatch(f.calls(), /@mergifyio requeue/);
+  });
+test('#4125: a requeue Mergify refused is asked again', (t) => {
+  const f = fixture(t, {
+    pauseHistory,
+    pulls: [dequeuedPull()],
+    comments: {
+      7: [
+        leftQueue('2026-11-12T17:53:27Z'),
+        {
+          user: { login: 'github-actions[bot]' },
+          created_at: '2026-11-12T17:56:59Z',
+          body: '@mergifyio requeue',
+        },
+        {
+          user: { login: 'mergify[bot]' },
+          created_at: '2026-11-12T17:57:09Z',
+          body: '> `requeue`\n\n#### Command disallowed due to command restrictions',
+        },
+      ],
+    },
+  });
+  const r = f.run(['sweep']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(f.calls(), /"body":"@mergifyio requeue"/);
   assert.match(r.stdout, /#7: requeued/);
 });
 test('a requeue comment failure still lets the next PR through', (t) => {

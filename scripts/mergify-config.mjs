@@ -72,6 +72,11 @@ commands_restrictions:
   dequeue:
     conditions:
       - sender-permission >= write
+  requeue:
+    conditions:
+      - or:
+          - sender-permission >= write
+          - sender = github-actions[bot]
 merge_queue:
   mode: serial
   max_parallel_checks: ${parallelChecks}
