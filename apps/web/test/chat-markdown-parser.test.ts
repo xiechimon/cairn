@@ -151,6 +151,18 @@ describe('reply bubbles', () => {
     expect(groups.map((g) => g.blocks.map((b) => b.kind))).toEqual([['list', 'list']]);
   });
 
+  it('gives each run of a mixed list its own source, once', () => {
+    const plainThenCheck = chatBubbleGroups('- Notes\n- [ ] Deploy');
+    expect(plainThenCheck.map((group) => group.source).join('\n')).toBe('- Notes\n- [ ] Deploy');
+    const plainThenProgress = chatBubbleGroups('- Notes\n- More\n- [/] Deploy\n- Done');
+    expect(plainThenProgress.map((group) => group.source).join('\n')).toBe(
+      '- Notes\n- More\n- [/] Deploy\n- Done',
+    );
+    for (const group of plainThenProgress) {
+      expect(group.source.match(/Notes/g)?.length ?? 0).toBeLessThanOrEqual(1);
+    }
+  });
+
   it('leaves tables, code and attachments outside the bubbles', () => {
     const groups = chatBubbleGroups(
       '前言\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n\n```sh\nls\n```\n\n![图](attachment:team-1/shot.png)\n\n结尾',

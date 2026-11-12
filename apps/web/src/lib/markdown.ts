@@ -258,8 +258,14 @@ function itemBlocks(item: Tokens.ListItem): ChatBlock[] {
   return blocks;
 }
 
-function listBlocks(list: Tokens.List): ChatBlock[] {
-  const runs: { tasks: boolean; items: Tokens.ListItem[]; start: number }[] = [];
+interface ListRun {
+  tasks: boolean;
+  items: Tokens.ListItem[];
+  start: number;
+}
+
+function listRuns(list: Tokens.List): ListRun[] {
+  const runs: ListRun[] = [];
   const base = typeof list.start === 'number' ? list.start : 1;
   list.items.forEach((item, index) => {
     const tasks = item.task || progressMarker(item) !== null;
@@ -267,7 +273,11 @@ function listBlocks(list: Tokens.List): ChatBlock[] {
     if (open !== undefined && open.tasks === tasks) open.items.push(item);
     else runs.push({ tasks, items: [item], start: base + index });
   });
-  return runs.map((run) =>
+  return runs;
+}
+
+function listBlocks(list: Tokens.List): ChatBlock[] {
+  return listRuns(list).map((run) =>
     run.tasks && run.items.some((item) => progressMarker(item) !== null)
       ? { kind: 'tasks', items: run.items.map(agentTaskItem) }
       : {
@@ -358,8 +368,19 @@ function topBlocks(text: string): TopBlock[] {
       spaced = true;
       continue;
     }
-    blockOf(token).forEach((block, n) => {
-      out.push({ block, spaced: spaced && n === 0, source: token.raw.trim() });
+    const blocks = blockOf(token);
+    const runSources =
+      token.type === 'list' && blocks.length > 1
+        ? listRuns(token as Tokens.List).map((run) =>
+            run.items.map((item) => item.raw.trim()).join('\n'),
+          )
+        : null;
+    blocks.forEach((block, n) => {
+      out.push({
+        block,
+        spaced: spaced && n === 0,
+        source: runSources?.[n] ?? token.raw.trim(),
+      });
     });
     spaced = /\n\s*\n\s*$/.test(token.raw);
   }
