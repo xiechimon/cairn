@@ -63,8 +63,6 @@ export function threadUpdates(
   if (review?.kind === 'review') note(review.conclusion.trim(), review.createdAt);
   const report = transcript.findLast((item) => item.kind === 'report');
   if (report?.kind === 'report') note(firstLine(report.markdown), report.createdAt);
-  const plan = transcript.findLast((item) => item.kind === 'plan');
-  if (todo.phase === 'confirm' && plan?.kind === 'plan') note(plan.title, plan.createdAt);
   if (lines.length === 0 && todo.phase === 'review') {
     for (const item of transcript.toReversed()) {
       if (item.kind !== 'robot') continue;
