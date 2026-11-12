@@ -18,7 +18,7 @@ the global template even if it also matches.
 Start from `.github/PULL_REQUEST_TEMPLATE.md`. Write in English for a reader
 who did not watch the work. Use this order:
 
-1. `## Proof`, screenshot first (D117): real screenshots of the running
+1. `## Proof`, screenshot first: real screenshots of the running
    product or of the API tool, taken from the live verify-cairn stack, never
    from a fixture page (`?scenario=`) or hand-made HTML. For UI, a before /
    after / unchanged table with one value line under each image, as in t3code
@@ -173,7 +173,7 @@ When the diff adds or modifies any `*-snapshots/*.png` baseline, the workflow pa
 
 ## UI reference comparison
 
-A PR that changes `apps/web/src` adds a reference table under Proof, one row per state that has a reference shot (D120):
+A PR that changes `apps/web/src` adds a reference table under Proof, one row per state that has a reference shot:
 
 ```markdown
 | State | Reference | Ours | Verdict |
