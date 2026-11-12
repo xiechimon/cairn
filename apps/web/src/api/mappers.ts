@@ -540,18 +540,6 @@ function transcriptHead(
       ...(machineName !== null ? { machine: machineName } : {}),
       ...(cancelled ? { cancelled: true } : {}),
     });
-    if (steps.some((s) => s.skillInjection != null)) {
-      const seen = new Map<string, string>();
-      for (const s of steps) {
-        for (const hit of s.skillInjection?.hits ?? []) {
-          if (!seen.has(hit.id)) seen.set(hit.id, hit.reason);
-        }
-      }
-      head.push({
-        kind: 'injected-skills',
-        skills: [...seen].map(([id, reason]) => ({ id, reason })),
-      });
-    }
   }
   return head;
 }

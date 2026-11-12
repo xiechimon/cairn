@@ -14,7 +14,6 @@ import {
   STOP_CLS,
   TOOL_BTN_CLS,
 } from '../chief/composer-surface.js';
-import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { type QueuedCapsule, QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
@@ -60,7 +59,6 @@ interface ComposerProps {
   mentionFiles?: FileMentionEntry[];
   onStop?: () => void;
   onReview?: () => void;
-  workingFor?: { startedAt?: number | undefined; seconds?: number | undefined } | undefined;
   queuedMessages?: QueuedCapsule[] | undefined;
   onSendQueuedNow?: ((id: string, content: string) => Promise<unknown>) | undefined;
   onRemoveQueued?: ((id: string, content: string) => Promise<unknown>) | undefined;
@@ -85,7 +83,6 @@ export function Composer({
   mentionFiles,
   onStop,
   onReview,
-  workingFor,
   queuedMessages,
   onSendQueuedNow,
   onRemoveQueued,
@@ -95,8 +92,6 @@ export function Composer({
 }: ComposerProps) {
   const { t } = useI18n();
   const narrow = useNarrow();
-  const tick = useLiveSeconds(streaming ? workingFor?.startedAt : null);
-  const elapsed = tick ?? workingFor?.seconds ?? null;
   const {
     draft,
     setDraft,
@@ -326,40 +321,31 @@ export function Composer({
               {t(placeholder)}
             </div>
           )}
-          {!readOnly && (
-            <>
-              {streaming && elapsed != null && (
-                <span
-                  className="flex h-7 flex-none items-center px-1 text-meta tabular-nums text-(--text-tertiary)"
-                  data-testid="composer-working"
-                >
-                  {t('工作中 · {time}', { time: formatClock(elapsed) })}
-                </span>
-              )}
-              {streaming && (
-                <IconTooltip
-                  label={t('停止')}
-                  trigger={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        'composer-stop',
-                        narrow ? ROUND_HIT_CLS : cn(SEND_BTN_CLS, STOP_CLS),
-                      )}
-                      onClick={onStop}
-                    />
-                  }
-                >
-                  {narrow ? (
-                    <span className={`${ROUND_FACE_CLS} bg-(--hover-1)`}>
-                      <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
-                    </span>
-                  ) : (
-                    <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
-                  )}
-                </IconTooltip>
-              )}
+          {!readOnly &&
+            (streaming && !hasContent ? (
+              <IconTooltip
+                label={t('停止')}
+                trigger={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      'composer-stop',
+                      narrow ? ROUND_HIT_CLS : cn(SEND_BTN_CLS, STOP_CLS),
+                    )}
+                    onClick={onStop}
+                  />
+                }
+              >
+                {narrow ? (
+                  <span className={`${ROUND_FACE_CLS} bg-(--hover-1)`}>
+                    <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
+                  </span>
+                ) : (
+                  <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
+                )}
+              </IconTooltip>
+            ) : (
               <IconTooltip
                 label={t('发送')}
                 trigger={
@@ -388,8 +374,7 @@ export function Composer({
                   <CornerDownLeft width={20} height={20} />
                 )}
               </IconTooltip>
-            </>
-          )}
+            ))}
         </div>
         <Input
           ref={fileInputRef}
