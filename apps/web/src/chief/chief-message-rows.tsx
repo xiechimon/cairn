@@ -279,6 +279,7 @@ export function chiefStreamRowKey(
 ): string | number {
   switch (item.kind) {
     case 'user':
+      return item.outboxKey != null ? `outbox-${item.outboxKey}` : (item.id ?? index);
     case 'robot':
     case 'thinking':
     case 'question':
@@ -433,6 +434,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     const sentFiles = parseAttachmentTokens(split.tokens.join('\n'));
     const bubbleText = sentFiles.length > 0 ? split.text.trim() : split.text;
     const showBubble = bubbleText !== '' || reply != null || sentFiles.length === 0;
+    const sending = item.delivery === 'sending';
+    const fade = sending ? 'opacity-55' : '';
     const userTools = (placement: 'left' | 'below-end', testId: string) => (
       <MessageToolbar
         placement={placement}
@@ -459,9 +462,12 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             data-testid="chief-msg-col"
           >
             {sentFiles.length > 0 && (
-              <div className="group/reply-block relative max-w-full" data-slot="reply-block">
+              <div
+                className={`group/reply-block relative max-w-full ${fade}`}
+                data-slot="reply-block"
+              >
                 <SentAttachments files={sentFiles} />
-                {!showBubble && userTools('left', 'chief-msg-tools')}
+                {!showBubble && !sending && userTools('left', 'chief-msg-tools')}
               </div>
             )}
             {showBubble && (
@@ -472,15 +478,22 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                   data-md={shown != null ? '' : undefined}
                   {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
                   {...highlight(item.id)}
-                  className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''}`}
+                  {...(sending ? { 'data-delivery': 'sending' } : {})}
+                  className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''} ${fade}`}
                 >
                   {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
                   {shown != null ? <ChatMarkdown text={bubbleText} /> : bubbleText}
                 </UserMessageBubble>
-                {userTools('left', 'chief-msg-tools')}
+                {!sending && userTools('left', 'chief-msg-tools')}
               </div>
             )}
-            {userTools('below-end', 'chief-msg-tools-touch')}
+            {sending ? (
+              <span role="status" className="sr-only" data-testid="chief-msg-sending">
+                {t('发送中')}
+              </span>
+            ) : (
+              userTools('below-end', 'chief-msg-tools-touch')
+            )}
           </MessageContent>
         </Message>
       </MessageScrollerItem>
