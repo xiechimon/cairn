@@ -32,8 +32,45 @@ test('the queue starts a batch immediately, admits 80 files, and accepts a stack
   }
 });
 
-test('path class does not keep a pull request out of the queue', () => {
-  assert.doesNotMatch(config, /-files ~=| -removed-files ~=|owner-route/);
+function admissionPattern(queue) {
+  const match = queue.match(/-files ~= \(\?i\)\^(\(\?:.*\))\$/);
+  assert.ok(match, 'owner-route file exclusion');
+  return new RegExp(match[1], 'i');
+}
+
+test('owner-route classes stay out of the queue and a non-sensitive path does not', () => {
+  for (const name of ['default', 'bot']) {
+    const [queue] = rules[name].split('    merge_conditions:\n');
+    assert.doesNotMatch(queue, /-label = owner-route/, name);
+    const pattern = admissionPattern(queue);
+    for (const path of [
+      '.github/workflows/ci.yml',
+      '.mergify.yml',
+      '.claude/workflows/pr-gate.js',
+      'scripts/merge-route.mjs',
+      'scripts/autonomy-brake.mjs',
+      'scripts/ops/review-gate/codex-gate.mjs',
+      'packages/shared/merge-gate-paths.json',
+      'integration/eval/owner-route.txt',
+      '.claude/hillclimb/owner-route.txt',
+      'apps/server/src/trajectory-export.ts',
+      'apps/server/src/services/secrets.ts',
+      'apps/server/src/services/machinesample.ts',
+      'apps/daemon/src/backend/command-gate.ts',
+      'apps/server/src/services/mcp-face.ts',
+    ])
+      assert.match(path, pattern, `${name} ${path}`);
+    for (const path of [
+      'apps/web/src/a.ts',
+      'scripts/x.mjs',
+      'apps/server/src/db/client.ts',
+      'scripts/ops/deploy-self.sh',
+      'apps/server/src/services/harness-eval-sample.ts',
+      '.github/CODEOWNERS',
+      'README.md',
+    ])
+      assert.doesNotMatch(path, pattern, `${name} ${path}`);
+  }
 });
 
 const rules = Object.fromEntries(
@@ -55,7 +92,7 @@ for (const [name, author, method] of [
     assert.doesNotMatch(queue, /status-success = review-gate/);
     assert.match(queue, /- check-success = merge-route\n/);
     assert.doesNotMatch(queue, /check-skipped = merge-route/);
-    assert.doesNotMatch(queue, /owner-route/);
+    assert.doesNotMatch(queue, /-label = owner-route/);
     for (const check of ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence', 'gates'])
       assert.match(queue, new RegExp(`check-success = ${check}\\n`), check);
     for (const check of ['check', 'pack-smoke', 'e2e-gate', 'gates'])
