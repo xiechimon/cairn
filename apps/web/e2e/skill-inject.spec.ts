@@ -18,14 +18,10 @@ test('the injected-skills row names each skill with its hit reason', async ({ pa
   await expect(row).toContainText('显式点名');
 });
 
-test('a computed zero-hit run shows the no-skills placeholder, not absence', async ({ page }) => {
+test('a run that loaded no skill shows no skills row', async ({ page }) => {
   await page.goto(ROUTE_ZERO);
-  await expect(page.getByTestId('injected-skills')).toHaveCount(0);
-  await expect(page.getByTestId('injected-skills-chip')).toContainText('已加载');
-  await page.getByTestId('injected-skills-chip').click();
-  const row = page.getByTestId('injected-skills');
-  await expect(row).toBeVisible();
-  await expect(row).toContainText('未注入技能');
+  await expect(page.getByTestId('user-bubble').first()).toBeVisible();
+  await expect(page.getByTestId('injected-skills-chip')).toHaveCount(0);
 });
 
 test('a run without an injection record grows no row (control zero-noise)', async ({ page }) => {

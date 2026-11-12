@@ -55,21 +55,16 @@ test.describe('streaming row typing dots (scenario 26)', () => {
     });
   });
 
-  test('the elapsed time is not in the row; it rides tabular figures in the composer next to stop', async ({
+  test('the elapsed time shows neither in the row nor in the composer; one button stops the run and turns into send once there is text', async ({
     page,
   }) => {
     await expect(row(page).getByText(/^\d+s$/)).toHaveCount(0);
-    const working = page.getByTestId('composer-working');
-    await expect(working).toContainText('工作中');
-    await expect(working).toContainText(/\d+:\d{2}/);
-    const fvn = await working.evaluate((el) => getComputedStyle(el).fontVariantNumeric);
-    expect(fvn).toContain('tabular-nums');
-    const boxes = await page.evaluate(() => {
-      const w = document.querySelector('[data-testid="composer-working"]')!.getBoundingClientRect();
-      const stop = document.querySelector('.composer-stop')!.getBoundingClientRect();
-      return { left: w.right <= stop.left, sameBand: Math.abs(w.top + w.height / 2 - (stop.top + stop.height / 2)) < 2 };
-    });
-    expect(boxes).toEqual({ left: true, sameBand: true });
+    await expect(page.getByText(/工作中 ·|Working ·/)).toHaveCount(0);
+    await expect(page.locator('.composer-stop')).toHaveCount(1);
+    await expect(page.locator('.composer-send')).toHaveCount(0);
+    await page.locator('.composer-input').fill('补充一句');
+    await expect(page.locator('.composer-stop')).toHaveCount(0);
+    await expect(page.locator('.composer-send')).toHaveCount(1);
   });
 
   test('prefers-reduced-motion stops the dots', async ({ page }) => {

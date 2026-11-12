@@ -86,11 +86,8 @@ describe('#1106 injected-selection readback row (mapper seam)', () => {
     ]);
   });
 
-  test('F3: hits=[] (computed zero hits) → row present, skills empty (zero injection is a checkable fact)', () => {
-    const items = render([step('s1', { hits: [] })]);
-    const rows = injectedItems(items);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.skills).toEqual([]);
+  test('F3: hits=[] (computed zero hits) → no row', () => {
+    expect(injectedItems(render([step('s1', { hits: [] })]))).toHaveLength(0);
   });
 
   test('F4: all steps null (chief face / old server) → no row produced', () => {

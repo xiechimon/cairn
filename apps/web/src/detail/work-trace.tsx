@@ -280,13 +280,11 @@ export function InjectedSkills({
           data-testid="injected-skills"
           className="mt-1.5 flex flex-wrap justify-center gap-1.5 [overflow-wrap:anywhere]"
         >
-          {skills.length > 0
-            ? skills.map((skill) => (
-                <span key={skill.id}>
-                  {skill.id}（{skill.reason}）
-                </span>
-              ))
-            : t('未注入技能（任务文本未命中任何技能）')}
+          {skills.map((skill) => (
+            <span key={skill.id}>
+              {skill.id}（{skill.reason}）
+            </span>
+          ))}
         </div>
       )}
     </div>

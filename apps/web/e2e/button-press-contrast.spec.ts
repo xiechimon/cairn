@@ -81,7 +81,7 @@ for (const theme of ['light', 'dark'] as const) {
     test('the thread composer Send button stays readable while pressed', async ({ page }) => {
       await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
       await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=16');
-      await page.locator('.composer-send').first().waitFor();
+      await page.getByTestId('composer-card').first().waitFor();
       await page.getByTestId('composer-toolbar').locator('xpath=ancestor::*[1]').locator('textarea, [contenteditable]').first().fill('hello');
       await expectReadable(page, page.locator('.composer-send').first(), 'thread send');
     });
