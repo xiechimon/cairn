@@ -9,6 +9,8 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../src/db/client.js';
 import { agentMemory, build, memoryCandidate, project, team, todo } from '../src/db/schema.js';
+import { injectMemoryDocuments } from '../src/services/memory.js';
+import { executeMemoryDocumentTool } from '../src/services/memory-documents.js';
 
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -364,6 +366,24 @@ function readDb(h: ReturnType<typeof home>) {
   }
 }
 
+function expectReachableLesson(h: ReturnType<typeof home>, id: string) {
+  const opened = openDbWithHandle(join(h.dir, 'server/server.db'));
+  try {
+    const owner = { agentId: 'team-1', teamId: 'team-1', projectId: 'project-1' };
+    const injected = injectMemoryDocuments(opened.db, owner).memories;
+    const link = injected.flatMap((row) => [...row.content.matchAll(/\]\(([^)]+)\)/g)])[0];
+    expect(link).toBeTruthy();
+    expect(
+      executeMemoryDocumentTool(opened.db, owner, 'memories', {
+        scope: 'project-1',
+        file: decodeURIComponent(link![1]!),
+      }),
+    ).toMatchObject({ id, content: lesson('x').content });
+  } finally {
+    opened.close();
+  }
+}
+
 test('memory candidates land as pending, deduplicated, and never in agent memory', async () => {
   const h = home(['build-a']);
   const input = writeCandidates([
@@ -432,6 +452,68 @@ test('a lesson already in memory is skipped, an overlapping one records the conf
   expect(after.candidates).toMatchObject([{ conflictIds: ['mem-same'], status: 'pending' }]);
 });
 
+test.each(['inline', 'file'] as const)(
+  'curation protects %s lessons before promotion',
+  async (shape) => {
+    const h = home(['build-a', 'build-b', 'build-c']);
+    const input = (buildId: string, content: string) =>
+      writeCandidates([candidateLine(buildId, { content })]);
+    const content = lesson('x').content;
+    await curate(h, ['--in', input('build-a', content)]);
+    await curate(h, [
+      '--in',
+      writeCandidates([candidateLine('build-b', { buildSucceeded: false })]),
+    ]);
+    const opened = openDbWithHandle(join(h.dir, 'server/server.db'));
+    const owner = { agentId: 'team-1', teamId: 'team-1', projectId: 'project-1' };
+    const saved = executeMemoryDocumentTool(
+      opened.db,
+      owner,
+      shape === 'file' ? 'save_memory' : 'memories',
+      {
+        scope: 'project-1',
+        file: shape === 'file' ? 'existing.md' : MEMORY_INDEX_TITLE,
+        ...(shape === 'file' ? { content } : {}),
+      },
+    ) as { id: string; baseVersion: string };
+    if (shape === 'inline')
+      executeMemoryDocumentTool(opened.db, owner, 'update_memory', {
+        scope: 'project-1',
+        file: MEMORY_INDEX_TITLE,
+        baseVersion: saved.baseVersion,
+        content: `- Different generated title：${content}`,
+      });
+    opened.close();
+    const known = await curate(h, ['--in', input('build-c', content)]);
+    expect(known.status, known.stderr).toBe(0);
+    expect(known.stdout).toContain('memory_known=1 memory_promoted=0');
+    const duplicate = readDb(h).candidates[0]!;
+    const confirmation = await curate(h, [`--confirm=${duplicate.id}`]);
+    expect(confirmation.status).toBe(1);
+    expect(confirmation.stderr).toContain('memory already exists');
+    expect(readDb(h).candidates[0]?.status).toBe('pending');
+    const reset = openDbWithHandle(join(h.dir, 'server/server.db'));
+    reset.db.delete(memoryCandidate).run();
+    reset.close();
+    const overlapping = '跑 server 测试用 pnpm vitest run，别用 npm test';
+    await curate(h, ['--in', input('build-a', overlapping)]);
+    const pending = readDb(h).candidates.find((row) => row.content === overlapping)!;
+    expect(pending.conflictIds).toHaveLength(1);
+    const recurrence = await curate(h, ['--in', input('build-b', overlapping)]);
+    expect(recurrence.stdout).toContain('memory_promoted=0');
+    const blocked = await curate(h, [`--confirm=${pending.id}`]);
+    expect(blocked.status).toBe(1);
+    expect(blocked.stderr).toContain('overlaps memories');
+    expect(readDb(h).candidates.find((row) => row.id === pending.id)).toMatchObject({
+      status: 'pending',
+      conflictIds: pending.conflictIds,
+    });
+    const forced = await curate(h, [`--confirm=${pending.id}`, '--force']);
+    expect(forced.status, forced.stderr).toBe(0);
+    expect(readDb(h).candidates.find((row) => row.id === pending.id)?.status).toBe('promoted');
+  },
+);
+
 test('needs evidence from two different builds, then a successful recurrence promotes it', async () => {
   const h = home(['build-a', 'build-b', 'build-c']);
   const first = await curate(h, ['--in', writeCandidates([candidateLine('build-a')])]);
@@ -463,9 +545,7 @@ test('needs evidence from two different builds, then a successful recurrence pro
   expect(candidates).toMatchObject([
     { status: 'promoted', buildIds: ['build-a', 'build-b', 'build-c'] },
   ]);
-  expect(
-    memories.find((row) => row.title === MEMORY_INDEX_TITLE && row.invalidAt === null)?.content,
-  ).toContain(JSON.stringify(lesson('x').content));
+  expectReachableLesson(h, candidates[0]!.memoryId!);
 });
 
 test('human confirmation promotes only with two builds of evidence', async () => {
@@ -481,8 +561,9 @@ test('human confirmation promotes only with two builds of evidence', async () =>
   await curate(h, ['--in', writeCandidates([candidateLine('build-b', { buildSucceeded: false })])]);
   const confirmed = await curate(h, [`--confirm=${id}`]);
   expect(confirmed.status, confirmed.stderr).toBe(0);
-  const { candidates, memories } = readDb(h);
-  expect(confirmed.stdout.trim()).toBe(`promoted=${id} memory=${memories[0]?.id}`);
+  const { candidates } = readDb(h);
+  expect(confirmed.stdout.trim()).toBe(`promoted=${id} memory=${candidates[0]?.memoryId}`);
+  expectReachableLesson(h, candidates[0]!.memoryId!);
   expect(candidates[0]?.status).toBe('promoted');
   const again = await curate(h, [`--confirm=${id}`]);
   expect(again.status).toBe(1);

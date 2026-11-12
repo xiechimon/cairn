@@ -39,7 +39,7 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
   });
 
   test('PATCH /chief refuses binding an Agent: the Coordinator model is the coordinator routing rule (D60)', async () => {
-    await relay('save_memory', { title: '旧记忆', content: '属于原 Agent' });
+    await relay('save_memory', { scope: 'team', file: '旧记忆', content: '属于原 Agent' });
     const res = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
       agent: { agentId: AGENT2_ID, thinkingLevel: null },
     });
@@ -207,7 +207,11 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
   });
 
   test('memory tab = the team shared storage (GET teams/{id}/memories)', async () => {
-    await relay('save_memory', { title: '共用记忆', content: 'chief 与 thread 同源' });
+    await relay('save_memory', {
+      scope: 'team',
+      file: '共用记忆',
+      content: 'chief 与 thread 同源',
+    });
     const res = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/memories`);
     expect(res.status).toBe(200);
     const mems = (await res.json()) as { title: string }[];

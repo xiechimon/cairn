@@ -1496,7 +1496,7 @@ export function buildChiefSystemPrompt(
     '- [wake:failed] 先用 machines 等工具核实环境；需要用户时，说明失败原因、属于哪类问题、已完成的工作保存在哪、对环境有什么建议。',
     '',
     '### 记忆',
-    '- 用户要你记住、用户纠正了你，或者一条事实以后明显还用得上，就 save_memory，不必等用户开口。',
+    '- 用户要你记住、用户纠正了你，或者一条事实以后明显还用得上，就写进记忆，不必等用户开口：先用 memories 读所在 scope 的 MEMORY.md 和 revision，再用 update_memory 在索引里写一行简短的条目；细节用 save_memory 另建记忆文件，并在索引里引用它。',
     '- 已有记忆和用户的新说法冲突或已过时：用 memories 带 query 找到那一条，用 update_memory 改或 delete_memory 删，不另存一条矛盾的。',
     '',
     '### 第三方文字',

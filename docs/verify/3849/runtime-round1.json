@@ -1,0 +1,43 @@
+{
+  "mode": "standalone process, real disk SQLite and production reopen",
+  "references": [
+    {
+      "path": "append",
+      "existingBytes": 1799,
+      "file": "append-1799.md",
+      "loadedPrefix": "- [append-1799.md](append-1799.md)\nexisting\nexisting\nexisting\nexisting\nexisting\nexisting\nexisting\nex",
+      "fullBodyPreserved": true
+    },
+    {
+      "path": "append",
+      "existingBytes": 25600,
+      "file": "append-25600.md",
+      "loadedPrefix": "- [append-25600.md](append-25600.md)\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "fullBodyPreserved": true
+    },
+    {
+      "path": "remember",
+      "existingBytes": 1799,
+      "file": "remember-1799.md",
+      "loadedPrefix": "- [remember-1799.md](remember-1799.md)\nexisting\nexisting\nexisting\nexisting\nexisting\nexisting\nexistin",
+      "fullBodyPreserved": true
+    },
+    {
+      "path": "remember",
+      "existingBytes": 25600,
+      "file": "remember-25600.md",
+      "loadedPrefix": "- [remember-25600.md](remember-25600.md)\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "fullBodyPreserved": true
+    }
+  ],
+  "flushPrompt": {
+    "chars": 4161,
+    "teamPrefix": true,
+    "projectFact": true,
+    "excerpt": [
+      "team | MEMORY.md | memory-index:markdown:g2Srk8EcSzSZJbke2slkr:1794286893596:live:probe-team:team:probe-agent:false:core:MEMORY.md\nTEAM-PREFIX\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\nprobe-project | MEMORY.md | memory-index:markdown:b5-xZkMrRBmDxnxnmmDm8:1794286893599:live:probe-team:probe-project:probe-agent:false:core:MEMORY.md\nPROJECT-COVERED-FACT"
+    ]
+  },
+  "reopen": true
+}

@@ -659,12 +659,6 @@ export const dataMigration = sqliteTable('data_migration', {
   detail: text('detail').notNull(),
 });
 
-export const memorySaveConflict = sqliteTable('memory_save_conflict', {
-  id: text('id').primaryKey(),
-  candidateIds: json<string[]>('candidateIds').notNull(),
-  createdAt: epochMs('createdAt').notNull(),
-});
-
 export const memoryCandidate = sqliteTable(
   'memory_candidate',
   {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { memoryToolParamsSchemas } from '../records/memory.js';
 import { THREAD_REPORT_LINE_MAX } from '../records/message.js';
 import {
   QUICK_REPLIES_MAX,
@@ -237,6 +238,52 @@ const githubListParams = (max: number) =>
     },
     ['projectId'],
   );
+
+function memoryParameters(schema: z.ZodType) {
+  return z.toJSONSchema(schema, {
+    target: 'openapi-3.0',
+    override: ({ jsonSchema }) => {
+      if (jsonSchema.type === 'integer') jsonSchema.type = 'number';
+      for (const key of [
+        'additionalProperties',
+        'minLength',
+        'maxLength',
+        'pattern',
+        'minimum',
+        'maximum',
+      ])
+        delete jsonSchema[key];
+    },
+  });
+}
+
+export const WORKER_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] = [
+  {
+    name: 'save_memory',
+    description:
+      'Create a memory file in the scope. Never overwrites: an occupied name returns 409. MEMORY.md is reserved; edit it with update_memory. There is no file count or content length limit.',
+    parameters: memoryParameters(memoryToolParamsSchemas.save_memory),
+  },
+  {
+    name: 'update_memory',
+    description:
+      'Edit a memory document directly using its current baseVersion from memories. Supply content or one unique verbatim old_str and new_str; optionally renameTo or moveTo. restoreVersion selects a retained version id and restores it as a new version using the current live or deleted revision. Missing base returns 400, stale base or occupied destination returns 409. MEMORY.md cannot move or rename. Keep MEMORY.md to short one-line entries, move detail into files, and merge or drop stale lines. A long index write succeeds with a tidy reminder. GitHub issue fence text is rejected.',
+    parameters: memoryParameters(memoryToolParamsSchemas.update_memory),
+  },
+  {
+    name: 'delete_memory',
+    description:
+      'Soft delete a memory file, retaining versions for restoreVersion. Requires its current baseVersion. MEMORY.md cannot be deleted; empty it with update_memory.',
+    parameters: memoryParameters(memoryToolParamsSchemas.delete_memory),
+  },
+  {
+    name: 'memories',
+    description:
+      'List MEMORY.md indexes and memory file names with first lines and revisions. Optional scope filters to team or a project id. Supply scope and file to read paged text or its deleted revision; versions:"list" lists retained earlier versions with ids. query searches names and full text. Follow nextOffset using offset until null; offsets count UTF-16 code units for file text, rows for listings and versions.',
+    parameters: memoryParameters(memoryToolParamsSchemas.memories),
+    replaySafe: true,
+  },
+];
 
 export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
@@ -687,53 +734,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
       'message',
     ]),
   },
-  {
-    name: 'save_memory',
-    description:
-      'Save a one-fact memory entry for the agent running the chief (shared store, quota 100). Returns candidates from the same project and global memories without saving when titles or bodies overlap; use update_memory, or force:true to confirm adding. Repeating identical content returns 409.',
-    parameters: obj(
-      {
-        title: str('Short memory title.'),
-        content: str('Memory body.'),
-        force: {
-          type: 'boolean',
-          description: 'Explicitly confirm adding despite similar candidates; default false.',
-        },
-        projectId: str('Optional project id for provenance.'),
-        layer: str(
-          'core (always in the prompt), scratchpad (this thread only), or searchable (read on demand). Default core.',
-        ),
-      },
-      ['title', 'content'],
-    ),
-  },
-  {
-    name: 'update_memory',
-    description:
-      'Update your memory content by memoryId: the old entry is marked invalid and superseded by a new entry (returned) that keeps the old values in history. For MEMORY.md, pass the whole new document. Only valid entries can be updated. GitHub issue fence text is rejected.',
-    parameters: obj({ memoryId: str('Memory id.'), content: str('Replacement memory body.') }, [
-      'memoryId',
-      'content',
-    ]),
-  },
-  {
-    name: 'delete_memory',
-    description: 'Delete a memory entry by id.',
-    parameters: obj({ memoryId: str('Memory id.') }, ['memoryId']),
-  },
-  {
-    name: 'memories',
-    description:
-      'List the currently valid memory entries of the agent running the chief, including history. Set query to search them (every space-separated term must appear in the title or content); entries the prompt could not show are found this way. Set includeInvalid:true to also list superseded entries.',
-    parameters: obj({
-      query: str('Search terms; only matching entries are returned.'),
-      includeInvalid: {
-        type: 'boolean',
-        description: 'Also list invalidated entries; default false.',
-      },
-    }),
-    replaySafe: true,
-  },
+  ...WORKER_MEMORY_REMOTE_TOOLS,
   {
     name: 'watch_todos',
     description: 'Watch todos so the chief is woken when they park at a gate, settle or fail.',
@@ -881,56 +882,6 @@ export const CHIEF_TOOLS_REMOVED_UNDER_D60 = {
   delete_agents: 'routing rules (agents are no longer configured here)',
   message_todo: 'message_thread',
 } as const satisfies Record<string, string>;
-
-export const WORKER_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] = [
-  {
-    name: 'save_memory',
-    description:
-      'Save a one-fact memory entry for yourself (the agent running this step). Use it only when the task instructions ask for it or a lesson is clearly worth keeping. Quota 100 per agent. Returns candidates from the same project and global memories without saving when titles or bodies overlap; use update_memory, or force:true to confirm adding. Repeating identical content returns 409.',
-    parameters: obj(
-      {
-        title: str('Short memory title.'),
-        content: str('Memory body.'),
-        force: {
-          type: 'boolean',
-          description: 'Explicitly confirm adding despite similar candidates; default false.',
-        },
-        projectId: str('Optional project id for provenance.'),
-        sourceTodoId: str('Optional source todo id; defaults to the running task.'),
-        layer: str(
-          'core (always in the prompt), scratchpad (this thread only), or searchable (read on demand). Default core.',
-        ),
-      },
-      ['title', 'content'],
-    ),
-  },
-  {
-    name: 'update_memory',
-    description:
-      'Update your memory content by memoryId: the old entry is marked invalid and superseded by a new entry (returned) that keeps the old values in history. For MEMORY.md, pass the whole new document. Only valid entries can be updated. GitHub issue fence text is rejected.',
-    parameters: obj({ memoryId: str('Memory id.'), content: str('Replacement memory body.') }, [
-      'memoryId',
-      'content',
-    ]),
-  },
-  {
-    name: 'delete_memory',
-    description: 'Delete one of your memory entries by id.',
-    parameters: obj({ memoryId: str('Memory id.') }, ['memoryId']),
-  },
-  {
-    name: 'memories',
-    description:
-      'List your own currently valid memory entries, including history. Set includeInvalid:true to also list superseded entries.',
-    parameters: obj({
-      includeInvalid: {
-        type: 'boolean',
-        description: 'Also list invalidated entries; default false.',
-      },
-    }),
-    replaySafe: true,
-  },
-];
 
 const WORKER_ATTACHMENT_TOOL: RemoteToolDef = {
   name: 'attachment',
