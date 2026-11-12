@@ -37,7 +37,7 @@
     {
       "id": "B4",
       "title": "Execution isolation: orbs, the agent's computer, own-key sandboxes",
-      "scope": "The per-task orb differentiator and the execution targets of D101: how a user sees and chooses where a thread runs, the agent's own computer and its screen, and E2B or Daytona with the user's key. Land the coordinator-computer note, then write the backend design and the machine-page and screen designs."
+      "scope": "The per-task orb differentiator and the execution targets : how a user sees and chooses where a thread runs, the agent's own computer and its screen, and E2B or Daytona with the user's key. Land the coordinator-computer note, then write the backend design and the machine-page and screen designs."
     },
     {
       "id": "B5",
@@ -77,7 +77,7 @@
     {
       "id": "B12",
       "title": "Phase 3: iOS app",
-      "scope": "Work for after phase 2 graduates: the native iOS app of D22. Research and design only when phase 2 is close."
+      "scope": "Work for after phase 2 graduates: the native iOS app . Research and design only when phase 2 is close."
     }
   ],
   "features": [
@@ -225,8 +225,8 @@
     {
       "id": "memory",
       "name": "Memory",
-      "summary": "Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. D123 plans direct in-place edits of MEMORY.md and memory files.",
-      "states": "Shipped: Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete. Planned D123 replacement: input, working, applied, awaiting input, partial, stopped, error and offline; page and focused-file composers.",
+      "summary": "Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. A design plans direct in-place edits of MEMORY.md and memory files.",
+      "states": "Shipped: Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete. Planned replacement: input, working, applied, awaiting input, partial, stopped, error and offline; page and focused-file composers.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -314,7 +314,7 @@
       },
       "backendDesign": [
         "docs/research/capability-routing-2026-11-06.md",
-        "docs/spec/21-single-machine-orchestration-defaults.md"
+        "docs/research/r14-orchestration-parent-card.md"
       ],
       "evidence": [
         "apps/server/test/chief-dispatch.test.ts",
@@ -350,7 +350,7 @@
         "click testid:chief-question-option-0-0"
       ],
       "research": {
-        "gap": "the Codex CLI and t3code question patterns behind D85 and D119 were never written up"
+        "gap": "the Codex CLI and t3code question patterns were never written up"
       },
       "frontendDesign": [
         "docs/design/qcard-variants/README.md",
@@ -561,7 +561,7 @@
       ],
       "backendDesign": [
         "docs/spec/23-rework-to-original-branch-and-pr-convergence.md",
-        "docs/spec/24-run-brief-written-to-worktree-file.md",
+        "docs/design/runtime-memory-out-of-tree.md",
         "docs/research/branch-model-2026-11-08.md",
         "docs/design/duet-shaped-clients.md"
       ],
@@ -879,7 +879,7 @@
       },
       "backendDesign": [
         "docs/spec/17-dual-runtime-execution-surface.md",
-        "docs/spec/24-run-brief-written-to-worktree-file.md",
+        "docs/design/runtime-memory-out-of-tree.md",
         "docs/spec/26-pi-session-runtime-and-trust-surface.md"
       ],
       "evidence": [
@@ -923,7 +923,6 @@
         "na": "a protocol between server and daemon with no user surface"
       },
       "backendDesign": [
-        "docs/spec/02-architecture-parity.md",
         "docs/research/2513-tla-statecharts.md"
       ],
       "evidence": [
@@ -1035,7 +1034,7 @@
     {
       "id": "own-key-sandboxes",
       "name": "Own-key cloud sandboxes",
-      "summary": "D101 execution target: orbs on E2B or Daytona with the user's own key, called outbound by the daemon.",
+      "summary": "Execution target: orbs on E2B or Daytona with the user's own key, called outbound by the daemon.",
       "states": "Not exposed in the UI yet; the daemon selects E2B when configured.",
       "centrality": 2,
       "status": "partial",
@@ -1450,7 +1449,7 @@
     {
       "id": "desktop-app",
       "name": "Desktop app",
-      "summary": "D45 and D100: a web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.",
+      "summary": "A web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.",
       "centrality": 2,
       "status": "planned",
       "research": [
@@ -1695,7 +1694,7 @@
         "click testid:schedule-detail-body"
       ],
       "research": {
-        "gap": "no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model behind D56"
+        "gap": "no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model "
       },
       "frontendDesign": {
         "gap": "the schedules page and detail dialog have no design"
@@ -1859,7 +1858,7 @@
         "docs/design/references/coordinator-chat"
       ],
       "backendDesign": {
-        "gap": "no design for server drafts (D110) and named prompts"
+        "gap": "no design for server drafts  and named prompts"
       },
       "evidence": [
         "apps/web/e2e/composer-slash.spec.ts",
@@ -2357,7 +2356,7 @@
         "na": "an API for other harnesses with no page"
       },
       "backendDesign": [
-        "docs/spec/02-architecture-parity.md"
+        "docs/research/desktop-mobile-mcp-forms-2026-11-08.md"
       ],
       "evidence": [
         "apps/server/test/mcp-face.test.ts",
@@ -2530,11 +2529,11 @@
     {
       "id": "ios-app",
       "name": "iOS app",
-      "summary": "D22: a native phone app with Live Activities, forked from Optio or t3code when the time comes.",
+      "summary": "A native phone app with Live Activities, forked from Optio or t3code when the time comes.",
       "centrality": 4,
       "status": "planned",
       "research": {
-        "gap": "the Optio and t3code comparison of D22 has not been done"
+        "gap": "the Optio and t3code comparison has not been done"
       },
       "frontendDesign": {
         "gap": "not designed"
