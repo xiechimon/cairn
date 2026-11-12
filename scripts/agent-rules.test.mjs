@@ -15,7 +15,7 @@ test('merge instructions require the pr-gate auto-merge verdict', () => {
       guidance
         .split('\n')
         .includes(
-          `- Both paths require a pr-gate go with \`mergedBy: 'auto-merge'\` (only CI and merge machinery, the eval ruler, and the credentials, machine and external-entry lists route to ian), ${tasks} and no \`coordinator-hold\` label. After merging, verify the resulting main commit's author and its \`commit-author\` Actions result.`,
+          `- Queue-routed PRs require a pr-gate go with \`mergedBy: 'auto-merge'\`. Owner-routed PRs follow the authorized admin-merge path instead. Either way, require ${tasks} and no \`coordinator-hold\` label. After merging, verify the resulting main commit's author and its \`commit-author\` Actions result.`,
         ),
       file,
     );

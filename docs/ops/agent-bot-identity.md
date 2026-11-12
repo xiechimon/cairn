@@ -77,7 +77,7 @@ Commits are not signed: no path creates commits through the GitHub API, so there
 
 Every PR merges by squash; the squash commit is authored by the PR opener, so App-opened PRs land on main as `cairnwright[bot]`.
 
-- Both paths require a pr-gate go with `mergedBy: 'auto-merge'` (only CI and merge machinery, the eval ruler, and the credentials, machine and external-entry lists route to ian), no unchecked tasks anywhere in the body and no `coordinator-hold` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.
+- Queue-routed PRs require a pr-gate go with `mergedBy: 'auto-merge'`. Owner-routed PRs follow the authorized admin-merge path instead. Either way, require no unchecked tasks anywhere in the body and no `coordinator-hold` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.
 - Other protected paths use that same queue, including one opened by `cairnwright[bot]`. CI and merge machinery, the eval ruler, and the credentials, machine and external-entry lists go to ian and do not add `coordinator-hold`. A security surface also needs `/security-review` findings fixed or recorded in Risk before merge, and required CI plus a Codex cloud review with no unresolved P0/P1 on the head. `pr-evidence` fails a security-surface head that lacks `Security review (<sha>): fixed` or `Security review (<sha>): recorded`.
 
 The regular GitHub user `cairnwright` is no longer used by anything; whether to keep or delete it is ian's decision.
