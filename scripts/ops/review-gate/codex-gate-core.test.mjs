@@ -707,7 +707,7 @@ test('from round 3 a P1 on lines unchanged since the last blocked head does not 
   assert.equal(result.addHuman, true);
   assert.match(result.summary, /bug class/);
   assert.match(result.summary, /reconsider the approach/);
-  assert.match(result.carried, /pre-existing in this PR, record in Risk/);
+  assert.match(result.carried, /review-gate recorded them in Carried review findings/);
   assert.match(result.carried, /discussion_rP1/);
 });
 
@@ -744,18 +744,26 @@ test('a P0 on lines unchanged since the last blocked head still blocks', () => {
 
 test('a carried P1 still fails when its deferral does not name an issue', () => {
   const missing = located('P1', {
+    id: 'PRRT_missing',
     line: 50,
+    url: 'https://github.com/o/r/pull/1#discussion_r90',
     deferral: 'deferred to #9, which is not an issue in this repository',
   });
   const waived = located('P1', {
     line: 50,
     deferral: 'deferred to #9, but a P0/P1 finding must be fixed',
   });
-  assert.equal(
-    decide(pr, done, [missing], noRetries, false, null, atRound(BLOCK_ROUND_CAP - 1, sinceQuiet))
-      .conclusion,
-    'failure',
+  const failed = decide(
+    pr,
+    done,
+    [missing],
+    noRetries,
+    false,
+    null,
+    atRound(BLOCK_ROUND_CAP - 1, sinceQuiet),
   );
+  assert.equal(failed.conclusion, 'failure');
+  assert.equal(failed.recordThreads, undefined);
   assert.equal(
     decide(pr, done, [waived], noRetries, false, null, atRound(BLOCK_ROUND_CAP - 1, sinceQuiet))
       .conclusion,
@@ -774,7 +782,7 @@ test('from round 3 an unanchored thread on an unchanged file does not block', ()
     atRound(BLOCK_ROUND_CAP - 1, sinceQuiet),
   );
   assert.equal(quiet.conclusion, 'success');
-  assert.match(quiet.carried, /pre-existing in this PR, record in Risk/);
+  assert.match(quiet.carried, /review-gate recorded them in Carried review findings/);
   const moved = decide(
     pr,
     done,
@@ -931,6 +939,65 @@ test('a deferral is judged on any Codex thread as soon as it is written, never o
   assert.match(open.deferral, /#9, which is not an issue/);
   assert.equal(human.deferral, undefined);
   assert.match(resolved.deferral, /#9, which is not an issue/);
+});
+
+test('from round 3 recordThreads lists only the non-blocking Codex P1', () => {
+  const carried = located('P1', {
+    id: 'PRRT_kwDOAb+/=1',
+    line: 50,
+    url: 'https://github.com/o/r/pull/1#discussion_r50',
+  });
+  const blocking = located('P1', {
+    id: 'PRRT_blocking',
+    line: 2,
+    url: 'https://github.com/o/r/pull/1#discussion_r2',
+  });
+  const p0 = located('P0', {
+    id: 'PRRT_p0',
+    line: 50,
+    url: 'https://github.com/o/r/pull/1#discussion_r80',
+  });
+  const human = located('P1', {
+    id: 'PRRT_human',
+    line: 50,
+    url: 'https://github.com/o/r/pull/1#discussion_r70',
+    authorLogin: 'dev',
+    authorType: 'User',
+  });
+  const result = decide(
+    pr,
+    done,
+    [carried, blocking, p0, human],
+    noRetries,
+    false,
+    null,
+    atRound(BLOCK_ROUND_CAP - 1, sinceQuiet),
+  );
+  assert.deepEqual(result.recordThreads, [
+    { id: 'PRRT_kwDOAb+/=1', url: 'https://github.com/o/r/pull/1#discussion_r50' },
+  ]);
+});
+
+test('carried findings stay in one details block and do not repeat a URL', async () => {
+  const core = await import('./codex-gate-core.mjs');
+  assert.equal(typeof core.withCarriedFindings, 'function');
+  assert.equal(
+    core.carriedReply('a'.repeat(40)),
+    "Recorded as pre-existing in this PR's Risk by review-gate at aaaaaaa; not blocking.",
+  );
+  const url = 'https://github.com/o/r/pull/1#discussion_r9';
+  const once = core.withCarriedFindings('Proof.\n', [url, url]);
+  assert.match(once, /<details>\n<summary>Carried review findings<\/summary>[\s\S]*<\/details>/);
+  assert.equal(once.split(url).length - 1, 1);
+  assert.equal(core.withCarriedFindings(once, [url]), once);
+  assert.equal(
+    core.withCarriedFindings('keep', ['https://github.com/o/r/pull/1#discussion_r9</details>']),
+    'keep',
+  );
+  const longer = core.withCarriedFindings('', ['https://github.com/o/r/pull/1#discussion_r12345']);
+  const both = core.withCarriedFindings(longer, ['https://github.com/o/r/pull/1#discussion_r1234']);
+  assert.match(both, /^- https:\/\/github.com\/o\/r\/pull\/1#discussion_r12345$/m);
+  assert.match(both, /^- https:\/\/github.com\/o\/r\/pull\/1#discussion_r1234$/m);
 });
 
 test('an open P1 that also carries a deferral reply is counted once, as an open finding', () => {
