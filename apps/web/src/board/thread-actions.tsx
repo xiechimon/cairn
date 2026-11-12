@@ -267,12 +267,7 @@ export function useThreadActions({
       <DeleteConfirm
         open={dialog === 'delete'}
         title={t('确定删除该任务？此操作不可撤销。')}
-        summary={
-          <>
-            <span className="text-(--text-tertiary)">#{todo.seqNum}</span>
-            {todo.title}
-          </>
-        }
+        summary={todo.title}
         ariaLabel={t('删除任务')}
         onClose={() => setDialog(null)}
         onConfirm={deleteTask}
