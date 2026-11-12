@@ -30,8 +30,8 @@ who did not watch the work. Use this order:
    `## Risk`, separated from the HTML tags by blank lines and closed with
    `</details>`. Keep this block collapsed.
 
-No review is required before merge: Codex cloud review comments are
-advisory (`AGENTS.md`, "Merge routes"). A security surface needs
+No review is required before merge and code review is off, Codex cloud
+review included (`AGENTS.md`, "Merge routes"). A security surface needs
 `/security-review` findings fixed or recorded in Risk; that does not send the
 PR to ian.
 Review states what reviewed the head, if anything did, and lists unfixed
@@ -189,7 +189,7 @@ A PR that changes `apps/web/src` adds a reference table under Proof, one row per
 
 ## Review
 
-Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) comments on pushes, and nothing waits for it. Never write `@codex` in a PR body: Codex reads it as a task request, answers that the repository has no environment, and skips the automatic review. Fix confirmed P0/P1 defects and record skipped ones with reasons under Review.
+Code review is off: do not run a local `codex exec` or `claude -p` review before pushing and do not request a Codex cloud review. Never write `@codex` in a PR body: Codex reads it as a task request. Record known defects you leave unfixed with reasons under Review.
 
 ## Mechanics
 

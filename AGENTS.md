@@ -27,12 +27,12 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 | Orchestration | `claude-opus-5-5` |
 | Implementation | Codex CLI with `gpt-6.1-sol`, or `claude-sonnet-5-5` |
 | Mechanical work | `claude-haiku-5-5` |
-| Review | Codex cloud review, from a fresh context; advisory |
+| Review | none: code review is off |
 
 - A run never switches models on quota exhaustion: save progress and pause until the quota window resets.
 - **Do not use**: extra models, gpt-6-astra (Codex too; keep its original model), the GPT 5.6 series, older-generation models, MiniMax M3, DeepSeek V4 Flash. The machine-checked ids are `deepseek-v4-flash`, `minimax-m3`, `gpt-6-astra` and `gpt-5.6*`: `BANNED_MODEL_IDS` in `scripts/lane-model-policy.mjs` holds them, and `scripts/lane-model-policy.test.mjs` fails when this list and `BANNED_MODEL_IDS` differ or when a role in the table names one of them.
 - The table binds orchestrator-dispatched runs. Overnight lanes use `ai-route`; routing and its quota limitations are documented in `docs/ops/lane-workers.md`.
-- Codex cloud review comments on pushes whoever implemented the change. Its findings are advisory: no check, queue condition or label waits for them (ian, 2026-11-12).
+- Code review is off, Codex cloud review included: no check, queue condition or label waits for one (ian, 2026-11-12).
 
 ## Merge routes
 
@@ -60,13 +60,13 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - Run `pnpm prepush` before pushing. It runs fast checks only; tests run in CI. A push is unverified until CI reports on that head. Run the exact command of any CI step your diff changes.
 - UI work under `apps/web/src`: read `apps/web/DESIGN-RULES.md` first (checkable rules), then `apps/web/DESIGN.md` (full reference). Write the brief from `.claude/skills/design-cairn/SKILL.md`, open the reference shots for the surface in `docs/design/references/`, and show a reference-versus-ours row per state in the PR. A new feature on a main surface needs a page draft before code.
 - Verify mechanism changes on compiled output, runtime logs or snapshots; use `.claude/skills/verify-cairn/SKILL.md` for acceptance guidance.
-- Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) comments on pushes, and nothing waits for it. Fix a confirmed P0/P1 defect in the PR while it is open, or in a follow-up once it merged; record unfixed ones with reasons in Risk.
+- Code review is off (ian, 2026-11-12): do not run a local `codex exec` or `claude -p` review before pushing and do not request a Codex cloud review. CI is the gate; record known defects you leave unfixed with reasons in Risk.
 - A security surface needs `/security-review` findings fixed or recorded in Risk before merge; that does not send the PR to ian.
 - Keep each PR to one self-contained change: aim for under 400 changed lines outside generated files and split anything past 1000 before review. The `pr-size` check fails a PR above 3000 changed lines outside `GENERATED_PATHS` in `scripts/pr-size.mjs`. Measured on 81 merged PRs: median open-to-merge is 18 minutes under 200 lines and 434 minutes over 3000.
 - Branch every PR from `origin/main`. Do not open a PR whose base is another open PR's branch: dependent work waits until its base merges, then branches from the updated `main`. Until then, keep it on a local branch.
 - Design first for a change to persisted state, a wire or step protocol, or concurrency: write a one-page design (states, transitions, every path that reads or writes the state, the behavior on each failure) and get it reviewed by the coordinator before writing code.
 - Before code for a state or lifecycle feature (delivery, retry, pause, identity, attribution), list every path that reads or writes that state and the expected behavior on each, put the list in the PR body, and write one test per row. A review finding on such a PR is usually a missed row.
-- When you fix a review finding, name its bug class, search the whole PR diff and every entry path the change touches for other instances, and fix all of them in one push. A finding that is real but outside this PR's change goes to an issue, not into the PR.
+- When you fix a defect, name its bug class, search the whole PR diff and every entry path the change touches for other instances, and fix all of them in one push. A defect that is real but outside this PR's change goes to an issue, not into the PR.
 - Never post Mergify commands (`@mergifyio queue`, `@mergifyio dequeue` or any other); the queue conditions drive the queue. A green PR enters the queue by itself; if it has not within 10 minutes, read the `Mergify Merge Queue` check run, fix the unmet condition it lists, and report it.
 - Review PRs with `docs/pr-review.md`; read diffs without switching branches in a shared worktree.
 - Decisions are recorded in the owner's plan decision table (`docs/cairn-plan.md`), not as ADRs. The table is git-tracked in this public repository; keep it free of secrets, credentials, internal addresses, personal information and quota details.
@@ -87,7 +87,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - Review only what the PR changes. Report a defect on a line the PR did not add or modify only when the PR's change makes it reachable or worse; otherwise leave it for the nightly scan, which files old-code problems as issues.
 - On a later review of the same PR, read only the commits pushed since the last review and do not repeat a finding that is already raised or resolved.
 - Name the bug class of each finding and list every instance of it in the diff in one comment, so one push fixes the class instead of one line per round. When a later commit adds another instance of a class already raised on this PR, add it to that class's thread instead of opening a new one.
-- Use P0 or P1 only for a defect that breaks behavior, loses data or opens a security hole. Findings are advisory at every severity: no check or queue condition waits for them (ian, 2026-11-12).
+- Use P0 or P1 only for a defect that breaks behavior, loses data or opens a security hole. These rules apply to a review someone asks for; no review runs by default. Findings are advisory at every severity: no check or queue condition waits for them (ian, 2026-11-12).
 - Flag hand-rolled code that re-implements what a maintained library or SDK already does (protocol encoders, parsers, retry and backoff, API clients), unless the PR states why the library can't be used.
 
 ## Worktrees and ports
