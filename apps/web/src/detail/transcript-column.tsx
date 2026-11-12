@@ -22,7 +22,7 @@ import { openingAnchor } from './scroll-anchor.js';
 import { type LiveStep, Transcript } from './transcript.js';
 
 const ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
-const VIEWPORT_CLS = 'chat-col px-4 pt-3 pb-(--chat-extra-space)';
+const VIEWPORT_CLS = 'chat-col px-4 pt-3';
 const CONTENT_CLS =
   'mx-auto block w-full max-w-(--chat-max-w) min-w-0 gap-0 [overflow-wrap:anywhere]';
 
@@ -43,6 +43,7 @@ interface TranscriptColumnProps {
   threadKey?: string;
   hasEarlier?: boolean;
   earlier?: EarlierPages;
+  shortEnd?: boolean;
 }
 
 export const TranscriptColumn = forwardRef<TranscriptColumnHandle, TranscriptColumnProps>(
@@ -71,6 +72,7 @@ function TranscriptColumnInner({
   threadKey,
   hasEarlier = false,
   earlier,
+  shortEnd = false,
   handleRef,
 }: Omit<TranscriptColumnProps, 'autoScroll'> & {
   handleRef: React.ForwardedRef<TranscriptColumnHandle>;
@@ -97,9 +99,9 @@ function TranscriptColumnInner({
     <MessageScroller className={ROOT_CLS}>
       <FadeScrollerViewport
         ref={viewportRef}
-        reserveEnd={false}
+        reserveEnd={shortEnd}
         data-testid="transcript-col"
-        className={VIEWPORT_CLS}
+        className={shortEnd ? VIEWPORT_CLS : `${VIEWPORT_CLS} pb-(--chat-extra-space)`}
       >
         <MessageScrollerContent className={CONTENT_CLS}>
           {lead}

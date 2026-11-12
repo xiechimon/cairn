@@ -3,6 +3,7 @@ import { boardDefault } from './board.js';
 import { chiefDefault } from './chief.js';
 import { at, PROJECT_ID, probeTodo, r7 } from './core.js';
 import { detailBuilding, detailConfirm, detailReview } from './detail.js';
+import { ENGINE_THREADS } from './engine-run-player.js';
 import type { ChiefContent, FixtureSet, TodoRecord } from './records.js';
 import { scheduleOnce } from './schedules.js';
 
@@ -244,6 +245,20 @@ export const homeC: FixtureSet = {
     },
   ],
   now: r7(20, 30),
+};
+
+export const homeCEngine: FixtureSet = {
+  ...homeC,
+  todos: [
+    ...(homeC.todos ?? []),
+    ...ENGINE_THREADS.map((thread, index) =>
+      homeTodo(thread.id, 2311 + index, thread.title, thread.phase, PROJECT_ID),
+    ),
+  ],
+  details: {
+    ...homeC.details,
+    ...Object.fromEntries(ENGINE_THREADS.map((thread) => [thread.id, thread.detail])),
+  },
 };
 
 export const homeCEmpty: FixtureSet = {

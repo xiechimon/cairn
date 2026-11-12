@@ -22,6 +22,8 @@ import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
+import { EngineCard } from './engine-card.js';
+import type { EngineRunView } from './engine-run.js';
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { STATUS_WORDS } from './status-words.js';
@@ -256,6 +258,7 @@ function ThreadBody({
   onOpenPlan,
   onClose,
   usage,
+  engine,
 }: {
   chat: ThreadChat;
   todo: TodoRecord;
@@ -269,6 +272,7 @@ function ThreadBody({
   onOpenPlan: (() => void) | undefined;
   onClose: () => void;
   usage: ThreadUsageView | null;
+  engine: EngineRunView | undefined;
 }) {
   const { t } = useI18n();
   const mentions = useThreadMentions(todo.projectId);
@@ -301,8 +305,22 @@ function ThreadBody({
             />
           }
           result={
-            chat.changes.status === 'ready' || chat.changes.status === 'error' ? (
-              <ChangesCard changes={chat.changes} onOpen={onViewChanges} />
+            engine !== undefined ||
+            chat.changes.status === 'ready' ||
+            chat.changes.status === 'error' ? (
+              <>
+                {engine?.controls}
+                {engine !== undefined && (
+                  <EngineCard
+                    run={engine.run}
+                    actions={engine.actions}
+                    className={engine.controls != null ? 'mt-2' : undefined}
+                  />
+                )}
+                {(chat.changes.status === 'ready' || chat.changes.status === 'error') && (
+                  <ChangesCard changes={chat.changes} onOpen={onViewChanges} />
+                )}
+              </>
             ) : undefined
           }
           hasEarlier={chat.hasEarlier}
@@ -311,6 +329,7 @@ function ThreadBody({
           running={threadStatus(todo) === 'running'}
           settled={chat.transcriptSettled}
           threadKey={todo.id}
+          shortEnd={engine !== undefined}
         />
       )}
       {chat.sendError != null && (
@@ -407,6 +426,23 @@ export function SideChat({
   );
   const view = chat.changes.status === 'none' ? 'chat' : chosenView;
   const showsChanges = view === 'changes';
+  const Stage = chat.engineStage;
+  const thread = (engine: EngineRunView | undefined) =>
+    todo == null ? null : (
+      <ReadyThread
+        todo={engine?.phase === undefined ? todo : { ...todo, phase: engine.phase }}
+        chat={
+          engine?.phase === undefined ? chat : { ...chat, running: engine.phase === 'building' }
+        }
+        engine={engine}
+        now={now}
+        view={view}
+        onView={setView}
+        chatStream={chatStream}
+        onClose={onClose}
+        onCloseAll={closeAll}
+      />
+    );
 
   const panelRef = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
@@ -447,16 +483,11 @@ export function SideChat({
       testId="side-chat-panel"
     >
       {todo != null && chat.load === 'ready' ? (
-        <ReadyThread
-          todo={todo}
-          chat={chat}
-          now={now}
-          view={view}
-          onView={setView}
-          chatStream={chatStream}
-          onClose={onClose}
-          onCloseAll={closeAll}
-        />
+        Stage !== undefined ? (
+          <Stage>{thread}</Stage>
+        ) : (
+          thread(chat.engineRun === undefined ? undefined : { run: chat.engineRun })
+        )
       ) : (
         <>
           <Head todoId={todoId} todo={null} onBack={onClose} onClose={closeAll} />
@@ -470,6 +501,7 @@ export function SideChat({
 function ReadyThread({
   todo,
   chat,
+  engine,
   now,
   view,
   onView,
@@ -479,6 +511,7 @@ function ReadyThread({
 }: {
   todo: TodoRecord;
   chat: ThreadChat;
+  engine: EngineRunView | undefined;
   now: number;
   view: ThreadView;
   onView: (view: ThreadView) => void;
@@ -547,6 +580,7 @@ function ReadyThread({
         onJumpToOrigin={jumpToOrigin}
         onOpenPlan={openPlan}
         onClose={onClose}
+        engine={engine}
         usage={
           (usage.hasRuns && threadUsageShown(usage.summary, usage.state)) ||
           contextPercentOf(todo.context) !== null

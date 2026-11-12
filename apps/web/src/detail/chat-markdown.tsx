@@ -77,10 +77,13 @@ function TaskIcon({ state }: { state: TaskState }) {
   );
 }
 
-export function TaskCard({ items }: { items: TaskItem[] }) {
+export function TaskCard({ items, bare = false }: { items: TaskItem[]; bare?: boolean }) {
   return (
     <ul
-      className="flex list-none flex-col gap-2 rounded-2xl border border-(--border) bg-(--card) px-4 py-3.5 font-sans font-normal shadow-sm"
+      className={cn(
+        'flex list-none flex-col gap-2 font-sans font-normal',
+        !bare && 'rounded-2xl border border-(--border) bg-(--card) px-4 py-3.5 shadow-sm',
+      )}
       data-testid="md-tasks"
     >
       {items.map((item, i) => (

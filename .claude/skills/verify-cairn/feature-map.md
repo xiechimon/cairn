@@ -126,6 +126,25 @@ Reach:
 - Backend design: **gap**: no design for report content, timing, quiet rules and retro proposal storage
 - Evidence: `apps/web/e2e/chief-daily-report.spec.ts`, `apps/server/test/chief-report.test.ts`, `apps/server/test/chief-digest.test.ts`
 
+### engine-view
+
+**Engine card in a task thread** (partial, centrality 1). A run that a task thread dispatched to an engine (Claude Code, Codex) shows as one card in the thread conversation, with a conversation view, a read-only raw output view and takeover. A web prototype on fixture data: no backend sends a run yet.
+
+States: Running with the plan checklist, trace rows and the typing bubble; waiting on a question with allow once, refuse and take over; finished with time and cost; failed with the failed command open; taken over with a hand back control; an unknown event as a row that opens its raw payload; a long run that scrolls inside the card; no card when the thread carries no run.
+
+Reach:
+
+1. `open /app/todo/<id of a thread listed by the todos API>`
+2. `click testid:engine-take-over`
+
+- Web routes: none
+- Keyboard shortcuts in its code: none
+- Test ids in its code: `engine-card`, `engine-choice`, `engine-diff`, `engine-edit`, `engine-events`, `engine-hand-back`, `engine-plan`, `engine-question`, `engine-raw`, `engine-state`, `engine-take-over`, `engine-take-over-confirm`, `engine-text`, `engine-typing`, `engine-unknown`, `engine-unknown-payload`
+- Research: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md)
+- Frontend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/references/thread-review](../../../docs/design/references/thread-review)
+- Backend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/home-redesign-backend-todo.md](../../../docs/design/home-redesign-backend-todo.md)
+- Evidence: `apps/web/e2e/chief-home-engine-card.spec.ts`, `apps/web/test/engine-run.test.ts`
+
 ### eval-gated-harness
 
 **Eval-gated harness changes** (partial, centrality 1). A differentiator: a harness change is adopted only when a protected eval judges it better; trajectories export to traces for the self-improvement loop.

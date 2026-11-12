@@ -29,6 +29,7 @@ import {
   type UsageCost,
 } from '@cairn/shared';
 import type { MachineProvider } from '../api/claude-accounts.js';
+import type { EngineRun, EngineRunStage } from '../board/engine-run.js';
 import type { AccountsContent } from './accounts.js';
 
 export type { Phase };
@@ -523,6 +524,8 @@ export interface DetailContent {
   compareTarget?: PlanDiffContent;
   revision?: RevisionStep;
   usage?: { rows: TokenUsage[]; machines: string[] };
+  engineRun?: EngineRun;
+  engineStage?: EngineRunStage;
 }
 
 export interface PlanVersion {

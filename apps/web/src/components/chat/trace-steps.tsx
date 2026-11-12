@@ -34,7 +34,7 @@ export type TraceStep =
 
 export type TraceDensity = 'comfortable' | 'compact';
 
-type ActionStep = Exclude<TraceStep, { kind: 'say' | 'wait' | 'check' }>;
+export type ActionStep = Exclude<TraceStep, { kind: 'say' | 'wait' | 'check' }>;
 
 export interface TraceStepItem {
   id: number | string;
@@ -89,7 +89,7 @@ function RowDetail({ children }: { children: ReactNode }) {
   return <div className="px-3 pb-3">{children}</div>;
 }
 
-function ActionRow({ step, compact }: { step: ActionStep; compact: boolean }) {
+export function TraceStepRow({ step, compact = false }: { step: ActionStep; compact?: boolean }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(isFailed(step));
   const running = isRunning(step);
@@ -220,7 +220,9 @@ export function TraceRows({
   return (
     <TraceCard className={className} {...props}>
       {steps.map(({ id, step }) =>
-        isAction(step) ? <ActionRow key={id} step={step} compact={density === 'compact'} /> : null,
+        isAction(step) ? (
+          <TraceStepRow key={id} step={step} compact={density === 'compact'} />
+        ) : null,
       )}
     </TraceCard>
   );

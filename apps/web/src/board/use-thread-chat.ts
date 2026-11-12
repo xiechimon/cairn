@@ -39,6 +39,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { useThreadPresence } from '../pwa/thread-presence.js';
+import type { EngineRun, EngineRunStage } from './engine-run.js';
 import { deriveThreadChanges, type ThreadChanges } from './thread-changes.js';
 import { useMarkThreadRead } from './use-mark-thread-read.js';
 
@@ -57,6 +58,8 @@ export interface ThreadChat {
   planDoc: DocBlock[] | undefined;
   planVersions: PlanVersion[] | undefined;
   changes: ThreadChanges;
+  engineRun?: EngineRun;
+  engineStage?: EngineRunStage;
   changesExpanded: boolean;
   toggleChangesExpanded: () => void;
   retryChanges: () => void;
@@ -344,6 +347,9 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       : fixtureDetail?.doc,
     planVersions: live ? mapPlanVersions(plans) : fixtureDetail?.planVersions,
     changes,
+    ...(!live && fixtureDetail?.engineRun !== undefined
+      ? { engineRun: fixtureDetail.engineRun, engineStage: fixtureDetail.engineStage }
+      : {}),
     changesExpanded,
     toggleChangesExpanded: () => setChangesExpanded((value) => !value),
     retryChanges: () => {
