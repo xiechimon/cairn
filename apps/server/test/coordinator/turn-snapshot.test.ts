@@ -5,6 +5,13 @@ import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import type { Db } from '../../src/db/client.js';
 import { coordinatorTurnSnapshot, project, step, todo } from '../../src/db/schema.js';
+import {
+  capturePreCallWorld,
+  captureToolResult,
+  existingTurnCapture,
+  openTurnCapture,
+  sealCoordinatorTurnSnapshot,
+} from '../../src/services/coordinator-turn-capture.js';
 import { boot, stub, type World, world } from './runner-world.js';
 
 function canonical(value: unknown): string {
@@ -106,6 +113,23 @@ describe('coordinator turn snapshot writer', () => {
     expect(created).toHaveLength(1);
     const result = JSON.parse(String(createCall.result)) as { id: string };
     expect(result.id).toBe(created[0]?.id);
+  });
+
+  it('never recreates a capture lost to a restart and seals no row for it', async () => {
+    const w = await world('hello');
+    const db = w.s.db;
+    const unclaimedStep = { ...w.s.db.select().from(step).where(eq(step.id, w.stepId)).get()! };
+    capturePreCallWorld(db, unclaimedStep.id, w.teamId, 'projects', 'c1', {});
+    captureToolResult(unclaimedStep.id, 'projects', []);
+    expect(existingTurnCapture(unclaimedStep.id)).toBeUndefined();
+    const before = db.select().from(coordinatorTurnSnapshot).all().length;
+    sealCoordinatorTurnSnapshot(db, unclaimedStep, w.teamId, 'success', 1234);
+    expect(db.select().from(coordinatorTurnSnapshot).all().length).toBe(before);
+    openTurnCapture('claimed-elsewhere');
+    capturePreCallWorld(db, 'claimed-elsewhere', w.teamId, 'projects', 'c2', {});
+    captureToolResult('claimed-elsewhere', 'projects', []);
+    const capture = existingTurnCapture('claimed-elsewhere');
+    expect(capture?.views).toHaveLength(1);
   });
 
   it('marks a turn unusable instead of truncating when payload bounds are exceeded', async () => {

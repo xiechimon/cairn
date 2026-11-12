@@ -28,8 +28,8 @@ import { steeredMessageScopes } from './chief-turns.js';
 import {
   capturePreCallWorld,
   captureToolResult,
+  existingTurnCapture,
   isCaptureTool,
-  openTurnCapture,
 } from './coordinator-turn-capture.js';
 import { projectOfTodo } from './git.js';
 import { resolveProjectGithubLabelIds } from './github-labels.js';
@@ -162,7 +162,7 @@ export async function executeRelayToolCall(
   const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
   if (!chiefRow) throw new NotFoundError(`chief ${threadRow.chiefId}`);
   const tool = isCaptureTool(name) ? name : undefined;
-  const captured = tool !== undefined ? openTurnCapture(stepId) : undefined;
+  const captured = tool !== undefined ? existingTurnCapture(stepId) : undefined;
   if (captured !== undefined && tool !== undefined)
     capturePreCallWorld(deps.db, stepId, threadRow.teamId, tool, toolCallId, params);
   let result: string;

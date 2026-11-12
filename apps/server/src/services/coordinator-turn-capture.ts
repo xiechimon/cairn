@@ -64,6 +64,10 @@ export function openTurnCapture(stepId: string): TurnCaptureState {
   return capture;
 }
 
+export function existingTurnCapture(stepId: string): TurnCaptureState | undefined {
+  return liveCaptures.get(stepId);
+}
+
 export function takeTurnCapture(stepId: string): TurnCaptureState | undefined {
   const capture = liveCaptures.get(stepId);
   liveCaptures.delete(stepId);
@@ -78,7 +82,7 @@ export function capturePreCallWorld(
   callId: string | undefined,
   params: Record<string, unknown>,
 ): void {
-  const capture = liveCaptures.get(stepId);
+  const capture = existingTurnCapture(stepId);
   if (capture === undefined) return;
   if (capture.views.length + capture.open.length >= COORDINATOR_SNAPSHOT_MAX_CALL_VIEWS) {
     capture.overLimit = true;
@@ -105,7 +109,7 @@ export function capturePreCallWorld(
 }
 
 export function captureToolResult(stepId: string, tool: CaptureTool, result: unknown): void {
-  const capture = liveCaptures.get(stepId);
+  const capture = existingTurnCapture(stepId);
   if (capture === undefined) return;
   const open = capture.open.pop();
   if (open === undefined || open.tool !== tool) {
