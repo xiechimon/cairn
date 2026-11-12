@@ -338,7 +338,19 @@ function evaluate(repo, number) {
     )
   )
     ghWrite('POST', `repos/${repo}/issues/${number}/comments`, { body: result.carried });
-  recordCarried(repo, number, threads, result, sha);
+  try {
+    recordCarried(repo, number, threads, result, sha);
+  } catch (error) {
+    console.error(error.message);
+    writeCheck(repo, sha, check, {
+      status: 'completed',
+      conclusion: 'failure',
+      title: 'Cannot record carried findings',
+      summary:
+        'The gate could not reply, resolve, or record a carried P1. A previous successful check on this head does not qualify it.',
+    });
+    return;
+  }
   writeCheck(repo, sha, check, result, stateEntry?.comment.html_url);
 
   const stalled = pr.labels.some((label) => label.name === STALL_LABEL);

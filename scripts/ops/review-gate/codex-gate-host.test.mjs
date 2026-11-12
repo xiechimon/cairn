@@ -42,6 +42,7 @@ else if (joined.includes('--slurp') && joined.includes('/issues/7/comments')) ou
 else if (joined.includes('HEAD_REF_FORCE_PUSHED_EVENT')) {
   out({data:{repository:{pullRequest:{timelineItems:{nodes:world.forcePushes,pageInfo:{hasNextPage:false,endCursor:null}}}}}});
 } else if (joined.includes('graphql')) {
+  if (world.failResolve && joined.includes('resolveReviewThread')) process.exit(2);
   out({ data: { repository: { pullRequest: { reviewThreads: {
     nodes: world.threads, pageInfo: { hasNextPage: false, endCursor: null } } } } } });
 } else if (joined.includes('/check-runs?')) out({ check_runs: world.checkRuns });
@@ -935,6 +936,20 @@ test('a carried finding is appended to the PR body read just before the update',
   assert.match(body, /kept edit/);
   assert.doesNotMatch(body, /stale description/);
   assert.match(body, /discussion_r50/);
+});
+
+test('a recording failure replaces a previous successful check on the head', () => {
+  const carried = finding('P1', 'PRRT_carried', 11, '50');
+  const out = run(
+    round3World([carried], {
+      failResolve: true,
+      checkRuns: [ownRun({ status: 'completed', conclusion: 'success' })],
+    }),
+  );
+  assert.equal(out.result.status, 0, out.result.stderr);
+  const body = out.body(out.checkWrites.at(-1));
+  assert.equal(body.conclusion, 'failure');
+  assert.match(body.output.summary, /previous successful check/i);
 });
 
 test('a pre-existing P1 before round 3 is not resolved by the gate', () => {
