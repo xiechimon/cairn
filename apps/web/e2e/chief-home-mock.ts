@@ -107,7 +107,13 @@ export const HISTORY = [
   { id: 'm6', role: 'assistant', content: '这条和 #9 是同一处，已经补给它了。', createdAt: 22 },
 ];
 
-export type Row = { id: string; role: string; content: unknown; createdAt: number };
+export type Row = {
+  id: string;
+  role: string;
+  content: unknown;
+  createdAt: number;
+  projectId?: string | null;
+};
 
 export interface MockState {
   threads: (typeof THREAD)[];

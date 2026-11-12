@@ -30,7 +30,7 @@ afterEach(() => {
 });
 
 const READY_AT = 1_800_000_000_000;
-const DEADLINE = READY_AT + 600_000;
+const DEADLINE = READY_AT;
 const GOOD_PLAN = 'Kind: fix\n## Verification\n- `pnpm test` passes\n';
 
 function world() {
@@ -195,16 +195,14 @@ test('merge permission API follows both session policy switches', async () => {
   expect((await req(w.app, 'GET', '/api/builds/missing/merge-permission')).status).toBe(404);
 });
 
-test('deadline survives a database close/reopen and confirmation runs exactly once when due', async () => {
+test('an eligible plan is confirmed by the first sweep after a restart, exactly once', async () => {
   const w = world();
   expect((await w.plans())[0]?.autoApproveAt).toBe(DEADLINE);
   w.restart();
   expect((await w.plans())[0]?.autoApproveAt).toBe(DEADLINE);
-  sweepPlanAutoConfirm(w.deps, DEADLINE - 1);
-  expect(w.phase()).toBe('confirm');
-  sweepPlanAutoConfirm(w.deps, DEADLINE);
+  sweepPlanAutoConfirm(w.deps);
   expect(w.phase()).toBe('building');
-  sweepPlanAutoConfirm(w.deps, DEADLINE + 1);
+  sweepPlanAutoConfirm(w.deps);
   expect(w.db.select().from(step).all()).toHaveLength(1);
   expect((await w.plans())[0]?.autoApproveAt).toBeNull();
 });
@@ -223,7 +221,7 @@ test('pause is idempotent, persists across restart, and manual approval still wo
   expect(await repeated.json()).toEqual(first);
   w.restart();
   expect((await w.plans())[0]).toEqual(first);
-  sweepPlanAutoConfirm(w.deps, DEADLINE + 86_400_000);
+  sweepPlanAutoConfirm(w.deps);
   expect(w.phase()).toBe('confirm');
   expect((await req(w.app, 'POST', '/api/builds/build/steps', { action: 'confirm' })).status).toBe(
     202,
@@ -270,7 +268,7 @@ test('project disable survives restart, preserves other settings, and leaves man
   expect((await w.plans())[0]?.autoApproveAt).toBeNull();
   const config = await req(w.app, 'GET', '/api/projects/project/merge-policy');
   expect(await config.json()).toMatchObject({ planAutoApproveEnabled: false });
-  sweepPlanAutoConfirm(w.deps, DEADLINE + 86_400_000);
+  sweepPlanAutoConfirm(w.deps);
   expect(w.phase()).toBe('confirm');
   expect((await req(w.app, 'POST', '/api/builds/build/steps', { action: 'confirm' })).status).toBe(
     202,
@@ -345,7 +343,7 @@ test.each([
       .run();
   if (reason === 'stale') w.db.update(todo).set({ latestBuildId: null }).run();
   expect((await w.plans())[0]?.autoApproveAt).toBeNull();
-  sweepPlanAutoConfirm(w.deps, DEADLINE);
+  sweepPlanAutoConfirm(w.deps);
   expect(w.phase()).toBe('confirm');
 });
 

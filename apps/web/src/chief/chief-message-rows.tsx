@@ -25,6 +25,7 @@ import type { ChiefSegment, ChiefStreamItem, ChiefToolRow } from '../fixtures/re
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { FileText } from '../icons/index.js';
+import { dateTimeFormat } from '../lib/date-format.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefReportRow } from './chief-report-row.js';
@@ -61,7 +62,7 @@ function MessageStamp({ createdAt, fallback }: { createdAt?: number; fallback?: 
       </span>
     );
   }
-  const absolute = new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+  const absolute = dateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(createdAt);

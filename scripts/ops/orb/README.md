@@ -679,7 +679,7 @@ coordinator's live `docs/verify/2277/canary.json` can establish nspawn, filesyst
 and egress behavior on omarchy. The macOS backend-user canary remains outside
 this item's scope.
 
-## Coordinator computer image (D75)
+## Coordinator computer image
 
 `install-host.sh` also runs `build-computer-image.sh` after the base image. It
 snapshots `cairn-orb-base` into `cairn-orb-computer` and installs
