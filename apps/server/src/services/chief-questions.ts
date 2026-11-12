@@ -225,10 +225,18 @@ export async function holdForQuestion(
 
 export function answerQuestion(
   deps: ChiefQuestionDeps,
-  input: { threadId: string; requestId: string; answers: AskUserAnswer[] },
+  input: {
+    threadId: string;
+    requestId: string;
+    answers: AskUserAnswer[];
+    answeredBy?: 'person' | 'coordinator';
+  },
 ): AskUserQuestionContent {
   const content = readQuestion(deps.db, input.threadId, input.requestId);
   if (content === null) throw new HttpError(404, `question ${input.requestId}`);
+  if (content.askedFor?.includes('job_submit') && input.answeredBy !== 'person') {
+    throw new HttpError(403, 'only the owner can answer a job submission');
+  }
   if (content.status !== 'pending') {
     const reason = content.status === 'cancelled' ? content.cancelReason : undefined;
     throw new HttpError(
@@ -273,6 +281,7 @@ export function answerQuestion(
     status: 'answered',
     answers: validated,
     answeredAt,
+    ...(input.answeredBy === undefined ? {} : { answeredBy: input.answeredBy }),
   };
   writeQuestion(deps.db, input.threadId, input.requestId, next, answeredAt);
   publishRow(deps, input.threadId, input.requestId);

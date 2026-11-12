@@ -444,10 +444,24 @@ function settleAbandoned(doc: Doc, now: number): void {
     if (now > preview.expiresAt) preview.values = null;
   }
 }
+export function isJobOwnerCaller(
+  pairedDeviceId: string | undefined,
+  ownerIdentity: unknown,
+  authToken: string | null,
+): boolean {
+  return !pairedDeviceId && (authToken === null || ownerIdentity !== undefined);
+}
+export function jobSubmitAnswerActor(content: unknown, owner: boolean): 'person' | undefined {
+  const question = typeof content === 'string' ? askQuestionContentOf(content) : null;
+  if (!question?.askedFor?.includes('job_submit')) return undefined;
+  if (!owner) throw new HttpError(403, 'only the owner can answer a job submission');
+  return 'person';
+}
 function ownerAffirmed(db: Db, questionId: string): boolean {
   const row = db.select().from(chiefMessage).where(eq(chiefMessage.id, questionId)).get();
   const content = row === undefined ? null : askQuestionContentOf(row.content);
-  if (content === null || !isOwnerAnswered(content)) return false;
+  if (content === null || content.answeredBy !== 'person' || !isOwnerAnswered(content))
+    return false;
   const choices = content.answers?.[0]?.choices;
   return choices?.length === 1 && choices[0] === JOB_SUBMIT_AFFIRMATIVE;
 }
@@ -473,6 +487,7 @@ export function recordOwnerAnswer(
       threadId: row.threadId,
       requestId: questionId,
       answers: [{ header: 'Submit', choices: answer.choices ?? [] }],
+      answeredBy: 'person',
     },
   );
 }

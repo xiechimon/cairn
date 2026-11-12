@@ -164,6 +164,90 @@ describe('job application server gate', () => {
     expect(teamId).not.toBe('');
   });
 
+  test('a paired device cannot confirm a job submit through the question route', async () => {
+    const ownerToken = 'owner-token-job-confirm';
+    const server = bootServer({ authToken: ownerToken });
+    const device = createPairedDevice(server.db, { teamId: server.team.id, name: 'phone' });
+    profile(server.db, server.user.id, server.team.id);
+    allow(server.db, server.user.id);
+    const attempt = openAttempt(server.db, server.user.id);
+    beginBrowsing(server.db, attempt.id, HOST, AT);
+    buildJobPreview(server.db, attempt.id, FORM, AT);
+    const threadId = thread(server.db, server.user.id, server.team.id);
+    const posted = postPreviewQuestion(server.db, attempt.id, threadId, AT, () => true);
+    const answer = JSON.stringify({
+      answers: [{ header: 'Submit', choices: [JOB_SUBMIT_AFFIRMATIVE] }],
+    });
+    const path = `/api/teams/${server.team.id}/chief/threads/${threadId}/questions/${posted.questionId}/answer`;
+    const denied = await server.app.request(path, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${device.token}`,
+        'content-type': 'application/json',
+      },
+      body: answer,
+    });
+    expect(denied.status).toBe(403);
+    const pending = server.db
+      .select()
+      .from(chiefMessage)
+      .where(eq(chiefMessage.id, posted.questionId))
+      .get();
+    expect(JSON.parse(String(pending?.content)).status).toBe('pending');
+    const unmarked = prepared();
+    unmarked.db
+      .update(chiefMessage)
+      .set({
+        content: JSON.stringify({
+          kind: 'ask_user_question',
+          requestId: unmarked.questionId,
+          status: 'answered',
+          questions: [
+            {
+              header: 'Submit',
+              question: 'Given name',
+              options: [{ label: JOB_SUBMIT_AFFIRMATIVE }],
+            },
+          ],
+          answers: [{ header: 'Submit', choices: [JOB_SUBMIT_AFFIRMATIVE] }],
+          askedFor: ['job_submit'],
+        }),
+      })
+      .where(eq(chiefMessage.id, unmarked.questionId))
+      .run();
+    expect(
+      answerAndReserve(
+        unmarked.db,
+        unmarked.attemptId,
+        { questionId: unmarked.questionId, choices: [JOB_SUBMIT_AFFIRMATIVE] },
+        FORM,
+        AT,
+      ),
+    ).toMatchObject({ status: 'failed', reserved: false });
+    expect(readJobCap(unmarked.db, unmarked.userId, AT).reserved).toBe(0);
+    const allowed = await server.app.request(path, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${ownerToken}`, 'content-type': 'application/json' },
+      body: answer,
+    });
+    expect(allowed.status).toBe(200);
+    const stored = server.db
+      .select()
+      .from(chiefMessage)
+      .where(eq(chiefMessage.id, posted.questionId))
+      .get();
+    expect(JSON.parse(String(stored?.content))).toMatchObject({ answeredBy: 'person' });
+    expect(
+      answerAndReserve(
+        server.db,
+        attempt.id,
+        { questionId: posted.questionId, choices: [JOB_SUBMIT_AFFIRMATIVE] },
+        FORM,
+        AT,
+      ),
+    ).toMatchObject({ status: 'submitting', reserved: true });
+  });
+
   test('profile edit keeps fields when the resume is missing and an empty profile stays idle', () => {
     const { db, userId, teamId } = world();
     expect(openAttempt(db, userId).status).toBe('idle');

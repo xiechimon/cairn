@@ -1,10 +1,15 @@
 import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { HttpError } from './lib/errors.js';
-import { setJobCapLimit, writeJobHost, writeOwnerProfile } from './services/job-applications.js';
+import {
+  isJobOwnerCaller,
+  setJobCapLimit,
+  writeJobHost,
+  writeOwnerProfile,
+} from './services/job-applications.js';
 
 function requireJobOwner(c: Context, authToken: string | null): void {
-  if (c.get('pairedDeviceId') || (authToken !== null && c.get('ownerIdentity') === undefined)) {
+  if (!isJobOwnerCaller(c.get('pairedDeviceId'), c.get('ownerIdentity'), authToken)) {
     throw new HttpError(403, 'only the owner can write job application state');
   }
 }
