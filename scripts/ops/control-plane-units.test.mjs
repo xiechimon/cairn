@@ -115,6 +115,10 @@ test('units are private and restart on failure', () => {
   }
 });
 
+test('the server comes back after a clean exit that systemd did not ask for', () => {
+  assert.deepEqual(units['cairn-server'].entries.get('Restart'), ['always']);
+});
+
 test('no unit sets TMPDIR without the shared heavy slot directory', () => {
   for (const { env } of [...Object.values(units), selfDeploy]) {
     assert.ok(!env.TMPDIR || env.CAIRN_HEAVY_SLOTS_DIR);
