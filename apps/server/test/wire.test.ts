@@ -122,6 +122,9 @@ const INFERRED_ROUTES = [
   'GET /api/todos/{id}/github-issue',
   'POST /api/todos/{id}/github-issue/retry',
   'GET /api/projects/{id}/files',
+  'PUT /api/job-applications/hosts',
+  'PUT /api/job-applications/profile',
+  'PUT /api/job-applications/cap',
 ];
 
 const CORE_ROUTES = [

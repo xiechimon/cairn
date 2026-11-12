@@ -15,11 +15,11 @@
 
 | Item | Count |
 |---|---|
-| Features | 53 |
+| Features | 54 |
 | status shipped | 44 |
 | status partial | 7 |
-| status planned | 2 |
-| research, frontend design and backend design all present or not applicable | 21 |
+| status planned | 3 |
+| research, frontend design and backend design all present or not applicable | 22 |
 | Research gaps | 15 |
 | Frontend design gaps | 20 |
 | Backend design gaps | 19 |
@@ -81,6 +81,7 @@
 | [Skills](#skills) | 3 | shipped | gap | yes | yes | B9 |
 | [Git release tags](#git-release-tags) | 4 | shipped | yes | n/a | yes |  |
 | [iOS app](#ios-app) | 4 | planned | gap | gap | gap | B12 |
+| [Job applications](#job-applications) | 4 | planned | n/a | n/a | yes |  |
 | [Thread tags](#thread-tags) | 4 | shipped | yes | yes | yes |  |
 
 ## Gaps by batch
@@ -613,6 +614,14 @@ Work for after phase 2 graduates: the native iOS app of D22. Research and design
 - Research: **gap**: the Optio and t3code comparison of D22 has not been done
 - Frontend design: **gap**: not designed
 - Backend design: **gap**: not designed
+
+### job-applications
+
+**Job applications** (planned). Owner-gated host allow, profile and daily cap for a later host-browser submit.
+
+- Research: n/a: the owner design is the source; no reference product is copied
+- Frontend design: n/a: this slice has no product UI
+- Backend design: [docs/design/job-applications.md](design/job-applications.md)
 
 ### thread-tags
 

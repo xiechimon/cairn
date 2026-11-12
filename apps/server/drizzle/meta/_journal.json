@@ -1058,6 +1058,13 @@
       "when": 1794422961793,
       "tag": "0154_hosted_cleanup_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 155,
+      "version": "6",
+      "when": 1794457919152,
+      "tag": "0155_job_application",
+      "breakpoints": true
     }
   ]
 }
