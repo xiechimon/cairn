@@ -156,7 +156,7 @@ function MentionChip({ seg }: { seg: DocSegment }) {
   const glances = useContext(TodoGlanceContext);
   const asLink = useContext(TaskMentionAsLinkContext);
   const href = mentionHref(seg, useThreadHref());
-  const className = mentionChipClass(seg.mentionKind);
+  const chipClass = mentionChipClass(seg.mentionKind);
   const todoId = seg.mentionKind === 'todo' ? seg.mentionId : undefined;
   const glance = todoId != null ? glances?.get(todoId) : undefined;
   const phase = glance?.phase;
@@ -171,7 +171,7 @@ function MentionChip({ seg }: { seg: DocSegment }) {
     );
   return href != null ? (
     <Link
-      className={cn(className, phase != null ? taskChipClass(phase) : 'cursor-pointer')}
+      className={cn(chipClass, phase != null ? taskChipClass(phase) : 'cursor-pointer')}
       to={href}
       data-phase={phase}
     >
@@ -179,7 +179,7 @@ function MentionChip({ seg }: { seg: DocSegment }) {
       <span className="max-w-48 truncate">{label}</span>
     </Link>
   ) : (
-    <span className={className}>{label}</span>
+    <span className={chipClass}>{label}</span>
   );
 }
 
