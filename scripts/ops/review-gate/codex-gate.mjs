@@ -4,14 +4,17 @@ import {
   ACTIONS_LOGIN,
   attemptStart,
   BLOCK_ROUND_CAP,
+  badgeOf,
   blockingThreads,
   blockRounds,
   carriedMarker,
+  carriedReply,
   decide,
   deferredIssue,
   deferredThreads,
   GATE_CHECK,
   HUMAN_LABEL,
+  isCodexAuthor,
   lastBlockedSha,
   markDeferrals,
   markPreExisting,
@@ -22,6 +25,7 @@ import {
   shouldSkip,
   trustedStateComment,
   usageLimitHit,
+  withCarriedFindings,
   writerReplies,
 } from './codex-gate-core.mjs';
 
@@ -30,6 +34,7 @@ const THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!, $cu
     pullRequest(number: $number) {
       reviewThreads(first: 100, after: $cursor) {
         nodes {
+          id
           isResolved
           isOutdated
           path
@@ -88,6 +93,7 @@ function loadThreads(repo, number) {
       )
         throw new Error('A review thread has more comments than one page');
       threads.push({
+        id: node.id,
         isResolved: node.isResolved,
         isOutdated: node.isOutdated,
         path: node.path,
@@ -99,6 +105,7 @@ function loadThreads(repo, number) {
         body: first?.body ?? '',
         reviewBody: first?.pullRequestReview?.body ?? '',
         url: first?.url ?? '',
+        commentBodies: node.comments.nodes.map((comment) => comment?.body ?? ''),
         replies: writerReplies(replies),
       });
     }
@@ -204,6 +211,50 @@ function loadSinceFiles(repo, base, head) {
   }
 }
 
+const REPLY_MUTATION =
+  'mutation($id:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$body}){comment{id}}}';
+const RESOLVE_MUTATION =
+  'mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}';
+
+function graphql(query, fields) {
+  const args = ['api', 'graphql', '-f', `query=${query}`];
+  for (const [key, value] of Object.entries(fields)) args.push('-f', `${key}=${value}`);
+  ghJson(args);
+}
+
+function recordCarried(repo, number, pr, threads, result, sha) {
+  if (result.recordIncomplete) throw new Error('A carried review thread cannot be recorded');
+  const listed = result.recordThreads ?? [];
+  if (listed.length === 0) return;
+  const byId = new Map(threads.filter((thread) => thread.id).map((thread) => [thread.id, thread]));
+  const selected = [];
+  for (const item of listed) {
+    const thread = byId.get(item.id);
+    if (!thread || thread.url !== item.url)
+      throw new Error('A carried review thread cannot be recorded');
+    if (
+      thread.isResolved ||
+      !isCodexAuthor(thread.authorLogin, thread.authorType) ||
+      badgeOf(thread.body) !== 'P1'
+    )
+      continue;
+    selected.push(thread);
+  }
+  if (selected.length === 0) return;
+  const reply = carriedReply(sha);
+  const nextBody = withCarriedFindings(
+    pr.body,
+    selected.map((thread) => thread.url),
+  );
+  if (nextBody !== (pr.body ?? ''))
+    ghWrite('PATCH', `repos/${repo}/pulls/${number}`, { body: nextBody });
+  for (const thread of selected) {
+    if (!(thread.commentBodies ?? []).some((body) => body.trim() === reply))
+      graphql(REPLY_MUTATION, { id: thread.id, body: reply });
+    graphql(RESOLVE_MUTATION, { id: thread.id });
+  }
+}
+
 function evaluate(repo, number) {
   const pr = ghJson(['api', `repos/${repo}/pulls/${number}`]);
   const skip = shouldSkip(pr);
@@ -283,6 +334,7 @@ function evaluate(repo, number) {
     )
   )
     ghWrite('POST', `repos/${repo}/issues/${number}/comments`, { body: result.carried });
+  recordCarried(repo, number, pr, threads, result, sha);
   writeCheck(repo, sha, check, result, stateEntry?.comment.html_url);
 
   const stalled = pr.labels.some((label) => label.name === STALL_LABEL);

@@ -361,6 +361,56 @@ export function carriedMarker(sha) {
   return `<!-- review-gate-carried:${sha} -->`;
 }
 
+const THREAD_ID = /^[A-Za-z0-9+/=_-]{4,200}$/;
+const THREAD_URL =
+  /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/\d+#discussion_r[A-Za-z0-9]+$/;
+const CARRIED_BLOCK = /<details>\s*<summary>Carried review findings<\/summary>[\s\S]*?<\/details>/;
+
+export function carriedReply(sha) {
+  const head = String(sha);
+  const short = /^[0-9a-f]{7,40}$/.test(head) ? head.slice(0, 7) : 'unknown';
+  return `Recorded as pre-existing in this PR's Risk by review-gate at ${short}; not blocking.`;
+}
+
+export function withCarriedFindings(body, urls) {
+  const text = typeof body === 'string' ? body : '';
+  const fresh = [];
+  const seen = new Set();
+  for (const url of urls) {
+    if (!THREAD_URL.test(url) || seen.has(url)) continue;
+    seen.add(url);
+    fresh.push(url);
+  }
+  if (fresh.length === 0) return text;
+  const match = CARRIED_BLOCK.exec(text);
+  const missing = fresh.filter((url) => !match?.[0].includes(url));
+  if (missing.length === 0) return text;
+  const lines = missing.map((url) => `- ${url}`).join('\n');
+  if (!match) {
+    const block = `<details>\n<summary>Carried review findings</summary>\n\n${lines}\n</details>\n`;
+    return text.length === 0 ? block : `${text.replace(/\n?$/, '\n\n')}${block}`;
+  }
+  const end = match.index + match[0].lastIndexOf('</details>');
+  return `${text.slice(0, end).replace(/\n?$/, '\n')}${lines}\n${text.slice(end)}`;
+}
+
+function threadsToRecord(carriedRound, invalid) {
+  const eligible = carriedRound.filter(
+    (thread) =>
+      badgeOf(thread.body) === 'P1' &&
+      isCodexAuthor(thread.authorLogin, thread.authorType) &&
+      !invalid.includes(thread) &&
+      typeof thread.url === 'string',
+  );
+  const ready = eligible.filter(
+    (thread) => THREAD_ID.test(thread.id ?? '') && THREAD_URL.test(thread.url),
+  );
+  return {
+    recordThreads: ready.map((thread) => ({ id: thread.id, url: thread.url })),
+    recordIncomplete: ready.length !== eligible.length,
+  };
+}
+
 function carriedListing(threads) {
   const lines = threads.map(
     (thread) =>
@@ -368,11 +418,11 @@ function carriedListing(threads) {
         .replace(/^P[0-3]\s+/, '')
         .replace(/@/g, '')}: ${thread.url}`,
   );
-  return `These findings are pre-existing in this PR, record in Risk:\n\n${lines.join('\n')}`;
+  return `These findings are pre-existing in this PR; review-gate recorded them in Carried review findings:\n\n${lines.join('\n')}`;
 }
 
 function roundNote(round) {
-  return `Review block round ${round} (cap ${BLOCK_ROUND_CAP}), reconsider the approach: stop fixing findings one line at a time. Name the bug class behind them, fix every instance, or change the approach; the PR is labelled \`${HUMAN_LABEL}\` for a human. From this round a P1 blocks only on lines changed since the last blocked head. Other open P1 threads are pre-existing in this PR, record in Risk. A P0 anywhere still blocks.`;
+  return `Review block round ${round} (cap ${BLOCK_ROUND_CAP}), reconsider the approach: stop fixing findings one line at a time. Name the bug class behind them, fix every instance, or change the approach; the PR is labelled \`${HUMAN_LABEL}\` for a human. From this round a P1 blocks only on lines changed since the last blocked head. Other open P1 threads are pre-existing in this PR; review-gate records and resolves them. A P0 anywhere still blocks.`;
 }
 
 const SECURITY_RECEIPT_HEADER = /^#{2,3} (?:🛡️ )?Codex Security Review\s*$/m;
@@ -610,9 +660,14 @@ export function decide(
   const carried = carriedNote(preExistingThreads(threads));
   const blockedHeads = rounds.others + (rounds.marked ? 1 : 0);
   const human = capped && !rounds.marked ? { addHuman: true } : {};
+  const recorded = threadsToRecord(carriedRound, invalid);
   const record =
     carriedRound.length > 0
-      ? { carried: `${carriedMarker(sha)}\n${carriedListing(carriedRound)}` }
+      ? {
+          carried: `${carriedMarker(sha)}\n${carriedListing(carriedRound)}`,
+          ...(recorded.recordThreads.length > 0 ? { recordThreads: recorded.recordThreads } : {}),
+          ...(recorded.recordIncomplete ? { recordIncomplete: true } : {}),
+        }
       : {};
   if (blocking.length === 0 && invalid.length === 0)
     return {

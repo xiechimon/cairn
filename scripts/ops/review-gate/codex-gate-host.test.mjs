@@ -57,6 +57,7 @@ const stateComment = (sha, status, securityReview) => ({
   updated_at: '2026-01-01T00:01:00Z',
 });
 const thread = (level, over = {}) => ({
+  id: `PRRT_${level}`,
   isResolved: false,
   isOutdated: false,
   path: 'src/a.ts',
@@ -626,7 +627,10 @@ test('from round 3 a P1 on lines unchanged since the last blocked head does not 
   assert.equal(out.labelAdds.length, 1);
   assert.deepEqual(out.body(out.labelAdds[0]).labels, ['review-gate-human']);
   assert.equal(out.commentPosts.length, 1);
-  assert.match(out.body(out.commentPosts[0]).body, /pre-existing in this PR, record in Risk/);
+  assert.match(
+    out.body(out.commentPosts[0]).body,
+    /review-gate recorded them in Carried review findings/,
+  );
   assert.match(
     out.calls.map((call) => call.args.join(' ')).join('\n'),
     new RegExp(`compare/${'2'.repeat(40)}\\.\\.\\.${SHA}`),
@@ -663,7 +667,10 @@ test('from round 3 a P0 on an old line still blocks', () => {
 test('from round 3 an unanchored thread on an unchanged file does not block', () => {
   const out = round3([thread('P1', { path: 'src/untouched.ts', line: null })], quietCompare);
   assert.equal(out.body(out.checkWrites[0]).conclusion, 'success');
-  assert.match(out.body(out.commentPosts[0]).body, /pre-existing in this PR, record in Risk/);
+  assert.match(
+    out.body(out.commentPosts[0]).body,
+    /review-gate recorded them in Carried review findings/,
+  );
 });
 
 test('a diverged compare does not narrow a round-3 P1', () => {
@@ -809,4 +816,101 @@ test('a thread with more comments than one page cannot be judged and fails as un
   });
   const out = run(deferralWorld([long]));
   assert.equal(out.body(out.checkWrites[0]).output.title, 'Cannot determine the review inputs');
+});
+
+const carriedReplyText =
+  "Recorded as pre-existing in this PR's Risk by review-gate at ccccccc; not blocking.";
+const finding = (level, id, line, slug, author) => {
+  const node = thread(level, { id, line });
+  node.comments.nodes[0].url = `https://github.com/o/r/pull/7#discussion_r${slug}`;
+  if (author) node.comments.nodes[0].author = author;
+  return node;
+};
+const namedCalls = (out, mutation) =>
+  out.calls.filter((call) => call.args.some((arg) => String(arg).includes(mutation)));
+const pullPatches = (out) =>
+  out.writes.filter((call) => /--method PATCH repos\/o\/r\/pulls\/7\b/.test(call.args.join(' ')));
+const round3World = (threads, extra = {}) => ({
+  comments: [stateComment(SHA, 'completed'), ...priorBlocks],
+  threads,
+  files: [{ filename: 'src/a.ts', patch: '@@ -9,1 +9,3 @@\n ctx\n+added\n+added2' }],
+  compare: quietCompare,
+  checkRuns: [ownRun()],
+  ...extra,
+});
+
+test('the review-gate job token has pull-requests write for thread reply and resolve', () => {
+  const workflow = readFileSync(
+    fileURLToPath(new URL('../../../.github/workflows/review-gate.yml', import.meta.url)),
+    'utf8',
+  );
+  const job = workflow.slice(workflow.indexOf('jobs:'), workflow.indexOf('concurrency:'));
+  assert.match(job, /pull-requests: write/);
+});
+
+test('from round 3 a carried Codex P1 is replied and resolved once; blocking P1, P0 and human threads are not', () => {
+  const splitCompare = {
+    behind_by: 0,
+    files: [{ filename: 'src/a.ts', patch: '@@ -9,1 +9,2 @@\n ctx\n+added' }],
+  };
+  const carried = finding('P1', 'PRRT_carried', 11, '50');
+  const blocking = finding('P1', 'PRRT_blocking', 10, '2');
+  const p0 = finding('P0', 'PRRT_p0', 11, '80');
+  const human = finding('P1', 'PRRT_human', 11, '70', { login: 'dev', __typename: 'User' });
+  const out = run(round3World([carried, blocking, p0, human], { compare: splitCompare }));
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure');
+  const replies = namedCalls(out, 'addPullRequestReviewThreadReply');
+  const resolves = namedCalls(out, 'resolveReviewThread');
+  assert.equal(replies.length, 1);
+  assert.equal(resolves.length, 1);
+  assert.equal(replies[0].args.find((arg) => arg.startsWith('body=')).slice(5), carriedReplyText);
+  assert.equal(replies[0].args.find((arg) => arg.startsWith('id=')).slice(3), 'PRRT_carried');
+  assert.equal(resolves[0].args.find((arg) => arg.startsWith('id=')).slice(3), 'PRRT_carried');
+  const touched = out.calls.map((call) => call.args.join(' ')).join('\n');
+  for (const id of ['PRRT_blocking', 'PRRT_p0', 'PRRT_human'])
+    assert.equal(touched.includes(id), false);
+  const patches = pullPatches(out);
+  assert.equal(patches.length, 1);
+  const body = out.body(patches[0]).body;
+  assert.match(body, /<details>\n<summary>Carried review findings<\/summary>/);
+  assert.equal(body.split('discussion_r50').length - 1, 1);
+  assert.doesNotMatch(body, /discussion_r2|discussion_r80|discussion_r70/);
+});
+
+test('a rerun does not duplicate the carried reply, resolve or PR body line', () => {
+  const listed =
+    '<details>\n<summary>Carried review findings</summary>\n\n- https://github.com/o/r/pull/7#discussion_r50\n</details>\n';
+  const openThread = finding('P1', 'PRRT_carried', 11, '50');
+  openThread.comments.nodes.push({
+    author: { login: 'github-actions[bot]', __typename: 'Bot' },
+    body: carriedReplyText,
+  });
+  const open = run(round3World([openThread], { pr: { ...basePr, body: listed } }));
+  assert.equal(open.result.status, 0, open.result.stderr);
+  assert.equal(namedCalls(open, 'addPullRequestReviewThreadReply').length, 0);
+  assert.equal(namedCalls(open, 'resolveReviewThread').length, 1);
+  assert.equal(pullPatches(open).length, 0);
+  const resolved = finding('P1', 'PRRT_carried', 11, '50');
+  resolved.isResolved = true;
+  resolved.comments.nodes.push({
+    author: { login: 'github-actions[bot]', __typename: 'Bot' },
+    body: carriedReplyText,
+  });
+  const again = run(round3World([resolved], { pr: { ...basePr, body: listed } }));
+  assert.equal(again.result.status, 0, again.result.stderr);
+  assert.equal(namedCalls(again, 'addPullRequestReviewThreadReply').length, 0);
+  assert.equal(namedCalls(again, 'resolveReviewThread').length, 0);
+  assert.equal(pullPatches(again).length, 0);
+});
+
+test('a pre-existing P1 before round 3 is not resolved by the gate', () => {
+  const out = run({
+    comments: [stateComment(SHA, 'completed')],
+    threads: [thread('P1', { id: 'PRRT_old', line: 50 })],
+    files: [{ filename: 'src/a.ts', patch: '@@ -40,1 +40,2 @@\n ctx\n+added' }],
+    checkRuns: [ownRun()],
+  });
+  assert.equal(out.body(out.checkWrites[0]).conclusion, 'success');
+  assert.equal(namedCalls(out, 'resolveReviewThread').length, 0);
 });
