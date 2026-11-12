@@ -141,8 +141,7 @@
   --composer-max-h: 384px;
   --composer-bottom-gap: 16px;
   --scroll-fade-size: 28px;
-  --chat-fade-size: 64px;
-  --chat-end-space: 16px;
+  --chat-end-space: 24px;
   --chat-extra-space: 35vh;
   --type-scale: calc(var(--rem-scale) * 17 / 16);
   --type-page: calc(1.5rem * var(--type-scale));
@@ -171,11 +170,6 @@
   --shadow-floating: 0 2px 6px rgb(0 0 0 / 0.2), 0 8px 24px rgb(0 0 0 / 0.32);
   --shadow-dialog: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px rgb(0 0 0 / 0.24);
   --shadow-jump: 0 2px 4px rgb(0 0 0 / 0.07), 0 6px 16px rgb(0 0 0 / 0.24);
-  --selection-bar-bg: rgb(0 0 0 / 0.8);
-  --selection-bar-ring: rgb(255 255 255 / 0.1);
-  --selection-bar-hover: rgb(255 255 255 / 0.1);
-  --selection-bar-ink: rgb(255 255 255);
-  --shadow-selection-bar: 0 4px 8px rgb(11 11 11 / 0.08), 0 12px 28px -2px rgb(0 0 0 / 0.24);
   --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 6px 18px -2px rgb(0 0 0 / 0.35);
   --composer-fill: var(--reply-bubble-fill);
   --composer-ring: rgb(255 255 255 / 0.07);
@@ -270,6 +264,7 @@
   --code-token-punctuation: #d3d7de;
   --code-token-comment: #818898;
   --bubble-fill: #33290f;
+  --bubble-highlight: #3f351b;
   --reply-bubble-fill: #292929;
   --chat-link: #7aa5e0;
   --task-ref-line: #6b6b6b;
@@ -319,11 +314,6 @@
   --shadow-floating: 0 2px 6px rgb(0 0 0 / 0.08), 0 8px 20px rgb(0 0 0 / 0.1);
   --shadow-dialog: 0 1px 2px rgb(0 0 0 / 0.04), 0 2px 8px rgb(0 0 0 / 0.1);
   --shadow-jump: 0 2px 4px rgb(0 0 0 / 0.04), 0 6px 16px rgb(0 0 0 / 0.1);
-  --selection-bar-bg: rgb(0 0 0 / 0.8);
-  --selection-bar-ring: rgb(255 255 255 / 0.1);
-  --selection-bar-hover: rgb(255 255 255 / 0.1);
-  --selection-bar-ink: rgb(255 255 255);
-  --shadow-selection-bar: 0 4px 8px rgb(11 11 11 / 0.08), 0 12px 28px -2px rgb(11 11 11 / 0.08);
   --panel-shadow-hover: 0 0 0 1px var(--input), 0 8px 20px -4px rgb(29 35 31 / 0.14);
   --composer-fill: var(--background);
   --composer-ring: rgb(0 0 0 / 0.13);
@@ -412,6 +402,7 @@
   --tag-tint: 12%;
   --code-pill-bg: #f2f2f2;
   --bubble-fill: #f3ead6;
+  --bubble-highlight: #e6ddc9;
   --reply-bubble-fill: #f2f2f2;
   --chat-link: #2f56b0;
   --task-ref-line: #a9a9a9;

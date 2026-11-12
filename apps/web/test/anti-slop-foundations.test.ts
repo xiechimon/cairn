@@ -59,10 +59,9 @@ describe('V16 no texture or gradient surfaces', () => {
   });
 });
 
-describe('V3 blur only on the measured claude.ai selection bar', () => {
-  test('the selection bar is the one blurred surface', () => {
+describe('V3 no blurred surfaces', () => {
+  test('only the pristine dialog overlays carry a blur class', () => {
     expect(offenders(/backdrop-blur|backdrop-filter:\s*blur|filter:\s*blur\(/).sort()).toEqual([
-      'chief/selection-reply.tsx',
       'components/ui/alert-dialog.tsx',
       'components/ui/dialog.tsx',
     ]);
@@ -72,11 +71,6 @@ describe('V3 blur only on the measured claude.ai selection bar', () => {
     expect(appCss).toMatch(
       /\[data-slot="dialog-overlay"\],\s*\[data-slot="alert-dialog-overlay"\] \{[^}]*backdrop-filter: none;/,
     );
-  });
-
-  test('it blurs by the measured 8px', () => {
-    const bar = sourceFiles.find(({ path }) => path === 'chief/selection-reply.tsx')?.text ?? '';
-    expect(bar.match(/backdrop-blur[\w-]*/g)).toEqual(['backdrop-blur-sm']);
   });
 });
 

@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { contextPercentOf } from '../chief/context-meter-ring.js';
-import { REPLY_SOURCE_ATTR } from '../chief/selection-reply-model.js';
+import { REPLY_SOURCE_ATTR } from '../chief/reply-source-highlight.js';
 import { TraceCard } from '../components/chat/trace-parts.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
