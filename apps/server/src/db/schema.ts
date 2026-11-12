@@ -1462,6 +1462,28 @@ export const coordinatorTurnSnapshot = sqliteTable(
   ],
 );
 
+export const actionJournal = sqliteTable(
+  'action_journal',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    actionId: text('actionId').notNull(),
+    targetId: text('targetId').notNull(),
+    actor: text('actor').$type<'user' | 'coordinator'>().notNull(),
+    surface: text('surface').notNull(),
+    kind: text('kind').$type<'run' | 'undo' | 'undo-refused' | 'error'>().notNull(),
+    inputHash: text('inputHash').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    index('action_journal_team_idx').on(t.teamId, t.createdAt),
+    check('action_journal_actor', sql`${t.actor} in ('user', 'coordinator')`),
+    check('action_journal_kind', sql`${t.kind} in ('run', 'undo', 'undo-refused', 'error')`),
+  ],
+);
+
 export const threadConversation = sqliteTable('thread_conversation', {
   threadId: text('threadId').primaryKey(),
   storeId: text('storeId').notNull(),
