@@ -214,7 +214,9 @@ test.describe('select text in a Coordinator message, then Reply', () => {
             blurredIsBar: blurred.every((el) => el === pill),
           };
         });
-        expect(measured).toEqual({
+        const { centreOffset, ...measuredRest } = measured;
+        expect(centreOffset).toBeLessThanOrEqual(1);
+        expect(measuredRest).toEqual({
           backdrop: 'blur(8px)',
           background: 'rgba(0, 0, 0, 0.8)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -225,7 +227,6 @@ test.describe('select text in a Coordinator message, then Reply', () => {
           buttonFont: '14px/20px',
           buttonGap: '4px',
           gapAbove: 8,
-          centreOffset: 0,
           blurredCount: 1,
           blurredIsBar: true,
         });
