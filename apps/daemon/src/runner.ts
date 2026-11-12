@@ -50,7 +50,6 @@ import {
   LOCAL_TOOL_CREATE_TAG,
   LocalRepoUnreachableError,
   localCommitIdentity,
-  normalizeClaudeResetsAt,
   noVisionSignalOf,
   PLAN_FILE_NAME,
   parseRetryAfterMs,
@@ -63,7 +62,6 @@ import {
   skillCallName,
   stepTakesSecrets,
   stripAnsiEscapes,
-  subscriptionKeyOf,
   transcriptPromptRowId,
   withCoAuthor,
   workspaceHookRowContent,
@@ -93,6 +91,7 @@ import {
   claudeCodeAuthFailureMessage,
   probeClaudeCodeAuth,
 } from './claude-code-auth.js';
+import { claudeQuotaTrip, claudeRateLimitReport, type QuotaTrip } from './claude-quota-trip.js';
 import {
   credentialRedactor,
   credentialSafeEvents,
@@ -1155,11 +1154,7 @@ async function runClaimedStep(
   let zeroProgressRetries = 0;
   let retryStorm = false;
   const retryStormMax = opts.retryStormMax ?? RETRY_STORM_MAX;
-  let quotaTrip: {
-    kind: 'quota' | 'capacity';
-    reason: string;
-    retryAfterMs: number | null;
-  } | null = null;
+  let quotaTrip: QuotaTrip | null = null;
   let networkRetries = 0;
   const networkRetryDelays =
     claimed.step.kind === 'plan' || isBuildStepKind(claimed.step.kind)
@@ -1288,26 +1283,17 @@ async function runClaimedStep(
     const machineId = claimed.step.machineId;
     if (machineId !== null) {
       void client
-        .reportClaudeRateLimit?.({
-          machineId,
-          status: notice.status,
-          ...(notice.rateLimitType !== undefined ? { rateLimitType: notice.rateLimitType } : {}),
-          ...(notice.utilization !== undefined ? { utilization: notice.utilization } : {}),
-          ...(notice.resetsAt !== undefined ? { resetsAt: notice.resetsAt } : {}),
-        })
+        .reportClaudeRateLimit?.(claudeRateLimitReport(machineId, notice))
         .catch((err: unknown) => {
           logger.step(
             `claude rate limit report failed: ${err instanceof Error ? err.message : String(err)}`,
           );
         });
     }
-    if (notice.status !== 'rejected' || quotaTrip !== null) return;
-    const until = normalizeClaudeResetsAt(notice.resetsAt);
-    quotaTrip = {
-      kind: 'quota',
-      reason: `Claude subscription ${subscriptionKeyOf(notice.rateLimitType)} rejected`,
-      retryAfterMs: until !== null && until > Date.now() ? Math.max(1, until - Date.now()) : null,
-    };
+    if (quotaTrip !== null) return;
+    const trip = claudeQuotaTrip(notice, Date.now());
+    if (trip === null) return;
+    quotaTrip = trip;
     void handle?.stop();
   };
   const openSession = (): Promise<AgentSessionHandle> => {
