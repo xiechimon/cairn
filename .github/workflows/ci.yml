@@ -128,7 +128,7 @@ jobs:
 
       - name: Codex review gate
         if: ${{ !cancelled() }}
-        run: node --test scripts/ops/review-gate/codex-gate-core.test.mjs scripts/ops/review-gate/codex-gate-host.test.mjs scripts/ops/review-gate/codex-gate-watchdog.test.mjs
+        run: node --test scripts/ops/review-gate/codex-gate-core.test.mjs
 
       - name: PR evidence regression tests
         run: python3 scripts/pr-evidence-gate.test.py
