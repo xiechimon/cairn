@@ -102,12 +102,7 @@ import {
 import { clearCredentials, pushCredential } from './credentials.js';
 import { DeltaRelay } from './delta-relay.js';
 import { buildExecutorRecord } from './executor-record.js';
-import {
-  GitPushHookError,
-  gitCredentialEnv,
-  isGitAuthFailure,
-  withGitCredentialFallback,
-} from './git.js';
+import { GitPushHookError, isGitAuthFailure, withGitCredentialFallback } from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import { landLocalMerge } from './local-merge.js';
@@ -121,6 +116,7 @@ import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
 import { resolveStepImages } from './step-attachments.js';
+import { assembleStepEnv } from './step-env.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import {
   resolveStreamLimits,
@@ -215,12 +211,6 @@ function resumeMissNote(sessionId: string, claimed: ClaimedStep): string {
   }
   return `本机找不到会话 ${sessionId}，无法续接。已改开新会话，按原任务继续。`;
 }
-
-const READONLY_GIT_ENV: Record<string, string> = {
-  GIT_CONFIG_COUNT: '1',
-  GIT_CONFIG_KEY_0: 'url.cairn-readonly-workspace-denied://.pushInsteadOf',
-  GIT_CONFIG_VALUE_0: '',
-};
 
 function confirmedPlanFile(plansDir: string, convId: string): string | null {
   const planFile = join(plansDir, convId, PLAN_FILE_NAME);
@@ -938,18 +928,6 @@ async function runClaimedStep(
       ? deps.otel.contextFor(claimed.step.buildId, stepId, claimed.step.kind)
       : undefined;
   const skillInjection: { facts: SkillInjectionFacts | null } = { facts: null };
-  const stepGitEnv: Record<string, string> =
-    repo?.kind === 'github' && creds.git !== null
-      ? (appCredential?.env() ?? {
-          ...Object.fromEntries(
-            Object.entries(gitCredentialEnv(creds.git)).filter(
-              (entry): entry is [string, string] => entry[1] !== undefined,
-            ),
-          ),
-          GH_TOKEN: creds.git.password,
-          GITHUB_TOKEN: creds.git.password,
-        })
-      : {};
   let temporary: ReturnType<typeof createTempEnvironment>;
   try {
     temporary = createTempEnvironment({ ...process.env, ...opts.env });
@@ -963,28 +941,16 @@ async function runClaimedStep(
     return;
   }
   stepCleanups.push(temporary.cleanup);
-  const stepEnv: Record<string, string> = {
-    ...opts.env,
-    ...temporary.env,
-    ...stepGitEnv,
-    ...(readonlyWorkspace || attachmentVerify ? READONLY_GIT_ENV : {}),
-  };
-  stepCleanups.push(() => {
-    for (const key of Object.keys(stepGitEnv)) {
-      delete stepEnv[key];
-      delete stepGitEnv[key];
-    }
+  const { env: stepEnv, dropGitCredentials } = assembleStepEnv({
+    inherited: opts.env,
+    temporary: temporary.env,
+    git: repo?.kind === 'github' ? creds.git : null,
+    appCredential,
+    readonlyGit: readonlyWorkspace || attachmentVerify,
+    claudeSubscriptionToken:
+      runtimeId === 'claude-code' ? creds.claudeSubscriptionToken : undefined,
   });
-  if (appCredential !== null) {
-    delete stepEnv.GH_TOKEN;
-    delete stepEnv.GITHUB_TOKEN;
-    delete stepEnv.CAIRN_GIT_CRED_PASSWORD;
-  }
-  delete stepEnv.CLAUDE_CODE_OAUTH_TOKEN;
-  if (runtimeId === 'claude-code' && creds.claudeSubscriptionToken !== undefined) {
-    stepEnv.CLAUDE_CODE_OAUTH_TOKEN = creds.claudeSubscriptionToken;
-    if (opts.env?.CAIRN_ORB !== '1') stepEnv.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = '1';
-  }
+  stepCleanups.push(dropGitCredentials);
   const sessionOpts: SessionOpts = {
     provider,
     modelId: agent.modelId,

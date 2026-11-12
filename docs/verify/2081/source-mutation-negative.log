@@ -1,0 +1,6 @@
+BLOCK: Source bytes differ or are missing: docs/verify/1671/README.md
+BLOCK: Source bytes differ or are missing: docs/verify/1671/live-setup.md
+BLOCK: Source bytes differ or are missing: docs/verify/1671/live-text-only-requests.json
+BLOCK: Source bytes differ or are missing: docs/verify/1671/live-text-only-terminal.json
+BLOCK: Source bytes differ or are missing: integration/verify/image-fallback-live.mts
+BLOCK: Source bytes differ or are missing: packages/shared/test/task-failure.test.ts

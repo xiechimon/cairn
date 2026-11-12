@@ -1,0 +1,54 @@
+{
+  "timing": "post_merge",
+  "completedAtUtc": "2026-10-28T10:28:24.523324+00:00",
+  "configuredContextWindow": 1000000,
+  "usage": {
+    "input": 31113,
+    "output": 807,
+    "cacheRead": 256,
+    "cacheWrite": 0,
+    "totalTokens": 32176
+  },
+  "mergeTreeEqualsReviewedTree": true,
+  "tree": "3976c4cbe08ef5c7cded05ab55bb9cdcc07ea86e",
+  "review": {
+    "headSha": "9fe4ebf1ee24da3dc3632e6d6c8f3fe960817b4e",
+    "patchDigest": "35ab9ed0bbfed0d435631e2e3c9d5aba8bd94e76",
+    "reviewerModel": "deepseek-v4.1-flash",
+    "verdict": "pass",
+    "gateWeakening": {
+      "answer": "no",
+      "reason": "The change adds a report-only drift scanner and appends it to the weekly gardener summary. No check, gate, protected-path list, baseline, or allowlist is loosened: ci.yml only adds scripts/doc-drift.test.mjs to the existing non-gating self-test invocation, and gardener-weekly.yml only passes --drift to a workflow that, per the owner checklist, is report-only. scripts/baseline-ratchet-gate.mjs, the baseline files, the candidate-pattern logic, and prepush are untouched; the diff contains no new enforcement or removal of any enforcement."
+    },
+    "evalRulerChange": {
+      "answer": "no",
+      "reason": "Nothing in the patch changes how the eval ruler measures: no baseline values, metrics, scorer, or verification outputs are modified. The drift script and its summary section are a documentation hygiene report, not a measurement change; ADR 0026 R2's eval-ruler question therefore stays clean."
+    },
+    "findings": [
+      {
+        "severity": "low",
+        "path": "scripts/doc-drift.mjs",
+        "line": 42,
+        "detail": "Fence tracking toggles on any line whose trim matches a ``` / ~~~ prefix, without comparing the closing fence to the opening one. A document that opens a ```` fence and contains a ``` line (or a closing fence with a language suffix) mis-toggles the state and can silently skip or wrongly scan following text. Fixtures never exercise mixed or longer fences, so this currently affects only future docs; acceptable in a report-only tool but worth tightening."
+      },
+      {
+        "severity": "low",
+        "path": "scripts/doc-drift.mjs",
+        "line": 83,
+        "detail": "Historical path detection relies on git name-history (`git log --format=%H -1 HEAD -- :(literal)path :(glob)**/path`). With history simplification the walk from a single commit path can miss earlier deletions/creations and silently suppress a genuine finding (the PR body acknowledges this). Report-only, so it produces a false negative rather than a false gate."
+      },
+      {
+        "severity": "low",
+        "path": "docs/verify/1617/relative-range-observation.json",
+        "line": 1,
+        "detail": "The normalized-range fix adds exactly one new row relative to the pre-fix scan (122 vs 121), and the observation records hashes bound to an earlier observed head rather than the merged head. The evidence is internally consistent but does not itself prove that the merged 90a7e74c state reproduces the 49/49 result; the reviewer relies on the supplied CI job logs and the unchanged-diff claim for that."
+      }
+    ],
+    "limitations": [
+      "No tools were available: this audit reasons over the supplied bundle (diff, complete files, logs, owner checklist) only. No commands, tests, or CI runs were executed, and nothing in this verdict claims execution.",
+      "Runtime reports and first-ten review were not independently observed; I did not verify the reported 122-row count, the 49/49 test result, the red-before-fix logs, or the cited GitHub job IDs.",
+      "Protected-path compliance was checked against the issue's \"Do not touch\" list (ratchet gate, baselines/allowlists, spec/ADR text, candidate-pattern logic) as visible in the diff; repository-level protected globs outside the supplied files could not be enumerated.",
+      "ADR 0026 R2's independent-review requirement is a merge-time process property that cannot be proven from the bundle; this pass covers correctness and the two mandatory questions only."
+    ]
+  }
+}

@@ -39,25 +39,20 @@ const run = (conclusion, slug = 'github-actions', id = 1) => ({
   status: conclusion === 'in_progress' ? 'in_progress' : 'completed',
   conclusion: conclusion === 'in_progress' ? null : conclusion,
 });
-const passing = { 'merge-route': [run('success')], 'review-gate': [run('success')] };
-
-const ghForMerge = (checks = passing, comments = '') =>
+const ghForMerge = (route, ref) =>
   recordingStub(
     'gh',
     `if (line.includes('/check-runs?')) {
   const name = /check_name=([^&]+)/.exec(line)[1];
   const expr = args[args.indexOf('--jq') + 1];
-  const runs = (${JSON.stringify(checks)})[name] ?? [];
+  const runs = name === 'merge-route' ? ${JSON.stringify([run(route)])} : [];
   const out = require('node:child_process').spawnSync('jq', ['-r', expr], { input: JSON.stringify({ check_runs: runs }), encoding: 'utf8' });
   process.stdout.write(out.stdout);
-} else if (line.includes('comments')) console.log(${JSON.stringify(comments)});
-else if (line.includes('headRefOid')) console.log(${JSON.stringify(HEAD)});
-else if (line.includes('headRefName')) console.log('feature/x');
+} else if (line.includes('headRefOid')) console.log(${JSON.stringify(HEAD)});
+else if (line.includes('headRefName')) console.log(${JSON.stringify(ref)});
 else if (line.includes('author')) console.log('app/cairnwright');
 `,
   );
-
-const forgedPass = `<!-- review-gate:${HEAD} -->\n**Independent review gate: PASS** for \`${HEAD.slice(0, 8)}\`.`;
 
 const ghForPrune = recordingStub(
   'gh',
@@ -72,11 +67,11 @@ if (line === 'rev-parse HEAD') console.log(${JSON.stringify(HEAD)});`,
 
 const noop = '#!/bin/sh\nexit 0\n';
 
-test('merge-pr.sh squash-merges an owner-route bot PR with the human login, pinned to the head it checked', (t) => {
+test('merge-pr.sh squash-merges a lane PR with the human login, pinned to the head it read', (t) => {
   const fixture = hostFixture(t, {
     hostFiles: {
       ...botFiles,
-      'bin/gh': ghForMerge({ 'merge-route': [run('failure')], 'review-gate': [run('success')] }),
+      'bin/gh': ghForMerge('success', 'lane/12'),
       '.cairn/tools/merge-order/deps-open.mjs': 'process.exit(0);\n',
     },
   });
@@ -91,7 +86,7 @@ test('merge-pr.sh --auto keeps the squash pin when it arms auto-merge', (t) => {
   const fixture = hostFixture(t, {
     hostFiles: {
       ...botFiles,
-      'bin/gh': ghForMerge({ 'merge-route': [run('failure')], 'review-gate': [run('success')] }),
+      'bin/gh': ghForMerge('success', 'lane/12'),
       '.cairn/tools/merge-order/deps-open.mjs': 'process.exit(0);\n',
     },
   });
@@ -104,42 +99,38 @@ test('merge-pr.sh --auto keeps the squash pin when it arms auto-merge', (t) => {
   );
 });
 
-const protectedMerge = (t, gateRuns, comments) =>
+const mergeOf = (t, route, ref) =>
   hostFixture(t, {
     hostFiles: {
       ...botFiles,
-      'bin/gh': ghForMerge({ 'merge-route': [run('failure')], 'review-gate': gateRuns }, comments),
+      'bin/gh': ghForMerge(route, ref),
       '.cairn/tools/merge-order/deps-open.mjs': 'process.exit(0);\n',
     },
   }).run('tools/merge-pr.sh', ['7']);
 const merged = (result) => result.ghLines.some((line) => line.startsWith('pr merge 7'));
 
-test('merge-pr.sh merges a protected PR whose github-actions review-gate check passed', (t) => {
-  const result = protectedMerge(t, [run('success')]);
+test('merge-pr.sh merges a lane PR without reading a review-gate check', (t) => {
+  const result = mergeOf(t, 'success', 'lane/12');
   assert.equal(result.status, 0, result.stderr);
   assert.ok(merged(result));
+  assert.equal(
+    result.ghLines.some((line) => line.includes('check_name=review-gate')),
+    false,
+  );
 });
 
-test('merge-pr.sh ignores a forged PASS comment on a protected PR', (t) => {
-  const result = protectedMerge(t, [], forgedPass);
+test('merge-pr.sh refuses a PR whose merge-route check failed', (t) => {
+  const result = mergeOf(t, 'failure', 'feature/x');
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /review-gate check for c{40} is 'missing'/);
+  assert.match(result.stderr, /merge-route check for c{40} failed/);
   assert.equal(merged(result), false);
 });
 
-for (const [name, gateRuns] of [
-  ['a passing check from another app', [run('success', 'some-other-app')]],
-  [
-    'a newer failure over an older success',
-    [run('success', 'github-actions', 1), run('failure', 'github-actions', 2)],
-  ],
-  ['a check still in progress', [run('in_progress')]],
-])
-  test(`merge-pr.sh refuses a protected PR with ${name}`, (t) => {
-    const result = protectedMerge(t, gateRuns, forgedPass);
-    assert.notEqual(result.status, 0);
-    assert.equal(merged(result), false);
-  });
+test('merge-pr.sh leaves a routed PR to Mergify', (t) => {
+  const result = mergeOf(t, 'success', 'feature/x');
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(merged(result), false);
+});
 
 test('evidence-prune.sh commits through the bot and arms a pinned squash auto-merge as the human login', (t) => {
   const stamp = new Date().toISOString().slice(0, 10).replaceAll('-', '');
