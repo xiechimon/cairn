@@ -1,30 +1,26 @@
 import { parseReplyQuote } from '@cairn/shared';
 import { cn } from 'cn';
+import { CircleAlert } from 'lucide-react';
 import { type CSSProperties, memo, type ReactNode, useContext } from 'react';
 import { isUsableTimestamp } from '../board/rel-time.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
-import { LiveRow, LiveSignal, TypingDots } from '../components/chat/live-row.js';
+import { LiveRow, TypingDots } from '../components/chat/live-row.js';
 import { STATUS_REF_CLS, StatusLine } from '../components/chat/status-line.js';
-import { TraceGroup, TraceRows, type TraceStepItem } from '../components/chat/trace-steps.js';
+import { TraceGroup, type TraceStepItem } from '../components/chat/trace-steps.js';
 import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
-import { ChatMarkdown, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
+import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import {
   type TodoGlance,
   TodoGlanceContext,
   TodoStatus,
   taskChipClass,
 } from '../detail/segments.js';
-import type {
-  ChiefContent,
-  ChiefSegment,
-  ChiefStreamItem,
-  ChiefToolRow,
-} from '../fixtures/records.js';
+import type { ChiefSegment, ChiefStreamItem, ChiefToolRow } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { FileText } from '../icons/index.js';
@@ -90,8 +86,6 @@ function runAttr(joinsPrev: boolean, joinsNext: boolean): string | undefined {
 
 const NO_GLANCES: ReadonlyMap<string, TodoGlance> = new Map();
 
-const TURN_NOTE_CLS = 'px-3 py-2 text-meta leading-5 text-(--text-tertiary)';
-
 const MSG_COL_CLS = `relative min-w-0 flex-1 ${CHAT_BODY_CLS} text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!`;
 const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
 
@@ -105,10 +99,7 @@ const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = `w-full max-w-full font-sans ${CHAT_BODY_CLS}`;
-const TRACE_REVEAL =
-  'opacity-0 group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
-const MARKER_ERROR_CLS =
-  'my-2.5 flex-col items-start gap-0.5 rounded-(--radius-card) bg-danger-soft px-3 py-2.5 text-left text-meta text-(--destructive)';
+const MARKER_ERROR_CLS = 'my-2.5 gap-1.5 text-meta text-(--destructive)';
 
 const CHIP_INLINE_CLS =
   'mx-0.5 inline-flex items-center gap-1 rounded-(--cds-radius-sm) px-1.5 py-px align-[1px] font-sans text-meta';
@@ -208,20 +199,16 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
   );
 }
 
-function turnToolSteps(tools: ChiefToolRow[] | undefined, runningVerb?: string): TraceStepItem[] {
-  return (tools ?? []).map((tool, k) => {
-    const running = runningVerb !== undefined && tool.running === true;
-    return {
-      id: k,
-      step: {
-        kind: 'tool',
-        ...(running ? { verb: runningVerb } : {}),
-        name: tool.label,
-        status: tool.error === true ? 'failed' : running ? 'running' : 'done',
-        ...(tool.seconds !== undefined ? { secs: tool.seconds } : {}),
-      },
-    };
-  });
+function turnToolSteps(tools: ChiefToolRow[] | undefined): TraceStepItem[] {
+  return (tools ?? []).map((tool, k) => ({
+    id: k,
+    step: {
+      kind: 'tool',
+      name: tool.label,
+      status: tool.error === true ? 'failed' : 'done',
+      ...(tool.seconds !== undefined ? { secs: tool.seconds } : {}),
+    },
+  }));
 }
 
 function TaskStartedRow({
@@ -308,7 +295,6 @@ interface ChiefStreamRowProps {
   item: ChiefStreamItem | ThreadActivity;
   index: number;
   replyable?: boolean;
-  runningTool: ChiefContent['runningTool'];
   onCopy: (text: string) => void;
   toolsOpen: ReadonlySet<number>;
   onToggleTools: (index: number) => void;
@@ -353,7 +339,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
   index: i,
   replyable = false,
-  runningTool,
   onCopy,
   toolsOpen,
   onToggleTools,
@@ -399,14 +384,14 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
         <Marker role="alert" className={MARKER_ERROR_CLS} title={item.text}>
-          <MarkerContent data-testid="chief-turn-error">
-            {t('Coordinator 这一轮没有完成。')}
-          </MarkerContent>
+          <CircleAlert aria-hidden="true" className="flex-none" />
+          <MarkerContent data-testid="chief-turn-error">{t('这一轮没有完成')}</MarkerContent>
           {onRetry !== undefined && (
             <Button
               variant="ghost"
+              size="sm"
               data-testid="chief-turn-retry"
-              className="h-7 cursor-pointer px-0 text-meta font-medium text-(--destructive) hover:bg-transparent hover:underline dark:hover:bg-transparent"
+              className="text-foreground"
               onClick={onRetry}
             >
               {t('重试')}
@@ -560,24 +545,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   }
-  if (item.kind === 'streaming') {
-    const callRunning = item.tools?.some((tool) => tool.running === true) === true;
-    const liveSteps: TraceStepItem[] = [
-      ...(runningTool != null && !callRunning
-        ? [
-            {
-              id: 'running',
-              step: {
-                kind: 'tool' as const,
-                verb: t('正在调用'),
-                name: runningTool,
-                status: 'running' as const,
-              },
-            },
-          ]
-        : []),
-      ...turnToolSteps(item.tools, t('正在调用')),
-    ];
+  if (item.kind === 'streaming')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
         <Message className={REPLY_ROW_CLS} data-testid="chief-msg">
@@ -589,25 +557,11 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               labelDetail={item.labelDetail}
               waiting={item.waiting === true}
               notice={isLiveNotice(item.label, item.labelDetail)}
-              disclosure={{ expand: '查看步骤', collapse: '收起实时步骤' }}
-            >
-              <div data-testid="chief-turn-tools">
-                {liveSteps.length > 0 && <TraceRows density="compact" steps={liveSteps} />}
-                {liveSteps.length === 0 && item.signalAt == null && (
-                  <p className={`m-0 ${TURN_NOTE_CLS}`}>{t('等待 Agent 响应…')}</p>
-                )}
-                {item.signalAt != null && (
-                  <p className={`m-0 ${TURN_NOTE_CLS}`}>
-                    <LiveSignal at={item.signalAt} className="min-w-0 truncate" />
-                  </p>
-                )}
-              </div>
-            </LiveRow>
+            />
           </MessageContent>
         </Message>
       </MessageScrollerItem>
     );
-  }
   const tools = turnToolSteps(item.tools);
   const settled = item.typing !== true;
   const whole = robotText(item);
@@ -635,6 +589,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             : undefined
         }
         onCopy={() => onCopy(quote)}
+        onSteps={tools.length > 0 ? () => onToggleTools(i) : undefined}
       />
     ) : null;
   const sourceHighlighted =
@@ -648,15 +603,14 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         data-run={runAttr(joinsPrev, joinsNext)}
       >
         <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-          {tools.length > 0 && (
+          {tools.length > 0 && toolsOpen.has(i) && (
             <TraceGroup
               density="compact"
               steps={tools}
-              open={toolsOpen.has(i)}
+              open
               onOpenChange={() => onToggleTools(i)}
               summaryTestId="chief-tools-toggle"
               cardTestId="chief-turn-tools"
-              className={toolsOpen.has(i) ? undefined : TRACE_REVEAL}
             />
           )}
           <TaskRefRows source={settled ? item : NO_TEXT} started={startedTasks} />
@@ -683,7 +637,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                 }
               />
             ) : (
-              <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
+              <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
                 <div
                   className={REPLY_BUBBLE_CLS}
                   data-slot="reply-bubble"

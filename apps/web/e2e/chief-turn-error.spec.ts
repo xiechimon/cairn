@@ -36,7 +36,7 @@ test('a failed turn says so in a plain sentence, keeps the raw text in a tooltip
   );
   await page.goto('/app');
   const row = page.getByTestId('chief-turn-error');
-  await expect(row).toHaveText('The Coordinator did not finish this turn.');
+  await expect(row).toHaveText('This turn did not finish');
   await expect(page.getByRole('alert').filter({ has: row })).toHaveAttribute('title', /E_UNBOUND/);
   await expect(page.getByTestId('chief-stream')).not.toContainText('E_UNBOUND');
   await page.getByTestId('chief-turn-retry').click();

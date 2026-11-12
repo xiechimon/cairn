@@ -234,7 +234,7 @@ test('the head is one calm row: a one-line title, the status in the task tone, c
   expect(geometry.controls).toEqual(['返回', '更多操作…', '关闭']);
   expect(geometry.statusInk).toBe(geometry.waitInk);
   await expect(title).toHaveText('Fold finished turns into purpose and duration');
-  await expect(title).toHaveAccessibleName('#2271 Fold finished turns into purpose and duration');
+  await expect(title).toHaveAccessibleName('Fold finished turns into purpose and duration');
   const lead = await head.evaluate((el) => {
     const h2 = el.querySelector('h2')!;
     const tile = el.querySelector('[data-slot="side-chat-glyph"]')!;
@@ -271,7 +271,7 @@ test('the head is one calm row: a one-line title, the status in the task tone, c
   });
   await title.hover();
   await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText(
-    '#2271 Fold finished turns into purpose and duration',
+    'Fold finished turns into purpose and duration',
   );
 });
 

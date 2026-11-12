@@ -799,7 +799,6 @@ export const EN: Record<string, string> = {
   查看步骤: 'View steps',
   收起实时步骤: 'Hide live steps',
   正在调用: 'Calling',
-  '等待 Agent 响应…': 'Waiting for the agent…',
   // #1257 板面挂起态：等机器 / 等额度 chip + 等额度 tooltip（下次尝试时刻）。
   // 等额度 chip 词复用 #1261 的同名键（上面等额度族）。
   等机器: 'Waiting for a machine',
@@ -1245,7 +1244,7 @@ export const EN: Record<string, string> = {
   // 排序第二档（[设计]，见 agent-detail-page.tsx 的 MEMORY_SORT_OPTIONS）。
   // 记忆 tab 空态（标题 + 说明）与零命中态：搜不到不等于没存过。
   // —— #631 总管对话失败闭环（sonner toast + 线程失败行）——
-  'Coordinator 这一轮没有完成。': 'The Coordinator did not finish this turn.',
+  这一轮没有完成: 'This turn did not finish',
   'Coordinator 本轮执行失败': 'The Coordinator turn failed',
   '撤回失败，Coordinator 可能已经开始处理这条了。':
     'Could not withdraw: the Coordinator may already be working on it.',
@@ -1314,7 +1313,7 @@ export const EN: Record<string, string> = {
   查看变更: 'Show changes',
   任务加载失败: 'Failed to load the task',
   任务不存在或已被删除: 'This task does not exist or was deleted',
-  '开始后才能回复 #{seq}': 'Start #{seq} to reply',
+  开始后才能回复: 'Start the task to reply',
   '这个任务已归档。取消归档后才能发消息。': 'This task is archived. Unarchive it to send messages.',
   调整面板宽度: 'Resize panel',
   拖动调宽: 'Drag to resize',
@@ -1441,6 +1440,7 @@ export const EN: Record<string, string> = {
   等待检查: 'Waiting on checks',
   未配置: 'Not configured',
   空闲: 'Idle',
+  '{n} 个在跑': '{n} running',
   项目设置: 'Project settings',
   回答: 'Answer',
   看计划: 'Review plan',
@@ -2006,7 +2006,6 @@ export const EN: Record<string, string> = {
   刚刚检查过: 'Last checked just now',
   '{n} 分钟前检查过': 'Last checked {n## minute ago|# minutes ago}',
   '{time}检查过': 'Last checked {time}',
-  '{n} 个文件夹': '{n## folder|# folders}',
   它自称: 'It calls itself',
   在这台工作: 'Work here',
   'Agent 的权限': 'Agent access',

@@ -52,6 +52,8 @@ const MACHINE_OFFLINE_KEYS = new Set([
   '排队中：等机器上线（前面 {ahead} 个）',
 ]);
 const RESPONDING_KEY = '模型输出中...';
+const QUOTA_WAIT_PREFIX = '等额度';
+const QUEUED_PREFIX = '排队中';
 
 const RUN_TOOL = /bash|shell|exec|command|terminal/i;
 const TASK_TOOLS = new Set([
@@ -135,6 +137,10 @@ export function statusMarkView({
   const tool = chief.runningTool ?? liveTool;
   if (tool != null) return view(toolMarkState(tool));
   if (live?.kind === 'streaming' && MACHINE_OFFLINE_KEYS.has(live.label)) return view('offline');
+  if (live?.kind === 'streaming' && live.label.startsWith(QUOTA_WAIT_PREFIX))
+    return view('offline', QUOTA_WAIT_PREFIX);
+  if (live?.kind === 'streaming' && live.label.startsWith(QUEUED_PREFIX))
+    return view('offline', QUEUED_PREFIX);
   if (live?.kind === 'robot' && live.typing === true) return view('write');
   if (live?.kind === 'streaming' && live.label === RESPONDING_KEY) return view('write');
   return view('think');
