@@ -241,10 +241,12 @@ export function AvatarSection() {
     <Section
       id="avatar"
       title="Avatar"
-      lede="Avatars are seeded from the name, so the same person always looks the same. A busy agent's avatar draws its spiral over a faint copy, so the face never changes."
+      lede="A person or an agent with no picture shows the first letter of the name on a pale tint. The tint is picked from the name, so the same person always looks the same. At 12px it is a plain colour dot."
     >
       <Specimen id="seeded-avatar" title="Seeded avatar">
         {[
+          { size: 'size-3', label: '12' },
+          { size: 'size-4', label: '16' },
           { size: 'size-6', label: '24' },
           { size: 'size-8', label: '32' },
           { size: 'size-10', label: '40' },
@@ -258,14 +260,6 @@ export function AvatarSection() {
           {['ada', 'grace', 'linus', 'margaret'].map((n) => (
             <SeededAvatar key={n} name={n} fallback="/avatar-user.png" className="size-8" />
           ))}
-        </Cell>
-        <Cell label="busy">
-          <SeededAvatar
-            name="cairn-agent"
-            fallback="/avatar-robot-1.svg"
-            className="size-10"
-            busy
-          />
         </Cell>
       </Specimen>
     </Section>

@@ -89,9 +89,6 @@ export function ProductChiefSection() {
         <Cell label="Identity, idle">
           <ChiefIdentity agent={CHIEF} />
         </Cell>
-        <Cell label="Identity, busy">
-          <ChiefIdentity agent={CHIEF} busy />
-        </Cell>
         <Cell label="Identity, not linked">
           <ChiefIdentity agent={{ displayName: 'Coordinator', avatarUrl: null }} />
         </Cell>
