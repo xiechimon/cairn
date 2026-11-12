@@ -44,6 +44,7 @@ import type {
   RouteUse,
   ScheduleKind,
   ScheduleReport,
+  SecretDelivery,
   ShipRoute,
   SkillInjectionRecord,
   SnoozeMode,
@@ -776,16 +777,30 @@ export const provider = sqliteTable('provider', {
   updatedAt: epochMs('updatedAt').notNull(),
 });
 
-export const secret = sqliteTable('secret', {
-  id: text('id').primaryKey(),
-  teamId: text('teamId')
-    .notNull()
-    .references(() => team.id),
-  projectId: text('projectId').references(() => project.id),
-  name: text('name').notNull(),
-  description: text('description'),
-  valueCipher: text('valueCipher'),
-});
+export const secret = sqliteTable(
+  'secret',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    projectId: text('projectId').references(() => project.id),
+    name: text('name').notNull(),
+    description: text('description'),
+    valueCipher: text('valueCipher'),
+    delivery: text('delivery').$type<SecretDelivery>().notNull().default('plaintext'),
+    httpOrigin: text('httpOrigin'),
+    httpHeader: text('httpHeader'),
+    httpTemplate: text('httpTemplate'),
+    policyRevision: integer('policyRevision').notNull().default(1),
+  },
+  (t) => [
+    check(
+      'secret_delivery_policy',
+      sql`(${t.delivery} = 'http' AND ${t.httpOrigin} IS NOT NULL AND ${t.httpHeader} IS NOT NULL AND ${t.httpTemplate} IS NOT NULL) OR (${t.delivery} = 'plaintext' AND ${t.httpOrigin} IS NULL AND ${t.httpHeader} IS NULL AND ${t.httpTemplate} IS NULL)`,
+    ),
+  ],
+);
 
 export const apiKey = sqliteTable('api_key', {
   id: text('id').primaryKey(),

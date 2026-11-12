@@ -7,6 +7,8 @@ import {
   type MemoryRecord,
   phaseSchema,
   routeOverrideSchema,
+  secretDeliverySchema,
+  secretHttpPolicySchema,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Context } from 'hono';
@@ -56,6 +58,8 @@ export const patchSecretBodySchema = z.object({
   name: z.string().optional(),
   description: z.string().nullish(),
   value: z.string().optional(),
+  delivery: secretDeliverySchema.optional(),
+  http: secretHttpPolicySchema.optional(),
 });
 
 export const createApiKeyBodySchema = apiKeyRecordSchema.extend({ name: z.string().nullish() });
