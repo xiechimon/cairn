@@ -13,6 +13,8 @@ import {
 import type { DetailContent, TodoRecord } from './records.js';
 
 const STEP_MS = 1400;
+const PLAYER_SHOWN =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('player');
 
 export function engineRunStage(script: EngineScript): EngineRunStage {
   const start = Math.min(script.start, script.steps.length);
@@ -40,7 +42,7 @@ export function engineRunStage(script: EngineScript): EngineRunStage {
         takeOver: () => setTakenOver(true),
         handBack: () => setTakenOver(false),
       },
-      controls: (
+      controls: !PLAYER_SHOWN ? undefined : (
         <div data-testid="engine-player" className="mt-5 flex flex-wrap items-center gap-2">
           <Button
             variant="secondary"

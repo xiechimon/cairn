@@ -30,6 +30,7 @@ import {
   type EngineRunState,
   engineCanTakeOver,
   engineCost,
+  engineEarlierCount,
   enginePlanItems,
   engineTraceStep,
 } from './engine-run.js';
@@ -47,6 +48,8 @@ const STATE_DOT: Record<EngineRunState, string> = {
 
 const BLOCK = 'px-3 py-2.5';
 const END_SLACK = 24;
+const HEAD_LINK =
+  'h-6 min-h-0 flex-none rounded-(--radius-control) px-2 text-meta font-normal text-foreground';
 
 const KEYBOARD_SCROLLABLE = { tabIndex: 0 } as const;
 
@@ -75,7 +78,7 @@ function useStickToEnd<T extends HTMLElement>() {
 
 function EditRow({ event }: { event: Extract<EngineEvent, { kind: 'edit' }> }) {
   const { t } = useI18n();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const { file } = event;
   return (
     <div data-testid="engine-edit">
@@ -233,7 +236,9 @@ function Conversation({
   onTakeOver: () => void;
 }) {
   const { t } = useI18n();
-  const scroller = useStickToEnd<HTMLDivElement>();
+  const [showsEarlier, setShowsEarlier] = useState(false);
+  const earlier = engineEarlierCount(run.events.length);
+  const events = showsEarlier ? run.events : run.events.slice(earlier);
   return (
     <>
       {run.plan.length > 0 && (
@@ -243,26 +248,32 @@ function Conversation({
       )}
       <div
         role="log"
-        {...scroller}
         aria-label={t('引擎事件')}
         data-testid="engine-events"
-        className="scroll-fade relative max-h-64 overflow-y-auto"
+        className="divide-y divide-(--border)"
       >
-        <div className="divide-y divide-(--border)">
-          {run.events.map((event) => (
-            <EventBlock
-              key={event.id}
-              event={event}
-              actions={run.state === 'taken_over' ? undefined : actions}
-              onTakeOver={onTakeOver}
-            />
-          ))}
-          {run.state === 'running' && (
-            <div className={cn(BLOCK, 'flex')}>
-              <TypingDots testId="engine-typing" label={t('引擎正在运行')} />
-            </div>
-          )}
-        </div>
+        {earlier > 0 && (
+          <TraceRowButton
+            data-testid="engine-earlier"
+            verb={t(showsEarlier ? '收起之前的 {n} 步' : '之前的 {n} 步', { n: earlier })}
+            expandable
+            open={showsEarlier}
+            onClick={() => setShowsEarlier((value) => !value)}
+          />
+        )}
+        {events.map((event) => (
+          <EventBlock
+            key={event.id}
+            event={event}
+            actions={run.state === 'taken_over' ? undefined : actions}
+            onTakeOver={onTakeOver}
+          />
+        ))}
+        {run.state === 'running' && (
+          <div className={cn(BLOCK, 'flex')}>
+            <TypingDots testId="engine-typing" label={t('引擎正在运行')} />
+          </div>
+        )}
       </div>
     </>
   );
@@ -306,65 +317,67 @@ export function EngineCard({
         className={cn('mt-5', className)}
       >
         <div className="px-3 py-2.5">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
             <div className="flex min-w-0 flex-auto items-center gap-2 text-ui leading-5">
               <span
                 aria-hidden="true"
                 data-slot="engine-dot"
                 className={cn('size-1.5 flex-none rounded-full', STATE_DOT[run.state])}
               />
-              <span className="font-medium whitespace-nowrap text-foreground">{run.engine}</span>
+              <span className="truncate font-medium text-foreground">{run.engine}</span>
               <span
                 data-testid="engine-state"
-                className="whitespace-nowrap text-(--text-secondary)"
+                className="flex-none whitespace-nowrap text-(--text-secondary)"
               >
                 {t(ENGINE_STATE_WORDS[run.state])}
               </span>
             </div>
-            <div className="flex flex-none items-center gap-2">
-              <SegmentedTabs
-                value={view}
-                onChange={setView}
-                label={t('引擎视图')}
-                className="h-7 p-0.5 group-data-horizontal/tabs:h-7"
-                optionHandle="h-6 px-2.5 text-foreground data-active:font-normal dark:text-foreground"
-                options={[
-                  { value: 'chat', label: t('对话'), testId: 'engine-view-chat' },
-                  { value: 'raw', label: t('原始输出'), testId: 'engine-view-raw' },
-                ]}
-              />
-              {actions !== undefined && run.state === 'taken_over' && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  data-testid="engine-hand-back"
-                  onClick={actions.handBack}
-                >
-                  {t('交还')}
-                </Button>
-              )}
-              {actions !== undefined && engineCanTakeOver(run.state) && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  data-testid="engine-take-over"
-                  onClick={() => setConfirming(true)}
-                >
-                  {t('接管')}
-                </Button>
-              )}
-            </div>
+            <SegmentedTabs
+              value={view}
+              onChange={setView}
+              label={t('引擎视图')}
+              className="h-7 flex-none p-0.5 group-data-horizontal/tabs:h-7"
+              optionHandle="h-6 px-2.5 text-foreground data-active:font-normal dark:text-foreground"
+              options={[
+                { value: 'chat', label: t('对话'), testId: 'engine-view-chat' },
+                { value: 'raw', label: t('原始输出'), testId: 'engine-view-raw' },
+              ]}
+            />
           </div>
-          <p data-testid="engine-choice" className="m-0 mt-1.5 text-meta text-content-tertiary">
-            {joinMeta([
-              run.elapsedSeconds === null ? null : formatWorkDuration(run.elapsedSeconds),
-              engineCost(run.costUsd),
-              t(ENGINE_CHOICE_WORDS.difficulty[choice.difficulty]),
-              t(ENGINE_CHOICE_WORDS.modelTier[choice.modelTier]),
-              t(ENGINE_CHOICE_WORDS.effort[choice.effort]),
-              choice.reason,
-            ])}
-          </p>
+          <div className="mt-1.5 flex items-start gap-3">
+            <p
+              data-testid="engine-choice"
+              className="m-0 min-w-0 flex-auto text-meta leading-5 text-content-tertiary"
+            >
+              {joinMeta([
+                run.elapsedSeconds === null ? null : formatWorkDuration(run.elapsedSeconds),
+                engineCost(run.costUsd),
+                t(ENGINE_CHOICE_WORDS.modelTier[choice.modelTier]),
+                t(ENGINE_CHOICE_WORDS.effort[choice.effort]),
+                choice.reason,
+              ])}
+            </p>
+            {actions !== undefined && run.state === 'taken_over' && (
+              <Button
+                variant="ghost"
+                data-testid="engine-hand-back"
+                className={HEAD_LINK}
+                onClick={actions.handBack}
+              >
+                {t('交还')}
+              </Button>
+            )}
+            {actions !== undefined && engineCanTakeOver(run.state) && (
+              <Button
+                variant="ghost"
+                data-testid="engine-take-over"
+                className={HEAD_LINK}
+                onClick={() => setConfirming(true)}
+              >
+                {t('接管')}
+              </Button>
+            )}
+          </div>
         </div>
         {view === 'chat' ? (
           <Conversation run={run} actions={actions} onTakeOver={() => setConfirming(true)} />

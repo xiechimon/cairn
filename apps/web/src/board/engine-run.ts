@@ -70,14 +70,19 @@ export const ENGINE_STATE_WORDS = {
 } as const satisfies Record<EngineRunState, string>;
 
 export const ENGINE_CHOICE_WORDS = {
-  difficulty: { easy: '低难度', standard: '标准难度', hard: '高难度' },
   modelTier: { inexpensive: '经济模型', mid: '中档模型', strong: '强模型' },
-  effort: { low: '低推理强度', medium: '中等推理强度', high: '高推理强度' },
+  effort: { low: '低强度', medium: '中等强度', high: '高强度' },
 } as const;
 
 export function engineCost(costUsd: number | null): string | null {
   if (costUsd === null) return null;
   return `$${costUsd < 0.01 && costUsd > 0 ? costUsd.toFixed(4) : costUsd.toFixed(2)}`;
+}
+
+const ENGINE_TAIL_EVENTS = 5;
+
+export function engineEarlierCount(total: number): number {
+  return total > ENGINE_TAIL_EVENTS + 1 ? total - ENGINE_TAIL_EVENTS : 0;
 }
 
 export function engineCanTakeOver(state: EngineRunState): boolean {

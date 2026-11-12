@@ -3,7 +3,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { settleTransitions } from './helpers.js';
 
 const open = (page: Page, state: string) =>
-  page.goto(`/app?scenario=home-c-engine&thread=home-c-engine-${state}`);
+  page.goto(`/app?scenario=home-c-engine&thread=home-c-engine-${state}&player`);
 const card = (page: Page) => page.getByTestId('engine-card');
 const planStates = (page: Page) =>
   page
@@ -28,7 +28,9 @@ for (const { state, data, word, phase } of STATES) {
     await expect(card(page)).toHaveAttribute('data-state', data);
     await expect(page.getByTestId('engine-state')).toHaveText(word);
     await expect(page.getByTestId('side-chat')).toHaveAttribute('data-phase', phase);
-    await expect(card(page)).toBeInViewport({ ratio: 1 });
+    await expect(
+      page.getByTestId('engine-events').locator(':scope > *').last(),
+    ).toBeInViewport({ ratio: 1 });
     await expect(card(page).locator('[data-trace-card]')).toHaveCount(0);
   });
 }
@@ -40,15 +42,17 @@ test('a running card shows the plan, the typing bubble and the reason for its mo
   expect(await planStates(page)).toEqual(['done', 'done', 'doing', 'todo']);
   await expect(page.getByTestId('engine-typing')).toBeVisible();
   await expect(page.getByTestId('engine-choice')).toHaveText(
-    '标准难度 · 中档模型 · 中等推理强度 · 要改一个文件并跑测试',
+    '中档模型 · 中等强度 · 要改一个文件并跑测试',
   );
+  await expect(page.getByTestId('engine-diff')).toHaveCount(0);
+  await page.getByTestId('engine-edit').getByRole('button').click();
   await expect(page.getByTestId('engine-diff').locator('[data-kind="add"]')).toHaveCount(3);
   await expect(page.getByTestId('engine-take-over')).toBeVisible();
 });
 
 test('a finished card carries time and cost and offers no takeover', async ({ page }) => {
   await open(page, 'finished');
-  await expect(page.getByTestId('engine-choice')).toContainText('4m 12s · $0.21 · 标准难度');
+  await expect(page.getByTestId('engine-choice')).toContainText('4m 12s · $0.21 · 中档模型');
   expect(await planStates(page)).toEqual(['done', 'done', 'done', 'done']);
   await expect(page.getByTestId('engine-typing')).toHaveCount(0);
   await expect(page.getByTestId('engine-take-over')).toHaveCount(0);
@@ -81,10 +85,25 @@ test('the view switch shows the raw output scrolled to its end and returns to th
   expect(box.mono.toLowerCase()).toContain('mono');
   await page.getByTestId('engine-view-chat').click();
   await expect(page.getByTestId('engine-events')).toBeVisible();
-  const events = await page
-    .getByTestId('engine-events')
-    .evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
-  expect(events).toBeLessThanOrEqual(1);
+});
+
+test('a long run folds its earlier steps behind one row', async ({ page }) => {
+  await open(page, 'long');
+  const earlier = page.getByTestId('engine-earlier');
+  const blocks = page.getByTestId('engine-events').locator(':scope > *');
+  await expect(earlier).toHaveText('之前的 20 步');
+  await expect(blocks).toHaveCount(6);
+  await earlier.click();
+  await expect(earlier).toHaveAttribute('aria-expanded', 'true');
+  await expect(blocks).toHaveCount(26);
+  await open(page, 'running');
+  await expect(page.getByTestId('engine-earlier')).toHaveCount(0);
+});
+
+test('the fixture driver stays off the page unless the address asks for it', async ({ page }) => {
+  await page.goto('/app?scenario=home-c-engine&thread=home-c-engine-running');
+  await expect(card(page)).toBeVisible();
+  await expect(page.getByTestId('engine-player')).toHaveCount(0);
 });
 
 test('an unknown event names its type and opens its raw payload', async ({ page }) => {

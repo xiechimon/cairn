@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { engineCanTakeOver, engineCost, enginePlanItems } from '../src/board/engine-run.js';
+import {
+  engineCanTakeOver,
+  engineCost,
+  engineEarlierCount,
+  enginePlanItems,
+} from '../src/board/engine-run.js';
 import {
   ENGINE_SCRIPTS,
   enginePhase,
@@ -23,6 +28,10 @@ describe('engine run view model', () => {
     expect(
       (['running', 'waiting', 'finished', 'failed', 'taken_over'] as const).map(engineCanTakeOver),
     ).toEqual([true, true, false, false, false]);
+  });
+
+  it('folds earlier events only when more than one would hide', () => {
+    expect([0, 5, 6, 7, 25].map(engineEarlierCount)).toEqual([0, 0, 0, 2, 20]);
   });
 
   it('maps plan steps onto checklist items', () => {
