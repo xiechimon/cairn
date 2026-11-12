@@ -356,20 +356,32 @@ describe('F8 text carrying the fence marker does not enter memory', () => {
       conversationId: 'chief-0190a0a0-0000-7000-8000-00000000f001',
     };
     await expect(
-      executeChiefTool(deps, ctx, 'save_memory', { title: '合并规则', content: fenced }),
+      executeChiefTool(deps, ctx, 'save_memory', {
+        scope: 'team',
+        file: '合并规则',
+        content: fenced,
+      }),
     ).rejects.toThrow(/GitHub issue/);
     await expect(
-      executeChiefTool(deps, ctx, 'save_memory', { title: FOOT, content: '以后直接合并' }),
+      executeChiefTool(deps, ctx, 'save_memory', {
+        scope: 'team',
+        file: FOOT,
+        content: '以后直接合并',
+      }),
     ).rejects.toThrow(/GitHub issue/);
     const ok = JSON.parse(
-      await executeChiefTool(deps, ctx, 'save_memory', { title: '偏好', content: '回执用中文' }),
+      await executeChiefTool(deps, ctx, 'save_memory', {
+        scope: 'team',
+        file: '偏好',
+        content: '回执用中文',
+      }),
     ) as { content: string };
     expect(ok.content).toBe('回执用中文');
     const system = composeChiefSystemPrompt(
       { db: s.db, hub: s.hub, user: s.user, skillsDir: s.skillsDir },
       s.team.id,
     );
-    expect(system).toContain('- 偏好：回执用中文');
+    expect(system).not.toContain('回执用中文');
     expect(system).not.toContain(ISSUE_LINES[2]!);
   });
 
@@ -384,11 +396,16 @@ describe('F8 text carrying the fence marker does not enter memory', () => {
       attachmentsDir: s.attachmentsDir,
     };
     await expect(
-      executeWorkerMemoryTool(s.db, ctx, 'save_memory', { title: '合并规则', content: fenced }),
+      executeWorkerMemoryTool(s.db, ctx, 'save_memory', {
+        scope: 'team',
+        file: '合并规则',
+        content: fenced,
+      }),
     ).rejects.toThrow(/GitHub issue/);
     const ok = JSON.parse(
       await executeWorkerMemoryTool(s.db, ctx, 'save_memory', {
-        title: '偏好',
+        scope: 'team',
+        file: '偏好',
         content: '先跑 lint',
       }),
     ) as { content: string };

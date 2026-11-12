@@ -1,9 +1,0 @@
-Final targeted suite: 15 files, including REST/digest identity, curation/trajectory, migration consumers, injection and shared snapshots.
- RUN  v5.0.1 <worktree>
-
-
- Test Files  15 passed (15)
-      Tests  263 passed (263)
-   Start at  10:59:34
-   Duration  63.49s (tests 78%, import 18%, transform 4%)
-

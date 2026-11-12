@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { Ellipsis, Reply, X } from 'lucide-react';
+import { Ellipsis, ListChecks, Reply, X } from 'lucide-react';
 import { type ReactNode, useLayoutEffect, useRef } from 'react';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
@@ -80,6 +80,7 @@ export function MessageToolbar({
   onReply,
   onCopy,
   onRewind,
+  onSteps,
   onDismiss,
   testId,
 }: {
@@ -89,6 +90,7 @@ export function MessageToolbar({
   onReply?: (() => void) | undefined;
   onCopy: () => void;
   onRewind?: (() => void) | undefined;
+  onSteps?: (() => void) | undefined;
   onDismiss?: (() => void) | undefined;
   testId: string;
 }) {
@@ -143,6 +145,12 @@ export function MessageToolbar({
             <Copy width={20} height={20} />
             {t('复制')}
           </DropdownMenuItem>
+          {onSteps !== undefined && (
+            <DropdownMenuItem data-action="steps" data-testid="chief-msg-steps" onClick={onSteps}>
+              <ListChecks width={20} height={20} />
+              {t('查看步骤')}
+            </DropdownMenuItem>
+          )}
           {onRewind !== undefined && (
             <DropdownMenuItem data-action="rewind" onClick={onRewind}>
               <Restore width={20} height={20} />

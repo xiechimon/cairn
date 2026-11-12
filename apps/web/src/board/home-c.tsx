@@ -21,6 +21,7 @@ import { ConversationSkeleton } from '../components/conversation-skeleton.js';
 import { EmptyState } from '../components/empty-state.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import type { QueryLike } from '../components/query-state.js';
+import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
 import { SubtreeErrorBoundary } from '../components/subtree-error-boundary.js';
@@ -145,6 +146,37 @@ function ConversationBoundary({ children, resetKey }: { children: ReactNode; res
   return (
     <SubtreeErrorBoundary resetKey={resetKey}>
       <ChiefScrollProvider>{children}</ChiefScrollProvider>
+    </SubtreeErrorBoundary>
+  );
+}
+
+function PanelBoundary({
+  title,
+  phoneTab,
+  resetKey,
+  onClose,
+  children,
+}: {
+  title: string;
+  phoneTab: boolean;
+  resetKey: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const { t } = useI18n();
+  return (
+    <SubtreeErrorBoundary
+      resetKey={resetKey}
+      frame={(fallback) => (
+        <SidePanel label={title} onDismiss={onClose} phoneTab={phoneTab} testId="panel-error">
+          <SidePanelHead closeLabel={t('关闭')} onClose={onClose}>
+            <SidePanelTitle>{title}</SidePanelTitle>
+          </SidePanelHead>
+          {fallback}
+        </SidePanel>
+      )}
+    >
+      {children}
     </SubtreeErrorBoundary>
   );
 }
@@ -441,7 +473,7 @@ export function HomeC({
     />
   );
 
-  const workPanel =
+  const panelBody =
     threadId !== null ? null : pane === 'file' ? (
       fileTarget !== null && (
         <FilePreviewPanel key={fileTarget.key} target={fileTarget} onClose={() => showPane(null)} />
@@ -482,6 +514,24 @@ export function HomeC({
         />
       )
     );
+  const workPanel = threadId === null && pane !== null && (
+    <PanelBoundary
+      title={
+        pane === 'file'
+          ? (fileTarget?.name ?? '')
+          : pane === 'machines'
+            ? t('电脑')
+            : pane === 'tasks'
+              ? t('任务')
+              : t('成果')
+      }
+      phoneTab={pane === 'tasks' || pane === 'made'}
+      resetKey={`${pane}:${fileTarget?.key ?? ''}:${projectId ?? ''}`}
+      onClose={() => showPane(null)}
+    >
+      {panelBody}
+    </PanelBoundary>
+  );
 
   const load =
     live && teamId === undefined

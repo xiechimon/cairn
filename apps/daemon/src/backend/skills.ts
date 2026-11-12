@@ -259,6 +259,26 @@ export function collectVisibleSkillNames(opts: SkillsCatalogOpts): Set<string> {
   return new Set(skills.map((s) => s.name));
 }
 
+export function withSkillDispatchDirectives(
+  prompt: string,
+  visibleNames: ReadonlySet<string>,
+  log: (msg: string) => void,
+): string {
+  const matched = new Set<string>();
+  for (const match of prompt.matchAll(/(?<![\w/])\/([a-z][a-z0-9-]*)(?![\w/-])/g)) {
+    const name = match[1] ?? '';
+    if (visibleNames.has(name)) matched.add(name);
+    else log(`unknown-dispatch: ${name}`);
+  }
+  if (matched.size === 0) return prompt;
+  const names = [...matched];
+  const directives = names
+    .map((n) => `Before proceeding, use the Skill tool to load "${n}".`)
+    .join('\n');
+  log(`dispatch: ${names.map((n) => `/${n}`).join(', ')}`);
+  return `${directives}\n\n${prompt}`;
+}
+
 export function piWorktreeSkillDirs(cwd: string): string[] {
   return [join(cwd, '.claude', 'skills'), join(cwd, '.pi', 'skills')];
 }

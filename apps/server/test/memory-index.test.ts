@@ -11,7 +11,6 @@ import {
 } from '../src/services/memory.js';
 import {
   applyMemoryPass,
-  MEMORY_PASS_STALE_MS,
   memoryPassDue,
   memoryPassSection,
 } from '../src/services/memory-consolidation.js';
@@ -169,9 +168,10 @@ describe('legacy weekly pass with MEMORY.md documents', () => {
               { keep: fact, drop: [document], content: 'Squash merges only.' },
             ],
           };
-    expect(
-      applyMemoryPass(db, { teamId: TEAM, agentId: AGENT }, raw, MEMORY_PASS_STALE_MS + 10_000),
-    ).toEqual({ merged: 0, expired: 0, skipped: operation === 'expire' ? 1 : 2 });
+    expect(applyMemoryPass(db, { teamId: TEAM, agentId: AGENT }, raw, 10_000)).toEqual({
+      applied: 0,
+      skipped: 1,
+    });
     expect(valid(db)).toHaveLength(2);
     expect(valid(db).find((row) => row.id === document)?.content).toBe(content);
   });
@@ -192,7 +192,7 @@ describe('legacy weekly pass with MEMORY.md documents', () => {
     for (const title of ['a', 'b', 'c']) insert(db, { title });
     expect(due()).toBe(false);
     insert(db, { title: 'd' });
-    expect(due()).toBe(true);
+    expect(due()).toBe(false);
   });
 
   test('folds preserve the most recent injection time through subsequent folds', () => {

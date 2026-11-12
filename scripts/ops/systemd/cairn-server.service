@@ -13,7 +13,7 @@ Environment=NODE_USE_ENV_PROXY=1
 EnvironmentFile=-%h/.config/cairn/server.env
 ExecStart=%h/.local/share/mise/installs/node/24/bin/node --max-old-space-size=1024 --import tsx src/index.ts
 MemoryMax=1536M
-Restart=on-failure
+Restart=always
 RestartSec=5
 UMask=0077
 

@@ -1,0 +1,33 @@
+[heavy-slots] acquired slot 1/2
+
+ RUN  v5.0.1 <worktree>
+
+ ❯ |@xiechimon/cairn| test/memory-callers-documents.test.ts (19 tests | 1 failed) 1837ms
+   × flush idempotence ignores generated titles for same fact 89ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/memory-callers-documents.test.ts > flush idempotence ignores generated titles for same fact
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/memory-callers-documents.test.ts:302:81
+    300|     expect(appendMemoryIndex(H.s.db, owner, 'first：title', detail)).to…
+    301|     const before = H.s.db.select().from(agentMemory).all();
+    302|     expect(appendMemoryIndex(H.s.db, owner, 'another generated title',…
+       |                                                                                 ^
+    303|     expect(H.s.db.select().from(agentMemory).all()).toEqual(before);
+    304|   },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 passed (19)
+   Start at  21:11:54
+   Duration  4.86s (transform 41%, tests 39%, import 19%, setup 1%)

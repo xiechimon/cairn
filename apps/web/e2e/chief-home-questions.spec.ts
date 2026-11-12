@@ -132,7 +132,7 @@ test('a pending question is its text and outlined chips at the end of the conver
   expect(firstBorder).toBe(otherBorder);
   await recommended.hover();
   await expect(page.locator('[data-slot="tooltip-content"]')).toContainText('推荐 · Verified');
-  await expect(page.locator('[data-slot="tooltip-content"]')).toContainText('1');
+  await expect(page.locator('[data-slot="tooltip-content"] kbd')).toHaveCount(0);
   await expect(page.getByTestId('chief-question-descriptions')).toHaveCount(0);
   await expect(question.getByRole('button', { name: '取消提问' })).toHaveCount(0);
   await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '输入你自己的回答…');
@@ -286,28 +286,6 @@ test('at 375px the question and its chips sit at the end of the conversation abo
   expect(questionBox.x).toBeGreaterThanOrEqual(0);
   expect(questionBox.x + questionBox.width).toBeLessThanOrEqual(375);
   expect(lastBox.y + lastBox.height).toBeLessThanOrEqual(questionBox.y);
-});
-
-test('digits pick an option while nothing is being typed, and stay text in a non-empty composer', async ({
-  page,
-}) => {
-  await mockLive(page, structuredClone(ONE));
-  await page.goto('/app');
-  const composer = page.getByTestId('home-c').getByTestId('chief-composer-input');
-  const option = page.getByTestId('chief-question-option-0-0');
-  await expect(option).toBeVisible();
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.keyboard.press('2');
-  await expect(page.getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'true');
-  await expect(composer).toHaveValue('');
-  await composer.click();
-  await page.keyboard.press('1');
-  await expect(option).toHaveAttribute('aria-pressed', 'true');
-  await expect(composer).toHaveValue('');
-  await composer.fill('ship it');
-  await page.keyboard.press('2');
-  await expect(composer).toHaveValue('ship it2');
-  await expect(page.getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'false');
 });
 
 const LONG_OPTIONS = Array.from({ length: 6 }, (_, n) => ({
@@ -504,14 +482,10 @@ test('question chips look like suggested-reply chips: outlined 28px pills with r
   await expect(chip).toHaveCSS('font-weight', '400');
   await expect(chip).toHaveCSS('height', '28px');
   await expect(chip).toHaveCSS('border-radius', /e\+\d+px$/);
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.keyboard.press('2');
-  await page.mouse.move(0, 0);
-  await expect(chip).toHaveAttribute('aria-pressed', 'true');
-  await expect(chip).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(chip).toHaveAttribute('aria-pressed', 'false');
 });
 
-test('the send button answers with the picked chip, and Ctrl+Enter or Cmd+Enter submits from the chips or the composer', async ({
+test('the send button answers with what is typed, and Ctrl+Enter submits it from a focused chip', async ({
   page,
 }) => {
   const answered: unknown[] = [];
@@ -528,15 +502,15 @@ test('the send button answers with the picked chip, and Ctrl+Enter or Cmd+Enter 
   await expect(primary).toHaveAttribute('aria-label', '提交回答');
   await expect(primary.locator('[data-slot="kbd"]')).toHaveCount(0);
   await expect(question.getByRole('button', { name: /提交回答/ })).toHaveCount(0);
-  await question.getByTestId('chief-question-option-0-1').focus();
-  await page.keyboard.press('2');
-  await expect(question.getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'true');
+  await expect(primary).toBeDisabled();
+  await page.getByTestId('chief-composer-input').fill('the cheaper one');
+  await expect(primary).toBeEnabled();
   await question.getByTestId('chief-question-option-0-1').press('Control+Enter');
   await expect.poll(() => answered.length).toBe(1);
-  expect(answered[0]).toEqual({ answers: [{ header: 'Model · #74', choices: ['wokey · deepseek-v4.1-flash'] }] });
+  expect(answered[0]).toEqual({ answers: [{ header: 'Model · #74', choices: ['the cheaper one'] }] });
 });
 
-test('a digit-picked option then typed text, and an empty composer with nothing picked', async ({
+test('a clicked option answers at once, and an empty composer with nothing picked cannot send', async ({
   page,
 }) => {
   const answered: unknown[] = [];
@@ -549,14 +523,11 @@ test('a digit-picked option then typed text, and an empty composer with nothing 
   const primary = page.getByTestId('chief-question-primary');
   const composer = page.getByTestId('chief-composer-input');
   await expect(primary).toBeDisabled();
-  await composer.click();
-  await page.keyboard.press('1');
-  await expect(page.getByTestId('chief-question-option-0-0')).toHaveAttribute('aria-pressed', 'true');
-  await expect(primary).toBeEnabled();
-  await composer.fill('typed answer wins');
   await composer.press('Enter');
+  expect(answered).toEqual([]);
+  await page.getByTestId('chief-question-option-0-0').click();
   await expect.poll(() => answered).toEqual([
-    { answers: [{ header: 'Model · #74', choices: ['typed answer wins'] }] },
+    { answers: [{ header: 'Model · #74', choices: ['Claude subscription'] }] },
   ]);
 });
 
@@ -583,7 +554,12 @@ test('a multi-step request: a chip moves on with the composer cleared, multi-sel
   const submit = page.getByTestId('chief-question-submit');
   await expect(submit).toBeDisabled();
   await page.getByTestId('chief-question-option-1-1').click();
+  await page.mouse.move(0, 0);
   await expect(page.getByTestId('chief-question-option-1-1')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('chief-question-option-1-1')).not.toHaveCSS(
+    'background-color',
+    'rgba(0, 0, 0, 0)',
+  );
   await expect(submit).toBeEnabled();
   expect(answered).toEqual([]);
   await composer.fill('a custom section');
@@ -750,8 +726,7 @@ for (const size of [
     expect(text.x + text.width).toBeLessThanOrEqual(size.width);
     await coordinator.getByTestId('chief-question-option-0-0').scrollIntoViewIfNeeded();
     await coordinator.getByTestId('chief-question-option-0-0').click({ trial: true });
-    await coordinator.getByTestId('chief-question-option-0-0').focus();
-    await page.keyboard.press('1');
+    await coordinator.getByTestId('chief-composer-input').fill('Maybe');
     const submit = coordinator.getByTestId('chief-question-primary');
     await expect(submit).toBeInViewport({ ratio: 1 });
     await submit.click({ trial: true });
@@ -980,10 +955,6 @@ test('answer drafts per request and the thread draft stay separate through every
   const activeComposer = page.getByTestId('home-c').locator('.chief-composer');
   const option = (n: number) =>
     page.getByTestId('chief-question').getByTestId(`chief-question-option-0-${n}`);
-  const pickByKey = async (n: number) => {
-    await option(n).focus();
-    await page.keyboard.press(String(n + 1));
-  };
   const toThread = async () => {
     await page.locator('[data-testid="composer-plus"]:visible').click();
     await page.getByRole('menuitemradio').filter({ hasText: '#9' }).click();
@@ -1083,14 +1054,6 @@ test('answer drafts per request and the thread draft stay separate through every
       },
     },
     {
-      name: 'pick an option by key inside the chips while the thread is targeted',
-      run: () => pickByKey(1),
-      composer: 'noteX1',
-      extra: async () => {
-        await expect(option(1)).toHaveAttribute('aria-pressed', 'true');
-      },
-    },
-    {
       name: 'focus B from the tasks panel while the thread is targeted',
       run: () => focusQuestion(page, B),
       composer: 'noteX1',
@@ -1100,15 +1063,8 @@ test('answer drafts per request and the thread draft stay separate through every
       run: () => focusQuestion(page, A),
       composer: 'noteX1',
     },
-    { name: 'target the Coordinator: the option replaced A custom text', run: toCoordinator, composer: '' },
-    {
-      name: 'typing custom text clears the option',
-      run: () => composer.fill('ansA2'),
-      composer: 'ansA2',
-      extra: async () => {
-        await expect(option(1)).toHaveAttribute('aria-pressed', 'false');
-      },
-    },
+    { name: 'target the Coordinator: A answer still there', run: toCoordinator, composer: 'ansA' },
+    { name: 'retype the answer for A', run: () => composer.fill('ansA2'), composer: 'ansA2' },
     {
       name: 'focus B: empty',
       run: () => focusQuestion(page, B),
@@ -1230,41 +1186,19 @@ test('answer drafts per request and the thread draft stay separate through every
     },
     { name: 'target the Coordinator: B answer still there', run: toCoordinator, composer: 'ansB' },
     {
-      name: 'custom text then an option: the option is what is shown',
-      run: () => pickByKey(0),
-      composer: '',
-      extra: async () => {
-        await expect(option(0)).toHaveAttribute('aria-pressed', 'true');
+      name: 'custom text then an option on B: the option is sent at once and A shows its text again',
+      run: async () => {
+        await option(0).click();
+        await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
       },
-    },
-    {
-      name: 'submit B: the option is what is sent',
-      run: () => composer.press('Enter'),
-      composer: '',
+      composer: 'ansA22',
       extra: async () => {
         await expect
           .poll(() => answered.map((row) => row.body.answers))
           .toEqual([[{ header: 'Merge · #2271', choices: ['Send it to ian'] }]]);
       },
     },
-    {
-      name: 'A shows its custom text again after B is answered',
-      run: async () => {
-        await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
-      },
-      composer: 'ansA22',
-    },
-    {
-      name: 'an option then custom text: the text is what is shown',
-      run: async () => {
-        await pickByKey(0);
-        await composer.fill('finalA');
-      },
-      composer: 'finalA',
-      extra: async () => {
-        await expect(option(0)).toHaveAttribute('aria-pressed', 'false');
-      },
-    },
+    { name: 'replace the answer for A', run: () => composer.fill('finalA'), composer: 'finalA' },
     {
       name: 'Enter with an upload in flight sends nothing until the upload finishes',
       run: async () => {

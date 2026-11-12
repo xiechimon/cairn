@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { mockLive, THREAD, toolRow } from './chief-home-mock.js';
+import { openReplySteps } from './helpers.js';
 
 const command = `git diff -- ${'long-unbroken-command'.repeat(80)}`;
 
@@ -20,6 +21,7 @@ for (const width of [1440, 375]) {
       const scroller = page.getByTestId('home-c').getByTestId('chief-body');
       await expect(scroller).toBeVisible();
       await page.evaluate((light) => document.documentElement.classList.toggle('light', light), theme === 'light');
+      await openReplySteps(page, page.getByTestId('home-c').getByTestId('chief-msg').last());
       const summary = page.getByTestId('chief-tools-toggle').first();
       await summary.scrollIntoViewIfNeeded();
       await scroller.getByTestId('md-code').scrollIntoViewIfNeeded();

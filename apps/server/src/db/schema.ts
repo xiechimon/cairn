@@ -256,6 +256,7 @@ export const build = sqliteTable('build', {
     .references(() => todo.id, { onDelete: 'cascade' }),
   withPlan: bool('withPlan').notNull(),
   prevPhase: text('prevPhase').$type<Phase | null>(),
+  afterStopPhase: text('afterStopPhase').$type<'done' | 'keep' | null>(),
   triggerSource: text('triggerSource').$type<TriggerSource>().notNull(),
   scheduledBy: text('scheduledBy'),
   planDocId: text('planDocId'),
@@ -656,12 +657,6 @@ export const dataMigration = sqliteTable('data_migration', {
   id: text('id').primaryKey(),
   doneAt: epochMs('doneAt').notNull(),
   detail: text('detail').notNull(),
-});
-
-export const memorySaveConflict = sqliteTable('memory_save_conflict', {
-  id: text('id').primaryKey(),
-  candidateIds: json<string[]>('candidateIds').notNull(),
-  createdAt: epochMs('createdAt').notNull(),
 });
 
 export const memoryCandidate = sqliteTable(

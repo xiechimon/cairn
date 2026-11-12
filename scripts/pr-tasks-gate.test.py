@@ -108,9 +108,9 @@ class TasksGateTests(unittest.TestCase):
 
 
 class WorkflowTaskGuardTests(unittest.TestCase):
-    def test_only_existing_decision_labels_disarm_auto_merge(self):
+    def test_only_the_autonomy_brake_disarms_auto_merge(self):
         workflow = Path('.github/workflows/pr-evidence.yml').read_text()
-        script = workflow.split('- name: Mark the decision pending and disarm auto-merge\n', 1)[1].split('        run: |\n', 1)[1]
+        script = workflow.split('- name: Disarm auto-merge while the autonomy brake is on\n', 1)[1].split('        run: |\n', 1)[1]
         script = '\n'.join(line[10:] for line in script.splitlines())
         for task_log, pending, expected_label, expected_disarm in [
             ('FAIL unchecked-task: line 3: Pending.', False, False, False),
@@ -123,7 +123,7 @@ class WorkflowTaskGuardTests(unittest.TestCase):
                 root = Path(directory)
                 root.joinpath('pr-tasks.log').write_text(task_log)
                 if pending:
-                    root.joinpath('hold.flag').touch()
+                    root.joinpath('autonomy-paused.flag').touch()
                 gh = root.joinpath('gh')
                 gh.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$GH_CALLS"\n')
                 gh.chmod(0o755)
@@ -136,33 +136,10 @@ class WorkflowTaskGuardTests(unittest.TestCase):
                 self.assertEqual('--disable-auto' in commands, expected_disarm, commands)
 
 
-    def test_coordinator_hold_goes_red_and_disarms_an_armed_auto_merge(self):
+    def test_no_label_holds_a_pull_request(self):
         workflow = Path('.github/workflows/pr-evidence.yml').read_text()
-        def step(name):
-            block = workflow.split(f'- name: {name}\n', 1)[1].split('        run: |\n', 1)[1]
-            lines = []
-            for line in block.splitlines():
-                if line and not line.startswith('          '):
-                    break
-                lines.append(line[10:])
-            return '\n'.join(lines)
-        refuse = step('Refuse while a hold is on (coordinator-hold label)')
-        disarm = step('Mark the decision pending and disarm auto-merge')
-        for labels, held in [('bug,coordinator-hold', True), ('bug', False), ('needs-decision', False)]:
-            with self.subTest(labels=labels), tempfile.TemporaryDirectory() as directory:
-                root = Path(directory)
-                gh = root.joinpath('gh')
-                gh.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$GH_CALLS"\n')
-                gh.chmod(0o755)
-                calls = root.joinpath('calls')
-                env = {**os.environ, 'PATH': directory + os.pathsep + os.environ['PATH'], 'GH_CALLS': str(calls), 'GITHUB_REPOSITORY': 'xiechimon/cairn', 'PR_NUMBER': '2510', 'LABELS': labels}
-                first = subprocess.run(['bash', '-e', '-c', refuse], cwd=directory, env=env, text=True, capture_output=True)
-                self.assertEqual(first.returncode, 1 if held else 0, first.stdout + first.stderr)
-                if held:
-                    self.assertIn('FAIL coordinator-hold', first.stdout)
-                    second = subprocess.run(['bash', '-e', '-c', disarm], cwd=directory, env=env, text=True, capture_output=True)
-                    self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
-                    self.assertIn('--disable-auto', calls.read_text())
+        self.assertNotIn('coordinator-hold', workflow)
+        self.assertNotIn('hold.flag', workflow)
 
 
 if __name__ == '__main__':

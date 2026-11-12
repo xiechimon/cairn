@@ -10,6 +10,8 @@ import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { flushSelfIssueWrites } from '../src/services/todos.js';
 import { bootServer, type TestServer } from './helpers.js';
 
+const isRoot = process.getuid?.() === 0;
+
 let readonlyHome: string;
 let gateDirectory: string;
 
@@ -79,61 +81,67 @@ async function getTodo(app: Hono, id: string) {
   return todoRecordSchema.parse(await (await call(app, 'GET', `/api/todos/${id}`)).json());
 }
 
-test('retry on an unwritable gate directory answers 503 naming the directory, with zero outbound calls', async () => {
-  const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-  const calls: string[] = [];
-  try {
-    const s = bootServer({
-      githubFetch: async (input, init) => {
-        calls.push(`${init?.method ?? 'GET'} ${String(input)}`);
-        return {
-          ok: false,
-          status: 404,
-          headers: { get: () => null },
-          json: async () => ({}),
-          text: async () => '',
-        };
-      },
-    });
-    seedConnection(s);
-    const projectId = await postGithubProject(s.app);
-    const todoId = await createTask(s.app, projectId);
-    await flushSelfIssueWrites();
-    expect((await getTodo(s.app, todoId)).sourceRef).toBeNull();
-    const retry = await call(s.app, 'POST', `/api/todos/${todoId}/github-issue/retry`);
-    expect(retry.status).toBe(503);
-    const body = (await retry.json()) as { error: string };
-    expect(body.error).toMatch(/not writable/);
-    expect(body.error).toContain(gateDirectory);
-    expect(calls).toHaveLength(0);
-    s.dispose();
-  } finally {
-    errorSpy.mockRestore();
-  }
-});
+test.skipIf(isRoot)(
+  'retry on an unwritable gate directory answers 503 naming the directory, with zero outbound calls',
+  async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const calls: string[] = [];
+    try {
+      const s = bootServer({
+        githubFetch: async (input, init) => {
+          calls.push(`${init?.method ?? 'GET'} ${String(input)}`);
+          return {
+            ok: false,
+            status: 404,
+            headers: { get: () => null },
+            json: async () => ({}),
+            text: async () => '',
+          };
+        },
+      });
+      seedConnection(s);
+      const projectId = await postGithubProject(s.app);
+      const todoId = await createTask(s.app, projectId);
+      await flushSelfIssueWrites();
+      expect((await getTodo(s.app, todoId)).sourceRef).toBeNull();
+      const retry = await call(s.app, 'POST', `/api/todos/${todoId}/github-issue/retry`);
+      expect(retry.status).toBe(503);
+      const body = (await retry.json()) as { error: string };
+      expect(body.error).toMatch(/not writable/);
+      expect(body.error).toContain(gateDirectory);
+      expect(calls).toHaveLength(0);
+      s.dispose();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  },
+);
 
-test('a creation-time mirror failure on an unwritable gate directory logs the todo and the cause', async () => {
-  const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-  try {
-    const s = bootServer({
-      githubFetch: async (input, init) => {
-        throw new Error(`unexpected outbound call: ${init?.method ?? 'GET'} ${String(input)}`);
-      },
-    });
-    seedConnection(s);
-    const projectId = await postGithubProject(s.app);
-    const todoId = await createTask(s.app, projectId);
-    await flushSelfIssueWrites();
-    const after = await getTodo(s.app, todoId);
-    expect(after.sourceKind).toBe('github-issue-self');
-    expect(after.sourceRef).toBeNull();
-    const logged = errorSpy.mock.calls
-      .map((callArgs) => callArgs.join(' '))
-      .filter((line) => line.includes(todoId));
-    expect(logged).toHaveLength(1);
-    expect(logged[0]).toMatch(/not writable/);
-    s.dispose();
-  } finally {
-    errorSpy.mockRestore();
-  }
-});
+test.skipIf(isRoot)(
+  'a creation-time mirror failure on an unwritable gate directory logs the todo and the cause',
+  async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const s = bootServer({
+        githubFetch: async (input, init) => {
+          throw new Error(`unexpected outbound call: ${init?.method ?? 'GET'} ${String(input)}`);
+        },
+      });
+      seedConnection(s);
+      const projectId = await postGithubProject(s.app);
+      const todoId = await createTask(s.app, projectId);
+      await flushSelfIssueWrites();
+      const after = await getTodo(s.app, todoId);
+      expect(after.sourceKind).toBe('github-issue-self');
+      expect(after.sourceRef).toBeNull();
+      const logged = errorSpy.mock.calls
+        .map((callArgs) => callArgs.join(' '))
+        .filter((line) => line.includes(todoId));
+      expect(logged).toHaveLength(1);
+      expect(logged[0]).toMatch(/not writable/);
+      s.dispose();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  },
+);

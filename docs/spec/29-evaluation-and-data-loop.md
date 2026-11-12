@@ -42,6 +42,8 @@ Completion criteria:
 
 ### E2 · pacman-bench: the harness measured on real work (#1517, #1518, #1519, #1532)
 
+Status (owner decision, 2026-11-12): shelved, not voided. The coding bench waits and nothing below is scheduled. The evaluation line runs on Langfuse only (`docs/design/eval-on-langfuse.md`): it measures Coordinator routing today, and scorers for other assistant behavior are added to the same Langfuse setup later. Its first step is PR #4010 (Coordinator turn snapshots). The ruler, the adoption judge and the trajectory capture are not shelved; only the coding bench content is.
+
 A bench of ~30 tasks distilled from merged PRs (issue text + base SHA as the prompt, the PR's own tests hidden in the grading container), run under Harbor for isolation, wired into CI as a regression gate, plus a same-model cross-harness page-generation comparison.
 
 Completion criteria:
@@ -102,9 +104,9 @@ Consequences already absorbed by other tickets: #1515's weekly summary is replac
 | E1 | #1606 | Pack failure-attribution fields | merged (PR #1660) |
 | E1-1 | #1515 | 7-day outcome backfill | closed; the weekly summary it carried is replaced by Langfuse score dashboards (§3) |
 | E1-2 | #1516 | Failure-replay candidate generation from rejections/rollbacks | landed (`pnpm traj:failure-replay`); confirmation via Langfuse annotation queue; bank at `integration/eval/failure-replay/` |
-| E2-1 | #1517 | pacman-bench v0: 30 tasks from merged PRs (Harbor format since 2026-10-25) | open |
-| E2-2 | #1518 | Isolated runner (Harbor since 2026-10-25) | open |
-| E2-3 | #1519 | Bench holdout slice as a CI regression gate | open |
+| E2-1 | #1517 | pacman-bench v0: 30 tasks from merged PRs (Harbor format since 2026-10-25) | open; shelved 2026-11-12 (see E2) |
+| E2-2 | #1518 | Isolated runner (Harbor since 2026-10-25) | open; shelved 2026-11-12 (see E2) |
+| E2-3 | #1519 | Bench holdout slice as a CI regression gate | open; shelved 2026-11-12 (see E2) |
 | E2-attached | #1532 | Same-model cross-harness page-generation comparison | open |
 | Observability | #1569–#1573 | Langfuse self-host, `traj:push`, score sync, OTel spans, bench-as-dataset | #1569 closed; #1570–#1573 open |
 | E3 | — | Self-optimization loop (#1579, #1614, #1576 as candidates) | not ticketed |

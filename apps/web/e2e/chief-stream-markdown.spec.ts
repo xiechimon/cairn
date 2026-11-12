@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { openReplySteps } from './helpers.js';
 
 declare global {
   interface Window {
@@ -435,7 +436,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     await expect(bubble.locator('.chat-para, .chat-md-item, .chat-md-code')).toHaveCount(0);
   });
 
-  test('F-R19: segment-row projection (#955) — thinking rows in a single column, the in-flight call inside the live row', async ({ page }) => {
+  test('F-R19: segment-row projection (#955) — thinking rows in a single column, the in-flight call stays out of the stream', async ({ page }) => {
     await stubEventSource(page);
     await stubCdnAvatar(page);
 
@@ -504,12 +505,12 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
 
     await expect(coordinator.locator('.chief-msg', { hasText: 'todo_write' })).toHaveCount(0);
     const live = coordinator.getByTestId('chief-msg').last();
-    await live.getByRole('button', { name: '查看步骤' }).click();
-    await expect(live.getByTestId('chief-turn-tools')).toContainText(/正在调用\s*todo_write/);
-    await expect(coordinator.getByText('todo_write')).toHaveCount(1);
+    await expect(live.getByTestId('typing-dots')).toBeVisible();
+    await expect(live.getByRole('button')).toHaveCount(0);
+    await expect(coordinator.getByText('todo_write')).toHaveCount(0);
   });
 
-  test('F-R20: the in-flight call carries the concrete command (not a bare tool name)', async ({ page }) => {
+  test('F-R20: the in-flight call shows on the status mark and its command stays out of the stream', async ({ page }) => {
 
     const state: Parameters<typeof mockChiefLiveApi>[1] = {
       final: false,
@@ -535,12 +536,12 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     await page.goto('/app?chief=chief-bbb');
 
     const coordinator = page.getByTestId('home-c');
-    const live = coordinator.getByTestId('chief-msg').last();
-    await live.getByRole('button', { name: '查看步骤' }).click();
-    await expect(live.getByTestId('chief-turn-tools')).toContainText(/正在调用\s*Bash ls -la/);
+    await expect(coordinator.getByTestId('chief-msg').last().getByTestId('typing-dots')).toBeVisible();
+    await expect(page.getByTestId('chief-status-mark')).toHaveAttribute('data-state', 'run');
+    await expect(coordinator.getByText('ls -la')).toHaveCount(0);
   });
 
-  test('F-R21: segment-order contract (#1003 / ADR 0011 premortem) — each call folds into the reply after it, the same in flight and after settle', async ({
+  test('F-R21: segment-order contract (#1003 / ADR 0011 premortem) — each call belongs to the reply after it and opens from its menu, the same in flight and after settle', async ({
     page,
   }) => {
 
@@ -599,13 +600,12 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
       await expect(rows.nth(0)).toContainText('派一下凭证链路验证');
       await expect(rows.nth(1)).toContainText('先盘点凭证面');
       await expect(rows.nth(2)).toContainText('先看现状');
-      await expect(rows.nth(2).getByTestId('chief-tools-toggle')).toHaveCount(0);
       await expect(rows.nth(3)).toContainText('再核对补发语义');
       await expect(rows.nth(4)).toContainText('最后收口票');
-      const fold = rows.nth(3).getByTestId('chief-tools-toggle');
-      await expect(fold).toHaveCount(1);
-      await fold.click();
+      await expect(coordinator.getByTestId('chief-turn-tools')).toHaveCount(0);
+      await openReplySteps(page, rows.nth(3));
       await expect(rows.nth(3).getByTestId('chief-turn-tools')).toContainText('todo_write');
+      await expect(rows.nth(2).getByTestId('chief-turn-tools')).toHaveCount(0);
       await expect(coordinator.getByText('todo_write')).toHaveCount(1);
       await expect(rows.filter({ hasText: '正在调用' })).toHaveCount(0);
     };

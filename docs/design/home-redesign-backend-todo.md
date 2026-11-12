@@ -68,7 +68,7 @@ Owner decision on 2026-11-11: cairn is a general assistant, not only a coding wo
 - [ ] Secrets the agent never reads. A masked entry box for site logins whose value goes to the site and never into the conversation; the journal records that a secret was used, not its value.
 - [ ] An outgoing check. Text leaving through a connector is scanned for sensitive data (card numbers, credentials) before it is sent, and held for approval when something is found.
 - [ ] More model sources. Local and OpenAI-compatible endpoints selectable per agent without code changes, through the existing provider configuration.
-- [ ] Clients. Desktop first, then a native iOS app in Swift, Android later (owner decision). The phone reference recording is kept outside the repository because it shows account details.
+- [ ] Clients. The web app is settled first, then a native iOS app in Swift; client work does not run in parallel with web polish (owner decision, 2026-11-12). The earlier decision read "desktop first, then iOS, Android later"; the 2026-11-12 decision did not restate where desktop sits. The phone reference recording is kept outside the repository because it shows account details.
 
 Not planned: chat-platform entrances such as Slack or Teams, a second task board, a plugin marketplace. Each repeats something cairn already has or serves teams rather than one owner.
 
@@ -77,7 +77,7 @@ Not planned: chat-platform entrances such as Slack or Teams, a second task board
 From a quick search of the code on 2026-11-11, not a full audit; each line says what the search found. Confirm before starting.
 
 - [ ] Message-first sending and local-first attachments: see the section above.
-- [ ] Error boundaries in the web. No React error boundary was found under `apps/web/src`, so one component that throws can blank the whole app. Wrap the routes, each side panel and the conversation, with a retry. Partial (#3978): routes (`SubtreeErrorBoundary` in `App.tsx`) and the conversation (`ConversationBoundary`) are wrapped. Side panels in `workPanel` are not, so this stays open.
+- [x] Error boundaries in the web. Routes (`SubtreeErrorBoundary` in `App.tsx`) and the conversation (`ConversationBoundary`) are wrapped (#3978). The home side panels are wrapped by `PanelBoundary` in `home-c.tsx`: a panel that throws keeps its frame, title and close button and shows the retry, and the conversation beside it stays usable.
 - [ ] Windowed rendering for long lists. No list virtualization was found; a long conversation renders every message, and one e2e test that renders 100 messages already runs close to its time limit on a loaded machine.
 - [ ] Event stream resume. No `Last-Event-ID` handling was found; after a dropped connection the client should resume from the last event it saw instead of refetching, and show a quiet reconnecting state.
 - [ ] Webhooks instead of polling for GitHub. No webhook receiver was found on the server; pull request and check state is polled with backoff. Webhooks cut latency and API quota, and need the same public or tunneled endpoint as the mail connector.

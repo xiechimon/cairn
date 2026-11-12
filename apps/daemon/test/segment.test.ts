@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { SegmentBuffer, segmentContent } from '../src/segment.js';
+import {
+  type SealedSegment,
+  SegmentBuffer,
+  SegmentEmitter,
+  segmentContent,
+} from '../src/segment.js';
 
 describe('SegmentBuffer（F1..F7）', () => {
   test('F1: consecutive appends of the same kind only accumulate, producing no line', () => {
@@ -77,6 +82,80 @@ describe('SegmentBuffer（F1..F7）', () => {
     expect(segmentContent({ kind: 'text', text: '甲' })).toEqual([{ type: 'text', text: '甲' }]);
     expect(segmentContent({ kind: 'thinking', text: '乙' })).toEqual([
       { type: 'thinking', thinking: '乙' },
+    ]);
+  });
+});
+
+function collectingEmitter(): { emitter: SegmentEmitter; rows: SealedSegment[] } {
+  const rows: SealedSegment[] = [];
+  const emitter = new SegmentEmitter(async (seg) => {
+    rows.push(seg);
+  });
+  return { emitter, rows };
+}
+
+describe('SegmentEmitter', () => {
+  test('a kind switch emits the finished segment and keeps the new one open', async () => {
+    const { emitter, rows } = collectingEmitter();
+    await emitter.append('thinking', 'plan');
+    await emitter.append('thinking', ' more');
+    await emitter.append('text', 'answer');
+    expect(rows).toEqual([{ kind: 'thinking', text: 'plan more' }]);
+    await emitter.seal();
+    expect(rows).toEqual([
+      { kind: 'thinking', text: 'plan more' },
+      { kind: 'text', text: 'answer' },
+    ]);
+  });
+
+  test('a streamed message ends with its trailing segment and ignores the full content', async () => {
+    const { emitter, rows } = collectingEmitter();
+    await emitter.append('text', 'streamed');
+    await emitter.endAssistantMessage([{ type: 'text', text: 'streamed' }]);
+    expect(rows).toEqual([{ kind: 'text', text: 'streamed' }]);
+  });
+
+  test('a message whose segments were all emitted already adds no row at its end', async () => {
+    const { emitter, rows } = collectingEmitter();
+    await emitter.append('text', 'before the tool call');
+    await emitter.seal();
+    await emitter.endAssistantMessage([{ type: 'text', text: 'before the tool call' }]);
+    expect(rows).toEqual([{ kind: 'text', text: 'before the tool call' }]);
+  });
+
+  test('a message that never streamed is emitted from its content blocks', async () => {
+    const { emitter, rows } = collectingEmitter();
+    await emitter.endAssistantMessage([
+      { type: 'thinking', thinking: 'reasoning' },
+      { type: 'text', text: 'first ' },
+      'second',
+      { type: 'tool_use', id: 'call-1' },
+      null,
+    ]);
+    expect(rows).toEqual([
+      { kind: 'thinking', text: 'reasoning' },
+      { kind: 'text', text: 'first second' },
+    ]);
+  });
+
+  test('a full message after a streamed one is still emitted', async () => {
+    const { emitter, rows } = collectingEmitter();
+    await emitter.append('text', 'one');
+    await emitter.endAssistantMessage('one');
+    await emitter.endAssistantMessage('two');
+    expect(rows).toEqual([
+      { kind: 'text', text: 'one' },
+      { kind: 'text', text: 'two' },
+    ]);
+  });
+
+  test('two full messages in a row are both emitted', async () => {
+    const { emitter, rows } = collectingEmitter();
+    await emitter.endAssistantMessage([{ type: 'text', text: 'one' }]);
+    await emitter.endAssistantMessage([{ type: 'text', text: 'two' }]);
+    expect(rows).toEqual([
+      { kind: 'text', text: 'one' },
+      { kind: 'text', text: 'two' },
     ]);
   });
 });

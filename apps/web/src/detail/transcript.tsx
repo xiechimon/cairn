@@ -279,16 +279,6 @@ function Row({
               {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
             </UserMessageBubble>
           </div>
-          {item.seq != null && item.title != null && (
-            <div className="mt-1.5 flex items-center justify-end" data-testid="taskline">
-              <span className="flex h-5 flex-none items-center rounded-(--cds-radius-sm) bg-(--muted) px-2 text-caption text-(--text-secondary)">
-                #{item.seq}
-              </span>
-              <span className="ml-1 min-w-0 truncate text-meta leading-5 text-foreground">
-                {item.title}
-              </span>
-            </div>
-          )}
           <ActionRow copy={item.markdown ?? item.text} stamp={item.at} t={t} align="end" overlay />
         </>
       );

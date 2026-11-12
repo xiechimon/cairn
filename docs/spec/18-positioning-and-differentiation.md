@@ -4,14 +4,14 @@
 
 > Canonical status: this volume = the pacman positioning source of truth (thesis / criterion / two axes / what not to do / honesty list),
 > revising volume 06 D1's positioning narrative (**revision does not replace** — D1's other components stay valid).
-> Ruling chain: #515 criterion and two axes → #516 adversarial ruling (thesis final draft) → #520 carrier six items (user 2026-10-02 agree). → D55 three-pillar thesis (#2489, PR #2490; owner accepted 2026-11-01).
+> Ruling chain: #515 criterion and two axes → #516 adversarial ruling (thesis final draft) → #520 carrier six items (user 2026-10-02 agree). → D55 three-pillar thesis (#2489, PR #2490; owner accepted 2026-11-01). → general-assistant thesis (owner decision, 2026-11-11; §1).
 > Argument and trade-offs were in ADR 0008 (removed; see the git history at 608eabac0): **the ADR recorded why, this volume records what**.
 
 ## 0. Overview
 
 | # | Item | Ruling |
 |---|---|---|
-| P1 | Thesis | output trusted because of how it lands: an evidence-bound, model-checked merge gate; eval-gated harness changes under a protected ruler; per-task orb isolation, opt-in today (D55, 2026-11-01; full text §1) |
+| P1 | Thesis | a self-hosted general assistant, not only a coding workspace (owner decision, 2026-11-11; full text §1). The evidence-bound merge gate, eval-gated harness changes and per-task orb isolation are capabilities, not the pitch |
 | P2 | Criterion | self-use first |
 | P3 | Semantic axis | machine-verified merge gate (ADR 0026 / 0028) plus eval-gated harness changes; human gates remain where the merge route sends work to the owner (§3.1) |
 | P4 | Runtime axis | aligned with the Multica runtime model: runtime = one computer × one CLI tool |
@@ -19,9 +19,17 @@
 | P6 | Chief | the gates' established consumer (withdrawn from the differentiation pillar), survival ruled by real closed-loop measurement, including the slow-path share once #2487 lands |
 | P7 | Shape | one chief; the entry chosen by the user; output that is code passes the gates; whether to open a PR is only how the code lands (§3.5) |
 
-## 1. Thesis (D55, 2026-11-01)
+## 1. Thesis (owner decision, 2026-11-11)
 
-> **cairn is a self-hosted agent team whose output is trusted because of how it lands, not because of who routed it.** Three pillars carry that trust; as of 2026-11-01 neither DeepSeek Harness's super-agent nor sig has any of them (walk: `docs/research/dsh-sig-walk-2026-11.md`, #2489, PR #2490):
+> **cairn is a self-hosted general assistant, not only a coding workspace.** You tell one Coordinator what you want; it opens a thread for each piece of work, and agents do that work on your own machines.
+
+The review and merge machinery is one capability among others and is not the product's pitch. Evaluation and harness self-improvement stay in scope: they apply to a personal assistant as much as to coding work (owner, 2026-11-12). What is specific to coding is the bench content, not the ruler, the adoption judge or the trajectory capture. The work this direction adds is listed under "Direction: a general assistant" in `docs/design/home-redesign-backend-todo.md`.
+
+### 1.1 Capabilities carried over from the 2026-11-01 thesis
+
+The 2026-11-01 thesis read "cairn is a self-hosted agent team whose output is trusted because of how it lands, not because of who routed it". Its three pillars stay as capabilities for work whose output is code:
+
+> As of 2026-11-01 neither DeepSeek Harness's super-agent nor sig has any of them (walk: `docs/research/dsh-sig-walk-2026-11.md`, #2489, PR #2490):
 >
 > 1. **An evidence-bound merge gate, model-checked.** The gate rule counts a verdict only for the patch it judged: verdicts bind to `patchDigest`, the independent review additionally to `headSha`, and a later passing verdict cannot clear a blocking one on the same digest (`apps/server/src/services/merge-gate/readiness.ts`; ADR 0021, 0026, 0028). The autonomous ship path evaluates that rule before merging and refuses when the head moved after the verdict (`apps/server/src/services/ship-gate.ts`). TLA+ models (`MergeGate`, `LocalLanding`, `RepeatedVerdict`, `ReviewHeadCausality`, plus `StepClaim` for who may run a step) are checked by TLC with negative controls (`.claude/skills/verify-merge-gate/`, `.claude/skills/verify-step-claim/`). Open gap, recorded there as F1: the manual REST merge (`mergeThroughGithub`) pins the merge to the checkpoint commit but does not yet re-read verdicts or re-derive the digest; closing it belongs to this pillar.
 > 2. **Harness eval and self-evolution under a ruler the agents cannot edit.** A PR that touches the enumerated chief-dispatch harness paths (`CHIEF_DISPATCH_HARNESS_PATHS`) cannot pass the gate without a digest-bound regression result at or above the baseline lower bound (`readiness.ts`, harness-regression blockers; broader prompt, skill, context and routing coverage is future work); builds record trajectory data that exports into validated trajectory packs, with incomplete exports reported (`apps/server/src/trajectory-export.ts`); rejections feed the bench; the ruler itself is a protected path (spec 29, ADR 0025). The paired-trial adoption judge (`integration/eval/adoption/judge.mts`) exists and is tested but is not yet wired into a merge path, and the self-optimizing outer loop (spec 29 E3, E4) has no tickets yet: today the claim is a regression floor on harness changes, with judged adoption and self-evolution as the stated next steps.
@@ -29,7 +37,7 @@
 >
 > The router (chief / coordinator), the daemon and machine pairing are necessary plumbing: cairn matches the best existing designs there (thread-subscription fast path #2487, watchdog #2488, quiet by default #1784) rather than claiming them as differentiators.
 
-Why the thesis changed: the earlier thesis (#516, 2026-10-01: "two hard gates + AI review with teeth + versioned plan documents", scarcity against Multica and todos) predates ADR 0026 / 0028, which replaced the human merge gate with machine trust, and the 2026-11-01 walk showed two shipped products (DSH super-agent, sig) with cairn's routing shape: a resident router over isolated workers on the user's own machines is table stakes. The earlier text is in git history and in `docs/adr/0008`.
+Why the thesis changed on 2026-11-11: the owner decided cairn is a general assistant whose planned work reaches past code (mail, job applications, a daily brief), so a pitch built on the merge gate describes one capability and not the product. Why it changed on 2026-11-01: the earlier thesis (#516, 2026-10-01: "two hard gates + AI review with teeth + versioned plan documents", scarcity against Multica and todos) predates ADR 0026 / 0028, which replaced the human merge gate with machine trust, and the 2026-11-01 walk showed two shipped products (DSH super-agent, sig) with cairn's routing shape: a resident router over isolated workers on the user's own machines is table stakes. The earlier text is in git history and in `docs/adr/0008`.
 
 In-volume terms (do not enter `CONTEXT.md` — that only manages product-domain entities):
 

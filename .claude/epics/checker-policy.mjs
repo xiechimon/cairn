@@ -1,5 +1,5 @@
 const exitCodes = { unknown: 2, complete: 0, paused: 20, failed: 30, incomplete: 10 };
-const humanLabels = new Set(['coordinator-hold', 'waits-ian', 'ready-for-human']);
+const humanLabels = new Set(['waits-ian', 'ready-for-human']);
 export const shaPattern = /^[a-f0-9]{40}$/;
 export const isoPattern = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/;
 export function requireFact(condition, message) {

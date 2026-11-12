@@ -634,8 +634,6 @@ export function readSteerPending(db: Db, conversationId: string): string[] {
   return pending ? [pending.content] : [];
 }
 
-const afterStopPhaseByBuild = new Map<string, Phase | 'keep'>();
-
 function hasLeftExecution(phase: Phase): boolean {
   return phase === 'closed' || phase === 'done' || phase === 'todo';
 }
@@ -652,6 +650,13 @@ function dropQuestionOnPhaseChange(
       'The thread moved on before an answer.',
     );
   }
+}
+
+function settleAfterStopPhase(deps: BuildDeps, buildId: string, land?: () => void): void {
+  deps.db.transaction(() => {
+    deps.db.update(build).set({ afterStopPhase: null }).where(eq(build.id, buildId)).run();
+    land?.();
+  });
 }
 
 function landReservedPhase(
@@ -770,13 +775,13 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   if (cancelledRow) publishBuild(deps, cancelledRow);
   const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) return;
-  const desired = afterStopPhaseByBuild.get(buildRow.id);
-  afterStopPhaseByBuild.delete(buildRow.id);
-  if (stepRow.archiveStop === null && desired === 'keep') return;
-  if (desired != null && desired !== 'keep') {
-    landReservedPhase(deps, todoRow, desired);
+  const desired = buildRow.afterStopPhase;
+  if (desired === 'done') {
+    settleAfterStopPhase(deps, buildRow.id, () => landReservedPhase(deps, todoRow, 'done'));
     return;
   }
+  settleAfterStopPhase(deps, buildRow.id);
+  if (stepRow.archiveStop === null && desired === 'keep') return;
   if (todoRow.latestBuildId !== buildRow.id || hasLeftExecution(todoRow.phase)) return;
   const target = stopFallbackPhase(db, buildRow);
   if (todoRow.phase === target) return;
@@ -962,7 +967,7 @@ function prepareStopFor(
   if (!todoRow) throw new NotFoundError(`todo ${todoId}`);
   if (todoRow.latestBuildId == null) return { state: 'ready' };
   const buildId = todoRow.latestBuildId;
-  if (after === 'exit') afterStopPhaseByBuild.delete(buildId);
+  if (after === 'exit') settleAfterStopPhase(deps, buildId);
   const active = db
     .select()
     .from(step)
@@ -977,14 +982,19 @@ function prepareStopFor(
     return { state: 'ready' };
   }
   const now = nowMs();
-  afterStopPhaseByBuild.set(buildId, after === 'done' ? 'done' : 'keep');
-  db.insert(stopPending)
-    .values({ conversationId: buildId, stepId: active.id, discard: true, createdAt: now })
-    .onConflictDoUpdate({
-      target: stopPending.conversationId,
-      set: { stepId: active.id, discard: true, createdAt: now },
-    })
-    .run();
+  db.transaction(() => {
+    db.update(build)
+      .set({ afterStopPhase: after === 'done' ? 'done' : 'keep' })
+      .where(eq(build.id, buildId))
+      .run();
+    db.insert(stopPending)
+      .values({ conversationId: buildId, stepId: active.id, discard: true, createdAt: now })
+      .onConflictDoUpdate({
+        target: stopPending.conversationId,
+        set: { stepId: active.id, discard: true, createdAt: now },
+      })
+      .run();
+  });
   deps.machineHub?.stopSignal(todoRow.teamId, active.id);
   return { state: 'stopping' };
 }
@@ -1051,6 +1061,7 @@ export function enqueueStep(
     })
     .run();
   clearStop(deps.db, buildId);
+  settleAfterStopPhase(deps, buildId);
   if (isBuildStepKind(kind)) {
     deps.db.update(build).set({ reportLine: null }).where(eq(build.id, buildId)).run();
   }
@@ -1386,7 +1397,9 @@ export function dispatchSplitChildren(deps: BuildDeps, parentId: string): number
         triggerSource: 'chief',
       });
       dispatched += 1;
-    } catch {}
+    } catch (error) {
+      console.warn('Split child not dispatched', { parentId, childId: child.id, error });
+    }
   }
   return dispatched;
 }
@@ -2628,7 +2641,7 @@ export function settleParkedStep(
     .where(eq(step.id, stepRow.id))
     .run();
   deps.db.delete(stopPending).where(eq(stopPending.stepId, stepRow.id)).run();
-  afterStopPhaseByBuild.delete(stepRow.buildId);
+  settleAfterStopPhase(deps, stepRow.buildId);
   finishScheduledStep(
     deps,
     stepRow,
@@ -2658,6 +2671,7 @@ export function applyStepFailure(
     return;
   }
   clearStop(db, stepRow.buildId);
+  settleAfterStopPhase(deps, stepRow.buildId);
   releaseUnissuedMergeAdmission(db, stepRow);
   const errorMessage =
     rawErrorMessage.trim() === '' ? `${stepRow.kind} 步异常结束，未上报原因` : rawErrorMessage;
@@ -3250,22 +3264,25 @@ export function completeStep(
     finishScheduledStep(deps, stepRow);
     return;
   }
-  const reserved = afterStopPhaseByBuild.get(buildRow.id);
+  const reserved = buildRow.afterStopPhase;
   const staleBuild = todoRow.latestBuildId !== null && todoRow.latestBuildId !== buildRow.id;
   if (
     (todoRow.archivedAt !== null && stepRow.kind !== 'merge') ||
-    reserved !== undefined ||
+    reserved !== null ||
     staleBuild ||
     hasLeftExecution(todoRow.phase)
   ) {
-    afterStopPhaseByBuild.delete(buildRow.id);
     deps.db
       .update(step)
       .set({ status: 'done', finishedAt: nowMs() })
       .where(eq(step.id, stepId))
       .run();
     finishScheduledStep(deps, stepRow);
-    if (reserved !== undefined && reserved !== 'keep') landReservedPhase(deps, todoRow, reserved);
+    settleAfterStopPhase(
+      deps,
+      buildRow.id,
+      reserved === 'done' ? () => landReservedPhase(deps, todoRow, 'done') : undefined,
+    );
     return;
   }
   const undelivered = undeliveredEnd(deps, stepRow, todoRow, buildRow, outcome);

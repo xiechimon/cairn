@@ -4,6 +4,8 @@ Research notes archived per ticket. Once written they are not maintained; cite t
 
 The notes and captures from the early study of todos.dev (the r1 to r9 series and their `assets/r*/` folders) were removed from the working tree. They remain in git history at `e95b775`; read one with `git show e95b775:docs/research/<file>`.
 
+The screenshots and recordings that the remaining notes embed (493 `png`, `jpg` and `gif` files, 35 MB) were removed from the working tree on 2026-11-12 to keep clones small. The notes keep their image links as the index of what was captured. The files remain in git history at `3d238b2`; restore one with `git show 3d238b2:docs/research/<path> > <file>`.
+
 ## Index
 
 ### Foundation

@@ -16,15 +16,19 @@ export const meta = {
 // go is false), and the verdict carries the SHA it was made on.
 // The caller merges only when go is true and headSha equals the PR head.
 // Run the copy from origin/main, not the PR's working tree, so a PR cannot
-// edit the gate that judges it. CI and merge machinery, the eval ruler, and
-// the credentials, machine, and external-entry lists return mergedBy user.
-// Every other path may auto-merge. Path class does not add coordinator-hold.
+// edit the gate that judges it. An edit of this file enters the queue with
+// every other green PR; path class does not send it to the user.
 
 const REPO = 'xiechimon/cairn'
 // 5 reviewers + 4 skeptics stays under the 10-agent guideline.
 const MAX_SKEPTICS = 4
 
-// Size never routes or blocks (D68): the review gate judges one problem per PR.
+// Path class, including a protected path or a security surface, does not
+// route to the user (ian, 2026-11-11). The required checks on a head that is
+// not a draft admit the PR; no review verdict or label holds it (ian,
+// 2026-11-12). This script runs from origin/main, so a PR cannot edit the
+// copy that judges it.
+// Size never routes or blocks (D68).
 // pr-gate runs 3, 4 and 5 each found another agent-steering or gate file that a
 // list of names missed (AGENTS.override.md, .pi/skills, nested .claude/).
 // Matching ignores case (APFS); globToRegExp says which matches fold Unicode.
@@ -49,7 +53,7 @@ function gatePathsHelp() {
 // named like the directory, so a symlink named .claude or scripts is protected
 // (run 10). AUTO_MERGE and EVIDENCE_RE get neither: a path that looks like
 // product source or evidence only through Unicode folding or a symlink stays
-// outside the set.
+// outside the set. Path class does not route to the user.
 function globToRegExp(glob, { protect = false } = {}) {
   const tail = protect && glob.endsWith('/**')
   const g = tail ? glob.slice(0, -3) : glob
@@ -74,32 +78,6 @@ const SCRIPT_SHA256 = 'fde93dec0355f8a54419143f3f001a527bc3383868e1c5943b0917664
 const PROTECTED_RE = PROTECTED.map((glob) => globToRegExp(glob, { protect: true }))
 const AUTO_MERGE_RE = AUTO_MERGE.map(globToRegExp)
 const isProtected = (f) => PROTECTED_RE.some((re) => re.test(f))
-const OWNER_SECURITY = ['credentials', 'machineAndCommandBoundary', 'externalEntryAuth']
-function ownerRouteClasses(gatePaths) {
-  const named = gatePaths?.ownerRoute
-  if (!named || typeof named !== 'object')
-    throw new Error(`pr-gate: args.gatePaths.ownerRoute must name the owner-route classes; ${gatePathsHelp()}`)
-  const queue = gatePaths?.humanQueue
-  if (!queue || typeof queue !== 'object')
-    throw new Error(`pr-gate: args.gatePaths.humanQueue must be an object; ${gatePathsHelp()}`)
-  return [
-    ['ci and merge machinery', requireGlobs(named.ciAndMergeMachinery, 'ownerRoute.ciAndMergeMachinery')],
-    ['eval ruler', requireGlobs(named.evalRuler, 'ownerRoute.evalRuler')],
-    ...OWNER_SECURITY.map((key) => [key, requireGlobs(queue[key], `humanQueue.${key}`)]),
-  ]
-}
-const OWNER_ROUTE = ownerRouteClasses(args?.gatePaths).map(([label, globs]) => [
-  label,
-  globs.map((glob) => globToRegExp(glob, { protect: true })),
-])
-function ownerRouteReasons(files) {
-  const reasons = []
-  for (const [label, res] of OWNER_ROUTE) {
-    const hit = files.filter((file) => res.some((re) => re.test(file)))
-    if (hit.length > 0) reasons.push(`owner route (${label}): ${hit.join(', ')}`)
-  }
-  return reasons
-}
 const EVIDENCE_RE = globToRegExp('docs/verify/**')
 
 // Without --no-renames a rename lists only its new name, so a protected file
@@ -368,7 +346,7 @@ const protectedPaths = [
     ...reviewed.flatMap((r) => r.review.protectedPaths ?? []),
   ]),
 ]
-const humanReasons = ownerRouteReasons([...new Set([...changedFiles, ...unlistedFiles])])
+const humanReasons = []
 const checked = Object.fromEntries(reviewed.map((r) => [r.key, r.review.checked]))
 const gatePathsMatch = safety?.gatePathsMatch === true
 if (!gatePathsMatch) log('the safety reviewer did not confirm that gatePaths equals origin/main:packages/shared/merge-gate-paths.json')

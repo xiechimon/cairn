@@ -30,15 +30,12 @@ who did not watch the work. Use this order:
    `## Risk`, separated from the HTML tags by blank lines and closed with
    `</details>`. Keep this block collapsed.
 
-For code changes, the Codex cloud review on the PR head is the required
-review. Protected paths, documentation included, need it too, with no
-unresolved P0/P1. A security surface also needs `/security-review` findings
-fixed or recorded in Risk. Those lists route to ian and do not add
-`coordinator-hold`. Other docs-only changes need no code review. Review convergence (whole bug class
-per push, one push per round, P2/P3 deferral to a real issue, the round-3
-stop) follows `AGENTS.md`, "How to work".
-Review links the Codex cloud review on the head SHA, states its verdict and
-lists unfixed findings with reasons. Risk states one-way or two-way
+No review is required before merge and code review is off, Codex cloud
+review included (`AGENTS.md`, "Merge routes"). A security surface needs
+`/security-review` findings fixed or recorded in Risk; that does not send the
+PR to ian.
+Review states what reviewed the head, if anything did, and lists unfixed
+findings with reasons. Risk states one-way or two-way
 door, blast radius and whether the owner must merge. Put longer overlap
 results and optional Upstream analysis inside the details block. Include
 Upstream only when adding a mechanism; name an existing equivalent or the
@@ -192,7 +189,7 @@ A PR that changes `apps/web/src` adds a reference table under Proof, one row per
 
 ## Review
 
-Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) reviews every push through the review gate. Never write `@codex` in a PR body: Codex reads it as a task request, answers that the repository has no environment, and skips the automatic review. Fix confirmed findings and record skipped ones with reasons under Review.
+Code review is off: do not run a local `codex exec` or `claude -p` review before pushing and do not request a Codex cloud review. Never write `@codex` in a PR body: Codex reads it as a task request. Record known defects you leave unfixed with reasons under Review.
 
 ## Mechanics
 
@@ -225,11 +222,11 @@ Do not run a local `codex exec` or `claude -p` review before pushing. Codex clou
   or file path in backticks. The pr-evidence check runs
   `node scripts/english-only-gate.mjs --text <body>` and reds otherwise;
   run it locally on `/tmp/pr.md` before opening.
-- `coordinator-hold` means the coordinator asked for changes or a person's decision is pending: `.mergify.yml`, `coordinator-merge.mjs` and `merge-pr.sh` all refuse the PR while it is on. Keep it on until you have pushed the requested work or ian gave the decision, then ask the coordinator to remove it.
+- No label holds a PR. Keep a PR a draft while a decision routed to ian is pending; a draft does not queue.
 - Agents decide by their own recommendation, say what they chose and why in chat, and continue; decisions routed to ian follow `AGENTS.md`, "Merge routes". Before asking ian about a PR whose auto-merge is armed, disarm it with `gh pr merge <n> --disable-auto`.
-- Before an agent enables merge, require passing CI checks on the head, a Codex cloud review with no unresolved P0/P1, and a pr-gate verdict of go with `mergedBy: 'auto-merge'` (`AGENTS.md`, "Merge routes"). CI and merge machinery, the eval ruler, and the `credentials`, `machineAndCommandBoundary` and `externalEntryAuth` lists route to ian. Every other path, including other protected paths, enters the merge queue. Path class does not add `coordinator-hold`. A security surface also needs `/security-review` findings fixed or recorded in Risk, and `pr-evidence` fails until the body has a line outside fenced code, `Security review (<40-hex head>): fixed` or `Security review (<40-hex head>): recorded`. The queue requires that check. No unchecked tasks anywhere in the body. ian may admin-merge; an agent uses `--admin` only on a PR ian named in chat, after every required check passes on its head (`AGENTS.md`, "Merge routes").
+- Before an agent enables merge, require passing CI checks on the head and a pr-gate verdict of go with `mergedBy: 'auto-merge'` (`AGENTS.md`, "Merge routes"). Protected-path PRs enter the merge queue with every other green PR, including security surfaces and PRs that used to be owner-routed. Path class does not keep a PR on ian's route. A security surface also needs `/security-review` findings fixed or recorded in Risk, and `pr-evidence` fails until the body has a line outside fenced code, `Security review (<40-hex head>): fixed` or `Security review (<40-hex head>): recorded`. The queue requires that check. No unchecked tasks anywhere in the body. ian may admin-merge; an agent uses `--admin` only on a PR ian named in chat, after every required check passes on its head (`AGENTS.md`, "Merge routes").
 - Agent sessions on a host with the App key commit, push and open PRs as the App: `~/.cairn/tools/app-token/as-bot.sh git commit ...`, `as-bot.sh git push origin HEAD:<branch>` and `as-bot.sh gh pr create ...`. The commit is authored and committed by `cairnwright[bot]` with `Co-authored-by: xiechimon`, and the push is a plain push with the usual hooks. The pre-commit and pre-push hooks and the `commit-author` check reject any other identity, except a Claude Code cloud session, which has no App key and commits with plain git as `Claude <noreply@anthropic.com>` and opens its PR through the GitHub connector; `docs/ops/agent-bot-identity.md` has the rule.
-- PRs that `.mergify.yml` admits (green `review-gate` from GitHub Actions, `merge-route` and `pr-size` checks, with no `coordinator-hold` and no owner-route class) enter the Mergify merge queue automatically, including a PR opened by `cairnwright[bot]`: never `gh pr merge` them; the required `Mergify Merge Queue` check refuses a direct merge while a PR is queued. That check and `Mergify Merge Protections` list any unmet condition; a new push dequeues the PR and it re-enters once CI passes again. The three classes in `AGENTS.md` keep ian's route and do not add `coordinator-hold`.
+- PRs that `.mergify.yml` admits (green `merge-route`, `pr-evidence`, `pr-size`, `commit-author` and required CI checks on a head that is not a draft) enter the Mergify merge queue automatically, including a PR opened by `cairnwright[bot]`: never `gh pr merge` them; the required `Mergify Merge Queue` check refuses a direct merge while a PR is queued. That check and `Mergify Merge Protections` list any unmet condition; a new push dequeues the PR and it re-enters once CI passes again. Path class does not keep a PR on the human route.
 - PRs that Mergify does not admit merge by squash on the route `AGENTS.md` gives them (`~/.cairn/tools/merge-pr.sh` on the dispatch host). After a merge, read the main commit author and the `commit-author` Actions result.
 
 ## Gate facts — what is actually enforced

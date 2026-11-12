@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import { epochMs, recordId } from './common.js';
 
-export const MEMORY_QUOTA_PER_AGENT = 100;
-export const MEMORY_QUOTA_PER_TEAM = 100;
-
 export const MEMORY_LAYERS = ['core', 'scratchpad', 'searchable'] as const;
 export type MemoryLayer = (typeof MEMORY_LAYERS)[number];
 

@@ -81,7 +81,7 @@ async function mockPendingQuestion(page: Page) {
   });
 }
 
-test('pending question chips take digits when nothing is focused and leaves a typed composer alone', async ({
+test('a pending question leaves digits alone: typed with nothing focused, they land in the composer', async ({
   page,
 }) => {
   await mockPendingQuestion(page);
@@ -91,10 +91,6 @@ test('pending question chips take digits when nothing is focused and leaves a ty
   await expect(option).toBeVisible();
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press('1');
-  await expect(option).toHaveAttribute('aria-pressed', 'true');
-  await expect(composer).toHaveValue('');
-  await composer.fill('draft');
-  await page.keyboard.press('2');
-  await expect(composer).toHaveValue('draft2');
-  await expect(page.getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'false');
+  await expect(composer).toHaveValue('1');
+  await expect(option).toHaveAttribute('aria-pressed', 'false');
 });
