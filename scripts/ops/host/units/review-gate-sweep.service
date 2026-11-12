@@ -1,8 +1,0 @@
-[Unit]
-Description=Re-dispatch the cairn review-gate workflow for stalled PRs
-
-[Service]
-Type=oneshot
-Environment=HTTPS_PROXY=http://127.0.0.1:7890
-Environment=HTTP_PROXY=http://127.0.0.1:7890
-ExecStart=%h/.cairn/tools/review-gate-sweep.sh
