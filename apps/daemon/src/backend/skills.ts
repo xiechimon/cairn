@@ -265,7 +265,7 @@ export function withSkillDispatchDirectives(
   log: (msg: string) => void,
 ): string {
   const matched = new Set<string>();
-  for (const match of prompt.matchAll(/\b\/([a-z][a-z0-9-]*)\b/g)) {
+  for (const match of prompt.matchAll(/(?<![\w/])\/([a-z][a-z0-9-]*)(?![\w/-])/g)) {
     const name = match[1] ?? '';
     if (visibleNames.has(name)) matched.add(name);
     else log(`unknown-dispatch: ${name}`);
