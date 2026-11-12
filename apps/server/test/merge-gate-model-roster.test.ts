@@ -42,6 +42,22 @@ describe('merge-gate model roster', () => {
     });
   });
 
+  test('a DeepSeek model hosted by another lab keeps DeepSeek as its maker', () => {
+    const roster = deriveModelRoster([
+      {
+        provider: 'mistral',
+        models: [{ id: 'deepseek-v4-1-flash-1017' }, { id: 'mistral-large-4' }],
+      },
+      { provider: 'deepseek', models: [{ id: 'deepseek-v4.1-flash' }] },
+    ]);
+    expect(roster.vendors).toEqual({
+      'deepseek-v4-1-flash-1017': 'DeepSeek',
+      'deepseek-v4.1-flash': 'DeepSeek',
+      'mistral-large-4': 'Mistral',
+    });
+    expect(modelsAreIndependent('deepseek-v4-1-flash-1017', 'deepseek-v4.1-flash')).toBe(false);
+  });
+
   test('hosted GLM spellings retain their maker and cannot review each other independently', () => {
     const ids = ['glm-5.2', 'glm-5-2', 'mistral/zai-glm-5-2', 'zai-glm-5-3'];
     for (const id of ids) {
