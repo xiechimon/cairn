@@ -6,6 +6,7 @@ import type {
   UserRecord,
 } from '@cairn/shared';
 import {
+  actionByToolName,
   CHIEF_NOTICE_KIND,
   coordinatorCreateTodoParamsSchema,
   coordinatorUpdateTodoParamsSchema,
@@ -37,6 +38,7 @@ import {
 import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { executeAction } from './action-registry.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta, resolveToolAttachmentId } from './attachments.js';
 import {
@@ -64,6 +66,7 @@ import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { refuseMailTurnTool } from './mail.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
 import {
   deleteMemoryEntry,
@@ -303,6 +306,7 @@ export async function executeChiefTool(
   name: string,
   params: Params,
 ): Promise<string> {
+  refuseMailTurnTool(ctx.turnPrompt ?? null, name);
   const { db } = deps;
   const svc = {
     db,
@@ -324,6 +328,23 @@ export async function executeChiefTool(
   requireUnarchivedTargets(db, ctx.teamId, name, params);
   if (isRouterTool(name)) return executeRouterTool(deps, ctx, name, params);
   if (name === SUGGEST_REPLIES_TOOL_NAME) return suggestQuickReplies(deps, ctx, params);
+  const action = actionByToolName(name);
+  if (action?.surfaces.includes('coordinator') === true) {
+    return json(
+      executeAction(
+        { db, reposDir: deps.reposDir },
+        {
+          id: action.id,
+          input: params,
+          actor: 'coordinator',
+          surface: 'coordinator',
+          teamId: ctx.teamId,
+          threadId: ctx.threadId,
+          scopeProjectId: ctx.turnScopeProjectId ?? null,
+        },
+      ),
+    );
+  }
   switch (name) {
     case 'projects': {
       const rows = db.select().from(project).where(eq(project.teamId, ctx.teamId)).all();

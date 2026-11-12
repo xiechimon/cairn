@@ -114,7 +114,7 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   {
     method: 'POST',
     path: '/api/teams/{id}/coordinator/messages',
-    note: 'body {content, projectId?, clientMessageId?}; projectId only tags the turn, 409 when that project is archived; a repeated clientMessageId returns the first response and starts no new turn',
+    note: 'body {content, projectId?, clientMessageId}; a missing clientMessageId is 400; projectId only tags the turn, 409 when that project is archived; a repeated clientMessageId returns the first response and starts no new turn',
   },
   { method: 'GET', path: '/api/projects', query: ['teamId'] },
   { method: 'GET', path: '/api/projects/{id}/todos' },

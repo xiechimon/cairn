@@ -32,13 +32,15 @@ import type { FetchLike } from '../lib/github.js';
 import { githubRepoReachable } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
-import { isGithubRepoRef, removeHostedRepoDir, validateGithubLocalSlotPath } from './git.js';
+import { isGithubRepoRef, validateGithubLocalSlotPath } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
+import { dispatchHostedCleanup, enqueueHostedCleanup } from './hosted-cleanup.js';
 import { moveProjectMemoriesToTeam } from './memory.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { insertMessageRow } from './transcript.js';
 
 type ProjectRow = typeof project.$inferSelect;
+export type ProjectTx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 export function projectMergeConfigOf(row: ProjectRow): ProjectMergeConfig {
   const raw = row.autonomy as (typeof row.autonomy & Partial<ProjectMergeConfig>) | null;
@@ -160,59 +162,65 @@ function projectRunningWork(db: ProjectReader, projectId: string): string[] {
   return rows.map((row) => row.line);
 }
 
-export function deleteProject(deps: ProjectDeps, id: string): boolean {
-  const removed = deps.db.transaction(
-    (tx) => {
-      const row = tx.select().from(project).where(eq(project.id, id)).get();
-      if (!row) return null;
-      const running = projectRunningWork(tx, id);
-      if (running.length > 0) {
-        throw new HttpError(
-          409,
-          `cannot delete project while work is running: ${running.join('; ')}`,
-          'project-running',
-        );
+export function deleteProject(
+  deps: ProjectDeps,
+  id: string,
+  beforeCommit?: (tx: ProjectTx, row: ProjectRow) => void,
+  join?: ProjectTx,
+): boolean {
+  const run = (tx: ProjectTx) => {
+    const row = tx.select().from(project).where(eq(project.id, id)).get();
+    if (!row) return null;
+    const running = projectRunningWork(tx, id);
+    if (running.length > 0) {
+      throw new HttpError(
+        409,
+        `cannot delete project while work is running: ${running.join('; ')}`,
+        'project-running',
+      );
+    }
+    const todoIds = tx
+      .select({ id: todo.id })
+      .from(todo)
+      .where(eq(todo.projectId, id))
+      .all()
+      .map((r) => r.id);
+    const buildIds =
+      todoIds.length > 0
+        ? tx
+            .select({ id: build.id })
+            .from(build)
+            .where(inArray(build.todoId, todoIds))
+            .all()
+            .map((r) => r.id)
+        : [];
+    if (buildIds.length > 0) {
+      tx.delete(stopPending).where(inArray(stopPending.conversationId, buildIds)).run();
+      tx.delete(step).where(inArray(step.buildId, buildIds)).run();
+    }
+    tx.delete(schedule).where(eq(schedule.projectId, id)).run();
+    tx.delete(tag).where(eq(tag.projectId, id)).run();
+    tx.delete(secret).where(eq(secret.projectId, id)).run();
+    if (todoIds.length > 0) tx.delete(todo).where(inArray(todo.id, todoIds)).run();
+    for (const chiefRow of tx.select().from(chief).where(eq(chief.teamId, row.teamId)).all()) {
+      const next = chiefRow.watches.filter((w) => !todoIds.includes(w.todoId));
+      if (next.length !== chiefRow.watches.length) {
+        tx.update(chief).set({ watches: next }).where(eq(chief.id, chiefRow.id)).run();
       }
-      const todoIds = tx
-        .select({ id: todo.id })
-        .from(todo)
-        .where(eq(todo.projectId, id))
-        .all()
-        .map((r) => r.id);
-      const buildIds =
-        todoIds.length > 0
-          ? tx
-              .select({ id: build.id })
-              .from(build)
-              .where(inArray(build.todoId, todoIds))
-              .all()
-              .map((r) => r.id)
-          : [];
-      if (buildIds.length > 0) {
-        tx.delete(stopPending).where(inArray(stopPending.conversationId, buildIds)).run();
-        tx.delete(step).where(inArray(step.buildId, buildIds)).run();
-      }
-      tx.delete(schedule).where(eq(schedule.projectId, id)).run();
-      tx.delete(tag).where(eq(tag.projectId, id)).run();
-      tx.delete(secret).where(eq(secret.projectId, id)).run();
-      if (todoIds.length > 0) tx.delete(todo).where(inArray(todo.id, todoIds)).run();
-      for (const chiefRow of tx.select().from(chief).where(eq(chief.teamId, row.teamId)).all()) {
-        const next = chiefRow.watches.filter((w) => !todoIds.includes(w.todoId));
-        if (next.length !== chiefRow.watches.length) {
-          tx.update(chief).set({ watches: next }).where(eq(chief.id, chiefRow.id)).run();
-        }
-      }
-      moveProjectMemoriesToTeam(tx, id);
-      tx.update(chiefThread).set({ projectId: null }).where(eq(chiefThread.projectId, id)).run();
-      tx.delete(project).where(eq(project.id, id)).run();
-      return row;
-    },
-    { behavior: 'immediate' },
-  );
+    }
+    moveProjectMemoriesToTeam(tx, id);
+    tx.update(chiefThread).set({ projectId: null }).where(eq(chiefThread.projectId, id)).run();
+    tx.delete(project).where(eq(project.id, id)).run();
+    beforeCommit?.(tx, row);
+    if (row.repoKind === 'hosted' && row.repoName !== null) {
+      enqueueHostedCleanup(tx, row, `cleanup-${row.id}`);
+    }
+    return row;
+  };
+  if (join) return run(join) !== null;
+  const removed = deps.db.transaction(run, { behavior: 'immediate' });
   if (removed === null) return false;
-  if (removed.repoKind === 'hosted' && removed.repoName !== null) {
-    removeHostedRepoDir(deps.reposDir, removed.teamId, removed.repoName);
-  }
+  dispatchHostedCleanup(deps.db, deps.reposDir);
   return true;
 }
 

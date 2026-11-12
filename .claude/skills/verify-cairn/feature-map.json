@@ -1576,7 +1576,8 @@
           "/api/projects/:id/branches",
           "/api/projects/:id/files",
           "/api/fs/list",
-          "/api/fs/pick"
+          "/api/fs/pick",
+          "/api/actions/proposals/:id/answer"
         ]
       },
       "reach": [

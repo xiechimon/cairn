@@ -1,4 +1,4 @@
-import { chiefDigestThreadId, ISSUE_FENCE_OPEN } from '@cairn/shared';
+import { chiefDigestThreadId, ISSUE_FENCE_OPEN, MAIL_FENCE_OPEN } from '@cairn/shared';
 import { and, eq, like } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
@@ -149,7 +149,8 @@ export function applyMemoryPass(
       drops.some((m) => m === undefined || m.projectId !== keep.projectId || !shownInFull(m)) ||
       content === '' ||
       content.length > CONTENT_MAX ||
-      content.includes(ISSUE_FENCE_OPEN)
+      content.includes(ISSUE_FENCE_OPEN) ||
+      content.includes(MAIL_FENCE_OPEN)
     ) {
       result.skipped += 1;
       continue;

@@ -1,4 +1,9 @@
 export const DB_TABLES = [
+  'action_journal',
+  'action_proposal',
+  'action_subscriber',
+  'action_wake_outbox',
+  'hosted_cleanup_outbox',
   'user',
   'team',
   'project',
@@ -75,6 +80,9 @@ export const DB_TABLES = [
   'data_migration',
   'task_issue_close',
   'deploy_lease',
+  'mail_account',
+  'mail_event',
+  'mail_rule',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -82,6 +90,14 @@ export type DbTable = (typeof DB_TABLES)[number];
 export const JOIN_ONLY_TABLES = ['todo_tag', 'todo_github_label'] as const;
 
 export const INTERNAL_ONLY_TABLES = [
+  'action_journal',
+  'action_proposal',
+  'action_subscriber',
+  'action_wake_outbox',
+  'hosted_cleanup_outbox',
+  'mail_account',
+  'mail_event',
+  'mail_rule',
   'steer_pending',
   'autonomy_pause',
   'step_route',
