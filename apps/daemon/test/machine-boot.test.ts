@@ -230,10 +230,10 @@ describe('D75 orb computer capability', () => {
 
   test('browser is advertised when the computer image marker pins agent-browser', async () => {
     const root = testTempDir('machine-boot-browser-');
-    const dir = join(root, 'var/lib/machines/cairn-orb-computer/etc');
+    const dir = join(root, 'var/lib/cairn-orb');
     mkdirSync(dir, { recursive: true });
     writeFileSync(
-      join(dir, 'cairn-orb-computer-image'),
+      join(dir, 'computer-image'),
       `recipe=abc\npackages=chromium\nagent-browser=${PINNED_AGENT_BROWSER_VERSION}\n`,
     );
     const caps = await report(orbComputer, { CAIRN_ORB_ROOT: root });
