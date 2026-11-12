@@ -154,6 +154,25 @@ test('merges into an existing ledger with sorted keys and honours --days', () =>
   }
 });
 
+test('keeps the folders a recorded decision retains as historical evidence', () => {
+  const repo = fixture();
+  try {
+    repo.commit(daysAgo(30), {
+      'docs/verify/2101/README.md': 'x',
+      'docs/verify/2136/README.md': 'x',
+      'docs/verify/2102/README.md': 'x',
+    });
+    const result = repo.run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(repo.has('docs/verify/2101/README.md'), true);
+    assert.equal(repo.has('docs/verify/2136/README.md'), true);
+    assert.equal(repo.has('docs/verify/2102'), false);
+    assert.deepEqual(Object.keys(repo.ledger()), ['2102']);
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('nothing due leaves the tree unchanged', () => {
   const repo = fixture();
   try {

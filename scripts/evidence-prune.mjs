@@ -20,6 +20,7 @@ const CODE_PATHS = [
 ];
 const SELF = [':!scripts/evidence-prune.mjs', ':!scripts/evidence-prune.test.mjs'];
 const FOLDER_REF = /docs\/verify\/([A-Za-z0-9_-]+)/g;
+const RETAINED_BY_SINGLE_BOT_IDENTITY_DECISION = new Set(['2101', '2136']);
 
 const { values } = parseArgs({
   options: {
@@ -74,7 +75,12 @@ const referenced = new Set([...codeRefs.stdout.matchAll(FOLDER_REF)].map((match)
 const now = values.now ? Date.parse(values.now) : Date.now();
 const cutoff = now - Number(values.days) * 86400000;
 const due = [...folders]
-  .filter((folder) => !referenced.has(folder) && lastCommit.get(folder).time < cutoff)
+  .filter(
+    (folder) =>
+      !referenced.has(folder) &&
+      !RETAINED_BY_SINGLE_BOT_IDENTITY_DECISION.has(folder) &&
+      lastCommit.get(folder).time < cutoff,
+  )
   .sort();
 
 if (due.length === 0) {
