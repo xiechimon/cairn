@@ -1,5 +1,5 @@
 [Unit]
-Description=Remove clean, idle Cairn worktrees whose PR is merged or closed
+Description=Remove clean, idle Cairn worktrees whose work is merged, closed or pushed
 
 [Service]
 Type=oneshot
