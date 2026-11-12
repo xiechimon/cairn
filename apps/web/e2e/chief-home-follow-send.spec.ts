@@ -202,8 +202,6 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
   }) => {
     if (activation === 'reduced-motion') await page.emulateMedia({ reducedMotion: 'reduce' });
     if (activation === 'phone-light') {
-      const cdp = await page.context().newCDPSession(page);
-      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
       await page.setViewportSize({ width: 390, height: 844 });
       await page.emulateMedia({ colorScheme: 'light' });
     }
@@ -217,6 +215,10 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
     const jump = home(page).getByTestId('jump-to-latest');
     await expect(row(page, 'Latest delivery report')).toBeAttached();
     await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+    if (activation === 'phone-light') {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    }
     await body.evaluate((node) => {
       node.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
       for (const item of node.querySelectorAll<HTMLElement>(
