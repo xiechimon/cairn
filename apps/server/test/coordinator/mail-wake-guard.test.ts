@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { fenceMailText } from '@cairn/shared';
+import { coordinatorConversationKey, fenceMailText } from '@cairn/shared';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -169,6 +169,56 @@ afterEach(async () => {
   const open = collector;
   collector = undefined;
   if (open !== undefined) await new Promise<void>((resolve) => open.close(() => resolve()));
+});
+
+it('drains a pending mail receipt before restoring the owner conversation', async () => {
+  const w = await world();
+  const storeId = 'mail-store';
+  w.s.db
+    .insert(coordinatorConversation)
+    .values({
+      threadId: w.threadId,
+      storeId,
+      conversationId: '9',
+      mailOwnerConversationId: '3',
+      piVersion: '1.5.0',
+      updatedAt: 1,
+    })
+    .run();
+  w.s.db
+    .insert(coordinatorInput)
+    .values({
+      id: 'mail-receipt',
+      threadId: w.threadId,
+      stepId: 'mail-step-gone',
+      kind: 'initial',
+      ownerMessageIds: [],
+      content: 'mail',
+      conversationId: coordinatorConversationKey(storeId, '9'),
+      state: 'pending',
+      createdAt: 1,
+    })
+    .run();
+  const coordinator = boot(w, stub('ok').faux);
+  coordinator.wake(w.threadId);
+  await coordinator.idle();
+  expect(
+    w.s.db.select().from(coordinatorInput).where(eq(coordinatorInput.id, 'mail-receipt')).get(),
+  ).toMatchObject({ state: 'released' });
+  expect(
+    w.s.db
+      .select()
+      .from(coordinatorConversation)
+      .where(eq(coordinatorConversation.threadId, w.threadId))
+      .get(),
+  ).toMatchObject({ mailOwnerConversationId: null });
+  expect(
+    w.s.db
+      .select()
+      .from(coordinatorConversation)
+      .where(eq(coordinatorConversation.threadId, w.threadId))
+      .get()?.conversationId,
+  ).not.toBe('9');
 });
 
 it('restores the persisted owner conversation after an interrupted mail wake', () => {

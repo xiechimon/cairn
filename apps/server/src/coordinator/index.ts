@@ -38,7 +38,7 @@ import {
   scrubProviderError,
 } from './credentials.js';
 import { acquireLease, type Lease, LeaseHeldError } from './lease.js';
-import { restoreInterruptedMailConversation } from './mail-owner.js';
+import { settleInterruptedMailConversation } from './mail-owner.js';
 import { createMemoryFlush } from './memory-flush.js';
 import {
   COLD_RECENT_EXCHANGES,
@@ -350,7 +350,6 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     try {
       const lease = acquireLease(db, threadId, owner);
       leases.set(threadId, lease);
-      restoreInterruptedMailConversation(db, threadId);
       return lease;
     } catch (error) {
       if (error instanceof LeaseHeldError) return null;
@@ -624,6 +623,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       if (closing) return;
       dirty.delete(threadId);
       if (heldLease(threadId) === null) return;
+      await settleInterruptedMailConversation(db, threadId, () => runtime.recoverThread(threadId));
       if (!runtime.isOpen(threadId)) migrateUnfetchedCoordinatorInputs(db, threadId, owner);
       const pending = db
         .select()
