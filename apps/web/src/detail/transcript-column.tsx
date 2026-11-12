@@ -36,6 +36,7 @@ interface TranscriptColumnProps {
   agent: { displayName: string; avatarUrl: string | null } | null;
   onOpenPlan?: () => void;
   lead?: ReactNode;
+  result?: ReactNode;
   autoScroll: boolean;
   running?: boolean;
   settled?: boolean;
@@ -64,6 +65,7 @@ function TranscriptColumnInner({
   agent,
   onOpenPlan,
   lead,
+  result,
   running,
   settled = true,
   threadKey,
@@ -106,6 +108,7 @@ function TranscriptColumnInner({
             liveStep={liveStep}
             agent={agent}
             onOpenPlan={onOpenPlan}
+            result={result}
           />
         </MessageScrollerContent>
       </FadeScrollerViewport>

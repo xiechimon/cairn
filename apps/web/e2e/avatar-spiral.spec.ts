@@ -46,13 +46,15 @@ test('account head shares the seeded user src (same identity as the sidebar chip
   await expect(page.locator('.account-avatar img')).toHaveAttribute('src', USER_SRC);
 });
 
-test('a working agent shows a pulse under the last line; finished rows stay still', async ({
+test('a working agent shows typing dots under the last line; finished rows stay still', async ({
   page,
 }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=26');
-  await expect(page.getByTestId('live-pulse')).toHaveCount(1);
-  await expect(page.getByTestId('live-pulse')).toHaveCSS('animation-name', 'live-pulse');
-  await expect(page.locator('.chat-row--agent').first().getByTestId('live-pulse')).toHaveCount(0);
+  const live = page.locator('.side-panel').getByTestId('live-row');
+  await expect(live).toHaveCount(1);
+  await expect(live.getByTestId('typing-dot')).toHaveCount(3);
+  await expect(live.getByTestId('typing-dot').first()).toHaveCSS('animation-name', 'typing-hop');
+  await expect(page.locator('.chat-row--agent').first().getByTestId('typing-dot')).toHaveCount(0);
 });
 
 test('the unbound chief reply carries no face and no avatar column', async ({ page }) => {

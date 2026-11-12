@@ -136,11 +136,16 @@ async function geometry(page: Page) {
     const cardEl = document.querySelector('.side-panel [data-testid="composer-card"]')!;
     const ta = cardEl.querySelector('textarea')!.getBoundingClientRect();
     const send = cardEl.querySelector('.composer-send')!.getBoundingClientRect();
-    const plus = cardEl.querySelector('[data-testid="composer-plus"]')!.getBoundingClientRect();
+    const card = cardEl.getBoundingClientRect();
+    const plus = document
+      .querySelector('.side-panel [data-testid="composer-plus"]')!
+      .getBoundingClientRect();
     return {
-      cardHeight: cardEl.getBoundingClientRect().height,
+      cardHeight: card.height,
       clearOfSend: ta.right <= send.left,
-      clearOfPlus: ta.left >= plus.right,
+      plusInCard: cardEl.querySelector('[data-testid="composer-plus"]') !== null,
+      plusBelowCard: Math.round(plus.top - card.bottom),
+      plusInset: Math.round(plus.left - card.left),
       bottomsAligned: Math.abs(ta.bottom - send.bottom) <= 1,
     };
   });
@@ -154,7 +159,13 @@ test('CDS composer: one line at rest, like the main composer', async ({ page }) 
   await expect(card.locator('textarea')).toHaveAttribute('placeholder', /回复这个任务|开始后才能回复/);
   const geom = await geometry(page);
   expect(Math.round(geom.cardHeight)).toBe(46);
-  expect(geom).toMatchObject({ clearOfSend: true, clearOfPlus: true, bottomsAligned: true });
+  expect(geom).toMatchObject({
+    clearOfSend: true,
+    plusInCard: false,
+    plusBelowCard: 6,
+    plusInset: 6,
+    bottomsAligned: true,
+  });
   await evidencePanelShot(page, 'one-line.png', card);
 });
 
@@ -170,7 +181,8 @@ test('CDS composer: a multi-line draft grows the card and the text never runs un
   await expect.poll(async () => (await geometry(page)).cardHeight).toBeGreaterThan(44);
   expect(await geometry(page)).toMatchObject({
     clearOfSend: true,
-    clearOfPlus: true,
+    plusInCard: false,
+    plusBelowCard: 6,
     bottomsAligned: true,
   });
   await evidencePanelShot(page, 'after.png', card);

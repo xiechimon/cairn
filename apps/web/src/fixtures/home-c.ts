@@ -187,6 +187,7 @@ export const homeC: FixtureSet = {
       transcript: [],
     },
     'home-c-working-a': detailBuilding(true).detail ?? { transcript: [] },
+    'home-c-working-c': { transcript: [{ kind: 'streaming', label: '处理中...' }] },
   },
   schedules: [
     scheduleOnce,

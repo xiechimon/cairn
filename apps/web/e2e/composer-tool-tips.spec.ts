@@ -13,9 +13,10 @@ async function expectTip(page: Page, button: Locator, label: string) {
 test('detail composer tools name themselves on hover', async ({ page }) => {
   await page.goto(DETAIL);
   const toolbar = page.getByTestId('composer-toolbar');
-  await expectTip(page, toolbar.getByRole('button', { name: '更多' }), '更多');
+  const plus = page.locator('.side-panel [data-testid="composer-plus"]');
+  await expectTip(page, plus, '更多');
   await expectTip(page, toolbar.getByRole('button', { name: '发送' }), '发送');
-  await toolbar.getByRole('button', { name: '更多' }).click();
+  await plus.click();
   await expect(page.getByRole('menuitem', { name: '添加附件' })).toBeVisible();
 });
 

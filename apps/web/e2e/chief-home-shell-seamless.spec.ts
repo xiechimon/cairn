@@ -107,7 +107,7 @@ for (const theme of ['light', 'dark'] as const) {
       for (const thread of [false, true]) {
         if (thread) {
           await page.goto('/app?scenario=home-c&thread=home-c-review');
-          await expect(page.getByTestId('side-chat-action')).toBeVisible();
+          await expect(page.locator('.side-panel .composer')).toBeVisible();
         }
         const clipped = await page.locator('[data-slot="thread-card"], [data-testid="chief-task-ref"], .chief-composer, .side-panel .composer, [data-testid="side-chat-action"], .side-panel [data-trace-card]').evaluateAll((nodes) => {
           const failures: string[] = [];

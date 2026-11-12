@@ -85,7 +85,8 @@ test('charter: `取消`/save charter stay in the viewport', async ({ page }) => 
 
 test('accept(34): `取消`/done stay in the viewport', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34');
-  await page.getByTestId('side-chat-action').getByRole('button', { name: '完成…' }).click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
+  await page.getByRole('menuitem', { name: '完成' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await expectShellCapped(dialog);

@@ -15,7 +15,7 @@ const CONTEXT_RESUME_SHORT: Record<ContextResumeState, string> = {
   idle: '空闲',
 };
 
-const METER_BTN_CLS =
+export const METER_BTN_CLS =
   'h-7 w-auto gap-1.5 px-1.5 pointer-coarse:h-11 cursor-default rounded-(--radius-control) text-caption font-normal tabular-nums text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-secondary) dark:hover:bg-(--menu-hover) dark:hover:text-(--text-secondary)';
 
 const VIEW = 24;
@@ -88,7 +88,7 @@ function contextMeterLabel(
     : t('上下文 {percent}%', { percent: filled });
 }
 
-function ContextMeterGlyph({ filled }: { filled: number }) {
+export function ContextMeterGlyph({ filled }: { filled: number }) {
   const arc = contextMeterArcPath(filled);
   return (
     <svg viewBox={`0 0 ${VIEW} ${VIEW}`} aria-hidden="true" className="size-3.5">

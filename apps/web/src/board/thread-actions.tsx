@@ -26,7 +26,7 @@ import { MoveToProjectSub } from './task-move-menu.js';
 import { RenameDialog } from './task-row-menu.js';
 import type { ThreadChat } from './use-thread-chat.js';
 
-export type ThreadActionKind = 'start' | 'approve' | 'finish' | 'retry' | 'unarchive';
+export type ThreadActionKind = 'start' | 'approve' | 'retry' | 'unarchive';
 
 export function threadActionOf(todo: TodoRecord, running: boolean): ThreadActionKind | null {
   if (todo.archivedAt != null) return 'unarchive';
@@ -36,8 +36,6 @@ export function threadActionOf(todo: TodoRecord, running: boolean): ThreadAction
       return 'start';
     case 'confirm':
       return 'approve';
-    case 'review':
-      return 'finish';
     case 'failed':
       return 'retry';
     default:
@@ -48,7 +46,6 @@ export function threadActionOf(todo: TodoRecord, running: boolean): ThreadAction
 const ACTION_COPY: Record<ThreadActionKind, { reason: string; primary: string }> = {
   start: { reason: '还没开始。', primary: '开始' },
   approve: { reason: '计划已就绪。要改计划，直接在下面回复。', primary: '批准计划' },
-  finish: { reason: '已就绪，等你审阅。要改，直接在下面回复。', primary: '完成…' },
   retry: { reason: '失败了。可以重试，或在下面回复说明怎么改。', primary: '重试' },
   unarchive: { reason: '这个任务已归档。取消归档后才能发消息。', primary: '取消归档' },
 };
@@ -63,13 +60,11 @@ export function useThreadActions({
   chat,
   onGone,
   onViewPlan,
-  onUsage,
 }: {
   todo: TodoRecord;
   chat: ThreadChat;
   onGone: () => void;
   onViewPlan: (() => void) | undefined;
-  onUsage: (() => void) | undefined;
 }): ThreadActions {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
@@ -159,11 +154,9 @@ export function useThreadActions({
   const runPrimary: Record<ThreadActionKind, () => void> = {
     start: orchestrate,
     approve,
-    finish: openAccept,
     retry: orchestrate,
     unarchive: setArchived(false),
   };
-  const canFinishFailed = !archived && phase === 'failed' && chat.buildLegDone;
 
   const card =
     kind === null ? null : kind === 'unarchive' ? (
@@ -188,7 +181,7 @@ export function useThreadActions({
       <div
         data-testid="side-chat-action"
         data-action={kind}
-        className="mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-wrap items-center gap-2 text-ui"
+        className="mx-auto mb-4 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-wrap gap-3"
       >
         <Tooltip>
           <TooltipTrigger
@@ -213,11 +206,6 @@ export function useThreadActions({
         {kind === 'approve' && onViewPlan !== undefined && (
           <Button variant="ghost" onClick={onViewPlan} className={cn(REPLY_CHIP_CLS, 'w-auto')}>
             {t('查看计划')}
-          </Button>
-        )}
-        {canFinishFailed && (
-          <Button variant="ghost" onClick={openAccept} className={cn(REPLY_CHIP_CLS, 'w-auto')}>
-            {t('完成…')}
           </Button>
         )}
       </div>
@@ -274,14 +262,6 @@ export function useThreadActions({
           setDialog('rename');
         }}
         moveSub={<MoveToProjectSub todo={todo} />}
-        {...(onUsage !== undefined
-          ? {
-              onUsage: () => {
-                setMenuOpen(false);
-                onUsage();
-              },
-            }
-          : {})}
       />
       {dialog === 'rename' && <RenameDialog todo={todo} open onClose={() => setDialog(null)} />}
       <DeleteConfirm

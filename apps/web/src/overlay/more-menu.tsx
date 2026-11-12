@@ -1,4 +1,4 @@
-import { Archive, CircleStop, Gauge, Pencil, Route, Undo2 } from 'lucide-react';
+import { Archive, CircleStop, Pencil, Route, Undo2 } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { DropdownMenu, DropdownMenuSeparator } from '../components/ui/dropdown-menu.js';
@@ -20,7 +20,6 @@ interface MoreMenuProps {
   onRouteOverride?: () => void;
   onRename?: () => void;
   moveSub?: ReactNode;
-  onUsage?: () => void;
   anchor?: ComponentProps<typeof KeyedMenuContent>['anchor'];
 }
 
@@ -41,7 +40,6 @@ export function MoreMenu({
   onRouteOverride,
   onRename,
   moveSub,
-  onUsage,
   anchor,
 }: MoreMenuProps) {
   const { t } = useI18n();
@@ -68,19 +66,6 @@ export function MoreMenu({
             action: 'rename',
             disabled: false,
             onClick: onRename,
-          },
-        ]
-      : []),
-    ...(onUsage !== undefined
-      ? [
-          {
-            key: 'usage',
-            shortcut: 'U',
-            label: t('用量'),
-            Icon: Gauge,
-            action: 'usage',
-            disabled: false,
-            onClick: onUsage,
           },
         ]
       : []),

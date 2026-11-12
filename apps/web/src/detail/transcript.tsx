@@ -1,7 +1,7 @@
 import type { StepPromptOrigin } from '@cairn/shared';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
-import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
+import { LiveRow, LiveSignal, TypingDots } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
 import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Button } from '../components/ui/button.js';
@@ -32,6 +32,7 @@ interface TranscriptProps {
   liveStep?: LiveStep | null;
   agent?: { displayName: string; avatarUrl: string | null } | null;
   onOpenPlan?: () => void;
+  result?: ReactNode;
 }
 
 function formatElapsed(seconds: number, t: TFunc): string {
@@ -43,10 +44,6 @@ const ROW_BASE = 'chat-row flex items-start';
 const AGENT_ROW = 'chat-row chat-row--agent flex flex-col items-start';
 
 const SCROLLER_ITEM_STYLE = { contentVisibility: 'visible' } as const;
-
-function prevRunningWork(prev: TranscriptItem | undefined): boolean {
-  return prev?.kind === 'work' && prev.steps.some((step) => step.kind === 'call' && step.running);
-}
 
 function endsWithAgentRow(item: TranscriptItem | undefined): boolean {
   if (item == null) return false;
@@ -125,7 +122,7 @@ function ActionRow({
 
 function Para({ para, gap = false }: { para: RobotPara; gap?: boolean }) {
   const quoteSkin =
-    'border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 [background-clip:content-box] text-(--text-secondary)';
+    'border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 [background-clip:content-box] text-foreground';
   if (para.quote === true) {
     return (
       <p className={`${PARA} ${quoteSkin}${gap ? ` ${PARA_GAP}` : ''}`}>
@@ -200,7 +197,7 @@ function Row({
               <div className="text-meta text-(--text-tertiary)">{q.header}</div>
               <div className="text-foreground">{q.question}</div>
               {q.options.length > 0 && (
-                <ul className="list-disc pl-5 text-(--text-secondary)">
+                <ul className="list-disc pl-5 text-foreground">
                   {q.options.map((o) => (
                     <li key={o.label}>
                       {o.label}
@@ -287,7 +284,7 @@ function Row({
               <span className="flex h-5 flex-none items-center rounded-(--cds-radius-sm) bg-(--muted) px-2 text-caption text-(--text-secondary)">
                 #{item.seq}
               </span>
-              <span className="ml-1 min-w-0 truncate text-meta leading-5 text-(--text-secondary)">
+              <span className="ml-1 min-w-0 truncate text-meta leading-5 text-foreground">
                 {item.title}
               </span>
             </div>
@@ -364,16 +361,15 @@ function Row({
     case 'streaming':
       return (
         <div className={`${AGENT_ROW} ${margin} [&>*]:max-w-full`} data-row="agent">
-          <LiveRow
-            variant="detail"
-            label={item.label}
-            labelVars={item.labelVars}
-            quiet={prevRunningWork(prev) && liveStep == null}
-            disclosure={
-              liveStep != null ? { expand: '展开实时步骤', collapse: '收起实时步骤' } : null
-            }
-          >
-            {liveStep != null && (
+          {liveStep == null ? (
+            <TypingDots testId="live-row" label={t(item.label, item.labelVars)} />
+          ) : (
+            <LiveRow
+              variant="detail"
+              label={item.label}
+              labelVars={item.labelVars}
+              disclosure={{ expand: '展开实时步骤', collapse: '收起实时步骤' }}
+            >
               <div className="mt-1 flex flex-col gap-0.5 text-meta text-(--text-tertiary)">
                 <span className="[overflow-wrap:anywhere]">
                   {t('本步：{n}', { n: liveStep.step })}
@@ -396,14 +392,14 @@ function Row({
                 ))}
                 <LiveSignal at={item.signalAt} className="[overflow-wrap:anywhere]" />
               </div>
-            )}
-          </LiveRow>
+            </LiveRow>
+          )}
         </div>
       );
     case 'plan':
       return (
         <>
-          <div className="chat-plan mt-3.5 flex items-center text-meta text-(--text-secondary) [&_svg]:text-(--text-tertiary)">
+          <div className="chat-plan mt-3.5 flex items-center text-meta text-foreground [&_svg]:text-(--text-tertiary)">
             <FileTab width={16} height={16} />
             <span className="chat-plan-title ml-1.5">{item.title}</span>
             {onOpenPlan != null ? (
@@ -421,7 +417,7 @@ function Row({
               </span>
             )}
           </div>
-          <div className="chat-preview mt-2 max-h-10 flex-none overflow-hidden pr-6 text-meta leading-5 text-(--text-tertiary) [mask-image:linear-gradient(to_bottom,black_50%,transparent)]">
+          <div className="chat-preview mt-2 max-h-10 flex-none overflow-hidden pr-6 text-meta leading-5 text-foreground [mask-image:linear-gradient(to_bottom,black_50%,transparent)]">
             {item.preview}
           </div>
           <ActionRow
@@ -504,7 +500,7 @@ function Row({
                 )}
                 {(f.file !== undefined || f.line !== undefined) && (
                   <p
-                    className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 text-meta [background-clip:content-box] text-(--text-secondary)`}
+                    className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 text-meta [background-clip:content-box] text-foreground`}
                   >
                     <Segments
                       segments={inlineSegments(
@@ -516,7 +512,7 @@ function Row({
                 )}
                 {f.suggestion !== undefined && f.suggestion !== '' && (
                   <p
-                    className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 text-meta [background-clip:content-box] text-(--text-secondary)`}
+                    className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 text-meta [background-clip:content-box] text-foreground`}
                   >
                     <Segments
                       segments={inlineSegments(t('建议：{body}', { body: f.suggestion }))}
@@ -564,7 +560,7 @@ function Row({
             {item.evidence.map((e) => (
               <p
                 key={e.path}
-                className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 text-meta [background-clip:content-box] text-(--text-secondary)`}
+                className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 text-meta [background-clip:content-box] text-foreground`}
                 data-testid="verify-evidence"
               >
                 <Segments
@@ -612,7 +608,7 @@ function FailRow({
       >
         <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{title}</p>
         {item.body !== '' && (
-          <p className={`${PARA} ${PARA_GAP} text-(--text-tertiary)`}>{t(item.body)}</p>
+          <p className={`${PARA} ${PARA_GAP} text-foreground`}>{t(item.body)}</p>
         )}
         {item.title !== '' && (
           <p
@@ -745,6 +741,7 @@ export function Transcript({
   agent = null,
   onOpenPlan,
   liveStep = null,
+  result,
 }: TranscriptProps) {
   const { t } = useI18n();
   const previous = useRef<{ live: boolean; ids: Set<string> }>({ live: false, ids: new Set() });
@@ -768,26 +765,35 @@ export function Transcript({
     previous.current = { live, ids };
   });
   const lastWork = shouldExpandLastWork(workItems) ? workItems.at(-1) : undefined;
+  const resultAt =
+    transcript.at(-1)?.kind === 'streaming' ? transcript.length - 1 : transcript.length;
+  const rows = transcript.map((item, index) => {
+    const id = 'id' in item ? item.id : undefined;
+    return (
+      <MessageScrollerItem key={id ?? index} messageId={id} style={SCROLLER_ITEM_STYLE}>
+        <Row
+          item={item}
+          prev={transcript[index - 1]}
+          t={t}
+          onOpenPlan={onOpenPlan}
+          agent={agent}
+          liveStep={liveStep}
+          defaultExpanded={item === lastWork}
+          entering={entering}
+        />
+      </MessageScrollerItem>
+    );
+  });
 
   return (
     <>
-      {transcript.map((item, index) => {
-        const id = 'id' in item ? item.id : undefined;
-        return (
-          <MessageScrollerItem key={id ?? index} messageId={id} style={SCROLLER_ITEM_STYLE}>
-            <Row
-              item={item}
-              prev={transcript[index - 1]}
-              t={t}
-              onOpenPlan={onOpenPlan}
-              agent={agent}
-              liveStep={liveStep}
-              defaultExpanded={item === lastWork}
-              entering={entering}
-            />
-          </MessageScrollerItem>
-        );
-      })}
+      {rows.slice(0, resultAt)}
+      {result != null && (
+        <MessageScrollerItem key="transcript-result" style={SCROLLER_ITEM_STYLE}>
+          {result}
+        </MessageScrollerItem>
+      )}
+      {rows.slice(resultAt)}
     </>
   );
 }

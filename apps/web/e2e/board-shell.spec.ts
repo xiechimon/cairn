@@ -42,7 +42,7 @@ for (const viewport of [{ width: 1440, height: 732 }, { width: 390, height: 844 
             : sheet
               ? sheet.getBoundingClientRect().bottom - Number.parseFloat(getComputedStyle(sheet).borderBottomWidth)
               : window.innerHeight;
-          const block = element.matches('.chief-composer') ? element.parentElement ?? element : element;
+          const block = element.parentElement ?? element;
           return floor - block.getBoundingClientRect().bottom;
         });
         gaps.push(gap);

@@ -53,7 +53,7 @@ export function ThreadLead({
               {origin.text}
             </UserMessageBubble>
           )}
-          <ThreadOriginLine origin={origin} onJump={onJumpToOrigin} />
+          <ThreadOriginLine onJump={onJumpToOrigin} />
         </div>
       )}
     </div>

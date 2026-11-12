@@ -3,7 +3,8 @@ import { evidenceShot } from './evidence';
 
 async function openAccept(page: Page) {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34');
-  await page.getByTestId('side-chat-action').getByRole('button', { name: '完成…' }).click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
+  await page.getByRole('menuitem', { name: '完成' }).click();
 
   const dialog = page.getByRole('dialog', { name: '完成任务' });
   await expect(dialog).toBeVisible();

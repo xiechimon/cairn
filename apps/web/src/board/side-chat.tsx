@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { REPLY_SOURCE_ATTR } from '../chief/selection-reply-model.js';
+import { TraceCard } from '../components/chat/trace-parts.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { SidePanel } from '../components/side-panel.js';
@@ -37,7 +38,12 @@ import {
   threadUpdates,
 } from './thread-panel-model.js';
 import { ThreadPrPanel } from './thread-pr-panel.js';
-import { ThreadUsageDisclosure } from './thread-usage-footer.js';
+import {
+  ThreadUsageDetails,
+  ThreadUsageRing,
+  type ThreadUsageView,
+  threadUsageShown,
+} from './thread-usage-ring.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
 import { useThreadMentions } from './use-thread-mentions.js';
 import { useThreadUsage } from './use-thread-usage.js';
@@ -110,7 +116,12 @@ function Unavailable({ chat }: { chat: ThreadChat }) {
       data-state={chat.load}
       className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center"
     >
-      <p className="m-0 text-ui text-content-tertiary">
+      <p
+        className={cn(
+          'm-0 text-ui',
+          chat.load === 'loading' ? 'text-content-tertiary' : 'text-foreground',
+        )}
+      >
         {chat.load === 'loading'
           ? t('加载中…')
           : chat.load === 'error'
@@ -166,7 +177,12 @@ function ChangesView({ chat, now }: { chat: ThreadChat; now: number }) {
         data-state={changes.status}
         className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center"
       >
-        <p className="m-0 text-ui text-content-tertiary">
+        <p
+          className={cn(
+            'm-0 text-ui',
+            changes.status === 'loading' ? 'text-content-tertiary' : 'text-foreground',
+          )}
+        >
           {changes.status === 'loading' ? t('加载中…') : t('变更加载失败')}
         </p>
         {changes.status === 'error' && (
@@ -197,47 +213,32 @@ function ChangesView({ chat, now }: { chat: ThreadChat; now: number }) {
   );
 }
 
-function ChangesButton({
-  changes,
-  active,
-  onToggle,
-}: {
-  changes: ThreadChanges;
-  active: boolean;
-  onToggle: () => void;
-}) {
+function ChangesCard({ changes, onOpen }: { changes: ThreadChanges; onOpen: () => void }) {
   const { t } = useI18n();
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            variant="ghost"
-            aria-pressed={active}
-            aria-label={active ? t('返回对话') : t('查看变更')}
-            data-testid="side-chat-changes"
-            onClick={onToggle}
-            className={cn(
-              'h-9 flex-none gap-1 px-2 text-meta text-content-secondary max-[640px]:h-8',
-              active && 'bg-(--menu-hover) text-foreground',
-            )}
-          />
-        }
+    <TraceCard className="mt-5 w-fit max-w-full">
+      <Button
+        variant="ghost"
+        data-testid="side-chat-changes"
+        data-state={changes.status}
+        aria-description={t('查看变更')}
+        onClick={onOpen}
+        className="h-10 max-w-full justify-start gap-2 border-0 px-3 text-ui font-normal text-foreground hover:bg-(--menu-hover) pointer-coarse:h-11 dark:hover:bg-(--menu-hover)"
       >
-        <FileDiff aria-hidden="true" className="size-5" />
+        <FileDiff aria-hidden="true" className="size-5 flex-none text-content-secondary" />
+        <span className="min-w-0 truncate">
+          {changes.status === 'ready'
+            ? t('改动 {n} 个文件', { n: changes.fileCount })
+            : t('变更加载失败')}
+        </span>
         {changes.status === 'ready' && (
-          <>
-            <span className="text-(--diff-add-fg) tabular-nums">+{changes.added}</span>
-            {changes.removed > 0 && (
-              <span className="text-destructive tabular-nums">−{changes.removed}</span>
-            )}
-          </>
+          <span className="flex flex-none gap-2 pl-2 text-meta tabular-nums">
+            <span className="text-(--diff-add-fg)">+{changes.added}</span>
+            {changes.removed > 0 && <span className="text-destructive">−{changes.removed}</span>}
+          </span>
         )}
-      </TooltipTrigger>
-      <TooltipContent side="bottom" sideOffset={8}>
-        {active ? t('返回对话') : t('查看变更')}
-      </TooltipContent>
-    </Tooltip>
+      </Button>
+    </TraceCard>
   );
 }
 
@@ -246,23 +247,27 @@ function ThreadBody({
   todo,
   actions,
   view,
+  onViewChanges,
   now,
   updates,
   origin,
   onJumpToOrigin,
   onOpenPlan,
   onClose,
+  usage,
 }: {
   chat: ThreadChat;
   todo: TodoRecord;
   actions: ThreadActions;
   view: ThreadView;
+  onViewChanges: () => void;
   now: number;
   updates: ThreadUpdates | null;
   origin: ThreadOrigin | null;
   onJumpToOrigin: () => void;
   onOpenPlan: (() => void) | undefined;
   onClose: () => void;
+  usage: ThreadUsageView | null;
 }) {
   const { t } = useI18n();
   const mentions = useThreadMentions(todo.projectId);
@@ -293,6 +298,11 @@ function ThreadBody({
               origin={origin}
               onJumpToOrigin={onJumpToOrigin}
             />
+          }
+          result={
+            chat.changes.status === 'ready' || chat.changes.status === 'error' ? (
+              <ChangesCard changes={chat.changes} onOpen={onViewChanges} />
+            ) : undefined
           }
           hasEarlier={chat.hasEarlier}
           {...(chat.earlier !== undefined ? { earlier: chat.earlier } : {})}
@@ -351,6 +361,12 @@ function ThreadBody({
           onSendQueuedNow={chat.sendQueuedNow}
           onRemoveQueued={chat.removeQueued}
           onEditQueued={chat.editQueued}
+          {...(usage !== null
+            ? {
+                meter: <ThreadUsageRing key={todo.id} {...usage} />,
+                menuMeter: <ThreadUsageDetails {...usage} className="px-2.5 py-2" />,
+              }
+            : {})}
         />
       )}
     </>
@@ -473,14 +489,7 @@ function ReadyThread({
   const [planOpen, setPlanOpen] = useState(false);
   const openPlan = chat.planDoc !== undefined ? () => setPlanOpen(true) : undefined;
   const usage = useThreadUsage(todo);
-  const [usageFor, setUsageFor] = useState<string | null>(null);
-  const actions = useThreadActions({
-    todo,
-    chat,
-    onGone: onClose,
-    onViewPlan: openPlan,
-    onUsage: usage.hasRuns ? () => setUsageFor(todo.id) : undefined,
-  });
+  const actions = useThreadActions({ todo, chat, onGone: onClose, onViewPlan: openPlan });
   const { live, teamId } = useLiveData();
   const prs = usePrs(teamId, todo.id, live);
   const prRows = prs.data ?? [];
@@ -503,22 +512,12 @@ function ReadyThread({
       <Head
         todoId={todo.id}
         todo={todo}
-        onBack={onClose}
+        onBack={view === 'changes' ? () => onView('chat') : onClose}
+        backLabel={view === 'changes' ? t('返回对话') : t('返回')}
         onClose={onCloseAll}
         menu={actions.menu}
         titleExtra={<ThreadAutomations key={todo.id} todo={todo} now={now} />}
         tooltip={`#${todo.seqNum} ${todo.title}`}
-        {...(chat.changes.status !== 'none'
-          ? {
-              changesButton: (
-                <ChangesButton
-                  changes={chat.changes}
-                  active={view === 'changes'}
-                  onToggle={() => onView(view === 'changes' ? 'chat' : 'changes')}
-                />
-              ),
-            }
-          : {})}
       >
         <StatusLine
           todo={todo}
@@ -540,27 +539,19 @@ function ReadyThread({
         todo={todo}
         actions={actions}
         view={view}
+        onViewChanges={() => onView('changes')}
         now={now}
         updates={updates}
         origin={origin}
         onJumpToOrigin={jumpToOrigin}
         onOpenPlan={openPlan}
         onClose={onClose}
+        usage={
+          usage.hasRuns && threadUsageShown(usage.summary, usage.state)
+            ? { summary: usage.summary, state: usage.state, onRetry: usage.retry }
+            : null
+        }
       />
-      <DialogShell
-        open={usageFor === todo.id}
-        onClose={() => setUsageFor(null)}
-        size="s"
-        title={t('用量')}
-        subtitle={`#${todo.seqNum} ${todo.title}`}
-      >
-        <ThreadUsageDisclosure
-          summary={usage.summary}
-          state={usage.state}
-          onRetry={usage.retry}
-          defaultOpen
-        />
-      </DialogShell>
       <DialogShell
         open={planOpen}
         onClose={() => setPlanOpen(false)}
@@ -589,7 +580,7 @@ function Head({
   onBack,
   onClose,
   menu,
-  changesButton,
+  backLabel,
   titleExtra,
   tooltip,
   children,
@@ -599,21 +590,18 @@ function Head({
   onBack: () => void;
   onClose: () => void;
   menu?: ReactNode;
-  changesButton?: ReactNode;
+  backLabel?: string;
   titleExtra?: ReactNode;
   tooltip?: string;
   children?: ReactNode;
 }) {
   const { t } = useI18n();
   const title = (
-    <h2 className="m-0 min-w-0 truncate text-heading leading-5 font-normal text-foreground">
-      {todo != null ? (
-        <>
-          <span className="text-content-tertiary tabular-nums">#{todo.seqNum}</span> {todo.title}
-        </>
-      ) : (
-        t('任务')
-      )}
+    <h2
+      aria-label={todo != null ? `#${todo.seqNum} ${todo.title}` : undefined}
+      className="m-0 min-w-0 truncate text-ui leading-5 font-normal text-foreground"
+    >
+      {todo != null ? todo.title : t('任务')}
     </h2>
   );
   return (
@@ -621,10 +609,10 @@ function Head({
       data-testid="side-chat"
       data-todo-id={todoId}
       data-phase={todo?.phase}
-      className="flex min-h-17 flex-none items-center gap-0.5 py-3.5 pr-3.5 pl-1.5"
+      className="flex min-h-17 flex-none items-center gap-0.5 py-3.5 pr-3.5 pl-1"
     >
       <IconTooltip
-        label={t('返回')}
+        label={backLabel ?? t('返回')}
         side="bottom"
         trigger={
           <Button
@@ -641,11 +629,14 @@ function Head({
       <span
         aria-hidden="true"
         data-slot="side-chat-glyph"
-        className="ml-1.5 flex size-7 flex-none items-center justify-center rounded-(--cds-radius-md) border border-border bg-background"
+        className="ml-1.5 flex size-6 flex-none items-center justify-center rounded-(--cds-radius-md) bg-background shadow-(--e1-lift)"
       >
         <ListChecks className="size-4 text-content-secondary" />
       </span>
-      <div data-slot="side-chat-titles" className="flex min-w-0 flex-1 flex-col gap-0.5 pr-1 pl-3">
+      <div
+        data-slot="side-chat-titles"
+        className="flex min-w-0 flex-1 flex-col gap-0.5 pr-1 pl-2.5"
+      >
         <div className="flex min-w-0 items-center gap-1.5">
           {tooltip === undefined ? (
             title
@@ -661,7 +652,6 @@ function Head({
         </div>
         {children}
       </div>
-      {changesButton}
       {menu}
       <IconTooltip
         label={t('关闭')}

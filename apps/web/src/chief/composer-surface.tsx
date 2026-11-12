@@ -46,19 +46,19 @@ export const TOOL_BTN_CLS =
 export const PROJECT_CHIP_CLS =
   "h-7 max-w-48 cursor-pointer gap-1.5 rounded-lg border-none bg-transparent px-2 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) data-[set]:bg-(--menu-hover) data-[set]:text-(--foreground) [&_svg:not([class*='size-'])]:size-auto";
 
-const SEND_BTN_CLS =
+export const SEND_BTN_CLS =
   'ml-auto size-7 cursor-pointer rounded-(--radius-control) border-0 bg-transparent text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-secondary) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent';
-const SEND_ON_CLS =
+export const SEND_ON_CLS =
   'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button)/90 hover:text-(--text-on-accent) dark:hover:bg-(--card-button)/90 dark:hover:text-(--text-on-accent)';
-const STOP_CLS =
+export const STOP_CLS =
   'text-foreground hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover)';
-const ROUND_HIT_CLS =
+export const ROUND_HIT_CLS =
   'group/round -m-1.5 size-11 flex-none cursor-pointer rounded-full border-0 bg-transparent p-0 text-foreground hover:bg-transparent dark:hover:bg-transparent aria-expanded:bg-transparent';
-const ROUND_FACE_CLS = 'grid size-8 place-items-center rounded-full';
-const HOME_COMPOSER_CLS =
+export const ROUND_FACE_CLS = 'grid size-8 place-items-center rounded-full';
+export const HOME_COMPOSER_CLS =
   'mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-chat flex-none';
-const MENU_CONTENT_CLS = 'w-auto max-w-80 min-w-56';
-const COMPOSER_FIELD_CLS =
+export const MENU_CONTENT_CLS = 'w-auto max-w-80 min-w-56';
+export const COMPOSER_FIELD_CLS =
   'shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)';
 
 export interface ComposerSurfaceHandle {

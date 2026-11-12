@@ -62,8 +62,8 @@ test('composer toolbar drops the `语音输入` button, keeps attachment', async
   const toolbar = page.locator('.composer-toolbar');
   await expect(toolbar).toBeVisible();
 
-  await expect(toolbar.locator('button[aria-label="语音输入"]')).toHaveCount(0);
-  await toolbar.locator('button[aria-label="更多"]').click();
+  await expect(page.locator('.side-panel button[aria-label="语音输入"]')).toHaveCount(0);
+  await page.locator('.side-panel [data-testid="composer-plus"]').click();
   await expect(page.getByRole('menuitem', { name: '添加附件' })).toBeVisible();
 });
 

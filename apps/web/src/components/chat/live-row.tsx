@@ -56,16 +56,25 @@ function TypingDotMarks() {
   ));
 }
 
-export function TypingDots({ className }: { className?: string }) {
+export function TypingDots({
+  className,
+  label,
+  testId = 'typing-dots',
+}: {
+  className?: string;
+  label?: string;
+  testId?: string;
+}) {
   const { t } = useI18n();
   return (
     <span
       role="status"
-      aria-label={t('正在回复')}
-      data-testid="typing-dots"
+      aria-label={label === undefined ? t('正在回复') : undefined}
+      data-testid={testId}
       className={`${TYPING_PILL} ${className ?? ''}`}
     >
       <TypingDotMarks />
+      {label !== undefined && <span className="sr-only">{label}</span>}
     </span>
   );
 }
