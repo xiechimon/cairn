@@ -8,6 +8,7 @@ import {
   FolderOutput,
   FolderPlus,
   Funnel,
+  House,
   ListChecks,
   Pencil,
   RotateCcw,
@@ -166,6 +167,7 @@ export interface ProjectMenuActions {
   onArchive: () => void;
   onRename: (name: string) => Promise<void>;
   onDelete: () => void;
+  onHome: () => void;
   onTasks: () => void;
   onSettings: () => void;
   onInstructions: () => void;
@@ -179,6 +181,7 @@ export function SidebarProjectMenu({
   onArchive,
   onRename,
   onDelete,
+  onHome,
   onTasks,
   onSettings,
   onInstructions,
@@ -198,6 +201,10 @@ export function SidebarProjectMenu({
           <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={() => setDialog('rename')}>
             <Pencil />
             {t('重命名')}
+          </DropdownMenuItem>
+          <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onHome}>
+            <House />
+            {t('项目主页')}
           </DropdownMenuItem>
           <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onTasks}>
             <ListChecks />

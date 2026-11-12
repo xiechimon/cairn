@@ -372,6 +372,11 @@ export function BoardSidebar({
         onArchive={() => actions.archive(row.id)}
         onRename={(name) => actions.rename(row.id, name)}
         onDelete={() => actions.remove(row.id)}
+        onHome={() => {
+          const next = new URLSearchParams(baseParams);
+          next.set('project', row.id);
+          navigate({ pathname: '/app', search: `?${next}` });
+        }}
         onTasks={() => navigate({ pathname: `/app/project/${row.id}/tasks`, search: plain })}
         onSettings={() => navigate({ pathname: `/app/project/${row.id}/settings`, search: plain })}
         onInstructions={() => {

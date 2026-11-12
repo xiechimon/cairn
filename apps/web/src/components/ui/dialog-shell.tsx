@@ -53,10 +53,10 @@ export function DialogFootRow({ hint, children }: { hint?: ReactNode; children?:
 }
 
 export const DIALOG_PRIMARY_BUTTON =
-  'rounded-md text-ui disabled:bg-secondary/50 disabled:text-content-dim disabled:opacity-100';
+  'rounded-md text-ui disabled:bg-primary disabled:text-primary-foreground disabled:opacity-40';
 
 export const DIALOG_TEXT_BUTTON =
-  'gap-1.5 rounded-md bg-secondary px-3 text-ui font-normal text-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] disabled:text-content-tertiary disabled:opacity-100 dark:hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)]';
+  'gap-1.5 rounded-md bg-secondary px-3 text-ui font-medium text-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] disabled:text-content-tertiary disabled:opacity-100 dark:hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)]';
 
 export const PICKER_ROW_SELECTED =
   'bg-card shadow-xs ring-1 ring-border hover:bg-card dark:hover:bg-card';

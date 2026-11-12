@@ -160,7 +160,7 @@ const openMenu = async (page: Page, name: string) => {
 };
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`a disabled Save is paler than the Cancel pill in fill and label (${theme})`, async ({
+  test(`a disabled Save stays a dimmed primary button beside the grey Cancel pill (${theme})`, async ({
     page,
   }) => {
     await page.emulateMedia({ colorScheme: theme });
@@ -191,16 +191,16 @@ for (const theme of ['light', 'dark'] as const) {
         saveInk: save!.color,
         saveOpacity: save!.opacity,
         secondary: token('--secondary'),
-        halfSecondary: token('--secondary', '50%'),
         foreground: token('--foreground'),
-        dim: token('--text-dim'),
+        primary: token('--primary'),
+        primaryInk: token('--primary-foreground'),
       };
     });
     expect(look.cancelFill).toBe(look.secondary);
     expect(look.cancelInk).toBe(look.foreground);
-    expect(look.saveFill).toBe(look.halfSecondary);
-    expect(look.saveInk).toBe(look.dim);
-    expect(look.saveOpacity).toBe('1');
+    expect(look.saveFill).toBe(look.primary);
+    expect(look.saveInk).toBe(look.primaryInk);
+    expect(look.saveOpacity).toBe('0.4');
     expect(look.saveFill).not.toBe(look.cancelFill);
     expect(look.saveInk).not.toBe(look.cancelInk);
   });
@@ -243,8 +243,12 @@ test('Delete asks for the name, then removes the project', async ({ page }) => {
   expect(patches).toEqual([{ id: 'proj-2', body: 'DELETE' }]);
 });
 
-test('the row menu keeps the project tasks and settings pages reachable', async ({ page }) => {
+test('the row menu keeps the project home, tasks and settings pages reachable', async ({ page }) => {
   await open(page, [PROJECT]);
+  await openMenu(page, 'cairn');
+  await page.getByRole('menuitem', { name: '项目主页' }).click();
+  await expect(page).toHaveURL(/\/app\?(?!.*chat=1).*project=proj-1/);
+  await page.goBack();
   await openMenu(page, 'cairn');
   await page.getByRole('menuitem', { name: '任务' }).click();
   await expect(page).toHaveURL(/\/app\/project\/proj-1\/tasks(\?|$)/);

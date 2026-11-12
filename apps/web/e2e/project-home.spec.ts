@@ -83,8 +83,7 @@ test('the ask link opens the project chat scoped to this project', async ({ page
     'placeholder',
     /cairn|Type your own answer/,
   );
-  await page.getByTestId('home-c-project-links').getByRole('link', { name: 'Project home' }).click();
-  await expect(home(page)).toBeVisible();
+  await expect(page.getByTestId('home-c-project-links')).toHaveCount(0);
 });
 
 test('from a project chat, clicking another sidebar project opens that project conversation', async ({

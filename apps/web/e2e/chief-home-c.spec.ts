@@ -175,20 +175,11 @@ test('a failed conversation load shows Retry instead of the greeting, with no co
   await expect(composer(page)).toBeVisible();
 });
 
-test('a project chat links to that project home, tasks and settings', async ({ page }) => {
+test('a project chat has no links row above the conversation', async ({ page }) => {
   await page.goto(home('home-c', `&project=${PROJECT_ID}&chat=1`));
-  const links = page.getByTestId('home-c-project-links');
-  await expect(links.getByRole('link', { name: 'Files' })).toHaveCount(0);
-  await links.getByRole('link', { name: 'Tasks' }).click();
-  await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_ID}/tasks`));
-  await page.goBack();
-  await links.getByRole('link', { name: 'Project settings' }).click();
-  await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_ID}/settings`));
-  await page.goBack();
-  await links.getByRole('link', { name: 'Project home' }).click();
-  await expect(page.getByTestId('project-home')).toBeVisible();
-  await page.goto(home('home-c'));
+  await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(page.getByTestId('home-c-project-links')).toHaveCount(0);
+  await expect(page.getByTestId('home-c-lead')).toHaveCount(0);
 });
 
 test('the home lands at the newest message', async ({

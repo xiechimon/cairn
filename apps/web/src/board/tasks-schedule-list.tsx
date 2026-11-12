@@ -57,12 +57,16 @@ export function TasksScheduleList({ projectId, now }: { projectId: string | null
           className="flex flex-col gap-0.5"
         >
           {rows.map((row) => (
-            <div key={row.id} data-slot="schedule-row-frame" className="group/task relative">
+            <div
+              key={row.id}
+              data-slot="schedule-row-frame"
+              className="group/task relative rounded-(--radius-tile) hover:bg-(--menu-hover) has-aria-expanded:bg-(--menu-hover)"
+            >
               <Button
                 variant="ghost"
                 data-slot="schedule-row"
                 onClick={() => setSelected(row)}
-                className="h-auto w-full items-start justify-start gap-4 rounded-(--radius-tile) px-2.5 py-2 text-left font-normal whitespace-normal hover:bg-(--menu-hover) pointer-coarse:pr-12 dark:hover:bg-(--menu-hover)"
+                className="h-auto w-full items-start justify-start gap-4 rounded-(--radius-tile) py-2 pr-11 pl-2.5 text-left font-normal whitespace-normal hover:bg-transparent pointer-coarse:pr-12 dark:hover:bg-transparent"
               >
                 <span className="flex size-7 flex-none items-center justify-center rounded-(--radius-control) bg-(--hover-1)">
                   <Clock aria-hidden className="size-4 text-content-tertiary" strokeWidth={1.75} />

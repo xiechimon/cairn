@@ -1,4 +1,4 @@
-import { House, ListChecks, MessageSquareWarning, PackageCheck, Settings2 } from 'lucide-react';
+import { ListChecks, MessageSquareWarning, PackageCheck } from 'lucide-react';
 import {
   type ReactNode,
   useCallback,
@@ -8,7 +8,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
 import { TaskCardContext } from '../chief/chief-message-rows.js';
@@ -126,12 +126,6 @@ interface HomeCProps {
   tasks: TasksView;
   tasksQuery?: QueryLike;
   archived?: ArchivedProjectState | null;
-}
-
-function projectHomeSearch(params: URLSearchParams): string {
-  const next = new URLSearchParams(params);
-  next.delete('chat');
-  return `?${next.toString()}`;
 }
 
 export function conversationBoundaryKey(input: {
@@ -363,42 +357,6 @@ export function HomeC({
     </p>
   );
 
-  const projectLinks = projectId !== null && (
-    <nav
-      data-testid="home-c-project-links"
-      aria-label={t('项目')}
-      className="mt-2 -ml-2.5 flex gap-1"
-    >
-      <Button
-        variant="ghost"
-        size="sm"
-        className="text-meta text-content-secondary"
-        render={<Link to={{ pathname: '/app', search: projectHomeSearch(searchParams) }} />}
-      >
-        <House aria-hidden="true" className="size-4" />
-        {t('项目主页')}
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="text-meta text-content-secondary"
-        render={<Link to={`/app/project/${projectId}/tasks`} />}
-      >
-        <ListChecks aria-hidden="true" className="size-4" />
-        {t('任务')}
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="text-meta text-content-secondary"
-        render={<Link to={`/app/project/${projectId}/settings`} />}
-      >
-        <Settings2 aria-hidden="true" className="size-4" />
-        {t('项目设置')}
-      </Button>
-    </nav>
-  );
-
   const hero = (
     <header
       data-testid="home-c-hero"
@@ -406,7 +364,6 @@ export function HomeC({
     >
       {greeting}
       {since}
-      {projectLinks}
       {badge === 0 && archived === null && (
         <div data-testid="home-c-starters" className="mt-4 flex flex-wrap gap-2">
           {STARTERS.map(({ label, Icon }) => (
@@ -422,12 +379,6 @@ export function HomeC({
         </div>
       )}
     </header>
-  );
-
-  const lead = projectLinks !== false && (
-    <section data-testid="home-c-lead" aria-label={t('首页概况')} className="pt-2 pb-4">
-      {projectLinks}
-    </section>
   );
 
   const heading = <h1 className="sr-only">{projectName ?? t('Coordinator')}</h1>;
@@ -592,23 +543,17 @@ export function HomeC({
                 )}
               </>
             ) : (
-              <>
-                <div className="mx-auto w-[calc(100%-2rem)] max-w-chat flex-none pt-6">
-                  {projectLinks}
-                </div>
-                <EmptyState
-                  testId="home-c-error"
-                  icon={MessageSquareWarning}
-                  title={t('对话加载失败')}
-                  description={t('对话记录还在，重试一下。')}
-                  action={{
-                    label: t('重试'),
-                    onClick:
-                      teamId === undefined ? () => void teamsQuery?.refetch() : surface.retry,
-                  }}
-                  className="mt-[12vh]"
-                />
-              </>
+              <EmptyState
+                testId="home-c-error"
+                icon={MessageSquareWarning}
+                title={t('对话加载失败')}
+                description={t('对话记录还在，重试一下。')}
+                action={{
+                  label: t('重试'),
+                  onClick: teamId === undefined ? () => void teamsQuery?.refetch() : surface.retry,
+                }}
+                className="mt-[12vh]"
+              />
             )}
           </section>
           {workPanel}
@@ -666,7 +611,6 @@ export function HomeC({
                   onSettings={() => surface.setChiefView('settings')}
                   showBindGate={!live}
                   hero={hero}
-                  lead={lead}
                   todoGlances={todoGlances}
                   prefill={prefill}
                   placeholder={

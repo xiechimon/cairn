@@ -76,7 +76,7 @@ test('`新建定时` footer: a grey `取消` pill left of a 32px primary `保存
   expect(pill.fill).toBe(pill.secondary);
   expect(pill.ink).toBe(pill.foreground);
   expect(pill.border).toMatch(/^rgba\(0, 0, 0, 0\)$|transparent/);
-  expect(pill.weight).toBe('400');
+  expect(pill.weight).toBe('500');
   await expect(save).toHaveCSS('border-top-left-radius', pill.radius);
   const [c, s] = await Promise.all([cancel.boundingBox(), save.boundingBox()]);
   expect(c!.x + c!.width).toBeLessThanOrEqual(s!.x);
