@@ -219,7 +219,7 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     const stream = page.getByTestId('chief-stream');
     const chip = stream.locator('.mention-chip--todo');
     await expect(chip).toHaveCount(1);
-    await expect(chip).toHaveText('#1');
+    await expect(chip).toHaveText('在 README.md 末尾追加一行「r3 lifecycle probe」');
 
     await expect(chip).toHaveAttribute('href', /^\/app\?(.*&)?thread=r3-legacy-1$/);
 
@@ -333,7 +333,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
 
     const chip = bubble.locator('.mention-chip--todo');
     await expect(chip).toHaveCount(1);
-    await expect(chip).toHaveText('#16');
+    await expect(chip).toHaveText('任务');
     await expect(chip).toHaveAttribute('href', /^\/app\?(.*&)?thread=t16$/);
 
     await expect(bubble).toContainText('prose #12 与 [伪链](todos:t2) [空](todo:) 保持字面');
