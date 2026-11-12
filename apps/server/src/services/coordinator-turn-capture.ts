@@ -36,6 +36,14 @@ const toolView = z.object({
   result: z.unknown(),
 });
 
+const projectView = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  repoKind: z.string().nullable(),
+  archivedAt: z.number().nullable(),
+});
+
 const claimView = z.object({
   systemPrompt: z.string(),
   instruction: z.string().nullable(),
@@ -45,6 +53,7 @@ const claimView = z.object({
   modelId: z.string(),
   thinkingLevel: z.string().nullable(),
   volatileText: z.string().nullable(),
+  projects: z.array(projectView),
 });
 
 const snapshotPayload = z.object({
