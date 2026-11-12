@@ -21,6 +21,7 @@ import { addChiefWatch } from '../src/services/chief.js';
 import { answerQuestion, createOrGetQuestion } from '../src/services/chief-questions.js';
 import { confirmBuild } from '../src/services/chief-tools.js';
 import { createScheduler } from '../src/services/scheduler.js';
+import { queueTaskMessage, readQueuedMessages } from '../src/services/task-message-queue.js';
 import { getTodo } from '../src/services/todos.js';
 import {
   bootServer,
@@ -144,24 +145,17 @@ async function setupWorld() {
 }
 
 describe('#1791 server auto-confirm after plan step', () => {
-  test('autonomous clean plan waits ten minutes before scheduler confirmation', async () => {
+  test('autonomous clean plan starts building when the plan is delivered, exactly once', async () => {
     const w = await setupWorld();
     try {
       const buildId = w.startBuild();
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, GOOD_PLAN);
       await w.done(planStep.step.id, { status: 'success', sessionId: 'psac-1' });
-      expect(w.todoRow().phase).toBe('confirm');
-      vi.useFakeTimers({ toFake: ['Date'] });
+      expect(w.todoRow().phase).toBe('building');
       const scheduler = createScheduler(w.s.svc, { tickMs: 15_000 });
-      const confirmedAt = w.todoRow().phaseAt;
-      vi.setSystemTime(confirmedAt + 600_000 - 1);
-      scheduler.tick();
-      expect(w.todoRow().phase).toBe('confirm');
-      vi.setSystemTime(confirmedAt + 600_000);
       scheduler.tick();
       expect(w.todoRow().phase).toBe('building');
-      scheduler.tick();
       await confirmBuild(
         {
           db: w.s.db,
@@ -222,7 +216,60 @@ describe('#1791 server auto-confirm after plan step', () => {
     }
   });
 
-  test('an empty Open questions heading confirms after the grace window', async () => {
+  test('a message queued while the plan is written is delivered to planning before any build step starts', async () => {
+    const w = await setupWorld();
+    try {
+      const buildId = w.startBuild();
+      const planStep = await w.claim();
+      await queueTaskMessage(w.s.svc, buildId, 'Use the existing parser instead.');
+      await w.uploadPlan(planStep.step.id, GOOD_PLAN);
+      await w.done(planStep.step.id, { status: 'success', sessionId: 'psac-queued' });
+      const steps = w.s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();
+      expect(steps.filter((st) => st.kind === 'build')).toHaveLength(0);
+      expect(w.messagesOf(buildId).some((m) => m.content === CONFIRM_ANNOUNCEMENT)).toBe(false);
+      expect(readQueuedMessages(w.s.db, buildId)).toHaveLength(0);
+      expect(
+        w.messagesOf(buildId).some((m) => m.content === 'Use the existing parser instead.'),
+      ).toBe(true);
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('a confirmation that throws at delivery leaves the plan at confirm for the next sweep', async () => {
+    const w = await setupWorld();
+    try {
+      const buildId = w.startBuild();
+      const planStep = await w.claim();
+      await w.uploadPlan(planStep.step.id, GOOD_PLAN);
+      const publish = w.s.hub.publishTodoDoc.bind(w.s.hub);
+      const failing = vi.spyOn(w.s.hub, 'publishTodoDoc').mockImplementation((teamId, record) => {
+        if (record.phase === 'building') throw new Error('publish failed');
+        publish(teamId, record);
+      });
+      await w.done(planStep.step.id, { status: 'success' });
+      failing.mockRestore();
+      expect(w.todoRow().phase).toBe('confirm');
+      const buildSteps = () =>
+        w.s.db
+          .select()
+          .from(stepTable)
+          .where(eq(stepTable.buildId, buildId))
+          .all()
+          .filter((st) => st.kind === 'build');
+      expect(buildSteps()).toHaveLength(0);
+      expect(w.messagesOf(buildId).some((m) => m.content === CONFIRM_ANNOUNCEMENT)).toBe(false);
+      const scheduler = createScheduler(w.s.svc, { tickMs: 15_000 });
+      scheduler.tick();
+      scheduler.stop();
+      expect(w.todoRow().phase).toBe('building');
+      expect(buildSteps()).toHaveLength(1);
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('an empty Open questions heading confirms at delivery', async () => {
     const w = await setupWorld();
     try {
       w.startBuild();
@@ -232,12 +279,6 @@ describe('#1791 server auto-confirm after plan step', () => {
         `${GOOD_PLAN}\n## Open questions\n\n## Notes\nnothing pending\n`,
       );
       await w.done(planStep.step.id, { status: 'success' });
-      const confirmedAt = w.todoRow().phaseAt;
-      const scheduler = createScheduler(w.s.svc, { tickMs: 15_000 });
-      scheduler.tick(confirmedAt + 600_000 - 1);
-      expect(w.todoRow().phase).toBe('confirm');
-      scheduler.tick(confirmedAt + 600_000);
-      scheduler.stop();
       expect(w.todoRow().phase).toBe('building');
     } finally {
       w.s.dispose();
@@ -271,7 +312,6 @@ describe('#1791 server auto-confirm after plan step', () => {
       w.startBuild();
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, GOOD_PLAN);
-      await w.done(planStep.step.id, { status: 'success' });
       const response = await call(w.s.app, 'POST', `/api/teams/${w.s.team.id}/chief/threads`, {
         body: { content: 'Review this plan' },
       });
@@ -289,6 +329,8 @@ describe('#1791 server auto-confirm after plan step', () => {
         questions: [{ header: 'Storage', question: 'Which backend?', options: [] }],
         askedFor: [],
       });
+      await w.done(planStep.step.id, { status: 'success' });
+      expect(w.todoRow().phase).toBe('confirm');
       createScheduler(w.s.svc, { tickMs: 15_000 }).tick(Date.now() + 600_000);
       expect(w.todoRow().phase).toBe('confirm');
       answerQuestion(w.s.svc, {
@@ -309,8 +351,6 @@ describe('#1791 server auto-confirm after plan step', () => {
       w.startBuild();
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, GOOD_PLAN);
-      await w.done(planStep.step.id, { status: 'success' });
-      expect(w.todoRow().phase).toBe('confirm');
       const response = await call(w.s.app, 'POST', `/api/teams/${w.s.team.id}/chief/threads`, {
         body: { content: 'Unrelated thread' },
       });
@@ -322,10 +362,7 @@ describe('#1791 server auto-confirm after plan step', () => {
         questions: [{ header: 'Lunch', question: 'Sandwiches?', options: [] }],
         askedFor: [],
       });
-      const confirmedAt = w.todoRow().phaseAt;
-      const scheduler = createScheduler(w.s.svc, { tickMs: 15_000 });
-      scheduler.tick(confirmedAt + 600_000);
-      scheduler.stop();
+      await w.done(planStep.step.id, { status: 'success' });
       expect(w.todoRow().phase).toBe('building');
     } finally {
       w.s.dispose();
