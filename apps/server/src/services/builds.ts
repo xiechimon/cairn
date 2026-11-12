@@ -1061,6 +1061,7 @@ export function enqueueStep(
     })
     .run();
   clearStop(deps.db, buildId);
+  settleAfterStopPhase(deps, buildId);
   if (isBuildStepKind(kind)) {
     deps.db.update(build).set({ reportLine: null }).where(eq(build.id, buildId)).run();
   }
@@ -2668,6 +2669,7 @@ export function applyStepFailure(
     return;
   }
   clearStop(db, stepRow.buildId);
+  settleAfterStopPhase(deps, stepRow.buildId);
   releaseUnissuedMergeAdmission(db, stepRow);
   const errorMessage =
     rawErrorMessage.trim() === '' ? `${stepRow.kind} 步异常结束，未上报原因` : rawErrorMessage;

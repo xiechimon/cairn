@@ -79,7 +79,9 @@ test('cutover preserves exact label identities and metadata, moved origins and s
       { todoId: 'ordinary', tagId: 'shared' },
     ]);
     expect(opened.db.all('SELECT * FROM todo ORDER BY id')).toEqual(original.tasks);
-    expect(opened.db.all('SELECT * FROM build ORDER BY id')).toEqual(original.builds);
+    expect(opened.db.all('SELECT * FROM build ORDER BY id')).toEqual(
+      original.builds.map((row) => ({ ...(row as object), afterStopPhase: null })),
+    );
     expect(opened.db.all('SELECT * FROM tag ORDER BY id')).toEqual(original.vocabulary);
     expect(opened.db.all('PRAGMA foreign_key_check')).toEqual([]);
   } finally {

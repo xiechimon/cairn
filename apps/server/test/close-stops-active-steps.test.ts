@@ -17,6 +17,7 @@ import {
 } from '../src/db/schema.js';
 import {
   applyStoppedStep,
+  enqueueStep,
   prepareStopForDone,
   sweepAbandonedBuildSteps,
 } from '../src/services/builds.js';
@@ -630,5 +631,43 @@ describe('the phase reserved for after a stop lives on the build row', () => {
     expect(stepStatus(w)).toBe('stopped');
     expect(reservedPhase(w)).toBeNull();
     expect(todoPhase(w)).toBe('failed');
+  });
+
+  test('a step that fails before the stop reaches it drops the reservation, so a restarted server finishes the continuation normally', async () => {
+    const { w, dbPath } = fileWorld({
+      phase: 'building',
+      stepStatus: 'claimed',
+      stepKind: 'build',
+    });
+    await req(w.s.app, 'POST', `/api/todos/${w.todoId}/stop-and-done`, {});
+    expect(reservedPhase(w)).toBe('done');
+    await finishStep(machineDepsOf(w.s), w.machineId, w.stepId, {
+      status: 'failed',
+      errorMessage: 'worker crashed',
+    });
+    expect(stepStatus(w)).toBe('failed');
+    expect(reservedPhase(w)).toBeNull();
+
+    const after = restarted(dbPath);
+    const continuation = enqueueStep(after.svc, w.buildId, 'build', w.teamId);
+    after.db
+      .update(stepTable)
+      .set({ status: 'claimed', machineId: w.machineId, lastHeartbeatAt: Date.now() })
+      .where(eq(stepTable.id, continuation.id))
+      .run();
+    await finishStep(machineDepsOf(after), w.machineId, continuation.id, {
+      status: 'success',
+      hasChanges: true,
+    });
+    expect(todoPhase(w)).not.toBe('done');
+    expect(reservedPhase(w, after.db)).toBeNull();
+  });
+
+  test('a new step on the build never inherits an earlier reservation', () => {
+    const w = makeWorld({ phase: 'building', stepStatus: 'claimed', stepKind: 'build' });
+    prepareStopForDone(w.s.svc, w.todoId, { actor: 'person', reason: 'test stop' });
+    expect(reservedPhase(w)).toBe('done');
+    enqueueStep(w.s.svc, w.buildId, 'build', w.teamId);
+    expect(reservedPhase(w)).toBeNull();
   });
 });
