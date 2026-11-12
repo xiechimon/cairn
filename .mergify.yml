@@ -131,7 +131,7 @@ commands_restrictions:
       - sender-permission >= write
 merge_queue:
   mode: serial
-  max_parallel_checks: 1
+  max_parallel_checks: 3
   dequeued_label: dequeued
 scopes:
   source:
