@@ -57,10 +57,11 @@ export async function settleInterruptedMailConversation(
 
 export function restoreInterruptedMailConversation(db: Db, threadId: string): void {
   const row = interruptedMail(db, threadId);
-  if (row === undefined) return;
+  const ownerId = row?.mailOwnerConversationId;
+  if (row === undefined || ownerId == null) return;
   db.update(coordinatorConversation)
     .set({
-      conversationId: row.mailOwnerConversationId,
+      conversationId: ownerId,
       mailOwnerConversationId: null,
       updatedAt: nowMs(),
     })
