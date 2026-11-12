@@ -4,7 +4,11 @@ import type { MachineAttachmentResponse } from '@cairn/shared';
 import { buildTaskPromptText, formatAttachmentToken } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { MachineClient } from '../src/machine-client.js';
-import { materializeFile, resolveStepImages } from '../src/step-attachments.js';
+import {
+  materializeFile,
+  resolveStepImages,
+  resolveStepImagesOrRaw,
+} from '../src/step-attachments.js';
 import { testTempDir } from './test-temp-dir.js';
 
 function fakeClient(attachments: Record<string, MachineAttachmentResponse | Error>): {
@@ -704,5 +708,38 @@ describe('#1406 token lines inside the issue-body fence', () => {
     expect(requested).toEqual(['id1']);
     expect(out.text.endsWith(after)).toBe(true);
     expect(fenceInner(out.text)).toContain('> [image attached: shot.png]');
+  });
+});
+
+describe('resolveStepImagesOrRaw', () => {
+  test('returns the resolved result when resolution succeeds', async () => {
+    const s = setup();
+    const { client } = fakeClient({ id1: pngResponse() });
+    const text = formatAttachmentToken('shot.png', 'team-a/id1.png');
+    const opts = { text, stepId: 's1', client, materializeDir: s.materializeDir, log: s.log };
+    const resolved = await resolveStepImagesOrRaw(opts);
+    expect(resolved).toEqual(await resolveStepImages(opts));
+    expect(s.lines.some((line) => line.includes('attachment resolve failed'))).toBe(false);
+  });
+
+  test('delivers the raw text and logs when resolution throws', async () => {
+    const s = setup();
+    const { client } = fakeClient({});
+    const text = formatAttachmentToken('shot.png', 'team-a/id1.png');
+    const lines: string[] = [];
+    const log = (line: string): void => {
+      lines.push(line);
+      if (lines.length === 1) throw new Error('log sink exploded');
+    };
+    const resolved = await resolveStepImagesOrRaw({
+      text,
+      stepId: 's1',
+      client,
+      materializeDir: s.materializeDir,
+      log,
+      imageSupport: false,
+    });
+    expect(resolved).toEqual({ text, images: [], skippedNoVision: 0 });
+    expect(lines[1]).toBe('attachment resolve failed (delivering raw text): log sink exploded');
   });
 });
