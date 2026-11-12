@@ -109,6 +109,28 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
   });
 });
 
+describe('push channel failures are reported once per outage', () => {
+  test('a failed stream logs the cause, then the reconnect is announced again', async () => {
+    class FlakyStreamApi extends FakeMachineApi {
+      private attempts = 0;
+      override async stream(signal: AbortSignal, onEvent: unknown, onConnected?: () => void) {
+        this.attempts += 1;
+        if (this.attempts <= 2) throw new Error('stream refused');
+        await super.stream(signal, onEvent, onConnected);
+      }
+    }
+    const { handle, lines } = await boot({ api: new FlakyStreamApi() });
+    await waitFor(() => lines.some((l) => l.includes('[wake] push channel connected')), 10_000);
+    const down = lines.filter((l) => l.includes('[wake] push channel down: stream refused'));
+    expect(down).toHaveLength(1);
+    expect(lines.indexOf(down[0] as string)).toBeLessThan(
+      lines.findIndex((l) => l.includes('[wake] push channel connected')),
+    );
+    await handle.stop();
+    await handle.done;
+  }, 15_000);
+});
+
 describe('server migration diagnosis (#519 control-plane move: machine.json serverUrl from registration differs from the current config)', () => {
   test('failure mode: old machine.json + new CAIRN_SERVER → startup warning line (contains both addresses and re-registration guidance), still goes online', async () => {
     const api = new FakeMachineApi();

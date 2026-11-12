@@ -256,6 +256,7 @@ export const build = sqliteTable('build', {
     .references(() => todo.id, { onDelete: 'cascade' }),
   withPlan: bool('withPlan').notNull(),
   prevPhase: text('prevPhase').$type<Phase | null>(),
+  afterStopPhase: text('afterStopPhase').$type<'done' | 'keep' | null>(),
   triggerSource: text('triggerSource').$type<TriggerSource>().notNull(),
   scheduledBy: text('scheduledBy'),
   planDocId: text('planDocId'),

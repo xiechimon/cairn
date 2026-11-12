@@ -169,7 +169,7 @@ export function FilePreviewPanel({ target, onClose }: { target: FileTarget; onCl
     fixture?.src ??
     (fixtureText !== undefined
       ? `data:text/plain;charset=utf-8,${encodeURIComponent(fixtureText)}`
-      : url);
+      : `${url}?download=1`);
   const download = () => downloadFile(downloadHref, target.name);
   const [copied, setCopied] = useState(false);
   const [showSource, setShowSource] = useState(false);

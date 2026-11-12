@@ -737,6 +737,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   void (async () => {
     let backoff = 1_000;
     let announced = false;
+    let reportedDown = false;
     while (!streamCtrl.signal.aborted) {
       try {
         await client.stream(
@@ -752,12 +753,19 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           () => {
             if (!announced) {
               announced = true;
+              reportedDown = false;
               logger.wake('push channel connected');
             }
           },
         );
         backoff = 1_000;
-      } catch {}
+      } catch (err) {
+        if (!reportedDown && !streamCtrl.signal.aborted) {
+          reportedDown = true;
+          announced = false;
+          logger.wake(`push channel down: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
       if (streamCtrl.signal.aborted) return;
       await sleep(backoff);
       backoff = nextBackoffMs(backoff);
