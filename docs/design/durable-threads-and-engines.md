@@ -40,6 +40,35 @@ An engine plans for itself. When the plan includes an action that cannot be undo
 | Owner stops a thread | Stops the engine through its handle, then the thread | A stop the engine does not acknowledge is retried and surfaced; the thread is not marked stopped until it is |
 | Result comes back | Thread records it and raises it for acceptance | A result that fails its check stays open with the reason; it is not marked done |
 
+## The engine view
+
+Owner decision on 2026-11-12. When a thread has dispatched work to an engine, the thread shows the run as one card in its conversation.
+
+- Default view: the engine's structured event stream rendered with cairn's own conversation components (reply text, the plan checklist, read, edit and run rows, a diff card, the running bubble). It is the same family as the thread itself and works on the phone.
+- Nothing is lost silently. An event type the adapter does not know renders as a generic row that names the type and opens its raw content. An engine that waits for input the adapter cannot map shows that it is waiting and offers takeover. Every unknown type is counted and reported, and each adapter is tested by replaying recorded streams per engine version.
+- A read-only raw output view (the engine's plain text log) is always available from the card.
+- A real terminal (a pseudo-terminal streamed to a maintained terminal component in the browser) is built later, for takeover and for engines in an interactive screen. It replaces the raw output view when it exists. It crosses the machine and command boundary, so it is owner-routed and needs its own design.
+- A thread's header carries the title and one status line only. Code changes, documents and pull requests are results: a compact card in the conversation that opens the result, never a control in the header. Most tasks have no code changes.
+
+## Commands and working habits belong to cairn
+
+Owner question on 2026-11-12: pi has no `/loop`, `/goal`, todo list and similar commands that other harnesses ship. The answer is that cairn does not wait for the harness to grow them and does not borrow an engine's. The runtime already extends pi through extensions (`apps/server/src/coordinator/runtime/server-runtime.ts` installs the Coordinator tools, volatile context, compaction and telemetry), and the web already has a slash menu (`apps/web/src/overlay/slash-menu.tsx`). Each habit is built once at that layer, so it behaves the same whichever engine does the work, survives a restart, and shows in the interface.
+
+| Habit | What it is in cairn | Built on |
+|---|---|---|
+| Loop: repeat until a condition holds | A schedule bound to the thread that wakes it with the same instruction, with a stop condition and a cap | The scheduler and the wake mechanism |
+| Goal: keep working toward a stated outcome | A goal stored on the thread, shown in its header area, checked at the end of each turn; the thread continues or reports why it stopped | Thread state and the goal line the web already renders |
+| Todo: a visible plan that is ticked off | A plan tool the thread calls to set and update steps; the conversation renders it as the checklist | A thread tool and the checklist block |
+| Plan first, then act | A mode on the thread: propose, wait for approval, then run | The approval mechanism in `docs/design/ai-native-actions.md` |
+| Compact, clear, rewind | Already handled by the runtime's compaction and rewind sync | Existing |
+| Sub-agents | A thread opening another thread, or dispatching to an engine | The dispatch contract above |
+
+Rules:
+
+- Each habit is one action in the registry proposed in `docs/design/ai-native-actions.md`, so the slash menu, the thread's tools and the CLI are generated from the same definition. A command the owner can type is a tool the agent can call.
+- State lives on the thread, not in the engine's session. An engine may have its own todo or loop; the thread does not depend on it, and the adapter maps the engine's plan events onto the thread's checklist where they exist.
+- A new habit needs its states and failure behavior written down first (what happens when the wake fails, the cap is reached, the goal cannot be checked), because it is persisted state.
+
 ## Open questions for the owner
 
 - Where a thread's durable session runs and is stored: the server, as the Coordinator's is, or the machine that does the work.
