@@ -60,7 +60,6 @@ import {
   REPORT_FILE_NAME,
   type ReviewGate,
   SESSION_FILE_NAME,
-  STREAM_TIMEOUTS_MS,
   skillCallName,
   stepTakesSecrets,
   stripAnsiEscapes,
@@ -103,12 +102,7 @@ import {
 import { clearCredentials, pushCredential } from './credentials.js';
 import { DeltaRelay } from './delta-relay.js';
 import { buildExecutorRecord } from './executor-record.js';
-import {
-  GitPushHookError,
-  gitCredentialEnv,
-  isGitAuthFailure,
-  withGitCredentialFallback,
-} from './git.js';
+import { GitPushHookError, isGitAuthFailure, withGitCredentialFallback } from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import { landLocalMerge } from './local-merge.js';
@@ -122,8 +116,16 @@ import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
 import { resolveStepImages } from './step-attachments.js';
+import { assembleStepEnv } from './step-env.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
-import { StreamWatchdog } from './stream-watchdog.js';
+import {
+  resolveStreamLimits,
+  STREAM_DURATION_CAP_DEFAULT_MS,
+  STREAM_DURATION_CAP_ENV,
+  STREAM_FIRST_EVENT_ENV,
+  STREAM_IDLE_ENV,
+  StreamWatchdog,
+} from './stream-watchdog.js';
 import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
 import { extractVerifyVerdict } from './verify-verdict.js';
@@ -171,18 +173,12 @@ export function combineTimeoutWithRootCause(timeoutText: string, rootCause: stri
   return rootCause !== null ? `${timeoutText}；根因: ${rootCause}` : timeoutText;
 }
 
-export const STREAM_DURATION_CAP_DEFAULT_MS = 3_600_000;
-
-export const STREAM_DURATION_CAP_ENV = 'CAIRN_STREAM_DURATION_CAP_MS';
-export const STREAM_IDLE_ENV = 'CAIRN_STREAM_IDLE_MS';
-export const STREAM_FIRST_EVENT_ENV = 'CAIRN_STREAM_FIRST_EVENT_MS';
-
-function envPositiveMs(name: string): number | null {
-  const raw = process.env[name];
-  if (raw === undefined) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
+export {
+  STREAM_DURATION_CAP_DEFAULT_MS,
+  STREAM_DURATION_CAP_ENV,
+  STREAM_FIRST_EVENT_ENV,
+  STREAM_IDLE_ENV,
+};
 
 export function buildTaskPrompt(claimed: ClaimedStep): string {
   const todo = claimed.todo;
@@ -215,12 +211,6 @@ function resumeMissNote(sessionId: string, claimed: ClaimedStep): string {
   }
   return `本机找不到会话 ${sessionId}，无法续接。已改开新会话，按原任务继续。`;
 }
-
-const READONLY_GIT_ENV: Record<string, string> = {
-  GIT_CONFIG_COUNT: '1',
-  GIT_CONFIG_KEY_0: 'url.cairn-readonly-workspace-denied://.pushInsteadOf',
-  GIT_CONFIG_VALUE_0: '',
-};
 
 function confirmedPlanFile(plansDir: string, convId: string): string | null {
   const planFile = join(plansDir, convId, PLAN_FILE_NAME);
@@ -938,18 +928,6 @@ async function runClaimedStep(
       ? deps.otel.contextFor(claimed.step.buildId, stepId, claimed.step.kind)
       : undefined;
   const skillInjection: { facts: SkillInjectionFacts | null } = { facts: null };
-  const stepGitEnv: Record<string, string> =
-    repo?.kind === 'github' && creds.git !== null
-      ? (appCredential?.env() ?? {
-          ...Object.fromEntries(
-            Object.entries(gitCredentialEnv(creds.git)).filter(
-              (entry): entry is [string, string] => entry[1] !== undefined,
-            ),
-          ),
-          GH_TOKEN: creds.git.password,
-          GITHUB_TOKEN: creds.git.password,
-        })
-      : {};
   let temporary: ReturnType<typeof createTempEnvironment>;
   try {
     temporary = createTempEnvironment({ ...process.env, ...opts.env });
@@ -963,28 +941,16 @@ async function runClaimedStep(
     return;
   }
   stepCleanups.push(temporary.cleanup);
-  const stepEnv: Record<string, string> = {
-    ...opts.env,
-    ...temporary.env,
-    ...stepGitEnv,
-    ...(readonlyWorkspace || attachmentVerify ? READONLY_GIT_ENV : {}),
-  };
-  stepCleanups.push(() => {
-    for (const key of Object.keys(stepGitEnv)) {
-      delete stepEnv[key];
-      delete stepGitEnv[key];
-    }
+  const { env: stepEnv, dropGitCredentials } = assembleStepEnv({
+    inherited: opts.env,
+    temporary: temporary.env,
+    git: repo?.kind === 'github' ? creds.git : null,
+    appCredential,
+    readonlyGit: readonlyWorkspace || attachmentVerify,
+    claudeSubscriptionToken:
+      runtimeId === 'claude-code' ? creds.claudeSubscriptionToken : undefined,
   });
-  if (appCredential !== null) {
-    delete stepEnv.GH_TOKEN;
-    delete stepEnv.GITHUB_TOKEN;
-    delete stepEnv.CAIRN_GIT_CRED_PASSWORD;
-  }
-  delete stepEnv.CLAUDE_CODE_OAUTH_TOKEN;
-  if (runtimeId === 'claude-code' && creds.claudeSubscriptionToken !== undefined) {
-    stepEnv.CLAUDE_CODE_OAUTH_TOKEN = creds.claudeSubscriptionToken;
-    if (opts.env?.CAIRN_ORB !== '1') stepEnv.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = '1';
-  }
+  stepCleanups.push(dropGitCredentials);
   const sessionOpts: SessionOpts = {
     provider,
     modelId: agent.modelId,
@@ -1199,8 +1165,6 @@ async function runClaimedStep(
     claimed.step.kind === 'plan' || isBuildStepKind(claimed.step.kind)
       ? PROVIDER_NETWORK_RETRY_DELAYS_MS
       : [0, 5_000];
-  const envFirstMs = envPositiveMs(STREAM_FIRST_EVENT_ENV);
-  const envIdleMs = envPositiveMs(STREAM_IDLE_ENV);
   let noVisionDegraded = false;
   const retryWithoutImages = async (failureText: string): Promise<boolean> => {
     if (
@@ -1259,24 +1223,17 @@ async function runClaimedStep(
     deps.sessionHandles?.delete(stepId);
     return true;
   };
-  const streamTimeouts = {
-    first: envFirstMs ?? opts.streamTimeouts?.first ?? STREAM_TIMEOUTS_MS.streamFirstEvent,
-    idle: envIdleMs ?? opts.streamTimeouts?.idle ?? STREAM_TIMEOUTS_MS.streamIdle,
-    body: Math.max(
-      opts.streamTimeouts?.body ?? STREAM_TIMEOUTS_MS.streamBodyTimeout,
-      envFirstMs ?? 0,
-      envIdleMs ?? 0,
-    ),
-  };
-  const absoluteDurationCapMs = envPositiveMs(STREAM_DURATION_CAP_ENV);
-  const streamDurationCapMs =
-    absoluteDurationCapMs ?? opts.streamDurationCapMs ?? STREAM_DURATION_CAP_DEFAULT_MS;
+  const streamLimits = resolveStreamLimits({
+    ...(opts.streamTimeouts !== undefined ? { timeouts: opts.streamTimeouts } : {}),
+    ...(opts.streamDurationCapMs !== undefined ? { durationCapMs: opts.streamDurationCapMs } : {}),
+  });
   const toolStartedAt = new Map<string, number>();
   const watchdog = new StreamWatchdog({
-    timeouts: streamTimeouts,
-    durationCapMs: streamDurationCapMs,
-    durationCapIsAbsolute: absoluteDurationCapMs !== null,
-    progressExtendsDuration: isBuildStepKind(claimed.step.kind) && absoluteDurationCapMs === null,
+    timeouts: streamLimits.timeouts,
+    durationCapMs: streamLimits.durationCapMs,
+    durationCapIsAbsolute: streamLimits.durationCapIsAbsolute,
+    progressExtendsDuration:
+      isBuildStepKind(claimed.step.kind) && !streamLimits.durationCapIsAbsolute,
     onTrip: () => {
       askChannel.abort();
       void handle?.stop();
