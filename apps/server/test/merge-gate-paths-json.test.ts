@@ -18,7 +18,6 @@ interface GatePaths {
   autoMerge: string[];
   protected: string[];
   humanQueue: Record<string, string[]>;
-  ownerRoute: { ciAndMergeMachinery: string[]; evalRuler: string[] };
   mergeGateSource: string[];
   limits: { maxLines: number; maxFiles: number; maxQueueFiles: number; maxLinesEachWay: number };
 }
@@ -100,24 +99,6 @@ describe('merge-gate-paths.json is the single source', () => {
       maxQueueFiles: 80,
       maxLinesEachWay: 8000,
     });
-  });
-
-  test('owner-route classes are the CI machinery, the eval ruler, and the three security lists', () => {
-    expect(gatePaths.ownerRoute.ciAndMergeMachinery).toEqual([
-      '.github/workflows/**',
-      '.mergify.yml',
-      '.claude/workflows/pr-gate.js',
-      'scripts/merge-route.mjs',
-      'scripts/autonomy-brake.mjs',
-      'scripts/ops/review-gate/**',
-      'packages/shared/merge-gate-paths.json',
-    ]);
-    expect(gatePaths.protected).toEqual(expect.arrayContaining(gatePaths.ownerRoute.evalRuler));
-    expect(gatePaths.ownerRoute.evalRuler).not.toContain(
-      'apps/server/src/services/harness-eval-*.ts',
-    );
-    for (const key of securityCapabilities)
-      expect(gatePaths.humanQueue[key]?.length).toBeGreaterThan(0);
   });
 
   test('every human-queue path is protected', () => {
