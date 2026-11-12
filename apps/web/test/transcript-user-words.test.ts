@@ -228,6 +228,36 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
     expect(users[0]?.markdown).toBeUndefined();
   });
 
+  test('F9b a plan the server confirmed shows no confirmation note and no owner bubble', () => {
+    const buildStep: StepJournalRow = {
+      id: 'step-build-auto',
+      buildId: BUILD.id,
+      kind: 'build',
+      machineId: null,
+      createdAt: NOW - 20_000,
+      status: 'done',
+      checkpointCommit: null,
+      skillInjection: null,
+    };
+    const confirmed = (actor: string) =>
+      render({
+        messages: [
+          msg('user', buildTaskPromptText(TITLE, SPEC), NOW - 50_000),
+          { ...msg('user', CONFIRM_ANNOUNCEMENT, NOW - 21_000), actor },
+        ],
+        steps: [buildStep],
+        build: { ...BUILD, withPlan: true },
+      });
+    const automatic = confirmed('server');
+    expect(userItems(automatic)).toHaveLength(0);
+    expect(automatic.some((item) => item.kind === 'note')).toBe(false);
+    const byOwner = confirmed('Ada');
+    expect(userItems(byOwner).map((item) => item.text)).toEqual(['确认']);
+    expect(byOwner).toContainEqual(
+      expect.objectContaining({ kind: 'note', text: `Ada ${CONFIRM_ANNOUNCEMENT}` }),
+    );
+  });
+
   test('F10 the first feedback of a restart round survives, the live face hangs no taskline', () => {
     const items = render({
       messages: [

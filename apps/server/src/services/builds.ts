@@ -2967,8 +2967,6 @@ function planContractOfStep(
   return checkPlanContract(latest.content);
 }
 
-export const PLAN_AUTO_CONFIRM_GRACE_MS = 10 * 60_000;
-
 type PlanAutoConfirmation =
   | { eligible: true; planId: string; deadline: number }
   | { eligible: false; reason: string };
@@ -3057,7 +3055,7 @@ function planAutoConfirmation(deps: Pick<BuildDeps, 'db'>, buildId: string): Pla
   return {
     eligible: true,
     planId: latestPlan.id,
-    deadline: todoRow.phaseAt + PLAN_AUTO_CONFIRM_GRACE_MS,
+    deadline: todoRow.phaseAt,
   };
 }
 
@@ -3068,26 +3066,38 @@ export function planAutoApproveAt(deps: BuildDeps, planId: string): number | nul
   return eligibility.eligible && eligibility.planId === planId ? eligibility.deadline : null;
 }
 
-export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): void {
+function confirmPlanAutomatically(deps: BuildDeps, buildId: string): void {
+  try {
+    applyBuildConfirm(deps, buildId, 'server');
+  } catch (error) {
+    if (
+      !(
+        error instanceof HttpError &&
+        error.status === 409 &&
+        (error.message.startsWith('agent-label-privileged:') ||
+          error.message.startsWith('intake-label-assignment-failed:'))
+      )
+    )
+      throw error;
+  }
+}
+
+function confirmDeliveredPlan(deps: BuildDeps, buildId: string): void {
+  try {
+    deps.db.transaction(() => {
+      if (planAutoConfirmation(deps, buildId).eligible) confirmPlanAutomatically(deps, buildId);
+    });
+  } catch {
+    return;
+  }
+}
+
+export function sweepPlanAutoConfirm(deps: BuildDeps): void {
   const waiting = deps.db.select().from(todo).where(eq(todo.phase, 'confirm')).all();
   for (const todoRow of waiting) {
     if (todoRow.latestBuildId === null) continue;
-    const buildId = todoRow.latestBuildId;
-    const eligibility = planAutoConfirmation(deps, buildId);
-    if (!eligibility.eligible || now < eligibility.deadline) continue;
-    try {
-      applyBuildConfirm(deps, buildId, 'server');
-    } catch (error) {
-      if (
-        !(
-          error instanceof HttpError &&
-          error.status === 409 &&
-          (error.message.startsWith('agent-label-privileged:') ||
-            error.message.startsWith('intake-label-assignment-failed:'))
-        )
-      )
-        throw error;
-    }
+    if (planAutoConfirmation(deps, todoRow.latestBuildId).eligible)
+      confirmPlanAutomatically(deps, todoRow.latestBuildId);
   }
 }
 
@@ -3329,6 +3339,7 @@ export function completeStep(
       return;
     }
     setTodoPhase(deps, todoRow.id, 'confirm', { hasPlan: true });
+    confirmDeliveredPlan(deps, stepRow.buildId);
     return;
   }
   if (

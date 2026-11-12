@@ -60,6 +60,14 @@ beforeAll(async () => {
       },
     },
     { content: '方案已就绪：四段完整。' },
+    {
+      toolCall: {
+        name: 'bash',
+        arguments: { command: `cat > plan.md <<'EOF'\n${PLAN_MD}\nEOF` },
+      },
+    },
+    { content: '方案已就绪：四段完整。' },
+    { content: '已按方案完成。' },
   ]);
   server = await bootRealServer({
     providerBaseUrl: stub.url,
@@ -164,4 +172,31 @@ test('the plan converges via the team-stream phase event when the conv stream is
   await pexpect(page.locator('.chat-plan-title')).toHaveCount(0);
   await page.getByRole('button', { name: '查看计划' }).click();
   await pexpect(page.getByTestId('side-chat-plan')).toBeVisible();
+});
+
+test('an autonomous project starts the work when the plan is delivered, with no approval step on screen', async () => {
+  const { todoId } = await seedWorld(
+    server.url,
+    server.teamId,
+    { title: '直接开工探针', spec: '在 plan.md 落一版方案。' },
+    { repoKind: 'hosted', projectName: 'direct-start', mergePolicy: 'autonomous' },
+  );
+  const buildId = startLegacyBuild(server, todoId, { withPlan: true });
+  const phases: string[] = [];
+  const watching = setInterval(() => phases.push(server.todoPhase(todoId)), 50);
+  await page.goto(`${server.url}/app/todo/${todoId}`);
+  await pexpect(page.getByTestId('side-chat')).toBeVisible({ timeout: 30_000 });
+  try {
+    await waitFor(() => ['building', 'review', 'done'].includes(server.todoPhase(todoId)), 150_000);
+  } finally {
+    clearInterval(watching);
+  }
+  expect(phases).not.toContain('confirm');
+  await pexpect(page.getByTestId('side-chat')).not.toHaveAttribute('data-phase', 'confirm');
+  await pexpect(page.getByRole('button', { name: '批准计划' })).toHaveCount(0);
+  await pexpect(page.locator('.chat-plan-title')).toHaveCount(0);
+  await pexpect(page.getByTestId('transcript-col')).not.toContainText('通过了确认');
+  await pexpect(page.getByTestId('user-bubble').filter({ hasText: '确认' })).toHaveCount(0);
+  const plans = await api(server.url, 'GET', `/api/builds/${buildId}/plans`);
+  expect(plans.body as unknown[]).toHaveLength(1);
 });
