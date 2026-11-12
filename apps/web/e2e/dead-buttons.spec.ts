@@ -300,13 +300,15 @@ test('project task rows and cards are real links that open the todo detail (#318
   await expect(page).toHaveURL(/\/app\?scenario=prj-tasks&thread=/);
 });
 
-test('detail transcript action rows carry no restore glyph (#884)', async ({ page }) => {
+test('detail transcript message tools carry no restore action (#884)', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
-  await expect(page.locator('.chat-row-icons .chat-copy').first()).toBeVisible();
   await expect(page.locator('.chat-col path[d^="M3 12a9"]')).toHaveCount(0);
-  const userRow = page.locator('.chat-row:has(.chat-bubble) ~ .chat-row-icons').first();
-  await expect(userRow.locator('svg')).toHaveCount(1);
-  await expect(userRow.locator('button svg')).toHaveCount(1);
+  const block = page.locator('.chat-row--user [data-slot="reply-block"]').first();
+  await block.hover();
+  const tools = block.getByTestId('msg-tools');
+  await expect(tools.getByRole('button')).toHaveCount(1);
+  await tools.getByTestId('chief-msg-more').click();
+  await expect(page.getByRole('menuitem')).toHaveText(['复制']);
 });
 
 test('fail row `查看原始错误` opens the raw-error dialog with the full text (#1258)', async ({
