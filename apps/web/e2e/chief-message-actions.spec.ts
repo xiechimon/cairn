@@ -253,4 +253,26 @@ test.describe('on a touch phone', () => {
     });
     expect(overlaps).toEqual([]);
   });
+
+  test('a tapped message in the task panel shows its tools, one row at a time', async ({ page }) => {
+    await page.goto('/app?scenario=home-c&thread=home-c-review');
+    const thread = page.locator('aside.side-panel');
+    const opened = thread.getByTestId('msg-tools-touch').filter({ visible: true });
+    const request = thread.getByTestId('user-bubble').first();
+    const reply = thread.locator('[data-row="agent"]').first();
+    await expect(request).toBeVisible();
+    await expect(opened).toHaveCount(0);
+    await request.tap();
+    await expect(opened).toHaveCount(1);
+    await opened.getByTestId('chief-msg-more').tap();
+    await expect(page.getByRole('menuitem', { name: '复制' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menuitem', { name: '复制' })).toBeHidden();
+    await reply.locator('[data-slot="reply-bubble"], p').first().tap();
+    await expect(opened).toHaveCount(1);
+    await expect(reply.getByTestId('msg-tools-touch')).toBeVisible();
+    await request.tap();
+    await request.tap();
+    await expect(opened).toHaveCount(0);
+  });
 });
