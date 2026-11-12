@@ -114,7 +114,7 @@ import { readSessionJsonlForUpload } from './session-jsonl.js';
 import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
-import { resolveStepImages } from './step-attachments.js';
+import { resolveStepImagesOrRaw } from './step-attachments.js';
 import { assembleStepEnv } from './step-env.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import {
@@ -665,25 +665,17 @@ async function runClaimedStep(
   let promptImages: DeliveredImage[] | undefined;
   let skippedNoVisionCount = 0;
   if (!isChief && prompt !== null) {
-    try {
-      const resolved = await resolveStepImages({
-        text: prompt,
-        stepId,
-        client,
-        materializeDir: deps.paths.stepAttachmentsDir,
-        log: (line) => logger.step(line),
-        imageSupport,
-      });
-      deliveryPrompt = resolved.text;
-      if (resolved.images.length > 0) promptImages = [...resolved.images];
-      skippedNoVisionCount = resolved.skippedNoVision;
-    } catch (err) {
-      logger.step(
-        `attachment resolve failed (delivering raw text): ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
-    }
+    const resolved = await resolveStepImagesOrRaw({
+      text: prompt,
+      stepId,
+      client,
+      materializeDir: deps.paths.stepAttachmentsDir,
+      log: (line) => logger.step(line),
+      imageSupport,
+    });
+    deliveryPrompt = resolved.text;
+    if (resolved.images.length > 0) promptImages = [...resolved.images];
+    skippedNoVisionCount = resolved.skippedNoVision;
   }
   if (skippedNoVisionCount > 0) {
     logger.step(
@@ -1185,25 +1177,15 @@ async function runClaimedStep(
         : isInfoBuild
           ? appendReportLocationNote(buildTaskPrompt(claimed), reportFile)
           : degradedFreshPrompt(claimed, deps.paths.plansDir, convId);
-    let degradedText = retryPrompt;
-    try {
-      const resolved = await resolveStepImages({
-        text: retryPrompt,
-        stepId,
-        client,
-        materializeDir: deps.paths.stepAttachmentsDir,
-        log: (line) => logger.step(line),
-        imageSupport: false,
-      });
-      degradedText = resolved.text;
-    } catch (err) {
-      logger.step(
-        `attachment resolve failed (delivering raw text): ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
-    }
-    sessionOpts.prompt = degradedText;
+    const degraded = await resolveStepImagesOrRaw({
+      text: retryPrompt,
+      stepId,
+      client,
+      materializeDir: deps.paths.stepAttachmentsDir,
+      log: (line) => logger.step(line),
+      imageSupport: false,
+    });
+    sessionOpts.prompt = degraded.text;
     continueId = null;
     journal.update(stepId, { prompt: retryPrompt, sessionAction: 'new', sessionId: null });
     delete sessionOpts.promptImages;
@@ -1329,31 +1311,23 @@ async function runClaimedStep(
         let delivery = fresh;
         let images: DeliveredImage[] | undefined;
         if (!isChief) {
-          try {
-            const resolved = await resolveStepImages({
-              text: fresh,
-              stepId,
-              client,
-              materializeDir: deps.paths.stepAttachmentsDir,
-              log: (line) => logger.step(line),
-              imageSupport,
+          const resolved = await resolveStepImagesOrRaw({
+            text: fresh,
+            stepId,
+            client,
+            materializeDir: deps.paths.stepAttachmentsDir,
+            log: (line) => logger.step(line),
+            imageSupport,
+          });
+          delivery = resolved.text;
+          if (resolved.images.length > 0) images = [...resolved.images];
+          if (resolved.skippedNoVision > 0) {
+            transcript.upsert({
+              id: `image-skip-${stepId}`,
+              role: 'system',
+              content: `图片未被模型读取：模型 ${modelKey} 不支持图片输入，${resolved.skippedNoVision} 张图片未下载（步骤继续执行，请以文字描述或改用支持图片的模型）`,
+              createdAt: now(),
             });
-            delivery = resolved.text;
-            if (resolved.images.length > 0) images = [...resolved.images];
-            if (resolved.skippedNoVision > 0) {
-              transcript.upsert({
-                id: `image-skip-${stepId}`,
-                role: 'system',
-                content: `图片未被模型读取：模型 ${modelKey} 不支持图片输入，${resolved.skippedNoVision} 张图片未下载（步骤继续执行，请以文字描述或改用支持图片的模型）`,
-                createdAt: now(),
-              });
-            }
-          } catch (resolveErr) {
-            logger.step(
-              `attachment resolve failed (delivering raw text): ${
-                resolveErr instanceof Error ? resolveErr.message : String(resolveErr)
-              }`,
-            );
           }
         }
         sessionOpts.prompt = delivery;
