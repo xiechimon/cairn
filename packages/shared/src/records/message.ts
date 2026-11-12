@@ -431,15 +431,20 @@ export type ConversationMessagesResponse = z.infer<typeof conversationMessagesRe
 
 export const STOP_MESSAGE = '已取消';
 
-export const buildSteerBodySchema = z.object({
-  content: z.string().min(1),
-  mode: z.literal('queue').optional(),
-  deliverAfterStop: z.boolean().optional(),
-  cancelQueued: z.boolean().optional(),
-  editQueued: z.boolean().optional(),
-  queuedMessageId: recordId.optional(),
-  clientMessageId: z.string().min(1).max(200).optional(),
-});
+export const buildSteerBodySchema = z
+  .object({
+    content: z.string().min(1),
+    mode: z.literal('queue').optional(),
+    deliverAfterStop: z.boolean().optional(),
+    cancelQueued: z.boolean().optional(),
+    editQueued: z.boolean().optional(),
+    queuedMessageId: recordId.optional(),
+    clientMessageId: z.string().min(1).max(200).optional(),
+  })
+  .refine((body) => body.queuedMessageId !== undefined || body.clientMessageId !== undefined, {
+    message: 'Required',
+    path: ['clientMessageId'],
+  });
 export type BuildSteerBody = z.infer<typeof buildSteerBodySchema>;
 
 export const buildStopBodySchema = z.object({

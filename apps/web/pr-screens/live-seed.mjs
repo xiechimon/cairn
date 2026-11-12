@@ -126,6 +126,7 @@ export async function seedWorld(server) {
 
   await post(`/api/teams/${teamId}/coordinator/messages`, {
     content: '帮我把 PR #42 合并前再检查一遍，有问题先问我。',
+    clientMessageId: crypto.randomUUID(),
   });
   const chief = await claim(online.token);
   if (chief?.kind !== 'chief') throw new Error(`chief claim got ${JSON.stringify(chief)}`);
