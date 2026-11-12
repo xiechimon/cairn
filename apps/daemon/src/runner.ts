@@ -124,6 +124,7 @@ import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
 import { resolveStepImages } from './step-attachments.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
+import { StreamWatchdog } from './stream-watchdog.js';
 import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
 import { extractVerifyVerdict } from './verify-verdict.js';
@@ -182,24 +183,6 @@ function envPositiveMs(name: string): number | null {
   if (raw === undefined) return null;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-export type StreamTimeoutArm = 'first' | 'idle' | 'body' | 'duration';
-
-export function streamTimeoutMessage(
-  arm: StreamTimeoutArm,
-  timeouts: { first: number; idle: number; body: number; durationCap: number },
-): string {
-  const value =
-    arm === 'first'
-      ? timeouts.first
-      : arm === 'idle'
-        ? timeouts.idle
-        : arm === 'body'
-          ? timeouts.body
-          : timeouts.durationCap;
-  const label = arm === 'duration' ? 'cap' : arm;
-  return `stream timeout (arm=${arm}, ${label}=${value}ms)`;
 }
 
 export function buildTaskPrompt(claimed: ClaimedStep): string {
@@ -1296,7 +1279,7 @@ async function runClaimedStep(
       noVisionDegraded ||
       sawProgress ||
       priorPassMadeProgress ||
-      timedOut ||
+      watchdog.trippedArm !== null ||
       stop.request !== null ||
       quotaTrip !== null ||
       promptImages === undefined ||
@@ -1360,46 +1343,18 @@ async function runClaimedStep(
   const absoluteDurationCapMs = envPositiveMs(STREAM_DURATION_CAP_ENV);
   const streamDurationCapMs =
     absoluteDurationCapMs ?? opts.streamDurationCapMs ?? STREAM_DURATION_CAP_DEFAULT_MS;
-  const progressResetsDuration =
-    isBuildStepKind(claimed.step.kind) && absoluteDurationCapMs === null;
-  let timedOut = false;
-  let timeoutArm: StreamTimeoutArm | null = null;
-  const runningToolCalls = new Set<string>();
   const toolStartedAt = new Map<string, number>();
-  let watchdog: NodeJS.Timeout | null = null;
-  let bodyTimeout: NodeJS.Timeout | null = null;
-  let durationCap: NodeJS.Timeout | null = null;
-  const tripTimeout = (arm: StreamTimeoutArm) => {
-    timedOut = true;
-    timeoutArm = arm;
-    askAbort.abort();
-    void handle?.stop();
-  };
-  const armWatchdog = (ms: number, arm: 'first' | 'idle') => {
-    if (watchdog) clearTimeout(watchdog);
-    watchdog = null;
-    if (arm === 'idle' && runningToolCalls.size > 0) return;
-    watchdog = setTimeout(() => tripTimeout(arm), ms);
-    watchdog.unref?.();
-  };
-  const armBodyTimeout = () => {
-    if (bodyTimeout) clearTimeout(bodyTimeout);
-    bodyTimeout = null;
-    if (runningToolCalls.size > 0) return;
-    bodyTimeout = setTimeout(() => tripTimeout('body'), streamTimeouts.body);
-    bodyTimeout.unref?.();
-  };
-  const armDurationCap = () => {
-    if (durationCap && absoluteDurationCapMs !== null) return;
-    if (durationCap) clearTimeout(durationCap);
-    durationCap = setTimeout(() => tripTimeout('duration'), streamDurationCapMs);
-    durationCap.unref?.();
-  };
-  askKeepAlive = () => {
-    armWatchdog(streamTimeouts.idle, 'idle');
-    armBodyTimeout();
-    armDurationCap();
-  };
+  const watchdog = new StreamWatchdog({
+    timeouts: streamTimeouts,
+    durationCapMs: streamDurationCapMs,
+    durationCapIsAbsolute: absoluteDurationCapMs !== null,
+    progressExtendsDuration: isBuildStepKind(claimed.step.kind) && absoluteDurationCapMs === null,
+    onTrip: () => {
+      askAbort.abort();
+      void handle?.stop();
+    },
+  });
+  askKeepAlive = () => watchdog.keepAlive();
   const segments = new SegmentBuffer();
   let sealedInMessage = false;
   let lastRowCreatedAt = 0;
@@ -1579,8 +1534,7 @@ async function runClaimedStep(
       lastErrorWasProcessCrash = false;
       sawDone = false;
       sawProgress = false;
-      timedOut = false;
-      timeoutArm = null;
+      watchdog.clearTrip();
       zeroProgressRetries = 0;
       retryStorm = false;
       usage = [];
@@ -1618,10 +1572,7 @@ async function runClaimedStep(
     stop.attach(handle).catch((err: unknown) => {
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     });
-    runningToolCalls.clear();
-    armWatchdog(streamTimeouts.first, 'first');
-    armBodyTimeout();
-    if (pass === 0) armDurationCap();
+    watchdog.startPass(pass === 0);
     try {
       for await (const ev of credentialSafeEvents(handle.events, () => credentialValues)) {
         if (!promptDelivered) {
@@ -1629,8 +1580,7 @@ async function runClaimedStep(
           await ackAnswers(claimed.answerIds ?? [], 'session-start');
         }
         if (ev.type === 'toolcall_end') {
-          if (ev.call.result === undefined) runningToolCalls.add(ev.call.id);
-          else runningToolCalls.delete(ev.call.id);
+          watchdog.noteToolCall(ev.call.id, ev.call.result === undefined);
           if (ev.call.result !== undefined && answeredPolls.size > 0) {
             const result = JSON.stringify(ev.call.result);
             const reached = [...answeredPolls].filter((id) => result.includes(id));
@@ -1638,12 +1588,11 @@ async function runClaimedStep(
             await ackAnswers(reached, 'poll');
           }
         }
-        armWatchdog(streamTimeouts.idle, 'idle');
-        armBodyTimeout();
+        watchdog.noteEvent();
         activity.noteEvent();
         switch (ev.type) {
           case 'text_delta': {
-            if (progressResetsDuration) armDurationCap();
+            watchdog.noteProgress();
             sawProgress = true;
             zeroProgressRetries = 0;
             activity.setPhase('responding');
@@ -1653,7 +1602,7 @@ async function runClaimedStep(
             break;
           }
           case 'thinking_delta': {
-            if (progressResetsDuration) armDurationCap();
+            watchdog.noteProgress();
             sawProgress = true;
             zeroProgressRetries = 0;
             activity.setPhase('thinking');
@@ -1663,7 +1612,7 @@ async function runClaimedStep(
             break;
           }
           case 'thinking': {
-            if (progressResetsDuration) armDurationCap();
+            watchdog.noteProgress();
             activity.setPhase('thinking');
             const sealedFull = segments.replace('thinking', ev.text);
             if (sealedFull !== null) await emitSegment(sealedFull);
@@ -1684,7 +1633,7 @@ async function runClaimedStep(
               };
               toolStartedAt.delete(ev.call.id);
             }
-            if (progressResetsDuration) armDurationCap();
+            watchdog.noteProgress();
             sawProgress = true;
             zeroProgressRetries = 0;
             if (ev.call.name && CHANGE_TOOLS.has(ev.call.name.toLowerCase())) {
@@ -1750,7 +1699,7 @@ async function runClaimedStep(
               );
             }
             if (ev.message.role === 'assistant' && ev.message.stopReason !== 'error') {
-              if (progressResetsDuration) armDurationCap();
+              watchdog.noteProgress();
               sawProgress = true;
               zeroProgressRetries = 0;
             }
@@ -1875,7 +1824,7 @@ async function runClaimedStep(
       if (
         failureText !== null &&
         (lastError !== null ||
-          (timedOut && lastModelError !== null) ||
+          (watchdog.trippedArm !== null && lastModelError !== null) ||
           (retryStorm && lastModelError !== null))
       ) {
         const amended: ProviderConfig | null =
@@ -1902,18 +1851,11 @@ async function runClaimedStep(
   textDeltas.flush();
   thinkingDeltas.flush();
   if (opts.env?.CAIRN_ORB !== '1') clearInterval(heartbeat);
-  if (watchdog) clearTimeout(watchdog);
-  if (bodyTimeout) clearTimeout(bodyTimeout);
-  if (durationCap) clearTimeout(durationCap);
+  watchdog.stop();
   askAbort.abort();
-  if (timedOut && timeoutArm !== null) {
-    lastError = combineTimeoutWithRootCause(
-      streamTimeoutMessage(timeoutArm, {
-        ...streamTimeouts,
-        durationCap: streamDurationCapMs,
-      }),
-      lastError ?? lastModelError,
-    );
+  const timeoutText = watchdog.message();
+  if (timeoutText !== null) {
+    lastError = combineTimeoutWithRootCause(timeoutText, lastError ?? lastModelError);
   } else if (retryStorm && lastError === null && lastModelError !== null) {
     lastError = lastModelError;
   }
@@ -1934,7 +1876,7 @@ async function runClaimedStep(
   if (quotaBlock !== null && lastError === null) {
     lastError = quotaBlock.reason;
   }
-  if (!timedOut && !stopped && !sawProgress && !sawDone && lastError === null) {
+  if (watchdog.trippedArm === null && !stopped && !sawProgress && !sawDone && lastError === null) {
     lastError =
       'agent session ended with zero progress and no terminal outcome (silent no-op round)';
     logger.step('zero-event round: session stream exhausted without progress, done, or error');

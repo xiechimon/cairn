@@ -21,10 +21,9 @@ import {
   STREAM_DURATION_CAP_ENV,
   STREAM_FIRST_EVENT_ENV,
   STREAM_IDLE_ENV,
-  type StreamTimeoutArm,
-  streamTimeoutMessage,
 } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { type StreamTimeoutArm, streamTimeoutMessage } from '../src/stream-watchdog.js';
 import { testTempDir } from './test-temp-dir.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
