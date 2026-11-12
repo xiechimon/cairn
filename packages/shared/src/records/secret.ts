@@ -55,12 +55,12 @@ export function isDaemonReadSecretName(name: string): boolean {
 }
 
 export const secretHttpPolicySchema = z.strictObject({
-  origin: z.string().transform((value, ctx) => {
-    const origin = normalizeSecretOrigin(value);
-    if (origin !== null) return origin;
-    ctx.addIssue({ code: 'custom', message: 'origin must be https://host on port 443' });
-    return z.NEVER;
-  }),
+  origin: z
+    .string()
+    .refine(
+      (value) => normalizeSecretOrigin(value) !== null,
+      'origin must be https://host on port 443',
+    ),
   header: z.string().refine(isSecretHeaderName, 'header cannot carry a secret'),
   template: z
     .string()

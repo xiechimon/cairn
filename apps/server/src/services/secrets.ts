@@ -1,5 +1,10 @@
 import type { SecretBox, SecretDelivery, SecretHttpPolicy, SecretRecord } from '@cairn/shared';
-import { isDaemonReadSecretName, isHttpSecretValue, isMailSecretName } from '@cairn/shared';
+import {
+  isDaemonReadSecretName,
+  isHttpSecretValue,
+  isMailSecretName,
+  normalizeSecretOrigin,
+} from '@cairn/shared';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { project, secret } from '../db/schema.js';
@@ -38,9 +43,11 @@ function policyColumns(delivery: SecretDelivery, policy: SecretHttpPolicy | unde
     return { delivery, httpOrigin: null, httpHeader: null, httpTemplate: null };
   }
   if (policy == null) throw new HttpError(400, 'an http secret needs origin, header and template');
+  const httpOrigin = normalizeSecretOrigin(policy.origin);
+  if (httpOrigin === null) throw new HttpError(400, 'origin must be https://host on port 443');
   return {
     delivery,
-    httpOrigin: policy.origin,
+    httpOrigin,
     httpHeader: policy.header,
     httpTemplate: policy.template,
   };
