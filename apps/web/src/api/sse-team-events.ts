@@ -4,8 +4,17 @@ export function teamEventInvalidations(
 ): (readonly string[])[] {
   switch (ev.type) {
     case 'todo': {
-      const doc = ev.doc as { id: string };
-      return [['todos'], ['todo', doc.id], ['tasks', teamId], ['schedules'], ['plans']];
+      const doc = ev.doc as { id: string; latestBuildId?: string | null };
+      const keys: (readonly string[])[] = [
+        ['todos'],
+        ['todo', doc.id],
+        ['tasks', teamId],
+        ['schedules'],
+        ['plans'],
+      ];
+      if (typeof doc.latestBuildId === 'string')
+        keys.push(['build', doc.latestBuildId], ['steps', doc.latestBuildId]);
+      return keys;
     }
     case 'build': {
       const doc = ev.doc as { id: string; todoId: string };
