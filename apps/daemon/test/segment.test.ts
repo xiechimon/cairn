@@ -137,4 +137,25 @@ describe('SegmentEmitter', () => {
       { kind: 'text', text: 'first second' },
     ]);
   });
+
+  test('a full message after a streamed one is still emitted', async () => {
+    const { emitter, rows } = collectingEmitter();
+    await emitter.append('text', 'one');
+    await emitter.endAssistantMessage('one');
+    await emitter.endAssistantMessage('two');
+    expect(rows).toEqual([
+      { kind: 'text', text: 'one' },
+      { kind: 'text', text: 'two' },
+    ]);
+  });
+
+  test('two full messages in a row are both emitted', async () => {
+    const { emitter, rows } = collectingEmitter();
+    await emitter.endAssistantMessage([{ type: 'text', text: 'one' }]);
+    await emitter.endAssistantMessage([{ type: 'text', text: 'two' }]);
+    expect(rows).toEqual([
+      { kind: 'text', text: 'one' },
+      { kind: 'text', text: 'two' },
+    ]);
+  });
 });
