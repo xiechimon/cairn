@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { HISTORY, mockLive } from './chief-home-mock';
 
 const TEXT_DEEP_LINK =
   '/app?scenario=chief-files&pane=file&file=team-files/att-test-txt.txt&fileName=test.txt';
@@ -298,4 +299,18 @@ test('the file panel fills the phone screen inside the existing panel mechanism'
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await panel.getByRole('button', { name: '关闭' }).click();
   await expect(panel).toHaveCount(0);
+});
+
+test('a live file downloads through the endpoint that names the file', async ({ page }) => {
+  await mockLive(page, { threads: [], messages: HISTORY }, (path, route) =>
+    path === '/api/attachments/att-notes'
+      ? route.fulfill({ contentType: 'text/plain', body: 'one\ntwo\n' })
+      : undefined,
+  );
+  await page.goto('/app?pane=file&file=team-files/att-notes.log&fileName=notes.log');
+  const panel = page.getByTestId('file-preview-panel');
+  await expect(panel.getByTestId('file-preview-text').locator('[data-slot="file-line"]')).toHaveCount(2);
+  const download = panel.getByRole('link', { name: '下载' });
+  await expect(download).toHaveAttribute('href', '/api/attachments/att-notes?download=1');
+  await expect(download).toHaveAttribute('download', 'notes.log');
 });
