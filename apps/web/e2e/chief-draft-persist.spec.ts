@@ -230,7 +230,7 @@ test('live face: an accepted send clears the server draft; a rejected send keeps
   await input.press('Enter');
   await expect(page.getByText('发送失败，请重试。')).toBeVisible();
   await expect(input).toHaveValue(DRAFT);
-  expect(store.content).toBe(DRAFT);
+  await expect.poll(() => store.content).toBe(DRAFT);
 
   accept = true;
   await input.press('Enter');

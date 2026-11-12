@@ -21,14 +21,15 @@ async function mockSlowSend(page: Page, total = 250): Promise<Row[]> {
       const content = (route.request().postDataJSON() as { content: string }).content;
       return new Promise<void>((resolve) =>
         setTimeout(() => {
-          history.push({
+          const message: Row = {
             id: `s-${history.length}`,
             role: 'user',
             content,
             createdAt: 1_000 + history.length,
-          });
+          };
+          history.push(message);
           running = true;
-          void json({ thread: THREAD }, 201).then(resolve);
+          void json({ thread: THREAD, message }, 201).then(resolve);
         }, 300),
       );
     }

@@ -1538,6 +1538,7 @@ export const EN: Record<string, string> = {
   '这个任务会带着这句话重跑。': 'Reruns this task with this note.',
   '已发出。': 'Sent.',
   '没发出去，再试一次。': 'Not sent. Try again.',
+  发送中: 'Sending',
   '回复这个任务…': 'Reply to this task…',
   回复这个任务: 'Reply to this task',
   '你直接对 {n} 说：{excerpt}': 'You told {n} directly: {excerpt}',
