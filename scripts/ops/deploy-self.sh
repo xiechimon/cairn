@@ -120,8 +120,12 @@ echo $$ >"$LOCK/pid"
 RUNTIME=daemon
 LEASE_OWNER=""
 
+health_url_is_loopback() {
+  [[ "$HEALTH_URL" =~ ^http://(127\.0\.0\.1|localhost|\[::1\])(:[0-9]+)?$ ]]
+}
+
 owner_token() {
-  [ -r "$TOKEN_FILE" ] || return 0
+  health_url_is_loopback && [ -r "$TOKEN_FILE" ] || return 0
   sed -nE 's/^[[:space:]]*CAIRN_TOKEN[[:space:]]*=[[:space:]]*//p' "$TOKEN_FILE" | head -n1 |
     sed -E "s/[[:space:]]+$//; s/^\"(.*)\"$/\\1/; s/^'(.*)'$/\\1/"
 }
@@ -134,6 +138,26 @@ lease_request() {
   { [ -z "$token" ] || printf 'header = "Authorization: Bearer %s"\n' "$token"; } |
     curl -sS --noproxy '*' --max-time 10 -K - -o "$STATE/lease-response" -w '%{http_code}' \
       -H "Origin: $HEALTH_URL" -H 'Content-Type: application/json' "$@" "$HEALTH_URL/api/server/deploy/lease"
+}
+
+refuse_lease_status() {
+  local status="$1" cause
+  case "$status" in
+    404) refuse "server lacks the deployment lease endpoint (HTTP 404); bootstrap server-only first" ;;
+    401 | 403)
+      if ! health_url_is_loopback; then
+        cause="it is sent only to a loopback CAIRN_HEALTH_URL, not $HEALTH_URL"
+      elif [ ! -r "$TOKEN_FILE" ]; then
+        cause="that file is missing or unreadable"
+      elif [ -z "$(owner_token)" ]; then
+        cause="that file has no CAIRN_TOKEN value"
+      else
+        cause="the server did not accept it"
+      fi
+      refuse "server rejected the deployment lease request (HTTP $status); the owner token is read from $TOKEN_FILE and $cause" ;;
+    000 | '') refuse "no response to the deployment lease request at $HEALTH_URL within 10s" ;;
+    *) refuse "deployment lease request answered HTTP $status" ;;
+  esac
 }
 
 resume_claims() {
@@ -328,7 +352,10 @@ drain_steps() {
   [ "$RUNTIME" = daemon ] || return 0
   [ -n "$LEASE_OWNER" ] || LEASE_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
   printf '%s\n' "$LEASE_OWNER" >"$STATE/lease-owner"
-  [ "$(lease_request -X PUT --data-binary "{\"owner\":\"$LEASE_OWNER\",\"ttlMs\":3600000}")" = 200 ] && assert_lease || refuse "cannot acquire deployment lease"
+  local status
+  status="$(lease_request -X PUT --data-binary "{\"owner\":\"$LEASE_OWNER\",\"ttlMs\":3600000}")" || true
+  [ "$status" = 200 ] || refuse_lease_status "$status"
+  assert_lease || refuse "cannot acquire deployment lease: the server returned another owner or an expired lease"
   wait_for_steps
 }
 
@@ -776,11 +803,7 @@ assert_hold
 classify_runtime
 if [ "$RUNTIME" = daemon ]; then
   LEASE_PROBE_STATUS="$(lease_request)" || true
-  case "$LEASE_PROBE_STATUS" in
-    200) ;;
-    401 | 403) refuse "server rejected the deployment lease request (HTTP $LEASE_PROBE_STATUS); the owner token is read from $TOKEN_FILE" ;;
-    *) refuse "server lacks the deployment lease endpoint (HTTP $LEASE_PROBE_STATUS); bootstrap server-only first" ;;
-  esac
+  [ "$LEASE_PROBE_STATUS" = 200 ] || refuse_lease_status "$LEASE_PROBE_STATUS"
 fi
 
 log "rehearsing migrations of $TARGET"
