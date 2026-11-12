@@ -1,4 +1,5 @@
 export const DB_TABLES = [
+  'action_journal',
   'user',
   'team',
   'project',
@@ -85,6 +86,7 @@ export type DbTable = (typeof DB_TABLES)[number];
 export const JOIN_ONLY_TABLES = ['todo_tag', 'todo_github_label'] as const;
 
 export const INTERNAL_ONLY_TABLES = [
+  'action_journal',
   'mail_account',
   'mail_event',
   'mail_rule',

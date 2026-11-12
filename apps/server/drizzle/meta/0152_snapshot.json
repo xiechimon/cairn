@@ -1,9 +1,114 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "2bf81f2b-7df7-4713-9a56-6f1bdff5682a",
+  "id": "476e713a-33ca-4c97-9446-adb7801502dc",
   "prevId": "c3672aae-ae53-4d00-bf84-87c69d6fdd5b",
   "tables": {
+    "action_journal": {
+      "name": "action_journal",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "teamId": {
+          "name": "teamId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actionId": {
+          "name": "actionId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "targetId": {
+          "name": "targetId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actor": {
+          "name": "actor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "surface": {
+          "name": "surface",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "inputHash": {
+          "name": "inputHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "action_journal_team_idx": {
+          "name": "action_journal_team_idx",
+          "columns": [
+            "teamId",
+            "createdAt"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "action_journal_teamId_team_id_fk": {
+          "name": "action_journal_teamId_team_id_fk",
+          "tableFrom": "action_journal",
+          "tableTo": "team",
+          "columnsFrom": [
+            "teamId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "action_journal_actor": {
+          "name": "action_journal_actor",
+          "value": "\"action_journal\".\"actor\" in ('user', 'coordinator')"
+        },
+        "action_journal_kind": {
+          "name": "action_journal_kind",
+          "value": "\"action_journal\".\"kind\" in ('run', 'undo', 'undo-refused', 'error')"
+        }
+      }
+    },
     "agent_memory": {
       "name": "agent_memory",
       "columns": {
@@ -2341,13 +2446,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "mailOwnerConversationId": {
-          "name": "mailOwnerConversationId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "lastMirroredEntryId": {

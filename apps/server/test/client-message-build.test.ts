@@ -117,11 +117,15 @@ describe('steering a running task with a client message id', () => {
     expect(messagesOf(s, 'one', 'steer')).toHaveLength(2);
   });
 
-  test('no key keeps today behaviour: two sends are two messages', async () => {
+  test('a missing clientMessageId is rejected and writes nothing', async () => {
     const { s } = await running();
-    await send(s, 'one', { content: 'steer' });
-    await send(s, 'one', { content: 'steer' });
-    expect(messagesOf(s, 'one', 'steer')).toHaveLength(2);
+    const res = await s.app.request('/api/conversations/build-one/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cairn-raw-send': '1' },
+      body: JSON.stringify({ content: 'steer' }),
+    });
+    expect(res.status).toBe(400);
+    expect(messagesOf(s, 'one', 'steer')).toEqual([]);
   });
 
   test('a key reused with different content returns the ORIGINAL response and stores nothing new', async () => {
@@ -274,11 +278,15 @@ describe('queueing a message with a client message id', () => {
     expect(s.db.select().from(queuedMessage).all()).toHaveLength(2);
   });
 
-  test('no key keeps today behaviour: two sends are two queued messages', async () => {
+  test('a missing clientMessageId is rejected and queues nothing', async () => {
     const { s } = await running();
-    await send(s, 'one', { content: 'later', mode: 'queue' });
-    await send(s, 'one', { content: 'later', mode: 'queue' });
-    expect(s.db.select().from(queuedMessage).all()).toHaveLength(2);
+    const res = await s.app.request('/api/conversations/build-one/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cairn-raw-send': '1' },
+      body: JSON.stringify({ content: 'later', mode: 'queue' }),
+    });
+    expect(res.status).toBe(400);
+    expect(s.db.select().from(queuedMessage).all()).toEqual([]);
   });
 
   test('a key reused with different content returns the ORIGINAL queued message', async () => {
