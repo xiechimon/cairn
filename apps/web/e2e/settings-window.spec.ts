@@ -15,7 +15,7 @@ test('sidebar footer: settings and activity icons, no user chip, quiet machine l
   await expect(footer.getByTestId('sidebar-activity')).toBeVisible();
   await expect(page.getByTestId('sidebar-user-menu')).toHaveCount(0);
   await expect(page.locator('[data-slot="sidebar-user"]')).toHaveCount(0);
-  await expect(footer.getByTestId('sidebar-attention').getByText('4 在线 · 1 离线')).toBeVisible();
+  await expect(footer.getByTestId('sidebar-attention')).toHaveText('4 在线');
   await expect(footer.getByTestId('sidebar-attention')).toHaveAttribute('title', '4 台在线 · 1 台离线（old-laptop）');
   await expect(footer.getByTestId('sidebar-attention')).toHaveAttribute('data-fleet', 'offline');
 
