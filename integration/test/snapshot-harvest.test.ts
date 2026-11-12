@@ -4,6 +4,7 @@ import { expect, it } from 'vitest';
 import { openDbWithHandle } from '../../apps/server/src/db/client.js';
 import { coordinatorTurnSnapshot } from '../../apps/server/src/db/schema.js';
 import { seed } from '../../apps/server/src/db/seed.js';
+import { buildDatasetItem, listHarvestCandidates } from '../eval/coordinator-routing/harvest.mts';
 import {
   harvestSnapshotReplayInput,
   SNAPSHOT_SCHEMA_VERSION,
@@ -184,6 +185,49 @@ it('reads a snapshot row by team and turn from the database', () => {
     );
     expect(() => harvestSnapshotReplayInput(db.db, 'other-team', 'turn-1')).toThrow(
       'incomplete: snapshot row missing',
+    );
+  } finally {
+    db.close();
+  }
+});
+
+it('lists harvest candidates and builds dataset items from sealed snapshots', () => {
+  const db = openDbWithHandle(':memory:');
+  try {
+    const { team: seeded } = seed(db.db);
+    const eligible = sealedRow({ teamId: seeded.id });
+    db.db.insert(coordinatorTurnSnapshot).values(eligible).run();
+    db.db
+      .insert(coordinatorTurnSnapshot)
+      .values(
+        sealedRow({
+          turnId: 'turn-2',
+          teamId: seeded.id,
+          sourceTraceId: otlpTraceIdOfTurn('turn-2'),
+          status: 'unusable',
+          reason: 'bounds',
+          payload: null,
+          payloadBytes: 0,
+          digest: null,
+        }),
+      )
+      .run();
+
+    const candidates = listHarvestCandidates(db.db, seeded.id);
+    expect(candidates).toHaveLength(2);
+    const ok = candidates.find((c) => c.turnId === 'turn-1');
+    expect(ok?.eligible).toBe(true);
+    const bad = candidates.find((c) => c.turnId === 'turn-2');
+    expect(bad?.eligible).toBe(false);
+    expect(bad?.reason).toMatch(/^incomplete: snapshot unusable/);
+
+    const item = buildDatasetItem(db.db, seeded.id, 'turn-1', null, 'routing');
+    expect(item.datasetName).toBe('routing');
+    expect(item.id).toBe('cairn-routing-turn-1');
+    expect(item.sourceTraceId).toBe(otlpTraceIdOfTurn('turn-1'));
+    expect(item.input.request).toBe('please create a task');
+    expect(() => buildDatasetItem(db.db, seeded.id, 'turn-2', null, 'routing')).toThrow(
+      'incomplete: snapshot unusable',
     );
   } finally {
     db.close();
