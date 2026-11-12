@@ -150,8 +150,10 @@ pnpm traj:failure-replay --intake --in /tmp/failure-replay-candidates.jsonl \
   --bank integration/eval/failure-replay --out /tmp/failure-replay-confirmed.jsonl
 ```
 
-Pending candidates never enter `integration/eval/`. The intake PR still needs a
-human merge.
+Pending candidates never enter `integration/eval/`. The intake PR touches the
+protected eval bank, so a human still marks the confirmed cases, but the PR
+enters the merge queue with every other green PR and merges on its own once
+the required checks pass.
 
 ## Pushing trajectory packs (#1570)
 
