@@ -8505,6 +8505,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "hosted_cleanup_outbox",
   "user",
   "team",
+  "job_application",
   "project",
   "todo",
   "tag",

@@ -730,7 +730,12 @@ export function sendChiefMessageFromComposer(
 export function answerChiefQuestion(
   deps: ChiefDeps,
   teamId: string,
-  input: { threadId: string; requestId: string; answers: AskUserAnswer[] },
+  input: {
+    threadId: string;
+    requestId: string;
+    answers: AskUserAnswer[];
+    answeredBy?: 'person' | 'coordinator';
+  },
 ): AskUserQuestionContent {
   const waiting = deps.db
     .select()

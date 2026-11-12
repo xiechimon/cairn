@@ -87,7 +87,7 @@ export function parseShellWords(source: string, env: ShellParseEnv): ShellParseE
   const startsWithToken = new RegExp(`^${token}`);
   const matches = matchAll(source, new RegExp(CHUNKER_SOURCE, 'g'));
   const entries: ShellParseEntry[] = [];
-  let commented = false;
+  let skipUntil = 0;
 
   const lookup = (name: string): string => {
     const value = env(name);
@@ -98,7 +98,7 @@ export function parseShellWords(source: string, env: ShellParseEnv): ShellParseE
 
   for (const match of matches) {
     const chunk = match[0];
-    if (!chunk || commented) continue;
+    if (!chunk || match.index < skipUntil) continue;
     if (CONTROL_RE.test(chunk)) {
       entries.push({ op: chunk });
       continue;
@@ -184,10 +184,12 @@ export function parseShellWords(source: string, env: ShellParseEnv): ShellParseE
         entries.push({ op: chunk });
         finished = true;
         break;
-      } else if (character === '#') {
-        commented = true;
-        if (out.length) entries.push(out);
-        entries.push({ comment: source.slice(match.index + index + 1) });
+      } else if (character === '#' && index === 0) {
+        const hashAt = match.index + index;
+        const newlineAt = source.indexOf('\n', hashAt);
+        const commentEnd = newlineAt === -1 ? source.length : newlineAt;
+        entries.push({ comment: source.slice(hashAt + 1, commentEnd) });
+        skipUntil = newlineAt === -1 ? source.length : newlineAt + 1;
         finished = true;
         break;
       } else if (character === '\\') {

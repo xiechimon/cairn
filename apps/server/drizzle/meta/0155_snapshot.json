@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "11f241dc-c034-462a-a230-cf55660f1920",
+  "id": "1bbe98bf-667e-47ac-9332-58c5c3cc0b26",
   "prevId": "69408c22-447e-414e-bcb4-4b7c04a61b73",
   "tables": {
     "action_journal": {
@@ -2711,13 +2711,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "mailOwnerConversationId": {
-          "name": "mailOwnerConversationId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "lastMirroredEntryId": {
           "name": "lastMirroredEntryId",
           "type": "text",
@@ -4113,6 +4106,44 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "job_application": {
+      "name": "job_application",
+      "columns": {
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "document": {
+          "name": "document",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "job_application_userId_user_id_fk": {
+          "name": "job_application_userId_user_id_fk",
+          "tableFrom": "job_application",
+          "tableTo": "user",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
