@@ -20,7 +20,7 @@ import { inlineSegments } from '../lib/markdown.js';
 import { ChatMarkdown, REPLY_BUBBLE_CLS, TaskCard } from './chat-markdown.js';
 import { Segments } from './segments.js';
 import { shouldExpandLastWork } from './work-expansion.js';
-import { InjectedSkills, WorkTrace } from './work-trace.js';
+import { WorkTrace } from './work-trace.js';
 
 export interface LiveStep {
   step: string;
@@ -255,8 +255,6 @@ function Row({
           {t('完成')}
         </div>
       );
-    case 'injected-skills':
-      return <InjectedSkills skills={item.skills} t={t} />;
     case 'chief':
       return (
         <div className={`${ROW_BASE} ${margin}`}>

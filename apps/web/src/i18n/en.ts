@@ -89,7 +89,6 @@ export const EN: Record<string, string> = {
   正在运行: 'Running',
   正在修改: 'Editing',
   正在准备: 'Preparing',
-  '已加载 {n} 个技能': 'Skills loaded: {n}',
   '还有 {n} 行': '{n## more line|# more lines}',
   无输出: 'No output',
   '本步异常结束：{reason}': 'This step ended abnormally: {reason}',

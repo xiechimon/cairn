@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, CircleDashed } from 'lucide-react';
+import { CircleDashed } from 'lucide-react';
 import { useState } from 'react';
 import {
   EMPTY_TRACE_COUNTS,
@@ -10,7 +10,6 @@ import {
   TraceRowButton,
   traceSummary,
 } from '../components/chat/trace-parts.js';
-import { Button } from '../components/ui/button.js';
 import type { TranscriptItem, WorkStep } from '../fixtures/records.js';
 import type { TFunc } from '../i18n/translate.js';
 
@@ -250,42 +249,6 @@ export function WorkTrace({
             <WorkStepRow key={step.id} step={step} enter={entering.has(step.id)} t={t} />
           ))}
         </TraceCard>
-      )}
-    </div>
-  );
-}
-
-export function InjectedSkills({
-  skills,
-  t,
-}: {
-  skills: { id: string; reason: string }[];
-  t: TFunc;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="mx-auto mt-3.5 max-w-[68ch] text-center text-meta text-(--text-tertiary)">
-      <Button
-        variant="secondary"
-        className="h-6 rounded-(--cds-radius-sm) px-2 text-meta font-normal"
-        data-testid="injected-skills-chip"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        {t('已加载 {n} 个技能', { n: skills.length })}
-        {open ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
-      </Button>
-      {open && (
-        <div
-          data-testid="injected-skills"
-          className="mt-1.5 flex flex-wrap justify-center gap-1.5 [overflow-wrap:anywhere]"
-        >
-          {skills.map((skill) => (
-            <span key={skill.id}>
-              {skill.id}（{skill.reason}）
-            </span>
-          ))}
-        </div>
       )}
     </div>
   );

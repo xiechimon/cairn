@@ -11,7 +11,7 @@ import { Segments, TodoGlanceContext, TodoStatus } from '../detail/segments.js';
 import { SourceIssueLine } from '../detail/source-issue.js';
 import { SpecBlock } from '../detail/spec-block.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
-import { InjectedSkills, WorkTrace } from '../detail/work-trace.js';
+import { WorkTrace } from '../detail/work-trace.js';
 import { useI18n } from '../i18n/provider.js';
 import { serializeMention } from '../overlay/mention-token.js';
 import type { DocView } from '../overlay/plan-dropdown.js';
@@ -322,7 +322,7 @@ export function ProductDetailSection() {
       <Specimen
         id="work-trace"
         title="Work trace"
-        note="WorkTrace collapsed and expanded, InjectedSkills"
+        note="WorkTrace collapsed and expanded"
         stage="sheet"
         className="flex-col"
       >
@@ -334,17 +334,6 @@ export function ProductDetailSection() {
         <Cell label="Expanded: think, read, search, edit, failed run, running">
           <div className="w-160">
             <WorkTrace item={TRANSCRIPT_WORK} defaultExpanded entering={new Set()} t={t} />
-          </div>
-        </Cell>
-        <Cell label="Injected skills chip">
-          <div className="w-160">
-            <InjectedSkills
-              skills={[
-                { id: 'frontend-design', reason: 'UI task' },
-                { id: 'verify', reason: 'acceptance' },
-              ]}
-              t={t}
-            />
           </div>
         </Cell>
       </Specimen>
