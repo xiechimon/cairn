@@ -14,7 +14,6 @@ export function connect(
   onEvent: (ev: Record<string, unknown>) => void,
   onResync: () => void,
   guards: StreamGuards,
-  onFirstOpen: () => void = () => {},
 ): () => void {
   let es: EventSource | null = null;
   let openedOnce = false;
@@ -90,7 +89,6 @@ export function connect(
     es.onopen = () => {
       retryDelay = 1_000;
       if (openedOnce) onResync();
-      else onFirstOpen();
       openedOnce = true;
       lastSeq = 0;
       bizWindow = SSE_BIZ_SILENCE_BASE_MS;

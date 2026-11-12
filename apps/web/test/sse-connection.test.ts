@@ -235,30 +235,6 @@ describe('business-frame silence (pings not counted) = the 150-second shape of X
   });
 });
 
-describe('first open closes the gap between the initial fetch and the subscription', () => {
-  it('runs the first-open refresh once, and a reconnect runs the resync instead', () => {
-    const onResync = vi.fn();
-    const onFirstOpen = vi.fn();
-    const dispose = connect(
-      URL,
-      () => {},
-      onResync,
-      { inFlight: () => false, reconcile: vi.fn() },
-      onFirstOpen,
-    );
-    const first = FakeEventSource.instances[0] as FakeEventSource;
-    first.fireOpen();
-    expect(onFirstOpen).toHaveBeenCalledTimes(1);
-    expect(onResync).not.toHaveBeenCalled();
-
-    first.onerror?.();
-    (FakeEventSource.instances[1] as FakeEventSource).fireOpen();
-    expect(onFirstOpen).toHaveBeenCalledTimes(1);
-    expect(onResync).toHaveBeenCalledTimes(1);
-    dispose();
-  });
-});
-
 describe('#462 existing faces unchanged', () => {
   it('complete silence (not even pings) → rebuild the connection + resync on reconnect', () => {
     const onResync = vi.fn();
