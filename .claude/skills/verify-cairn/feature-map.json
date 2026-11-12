@@ -314,7 +314,7 @@
       },
       "backendDesign": [
         "docs/research/capability-routing-2026-11-06.md",
-        "CONTEXT.md"
+        "docs/research/r14-orchestration-parent-card.md"
       ],
       "evidence": [
         "apps/server/test/chief-dispatch.test.ts",

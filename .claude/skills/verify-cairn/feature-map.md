@@ -104,7 +104,7 @@ Reach:
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-dispatch-judgment.md](features/chief-dispatch-judgment.md)
 - Research: [docs/research/cairn-dogfood-feasibility-2026-11-06.md](../../../docs/research/cairn-dogfood-feasibility-2026-11-06.md), [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md), [docs/research/r15-agent-responsibility-default.md](../../../docs/research/r15-agent-responsibility-default.md)
 - Frontend design: n/a: dispatch shows as threads and report rows inside the Coordinator chat
-- Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [CONTEXT.md](../../../CONTEXT.md)
+- Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md)
 - Evidence: `apps/server/test/chief-dispatch.test.ts`, `integration/test/chief-dispatch-policy-binding.test.ts`, `apps/server/test/agent-removal.test.ts`
 
 ### daily-report
