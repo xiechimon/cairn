@@ -39,6 +39,6 @@ test('a handoff reaches the desktop as a decision rather than a build review', a
   };
   disconnect = startTeamStream('team', new QueryClient());
   receive?.({ data: JSON.stringify({ type: 'notification', notification: record }) });
-  await vi.waitFor(() => expect(shown).toHaveBeenCalledWith('需要你决定', expect.objectContaining({ body: '#1 Repair CI' })));
+  await vi.waitFor(() => expect(shown).toHaveBeenCalledWith('需要你决定', expect.objectContaining({ body: 'Repair CI' })));
   expect(notificationRecordSchema.safeParse(record).success).toBe(true);
 });
