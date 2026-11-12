@@ -45,6 +45,7 @@ Environment (defaults in brackets):
   CAIRN_DEPLOY_NOTIFY [$CAIRN_DEPLOY_STATE/notify.sh]
   CAIRN_DEPLOY_NOTIFY_TIMEOUT [5]
   CAIRN_GH_WRAPPER [~/.cairn/tools/app-token/as-bot.sh]
+  CAIRN_HOME [~/.cairn] holds the owner token file `token` sent to the lease endpoint
 EOF
   exit 2
 }
@@ -74,6 +75,7 @@ DAEMON_UNIT=cairn-daemon.service
 ORB_UNIT=cairn-daemon-orb.service
 ORB_ALARM_TITLE="Orb daemon needs attention"
 DB="$DATA_DIR/server.db"
+OWNER_TOKEN_FILE="${CAIRN_HOME:-$HOME/.cairn}/token"
 
 EXIT_REFUSED=2
 EXIT_BUSY=75
@@ -118,9 +120,50 @@ echo $$ >"$LOCK/pid"
 RUNTIME=daemon
 LEASE_OWNER=""
 
+health_url_is_loopback() {
+  [[ "$HEALTH_URL" =~ ^http://(127\.0\.0\.1|localhost|\[::1\])(:[0-9]+)?$ ]]
+}
+
+owner_token() {
+  local line value token_line='^[[:space:]]*CAIRN_TOKEN[[:space:]]*=[[:space:]]*(.*[^[:space:]])[[:space:]]*$'
+  local double_quoted='^"(.*)"$' single_quoted="^'(.*)'\$"
+  health_url_is_loopback && [ -r "$OWNER_TOKEN_FILE" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    [[ "$line" =~ $token_line ]] || continue
+    value="${BASH_REMATCH[1]}"
+    if [[ "$value" =~ $double_quoted || "$value" =~ $single_quoted ]]; then value="${BASH_REMATCH[1]}"; fi
+    printf '%s' "$value"
+    return 0
+  done <"$OWNER_TOKEN_FILE"
+}
+
 lease_request() {
+  local token
+  token="$(owner_token)"
   curl -sS --noproxy '*' --max-time 10 -o "$STATE/lease-response" -w '%{http_code}' \
-    -H "Origin: $HEALTH_URL" -H 'Content-Type: application/json' "$@" "$HEALTH_URL/api/server/deploy/lease"
+    -H "Origin: $HEALTH_URL" -H 'Content-Type: application/json' \
+    -H @<(if [ -n "$token" ]; then printf 'Authorization: Bearer %s\n' "$token"; fi) \
+    "$@" "$HEALTH_URL/api/server/deploy/lease"
+}
+
+refuse_lease_status() {
+  local status="$1" cause
+  case "$status" in
+    404) refuse "server lacks the deployment lease endpoint (HTTP 404); bootstrap server-only first" ;;
+    401 | 403)
+      if ! health_url_is_loopback; then
+        cause="the owner token is sent only to a loopback CAIRN_HEALTH_URL, not $HEALTH_URL"
+      elif [ ! -r "$OWNER_TOKEN_FILE" ]; then
+        cause="no readable owner token file at $OWNER_TOKEN_FILE"
+      elif [ -z "$(owner_token)" ]; then
+        cause="$OWNER_TOKEN_FILE has no CAIRN_TOKEN line"
+      else
+        cause="the server rejected the owner token in $OWNER_TOKEN_FILE"
+      fi
+      refuse "deployment lease request unauthorized (HTTP $status): $cause" ;;
+    000 | '') refuse "deployment lease endpoint unreachable at $HEALTH_URL (no HTTP response within 10s)" ;;
+    *) refuse "deployment lease endpoint answered HTTP $status" ;;
+  esac
 }
 
 resume_claims() {
@@ -315,7 +358,10 @@ drain_steps() {
   [ "$RUNTIME" = daemon ] || return 0
   [ -n "$LEASE_OWNER" ] || LEASE_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
   printf '%s\n' "$LEASE_OWNER" >"$STATE/lease-owner"
-  [ "$(lease_request -X PUT --data-binary "{\"owner\":\"$LEASE_OWNER\",\"ttlMs\":3600000}")" = 200 ] && assert_lease || refuse "cannot acquire deployment lease"
+  local status
+  status="$(lease_request -X PUT --data-binary "{\"owner\":\"$LEASE_OWNER\",\"ttlMs\":3600000}")" || true
+  [ "$status" = 200 ] || refuse_lease_status "$status"
+  assert_lease || refuse "cannot acquire deployment lease: the server returned another owner or an expired lease"
   wait_for_steps
 }
 
@@ -762,7 +808,8 @@ assert_deployable
 assert_hold
 classify_runtime
 if [ "$RUNTIME" = daemon ]; then
-  [ "$(lease_request)" = 200 ] || refuse "server lacks the deployment lease endpoint; bootstrap server-only first"
+  LEASE_STATUS="$(lease_request)" || true
+  [ "$LEASE_STATUS" = 200 ] || refuse_lease_status "$LEASE_STATUS"
 fi
 
 log "rehearsing migrations of $TARGET"
