@@ -1,4 +1,4 @@
-import { transcriptPromptRowId } from '@cairn/shared';
+import { quickRepliesRowId, transcriptPromptRowId } from '@cairn/shared';
 import { and, desc, eq, gt, inArray, lt, lte, or, type SQL, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefMessage, message, step } from '../db/schema.js';
@@ -116,13 +116,17 @@ function chiefMessagesWithTurnBoundaries(
     const aStepId = boundaryStepIds.get(a.id);
     const bStepId = boundaryStepIds.get(b.id);
     if (aStepId !== undefined && bStepId === undefined) {
-      return b.id.startsWith(`${aStepId}-`) ? -1 : 1;
+      return writtenDuringTurn(b.id, aStepId) ? -1 : 1;
     }
     if (bStepId !== undefined && aStepId === undefined) {
-      return a.id.startsWith(`${bStepId}-`) ? 1 : -1;
+      return writtenDuringTurn(a.id, bStepId) ? 1 : -1;
     }
     return 0;
   });
+}
+
+function writtenDuringTurn(messageId: string, stepId: string): boolean {
+  return messageId.startsWith(`${stepId}-`) || messageId === quickRepliesRowId(stepId);
 }
 
 export function newestMessagePage<T extends PagedTable>(
