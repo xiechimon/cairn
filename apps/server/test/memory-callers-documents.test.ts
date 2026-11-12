@@ -198,7 +198,7 @@ test('injected revision is accepted by the document API', () => {
     }),
   ).toMatchObject({ content: '- direct' });
 });
-test.each(['MEMORY.md', 'duplicate.md', 'bad\nname\0.md', 'x'.repeat(1200)])(
+test.each(['MEMORY.md', 'duplicate.md', 'bad\nname\0.md', 'x'.repeat(1200), 'cut \uD83D'])(
   'internal callers allocate reachable files for %s',
   (title) => {
     const owner = { teamId: H.teamId, agentId: AGENT_ID, projectId: null };

@@ -717,7 +717,7 @@ export function purgeExpiredMemoryVersions(db: Db, now: number = nowMs()): numbe
 }
 
 export function normalizeMemoryFileName(title: string): string {
-  const name = title.replace(/[\r\n\0]+/g, ' ') || 'untitled.md';
+  const name = title.replace(/[\r\n\0]+/g, ' ').replace(/[\uD800-\uDBFF]$/, '') || 'untitled.md';
   return name.length <= 1024
     ? name
     : `${name.slice(0, 980).replace(/[\uD800-\uDBFF]$/, '')}-${createHash('sha256').update(title).digest('hex').slice(0, 32)}.md`;

@@ -650,7 +650,7 @@ export function finishChiefDigest(
           rememberMemoryFile(
             db,
             { ...scope, projectId: null, source: 'digest', sourceBuildId: thread.id },
-            item.text.slice(0, 40),
+            item.text.slice(0, 40).replace(/[\uD800-\uDBFF]$/, ''),
             item.text,
           ).id,
         );
