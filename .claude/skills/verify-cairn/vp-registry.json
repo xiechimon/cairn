@@ -196,7 +196,7 @@
           ],
           "status": "stale",
           "purpose": "The sidebar, the user menu and agent create/cards build dicebear avatar URLs while avatarUrl stays null in the API and SQLite.",
-          "note": "static check by /code-review on #1411: reads .team-agent-avatar img, a class apps/web/src no longer has."
+          "note": "static check by /code-review on #1411: reads .team-agent-avatar img, a class apps/web/src no longer has. It also imports apps/web/src/lib/spiral-avatar.ts, removed when the default avatar became a tinted initial (owner 2026-11-12)."
         }
       }
     },
