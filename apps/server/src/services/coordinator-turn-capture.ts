@@ -36,7 +36,19 @@ const toolView = z.object({
   result: z.unknown(),
 });
 
+const claimView = z.object({
+  systemPrompt: z.string(),
+  instruction: z.string().nullable(),
+  trigger: z.string(),
+  memories: z.array(z.string()),
+  provider: z.string(),
+  modelId: z.string(),
+  thinkingLevel: z.string().nullable(),
+  volatileText: z.string().nullable(),
+});
+
 const snapshotPayload = z.object({
+  claim: claimView.nullable(),
   toolViews: z.array(toolView),
 });
 
@@ -52,6 +64,7 @@ interface TurnCaptureState {
   views: z.infer<typeof toolView>[];
   recordCount: number;
   overLimit: boolean;
+  claim: z.infer<typeof claimView> | null;
 }
 
 const liveCaptures = new Map<string, TurnCaptureState>();
@@ -59,7 +72,13 @@ const liveCaptures = new Map<string, TurnCaptureState>();
 export function openTurnCapture(stepId: string): TurnCaptureState {
   const existing = liveCaptures.get(stepId);
   if (existing) return existing;
-  const capture: TurnCaptureState = { open: [], views: [], recordCount: 0, overLimit: false };
+  const capture: TurnCaptureState = {
+    open: [],
+    views: [],
+    recordCount: 0,
+    overLimit: false,
+    claim: null,
+  };
   liveCaptures.set(stepId, capture);
   return capture;
 }
@@ -72,6 +91,12 @@ export function takeTurnCapture(stepId: string): TurnCaptureState | undefined {
   const capture = liveCaptures.get(stepId);
   liveCaptures.delete(stepId);
   return capture;
+}
+
+export function captureClaimInputs(stepId: string, claim: z.infer<typeof claimView>): void {
+  const capture = existingTurnCapture(stepId);
+  if (capture === undefined || capture.claim !== null) return;
+  capture.claim = claimView.parse(claim);
 }
 
 export function capturePreCallWorld(
@@ -156,7 +181,7 @@ export function sealCoordinatorTurnSnapshot(
   };
   try {
     if (capture.overLimit) throw new Error('capture view or record limit crossed');
-    const parsed = snapshotPayload.parse({ toolViews: capture.views });
+    const parsed = snapshotPayload.parse({ claim: capture.claim, toolViews: capture.views });
     const redacted = redactSecrets(parsed);
     const payloadText = JSON.stringify(redacted.value);
     if (Buffer.byteLength(payloadText, 'utf8') > COORDINATOR_SNAPSHOT_PAYLOAD_MAX_BYTES)

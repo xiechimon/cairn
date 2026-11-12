@@ -80,6 +80,29 @@ describe('coordinator turn snapshot writer', () => {
     expect(row?.expiresAt).toBe((row?.capturedAt ?? 0) + 30 * 86_400_000);
   });
 
+  it('captures the verbatim prompt and context inputs fed to the claim', async () => {
+    const w = await world('what should I ask?');
+    const { faux } = stub('fine');
+    const coordinator = boot(w, faux);
+
+    coordinator.wake(w.threadId);
+    await coordinator.idle();
+
+    const row = snapshotRow(w.s.db, w.stepId);
+    expect(row?.status).toBe('sealed');
+    const payload = JSON.parse(row?.payload ?? 'null');
+    const claim = payload?.claim;
+    expect(claim).toBeDefined();
+    expect(claim.systemPrompt).toContain('Coordinator');
+    expect(claim.instruction).toBe('what should I ask?');
+    expect(claim.trigger).toBe('user');
+    expect(Array.isArray(claim.memories)).toBe(true);
+    expect(claim.memories.join('\n')).toContain('记忆文件');
+    expect(claim.provider).toBe('stub');
+    expect(claim.modelId).toBe('m');
+    expect(claim.volatileText).toBeNull();
+  });
+
   it('keeps the turn successful when snapshot sealing fails and never inserts a second row', async () => {
     const w = await world('hello');
     const { faux } = stub('all quiet');
