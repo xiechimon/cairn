@@ -1,0 +1,8 @@
+ ✓ test/memory-delete-references.test.ts > forgetting a digest file through REST removes its generated index reference 403ms
+ ✓ test/memory-delete-references.test.ts > forgetting a curation file through REST removes its generated index reference 333ms
+ ✓ test/memory-delete-references.test.ts > forgetting a spilled flush file through REST removes its generated index reference 271ms
+ ✓ test/memory-delete-references.test.ts > forgetting a file drops generated lines only and leaves hand-written mentions 267ms
+ ✓ test/memory-delete-references.test.ts > forgetting a superseded version keeps the reference to the live file 201ms
+ ✓ test/memory-delete-references.test.ts > forgetting a file leaves another scope with the same file name untouched 241ms
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
