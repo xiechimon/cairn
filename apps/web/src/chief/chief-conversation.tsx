@@ -64,6 +64,7 @@ import { foldTaskCards } from './chief-task-refs.js';
 import { serverDraftBinding } from './composer-binding.js';
 import { composerMode } from './composer-mode.js';
 import { ComposerSurface, type ComposerSurfaceHandle } from './composer-surface.js';
+import type { UnsentSends } from './outbox.js';
 import { outstandingReportIds } from './outstanding-reports.js';
 import { questionDockState } from './question-dock-state.js';
 import { awaitingStream } from './question-lifecycle.js';
@@ -110,6 +111,7 @@ export interface ChiefConversationProps {
   onSend?: (text: string) => void | Promise<void>;
   onRewind?: (messageId: string) => void;
   onWithdraw?: (messageId: string) => Promise<void>;
+  unsent?: UnsentSends | undefined;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
   earlier?: EarlierPages;
@@ -138,6 +140,7 @@ export function ChiefConversation({
   onSend,
   onRewind,
   onWithdraw,
+  unsent,
   onSteer,
   onStop,
   earlier,
@@ -353,19 +356,28 @@ export function ChiefConversation({
   useScrollFade(heroScrollRef, { enabled: heroLayout });
   const canStop = targetPlaceholder === null && chief.running === true && onStop != null;
   const connected = useConnected();
+  const restoreSent = (text: string) => {
+    followSentRef.current = false;
+    const reply = parseReplyQuote(text);
+    const body = reply?.body ?? text;
+    if (reply !== null)
+      setReplyQuote({ sourceMessageId: reply.sourceMessageId ?? '', quote: reply.quote });
+    restoreToThread((cur) => (cur === '' ? body : `${cur}\n${body}`));
+  };
+  const restoreSentRef = useRef(restoreSent);
+  restoreSentRef.current = restoreSent;
+  useEffect(() => {
+    for (const entry of unsent?.failed ?? []) {
+      const text = unsent?.discard(entry.key) ?? null;
+      if (text !== null) restoreSentRef.current(text);
+    }
+  }, [unsent]);
   const withdraw =
     onWithdraw == null
       ? undefined
       : (messageId: string, text: string) => {
           onWithdraw(messageId).then(
-            () => {
-              followSentRef.current = false;
-              const reply = parseReplyQuote(text);
-              const body = reply?.body ?? text;
-              if (reply !== null)
-                setReplyQuote({ sourceMessageId: reply.sourceMessageId ?? '', quote: reply.quote });
-              restoreToThread((cur) => (cur === '' ? body : `${cur}\n${body}`));
-            },
+            () => restoreSent(text),
             () => {},
           );
         };

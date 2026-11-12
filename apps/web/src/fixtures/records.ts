@@ -590,6 +590,8 @@ export type ChiefStreamItem =
       id?: string;
       markdown?: string;
       pending?: 'queued' | 'held';
+      delivery?: 'sending';
+      outboxKey?: string;
       at?: string;
       createdAt?: number;
       projectId?: string | null;

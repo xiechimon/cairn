@@ -1540,6 +1540,7 @@ export const EN: Record<string, string> = {
   '#{seq} 会带着这句话重跑。': 'Reruns #{seq} with this note.',
   '已发给 #{seq}。': 'Sent to #{seq}.',
   '没发出去，再试一次。': 'Not sent. Try again.',
+  发送中: 'Sending',
   '回复 #{seq}': 'Reply to #{seq}',
   '回复 #{seq}…': 'Reply to #{seq}…',
   回复这个任务: 'Reply to this task',
