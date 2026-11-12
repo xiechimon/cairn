@@ -12,6 +12,7 @@ import type { Db } from '../db/client.js';
 import { actionJournal, project } from '../db/schema.js';
 import { HttpError, notFound, parseWith } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { proposeAction, settlePendingProposal } from './action-proposals.js';
 import { deleteProject } from './projects.js';
 
 export interface ExecuteActionDeps {
@@ -25,13 +26,14 @@ export interface ExecuteActionRequest {
   actor: 'user' | 'coordinator';
   surface: ActionSurface;
   teamId: string;
+  threadId?: string;
+  scopeProjectId?: string | null;
   registry?: readonly ActionEntry[];
 }
 
-export interface ExecutedAction {
-  journalId: string;
-  output: unknown;
-}
+export type ExecuteActionResult =
+  | { status: 'executed'; journalId: string; output: unknown }
+  | { status: 'pending'; proposalId: string };
 
 type JournalTx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
@@ -82,7 +84,7 @@ function archiveOn(
 export function executeAction(
   deps: ExecuteActionDeps,
   request: ExecuteActionRequest,
-): ExecutedAction {
+): ExecuteActionResult {
   const registry = request.registry ?? SLICE1_ACTIONS;
   const entry = registry.find((item) => item.id === request.id);
   if (entry === undefined) throw new HttpError(400, `unknown action ${request.id}`);
@@ -92,10 +94,20 @@ export function executeAction(
   if (!entry.surfaces.includes(request.surface)) {
     throw new HttpError(403, `action ${entry.id} is not on surface ${request.surface}`);
   }
-  if (request.actor === 'coordinator' && entry.class === 'confirm-once') {
-    throw new HttpError(400, `action ${entry.id} requires a proposal`);
-  }
   const targetId = entry.targetOf(parsed);
+  if (request.actor === 'coordinator' && entry.class === 'confirm-once') {
+    if (!request.threadId) throw new HttpError(400, 'coordinator confirm-once requires a threadId');
+    requireOwnedProject(deps.db, targetId, request.teamId);
+    const proposed = proposeAction(deps.db, {
+      teamId: request.teamId,
+      actionId: entry.id,
+      targetId,
+      input,
+      threadId: request.threadId,
+      scopeProjectId: request.scopeProjectId ?? null,
+    });
+    return { status: 'pending', proposalId: proposed.proposalId };
+  }
   requireOwnedProject(deps.db, targetId, request.teamId);
   const hash = inputHash(input);
   if (entry.id === projectDeleteAction.id) {
@@ -104,9 +116,10 @@ export function executeAction(
     const removed = deleteProject(deps, targetId, (tx, deleted) => {
       if (deleted.teamId !== request.teamId) throw notFound(`project ${targetId}`);
       tx.insert(actionJournal).values(row).run();
+      settlePendingProposal(tx, request.teamId, entry.id, targetId);
     });
     if (!removed) throw notFound(`project ${targetId}`);
-    return { journalId: row.id, output };
+    return { status: 'executed', journalId: row.id, output };
   }
   const archived = entry.id === projectArchiveAction.id;
   if (entry.id !== projectArchiveAction.id && entry.id !== projectUnarchiveAction.id) {
@@ -121,5 +134,5 @@ export function executeAction(
     },
     { behavior: 'immediate' },
   );
-  return { journalId: row.id, output };
+  return { status: 'executed', journalId: row.id, output };
 }

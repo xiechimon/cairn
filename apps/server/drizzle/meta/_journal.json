@@ -1044,6 +1044,20 @@
       "when": 1794422961791,
       "tag": "0152_action_journal",
       "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "6",
+      "when": 1794422961792,
+      "tag": "0153_action_proposal",
+      "breakpoints": true
+    },
+    {
+      "idx": 154,
+      "version": "6",
+      "when": 1794422961793,
+      "tag": "0154_hosted_cleanup_outbox",
+      "breakpoints": true
     }
   ]
 }

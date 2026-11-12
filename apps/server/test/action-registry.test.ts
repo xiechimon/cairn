@@ -12,6 +12,7 @@ import {
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { executeAction } from '../src/services/action-registry.js';
+import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { repoDirFor } from '../src/services/git.js';
 import { bootServer, req } from './helpers.js';
 
@@ -36,6 +37,36 @@ function world() {
 
 function journals(s: ReturnType<typeof world>) {
   return s.db.select().from(actionJournal).all();
+}
+
+function chiefCtx(s: ReturnType<typeof world>): ChiefToolCtx {
+  return {
+    teamId: s.team.id,
+    userId: s.user.id,
+    chiefId: 'chief-a',
+    threadId: 'thread-a',
+    chiefAgentId: 'agent-a',
+    conversationId: 'thread-a',
+  };
+}
+
+async function chiefAction(s: ReturnType<typeof world>, name: string, projectId: string) {
+  const text = await executeChiefTool(
+    {
+      db: s.db,
+      hub: s.hub,
+      machineHub: s.machineHub,
+      box: s.secretBox,
+      user: s.user,
+      reposDir: s.reposDir,
+      attachmentsDir: s.attachmentsDir,
+      skillsDir: s.skillsDir,
+    },
+    chiefCtx(s),
+    name,
+    { projectId },
+  );
+  return JSON.parse(text) as { status: string; journalId?: string; output?: unknown };
 }
 
 function expectStatus(run: () => void, status: number): void {
@@ -216,5 +247,30 @@ describe('action registry execute', () => {
     for (const forbidden of ['value', 'token', 'secret', 'password']) {
       expect(names).not.toContain(forbidden);
     }
+  });
+
+  test('coordinator archive and unarchive run through execute and journal the actor', async () => {
+    const s = world();
+    await expect(chiefAction(s, 'archive_project', 'missing')).rejects.toMatchObject({
+      status: 404,
+    });
+    expect(journals(s)).toEqual([]);
+    const archived = await chiefAction(s, 'archive_project', 'project-a');
+    expect(archived).toMatchObject({
+      status: 'executed',
+      output: { projectId: 'project-a' },
+    });
+    expect(s.db.select().from(projectTable).get()?.archivedAt).toEqual(expect.any(Number));
+    const unarchived = await chiefAction(s, 'unarchive_project', 'project-a');
+    expect(unarchived).toMatchObject({
+      status: 'executed',
+      output: { projectId: 'project-a', archivedAt: null },
+    });
+    expect(s.db.select().from(projectTable).get()?.archivedAt).toBeNull();
+    expect(journals(s).map((row) => [row.actionId, row.actor, row.surface, row.kind])).toEqual([
+      ['project.archive', 'coordinator', 'coordinator', 'run'],
+      ['project.unarchive', 'coordinator', 'coordinator', 'run'],
+    ]);
+    s.dispose();
   });
 });
