@@ -69,6 +69,26 @@ Rules:
 - State lives on the thread, not in the engine's session. An engine may have its own todo or loop; the thread does not depend on it, and the adapter maps the engine's plan events onto the thread's checklist where they exist.
 - A new habit needs its states and failure behavior written down first (what happens when the wake fails, the cap is reached, the goal cannot be checked), because it is persisted state.
 
+## Model and effort follow the task's difficulty
+
+Owner rule on 2026-11-12: when work is dispatched, the model and the reasoning effort are chosen from how hard the task is, not fixed per role.
+
+What exists: a task request carries a difficulty (`easy`, `standard`, `hard` in `packages/shared/src/records/task-request.ts`), capability routing ranks models by it (`packages/shared/src/capability-routing.ts`), and a routing rule or an agent can pin a thinking level (`thinkingLevel` in `packages/shared/src/records/routing-rule.ts` and `agent.ts`). Missing: effort is not derived from difficulty, the difficulty is set once at intake, and the three roles above do not share one table.
+
+Proposal:
+
+| Difficulty | Who does it | Model tier | Effort |
+|---|---|---|---|
+| Easy (a question, a status read, one setting, one small edit) | The router or the thread itself | Inexpensive | Low |
+| Standard (a few steps, one file or one tool chain) | The thread, or one engine | Mid-range | Medium |
+| Hard (many files, unclear cause, irreversible actions, anything that failed once) | An engine, with an independent check on the result | Strong | High |
+
+- The difficulty is decided by rule first (the risk list in this document), then by the owner's explicit setting, which always wins.
+- It can only be raised during the work: a failed attempt, a check that does not pass or a plan that grows moves the task up one level and the next dispatch uses the higher row. It is never lowered silently.
+- The chosen model, effort and the reason are recorded on the dispatch and shown in the engine card, so the owner sees why a task cost what it did.
+- Effort maps to whatever each engine calls it (thinking level, reasoning effort); an engine that has no such control ignores it and the dispatch record says so.
+- A run still never switches model because a quota ran out; that pauses the work, as today.
+
 ## Open questions for the owner
 
 - Where a thread's durable session runs and is stored: the server, as the Coordinator's is, or the machine that does the work.
