@@ -1,7 +1,7 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { AGENT_TODO_MAX_ITEMS, type StepEvent } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { parseAgentTodoText } from '../src/agent-todo.js';
+import { AgentTodoReporter, parseAgentTodoText } from '../src/agent-todo.js';
 import {
   createClaudeMapState,
   mapClaudeMessage,
@@ -152,5 +152,57 @@ describe('parseAgentTodoText (pi text channel: `- [ ]` lines → cairn format)',
   test('prose grammar is same-source with the web TaskCard: `*` markers and indentation also recognized', () => {
     const items = parseAgentTodoText('  * [~] 缩进的星号条目');
     expect(items).toEqual([{ text: '缩进的星号条目', state: 'doing' }]);
+  });
+});
+
+type ReportedItem = Parameters<AgentTodoReporter['report']>[0][number];
+
+describe('AgentTodoReporter', () => {
+  const list = (state: ReportedItem['state']): ReportedItem[] => [
+    { text: 'first', state },
+    { text: 'second', state: 'todo' },
+  ];
+
+  test('an unchanged list is sent once, a changed one again, an empty one never', async () => {
+    const sent: ReportedItem[][] = [];
+    const reporter = new AgentTodoReporter({
+      send: async (items) => {
+        sent.push(items);
+      },
+      onFirstError: () => {},
+    });
+    reporter.report([]);
+    reporter.report(list('todo'));
+    reporter.report(list('todo'));
+    reporter.report(list('done'));
+    expect(sent).toEqual([list('todo'), list('done')]);
+  });
+
+  test('a caller mutating its list afterwards does not hide the next change', async () => {
+    const sent: ReportedItem[][] = [];
+    const reporter = new AgentTodoReporter({
+      send: async (items) => {
+        sent.push(items);
+      },
+      onFirstError: () => {},
+    });
+    const items = list('todo');
+    reporter.report(items);
+    const first = items[0];
+    if (first !== undefined) first.state = 'done';
+    reporter.report(items);
+    expect(sent.map((batch) => batch[0]?.state)).toEqual(['todo', 'done']);
+  });
+
+  test('a failing relay is reported once', async () => {
+    const errors: unknown[] = [];
+    const reporter = new AgentTodoReporter({
+      send: () => Promise.reject(new Error('relay down')),
+      onFirstError: (err) => errors.push(err),
+    });
+    reporter.report(list('todo'));
+    reporter.report(list('done'));
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(errors).toHaveLength(1);
   });
 });
