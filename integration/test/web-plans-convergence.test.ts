@@ -105,7 +105,7 @@ afterAll(async () => {
   if (home) rmSync(home, { recursive: true, force: true });
 });
 
-test('plan card converges via the team-stream phase event when the conv stream is dead (#666)', async () => {
+test('the plan converges via the team-stream phase event when the conv stream is dead (#666)', async () => {
   const { todoId } = await seedWorld(
     server.url,
     server.teamId,
@@ -126,9 +126,7 @@ test('plan card converges via the team-stream phase event when the conv stream i
     timeout: 150_000,
   });
   try {
-    await pexpect(page.locator('.chat-plan-title').last()).toHaveText('方案 · v1', {
-      timeout: 30_000,
-    });
+    await pexpect(page.getByRole('button', { name: '查看计划' })).toBeVisible({ timeout: 30_000 });
   } catch (err) {
     const todoNow = (await api(server.url, 'GET', `/api/todos/${todoId}`)).body as {
       latestBuildId: string | null;
@@ -163,4 +161,7 @@ test('plan card converges via the team-stream phase event when the conv stream i
   expect(plans.status).toBe(200);
   expect(plans.body as unknown[]).toHaveLength(1);
   expect(blocked).toBeGreaterThan(0);
+  await pexpect(page.locator('.chat-plan-title')).toHaveCount(0);
+  await page.getByRole('button', { name: '查看计划' }).click();
+  await pexpect(page.getByTestId('side-chat-plan')).toBeVisible();
 });
