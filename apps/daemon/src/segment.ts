@@ -72,6 +72,7 @@ export class SegmentEmitter {
     const trailing = this.buffer.seal();
     if (hadRows || trailing !== null) {
       await this.deliver(trailing);
+      this.emittedInMessage = false;
       return;
     }
     const blocks = Array.isArray(content) ? content : [content];
@@ -89,6 +90,7 @@ export class SegmentEmitter {
       }
     }
     await this.seal();
+    this.emittedInMessage = false;
   }
 
   private async deliver(seg: SealedSegment | null): Promise<void> {
