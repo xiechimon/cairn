@@ -478,6 +478,13 @@ name comes from `--name omarchy-orb`. The server remains
 Do not inherit a production `CAIRN_API_KEY` or `CAIRN_TEAM` in this user unit;
 use the authorize URL for the separate enrollment.
 
+`CAIRN_COMPUTER=orb` gives a host-executor daemon the Coordinator computer
+without moving builds into Orbs. The daemon then reports the `computer`
+capability, and `browser` when the `cairn-orb-computer` image carries the
+pinned agent-browser marker. Any other non-empty value stops the daemon at
+startup. A daemon with `CAIRN_EXECUTOR=orb` and the nspawn runtime already has
+the computer and ignores this switch.
+
 Record live acceptance using [the trial evidence template](../../../docs/verify/b2-trial-one/README.md).
 Local fake tests do not establish Linux enrollment or Orb execution.
 
