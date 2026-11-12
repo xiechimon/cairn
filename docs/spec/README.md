@@ -10,4 +10,4 @@ Specs that still govern current behavior. The numbering skips retired volumes; d
 | 03, 04, 05 | Replication build order and acceptance. Spec 06 already retired the replication obligation | `docs/spec/18-positioning-and-differentiation.md` |
 | 25 | Never a spec. The feature map moved to `docs/feature-map.md` | `docs/feature-map.md` |
 
-The remaining numbered specs (06, 08, 11 through 24, 26 through 30) and `base-ui-theme.md` stay. A later change removes the ones whose own text says they are superseded.
+The remaining numbered specs stay, but not all of them govern current behavior. Spec 21 says its mechanism was voided, spec 24 says its instructions are historical and must not be implemented, and spec 07 is an unevaluated draft. Read a spec's own status line before following it. A later change removes those three.
