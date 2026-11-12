@@ -424,17 +424,9 @@ export function HomeC({
     </header>
   );
 
-  const lead = (projectLinks !== false || chiefData.hasEarlier === true) && (
+  const lead = projectLinks !== false && (
     <section data-testid="home-c-lead" aria-label={t('首页概况')} className="pt-2 pb-4">
       {projectLinks}
-      {chiefData.hasEarlier === true && (
-        <p
-          data-testid="home-c-earlier"
-          className="m-0 mt-8 text-center text-caption text-content-dim"
-        >
-          {t('往上滑看更早的对话')}
-        </p>
-      )}
     </section>
   );
 
@@ -494,7 +486,6 @@ export function HomeC({
         machines={computers}
         open={pane === 'machines' && threadId === null}
         onToggle={() => togglePane('machines')}
-        loading={machinesQuery?.isPending === true}
       />
     </header>
   );
@@ -511,7 +502,6 @@ export function HomeC({
           machines={computers}
           open={pane === 'machines' && threadId === null}
           onToggle={() => togglePane('machines')}
-          loading={machinesQuery?.isPending === true}
         />
       }
     />

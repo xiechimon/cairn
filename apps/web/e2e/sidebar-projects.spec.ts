@@ -196,6 +196,17 @@ test('Delete asks for the name, then removes the project', async ({ page }) => {
   expect(patches).toEqual([{ id: 'proj-2', body: 'DELETE' }]);
 });
 
+test('the row menu keeps the project tasks and settings pages reachable', async ({ page }) => {
+  await open(page, [PROJECT]);
+  await openMenu(page, 'cairn');
+  await page.getByRole('menuitem', { name: '任务' }).click();
+  await expect(page).toHaveURL(/\/app\/project\/proj-1\/tasks(\?|$)/);
+  await page.goBack();
+  await openMenu(page, 'cairn');
+  await page.getByRole('menuitem', { name: '项目设置' }).click();
+  await expect(page).toHaveURL(/\/app\/project\/proj-1\/settings(\?|$)/);
+});
+
 test('Project instructions opens the memory tab of the project settings', async ({ page }) => {
   await open(page, [PROJECT]);
   await openMenu(page, 'cairn');

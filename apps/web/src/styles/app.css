@@ -637,6 +637,10 @@
   }
 }
 
+.board-shell:not(:has(> .board-sidebar)) > .board-sheet {
+  border-left-width: 0;
+}
+
 @media (width < 48rem) {
   .detail-head :is(button, a) {
     width: 32px;

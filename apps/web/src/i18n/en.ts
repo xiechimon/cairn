@@ -1462,7 +1462,6 @@ export const EN: Record<string, string> = {
   首页概况: 'Home overview',
   '跟 Coordinator 说（在 {name} 里）…': 'Talk to the Coordinator (in {name})…',
   首页: 'Home',
-  往上滑看更早的对话: 'Scroll up for earlier messages',
   'Claude 登录需要处理': 'Claude sign-in needs attention',
   '{kind} 步骤': '{kind} step',
   '{name} 接任务': 'Run steps on {name}',

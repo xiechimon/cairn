@@ -1,6 +1,6 @@
-import { CalendarClock, Clock } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { useSchedules } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { QueryBoundary } from '../components/query-state.js';
@@ -86,15 +86,6 @@ export function TasksScheduleList({ projectId, now }: { projectId: string | null
           ))}
         </section>
       </QueryBoundary>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="mt-1 gap-1.5 self-start text-meta text-content-secondary"
-        render={<Link to="/app/schedules" />}
-      >
-        <CalendarClock aria-hidden className="size-4" strokeWidth={1.75} />
-        {t('管理定时')}
-      </Button>
       <ScheduleDetailController schedule={selected} now={now} onClose={() => setSelected(null)} />
     </>
   );

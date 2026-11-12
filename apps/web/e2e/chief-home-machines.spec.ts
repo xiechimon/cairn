@@ -13,7 +13,7 @@ test('the computer chip names only the Coordinator machine and its running count
   await expect(chip(page)).toHaveAccessibleName(/2\/8 在跑/);
   await expect(chip(page)).not.toHaveAccessibleName(/\+1/);
   await expect(chip(page)).toHaveText('');
-  await expect(page.getByTestId('machines-online-dot')).toHaveCount(1);
+  await expect(chip(page).locator('span')).toHaveCount(0);
   await expect(chip(page)).toHaveAttribute('aria-pressed', 'false');
 });
 

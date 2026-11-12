@@ -47,8 +47,9 @@ test.describe('the Coordinator lives only on the home', () => {
   }) => {
     await page.goto('/app?scenario=17b&thread=7ve0iOkQ-JBpSL98zSiGc');
     await expect(page.getByTestId('side-chat')).toBeVisible();
-    await expect(page.locator('.board-sidebar--collapsed')).toBeVisible();
-    await page.getByRole('complementary').getByRole('link', { name: 'Coordinator' }).click();
+    await expect(page.locator('.board-sidebar')).toHaveCount(0);
+    await page.getByTestId('sidebar-reopen').click();
+    await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click();
     await expect(page).toHaveURL(/\/app\?scenario=17b$/);
     await expect(page.getByTestId('side-chat')).toHaveCount(0);
     await expect(page.getByTestId('home-c')).toBeVisible();

@@ -223,6 +223,7 @@ export function BoardPage() {
         searchPanel={false}
         onSearch={() => search.setOpen(true)}
         menuTrigger={!homeShown}
+        hiddenByPanel={homeShown}
       />
       <div className={`board-sheet ${SHEET_PANEL}`}>
         <div className="relative flex min-h-0 min-w-0 flex-1">

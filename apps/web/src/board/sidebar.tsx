@@ -308,10 +308,10 @@ export function BoardSidebar({
   const projectParam = pathname === '/app' ? baseParams.get('project') : null;
   baseParams.delete('project');
   baseParams.delete('chat');
-  const projectHref = (id: string, chat = false) => {
+  const projectHref = (id: string) => {
     const next = new URLSearchParams(baseParams);
     next.set('project', id);
-    if (chat) next.set('chat', '1');
+    next.set('chat', '1');
     return { pathname: '/app', search: `?${next}` };
   };
   const plain = `?${baseParams}`;
@@ -372,6 +372,8 @@ export function BoardSidebar({
         onArchive={() => actions.archive(row.id)}
         onRename={(name) => actions.rename(row.id, name)}
         onDelete={() => actions.remove(row.id)}
+        onTasks={() => navigate({ pathname: `/app/project/${row.id}/tasks`, search: plain })}
+        onSettings={() => navigate({ pathname: `/app/project/${row.id}/settings`, search: plain })}
         onInstructions={() => {
           const next = new URLSearchParams(baseParams);
           next.set('tab', 'memory');
@@ -391,7 +393,7 @@ export function BoardSidebar({
         status={isArchivedProject(row) ? null : statusText(row.id)}
         archived={isArchivedProject(row) ? archivedLabel : null}
         active={activeProject === row.id}
-        onClick={() => navigate(projectHref(row.id, isArchivedProject(row)))}
+        onClick={() => navigate(projectHref(row.id))}
         menu={projectMenu(row)}
       />
     ));

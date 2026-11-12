@@ -212,7 +212,15 @@ test('the row menu matches the reference metrics and order', async ({ page }) =>
   const trigger = page.getByRole('button', { name: 'r3-lifecycle 的菜单' });
   await trigger.click();
   const menu = page.locator('[data-slot="dropdown-menu-content"]');
-  await expect(menu.getByRole('menuitem')).toHaveText(['重命名', '项目说明', '移到分组', '归档', '删除']);
+  await expect(menu.getByRole('menuitem')).toHaveText([
+    '重命名',
+    '任务',
+    '项目设置',
+    '项目说明',
+    '移到分组',
+    '归档',
+    '删除',
+  ]);
   await expect.poll(() => menu.evaluate((el) => el.getBoundingClientRect().width)).toBe(168);
   const m = await page.evaluate(() => {
     const menu = document.querySelector('[data-slot="dropdown-menu-content"]')!;
@@ -231,7 +239,7 @@ test('the row menu matches the reference metrics and order', async ({ page }) =>
       itemRadius: getComputedStyle(items[0]!).borderRadius,
       icon: [box(svg).width, box(svg).x - box(items[0]!).x],
       font: getComputedStyle(items[0]!).fontSize,
-      danger: getComputedStyle(items[4]!).color,
+      danger: getComputedStyle(items.at(-1)!).color,
       destructive: (() => {
         const probe = document.createElement('span');
         probe.style.color = 'var(--destructive)';
@@ -245,7 +253,7 @@ test('the row menu matches the reference metrics and order', async ({ page }) =>
   expect(m.menu.width).toBe(168);
   expect(m.radius).toBe('10px');
   expect(m.padding).toBe('6px');
-  expect(m.itemHeights).toEqual([27, 27, 27, 27, 27]);
+  expect(m.itemHeights).toEqual([27, 27, 27, 27, 27, 27, 27]);
   expect(m.itemRadius).toBe('6px');
   expect(m.icon).toEqual([20, 10]);
   expect(m.font).toBe('13px');

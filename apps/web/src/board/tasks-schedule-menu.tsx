@@ -1,6 +1,7 @@
 import type { ScheduleRecord as WireSchedule } from '@cairn/shared';
-import { Ellipsis, History, Pause, Play, RotateCw } from 'lucide-react';
+import { CalendarClock, Ellipsis, History, Pause, Play, RotateCw } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
@@ -44,6 +45,7 @@ export function ScheduleRowMenu({
   onOpenDetail: () => void;
 }) {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -145,6 +147,14 @@ export function ScheduleRowMenu({
           <KeyedMenuItem shortcut="H" data-action="detail" onClick={onOpenDetail}>
             <History />
             {t('查看详情')}
+          </KeyedMenuItem>
+          <KeyedMenuItem
+            shortcut="M"
+            data-action="manage"
+            onClick={() => navigate('/app/schedules')}
+          >
+            <CalendarClock />
+            {t('管理定时')}
           </KeyedMenuItem>
           <DropdownMenuSeparator />
           <KeyedMenuItem

@@ -125,18 +125,17 @@ test('a text file that fails to load shows the error state with retry', async ({
   await expect(panel.getByRole('button', { name: '重试' })).toBeVisible();
 });
 
-test('opening the file panel folds the sidebar to the rail like the other panels', async ({
-  page,
-}) => {
+test('opening the file panel hides the sidebar like the other panels', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(TEXT_DEEP_LINK);
   await expect(page.getByTestId('file-preview-panel')).toBeVisible();
   await expect(page.getByTestId('side-panel-resize')).toBeAttached();
-  const rail = page.locator('.board-sidebar--collapsed');
-  await expect(rail).toBeVisible();
-  expect(await rail.evaluate((el) => el.getBoundingClientRect().width)).toBe(48);
+  await expect(page.locator('.board-sidebar')).toHaveCount(0);
+  await expect(page.getByTestId('sidebar-reopen')).toBeVisible();
   await page.getByTestId('file-preview-panel').getByRole('button', { name: '关闭' }).click();
-  await expect(rail).toHaveCount(0);
+  await expect(page.locator('.board-sidebar')).toBeVisible();
+  await expect(page.locator('.board-sidebar--collapsed')).toHaveCount(0);
+  await expect(page.getByTestId('sidebar-reopen')).toHaveCount(0);
 });
 
 test('composer tiles: 122px, remove tooltip names the file, keyboard removal returns focus', async ({

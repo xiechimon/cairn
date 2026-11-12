@@ -16,7 +16,6 @@ import { SegmentedTabs } from '../components/segmented.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
-import { Skeleton } from '../components/ui/skeleton.js';
 import { Spinner } from '../components/ui/spinner.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -123,19 +122,16 @@ export function MachineChip({
   machines,
   open,
   onToggle,
-  loading = false,
   round = false,
 }: {
   machines: readonly MachineRow[];
   open: boolean;
   onToggle: () => void;
-  loading?: boolean;
   round?: boolean;
 }) {
   const { t } = useI18n();
   const connected = useConnected();
   const host = coordinatorMachine(machines);
-  const hostOnline = connected && host?.online === true;
   const label =
     host === null
       ? t('电脑')
@@ -161,25 +157,6 @@ export function MachineChip({
       }
     >
       <Laptop aria-hidden="true" className={round ? 'size-5.5' : undefined} />
-      {loading ? (
-        <Skeleton
-          className={cn(
-            'absolute size-1.5 animate-none rounded-full',
-            round ? 'top-3 right-3' : 'top-1 right-1',
-          )}
-        />
-      ) : (
-        hostOnline && (
-          <span
-            aria-hidden="true"
-            data-testid="machines-online-dot"
-            className={cn(
-              'absolute size-1.5 rounded-full bg-running',
-              round ? 'top-3 right-3' : 'top-1 right-1',
-            )}
-          />
-        )
-      )}
     </IconTooltip>
   );
 }

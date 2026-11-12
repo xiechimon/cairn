@@ -44,7 +44,7 @@ for (const [name, url] of [
   });
 }
 
-test('`新建定时` footer: text `取消` left of a 32px primary `保存`, no outline button', async ({
+test('`新建定时` footer: a grey `取消` pill left of a 32px primary `保存`, no outline or bare-text button', async ({
   page,
 }) => {
   await light(page, '/app/schedules?scenario=r3-92');
@@ -52,7 +52,32 @@ test('`新建定时` footer: text `取消` left of a 32px primary `保存`, no o
   const cancel = foot.getByRole('button', { name: '取消' });
   const save = foot.getByRole('button', { name: '保存' });
   await expect(save).toHaveCSS('height', '32px');
-  await expect(cancel).toHaveAttribute('data-variant', 'ghost');
+  await expect(cancel).toHaveCSS('height', '32px');
+  const pill = await cancel.evaluate((el) => {
+    const token = (name: string) => {
+      const probe = document.createElement('span');
+      probe.style.color = `var(${name})`;
+      document.body.append(probe);
+      const value = getComputedStyle(probe).color;
+      probe.remove();
+      return value;
+    };
+    const cs = getComputedStyle(el);
+    return {
+      fill: cs.backgroundColor,
+      ink: cs.color,
+      border: cs.borderTopColor,
+      radius: cs.borderTopLeftRadius,
+      weight: cs.fontWeight,
+      secondary: token('--secondary'),
+      foreground: token('--foreground'),
+    };
+  });
+  expect(pill.fill).toBe(pill.secondary);
+  expect(pill.ink).toBe(pill.foreground);
+  expect(pill.border).toMatch(/^rgba\(0, 0, 0, 0\)$|transparent/);
+  expect(pill.weight).toBe('400');
+  await expect(save).toHaveCSS('border-top-left-radius', pill.radius);
   const [c, s] = await Promise.all([cancel.boundingBox(), save.boundingBox()]);
   expect(c!.x + c!.width).toBeLessThanOrEqual(s!.x);
 });

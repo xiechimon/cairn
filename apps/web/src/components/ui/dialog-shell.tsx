@@ -56,7 +56,7 @@ export const DIALOG_PRIMARY_BUTTON =
   'rounded-md text-ui disabled:bg-secondary disabled:text-content-secondary disabled:opacity-100';
 
 export const DIALOG_TEXT_BUTTON =
-  'gap-1.5 px-3 text-ui font-normal text-content-secondary disabled:text-content-tertiary disabled:opacity-100';
+  'gap-1.5 rounded-md bg-secondary px-3 text-ui font-normal text-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] disabled:text-content-tertiary disabled:opacity-100 dark:hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)]';
 
 export const PICKER_ROW_SELECTED =
   'bg-card shadow-xs ring-1 ring-border hover:bg-card dark:hover:bg-card';

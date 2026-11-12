@@ -61,9 +61,8 @@ test('the sidebar lists project names only, and the project chat filters the tas
   const rows = page.locator('[data-slot="sidebar-project-row"]');
   await expect(rows).toHaveCount(2);
   await rows.filter({ hasText: 'cairn' }).click();
-  await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}`));
-  await expect(page.getByTestId('project-home')).toBeVisible();
-  await page.goto(home('home-c', `&project=${PROJECT_ID}&chat=1`));
+  await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}&chat=1`));
+  await expect(page.getByTestId('project-home')).toHaveCount(0);
   await expect(page.getByTestId('tasks-badge')).toHaveText('2');
   const cards = page.getByTestId('chief-stream').locator('[data-slot="task-card"]');
   await expect(cards).toHaveCount(1);
@@ -209,11 +208,12 @@ test('the tab title carries the Tasks count on every page and the sidebar carrie
   await expect(page).toHaveTitle('(3) Cairn');
 });
 
-test('the earlier-messages divider shows only when the conversation reports earlier messages', async ({
+test('nothing sits above the first loaded message, also when the conversation has earlier messages', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
-  await expect(page.getByTestId('home-c-earlier')).toHaveText('Scroll up for earlier messages');
-  await page.goto(home('home-c-empty'));
-  await expect(page.getByTestId('home-c-earlier')).toHaveCount(0);
+  await expect(page.getByTestId('chief-stream')).toContainText('Run the orb canary until it passes');
+  await expect(page.getByTestId('home-c-lead')).toHaveCount(0);
+  await expect(page.getByTestId('home-c')).not.toContainText('Scroll up for earlier messages');
 });
+

@@ -8,8 +8,10 @@ import {
   FolderOutput,
   FolderPlus,
   Funnel,
+  ListChecks,
   Pencil,
   RotateCcw,
+  Settings2,
   StickyNote,
   Trash2,
 } from 'lucide-react';
@@ -164,6 +166,8 @@ export interface ProjectMenuActions {
   onArchive: () => void;
   onRename: (name: string) => Promise<void>;
   onDelete: () => void;
+  onTasks: () => void;
+  onSettings: () => void;
   onInstructions: () => void;
 }
 
@@ -175,6 +179,8 @@ export function SidebarProjectMenu({
   onArchive,
   onRename,
   onDelete,
+  onTasks,
+  onSettings,
   onInstructions,
 }: {
   name: string;
@@ -192,6 +198,14 @@ export function SidebarProjectMenu({
           <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={() => setDialog('rename')}>
             <Pencil />
             {t('重命名')}
+          </DropdownMenuItem>
+          <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onTasks}>
+            <ListChecks />
+            {t('任务')}
+          </DropdownMenuItem>
+          <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onSettings}>
+            <Settings2 />
+            {t('项目设置')}
           </DropdownMenuItem>
           <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onInstructions}>
             <StickyNote />

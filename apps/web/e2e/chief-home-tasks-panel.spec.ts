@@ -78,7 +78,7 @@ test('Up next, Scheduled and Done tabs list their own entries', async ({ page })
   await expect(next).toContainText('Sidebar status groups');
   await panel(page).getByRole('tab', { name: '定时' }).click();
   await expect(panel(page).locator('[data-slot="schedule-row"]')).toHaveCount(3);
-  await expect(panel(page).getByRole('link', { name: '管理定时' })).toBeVisible();
+  await expect(panel(page)).not.toContainText('管理定时');
   await panel(page).getByRole('tab', { name: '已完成' }).click();
   await expect(panel(page).locator('[data-section="resolved"]')).toContainText(
     'Unread dot on threads',
@@ -86,9 +86,6 @@ test('Up next, Scheduled and Done tabs list their own entries', async ({ page })
   await expect(panel(page).locator('[data-section="resolved"] [data-slot="task-row"]')).toContainText(
     /\d+月\d+日/,
   );
-  await expect(panel(page).getByRole('link', { name: '管理定时' })).toHaveCount(0);
-  await panel(page).getByRole('tab', { name: '进行中' }).click();
-  await expect(panel(page).getByRole('link', { name: '管理定时' })).toHaveCount(0);
 });
 
 test('a schedule row opens the schedule detail', async ({ page }) => {
@@ -199,7 +196,13 @@ test('a scheduled row menu offers run, pause and delete; delete asks first', asy
     /^下次 /,
     '还没运行过',
   ]);
-  await expect(menu.getByRole('menuitem')).toHaveText([/立即运行/, /暂停定时/, /查看详情/, /删除/]);
+  await expect(menu.getByRole('menuitem')).toHaveText([
+    /立即运行/,
+    /暂停定时/,
+    /查看详情/,
+    /管理定时/,
+    /删除/,
+  ]);
   await menu.getByRole('menuitem', { name: /删除/ }).click();
   await expect(page.getByRole('alertdialog')).toBeVisible();
 });
@@ -321,10 +324,15 @@ test('the menu offers Mark done on open tasks only and follows the checkbox', as
   await expect(page.getByRole('alertdialog', { name: '停止并标记完成' })).toBeVisible();
 });
 
-test('Manage schedules links to the schedules page', async ({ page }) => {
+test('Manage schedules sits in the schedule row menu and opens the schedules page', async ({
+  page,
+}) => {
   await page.goto(`${HOME}&pane=tasks`);
   await panel(page).getByRole('tab', { name: '定时' }).click();
-  await panel(page).getByRole('link', { name: '管理定时' }).click();
+  const frame = panel(page).locator('[data-slot="schedule-row-frame"]').first();
+  await frame.hover();
+  await frame.getByTestId('schedule-row-menu-button').click();
+  await page.getByRole('menuitem', { name: /管理定时/ }).click();
   await expect(page).toHaveURL(/\/app\/schedules/);
 });
 

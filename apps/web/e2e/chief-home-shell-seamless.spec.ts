@@ -11,6 +11,8 @@ for (const theme of ['light', 'dark'] as const) {
     test('sheet hairline and conversation divider remain visible at one CSS pixel', async ({ page }) => {
       await page.goto('/app?scenario=home-c&thread=home-c-review');
       await expect(page.getByTestId('side-chat')).toBeVisible();
+      await page.getByTestId('sidebar-reopen').click();
+      await expect(page.locator('.board-sidebar')).toBeVisible();
       const lines = await page.evaluate(() => {
         const sheet = document.querySelector('.board-sheet');
         const panel = document.querySelector('.side-panel');
@@ -58,6 +60,8 @@ for (const theme of ['light', 'dark'] as const) {
     test('the flat sheet meets the sidebar edge to edge with no gutter', async ({ page }) => {
       await page.goto('/app?scenario=home-c&thread=home-c-review');
       await expect(page.getByTestId('side-chat')).toBeVisible();
+      await page.getByTestId('sidebar-reopen').click();
+      await expect(page.locator('.board-sidebar')).toBeVisible();
       const canvas = await page.evaluate(() => {
         const sidebar = document.querySelector('.board-sidebar');
         const sheet = document.querySelector('.board-sheet');
