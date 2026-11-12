@@ -209,7 +209,9 @@ test.describe('select text in a Coordinator message, then Reply', () => {
             buttonFont: `${b.fontSize}/${b.lineHeight}`,
             buttonGap: b.columnGap,
             gapAbove: sr ? Math.round(sr.top - pr.bottom) : null,
-            centreOffset: sr ? Math.abs(Math.round(pr.left + pr.width / 2 - (sr.left + sr.width / 2))) : null,
+            centreOffset: sr
+              ? Math.floor(Math.abs(pr.left + pr.width / 2 - (sr.left + sr.width / 2)))
+              : null,
             blurredCount: blurred.length,
             blurredIsBar: blurred.every((el) => el === pill),
           };
