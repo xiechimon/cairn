@@ -65,9 +65,9 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('the 12px avatar in a message chip is a colour dot with no letter', async ({ page }) => {
-  await page.goto('/app?scenario=114');
-  const dot = page.getByTestId('chief-chip-agent').first().locator(INITIAL);
+test('the 12px avatar is a colour dot with no letter', async ({ page }) => {
+  await page.goto('/design.html?only=seeded-avatar');
+  const dot = page.locator('[data-gallery-only]').locator(INITIAL).first();
   await expect(dot).toBeVisible();
   await expect(dot).toHaveCSS('font-size', '0px');
   expect((await dot.boundingBox())?.width).toBe(12);

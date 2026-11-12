@@ -183,7 +183,7 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(page.locator('svg circle[stroke-dasharray]')).toHaveCount(0);
   });
 
-  test('F-R1/R2/R3: robot markdown rows share the block parser — bold/heading/list/fence/chip all render, zero star leakage', async ({
+  test('F-R1/R2/R3: robot markdown rows share the block parser — bold/heading/list/fence all render, zero star leakage', async ({
     page,
   }) => {
     const stream = page.getByTestId('chief-stream');
@@ -198,11 +198,7 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(leadBullet).toContainText(': 凭证链路验证');
 
     await expect(stream.locator('.chat-code', { hasText: 'docs/verify/' })).toHaveCount(1);
-    const mention = stream.locator('.mention-chip--agent');
-    await expect(mention).toHaveCount(1);
-    await expect(mention).toHaveText('r5-scribe');
-
-    await expect(mention).not.toHaveAttribute('href', /.*/);
+    await expect(stream.locator('.mention-chip--agent')).toHaveCount(0);
 
     await expect(stream.locator('.chat-md-item--ordered').first()).toContainText('第一步：读取配置');
     const nested = stream.locator('.chat-md-item--bullet[data-depth="1"]');
@@ -213,23 +209,21 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(fence).toContainText('curl -s localhost:8787/healthz');
   });
 
-  test('F-R13: todo mentions render as chips, anchors point at task detail and a click opens it; literal #seq/pseudo schemes render no chip (#675)', async ({
+  test('F-R13: a todo mention renders as the title link, points at task detail and a click opens it; literal #seq/pseudo schemes render no link (#675)', async ({
     page,
   }) => {
     const stream = page.getByTestId('chief-stream');
-    const chip = stream.locator('.mention-chip--todo');
-    await expect(chip).toHaveCount(1);
-    await expect(chip).toHaveText('在 README.md 末尾追加一行「r3 lifecycle probe」');
+    const mention = stream.locator('a[data-slot="task-mention"]');
+    await expect(mention).toHaveCount(1);
+    await expect(mention).toHaveText('在 README.md 末尾追加一行「r3 lifecycle probe」');
 
-    await expect(chip).toHaveAttribute('href', /^\/app\?(.*&)?thread=r3-legacy-1$/);
+    await expect(mention).toHaveAttribute('href', /^\/app\?(.*&)?thread=r3-legacy-1$/);
 
     await expect(stream).toContainText('prose #12 与 [伪链](todos:t2) 保持字面');
-    expect(await stream.locator('.mention-chip').count()).toBe(
-      await stream.locator('.mention-chip--agent').count() +
-        (await stream.locator('.mention-chip--todo').count()),
-    );
+    await expect(stream.locator('.mention-chip')).toHaveCount(0);
+    await expect(stream.getByTestId('chief-task-ref')).toHaveCount(1);
 
-    await chip.click();
+    await mention.click();
     await expect(page).toHaveURL(/[?&]thread=r3-legacy-1/);
   });
 
@@ -274,8 +268,12 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(stream.getByTestId('chief-msg').locator('p').first()).toContainText('已创建并派工');
     await expect(stream.locator('.chat-para, .chat-md-item, .chat-md-code')).toHaveCount(0);
 
-    await expect(stream.getByTestId('chief-chip-todo')).toHaveCount(1);
-    await expect(stream.getByTestId('chief-chip-agent')).toHaveCount(1);
+    await expect(stream.locator('a[data-slot="task-mention"]')).toHaveText(
+      '编写 CONTRIBUTING.md 贡献指南',
+    );
+    await expect(stream.getByTestId('chief-task-ref')).toHaveCount(1);
+    await expect(stream.locator('.mention-chip')).toHaveCount(0);
+    await expect(stream).not.toContainText('r5-scribe');
 
     await expect(stream.getByTestId('chief-msg-tools').getByRole('button')).toHaveCount(1);
   });

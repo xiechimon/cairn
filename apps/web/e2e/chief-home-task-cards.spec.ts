@@ -93,7 +93,9 @@ test('a reply that both mentions and created a task shows exactly one reference 
   await page.goto('/app');
   const stream = page.getByTestId('chief-stream');
   const reply = stream.getByTestId('chief-msg').filter({ hasText: 'in cairn and forwarded your words.' });
-  await expect(reply.locator('a.mention-chip--todo')).toHaveCount(1);
+  await expect(reply.locator('a[data-slot="task-mention"]')).toHaveCount(1);
+  await expect(reply.locator('.mention-chip--todo')).toHaveCount(0);
+  await expect(reply.locator('svg[data-glyph]')).toHaveCount(1);
   await expect(reply.getByTestId('chief-task-refs')).toHaveCount(1);
   await expect(reply.getByTestId('chief-task-ref')).toHaveCount(1);
   await expect(stream.getByTestId('chief-task-ref')).toHaveCount(1);

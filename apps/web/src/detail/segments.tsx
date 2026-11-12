@@ -40,6 +40,8 @@ export interface TodoGlance {
 
 export const TodoGlanceContext = createContext<ReadonlyMap<string, TodoGlance> | null>(null);
 
+export const TaskMentionAsLinkContext = createContext(false);
+
 const TASK_NUMBER_LABEL = /^#\d+$/;
 
 type StatusTone = 'working' | 'wait' | 'quiet' | 'fail';
@@ -127,9 +129,32 @@ export function TodoStatusTile({ phase }: { phase: Phase }) {
   );
 }
 
+export function TaskMentionLink({
+  todoId,
+  phase,
+  children,
+}: {
+  todoId: string;
+  phase: Phase | undefined;
+  children: ReactNode;
+}) {
+  const threadHref = useThreadHref();
+  return (
+    <Link
+      className={CHAT_ANCHOR_SKIN}
+      to={threadHref(todoId)}
+      data-slot="task-mention"
+      data-phase={phase}
+    >
+      {children}
+    </Link>
+  );
+}
+
 function MentionChip({ seg }: { seg: DocSegment }) {
   const { t } = useI18n();
   const glances = useContext(TodoGlanceContext);
+  const asLink = useContext(TaskMentionAsLinkContext);
   const href = mentionHref(seg, useThreadHref());
   const className = mentionChipClass(seg.mentionKind);
   const todoId = seg.mentionKind === 'todo' ? seg.mentionId : undefined;
@@ -137,6 +162,13 @@ function MentionChip({ seg }: { seg: DocSegment }) {
   const phase = glance?.phase;
   const label =
     todoId != null && TASK_NUMBER_LABEL.test(seg.text) ? (glance?.title ?? t('任务')) : seg.text;
+  if (seg.mentionKind === 'agent') return <span data-slot="agent-mention">{label}</span>;
+  if (asLink && todoId != null)
+    return (
+      <TaskMentionLink todoId={todoId} phase={phase}>
+        {label}
+      </TaskMentionLink>
+    );
   return href != null ? (
     <Link
       className={cn(className, phase != null ? taskChipClass(phase) : 'cursor-pointer')}
