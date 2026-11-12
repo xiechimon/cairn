@@ -6,6 +6,7 @@ import { EmptyState } from './empty-state.js';
 interface BoundaryProps {
   children: ReactNode;
   resetKey?: string;
+  frame?: (fallback: ReactNode) => ReactNode;
 }
 
 interface BoundaryState {
@@ -51,7 +52,9 @@ export class SubtreeErrorBoundary extends Component<BoundaryProps, BoundaryState
   };
 
   render() {
-    if (this.state.failed) return <BoundaryFallback onRetry={this.retry} />;
-    return <Fragment key={this.state.resetKey}>{this.props.children}</Fragment>;
+    if (!this.state.failed)
+      return <Fragment key={this.state.resetKey}>{this.props.children}</Fragment>;
+    const fallback = <BoundaryFallback onRetry={this.retry} />;
+    return this.props.frame?.(fallback) ?? fallback;
   }
 }
