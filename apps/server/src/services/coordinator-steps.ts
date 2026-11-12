@@ -20,6 +20,7 @@ import {
   notifyChiefTurn,
   parseChiefTrigger,
   recoverGateWake,
+  turnProvenance,
 } from './chief.js';
 import { CHIEF_DIGEST_SYSTEM_PROMPT, isChiefDigestStep } from './chief-digest.js';
 import { cancelPendingQuestions } from './chief-questions.js';
@@ -156,7 +157,13 @@ export function finishCoordinatorTurn(
     stepRow.buildId,
     '回合已结束',
   );
-  finishChiefTurn(deps, stepRow.buildId, outcome);
+  finishChiefTurn(
+    deps,
+    stepRow.buildId,
+    turnProvenance(stepRow.prompt)?.startsWith('mail:') === true
+      ? { ...outcome, sessionId: undefined }
+      : outcome,
+  );
   if (outcome.status === 'success')
     notifyChiefTurn(
       deps,

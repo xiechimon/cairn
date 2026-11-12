@@ -2544,6 +2544,35 @@
       },
       "evidence": [],
       "batch": "B12"
+    },
+    {
+      "id": "job-applications",
+      "name": "Job applications",
+      "summary": "Owner-gated host allow, profile and daily cap for a later host-browser submit.",
+      "centrality": 4,
+      "status": "planned",
+      "code": {
+        "server": [
+          "apps/server/src/services/job-applications.ts",
+          "apps/server/src/routes-job-applications.ts"
+        ]
+      },
+      "routes": {
+        "server": [
+          "/api/job-applications/cap",
+          "/api/job-applications/hosts",
+          "/api/job-applications/profile"
+        ]
+      },
+      "research": {
+        "na": "the owner design is the source; no reference product is copied"
+      },
+      "frontendDesign": {
+        "na": "this slice has no product UI"
+      },
+      "backendDesign": [
+        "docs/design/job-applications.md"
+      ]
     }
   ]
 }

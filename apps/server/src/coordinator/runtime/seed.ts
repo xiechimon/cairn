@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { shortEvent } from '@cairn/shared';
+import { dropMailFence, shortEvent } from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
 import type { Message } from '@earendil-works/pi-ai';
 import {
@@ -60,6 +60,7 @@ export function seedMessageText(row: SeedRow): { role: 'user' | 'assistant'; tex
       role = 'user';
       text = shortEvent(text, row.id) ?? text;
     } else return null;
+    text = dropMailFence(text);
   }
   if (text.length > SEED_ROW_MAX_CHARS) {
     text = `${text.slice(0, SEED_ROW_MAX_CHARS)}\n[cut: ${text.length} characters in all; read_history ids ["${row.id}"] offset ${SEED_ROW_MAX_CHARS} reads on]`;

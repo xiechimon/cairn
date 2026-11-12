@@ -41,6 +41,7 @@ export const CHIEF_TOOLS_ADDED = [
   'search_history',
   'read_history',
   'github_overlap',
+  'job_profile',
 ] as const;
 
 export const CHIEF_TOOL_CATEGORIES = {
@@ -63,6 +64,7 @@ export const CHIEF_TOOL_CATEGORIES = {
     'conversation',
     'search_history',
     'read_history',
+    'job_profile',
   ],
   organize: [
     'create_todo',
@@ -768,9 +770,15 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     description: 'Cancel a pending wake-up.',
     parameters: obj({ wakeId: str('Wake id.') }, ['wakeId']),
   },
+  {
+    name: 'job_profile',
+    description: 'Read owner profile fields marked fillable. Omits unmarked fields.',
+    parameters: obj({}),
+    replaySafe: true,
+  },
 ];
 
-export const CHIEF_TOOL_COUNT = 47;
+export const CHIEF_TOOL_COUNT = 48;
 
 export const CHIEF_ROUTER_TOOL_NAMES = [
   'open_thread',

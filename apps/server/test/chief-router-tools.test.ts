@@ -4,6 +4,7 @@ import {
   CHIEF_ROUTER_THREADS_PAGE,
   CHIEF_ROUTER_TOOL_NAMES,
   CHIEF_ROUTER_TOOLS,
+  CHIEF_TOOL_COUNT,
   CHIEF_TOOLS_REMOVED_UNDER_D60,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -75,7 +76,7 @@ function expectRejected(promise: Promise<unknown>, status: number, message: RegE
 
 describe('router tool vocabulary', () => {
   test('the router tools are a separate six from the base vocabulary', () => {
-    expect(CHIEF_REMOTE_TOOLS).toHaveLength(47);
+    expect(CHIEF_REMOTE_TOOLS).toHaveLength(CHIEF_TOOL_COUNT);
     expect(CHIEF_ROUTER_TOOLS.map((t) => t.name)).toEqual([...CHIEF_ROUTER_TOOL_NAMES]);
     for (const name of CHIEF_ROUTER_TOOL_NAMES) {
       expect(CHIEF_REMOTE_TOOLS.map((t) => t.name)).not.toContain(name);
@@ -99,7 +100,9 @@ describe('router tool vocabulary', () => {
       ...CHIEF_ROUTER_TOOL_NAMES,
       ...CHIEF_REPLY_TOOLS.map((t) => t.name),
     ]);
-    expect(Object.keys(chiefToolDefHashes())).toHaveLength(54);
+    expect(Object.keys(chiefToolDefHashes())).toHaveLength(
+      CHIEF_TOOL_COUNT + CHIEF_ROUTER_TOOL_NAMES.length + CHIEF_REPLY_TOOLS.length,
+    );
   });
 });
 

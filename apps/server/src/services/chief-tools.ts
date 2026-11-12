@@ -65,6 +65,7 @@ import { createRequestTodo, updateRequestTodo } from './coordinator-request.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
+import { readFillableProfile } from './job-applications.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { refuseMailTurnTool } from './mail.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
@@ -1027,6 +1028,8 @@ export async function executeChiefTool(
       return json({ cleared: ok });
     }
 
+    case 'job_profile':
+      return json(readFillableProfile(db, ctx.userId));
     default:
       throw new HttpError(400, `unknown chief tool: ${name}`);
   }

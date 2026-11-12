@@ -1052,6 +1052,19 @@ Reach:
 - Backend design: **gap**: not designed
 - Evidence: none
 
+### job-applications
+
+**Job applications** (planned, centrality 4). Owner-gated host allow, profile and daily cap for a later host-browser submit.
+
+
+- Web routes: none
+- Keyboard shortcuts in its code: none
+- Test ids in its code: none
+- Research: n/a: the owner design is the source; no reference product is copied
+- Frontend design: n/a: this slice has no product UI
+- Backend design: [docs/design/job-applications.md](../../../docs/design/job-applications.md)
+- Evidence: none
+
 ### thread-tags
 
 **Thread tags** (shipped, centrality 4). Category UI, vocabulary, seeding and assignment writers are retired; only legacy read/storage compatibility remains.
