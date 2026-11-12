@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -843,13 +843,13 @@ const round3World = (threads, extra = {}) => ({
   ...extra,
 });
 
-test('the review-gate job token has pull-requests write for thread reply and resolve', () => {
-  const workflow = readFileSync(
-    fileURLToPath(new URL('../../../.github/workflows/review-gate.yml', import.meta.url)),
-    'utf8',
+test('the review-gate workflow is gone, so no job posts the check', () => {
+  assert.equal(
+    existsSync(
+      fileURLToPath(new URL('../../../.github/workflows/review-gate.yml', import.meta.url)),
+    ),
+    false,
   );
-  const job = workflow.slice(workflow.indexOf('jobs:'), workflow.indexOf('concurrency:'));
-  assert.match(job, /pull-requests: write/);
 });
 
 test('from round 3 a carried Codex P1 is replied and resolved once; blocking P1, P0 and human threads are not', () => {
