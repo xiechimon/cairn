@@ -96,7 +96,7 @@ describe('merge-gate-paths.json is the single source', () => {
     expect(gatePaths.limits).toEqual({
       maxLines: 800,
       maxFiles: 40,
-      maxQueueFiles: 80,
+      maxQueueFiles: 3000,
       maxLinesEachWay: 8000,
     });
   });
