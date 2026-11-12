@@ -15,7 +15,7 @@ A box marked **owner route** changes a security surface from `packages/shared/me
 
 ## Computers panel
 
-- [x] G3. Return the threads running on a machine (title, project, start time) so the work tab lists them instead of a count. Small, read-only. Done in #3971: `GET /api/teams/:id/machines` returns `running`. Still open: the computers panel reads fixture `runningHere`; `mapMachines` does not copy `running`.
+- [x] G3. Return the threads running on a machine (title, project, start time) so the work tab lists them instead of a count. Small, read-only. Done in #3971: `GET /api/teams/:id/machines` returns `running`, and `mapMachines` copies it to the panel's `runningHere`, so the work tab lists the threads on a live stack.
 - [ ] G1. Store and return the machine's own hostname. Small. **Owner route.**
 - [ ] G2. Report, store and enforce the folders an agent may use on a machine. Large. **Owner route, design first.**
 - [ ] Agent browser and desktop use on by default. The panel no longer shows the two switches; the owner wants both open by default. Today the browser capability is off per computer and desktop control is a lease the user takes. Needs a default, a place to turn it off, and the daemon side. **Design first.** Grants slice only (#3981): owner-only `browserOverride` and `desktopOverride` writes; a null override leaves the reported capability on. Still open: the daemon stamp check and folders (G2).
@@ -34,7 +34,7 @@ A box marked **owner route** changes a security surface from `packages/shared/me
 
 ## Attachments and file preview
 
-- [x] G-A. Download under the file's own name through `?download=1`. Small. Done in #3975: `?download=1` sets `content-disposition` from the stored file name. #3924's preview button sets the HTML `download` attribute on `/api/attachments/:id` and does not append `?download=1`.
+- [x] G-A. Download under the file's own name through `?download=1`. Small. Done in #3975: `?download=1` sets `content-disposition` from the stored file name, and the file preview's download control requests `/api/attachments/:id?download=1`.
 - [ ] G-F. PDF inside the panel: check on a live stack whether the `sandbox` response header blocks the built-in viewer, then decide. Needs a security review.
 - [ ] G-D. Attachment metadata endpoint, only if a size line is wanted.
 - [ ] G-E. Preview of office documents. Medium, new dependency, owner decision.
