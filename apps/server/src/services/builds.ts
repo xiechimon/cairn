@@ -1386,7 +1386,9 @@ export function dispatchSplitChildren(deps: BuildDeps, parentId: string): number
         triggerSource: 'chief',
       });
       dispatched += 1;
-    } catch {}
+    } catch (error) {
+      console.warn('Split child not dispatched', { parentId, childId: child.id, error });
+    }
   }
   return dispatched;
 }
