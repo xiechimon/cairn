@@ -59,8 +59,8 @@ Reach:
 3. `type a request and press Enter`
 
 - Web routes: `/app`
-- Keyboard shortcuts in its code: `Enter`
-- Test ids in its code: `chief-body`, `chief-bubble`, `chief-chip-agent`, `chief-chip-todo`, `chief-composer-block`, `chief-composer-error`, `chief-composer-input`, `chief-composer-placeholder`, `chief-digest`, `chief-digest-card`, `chief-digest-group`, `chief-digest-item`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-home-scroll`, `chief-msg`, `chief-msg-block-tools`, `chief-msg-col`, `chief-msg-copy`, `chief-msg-foot`, `chief-msg-more`, `chief-msg-reply`, `chief-msg-stamp`, `chief-msg-steps`, `chief-msg-tools-touch`, `chief-note`, `chief-outage`, `chief-question`, `chief-question-asked`, `chief-question-chips`, `chief-question-dismiss`, `chief-question-error`, `chief-question-input-*`, `chief-question-line`, `chief-question-option-*`, `chief-question-submit`, `chief-question-text`, `chief-question-tools`, `chief-question-tools-touch`, `chief-quick-replies`, `chief-quick-reply`, `chief-reply`, `chief-reply-bubble`, `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`, `chief-routing-row`, `chief-sent-attachment`, `chief-sent-attachments`, `chief-settings-col`, `chief-settings-topbar`, `chief-status-live`, `chief-status-mark`, `chief-status-pill`, `chief-stopped`, `chief-stream`, `chief-task-created`, `chief-task-ref`, `chief-task-refs`, `chief-task-started`, `chief-time-divider`, `chief-turn-error`, `chief-turn-retry`, `composer-context-meter`, `composer-plus`, `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `home-c`, `home-c-error`, `home-c-hero`, `home-c-pane-buttons`, `home-c-since`, `home-c-starters`, `memory-list`, `panel-error`, `project-instructions-input`, `reply-quote`, `selection-reply`, `selection-reply-bar`, `tasks-badge`, `tasks-toggle`, `thread-activity`, `thread-activity-event`, `thread-activity-summary`, `thread-activity-toggle`, `thread-report-reply`
+- Keyboard shortcuts in its code: none
+- Test ids in its code: `chief-body`, `chief-bubble`, `chief-chip-agent`, `chief-chip-todo`, `chief-composer-block`, `chief-composer-error`, `chief-composer-input`, `chief-composer-placeholder`, `chief-digest`, `chief-digest-card`, `chief-digest-group`, `chief-digest-item`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-home-scroll`, `chief-msg`, `chief-msg-block-tools`, `chief-msg-col`, `chief-msg-copy`, `chief-msg-foot`, `chief-msg-more`, `chief-msg-reply`, `chief-msg-stamp`, `chief-msg-steps`, `chief-msg-tools-touch`, `chief-note`, `chief-outage`, `chief-question`, `chief-question-asked`, `chief-question-chips`, `chief-question-dismiss`, `chief-question-error`, `chief-question-input-*`, `chief-question-line`, `chief-question-option-*`, `chief-question-submit`, `chief-question-text`, `chief-question-tools`, `chief-question-tools-touch`, `chief-quick-replies`, `chief-quick-reply`, `chief-reply`, `chief-reply-bubble`, `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`, `chief-routing-row`, `chief-sent-attachment`, `chief-sent-attachments`, `chief-settings-col`, `chief-settings-topbar`, `chief-status-live`, `chief-status-mark`, `chief-status-pill`, `chief-stopped`, `chief-stream`, `chief-task-created`, `chief-task-ref`, `chief-task-refs`, `chief-task-started`, `chief-time-divider`, `chief-turn-error`, `chief-turn-retry`, `composer-context-meter`, `composer-plus`, `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `home-c`, `home-c-error`, `home-c-hero`, `home-c-pane-buttons`, `home-c-since`, `home-c-starters`, `memory-list`, `panel-error`, `project-instructions-input`, `reply-quote`, `tasks-badge`, `tasks-toggle`, `thread-activity`, `thread-activity-event`, `thread-activity-summary`, `thread-activity-toggle`, `thread-report-reply`
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-segments.md](features/chief-segments.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md)
 - Research: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/research/dsh-sig-walk-2026-11.md](../../../docs/research/dsh-sig-walk-2026-11.md), [docs/research/pi-durable-spike.md](../../../docs/research/pi-durable-spike.md) (not on main), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
@@ -324,23 +324,23 @@ Reach:
 
 ### selection-reply
 
-**Selection reply** (shipped, centrality 1). Select text in a Coordinator message and press Reply to quote it above the composer; the sent message carries the quote and its source message id.
+**Reply quote** (shipped, centrality 1). Press Reply in a Coordinator message's hover tools to quote it above the composer; the sent message carries the quote and its source message id. Selecting text shows no reply bar.
 
-States: Bar above the selection, quote staged above the composer, sent bubble with the quote, no bar on touch selections, light and dark, 1440 and 390 wide.
+States: Quote staged above the composer, source marked while the quote bar is hovered and unmarked once it is removed, sent bubble with the quote, light and dark, 1440 and 390 wide.
 
 Reach:
 
 1. `open /app`
-2. `type select two or more characters inside one Coordinator reply`
-3. `click testid:selection-reply`
+2. `hover testid:chief-reply-bubble`
+3. `click testid:chief-msg-reply`
 
 - Web routes: `/app`
-- Keyboard shortcuts in its code: `Enter`
-- Test ids in its code: `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `reply-quote`, `selection-reply`, `selection-reply-bar`
+- Keyboard shortcuts in its code: none
+- Test ids in its code: `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `reply-quote`
 - Research: [docs/research/selection-reply-2026-11-08.md](../../../docs/research/selection-reply-2026-11-08.md)
 - Frontend design: [docs/design/selection-reply-2026-11-08.md](../../../docs/design/selection-reply-2026-11-08.md)
 - Backend design: [docs/design/selection-reply-2026-11-08.md](../../../docs/design/selection-reply-2026-11-08.md)
-- Evidence: `apps/web/e2e/chief-selection-reply.spec.ts`, `packages/shared/test/reply-quote.test.ts`, `apps/web/test/selection-reply-model.test.ts`
+- Evidence: `apps/web/e2e/chief-reply-quote.spec.ts`, `packages/shared/test/reply-quote.test.ts`
 
 ### steer-queue-stop
 

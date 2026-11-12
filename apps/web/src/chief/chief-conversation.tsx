@@ -44,7 +44,6 @@ import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefContent, ChiefStreamItem, Phase } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
-import { useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { ArrowDown } from '../icons/index.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
@@ -69,14 +68,13 @@ import { questionDockState } from './question-dock-state.js';
 import { awaitingStream } from './question-lifecycle.js';
 import { QuickReplies } from './quick-replies.js';
 import { ReplyingToBar } from './reply-quote-block.js';
-import { ReplySourceHighlightContext } from './reply-source-highlight.js';
-import { type ReplyQuoteDraft, SelectionReply } from './selection-reply.js';
+import { type ReplyQuoteDraft, ReplySourceHighlightContext } from './reply-source-highlight.js';
 import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
 import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
 const SCROLLER_CONTENT_CLS =
-  'mx-auto flex w-full max-w-chat-gutter min-w-0 flex-col justify-end gap-0 overflow-x-clip px-4 pt-8 [overflow-wrap:anywhere]';
+  'mx-auto flex w-full max-w-chat-gutter min-w-0 flex-col justify-end gap-0 overflow-x-clip px-4 pt-8 in-data-[chat-top=under-header]:pt-20 [overflow-wrap:anywhere]';
 
 const THREAD_COMPOSER = 'thread';
 
@@ -348,9 +346,7 @@ export function ChiefConversation({
   );
   const empty = (chief.stream?.length ?? 0) === 0;
   const heroLayout = empty && !heroCollapsed && !questionPending;
-  const heroScrollRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  useScrollFade(heroScrollRef, { enabled: heroLayout });
   const canStop = targetPlaceholder === null && chief.running === true && onStop != null;
   const connected = useConnected();
   const withdraw =
@@ -552,10 +548,9 @@ export function ChiefConversation({
     <>
       {heroLayout ? (
         <div
-          ref={heroScrollRef}
           {...drop.bind}
           data-testid="chief-home-scroll"
-          className="scroll-fade min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none pb-6"
+          className="min-h-0 min-w-0 flex-1 in-data-[chat-top=under-header]:pt-12 overflow-x-hidden overflow-y-auto overscroll-none pb-6"
         >
           {hero}
           {intro}
@@ -569,11 +564,14 @@ export function ChiefConversation({
               reserveEnd
               ref={viewportRef}
               data-testid="chief-body"
-              className="chat-fade"
+              fade={false}
+              className="scrollbar-gutter-both"
             >
               <MessageScrollerContent className={SCROLLER_CONTENT_CLS} data-testid="chief-stream">
                 <TodoGlanceContext.Provider value={glances}>
-                  <ReplySourceHighlightContext.Provider value={highlightedSource}>
+                  <ReplySourceHighlightContext.Provider
+                    value={highlightedSource === replyQuote ? highlightedSource : null}
+                  >
                     {lead}
                     {day == null ? (
                       renderRows(rows)
@@ -595,11 +593,6 @@ export function ChiefConversation({
               <ArrowDown width={20} height={20} />
               <span className="sr-only">{t('滚动到最新')}</span>
             </JumpToLatestButton>
-            <SelectionReply
-              containerRef={viewportRef}
-              enabled={onSend != null && composerReplacement == null}
-              onReply={stageReply}
-            />
             {earlier != null && (
               <EarlierLoader
                 earlier={earlier}
@@ -632,7 +625,7 @@ export function ChiefConversation({
               <p
                 role="alert"
                 data-testid="chief-composer-error"
-                className={`mx-auto mt-2 mb-0 flex w-[calc(100%-2rem)] max-w-chat max-h-12 items-start gap-1.5 overflow-y-auto text-meta text-destructive`}
+                className={`mx-auto my-2 flex w-[calc(100%-2rem)] max-w-chat max-h-12 items-start gap-1.5 overflow-y-auto text-meta text-destructive`}
               >
                 <TriangleAlert aria-hidden="true" className="size-4 flex-none" />
                 {composerError}
