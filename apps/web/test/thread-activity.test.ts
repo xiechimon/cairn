@@ -72,7 +72,7 @@ describe('groupThreadEvents', () => {
       never,
     );
     expect(entries).toHaveLength(1);
-    expect(activities(entries)[0]).toMatchObject({ seqNum: 2 });
+    expect(activities(entries)[0]).toMatchObject({ title: 'task 2' });
     expect(activities(entries)[0]?.events).toHaveLength(3);
   });
 
@@ -81,10 +81,10 @@ describe('groupThreadEvents', () => {
       toRows([message(2), message(3), message(2, 'back')]),
       never,
     );
-    expect(activities(entries).map((a) => [a.seqNum, a.events.length])).toEqual([
-      [2, 1],
-      [3, 1],
-      [2, 1],
+    expect(activities(entries).map((a) => [a.title, a.events.length])).toEqual([
+      ['task 2', 1],
+      ['task 3', 1],
+      ['task 2', 1],
     ]);
   });
 
@@ -156,7 +156,7 @@ describe('activitySummary', () => {
     );
     expect(activity).toBeDefined();
     expect(activitySummary(activity as ThreadActivity)).toEqual({
-      seqNum: 2,
+      title: 'task 2',
       messages: 4,
       status: '审阅中',
     });
@@ -167,7 +167,7 @@ describe('activitySummary', () => {
       groupThreadEvents(toRows([report(2, 'review'), report(2, 'done')]), never),
     );
     expect(activitySummary(activity as ThreadActivity)).toEqual({
-      seqNum: 2,
+      title: 'task 2',
       messages: 0,
       status: '已完成',
     });
@@ -176,7 +176,7 @@ describe('activitySummary', () => {
   test('a group with only messages has no status', () => {
     const [activity] = activities(groupThreadEvents(toRows([message(2), message(2, 'x')]), never));
     expect(activitySummary(activity as ThreadActivity)).toEqual({
-      seqNum: 2,
+      title: 'task 2',
       messages: 2,
       status: null,
     });

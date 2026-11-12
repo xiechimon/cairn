@@ -51,12 +51,12 @@ describe('chief thread reports and quiet event turns (#1784)', () => {
   });
 
   test('report labels use a Chinese source and an English translation', () => {
-    const key = '任务 #{n} {title}：{status}';
-    const vars = { n: 9, title: 'Repair board counts', status: translate('en', EN, '已完成') };
+    const key = '{n}：{status}';
+    const vars = { n: 'Repair board counts', status: translate('en', EN, '已完成') };
     expect(translate('zh', EN, key, { ...vars, status: '已完成' })).toBe(
-      '任务 #9 Repair board counts：已完成',
+      'Repair board counts：已完成',
     );
-    expect(translate('en', EN, key, vars)).toBe('Task #9 Repair board counts: Done');
+    expect(translate('en', EN, key, vars)).toBe('Repair board counts: Done');
   });
 
   test('an invisible resumed-turn boundary restores the reply without rendering generated prompt text', () => {

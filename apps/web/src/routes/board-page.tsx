@@ -33,6 +33,7 @@ import { useTasksView } from '../board/use-tasks-view.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
 import { toastError } from '../components/ui/toaster.js';
+import { TodoGlanceContext } from '../detail/segments.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
 import {
   fixtureProjects,
@@ -129,6 +130,13 @@ export function BoardPage() {
   const fixtureTodos = useMemo(() => withoutDeleted(fixture.todos), [fixture]);
   const liveTodos = useMemo(() => (todosQ.data ?? []).map(toDisplayTodo), [todosQ.data]);
   const todos = live ? liveTodos : fixtureTodos;
+  const todoGlances = useMemo(
+    () =>
+      new Map(
+        todos.map((todo) => [todo.id, { phase: todo.phase, seq: todo.seqNum, title: todo.title }]),
+      ),
+    [todos],
+  );
   const tasks = useTasksView(fixture);
   const machines = useMemo(
     () => (live ? mapMachines(machinesQ.data ?? []) : fixture.resources?.machines),
@@ -291,17 +299,19 @@ export function BoardPage() {
           )}
         </div>
         {threadId !== null && (
-          <SideChat
-            key={threadId}
-            todoId={threadId}
-            listed={
-              todos.find((todo) => todo.id === threadId) ??
-              (!live && todos.length === 1 ? todos[0] : undefined)
-            }
-            now={live ? Date.now() : fixture.now}
-            chatStream={{ items: chiefData.stream ?? [], at: chiefData.streamAt ?? [] }}
-            onClose={closeThread}
-          />
+          <TodoGlanceContext.Provider value={todoGlances}>
+            <SideChat
+              key={threadId}
+              todoId={threadId}
+              listed={
+                todos.find((todo) => todo.id === threadId) ??
+                (!live && todos.length === 1 ? todos[0] : undefined)
+              }
+              now={live ? Date.now() : fixture.now}
+              chatStream={{ items: chiefData.stream ?? [], at: chiefData.streamAt ?? [] }}
+              onClose={closeThread}
+            />
+          </TodoGlanceContext.Provider>
         )}
       </div>
       <SearchPanel
