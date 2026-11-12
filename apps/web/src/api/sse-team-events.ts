@@ -13,7 +13,11 @@ export function teamEventInvalidations(
         ['plans'],
       ];
       if (typeof doc.latestBuildId === 'string')
-        keys.push(['build', doc.latestBuildId], ['steps', doc.latestBuildId]);
+        keys.push(
+          ['build', doc.latestBuildId],
+          ['steps', doc.latestBuildId],
+          ['messages', doc.latestBuildId],
+        );
       return keys;
     }
     case 'build': {

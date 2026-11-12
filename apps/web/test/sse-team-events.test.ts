@@ -18,11 +18,12 @@ describe('team event → invalidation keys', () => {
     expect(keys).toContain('plans');
   });
 
-  it('todo document event refreshes the steps and build of its latest build, so the thread leaves its running state when the conversation stream is down', () => {
+  it('todo document event refreshes the steps, build and messages of its latest build together, so a thread with its conversation stream down neither stays running nor shows steps ahead of its messages', () => {
     const doc = { ...todo(7, 'confirm'), latestBuildId: 'build-7' };
     const keys = keysOf({ type: 'todo', seq: 1, v: 3, doc });
     expect(keys).toContain('steps/build-7');
     expect(keys).toContain('build/build-7');
+    expect(keys).toContain('messages/build-7');
     expect(keysOf({ type: 'todo', seq: 2, v: 3, doc: { ...doc, latestBuildId: null } })).not.toContain(
       'steps/null',
     );

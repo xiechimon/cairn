@@ -312,5 +312,14 @@ export function startConversationStream(
     },
     resync,
     streamGuards(qc),
+    () => {
+      for (const queryKey of [
+        ['messages', conversationId],
+        ['steps', conversationId],
+        ['build', conversationId],
+        ['plans'],
+      ])
+        void invalidateConverged(qc, { queryKey });
+    },
   );
 }
