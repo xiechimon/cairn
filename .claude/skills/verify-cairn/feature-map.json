@@ -2355,9 +2355,9 @@
       "frontendDesign": {
         "na": "an API for other harnesses with no page"
       },
-      "backendDesign": [
-        "docs/design/runtime-memory-out-of-tree.md"
-      ],
+      "backendDesign": {
+        "gap": "no design for the MCP endpoint, tool surface, grants, authentication and failure behavior"
+      },
       "evidence": [
         "apps/server/test/mcp-face.test.ts",
         "integration/test/m4b-mcp-e2e.test.ts"
