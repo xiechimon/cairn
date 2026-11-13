@@ -13,27 +13,21 @@ export function queuedBeforeMerge(mergedAt, timeline) {
   if (typeof mergedAt !== 'string') return false;
   const mergeTime = Date.parse(mergedAt);
   if (Number.isNaN(mergeTime)) return false;
-  const beforeMerge = (event) => {
-    const at = eventTime(event);
-    return !Number.isNaN(at) && at < mergeTime;
+  const labelAtMerge = (name) => {
+    const changes = timeline
+      .filter((event) => {
+        const at = eventTime(event);
+        return (
+          (event.event === 'labeled' || event.event === 'unlabeled') &&
+          event.label?.name === name &&
+          !Number.isNaN(at) &&
+          at < mergeTime
+        );
+      })
+      .sort((a, b) => eventTime(a) - eventTime(b));
+    return changes.at(-1)?.event === 'labeled';
   };
-  if (
-    timeline.some(
-      (event) =>
-        event.event === 'labeled' && event.label?.name === 'dequeued' && beforeMerge(event),
-    )
-  ) {
-    return false;
-  }
-  const queued = timeline.filter(
-    (event) =>
-      (event.event === 'labeled' || event.event === 'unlabeled') &&
-      event.label?.name === 'queued' &&
-      beforeMerge(event),
-  );
-  if (queued.length === 0) return false;
-  queued.sort((a, b) => eventTime(a) - eventTime(b));
-  return queued.at(-1).event === 'labeled';
+  return labelAtMerge('queued') && !labelAtMerge('dequeued');
 }
 
 export function auditPull(repo, number) {
