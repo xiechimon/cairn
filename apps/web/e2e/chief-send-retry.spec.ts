@@ -227,7 +227,7 @@ test('a returned message that is edited is sent under a new client message id', 
   await composer(page).fill('Fixed my typo');
   await composer(page).press('Enter');
   await expect(bubbles(page).filter({ hasText: 'Fixed my typo' })).toHaveCount(1);
-  expect(posts).toHaveLength(2);
+  await expect.poll(() => posts.length).toBe(2);
   expect(posts[1]?.clientMessageId).not.toBe(posts[0]?.clientMessageId);
 });
 
@@ -293,7 +293,7 @@ test('a new send after a delivered one gets a fresh client message id even with 
   await composer(page).fill('Same words');
   await composer(page).press('Enter');
   await expect(bubbles(page)).toHaveCount(3);
-  expect(posts).toHaveLength(2);
+  await expect.poll(() => posts.length).toBe(2);
   expect(posts[0]?.clientMessageId).not.toBe(posts[1]?.clientMessageId);
   expect(ledger.size).toBe(2);
 });
