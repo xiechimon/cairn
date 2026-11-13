@@ -97,7 +97,7 @@ export function agentCursorScript(x: number, y: number, kind: AgentCursorKind): 
     svg.setAttribute('width', '26');
     svg.setAttribute('height', '26');
     svg.setAttribute('viewBox', '0 0 22 22');
-    svg.style.cssText = 'all:initial;display:block;flex:none;width:26px;height:26px;margin:0;overflow:visible;';
+    svg.style.cssText = 'all:initial;pointer-events:none;display:block;flex:none;width:26px;height:26px;margin:0;overflow:visible;';
     const arrow = document.createElementNS(ns, 'path');
     arrow.setAttribute('d', 'M3 2 L18 10.5 L11.2 12 L7.9 18.6 Z');
     arrow.setAttribute('fill', '#1a1a1a');
@@ -107,7 +107,7 @@ export function agentCursorScript(x: number, y: number, kind: AgentCursorKind): 
     svg.appendChild(arrow);
     const label = document.createElement('span');
     label.textContent = 'Coordinator';
-    label.style.cssText = 'all:initial;margin-top:18px;padding:2px 7px;border-radius:999px;background:#d97757;color:#ffffff;font:500 11px/16px -apple-system,system-ui,sans-serif;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25);';
+    label.style.cssText = 'all:initial;pointer-events:none;margin-top:18px;padding:2px 7px;border-radius:999px;background:#d97757;color:#ffffff;font:500 11px/16px -apple-system,system-ui,sans-serif;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25);';
     cursor.append(svg, label);
     cursor.style.transform = 'translate(${left - 3}px, ${top - 2}px)';
     host.appendChild(cursor);
