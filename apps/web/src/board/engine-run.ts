@@ -1,5 +1,7 @@
 import type { ComponentType, ReactNode } from 'react';
+import { formatWorkDuration } from '../detail/work-trace.js';
 import type { DiffFile, TodoRecord, TranscriptItem, WorkStep } from '../fixtures/records.js';
+import type { ThreadUsageSummary } from './thread-usage-model.js';
 
 export type EngineRunState = 'running' | 'waiting' | 'finished' | 'failed' | 'taken_over';
 export type EngineAnswer = 'allowed' | 'refused';
@@ -24,19 +26,11 @@ export type EngineEvent =
   | { kind: 'question'; id: string; text: string; answer: EngineAnswer | null }
   | { kind: 'unknown'; id: string; type: string; payload: string };
 
-export interface EngineChoice {
-  difficulty: 'easy' | 'standard' | 'hard';
-  modelTier: 'inexpensive' | 'mid' | 'strong';
-  effort: 'low' | 'medium' | 'high';
-  reason: string;
-}
-
 export interface EngineRun {
   engine: string;
   state: EngineRunState;
   elapsedSeconds: number | null;
   costUsd: number | null;
-  choice: EngineChoice;
   plan: EnginePlanStep[];
   events: EngineEvent[];
   rawOutput: string;
@@ -59,14 +53,22 @@ export type EngineRunStage = ComponentType<{
   children: (view: EngineRunView) => ReactNode;
 }>;
 
-export const ENGINE_CHOICE_WORDS = {
-  modelTier: { inexpensive: '经济模型', mid: '中档模型', strong: '强模型' },
-  effort: { low: '低强度', medium: '中等强度', high: '高强度' },
-} as const;
-
-export function engineCost(costUsd: number | null): string | null {
+function engineCost(costUsd: number | null): string | null {
   if (costUsd === null) return null;
   return `$${costUsd < 0.01 && costUsd > 0 ? costUsd.toFixed(4) : costUsd.toFixed(2)}`;
+}
+
+export function engineUsageSummary(
+  summary: ThreadUsageSummary,
+  run: EngineRun,
+): ThreadUsageSummary {
+  return {
+    ...summary,
+    engines: [run.engine],
+    duration:
+      run.elapsedSeconds === null ? summary.duration : formatWorkDuration(run.elapsedSeconds),
+    cost: engineCost(run.costUsd) ?? summary.cost,
+  };
 }
 
 export function engineCanTakeOver(state: EngineRunState): boolean {

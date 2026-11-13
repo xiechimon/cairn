@@ -266,7 +266,7 @@
     ) {
     outline: none;
     border-color: var(--focus-field-border);
-    box-shadow: 0 0 0 3px var(--focus-halo);
+    box-shadow: none;
   }
 
   :root
@@ -289,7 +289,7 @@
   :root [data-slot="input-group"]:has([aria-invalid="true"]:focus-visible) {
     outline: none;
     border-color: var(--destructive);
-    box-shadow: 0 0 0 3px var(--danger-halo);
+    box-shadow: none;
   }
 }
 
@@ -385,10 +385,6 @@
 
 @utility pb-chief-launcher {
   padding-bottom: var(--chief-launcher-clearance);
-}
-
-@utility chat-fade {
-  --scroll-fade-size: var(--chat-fade-size);
 }
 
 @utility above-chief-launcher {
@@ -556,7 +552,6 @@
 
   html[data-narrow-chrome] {
     --narrow-top: calc(env(safe-area-inset-top) + 5.75rem);
-    --chat-fade-size: 76px;
     --narrow-bottom: calc(max(0.75rem, env(safe-area-inset-bottom)) + 4.375rem);
   }
 

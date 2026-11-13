@@ -42,7 +42,7 @@ An engine plans for itself. When the plan includes an action that cannot be undo
 
 ## The engine view
 
-Owner decisions on 2026-11-12 and 2026-11-13. When a thread has dispatched work to an engine, the run has no card of its own: its events are the thread's own conversation, Raw output and takeover are items of the thread's `…` menu; time, cost and the model tier sit in the thread's usage popover.
+Owner decisions on 2026-11-12 and 2026-11-13. When a thread has dispatched work to an engine, the run has no card of its own: its events are the thread's own conversation, Raw output and takeover are items of the thread's `…` menu; the engine, time and cost sit in the thread's usage popover, filled from the build's steps on a live thread.
 
 - Default view: the engine's structured event stream rendered with cairn's own conversation components (reply text, the plan checklist, read, edit and run rows, the running row). It is the same family as the thread itself and works on the phone.
 - Nothing is lost silently. An event type the adapter does not know renders as a generic row that names the type and opens its raw content. An engine that waits for input the adapter cannot map shows that it is waiting and offers takeover. Every unknown type is counted and reported, and each adapter is tested by replaying recorded streams per engine version.

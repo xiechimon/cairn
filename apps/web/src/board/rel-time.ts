@@ -32,6 +32,16 @@ export function isUsableTimestamp(ts: number | null | undefined, now: number): t
   return typeof ts === 'number' && Number.isFinite(ts) && ts > 0 && ts <= now + CLOCK_SKEW;
 }
 
+export function compactAge(ts: number | null | undefined, now: number): string {
+  if (ts == null || !Number.isFinite(ts) || ts <= 0) return '';
+  const diff = Math.max(now - ts, 0);
+  if (diff < HOUR) return `${Math.max(Math.floor(diff / MINUTE), 1)}m`;
+  if (diff < DAY) return `${Math.floor(diff / HOUR)}h`;
+  if (diff < 7 * DAY) return `${Math.floor(diff / DAY)}d`;
+  if (diff < 365 * DAY) return `${Math.floor(diff / (7 * DAY))}w`;
+  return `${Math.floor(diff / (365 * DAY))}y`;
+}
+
 export function joinMeta(parts: readonly (string | null | undefined)[]): string {
   return parts.filter((part) => part != null && part !== '').join(' · ');
 }

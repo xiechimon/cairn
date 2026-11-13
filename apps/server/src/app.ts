@@ -116,6 +116,7 @@ export function createApp(ctx: AppContext, logger?: Logger): Hono {
     },
   });
   registerMemberActivity(app, ctx);
+  app.use('/api/*', compress());
   registerRoutes(app, ctx);
   registerMachineRoutes(app, ctx);
   registerRemoteRoutes(app, ctx);

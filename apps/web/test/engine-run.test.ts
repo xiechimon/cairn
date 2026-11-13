@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { engineCanTakeOver, engineCost } from '../src/board/engine-run.js';
+import { engineCanTakeOver, engineUsageSummary } from '../src/board/engine-run.js';
 import { earlierStepCount } from '../src/detail/work-trace.js';
 import {
   ENGINE_SCRIPTS,
@@ -13,11 +13,27 @@ const planOf = (shown: number, answers = {}) =>
   engineRunAt(script, shown, answers).plan.map((step) => step.state);
 
 describe('engine run view model', () => {
-  it('formats a cost and hides one that is not known', () => {
-    expect(engineCost(0.21)).toBe('$0.21');
-    expect(engineCost(0.004)).toBe('$0.0040');
-    expect(engineCost(0)).toBe('$0.00');
-    expect(engineCost(null)).toBeNull();
+  it('fills the usage rows a live thread fills, keeping what the run does not know', () => {
+    const summary = {
+      cost: '—',
+      tokens: '1.2k',
+      cached: '',
+      models: [],
+      machines: [],
+      duration: '',
+      engines: [],
+    };
+    const run = engineRunAt(script, 0);
+    const usage = (elapsedSeconds: number | null, costUsd: number | null) =>
+      engineUsageSummary(summary, { ...run, elapsedSeconds, costUsd });
+    expect(usage(252, 0.21)).toMatchObject({
+      engines: ['Claude Code'],
+      duration: '4m 12s',
+      cost: '$0.21',
+      tokens: '1.2k',
+    });
+    expect(usage(10, 0.004).cost).toBe('$0.0040');
+    expect(usage(null, null)).toMatchObject({ duration: '', cost: '—' });
   });
 
   it('offers takeover only while the engine is still working', () => {

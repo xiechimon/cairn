@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "5bad9a58aea131fab6e4ab3db14ecc833c0d3c52",
-    "date": "2026-11-12"
+    "sha": "c13de9c08f2072bd61e6c98bfeb0b1fa52677506",
+    "date": "2026-11-13"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -148,8 +148,8 @@
       "kind": "registry",
       "upstreamItem": "popover",
       "status": "deviated",
-      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). Paper menu face: popup consumes --radius-popover (10px) + --shadow-popover (light 1px ring + soft pool, dark inset highlight); text-sm -> text-ui (DESIGN.md type scale).",
-      "hash": "5447fa40ccd7d24345f7f507649df4f40271315db8befafb637216bcb75270f1"
+      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). Paper menu face: popup consumes --radius-popover (10px) + --shadow-popover (light 1px ring + soft pool, dark inset highlight); text-sm -> text-ui (DESIGN.md type scale). Portal keepMounted exposed on PopoverContent so the Tasks panel PR hover cards are pre-rendered and open instantly (1 consumer, owner 2026-11-13).",
+      "hash": "0faffc4c5ed799be8c2eef1c2ef89d7957bc114f8de5feb64293712b71550fe8"
     },
     "seeded-avatar.tsx": {
       "kind": "adapter",

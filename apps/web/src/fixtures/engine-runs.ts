@@ -1,10 +1,4 @@
-import type {
-  EngineAnswer,
-  EngineChoice,
-  EngineEvent,
-  EngineRun,
-  EngineRunState,
-} from '../board/engine-run.js';
+import type { EngineAnswer, EngineEvent, EngineRun, EngineRunState } from '../board/engine-run.js';
 import type { DiffFile, TodoRecord } from './records.js';
 
 export interface EngineScriptStep {
@@ -15,7 +9,6 @@ export interface EngineScriptStep {
 
 export interface EngineScript {
   engine: string;
-  choice: EngineChoice;
   plan: string[];
   steps: EngineScriptStep[];
   refused?: EngineScriptStep[];
@@ -72,7 +65,6 @@ export function engineRunAt(
     state,
     elapsedSeconds: ended ? script.elapsedSeconds : null,
     costUsd: ended ? script.costUsd : null,
-    choice: script.choice,
     plan: script.plan.map((text, index) => ({
       text,
       state: index < planDone ? 'done' : index === planDone && active ? 'doing' : 'todo',
@@ -163,12 +155,6 @@ const OPENING: EngineScriptStep[] = [
 
 const FILENAME_FIX: EngineScript = {
   engine: 'Claude Code',
-  choice: {
-    difficulty: 'standard',
-    modelTier: 'mid',
-    effort: 'medium',
-    reason: '要改一个文件并跑测试',
-  },
   plan: [
     '找到设置文件名的地方',
     '改成同时带 ASCII 和 UTF-8 两种文件名',
@@ -230,12 +216,6 @@ const FILENAME_FIX: EngineScript = {
 
 const UPLOAD_FAILED: EngineScript = {
   ...FILENAME_FIX,
-  choice: {
-    difficulty: 'hard',
-    modelTier: 'strong',
-    effort: 'high',
-    reason: '上一次尝试没通过检查，难度上调一级',
-  },
   steps: [
     ...OPENING,
     run(
@@ -320,12 +300,6 @@ function sweepFile(path: string, index: number): EngineScriptStep[] {
 
 const FILENAME_SWEEP: EngineScript = {
   engine: 'Codex',
-  choice: {
-    difficulty: 'hard',
-    modelTier: 'strong',
-    effort: 'high',
-    reason: '要改多个文件，原因还不清楚',
-  },
   plan: ['找出所有设置文件名的地方', '逐个改用同一个函数', '跑全部测试', '汇报结果'],
   steps: [
     say('sweep-start', '设置文件名的地方不止下载接口一处，我先把它们都找出来。', 0),

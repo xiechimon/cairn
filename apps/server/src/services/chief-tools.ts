@@ -890,8 +890,7 @@ export async function executeChiefTool(
         } satisfies ChiefNoticeContent),
         createdAt: nowMs(),
       };
-      upsertChiefMessage(db, notice);
-      deps.convHub?.publishMessage(ctx.threadId, notice);
+      deps.convHub?.publishMessage(ctx.threadId, upsertChiefMessage(db, notice));
       notifyChiefMessage(
         { db, hub: deps.hub, user: deps.user },
         {

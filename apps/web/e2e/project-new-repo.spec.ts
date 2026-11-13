@@ -184,7 +184,7 @@ test('github owner/repo backfills the repo segment once valid', async ({ page })
   await expect(name).toHaveValue('Renamed');
 });
 
-test('the name input focus is the field ring: --focus-ring border plus a 3px halo, not the UA default', async ({
+test('the name input focus is the field ring: one --focus-ring border, no halo, not the UA default', async ({
   page,
 }) => {
   await page.goto(NEW_PROJECT);
@@ -209,8 +209,7 @@ test('the name input focus is the field ring: --focus-ring border plus a 3px hal
   });
   expect(cs.visible).toBe(true);
   expect(cs.outline).toBe('none');
-  expect(cs.shadow).toContain('0px 0px 0px 3px');
-  expect(cs.shadow).not.toContain('rgb(0, 95, 204)');
+  expect(cs.shadow).toBe('none');
 });
 
 // ——— submit + error face (live build, stubbed network) ———

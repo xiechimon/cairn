@@ -73,6 +73,17 @@ describe('thread report rows with the session line', () => {
     expect(mapChiefStream(rows)).toEqual([{ ...REPORT, id: 'a', line: 'Short line' }]);
   });
 
+  test('a task titled with a raw reply marker never shows the marker', () => {
+    const marker = '<!-- reply source=W8e5vwClguMQQSa9iFJaK-e66 -->';
+    const [item] = mapChiefStream([
+      { id: 'a', role: 'system', content: JSON.stringify({ ...REPORT, title: marker }), createdAt: 1 },
+    ]);
+    const html = render(item as unknown as Record<string, unknown>);
+    expect(html).not.toContain('reply source');
+    expect(html).not.toContain('&lt;!--');
+    expect(plain(html)).toContain(': In review');
+  });
+
   test('a needs-you report says the thread needs you and keeps its line', () => {
     const html = render({ ...REPORT, phase: 'needs-you', id: 'r3', line: 'Which export format?' });
     expect(plain(html)).toContain('Export: Needs you');

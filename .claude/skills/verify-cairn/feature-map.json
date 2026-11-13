@@ -147,16 +147,15 @@
     },
     {
       "id": "selection-reply",
-      "name": "Selection reply",
-      "summary": "Select text in a Coordinator message and press Reply to quote it above the composer; the sent message carries the quote and its source message id.",
-      "states": "Bar above the selection, quote staged above the composer, sent bubble with the quote, no bar on touch selections, light and dark, 1440 and 390 wide.",
+      "name": "Reply quote",
+      "summary": "Press Reply in a Coordinator message's hover tools to quote it above the composer; the sent message carries the quote and its source message id. Selecting text shows no reply bar.",
+      "states": "Quote staged above the composer, source marked while the quote bar is hovered and unmarked once it is removed, sent bubble with the quote, light and dark, 1440 and 390 wide.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/chief/selection-reply.tsx",
-          "apps/web/src/chief/selection-reply-model.ts",
-          "apps/web/src/chief/reply-quote-block.tsx"
+          "apps/web/src/chief/reply-quote-block.tsx",
+          "apps/web/src/chief/reply-source-highlight.ts"
         ],
         "other": [
           "packages/shared/src/reply-quote.ts"
@@ -169,8 +168,8 @@
       },
       "reach": [
         "open /app",
-        "type select two or more characters inside one Coordinator reply",
-        "click testid:selection-reply"
+        "hover testid:chief-reply-bubble",
+        "click testid:chief-msg-reply"
       ],
       "research": [
         "docs/research/selection-reply-2026-11-08.md"
@@ -182,9 +181,8 @@
         "docs/design/selection-reply-2026-11-08.md"
       ],
       "evidence": [
-        "apps/web/e2e/chief-selection-reply.spec.ts",
-        "packages/shared/test/reply-quote.test.ts",
-        "apps/web/test/selection-reply-model.test.ts"
+        "apps/web/e2e/chief-reply-quote.spec.ts",
+        "packages/shared/test/reply-quote.test.ts"
       ]
     },
     {
@@ -744,7 +742,7 @@
       },
       "reach": [
         "open /app/todo/<id of a thread listed by the todos API>",
-        "click testid:work-prs"
+        "click testid:thread-pr-panel"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/branch-sync.md"
@@ -800,7 +798,7 @@
       },
       "reach": [
         "open /app/todo/<id of a thread listed by the todos API>",
-        "click testid:work-prs",
+        "click testid:thread-pr-panel",
         "click testid:accept-dialog-pr"
       ],
       "verify": [

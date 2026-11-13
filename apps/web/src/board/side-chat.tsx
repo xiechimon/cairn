@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { contextPercentOf } from '../chief/context-meter-ring.js';
-import { REPLY_SOURCE_ATTR } from '../chief/selection-reply-model.js';
+import { REPLY_SOURCE_ATTR } from '../chief/reply-source-highlight.js';
 import { TraceCard } from '../components/chat/trace-parts.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
@@ -22,7 +22,12 @@ import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
-import { type EngineRunView, engineCanTakeOver, engineTranscript } from './engine-run.js';
+import {
+  type EngineRunView,
+  engineCanTakeOver,
+  engineTranscript,
+  engineUsageSummary,
+} from './engine-run.js';
 import { EngineQuestion, EngineRawView, TakeOverDialog } from './engine-run-view.js';
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
@@ -608,11 +613,13 @@ function ReadyThread({
           (usage.hasRuns && threadUsageShown(usage.summary, usage.state)) ||
           contextPercentOf(todo.context) !== null
             ? {
-                summary: usage.summary,
+                summary:
+                  engine === undefined
+                    ? usage.summary
+                    : engineUsageSummary(usage.summary, engine.run),
                 state: usage.state,
                 onRetry: usage.retry,
                 context: todo.context,
-                engineRun: engine?.run,
               }
             : null
         }

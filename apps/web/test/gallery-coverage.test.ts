@@ -13,6 +13,8 @@ const NOT_IN_GALLERY: Record<string, string> = {
     'Registry copy with no consumer; confirm surfaces use alert-dialog-shell.tsx, shown in the Dialog section.',
   'model-select-core.tsx':
     'Gap: rendered only through src/routes/agent-model-select.tsx on the routing settings page; no specimen yet.',
+  'thread/task-pr-line.tsx':
+    'Gap: rendered only by src/board/tasks-panel.tsx under each task row; e2e/thread-pr-panel.spec.ts covers its states; no specimen yet.',
   'conversation-skeleton.tsx':
     'Gap: rendered only by src/board/home-c.tsx while the Coordinator data loads; no specimen yet.',
   'queued-capsules.tsx':

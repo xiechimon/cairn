@@ -25,11 +25,9 @@ import {
   buildPlanContractRewritePrompt,
   buildPlanRewritePrompt,
   buildReplanPrompt,
-  buildRestartPrompt,
   buildReviewRejectPrompt,
   buildReviewStepPrompt,
   buildReworkNewBranchNote,
-  buildReworkReuseNote,
   buildTaskPromptText,
   buildVerifyStepPrompt,
   CONFIRM_ANNOUNCEMENT,
@@ -59,7 +57,6 @@ import {
   VERIFY_VERDICT_KIND,
   type VerifyVerdict,
   withCoAuthor,
-  withRetryLessons,
 } from '@cairn/shared';
 import {
   and,
@@ -116,11 +113,11 @@ import {
 } from './build-gate-verdict.js';
 import {
   assertNoMergedPrElsewhere,
-  latestPrBuild,
   mergedPrElsewhere,
   probeReworkTargetPr,
 } from './build-pr-probe.js';
 import { recordBuildFeedback } from './build-provenance.js';
+import { restartFailedBuild } from './build-restart.js';
 import {
   applyStoppedStep,
   hasLeftExecution,
@@ -192,6 +189,7 @@ import {
 import { endSnoozeOn } from './snooze.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
+import { type BuildStepRoute, listBuildStepRoutes } from './step-route.js';
 import { readTeamAttributionSettings } from './team-attribution-settings.js';
 import { childrenOfTodo, getTodo, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
@@ -752,6 +750,9 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
       );
     }
   }
+  const routeById = new Map(
+    listBuildStepRoutes(deps.db, [buildId]).map((route) => [route.stepId, route]),
+  );
   return rows.map((r) => ({
     id: r.id,
     buildId: r.buildId,
@@ -767,7 +768,14 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
       ? { quotaWait: toQuotaWait(r.quotaBlock) }
       : {}),
     ...(r.promptOrigin !== null ? { promptOrigin: r.promptOrigin } : {}),
+    ...(r.claimedAt !== null ? { startedAt: r.claimedAt } : {}),
+    ...(r.finishedAt !== null ? { finishedAt: r.finishedAt } : {}),
+    route: stepRouteView(routeById.get(r.id)),
   }));
+}
+
+function stepRouteView(route: BuildStepRoute | undefined): StepJournalRow['route'] {
+  return route === undefined ? null : { harness: route.harness, modelId: route.modelId };
 }
 
 export function assertNamedMachineForNewTask(deps: BuildDeps, teamId: string): void {
@@ -1087,203 +1095,7 @@ export async function applyBuildStepAction(
   else assertParkedBuildIdle(deps, row);
 
   if (body.action === 'restart') {
-    if (todoRecord.phase !== 'failed') {
-      throw new HttpError(409, `restart 仅适用于 failed 相位（当前 ${todoRecord.phase}）`);
-    }
-    const feedbackText = body.feedback.trim() === '' ? null : body.feedback;
-    const preservedStep = deps.db
-      .select({ id: step.id })
-      .from(step)
-      .where(
-        and(
-          eq(step.buildId, row.id),
-          inArray(step.kind, ['build', 'session']),
-          eq(step.status, 'failed'),
-          isNotNull(step.checkpointCommit),
-        ),
-      )
-      .get();
-    const reworkTarget = preservedStep !== undefined ? row : latestPrBuild(deps.db, row.todoId);
-    const prClosed: 'merged' | 'closed' | null =
-      reworkTarget !== null
-        ? await probeReworkTargetPr(
-            deps,
-            reworkTarget,
-            todoRecord,
-            githubPrOf(deps, todoRecord, reworkTarget.prNumber) !== null,
-          )
-        : null;
-    const afterCommit: (() => void)[] = [];
-    const transcriptDeps = { ...deps, afterCommit };
-    const recordRestartConversation = (conversationId: string) => {
-      completeClientMessage(deps.db, buildId, body.clientMessageId, {
-        delegated: true,
-        delivered: 'restart',
-        conversationId,
-      });
-      beforeCommit?.();
-    };
-    deps.db.transaction(() => {
-      claimClientMessage(deps.db, buildId, body.clientMessageId, {
-        delegated: true,
-        delivered: 'restart',
-      });
-      const current = getTodo(deps, row.todoId);
-      if (
-        !current ||
-        current.archivedAt !== null ||
-        current.phase !== 'failed' ||
-        current.latestBuildId !== row.id
-      )
-        throw new HttpError(
-          409,
-          'Task changed while restart was being prepared; retry from its current state.',
-        );
-      todoRecord = current;
-      if (origin === 'automatic') assertAutomaticRetryAllowed(deps, current.id);
-      if (reworkTarget !== null && prClosed === null) {
-        const currentTarget = deps.db
-          .select()
-          .from(build)
-          .where(eq(build.id, reworkTarget.id))
-          .get();
-        if (currentTarget) assertParkedBuildIdle(deps, currentTarget);
-        if (hasActiveStep(deps, reworkTarget.id))
-          throw new HttpError(409, 'Wait for active steps to finish before restarting this build.');
-        const now = nowMs();
-        const reuseLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
-        recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
-        if (feedbackText !== null) {
-          insertMessageRow(transcriptDeps, reworkTarget.id, {
-            id: newRecordId(),
-            role: 'user',
-            content: feedbackText,
-            createdAt: now,
-          });
-        }
-        if (
-          reworkTarget.errorMessage !== null &&
-          !hasFailureRow(deps, reworkTarget.id, reworkTarget.errorMessage)
-        ) {
-          insertMessageRow(transcriptDeps, reworkTarget.id, {
-            id: newRecordId(),
-            role: 'system',
-            content: buildFailureRowContent({
-              reason: reworkTarget.errorMessage,
-              pr:
-                reworkTarget.prNumber !== null
-                  ? { number: reworkTarget.prNumber, url: reworkTarget.prUrl }
-                  : null,
-            }),
-            createdAt: now - 1,
-          });
-        }
-        insertMessageRow(transcriptDeps, reworkTarget.id, {
-          id: newRecordId(),
-          role: 'system',
-          content: buildReworkReuseNote({ prNumber: reworkTarget.prNumber }),
-          createdAt: now,
-        });
-        const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
-        const reuseKind = buildRunsSession(deps, reworkTarget.id)
-          ? 'session'
-          : reworkTarget.withPlan
-            ? 'plan'
-            : 'build';
-        recordRestartConversation(reworkTarget.id);
-        enqueueStep(
-          deps,
-          reworkTarget.id,
-          reuseKind,
-          todoRecord.teamId,
-          withRetryLessons(
-            restartPrompt,
-            reuseKind === 'session' ? 'build' : reuseKind,
-            reuseLessons,
-          ),
-          true,
-          origin === 'person',
-        );
-        deps.db
-          .update(build)
-          .set({
-            errorMessage: null,
-            prevPhase: 'failed',
-          })
-          .where(eq(build.id, reworkTarget.id))
-          .run();
-        setTodoPhase(deps, todoRecord.id, 'queued', {
-          latestBuildId: reworkTarget.id,
-          lastRunAt: now,
-        });
-        const reusedRow = deps.db.select().from(build).where(eq(build.id, reworkTarget.id)).get();
-        if (!reusedRow) throw new Error('build missing after update');
-        publishBuild(deps, reusedRow);
-        return;
-      }
-      const priorLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
-      recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
-      const newId = newUuidv7();
-      const createdAt = nowMs();
-      deps.db
-        .insert(build)
-        .values({
-          id: newId,
-          todoId: todoRecord.id,
-          withPlan: false,
-          prevPhase: todoRecord.phase,
-          triggerSource: 'user',
-          planDocId: null,
-          errorMessage: null,
-          prUrl: null,
-          prNumber: null,
-          changes: null,
-          diffHash: null,
-          createdAt,
-        })
-        .run();
-      if (feedbackText !== null) {
-        insertMessageRow(transcriptDeps, newId, {
-          id: newRecordId(),
-          role: 'user',
-          content: feedbackText,
-          createdAt,
-        });
-      }
-      if (prClosed !== null && reworkTarget !== null) {
-        insertMessageRow(transcriptDeps, newId, {
-          id: newRecordId(),
-          role: 'system',
-          content: buildReworkNewBranchNote({
-            prNumber: reworkTarget.prNumber,
-            prUrl: reworkTarget.prUrl,
-            branch: conversationBranch(newId),
-            outcome: prClosed,
-          }),
-          createdAt,
-        });
-      }
-      const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
-      recordRestartConversation(newId);
-      enqueueStep(
-        deps,
-        newId,
-        'session',
-        todoRecord.teamId,
-        [SESSION_BRIEF, restartPrompt, priorLessons].filter((part) => part != null).join('\n\n'),
-        false,
-        origin === 'person',
-      );
-      setTodoPhase(deps, todoRecord.id, 'queued', {
-        latestBuildId: newId,
-        lastRunAt: createdAt,
-      });
-      const newRow = deps.db.select().from(build).where(eq(build.id, newId)).get();
-      if (!newRow) throw new Error('build missing after insert');
-      publishBuild(deps, newRow);
-      return;
-    });
-    for (const publish of afterCommit) publish();
+    await restartFailedBuild(deps, row, todoRecord, body, actorName, origin, beforeCommit);
     return;
   }
 
@@ -1565,7 +1377,7 @@ function assertNoMergeStepInFlight(deps: BuildDeps, buildId: string): void {
 export const INFO_CARD_MERGE_REFUSAL =
   '信息卡的产出是报告附件，不进合并：要把内容落进仓库，请建下游代码卡走正常流程';
 
-function githubPrOf(
+export function githubPrOf(
   deps: BuildDeps,
   todoRow: { projectId: string; teamId: string },
   prNumber: number | null,
@@ -1648,7 +1460,7 @@ export function hasActiveStep(deps: BuildDeps, buildId: string): boolean {
   return mergingBuilds.has(buildId) || stepKindInFlight(deps, buildId) !== null;
 }
 
-function assertParkedBuildIdle(deps: BuildDeps, row: BuildRow): void {
+export function assertParkedBuildIdle(deps: BuildDeps, row: BuildRow): void {
   if (retryIsParked(row.errorMessage ?? '') && hasActiveStep(deps, row.id))
     throw new HttpError(
       409,
@@ -2379,7 +2191,7 @@ export function sweepPlanAutoConfirm(deps: BuildDeps): void {
   }
 }
 
-function hasFailureRow(deps: BuildDeps, buildId: string, reason: string): boolean {
+export function hasFailureRow(deps: BuildDeps, buildId: string, reason: string): boolean {
   return deps.db
     .select({ content: message.content })
     .from(message)

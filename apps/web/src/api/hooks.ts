@@ -96,6 +96,7 @@ import { resumeRefreshDelayMs } from './resume-refresh-delay.js';
 
 const CHIEF_THREADS_INFLIGHT_POLL_MS = 3000;
 const BACKUP_HEALTH_POLL_MS = 5 * 60 * 1000;
+const STREAM_KEPT_FRESH_MS = 60_000;
 const PREFETCH_FRESH_MS = 10_000;
 
 export type { ApiKeyRow, PlanRow };
@@ -160,6 +161,7 @@ export const useTodos = (teamId: string | undefined, enabled: boolean) =>
     queryKey: ['todos', teamId],
     queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}`),
     enabled: enabled && teamId !== undefined,
+    staleTime: STREAM_KEPT_FRESH_MS,
   });
 
 export const useArchivedTodos = (teamId: string | undefined, enabled: boolean) =>
@@ -175,6 +177,7 @@ export const useTasks = (teamId: string | undefined, enabled: boolean) =>
     queryFn: async () =>
       tasksQuerySchema.parse(await api.get(`/api/tasks?teamId=${teamId}&sectioned=1`)),
     enabled: enabled && teamId !== undefined,
+    staleTime: STREAM_KEPT_FRESH_MS,
   });
 
 const todoQuery = (id: string | undefined) => ({
@@ -378,13 +381,18 @@ export const useMachines = (teamId: string | undefined, enabled: boolean) =>
     enabled: enabled && teamId !== undefined,
   });
 
-export function useComputers(teamId: string | undefined, enabled: boolean) {
+export function useComputers(
+  teamId: string | undefined,
+  enabled: boolean,
+  refetchIntervalMs?: number,
+) {
   const auth = useAuth();
   return useQuery({
     queryKey: computerQueryKeys(teamId, auth.generation).computers,
     queryFn: async () =>
       (await api.get<{ computers: ComputerRecord[] }>('/api/computers')).computers,
     enabled: enabled && teamId !== undefined && !auth.gateOpen,
+    ...(refetchIntervalMs !== undefined ? { refetchInterval: refetchIntervalMs } : {}),
   });
 }
 

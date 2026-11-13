@@ -1,9 +1,11 @@
-import type { TokenUsage } from '@cairn/shared';
+import type { StepJournalRow, TokenUsage } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { threadContextOf } from '../src/api/mappers.js';
 import {
   type ThreadUsageSummary,
   threadContextReading,
+  threadEngines,
+  threadRunSeconds,
   threadUsageBuildIds,
   threadUsageCaption,
   threadUsageSummary,
@@ -98,6 +100,8 @@ describe('threadUsageCaption', () => {
     cost: '$1.25',
     tokens: '2.5k',
     cached: '90%',
+    duration: '',
+    engines: [],
     models: ['provider/model-a'],
     machines: [],
     ...patch,
@@ -145,5 +149,46 @@ describe('thread context usage', () => {
     expect(threadContextReading(null)).toBe('');
     expect(threadContextReading(undefined)).toBe('');
     expect(threadContextReading({ tokens: 10, contextWindow: 0 })).toBe('');
+  });
+});
+
+describe('thread run window and engines from the step journal', () => {
+  const row = (patch: Partial<StepJournalRow> = {}): StepJournalRow => ({
+    id: 'step-1',
+    buildId: 'build-1',
+    kind: 'build',
+    machineId: null,
+    createdAt: 0,
+    status: 'done',
+    checkpointCommit: null,
+    skillInjection: null,
+    route: null,
+    ...patch,
+  });
+
+  test('sums finished runs and counts a running one up to now', () => {
+    const steps = [
+      row({ startedAt: 1_000, finishedAt: 61_000 }),
+      row({ id: 'step-2', status: 'claimed', startedAt: 100_000 }),
+    ];
+    expect(threadRunSeconds(steps, 130_000)).toBe(90);
+    expect(threadUsageSummary(null, [], steps, 130_000).duration).toBe('1m 30s');
+  });
+
+  test('shows no duration when no run has started', () => {
+    expect(threadRunSeconds([row()], 5_000)).toBeNull();
+    expect(threadUsageSummary(null, [], [row()], 5_000).duration).toBe('');
+    expect(threadUsageSummary(null, []).duration).toBe('');
+  });
+
+  test('names each engine once and skips steps without a route', () => {
+    const steps = [
+      row({ route: { harness: 'claude-code', modelId: 'm' } }),
+      row({ id: 'b', route: { harness: 'pi', modelId: null } }),
+      row({ id: 'c', route: { harness: 'claude-code', modelId: 'n' } }),
+      row({ id: 'd', route: { harness: null, modelId: null } }),
+      row({ id: 'e' }),
+    ];
+    expect(threadEngines(steps)).toEqual(['Claude Code', 'Cairn']);
   });
 });

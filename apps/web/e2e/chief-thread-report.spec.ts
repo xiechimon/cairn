@@ -346,10 +346,10 @@ test('events about one thread coalesce, repeated statuses dedupe, another thread
   await group.getByTestId('thread-activity-toggle').click();
   await expect(group.getByTestId('thread-activity-event')).toHaveCount(3);
   await expect(stream.getByTestId('thread-message-marker')).toHaveText('Coordinator 直接对 Trim the log 说：elsewhere');
-  const box = await group.getByTestId('thread-activity-summary').boundingBox();
+  const box = await group.boundingBox();
   const chat = await stream.boundingBox();
   if (box === null || chat === null) throw new Error('no box');
-  expect(box.x - chat.x).toBeLessThan(40);
+  expect(box.x - chat.x).toBeLessThan(20);
   const decoration = await group.getByTestId('thread-activity-summary').evaluate((node) => getComputedStyle(node).textDecorationLine);
   expect(decoration).toBe('none');
 });

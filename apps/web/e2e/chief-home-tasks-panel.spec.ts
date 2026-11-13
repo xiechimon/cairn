@@ -350,7 +350,7 @@ test('every open task has a checkbox, failed and done rows do not, and it does n
   const rowOf = (title: string) =>
     panel(page).locator('[data-slot="task-row-frame"]').filter({ hasText: title });
   await expect(rowOf('Fold finished turns').getByRole('checkbox')).toHaveAccessibleName(
-    /^标记完成：Fold finished turns/,
+    /^选择：Fold finished turns/,
   );
   await expect(rowOf('Connect a Claude subscription token').getByRole('checkbox')).toHaveCount(1);
   await expect(rowOf('Orb canary round 7').getByRole('checkbox')).toHaveCount(1);
@@ -364,35 +364,61 @@ test('every open task has a checkbox, failed and done rows do not, and it does n
   await expect(page).not.toHaveURL(/[?&]thread=/);
 });
 
-test('the checkbox on a running task asks before stopping it', async ({ page }) => {
+test('ticking rows selects them into one bar; Escape, the close button and a tab switch clear it', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  const bar = panel(page).locator('[data-slot="tasks-selection-bar"]');
+  const tick = (title: string) =>
+    panel(page)
+      .locator('[data-slot="task-row-frame"]')
+      .filter({ hasText: title })
+      .getByRole('checkbox')
+      .click();
+  await expect(bar).toHaveCount(0);
+  await tick('Fold finished turns');
+  await tick('Orb canary round 7');
+  await expect(bar).toContainText('已选 2 个');
+  await expect(panel(page).getByRole('checkbox', { checked: true })).toHaveCount(2);
+  await tick('Orb canary round 7');
+  await expect(bar).toContainText('已选 1 个');
+  await page.keyboard.press('Escape');
+  await expect(bar).toHaveCount(0);
+  await tick('Fold finished turns');
+  await bar.getByRole('button', { name: '取消选择' }).click();
+  await expect(bar).toHaveCount(0);
+  await tick('Fold finished turns');
+  await panel(page).getByRole('tab', { name: /接下来/ }).click();
+  await panel(page).getByRole('tab', { name: '进行中' }).click();
+  await expect(bar).toHaveCount(0);
+  await expect(panel(page).getByRole('checkbox', { checked: true })).toHaveCount(0);
+});
+
+test('completing a selection that holds a running task asks before stopping it', async ({ page }) => {
   await page.goto(`${HOME}&pane=tasks`);
   await panel(page)
     .locator('[data-slot="task-row-frame"]')
     .filter({ hasText: 'Orb canary round 7' })
     .getByRole('checkbox')
     .click();
+  await panel(page).getByTestId('tasks-selection-resolve').click();
   const confirm = page.getByRole('alertdialog', { name: '停止并标记完成' });
   await expect(confirm).toBeVisible();
-  await expect(confirm).toContainText('停止并标记完成？');
   await expect(confirm).toContainText('正在运行的工作会被停止');
   await confirm.getByRole('button', { name: '取消' }).click();
   await expect(confirm).toHaveCount(0);
 });
 
-test('the checkbox on a task ready for review opens the accept dialog with the merge choice', async ({
-  page,
-}) => {
+test('marking a task ready for review done opens no accept dialog', async ({ page }) => {
   await page.goto(`${HOME}&pane=tasks`);
-  await panel(page)
+  const frame = panel(page)
     .locator('[data-slot="task-row-frame"]')
-    .filter({ hasText: 'Fold finished turns' })
-    .getByRole('checkbox')
-    .click();
-  const dialog = page.getByRole('dialog', { name: '完成任务' });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('checkbox')).toBeVisible();
-  await dialog.getByRole('button', { name: '取消' }).click();
-  await expect(dialog).toHaveCount(0);
+    .filter({ hasText: 'Fold finished turns' });
+  await frame.hover();
+  await frame.getByTestId('task-row-menu-button').click();
+  await page.getByRole('menuitem', { name: /标记完成/ }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
 });
 
 test('the menu offers Mark done on open tasks only and follows the checkbox', async ({ page }) => {

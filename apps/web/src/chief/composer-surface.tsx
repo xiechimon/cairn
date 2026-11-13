@@ -277,7 +277,7 @@ export function ComposerSurface({
       inert={!active}
       aria-hidden={active ? undefined : true}
       data-narrow={narrow || undefined}
-      className={cn(HOME_COMPOSER_CLS, 'mt-2')}
+      className={HOME_COMPOSER_CLS}
       style={active ? { viewTransitionName: 'chief-composer' } : undefined}
     >
       <div

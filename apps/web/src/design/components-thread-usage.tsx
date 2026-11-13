@@ -9,6 +9,8 @@ const SUMMARY: ThreadUsageSummary = {
   cached: '91%',
   models: ['anthropic/claude-sonnet-5-5', 'openai/gpt-6.1-sol'],
   machines: ['omarchy', 'Mac'],
+  duration: '',
+  engines: [],
 };
 
 const CONTEXT = { tokens: 62_000, contextWindow: 200_000 };

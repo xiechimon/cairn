@@ -39,14 +39,14 @@ for (const { state, data, phase } of STATES) {
   });
 }
 
-test('a running run shows its plan and steps, with the model choice in the usage popover', async ({ page }) => {
+test('a running run shows its plan and steps, with its time so far in the usage popover', async ({ page }) => {
   await open(page, 'running');
   expect(await planStates(page)).toEqual(['done', 'done', 'doing', 'todo']);
   await expect(page.getByTestId('work-spinner')).toBeVisible();
-  await expect(transcript(page)).not.toContainText('中档模型');
   await page.getByTestId('thread-usage-ring').click();
   const usage = page.getByTestId('thread-usage');
-  await expect(usage).toContainText('中档模型 · 中等强度');
+  await expect(usage).toContainText('时长');
+  await expect(usage).not.toContainText('模型档位');
   await expect(usage).not.toContainText('要改一个文件并跑测试');
   await page.keyboard.press('Escape');
   await expect(await menuItem(page, '接管')).toBeVisible();

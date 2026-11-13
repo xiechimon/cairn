@@ -109,6 +109,15 @@ export const stepJournalRowSchema = stepRecordSchema.extend({
   blockerHandoff: blockerHandoffSchema.optional(),
   quotaWait: quotaWaitSchema.optional(),
   promptOrigin: stepPromptOriginSchema.optional(),
+  startedAt: epochMs.optional(),
+  finishedAt: epochMs.optional(),
+  route: z
+    .object({
+      harness: z.enum(['claude-code', 'pi']).nullable(),
+      modelId: z.string().nullable(),
+    })
+    .nullable()
+    .optional(),
 });
 export type StepJournalRow = z.infer<typeof stepJournalRowSchema>;
 
