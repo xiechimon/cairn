@@ -87,6 +87,8 @@ Duet is waitlisted, so nothing here comes from operating it. Every Duet row is S
 
 ### 2.3 Channels are projects, and a channel is a lens
 
+Superseded 2026-11-13 (owner): each project channel is its own conversation and context; see `coordinator-project-channels.md`. The text below records the earlier decision.
+
 Duet channels are separate chats that share one memory (Read). cairn should not add a chat per project, because the owner's rule is one Coordinator entry and D58 already says "projects as filters and context" (Read, `mobile-information-architecture.md`). So:
 
 - Selecting a project shows the same Coordinator conversation filtered to messages whose `chief_message.projectId` is that project, plus that project's task cards. `chief_message` already has a nullable `projectId` column (Read, `apps/server/src/db/schema.ts`). Whether every owner message and every task card gets one written today is not verified; PR 3 checks it and writes it.
