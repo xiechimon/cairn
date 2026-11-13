@@ -259,3 +259,20 @@ export async function resolveStepImagesOrRaw(
     return { text: opts.text, images: [], skippedNoVision: 0 };
   }
 }
+
+export interface DeliveredPrompt {
+  text: string;
+  images: DeliveredImage[] | undefined;
+  skippedNoVision: number;
+}
+
+export async function resolveDeliveredPrompt(
+  opts: ResolveStepImagesOpts,
+): Promise<DeliveredPrompt> {
+  const resolved = await resolveStepImagesOrRaw(opts);
+  return {
+    text: resolved.text,
+    images: resolved.images.length > 0 ? [...resolved.images] : undefined,
+    skippedNoVision: resolved.skippedNoVision,
+  };
+}
