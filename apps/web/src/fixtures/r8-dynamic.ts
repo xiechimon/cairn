@@ -690,62 +690,6 @@ export const skillsRouting: FixtureSet = {
   },
 };
 
-const SKILL_INJECT_TRANSCRIPT: TranscriptItem[] = [
-  { kind: 'run', at: '13:35', machine: 'xmonsMac-3574' },
-  {
-    kind: 'injected-skills',
-    skills: [
-      {
-        id: 'better-typography',
-        reason: '任务文本与技能同域「前端界面」（任务命中「字号」，技能描述命中「ui」）',
-      },
-      { id: 'tdd', reason: '任务文本显式点名「tdd」' },
-    ],
-  },
-  {
-    kind: 'user',
-    text: '修复看板卡片的字号过小与换行溢出',
-    seq: 9,
-    title: '字号与换行修复',
-  },
-  {
-    kind: 'robot',
-    paragraphs: [[{ text: '已修复字号与换行。' }]],
-    footer: { seconds: 12 },
-  },
-];
-
-const SKILL_INJECT_ZERO_TRANSCRIPT: TranscriptItem[] = [
-  { kind: 'run', at: '13:35', machine: 'xmonsMac-3574' },
-  { kind: 'injected-skills', skills: [] },
-  {
-    kind: 'user',
-    text: '把首页轮播图换成静态图',
-    seq: 10,
-    title: '轮播图静态化',
-  },
-];
-
-export const skillInject: FixtureSet = {
-  todos: [probeTodo('review', r7(13, 37))],
-  now: r7(13, 40),
-  detail: {
-    transcript: SKILL_INJECT_TRANSCRIPT,
-    doc: DOC_V2,
-    changes: probeChanges(true),
-  },
-};
-
-export const skillInjectZero: FixtureSet = {
-  todos: [probeTodo('review', r7(13, 37))],
-  now: r7(13, 40),
-  detail: {
-    transcript: SKILL_INJECT_ZERO_TRANSCRIPT,
-    doc: DOC_V2,
-    changes: probeChanges(true),
-  },
-};
-
 export const versionMenuV2: FixtureSet = withDetail(detailV2(r8(23, 54)), {
   versionMenu: 'versions',
   compareTarget: planDiff('v1', 'v2', LINES_V1, LINES_V2, false),

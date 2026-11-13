@@ -3,6 +3,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 const MARK = 'data-scroll-probe-1032';
 
 async function expectScrollerReachesBottom(page: Page, probe: Locator, last: Locator) {
+  await expect(last).toBeAttached();
   await probe.evaluate((el, mark) => {
     let node = el.parentElement;
     while (node != null && node !== document.documentElement) {

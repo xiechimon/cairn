@@ -13,11 +13,11 @@ while read -r pr ref sha at; do
   if [ "$lane" != "$ref" ] && grep -qx "$lane" ~/.local/state/overnight/hold; then continue; fi
   touch $ST/stale-$pr-${sha:0:12}
   if [ "$lane" != "$ref" ] && grep -qx "$lane" ~/.local/state/overnight/mine && [ -d ~/lanes/cairn-$lane ]; then
-    note="This lane already has PR #$pr with no new commit for over 24 hours. Before anything else run \`gh pr view $pr -R $R --comments\` and \`gh pr checks $pr -R $R\`: fix every blocking finding in the latest review-gate comment, every failing required check, and rebase onto origin/main if it conflicts. Commit the fixes on lane/$lane."
+    note="This lane already has PR #$pr with no new commit for over 24 hours. Before anything else run \`gh pr view $pr -R $R --comments\` and \`gh pr checks $pr -R $R\`: fix every failing required check, and rebase onto origin/main if it conflicts. Commit the fixes on lane/$lane."
     EXTRA_NOTE="$note" ~/lanes/dispatch-issue.sh "$lane" implement >/dev/null 2>&1 && echo "$(date -u +%H:%M) stale: re-dispatched lane $lane for PR #$pr"
   else
     gh issue create -R $R -t "stale PR #$pr: no new commit for 24h" -l stale-pr -l batch:now -l by:cairn \
-      -b "PR #$pr ($ref) has had no new commit since $at. Its owner (thread or agent) should fix the blockers (review-gate findings, failing checks, conflicts) or close it. Opened by stale-prs on omarchy." >/dev/null 2>&1 && echo "$(date -u +%H:%M) stale: opened issue for PR #$pr"
+      -b "PR #$pr ($ref) has had no new commit since $at. Its owner (thread or agent) should fix the blockers (failing checks, conflicts) or close it. Opened by stale-prs on omarchy." >/dev/null 2>&1 && echo "$(date -u +%H:%M) stale: opened issue for PR #$pr"
   fi
 done
 exit 0

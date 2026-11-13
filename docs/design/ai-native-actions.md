@@ -74,3 +74,12 @@ Step 1 changes persisted state and the tool protocol, so each step needs its own
 - Whether a thread, and an outside MCP client, get the same free class as the Coordinator or a narrower one.
 - Whether the journal is per team or per user, and how long it is kept.
 - Which interface actions the agent may run while the owner is typing, so it never moves the screen under their hands.
+
+## Decisions taken on 2026-11-12
+
+Decided on 2026-11-12: proposed by Claude at ian's delegation and confirmed by ian the same day.
+
+- **Free class of a thread and of an outside MCP client.** A thread gets the same free class as the Coordinator, limited to the project it belongs to. An outside MCP client may read and create tasks; anything else opens per API key through that key's tool whitelist.
+- **Journal.** It is stored per team, every row records the operator, and rows do not expire for now.
+
+The third question above, interface actions while the owner is typing, is still open.

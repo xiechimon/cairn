@@ -68,7 +68,6 @@ export interface ThreadChat {
   locked: boolean;
   running: boolean;
   waitingOnChecks: boolean;
-  workingFor: { startedAt?: number; seconds?: number } | undefined;
   machineName: string | null;
   stopped: boolean;
   sendError: string | null;
@@ -322,8 +321,6 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     void fetchNextPage();
   }, [fetchNextPage]);
 
-  const streamingItem = transcript.findLast((item) => item.kind === 'streaming');
-
   return {
     load,
     todo,
@@ -373,10 +370,6 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       !running &&
       buildQ.data != null &&
       resolvedBuildPrNumber(buildQ.data) != null,
-    workingFor:
-      running && streamingItem?.kind === 'streaming'
-        ? { startedAt: streamingItem.startedAt, seconds: streamingItem.seconds }
-        : undefined,
     machineName,
     stopped: buildQ.data?.errorMessage === STOP_MESSAGE,
     sendError: mutations.messageThread.isError

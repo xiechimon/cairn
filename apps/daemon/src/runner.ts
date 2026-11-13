@@ -1,19 +1,16 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
-  AgentTodoItem,
   AgentTokenUsage,
-  AnswerDeliveryVia,
   BoundGitCredentials,
   ClaimedStep,
   CommitIdentity,
   DeliveredImage,
   LocalToolDef,
-  MachineAskBody,
   MachineDoneBody,
   MachineHeartbeatBody,
   PreparedWorkspace,
@@ -53,7 +50,6 @@ import {
   LOCAL_TOOL_CREATE_TAG,
   LocalRepoUnreachableError,
   localCommitIdentity,
-  normalizeClaudeResetsAt,
   noVisionSignalOf,
   PLAN_FILE_NAME,
   parseRetryAfterMs,
@@ -63,11 +59,9 @@ import {
   REPORT_FILE_NAME,
   type ReviewGate,
   SESSION_FILE_NAME,
-  STREAM_TIMEOUTS_MS,
   skillCallName,
   stepTakesSecrets,
   stripAnsiEscapes,
-  subscriptionKeyOf,
   transcriptPromptRowId,
   withCoAuthor,
   workspaceHookRowContent,
@@ -75,7 +69,8 @@ import {
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { z } from 'zod';
 import { createActivityTracker } from './activity.js';
-import { parseAgentTodoText } from './agent-todo.js';
+import { AgentTodoReporter, parseAgentTodoText } from './agent-todo.js';
+import { AskChannel } from './ask-channel.js';
 import { prepareFileAttachment } from './attach-file.js';
 import { SessionNotResumableError } from './backend/errors.js';
 import { notInConfigLine, resolveMcpEndpoints } from './backend/mcp-config.js';
@@ -86,6 +81,7 @@ import {
   collectVisibleSkillNames,
   piWorktreeSkillDirs,
   type SkillsCatalogOpts,
+  withSkillDispatchDirectives,
 } from './backend/skills.js';
 import { createVerificationClone } from './backend/verification-clone.js';
 import { prepareWebTools } from './backend/web-search.js';
@@ -95,6 +91,7 @@ import {
   claudeCodeAuthFailureMessage,
   probeClaudeCodeAuth,
 } from './claude-code-auth.js';
+import { claudeQuotaTrip, claudeRateLimitReport, type QuotaTrip } from './claude-quota-trip.js';
 import {
   credentialRedactor,
   credentialSafeEvents,
@@ -102,13 +99,9 @@ import {
   prepareCredentialSessionUpload,
 } from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
+import { DeltaRelay } from './delta-relay.js';
 import { buildExecutorRecord } from './executor-record.js';
-import {
-  GitPushHookError,
-  gitCredentialEnv,
-  isGitAuthFailure,
-  withGitCredentialFallback,
-} from './git.js';
+import { GitPushHookError, isGitAuthFailure, withGitCredentialFallback } from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import { landLocalMerge } from './local-merge.js';
@@ -116,13 +109,22 @@ import type { DaemonLogger } from './log.js';
 import { isTransientUploadError, type MachineApi, MachineApiError } from './machine-client.js';
 import { extractReviewVerdict } from './review-findings.js';
 import { buildSecretTool } from './secret-channel.js';
-import { type SealedSegment, SegmentBuffer, segmentContent } from './segment.js';
+import { type SealedSegment, SegmentEmitter, segmentContent } from './segment.js';
 import { readSessionJsonlForUpload } from './session-jsonl.js';
 import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
-import { resolveStepImages } from './step-attachments.js';
+import { resolveStepImagesOrRaw } from './step-attachments.js';
+import { assembleStepEnv } from './step-env.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
+import {
+  resolveStreamLimits,
+  STREAM_DURATION_CAP_DEFAULT_MS,
+  STREAM_DURATION_CAP_ENV,
+  STREAM_FIRST_EVENT_ENV,
+  STREAM_IDLE_ENV,
+  StreamWatchdog,
+} from './stream-watchdog.js';
 import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
 import { extractVerifyVerdict } from './verify-verdict.js';
@@ -170,36 +172,12 @@ export function combineTimeoutWithRootCause(timeoutText: string, rootCause: stri
   return rootCause !== null ? `${timeoutText}；根因: ${rootCause}` : timeoutText;
 }
 
-export const STREAM_DURATION_CAP_DEFAULT_MS = 3_600_000;
-
-export const STREAM_DURATION_CAP_ENV = 'CAIRN_STREAM_DURATION_CAP_MS';
-export const STREAM_IDLE_ENV = 'CAIRN_STREAM_IDLE_MS';
-export const STREAM_FIRST_EVENT_ENV = 'CAIRN_STREAM_FIRST_EVENT_MS';
-
-function envPositiveMs(name: string): number | null {
-  const raw = process.env[name];
-  if (raw === undefined) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-export type StreamTimeoutArm = 'first' | 'idle' | 'body' | 'duration';
-
-export function streamTimeoutMessage(
-  arm: StreamTimeoutArm,
-  timeouts: { first: number; idle: number; body: number; durationCap: number },
-): string {
-  const value =
-    arm === 'first'
-      ? timeouts.first
-      : arm === 'idle'
-        ? timeouts.idle
-        : arm === 'body'
-          ? timeouts.body
-          : timeouts.durationCap;
-  const label = arm === 'duration' ? 'cap' : arm;
-  return `stream timeout (arm=${arm}, ${label}=${value}ms)`;
-}
+export {
+  STREAM_DURATION_CAP_DEFAULT_MS,
+  STREAM_DURATION_CAP_ENV,
+  STREAM_FIRST_EVENT_ENV,
+  STREAM_IDLE_ENV,
+};
 
 export function buildTaskPrompt(claimed: ClaimedStep): string {
   const todo = claimed.todo;
@@ -232,12 +210,6 @@ function resumeMissNote(sessionId: string, claimed: ClaimedStep): string {
   }
   return `本机找不到会话 ${sessionId}，无法续接。已改开新会话，按原任务继续。`;
 }
-
-const READONLY_GIT_ENV: Record<string, string> = {
-  GIT_CONFIG_COUNT: '1',
-  GIT_CONFIG_KEY_0: 'url.cairn-readonly-workspace-denied://.pushInsteadOf',
-  GIT_CONFIG_VALUE_0: '',
-};
 
 function confirmedPlanFile(plansDir: string, convId: string): string | null {
   const planFile = join(plansDir, convId, PLAN_FILE_NAME);
@@ -454,31 +426,15 @@ async function runClaimedStep(
   });
   activity.setPhase('preparing');
 
-  let agentTodoRelayWarned = false;
-  let lastAgentTodo: AgentTodoItem[] | null = null;
-  const reportAgentTodo = (items: readonly AgentTodoItem[]): void => {
-    if (items.length === 0) return;
-    if (
-      lastAgentTodo !== null &&
-      lastAgentTodo.length === items.length &&
-      lastAgentTodo.every((it, i) => {
-        const next = items[i];
-        return next !== undefined && it.text === next.text && it.state === next.state;
-      })
-    ) {
-      return;
-    }
-    lastAgentTodo = items.map((it) => ({ ...it }));
-    client.agentTodo?.(stepId, { items: items.map((it) => ({ ...it })) })?.catch((err: unknown) => {
-      if (agentTodoRelayWarned) return;
-      agentTodoRelayWarned = true;
+  const agentTodo = new AgentTodoReporter({
+    send: (items) => client.agentTodo?.(stepId, { items }),
+    onFirstError: (err) =>
       logger.step(
         `agent todo relay failed (suppressed until next step): ${
           err instanceof Error ? err.message : String(err)
         }`,
-      );
-    });
-  };
+      ),
+  });
 
   const isChief = claimed.step.kind === 'chief';
   const isReview = claimed.step.kind === 'review';
@@ -709,25 +665,17 @@ async function runClaimedStep(
   let promptImages: DeliveredImage[] | undefined;
   let skippedNoVisionCount = 0;
   if (!isChief && prompt !== null) {
-    try {
-      const resolved = await resolveStepImages({
-        text: prompt,
-        stepId,
-        client,
-        materializeDir: deps.paths.stepAttachmentsDir,
-        log: (line) => logger.step(line),
-        imageSupport,
-      });
-      deliveryPrompt = resolved.text;
-      if (resolved.images.length > 0) promptImages = [...resolved.images];
-      skippedNoVisionCount = resolved.skippedNoVision;
-    } catch (err) {
-      logger.step(
-        `attachment resolve failed (delivering raw text): ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
-    }
+    const resolved = await resolveStepImagesOrRaw({
+      text: prompt,
+      stepId,
+      client,
+      materializeDir: deps.paths.stepAttachmentsDir,
+      log: (line) => logger.step(line),
+      imageSupport,
+    });
+    deliveryPrompt = resolved.text;
+    if (resolved.images.length > 0) promptImages = [...resolved.images];
+    skippedNoVisionCount = resolved.skippedNoVision;
   }
   if (skippedNoVisionCount > 0) {
     logger.step(
@@ -958,86 +906,19 @@ async function runClaimedStep(
     });
     localToolDefs.push(skillLoadTool);
     if (deliveryPrompt !== null) {
-      const visibleNames = collectVisibleSkillNames(skillScanOpts);
-      const slashPattern = /\b\/([a-z][a-z0-9-]*)\b/g;
-      const matched: string[] = [];
-      let m = slashPattern.exec(deliveryPrompt);
-      while (m !== null) {
-        const name = m[1] ?? '';
-        if (visibleNames.has(name)) {
-          matched.push(name);
-        } else {
-          logger.skills(`unknown-dispatch: ${name}`);
-        }
-        m = slashPattern.exec(deliveryPrompt);
-      }
-      if (matched.length > 0) {
-        const uniqueMatched = [...new Set(matched)];
-        const directives = uniqueMatched
-          .map((n) => `Before proceeding, use the Skill tool to load "${n}".`)
-          .join('\n');
-        deliveryPrompt = `${directives}\n\n${deliveryPrompt}`;
-        logger.skills(`dispatch: ${uniqueMatched.map((n) => `/${n}`).join(', ')}`);
-      }
+      deliveryPrompt = withSkillDispatchDirectives(
+        deliveryPrompt,
+        collectVisibleSkillNames(skillScanOpts),
+        (msg) => logger.skills(msg),
+      );
     }
   }
-  const askAbort = new AbortController();
+  const askChannel = new AskChannel({ client, stepId, log: (message) => logger.step(message) });
   const telemetry =
     deps.otel != null
       ? deps.otel.contextFor(claimed.step.buildId, stepId, claimed.step.kind)
       : undefined;
-  let askKeepAlive: (() => void) | null = null;
-  const answeredPolls = new Set<string>();
-  const ackAnswers = async (answerIds: readonly string[], via: AnswerDeliveryVia) => {
-    if (answerIds.length === 0) return;
-    await client.steerAck?.(stepId, { answerIds: [...answerIds], via }).catch((err: unknown) => {
-      logger.step(`answer ack failed: ${err instanceof Error ? err.message : String(err)}`);
-    });
-  };
-  const runAskChannel = async (params: Record<string, unknown>): Promise<string> => {
-    if (client.askUser === undefined) throw new Error('ask channel unavailable');
-    const requestId = `ask-${randomUUID()}`;
-    const keepAlive = setInterval(() => askKeepAlive?.(), 30_000);
-    keepAlive.unref?.();
-    try {
-      const response = await client.askUser(
-        stepId,
-        {
-          requestId,
-          questions: (params.questions ?? []) as MachineAskBody['questions'],
-          ...(typeof params.provenance === 'string' ? { provenance: params.provenance } : {}),
-        },
-        { signal: askAbort.signal },
-      );
-      if (response.status === 'answered' && !askAbort.signal.aborted) {
-        answeredPolls.add(requestId);
-      }
-      return JSON.stringify(response);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return JSON.stringify({
-        status: 'cancelled',
-        requestId,
-        answers: null,
-        reason: `ask channel aborted: ${msg}`,
-      });
-    } finally {
-      clearInterval(keepAlive);
-    }
-  };
   const skillInjection: { facts: SkillInjectionFacts | null } = { facts: null };
-  const stepGitEnv: Record<string, string> =
-    repo?.kind === 'github' && creds.git !== null
-      ? (appCredential?.env() ?? {
-          ...Object.fromEntries(
-            Object.entries(gitCredentialEnv(creds.git)).filter(
-              (entry): entry is [string, string] => entry[1] !== undefined,
-            ),
-          ),
-          GH_TOKEN: creds.git.password,
-          GITHUB_TOKEN: creds.git.password,
-        })
-      : {};
   let temporary: ReturnType<typeof createTempEnvironment>;
   try {
     temporary = createTempEnvironment({ ...process.env, ...opts.env });
@@ -1051,28 +932,16 @@ async function runClaimedStep(
     return;
   }
   stepCleanups.push(temporary.cleanup);
-  const stepEnv: Record<string, string> = {
-    ...opts.env,
-    ...temporary.env,
-    ...stepGitEnv,
-    ...(readonlyWorkspace || attachmentVerify ? READONLY_GIT_ENV : {}),
-  };
-  stepCleanups.push(() => {
-    for (const key of Object.keys(stepGitEnv)) {
-      delete stepEnv[key];
-      delete stepGitEnv[key];
-    }
+  const { env: stepEnv, dropGitCredentials } = assembleStepEnv({
+    inherited: opts.env,
+    temporary: temporary.env,
+    git: repo?.kind === 'github' ? creds.git : null,
+    appCredential,
+    readonlyGit: readonlyWorkspace || attachmentVerify,
+    claudeSubscriptionToken:
+      runtimeId === 'claude-code' ? creds.claudeSubscriptionToken : undefined,
   });
-  if (appCredential !== null) {
-    delete stepEnv.GH_TOKEN;
-    delete stepEnv.GITHUB_TOKEN;
-    delete stepEnv.CAIRN_GIT_CRED_PASSWORD;
-  }
-  delete stepEnv.CLAUDE_CODE_OAUTH_TOKEN;
-  if (runtimeId === 'claude-code' && creds.claudeSubscriptionToken !== undefined) {
-    stepEnv.CLAUDE_CODE_OAUTH_TOKEN = creds.claudeSubscriptionToken;
-    if (opts.env?.CAIRN_ORB !== '1') stepEnv.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = '1';
-  }
+  stepCleanups.push(dropGitCredentials);
   const sessionOpts: SessionOpts = {
     provider,
     modelId: agent.modelId,
@@ -1086,7 +955,7 @@ async function runClaimedStep(
       ? {
           remoteTools,
           executeRemoteTool: (name, params) => {
-            if (name === 'ask_user' && client.askUser) return runAskChannel(params);
+            if (name === 'ask_user' && askChannel.available) return askChannel.ask(params);
             if (name === 'attach_file' && !isChief) {
               const prepared = prepareFileAttachment(
                 cwd,
@@ -1277,25 +1146,19 @@ async function runClaimedStep(
   let zeroProgressRetries = 0;
   let retryStorm = false;
   const retryStormMax = opts.retryStormMax ?? RETRY_STORM_MAX;
-  let quotaTrip: {
-    kind: 'quota' | 'capacity';
-    reason: string;
-    retryAfterMs: number | null;
-  } | null = null;
+  let quotaTrip: QuotaTrip | null = null;
   let networkRetries = 0;
   const networkRetryDelays =
     claimed.step.kind === 'plan' || isBuildStepKind(claimed.step.kind)
       ? PROVIDER_NETWORK_RETRY_DELAYS_MS
       : [0, 5_000];
-  const envFirstMs = envPositiveMs(STREAM_FIRST_EVENT_ENV);
-  const envIdleMs = envPositiveMs(STREAM_IDLE_ENV);
   let noVisionDegraded = false;
   const retryWithoutImages = async (failureText: string): Promise<boolean> => {
     if (
       noVisionDegraded ||
       sawProgress ||
       priorPassMadeProgress ||
-      timedOut ||
+      watchdog.trippedArm !== null ||
       stop.request !== null ||
       quotaTrip !== null ||
       promptImages === undefined ||
@@ -1314,25 +1177,15 @@ async function runClaimedStep(
         : isInfoBuild
           ? appendReportLocationNote(buildTaskPrompt(claimed), reportFile)
           : degradedFreshPrompt(claimed, deps.paths.plansDir, convId);
-    let degradedText = retryPrompt;
-    try {
-      const resolved = await resolveStepImages({
-        text: retryPrompt,
-        stepId,
-        client,
-        materializeDir: deps.paths.stepAttachmentsDir,
-        log: (line) => logger.step(line),
-        imageSupport: false,
-      });
-      degradedText = resolved.text;
-    } catch (err) {
-      logger.step(
-        `attachment resolve failed (delivering raw text): ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
-    }
-    sessionOpts.prompt = degradedText;
+    const degraded = await resolveStepImagesOrRaw({
+      text: retryPrompt,
+      stepId,
+      client,
+      materializeDir: deps.paths.stepAttachmentsDir,
+      log: (line) => logger.step(line),
+      imageSupport: false,
+    });
+    sessionOpts.prompt = degraded.text;
     continueId = null;
     journal.update(stepId, { prompt: retryPrompt, sessionAction: 'new', sessionId: null });
     delete sessionOpts.promptImages;
@@ -1347,111 +1200,47 @@ async function runClaimedStep(
     deps.sessionHandles?.delete(stepId);
     return true;
   };
-  const streamTimeouts = {
-    first: envFirstMs ?? opts.streamTimeouts?.first ?? STREAM_TIMEOUTS_MS.streamFirstEvent,
-    idle: envIdleMs ?? opts.streamTimeouts?.idle ?? STREAM_TIMEOUTS_MS.streamIdle,
-    body: Math.max(
-      opts.streamTimeouts?.body ?? STREAM_TIMEOUTS_MS.streamBodyTimeout,
-      envFirstMs ?? 0,
-      envIdleMs ?? 0,
-    ),
-  };
-  const absoluteDurationCapMs = envPositiveMs(STREAM_DURATION_CAP_ENV);
-  const streamDurationCapMs =
-    absoluteDurationCapMs ?? opts.streamDurationCapMs ?? STREAM_DURATION_CAP_DEFAULT_MS;
-  const progressResetsDuration =
-    isBuildStepKind(claimed.step.kind) && absoluteDurationCapMs === null;
-  let timedOut = false;
-  let timeoutArm: StreamTimeoutArm | null = null;
-  const runningToolCalls = new Set<string>();
+  const streamLimits = resolveStreamLimits({
+    ...(opts.streamTimeouts !== undefined ? { timeouts: opts.streamTimeouts } : {}),
+    ...(opts.streamDurationCapMs !== undefined ? { durationCapMs: opts.streamDurationCapMs } : {}),
+  });
   const toolStartedAt = new Map<string, number>();
-  let watchdog: NodeJS.Timeout | null = null;
-  let bodyTimeout: NodeJS.Timeout | null = null;
-  let durationCap: NodeJS.Timeout | null = null;
-  const tripTimeout = (arm: StreamTimeoutArm) => {
-    timedOut = true;
-    timeoutArm = arm;
-    askAbort.abort();
-    void handle?.stop();
-  };
-  const armWatchdog = (ms: number, arm: 'first' | 'idle') => {
-    if (watchdog) clearTimeout(watchdog);
-    watchdog = null;
-    if (arm === 'idle' && runningToolCalls.size > 0) return;
-    watchdog = setTimeout(() => tripTimeout(arm), ms);
-    watchdog.unref?.();
-  };
-  const armBodyTimeout = () => {
-    if (bodyTimeout) clearTimeout(bodyTimeout);
-    bodyTimeout = null;
-    if (runningToolCalls.size > 0) return;
-    bodyTimeout = setTimeout(() => tripTimeout('body'), streamTimeouts.body);
-    bodyTimeout.unref?.();
-  };
-  const armDurationCap = () => {
-    if (durationCap && absoluteDurationCapMs !== null) return;
-    if (durationCap) clearTimeout(durationCap);
-    durationCap = setTimeout(() => tripTimeout('duration'), streamDurationCapMs);
-    durationCap.unref?.();
-  };
-  askKeepAlive = () => {
-    armWatchdog(streamTimeouts.idle, 'idle');
-    armBodyTimeout();
-    armDurationCap();
-  };
-  const segments = new SegmentBuffer();
-  let sealedInMessage = false;
+  const watchdog = new StreamWatchdog({
+    timeouts: streamLimits.timeouts,
+    durationCapMs: streamLimits.durationCapMs,
+    durationCapIsAbsolute: streamLimits.durationCapIsAbsolute,
+    progressExtendsDuration:
+      isBuildStepKind(claimed.step.kind) && !streamLimits.durationCapIsAbsolute,
+    onTrip: () => {
+      askChannel.abort();
+      void handle?.stop();
+    },
+  });
+  askChannel.keepAlive = () => watchdog.keepAlive();
   let lastRowCreatedAt = 0;
   const rowCreatedAt = (): number => {
     lastRowCreatedAt = Math.max(now(), lastRowCreatedAt + 1);
     return lastRowCreatedAt;
   };
-  let deltaBuf = '';
-  let deltaTimer: NodeJS.Timeout | null = null;
-  const flushDeltasNow = async (): Promise<void> => {
-    if (deltaTimer !== null) {
-      clearTimeout(deltaTimer);
-      deltaTimer = null;
-    }
-    const text = deltaBuf;
-    deltaBuf = '';
-    if (text === '') return;
-    try {
-      await client.transcriptDelta(stepId, text);
-    } catch (err: unknown) {
+  const textDeltas = new DeltaRelay({
+    flushMs: TRANSCRIPT_DELTA_FLUSH_MS,
+    send: (text) => client.transcriptDelta(stepId, text),
+    onError: (err) =>
       logger.step(
         `transcript delta relay failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-  };
-  const flushDeltas = (): void => {
-    void flushDeltasNow();
-  };
-  let thinkingBuf = '';
-  let thinkingTimer: NodeJS.Timeout | null = null;
-  const flushThinkingNow = async (): Promise<void> => {
-    if (thinkingTimer !== null) {
-      clearTimeout(thinkingTimer);
-      thinkingTimer = null;
-    }
-    const text = thinkingBuf;
-    thinkingBuf = '';
-    if (text === '' || client.thinkingDelta === undefined) return;
-    try {
-      await client.thinkingDelta(stepId, text);
-    } catch (err: unknown) {
+      ),
+  });
+  const thinkingDeltas = new DeltaRelay({
+    flushMs: TRANSCRIPT_DELTA_FLUSH_MS,
+    send: (text) => client.thinkingDelta?.(stepId, text),
+    onError: (err) =>
       logger.step(
         `thinking delta relay failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-  };
-  const flushThinking = (): void => {
-    void flushThinkingNow();
-  };
+      ),
+  });
   const emitSegment = async (seg: SealedSegment): Promise<void> => {
-    await flushThinkingNow();
-    await flushDeltasNow();
-    sealedInMessage = true;
+    await thinkingDeltas.flushNow();
+    await textDeltas.flushNow();
     messageSeq += 1;
     const row = {
       id: `msg-${stepId}-${messageSeq}`,
@@ -1467,58 +1256,26 @@ async function runClaimedStep(
     }
     if (seg.kind === 'text') {
       const items = parseAgentTodoText(seg.text);
-      if (items !== null) reportAgentTodo(items);
+      if (items !== null) agentTodo.report(items);
     }
   };
-  const sealSegment = async (): Promise<void> => {
-    const seg = segments.seal();
-    if (seg !== null) await emitSegment(seg);
-  };
-  const sealFromContent = async (content: unknown): Promise<void> => {
-    const blocks = Array.isArray(content) ? content : [content];
-    for (const block of blocks) {
-      if (typeof block === 'string') {
-        const sealedText = segments.append('text', block);
-        if (sealedText !== null) await emitSegment(sealedText);
-        continue;
-      }
-      if (block === null || typeof block !== 'object') continue;
-      const b = block as { type?: string; text?: string; thinking?: string };
-      const sealed =
-        b.type === 'thinking' && typeof b.thinking === 'string'
-          ? segments.replace('thinking', b.thinking)
-          : b.type === 'text' && typeof b.text === 'string'
-            ? segments.append('text', b.text)
-            : null;
-      if (sealed !== null) await emitSegment(sealed);
-    }
-    await sealSegment();
-  };
+  const segments = new SegmentEmitter(emitSegment);
   let handle: AgentSessionHandle | null = null;
   sessionOpts.onClaudeRateLimit = (notice) => {
     const machineId = claimed.step.machineId;
     if (machineId !== null) {
       void client
-        .reportClaudeRateLimit?.({
-          machineId,
-          status: notice.status,
-          ...(notice.rateLimitType !== undefined ? { rateLimitType: notice.rateLimitType } : {}),
-          ...(notice.utilization !== undefined ? { utilization: notice.utilization } : {}),
-          ...(notice.resetsAt !== undefined ? { resetsAt: notice.resetsAt } : {}),
-        })
+        .reportClaudeRateLimit?.(claudeRateLimitReport(machineId, notice))
         .catch((err: unknown) => {
           logger.step(
             `claude rate limit report failed: ${err instanceof Error ? err.message : String(err)}`,
           );
         });
     }
-    if (notice.status !== 'rejected' || quotaTrip !== null) return;
-    const until = normalizeClaudeResetsAt(notice.resetsAt);
-    quotaTrip = {
-      kind: 'quota',
-      reason: `Claude subscription ${subscriptionKeyOf(notice.rateLimitType)} rejected`,
-      retryAfterMs: until !== null && until > Date.now() ? Math.max(1, until - Date.now()) : null,
-    };
+    if (quotaTrip !== null) return;
+    const trip = claudeQuotaTrip(notice, Date.now());
+    if (trip === null) return;
+    quotaTrip = trip;
     void handle?.stop();
   };
   const openSession = (): Promise<AgentSessionHandle> => {
@@ -1554,31 +1311,23 @@ async function runClaimedStep(
         let delivery = fresh;
         let images: DeliveredImage[] | undefined;
         if (!isChief) {
-          try {
-            const resolved = await resolveStepImages({
-              text: fresh,
-              stepId,
-              client,
-              materializeDir: deps.paths.stepAttachmentsDir,
-              log: (line) => logger.step(line),
-              imageSupport,
+          const resolved = await resolveStepImagesOrRaw({
+            text: fresh,
+            stepId,
+            client,
+            materializeDir: deps.paths.stepAttachmentsDir,
+            log: (line) => logger.step(line),
+            imageSupport,
+          });
+          delivery = resolved.text;
+          if (resolved.images.length > 0) images = [...resolved.images];
+          if (resolved.skippedNoVision > 0) {
+            transcript.upsert({
+              id: `image-skip-${stepId}`,
+              role: 'system',
+              content: `图片未被模型读取：模型 ${modelKey} 不支持图片输入，${resolved.skippedNoVision} 张图片未下载（步骤继续执行，请以文字描述或改用支持图片的模型）`,
+              createdAt: now(),
             });
-            delivery = resolved.text;
-            if (resolved.images.length > 0) images = [...resolved.images];
-            if (resolved.skippedNoVision > 0) {
-              transcript.upsert({
-                id: `image-skip-${stepId}`,
-                role: 'system',
-                content: `图片未被模型读取：模型 ${modelKey} 不支持图片输入，${resolved.skippedNoVision} 张图片未下载（步骤继续执行，请以文字描述或改用支持图片的模型）`,
-                createdAt: now(),
-              });
-            }
-          } catch (resolveErr) {
-            logger.step(
-              `attachment resolve failed (delivering raw text): ${
-                resolveErr instanceof Error ? resolveErr.message : String(resolveErr)
-              }`,
-            );
           }
         }
         sessionOpts.prompt = delivery;
@@ -1604,21 +1353,12 @@ async function runClaimedStep(
       lastErrorWasProcessCrash = false;
       sawDone = false;
       sawProgress = false;
-      timedOut = false;
-      timeoutArm = null;
+      watchdog.clearTrip();
       zeroProgressRetries = 0;
       retryStorm = false;
       usage = [];
-      if (thinkingTimer !== null) {
-        clearTimeout(thinkingTimer);
-        thinkingTimer = null;
-      }
-      thinkingBuf = '';
-      if (deltaTimer !== null) {
-        clearTimeout(deltaTimer);
-        deltaTimer = null;
-      }
-      deltaBuf = '';
+      thinkingDeltas.discard();
+      textDeltas.discard();
     }
     if (stop.request !== null) break;
     activity.setPhase('starting', pass > 0 ? { resetLive: true } : undefined);
@@ -1627,8 +1367,8 @@ async function runClaimedStep(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (await retryWithoutImages(message)) continue;
-      flushDeltas();
-      flushThinking();
+      textDeltas.flush();
+      thinkingDeltas.flush();
       clearCredentials(creds);
       await failStep(deps, heartbeat, stepId, message);
       return;
@@ -1651,63 +1391,42 @@ async function runClaimedStep(
     stop.attach(handle).catch((err: unknown) => {
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     });
-    runningToolCalls.clear();
-    armWatchdog(streamTimeouts.first, 'first');
-    armBodyTimeout();
-    if (pass === 0) armDurationCap();
+    watchdog.startPass(pass === 0);
     try {
       for await (const ev of credentialSafeEvents(handle.events, () => credentialValues)) {
         if (!promptDelivered) {
           promptDelivered = true;
-          await ackAnswers(claimed.answerIds ?? [], 'session-start');
+          await askChannel.ackAnswers(claimed.answerIds ?? [], 'session-start');
         }
         if (ev.type === 'toolcall_end') {
-          if (ev.call.result === undefined) runningToolCalls.add(ev.call.id);
-          else runningToolCalls.delete(ev.call.id);
-          if (ev.call.result !== undefined && answeredPolls.size > 0) {
-            const result = JSON.stringify(ev.call.result);
-            const reached = [...answeredPolls].filter((id) => result.includes(id));
-            for (const id of reached) answeredPolls.delete(id);
-            await ackAnswers(reached, 'poll');
-          }
+          watchdog.noteToolCall(ev.call.id, ev.call.result === undefined);
+          if (ev.call.result !== undefined) await askChannel.ackPollsReachedBy(ev.call.result);
         }
-        armWatchdog(streamTimeouts.idle, 'idle');
-        armBodyTimeout();
+        watchdog.noteEvent();
         activity.noteEvent();
         switch (ev.type) {
           case 'text_delta': {
-            if (progressResetsDuration) armDurationCap();
+            watchdog.noteProgress();
             sawProgress = true;
             zeroProgressRetries = 0;
             activity.setPhase('responding');
-            deltaBuf += ev.text;
-            if (deltaTimer === null) {
-              deltaTimer = setTimeout(flushDeltas, TRANSCRIPT_DELTA_FLUSH_MS);
-              deltaTimer.unref?.();
-            }
-            const sealedText = segments.append('text', ev.text);
-            if (sealedText !== null) await emitSegment(sealedText);
+            textDeltas.push(ev.text);
+            await segments.append('text', ev.text);
             break;
           }
           case 'thinking_delta': {
-            if (progressResetsDuration) armDurationCap();
+            watchdog.noteProgress();
             sawProgress = true;
             zeroProgressRetries = 0;
             activity.setPhase('thinking');
-            thinkingBuf += ev.text;
-            if (thinkingTimer === null) {
-              thinkingTimer = setTimeout(flushThinking, TRANSCRIPT_DELTA_FLUSH_MS);
-              thinkingTimer.unref?.();
-            }
-            const sealedThinking = segments.append('thinking', ev.text);
-            if (sealedThinking !== null) await emitSegment(sealedThinking);
+            thinkingDeltas.push(ev.text);
+            await segments.append('thinking', ev.text);
             break;
           }
           case 'thinking': {
-            if (progressResetsDuration) armDurationCap();
+            watchdog.noteProgress();
             activity.setPhase('thinking');
-            const sealedFull = segments.replace('thinking', ev.text);
-            if (sealedFull !== null) await emitSegment(sealedFull);
+            await segments.replace('thinking', ev.text);
             break;
           }
           case 'toolcall_end': {
@@ -1725,13 +1444,13 @@ async function runClaimedStep(
               };
               toolStartedAt.delete(ev.call.id);
             }
-            if (progressResetsDuration) armDurationCap();
+            watchdog.noteProgress();
             sawProgress = true;
             zeroProgressRetries = 0;
             if (ev.call.name && CHANGE_TOOLS.has(ev.call.name.toLowerCase())) {
               sawChangeTool = true;
             }
-            await sealSegment();
+            await segments.seal();
             if (ev.call.result === undefined) {
               const skillName = skillCallName(ev.call);
               activity.toolStarted(
@@ -1743,7 +1462,7 @@ async function runClaimedStep(
               const skillFact = classifySkillFact(ev.call);
               if (skillFact !== null) activity.noteSkill(skillFact);
             }
-            if (ev.call.todo !== undefined) reportAgentTodo(ev.call.todo);
+            if (ev.call.todo !== undefined) agentTodo.report(ev.call.todo);
             transcript.upsert({
               id: ev.call.id,
               role: 'assistant',
@@ -1791,7 +1510,7 @@ async function runClaimedStep(
               );
             }
             if (ev.message.role === 'assistant' && ev.message.stopReason !== 'error') {
-              if (progressResetsDuration) armDurationCap();
+              watchdog.noteProgress();
               sawProgress = true;
               zeroProgressRetries = 0;
             }
@@ -1805,14 +1524,7 @@ async function runClaimedStep(
               });
               break;
             }
-            const hadRows = sealedInMessage;
-            sealedInMessage = false;
-            const trailing = segments.seal();
-            if (hadRows || trailing !== null) {
-              if (trailing !== null) await emitSegment(trailing);
-            } else {
-              await sealFromContent(ev.message.content);
-            }
+            await segments.endAssistantMessage(ev.message.content);
             break;
           }
           case 'error':
@@ -1916,7 +1628,7 @@ async function runClaimedStep(
       if (
         failureText !== null &&
         (lastError !== null ||
-          (timedOut && lastModelError !== null) ||
+          (watchdog.trippedArm !== null && lastModelError !== null) ||
           (retryStorm && lastModelError !== null))
       ) {
         const amended: ProviderConfig | null =
@@ -1939,22 +1651,15 @@ async function runClaimedStep(
     break;
   }
   deps.sessionHandles?.delete(stepId);
-  await sealSegment();
-  flushDeltas();
-  flushThinking();
+  await segments.seal();
+  textDeltas.flush();
+  thinkingDeltas.flush();
   if (opts.env?.CAIRN_ORB !== '1') clearInterval(heartbeat);
-  if (watchdog) clearTimeout(watchdog);
-  if (bodyTimeout) clearTimeout(bodyTimeout);
-  if (durationCap) clearTimeout(durationCap);
-  askAbort.abort();
-  if (timedOut && timeoutArm !== null) {
-    lastError = combineTimeoutWithRootCause(
-      streamTimeoutMessage(timeoutArm, {
-        ...streamTimeouts,
-        durationCap: streamDurationCapMs,
-      }),
-      lastError ?? lastModelError,
-    );
+  watchdog.stop();
+  askChannel.abort();
+  const timeoutText = watchdog.message();
+  if (timeoutText !== null) {
+    lastError = combineTimeoutWithRootCause(timeoutText, lastError ?? lastModelError);
   } else if (retryStorm && lastError === null && lastModelError !== null) {
     lastError = lastModelError;
   }
@@ -1975,7 +1680,7 @@ async function runClaimedStep(
   if (quotaBlock !== null && lastError === null) {
     lastError = quotaBlock.reason;
   }
-  if (!timedOut && !stopped && !sawProgress && !sawDone && lastError === null) {
+  if (watchdog.trippedArm === null && !stopped && !sawProgress && !sawDone && lastError === null) {
     lastError =
       'agent session ended with zero progress and no terminal outcome (silent no-op round)';
     logger.step('zero-event round: session stream exhausted without progress, done, or error');

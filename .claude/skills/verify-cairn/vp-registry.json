@@ -196,7 +196,7 @@
           ],
           "status": "stale",
           "purpose": "The sidebar, the user menu and agent create/cards build dicebear avatar URLs while avatarUrl stays null in the API and SQLite.",
-          "note": "static check by /code-review on #1411: reads .team-agent-avatar img, a class apps/web/src no longer has."
+          "note": "static check by /code-review on #1411: reads .team-agent-avatar img, a class apps/web/src no longer has. It also imports apps/web/src/lib/spiral-avatar.ts, removed when the default avatar became a tinted initial (owner 2026-11-12)."
         }
       }
     },
@@ -292,7 +292,7 @@
       "recipe": null,
       "cases": {
         "report-retro-accept": {
-          "script": "docs/verify/2592/drive-chief-daily-report.mjs",
+          "script": ".claude/skills/verify-cairn/scripts/drive-chief-daily-report.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -328,7 +328,7 @@
       "recipe": null,
       "cases": {
         "retry-failed-turn": {
-          "script": "docs/verify/1858/drive-retry.mjs",
+          "script": ".claude/skills/verify-cairn/scripts/drive-retry.mjs",
           "args": [],
           "needs": [
             "own-stack",

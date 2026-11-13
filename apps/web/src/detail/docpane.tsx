@@ -115,13 +115,11 @@ export function DiffFileBlock({
   expanded,
   buildId,
   allowFullFile = true,
-  fileRow = true,
 }: {
   file: DiffFile;
   expanded: boolean;
   buildId: string | null;
   allowFullFile?: boolean;
-  fileRow?: boolean;
 }) {
   const { t } = useI18n();
   const { live } = useLiveData();
@@ -135,25 +133,23 @@ export function DiffFileBlock({
   );
   return (
     <div>
-      {fileRow && (
-        <div className="doc-file-row flex h-8.5 flex-none items-center gap-1.5 border-b border-(--border) pl-3 text-ui text-(--text-tertiary) [&_svg]:text-(--text-tertiary)">
-          {expanded ? (
-            <ChevronDown width={10} height={10} />
-          ) : (
-            <ChevronRight width={10} height={10} />
+      <div className="doc-file-row flex h-8.5 flex-none items-center gap-1.5 border-b border-(--border) pl-3 text-ui text-(--text-tertiary) [&_svg]:text-(--text-tertiary)">
+        {expanded ? (
+          <ChevronDown width={10} height={10} />
+        ) : (
+          <ChevronRight width={10} height={10} />
+        )}
+        <span className="min-w-0 truncate">
+          <span className="font-medium text-(--foreground)">{baseName(file.path)}</span>
+          {dirName(file.path) !== '' && <span className="ml-1.5">{dirName(file.path)}</span>}
+        </span>
+        <span className="ml-auto pr-4 font-mono text-meta text-(--diff-add-fg)">
+          +{file.added}
+          {file.removed != null && file.removed > 0 && (
+            <span className="text-(--destructive)"> −{file.removed}</span>
           )}
-          <span className="min-w-0 truncate">
-            <span className="font-medium text-(--foreground)">{baseName(file.path)}</span>
-            {dirName(file.path) !== '' && <span className="ml-1.5">{dirName(file.path)}</span>}
-          </span>
-          <span className="ml-auto pr-4 font-mono text-meta text-(--diff-add-fg)">
-            +{file.added}
-            {file.removed != null && file.removed > 0 && (
-              <span className="text-(--destructive)"> −{file.removed}</span>
-            )}
-          </span>
-        </div>
-      )}
+        </span>
+      </div>
       {expanded && (
         <div>
           {full.kind === 'hidden' &&

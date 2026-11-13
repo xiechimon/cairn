@@ -21,6 +21,7 @@ import { ownerChain, runOwned } from './owned-process.mjs';
 const DEFAULT_SLOTS = 2;
 const POLL_MS = 250;
 const PARTIAL_WRITE_GRACE_MS = 2_000;
+const CLOSED_PROBE_CODES = new Set(['ENOENT', 'ECONNREFUSED', 'ECONNRESET']);
 const DEFAULT_E2E_PORT = 8398;
 const PORT_STRIDE = 10;
 const LOCK_SCRIPT = `
@@ -138,6 +139,20 @@ function isAlive(pid) {
   }
 }
 
+export function probeAnswers(probe) {
+  return new Promise((done, reject) => {
+    const connection = createConnection(probe);
+    connection.once('connect', () => {
+      connection.destroy();
+      done(true);
+    });
+    connection.once('error', (error) => {
+      if (CLOSED_PROBE_CODES.has(error.code)) done(false);
+      else reject(error);
+    });
+  });
+}
+
 async function holderState(path, legacyPid) {
   let text;
   let modified;
@@ -163,19 +178,7 @@ async function holderState(path, legacyPid) {
       }
     }
     const alive =
-      typeof record.probe === 'string'
-        ? await new Promise((done, reject) => {
-            const connection = createConnection(record.probe);
-            connection.once('connect', () => {
-              connection.destroy();
-              done(true);
-            });
-            connection.once('error', (error) => {
-              if (error.code === 'ENOENT' || error.code === 'ECONNREFUSED') done(false);
-              else reject(error);
-            });
-          })
-        : isAlive(pid);
+      typeof record.probe === 'string' ? await probeAnswers(record.probe) : isAlive(pid);
     if (
       !alive &&
       typeof record.token === 'string' &&

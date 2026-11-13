@@ -1,7 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
-import type { ActionStep } from '../components/chat/trace-steps.js';
 import type { DiffFile, TodoRecord, TranscriptItem, WorkStep } from '../fixtures/records.js';
-import type { TaskItem } from '../lib/markdown.js';
 
 export type EngineRunState = 'running' | 'waiting' | 'finished' | 'failed' | 'taken_over';
 export type EngineAnswer = 'allowed' | 'refused';
@@ -61,14 +59,6 @@ export type EngineRunStage = ComponentType<{
   children: (view: EngineRunView) => ReactNode;
 }>;
 
-export const ENGINE_STATE_WORDS = {
-  running: '运行中',
-  waiting: '等你输入',
-  finished: '已完成',
-  failed: '失败',
-  taken_over: '你已接管',
-} as const satisfies Record<EngineRunState, string>;
-
 export const ENGINE_CHOICE_WORDS = {
   modelTier: { inexpensive: '经济模型', mid: '中档模型', strong: '强模型' },
   effort: { low: '低强度', medium: '中等强度', high: '高强度' },
@@ -79,34 +69,8 @@ export function engineCost(costUsd: number | null): string | null {
   return `$${costUsd < 0.01 && costUsd > 0 ? costUsd.toFixed(4) : costUsd.toFixed(2)}`;
 }
 
-const ENGINE_TAIL_EVENTS = 5;
-
-export function engineEarlierCount(total: number): number {
-  return total > ENGINE_TAIL_EVENTS + 1 ? total - ENGINE_TAIL_EVENTS : 0;
-}
-
 export function engineCanTakeOver(state: EngineRunState): boolean {
   return state === 'running' || state === 'waiting';
-}
-
-export function enginePlanItems(plan: readonly EnginePlanStep[]): TaskItem[] {
-  return plan.map((step) => ({
-    state: step.state,
-    segments: [{ text: step.text }],
-    blocks: [],
-  }));
-}
-
-export function engineTraceStep(event: Extract<EngineEvent, { kind: 'read' | 'run' }>): ActionStep {
-  return event.kind === 'read'
-    ? { kind: 'read', path: event.path, lines: event.lines, secs: event.seconds }
-    : {
-        kind: 'run',
-        command: event.command,
-        exit: event.exit,
-        output: event.output,
-        secs: event.seconds,
-      };
 }
 
 const settled = { error: false, running: false, unfinished: false } as const;

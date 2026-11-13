@@ -1,6 +1,8 @@
 import { expect, type Page, test } from '@playwright/test';
+import { HISTORY, mockLive, PROJECT } from './chief-home-mock';
 
 const HOME = '/app?scenario=home-c';
+const MIDDAY_IN_BEIJING = Date.UTC(2026, 10, 12, 4);
 
 const chip = (page: Page) => page.getByTestId('machines-button');
 const panel = (page: Page) => page.getByRole('complementary', { name: '电脑' });
@@ -30,7 +32,7 @@ test('the chip opens a list with one row per computer, the Coordinator machine f
   const rows = panel(page).getByRole('button', { name: /xmonsMac|omarchy/ });
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toContainText('xmonsMac');
-  await expect(rows.nth(0)).toContainText('在线 · 2/8 在跑');
+  await expect(rows.nth(0)).toHaveText('xmonsMac2 个在跑');
   await expect(rows.nth(0)).not.toContainText('Coordinator');
   await expect(rows.nth(1)).toContainText('omarchy');
   await expect(rows.nth(1)).toContainText('离线');
@@ -123,6 +125,7 @@ test('the icon-only header buttons show a tooltip with their name on hover', asy
 test('computers share one group, each glyph carries its status dot, and the add row is outlined', async ({
   page,
 }) => {
+  await page.clock.setFixedTime(MIDDAY_IN_BEIJING);
   await page.goto('/app?scenario=home-c-machines&pane=machines');
   const group = panel(page).locator('[data-slot="list-card"]').filter({ hasText: 'xmonsMac' });
   await expect(group).toHaveCount(1);
@@ -135,7 +138,7 @@ test('computers share one group, each glyph carries its status dot, and the add 
   await expect(dots.nth(1)).toHaveAttribute('data-online', 'false');
   await expect(dots.nth(2)).toHaveAttribute('data-online', 'true');
   await expect(dots.nth(3)).toHaveAttribute('data-online', 'false');
-  await expect(rows.nth(3)).toContainText(/^Office Mac mini12\d 分钟前检查过$/);
+  await expect(rows.nth(3)).toHaveText('Office Mac mini离线 · 2 小时前');
   await expect(group).toHaveAttribute('data-outlined', 'true');
   await expect(panel(page).getByTestId('machines-add').locator('[data-slot="list-card"]')).toHaveAttribute(
     'data-outlined',
@@ -171,14 +174,15 @@ test('re-checking shows a spinner in place of the label and keeps the button nam
 
 const REF = '/app?scenario=sessions-ref&pane=machines';
 
-test('the reference list shows folder counts online and the minutes since the last check offline', async ({
+test('the reference list says what runs on an online computer and how long an offline one has been away', async ({
   page,
 }) => {
+  await page.clock.setFixedTime(MIDDAY_IN_BEIJING);
   await page.goto(REF);
   const rows = panel(page).getByTestId('machine-list-row');
   await expect(rows).toHaveCount(2);
-  await expect(rows.nth(0)).toHaveText('工作室的 MacBook Air在线 · 2 个文件夹');
-  await expect(rows.nth(1)).toHaveText(/^办公室 Mac mini11[45] 分钟前检查过$/);
+  await expect(rows.nth(0)).toHaveText('工作室的 MacBook Air2 个在跑');
+  await expect(rows.nth(1)).toHaveText(/^办公室 Mac mini离线 · \d+ (分钟|小时)前$/);
   await expect(panel(page).getByRole('button', { name: /云|cloud/i })).toHaveCount(0);
 });
 
@@ -228,4 +232,34 @@ test('a live computer without the running list falls back to its running count o
   await panel(page).getByRole('tab', { name: 'Agent 的权限' }).click();
   await expect(panel(page).getByText('Agent 在这台电脑上能用的文件夹')).toBeVisible();
   await expect(panel(page).getByTestId('machine-folders-empty')).toHaveText('还没有开放任何文件夹');
+});
+
+test('a live computer lists the threads the server reports running on it', async ({ page }) => {
+  const startedAt = Date.now() - 20 * 60_000;
+  await mockLive(page, {
+    threads: [],
+    messages: HISTORY,
+    machines: [
+      {
+        id: 'm1',
+        name: 'omarchy',
+        online: true,
+        kind: 'remote',
+        enabledRuntimes: ['pi'],
+        runningSteps: 2,
+        running: [
+          { threadId: 'todo-1', title: 'Orb canary round 7', projectId: PROJECT.id, startedAt },
+          { threadId: 'todo-2', title: 'Serif greeting fix', projectId: PROJECT.id, startedAt },
+        ],
+      },
+    ],
+  });
+  await page.goto('/app?pane=machines');
+  await panel(page).getByRole('button', { name: /omarchy/ }).click();
+  await panel(page).getByRole('tab', { name: '在这台工作' }).click();
+  const running = panel(page).getByTestId('machine-running-row');
+  await expect(running).toHaveCount(2);
+  await expect(running.first()).toContainText('Orb canary round 7');
+  await expect(running.first()).toContainText('cairn');
+  await expect(panel(page).getByTestId('machine-running-empty')).toHaveCount(0);
 });

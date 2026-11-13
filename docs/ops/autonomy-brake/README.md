@@ -13,7 +13,7 @@ node scripts/autonomy-brake.mjs verify-recovery 123
 
 `status` prints JSON. `pause` creates the label if absent and reuses an existing open marker. `sweep` paginates all open PRs, disarms every armed auto-merge, prints each result, and exits nonzero after trying the remaining PRs if any disarm fails. Closing a marker never re-arms previously disarmed PRs.
 
-The GitHub Actions workflow runs independently of omarchy. A first failed `ci` attempt on main reruns that run's failed jobs. A later failed attempt of the same SHA publishes the SHA and run URL, then sweeps. An unpaused sweep removes `dequeued` and posts `@mergifyio requeue` when Mergify left only because `autonomy-brake` failed. Scheduled and manual runs sweep only while paused. The required `pr-evidence` job checks the brake before its body checks. A brake lookup error fails closed and uses the existing failure disarm step.
+The GitHub Actions workflow runs independently of omarchy. A first failed `ci` attempt on main reruns that run's failed jobs. A later failed attempt of the same SHA publishes the SHA and run URL, then sweeps. An unpaused sweep posts `@mergifyio requeue` on a `dequeued` PR when Mergify's latest payload says it left with `CHECKS_FAILED` only because of `autonomy-brake`, or, when the payload names no other check than `autonomy-brake` or `pr-evidence`, its `left_at` falls while an `autonomy-paused` marker was open (#4125). It asks again after Mergify refuses a command and leaves the label to Mergify. `.mergify.yml` lets `github-actions[bot]` run `requeue`, and only that command. Scheduled and manual runs sweep only while paused. The required `pr-evidence` job checks the brake before its body checks. A brake lookup error fails closed and uses the existing failure disarm step.
 
 A labelled `cairn-recovery` PR targeting main can pass the brake only with one commit naming full reverted SHAs in `This reverts commit <sha>` lines. The verifier finds the latest successful GitHub Actions `check` along main's first-parent history, requires every reverted SHA after it, and reconstructs the revert in a temporary clone at the PR base SHA, newest revert first. Git tree identity includes file bytes, paths, modes, and symlinks. Merge commits are reverted against their first parent. Missing checks, GitHub errors, conflicts, extra files, or changed bytes reject the exception. Body, decision, and other required checks still apply.
 
@@ -62,12 +62,11 @@ GITHUB_REPOSITORY=owner/repository node scripts/coordinator-merge.mjs 123 124
 
 For each PR it polls up to 90 times, 60 seconds apart (`COORDINATOR_MERGE_ITERATIONS`, `COORDINATOR_MERGE_INTERVAL_MS`). Each iteration reads the current head; a `gh` or network error, or an empty head, retries on the next iteration and never changes state. It merges only when all of these hold on the current head:
 
-- The newest `review-gate` check run from GitHub Actions on the head succeeded. Check runs from other apps are ignored; a failed run stops the helper with a nonzero exit, and one still in progress keeps it waiting.
 - Every `gh` call targets the repository named by `GITHUB_REPOSITORY` (`-R`), whatever `GH_REPO` or the checkout says.
 - At least 4 required checks are present and every one is success or skipped.
 - No `autonomy-paused` issue is open. A failed marker lookup counts as paused.
 
-The squash merge uses the first commit's subject plus ` (#n)`, the first commit's body plus every `closes|fixes|resolves #N` line from all commits that the body does not already contain, and `--match-head-commit <head>`. It then prints the PR state and merge SHA. If the head moves after a pass, the next iteration waits for the new head's `review-gate` check. Exit is nonzero if any PR is blocked, times out, or fails to merge.
+The squash merge uses the first commit's subject plus ` (#n)`, the first commit's body plus every `closes|fixes|resolves #N` line from all commits that the body does not already contain, and `--match-head-commit <head>`. It then prints the PR state and merge SHA. If the head moves between the checks and the merge, the next iteration judges the new head. No review verdict or label is read. Exit is nonzero if any PR times out or fails to merge.
 
 ```sh
 node --test scripts/coordinator-merge.test.mjs

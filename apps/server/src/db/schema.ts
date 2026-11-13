@@ -44,6 +44,7 @@ import type {
   RouteUse,
   ScheduleKind,
   ScheduleReport,
+  SecretDelivery,
   ShipRoute,
   SkillInjectionRecord,
   SnoozeMode,
@@ -256,6 +257,7 @@ export const build = sqliteTable('build', {
     .references(() => todo.id, { onDelete: 'cascade' }),
   withPlan: bool('withPlan').notNull(),
   prevPhase: text('prevPhase').$type<Phase | null>(),
+  afterStopPhase: text('afterStopPhase').$type<'done' | 'keep' | null>(),
   triggerSource: text('triggerSource').$type<TriggerSource>().notNull(),
   scheduledBy: text('scheduledBy'),
   planDocId: text('planDocId'),
@@ -658,12 +660,6 @@ export const dataMigration = sqliteTable('data_migration', {
   detail: text('detail').notNull(),
 });
 
-export const memorySaveConflict = sqliteTable('memory_save_conflict', {
-  id: text('id').primaryKey(),
-  candidateIds: json<string[]>('candidateIds').notNull(),
-  createdAt: epochMs('createdAt').notNull(),
-});
-
 export const memoryCandidate = sqliteTable(
   'memory_candidate',
   {
@@ -781,16 +777,30 @@ export const provider = sqliteTable('provider', {
   updatedAt: epochMs('updatedAt').notNull(),
 });
 
-export const secret = sqliteTable('secret', {
-  id: text('id').primaryKey(),
-  teamId: text('teamId')
-    .notNull()
-    .references(() => team.id),
-  projectId: text('projectId').references(() => project.id),
-  name: text('name').notNull(),
-  description: text('description'),
-  valueCipher: text('valueCipher'),
-});
+export const secret = sqliteTable(
+  'secret',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    projectId: text('projectId').references(() => project.id),
+    name: text('name').notNull(),
+    description: text('description'),
+    valueCipher: text('valueCipher'),
+    delivery: text('delivery').$type<SecretDelivery>().notNull().default('plaintext'),
+    httpOrigin: text('httpOrigin'),
+    httpHeader: text('httpHeader'),
+    httpTemplate: text('httpTemplate'),
+    policyRevision: integer('policyRevision').notNull().default(1),
+  },
+  (t) => [
+    check(
+      'secret_delivery_policy',
+      sql`(${t.delivery} = 'http' AND ${t.httpOrigin} IS NOT NULL AND ${t.httpHeader} IS NOT NULL AND ${t.httpTemplate} IS NOT NULL) OR (${t.delivery} = 'plaintext' AND ${t.httpOrigin} IS NULL AND ${t.httpHeader} IS NULL AND ${t.httpTemplate} IS NULL)`,
+    ),
+  ],
+);
 
 export const apiKey = sqliteTable('api_key', {
   id: text('id').primaryKey(),

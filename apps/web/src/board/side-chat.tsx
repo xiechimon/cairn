@@ -22,8 +22,8 @@ import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
-import { EngineCard, EngineRawView, EngineRunRow, EngineRunTail } from './engine-card.js';
 import { type EngineRunView, engineTranscript } from './engine-run.js';
+import { EngineRawView, EngineRunTail } from './engine-run-view.js';
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { STATUS_WORDS } from './status-words.js';
@@ -168,12 +168,7 @@ function SourceLine({
   );
 }
 
-type ThreadView = 'chat' | 'changes' | 'raw' | 'engine';
-
-const ENGINE_DRAFT =
-  typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('engine');
-const ENGINE_AS_ROW = ENGINE_DRAFT === 'row';
-const ENGINE_AS_CARD = ENGINE_DRAFT !== 'row' && ENGINE_DRAFT !== 'inline';
+type ThreadView = 'chat' | 'changes' | 'raw';
 
 function ChangesView({ chat, now }: { chat: ThreadChat; now: number }) {
   const { t } = useI18n();
@@ -257,7 +252,6 @@ function ThreadBody({
   view,
   onViewChanges,
   onViewRaw,
-  onViewEngine,
   now,
   updates,
   origin,
@@ -273,7 +267,6 @@ function ThreadBody({
   view: ThreadView;
   onViewChanges: () => void;
   onViewRaw: () => void;
-  onViewEngine: () => void;
   now: number;
   updates: ThreadUpdates | null;
   origin: ThreadOrigin | null;
@@ -302,13 +295,10 @@ function ThreadBody({
         <ChangesView chat={chat} now={now} />
       ) : (
         <TranscriptColumn
-          transcript={
-            engine === undefined || ENGINE_AS_CARD || (ENGINE_AS_ROW && view !== 'engine')
-              ? chat.transcript
-              : view === 'engine'
-                ? engineTranscript(engine.run)
-                : [...chat.transcript, ...engineTranscript(engine.run)]
-          }
+          transcript={[
+            ...chat.transcript.filter((item) => item.kind !== 'plan'),
+            ...(engine === undefined ? [] : engineTranscript(engine.run)),
+          ]}
           liveStep={null}
           agent={null}
           onOpenPlan={onOpenPlan}
@@ -327,24 +317,8 @@ function ThreadBody({
             chat.changes.status === 'error' ? (
               <>
                 {engine?.controls}
-                {engine !== undefined && ENGINE_AS_CARD && (
-                  <EngineCard
-                    run={engine.run}
-                    actions={engine.actions}
-                    className={engine.controls != null ? 'mt-2' : undefined}
-                  />
-                )}
-                {engine !== undefined && !ENGINE_AS_CARD && (
-                  <>
-                    {ENGINE_AS_ROW && view !== 'engine' && (
-                      <EngineRunRow run={engine.run} onOpen={onViewEngine} />
-                    )}
-                    <EngineRunTail
-                      run={engine.run}
-                      actions={engine.actions}
-                      {...(ENGINE_AS_ROW && view !== 'engine' ? {} : { onViewRaw })}
-                    />
-                  </>
+                {engine !== undefined && (
+                  <EngineRunTail run={engine.run} actions={engine.actions} onViewRaw={onViewRaw} />
                 )}
                 {(chat.changes.status === 'ready' || chat.changes.status === 'error') && (
                   <ChangesCard changes={chat.changes} onOpen={onViewChanges} />
@@ -390,11 +364,10 @@ function ThreadBody({
               ? t('已关闭，不能再回复')
               : chat.started
                 ? t('回复这个任务')
-                : t('开始后才能回复 #{seq}', { seq: todo.seqNum })
+                : t('开始后才能回复')
           }
           aiReview={false}
           streaming={chat.running}
-          workingFor={chat.workingFor}
           editable={chat.send !== undefined}
           readOnly={chat.locked}
           draft={draft}
@@ -454,7 +427,7 @@ export function SideChat({
     searchParams.get(VIEW_PARAM) === 'changes' ? 'changes' : 'chat',
   );
   const view = chosenView === 'changes' && chat.changes.status === 'none' ? 'chat' : chosenView;
-  const showsChanges = view === 'changes';
+  const showsSubView = view !== 'chat';
   const Stage = chat.engineStage;
   const thread = (engine: EngineRunView | undefined) =>
     todo == null ? null : (
@@ -497,12 +470,12 @@ export function SideChat({
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
       if (document.querySelector(OPEN_SURFACE) !== null) return;
-      if (showsChanges) setView('chat');
+      if (showsSubView) setView('chat');
       else onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, showsChanges]);
+  }, [onClose, showsSubView]);
 
   return (
     <SidePanel
@@ -575,18 +548,12 @@ function ReadyThread({
       <Head
         todoId={todo.id}
         todo={todo}
-        onBack={
-          view === 'raw' && ENGINE_AS_ROW
-            ? () => onView('engine')
-            : view !== 'chat'
-              ? () => onView('chat')
-              : onClose
-        }
+        onBack={view !== 'chat' ? () => onView('chat') : onClose}
         backLabel={view !== 'chat' ? t('返回对话') : t('返回')}
         onClose={onCloseAll}
         menu={actions.menu}
         titleExtra={<ThreadAutomations key={todo.id} todo={todo} now={now} />}
-        tooltip={`#${todo.seqNum} ${todo.title}`}
+        tooltip={todo.title}
       >
         <StatusLine
           todo={todo}
@@ -610,7 +577,6 @@ function ReadyThread({
         view={view}
         onViewChanges={() => onView('changes')}
         onViewRaw={() => onView('raw')}
-        onViewEngine={() => onView('engine')}
         now={now}
         updates={updates}
         origin={origin}
@@ -635,7 +601,7 @@ function ReadyThread({
         onClose={() => setPlanOpen(false)}
         size="l"
         title={t('方案')}
-        subtitle={`#${todo.seqNum} ${todo.title}`}
+        subtitle={todo.title}
       >
         <div data-testid="side-chat-plan" className="flex h-[min(70vh,720px)] min-h-0 flex-col">
           <DocPane
@@ -675,10 +641,7 @@ function Head({
 }) {
   const { t } = useI18n();
   const title = (
-    <h2
-      aria-label={todo != null ? `#${todo.seqNum} ${todo.title}` : undefined}
-      className="m-0 min-w-0 truncate text-ui leading-5 font-normal text-foreground"
-    >
+    <h2 className="m-0 min-w-0 truncate text-ui leading-5 font-normal text-foreground">
       {todo != null ? todo.title : t('任务')}
     </h2>
   );

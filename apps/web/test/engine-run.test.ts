@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  engineCanTakeOver,
-  engineCost,
-  engineEarlierCount,
-  enginePlanItems,
-} from '../src/board/engine-run.js';
+import { engineCanTakeOver, engineCost } from '../src/board/engine-run.js';
+import { earlierStepCount } from '../src/detail/work-trace.js';
 import {
   ENGINE_SCRIPTS,
   enginePhase,
@@ -30,14 +26,8 @@ describe('engine run view model', () => {
     ).toEqual([true, true, false, false, false]);
   });
 
-  it('folds earlier events only when more than one would hide', () => {
-    expect([0, 5, 6, 7, 25].map(engineEarlierCount)).toEqual([0, 0, 0, 2, 20]);
-  });
-
-  it('maps plan steps onto checklist items', () => {
-    expect(enginePlanItems([{ text: 'Run the tests', state: 'doing' }])).toEqual([
-      { state: 'doing', segments: [{ text: 'Run the tests' }], blocks: [] },
-    ]);
+  it('folds earlier steps only when more than one would hide', () => {
+    expect([0, 5, 6, 7, 25].map(earlierStepCount)).toEqual([0, 0, 0, 2, 20]);
   });
 });
 

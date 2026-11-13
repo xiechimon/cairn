@@ -15,9 +15,7 @@ import {
   IN_PROGRESS_PHASES,
   isChiefConversationId,
   isWaitingPhase,
-  MEMORY_LAYERS,
   MERGE_HUMAN_ONLY_COPY,
-  type MemoryLayer,
   MODEL_SOURCE_RUNTIME_LABELS,
   SUGGEST_REPLIES_TOOL_NAME,
   snoozeTodoBodySchema,
@@ -69,13 +67,7 @@ import { readFillableProfile } from './job-applications.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { refuseMailTurnTool } from './mail.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
-import {
-  deleteMemoryEntry,
-  listMemoryEntries,
-  saveMemoryEntry,
-  searchMemoryEntries,
-  updateMemoryEntry,
-} from './memory.js';
+import { executeMemoryDocumentTool } from './memory-documents.js';
 import { notifyChiefMessage } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
@@ -157,22 +149,6 @@ function num(params: Params, key: string): number | undefined {
   }
   return v;
 }
-function bool(params: Params, key: string, fallback: boolean): boolean {
-  const v = params[key];
-  if (v === undefined || v === null) return fallback;
-  if (typeof v !== 'boolean') throw new HttpError(400, `invalid params.${key}: expected boolean`);
-  return v;
-}
-
-function memoryLayer(params: Params): MemoryLayer {
-  const v = params.layer;
-  if (v === undefined || v === null) return 'core';
-  if (typeof v !== 'string' || !(MEMORY_LAYERS as readonly string[]).includes(v)) {
-    throw new HttpError(400, 'invalid params.layer');
-  }
-  return v as MemoryLayer;
-}
-
 function json(result: unknown): string {
   return JSON.stringify(result ?? null);
 }
@@ -750,6 +726,18 @@ export async function executeChiefTool(
       const existing = listSecrets(keysvc, ctx.teamId).find(
         (s) => s.name === name && s.projectId === projectId,
       );
+      if (
+        listSecrets(keysvc, ctx.teamId).some(
+          (s) =>
+            s.name === name &&
+            s.delivery === 'http' &&
+            (s.projectId === null || projectId === null || s.projectId === projectId),
+        )
+      )
+        throw new HttpError(
+          400,
+          `secret ${name} uses http delivery and can only be changed in settings`,
+        );
       const value = str(params, 'value');
       const description = optStr(params, 'description') ?? null;
       if (existing) {
@@ -914,75 +902,26 @@ export async function executeChiefTool(
       );
       return json({ notified: true });
     }
-    case 'save_memory': {
+    case 'save_memory':
+    case 'update_memory':
+    case 'delete_memory':
+    case 'memories': {
       if (ctx.chiefAgentId === null)
         throw new HttpError(409, 'no coordinator routing rule — memory has no store');
-      const explicitProject = optStr(params, 'projectId');
-      if (explicitProject === undefined && ctx.turnScopeMixed === true) {
-        throw new HttpError(
-          400,
-          'this turn now covers more than one project: pass projectId so the memory lands in the right project',
-        );
-      }
-      const projectId = explicitProject ?? ctx.turnScopeProjectId ?? null;
-      const sourceTodoId = optStr(params, 'sourceTodoId') ?? null;
-      if (projectId !== null) {
-        requireProjectRow(db, projectId, ctx.teamId);
-        requireUnarchivedTargets(db, ctx.teamId, name, { projectId });
-      }
-      if (sourceTodoId !== null) requireTeamTodo(db, sourceTodoId, ctx.teamId);
-      const layer = memoryLayer(params);
-      const row = saveMemoryEntry(db, {
-        agentId: ctx.chiefAgentId,
-        teamId: ctx.teamId,
-        title: str(params, 'title'),
-        content: str(params, 'content'),
-        force: bool(params, 'force', false),
-        projectId,
-        sourceTodoId,
-        sourceBuildId: ctx.conversationId,
-        source: 'Coordinator',
-        layer,
-        threadId: layer === 'scratchpad' ? ctx.threadId : null,
-      });
-      return json(row);
-    }
-    case 'update_memory': {
-      const memoryId = str(params, 'memoryId');
-      if (ctx.chiefAgentId === null) throw new HttpError(404, `memory ${memoryId}`);
       return json(
-        updateMemoryEntry(db, {
-          memoryId,
-          agentId: ctx.chiefAgentId,
-          teamId: ctx.teamId,
-          threadId: ctx.threadId,
-          content: str(params, 'content'),
-        }),
+        executeMemoryDocumentTool(
+          db,
+          {
+            agentId: ctx.chiefAgentId,
+            teamId: ctx.teamId,
+            projectId: ctx.turnScopeProjectId ?? null,
+            source: 'Coordinator',
+            sourceBuildId: ctx.conversationId,
+          },
+          name,
+          params,
+        ),
       );
-    }
-    case 'delete_memory': {
-      const memoryId = str(params, 'memoryId');
-      const removed =
-        ctx.chiefAgentId === null
-          ? 0
-          : deleteMemoryEntry(db, {
-              memoryId,
-              agentId: ctx.chiefAgentId,
-              teamId: ctx.teamId,
-              threadId: ctx.threadId,
-            });
-      if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
-      return json({ deleted: memoryId });
-    }
-    case 'memories': {
-      if (ctx.chiefAgentId === null) return json([]);
-      const entries = listMemoryEntries(
-        db,
-        { agentId: ctx.chiefAgentId, teamId: ctx.teamId, threadId: ctx.threadId },
-        bool(params, 'includeInvalid', false),
-      );
-      const query = optStr(params, 'query');
-      return json(query === undefined ? entries : searchMemoryEntries(entries, query));
     }
     case 'watch_todos': {
       const todoIds = strArr(params, 'todoIds');
@@ -1175,66 +1114,27 @@ export async function executeWorkerMemoryTool(
   params: Params,
 ): Promise<string> {
   switch (name) {
-    case 'save_memory': {
-      const projectId = optStr(params, 'projectId');
-      const sourceTodoId = optStr(params, 'sourceTodoId');
-      if (projectId !== undefined) requireProjectRow(db, projectId, ctx.teamId);
-      if (sourceTodoId !== undefined) requireTeamTodo(db, sourceTodoId, ctx.teamId);
-      const layer = memoryLayer(params);
-      const row = saveMemoryEntry(db, {
-        agentId: ctx.agentId,
-        teamId: ctx.teamId,
-        title: str(params, 'title'),
-        content: str(params, 'content'),
-        force: bool(params, 'force', false),
-        projectId: projectId ?? ctx.projectId,
-        sourceTodoId: sourceTodoId ?? ctx.todoId,
-        sourceBuildId: ctx.buildId,
-        source: ctx.sourceName,
-        layer,
-        threadId: layer === 'scratchpad' ? ctx.todoId : null,
-        teamScoped: ctx.teamScoped,
-      });
-      return json(row);
-    }
-    case 'update_memory': {
+    case 'save_memory':
+    case 'update_memory':
+    case 'delete_memory':
+    case 'memories':
       return json(
-        updateMemoryEntry(db, {
-          memoryId: str(params, 'memoryId'),
-          agentId: ctx.agentId,
-          teamId: ctx.teamId,
-          threadId: ctx.todoId,
-          content: str(params, 'content'),
-          teamScoped: ctx.teamScoped,
-        }),
-      );
-    }
-    case 'delete_memory': {
-      const memoryId = str(params, 'memoryId');
-      const removed = deleteMemoryEntry(db, {
-        memoryId,
-        agentId: ctx.agentId,
-        teamId: ctx.teamId,
-        threadId: ctx.todoId,
-        teamScoped: ctx.teamScoped,
-      });
-      if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
-      return json({ deleted: memoryId });
-    }
-    case 'memories': {
-      return json(
-        listMemoryEntries(
+        executeMemoryDocumentTool(
           db,
           {
             agentId: ctx.agentId,
             teamId: ctx.teamId,
-            threadId: ctx.todoId,
+            projectId: ctx.projectId,
             teamScoped: ctx.teamScoped,
+            workerScope: true,
+            source: ctx.sourceName,
+            sourceTodoId: ctx.todoId,
+            sourceBuildId: ctx.buildId,
           },
-          bool(params, 'includeInvalid', false),
+          name,
+          params,
         ),
       );
-    }
     case 'attachment': {
       const attachmentId = resolveToolAttachmentId(db, ctx.teamId, str(params, 'attachmentId'));
       if (!todoAuthorizesAttachment(db, ctx.todoId, attachmentId)) {

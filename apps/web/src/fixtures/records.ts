@@ -406,7 +406,6 @@ export type TranscriptItem =
       skills?: SkillFact[];
     }
   | { kind: 'skills'; read: string[]; denied: string[] }
-  | { kind: 'injected-skills'; skills: { id: string; reason: string }[] }
   | { kind: 'plan'; title: string; preview: string; seconds?: number; createdAt?: number }
   | { kind: 'work'; id: string; steps: WorkStep[]; expanded?: boolean; createdAt?: number }
   | { kind: 'elapsed'; seconds: number }
@@ -556,7 +555,6 @@ export interface ChiefSegment {
   text: string;
   code?: boolean;
   todo?: number;
-  agent?: string;
   strong?: boolean;
 }
 
@@ -593,6 +591,8 @@ export type ChiefStreamItem =
       id?: string;
       markdown?: string;
       pending?: 'queued' | 'held';
+      delivery?: 'sending';
+      outboxKey?: string;
       at?: string;
       createdAt?: number;
       projectId?: string | null;

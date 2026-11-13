@@ -77,13 +77,10 @@ function TaskIcon({ state }: { state: TaskState }) {
   );
 }
 
-export function TaskCard({ items, bare = false }: { items: TaskItem[]; bare?: boolean }) {
+export function TaskCard({ items }: { items: TaskItem[] }) {
   return (
     <ul
-      className={cn(
-        'flex list-none flex-col gap-2 font-sans font-normal',
-        !bare && 'rounded-2xl border border-(--border) bg-(--card) px-4 py-3.5 shadow-sm',
-      )}
+      className="flex list-none flex-col gap-2 rounded-2xl border border-(--border) bg-(--card) px-4 py-3.5 font-sans font-normal shadow-sm"
       data-testid="md-tasks"
     >
       {items.map((item, i) => (
@@ -491,6 +488,8 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
 
 export const REPLY_BUBBLE_CLS =
   'w-fit max-w-[min(100%,var(--container-reply-bubble))] rounded-(--radius-reply) bg-(--reply-bubble-fill) px-3.5 py-1.75';
+export const REPLY_BLOCK_CLS =
+  'group/reply-block relative w-fit max-w-[min(100%,var(--container-reply-bubble))]';
 
 function ReplyGroup({
   group,
@@ -503,7 +502,7 @@ function ReplyGroup({
 }) {
   return (
     <div
-      className="group/reply-block relative w-fit max-w-full"
+      className={group.bubble ? REPLY_BLOCK_CLS : 'group/reply-block relative w-fit max-w-full'}
       data-slot="reply-block"
       data-bubble={group.bubble ? 'true' : 'false'}
     >

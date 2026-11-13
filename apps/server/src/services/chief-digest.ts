@@ -55,7 +55,6 @@ import {
 import { coordinatorServerContextEnabled } from './coordinator-context.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { listMemoryEntries, saveMemoryEntry } from './memory.js';
 import {
   applyMemoryPass,
   MEMORY_PASS_MARK,
@@ -63,6 +62,7 @@ import {
   memoryPassSection,
   withMemoryPass,
 } from './memory-consolidation.js';
+import { rememberMemoryFile } from './memory-documents.js';
 import type { VapidKeys } from './push.js';
 import { coordinatorProfile } from './routing-rules.js';
 import { serverTimezone } from './schedules.js';
@@ -88,7 +88,7 @@ const GITHUB_READ_TOOLS: ReadonlySet<string> = new Set([
   'workflow_runs',
 ]);
 const READ_TOOLS: ReadonlySet<string> = new Set(
-  CHIEF_TOOL_CATEGORIES.read.filter((name) => !GITHUB_READ_TOOLS.has(name)),
+  [...CHIEF_TOOL_CATEGORIES.read, 'memories'].filter((name) => !GITHUB_READ_TOOLS.has(name)),
 );
 
 export const CHIEF_DIGEST_REMOTE_TOOLS = CHIEF_REMOTE_TOOLS.filter((t) => READ_TOOLS.has(t.name));
@@ -619,7 +619,9 @@ export function finishChiefDigest(
         ? (parsed as { memory?: unknown }).memory
         : undefined;
     if (owner !== undefined && agentId !== undefined && memory !== undefined) {
-      applyMemoryPass(db, { teamId: owner.teamId, agentId }, memory, now);
+      const result = applyMemoryPass(db, { teamId: owner.teamId, agentId }, memory, now);
+      if (result.skipped > 0)
+        db.update(step).set({ status: 'failed' }).where(eq(step.id, stepRow.id)).run();
     }
   }
   if (!ok) return;
@@ -643,23 +645,18 @@ export function finishChiefDigest(
         ...item,
         memory: { id, agentId: rememberAs },
       });
-      const entry = {
-        ...scope,
-        title: item.text.slice(0, 40),
-        content: item.text,
-        projectId: null,
-        sourceTodoId: null,
-        sourceBuildId: null,
-      };
       try {
-        const saved = saveMemoryEntry(db, entry);
-        if (!('status' in saved)) return link(saved.id);
-        const forced = saveMemoryEntry(db, { ...entry, force: true });
-        return 'status' in forced ? item : link(forced.id);
+        return link(
+          rememberMemoryFile(
+            db,
+            { ...scope, projectId: null, source: 'digest', sourceBuildId: thread.id },
+            item.text.slice(0, 40).replace(/[\uD800-\uDBFF]$/, ''),
+            item.text,
+          ).id,
+        );
       } catch (err) {
-        if (!(err instanceof HttpError) || err.status !== 409) return item;
-        const same = listMemoryEntries(db, scope).find((row) => row.content === item.text);
-        return same === undefined ? item : link(same.id);
+        if (!(err instanceof HttpError)) throw err;
+        return item;
       }
     }),
   };

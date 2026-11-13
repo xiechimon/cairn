@@ -13,7 +13,7 @@ test('CDS composer: 14px radius, shadow-composer ladder, 8px send, 384 max-h', a
     const composerShadow = getComputedStyle(probe).boxShadow;
     probe.remove();
     const root = getComputedStyle(document.documentElement);
-    const send = el.querySelector('.composer-send');
+    const send = el.querySelector('.composer-send, .composer-stop');
     const sendCs = send ? getComputedStyle(send) : null;
     return {
       radius: cs.borderTopLeftRadius,

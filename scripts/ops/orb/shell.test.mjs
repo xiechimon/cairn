@@ -9,6 +9,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -81,7 +82,7 @@ if (cmd === 'findmnt' && existsSync(join(root, 'active-mount'))) {
 }
 if (cmd === 'mv') {
   if (process.env.FAIL_PUBLISH && args.at(-2).includes('.cairn-orb-build.')) process.exit(1);
-  if (existsSync(args.at(-1))) process.exit(1);
+  if (!args.includes('-f') && existsSync(args.at(-1))) process.exit(1);
   renameSync(args.at(-2), args.at(-1));
 }
 if (cmd === 'arch-chroot') {
@@ -1200,10 +1201,21 @@ test('computer image builds from the base with the host mirrorlist read-only and
     assert.doesNotMatch(desktop, /-rfbport [1-9]/);
     assert.equal(existsSync(join(f.image, 'etc/cairn-orb-image')), false);
     assert.match(readFileSync(join(f.image, 'etc/cairn-orb-computer-image'), 'utf8'), /^recipe=/);
+    const published = join(f.root, 'var/lib/cairn-orb/computer-image');
+    assert.equal(
+      readFileSync(published, 'utf8'),
+      readFileSync(join(f.image, 'etc/cairn-orb-computer-image'), 'utf8'),
+    );
+    assert.equal(statSync(published).mode & 0o777, 0o644);
     assert.deepEqual(f.stages(), []);
+    rmSync(published);
     const second = f.run('build-computer-image.sh');
     assert.equal(second.status, 0, second.stderr);
     assert.equal(second.stdout.trim(), '0 changes');
+    assert.equal(
+      readFileSync(published, 'utf8'),
+      readFileSync(join(f.image, 'etc/cairn-orb-computer-image'), 'utf8'),
+    );
     writeFileSync(
       join(f.root, 'var/lib/machines/cairn-orb-base/etc/cairn-orb-image'),
       'recipe=r2\nclaude=2.1.302\ncodex=0.163.0\npnpm=10.0.0\nnode_major=26\nagent_uid=1000',

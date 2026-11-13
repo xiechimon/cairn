@@ -18,7 +18,6 @@ import {
   InputSection,
   TooltipSection,
 } from './components-controls.js';
-import { EngineCardSection } from './components-engine.js';
 import { IdentitySection, StreamSection, StructureSection } from './components-more.js';
 import { DialogSection, MenuSection, ToastSection } from './components-overlays.js';
 import { PanelSection } from './components-panel.js';
@@ -123,7 +122,6 @@ const NAV = [
       ['permission', 'Permission and proposal'],
       ['plan', 'Plan approval, usage'],
       ['thread-usage', 'Thread usage'],
-      ['engine-card', 'Engine card'],
       ['pr-bar', 'Pull request bar'],
       ['pr-card', 'PR card'],
       ['pr-list', 'PR list'],
@@ -241,7 +239,6 @@ function GallerySections({ theme }: { theme: GalleryTheme }) {
       <PermissionSection />
       <PlanSection />
       <ThreadUsageSection />
-      <EngineCardSection />
       <PrBarSection />
       <PrCardSection />
       <PrListSection />

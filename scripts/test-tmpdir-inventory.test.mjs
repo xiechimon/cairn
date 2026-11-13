@@ -66,8 +66,8 @@ test('allocation inventory preserves each call location on a shared line', () =>
   );
 });
 
-test('every raw mkdtemp site at the documented snapshot is listed in docs/verify/1951/inventory.md', () => {
-  const markdown = readFileSync(resolve(root, 'docs/verify/1951/inventory.md'), 'utf8');
+test('every raw mkdtemp site at the documented snapshot is listed in scripts/test-tmpdir-inventory.md', () => {
+  const markdown = readFileSync(resolve(root, 'scripts/test-tmpdir-inventory.md'), 'utf8');
   const revision = markdown.match(/^Snapshot: origin\/main ([a-f0-9]{40})\./m)?.[1];
   assert.ok(revision, 'inventory must name its full snapshot commit SHA');
   const expected = trackedAllocationSites(root, revision).map(allocationKey).sort();
@@ -126,7 +126,7 @@ test('allocation snapshot reads committed sources despite staged and working tre
 });
 
 test('eval CLI and harness allocations have function-level ownership rather than Vitest hooks', () => {
-  const markdown = readFileSync(resolve(root, 'docs/verify/1951/inventory.md'), 'utf8');
+  const markdown = readFileSync(resolve(root, 'scripts/test-tmpdir-inventory.md'), 'utf8');
   const rows = markdown.split('\n').filter((line) => line.startsWith('| `integration/eval/'));
   assert.equal(rows.length, 8);
   for (const row of rows) {
@@ -136,7 +136,7 @@ test('eval CLI and harness allocations have function-level ownership rather than
 });
 
 test('live verification CLI allocation names stop and process-exit ownership rather than Vitest hooks', () => {
-  const markdown = readFileSync(resolve(root, 'docs/verify/1951/inventory.md'), 'utf8');
+  const markdown = readFileSync(resolve(root, 'scripts/test-tmpdir-inventory.md'), 'utf8');
   const rows = markdown
     .split('\n')
     .filter((line) => line.includes('integration/verify/image-fallback-live.mts'));

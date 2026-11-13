@@ -1,6 +1,8 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
 import { Hono } from 'hono';
+import { compress } from 'hono/compress';
 import type { Logger } from 'pino';
 import type { AppContext } from './context.js';
 import { HttpError } from './lib/errors.js';
@@ -40,11 +42,14 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 const API_PREFIXES = ['/api/', '/git/', '/_mp/'];
+const HASHED_ASSET_PREFIX = 'assets/';
+const HASHED_ASSET_CACHE = 'public, max-age=31536000, immutable';
+const UNHASHED_FILE_CACHE = 'public, max-age=3600';
 
 function registerStaticSpa(app: Hono, webDir: string): void {
   const root = resolve(webDir);
   const indexFile = join(root, 'index.html');
-  app.get('/*', (c) => {
+  app.get('/*', compress(), async (c) => {
     const { pathname } = new URL(c.req.url);
     let decoded: string;
     try {
@@ -63,15 +68,21 @@ function registerStaticSpa(app: Hono, webDir: string): void {
     if (existsSync(filePath) && statSync(filePath).isDirectory()) {
       filePath = join(filePath, 'index.html');
     }
-    let isIndex = false;
     if (!existsSync(filePath) || !statSync(filePath).isFile()) {
       if (!existsSync(indexFile)) return c.json({ error: 'Not found' }, 404);
       filePath = indexFile;
-      isIndex = true;
     }
-    const body = readFileSync(filePath);
+    const isIndex = filePath === indexFile;
+    const body = await readFile(filePath);
     c.header('content-type', CONTENT_TYPES[extname(filePath)] ?? 'application/octet-stream');
-    c.header('cache-control', isIndex ? 'no-cache' : 'public, max-age=3600');
+    c.header(
+      'cache-control',
+      isIndex
+        ? 'no-cache'
+        : rel.startsWith(HASHED_ASSET_PREFIX)
+          ? HASHED_ASSET_CACHE
+          : UNHASHED_FILE_CACHE,
+    );
     return c.body(new Uint8Array(body));
   });
 }

@@ -120,7 +120,7 @@ const conversation: ChiefContent = {
       answers: null,
       questions: [
         {
-          header: 'Credential relay · #74',
+          header: 'Relay model',
           question: 'relay-186 cannot run glm-5.3-flash. Which model should rerun it?',
           options: [
             { label: 'wokey · deepseek-v4.1-flash', description: 'Metered' },

@@ -71,7 +71,13 @@ Proposed cutover, one way for new turns, two way for an unfinished step:
 
 ## Decisions for the owner
 
-Recommended, not taken:
+Recommended, then decided on 2026-11-12: proposed by Claude at ian's delegation and confirmed by ian the same day.
+
+- Item 1 is taken as recommended: thread turns use the Coordinator's connection until a `thread` route is set, and the cost shows in the thread.
+- Item 2 is taken: a Claude Code step that is running at cutover runs to its end.
+- Item 3 is taken: the engine view is read-only first, takeover is built last, and once it exists owner keystrokes may spend the owner's own subscription quota.
+
+The recommendations as written:
 
 1. Thread-turn billing follows the coordinator connection until a `thread` route is set. Confirm the account. This spends money on every thread turn.
 2. Finish in-flight Claude steps rather than killing them at cutover. Reject if those sessions should be abandoned.

@@ -1,0 +1,56 @@
+[heavy-slots] acquired slot 1/2
+
+ RUN  v5.0.1 <worktree>
+
+
+[diag] stub requests consumed: 5
+[diag] daemon.log tail:
+[skills] filtered: computer-use not in injected selection
+[skills] filtered: diagnosing-bugs not in injected selection
+[skills] filtered: great-resume not in injected selection
+[skills] filtered: grill-me not in injected selection
+[skills] filtered: handoff not in injected selection
+[skills] filtered: humanizer-zh not in injected selection
+[skills] filtered: interview not in injected selection
+[skills] filtered: omarchy-app not in injected selection
+[skills] filtered: pr not in injected selection
+[skills] filtered: research not in injected selection
+[skills] filtered: restore-machine not in injected selection
+[skills] filtered: retro not in injected selection
+[skills] filtered: rex not in injected selection
+[skills] filtered: shadcn not in injected selection
+[skills] filtered: built-in-browser not in injected selection
+[skills] filtered: chrome-browser not in injected selection
+[skills] filtered: deep-research not in injected selection
+[skills] filtered: docs not in injected selection
+[skills] filtered: docx not in injected selection
+[skills] filtered: google-workspace not in injected selection
+[skills] filtered: import-memory not in injected selection
+[skills] filtered: morning not in injected selection
+[skills] filtered: pdf not in injected selection
+[skills] filtered: pptx not in injected selection
+[skills] filtered: setup-writing-style not in injected selection
+[skills] filtered: skill-creator not in injected selection
+[skills] filtered: xlsx not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: verify not in injected selection
+[skills] filtered: walk not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] executor record {"backend":"pi","model":"stub-gw/stub-model","harness_sha":"949072a4eccd4c9563ac3cdda5eebb0e869aacbc3b7190d27fb81554269fc50d","effort":null}
+new session <synthetic-session-id>
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+finished (0 running)
+[machine] Shutting down…
+
+
+ Test Files  29 passed (29)
+      Tests  428 passed (428)
+   Start at  20:51:08
+   Duration  25.67s (tests 50%, import 31%, transform 17%, setup 1%)
+
+     Import  |@xiechimon/cairn| 458 modules were evaluated 7807 times · 20.77s total, 32% of tracked time
+             ~4.12s faster with isolate: false — shared modules are evaluated once per worker instead of once per file
+             learn more: https://vitest.dev/guide/improving-performance#test-isolation

@@ -258,6 +258,25 @@ describe('SubtreeErrorBoundary', () => {
     expect(mounts).toBe(after);
   });
 
+  it('renders the fallback inside the frame it is given and retries from there', () => {
+    let fail = true;
+    function Child() {
+      if (fail) throw new Error('panel failure');
+      return h('span', null, 'ready');
+    }
+    const view = render(
+      h(SubtreeErrorBoundary, {
+        frame: (fallback: ReactNode) => h('aside', { 'data-testid': 'frame' }, 'Tasks', fallback),
+        children: h(Child),
+      }),
+    );
+    expect(view.text()).toContain('Tasks');
+    expect(view.text()).toContain('This part failed');
+    fail = false;
+    view.retry();
+    expect(view.text()).toBe('ready');
+  });
+
   it('changes the conversation key when a Coordinator deep link switches threads', () => {
     const stuck = conversationBoundaryKey({
       projectId: null,

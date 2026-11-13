@@ -88,6 +88,7 @@ export function deriveModelRoster(catalogs: readonly RosterCatalog[]): ModelRost
   const assign = (id: string, vendor: string) => {
     const makerId = id.replace(/^zai-/u, '').replaceAll('.', '-');
     if (makerId.startsWith('glm-')) vendor = 'Z.ai';
+    else if (makerId.startsWith('deepseek-')) vendor = 'DeepSeek';
     const prev = assigned.get(id);
     if (prev === undefined) assigned.set(id, vendor);
     else if (prev !== vendor) assigned.set(id, null);

@@ -5946,11 +5946,38 @@ exports[`body/envelope schema snapshots > setSecretBody > setSecretBody.json 1`]
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "delivery": {
+      "enum": [
+        "plaintext",
+        "http",
+      ],
+      "type": "string",
+    },
     "description": {
       "type": [
         "string",
         "null",
       ],
+    },
+    "http": {
+      "additionalProperties": false,
+      "properties": {
+        "header": {
+          "type": "string",
+        },
+        "origin": {
+          "type": "string",
+        },
+        "template": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "origin",
+        "header",
+        "template",
+      ],
+      "type": "object",
     },
     "name": {
       "type": "string",
@@ -8549,7 +8576,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "member_activity",
   "build_feedback",
   "build_outcome_backfill",
-  "memory_save_conflict",
   "memory_candidate",
   "push_subscription",
   "push_digest_item",
@@ -10893,10 +10919,44 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sec
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "delivery": {
+      "enum": [
+        "plaintext",
+        "http",
+      ],
+      "type": "string",
+    },
     "description": {
       "type": [
         "string",
         "null",
+      ],
+    },
+    "http": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "header": {
+              "type": "string",
+            },
+            "origin": {
+              "type": "string",
+            },
+            "template": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "origin",
+            "header",
+            "template",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
       ],
     },
     "id": {
@@ -10904,6 +10964,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sec
     },
     "name": {
       "type": "string",
+    },
+    "policyRevision": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer",
     },
     "projectId": {
       "type": [

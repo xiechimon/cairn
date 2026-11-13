@@ -21,14 +21,15 @@ async function mockSlowSend(page: Page, total = 250): Promise<Row[]> {
       const content = (route.request().postDataJSON() as { content: string }).content;
       return new Promise<void>((resolve) =>
         setTimeout(() => {
-          history.push({
+          const message: Row = {
             id: `s-${history.length}`,
             role: 'user',
             content,
             createdAt: 1_000 + history.length,
-          });
+          };
+          history.push(message);
           running = true;
-          void json({ thread: THREAD }, 201).then(resolve);
+          void json({ thread: THREAD, message }, 201).then(resolve);
         }, 300),
       );
     }
@@ -202,8 +203,6 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
   }) => {
     if (activation === 'reduced-motion') await page.emulateMedia({ reducedMotion: 'reduce' });
     if (activation === 'phone-light') {
-      const cdp = await page.context().newCDPSession(page);
-      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
       await page.setViewportSize({ width: 390, height: 844 });
       await page.emulateMedia({ colorScheme: 'light' });
     }
@@ -217,6 +216,10 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
     const jump = home(page).getByTestId('jump-to-latest');
     await expect(row(page, 'Latest delivery report')).toBeAttached();
     await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+    if (activation === 'phone-light') {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    }
     await body.evaluate((node) => {
       node.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
       for (const item of node.querySelectorAll<HTMLElement>(

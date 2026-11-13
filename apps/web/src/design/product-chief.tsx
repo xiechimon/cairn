@@ -40,7 +40,6 @@ export function ProductChiefSection() {
           <div className="w-160">
             <QuestionChips
               item={QUESTION_PENDING}
-              numberKeys
               onAnswer={({ answers }) =>
                 setLast(
                   `Answered: ${answers.map((a) => a.choices?.join(' + ') ?? a.text).join(' / ')}`,
@@ -89,9 +88,6 @@ export function ProductChiefSection() {
       <Specimen id="identity" title="Identity" note="ChiefIdentity" stage="canvas">
         <Cell label="Identity, idle">
           <ChiefIdentity agent={CHIEF} />
-        </Cell>
-        <Cell label="Identity, busy">
-          <ChiefIdentity agent={CHIEF} busy />
         </Cell>
         <Cell label="Identity, not linked">
           <ChiefIdentity agent={{ displayName: 'Coordinator', avatarUrl: null }} />

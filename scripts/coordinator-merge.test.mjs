@@ -10,17 +10,6 @@ const sha = (letter) => letter.repeat(40);
 const A = sha('a');
 const B = sha('b');
 const FAIL = { error: true };
-const gate = (head, conclusion, over = {}) => ({
-  name: 'review-gate',
-  head_sha: head,
-  status: 'completed',
-  conclusion,
-  app: { slug: 'github-actions' },
-  ...over,
-});
-const pass = (head, over) => gate(head, 'success', over);
-const block = (head, over) => gate(head, 'failure', over);
-const review = (...runs) => ({ check_runs: runs.map((run, id) => ({ id, ...run })) });
 const green = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'].map((name) => ({
   name,
   bucket: 'pass',
@@ -39,7 +28,6 @@ const mustBeGreen = ['gates', 'dead-class-gate', 'ops-backup-test'].map((name) =
 }));
 const base = {
   head: [A],
-  reviews: [review(pass(A))],
   checks: [green],
   allChecks: [[...green, ...mustBeGreen]],
   markers: [[]],
@@ -64,7 +52,6 @@ if (args[0] === 'pr' && args[1] === 'checks') key = args.includes('--required') 
 else if (args[0] === 'pr' && args[1] === 'view') key = 'view';
 else if (args[0] === 'pr' && args[1] === 'merge') process.exit(0);
 else if (p.includes('/issues?')) key = 'markers';
-else if (p.includes('/check-runs?')) key = 'reviews';
 else if (p.endsWith('/commits?per_page=100')) key = 'commits';
 else if (/\\/pulls\\/\\d+$/.test(p)) key = 'head';
 else process.exit(2);
@@ -74,7 +61,7 @@ fs.writeFileSync(counterFile, String(count + 1));
 const seq = d[key];
 const item = seq[Math.min(count, seq.length - 1)];
 if (item && item.error) process.exit(1);
-if (key === 'head') console.log(JSON.stringify(typeof item === 'string' ? { head: { sha: item }, labels: [] } : { head: { sha: item.sha }, labels: item.labels.map((name) => ({ name })) }));
+if (key === 'head') console.log(JSON.stringify({ head: { sha: item }, labels: d.labels ?? [] }));
 else if (key === 'checks' || key === 'allChecks' || key === 'view') console.log(JSON.stringify(item));
 else console.log(JSON.stringify([item]));
 `,
@@ -102,7 +89,7 @@ else console.log(JSON.stringify([item]));
 }
 const flag = (args, name) => args[args.indexOf(name) + 1];
 
-test('merges on PASS with green checks and no brake', (t) => {
+test('merges with green checks and no brake', (t) => {
   const { result, merges } = run(t);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(merges.length, 1);
@@ -111,14 +98,6 @@ test('merges on PASS with green checks and no brake', (t) => {
   assert.ok(merges[0].includes('--squash'));
   assert.ok(!merges[0].includes('--auto'));
   assert.match(result.stdout, new RegExp(`7 MERGED ${sha('c')}`));
-});
-
-test('a review-gate check still in progress waits', (t) => {
-  const { result, merges } = run(t, {
-    reviews: [review(gate(A, null, { status: 'in_progress' }))],
-  });
-  assert.notEqual(result.status, 0);
-  assert.equal(merges.length, 0);
 });
 
 test('network errors mid-loop neither exit nor change state', (t) => {
@@ -142,24 +121,6 @@ test('open brake blocks merge, then proceeds once closed', (t) => {
 
 test('marker lookup failure waits and never merges', (t) => {
   const { result, merges } = run(t, { markers: [FAIL] });
-  assert.notEqual(result.status, 0);
-  assert.equal(merges.length, 0);
-});
-
-test('a failed review-gate check on the current head stops nonzero', (t) => {
-  const { result, merges } = run(t, { reviews: [review(pass(A), block(A))] });
-  assert.notEqual(result.status, 0);
-  assert.match(result.stdout, /BLOCK/);
-  assert.equal(merges.length, 0);
-});
-
-test('the newest check run wins over an older failure', (t) => {
-  const { merges } = run(t, { reviews: [review(block(A), pass(A))] });
-  assert.equal(merges.length, 1);
-});
-
-test('a check run for another head is ignored', (t) => {
-  const { result, merges } = run(t, { reviews: [review(pass(B))] });
   assert.notEqual(result.status, 0);
   assert.equal(merges.length, 0);
 });
@@ -220,10 +181,9 @@ test('a skipped must-be-green job counts as green', (t) => {
   assert.equal(run(t, { allChecks: [withJob('ops-backup-test', 'skipping')] }).merges.length, 1);
 });
 
-test('head moved after PASS re-waits for the new head verdict', (t) => {
+test('a head that moves while the brake is on merges pinned to the new head', (t) => {
   const { result, merges } = run(t, {
     head: [A, B, B],
-    reviews: [review(pass(A)), review(pass(A)), review(pass(A), pass(B))],
     markers: [[{ number: 9 }], []],
   });
   assert.equal(result.status, 0, result.stderr);
@@ -231,28 +191,19 @@ test('head moved after PASS re-waits for the new head verdict', (t) => {
   assert.equal(flag(merges[0], '--match-head-commit'), B);
 });
 
-test('a held PR never merges, even after a new head gets a PASS (the #2510 sequence)', (t) => {
-  const held = (head) => ({ sha: head, labels: ['coordinator-hold'] });
-  const { result, merges } = run(t, {
-    head: [held(A), held(B)],
-    reviews: [review(pass(A)), review(pass(A), pass(B))],
-  });
-  assert.notEqual(result.status, 0);
-  assert.equal(merges.length, 0);
-  assert.match(result.stdout, /held by coordinator-hold/);
-});
-
-test('a hold added after the checks pass still stops the merge', (t) => {
-  const { merges } = run(t, { head: [A, { sha: A, labels: ['coordinator-hold'] }] });
-  assert.equal(merges.length, 0);
-});
-
-test('once the hold is removed the PR merges', (t) => {
-  const { result, merges } = run(t, {
-    head: [{ sha: A, labels: ['coordinator-hold'] }, A],
-  });
+test('a head that moves between the checks and the merge is judged again', (t) => {
+  const { result, merges, calls } = run(t, { head: [A, B, B, B] });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(merges.length, 1);
+  assert.equal(flag(merges[0], '--match-head-commit'), B);
+  assert.equal(calls.filter((c) => c[1] === 'checks' && c.includes('--required')).length, 2);
+});
+
+test('a missing review-gate check and a coordinator-hold label do not stop the merge', (t) => {
+  const { result, merges, calls } = run(t, { labels: [{ name: 'coordinator-hold' }] });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(merges.length, 1);
+  assert.equal(calls.filter((c) => c[1]?.includes('/check-runs')).length, 0);
 });
 
 test('multi-commit closing keywords are carried once', (t) => {
@@ -271,26 +222,6 @@ test('multi-commit closing keywords are carried once', (t) => {
   assert.equal(body.match(/fixes #43/gi).length, 1);
   assert.match(body, /resolves #44/);
   assert.match(body, /^Body/);
-});
-
-test('a passing check from another app after a real failure still stops', (t) => {
-  const { result, merges } = run(t, {
-    reviews: [review(block(A), pass(A, { app: { slug: 'mallory-app' } }))],
-  });
-  assert.notEqual(result.status, 0);
-  assert.match(result.stdout, /BLOCK/);
-  assert.equal(merges.length, 0);
-});
-
-test('a passing check from another app alone is not a verdict', (t) => {
-  const { merges } = run(t, { reviews: [review(pass(A, { app: { slug: 'mallory-app' } }))] });
-  assert.equal(merges.length, 0);
-});
-
-test('no review-gate check on the head waits', (t) => {
-  const { result, merges } = run(t, { reviews: [review()] });
-  assert.notEqual(result.status, 0);
-  assert.equal(merges.length, 0);
 });
 
 test('every gh call targets the configured repo, not GH_REPO', (t) => {

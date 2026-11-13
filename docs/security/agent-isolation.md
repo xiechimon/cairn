@@ -1,6 +1,6 @@
 # Isolate a Cairn execution machine
 
-Use this guide before connecting a machine that processes issues, repositories, or MCP responses from people you do not trust. Read the [pre-launch findings](2000-prelaunch-review.md) before exposing a server. The reviewed checkout has unresolved registration and credential findings; the steps below reduce exposure and do not repair them.
+Use this guide before connecting a machine that processes issues, repositories, or MCP responses from people you do not trust. Read the [pre-launch findings](2000-prelaunch-review.md) before exposing a server. The registration, upload, file-permission and bind findings of that review are fixed (#2053 to #2057). Team secrets still reach the model in plaintext; the steps below reduce that exposure and do not repair it.
 
 ## Choose the execution boundary
 
@@ -18,16 +18,16 @@ Assume a shell-capable agent can read and modify every file available to its OS 
 
 Assume tool responses, repository files, issue text, attachments, and MCP results can contain prompt injection. Human plan, review, and merge gates control workflow decisions. They do not intercept every filesystem write or network request. The Pi command gate catches selected command shapes, while Claude Code uses `bypassPermissions`; do not use those controls as a machine isolation guarantee.
 
-Grant only the necessary team secrets, MCP tools, provider access, and repository permissions. Keep a human approval step for consequential operations. With the current `get_secret`, a granted secret is visible to the model and may persist in tool results or transcripts. Until #1775 ships an approved boundary, use disposable, revocable credentials and avoid high-value team secrets in untrusted tasks.
+Grant only the necessary team secrets, MCP tools, provider access, and repository permissions. Keep a human approval step for consequential operations. With the current `get_secret`, a granted secret is visible to the model and may persist in tool results or transcripts. #1775 closed with the gateway research only and no boundary is implemented. Until one ships, use disposable, revocable credentials and avoid high-value team secrets in untrusted tasks.
 
 Run credential-holding services outside the untrusted execution identity where the deployment supports that separation. An unrestricted agent sharing the daemon's user can read daemon files and inherited environment data. Removing credentials from a prompt alone does not protect that arrangement. The current Pi runtime also runs in the daemon process; do not claim an external gateway boundary without restructuring and verification.
 
 ## Protect server access and local state
 
 1. Bind a local server explicitly to `HOST=127.0.0.1`. Set a random `CAIRN_TOKEN` and `CAIRN_REQUIRE_TOKEN=1` before startup. Protect the token from shell history, logs, and shared environment files. Require-token mode also suppresses the token-bearing startup login link.
-2. For remote access, use authenticated TLS and a firewall or private network with an explicit client allowlist. With #2053, enrollment confirmation requires the server owner bearer or an allowlisted loopback Tailscale identity when authentication is enabled; keep start/poll reachable for the CLI, and still prefer authenticated TLS plus network allowlisting for remote daemons.
-3. Restrict every API key to trusted holders while #2054 is unresolved. A read-only MCP key currently also permits machine enrollment. Do not treat MCP tool grants as a complete limit on that key's authority.
-4. Before starting the daemon under its dedicated user, set `umask 077`. Make its Cairn home private and keep `machine.json` readable only by its owner. Check existing files as well as newly created ones. #2056 tracks automatic permission enforcement.
+2. For remote access, use authenticated TLS and a firewall or private network with an explicit client allowlist. Enrollment confirmation requires the server owner when authentication is enabled (#2053), and `CAIRN_TAILSCALE_USERS` grants no access; keep start/poll reachable for the CLI, and still prefer authenticated TLS plus network allowlisting for remote daemons.
+3. Give machine access only to the API keys that enroll machines. A key enrolls a machine only when it was created with machine access (#2054); MCP grants and Git access do not include it.
+4. Before starting the daemon under its dedicated user, set `umask 077`. Make its Cairn home private and keep `machine.json` readable only by its owner. The daemon sets its state directory to `0700` and `machine.json` to `0600` when it writes them (#2056); check files that other tools placed there.
 5. Keep the server database and `secretbox.key` private. Back them up together into restricted storage. Anyone with both can decrypt stored secrets. Never mount those backups into the executor.
 6. Use encrypted transport for remote daemon connections. Do not send machine tokens, API keys, or step credential bundles over untrusted plaintext HTTP. The default loopback URL is for local use.
 

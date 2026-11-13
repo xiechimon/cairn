@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, CircleDashed } from 'lucide-react';
+import { CircleDashed } from 'lucide-react';
 import { useState } from 'react';
 import {
   EMPTY_TRACE_COUNTS,
@@ -10,9 +10,14 @@ import {
   TraceRowButton,
   traceSummary,
 } from '../components/chat/trace-parts.js';
-import { Button } from '../components/ui/button.js';
 import type { TranscriptItem, WorkStep } from '../fixtures/records.js';
 import type { TFunc } from '../i18n/translate.js';
+
+const TAIL_STEPS = 5;
+
+export function earlierStepCount(total: number): number {
+  return total > TAIL_STEPS + 1 ? total - TAIL_STEPS : 0;
+}
 
 const DONE_VERBS = {
   read: '读取了',
@@ -58,7 +63,7 @@ function stepTarget(step: Extract<WorkStep, { kind: 'call' }>): string {
 }
 
 function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TFunc }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(step.kind === 'call' && step.error);
   const [animate] = useState(enter);
   const call = step.kind === 'call' ? step : null;
   const lines = call
@@ -205,8 +210,11 @@ export function WorkTrace({
   const [disclosure, setDisclosure] = useState<{ defaultExpanded: boolean; open: boolean } | null>(
     null,
   );
+  const [showsEarlier, setShowsEarlier] = useState(false);
   const expanded =
     disclosure?.defaultExpanded === defaultExpanded ? disclosure.open : defaultExpanded;
+  const earlier = disclosure === null ? earlierStepCount(item.steps.length) : 0;
+  const shown = showsEarlier ? item.steps : item.steps.slice(earlier);
   const counts = { ...EMPTY_TRACE_COUNTS };
   const readPaths = new Set<string>();
   const editPaths = new Set<string>();
@@ -246,48 +254,19 @@ export function WorkTrace({
       </div>
       {expanded && (
         <TraceCard>
-          {item.steps.map((step) => (
+          {earlier > 0 && (
+            <TraceRowButton
+              data-testid="work-earlier"
+              verb={t(showsEarlier ? '收起之前的 {n} 步' : '之前的 {n} 步', { n: earlier })}
+              expandable
+              open={showsEarlier}
+              onClick={() => setShowsEarlier((value) => !value)}
+            />
+          )}
+          {shown.map((step) => (
             <WorkStepRow key={step.id} step={step} enter={entering.has(step.id)} t={t} />
           ))}
         </TraceCard>
-      )}
-    </div>
-  );
-}
-
-export function InjectedSkills({
-  skills,
-  t,
-}: {
-  skills: { id: string; reason: string }[];
-  t: TFunc;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="mx-auto mt-3.5 max-w-[68ch] text-center text-meta text-(--text-tertiary)">
-      <Button
-        variant="secondary"
-        className="h-6 rounded-(--cds-radius-sm) px-2 text-meta font-normal"
-        data-testid="injected-skills-chip"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        {t('已加载 {n} 个技能', { n: skills.length })}
-        {open ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
-      </Button>
-      {open && (
-        <div
-          data-testid="injected-skills"
-          className="mt-1.5 flex flex-wrap justify-center gap-1.5 [overflow-wrap:anywhere]"
-        >
-          {skills.length > 0
-            ? skills.map((skill) => (
-                <span key={skill.id}>
-                  {skill.id}（{skill.reason}）
-                </span>
-              ))
-            : t('未注入技能（任务文本未命中任何技能）')}
-        </div>
       )}
     </div>
   );

@@ -151,7 +151,7 @@ describe('pi session policy (#925 trust/telemetry/settings + #927 cost/cache)', 
     expect(flat).not.toContain('PI-TRUST-HIJACK-MARKER');
 
     expect(flat).toContain(TASK_SPEC);
-    expect(flat).toContain('You are an expert coding assistant operating inside pi');
+    expect(flat).toContain('You are a coding assistant running inside pi');
     expect(flat).toContain('repository-policy-guidance-sentinel');
     expect(flat).toContain('For UI tasks, attach light and dark screenshots');
     const workspace = join(paths.workspacesDir, buildId);

@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { openReplySteps } from './helpers.js';
 
 declare global {
   interface Window {
@@ -182,7 +183,7 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(page.locator('svg circle[stroke-dasharray]')).toHaveCount(0);
   });
 
-  test('F-R1/R2/R3: robot markdown rows share the block parser — bold/heading/list/fence/chip all render, zero star leakage', async ({
+  test('F-R1/R2/R3: robot markdown rows share the block parser — bold/heading/list/fence all render, zero star leakage', async ({
     page,
   }) => {
     const stream = page.getByTestId('chief-stream');
@@ -197,11 +198,7 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(leadBullet).toContainText(': 凭证链路验证');
 
     await expect(stream.locator('.chat-code', { hasText: 'docs/verify/' })).toHaveCount(1);
-    const mention = stream.locator('.mention-chip--agent');
-    await expect(mention).toHaveCount(1);
-    await expect(mention).toHaveText('r5-scribe');
-
-    await expect(mention).not.toHaveAttribute('href', /.*/);
+    await expect(stream.locator('.mention-chip--agent')).toHaveCount(0);
 
     await expect(stream.locator('.chat-md-item--ordered').first()).toContainText('第一步：读取配置');
     const nested = stream.locator('.chat-md-item--bullet[data-depth="1"]');
@@ -212,23 +209,21 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(fence).toContainText('curl -s localhost:8787/healthz');
   });
 
-  test('F-R13: todo mentions render as chips, anchors point at task detail and a click opens it; literal #seq/pseudo schemes render no chip (#675)', async ({
+  test('F-R13: a todo mention renders as the title link, points at task detail and a click opens it; literal #seq/pseudo schemes render no link (#675)', async ({
     page,
   }) => {
     const stream = page.getByTestId('chief-stream');
-    const chip = stream.locator('.mention-chip--todo');
-    await expect(chip).toHaveCount(1);
-    await expect(chip).toHaveText('#1');
+    const mention = stream.locator('a[data-slot="task-mention"]');
+    await expect(mention).toHaveCount(1);
+    await expect(mention).toHaveText('在 README.md 末尾追加一行「r3 lifecycle probe」');
 
-    await expect(chip).toHaveAttribute('href', /^\/app\?(.*&)?thread=r3-legacy-1$/);
+    await expect(mention).toHaveAttribute('href', /^\/app\?(.*&)?thread=r3-legacy-1$/);
 
     await expect(stream).toContainText('prose #12 与 [伪链](todos:t2) 保持字面');
-    expect(await stream.locator('.mention-chip').count()).toBe(
-      await stream.locator('.mention-chip--agent').count() +
-        (await stream.locator('.mention-chip--todo').count()),
-    );
+    await expect(stream.locator('.mention-chip')).toHaveCount(0);
+    await expect(stream.getByTestId('chief-task-ref')).toHaveCount(1);
 
-    await chip.click();
+    await mention.click();
     await expect(page).toHaveURL(/[?&]thread=r3-legacy-1/);
   });
 
@@ -273,8 +268,12 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(stream.getByTestId('chief-msg').locator('p').first()).toContainText('已创建并派工');
     await expect(stream.locator('.chat-para, .chat-md-item, .chat-md-code')).toHaveCount(0);
 
-    await expect(stream.getByTestId('chief-chip-todo')).toHaveCount(1);
-    await expect(stream.getByTestId('chief-chip-agent')).toHaveCount(1);
+    await expect(stream.locator('a[data-slot="task-mention"]')).toHaveText(
+      '编写 CONTRIBUTING.md 贡献指南',
+    );
+    await expect(stream.getByTestId('chief-task-ref')).toHaveCount(1);
+    await expect(stream.locator('.mention-chip')).toHaveCount(0);
+    await expect(stream).not.toContainText('r5-scribe');
 
     await expect(stream.getByTestId('chief-msg-tools').getByRole('button')).toHaveCount(1);
   });
@@ -332,7 +331,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
 
     const chip = bubble.locator('.mention-chip--todo');
     await expect(chip).toHaveCount(1);
-    await expect(chip).toHaveText('#16');
+    await expect(chip).toHaveText('任务');
     await expect(chip).toHaveAttribute('href', /^\/app\?(.*&)?thread=t16$/);
 
     await expect(bubble).toContainText('prose #12 与 [伪链](todos:t2) [空](todo:) 保持字面');
@@ -435,7 +434,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     await expect(bubble.locator('.chat-para, .chat-md-item, .chat-md-code')).toHaveCount(0);
   });
 
-  test('F-R19: segment-row projection (#955) — thinking rows in a single column, the in-flight call inside the live row', async ({ page }) => {
+  test('F-R19: segment-row projection (#955) — thinking rows in a single column, the in-flight call stays out of the stream', async ({ page }) => {
     await stubEventSource(page);
     await stubCdnAvatar(page);
 
@@ -504,12 +503,12 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
 
     await expect(coordinator.locator('.chief-msg', { hasText: 'todo_write' })).toHaveCount(0);
     const live = coordinator.getByTestId('chief-msg').last();
-    await live.getByRole('button', { name: '查看步骤' }).click();
-    await expect(live.getByTestId('chief-turn-tools')).toContainText(/正在调用\s*todo_write/);
-    await expect(coordinator.getByText('todo_write')).toHaveCount(1);
+    await expect(live.getByTestId('typing-dots')).toBeVisible();
+    await expect(live.getByRole('button')).toHaveCount(0);
+    await expect(coordinator.getByText('todo_write')).toHaveCount(0);
   });
 
-  test('F-R20: the in-flight call carries the concrete command (not a bare tool name)', async ({ page }) => {
+  test('F-R20: the in-flight call shows on the status mark and its command stays out of the stream', async ({ page }) => {
 
     const state: Parameters<typeof mockChiefLiveApi>[1] = {
       final: false,
@@ -535,12 +534,12 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     await page.goto('/app?chief=chief-bbb');
 
     const coordinator = page.getByTestId('home-c');
-    const live = coordinator.getByTestId('chief-msg').last();
-    await live.getByRole('button', { name: '查看步骤' }).click();
-    await expect(live.getByTestId('chief-turn-tools')).toContainText(/正在调用\s*Bash ls -la/);
+    await expect(coordinator.getByTestId('chief-msg').last().getByTestId('typing-dots')).toBeVisible();
+    await expect(page.getByTestId('chief-status-mark')).toHaveAttribute('data-state', 'run');
+    await expect(coordinator.getByText('ls -la')).toHaveCount(0);
   });
 
-  test('F-R21: segment-order contract (#1003 / ADR 0011 premortem) — each call folds into the reply after it, the same in flight and after settle', async ({
+  test('F-R21: segment-order contract (#1003 / ADR 0011 premortem) — each call belongs to the reply after it and opens from its menu, the same in flight and after settle', async ({
     page,
   }) => {
 
@@ -599,13 +598,12 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
       await expect(rows.nth(0)).toContainText('派一下凭证链路验证');
       await expect(rows.nth(1)).toContainText('先盘点凭证面');
       await expect(rows.nth(2)).toContainText('先看现状');
-      await expect(rows.nth(2).getByTestId('chief-tools-toggle')).toHaveCount(0);
       await expect(rows.nth(3)).toContainText('再核对补发语义');
       await expect(rows.nth(4)).toContainText('最后收口票');
-      const fold = rows.nth(3).getByTestId('chief-tools-toggle');
-      await expect(fold).toHaveCount(1);
-      await fold.click();
+      await expect(coordinator.getByTestId('chief-turn-tools')).toHaveCount(0);
+      await openReplySteps(page, rows.nth(3));
       await expect(rows.nth(3).getByTestId('chief-turn-tools')).toContainText('todo_write');
+      await expect(rows.nth(2).getByTestId('chief-turn-tools')).toHaveCount(0);
       await expect(coordinator.getByText('todo_write')).toHaveCount(1);
       await expect(rows.filter({ hasText: '正在调用' })).toHaveCount(0);
     };

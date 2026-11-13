@@ -4,17 +4,11 @@ import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { project } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import {
-  isMemoryIndex,
-  listMemoryEntries,
-  saveMemoryEntry,
-  updateMemoryEntry,
-} from '../services/memory.js';
+import { ensureMemoryIndex, listStoredMemoryEntries, memoryIndexText } from '../services/memory.js';
+import { appendMemoryIndex, memoryDocumentVersion } from '../services/memory-documents.js';
 import { coordinatorProfile } from '../services/routing-rules.js';
 import type { MemoryFlush } from './runtime/compaction.js';
 
-const TITLE_MAX = 40;
-const CONTENT_MAX = 500;
 const EXISTING_MAX_CHARS = 8_000;
 export const FLUSH_SOURCE = 'compaction-flush';
 
@@ -22,7 +16,6 @@ const candidateSchema = z.object({
   title: z.string(),
   content: z.string(),
   projectId: z.string().nullish(),
-  replaces: z.string().nullish(),
 });
 const outputSchema = z.object({ memories: z.array(z.unknown()) });
 
@@ -49,8 +42,8 @@ export function parseFlushOutput(raw: string) {
     })
     .map((entry) => ({
       ...entry,
-      title: entry.title.trim().slice(0, TITLE_MAX),
-      content: entry.content.trim().slice(0, CONTENT_MAX),
+      title: entry.title.trim(),
+      content: entry.content.trim(),
     }))
     .filter((entry) => entry.title !== '' && entry.content !== '')
     .slice(0, COORDINATOR_MEMORY_FLUSH_MAX);
@@ -74,35 +67,20 @@ export function applyFlush(
   );
   for (const entry of parseFlushOutput(raw)) {
     try {
-      if (entry.replaces != null && !isMemoryIndex(db, entry.replaces)) {
-        updateMemoryEntry(db, {
-          memoryId: entry.replaces,
-          agentId,
-          teamId: scope.teamId,
-          threadId: scope.threadId,
-          content: entry.content,
-        });
-        result.updated += 1;
-        continue;
-      }
       const projectId = entry.projectId ?? null;
       if (projectId !== null && !projects.has(projectId)) {
         result.skipped += 1;
         continue;
       }
-      const saved = saveMemoryEntry(db, {
+      const owner = {
         agentId,
         teamId: scope.teamId,
-        title: entry.title,
-        content: entry.content,
         projectId,
-        sourceTodoId: null,
-        sourceBuildId: scope.threadId,
         source: FLUSH_SOURCE,
-        force: true,
-      });
-      if ('status' in saved) result.skipped += 1;
-      else result.saved += 1;
+        sourceBuildId: scope.threadId,
+      };
+      if (appendMemoryIndex(db, owner, entry.title, entry.content)) result.saved++;
+      else result.skipped++;
     } catch (error) {
       if (!(error instanceof HttpError)) throw error;
       result.skipped += 1;
@@ -114,17 +92,32 @@ export function applyFlush(
 function existingLines(db: Db, scope: { teamId: string; threadId: string }): string {
   const agentId = coordinatorProfile(db, scope.teamId)?.id;
   if (agentId === undefined) return '(none)';
-  const lines = listMemoryEntries(db, { agentId, teamId: scope.teamId, threadId: scope.threadId })
-    .reverse()
-    .map((m) => `${m.id} | ${m.title}: ${m.content}`);
-  const kept: string[] = [];
-  let used = 0;
-  for (const line of lines) {
-    if (used + line.length > EXISTING_MAX_CHARS) break;
-    kept.push(line);
-    used += line.length + 1;
+  const owner = { agentId, teamId: scope.teamId };
+  const scopes = new Set([null, ...listStoredMemoryEntries(db, owner).map((row) => row.projectId)]);
+  const indexes = [...scopes].map((projectId) => ensureMemoryIndex(db, { ...owner, projectId }));
+  const selected: { header: string; content: string }[] = [];
+  const noteBudget = `\n(${indexes.length} additional scopes omitted from this excerpt.)`.length;
+  let reserved = noteBudget;
+  for (const index of indexes) {
+    const header = `${index.projectId ?? 'team'} | MEMORY.md | ${memoryDocumentVersion(index)}`;
+    const content = memoryIndexText(index);
+    const required = header.length + Math.min(256, content.length) + 3;
+    if (reserved + required > EXISTING_MAX_CHARS) break;
+    selected.push({ header, content });
+    reserved += required;
   }
-  return kept.length > 0 ? kept.join('\n') : '(none)';
+  const omitted = indexes.length - selected.length;
+  const note = omitted > 0 ? `\n(${omitted} additional scopes omitted from this excerpt.)` : '';
+  const remaining =
+    EXISTING_MAX_CHARS -
+    note.length -
+    selected.map(({ header }) => header).join('\n\n').length -
+    selected.length;
+  const perIndex = Math.floor(remaining / Math.max(1, selected.length));
+  return (
+    selected.map(({ header, content }) => `${header}\n${content.slice(0, perIndex)}`).join('\n\n') +
+    note
+  );
 }
 
 export function flushPrompt(

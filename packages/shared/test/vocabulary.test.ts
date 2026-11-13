@@ -31,7 +31,6 @@ import {
   MCP_TOOL_REGISTRY,
   MCP_TOOLS_READ,
   MCP_TOOLS_WRITE,
-  MEMORY_QUOTA_PER_AGENT,
   MEMORY_TOOLS,
   MODEL_SOURCE_RUNTIMES,
   maskApiKey,
@@ -157,7 +156,6 @@ describe('machine protocol (02 §5, r3 §1.6)', () => {
       streamBodyTimeout: 540_000,
     });
     expect(ORPHAN_WORKTREE_TTL_MS).toBe(7 * 24 * 60 * 60 * 1000);
-    expect(MEMORY_QUOTA_PER_AGENT).toBe(100);
   });
 
   it('pi stream event vocabulary is the 17-item bundle extraction (02 §5.6)', () => {
@@ -399,14 +397,7 @@ describe('worker memory tools (02 §4.4/r5 §6: worker-step remoteTools memory t
     expect(save).toBeDefined();
     const props = (save as { parameters: { properties: Record<string, unknown> } }).parameters
       .properties;
-    expect(Object.keys(props).sort()).toEqual([
-      'content',
-      'force',
-      'layer',
-      'projectId',
-      'sourceTodoId',
-      'title',
-    ]);
+    expect(Object.keys(props).sort()).toEqual(['content', 'file', 'scope']);
   });
 });
 
@@ -548,7 +539,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
 describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription; #2243 +claude_subscription; #2233 +queued_message; #2592 +chief_report +retro_proposal; D75 +computer +computer_call; #2501 +client_message)', () => {
   it('DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796)', () => {
     expect(INTERNAL_ONLY_TABLES).toContain('autonomy_pause');
-    expect(DB_TABLES).toHaveLength(85);
+    expect(DB_TABLES).toHaveLength(84);
     for (const table of [
       'action_journal',
       'action_proposal',

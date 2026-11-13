@@ -42,11 +42,11 @@ An engine plans for itself. When the plan includes an action that cannot be undo
 
 ## The engine view
 
-Owner decision on 2026-11-12. When a thread has dispatched work to an engine, the thread shows the run as one card in its conversation.
+Owner decisions on 2026-11-12 and 2026-11-13. When a thread has dispatched work to an engine, the run has no card of its own: its events are the thread's own conversation, and one tail line where the work ends carries the run's cost, model choice, raw output and takeover.
 
-- Default view: the engine's structured event stream rendered with cairn's own conversation components (reply text, the plan checklist, read, edit and run rows, a diff card, the running bubble). It is the same family as the thread itself and works on the phone.
+- Default view: the engine's structured event stream rendered with cairn's own conversation components (reply text, the plan checklist, read, edit and run rows, the running row). It is the same family as the thread itself and works on the phone.
 - Nothing is lost silently. An event type the adapter does not know renders as a generic row that names the type and opens its raw content. An engine that waits for input the adapter cannot map shows that it is waiting and offers takeover. Every unknown type is counted and reported, and each adapter is tested by replaying recorded streams per engine version.
-- A read-only raw output view (the engine's plain text log) is always available from the card.
+- A read-only raw output view (the engine's plain text log) is always available from the tail line.
 - A real terminal (a pseudo-terminal streamed to a maintained terminal component in the browser) is built later, for takeover and for engines in an interactive screen. It replaces the raw output view when it exists. It crosses the machine and command boundary, so it is owner-routed and needs its own design.
 - A thread's header carries the title and one status line only. Code changes, documents and pull requests are results: a compact card in the conversation that opens the result, never a control in the header. Most tasks have no code changes.
 
@@ -85,7 +85,7 @@ Proposal:
 
 - The difficulty is decided by rule first (the risk list in this document), then by the owner's explicit setting, which always wins.
 - It can only be raised during the work: a failed attempt, a check that does not pass or a plan that grows moves the task up one level and the next dispatch uses the higher row. It is never lowered silently.
-- The chosen model, effort and the reason are recorded on the dispatch and shown in the engine card, so the owner sees why a task cost what it did.
+- The chosen model, effort and the reason are recorded on the dispatch and shown on the run's tail line, so the owner sees why a task cost what it did.
 - Effort maps to whatever each engine calls it (thinking level, reasoning effort); an engine that has no such control ignores it and the dispatch record says so.
 - A run still never switches model because a quota ran out; that pauses the work, as today.
 
@@ -96,6 +96,15 @@ Proposal:
 - How subscriptions and model routing map to engines, and which model source and billing the thread's own turns use.
 - Migration of threads that run directly on `claude-code` today.
 - Whether the router and a thread are the same harness with different models and tools, or two configurations of one runtime.
+
+## Decisions taken on 2026-11-12
+
+Decided on 2026-11-12: proposed by Claude at ian's delegation and confirmed by ian the same day.
+
+- **Phases stay on the task.** A task's phase still changes only through the server's transition table; the thread is the session that does the work. The plan, build, review and verify steps become dispatches inside the thread. The confirm phase appears only in plan-first mode or when the plan contains an action that cannot be undone. The merge gate applies only when the output is code.
+- **Billing of a thread's own turns.** They use the Coordinator's connection until a separate `thread` route is set, and the cost shows in the thread. This answers the billing half of the third open question above.
+- **Cutover.** A Claude Code step that is running at the switch runs to its end. This answers the migration question above.
+- **The engine view.** It is read-only first. Takeover is built last, and once it exists it may spend ian's own subscription quota.
 
 ## Order of work
 

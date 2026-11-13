@@ -328,7 +328,7 @@ describe('#1260 chief step delivery = coordinator rule home machine', () => {
   });
 });
 
-describe('#895 GET /chief orchestration envelope (spec 21 A5; #1260 re-source)', () => {
+describe('#895 GET /chief orchestration envelope (#1260 re-source)', () => {
   interface OrchestrationBlock {
     orchestration: {
       homeMachineId: string | null;

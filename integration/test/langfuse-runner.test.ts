@@ -738,6 +738,116 @@ registerHooks({resolve(specifier,context,next){const key=specifier.includes('eva
     expect(cli.stdout).toContain('"items":6');
   }, 20_000);
 
+  it('rejects a stale candidate head through the CLI without starting an experiment', () => {
+    const dir = makeTestTempDir('eval-langfuse-cli-stale-');
+    closers.push(async () => releaseTestTempDir(dir));
+    const preload = join(dir, 'cli-fixtures.mjs');
+    writeFileSync(
+      preload,
+      `
+import childProcess from 'node:child_process';
+import {registerHooks, syncBuiltinESMExports} from 'node:module';
+childProcess.execFileSync = (_command, args) => args[0] === 'rev-parse' ? 'a'.repeat(40) : '';
+syncBuiltinESMExports();
+let experiments = 0;
+const modules = {
+  '@cairn/shared/langfuse': \`export function openExperimentClient(){return {client:{dataset:{get:async()=>{throw new Error('unreachable')}},experiment:{run:async()=>{experiments++;throw new Error('unreachable')}}},close:async()=>{}}}\`,
+  'eval-auth.js': \`export async function evalCodexKey(){return 'test-key';}\`,
+};
+globalThis.__experiments = () => experiments;
+registerHooks({resolve(specifier,context,next){const key=specifier.includes('eval-auth.')?'eval-auth.js':(specifier==='@cairn/shared/langfuse'||specifier.includes('packages/shared/src/langfuse.'))?'@cairn/shared/langfuse':undefined;return key?{url:'data:text/javascript,'+encodeURIComponent(modules[key]),shortCircuit:true}:next(specifier,context);}});
+`,
+    );
+    const path = join(dir, 'manifest.json');
+    writeFileSync(
+      path,
+      JSON.stringify({
+        ...manifest,
+        candidateSha: 'b'.repeat(40),
+        runnerSha: 'b'.repeat(40),
+        promptSha: createHash('sha256')
+          .update(readFileSync(new URL('../../apps/server/src/services/chief.ts', import.meta.url)))
+          .digest('hex'),
+      }),
+    );
+    const cli = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        preload,
+        '--import',
+        import.meta.resolve('tsx'),
+        new URL('../eval/coordinator-routing/run.mts', import.meta.url).pathname,
+        path,
+      ],
+      { encoding: 'utf8', timeout: 15_000, env: { ...process.env, PI_CODING_AGENT_DIR: dir } },
+    );
+    expect(cli.status).toBe(1);
+    expect(cli.stderr).toContain('incomplete: experiment did not finish');
+  }, 20_000);
+
+  it('reports an incomplete run when the sandboxed turn times out and never scores it', async () => {
+    const dir = makeTestTempDir('eval-langfuse-cli-timeout-');
+    closers.push(async () => releaseTestTempDir(dir));
+    const fixture = join(dir, 'items.json');
+    writeFileSync(
+      fixture,
+      JSON.stringify([
+        {
+          id: '0',
+          datasetId: 'd',
+          sourceTraceId: '0',
+          status: 'ACTIVE',
+          input: { ...input, snapshot: { ...input.snapshot, sourceTraceId: '0' } },
+          expectedOutput: { decision: 'answer', parts: [], askCandidates: [], blockedBy: [] },
+        },
+      ]),
+    );
+    const preload = join(dir, 'cli-fixtures.mjs');
+    writeFileSync(
+      preload,
+      `
+import childProcess from 'node:child_process';
+import {registerHooks, syncBuiltinESMExports} from 'node:module';
+const fixture = ${JSON.stringify(fixture)};
+childProcess.execFileSync = (_command, args) => args[0] === 'rev-parse' ? 'a'.repeat(40) : '';
+syncBuiltinESMExports();
+const modules = {
+  '@cairn/shared/langfuse': \`import {readFileSync} from 'node:fs';export function openExperimentClient(){return {client:{dataset:{get:async()=>({items:JSON.parse(readFileSync(\${JSON.stringify(fixture)},'utf8'))})},experiment:{run:async({task,data})=>{const itemResults=[];for(const item of data)try{itemResults.push(await task(item))}catch(e){throw e}return {itemResults,runName:'fixture',experimentId:'fixture'};}}},close:async()=>{}}}\`,
+  'eval-auth.js': \`export async function evalCodexKey(){return 'test-key';}\`,
+  './sandbox.mts': \`export async function runSandboxedTurn(){throw new Error('incomplete: worker exit 1, timeout=true, uncaptured=false');}\`,
+};
+registerHooks({resolve(specifier,context,next){const key=specifier.includes('eval-auth.')?'eval-auth.js':(specifier==='./sandbox.mts'||specifier.includes('coordinator-routing/sandbox.mts'))?'./sandbox.mts':(specifier==='@cairn/shared/langfuse'||specifier.includes('packages/shared/src/langfuse.'))?'@cairn/shared/langfuse':undefined;return key?{url:'data:text/javascript,'+encodeURIComponent(modules[key]),shortCircuit:true}:next(specifier,context);}});
+`,
+    );
+    const path = join(dir, 'manifest.json');
+    writeFileSync(
+      path,
+      JSON.stringify({
+        ...manifest,
+        runnerSha: manifest.candidateSha,
+        promptSha: createHash('sha256')
+          .update(readFileSync(new URL('../../apps/server/src/services/chief.ts', import.meta.url)))
+          .digest('hex'),
+      }),
+    );
+    const cli = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        preload,
+        '--import',
+        import.meta.resolve('tsx'),
+        new URL('../eval/coordinator-routing/run.mts', import.meta.url).pathname,
+        path,
+      ],
+      { encoding: 'utf8', timeout: 15_000, env: { ...process.env, PI_CODING_AGENT_DIR: dir } },
+    );
+    expect(cli.status).toBe(1);
+    expect(cli.stderr).toContain('incomplete');
+    expect(cli.stdout).not.toContain('"items"');
+  }, 20_000);
+
   it('runs the real disposable Coordinator through SDK experiment.run and exports its item span', async () => {
     const model = await startStubLlm([{ content: 'all quiet' }]);
     closers.push(() => model.close());

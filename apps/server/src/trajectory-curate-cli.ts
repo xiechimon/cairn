@@ -13,15 +13,15 @@ import {
 } from './trajectory-curate.js';
 
 const USAGE =
-  'Use --in <candidates.jsonl>, --confirm <candidateId> [--force] or --dismiss <candidateId>, with optional --out-dir <dir>';
+  'Use --in <candidates.jsonl>, --confirm <candidateId> or --dismiss <candidateId>, with optional --out-dir <dir>';
 
 try {
   const { values } = parseArgs({
     options: {
       in: { type: 'string' },
+      force: { type: 'boolean', default: false },
       confirm: { type: 'string' },
       dismiss: { type: 'string' },
-      force: { type: 'boolean', default: false },
       'out-dir': { type: 'string' },
     },
   });

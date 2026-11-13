@@ -312,6 +312,8 @@ Row 2 implementation: [#3586](https://github.com/xiechimon/cairn/pull/3586).
 
 Each PR is independent off `main` unless it says otherwise, and each ends with screenshots from a live verify stack.
 
+Owner decision on 2026-11-12: the web app is settled first, and iOS follows it. The iOS rows (8, 9 and 11) start once the web app is settled, not in parallel with its polish, whatever their listed dependencies allow. The decision did not restate where the desktop row sits.
+
 | # | PR | Area | Depends on |
 |---|---|---|---|
 | 1 | `docs`: update `mobile-information-architecture.md` to Chat and Tasks, `section`, drawer, deep links | docs | this document accepted |

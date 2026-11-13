@@ -344,7 +344,7 @@ describe('[skills] log line family (02 §5.3 prefix vocabulary expansion)', () =
 });
 
 const GOLDEN_CATALOG =
-  "\n\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\nWhen a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n<available_skills>\n  <skill>\n    <name>golden-skill</name>\n    <description>零回归金样。</description>\n    <location><ROOT>/golden-skill/SKILL.md</location>\n  </skill>\n</available_skills>";
+  "\n\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\nResolve relative paths against the skill's directory (parent of SKILL.md). Use absolute paths in tool calls.\n\n<available_skills>\n  <skill>\n    <name>golden-skill</name>\n    <description>零回归金样。</description>\n    <location><ROOT>/golden-skill/SKILL.md</location>\n  </skill>\n</available_skills>";
 
 function goldenRoot(tag: string): string {
   const root = fixtureRoot(tag);

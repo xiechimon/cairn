@@ -17,7 +17,7 @@
     <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-SQLite-173a2f?style=flat-square">
   </p>
 
-  <p><b>Tell one Coordinator what you want. Agents build it in isolated threads on your machines, and nothing merges without evidence.</b></p>
+  <p><b>Cairn is a self-hosted general assistant. Tell one Coordinator what you want, and agents do the work in isolated threads on your own machines.</b></p>
 
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="site/img/hero-dark.webp">
