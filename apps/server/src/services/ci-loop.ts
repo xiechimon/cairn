@@ -14,7 +14,6 @@ import {
   hasPullFields,
   isFullSha,
   isOwnPull,
-  WRITE_AUTHOR_ASSOCIATIONS,
 } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import { recoverAutonomousMerges, settleAutonomousMerge } from './autonomous-merge.js';
@@ -29,7 +28,6 @@ import {
   maybeEnqueueVerifyStep,
   roundStart,
   stopUnclaimedGateSteps,
-  toBuildRecord,
 } from './builds.js';
 import { AnonReadBudget } from './ci-anon-budget.js';
 import {
@@ -49,6 +47,7 @@ import {
   countMarkedRounds,
   deadLoopMessage,
 } from './ci-fix-prompts.js';
+import { KnownRows } from './ci-known-rows.js';
 import {
   CI_EMPTY_CHECKS_GRACE_MS,
   failWithMessage,
@@ -58,6 +57,12 @@ import {
   pushNotSeen,
   writeSystemRow,
 } from './ci-loop-rows.js';
+import {
+  adoptPull,
+  CI_MERGE_CONFLICT_ROUNDS_MAX,
+  mergeConflictRound,
+  pickOwnBranchPull,
+} from './ci-pr-rounds.js';
 import { DONE_ROW, prClosedUnmergedRow } from './delivery-rows.js';
 import { autonomousToken } from './github-autonomous-token.js';
 import { syncAutonomyPauses } from './github-autonomy-brake.js';
@@ -94,6 +99,7 @@ export {
   CI_FIX_ROUNDS_MAX,
   CI_MERGE_CONFLICT_PROMPT_HEAD,
   CI_MERGE_CONFLICT_REVIEW_NOTE,
+  CI_MERGE_CONFLICT_ROUNDS_MAX,
   CI_MERGE_CONFLICT_VERIFY_NOTE,
   type CiCheckFailure,
   countMarkedRounds,
@@ -101,8 +107,6 @@ export {
   latestCompletedCheckRuns,
   verdictOfCheckRuns,
 };
-
-export const CI_MERGE_CONFLICT_ROUNDS_MAX = 2;
 
 export const CI_REQUIRED_CHECKS_TTL_MS = 600_000;
 
@@ -174,7 +178,7 @@ export function createCiPoller(
     closedSeenAt.delete(key);
     listFailures.delete(key);
   }
-  const knownRows = new Set<string>();
+  const rows = new KnownRows(deps);
   const liveKeys = new Set<string>();
   const grindKeys = new Set<string>();
   let sweeping = false;
@@ -184,70 +188,12 @@ export function createCiPoller(
     run.anonIpReadsPerHour ?? CI_ANON_IP_READS_PER_HOUR,
   );
 
-  function rowKnown(buildId: string, content: string, since: number): boolean {
-    const memo = `${buildId}\u0000${since}\u0000${content}`;
-    if (knownRows.has(memo)) return true;
-    if (!hasMessageRow(deps, buildId, 'system', content, since)) return false;
-    knownRows.add(memo);
-    return true;
-  }
-
   function stillOurs(cand: { buildId: string; todoId: string }, since: number): boolean {
     return (
       freshReviewRow(deps, cand.todoId, cand.buildId) !== null &&
       !hasActiveStep(deps, cand.buildId) &&
-      !rowKnown(cand.buildId, DONE_ROW, since)
+      !rows.has(cand.buildId, DONE_ROW, since)
     );
-  }
-
-  function mergeConflictRound(
-    cand: { buildId: string; todoId: string },
-    teamId: string,
-    pr: { prNumber: number; prUrl: string | null },
-    defaultBranch: string,
-    fromReview: boolean,
-  ): 'appended' | 'failed' | 'hinted' {
-    if (
-      run.threadPrWakes ||
-      deps.db.select().from(threadPr).where(eq(threadPr.buildId, cand.buildId)).get()
-    )
-      return 'hinted';
-    const rounds = countMarkedRounds(deps.db, cand.buildId, CI_MERGE_CONFLICT_PROMPT_HEAD);
-    if (rounds >= CI_MERGE_CONFLICT_ROUNDS_MAX) {
-      const text = `PR #${pr.prNumber} 与默认分支「${githubText(defaultBranch)}」冲突，已自动解冲突 ${rounds} 轮仍冲突：不再派解冲突步，由人处理（在 GitHub 上解决冲突，或打回重做）。`;
-      if (!fromReview) {
-        failWithMessage(deps, cand, teamId, text);
-        return 'failed';
-      }
-      hintOnce(cand.buildId, text, roundStart(deps, cand.buildId));
-      return 'hinted';
-    }
-    const reverify =
-      deps.db
-        .select({ id: step.id })
-        .from(step)
-        .where(and(eq(step.buildId, cand.buildId), eq(step.kind, 'verify')))
-        .get() !== undefined;
-    const stopsReview = stopUnclaimedGateSteps(deps, cand.buildId).includes('review');
-    if (fromReview) setTodoPhase(deps, cand.todoId, 'queued');
-    enqueueStep(
-      deps,
-      cand.buildId,
-      'build',
-      teamId,
-      buildMergeConflictPrompt({ ...pr, defaultBranch, round: rounds + 1 }),
-      undefined,
-      undefined,
-      { kind: 'merge-conflict', round: rounds + 1, roundsMax: CI_MERGE_CONFLICT_ROUNDS_MAX },
-    );
-    if (reverify) writeSystemRow(deps, cand.buildId, CI_MERGE_CONFLICT_VERIFY_NOTE);
-    if (stopsReview) writeSystemRow(deps, cand.buildId, CI_MERGE_CONFLICT_REVIEW_NOTE);
-    return 'appended';
-  }
-
-  function hintOnce(buildId: string, content: string, since: number): void {
-    if (rowKnown(buildId, content, since)) return;
-    writeSystemRow(deps, buildId, content);
   }
 
   async function ownBranchPull(
@@ -264,53 +210,7 @@ export function createCiPoller(
       base: recorded.defaultBranch,
     });
     if (list === null) return 'unreadable';
-    const own = list.filter(
-      (p) =>
-        p.headRepoId === recorded.baseRepoId &&
-        p.baseRepoId === recorded.baseRepoId &&
-        p.headRef === branch &&
-        p.baseRef === recorded.defaultBranch,
-    );
-    const changed = own.find(
-      (p) => p.number === recorded.number && (p.state === 'open' || p.merged),
-    );
-    if (changed !== undefined) return changed;
-    const adoptable = own.filter((p) => WRITE_AUTHOR_ASSOCIATIONS.has(p.authorAssociation ?? ''));
-    const open = adoptable.filter((p) => p.state === 'open');
-    const rejected = own.reduce(
-      (n, p) => (p.state === 'closed' && !p.merged && p.number > n ? p.number : n),
-      mergedAfter,
-    );
-    const pool = open.length > 0 ? open : adoptable.filter((p) => p.merged && p.number > rejected);
-    return pool.reduce<GithubBranchPull | null>(
-      (best, p) => (best === null || p.number > best.number ? p : best),
-      null,
-    );
-  }
-
-  function adoptPull(
-    buildId: string,
-    teamId: string,
-    fullName: string,
-    from: number,
-    to: GithubBranchPull,
-    reason: string,
-    since: number,
-  ): boolean {
-    const changed = deps.db
-      .update(build)
-      .set({ prNumber: to.number, prUrl: `https://github.com/${fullName}/pull/${to.number}` })
-      .where(and(eq(build.id, buildId), eq(build.prNumber, from)))
-      .run().changes;
-    if (changed === 0) return false;
-    const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-    if (row) deps.hub.publishBuildDoc(teamId, toBuildRecord(row));
-    hintOnce(
-      buildId,
-      `PR #${from} ${reason}；本任务工作分支「${conversationBranch(buildId)}」上${to.state === 'open' ? '开着' : '已合并'}的 PR #${to.number} 改记为本任务的 PR，对账接着读它。`,
-      since,
-    );
-    return true;
+    return pickOwnBranchPull(list, branch, recorded, mergedAfter);
   }
 
   async function reconcileOne(
@@ -398,6 +298,9 @@ export function createCiPoller(
       ) {
         if (state === 'dirty') {
           const done = mergeConflictRound(
+            deps,
+            rows,
+            run.threadPrWakes === true,
             cand,
             todoRow.teamId,
             { prNumber, prUrl: buildRow.prUrl },
@@ -409,7 +312,7 @@ export function createCiPoller(
             return;
           }
         } else {
-          hintOnce(
+          rows.hint(
             cand.buildId,
             `PR #${prNumber} 落后于默认分支「${githubText(target.baseBranch ?? pull.defaultBranch)}」。cairn 不替人更新分支，合并由人做：在 GitHub 上点 Update branch（即 PUT pulls/${prNumber}/update-branch，带 expected_head_sha 为当前 head），CI 重跑后再合并。`,
             roundStart(deps, cand.buildId),
@@ -460,6 +363,8 @@ export function createCiPoller(
         }
         if (own !== null && own !== 'unreadable' && own !== 'skipped') {
           const adopted = adoptPull(
+            deps,
+            rows,
             cand.buildId,
             todoRow.teamId,
             target.fullName,
@@ -473,17 +378,17 @@ export function createCiPoller(
           return;
         }
       }
-      hintOnce(cand.buildId, foreignText, since);
+      rows.hint(cand.buildId, foreignText, since);
       tally.reviewForeign += 1;
       return;
     }
-    if (rowKnown(cand.buildId, pull.merged ? DONE_ROW : closedText, since)) {
+    if (rows.has(cand.buildId, pull.merged ? DONE_ROW : closedText, since)) {
       tally.settledBefore += 1;
       return;
     }
     if (pull.merged) {
       if (pull.baseRef !== (target.baseBranch ?? pull.defaultBranch)) {
-        hintOnce(
+        rows.hint(
           cand.buildId,
           `PR #${prNumber} 合并进了分支「${githubText(pull.baseRef)}」，不是默认分支「${githubText(target.baseBranch ?? pull.defaultBranch)}」，改动还没进默认分支。任务留在审核关口，由人决定下一步。`,
           since,
@@ -528,7 +433,7 @@ export function createCiPoller(
         }
         if (status === 'unreadable') {
           if ((pairs.get(cmpKey)?.failures ?? 0) >= 2 && stillOurs(cand, since)) {
-            hintOnce(
+            rows.hint(
               cand.buildId,
               `PR #${prNumber} 已在 GitHub 合并，但暂时读不到 compare（GitHub 出错、超时或限流），无法确认分支提交 ${checkpoint.slice(0, 7)} 在这次合并里；稍后重试。`,
               since,
@@ -544,7 +449,7 @@ export function createCiPoller(
         if (status !== 'ahead' && status !== 'identical') {
           const head = pull.headSha.slice(0, 7);
           const cp = checkpoint.slice(0, 7);
-          hintOnce(
+          rows.hint(
             cand.buildId,
             status === 'missing'
               ? `PR #${prNumber} 已在 GitHub 合并（合并时 head ${head}），但 GitHub 上找不到分支提交 ${cp}（可能从没推送过），无法确认它在这次合并里。任务留在审核关口。`
@@ -586,7 +491,7 @@ export function createCiPoller(
       return;
     }
     if (pull.baseRef !== (target.baseBranch ?? pull.defaultBranch)) {
-      hintOnce(
+      rows.hint(
         cand.buildId,
         `PR #${prNumber} 的目标分支是「${githubText(pull.baseRef)}」，不是默认分支「${githubText(target.baseBranch ?? pull.defaultBranch)}」；它在 GitHub 关闭且未合并，可能是从工作分支往别的分支开的另一张 PR。对账不据它打回；任务留在审核关口，由人核对这张 PR。`,
         since,
@@ -622,6 +527,8 @@ export function createCiPoller(
     }
     if (found !== null) {
       const adopted = adoptPull(
+        deps,
+        rows,
         cand.buildId,
         todoRow.teamId,
         target.fullName,
@@ -722,6 +629,9 @@ export function createCiPoller(
         return;
       }
       const done = mergeConflictRound(
+        deps,
+        rows,
+        run.threadPrWakes === true,
         cand,
         todoRow.teamId,
         { prNumber: buildRow.prNumber, prUrl: buildRow.prUrl },
@@ -807,7 +717,7 @@ export function createCiPoller(
       const names = verdict.checks
         .map((c) => `「${githubText(c.name)}」（${githubText(c.conclusion)}）`)
         .join('、');
-      hintOnce(
+      rows.hint(
         cand.buildId,
         `PR #${buildRow.prNumber} 的 head ${own ? ref.slice(0, 7) : `分支「${githubText(branch)}」`} 上，检查 ${names} 的结论不算通过：磨绿不推进、也不派修复步。等它重跑，或由人处理。`,
         roundStart(deps, cand.buildId),
@@ -856,7 +766,7 @@ export function createCiPoller(
       own &&
       countMarkedRounds(deps.db, cand.buildId, CI_FIX_PROMPT_HEAD) > 0
     ) {
-      hintOnce(cand.buildId, CI_FIX_GREEN_EVENT, 0);
+      rows.hint(cand.buildId, CI_FIX_GREEN_EVENT, 0);
     }
     maybeEnqueueIndependentReview(deps, todoRow, cand.buildId);
     const lastVerifyAt = deps.db
@@ -1009,8 +919,7 @@ export function createCiPoller(
       }
     }
     const memoBuilds = new Set([...reviewBuilds, ...candidates.map((c) => c.buildId)]);
-    for (const k of knownRows)
-      if (!memoBuilds.has(k.slice(0, k.indexOf('\u0000')))) knownRows.delete(k);
+    rows.retain(memoBuilds);
     run.logger?.info(tally, 'ci pr-checks sweep');
   }
 
