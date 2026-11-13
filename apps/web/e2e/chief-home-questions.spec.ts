@@ -833,7 +833,7 @@ test('an answer upload in flight still blocks a chip answer and moving to anothe
   const state = {
     ...structuredClone(TWO),
     threads: [
-      { ...THREAD, activeRun: { phase: 'chief' }, pending: [{ messageId: 'q1', state: 'queued' }] },
+      { ...THREAD, activeRun: { phase: 'chief' }, pending: [{ messageId: 'q1', state: 'held' }] },
     ],
   };
   state.messages = [...state.messages, { id: 'q1', role: 'user', content: 'queued note', createdAt: 30 }];
@@ -901,7 +901,7 @@ test('answer drafts per request and the thread draft stay separate through every
   const state = {
     ...structuredClone(TWO),
     threads: [
-      { ...THREAD, activeRun: { phase: 'chief' }, pending: [{ messageId: 'q1', state: 'queued' }] },
+      { ...THREAD, activeRun: { phase: 'chief' }, pending: [{ messageId: 'q1', state: 'held' }] },
     ],
     todos: [{ ...TASK, phase: 'confirm' }],
   };

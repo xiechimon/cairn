@@ -92,8 +92,6 @@ export interface ComposerSurfaceProps {
   above: ReactNode;
   tools: ReactNode;
   menu?: ReactNode;
-  canStop: boolean;
-  onStop?: (() => void) | undefined;
   context?: ChiefContextUsage | null | undefined;
   threadId?: string | null;
   handleRef?: Ref<ComposerSurfaceHandle>;
@@ -121,8 +119,6 @@ export function ComposerSurface({
   above,
   tools,
   menu,
-  canStop,
-  onStop,
   context = null,
   threadId = null,
   handleRef,
@@ -200,7 +196,6 @@ export function ComposerSurface({
     },
     [textareaRef, composerRef],
   );
-  const stopMode = canStop && wire.draft === '' && wire.tokens.length === 0;
   const narrow = useNarrow();
   const hasDraft =
     send !== undefined
@@ -416,49 +411,31 @@ export function ComposerSurface({
               listboxId={slashListboxId}
             />
           </div>
-          {stopMode && send === undefined ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={t('停止 Coordinator 这次回复')}
-              className={narrow ? cn(ROUND_HIT_CLS, 'ml-auto') : cn(SEND_BTN_CLS, STOP_CLS)}
-              onClick={onStop}
-            >
-              {narrow ? (
-                <span className={`${ROUND_FACE_CLS} bg-(--hover-1)`}>
-                  <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
-                </span>
-              ) : (
-                <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
-              )}
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={send?.label ?? t('发送')}
-              data-testid={send?.testId}
-              disabled={send !== undefined && !send.enabled}
-              className={
-                narrow ? cn(ROUND_HIT_CLS, 'ml-auto') : cn(SEND_BTN_CLS, hasDraft && SEND_ON_CLS)
-              }
-              onClick={send?.onClick ?? wire.send}
-            >
-              {narrow ? (
-                <span
-                  className={cn(
-                    ROUND_FACE_CLS,
-                    'bg-(--hover-1)',
-                    hasDraft ? 'text-foreground' : 'text-content-tertiary',
-                  )}
-                >
-                  <ArrowUp width={20} height={20} />
-                </span>
-              ) : (
-                <CornerDownLeft width={20} height={20} />
-              )}
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={send?.label ?? t('发送')}
+            data-testid={send?.testId}
+            disabled={send !== undefined && !send.enabled}
+            className={
+              narrow ? cn(ROUND_HIT_CLS, 'ml-auto') : cn(SEND_BTN_CLS, hasDraft && SEND_ON_CLS)
+            }
+            onClick={send?.onClick ?? wire.send}
+          >
+            {narrow ? (
+              <span
+                className={cn(
+                  ROUND_FACE_CLS,
+                  'bg-(--hover-1)',
+                  hasDraft ? 'text-foreground' : 'text-content-tertiary',
+                )}
+              >
+                <ArrowUp width={20} height={20} />
+              </span>
+            ) : (
+              <CornerDownLeft width={20} height={20} />
+            )}
+          </Button>
         </div>
         {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
         <input
