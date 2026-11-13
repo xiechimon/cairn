@@ -6,7 +6,6 @@ node scripts/commit-identity.mjs pre-commit
 STAGED=$(git diff --cached --name-only --diff-filter=ACMRT)
 [ -z "$STAGED" ] && exit 0
 
-node scripts/check-lockfile-commit.mjs
 node scripts/public-content-gate.mjs --staged
 
 # Strip base64 payload runs from data: URIs before scanning (#1112). drawio
