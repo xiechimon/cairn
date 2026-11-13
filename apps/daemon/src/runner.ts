@@ -39,7 +39,6 @@ import {
   classifyStepFailure,
   composeTaskPromptWithInstruction,
   conversationBranch,
-  gitCredentialRowContent,
   isBackendRuntimeId,
   isBuildStepKind,
   isIssueSourcedTask,
@@ -57,7 +56,6 @@ import {
   stepTakesSecrets,
   stripAnsiEscapes,
   transcriptPromptRowId,
-  workspaceHookRowContent,
 } from '@cairn/shared';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { z } from 'zod';
@@ -107,6 +105,7 @@ import {
   stepMcpEndpoints,
 } from './step-skill-tool.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
+import { seedStepTranscript } from './step-transcript-seed.js';
 import { StepTranscriptStream } from './step-transcript-stream.js';
 import { prepareStepWorkspace, prepareVerifyClone } from './step-workspace.js';
 import {
@@ -877,47 +876,21 @@ async function runClaimedStep(
     redact,
   );
   deps.stepTranscripts?.set(stepId, transcript);
-  if (skippedNoVisionCount > 0) {
-    transcript.upsert({
-      id: `image-skip-${stepId}`,
-      role: 'system',
-      content: `图片未被模型读取：模型 ${modelKey} 不支持图片输入，${skippedNoVisionCount} 张图片未下载（步骤继续执行，请以文字描述或改用支持图片的模型）`,
-      createdAt: now(),
-    });
-  }
-  if (prompt !== null) {
-    transcript.upsert({
-      id: transcriptPromptRowId(stepId),
-      role: 'user',
-      content: prompt,
-      createdAt: now(),
-    });
-  }
-  for (const [index, hook] of [...(opts.hookNotes ?? []), ...(ws?.hooks ?? [])].entries()) {
-    const output =
-      opts.hookNotes?.includes(hook) &&
-      hook.output.startsWith('orb: started in') &&
-      opts.orbStartedAt !== undefined
-        ? `orb: started in ${Math.max(0, now() - opts.orbStartedAt)}ms`
-        : hook.output;
-    transcript.upsert({
-      id: opts.hookNotes?.includes(hook)
-        ? `orb-hook-${index}-${stepId}`
-        : `hook-${hook.name}-${stepId}`,
-      role: 'system',
-      content: workspaceHookRowContent(hook, redact(output)),
-      createdAt: now(),
-    });
-  }
-
-  if (repo !== null && repo.kind === 'github' && ws !== null) {
-    transcript.upsert({
-      id: `git-credential-${stepId}`,
-      role: 'system',
-      content: gitCredentialRowContent(ws.credentialSource ?? 'integration'),
-      createdAt: now(),
-    });
-  }
+  seedStepTranscript(transcript, {
+    stepId,
+    now,
+    modelKey,
+    skippedNoVisionCount,
+    prompt,
+    orbHookNotes: opts.hookNotes ?? [],
+    orbStartedAt: opts.orbStartedAt,
+    workspaceHooks: ws?.hooks ?? [],
+    gitCredentialSource:
+      repo !== null && repo.kind === 'github' && ws !== null
+        ? (ws.credentialSource ?? 'integration')
+        : null,
+    redact,
+  });
 
   if (
     ws !== null &&
