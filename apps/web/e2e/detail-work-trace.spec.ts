@@ -194,7 +194,7 @@ test('work groups consecutive thinking and calls, with only the last block expan
   await expect(read).toContainText('1.3s');
   await expect(read).not.toContainText('/home/user');
   await read.click();
-  await expect(block.getByTestId('tool-output')).toContainText('export const ready = true;');
+  await expect(read.locator('..').getByTestId('tool-output')).toContainText('export const ready = true;');
   await block.getByTestId('work-think').click();
   await expect(block.getByTestId('thinking-body')).toHaveText(LONG_THINKING);
   await expect(page.getByTestId('work-block').last().getByTestId('work-spinner')).toBeVisible();
@@ -209,8 +209,8 @@ test('call details preserve commands, cap output and show edit lines', async ({ 
   await expect(run).toContainText('Verify changes');
   await expect(run).toContainText('12s');
   await run.click();
-  const output = block.getByTestId('tool-output');
-  await expect(block.locator('.work-code-header')).toContainText('$ pnpm test');
+  const output = run.locator('..').getByTestId('tool-output');
+  await expect(run.locator('..').locator('.work-code-header')).toContainText('$ pnpm test');
   await expect(output).toContainText('output line 40');
   await expect(output).not.toContainText('output line 41');
   await expect(block).toContainText('还有 5 行');
@@ -218,12 +218,12 @@ test('call details preserve commands, cap output and show edit lines', async ({ 
   await expect(edit).toContainText('+2');
   await expect(edit).toContainText('−1');
   await edit.click();
-  await expect(block.getByTestId('tool-output').last()).toContainText('old line');
-  await expect(block.getByTestId('tool-output').last()).toContainText('new line');
+  await expect(edit.locator('..').getByTestId('tool-output')).toContainText('old line');
+  await expect(edit.locator('..').getByTestId('tool-output')).toContainText('new line');
   await expect(block.getByTestId('work-call').last()).toContainText('docs · lookup');
   const failed = block.getByTestId('work-call').filter({ hasText: 'src/other.ts' });
   await expect(failed.getByText('失败')).toBeVisible();
-  await failed.click();
+  await expect(failed).toHaveAttribute('aria-expanded', 'true');
   await expect(block.getByTestId('edit-error')).toHaveText('old_string not found in src/other.ts');
 });
 
