@@ -34,6 +34,7 @@ import {
   newChiefThreadId,
   orchestratedTodoIdOf,
   redactSecrets,
+  SUGGEST_REPLIES_TOOL_NAME,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   threadMessageContentSchema,
   titleAuthor,
@@ -369,7 +370,7 @@ export function coordinatorThreadRow(deps: ChiefDeps, chiefRow: ChiefRow): Threa
 const CHANNEL_GREETING_OPEN = '【新频道】';
 
 function channelGreetingPrompt(ownerName: string, projectName: string): string {
-  return `${CHANNEL_GREETING_OPEN}用户刚打开项目「${projectName}」的新频道，还没有说话。用 1 到 3 句话、以「${ownerName}」称呼用户打招呼；系统提示「等人处理」里有属于这个项目的任务就提一句，没有就不提；最后问用户想在这个项目里做什么。不要建任务。`;
+  return `${CHANNEL_GREETING_OPEN}用户刚打开项目「${projectName}」的新频道，还没有说话。用 1 到 3 句话、以「${ownerName}」称呼用户打招呼；系统提示「等人处理」里有属于这个项目的任务就提一句，没有就不提；最后问用户想在这个项目里做什么。写问候之前必须先调用 ${SUGGEST_REPLIES_TOOL_NAME}，给 2 到 3 个这个项目里此刻最可能要做的事，每个是用户会直接发出的一句短话，比如处理某个等人处理的任务、接着最近的活或给这个项目做个计划；不能省略这一步。不要建任务。`;
 }
 
 export function openProjectChannel(

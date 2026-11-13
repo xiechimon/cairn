@@ -46,6 +46,6 @@ test('five expired machines and three expired subscriptions stay one banner and 
   await expect(composer).toBeVisible();
   const box = await composer.boundingBox();
   expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(667);
-  const body = await home.getByTestId('chief-home-scroll').boundingBox();
+  const body = await home.getByTestId('chief-body').boundingBox();
   expect(body?.height ?? 0).toBeGreaterThanOrEqual(200);
 });
