@@ -1,18 +1,17 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { makeTestTempDir } from './test-tmpdir.mjs';
 
-function runStep(t, file, name, env) {
+function runStep(file, name, env) {
   const text = readFileSync(file, 'utf8');
   const step = text.split('      - ').find((part) => part.startsWith(`name: ${name}\n`));
   assert.ok(step, `Missing step ${name}`);
   const body = step.match(/ {8}run: \|\n((?: {10}.*\n|\n)+)/)?.[1].replace(/^ {10}/gm, '');
   assert.ok(body);
-  const dir = mkdtempSync(join(tmpdir(), 'brake-workflow-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const dir = makeTestTempDir('brake-workflow-');
   const calls = join(dir, 'calls');
   writeFileSync(calls, '');
   writeFileSync(
@@ -40,8 +39,8 @@ function runStep(t, file, name, env) {
   });
   return { result, dir, calls: () => readFileSync(calls, 'utf8') };
 }
-test('workflow_run success resumes instead of pausing', (t) => {
-  const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+test('workflow_run success resumes instead of pausing', () => {
+  const f = runStep('.github/workflows/autonomy-brake.yml', 'Apply the brake', {
     EVENT_NAME: 'workflow_run',
     CONCLUSION: 'success',
     HEAD_BRANCH: 'main',
@@ -49,8 +48,8 @@ test('workflow_run success resumes instead of pausing', (t) => {
   assert.equal(f.result.status, 0, f.result.stderr);
   assert.equal(f.calls(), 'scripts/autonomy-brake.mjs resume\n');
 });
-test('a green run from a fork cannot resume', (t) => {
-  const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+test('a green run from a fork cannot resume', () => {
+  const f = runStep('.github/workflows/autonomy-brake.yml', 'Apply the brake', {
     EVENT_NAME: 'workflow_run',
     CONCLUSION: 'success',
     HEAD_REPOSITORY: 'fork/repo',
@@ -59,16 +58,16 @@ test('a green run from a fork cannot resume', (t) => {
   assert.equal(f.result.status, 0, f.result.stderr);
   assert.equal(f.calls(), '');
 });
-test('schedule sweeps the markers and then tries to resume', (t) => {
-  const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+test('schedule sweeps the markers and then tries to resume', () => {
+  const f = runStep('.github/workflows/autonomy-brake.yml', 'Apply the brake', {
     EVENT_NAME: 'schedule',
     PAUSED: 'true',
   });
   assert.equal(f.result.status, 0, f.result.stderr);
   assert.equal(f.calls(), 'scripts/autonomy-brake.mjs sweep\nscripts/autonomy-brake.mjs resume\n');
 });
-test('a cancelled main ci run does not pause or sweep', (t) => {
-  const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+test('a cancelled main ci run does not pause or sweep', () => {
+  const f = runStep('.github/workflows/autonomy-brake.yml', 'Apply the brake', {
     EVENT_NAME: 'workflow_run',
     CONCLUSION: 'cancelled',
     HEAD_BRANCH: 'main',
@@ -79,8 +78,8 @@ test('a cancelled main ci run does not pause or sweep', (t) => {
   assert.equal(f.calls(), '');
 });
 for (const conclusion of ['failure', 'timed_out', 'startup_failure', 'action_required']) {
-  test(`a main ci run that ends ${conclusion} still pauses`, (t) => {
-    const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+  test(`a main ci run that ends ${conclusion} still pauses`, () => {
+    const f = runStep('.github/workflows/autonomy-brake.yml', 'Apply the brake', {
       EVENT_NAME: 'workflow_run',
       CONCLUSION: conclusion,
       HEAD_BRANCH: 'main',
@@ -91,16 +90,16 @@ for (const conclusion of ['failure', 'timed_out', 'startup_failure', 'action_req
     assert.match(f.calls(), /pause --reason/);
   });
 }
-test('schedule without a marker restores head signals without opening a marker', (t) => {
-  const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+test('schedule without a marker restores head signals without opening a marker', () => {
+  const f = runStep('.github/workflows/autonomy-brake.yml', 'Apply the brake', {
     EVENT_NAME: 'schedule',
   });
   assert.equal(f.result.status, 0, f.result.stderr);
   assert.doesNotMatch(f.calls(), /pause --reason/);
   assert.match(f.calls(), /sweep/);
 });
-test('failed main workflow pauses and synchronizes the brake', (t) => {
-  const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+test('failed main workflow pauses and synchronizes the brake', () => {
+  const f = runStep('.github/workflows/autonomy-brake.yml', 'Apply the brake', {
     EVENT_NAME: 'workflow_run',
     CONCLUSION: 'failure',
     HEAD_BRANCH: 'main',
@@ -111,8 +110,8 @@ test('failed main workflow pauses and synchronizes the brake', (t) => {
   assert.match(f.calls(), /pause --reason.*abc.*https:\/\/example.com\/run/);
 });
 for (const conclusion of ['failure', 'timed_out', 'startup_failure', 'action_required'])
-  test(`attempt 1 ${conclusion} reruns failed jobs and does not pause`, (t) => {
-    const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+  test(`attempt 1 ${conclusion} reruns failed jobs and does not pause`, () => {
+    const f = runStep('.github/workflows/autonomy-brake.yml', 'Apply the brake', {
       EVENT_NAME: 'workflow_run',
       CONCLUSION: conclusion,
       HEAD_BRANCH: 'main',
@@ -127,8 +126,8 @@ for (const conclusion of ['failure', 'timed_out', 'startup_failure', 'action_req
     assert.doesNotMatch(f.calls(), /(?:^|\n)run rerun/);
   });
 for (const attempt of ['2', '3'])
-  test(`attempt ${attempt} of the same SHA pauses without another rerun`, (t) => {
-    const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+  test(`attempt ${attempt} of the same SHA pauses without another rerun`, () => {
+    const f = runStep('.github/workflows/autonomy-brake.yml', 'Apply the brake', {
       EVENT_NAME: 'workflow_run',
       CONCLUSION: 'failure',
       HEAD_BRANCH: 'main',
@@ -141,8 +140,8 @@ for (const attempt of ['2', '3'])
     assert.match(f.calls(), /pause --reason.*abc.*https:\/\/example.com\/run/);
     assert.doesNotMatch(f.calls(), /rerun-failed/);
   });
-test('a failed first rerun still pauses', (t) => {
-  const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+test('a failed first rerun still pauses', () => {
+  const f = runStep('.github/workflows/autonomy-brake.yml', 'Apply the brake', {
     EVENT_NAME: 'workflow_run',
     CONCLUSION: 'failure',
     HEAD_BRANCH: 'main',
@@ -162,8 +161,8 @@ test('the workflow forwards run_attempt and the run id', () => {
   assert.match(text, /RUN_ID: \$\{\{ github\.event\.workflow_run\.id \}\}/);
 });
 for (const valid of [false, true])
-  test(`paused PR recovery=${valid} gates and disarms correctly`, (t) => {
-    const f = runStep(t, '.github/workflows/pr-evidence.yml', 'Check the autonomy brake', {
+  test(`paused PR recovery=${valid} gates and disarms correctly`, () => {
+    const f = runStep('.github/workflows/pr-evidence.yml', 'Check the autonomy brake', {
       PAUSED: 'true',
       RECOVERY_EXIT: valid ? '0' : '1',
       PR_NUMBER: '7',
@@ -196,8 +195,8 @@ test('required check shape retains unconditional job, trigger coverage, and brak
   assert.doesNotMatch(text, /hold\.flag|coordinator-hold/);
 });
 
-test('paused schedule sweeps and workflow permissions and triggers retain the outage path', (t) => {
-  const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+test('paused schedule sweeps and workflow permissions and triggers retain the outage path', () => {
+  const f = runStep('.github/workflows/autonomy-brake.yml', 'Apply the brake', {
     EVENT_NAME: 'schedule',
     PAUSED: 'true',
   });
@@ -219,8 +218,70 @@ test('paused schedule sweeps and workflow permissions and triggers retain the ou
   assert.match(text, /ref: main\n\s+fetch-depth: 0/);
 });
 
-test('PR evidence executes only the trusted base brake', (t) => {
-  const f = runStep(t, '.github/workflows/pr-evidence.yml', 'Check the autonomy brake', {
+function readStep() {
+  const text = readFileSync('.github/workflows/pr-evidence.yml', 'utf8');
+  const step = text
+    .split('      - ')
+    .find((part) => part.startsWith('name: Read the PR as it is now\n'));
+  return step.match(/ {8}run: \|\n((?: {10}.*\n|\n)+)/)?.[1].replace(/^ {10}/gm, '');
+}
+
+function runRead(gh) {
+  const dir = makeTestTempDir('pr-read-');
+  const calls = join(dir, 'calls');
+  writeFileSync(calls, '');
+  writeFileSync(join(dir, 'gh'), gh, { mode: 0o755 });
+  writeFileSync(
+    join(dir, 'jq'),
+    '#!/bin/sh\nif [ "$1" = "-r" ]; then printf kept; else cat; fi\n',
+    { mode: 0o755 },
+  );
+  const result = spawnSync('bash', ['-e', '-c', readStep()], {
+    cwd: dir,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      PATH: `${dir}:${process.env.PATH}`,
+      CALLS: calls,
+      RUNNER_TEMP: dir,
+      GITHUB_OUTPUT: join(dir, 'output'),
+      GITHUB_REPOSITORY: 'owner/repo',
+      PR_NUMBER: '4088',
+      PR_READ_BACKOFF: '0',
+    },
+  });
+  return { result, dir, calls: () => readFileSync(calls, 'utf8') };
+}
+
+test('reading the PR retries a transient 5xx and then writes the body', () => {
+  const f = runRead(
+    `#!/bin/sh
+echo "$*" >> "$CALLS"
+n=$(grep -c . "$CALLS")
+if [ "$n" -lt 3 ]; then echo 'gh: HTTP 503' >&2; exit 1; fi
+printf '%s\\n' '{"draft":false,"body":"kept"}'
+`,
+  );
+  assert.equal(f.result.status, 0, f.result.stderr);
+  assert.equal(f.calls().trim().split('\n').length, 3);
+  assert.equal(readFileSync(join(f.dir, 'pr-body.md'), 'utf8').trim(), 'kept');
+});
+
+test('reading the PR fails when the 5xx persists', () => {
+  const f = runRead('#!/bin/sh\necho "$*" >> "$CALLS"\necho "gh: HTTP 503" >&2\nexit 1\n');
+  assert.equal(f.result.status, 1);
+  assert.equal(f.calls().trim().split('\n').length, 3);
+  assert.match(f.result.stderr, /HTTP 503/);
+});
+
+test('reading the PR does not retry a 4xx', () => {
+  const f = runRead('#!/bin/sh\necho "$*" >> "$CALLS"\necho "gh: HTTP 404" >&2\nexit 1\n');
+  assert.equal(f.result.status, 1);
+  assert.equal(f.calls().trim().split('\n').length, 1);
+});
+
+test('PR evidence executes only the trusted base brake', () => {
+  const f = runStep('.github/workflows/pr-evidence.yml', 'Check the autonomy brake', {
     PR_NUMBER: '7',
   });
   assert.equal(f.result.status, 0, f.result.stderr);
@@ -247,8 +308,8 @@ test('the trusted brake copy runs alone from RUNNER_TEMP', () => {
   }
 });
 for (const conclusion of ['timed_out'])
-  test(`main push conclusion ${conclusion} applies the brake`, (t) => {
-    const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+  test(`main push conclusion ${conclusion} applies the brake`, () => {
+    const f = runStep('.github/workflows/autonomy-brake.yml', 'Apply the brake', {
       EVENT_NAME: 'workflow_run',
       CONCLUSION: conclusion,
       HEAD_BRANCH: 'main',
@@ -257,8 +318,8 @@ for (const conclusion of ['timed_out'])
     assert.match(f.calls(), /pause --reason/);
   });
 for (const event of ['pull_request', 'push'])
-  test(`fork main ${event} cannot apply the brake`, (t) => {
-    const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+  test(`fork main ${event} cannot apply the brake`, () => {
+    const f = runStep('.github/workflows/autonomy-brake.yml', 'Apply the brake', {
       EVENT_NAME: 'workflow_run',
       RUN_EVENT: event,
       HEAD_REPOSITORY: 'fork/repo',
@@ -270,8 +331,8 @@ for (const event of ['pull_request', 'push'])
   });
 
 for (const paused of ['true', 'false'])
-  test(`issues event sweeps current marker state: paused=${paused}`, (t) => {
-    const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+  test(`issues event sweeps current marker state: paused=${paused}`, () => {
+    const f = runStep('.github/workflows/autonomy-brake.yml', 'Apply the brake', {
       EVENT_NAME: 'issues',
       PAUSED: paused,
       FAILED_SHA: '',

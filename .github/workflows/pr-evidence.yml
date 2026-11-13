@@ -93,7 +93,16 @@ jobs:
       # classic-projects field and can fail without applying the edit.
       - name: Read the PR as it is now
         run: |
-          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pr.json"
+          for attempt in 1 2 3; do
+            if gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pr.json" 2>"$RUNNER_TEMP/pr.err"; then
+              break
+            fi
+            cat "$RUNNER_TEMP/pr.err" >&2
+            if [ "$attempt" -eq 3 ] || ! grep -q 'HTTP 5[0-9][0-9]' "$RUNNER_TEMP/pr.err"; then
+              exit 1
+            fi
+            sleep "${PR_READ_BACKOFF:-$((attempt * 2))}"
+          done
           jq -r '.body // ""' "$RUNNER_TEMP/pr.json" > "$RUNNER_TEMP/pr-body.md"
           echo "draft=$(jq -r '.draft' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
         id: pr
