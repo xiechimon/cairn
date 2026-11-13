@@ -1,5 +1,0 @@
-pr-evidence: sections: 1/2 answered
-FAIL missing-section: Verified
-pr-evidence: scanned 0 image link(s)
-pr-evidence: RED (1 problem(s))
-exit=1

@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
-const EVIDENCE = join(REPO, 'docs/verify/1259');
+const EVIDENCE =
+  process.env.VERIFY_EVIDENCE_DIR ?? join(REPO, '.claude/verify-evidence/1259-mea-live');
 mkdirSync(EVIDENCE, { recursive: true });
 
 const WEB = process.env.MEA_WEB ?? 'http://127.0.0.1:5274';

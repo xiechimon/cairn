@@ -519,7 +519,7 @@ jobs:
           VP_REACH_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git fetch origin "${VP_REACH_BASE_SHA:-main}"
-          node --test docs/verify/1542/reach.test.mjs
+          node --test scripts/probe-reach.test.mjs
           node .claude/skills/verify-cairn/scripts/vp-registry-gate.mjs --check-reach
 
       - name: Dispatch agent start/check round trip (#1556)

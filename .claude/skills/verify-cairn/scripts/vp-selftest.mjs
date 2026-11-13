@@ -1217,7 +1217,7 @@ const cases = [
     },
   ],
   [
-    'stale ticket-named probes are archived under docs/verify, not in scripts/',
+    'stale ticket-named probes are archived under the skill archive, not in scripts/',
     () => {
       const stale = [];
       for (const [feature, entry] of Object.entries(REGISTRY.features)) {
@@ -1225,7 +1225,7 @@ const cases = [
           const base = c.script.split('/').pop();
           if (c.status !== 'stale' || !/^drive-\d/.test(base)) continue;
           const id = base.match(/^drive-(\d+(?:-\d+)?)/)[1];
-          const archived = `docs/verify/${id}/${base}`;
+          const archived = `.claude/skills/verify-cairn/archive/${id}/${base}`;
           if (c.script !== archived || !existsSync(resolve(ROOT, archived))) stale.push(`${feature}/${name} ${c.script}`);
         }
       }
@@ -1361,26 +1361,26 @@ const cases = [
     },
   ],
   [
-    'the registry gate allows an archived ticket script only at docs/verify/<ticket>/<script>',
+    'the registry gate allows an archived ticket script only at archive/<ticket>/<script>',
     () => {
-      const outside = 'docs/verify/1500/drive-1500-new.mjs';
-      const featureNamed = 'docs/verify/1500/drive-hotkeys-copy.mjs';
+      const outside = '.claude/skills/verify-cairn/archive/1500/drive-1500-new.mjs';
+      const featureNamed = '.claude/skills/verify-cairn/archive/1500/drive-hotkeys-copy.mjs';
       const registry = gateRegistry({
         ticket: { ...STUB, script: outside },
         feature: { ...STUB, script: featureNamed },
       });
       const r = runGate(registry, GATE_SCRIPTS, GATE_MAPS, [outside, featureNamed]);
       const archived = runGate(
-        gateRegistry({ moved: { ...STUB, script: 'docs/verify/902/drive-902-gate-actor.mjs' } }),
+        gateRegistry({ moved: { ...STUB, script: '.claude/skills/verify-cairn/archive/902/drive-902-gate-actor.mjs' } }),
         GATE_SCRIPTS,
         GATE_MAPS,
-        ['docs/verify/902/drive-902-gate-actor.mjs'],
+        ['.claude/skills/verify-cairn/archive/902/drive-902-gate-actor.mjs'],
       );
       const wrongDir = runGate(
-        gateRegistry({ moved: { ...STUB, script: 'docs/verify/900/drive-902-gate-actor.mjs' } }),
+        gateRegistry({ moved: { ...STUB, script: '.claude/skills/verify-cairn/archive/900/drive-902-gate-actor.mjs' } }),
         GATE_SCRIPTS,
         GATE_MAPS,
-        ['docs/verify/900/drive-902-gate-actor.mjs'],
+        ['.claude/skills/verify-cairn/archive/900/drive-902-gate-actor.mjs'],
       );
       const backInScripts = runGate(
         gateRegistry({ legacy: { ...STUB, script: `${GATE_DIR}drive-902-gate-actor.mjs` } }),
@@ -1390,7 +1390,7 @@ const cases = [
       const bad = [
         [r.code === 1 && r.out.includes(`t/ticket: ${outside} is named after a ticket`) && !r.out.includes('t/feature:'), 'new ticket script'],
         [archived.code === 0, `archived exit ${archived.code}: ${archived.out.trim().split('\n')[0]}`],
-        [wrongDir.code === 1 && wrongDir.out.includes('docs/verify/900/drive-902-gate-actor.mjs is named after a ticket'), 'wrong dir'],
+        [wrongDir.code === 1 && wrongDir.out.includes('.claude/skills/verify-cairn/archive/900/drive-902-gate-actor.mjs is named after a ticket'), 'wrong dir'],
         [backInScripts.code === 1 && backInScripts.out.includes('scripts/drive-902-gate-actor.mjs: named after a ticket'), 'back in scripts'],
       ].filter(([ok]) => !ok);
       for (const [, why] of bad) console.log(`      ${why}`);
