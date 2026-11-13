@@ -103,7 +103,12 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   {
     method: 'GET',
     path: '/api/teams/{id}/chief/threads',
-    note: 'only the one global Coordinator thread (D58)',
+    note: 'the main Coordinator thread first, then one thread per opened project channel',
+  },
+  {
+    method: 'POST',
+    path: '/api/teams/{id}/chief/channels/{projectId}',
+    note: 'find or create the project channel thread; 201 with a greeting turn queued when created, 200 when it exists; 404 for a project outside the team, 409 when archived',
   },
   {
     method: 'GET',

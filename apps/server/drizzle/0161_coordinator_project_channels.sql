@@ -1,0 +1,3 @@
+DROP INDEX `chief_thread_coordinator_unique`;--> statement-breakpoint
+CREATE UNIQUE INDEX `chief_thread_channel_unique` ON `chief_thread` (`chiefId`,`projectId`) WHERE "chief_thread"."archivedAt" is null and "chief_thread"."projectId" is not null;--> statement-breakpoint
+CREATE UNIQUE INDEX `chief_thread_coordinator_unique` ON `chief_thread` (`chiefId`) WHERE "chief_thread"."archivedAt" is null and "chief_thread"."projectId" is null and "chief_thread"."id" not like 'chief-digest-%';

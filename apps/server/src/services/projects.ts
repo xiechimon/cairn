@@ -209,7 +209,10 @@ export function deleteProject(
       }
     }
     moveProjectMemoriesToTeam(tx, id);
-    tx.update(chiefThread).set({ projectId: null }).where(eq(chiefThread.projectId, id)).run();
+    tx.update(chiefThread)
+      .set({ projectId: null, archivedAt: sql`coalesce(${chiefThread.archivedAt}, ${nowMs()})` })
+      .where(eq(chiefThread.projectId, id))
+      .run();
     tx.delete(project).where(eq(project.id, id)).run();
     beforeCommit?.(tx, row);
     if (row.repoKind === 'hosted' && row.repoName !== null) {

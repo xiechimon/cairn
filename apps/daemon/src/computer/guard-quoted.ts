@@ -229,7 +229,7 @@ function wordsHaveLifecycleHazard(words: readonly string[]): boolean {
   let sawServiceAction = false;
   for (const word of words) {
     const folded = word.toLowerCase();
-    if (/(?:\.browser-profiles|--user-data-dir)/.test(folded)) return true;
+    if (BROWSER_STATE_PATHS.some((path) => folded.includes(path))) return true;
     if (/(?:\/tmp\/\.x11-unix|\/tmp\/\.x\d+-lock)/.test(folded)) return true;
     const base = folded.split('/').at(-1) ?? '';
     if (/^(?:kill|pkill|killall|xkill)$/.test(base)) return true;
@@ -286,7 +286,9 @@ const SPLICE_SOLO_COMMANDS = ['kill', 'pkill', 'killall', 'xkill'];
 
 const SPLICE_SERVICE_COMMANDS = ['systemctl', 'service'];
 
-const SPLICE_PATHS = ['.browser-profiles', '--user-data-dir', '/tmp/.x11-unix'];
+export const BROWSER_STATE_PATHS = ['.browser-profiles', '.agent-browser', '--user-data-dir'];
+
+const SPLICE_PATHS = [...BROWSER_STATE_PATHS, '/tmp/.x11-unix'];
 
 function affixMatches(first: string, last: string, value: string): boolean {
   return (
@@ -683,7 +685,7 @@ function overflowLifecycle(piece: SplicePiece): {
     if (basenamePossible(segments, holes, name))
       return { hazard: true, service: false, action: false };
   }
-  for (const snippet of ['.browser-profiles', '--user-data-dir', '/tmp/.x11-unix']) {
+  for (const snippet of SPLICE_PATHS) {
     if (scanSpliceTarget(segments, holes, snippet).contains) {
       return { hazard: true, service: false, action: false };
     }

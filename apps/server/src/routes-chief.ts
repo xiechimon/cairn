@@ -18,6 +18,7 @@ import {
   getChiefEnvelope,
   getChiefThread,
   listChiefThreads,
+  openProjectChannel,
   patchChief,
   rewindChiefThread,
   sendChiefMessageFromComposer,
@@ -98,6 +99,13 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     const { result, replayed } = sendChiefMessageFromComposer(svc, teamId, body);
     if (!replayed) ctx.convHub?.publishMessage(result.thread.id, { ...result.message });
     return c.json(result, 201);
+  });
+
+  app.post('/api/teams/:id/chief/channels/:projectId', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const { thread, created } = openProjectChannel(svc, teamId, c.req.param('projectId'));
+    return c.json(thread, created ? 201 : 200);
   });
 
   app.post('/api/teams/:id/chief/threads/:tid/rewind', async (c) => {
