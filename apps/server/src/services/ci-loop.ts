@@ -8,11 +8,9 @@ import {
   type GithubPull,
   githubBranchPulls,
   githubCommitCheckRuns,
-  githubCompareStatus,
   githubPull,
   githubRequiredChecks,
   hasPullFields,
-  isFullSha,
   isOwnPull,
 } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
@@ -58,6 +56,11 @@ import {
   writeSystemRow,
 } from './ci-loop-rows.js';
 import {
+  CI_MISSING_COMPARE_RECHECK_MS,
+  MergedCompareCache,
+  mergedCheckpointHint,
+} from './ci-merged-compare.js';
+import {
   adoptPull,
   CI_MERGE_CONFLICT_ROUNDS_MAX,
   mergeConflictRound,
@@ -77,8 +80,6 @@ import { blockingWorkerQuestions } from './worker-question-store.js';
 export const CI_POLL_INTERVAL_MS = 60_000;
 
 export const CI_ANON_READ_INTERVAL_MS = 300_000;
-
-export const CI_MISSING_COMPARE_RECHECK_MS = 600_000;
 
 export const CI_ANON_READS_PER_HOUR = 20;
 
@@ -101,6 +102,7 @@ export {
   CI_MERGE_CONFLICT_REVIEW_NOTE,
   CI_MERGE_CONFLICT_ROUNDS_MAX,
   CI_MERGE_CONFLICT_VERIFY_NOTE,
+  CI_MISSING_COMPARE_RECHECK_MS,
   type CiCheckFailure,
   countMarkedRounds,
   deadLoopMessage,
@@ -166,10 +168,6 @@ export function createCiPoller(
   const grindPullCache = new Map<string, PullCacheEntry>();
   const requiredCache = new Map<string, { at: number; names: string[] | null }>();
   const anonReadAt = new Map<string, number>();
-  const compareCache = new Map<
-    string,
-    Map<string, { status: string; at: number; failures: number }>
-  >();
   const foreignListedAt = new Map<string, number>();
   const listFailures = new Map<string, number>();
   const lastReadByBuild = new Map<string, number>();
@@ -187,6 +185,7 @@ export function createCiPoller(
     run.anonReadsPerHour ?? CI_ANON_READS_PER_HOUR,
     run.anonIpReadsPerHour ?? CI_ANON_IP_READS_PER_HOUR,
   );
+  const compares = new MergedCompareCache(run.githubFetch, anonBudget);
 
   function stillOurs(cand: { buildId: string; todoId: string }, since: number): boolean {
     return (
@@ -403,39 +402,16 @@ export function createCiPoller(
         return;
       }
       if (checkpoint !== null && pull.headSha !== null && checkpoint !== pull.headSha) {
-        const pairs = compareCache.get(key) ?? new Map();
-        compareCache.set(key, pairs);
-        const cmpKey = `${checkpoint}...${pull.headSha}`;
-        const cached = pairs.get(cmpKey);
-        let status =
-          cached === undefined ||
-          ((cached.status === 'missing' || cached.status === 'unreadable') &&
-            now - cached.at >= CI_MISSING_COMPARE_RECHECK_MS)
-            ? null
-            : cached.status;
-        if (status === null) {
-          const sendsRequest = isFullSha(checkpoint) && isFullSha(pull.headSha);
-          if (token === null && sendsRequest && !anonBudget.take(now)) {
-            tally.reviewSkipped += 1;
-            return;
-          }
-          status =
-            (await githubCompareStatus(
-              run.githubFetch,
-              token,
-              target.owner,
-              target.repo,
-              checkpoint,
-              pull.headSha,
-            )) ?? 'unreadable';
-          const failures = status === 'unreadable' ? (cached?.failures ?? 0) + 1 : 0;
-          pairs.set(cmpKey, { status, at: now, failures });
+        const read = await compares.read(key, target, token, checkpoint, pull.headSha, now);
+        if (read === 'skipped') {
+          tally.reviewSkipped += 1;
+          return;
         }
-        if (status === 'unreadable') {
-          if ((pairs.get(cmpKey)?.failures ?? 0) >= 2 && stillOurs(cand, since)) {
+        if (read.status === 'unreadable') {
+          if (read.failures >= 2 && stillOurs(cand, since)) {
             rows.hint(
               cand.buildId,
-              `PR #${prNumber} 已在 GitHub 合并，但暂时读不到 compare（GitHub 出错、超时或限流），无法确认分支提交 ${checkpoint.slice(0, 7)} 在这次合并里；稍后重试。`,
+              mergedCheckpointHint(prNumber, read.status, checkpoint, pull.headSha),
               since,
             );
           }
@@ -446,16 +422,10 @@ export function createCiPoller(
           tally.reviewSkipped += 1;
           return;
         }
-        if (status !== 'ahead' && status !== 'identical') {
-          const head = pull.headSha.slice(0, 7);
-          const cp = checkpoint.slice(0, 7);
+        if (read.status !== 'ahead' && read.status !== 'identical') {
           rows.hint(
             cand.buildId,
-            status === 'missing'
-              ? `PR #${prNumber} 已在 GitHub 合并（合并时 head ${head}），但 GitHub 上找不到分支提交 ${cp}（可能从没推送过），无法确认它在这次合并里。任务留在审核关口。`
-              : status === 'invalid'
-                ? `PR #${prNumber} 已在 GitHub 合并，但机器回报的分支提交不是有效的提交 SHA，无法核对它是否在这次合并里。任务留在审核关口。`
-                : `PR #${prNumber} 已在 GitHub 合并（合并时 head ${head}），但分支提交 ${cp} 不是那个 head 的祖先：合并之后又推了提交，或分支被改写过。这部分改动可能还没进默认分支；任务留在审核关口，由人把这个提交另行合入默认分支。`,
+            mergedCheckpointHint(prNumber, read.status, checkpoint, pull.headSha),
             since,
           );
           tally.hinted += 1;
@@ -898,7 +868,7 @@ export function createCiPoller(
     for (const k of grindPullCache.keys()) if (!grindKeys.has(k)) grindPullCache.delete(k);
     for (const k of pullCache.keys()) if (!liveKeys.has(k)) pullCache.delete(k);
     for (const k of anonReadAt.keys()) if (!liveKeys.has(k)) anonReadAt.delete(k);
-    for (const k of compareCache.keys()) if (!liveKeys.has(k)) compareCache.delete(k);
+    compares.retain(liveKeys);
     for (const k of closedSeenAt.keys()) if (!liveKeys.has(k)) closedSeenAt.delete(k);
     const reviewBuilds = new Set(reviewCandidates.map((c) => c.buildId));
     for (const k of lastReadByBuild.keys()) if (!reviewBuilds.has(k)) lastReadByBuild.delete(k);

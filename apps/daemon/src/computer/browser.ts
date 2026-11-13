@@ -87,6 +87,16 @@ function secretField(type: string, autocomplete: string): boolean {
     .some((token) => SECRET_AUTOCOMPLETE.has(token));
 }
 
+const INPUT_VALUE_LINE =
+  /^(\s*- (?:textbox|searchbox|combobox|spinbutton|slider)\b(?: "(?:[^"\\]|\\.)*")?(?: \[[^\]]*\])?(?: [a-z-]+ \[[^\]]*\])?): .*$/;
+
+function clearInputValues(snapshot: string): string {
+  return snapshot
+    .split('\n')
+    .map((line) => line.replace(INPUT_VALUE_LINE, '$1: [value cleared]'))
+    .join('\n');
+}
+
 function parseLoginSignals(output: string): LoginSignal[] | null {
   let parsed: unknown;
   try {
@@ -231,10 +241,12 @@ export async function runBrowserTool(
   const withDetection = async (text: string): Promise<BrowserToolResult> => {
     const detection = await read([...prefix, '--json', 'eval', LOGIN_DETECTION_SCRIPT]);
     const signals = detection.code === 0 ? parseLoginSignals(detection.text) : null;
-    if (signals === null) return { text: `[login detection unavailable]\n${text}` };
+    if (signals === null) {
+      return { text: `[login detection unavailable]\n${clearInputValues(text)}` };
+    }
     if (signals.length === 0) return { text };
     return {
-      text: `[login form: ${signals.join(', ')}]\n${text}`,
+      text: `[login form: ${signals.join(', ')}]\n${clearInputValues(text)}`,
       loginForm: { signals },
     };
   };
