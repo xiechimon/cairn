@@ -185,6 +185,7 @@ import {
 import { endSnoozeOn } from './snooze.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
+import { type BuildStepRoute, listBuildStepRoutes } from './step-route.js';
 import { readTeamAttributionSettings } from './team-attribution-settings.js';
 import { childrenOfTodo, getTodo, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
@@ -745,6 +746,9 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
       );
     }
   }
+  const routeById = new Map(
+    listBuildStepRoutes(deps.db, [buildId]).map((route) => [route.stepId, route]),
+  );
   return rows.map((r) => ({
     id: r.id,
     buildId: r.buildId,
@@ -760,7 +764,14 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
       ? { quotaWait: toQuotaWait(r.quotaBlock) }
       : {}),
     ...(r.promptOrigin !== null ? { promptOrigin: r.promptOrigin } : {}),
+    ...(r.claimedAt !== null ? { startedAt: r.claimedAt } : {}),
+    ...(r.finishedAt !== null ? { finishedAt: r.finishedAt } : {}),
+    route: stepRouteView(routeById.get(r.id)),
   }));
+}
+
+function stepRouteView(route: BuildStepRoute | undefined): StepJournalRow['route'] {
+  return route === undefined ? null : { harness: route.harness, modelId: route.modelId };
 }
 
 export function assertNamedMachineForNewTask(deps: BuildDeps, teamId: string): void {

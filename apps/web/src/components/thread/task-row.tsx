@@ -17,13 +17,15 @@ export interface TaskRowProps {
   what: string;
   where: string | null;
   age: string;
+  stamp?: string;
   date?: string;
   waiting: boolean;
   muted?: boolean;
   prLink?: { number: number; url: string };
-  check?: { label: string; onCheck: () => void } | 'none';
+  check?: { label: string; onCheck: () => void; checked?: boolean } | 'none';
   why?: string;
   menu?: ReactNode;
+  below?: ReactNode;
   onOpen?: () => void;
   onIntent?: () => void;
 }
@@ -45,6 +47,7 @@ export function TaskRow({
   what,
   where,
   age,
+  stamp,
   date,
   waiting,
   muted = false,
@@ -52,6 +55,7 @@ export function TaskRow({
   check,
   why,
   menu,
+  below,
   onOpen,
   onIntent,
 }: TaskRowProps) {
@@ -59,6 +63,7 @@ export function TaskRow({
   const checkable = check !== undefined && check !== 'none';
   const status = `${word} · ${what}${waiting && where !== null ? ` → ${where}` : ''}${age === '' ? '' : ` · ${age}`}`;
   const dated = date !== undefined && date !== '';
+  const stamped = !dated && stamp !== undefined && stamp !== '';
   const row = (
     <Tooltip>
       <TooltipTrigger
@@ -76,6 +81,7 @@ export function TaskRow({
               'h-auto w-full items-start justify-start gap-4 rounded-(--radius-tile) px-2.5 py-2 text-left font-normal whitespace-normal hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)',
               menu != null && 'pointer-coarse:pr-12',
               prLink != null && 'pr-16',
+              below != null && 'hover:bg-transparent dark:hover:bg-transparent',
             )}
           />
         }
@@ -105,6 +111,18 @@ export function TaskRow({
                 {date}
               </span>
             )}
+            {stamped && (
+              <span
+                data-slot="task-row-stamp"
+                className={cn(
+                  'flex-none text-caption leading-5 text-content-tertiary tabular-nums',
+                  menu != null &&
+                    'pointer-fine:group-hover/task:mr-7 pointer-fine:group-focus-within/task:mr-7 pointer-fine:group-has-aria-expanded/task:mr-7',
+                )}
+              >
+                {stamp}
+              </span>
+            )}
           </span>
           {waiting && (
             <span
@@ -122,8 +140,16 @@ export function TaskRow({
     </Tooltip>
   );
   return (
-    <div data-slot="task-row-frame" className="group/task relative">
+    <div
+      data-slot="task-row-frame"
+      className={cn(
+        'group/task relative',
+        below != null && 'rounded-(--radius-tile) hover:bg-(--menu-hover)',
+        checkable && check.checked === true && 'rounded-(--radius-tile) bg-(--menu-hover)',
+      )}
+    >
       {row}
+      {below}
       <span id={descriptionId} data-slot="task-row-description" className="sr-only">
         {`${word} · ${what}`}
         {waiting && where !== null && <span data-slot="task-row-where">{` → ${where}`}</span>}
@@ -132,7 +158,7 @@ export function TaskRow({
       {checkable && (
         <Checkbox
           aria-label={check.label}
-          checked={false}
+          checked={check.checked ?? false}
           onCheckedChange={check.onCheck}
           data-waiting={waiting ? '' : undefined}
           className="absolute top-3.5 left-4 data-waiting:border-(--card-button)"

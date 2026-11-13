@@ -4828,6 +4828,11 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
               "minimum": -9007199254740991,
               "type": "integer",
             },
+            "finishedAt": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
             "id": {
               "type": "string",
             },
@@ -5062,6 +5067,43 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
               ],
               "type": "object",
             },
+            "route": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "harness": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "claude-code",
+                            "pi",
+                          ],
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "modelId": {
+                      "type": [
+                        "string",
+                        "null",
+                      ],
+                    },
+                  },
+                  "required": [
+                    "harness",
+                    "modelId",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
             "skillInjection": {
               "anyOf": [
                 {
@@ -5106,6 +5148,11 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                   "type": "null",
                 },
               ],
+            },
+            "startedAt": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
             },
             "status": {
               "enum": [
@@ -6267,6 +6314,11 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
       "minimum": -9007199254740991,
       "type": "integer",
     },
+    "finishedAt": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
+    },
     "id": {
       "type": "string",
     },
@@ -6501,6 +6553,43 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
       ],
       "type": "object",
     },
+    "route": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "harness": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "claude-code",
+                    "pi",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "modelId": {
+              "type": [
+                "string",
+                "null",
+              ],
+            },
+          },
+          "required": [
+            "harness",
+            "modelId",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
     "skillInjection": {
       "anyOf": [
         {
@@ -6545,6 +6634,11 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
           "type": "null",
         },
       ],
+    },
+    "startedAt": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
     },
     "status": {
       "enum": [

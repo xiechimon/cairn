@@ -171,10 +171,13 @@ export async function bootRealServer(opts: {
       ) {
         const res = await app.fetch(input as never, init);
         if (res.status === 200) {
-          const body = (await res
-            .clone()
-            .json()
-            .catch(() => null)) as {
+          const copy = res.clone();
+          const encoding = copy.headers.get('content-encoding');
+          const decoded =
+            encoding === 'gzip' || encoding === 'deflate'
+              ? new Response(copy.body?.pipeThrough(new DecompressionStream(encoding)))
+              : copy;
+          const body = (await decoded.json().catch(() => null)) as {
             machineId?: string;
           } | null;
           if (typeof body?.machineId === 'string') {
