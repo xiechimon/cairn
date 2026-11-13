@@ -8,7 +8,8 @@ import {
 } from '@cairn/shared';
 import { MachineApiError } from '../machine-client.js';
 import { writePrivateFile } from '../private-fs.js';
-import { type RunStepDeps, type RunStepOptions, resumePendingUpload, runStep } from '../runner.js';
+import { type RunStepDeps, type RunStepOptions, runStep } from '../runner.js';
+import { resumePendingUpload } from '../step-final-upload.js';
 import { StepStops } from '../step-stops.js';
 import type { OrbLifecycle } from './lifecycle.js';
 import {

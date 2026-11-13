@@ -55,7 +55,6 @@ import { createComputerOrbProvider, createOrbProvider } from './orb/select.js';
 import { relayOrbStopped, runOrbStep } from './orb/step.js';
 import { ensurePrivateDir } from './private-fs.js';
 import { setupProxy } from './proxy.js';
-import { resumePendingUpload } from './runner.js';
 import {
   ensureStateDirs,
   loadMachineJson,
@@ -66,6 +65,7 @@ import {
   saveMachineJson,
 } from './state.js';
 import { resolveStepImages, sweepStepAttachments } from './step-attachments.js';
+import { resumePendingUpload } from './step-final-upload.js';
 import { StepStops } from './step-stops.js';
 import { performSync } from './sync.js';
 import { DAEMON_VERSION } from './version.js';
