@@ -89,7 +89,11 @@ import {
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { seedStepTranscript } from './step-transcript-seed.js';
 import { StepTranscriptStream } from './step-transcript-stream.js';
-import { prepareStepWorkspace, prepareVerifyClone } from './step-workspace.js';
+import {
+  prepareStepWorkspace,
+  prepareVerifyClone,
+  resetFreshSessionWorkspace,
+} from './step-workspace.js';
 import {
   resolveStreamLimits,
   STREAM_DURATION_CAP_DEFAULT_MS,
@@ -688,12 +692,15 @@ async function runClaimedStep(
     ws.reused &&
     headAtStart !== null
   ) {
-    try {
-      await deps.workspace.restoreCheckpoint(ws.cwd, headAtStart);
-      rmSync(join(deps.paths.plansDir, convId, PLAN_FILE_NAME), { force: true });
+    const reason = await resetFreshSessionWorkspace({
+      workspace: deps.workspace,
+      cwd: ws.cwd,
+      headAtStart,
+      planFile: join(deps.paths.plansDir, convId, PLAN_FILE_NAME),
+    });
+    if (reason === null) {
       logger.workspace('返工新会话：工作区回退到分支头');
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
+    } else {
       logger.step(`fresh-session worktree reset failed: ${reason}`);
       transcript.upsert({
         id: `fresh-reset-${stepId}`,

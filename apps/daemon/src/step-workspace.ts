@@ -1,3 +1,4 @@
+import { rmSync } from 'node:fs';
 import type {
   BoundGitCredentials,
   ClaimedStep,
@@ -101,5 +102,20 @@ export async function prepareVerifyClone(input: VerifyCloneInput): Promise<Verif
     };
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export async function resetFreshSessionWorkspace(input: {
+  workspace: Pick<WorktreeOps, 'restoreCheckpoint'>;
+  cwd: string;
+  headAtStart: string;
+  planFile: string;
+}): Promise<string | null> {
+  try {
+    await input.workspace.restoreCheckpoint(input.cwd, input.headAtStart);
+    rmSync(input.planFile, { force: true });
+    return null;
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
   }
 }
