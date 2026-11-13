@@ -176,8 +176,7 @@ test('scrolling up stops following, and the jump button resumes it', async ({ pa
   await expect.poll(() => gapToBottom(page)).toBeGreaterThan(300);
   const parked = await gapToBottom(page);
   for (let n = 1; n < 4; n++) await emit(page, { type: 'text_delta', text: `${paragraph(n)}\n\n` });
-  await expect(home(page).getByText(paragraph(3).trim(), { exact: false })).toBeAttached();
-  await expect.poll(() => gapToBottom(page)).toBeGreaterThanOrEqual(parked);
+  await expect.poll(() => gapToBottom(page)).toBeGreaterThan(parked);
   const jump = home(page).getByTestId('jump-to-latest');
   await expect(jump).toHaveAttribute('data-active', 'true');
 
@@ -192,8 +191,7 @@ test('scrolling up stops following, and the jump button resumes it', async ({ pa
   await expect.poll(() => gapToBottom(page)).toBeGreaterThan(300);
   const parkedAfterJump = await gapToBottom(page);
   await emit(page, { type: 'text_delta', text: `${paragraph(5)}\n\n` });
-  await expect(home(page).getByText(paragraph(5).trim(), { exact: false })).toBeAttached();
-  await expect.poll(() => gapToBottom(page)).toBeGreaterThanOrEqual(parkedAfterJump);
+  await expect.poll(() => gapToBottom(page)).toBeGreaterThan(parkedAfterJump);
   await expect(jump).toHaveAttribute('data-active', 'true');
 });
 

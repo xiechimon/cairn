@@ -238,8 +238,8 @@ test.describe('on a touch phone', () => {
     const bubbles = page.getByTestId('home-c').getByTestId('chief-bubble');
     await bubbles.first().tap();
     await expect(page.getByTestId('chief-msg-tools-touch').filter({ visible: true })).toHaveCount(1);
-    const overlaps = await page.evaluate(() => {
-      const items = [...document.querySelectorAll('[data-testid="chief-stream"] > *')];
+    const overlaps = () => page.evaluate(() => {
+      const items = [...document.querySelectorAll('[data-testid="chief-virtual-rows"] > *')];
       const found: string[] = [];
       items.forEach((item, index) => {
         const tools = item.querySelector('[data-tools-open] [data-testid="chief-msg-tools-touch"]');
@@ -251,7 +251,7 @@ test.describe('on a touch phone', () => {
       });
       return found;
     });
-    expect(overlaps).toEqual([]);
+    await expect.poll(overlaps).toEqual([]);
   });
 
   test('a tapped message in the task panel shows its tools, one row at a time', async ({ page }) => {

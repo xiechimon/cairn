@@ -8,9 +8,9 @@ import {
 } from '@cairn/shared';
 import { TriangleAlert } from 'lucide-react';
 import {
+  type CSSProperties,
   Fragment,
   type ReactNode,
-  startTransition,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -73,13 +73,47 @@ import { ReplyingToBar } from './reply-quote-block.js';
 import { type ReplyQuoteDraft, ReplySourceHighlightContext } from './reply-source-highlight.js';
 import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
 import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
+import { VirtualStream } from './virtual-stream.js';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
 const SCROLLER_CONTENT_CLS =
   'mx-auto flex w-full max-w-chat-gutter min-w-0 flex-col justify-end gap-0 overflow-x-clip px-4 pt-8 in-data-[chat-top=under-header]:pt-20 [overflow-wrap:anywhere]';
 
 const THREAD_COMPOSER = 'thread';
-const FIRST_ROWS = 24;
+const VISIBLE_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
+
+interface StreamLayout {
+  grouped: GroupedRow[];
+  keys: (string | number)[];
+  runs: BubbleRun[];
+  startedBy: ReadonlyMap<GroupedRow['item'], readonly string[]>;
+  dividers: (number | null)[];
+  lastAt: number | null;
+}
+
+function layoutStream(
+  list: readonly StreamRow[],
+  keepsOwnRow: (item: ChiefStreamItem) => boolean,
+  glances: ReadonlyMap<string, TodoGlance>,
+  previousAt: number | null,
+): StreamLayout {
+  const { rows: grouped, startedBy } = foldTaskCards(groupThreadEvents(list, keepsOwnRow), glances);
+  let lastAt = previousAt;
+  const dividers = grouped.map(({ item }) => {
+    const at = 'createdAt' in item && typeof item.createdAt === 'number' ? item.createdAt : null;
+    const divider = at !== null && needsTimeDivider(lastAt, at) ? at : null;
+    if (at !== null) lastAt = at;
+    return divider;
+  });
+  return {
+    grouped,
+    keys: grouped.map(({ item, i }) => chiefStreamRowKey(item, i)),
+    runs: bubbleRuns(grouped, previousAt),
+    startedBy,
+    dividers,
+    lastAt,
+  };
+}
 
 function workingRowLast(stream: readonly ChiefStreamItem[]): readonly ChiefStreamItem[] {
   const at = stream.findIndex((item) => item.kind === 'streaming');
@@ -394,23 +428,17 @@ export function ChiefConversation({
       ? () => withdraw(waitingTurn.messageId, waitingTurn.text)
       : onStop;
   stopTurnRef.current = stopTurn;
-  const allRows = awaitingStream(workingRowLast(chief.stream ?? []), questionPending).map(
-    (item, i) => ({
-      item,
-      i,
-    }),
+  const allRows = useMemo(
+    () =>
+      awaitingStream(workingRowLast(chief.stream ?? []), questionPending).map((item, i) => ({
+        item,
+        i,
+      })),
+    [chief.stream, questionPending],
   );
-  const rows = allRows.filter(({ item }) => item.kind !== 'user' || item.pending !== 'held');
-  const [hiddenRows, setHiddenRows] = useState(() => Math.max(0, rows.length - FIRST_ROWS));
-  const hidden = day == null ? Math.min(hiddenRows, Math.max(0, rows.length - FIRST_ROWS)) : 0;
-  const shownRows = hidden > 0 ? rows.slice(hidden) : rows;
-  const earlierRows = useMemo<EarlierPages>(
-    () => ({
-      loading: false,
-      failed: false,
-      onLoad: () => startTransition(() => setHiddenRows(0)),
-    }),
-    [],
+  const rows = useMemo(
+    () => allRows.filter(({ item }) => item.kind !== 'user' || item.pending !== 'held'),
+    [allRows],
   );
   const latestUser = rows.findLast(({ item }) => item.kind === 'user');
   const latestUserKey =
@@ -446,7 +474,10 @@ export function ChiefConversation({
         ]
       : [],
   );
-  const outstandingReports = outstandingReportIds(chief.stream ?? []);
+  const outstandingReports = useMemo(
+    () => outstandingReportIds(chief.stream ?? []),
+    [chief.stream],
+  );
   const capsules = (
     <>
       {replyQuote !== null && (
@@ -481,34 +512,16 @@ export function ChiefConversation({
     [onSend, lastUserText, resend],
   );
   const clock = useMinuteClock();
-  const dividerClock = { previousAt: null as number | null };
-  const streamRow = (
-    { item, i }: GroupedRow,
-    run: BubbleRun | undefined,
-    startedTasks: readonly string[] | undefined,
-  ) => {
-    const at = 'createdAt' in item && typeof item.createdAt === 'number' ? item.createdAt : null;
-    const divider =
-      at !== null && needsTimeDivider(dividerClock.previousAt, at) ? (
-        <MessageScrollerItem key={`divider-${chiefStreamRowKey(item, i)}`}>
-          <div
-            data-testid="chief-time-divider"
-            className="mt-5 text-center text-caption text-(--text-tertiary)"
-          >
-            <time dateTime={new Date(at).toISOString()}>
-              {timeDividerLabel(at, clock, locale, t)}
-            </time>
-          </div>
-        </MessageScrollerItem>
-      ) : null;
-    if (at !== null) dividerClock.previousAt = at;
-    return (
-      <Fragment key={chiefStreamRowKey(item, i)}>
-        {divider}
-        {row(item, i, run, startedTasks)}
-      </Fragment>
-    );
-  };
+  const dayEarlier = day?.earlier ?? 0;
+  const [earlierLayout, streamLayout] = useMemo(() => {
+    const keepsOwnRow = (item: ChiefStreamItem) =>
+      item.kind === 'thread-report' && outstandingReports.has(item.id);
+    const before = layoutStream(rows.slice(0, dayEarlier), keepsOwnRow, glances, null);
+    return [
+      before,
+      layoutStream(rows.slice(dayEarlier), keepsOwnRow, glances, before.lastAt),
+    ] as const;
+  }, [rows, outstandingReports, glances, dayEarlier]);
   const row = (
     item: GroupedRow['item'],
     i: number,
@@ -531,8 +544,6 @@ export function ChiefConversation({
       {...(startedTasks !== undefined ? { startedTasks } : {})}
     />
   );
-  const keepsOwnRow = (item: ChiefStreamItem) =>
-    item.kind === 'thread-report' && outstandingReports.has(item.id);
   const lastRobotIndex = rows.findLastIndex(
     ({ item }) => item.kind === 'robot' && item.typing !== true,
   );
@@ -556,19 +567,31 @@ export function ChiefConversation({
       }
     />
   );
-  const renderRows = (list: StreamRow[]) => {
-    const { rows: grouped, startedBy } = foldTaskCards(
-      groupThreadEvents(list, keepsOwnRow),
-      glances,
-    );
-    const runs = bubbleRuns(grouped, dividerClock.previousAt);
-    return grouped.map((entry, n) => (
-      <Fragment key={chiefStreamRowKey(entry.item, entry.i)}>
-        {streamRow(entry, runs[n], startedBy.get(entry.item))}
+  const streamEntry = (layout: StreamLayout, n: number) => {
+    const entry = layout.grouped[n];
+    if (entry === undefined) return null;
+    const at = layout.dividers[n];
+    return (
+      <>
+        {at != null && (
+          <MessageScrollerItem style={VISIBLE_ITEM_STYLE}>
+            <div
+              data-testid="chief-time-divider"
+              className="mt-5 text-center text-caption text-(--text-tertiary)"
+            >
+              <time dateTime={new Date(at).toISOString()}>
+                {timeDividerLabel(at, clock, locale, t)}
+              </time>
+            </div>
+          </MessageScrollerItem>
+        )}
+        {row(entry.item, entry.i, layout.runs[n], layout.startedBy.get(entry.item))}
         {quickAfter !== undefined && entry.item === quickAfter && quickReplies}
-      </Fragment>
-    ));
+      </>
+    );
   };
+  const renderRows = (layout: StreamLayout) =>
+    layout.keys.map((key, n) => <Fragment key={key}>{streamEntry(layout, n)}</Fragment>);
   const intro = !chief.bound && showBindGate && (
     <div
       data-testid="chief-gate"
@@ -609,14 +632,18 @@ export function ChiefConversation({
                   >
                     {lead}
                     {day == null ? (
-                      renderRows(shownRows)
+                      <VirtualStream
+                        keys={streamLayout.keys}
+                        renderRow={(n) => streamEntry(streamLayout, n)}
+                        viewportRef={viewportRef}
+                      />
                     ) : (
                       <>
                         <div data-testid="chief-earlier" className="opacity-60">
-                          {renderRows(rows.slice(0, day.earlier))}
+                          {renderRows(earlierLayout)}
                         </div>
                         {day.today}
-                        {renderRows(rows.slice(day.earlier))}
+                        {renderRows(streamLayout)}
                       </>
                     )}
                     <ChiefQuestion bound={answerHere} />
@@ -628,11 +655,11 @@ export function ChiefConversation({
               <ArrowDown width={20} height={20} />
               <span className="sr-only">{t('滚动到最新')}</span>
             </JumpToLatestButton>
-            {(hidden > 0 || earlier != null) && (
+            {earlier != null && (
               <EarlierLoader
-                earlier={hidden > 0 || earlier == null ? earlierRows : earlier}
-                hasEarlier={hidden > 0 || chief.hasEarlier === true}
-                rowCount={shownRows.length}
+                earlier={earlier}
+                hasEarlier={chief.hasEarlier === true}
+                rowCount={rows.length}
                 viewportRef={viewportRef}
               />
             )}
