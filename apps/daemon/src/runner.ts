@@ -8,7 +8,6 @@ import type {
   ClaimedStep,
   CommitIdentity,
   DeliveredImage,
-  LocalToolDef,
   MachineHeartbeatBody,
   PreparedWorkspace,
   ProviderConfig,
@@ -40,7 +39,6 @@ import { SessionNotResumableError } from './backend/errors.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
 import { piWorktreeSkillDirs } from './backend/skills.js';
-import { prepareWebTools } from './backend/web-search.js';
 import { assertNoLegacyBrief, composeBrief } from './brief-file.js';
 import type { ClaudeCodeAuthProbe } from './claude-code-auth.js';
 import { claudeQuotaTrip, forwardClaudeRateLimit, type QuotaTrip } from './claude-quota-trip.js';
@@ -55,7 +53,6 @@ import { GitPushHookError, isGitAuthFailure } from './git.js';
 import { type StepJournal, TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { type MachineApi, MachineApiError } from './machine-client.js';
-import { buildSecretTool } from './secret-channel.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
 import { resolveDeliveredPrompt, resolveStepImagesOrRaw } from './step-attachments.js';
@@ -64,8 +61,9 @@ import { composeDoneBody } from './step-done-body.js';
 import { assembleStepEnv } from './step-env.js';
 import { reportStepProvenance } from './step-executor-record.js';
 import { putFinalArtifacts } from './step-final-upload.js';
-import { prepareCreateTagTool, stepGitRunner } from './step-git-tools.js';
+import { stepGitRunner } from './step-git-tools.js';
 import { runLocalMergeStep } from './step-local-merge.js';
+import { assembleStepLocalTools } from './step-local-tools.js';
 import { readDeliveredPlan, readInfoReport } from './step-outputs.js';
 import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
 import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
@@ -79,11 +77,7 @@ import {
 import { resolveStepProvider } from './step-provider.js';
 import { stepQuotaBlock } from './step-quota-block.js';
 import { stepRemoteToolExecutor } from './step-remote-tools.js';
-import {
-  prepareSkillLoadTool,
-  sessionInjectedSkills,
-  stepMcpEndpoints,
-} from './step-skill-tool.js';
+import { sessionInjectedSkills, stepMcpEndpoints } from './step-skill-tool.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { seedStepTranscript } from './step-transcript-seed.js';
 import { StepTranscriptStream } from './step-transcript-stream.js';
@@ -507,22 +501,6 @@ async function runClaimedStep(
     return;
   }
   const isPi = backend.brief?.backendId === 'pi';
-  const webTools = prepareWebTools({
-    enabled: isPi && !isChief && !isReview && claimed.remoteToolsOnly !== true,
-    metered: opts.env?.CAIRN_ORB !== '1',
-    creds,
-    stepId,
-    home: deps.paths.home,
-    log: (line) => logger.step(line),
-  });
-  const secretTool = stepTakesSecrets(claimed.step.kind)
-    ? buildSecretTool({
-        creds: webTools.secretCreds,
-        stepId,
-        agentId: agent?.id ?? null,
-        onAudit: (line) => logger.step(line),
-      })
-    : null;
   const appIdentity: CommitIdentity | null = tokenRes.commitIdentity ?? null;
   const stepIdentity: CommitIdentity =
     appIdentity ?? localCommitIdentity(claimed.agent?.displayName ?? 'cairn-agent');
@@ -533,33 +511,44 @@ async function runClaimedStep(
     allowMachineFallback: repo?.kind === 'github',
     log: (line) => logger.step(line),
   });
-  const createTagTool = prepareCreateTagTool({
-    localTools: claimed.localTools,
-    repoDir: ws?.cwd ?? null,
-    credential: creds.git,
-    identity: stepIdentity,
-    runGit: withStepGit,
-    redact,
-  });
-  const localToolDefs = [secretTool, createTagTool, ...webTools.tools].filter(
-    (t): t is LocalToolDef => t !== null,
-  );
   const injectedForSession = sessionInjectedSkills(agent);
   const skillsRootDir = deps.skillsDir;
-  if (isPi && skillsRootDir !== undefined) {
-    const skillLoad = prepareSkillLoadTool({
-      skillsDir: skillsRootDir,
+  const localTools = assembleStepLocalTools({
+    web: {
+      enabled: isPi && !isChief && !isReview && claimed.remoteToolsOnly !== true,
+      metered: opts.env?.CAIRN_ORB !== '1',
+      creds,
+      stepId,
       home: deps.paths.home,
-      cwd,
-      isChief,
-      skillsAllowlist: agent.skillsAllowlist,
-      injectedSkills: injectedForSession,
-      teamSkillsDir,
-      log: (msg) => logger.skills(msg),
-    });
-    localToolDefs.push(skillLoad.tool);
-    if (deliveryPrompt !== null) deliveryPrompt = skillLoad.withDispatch(deliveryPrompt);
-  }
+      log: (line) => logger.step(line),
+    },
+    secrets: stepTakesSecrets(claimed.step.kind)
+      ? { stepId, agentId: agent?.id ?? null, onAudit: (line) => logger.step(line) }
+      : null,
+    createTag: {
+      localTools: claimed.localTools,
+      repoDir: ws?.cwd ?? null,
+      credential: creds.git,
+      identity: stepIdentity,
+      runGit: withStepGit,
+      redact,
+    },
+    skillLoad:
+      isPi && skillsRootDir !== undefined
+        ? {
+            skillsDir: skillsRootDir,
+            home: deps.paths.home,
+            cwd,
+            isChief,
+            skillsAllowlist: agent.skillsAllowlist,
+            injectedSkills: injectedForSession,
+            teamSkillsDir,
+            log: (msg) => logger.skills(msg),
+          }
+        : null,
+  });
+  const localToolDefs = localTools.tools;
+  if (deliveryPrompt !== null) deliveryPrompt = localTools.dispatch(deliveryPrompt);
   const askChannel = new AskChannel({ client, stepId, log: (message) => logger.step(message) });
   const telemetry =
     deps.otel != null
