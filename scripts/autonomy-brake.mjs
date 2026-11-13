@@ -37,26 +37,44 @@ function assertExactRevertTree(dir, { baseSha, headSha, names, history }) {
 
 export const repo = process.env.GITHUB_REPOSITORY;
 if (!/^[\w.-]+\/[\w.-]+$/.test(repo ?? '')) throw new Error('GITHUB_REPOSITORY is required');
+const transient = /HTTP 5\d\d/;
+const readAttempts = 3;
+const readBackoffMs = (process.env.BRAKE_READ_BACKOFF_MS ?? '1000,2000').split(',').map(Number);
+
+function gh(args, input) {
+  return execFileSync('gh', args, {
+    encoding: 'utf8',
+    maxBuffer: 512 * 1024 * 1024,
+    ...(input ? { input } : {}),
+  });
+}
+
+function readGh(args) {
+  let error;
+  for (let attempt = 1; attempt <= readAttempts; attempt++) {
+    try {
+      return gh(args);
+    } catch (caught) {
+      error = caught;
+      if (attempt === readAttempts || !transient.test(String(caught.stderr))) throw caught;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, readBackoffMs[attempt - 1]);
+    }
+  }
+  throw error;
+}
+
 export const api = (path, payload, method) => {
   const verb = method ?? (payload ? 'POST' : undefined);
-  const output = execFileSync(
-    'gh',
-    ['api', path, ...(verb ? ['--method', verb] : []), ...(payload ? ['--input', '-'] : [])],
-    {
-      encoding: 'utf8',
-      maxBuffer: 512 * 1024 * 1024,
-      ...(payload ? { input: JSON.stringify(payload) } : {}),
-    },
-  );
+  const args = [
+    'api',
+    path,
+    ...(verb ? ['--method', verb] : []),
+    ...(payload ? ['--input', '-'] : []),
+  ];
+  const output = payload ? gh(args, JSON.stringify(payload)) : readGh(args);
   return output.trim() ? JSON.parse(output) : null;
 };
-export const pages = (path) =>
-  JSON.parse(
-    execFileSync('gh', ['api', path, '--paginate', '--slurp'], {
-      encoding: 'utf8',
-      maxBuffer: 512 * 1024 * 1024,
-    }),
-  );
+export const pages = (path) => JSON.parse(readGh(['api', path, '--paginate', '--slurp']));
 export const markers = () =>
   pages(`repos/${repo}/issues?state=open&labels=autonomy-paused&per_page=100`)
     .flat()

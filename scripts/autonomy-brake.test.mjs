@@ -60,6 +60,7 @@ else console.log('{}');
           ...process.env,
           PATH: `${dir}:${process.env.PATH}`,
           GITHUB_REPOSITORY: 'owner/repo',
+          BRAKE_READ_BACKOFF_MS: '0,0',
           CALLS: log,
           DATA: join(dir, 'data'),
         },
@@ -287,6 +288,81 @@ test('a new paused head fails the PR check and publishes a failure status', (t) 
   const r = f.run(['check-pr', '7']);
   assert.equal(r.status, 1);
   assert.match(f.calls(), /statuses\/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/);
+});
+
+const pullPath = 'repos/owner/repo/pulls/7';
+const markerPath = 'repos/owner/repo/issues?state=open&labels=autonomy-paused&per_page=100';
+const serverError = { error: 'gh: HTTP 503' };
+
+test('check-pr retries a transient 5xx on the PR lookup and still judges the head', (t) => {
+  const f = fixture(t, {
+    issues: [],
+    pr: { head: { sha: 'a'.repeat(40) }, labels: [] },
+    responses: { [pullPath]: [serverError, serverError] },
+  });
+  const r = f.run(['check-pr', '7']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(
+    f
+      .calls()
+      .split('\n')
+      .filter((row) => row.includes(`"${pullPath}"`)).length,
+    3,
+  );
+  assert.match(f.calls(), /"state":"success"/);
+});
+
+test('check-pr fails closed when the PR lookup stays 5xx', (t) => {
+  const f = fixture(t, {
+    issues: [],
+    pr: { head: { sha: 'a'.repeat(40) }, labels: [] },
+    responses: { [pullPath]: Array(3).fill(serverError) },
+  });
+  const r = f.run(['check-pr', '7']);
+  assert.equal(r.status, 1);
+  assert.equal(
+    f
+      .calls()
+      .split('\n')
+      .filter((row) => row.includes(`"${pullPath}"`)).length,
+    3,
+  );
+  assert.doesNotMatch(f.calls(), /statuses\//);
+  assert.match(r.stderr, /HTTP 503/);
+});
+
+test('check-pr does not retry a 4xx on the PR lookup', (t) => {
+  const f = fixture(t, {
+    issues: [],
+    responses: { [pullPath]: [{ error: 'gh: HTTP 404' }, {}] },
+  });
+  const r = f.run(['check-pr', '7']);
+  assert.equal(r.status, 1);
+  assert.equal(
+    f
+      .calls()
+      .split('\n')
+      .filter((row) => row.includes(`"${pullPath}"`)).length,
+    1,
+  );
+});
+
+test('check-pr retries a transient 5xx on the pause marker lookup', (t) => {
+  const f = fixture(t, {
+    issues: [],
+    pr: { head: { sha: 'a'.repeat(40) }, labels: [] },
+    responses: { [markerPath]: [serverError] },
+  });
+  const r = f.run(['check-pr', '7']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(
+    f
+      .calls()
+      .split('\n')
+      .filter((row) => row.includes(markerPath)).length,
+    2,
+  );
+  assert.match(f.calls(), /"state":"success"/);
 });
 
 for (const status of ['queued', 'in_progress', 'waiting', 'pending', 'requested'])
