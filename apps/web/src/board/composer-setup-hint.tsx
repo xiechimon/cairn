@@ -22,8 +22,7 @@ const CHIP_CLS =
 
 const CODE_CLS = 'rounded bg-(--menu-hover) px-1 py-px font-mono text-meta text-(--text-secondary)';
 
-export function ComposerSetupHint() {
-  const { t } = useI18n();
+export function useComposerSetupStep(): FirstRunStepId | null {
   const { live, teamId } = useLiveData();
   const providersQ = useProviders(teamId, live);
   const routingQ = useModelRouting(teamId, live);
@@ -37,8 +36,11 @@ export function ComposerSetupHint() {
     machinesOnline: machinesQ.data?.filter((machine) => machine.online).length,
     coordinatorCanAnswer: coordinatorCanAnswer(chiefQ.data),
   });
-  const next = nextOpenStep(steps);
-  if (!live || next === null) return null;
+  return live ? nextOpenStep(steps) : null;
+}
+
+export function ComposerSetupHint({ next }: { next: FirstRunStepId }) {
+  const { t } = useI18n();
   const copy: Record<FirstRunStepId, { icon: ReactNode; label: string; hint: ReactNode }> = {
     'model-source': {
       icon: <Key width={16} height={16} />,
