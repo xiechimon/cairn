@@ -17,7 +17,8 @@ import {
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { githubListPulls } from '../src/lib/github.js';
-import { type BuildDeps, completeStep, requestMerge } from '../src/services/builds.js';
+import { requestMerge } from '../src/services/build-merge-request.js';
+import { type BuildDeps, completeStep } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';

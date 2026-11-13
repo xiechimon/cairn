@@ -10,7 +10,8 @@ import {
 import { HttpError } from '../src/lib/errors.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { newUuidv7, nowMs } from '../src/lib/ids.js';
-import { completeStep, requestMerge } from '../src/services/builds.js';
+import { requestMerge } from '../src/services/build-merge-request.js';
+import { completeStep } from '../src/services/builds.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';

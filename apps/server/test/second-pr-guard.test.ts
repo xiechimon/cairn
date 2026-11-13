@@ -21,7 +21,8 @@ import {
 import { HttpError } from '../src/lib/errors.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { newUuidv7, nowMs } from '../src/lib/ids.js';
-import { type BuildDeps, requestMerge } from '../src/services/builds.js';
+import { requestMerge } from '../src/services/build-merge-request.js';
+import type { BuildDeps } from '../src/services/builds.js';
 import { claimStep, finishStep, type MachineDeps } from '../src/services/machines.js';
 import { bootServer, seedSessionRoute, type TestServer } from './helpers.js';
 

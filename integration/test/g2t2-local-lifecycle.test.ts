@@ -18,7 +18,7 @@ import {
 } from '../../apps/server/src/db/schema.js';
 import { seed } from '../../apps/server/src/db/seed.js';
 import { systemGitOps } from '../../apps/server/src/lib/git.js';
-import { requestMerge } from '../../apps/server/src/services/builds.js';
+import { requestMerge } from '../../apps/server/src/services/build-merge-request.js';
 import { TeamStreamHub } from '../../apps/server/src/services/events.js';
 import { enqueueLocalMerge } from '../../apps/server/src/services/local-merge.js';
 import { localGateFacts } from '../../apps/server/src/services/local-merge-facts.js';

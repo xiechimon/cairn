@@ -7,7 +7,8 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { type BuildDeps, requestMerge, startBuilds } from '../src/services/builds.js';
+import { requestMerge } from '../src/services/build-merge-request.js';
+import { type BuildDeps, startBuilds } from '../src/services/builds.js';
 import { resumeAutonomyPauses } from '../src/services/github-autonomy-brake.js';
 import { parseShipGateInstruction, reverifyShip } from '../src/services/ship-gate.js';
 import { setTodoPhase } from '../src/services/todos.js';

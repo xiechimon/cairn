@@ -12,7 +12,8 @@ import {
   step,
   todo,
 } from '../src/db/schema.js';
-import { finishTodoDone, requestMerge } from '../src/services/builds.js';
+import { requestMerge } from '../src/services/build-merge-request.js';
+import { finishTodoDone } from '../src/services/builds.js';
 import { transitionTodos } from '../src/services/chief-tools.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { recordCorrectionGuard } from '../src/services/correction.js';
