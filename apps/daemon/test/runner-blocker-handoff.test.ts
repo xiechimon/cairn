@@ -12,8 +12,9 @@ import {
 import { describe, expect, test } from 'vitest';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
-import { buildTaskPrompt, runStep } from '../src/runner.js';
+import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { buildTaskPrompt } from '../src/step-prompt.js';
 import { FakeMachineApi, fakeBackend } from './machine-loop-harness.js';
 import { testTempDir } from './test-temp-dir.js';
 
