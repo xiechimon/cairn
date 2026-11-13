@@ -1,7 +1,7 @@
 name: diagram-text-fit
 
 # Diagram text-fit gate (#1087): every label in every
-# docs/verify/**/*.drawio.svg must fit its shape. The check is
+# docs/**/*.drawio.svg must fit its shape. The check is
 # scripts/check-diagram-text-fit.py — pure stdlib, a static advance table
 # instead of fonts, so it runs identically on fontless CI runners.
 #
@@ -33,5 +33,12 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
-      - name: Check diagram label text fit (docs/verify/**/*.drawio.svg)
-        run: python3 scripts/check-diagram-text-fit.py 'docs/verify/**/*.drawio.svg'
+      - name: Check diagram label text fit (docs/**/*.drawio.svg)
+        run: |
+          shopt -s globstar nullglob
+          diagrams=(docs/**/*.drawio.svg)
+          if [ "${#diagrams[@]}" -eq 0 ]; then
+            echo "no diagrams under docs/"
+            exit 0
+          fi
+          python3 scripts/check-diagram-text-fit.py "${diagrams[@]}"

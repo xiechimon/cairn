@@ -1,2 +1,0 @@
-error: gh auth status failed (network down, proxy flaking, or not authenticated)
-exit=2

@@ -1,9 +1,0 @@
-{
-  "finding": "Task-workspace overlay dependency omission",
-  "review": "https://github.com/xiechimon/cairn/pull/3601#discussion_r4511447257",
-  "red": "4 configuration loads failed on 926728f544df7c56af002dada1d10a4e29af9876",
-  "green": "12 screenshot harness/workflow tests passed",
-  "live": "Installed Playwright CLI loads all four actual overlaid screenshot configurations on isolated old trees",
-  "mocked": "One minimal collection spec per config; old dependency files throw; no application screenshots taken",
-  "notCovered": "Native browser capture in this local regression; capture remains covered by CI"
-}

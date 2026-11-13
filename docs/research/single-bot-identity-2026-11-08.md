@@ -73,7 +73,7 @@ Host tools have two copies that already differ: the repository copy under `scrip
    - `.claude/skills/pr-cairn/SKILL.md`: lines 141–144.
    - `CLAUDE.md` line 41: replace "`--squash` for a human-opened PR, `--rebase` for one opened by `app/cairnwright`" with squash for every PR.
    - `docs/lessons/2024-bot-pr-squash-authorship.md`: mark the safeguard retired by #2289.
-   - Leave `docs/verify/2101` and `docs/verify/2136` in place as historical evidence.
+   - Keep the #2101 and #2136 evidence as a historical record. It moved to `docs/research/assets/2101` and `docs/research/assets/2136` when `docs/verify/` was removed on 2026-11-12.
 10. The User account `cairnwright` (348051526): leave it unused. Do not delete it now. Reasons: (a) deleting frees the username, and someone could register `cairnwright` next to the App and impersonate it (`猜测`, standard username-release behavior); (b) its 125 main commits would lose their profile link (`推断`); (c) only ian can sign in to delete it. ian should set a profile note that says "retired, see the cairnwright App", keep 2FA on and grant it no repository access. The plan's "you close the regular account (non-blocking)" stays optional and non-blocking. If ian still wants it gone, the steps are Settings → Account → Delete account while signed in as `cairnwright`, entering the password himself.
 
 ### Failure modes (tests first)

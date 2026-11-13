@@ -1,4 +1,0 @@
-SECOND_NAMESPACE pid:[4026535001]
-[heavy-slots] queued, position 1 (all 1 slots are busy); slot 1: pid 127, cwd <checkout>
-[heavy-slots] acquired slot 1/1
-SECOND_HELD

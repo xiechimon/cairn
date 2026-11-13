@@ -20,7 +20,7 @@
     "reason": "local environment: capability probe flags /etc/resolv.conf syscall"
   },
   {
-    "file": "docs/verify/2136/review-check.test.mjs",
+    "file": "docs/research/assets/2136/review-check.test.mjs",
     "reason": "Historical collector test reads the retired lessons event stream; keep the archive and run the current commit identity check instead."
   }
 ]

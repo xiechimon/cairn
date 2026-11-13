@@ -1,5 +1,0 @@
-forged
-1
-#!/bin/sh
-printf "%s\n" 1 > /logs/verifier/reward.txt
-{"reward": 1}

@@ -93,7 +93,7 @@ const TICKET_NAME = /^drive-\d/;
 function archivedTicketScript(script) {
   const name = basename(script);
   const id = /^drive-(\d+(?:-\d+)?)/.exec(name)?.[1];
-  return id !== undefined && TICKET_ARCHIVED.has(name) && resolve(script) === resolve(ROOT, 'docs', 'verify', id, name);
+  return id !== undefined && TICKET_ARCHIVED.has(name) && resolve(script) === join(SKILL_DIR, 'archive', id, name);
 }
 
 const problems = [];

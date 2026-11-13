@@ -71,7 +71,7 @@ for (const [name, paths, expected] of [
     ['docs/verify/1/drive.tsx', 'docs/verify/1/run', 'docs/verify/1/notes.yaml'],
     true,
   ],
-  ['data beside an executable check', ['docs/verify/2136/fixture.json'], true],
+  ['data beside an executable file', ['docs/design/memory-inplace-prototype/fixture.json'], true],
   [
     'the #2188 lessons and evidence change',
     [
@@ -583,7 +583,7 @@ test('local code checks retain fast checks and advisory dead-class', () => {
     'pnpm typecheck',
     'pnpm spec:parse',
     'node scripts/e2e-affected.mjs --check-coverage',
-    'node --test docs/verify/1542/reach.test.mjs',
+    'node --test scripts/probe-reach.test.mjs',
   ])
     assert.ok(commands.includes(command), command);
 });
@@ -626,7 +626,7 @@ test('code changes keep suites in CI and out of local plans', () => {
         ['pnpm', 'typecheck'],
         ['pnpm', 'spec:parse'],
         ['node', 'scripts/e2e-affected.mjs', '--check-coverage'],
-        ['node', '--test', 'docs/verify/1542/reach.test.mjs'],
+        ['node', '--test', 'scripts/probe-reach.test.mjs'],
         ['node', '--test', 'scripts/escape-trace.test.mjs'],
         ['node', 'scripts/escape-trace.mjs', 'validate-cases', 'integration/eval/review/cases'],
         ['node', '--test', 'scripts/review-escapes.test.mjs'],
