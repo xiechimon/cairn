@@ -1688,18 +1688,23 @@ export function mapChief(
   const chiefStream: ChiefStreamItem[] = collected?.items ?? [];
   const trailingTools = collected?.trailingTools ?? [];
   let waitingTurn: ChiefContent['waitingTurn'];
+  const liveReply: ChiefStreamItem | null =
+    collected?.eventTurn === true || (opts.liveText ?? '').trim() === ''
+      ? null
+      : {
+          kind: 'robot',
+          markdown: autoCloseStrong(opts.liveText ?? ''),
+          typing: true,
+          seconds: '',
+          ...(trailingTools.length > 0 ? { tools: trailingTools } : {}),
+        };
+  if (!running && liveReply !== null) chiefStream.push(liveReply);
   if (running && collected?.eventTurn !== true) {
     if ((opts.liveThinking ?? '').trim() !== '') {
       chiefStream.push({ kind: 'thinking', text: opts.liveThinking ?? '' });
     }
-    if ((opts.liveText ?? '').trim() !== '') {
-      chiefStream.push({
-        kind: 'robot',
-        markdown: autoCloseStrong(opts.liveText ?? ''),
-        typing: true,
-        seconds: '',
-        ...(trailingTools.length > 0 ? { tools: trailingTools } : {}),
-      });
+    if (liveReply !== null) {
+      chiefStream.push(liveReply);
     } else if (chiefStream[chiefStream.length - 1]?.kind !== 'robot' || trailingTools.length > 0) {
       const lastUser = collected?.items.findLastIndex((item) => item.kind === 'user') ?? -1;
       const turnStartedAt = lastUser >= 0 ? collected?.itemsAt[lastUser] : undefined;

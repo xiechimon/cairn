@@ -271,9 +271,11 @@ describe('mapChief typing tail row (#651 F-B1..B4)', () => {
     });
   });
 
-  test('F-B2 activeRun null (turn settled) → stale buffer does not render', () => {
-    const content = mapChief(ENV, opts(null, '上一轮的残留文本'));
-    expect(robotItems(content.stream ?? []).some((r) => r.typing === true)).toBe(false);
+  test('F-B2 activeRun null before the stored reply loads → the streamed reply stays at the tail', () => {
+    const content = mapChief(ENV, opts(null, '最终结论'));
+    const stream = content.stream ?? [];
+    expect(stream[stream.length - 1]).toMatchObject({ kind: 'robot', markdown: '最终结论', typing: true });
+    expect(stream.some((item) => item.kind === 'streaming')).toBe(false);
   });
 
   test('F-B3 empty/whitespace-only buffer → no air bubble hung', () => {

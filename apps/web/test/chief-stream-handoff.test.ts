@@ -103,20 +103,17 @@ const USER: MessageRow = {
   createdAt: NOW - 1000,
 };
 
-function visibleTailText(messages: MessageRow[], liveText: string): string {
-  const chief = mapChief(
-    ENV,
-    { threads: [THREAD], activeThreadId: CONV, messages, liveText },
-  );
+function visibleTailText(messages: MessageRow[], liveText: string, thread = THREAD): string {
+  const chief = mapChief(ENV, { threads: [thread], activeThreadId: CONV, messages, liveText });
   return (chief.stream ?? [])
     .filter((i): i is Extract<ChiefStreamItem, { kind: 'robot' }> => i.kind === 'robot')
     .map((i) => i.markdown ?? '')
     .join('\n');
 }
 
-function visible(messages: MessageRow[]): string {
+function visible(messages: MessageRow[], thread = THREAD): string {
   const knownIds = new Set(messages.map((m) => m.id));
-  return visibleTailText(messages, liveTextStore.getVisible(CONV, knownIds));
+  return visibleTailText(messages, liveTextStore.getVisible(CONV, knownIds), thread);
 }
 
 beforeEach(() => {
@@ -198,6 +195,22 @@ describe('chief streaming handoff (#857 F-H1..H6)', () => {
     liveTextStore.prune(CONV, knownIds);
     expect(liveTextStore.get(CONV)).toBe('');
   });
+
+  test.each(['done', 'stopped', 'failed'])(
+    'F-H10 a %s turn keeps the streamed reply after the thread stops running until the stored row loads',
+    (status) => {
+      const es = startStream(freshClient());
+      es.push({ type: 'text_delta', text: '最终结论' });
+      es.push({ type: 'message', message: textRow('m1', '最终结论') });
+      es.push(stepEvent(status));
+      const finished = { ...THREAD, activeRun: null };
+
+      expect(visible([USER], finished)).toBe('最终结论');
+
+      const settled = [USER, textRow('m1', '最终结论')];
+      expect(visible(settled, finished).split('最终结论')).toHaveLength(2);
+    },
+  );
 
   test('F-H9 a terminal step drops text streamed after the pending handoff and keeps the settled prefix', () => {
     const es = startStream(freshClient());
