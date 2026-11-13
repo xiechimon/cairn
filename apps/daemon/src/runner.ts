@@ -4,7 +4,6 @@ import { dirname, join } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
-  AgentTokenUsage,
   ClaimedStep,
   CommitIdentity,
   DeliveredImage,
@@ -17,16 +16,11 @@ import type {
   WorktreeOps,
 } from '@cairn/shared';
 import {
-  classifyAgentFailure,
-  classifySkillFact,
   classifyStepFailure,
   isBuildStepKind,
   localCommitIdentity,
   noVisionSignalOf,
   PLAN_FILE_NAME,
-  parseRetryAfterMs,
-  REMOTE_TOOL_RETRY_DELAYS_MS,
-  skillCallName,
   stepTakesSecrets,
   transcriptPromptRowId,
 } from '@cairn/shared';
@@ -40,7 +34,7 @@ import { RETRY_STORM_MAX } from './backend/pi-retry.js';
 import { piWorktreeSkillDirs } from './backend/skills.js';
 import { assertNoLegacyBrief, composeBrief } from './brief-file.js';
 import type { ClaudeCodeAuthProbe } from './claude-code-auth.js';
-import { claudeQuotaTrip, forwardClaudeRateLimit, type QuotaTrip } from './claude-quota-trip.js';
+import { claudeQuotaTrip, forwardClaudeRateLimit } from './claude-quota-trip.js';
 import {
   credentialRedactor,
   credentialSafeEvents,
@@ -59,6 +53,12 @@ import { reportStepProvenance } from './step-executor-record.js';
 import { stepGitRunner } from './step-git-tools.js';
 import { runLocalMergeStep } from './step-local-merge.js';
 import { assembleStepLocalTools } from './step-local-tools.js';
+import {
+  consumeStepPassEvent,
+  newStepPassState,
+  resetStepPassForRetry,
+  type StepPassEventContext,
+} from './step-pass-events.js';
 import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
 import {
   composeWorkerSystemPrompt,
@@ -138,31 +138,6 @@ export {
   STREAM_FIRST_EVENT_ENV,
   STREAM_IDLE_ENV,
 };
-
-const CHANGE_TOOLS = new Set(['edit', 'write', 'bash']);
-
-async function withRetries<T>(
-  fn: () => Promise<T>,
-  delaysMs: readonly number[],
-  logger: DaemonLogger,
-  label: string,
-): Promise<T | null> {
-  let lastErr: unknown;
-  for (let i = 0; i <= delaysMs.length; i++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastErr = err;
-      const delay = delaysMs[i - 1];
-      if (delay === undefined) break;
-      await new Promise((r) => setTimeout(r, delay));
-    }
-  }
-  logger.step(
-    `${label} retry exhausted: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
-  );
-  return null;
-}
 
 export async function runStep(
   deps: RunStepDeps,
@@ -711,18 +686,9 @@ async function runClaimedStep(
     });
   }
 
-  let usage: AgentTokenUsage = [];
-  let lastError: string | null = null;
-  let lastModelError: string | null = null;
-  let lastErrorWasProcessCrash = false;
-  let sawChangeTool = false;
-  let sawDone = false;
-  let sawProgress = false;
+  const passState = newStepPassState();
   let priorPassMadeProgress = false;
-  let zeroProgressRetries = 0;
-  let retryStorm = false;
   const retryStormMax = opts.retryStormMax ?? RETRY_STORM_MAX;
-  let quotaTrip: QuotaTrip | null = null;
   let networkRetries = 0;
   const networkRetryDelays =
     claimed.step.kind === 'plan' || isBuildStepKind(claimed.step.kind)
@@ -738,11 +704,11 @@ async function runClaimedStep(
   const retryWithoutImages = async (failureText: string): Promise<boolean> => {
     if (
       noVisionDegraded ||
-      sawProgress ||
+      passState.sawProgress ||
       priorPassMadeProgress ||
       watchdog.trippedArm !== null ||
       stop.request !== null ||
-      quotaTrip !== null ||
+      passState.quotaTrip !== null ||
       promptImages === undefined ||
       prompt === null ||
       !noVisionSignalOf(failureText)
@@ -807,10 +773,10 @@ async function runClaimedStep(
   let handle: AgentSessionHandle | null = null;
   sessionOpts.onClaudeRateLimit = (notice) => {
     forwardClaudeRateLimit(client, claimed.step.machineId, notice, (line) => logger.step(line));
-    if (quotaTrip !== null) return;
+    if (passState.quotaTrip !== null) return;
     const trip = claudeQuotaTrip(notice, Date.now());
     if (trip === null) return;
-    quotaTrip = trip;
+    passState.quotaTrip = trip;
     void handle?.stop();
   };
   const openSession = (): Promise<AgentSessionHandle> => {
@@ -880,16 +846,9 @@ async function runClaimedStep(
   };
   for (let pass = 0; ; pass++) {
     if (pass > 0) {
-      priorPassMadeProgress ||= sawProgress;
-      lastError = null;
-      lastModelError = null;
-      lastErrorWasProcessCrash = false;
-      sawDone = false;
-      sawProgress = false;
+      priorPassMadeProgress ||= passState.sawProgress;
+      resetStepPassForRetry(passState);
       watchdog.clearTrip();
-      zeroProgressRetries = 0;
-      retryStorm = false;
-      usage = [];
       stream.discardDeltas();
     }
     if (stop.request !== null) break;
@@ -917,6 +876,23 @@ async function runClaimedStep(
       }
     }
     journal.update(stepId, { state: 'running', sessionId: handle.sessionId });
+    const passEvents: StepPassEventContext = {
+      stepId,
+      client,
+      logger,
+      modelKey,
+      provider,
+      handle,
+      promptImages,
+      retryStormMax,
+      now,
+      watchdog,
+      activity,
+      stream,
+      transcript,
+      agentTodo,
+      toolStartedAt,
+    };
     deps.sessionHandles?.set(stepId, handle);
     let promptDelivered = false;
     stop.attach(handle).catch((err: unknown) => {
@@ -935,208 +911,21 @@ async function runClaimedStep(
         }
         watchdog.noteEvent();
         activity.noteEvent();
-        switch (ev.type) {
-          case 'text_delta': {
-            watchdog.noteProgress();
-            sawProgress = true;
-            zeroProgressRetries = 0;
-            activity.setPhase('responding');
-            stream.pushText(ev.text);
-            await segments.append('text', ev.text);
-            break;
-          }
-          case 'thinking_delta': {
-            watchdog.noteProgress();
-            sawProgress = true;
-            zeroProgressRetries = 0;
-            activity.setPhase('thinking');
-            stream.pushThinking(ev.text);
-            await segments.append('thinking', ev.text);
-            break;
-          }
-          case 'thinking': {
-            watchdog.noteProgress();
-            activity.setPhase('thinking');
-            await segments.replace('thinking', ev.text);
-            break;
-          }
-          case 'toolcall_end': {
-            const eventTime = now();
-            if (ev.call.result === undefined) {
-              const startedAt = ev.call.startedAt ?? toolStartedAt.get(ev.call.id) ?? eventTime;
-              toolStartedAt.set(ev.call.id, startedAt);
-              ev.call = { ...ev.call, startedAt };
-            } else {
-              const startedAt = ev.call.startedAt ?? toolStartedAt.get(ev.call.id);
-              ev.call = {
-                ...ev.call,
-                ...(startedAt !== undefined ? { startedAt } : {}),
-                endedAt: ev.call.endedAt ?? eventTime,
-              };
-              toolStartedAt.delete(ev.call.id);
-            }
-            watchdog.noteProgress();
-            sawProgress = true;
-            zeroProgressRetries = 0;
-            if (ev.call.name && CHANGE_TOOLS.has(ev.call.name.toLowerCase())) {
-              sawChangeTool = true;
-            }
-            await segments.seal();
-            if (ev.call.result === undefined) {
-              const skillName = skillCallName(ev.call);
-              activity.toolStarted(
-                ev.call.id,
-                skillName !== null ? `skill: ${skillName}` : ev.call.name || 'tool',
-              );
-            } else {
-              activity.toolEnded(ev.call.id);
-              const skillFact = classifySkillFact(ev.call);
-              if (skillFact !== null) activity.noteSkill(skillFact);
-            }
-            if (ev.call.todo !== undefined) agentTodo.report(ev.call.todo);
-            transcript.upsert({
-              id: ev.call.id,
-              role: 'assistant',
-              content: { kind: 'toolcall', call: ev.call },
-              createdAt: stream.rowCreatedAt(),
-            });
-            if (ev.call.result === undefined) {
-              await client.tool(stepId, ev.call).catch((err: unknown) => {
-                logger.step(
-                  `tool start relay failed for ${ev.call.id}: ${
-                    err instanceof Error ? err.message : String(err)
-                  }`,
-                );
-              });
-            } else {
-              const ok = await withRetries(
-                () => client.tool(stepId, ev.call),
-                REMOTE_TOOL_RETRY_DELAYS_MS,
-                logger,
-                `tool relay ${ev.call.id}`,
-              );
-              if (ok === null)
-                logger.step(
-                  `tool relay failed for ${ev.call.id} (transcript upload will carry it)`,
-                );
-            }
-            break;
-          }
-          case 'message_end': {
-            if (ev.message.role === 'user') break;
-            const messageUsage = ev.message.usage as
-              | {
-                  input?: number;
-                  output?: number;
-                  cacheRead?: number;
-                  cacheWrite?: number;
-                  cost?: { total?: number };
-                }
-              | undefined;
-            if (ev.message.role === 'assistant' && messageUsage !== undefined) {
-              logger.step(
-                `message usage: ${modelKey} input=${messageUsage.input ?? 0} output=${messageUsage.output ?? 0} cacheRead=${messageUsage.cacheRead ?? 0} cacheWrite=${messageUsage.cacheWrite ?? 0}${
-                  messageUsage.cost !== undefined ? ` cost=${messageUsage.cost.total ?? 0}` : ''
-                }`,
-              );
-            }
-            if (ev.message.role === 'assistant' && ev.message.stopReason !== 'error') {
-              watchdog.noteProgress();
-              sawProgress = true;
-              zeroProgressRetries = 0;
-            }
-            if (ev.message.role !== 'assistant') {
-              transcript.upsert({
-                id: stream.nextMessageId(),
-                role: ev.message.role,
-                content: ev.message.content,
-                createdAt: stream.rowCreatedAt(),
-              });
-              break;
-            }
-            await segments.endAssistantMessage(ev.message.content);
-            break;
-          }
-          case 'error':
-            lastError = ev.error.message;
-            lastModelError = ev.error.message;
-            lastErrorWasProcessCrash = ev.error.processCrash === true;
-            logger.step(`error: ${ev.error.message} (retryable=${ev.error.retryable})`);
-            {
-              const failureKind = lastErrorWasProcessCrash
-                ? 'other'
-                : classifyAgentFailure(ev.error.message);
-              if (
-                !lastErrorWasProcessCrash &&
-                classifyStepFailure(ev.error.message) === 'model_unavailable'
-              ) {
-                logger.step(`model unavailable: ${modelKey} — stopping session without retry`);
-                await handle.stop();
-              } else if (failureKind === 'quota' || failureKind === 'capacity') {
-                if (quotaTrip === null) {
-                  quotaTrip = {
-                    kind: failureKind,
-                    reason: ev.error.message,
-                    retryAfterMs: parseRetryAfterMs(ev.error.message),
-                  };
-                  logger.step(
-                    `quota circuit breaker: ${failureKind} on ${provider?.providerId ?? 'unknown'} — stopping session (no auto-retry spin)`,
-                  );
-                }
-                void handle.stop();
-              }
-              if (promptImages !== undefined && noVisionSignalOf(ev.error.message)) {
-                logger.step(
-                  `image capability rejected by ${modelKey} — stopping session (no auto-retry spin)`,
-                );
-                void handle.stop();
-              }
-            }
-            break;
-          case 'auto_retry_start':
-            lastError = null;
-            zeroProgressRetries += 1;
-            if (zeroProgressRetries > retryStormMax) {
-              retryStorm = true;
-              logger.step(
-                `retry storm: ${zeroProgressRetries} consecutive zero-progress auto-retries (max ${retryStormMax}) — stopping session`,
-              );
-              void handle.stop();
-            }
-            logger.step(`auto_retry_start attempt=${ev.attempt}`);
-            activity.setPhase('retrying', { attempt: ev.attempt });
-            break;
-          case 'auto_retry_end':
-            activity.setPhase('awaiting_model');
-            break;
-          case 'compaction_start':
-            logger.step('compaction_start');
-            activity.setPhase('compacting');
-            break;
-          case 'compaction_end':
-            activity.setPhase('awaiting_model');
-            break;
-          case 'done':
-            sawDone = true;
-            usage = ev.usage;
-            break;
-          default:
-            break;
-        }
-        if (classifyStepFailure(lastModelError ?? '') === 'model_unavailable') break;
+        await consumeStepPassEvent(ev, passEvents, passState);
+        if (classifyStepFailure(passState.lastModelError ?? '') === 'model_unavailable') break;
       }
     } catch (err) {
-      lastError = err instanceof Error ? err.message : String(err);
+      passState.lastError = err instanceof Error ? err.message : String(err);
     }
     stop.detach();
-    if (classifyStepFailure(lastModelError ?? '') === 'model_unavailable')
-      lastError = lastModelError;
+    if (classifyStepFailure(passState.lastModelError ?? '') === 'model_unavailable')
+      passState.lastError = passState.lastModelError;
     {
-      const failureText = lastModelError ?? lastError;
+      const failureText = passState.lastModelError ?? passState.lastError;
       const stopPending = stop.request !== null;
       if (
         failureText !== null &&
-        lastError !== null &&
+        passState.lastError !== null &&
         !stopPending &&
         classifyStepFailure(failureText) === 'network' &&
         networkRetries < networkRetryDelays.length
@@ -1152,14 +941,18 @@ async function runClaimedStep(
         continue;
       }
     }
-    if (classifyStepFailure(lastModelError ?? lastError ?? '') === 'model_unavailable') break;
-    if (pass === 0 && !sawProgress && quotaTrip === null) {
-      const failureText = lastModelError ?? lastError;
+    if (
+      classifyStepFailure(passState.lastModelError ?? passState.lastError ?? '') ===
+      'model_unavailable'
+    )
+      break;
+    if (pass === 0 && !passState.sawProgress && passState.quotaTrip === null) {
+      const failureText = passState.lastModelError ?? passState.lastError;
       if (
         failureText !== null &&
-        (lastError !== null ||
-          (watchdog.trippedArm !== null && lastModelError !== null) ||
-          (retryStorm && lastModelError !== null))
+        (passState.lastError !== null ||
+          (watchdog.trippedArm !== null && passState.lastModelError !== null) ||
+          (passState.retryStorm && passState.lastModelError !== null))
       ) {
         const amended: ProviderConfig | null =
           backend.adaptProviderCompat?.(provider, failureText) ?? null;
@@ -1176,10 +969,20 @@ async function runClaimedStep(
         }
       }
     }
-    const imageFailure = lastModelError ?? lastError;
+    const imageFailure = passState.lastModelError ?? passState.lastError;
     if (imageFailure !== null && (await retryWithoutImages(imageFailure))) continue;
     break;
   }
+  let { usage, lastError } = passState;
+  const {
+    lastModelError,
+    lastErrorWasProcessCrash,
+    sawChangeTool,
+    sawDone,
+    sawProgress,
+    retryStorm,
+    quotaTrip,
+  } = passState;
   deps.sessionHandles?.delete(stepId);
   await segments.seal();
   stream.flushDeltas();
