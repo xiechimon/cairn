@@ -1147,6 +1147,7 @@ test('computer image builds from the base with the host mirrorlist read-only and
           'xdotool',
           'chromium',
           'imagemagick',
+          'wqy-microhei',
         ].every((word) => call.includes(word)),
       ),
     );
