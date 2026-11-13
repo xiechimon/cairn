@@ -8,6 +8,8 @@ Owner decisions (2026-11-13):
 - Handoff timeout is 15 minutes; then the attempt stops, with no retry.
 - The push opens the machine page with the screen enlarged and view-only; the owner presses Take control.
 - The owner wants the agent to fill his password and hand over only for human verification. That ships as a second milestone (M2b below), after this handoff, because it needs its own security-surface change.
+- M2b fills a saved login without a per-fill confirmation; the login is bound to one origin and the activity row says "filled from saved login".
+- Session persistence for M4: `--restore` with an encryption key the daemon passes only to browser commands, and the agent's shell refuses `.agent-browser/` paths. The residual risk below is accepted until the browser runs as a separate user.
 
 ## Goal
 
@@ -65,7 +67,6 @@ Precedent: Grok, Rakazo, Skyvern, Browser Use and agent-browser type a stored pa
 
 Residual risk: after the fill and before submit, the value sits in the page on the same computer where the agent has a shell. Scrubbing reduces it; it is not a boundary. Rakazo documents the same limit.
 
-## Decisions for the owner
+## Residual risk accepted for M4
 
-1. M2b approval: recommended no per-fill confirmation for a login you saved for one origin (Rakazo, Grok); the activity row says "filled from saved login". The stricter option is a confirmation on each use (dots).
-2. Session persistence for M4. Today `browser.ts` passes no `--restore`, so a computer idle stop probably drops the login. Recommended: add `--restore` with an encryption key the daemon passes only to browser commands, and refuse `.agent-browser/` paths in the agent's shell. Residual risk: the agent's shell runs as the same user as the browser, so a determined agent could still read the live session; full isolation needs the browser under a separate user, which is a later change.
+The agent's shell runs as the same user as the browser, so a determined agent could still read the live session. Full isolation needs the browser under a separate user, which is a later change.
