@@ -40,7 +40,6 @@ import {
   composeTaskPromptWithInstruction,
   conversationBranch,
   gitCredentialRowContent,
-  INFO_REPORT_MAX_BYTES,
   isBackendRuntimeId,
   isBuildStepKind,
   isIssueSourcedTask,
@@ -102,6 +101,7 @@ import { assembleStepEnv } from './step-env.js';
 import { stepExecutorRecord } from './step-executor-record.js';
 import { prepareCreateTagTool, stepGitRunner } from './step-git-tools.js';
 import { localMergeDoneBody } from './step-local-merge.js';
+import { readDeliveredPlan, readInfoReport, requireUploadedEvidence } from './step-outputs.js';
 import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
 import {
   prepareSkillLoadTool,
@@ -1673,13 +1673,10 @@ async function runClaimedStep(
   }
 
   let report: string | null = null;
-  if (isInfoBuild && !stopped && lastError === null && existsSync(reportFile)) {
-    const content = readFileSync(reportFile, 'utf8');
-    if (Buffer.byteLength(content, 'utf8') > INFO_REPORT_MAX_BYTES) {
-      lastError = `${REPORT_FILE_NAME} 超过上限 ${INFO_REPORT_MAX_BYTES} 字节，请压缩报告后重试`;
-    } else if (content.trim() !== '') {
-      report = content;
-    }
+  if (isInfoBuild && !stopped && lastError === null) {
+    const read = readInfoReport(reportFile);
+    if (read.kind === 'too-large') lastError = read.error;
+    else if (read.kind === 'report') report = read.content;
   }
 
   const status = stopped ? 'stopped' : lastError === null ? 'success' : 'failed';
@@ -1723,14 +1720,7 @@ async function runClaimedStep(
   const messages = transcript.messages();
   let planContent: string | null = null;
   if (claimed.step.kind === 'plan' && !stopped) {
-    const readAt = (p: string): string | null => {
-      if (!existsSync(p)) return null;
-      const content = readFileSync(p, 'utf8');
-      return content.trim() !== '' ? content : null;
-    };
-    const planPath = join(deps.paths.plansDir, convId, PLAN_FILE_NAME);
-    planContent =
-      (existsSync(planPath) ? readAt(planPath) : readAt(join(cwd, PLAN_FILE_NAME))) ?? null;
+    planContent = readDeliveredPlan(deps.paths.plansDir, convId, cwd);
   }
   const reviewExtraction =
     claimed.step.kind === 'review' ? extractReviewVerdict(transcript.messages()) : null;
@@ -1738,18 +1728,12 @@ async function runClaimedStep(
     claimed.step.kind === 'verify'
       ? extractVerifyVerdict(transcript.messages(), { strict: attachmentVerify })
       : null;
-  if (attachmentVerify && verifyExtraction?.status === 'ok' && verifyExtraction.verdict.passed) {
-    const evidence = verifyExtraction.verdict.evidence;
-    if (
-      evidence.length === 0 ||
-      evidence.some((item) => !uploadedVerifyEvidence.has(resolve(cwd, item.path)))
-    ) {
-      verifyExtraction.verdict = {
-        ...verifyExtraction.verdict,
-        passed: false,
-        conclusion: `${verifyExtraction.verdict.conclusion}\nAttachment evidence is missing or was not successfully uploaded by this verification step.`,
-      };
-    }
+  if (attachmentVerify && verifyExtraction?.status === 'ok') {
+    verifyExtraction.verdict = requireUploadedEvidence(
+      verifyExtraction.verdict,
+      uploadedVerifyEvidence,
+      cwd,
+    );
   }
   const sessionIdForDone = handle?.sessionId ?? continueId;
   const doneBody: MachineDoneBody = {
