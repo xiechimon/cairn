@@ -7,7 +7,12 @@ import {
   REPORT_FILE_NAME,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { buildTaskPrompt, planStepPrompt } from '../src/step-prompt.js';
+import {
+  buildTaskPrompt,
+  degradedFreshPrompt,
+  freshSessionPrompt,
+  planStepPrompt,
+} from '../src/step-prompt.js';
 
 const paths = { plansDir: '/state/plans', reportsDir: '/state/reports' };
 const repo = { cloneUrl: 'https://github.com/octo/alpha.git', baseBranch: 'main' };
@@ -74,5 +79,24 @@ describe('planStepPrompt', () => {
     const plan = planStepPrompt(claimed({ kind: 'review' }), 'resume here', paths);
     expect(plan.prompt).toBe('resume here');
     expect(plan.reviewGate).toBe('confirm');
+  });
+});
+
+describe('freshSessionPrompt', () => {
+  const reportFile = '/state/reports/conv-1/report.md';
+  const input = { reportFile, plansDir: paths.plansDir, convId: 'conv-1' };
+
+  test('an info build resends the task with the report location', () => {
+    const step = claimed({ kind: 'build', output: 'info', withRepo: true });
+    expect(freshSessionPrompt(step, { ...input, isInfoBuild: true })).toBe(
+      appendReportLocationNote(buildTaskPrompt(step), reportFile),
+    );
+  });
+
+  test('any other step resends the degraded fresh prompt', () => {
+    const step = claimed({ kind: 'plan' });
+    expect(freshSessionPrompt(step, { ...input, isInfoBuild: false })).toBe(
+      degradedFreshPrompt(step, paths.plansDir, 'conv-1'),
+    );
   });
 });

@@ -65,6 +65,15 @@ function confirmedPlanFile(plansDir: string, convId: string): string | null {
   }
 }
 
+export function freshSessionPrompt(
+  claimed: ClaimedStep,
+  input: { isInfoBuild: boolean; reportFile: string; plansDir: string; convId: string },
+): string {
+  return input.isInfoBuild
+    ? appendReportLocationNote(buildTaskPrompt(claimed), input.reportFile)
+    : degradedFreshPrompt(claimed, input.plansDir, input.convId);
+}
+
 export function degradedFreshPrompt(
   claimed: ClaimedStep,
   plansDir: string,

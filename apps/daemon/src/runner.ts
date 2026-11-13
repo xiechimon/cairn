@@ -19,7 +19,6 @@ import type {
   WorktreeOps,
 } from '@cairn/shared';
 import {
-  appendReportLocationNote,
   classifyAgentFailure,
   classifySkillFact,
   classifyStepFailure,
@@ -73,9 +72,8 @@ import { readDeliveredPlan, readInfoReport } from './step-outputs.js';
 import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
 import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
 import {
-  buildTaskPrompt,
   composeWorkerSystemPrompt,
-  degradedFreshPrompt,
+  freshSessionPrompt,
   planStepPrompt,
   resumeMissNote,
   taskMetaOpts,
@@ -775,6 +773,12 @@ async function runClaimedStep(
     claimed.step.kind === 'plan' || isBuildStepKind(claimed.step.kind)
       ? PROVIDER_NETWORK_RETRY_DELAYS_MS
       : [0, 5_000];
+  const freshPromptPaths = {
+    isInfoBuild,
+    reportFile,
+    plansDir: deps.paths.plansDir,
+    convId,
+  };
   let noVisionDegraded = false;
   const retryWithoutImages = async (failureText: string): Promise<boolean> => {
     if (
@@ -795,11 +799,7 @@ async function runClaimedStep(
     backend.rememberNoVision?.(sessionOpts.provider, sessionOpts.modelId);
     deps.stepImageSupport?.set(stepId, false);
     const retryPrompt =
-      continueId === null
-        ? activePrompt
-        : isInfoBuild
-          ? appendReportLocationNote(buildTaskPrompt(claimed), reportFile)
-          : degradedFreshPrompt(claimed, deps.paths.plansDir, convId);
+      continueId === null ? activePrompt : freshSessionPrompt(claimed, freshPromptPaths);
     const degraded = await resolveStepImagesOrRaw({
       text: retryPrompt,
       stepId,
@@ -888,9 +888,7 @@ async function runClaimedStep(
         createdAt: now(),
       });
       if (!opts.resume) {
-        const fresh = isInfoBuild
-          ? appendReportLocationNote(buildTaskPrompt(claimed), reportFile)
-          : degradedFreshPrompt(claimed, deps.paths.plansDir, convId);
+        const fresh = freshSessionPrompt(claimed, freshPromptPaths);
         journal.update(stepId, {
           prompt: fresh,
           sessionAction: 'new',
