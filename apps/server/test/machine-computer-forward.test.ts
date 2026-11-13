@@ -486,15 +486,21 @@ describe('forwardComputerCall replay', () => {
     return { ...ctx, calls, result, id: computerCallId('step-a', toolCallId) };
   }
 
-  test('a dispatched command reports starting, a live frame reports running, and completion reports stopped', async () => {
-    const { s, result, id } = await started();
-    expect(s.db.select().from(computerTable).get()?.state).toBe('starting');
+  test('the computer state follows the machine presence report, not the calls in flight', async () => {
+    const { s, deps, result, id } = await started();
+    const { scopeKey, providerRef } = s.db.select().from(computerTable).get() ?? {
+      scopeKey: '',
+      providerRef: '',
+    };
+    markPresence(deps, 'omarchy', { computers: [{ scopeKey, providerRef, state: 'running' }] });
+    expect(s.db.select().from(computerTable).get()?.state).toBe('running');
     receiveComputerFrames(s.db, s.hub, 'omarchy', id, [
       { kind: 'output', seq: 1, stream: 'stdout', text: 'a' },
     ]);
-    expect(s.db.select().from(computerTable).get()?.state).toBe('running');
     receiveComputerFrames(s.db, s.hub, 'omarchy', id, [done(2, 'done', 0)]);
     await result;
+    expect(s.db.select().from(computerTable).get()?.state).toBe('running');
+    markPresence(deps, 'omarchy', { computers: [{ scopeKey, providerRef, state: 'stopped' }] });
     expect(s.db.select().from(computerTable).get()?.state).toBe('stopped');
   });
 
@@ -521,10 +527,6 @@ describe('forwardComputerCall replay', () => {
     expect(again.text).toContain('interrupted, may have partially run');
     expect(calls).toHaveLength(1);
     expect(callRow(s, id).state).toBe('interrupted');
-    expect(s.db.select().from(computerTable).get()?.state).toBe('stopped');
-    expect(
-      feed.filter((event) => event.type === 'computer.state').map((event) => event.state),
-    ).toEqual(expect.arrayContaining(['stopped']));
     expect(feed.filter((event) => event.type === 'computer.command')).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -535,7 +537,7 @@ describe('forwardComputerCall replay', () => {
     );
   });
 
-  test('a terminal frame after the waiter is gone still publishes stopped state and the final feed', async () => {
+  test('a terminal frame after the waiter is gone still publishes the final feed', async () => {
     const { s, id } = await started();
     const feed = watchFeed(s);
     dropComputerWaiters();
@@ -544,10 +546,6 @@ describe('forwardComputerCall replay', () => {
     ]);
     receiveComputerFrames(s.db, s.hub, 'omarchy', id, [done(2, 'late-done', 0)]);
     expect(callRow(s, id).state).toBe('done');
-    expect(s.db.select().from(computerTable).get()?.state).toBe('stopped');
-    expect(
-      feed.filter((event) => event.type === 'computer.state').map((event) => event.state),
-    ).toEqual(['running', 'stopped']);
     expect(feed.filter((event) => event.type === 'computer.command')).toEqual([
       expect.objectContaining({
         type: 'computer.command',
@@ -984,7 +982,7 @@ describe('feed and redaction', () => {
     ]);
   });
 
-  test('a read_file reports starting, running and stopped without a feed command', async () => {
+  test('a read_file adds no feed command and publishes nothing to another user', async () => {
     const ctx = boot();
     addMachine(ctx.s, 'omarchy', { computer: true });
     connect(ctx.s, 'omarchy');
@@ -1007,19 +1005,15 @@ describe('feed and redaction', () => {
       params: { path: 'a' },
     });
     const id = computerCallId('step-a', 'r-state');
-    const states = () =>
-      feed.filter((event) => event.type === 'computer.state').map((event) => event.state);
     expect(feed.filter((event) => event.type === 'computer.command')).toEqual([]);
-    expect(states()).toEqual(['starting']);
     receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', id, [
       { kind: 'output', seq: 1, stream: 'stdout', text: 'file' },
     ]);
-    expect(states()).toEqual(['starting', 'running']);
     receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', id, [
       { kind: 'done', seq: 2, text: 'file', exitCode: 0 },
     ]);
     await result;
-    expect(states()).toEqual(['starting', 'running', 'stopped']);
+    expect(feed.filter((event) => event.type === 'computer.command')).toEqual([]);
     expect(stranger).toEqual([]);
   });
 });

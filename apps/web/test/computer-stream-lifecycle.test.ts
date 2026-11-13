@@ -158,20 +158,6 @@ test('an output frame and completion refresh the computer list for a call alread
   ]);
 });
 
-test('a computer state event refreshes the list without adding a feed row', () => {
-  const qc = new QueryClient();
-  const invalidate = vi.spyOn(qc, 'invalidateQueries');
-  const disconnect = startTeamStream('team-1', qc);
-  disposers.push(disconnect);
-  const source = FakeEventSource.instances.at(-1)!;
-  source.onopen?.();
-  source.emit({ type: 'computer.state', computerId: 'comp-1', state: 'running' });
-  source.emit({ type: 'computer.state', computerId: 'comp-1', state: 'nope' });
-  expect(computerFeedStore.snapshot()).toEqual([]);
-  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['computers', 'team-1'] });
-  expect(invalidate).toHaveBeenCalledTimes(1);
-});
-
 test('a missing stream event drops cached live results during reconciliation', () => {
   const { source } = start('first-team');
   source.emit({ type: 'computer.command', command, seq: 1 });

@@ -1,4 +1,6 @@
+import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { join } from 'node:path';
 import type { ComputerPresence, MachinePresenceBody } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -7,6 +9,7 @@ import { loadDaemonConfig } from '../src/config.js';
 import type { DaemonLogger } from '../src/log.js';
 import { MachineClient } from '../src/machine-client.js';
 import { runMachine } from '../src/machine-loop.js';
+import { computerMachineName } from '../src/orb/computer.js';
 import { statePaths } from '../src/state.js';
 import { FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
 
@@ -85,6 +88,73 @@ describe('computer presence machine wiring', () => {
       await handle.stop();
       await handle.done;
       expect(listeners.size).toBe(0);
+      expect(releaseTestTempDir(home)).toBe(true);
+    }
+  });
+
+  test('a daemon with the Orb computer reports what machinectl shows running, not only while a call is open', async () => {
+    const home = makeTestTempDir('computer-presence-orb-');
+    const bin = join(home, 'bin');
+    mkdirSync(bin);
+    const scopeKey = 'chief:one';
+    const name = computerMachineName(scopeKey);
+    writeFileSync(
+      join(bin, 'machinectl'),
+      `#!/bin/sh\nif [ "$1" = list ]; then echo "${name} container systemd-nspawn - - 10.0.0.2"; fi\n`,
+    );
+    chmodSync(join(bin, 'machinectl'), 0o755);
+    mkdirSync(join(home, 'orb-state'), { recursive: true });
+    writeFileSync(
+      join(home, 'orb-state', 'computers.json'),
+      JSON.stringify([{ scopeKey, name, lastUsedAt: Date.now(), holdUntil: 0 }]),
+    );
+    vi.stubEnv('PATH', `${bin}:${process.env.PATH ?? ''}`);
+    const api = new FakeMachineApi();
+    const logger = Object.fromEntries(
+      [
+        'raw',
+        'prefixed',
+        'supervisor',
+        'machine',
+        'step',
+        'workspace',
+        'recover',
+        'wake',
+        'mcp',
+        'skills',
+        'gate',
+        'trust',
+      ].map((key) => [key, vi.fn()]),
+    ) as unknown as DaemonLogger;
+    const config = loadDaemonConfig(
+      { home, serverUrl: 'http://server', apiKey: 'test', teamId: 'team-1' },
+      {},
+    );
+    const handle = await runMachine({
+      config,
+      paths: statePaths(home, config.workspacesDir),
+      logger,
+      client: api,
+      backend: fakeBackend([]).backend,
+      claudeCodeAuthProbe: async () => ({ state: 'unknown', reason: 'test' }),
+      capabilitiesProbe: () => ({ mcpServers: [], skills: [] }),
+      idleSleepPrevention: false,
+      proxyEnv: {},
+      capEnv: { CAIRN_COMPUTER: 'orb' },
+      otel: null,
+    });
+    try {
+      await waitFor(() =>
+        api.presenceBodies.some((body) =>
+          (body as MachinePresenceBody).computers?.some(
+            (report) => report.providerRef === name && report.state === 'running',
+          ),
+        ),
+      );
+    } finally {
+      await handle.stop();
+      await handle.done;
+      vi.unstubAllEnvs();
       expect(releaseTestTempDir(home)).toBe(true);
     }
   });
