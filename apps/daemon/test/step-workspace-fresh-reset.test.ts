@@ -1,11 +1,23 @@
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { resetFreshSessionWorkspace } from '../src/step-workspace.js';
 
+const dirs: string[] = [];
+
+afterEach(() => {
+  for (const dir of dirs.splice(0)) releaseTestTempDir(dir);
+});
+
+function tempDir(): string {
+  const dir = makeTestTempDir('fresh-reset-');
+  dirs.push(dir);
+  return dir;
+}
+
 function planFile(): string {
-  const file = join(mkdtempSync(join(tmpdir(), 'fresh-reset-')), 'plan.md');
+  const file = join(tempDir(), 'plan.md');
   writeFileSync(file, 'old plan');
   return file;
 }
@@ -46,7 +58,7 @@ describe('resetFreshSessionWorkspace', () => {
       workspace: { restoreCheckpoint: async () => {} },
       cwd: '/ws',
       headAtStart: 'abc123',
-      planFile: join(tmpdir(), 'missing-dir-for-fresh-reset', 'plan.md'),
+      planFile: join(tempDir(), 'plan.md'),
     });
     expect(reason).toBeNull();
   });
