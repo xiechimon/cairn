@@ -279,8 +279,7 @@ test('the real commit hook refuses a type-change-only disclosure before formatti
   mkdirSync(join(cwd, 'scripts'));
   for (const name of ['public-content-gate.mjs', 'public-content-allowlist.json'])
     copyFileSync(join(import.meta.dirname, name), join(cwd, 'scripts', name));
-  for (const name of ['commit-identity.mjs', 'check-lockfile-commit.mjs'])
-    writeFileSync(join(cwd, 'scripts', name), '');
+  writeFileSync(join(cwd, 'scripts', 'commit-identity.mjs'), '');
   const result = spawnSync('sh', [join(import.meta.dirname, '../.husky/pre-commit')], {
     cwd,
     encoding: 'utf8',
