@@ -6,6 +6,7 @@ import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
   chiefThread,
+  dueEvent,
   gateState,
   notification,
   plan as planTable,
@@ -17,7 +18,14 @@ import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import type { BuildDeps } from '../src/services/builds.js';
 import { executeChiefTool, transitionTodos } from '../src/services/chief-tools.js';
 import { listNeedsYou } from '../src/services/needs-you.js';
-import { reconcileOwners, seedOwnerCheckpoints } from '../src/services/owner.js';
+import {
+  COORDINATOR_TURN_DEADLINE_MS,
+  handoffUnclaimedOwnershipWake,
+  ownershipHandoffEventId,
+  ownershipOf,
+  reconcileOwners,
+  seedOwnerCheckpoints,
+} from '../src/services/owner.js';
 import { parkFailedBuild } from '../src/services/retry-parking.js';
 import { getTodo, setTodoArchived, setTodoPhase } from '../src/services/todos.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
@@ -124,6 +132,14 @@ function openWorld(
   const deps: BuildDeps = { ...s.svc, reposDir: s.reposDir, box: s.secretBox };
   const spy = vi.spyOn(s.svc.hub, 'publishNotification');
   return { s, deps, projectId, todoId, buildId, stepId, notified: () => spy.mock.calls.length };
+}
+
+function handoffEvent(w: World, stepId: string) {
+  return w.s.db
+    .select()
+    .from(dueEvent)
+    .where(eq(dueEvent.id, ownershipHandoffEventId(stepId)))
+    .get();
 }
 
 function wakes(w: World): string[] {
@@ -383,6 +399,68 @@ describe('reconcileOwners (#3512)', () => {
     expect(ownerNow(w)).toBe('coordinator');
     expect(wakes(w)).toHaveLength(1);
     expect(wakes(w)[0]).toMatch(/^\[wake:failed\]/);
+    expect(w.notified()).toBe(before);
+    const turn = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get();
+    const queued = w.s.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.id, turn?.coordinatorTurn?.stepId ?? ''))
+      .get();
+    expect(handoffEvent(w, queued?.id ?? '')?.dueAt).toBe(
+      (queued?.createdAt ?? 0) + COORDINATOR_TURN_DEADLINE_MS,
+    );
+  });
+
+  test('an unclaimed Coordinator wake hands the task back when its deadline event fires', () => {
+    const w = openWorld({ phase: 'building', failure: 'repeated' });
+    w.s.db
+      .update(buildTable)
+      .set({ errorMessage: 'PR Auto-fix needs you: review round cap (3) reached' })
+      .where(eq(buildTable.id, w.buildId))
+      .run();
+    setTodoPhase(w.deps, w.todoId, 'failed');
+    reconcileOwners(w.deps, [w.todoId]);
+    const turn = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get();
+    const stepId = turn?.coordinatorTurn?.stepId ?? '';
+    const queued = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get();
+    const before = w.notified();
+    handoffUnclaimedOwnershipWake(w.deps, stepId, (queued?.createdAt ?? 0) + 60_000);
+    expect(ownerNow(w)).toBe('coordinator');
+    expect(w.notified()).toBe(before);
+    const due = (queued?.createdAt ?? 0) + COORDINATOR_TURN_DEADLINE_MS;
+    handoffUnclaimedOwnershipWake(w.deps, stepId, due);
+    const fresh = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get();
+    expect(ownershipOf(w.s.db, fresh!, due)).toMatchObject({ owner: 'owner', reason: 'handoff' });
+    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()?.status).toBe(
+      'stopped',
+    );
+    expect(w.notified() - before).toBe(1);
+  });
+
+  test('a claimed Coordinator wake is not handed back when its deadline event fires', () => {
+    const w = openWorld({ phase: 'building', failure: 'repeated' });
+    w.s.db
+      .update(buildTable)
+      .set({ errorMessage: 'PR Auto-fix needs you: review round cap (3) reached' })
+      .where(eq(buildTable.id, w.buildId))
+      .run();
+    setTodoPhase(w.deps, w.todoId, 'failed');
+    reconcileOwners(w.deps, [w.todoId]);
+    const turn = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get();
+    const stepId = turn?.coordinatorTurn?.stepId ?? '';
+    const queued = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get();
+    w.s.db
+      .update(stepTable)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(stepTable.id, stepId))
+      .run();
+    const before = w.notified();
+    handoffUnclaimedOwnershipWake(
+      w.deps,
+      stepId,
+      (queued?.createdAt ?? 0) + COORDINATOR_TURN_DEADLINE_MS,
+    );
+    expect(ownerNow(w)).toBe('coordinator');
     expect(w.notified()).toBe(before);
   });
 

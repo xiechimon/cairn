@@ -28,7 +28,6 @@ import {
   REMOTE_TOOL_RETRY_DELAYS_MS,
   skillCallName,
   stepTakesSecrets,
-  stripAnsiEscapes,
   transcriptPromptRowId,
 } from '@cairn/shared';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
@@ -49,14 +48,12 @@ import {
   prepareCredentialSessionUpload,
 } from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
-import { GitPushHookError, isGitAuthFailure } from './git.js';
 import { type StepJournal, TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { type MachineApi, MachineApiError } from './machine-client.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
 import { resolveDeliveredPrompt, resolveStepImagesOrRaw } from './step-attachments.js';
-import { commitAndPushStep, preserveFailedBuild } from './step-closing-git.js';
 import { composeDoneBody } from './step-done-body.js';
 import { assembleStepEnv } from './step-env.js';
 import { reportStepProvenance } from './step-executor-record.js';
@@ -77,6 +74,7 @@ import {
 import { resolveStepProvider } from './step-provider.js';
 import { stepQuotaBlock } from './step-quota-block.js';
 import { stepRemoteToolExecutor } from './step-remote-tools.js';
+import { settleStepGit } from './step-settle-git.js';
 import { sessionInjectedSkills, stepMcpEndpoints } from './step-skill-tool.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { seedStepTranscript } from './step-transcript-seed.js';
@@ -719,7 +717,6 @@ async function runClaimedStep(
 
   let usage: AgentTokenUsage = [];
   let lastError: string | null = null;
-  let closingPushHookError: GitPushHookError | null = null;
   let lastModelError: string | null = null;
   let lastErrorWasProcessCrash = false;
   let sawChangeTool = false;
@@ -1252,92 +1249,36 @@ async function runClaimedStep(
     }
   }
 
-  const pushStep = (git: WorktreeOps, workspace: PreparedWorkspace) =>
-    withStepGit(async (credential) => {
-      await git.push(workspace.cwd, workspace.branch, credential, {
-        base: headAtStart,
-        identity: appIdentity,
-        coAuthor: tokenRes.coAuthor ?? null,
-      });
-    });
-  let headCommit: string | null = attachmentVerify ? headAtStart : null;
-  let branchDrift: { expected: string; actual: string } | null = null;
-  let artifactBranches: string[] = [];
-  let hasChanges = isReview || attachmentVerify ? false : sawChangeTool;
-  if (readonlyWorkspace) hasChanges = false;
-  if (
-    ws !== null &&
-    ws.readonly !== true &&
-    deps.workspace &&
-    lastError === null &&
-    !stopped &&
-    !isReview &&
-    !attachmentVerify
-  ) {
-    const git = deps.workspace;
-    const workspace = ws;
-    const closing = await commitAndPushStep({
-      git,
-      ws: workspace,
-      claimed,
-      stepId,
-      coAuthor: tokenRes.coAuthor ?? null,
-      identity: stepIdentity,
-      mergeCredential: creds.git,
-      headAtStart,
-      stepStartMs,
-      push: () => pushStep(git, workspace),
-      note: (id, content) => transcript.upsert({ id, role: 'system', content, createdAt: now() }),
-      log: (message) => logger.step(message),
-      logRaw: (message) => logger.raw(message),
-    });
-    headCommit = closing.headCommit;
-    branchDrift = closing.branchDrift;
-    artifactBranches = closing.artifactBranches;
-    if (closing.hasChanges !== null) hasChanges = closing.hasChanges;
-    if (closing.error !== null) {
-      const err = closing.error;
-      if (err instanceof GitPushHookError) closingPushHookError = err;
-      lastError = err instanceof Error ? err.message : String(err);
-    }
-  }
-
-  let pushHookOutput: string | null = null;
-  if (isBuildStepKind(claimed.step.kind) && closingPushHookError !== null) {
-    pushHookOutput = stripAnsiEscapes(closingPushHookError.message);
-    lastError = null;
-    if (ws !== null && deps.workspace) {
-      headCommit = await deps.workspace.headCommit(ws.cwd);
-      hasChanges = true;
-    }
-  }
-
-  let preservedCommits: string[] = [];
-  if (
-    isBuildStepKind(claimed.step.kind) &&
-    lastError !== null &&
-    !isGitAuthFailure(lastError) &&
-    !stopped &&
-    ws !== null &&
-    ws.readonly !== true &&
-    deps.workspace
-  ) {
-    const git = deps.workspace;
-    const workspace = ws;
-    const preserved = await preserveFailedBuild({
-      git,
-      ws: workspace,
-      claimed,
-      push: () => pushStep(git, workspace),
-      log: (message) => logger.step(message),
-      logRaw: (message) => logger.raw(message),
-    });
-    if (preserved !== null) {
-      headCommit = preserved.headCommit;
-      preservedCommits = preserved.commits;
-      hasChanges = true;
-    }
-  }
+  const settledGit = await settleStepGit({
+    git: deps.workspace,
+    ws,
+    claimed,
+    stepId,
+    coAuthor: tokenRes.coAuthor ?? null,
+    appIdentity,
+    identity: stepIdentity,
+    mergeCredential: creds.git,
+    headAtStart,
+    stepStartMs,
+    runGit: withStepGit,
+    headCommit: attachmentVerify ? headAtStart : null,
+    hasChanges: isReview || attachmentVerify || readonlyWorkspace ? false : sawChangeTool,
+    lastError,
+    stopped,
+    closes: lastError === null && !stopped && !isReview && !attachmentVerify,
+    note: (id, content) => transcript.upsert({ id, role: 'system', content, createdAt: now() }),
+    log: (message) => logger.step(message),
+    logRaw: (message) => logger.raw(message),
+  });
+  lastError = settledGit.lastError;
+  const {
+    headCommit,
+    branchDrift,
+    artifactBranches,
+    hasChanges,
+    pushHookOutput,
+    preservedCommits,
+  } = settledGit;
 
   let report: string | null = null;
   if (isInfoBuild && !stopped && lastError === null) {

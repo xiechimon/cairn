@@ -92,7 +92,7 @@ import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemoryDocuments } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
-import { ownershipOf } from './owner.js';
+import { ownershipOf, rescheduleOwnershipHandoff } from './owner.js';
 import { PICKED_PROJECT_OPEN, stepScopeProjectId } from './picked-project.js';
 import { chiefRemoteTools, coordinatorProfile, type RouteProfile } from './routing-rules.js';
 import { type LocalSkill, scanLocalSkills } from './skills.js';
@@ -1320,6 +1320,7 @@ export function recoverGateWake(deps: ChiefDeps, failedStep: typeof step.$inferS
         .set({ coordinatorTurn: { ...row.coordinatorTurn, stepId: retryId } })
         .where(eq(todo.id, record.id))
         .run();
+      rescheduleOwnershipHandoff(deps.db, failedStep.id, retryId);
     }
     return;
   }
