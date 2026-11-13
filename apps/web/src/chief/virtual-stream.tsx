@@ -1,9 +1,16 @@
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { defaultRangeExtractor, type Range, useVirtualizer } from '@tanstack/react-virtual';
 import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react';
 import { FOLLOW_THRESHOLD } from '../components/chat/jump-to-latest.js';
 
 const ESTIMATED_ROW_HEIGHT = 120;
 const OVERSCAN = 4;
+
+function keepNewestRowMounted(range: Range): number[] {
+  const indexes = defaultRangeExtractor(range);
+  const newest = range.count - 1;
+  if (newest >= 0 && indexes[indexes.length - 1] !== newest) indexes.push(newest);
+  return indexes;
+}
 
 export function VirtualStream({
   keys,
@@ -22,6 +29,7 @@ export function VirtualStream({
     estimateSize: () => ESTIMATED_ROW_HEIGHT,
     getItemKey: (index) => keys[index] ?? index,
     overscan: OVERSCAN,
+    rangeExtractor: keepNewestRowMounted,
     anchorTo: 'end',
     initialOffset: Number.MAX_SAFE_INTEGER,
     scrollEndThreshold: FOLLOW_THRESHOLD,
