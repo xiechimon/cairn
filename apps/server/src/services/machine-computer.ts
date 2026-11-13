@@ -15,7 +15,7 @@ import {
 } from '@cairn/shared';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { chief, chiefThread, computer, computerCall, machine, step } from '../db/schema.js';
+import { chiefThread, computer, computerCall, machine, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { NotFoundError } from './builds.js';
@@ -251,11 +251,6 @@ export function receiveComputerFrames(
   else if (result.pending !== null) pendingOutput.set(callId, result.pending);
   const live = pendingCalls.get(callId);
   const publishHub = live?.hub ?? hub;
-  const computerId =
-    db.select().from(computerCall).where(eq(computerCall.id, callId)).get()?.computerId ?? null;
-  if (syncObservedComputerState(db, computerId)) {
-    publishObservedComputerState(db, publishHub, computerId);
-  }
   if (result.finished) settleComputerCall(db, callId, hub);
   else if (result.publishOutput) {
     const row = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
@@ -416,14 +411,7 @@ export function settleComputerCall(db: Db, callId: string, hub?: TeamStreamHub):
     live.dispose();
   }
   const publishHub = live?.hub ?? hub;
-  if (publishHub) {
-    if (syncObservedComputerState(db, row.computerId)) {
-      publishObservedComputerState(db, publishHub, row.computerId);
-    }
-    publishFeed(db, publishHub, row);
-  } else {
-    syncObservedComputerState(db, row.computerId);
-  }
+  if (publishHub) publishFeed(db, publishHub, row);
   live?.resolve(resultOfRow(row));
 }
 
@@ -469,56 +457,6 @@ function openPending(
   };
   pendingCalls.set(call.callId, pending);
   return pending;
-}
-
-function syncObservedComputerState(db: Db, computerId: string | null): boolean {
-  if (!computerId) return false;
-  const current = db
-    .select({ state: computer.state })
-    .from(computer)
-    .where(eq(computer.id, computerId))
-    .get();
-  if (!current) return false;
-  const open = db
-    .select({ state: computerCall.state, startedAt: computerCall.startedAt })
-    .from(computerCall)
-    .where(
-      and(
-        eq(computerCall.computerId, computerId),
-        inArray(computerCall.state, ['dispatched', 'running']),
-      ),
-    )
-    .all();
-  const state =
-    open.length === 0
-      ? 'stopped'
-      : open.some((row) => row.state === 'running' || row.startedAt !== null)
-        ? 'running'
-        : 'starting';
-  if (current.state === state) return false;
-  db.update(computer).set({ state, updatedAt: nowMs() }).where(eq(computer.id, computerId)).run();
-  return true;
-}
-
-function publishObservedComputerState(
-  db: Db,
-  hub: TeamStreamHub | undefined,
-  computerId: string | null,
-): void {
-  if (!hub || !computerId) return;
-  const row = db.select().from(computer).where(eq(computer.id, computerId)).get();
-  if (!row?.scopeKey.startsWith('chief:')) return;
-  const owner = db
-    .select({ userId: chief.userId, teamId: chief.teamId })
-    .from(chief)
-    .where(eq(chief.id, row.scopeKey.slice('chief:'.length)))
-    .get();
-  if (!owner || owner.teamId !== row.teamId || owner.userId === '') return;
-  hub.publishPrivate(row.teamId, owner.userId, () => ({
-    type: 'computer.state',
-    computerId: row.id,
-    state: row.state,
-  }));
 }
 
 function releaseExecutionLease(db: Db, stepId: string): void {
@@ -746,8 +684,6 @@ async function holdTakeover(
     })
     .run();
   markHandoffIfNone(db, target.id, 'model', stepId, now);
-  if (syncObservedComputerState(db, target.id))
-    publishObservedComputerState(db, deps.hub, target.id);
   const asked = body.params.reason;
   const reason =
     typeof asked === 'string' && asked.trim() !== '' ? redact(asked).slice(0, 200) : '';
@@ -795,9 +731,6 @@ async function holdTakeover(
       .run();
     clearHandoff(db, target.id);
     releaseExecutionLease(db, stepId);
-    if (syncObservedComputerState(db, target.id)) {
-      publishObservedComputerState(db, deps.hub, target.id);
-    }
   }
   return { text: outcome === 'handed_back' ? TAKEOVER_HANDED_BACK : TAKEOVER_NOT_DONE };
 }
@@ -851,12 +784,7 @@ export async function forwardComputerCall(
         .where(eq(computerCall.id, callId))
         .run();
       const interrupted = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
-      if (interrupted) {
-        if (syncObservedComputerState(db, interrupted.computerId)) {
-          publishObservedComputerState(db, deps.hub, interrupted.computerId);
-        }
-        publishFeed(db, deps.hub, interrupted);
-      }
+      if (interrupted) publishFeed(db, deps.hub, interrupted);
       return resultOfRow({ ...existing, state: 'interrupted' });
     }
     return resultOfRow(existing);
@@ -937,15 +865,10 @@ export async function forwardComputerCall(
     deadlineAt,
     ...(target.scopeKey !== undefined ? { scopeKey: target.scopeKey } : {}),
   };
-  syncObservedComputerState(db, target.computerId);
   if (!deps.machineHub.pushComputer(target.machineId, call)) {
     db.delete(computerCall).where(eq(computerCall.id, dispatchId)).run();
-    if (syncObservedComputerState(db, target.computerId)) {
-      publishObservedComputerState(db, deps.hub, target.computerId);
-    }
     throw new HttpError(409, COMPUTER_NOT_CONNECTED);
   }
-  publishObservedComputerState(db, deps.hub, target.computerId);
   const pending = openPending(deps, call);
   const row = db.select().from(computerCall).where(eq(computerCall.id, dispatchId)).get();
   if (row) publishFeed(db, deps.hub, row);
