@@ -42,7 +42,7 @@ An engine plans for itself. When the plan includes an action that cannot be undo
 
 ## The engine view
 
-Owner decisions on 2026-11-12 and 2026-11-13. When a thread has dispatched work to an engine, the run has no card of its own: its events are the thread's own conversation, and one tail line where the work ends carries the run's cost, model choice, raw output and takeover.
+Owner decisions on 2026-11-12 and 2026-11-13. When a thread has dispatched work to an engine, the run has no card of its own: its events are the thread's own conversation, and one tail row where the work ends carries raw output and takeover; cost and the model choice sit in the thread's usage popover.
 
 - Default view: the engine's structured event stream rendered with cairn's own conversation components (reply text, the plan checklist, read, edit and run rows, the running row). It is the same family as the thread itself and works on the phone.
 - Nothing is lost silently. An event type the adapter does not know renders as a generic row that names the type and opens its raw content. An engine that waits for input the adapter cannot map shows that it is waiting and offers takeover. Every unknown type is counted and reported, and each adapter is tested by replaying recorded streams per engine version.
@@ -85,7 +85,7 @@ Proposal:
 
 - The difficulty is decided by rule first (the risk list in this document), then by the owner's explicit setting, which always wins.
 - It can only be raised during the work: a failed attempt, a check that does not pass or a plan that grows moves the task up one level and the next dispatch uses the higher row. It is never lowered silently.
-- The chosen model, effort and the reason are recorded on the dispatch and shown on the run's tail line, so the owner sees why a task cost what it did.
+- The chosen model, effort and the reason are recorded on the dispatch and shown in the thread's usage popover, so the owner sees why a task cost what it did.
 - Effort maps to whatever each engine calls it (thinking level, reasoning effort); an engine that has no such control ignores it and the dispatch record says so.
 - A run still never switches model because a quota ran out; that pauses the work, as today.
 

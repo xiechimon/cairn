@@ -3,9 +3,11 @@ import { ContextMeterGlyph, contextPercentOf, METER_BTN_CLS } from '../chief/con
 import { Button } from '../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
+import { formatWorkDuration } from '../detail/work-trace.js';
 import type { ChiefContextUsage } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
+import { ENGINE_CHOICE_WORDS, type EngineRun, engineCost } from './engine-run.js';
 import {
   type ThreadUsageSummary,
   threadContextReading,
@@ -19,6 +21,7 @@ export interface ThreadUsageView {
   state: ThreadUsageState;
   onRetry: () => void;
   context?: ChiefContextUsage | null | undefined;
+  engineRun?: EngineRun | undefined;
 }
 
 const UNKNOWN = '—';
@@ -46,12 +49,27 @@ export function ThreadUsageDetails({
   state,
   onRetry,
   context,
+  engineRun,
   className,
 }: ThreadUsageView & { className?: string }) {
   const { t } = useI18n();
   const rows = [
     { label: t('上下文'), value: threadContextReading(context) },
-    { label: t('花费'), value: summary.cost },
+    ...(engineRun === undefined
+      ? []
+      : [
+          {
+            label: t('时长'),
+            value:
+              engineRun.elapsedSeconds === null ? '' : formatWorkDuration(engineRun.elapsedSeconds),
+          },
+          {
+            label: t('模型档位'),
+            value: `${t(ENGINE_CHOICE_WORDS.modelTier[engineRun.choice.modelTier])} · ${t(ENGINE_CHOICE_WORDS.effort[engineRun.choice.effort])}`,
+          },
+          { label: t('选择理由'), value: engineRun.choice.reason },
+        ]),
+    { label: t('花费'), value: engineCost(engineRun?.costUsd ?? null) ?? summary.cost },
     { label: t('Token 数'), value: summary.tokens },
     { label: t('缓存命中'), value: summary.cached },
     { label: t('模型列表'), value: summary.models.join(' · ') },
@@ -83,9 +101,11 @@ export function ThreadUsageDetails({
           </div>
         ))}
       </dl>
-      <p className="m-0 text-caption text-content-tertiary">
-        {t('包含全部运行；总时长暂不可用。')}
-      </p>
+      {engineRun === undefined && (
+        <p className="m-0 text-caption text-content-tertiary">
+          {t('包含全部运行；总时长暂不可用。')}
+        </p>
+      )}
       {state !== 'ready' && (
         <p
           role="status"

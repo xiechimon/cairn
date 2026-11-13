@@ -585,6 +585,7 @@ function ReadyThread({
         onClose={onClose}
         engine={engine}
         usage={
+          engine !== undefined ||
           (usage.hasRuns && threadUsageShown(usage.summary, usage.state)) ||
           contextPercentOf(todo.context) !== null
             ? {
@@ -592,6 +593,7 @@ function ReadyThread({
                 state: usage.state,
                 onRetry: usage.retry,
                 context: todo.context,
+                engineRun: engine?.run,
               }
             : null
         }

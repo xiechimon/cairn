@@ -9,18 +9,14 @@ import {
   DialogShell,
 } from '../components/ui/dialog-shell.js';
 import { REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
-import { formatWorkDuration } from '../detail/work-trace.js';
 import { useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import {
-  ENGINE_CHOICE_WORDS,
   type EngineRun,
   type EngineRunActions,
   engineCanTakeOver,
-  engineCost,
   enginePendingQuestion,
 } from './engine-run.js';
-import { joinMeta } from './rel-time.js';
 
 const END_SLACK = 24;
 const KEYBOARD_SCROLLABLE = { tabIndex: 0 } as const;
@@ -133,7 +129,6 @@ export function EngineRunTail({
 }) {
   const { t } = useI18n();
   const [confirming, setConfirming] = useState(false);
-  const { choice } = run;
   const question = enginePendingQuestion(run);
   return (
     <>
@@ -170,17 +165,8 @@ export function EngineRunTail({
       <div
         data-testid="engine-tail"
         data-state={run.state}
-        className="mt-4 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-meta leading-5 text-content-tertiary"
+        className="mt-4 flex min-w-0 items-center text-meta leading-5"
       >
-        <span data-testid="engine-choice" className="min-w-0">
-          {joinMeta([
-            run.elapsedSeconds === null ? null : formatWorkDuration(run.elapsedSeconds),
-            engineCost(run.costUsd),
-            t(ENGINE_CHOICE_WORDS.modelTier[choice.modelTier]),
-            t(ENGINE_CHOICE_WORDS.effort[choice.effort]),
-            choice.reason,
-          ])}
-        </span>
         <span className="-ml-1.5 flex flex-none items-center">
           <Button
             variant="ghost"

@@ -36,23 +36,27 @@ for (const { state, data, phase } of STATES) {
   });
 }
 
-test('a running run shows its plan, its steps and the reason for its model', async ({ page }) => {
+test('a running run shows its plan and steps, with the model choice in the usage popover', async ({ page }) => {
   await open(page, 'running');
   expect(await planStates(page)).toEqual(['done', 'done', 'doing', 'todo']);
   await expect(page.getByTestId('work-spinner')).toBeVisible();
-  await expect(page.getByTestId('engine-choice')).toHaveText(
-    '中档模型 · 中等强度 · 要改一个文件并跑测试',
-  );
   await expect(page.getByTestId('engine-take-over')).toBeVisible();
+  await expect(tail(page)).not.toContainText('中档模型');
+  await page.getByTestId('thread-usage-ring').click();
+  const usage = page.getByTestId('thread-usage');
+  await expect(usage).toContainText('中档模型 · 中等强度');
+  await expect(usage).toContainText('要改一个文件并跑测试');
 });
 
-test('a finished run carries time and cost and offers no takeover', async ({ page }) => {
+test('a finished run keeps time and cost in the usage popover and offers no takeover', async ({ page }) => {
   await open(page, 'finished');
-  await expect(page.getByTestId('engine-choice')).toContainText('4m 12s · $0.21 · 中档模型');
   expect(await planStates(page)).toEqual(['done', 'done', 'done', 'done']);
   await expect(page.getByTestId('engine-take-over')).toHaveCount(0);
   await expect(page.getByTestId('engine-question')).toHaveCount(0);
   await expect(transcript(page)).toContainText('已允许这一次');
+  await page.getByTestId('thread-usage-ring').click();
+  await expect(page.getByTestId('thread-usage')).toContainText('4m 12s');
+  await expect(page.getByTestId('thread-usage')).toContainText('$0.21');
 });
 
 test('a failed run opens the failed command with its output', async ({ page }) => {
