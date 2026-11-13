@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import type { MachineHeartbeatBody } from '@cairn/shared';
 import { collectVisibleSkillFileMap, type SkillsCatalogOpts } from './backend/skills.js';
 import { buildExecutorRecord, type ExecutorRecord } from './executor-record.js';
 
@@ -29,4 +30,24 @@ export function stepExecutorRecord(input: StepExecutorInput): ExecutorRecord {
       tools: input.tools.map(({ name, description }) => ({ name, description })),
     },
   });
+}
+
+export async function reportStepProvenance(input: {
+  record: () => StepExecutorInput;
+  provenance: MachineHeartbeatBody;
+  baseSha: string | null;
+  heartbeat: (provenance: MachineHeartbeatBody) => Promise<void>;
+  log: (line: string) => void;
+}): Promise<void> {
+  try {
+    const executorRecord = stepExecutorRecord(input.record());
+    input.provenance.baseSha = input.baseSha;
+    input.provenance.harnessHash = executorRecord.harness_sha;
+    input.log(`executor record ${JSON.stringify(executorRecord)}`);
+    await input.heartbeat(input.provenance);
+  } catch (err: unknown) {
+    input.log(
+      `build provenance report failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 }
