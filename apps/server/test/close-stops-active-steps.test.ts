@@ -15,12 +15,8 @@ import {
   stopPending as stopPendingTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import {
-  applyStoppedStep,
-  enqueueStep,
-  prepareStopForDone,
-  sweepAbandonedBuildSteps,
-} from '../src/services/builds.js';
+import { sweepAbandonedBuildSteps } from '../src/services/build-abandoned-sweep.js';
+import { applyStoppedStep, enqueueStep, prepareStopForDone } from '../src/services/builds.js';
 import { type ChiefToolDeps, transitionTodos } from '../src/services/chief-tools.js';
 import { claimStep, finishStep } from '../src/services/machines.js';
 import { RETRY_PARKED_MARK } from '../src/services/retry-parking.js';

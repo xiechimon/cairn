@@ -27,21 +27,17 @@ import {
   buildReplanPrompt,
   buildReviewRejectPrompt,
   buildReviewStepPrompt,
-  buildReworkNewBranchNote,
   buildTaskPromptText,
   buildVerifyStepPrompt,
   CONFIRM_ANNOUNCEMENT,
-  conversationBranch,
   DEFAULT_SHIP_ROUTE,
   isActiveStepStatus,
   isBuildStepKind,
   isPlanContractRewritePrompt,
-  isWaitingPhase,
   MERGE_ANNOUNCEMENT,
   type PlanContractCheck,
   parseReviewPromptMeta,
   planVerificationItems,
-  prNumberFromUrl,
   REVIEW_ANNOUNCEMENT,
   type RouteOverride,
   SESSION_BRIEF,
@@ -51,7 +47,6 @@ import {
   UNSTARTED_STEP_STATUSES,
   VERIFY_ANNOUNCEMENT,
   type VerifyVerdict,
-  withCoAuthor,
 } from '@cairn/shared';
 import {
   and,
@@ -69,14 +64,11 @@ import {
 } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
-  autonomousMergeAdmission,
   build,
   machine,
   message,
   plan as planTable,
   project,
-  queuedMessage,
-  schedule,
   steerPending,
   step,
   stopPending,
@@ -84,21 +76,10 @@ import {
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { systemGitOps } from '../lib/git.js';
-import {
-  type FetchLike,
-  type GithubMergeResult,
-  githubMergePull,
-  githubPull,
-  hasPullFields,
-  isFullSha,
-  isOwnPull,
-  WRITE_AUTHOR_ASSOCIATIONS,
-} from '../lib/github.js';
+import { type FetchLike, isFullSha } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
-import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
-import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
 import { BLOCKED_STEP_KINDS, blockedHold, blockedNow } from './blockers.js';
 import { settleReviewStep, settleVerifyStep } from './build-gate-steps.js';
 import {
@@ -107,13 +88,11 @@ import {
   ticketRefOf,
   type VerdictReport,
 } from './build-gate-verdict.js';
-import {
-  assertNoMergedPrElsewhere,
-  mergedPrElsewhere,
-  probeReworkTargetPr,
-} from './build-pr-probe.js';
+import { mergeThroughGithub } from './build-github-merge.js';
+import { mergedPrElsewhere } from './build-pr-probe.js';
 import { recordBuildFeedback } from './build-provenance.js';
 import { restartFailedBuild } from './build-restart.js';
+import { type BuildSteerResult, sendBuildSteer } from './build-steer.js';
 import {
   applyStoppedStep,
   hasLeftExecution,
@@ -121,19 +100,11 @@ import {
   releaseUnissuedMergeAdmission,
   releaseZombieQueued,
   settleAfterStopPhase,
-  stopStepKeepPhase,
   stopUnclaimedGateSteps,
 } from './build-stop.js';
 import { askUndeliveredOnce, undeliveredEnd } from './build-undelivered.js';
-import {
-  claimClientMessage,
-  completeClientMessage,
-  findClientMessage,
-  replayAfterConflict,
-} from './client-message.js';
-import { assertCorrectionDone } from './correction.js';
+import { claimClientMessage, findClientMessage } from './client-message.js';
 import { DONE_ROW } from './delivery-rows.js';
-import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { markFirstPrPromptDue } from './first-pr-report.js';
 import {
@@ -143,17 +114,12 @@ import {
   readBuildChanges,
   repoDirFor,
 } from './git.js';
-import { readGithubAutonomyPause } from './github-autonomy-brake.js';
-import { teamUserToken } from './github-connection.js';
-import { githubText } from './github-text.js';
-import { humanWorkIdentity } from './github-work-attribution.js';
 import type { HarnessEvalDispatchPort } from './harness-eval-coordinator.js';
 import { buildHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { storeInfoReport } from './info-handoff.js';
 import { enqueueLocalMerge } from './local-merge.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { isCodexReviewModel } from './merge-gate/model-identity.js';
-import { assertMergeRequiredChecks } from './merge-required-checks.js';
 import { effectiveModel } from './model-fallback.js';
 import { resolveNamedPrompt } from './named-prompts.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -165,7 +131,6 @@ import {
   planAwaitsAutoConfirm,
   planContractOfStep,
 } from './plan-auto-confirm.js';
-import { ensurePullClosesTaskIssue } from './pr-closing-line.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
@@ -174,27 +139,14 @@ import { retryLessonsOf } from './retry-lessons.js';
 import { assertAutomaticRetryAllowed, parkFailedBuild, retryIsParked } from './retry-parking.js';
 import { policyForStep, profileForStep, routeForStep } from './routing-rules.js';
 import { finishScheduledStep } from './schedules.js';
-import {
-  appendShipGateInstruction,
-  CUSTOM_NEEDS_PR,
-  hasGithubPr,
-  judgeShip,
-  parseShipGateInstruction,
-  settleAbandonedShip,
-} from './ship-gate.js';
-import { endSnoozeOn } from './snooze.js';
+import { appendShipGateInstruction, CUSTOM_NEEDS_PR, hasGithubPr, judgeShip } from './ship-gate.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
 import { type BuildStepRoute, listBuildStepRoutes } from './step-route.js';
-import { readTeamAttributionSettings } from './team-attribution-settings.js';
 import { childrenOfTodo, getTodo, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 import { blockingWorkerQuestions, pendingWorkerQuestions } from './worker-question-store.js';
-import {
-  type QuestionAnswer,
-  settleQuestionAnswers,
-  settleWorkerReply,
-} from './worker-questions.js';
+import type { QuestionAnswer } from './worker-questions.js';
 
 export {
   cancelBuild,
@@ -205,7 +157,7 @@ export {
   stopActiveStepsForArchive,
   stoppedBeforeFirstRun,
 } from './build-stop.js';
-export { applyStoppedStep, stopUnclaimedGateSteps };
+export { applyStoppedStep, type BuildSteerResult, sendBuildSteer, stopUnclaimedGateSteps };
 
 export interface BuildDeps {
   githubAppTokenSocket?: string | null | undefined;
@@ -272,7 +224,7 @@ export class BuildContinuationPhaseError extends HttpError {
   }
 }
 
-interface BuildSteerOptions {
+export interface BuildSteerOptions {
   allowReviewContinuation?: boolean;
   afterTurn?: boolean;
   human?: boolean;
@@ -280,313 +232,6 @@ interface BuildSteerOptions {
   schedule?: { id: string; createdBy: string; at: number };
   answer?: QuestionAnswer;
   beforeCommit?: () => void;
-}
-
-function continuationTodo(
-  deps: BuildDeps,
-  buildRow: BuildRow,
-  options: BuildSteerOptions,
-): TodoRow {
-  const row = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-  const active = deps.db
-    .select({ id: step.id })
-    .from(step)
-    .where(and(eq(step.buildId, buildRow.id), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
-    .get();
-  const stopped =
-    deps.db
-      .select({ id: step.id })
-      .from(step)
-      .where(and(eq(step.buildId, buildRow.id), eq(step.status, 'stopped')))
-      .get() !== undefined;
-  const resumable =
-    row?.phase === 'done' ||
-    row?.phase === 'building' ||
-    (options.allowReviewContinuation === true && row?.phase === 'review') ||
-    row?.phase === 'needs_input' ||
-    (options.afterTurn === true &&
-      row !== undefined &&
-      (['planning', 'confirm', 'review', 'failed'].includes(row.phase) ||
-        (row.phase === 'todo' && stopped)));
-  if (row && row.archivedAt === null && row.latestBuildId === buildRow.id && (!resumable || active))
-    throw new BuildContinuationPhaseError();
-  if (
-    !row ||
-    row.archivedAt !== null ||
-    !resumable ||
-    row.latestBuildId !== buildRow.id ||
-    active
-  ) {
-    throw new HttpError(
-      409,
-      'conversation must have an active step or be the completed task thread',
-    );
-  }
-  return row;
-}
-
-export interface BuildSteerResult {
-  conversationId: string;
-  message: { id: string; role: 'user'; content: string; createdAt: number };
-  delivered: 'steer' | 'new-turn';
-}
-
-export async function sendBuildSteer(
-  deps: BuildDeps,
-  conversationId: string,
-  body: { content: string; queuedMessageId?: string; clientMessageId?: string },
-  options: BuildSteerOptions | boolean = {},
-): Promise<BuildSteerResult> {
-  const continuationOptions = typeof options === 'boolean' ? { afterTurn: options } : options;
-  const { db } = deps;
-  const replay = findClientMessage<BuildSteerResult>(db, conversationId, body.clientMessageId);
-  if (replay !== undefined) return replay;
-  let buildRow = db.select().from(build).where(eq(build.id, conversationId)).get();
-  if (!buildRow) throw new HttpError(404, `conversation ${conversationId}`);
-  if ((continuationOptions.human ?? deps.steerOptions?.human) !== true)
-    assertAutomaticRetryAllowed(deps, buildRow.todoId);
-  else assertParkedBuildIdle(deps, buildRow);
-  const running = db
-    .select()
-    .from(step)
-    .where(and(eq(step.buildId, conversationId), eq(step.status, 'claimed')))
-    .all()
-    .at(-1);
-  let todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-  if (todoRow?.phase === 'closed' && todoRow.archivedAt === null)
-    throw new BuildContinuationPhaseError();
-  if (!todoRow || todoRow.archivedAt !== null || todoRow.latestBuildId !== conversationId)
-    throw new HttpError(409, 'Task cannot accept a message');
-  let targetBuildId = conversationId;
-  let prClosed: 'closed' | null = null;
-  if (running && continuationOptions.schedule) {
-    throw new HttpError(409, 'Scheduled continuation requires an idle thread');
-  }
-  if (!running) {
-    todoRow = continuationTodo(deps, buildRow, continuationOptions);
-    buildRow = ensureBuildPrNumber(deps, buildRow);
-    if (projectOfTodo(db, todoRow)?.repoKind === 'local') {
-      const admission = db
-        .select()
-        .from(autonomousMergeAdmission)
-        .where(eq(autonomousMergeAdmission.buildId, buildRow.id))
-        .get();
-      const landedStep = db
-        .select({ id: step.id })
-        .from(step)
-        .where(
-          and(
-            eq(step.buildId, buildRow.id),
-            eq(step.kind, 'merge'),
-            eq(step.status, 'done'),
-            isNotNull(step.checkpointCommit),
-          ),
-        )
-        .get();
-      if (admission?.state === 'merged' || landedStep) targetBuildId = newUuidv7();
-    }
-    if (githubPrOf(deps, todoRow, buildRow.prNumber) !== null) {
-      const outcome = await probeReworkTargetPr(deps, buildRow, todoRow, true);
-      const settledMeanwhile = findClientMessage<BuildSteerResult>(
-        db,
-        conversationId,
-        body.clientMessageId,
-      );
-      if (settledMeanwhile !== undefined) return settledMeanwhile;
-      todoRow = continuationTodo(deps, buildRow, continuationOptions);
-      if (outcome === 'merged') {
-        throw new HttpError(
-          409,
-          `PR #${buildRow.prNumber} is already merged. Create a new task for further changes; this task cannot merge a second delivery.`,
-        );
-      }
-      prClosed = outcome;
-      if (prClosed === 'closed') targetBuildId = newUuidv7();
-    }
-  }
-  if (continuationOptions.schedule && targetBuildId !== conversationId) {
-    throw new HttpError(
-      409,
-      'Scheduled continuation would require a new build after the previous delivery. Create a new task.',
-    );
-  }
-  const afterCommit: (() => void)[] = [];
-  const transcriptDeps = { ...deps, afterCommit };
-  let sent: BuildSteerResult;
-  try {
-    sent = db.transaction((): BuildSteerResult => {
-      claimClientMessage(db, conversationId, body.clientMessageId);
-      if (continuationOptions.schedule) {
-        const wake = continuationOptions.schedule;
-        const current = db.select().from(schedule).where(eq(schedule.id, wake.id)).get();
-        if (!current?.enabled || current.nextRunAt === null || current.nextRunAt > wake.at) {
-          throw new HttpError(409, 'Scheduled wake is no longer enabled or due');
-        }
-        if (wake.createdBy.startsWith('worker:') && isWaitingPhase(todoRow?.phase ?? '')) {
-          throw new HttpError(409, 'Worker schedule is waiting at a confirmation or review gate');
-        }
-      }
-      if (
-        body.queuedMessageId !== undefined &&
-        !db
-          .select({ id: queuedMessage.id })
-          .from(queuedMessage)
-          .where(
-            and(
-              eq(queuedMessage.id, body.queuedMessageId),
-              eq(queuedMessage.conversationId, conversationId),
-            ),
-          )
-          .get()
-      )
-        throw new HttpError(409, 'Queued message was already delivered');
-      const now = nowMs();
-      const human =
-        continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
-      if (continuationOptions.answer !== undefined)
-        settleQuestionAnswers(deps, conversationId, [continuationOptions.answer]);
-      const answered =
-        continuationOptions.answer !== undefined ||
-        (human && settleWorkerReply(deps, conversationId, body.content) > 0);
-      const messageRow = {
-        id: human ? `human-${newRecordId()}` : newRecordId(),
-        actor: human ? deps.user.displayName : (continuationOptions.actor ?? null),
-        role: 'user' as const,
-        content: body.content,
-        createdAt: now,
-      };
-      if (targetBuildId !== conversationId) {
-        db.insert(build)
-          .values({
-            id: targetBuildId,
-            todoId: buildRow.todoId,
-            withPlan: false,
-            prevPhase: todoRow?.phase ?? 'done',
-            triggerSource: 'user',
-            createdAt: now,
-          })
-          .run();
-        insertMessageRow(transcriptDeps, targetBuildId, {
-          id: newRecordId(),
-          role: 'system',
-          content:
-            prClosed === 'closed'
-              ? buildReworkNewBranchNote({
-                  prNumber: buildRow.prNumber,
-                  prUrl: buildRow.prUrl,
-                  branch: conversationBranch(targetBuildId),
-                  outcome: 'closed',
-                })
-              : `The previous build was merged locally. Continuing this task on a new branch: ${conversationBranch(targetBuildId)}.`,
-          createdAt: now,
-        });
-      }
-      if (!continuationOptions.schedule)
-        insertMessageRow(
-          transcriptDeps,
-          targetBuildId,
-          messageRow,
-          body.queuedMessageId === undefined
-            ? undefined
-            : { conversationId, messageId: body.queuedMessageId },
-        );
-      if (running && !answered) {
-        db.insert(steerPending)
-          .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
-          .onConflictDoUpdate({
-            target: steerPending.conversationId,
-            set: { stepId: running.id, content: body.content, createdAt: now },
-          })
-          .run();
-      }
-      const result = {
-        conversationId: targetBuildId,
-        message: messageRow,
-        delivered: running ? ('steer' as const) : ('new-turn' as const),
-      };
-      completeClientMessage(db, conversationId, body.clientMessageId, result);
-      continuationOptions.beforeCommit?.();
-      if (todoRow) {
-        if (
-          !continuationOptions.schedule &&
-          (continuationOptions.human ?? deps.steerOptions?.human) !== false
-        )
-          addUserMessageAttachmentGrants(db, todoRow.id, todoRow.teamId, body.content);
-        if (running) {
-          deps.machineHub?.steerSignal(todoRow.teamId, running.id);
-        } else {
-          db.update(build)
-            .set({ errorMessage: null, prevPhase: todoRow?.phase ?? 'done' })
-            .where(eq(build.id, targetBuildId))
-            .run();
-          const nextPhase =
-            todoRow.phase === 'building' || todoRow.phase === 'planning' ? todoRow.phase : 'queued';
-          setTodoPhase(deps, todoRow.id, nextPhase, {
-            lastRunAt: now,
-            latestBuildId: targetBuildId,
-          });
-          const previousWork = db
-            .select({ kind: step.kind })
-            .from(step)
-            .where(
-              and(
-                eq(step.buildId, conversationId),
-                inArray(step.kind, ['plan', 'build', 'session']),
-              ),
-            )
-            .orderBy(desc(step.createdAt))
-            .get();
-          const continuedStep = enqueueStep(
-            deps,
-            targetBuildId,
-            continuationOptions.afterTurn && previousWork?.kind === 'plan'
-              ? 'plan'
-              : previousWork?.kind === 'session'
-                ? 'session'
-                : 'build',
-            todoRow.teamId,
-            answered ? ANSWERS_CONTINUE_PROMPT : body.content,
-            false,
-            human && !continuationOptions.schedule,
-          );
-          if (continuationOptions.schedule) {
-            const wake = continuationOptions.schedule;
-            db.update(step)
-              .set({ scheduleId: wake.id, scheduledBy: wake.createdBy })
-              .where(eq(step.id, continuedStep.id))
-              .run();
-            insertMessageRow(transcriptDeps, targetBuildId, {
-              id: `schedule-wake-${continuedStep.id}`,
-              role: 'system',
-              content: JSON.stringify({ kind: 'schedule-wake', stepId: continuedStep.id }),
-              createdAt: wake.at,
-            });
-          }
-          const continued = db.select().from(build).where(eq(build.id, targetBuildId)).get();
-          if (continued) publishBuild(deps, continued);
-        }
-      }
-      if (body.queuedMessageId !== undefined)
-        db.delete(queuedMessage).where(eq(queuedMessage.id, body.queuedMessageId)).run();
-      if (targetBuildId !== conversationId)
-        db.update(queuedMessage)
-          .set({ conversationId: targetBuildId })
-          .where(eq(queuedMessage.conversationId, conversationId))
-          .run();
-      return {
-        conversationId: targetBuildId,
-        message: messageRow,
-        delivered: running ? ('steer' as const) : ('new-turn' as const),
-      };
-    });
-  } catch (error) {
-    return replayAfterConflict<BuildSteerResult>(db, conversationId, body.clientMessageId, error);
-  }
-  for (const publish of afterCommit) publish();
-  const fromUser =
-    continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
-  if (fromUser && !continuationOptions.schedule) endSnoozeOn(deps, buildRow.todoId, 'user-message');
-  return sent;
 }
 
 export async function messageTodo(
@@ -1232,7 +877,7 @@ export function buildRunsSession(deps: BuildDeps, buildId: string): boolean {
   );
 }
 
-function assertDeliveredBuild(deps: BuildDeps, row: BuildRow): void {
+export function assertDeliveredBuild(deps: BuildDeps, row: BuildRow): void {
   const { db } = deps;
   const buildStep = db
     .select()
@@ -1383,17 +1028,6 @@ export function githubPrOf(
   return repoRef === null ? null : { repoRef, prNumber };
 }
 
-function ensureBuildPrNumber(deps: BuildDeps, row: BuildRow): BuildRow {
-  if (row.prNumber !== null) return row;
-  const parsed = prNumberFromUrl(row.prUrl);
-  if (parsed === null) return row;
-  deps.db.update(build).set({ prNumber: parsed }).where(eq(build.id, row.id)).run();
-  const updated = deps.db.select().from(build).where(eq(build.id, row.id)).get();
-  if (updated === undefined) return row;
-  publishBuild(deps, updated);
-  return updated;
-}
-
 export function buildMergePermission(deps: BuildDeps, buildId: string): BuildMergePermission {
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (!buildRow) throw new NotFoundError(`build ${buildId}`);
@@ -1409,7 +1043,7 @@ function missingMergeTools(deps: BuildDeps, todoRow: TodoRow): string[] {
   return [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].filter((tool) => !policy.tools.includes(tool));
 }
 
-function assertMergeTools(deps: BuildDeps, todoRow: TodoRow): void {
+export function assertMergeTools(deps: BuildDeps, todoRow: TodoRow): void {
   const missingTools = missingMergeTools(deps, todoRow);
   if (missingTools.length > 0) {
     throw new HttpError(
@@ -1419,7 +1053,7 @@ function assertMergeTools(deps: BuildDeps, todoRow: TodoRow): void {
   }
 }
 
-const STEP_KIND_TEXT: Record<StepKind, string> = {
+export const STEP_KIND_TEXT: Record<StepKind, string> = {
   plan: '规划',
   build: '执行',
   session: '会话',
@@ -1429,9 +1063,9 @@ const STEP_KIND_TEXT: Record<StepKind, string> = {
   verify: '验证',
 };
 
-const mergingBuilds = new Set<string>();
+export const mergingBuilds = new Set<string>();
 
-function stepKindInFlight(deps: BuildDeps, buildId: string): StepKind | null {
+export function stepKindInFlight(deps: BuildDeps, buildId: string): StepKind | null {
   return (
     deps.db
       .select({ kind: step.kind })
@@ -1514,237 +1148,6 @@ function dispatchHeadSha(deps: BuildDeps, buildId: string): string | null {
     if (row.commit !== null && isFullSha(row.commit)) return row.commit;
   }
   return null;
-}
-
-function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; failed: boolean } {
-  const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
-  if (!todoRow) throw new NotFoundError(`todo ${row.todoId}`);
-  const failed = todoRow.phase === 'failed';
-  if (failed) {
-    assertDeliveredBuild(deps, row);
-  } else {
-    assertPhaseTransition(todoRow.phase, 'done');
-    if (todoRow.phase !== 'review') {
-      throw new HttpError(409, `合并只在审核关口发起，当前相位 ${todoRow.phase}`);
-    }
-  }
-  if (todoRow.latestBuildId !== null && todoRow.latestBuildId !== row.id) {
-    throw new HttpError(
-      409,
-      `这次运行已不是任务的当前运行（任务重跑过），cairn 不经它合并 PR #${row.prNumber}`,
-    );
-  }
-  const busy = stepKindInFlight(deps, row.id);
-  if (busy !== null) {
-    throw new HttpError(
-      409,
-      busy === 'review'
-        ? '本任务还有一个审核步在跑：等审核结论出来再合并。'
-        : `本任务还有一个${STEP_KIND_TEXT[busy]}步在排队或在跑，它收尾时还会推送提交：等它跑完再合并。`,
-    );
-  }
-  assertCorrectionDone(deps.db, todoRow);
-  return { todoRow, failed };
-}
-
-const CLOSING_SHAPE = /(?<![a-z])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s*\S*\d/i;
-
-const PLAIN_MERGE_BODY = 'Merged by cairn.';
-
-function unclearReason(result: Extract<GithubMergeResult, { kind: 'unknown' }>): string {
-  switch (result.reason) {
-    case 'timeout':
-      return '请求超时';
-    case 'network':
-      return '网络错误';
-    case 'malformed':
-      return `HTTP ${result.status}，应答读不出`;
-    case 'status':
-      return `HTTP ${result.status}`;
-  }
-}
-
-async function mergeThroughGithub(
-  deps: BuildDeps,
-  row: BuildRow,
-  prNumber: number,
-  repoRef: GithubRepoRef,
-  actor: string,
-): Promise<{ delegated: true }> {
-  apiMergeGate(deps, row);
-  await assertNoMergedPrElsewhere(deps, row, prNumber);
-  const gate = apiMergeGate(deps, row);
-  assertMergeTools(deps, gate.todoRow);
-  const hint = gate.failed
-    ? '在 GitHub 上合并后再点一次合并：cairn 把卡恢复到审核关口，由对账核对后收尾'
-    : 'cairn 对账读到合并后核对并收尾（核对不上时在时间线说明，由人处理，例如完成时不勾合并）';
-  const access = await teamUserToken(deps, gate.todoRow.teamId);
-  if ('reason' in access) {
-    if (access.reason === 'no-secret-box') {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} 要经 GitHub 合并，但 server 没有配置密钥（secret box），读不了团队的 GitHub 连接：请检查 server 的密钥配置。`,
-      );
-    }
-    const reconnect = access.reason === 'token-unreadable';
-    const connect = reconnect ? '重新连接 GitHub' : '连接 GitHub';
-    const next = gate.failed
-      ? `任务处于失败态：${connect} 后再点合并`
-      : `请${connect} 后再点合并，或直接在 GitHub 上合并这张 PR（${hint}；私有仓库没有连接时对账读不到它）`;
-    throw new HttpError(
-      409,
-      reconnect
-        ? `PR #${prNumber} 要经 GitHub 合并，但团队的 GitHub 连接解不开（密钥换过或密文损坏）：${next}。`
-        : `PR #${prNumber} 要经 GitHub 合并，但团队没有连接 GitHub：${next}。`,
-    );
-  }
-  const token = access.token;
-  if (mergingBuilds.has(row.id)) {
-    throw new HttpError(409, `PR #${prNumber} 的合并请求正在进行，等它返回后再试。`);
-  }
-  mergingBuilds.add(row.id);
-  try {
-    const fetchImpl = deps.githubFetch ?? fetch;
-    const page = await githubPull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber);
-    const before = apiMergeGate(deps, row);
-    if (before.todoRow.phase !== gate.todoRow.phase) {
-      throw new HttpError(409, `读取 PR 期间任务相位已变为 ${before.todoRow.phase}，没有发起合并`);
-    }
-    const pull = page?.pull ?? null;
-    const branch = conversationBranch(row.id);
-    if (pull === null || !hasPullFields(pull) || pull.title === null || pull.headSha === null) {
-      throw new HttpError(
-        409,
-        `读不到 PR #${prNumber} 在 GitHub 上的状态（网络、限流或 GitHub 连接失效），没有发起合并：稍后再试。`,
-      );
-    }
-    if (pull.state === 'closed' && !pull.merged) {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} 在 GitHub 上已关闭且未合并，无法合并：重新打开它，或重新运行任务。`,
-      );
-    }
-    if (!isOwnPull(pull, branch)) {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} 的 head 不是本任务在 ${repoRef.owner}/${repoRef.repo} 的工作分支「${branch}」，cairn 不合并它：请在 GitHub 上核对这张 PR。`,
-      );
-    }
-    if (!WRITE_AUTHOR_ASSOCIATIONS.has(pull.authorAssociation ?? '')) {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} 的作者对仓库没有写权限（author_association ${githubText(pull.authorAssociation ?? '缺失')}），cairn 不经 API 合并它：请在 GitHub 上核对后合并（${hint}）。`,
-      );
-    }
-    const baseBranch = projectOfTodo(deps.db, before.todoRow)?.baseBranch ?? pull.defaultBranch;
-    if (pull.baseRef !== baseBranch) {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} targets branch "${githubText(pull.baseRef)}" instead of project base branch "${githubText(baseBranch)}". Check the PR base on GitHub before merging.`,
-      );
-    }
-    if (pull.merged) {
-      if (!gate.failed) {
-        throw new HttpError(409, `PR #${prNumber} 已在 GitHub 合并，没有再发起合并：${hint}。`);
-      }
-      setTodoPhase(deps, row.todoId, 'review');
-      insertMessageRow(deps, row.id, {
-        id: newRecordId(),
-        role: 'system',
-        content: `PR #${prNumber} 已在 GitHub 合并：任务回到审核关口，cairn 对账核对后收尾（核对不上时在时间线说明）。`,
-        createdAt: nowMs(),
-      });
-      return { delegated: true };
-    }
-    const checkpoint = lastPushedCheckpoint(deps, row.id, { mergeSteps: true });
-    if (checkpoint === null || !isFullSha(checkpoint)) {
-      throw new HttpError(
-        409,
-        `本任务没有可核对的推送提交（执行步没回报有效的提交 SHA），cairn 不经 GitHub 合并 PR #${prNumber}：请在 GitHub 上核对后合并（${hint}），或重新运行任务。`,
-      );
-    }
-    if (pull.headSha !== checkpoint) {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} 的 head 是 ${githubText(pull.headSha).slice(0, 7)}，不是本任务最后推送的提交 ${checkpoint.slice(0, 7)}：GitHub 可能还没同步刚推的提交（稍后再点），或分支上有了别的提交（有人推送，或点了 Update branch）。cairn 只合并它推送过的提交；请在 GitHub 上核对后合并（${hint}），或让任务再跑一轮。`,
-      );
-    }
-    const titled = `${pull.title} (#${prNumber})`;
-    if (await readGithubAutonomyPause(fetchImpl, token, `${repoRef.owner}/${repoRef.repo}`)) {
-      throw new HttpError(409, 'autonomy-paused: GitHub autonomy marker is open or unreadable');
-    }
-    await assertMergeRequiredChecks(fetchImpl, token, repoRef, pull.baseRef, checkpoint);
-    const closing = apiMergeGate(deps, row);
-    await ensurePullClosesTaskIssue(
-      fetchImpl,
-      token,
-      repoRef,
-      prNumber,
-      closing.todoRow,
-      pull.body,
-    ).catch((error: unknown) => {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} 的描述里补不上关闭本任务 issue 的那一行（${error instanceof Error ? githubText(error.message) : '未知错误'}），没有发起合并：稍后再试。`,
-      );
-    });
-    apiMergeGate(deps, row);
-    claimAutonomousMerge(deps.db, row.id);
-    const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
-      sha: checkpoint,
-      commitTitle: CLOSING_SHAPE.test(pull.title) ? `Merge pull request #${prNumber}` : titled,
-      commitMessage: withCoAuthor(
-        PLAIN_MERGE_BODY,
-        readTeamAttributionSettings(deps.db, before.todoRow.teamId).coAuthorTrailer
-          ? humanWorkIdentity(deps.db, before.todoRow, row.triggerSource)
-          : null,
-      ),
-    });
-    if (result.kind === 'merged' || result.kind === 'refused' || result.kind === 'rate-limited')
-      settleAutonomousMerge(deps.db, row.id, result.kind === 'merged' ? 'merged' : 'refused');
-    if (result.kind === 'rate-limited') {
-      const { limit } = result;
-      const when =
-        limit.retryAfterSeconds !== null
-          ? `，${limit.retryAfterSeconds} 秒后再试`
-          : limit.resetAt !== null
-            ? `，限流在 ${new Date(limit.resetAt).toISOString()} 解除`
-            : '';
-      throw new HttpError(
-        409,
-        `GitHub 限流，没有处理合并 PR #${prNumber} 的请求（HTTP ${limit.status}${when}）${result.message === '' ? '' : `：${githubText(result.message)}`}——稍后再点合并，或直接在那里合并（${hint}）`,
-      );
-    }
-    if (result.kind === 'refused') {
-      throw new HttpError(
-        409,
-        result.status === 401
-          ? `GitHub 不认团队的 GitHub 连接（HTTP 401），PR #${prNumber} 没有合并：请重新连接 GitHub 后再点合并。`
-          : `GitHub 拒绝合并 PR #${prNumber}（HTTP ${result.status}）${result.message === '' ? '' : `：${githubText(result.message)}`}——可在 GitHub 上处理后直接在那里合并（${hint}）`,
-      );
-    }
-    const now = deps.db
-      .select({ phase: todo.phase })
-      .from(todo)
-      .where(eq(todo.id, row.todoId))
-      .get();
-    const atGate = now?.phase === gate.todoRow.phase;
-    if (atGate && gate.failed) setTodoPhase(deps, row.todoId, 'review');
-    insertGateAnnouncement(deps, row.id, MERGE_ANNOUNCEMENT, actor);
-    insertMessageRow(deps, row.id, {
-      id: newRecordId(),
-      role: 'system',
-      content:
-        result.kind === 'merged'
-          ? `PR #${prNumber} 已由 cairn 经 GitHub 合并（squash，合并提交 ${githubText(result.sha).slice(0, 7)}）`
-          : `已请 GitHub 合并 PR #${prNumber}，GitHub 没有明确答复（${unclearReason(result)}）。cairn 对账会读这张 PR：已合并就收尾；还开着就留在审核关口，可以再点合并。`,
-      createdAt: nowMs(),
-    });
-    if (result.kind === 'merged' && atGate) finishTodoDone(deps, row.todoId, row.id);
-    return { delegated: true };
-  } finally {
-    mergingBuilds.delete(row.id);
-  }
 }
 
 const PLAN_REWRITE_PROMPT = buildPlanRewritePrompt();
@@ -1930,159 +1333,6 @@ export function failStepWithEvents(
       skillInjection: failedStep.skillInjection ?? null,
     });
   }
-}
-
-export const BUILD_ABANDONED_STEP_MS = 120_000;
-export const ABANDONED_CLAIM_QUARANTINE_LIMIT = 3;
-
-export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs()): void {
-  const exitedLeftovers = deps.db
-    .select({ id: step.id })
-    .from(step)
-    .innerJoin(build, eq(step.buildId, build.id))
-    .innerJoin(todo, eq(build.todoId, todo.id))
-    .where(
-      and(
-        or(isNotNull(todo.archivedAt), inArray(todo.phase, ['closed', 'done'])),
-        inArray(step.status, [...UNSTARTED_STEP_STATUSES]),
-      ),
-    )
-    .all();
-  for (const { id } of exitedLeftovers) stopStepKeepPhase(deps, id);
-  const candidates = deps.db
-    .select()
-    .from(step)
-    .where(
-      and(
-        inArray(step.kind, ['plan', 'build', 'session', 'merge', 'review', 'verify']),
-        inArray(step.status, ['pending', 'claimed']),
-      ),
-    )
-    .all();
-  for (const row of candidates) {
-    if (row.status === 'pending') continue;
-    const buildRow = deps.db.select().from(build).where(eq(build.id, row.buildId)).get();
-    if (!buildRow) continue;
-    const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-    if (!todoRow) continue;
-    const ending = abandonedEnding(deps, row, todoRow, now);
-    if (ending === null || parseShipGateInstruction(row.prompt) !== null) continue;
-    applyAbandonedEnding(deps, row, todoRow, ending);
-  }
-}
-
-type AbandonedEnding = 'stop' | 'release';
-
-function abandonedEnding(
-  deps: BuildDeps,
-  row: typeof step.$inferSelect,
-  todoRow: typeof todo.$inferSelect,
-  now: number,
-): AbandonedEnding | null {
-  if (now - stepActivityAt(row) <= BUILD_ABANDONED_STEP_MS) return null;
-  const machineRow = row.machineId
-    ? deps.db.select().from(machine).where(eq(machine.id, row.machineId)).get()
-    : undefined;
-  const progressed =
-    row.lastHeartbeatAt !== null && row.lastHeartbeatAt > (row.claimedAt ?? row.createdAt);
-  if (machineRow?.online && progressed) return null;
-  return row.archiveStop !== null ||
-    todoRow.archivedAt !== null ||
-    todoRow.phase === 'closed' ||
-    todoRow.phase === 'done'
-    ? 'stop'
-    : 'release';
-}
-
-function applyAbandonedEnding(
-  deps: BuildDeps,
-  row: typeof step.$inferSelect,
-  todoRow: typeof todo.$inferSelect,
-  ending: AbandonedEnding,
-): void {
-  if (ending === 'stop') stopStepKeepPhase(deps, row.id);
-  else releaseClaimedStep(deps, row, todoRow);
-}
-
-export async function sweepAbandonedShipSteps(
-  deps: BuildDeps,
-  now: number = nowMs(),
-): Promise<void> {
-  const candidates = deps.db
-    .select()
-    .from(step)
-    .where(and(eq(step.kind, 'merge'), eq(step.status, 'claimed')))
-    .all()
-    .filter((row) => parseShipGateInstruction(row.prompt) !== null);
-  for (const row of candidates) {
-    const todoRow = todoOfBuild(deps, row.buildId);
-    if (todoRow === undefined || abandonedEnding(deps, row, todoRow, now) === null) continue;
-    const violation = await settleAbandonedShip(deps, row);
-    const current = deps.db.select().from(step).where(eq(step.id, row.id)).get();
-    const currentTodo = todoOfBuild(deps, row.buildId);
-    if (
-      current?.status !== 'claimed' ||
-      current.claimedAt !== row.claimedAt ||
-      currentTodo === undefined
-    )
-      continue;
-    if (violation !== null) {
-      applyStepFailure(deps, current, violation);
-      continue;
-    }
-    const ending = abandonedEnding(deps, current, currentTodo, now);
-    if (ending !== null) applyAbandonedEnding(deps, current, currentTodo, ending);
-  }
-}
-
-function todoOfBuild(deps: BuildDeps, buildId: string): typeof todo.$inferSelect | undefined {
-  const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-  return buildRow && deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-}
-
-function releaseClaimedStep(
-  deps: BuildDeps,
-  row: typeof step.$inferSelect,
-  todoRow: typeof todo.$inferSelect,
-): void {
-  if (row.archiveStop !== null) {
-    applyStoppedStep(deps, row.id);
-    return;
-  }
-  if (row.kind === 'merge' && row.prompt?.includes('"local-merge"')) {
-    const projectRow = projectOfTodo(deps.db, todoRow);
-    if (projectRow && projectMergeConfigOf(projectRow).mergePolicy === 'autonomous') return;
-  }
-  const noProgress =
-    row.lastHeartbeatAt === null || row.lastHeartbeatAt <= (row.claimedAt ?? row.createdAt);
-  const claims = noProgress ? row.claimCount + 1 : row.claimCount;
-  if (noProgress && claims >= ABANDONED_CLAIM_QUARANTINE_LIMIT) {
-    applyStepFailure(
-      deps,
-      row,
-      `crashed ${claims} times after being claimed without progress; quarantined`,
-    );
-  } else {
-    deps.db
-      .update(step)
-      .set({ status: 'pending', machineId: null, claimCount: claims })
-      .where(eq(step.id, row.id))
-      .run();
-  }
-  const released = deps.db.select().from(step).where(eq(step.id, row.id)).get();
-  if (released) {
-    deps.convHub?.publishStep(row.buildId, {
-      id: released.id,
-      buildId: released.buildId,
-      kind: released.kind,
-      machineId: released.machineId,
-      createdAt: released.createdAt,
-      status: released.status,
-      checkpointCommit: released.checkpointCommit,
-      skillInjection: released.skillInjection ?? null,
-    });
-  }
-  deps.machineHub?.wake(todoRow.teamId);
 }
 
 function stepArtifactGate(

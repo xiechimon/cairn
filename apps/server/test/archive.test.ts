@@ -22,13 +22,13 @@ import {
   todo,
   tokenUsage,
 } from '../src/db/schema.js';
+import { sweepAbandonedBuildSteps } from '../src/services/build-abandoned-sweep.js';
 import {
   applyStepFailure,
   applyStoppedStep,
   completeStep,
   prepareStopForDone,
   requestStop,
-  sweepAbandonedBuildSteps,
   sweepZombieQueuedTodos,
 } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';

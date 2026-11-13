@@ -235,3 +235,32 @@ it('records the full todo closure of pre-existing todos at claim time', async ()
     expect.objectContaining({ id: 'todo-pre' }),
   ]);
 });
+
+it('does not count the repeated pre-call todo projection against the record cap', async () => {
+  const w = await world('please create a task');
+  w.s.db.insert(project).values({ id: 'p-cap', teamId: w.teamId, name: 'cap' }).run();
+  for (let i = 0; i < 200; i += 1) {
+    w.s.db
+      .insert(todo)
+      .values({
+        id: `todo-cap-${i}`,
+        teamId: w.teamId,
+        projectId: 'p-cap',
+        title: `cap ${i}`,
+        phase: 'todo',
+        phaseAt: 1,
+        seqNum: i + 1,
+      })
+      .run();
+  }
+  const { faux } = toolThenCreateTodo(w);
+  const coordinator = boot(w, faux);
+  coordinator.wake(w.threadId);
+  await coordinator.idle();
+
+  const row = snapshotRow(w.s.db, w.stepId);
+  expect(row?.status).toBe('sealed');
+  const payload = JSON.parse(row?.payload ?? 'null');
+  expect(payload?.claim?.initialTodos).toHaveLength(200);
+  expect((payload?.toolViews ?? []).length).toBeGreaterThan(0);
+});

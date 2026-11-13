@@ -21,11 +21,8 @@ import {
   recoverAutonomousMerges,
   settleAutonomousMerge,
 } from '../src/services/autonomous-merge.js';
-import {
-  applyStoppedStep,
-  failStepWithEvents,
-  sweepAbandonedBuildSteps,
-} from '../src/services/builds.js';
+import { sweepAbandonedBuildSteps } from '../src/services/build-abandoned-sweep.js';
+import { applyStoppedStep, failStepWithEvents } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { projectMergeConfigOf, updateProjectMergeConfig } from '../src/services/projects.js';
 import { bootServer, pauseTeamForTest } from './helpers.js';

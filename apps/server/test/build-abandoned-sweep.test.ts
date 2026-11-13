@@ -13,7 +13,7 @@ import {
   ABANDONED_CLAIM_QUARANTINE_LIMIT,
   BUILD_ABANDONED_STEP_MS,
   sweepAbandonedBuildSteps,
-} from '../src/services/builds.js';
+} from '../src/services/build-abandoned-sweep.js';
 import { claimStep } from '../src/services/machines.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { bootServer, seedRoute, seedSessionRoute, type TestServer } from './helpers.js';
