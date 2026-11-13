@@ -493,7 +493,23 @@ describe('SPA static same-origin hosting (02/A1)', () => {
       expect(root.headers.get('cache-control')).toBe('no-cache');
 
       const missingAsset = await req(s.app, 'GET', '/assets/gone.js');
-      expect(missingAsset.headers.get('cache-control')).toBe('no-cache');
+      expect(missingAsset.headers.get('cache-control')).not.toBe(
+        'public, max-age=31536000, immutable',
+      );
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('a hashed asset from an older build is a 404, not the SPA shell', async () => {
+    const { s } = await setupWorld({ webDir });
+    try {
+      const gone = await req(s.app, 'GET', '/assets/rfb-OLDHASH0.js');
+      expect(gone.status).toBe(404);
+      expect(gone.headers.get('content-type') ?? '').not.toContain('text/html');
+      const route = await req(s.app, 'GET', '/app/projects/p1');
+      expect(route.status).toBe(200);
+      expect(route.headers.get('content-type')).toContain('text/html');
     } finally {
       s.dispose();
     }
