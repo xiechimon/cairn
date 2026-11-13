@@ -1,6 +1,6 @@
 # Coordinator project channels: one conversation and one context per project
 
-Status: proposed 2026-11-13 by the owner's choice of option C2 in the channel thread; awaiting review. Supersedes section 2.3 of `duet-shaped-clients.md` ("a channel is a lens").
+Status: accepted by the owner on 2026-11-13, including the D58 reversal and the model-written channel greeting. Supersedes section 2.3 of `duet-shaped-clients.md` ("a channel is a lens").
 
 ## Problem
 
@@ -38,7 +38,7 @@ This design follows Claude Projects: separate conversation and context per proje
 | --- | --- | --- |
 | Owner sends in a project channel (`POST /chief/threads`, `POST /conversations/:id/messages`) | Main thread, row tagged with `projectId` | Find or create that project's thread; the row lands there |
 | Owner sends in the main channel | Main thread | Unchanged |
-| `coordinatorThreadRow` | Finds or creates the one thread | Takes a scope; finds or creates the thread for it |
+| `coordinatorThreadRow` | Finds or creates the one thread | Takes a scope; finds or creates the thread for it; a new project thread enqueues its greeting turn |
 | `create_todo` from a channel | Watch on the calling thread | Unchanged, so a task's reports return to the channel that created it |
 | Thread reports and wakes (`insertThreadReport`, `notifyWatchers`) | To the watching thread | Unchanged; plus one mirror line in the main channel when a project-channel task reaches needs-you or done |
 | Questions to the owner (`chief-questions.ts`) | On the asking thread | Unchanged; the Tasks panel already lists them across threads |
@@ -54,7 +54,15 @@ The main thread keeps all 8,000+ rows, including the 779 tagged cairn. Project c
 
 ## Empty channel
 
-A channel is only a conversation (owner, 2026-11-13). A channel with no messages shows no home greeting, date line or counts; those belong to the main channel's home. Instead the first row is a Coordinator bubble that greets the owner by display name and asks what they want to do in this project, worded like "Owner, what would you like to do in cairn?" through `t()`. The bubble is rendered by the client from the user's display name and the project name; it is not a model turn and is not stored, so opening a channel costs nothing and writes nothing. It disappears once the channel has a real message. The composer is focused below it.
+A channel is only a conversation (owner, 2026-11-13). A channel with no messages shows no home greeting, date line or counts; those belong to the main channel's home.
+
+The first message is a model turn, following OpenClaw's session reset prompt (`src/auto-reply/reply/session-reset-prompt.ts`: read the startup context, then "greet the user in your configured persona … Keep it to 1-3 sentences and ask what they want to do"). Hermes Agent answers `/new` with a fixed ephemeral reply and Letta seeds a fixed message sequence; neither can say anything about the project, which is why this design uses the model.
+
+- When the project thread is created, the server enqueues one greeting turn on it. The prompt has team and project memory and the project's open tasks; the Coordinator greets the owner by display name in one to three sentences, names anything in the project that waits on the owner, and asks what they want to do. The reply is stored as an ordinary Coordinator message.
+- It runs once per thread, at creation, never on later opens.
+- The owner's request comes first: if the owner sends before the greeting turn starts, the greeting turn is dropped and the owner's message is answered instead.
+- While the turn runs, the channel shows the usual typing state. If the turn fails or no model is configured, the client shows a fixed bubble instead, worded like "Owner, what would you like to do in cairn?" through `t()`, and no error mark.
+- The composer is focused from the start.
 
 ## Failure behavior
 
@@ -69,7 +77,7 @@ Each active channel carries its own system prompt and session. Idle channels cos
 
 ## PR order
 
-1. Server: scoped threads, index migration, prompt memory scope, mirror line, tests per table row above.
-2. Web: one thread per channel, delete `streamForProject`, empty state for a new channel.
+1. Server: scoped threads, index migration, prompt memory scope, mirror line, greeting turn, tests per table row above.
+2. Web: one thread per channel, delete `streamForProject`, greeting fallback for a new channel.
 3. `channel_messages` tool.
 4. Update `apps/web/DESIGN.md` (Coordinator chat) to describe separate channels.
