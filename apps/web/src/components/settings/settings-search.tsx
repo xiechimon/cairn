@@ -124,7 +124,7 @@ export function SettingsSearch({
     <div className="relative flex-none">
       <div
         data-testid="settings-search"
-        className="flex h-7 items-center gap-2 rounded-(--radius-control) border border-border px-2.5 text-content-tertiary transition-colors duration-(--dur-fast) focus-within:ring-1 focus-within:ring-(--focus-ring) hover:bg-sidebar-hover"
+        className="flex h-7 items-center gap-2 rounded-(--radius-control) border border-border px-2.5 text-content-tertiary transition-colors duration-(--dur-fast) focus-within:border-(--focus-field-border) hover:bg-sidebar-hover"
       >
         <Search aria-hidden className="size-5 flex-none" strokeWidth={1.75} />
         <Input

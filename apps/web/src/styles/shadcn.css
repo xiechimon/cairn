@@ -105,7 +105,6 @@
   --focus-width: 2.4px;
   --focus-field-border: var(--focus-ring);
   --focus-halo: color-mix(in srgb, var(--focus-ring) 22%, transparent);
-  --danger-halo: color-mix(in srgb, var(--destructive) 20%, transparent);
   --radius-menu-item: 8px;
   --dialog-w-s: 400px;
   --dialog-w-m: 480px;
