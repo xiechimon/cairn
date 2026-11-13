@@ -139,7 +139,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `engine-choice`, `engine-hand-back`, `engine-question`, `engine-raw`, `engine-raw-view`, `engine-tail`, `engine-take-over`, `engine-take-over-confirm`, `engine-view-raw`
+- Test ids in its code: `engine-hand-back`, `engine-question`, `engine-raw`, `engine-raw-view`, `engine-tail`, `engine-take-over`, `engine-take-over-confirm`, `engine-view-raw`
 - Research: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md)
 - Frontend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/references/thread-review](../../../docs/design/references/thread-review)
 - Backend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/home-redesign-backend-todo.md](../../../docs/design/home-redesign-backend-todo.md)
