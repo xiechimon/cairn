@@ -255,13 +255,15 @@ export function WorkTrace({
       {expanded && (
         <TraceCard>
           {earlier > 0 && (
-            <TraceRowButton
-              data-testid="work-earlier"
-              verb={t(showsEarlier ? '收起之前的 {n} 步' : '之前的 {n} 步', { n: earlier })}
-              expandable
-              open={showsEarlier}
-              onClick={() => setShowsEarlier((value) => !value)}
-            />
+            <div>
+              <TraceRowButton
+                data-testid="work-earlier"
+                verb={t(showsEarlier ? '收起之前的 {n} 步' : '之前的 {n} 步', { n: earlier })}
+                expandable
+                open={showsEarlier}
+                onClick={() => setShowsEarlier((value) => !value)}
+              />
+            </div>
           )}
           {shown.map((step) => (
             <WorkStepRow key={step.id} step={step} enter={entering.has(step.id)} t={t} />

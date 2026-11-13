@@ -181,7 +181,7 @@ export function EngineRunTail({
             choice.reason,
           ])}
         </span>
-        <span className="flex flex-none items-center">
+        <span className="-ml-1.5 flex flex-none items-center">
           <Button
             variant="ghost"
             data-testid="engine-view-raw"
