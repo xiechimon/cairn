@@ -30,7 +30,6 @@ import {
   buildTaskPromptText,
   buildVerifyStepPrompt,
   CONFIRM_ANNOUNCEMENT,
-  conversationBranch,
   DEFAULT_SHIP_ROUTE,
   isActiveStepStatus,
   isBuildStepKind,
@@ -48,7 +47,6 @@ import {
   UNSTARTED_STEP_STATUSES,
   VERIFY_ANNOUNCEMENT,
   type VerifyVerdict,
-  withCoAuthor,
 } from '@cairn/shared';
 import {
   and,
@@ -78,20 +76,10 @@ import {
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { systemGitOps } from '../lib/git.js';
-import {
-  type FetchLike,
-  type GithubMergeResult,
-  githubMergePull,
-  githubPull,
-  hasPullFields,
-  isFullSha,
-  isOwnPull,
-  WRITE_AUTHOR_ASSOCIATIONS,
-} from '../lib/github.js';
+import { type FetchLike, isFullSha } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
-import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
 import { BLOCKED_STEP_KINDS, blockedHold, blockedNow } from './blockers.js';
 import { settleReviewStep, settleVerifyStep } from './build-gate-steps.js';
 import {
@@ -100,7 +88,8 @@ import {
   ticketRefOf,
   type VerdictReport,
 } from './build-gate-verdict.js';
-import { assertNoMergedPrElsewhere, mergedPrElsewhere } from './build-pr-probe.js';
+import { mergeThroughGithub } from './build-github-merge.js';
+import { mergedPrElsewhere } from './build-pr-probe.js';
 import { recordBuildFeedback } from './build-provenance.js';
 import { restartFailedBuild } from './build-restart.js';
 import { type BuildSteerResult, sendBuildSteer } from './build-steer.js';
@@ -116,7 +105,6 @@ import {
 } from './build-stop.js';
 import { askUndeliveredOnce, undeliveredEnd } from './build-undelivered.js';
 import { claimClientMessage, findClientMessage } from './client-message.js';
-import { assertCorrectionDone } from './correction.js';
 import { DONE_ROW } from './delivery-rows.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -128,17 +116,12 @@ import {
   readBuildChanges,
   repoDirFor,
 } from './git.js';
-import { readGithubAutonomyPause } from './github-autonomy-brake.js';
-import { teamUserToken } from './github-connection.js';
-import { githubText } from './github-text.js';
-import { humanWorkIdentity } from './github-work-attribution.js';
 import type { HarnessEvalDispatchPort } from './harness-eval-coordinator.js';
 import { buildHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { storeInfoReport } from './info-handoff.js';
 import { enqueueLocalMerge } from './local-merge.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { isCodexReviewModel } from './merge-gate/model-identity.js';
-import { assertMergeRequiredChecks } from './merge-required-checks.js';
 import { effectiveModel } from './model-fallback.js';
 import { resolveNamedPrompt } from './named-prompts.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -150,7 +133,6 @@ import {
   planAwaitsAutoConfirm,
   planContractOfStep,
 } from './plan-auto-confirm.js';
-import { ensurePullClosesTaskIssue } from './pr-closing-line.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
@@ -170,7 +152,6 @@ import {
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
 import { type BuildStepRoute, listBuildStepRoutes } from './step-route.js';
-import { readTeamAttributionSettings } from './team-attribution-settings.js';
 import { childrenOfTodo, getTodo, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 import { blockingWorkerQuestions, pendingWorkerQuestions } from './worker-question-store.js';
@@ -905,7 +886,7 @@ export function buildRunsSession(deps: BuildDeps, buildId: string): boolean {
   );
 }
 
-function assertDeliveredBuild(deps: BuildDeps, row: BuildRow): void {
+export function assertDeliveredBuild(deps: BuildDeps, row: BuildRow): void {
   const { db } = deps;
   const buildStep = db
     .select()
@@ -1071,7 +1052,7 @@ function missingMergeTools(deps: BuildDeps, todoRow: TodoRow): string[] {
   return [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].filter((tool) => !policy.tools.includes(tool));
 }
 
-function assertMergeTools(deps: BuildDeps, todoRow: TodoRow): void {
+export function assertMergeTools(deps: BuildDeps, todoRow: TodoRow): void {
   const missingTools = missingMergeTools(deps, todoRow);
   if (missingTools.length > 0) {
     throw new HttpError(
@@ -1081,7 +1062,7 @@ function assertMergeTools(deps: BuildDeps, todoRow: TodoRow): void {
   }
 }
 
-const STEP_KIND_TEXT: Record<StepKind, string> = {
+export const STEP_KIND_TEXT: Record<StepKind, string> = {
   plan: '规划',
   build: '执行',
   session: '会话',
@@ -1091,9 +1072,9 @@ const STEP_KIND_TEXT: Record<StepKind, string> = {
   verify: '验证',
 };
 
-const mergingBuilds = new Set<string>();
+export const mergingBuilds = new Set<string>();
 
-function stepKindInFlight(deps: BuildDeps, buildId: string): StepKind | null {
+export function stepKindInFlight(deps: BuildDeps, buildId: string): StepKind | null {
   return (
     deps.db
       .select({ kind: step.kind })
@@ -1176,237 +1157,6 @@ function dispatchHeadSha(deps: BuildDeps, buildId: string): string | null {
     if (row.commit !== null && isFullSha(row.commit)) return row.commit;
   }
   return null;
-}
-
-function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; failed: boolean } {
-  const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
-  if (!todoRow) throw new NotFoundError(`todo ${row.todoId}`);
-  const failed = todoRow.phase === 'failed';
-  if (failed) {
-    assertDeliveredBuild(deps, row);
-  } else {
-    assertPhaseTransition(todoRow.phase, 'done');
-    if (todoRow.phase !== 'review') {
-      throw new HttpError(409, `合并只在审核关口发起，当前相位 ${todoRow.phase}`);
-    }
-  }
-  if (todoRow.latestBuildId !== null && todoRow.latestBuildId !== row.id) {
-    throw new HttpError(
-      409,
-      `这次运行已不是任务的当前运行（任务重跑过），cairn 不经它合并 PR #${row.prNumber}`,
-    );
-  }
-  const busy = stepKindInFlight(deps, row.id);
-  if (busy !== null) {
-    throw new HttpError(
-      409,
-      busy === 'review'
-        ? '本任务还有一个审核步在跑：等审核结论出来再合并。'
-        : `本任务还有一个${STEP_KIND_TEXT[busy]}步在排队或在跑，它收尾时还会推送提交：等它跑完再合并。`,
-    );
-  }
-  assertCorrectionDone(deps.db, todoRow);
-  return { todoRow, failed };
-}
-
-const CLOSING_SHAPE = /(?<![a-z])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s*\S*\d/i;
-
-const PLAIN_MERGE_BODY = 'Merged by cairn.';
-
-function unclearReason(result: Extract<GithubMergeResult, { kind: 'unknown' }>): string {
-  switch (result.reason) {
-    case 'timeout':
-      return '请求超时';
-    case 'network':
-      return '网络错误';
-    case 'malformed':
-      return `HTTP ${result.status}，应答读不出`;
-    case 'status':
-      return `HTTP ${result.status}`;
-  }
-}
-
-async function mergeThroughGithub(
-  deps: BuildDeps,
-  row: BuildRow,
-  prNumber: number,
-  repoRef: GithubRepoRef,
-  actor: string,
-): Promise<{ delegated: true }> {
-  apiMergeGate(deps, row);
-  await assertNoMergedPrElsewhere(deps, row, prNumber);
-  const gate = apiMergeGate(deps, row);
-  assertMergeTools(deps, gate.todoRow);
-  const hint = gate.failed
-    ? '在 GitHub 上合并后再点一次合并：cairn 把卡恢复到审核关口，由对账核对后收尾'
-    : 'cairn 对账读到合并后核对并收尾（核对不上时在时间线说明，由人处理，例如完成时不勾合并）';
-  const access = await teamUserToken(deps, gate.todoRow.teamId);
-  if ('reason' in access) {
-    if (access.reason === 'no-secret-box') {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} 要经 GitHub 合并，但 server 没有配置密钥（secret box），读不了团队的 GitHub 连接：请检查 server 的密钥配置。`,
-      );
-    }
-    const reconnect = access.reason === 'token-unreadable';
-    const connect = reconnect ? '重新连接 GitHub' : '连接 GitHub';
-    const next = gate.failed
-      ? `任务处于失败态：${connect} 后再点合并`
-      : `请${connect} 后再点合并，或直接在 GitHub 上合并这张 PR（${hint}；私有仓库没有连接时对账读不到它）`;
-    throw new HttpError(
-      409,
-      reconnect
-        ? `PR #${prNumber} 要经 GitHub 合并，但团队的 GitHub 连接解不开（密钥换过或密文损坏）：${next}。`
-        : `PR #${prNumber} 要经 GitHub 合并，但团队没有连接 GitHub：${next}。`,
-    );
-  }
-  const token = access.token;
-  if (mergingBuilds.has(row.id)) {
-    throw new HttpError(409, `PR #${prNumber} 的合并请求正在进行，等它返回后再试。`);
-  }
-  mergingBuilds.add(row.id);
-  try {
-    const fetchImpl = deps.githubFetch ?? fetch;
-    const page = await githubPull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber);
-    const before = apiMergeGate(deps, row);
-    if (before.todoRow.phase !== gate.todoRow.phase) {
-      throw new HttpError(409, `读取 PR 期间任务相位已变为 ${before.todoRow.phase}，没有发起合并`);
-    }
-    const pull = page?.pull ?? null;
-    const branch = conversationBranch(row.id);
-    if (pull === null || !hasPullFields(pull) || pull.title === null || pull.headSha === null) {
-      throw new HttpError(
-        409,
-        `读不到 PR #${prNumber} 在 GitHub 上的状态（网络、限流或 GitHub 连接失效），没有发起合并：稍后再试。`,
-      );
-    }
-    if (pull.state === 'closed' && !pull.merged) {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} 在 GitHub 上已关闭且未合并，无法合并：重新打开它，或重新运行任务。`,
-      );
-    }
-    if (!isOwnPull(pull, branch)) {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} 的 head 不是本任务在 ${repoRef.owner}/${repoRef.repo} 的工作分支「${branch}」，cairn 不合并它：请在 GitHub 上核对这张 PR。`,
-      );
-    }
-    if (!WRITE_AUTHOR_ASSOCIATIONS.has(pull.authorAssociation ?? '')) {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} 的作者对仓库没有写权限（author_association ${githubText(pull.authorAssociation ?? '缺失')}），cairn 不经 API 合并它：请在 GitHub 上核对后合并（${hint}）。`,
-      );
-    }
-    const baseBranch = projectOfTodo(deps.db, before.todoRow)?.baseBranch ?? pull.defaultBranch;
-    if (pull.baseRef !== baseBranch) {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} targets branch "${githubText(pull.baseRef)}" instead of project base branch "${githubText(baseBranch)}". Check the PR base on GitHub before merging.`,
-      );
-    }
-    if (pull.merged) {
-      if (!gate.failed) {
-        throw new HttpError(409, `PR #${prNumber} 已在 GitHub 合并，没有再发起合并：${hint}。`);
-      }
-      setTodoPhase(deps, row.todoId, 'review');
-      insertMessageRow(deps, row.id, {
-        id: newRecordId(),
-        role: 'system',
-        content: `PR #${prNumber} 已在 GitHub 合并：任务回到审核关口，cairn 对账核对后收尾（核对不上时在时间线说明）。`,
-        createdAt: nowMs(),
-      });
-      return { delegated: true };
-    }
-    const checkpoint = lastPushedCheckpoint(deps, row.id, { mergeSteps: true });
-    if (checkpoint === null || !isFullSha(checkpoint)) {
-      throw new HttpError(
-        409,
-        `本任务没有可核对的推送提交（执行步没回报有效的提交 SHA），cairn 不经 GitHub 合并 PR #${prNumber}：请在 GitHub 上核对后合并（${hint}），或重新运行任务。`,
-      );
-    }
-    if (pull.headSha !== checkpoint) {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} 的 head 是 ${githubText(pull.headSha).slice(0, 7)}，不是本任务最后推送的提交 ${checkpoint.slice(0, 7)}：GitHub 可能还没同步刚推的提交（稍后再点），或分支上有了别的提交（有人推送，或点了 Update branch）。cairn 只合并它推送过的提交；请在 GitHub 上核对后合并（${hint}），或让任务再跑一轮。`,
-      );
-    }
-    const titled = `${pull.title} (#${prNumber})`;
-    if (await readGithubAutonomyPause(fetchImpl, token, `${repoRef.owner}/${repoRef.repo}`)) {
-      throw new HttpError(409, 'autonomy-paused: GitHub autonomy marker is open or unreadable');
-    }
-    await assertMergeRequiredChecks(fetchImpl, token, repoRef, pull.baseRef, checkpoint);
-    const closing = apiMergeGate(deps, row);
-    await ensurePullClosesTaskIssue(
-      fetchImpl,
-      token,
-      repoRef,
-      prNumber,
-      closing.todoRow,
-      pull.body,
-    ).catch((error: unknown) => {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} 的描述里补不上关闭本任务 issue 的那一行（${error instanceof Error ? githubText(error.message) : '未知错误'}），没有发起合并：稍后再试。`,
-      );
-    });
-    apiMergeGate(deps, row);
-    claimAutonomousMerge(deps.db, row.id);
-    const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
-      sha: checkpoint,
-      commitTitle: CLOSING_SHAPE.test(pull.title) ? `Merge pull request #${prNumber}` : titled,
-      commitMessage: withCoAuthor(
-        PLAIN_MERGE_BODY,
-        readTeamAttributionSettings(deps.db, before.todoRow.teamId).coAuthorTrailer
-          ? humanWorkIdentity(deps.db, before.todoRow, row.triggerSource)
-          : null,
-      ),
-    });
-    if (result.kind === 'merged' || result.kind === 'refused' || result.kind === 'rate-limited')
-      settleAutonomousMerge(deps.db, row.id, result.kind === 'merged' ? 'merged' : 'refused');
-    if (result.kind === 'rate-limited') {
-      const { limit } = result;
-      const when =
-        limit.retryAfterSeconds !== null
-          ? `，${limit.retryAfterSeconds} 秒后再试`
-          : limit.resetAt !== null
-            ? `，限流在 ${new Date(limit.resetAt).toISOString()} 解除`
-            : '';
-      throw new HttpError(
-        409,
-        `GitHub 限流，没有处理合并 PR #${prNumber} 的请求（HTTP ${limit.status}${when}）${result.message === '' ? '' : `：${githubText(result.message)}`}——稍后再点合并，或直接在那里合并（${hint}）`,
-      );
-    }
-    if (result.kind === 'refused') {
-      throw new HttpError(
-        409,
-        result.status === 401
-          ? `GitHub 不认团队的 GitHub 连接（HTTP 401），PR #${prNumber} 没有合并：请重新连接 GitHub 后再点合并。`
-          : `GitHub 拒绝合并 PR #${prNumber}（HTTP ${result.status}）${result.message === '' ? '' : `：${githubText(result.message)}`}——可在 GitHub 上处理后直接在那里合并（${hint}）`,
-      );
-    }
-    const now = deps.db
-      .select({ phase: todo.phase })
-      .from(todo)
-      .where(eq(todo.id, row.todoId))
-      .get();
-    const atGate = now?.phase === gate.todoRow.phase;
-    if (atGate && gate.failed) setTodoPhase(deps, row.todoId, 'review');
-    insertGateAnnouncement(deps, row.id, MERGE_ANNOUNCEMENT, actor);
-    insertMessageRow(deps, row.id, {
-      id: newRecordId(),
-      role: 'system',
-      content:
-        result.kind === 'merged'
-          ? `PR #${prNumber} 已由 cairn 经 GitHub 合并（squash，合并提交 ${githubText(result.sha).slice(0, 7)}）`
-          : `已请 GitHub 合并 PR #${prNumber}，GitHub 没有明确答复（${unclearReason(result)}）。cairn 对账会读这张 PR：已合并就收尾；还开着就留在审核关口，可以再点合并。`,
-      createdAt: nowMs(),
-    });
-    if (result.kind === 'merged' && atGate) finishTodoDone(deps, row.todoId, row.id);
-    return { delegated: true };
-  } finally {
-    mergingBuilds.delete(row.id);
-  }
 }
 
 const PLAN_REWRITE_PROMPT = buildPlanRewritePrompt();
