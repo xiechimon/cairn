@@ -14,7 +14,6 @@ import type {
 } from '@cairn/shared';
 import {
   ACTIVE_STEP_STATUSES,
-  CONFIRM_ANNOUNCEMENT,
   isBuildStepKind,
   type RouteOverride,
   SESSION_BRIEF,
@@ -42,11 +41,7 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { resolveNamedPrompt } from './named-prompts.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition } from './phase.js';
-import {
-  planAutoApproveAt,
-  planAutoConfirmation,
-  planAwaitsAutoConfirm,
-} from './plan-auto-confirm.js';
+import { planAutoApproveAt, planAwaitsAutoConfirm } from './plan-auto-confirm.js';
 import type { VapidKeys } from './push.js';
 import { toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
@@ -56,7 +51,6 @@ import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
 import { type BuildStepRoute, listBuildStepRoutes } from './step-route.js';
 import { childrenOfTodo, getTodo, setTodoPhase } from './todos.js';
-import { insertGateAnnouncement } from './transcript.js';
 import type { QuestionAnswer } from './worker-questions.js';
 
 export {
@@ -97,6 +91,11 @@ export interface BuildDeps {
 
 type BuildRow = typeof build.$inferSelect;
 
+export {
+  applyBuildConfirm,
+  confirmPlanAutomatically,
+  sweepPlanAutoConfirm,
+} from './build-confirm.js';
 export { assertDeliveredBuild, buildRunsSession, restoreFailedReview } from './build-delivery.js';
 export { assertMergeTools, buildMergePermission } from './build-merge-permission.js';
 export { requestMerge } from './build-merge-request.js';
@@ -494,26 +493,6 @@ export function dispatchSplitChildren(deps: BuildDeps, parentId: string): number
   return dispatched;
 }
 
-export function applyBuildConfirm(deps: BuildDeps, buildId: string, actorName: string): void {
-  const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-  if (!row) throw new NotFoundError(`build ${buildId}`);
-  assertSplitProposalExecutable(row.errorMessage);
-  const todoRecord = getTodo(deps, row.todoId);
-  if (!todoRecord) throw new NotFoundError(`todo ${row.todoId}`);
-  if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
-  if (todoRecord.phase !== 'confirm') {
-    throw new HttpError(409, `确认仅适用于待确认（confirm）关口，当前相位 ${todoRecord.phase}`);
-  }
-  insertGateAnnouncement(deps, buildId, CONFIRM_ANNOUNCEMENT, actorName);
-  if (childrenOfTodo(deps.db, todoRecord.id).length > 0) {
-    dispatchSplitChildren(deps, todoRecord.id);
-    setTodoPhase(deps, todoRecord.id, 'building');
-    return;
-  }
-  setTodoPhase(deps, todoRecord.id, 'building');
-  enqueueStep(deps, buildId, 'build', todoRecord.teamId);
-}
-
 export function reviewInstructionOf(
   deps: BuildDeps,
   teamId: string,
@@ -546,31 +525,6 @@ export const STEP_KIND_TEXT: Record<StepKind, string> = {
   review: '审核',
   verify: '验证',
 };
-
-export function confirmPlanAutomatically(deps: BuildDeps, buildId: string): void {
-  try {
-    applyBuildConfirm(deps, buildId, 'server');
-  } catch (error) {
-    if (
-      !(
-        error instanceof HttpError &&
-        error.status === 409 &&
-        (error.message.startsWith('agent-label-privileged:') ||
-          error.message.startsWith('intake-label-assignment-failed:'))
-      )
-    )
-      throw error;
-  }
-}
-
-export function sweepPlanAutoConfirm(deps: BuildDeps): void {
-  const waiting = deps.db.select().from(todo).where(eq(todo.phase, 'confirm')).all();
-  for (const todoRow of waiting) {
-    if (todoRow.latestBuildId === null) continue;
-    if (planAutoConfirmation(deps, todoRow.latestBuildId).eligible)
-      confirmPlanAutomatically(deps, todoRow.latestBuildId);
-  }
-}
 
 export class NotFoundError extends Error {
   constructor(what: string) {
