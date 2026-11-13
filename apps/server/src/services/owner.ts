@@ -7,7 +7,7 @@ import {
 } from '@cairn/shared';
 import { and, eq, inArray, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, gateState, message, project, step, todo } from '../db/schema.js';
+import { build, dueEvent, gateState, message, project, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { BLOCKED_BY_HOLD, deadEndBlocker } from './blockers.js';
 import { planAwaitsAutoConfirm } from './builds.js';
@@ -32,6 +32,12 @@ export type Ownership =
   | { owner: 'coordinator'; reason: CoordinatorReason; workKey: string };
 
 export const COORDINATOR_TURN_DEADLINE_MS = 30 * 60 * 1000;
+
+export const OWNERSHIP_HANDOFF_KIND = 'ownership-handoff';
+
+export function ownershipHandoffEventId(stepId: string): string {
+  return `ownership-handoff:${stepId}`;
+}
 
 const ENDED_STEP = new Set(['done', 'failed', 'stopped']);
 
@@ -151,7 +157,7 @@ export function ownershipOf(db: Db, row: TodoRow, now = nowMs()): Ownership | nu
     owner: 'owner',
     reason: 'handoff',
     from: ownership.reason,
-    workKey: ownership.workKey,
+    workKey: `${ownership.workKey}:unclaimed`,
   };
 }
 
@@ -242,15 +248,16 @@ function claimCheckpoint(db: Db, row: TodoRow, owner: string, workKey: string): 
 
 function cancelUnstartedWake(deps: OwnerDeps, row: TodoRow): void {
   if (row.coordinatorTurn === null) return;
+  const target = deps.db
+    .select({ status: step.status })
+    .from(step)
+    .where(eq(step.id, row.coordinatorTurn.stepId))
+    .get();
+  if (target !== undefined && !UNSTARTED_STEP_STATUSES.includes(target.status as 'pending')) return;
   const [stopped] = deps.db
     .update(step)
     .set({ status: 'stopped', finishedAt: nowMs() })
-    .where(
-      and(
-        eq(step.id, row.coordinatorTurn.stepId),
-        inArray(step.status, [...UNSTARTED_STEP_STATUSES]),
-      ),
-    )
+    .where(eq(step.id, row.coordinatorTurn.stepId))
     .returning()
     .all();
   if (stopped === undefined) return;
@@ -281,6 +288,71 @@ function reconcileRow(deps: OwnerDeps, row: TodoRow): void {
     .set({ coordinatorTurn: { stepId, workKey: ownership.workKey } })
     .where(eq(todo.id, row.id))
     .run();
+  const queued = deps.db
+    .select({ createdAt: step.createdAt })
+    .from(step)
+    .where(eq(step.id, stepId))
+    .get();
+  if (queued === undefined) return;
+  deps.db
+    .insert(dueEvent)
+    .values({
+      id: ownershipHandoffEventId(stepId),
+      kind: OWNERSHIP_HANDOFF_KIND,
+      dueAt: queued.createdAt + COORDINATOR_TURN_DEADLINE_MS,
+    })
+    .onConflictDoNothing()
+    .run();
+}
+
+export function rescheduleOwnershipHandoff(db: Db, fromStepId: string, toStepId: string): void {
+  db.delete(dueEvent)
+    .where(eq(dueEvent.id, ownershipHandoffEventId(fromStepId)))
+    .run();
+  const queued = db
+    .select({ createdAt: step.createdAt })
+    .from(step)
+    .where(eq(step.id, toStepId))
+    .get();
+  if (queued === undefined) return;
+  db.insert(dueEvent)
+    .values({
+      id: ownershipHandoffEventId(toStepId),
+      kind: OWNERSHIP_HANDOFF_KIND,
+      dueAt: queued.createdAt + COORDINATOR_TURN_DEADLINE_MS,
+    })
+    .onConflictDoNothing()
+    .run();
+}
+
+export function handoffUnclaimedOwnershipWake(
+  deps: OwnerDeps,
+  stepId: string,
+  now: number,
+): number | null {
+  const wake = deps.db
+    .select({ status: step.status, createdAt: step.createdAt })
+    .from(step)
+    .where(eq(step.id, stepId))
+    .get();
+  if (wake === undefined || ENDED_STEP.has(wake.status) || wake.status === 'claimed') return null;
+  const dueAt = wake.createdAt + COORDINATOR_TURN_DEADLINE_MS;
+  if (now < dueAt) return dueAt;
+  const row = deps.db
+    .select()
+    .from(todo)
+    .where(sql`json_extract(${todo.coordinatorTurn}, '$.stepId') = ${stepId}`)
+    .get();
+  if (row?.coordinatorTurn?.stepId !== stepId) return null;
+  const current = deps.db.select().from(todo).where(eq(todo.id, row.id)).get();
+  if (current === undefined) return null;
+  const decided = ownershipOf(deps.db, current, now);
+  if (decided?.owner !== 'owner' || decided.reason !== 'handoff') return null;
+  const fresh = deps.db.select().from(todo).where(eq(todo.id, current.id)).get();
+  if (fresh === undefined) return null;
+  cancelUnstartedWake(deps, fresh);
+  reconcileRow(deps, fresh);
+  return null;
 }
 
 export function seedOwnerCheckpoints(db: Db): number {

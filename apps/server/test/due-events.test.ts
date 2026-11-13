@@ -2,6 +2,7 @@ import { scheduleRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import { chief, dueEvent, schedule as scheduleTable } from '../src/db/schema.js';
+import { newRecordId } from '../src/lib/ids.js';
 import {
   createDueRunner,
   type DueClock,
@@ -418,5 +419,40 @@ describe('due events (#2502)', () => {
       at + dueBackoffMs(1),
     );
     scheduler.stop();
+  });
+
+  test('an ownership handoff event is delivered by its kind and reschedules until its deadline', async () => {
+    const server = boot();
+    const stepId = newRecordId();
+    const createdAt = 1_000;
+    const seen: number[] = [];
+    server.db
+      .insert(dueEvent)
+      .values({
+        id: `ownership-handoff:${stepId}`,
+        kind: 'ownership-handoff',
+        dueAt: createdAt,
+      })
+      .run();
+    const clock = new FakeClock(createdAt);
+    const runner = createDueRunner(server.db, clock, {
+      'ownership-handoff': (_event, now) => {
+        seen.push(now);
+        return now < createdAt + 30_000 ? { rescheduleAt: now + 15_000 } : undefined;
+      },
+    });
+    runner.arm();
+    await clock.advance(0);
+    await clock.advance(15_000);
+    await clock.advance(15_000);
+    expect(seen).toEqual([createdAt, createdAt + 15_000, createdAt + 30_000]);
+    expect(
+      server.db
+        .select()
+        .from(dueEvent)
+        .where(eq(dueEvent.id, `ownership-handoff:${stepId}`))
+        .get(),
+    ).toBeUndefined();
+    runner.stop();
   });
 });
