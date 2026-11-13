@@ -69,7 +69,9 @@ function registerStaticSpa(app: Hono, webDir: string): void {
       filePath = join(filePath, 'index.html');
     }
     if (!existsSync(filePath) || !statSync(filePath).isFile()) {
-      if (!existsSync(indexFile)) return c.json({ error: 'Not found' }, 404);
+      if (!existsSync(indexFile) || rel.startsWith(HASHED_ASSET_PREFIX)) {
+        return c.json({ error: 'Not found' }, 404);
+      }
       filePath = indexFile;
     }
     const isIndex = filePath === indexFile;
