@@ -183,11 +183,6 @@ export function capturePreCallWorld(
       phase: row.phase,
       archivedAt: row.archivedAt ?? null,
     }));
-  if (capture.recordCount + preCallTodos.length > COORDINATOR_SNAPSHOT_MAX_RECORDS) {
-    capture.overLimit = true;
-    return;
-  }
-  capture.recordCount += preCallTodos.length;
   capture.open.push({ callId: callId ?? '', tool, params, preCallTodos });
 }
 
