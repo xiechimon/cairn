@@ -2,13 +2,13 @@ import type { TasksQuery } from '@cairn/shared';
 import { and, asc, eq, gte, isNull, or } from 'drizzle-orm';
 import { chiefMessage, chiefThread, todo } from '../db/schema.js';
 import { askQuestionContentOf } from './chief-questions.js';
-import { TASKS_RECENT_MS } from './owner.js';
+import { ownershipOf, sectionOf, TASKS_RECENT_MS } from './owner.js';
 import { type TodoDeps, toTodoRecord } from './todos.js';
 
 export function listTasks(
   deps: Pick<TodoDeps, 'db'>,
   teamId: string,
-  now = Date.now(),
+  { sectionedOnly = false, now = Date.now() }: { sectionedOnly?: boolean; now?: number } = {},
 ): TasksQuery {
   const todos = deps.db
     .select()
@@ -21,6 +21,7 @@ export function listTasks(
     )
     .orderBy(asc(todo.seqNum), asc(todo.id))
     .all()
+    .filter((row) => !sectionedOnly || sectionOf(row, ownershipOf(deps.db, row, now), now) !== null)
     .map((row) => ({ kind: 'todo' as const, ...toTodoRecord(deps, row, now) }));
   const questions: TasksQuery['entries'] = deps.db
     .select({ message: chiefMessage })
