@@ -1,6 +1,7 @@
 import { realpathSync } from 'node:fs';
 
 const PROTECTED_BRANCHES = new Set(['main', 'master']);
+const UNDELETABLE_PREFIXES = ['pr-assets/'];
 
 const GH_ALLOWED = {
   pr: new Set(['view', 'list', 'comment', 'create', 'close', 'update-branch', 'edit', 'merge']),
@@ -189,7 +190,33 @@ function checkRefspec(spec) {
   return allow;
 }
 
+function checkGitPushDelete(args) {
+  const rest = args.filter((arg) => arg !== '-q' && arg !== '--quiet');
+  const deletes = rest.filter((arg) => arg === '--delete').length;
+  const positional = rest.filter((arg) => arg !== '--delete');
+  const bad = positional.find((arg) => arg.startsWith('-'));
+  if (deletes !== 1 || bad)
+    return deny(
+      `git push --delete ${bad ?? ''} is refused (form: git push origin --delete <branch>)`,
+    );
+  const [remote, ...refs] = positional;
+  if (remote !== 'origin') return deny('git push must name the origin remote');
+  if (refs.length !== 1) return deny('git push --delete takes exactly one branch');
+  const [ref] = refs;
+  if (/[*?[\\:+]/.test(ref)) return deny(`deleting ${ref} is refused: name one branch`);
+  if (ref.startsWith('refs/') && !ref.startsWith('refs/heads/'))
+    return deny(`deleting ${ref} is refused: only branches are allowed`);
+  const branch = ref.replace(/^refs\/heads\//, '').replace(/^heads\//, '');
+  if (branch === '' || branch === 'HEAD' || branch === '@')
+    return deny('git push --delete needs a branch name');
+  if (PROTECTED_BRANCHES.has(branch)) return deny(`deleting ${branch} is refused`);
+  const keep = UNDELETABLE_PREFIXES.find((prefix) => branch.startsWith(prefix));
+  if (keep) return deny(`deleting ${branch} is refused: ${keep}* branches host PR images`);
+  return allow;
+}
+
 function checkGitPush(args) {
+  if (args.includes('--delete')) return checkGitPushDelete(args);
   const positional = [];
   for (const arg of args) {
     if (arg.startsWith('--force-with-lease')) continue;
