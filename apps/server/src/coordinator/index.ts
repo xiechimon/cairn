@@ -294,6 +294,13 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       ...(options.fixedProviders === undefined ? {} : { fixedProviders: options.fixedProviders }),
       ...(options.stopPollMs === undefined ? {} : { stopPollMs: options.stopPollMs }),
       factsFor,
+      providersFor: (threadId) => {
+        const teamId = threadTeam(threadId);
+        const providers =
+          teamId === null ? null : coordinatorProviders({ db, box: machine.box }, teamId);
+        if (providers === null || teamId === null) return [];
+        return [binding(teamId, providers.router), binding(teamId, providers.summary)];
+      },
       onInputError: (threadId, error) =>
         logger.error(
           { threadId, error: String(redactSecrets(String(error)).value) },

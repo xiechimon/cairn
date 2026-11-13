@@ -438,6 +438,82 @@ describe('handoff state paths', () => {
     expect(computerRow(s).handoffReason).toBe('login');
   });
 
+  test('a replay of a waiting takeover keeps waiting instead of ending the call', async () => {
+    const { s, deps } = boot();
+    const first = forwardComputerCall(deps, 'sidecar', 'step-a', takeover(), FAST);
+    await waitForPending(s);
+    dropComputerWaiters();
+    const again = forwardComputerCall(deps, 'sidecar', 'step-a', takeover(), FAST);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(takeoverRow(s)).toMatchObject({ state: 'running', finishedAt: null });
+    expect(computerRow(s).handoffReason).toBe('model');
+    const lease = acquireComputerControl(s.db, s.machineHub, s.team.id, s.user.id, COMPUTER);
+    releaseComputerControl(s.db, s.team.id, s.user.id, COMPUTER, lease.leaseId);
+    expect((await again).text).toBe(HANDED_BACK);
+    await first.catch(() => undefined);
+  });
+
+  test('a restart keeps a fresh takeover waiting and ends only one past its deadline', () => {
+    const { s } = boot();
+    const now = Date.now();
+    setHandoff(s, {
+      handoffReason: 'model',
+      handoffStepId: 'step-a',
+      handoffRequestedAt: now - 60_000,
+    });
+    s.db
+      .insert(computerCallTable)
+      .values({
+        id: 'd'.repeat(64),
+        teamId: s.team.id,
+        stepId: 'step-a',
+        toolCallId: 'waiting',
+        machineId: 'omarchy',
+        computerId: COMPUTER,
+        tool: 'request_takeover',
+        replaySafe: false,
+        params: {},
+        state: 'running',
+        deadlineAt: now + 14 * 60_000,
+        createdAt: now - 60_000,
+      })
+      .run();
+    sweepComputerHandoffs(s.db, now);
+    expect(computerRow(s).handoffReason).toBe('model');
+    expect(takeoverRow(s)).toMatchObject({ state: 'running', finishedAt: null });
+
+    const overdue = boot();
+    const overdueNow = Date.now();
+    setHandoff(overdue.s, {
+      handoffReason: 'login',
+      handoffStepId: 'step-a',
+      handoffRequestedAt: overdueNow - 16 * 60_000,
+    });
+    overdue.s.db
+      .insert(computerCallTable)
+      .values({
+        id: 'e'.repeat(64),
+        teamId: overdue.s.team.id,
+        stepId: 'step-a',
+        toolCallId: 'late',
+        machineId: 'omarchy',
+        computerId: COMPUTER,
+        tool: 'request_takeover',
+        replaySafe: false,
+        params: {},
+        state: 'running',
+        deadlineAt: overdueNow - 60_000,
+        createdAt: overdueNow - 16 * 60_000,
+      })
+      .run();
+    sweepComputerHandoffs(overdue.s.db, overdueNow);
+    expect(computerRow(overdue.s).handoffReason).toBeNull();
+    expect(takeoverRow(overdue.s)).toMatchObject({
+      state: 'error',
+      finishedAt: expect.any(Number),
+    });
+  });
+
   test('the start sweep clears an overdue handoff, keeps a fresh one and ends a left-over takeover call', () => {
     const { s } = boot();
     const now = Date.now();
@@ -459,7 +535,7 @@ describe('handoff state paths', () => {
         replaySafe: false,
         params: {},
         state: 'running',
-        deadlineAt: now + 60_000,
+        deadlineAt: now - 60_000,
         createdAt: now - 1000,
       })
       .run();
