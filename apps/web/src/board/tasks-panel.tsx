@@ -45,7 +45,7 @@ export type TasksTab = 'active' | 'next' | 'scheduled' | 'resolved';
 
 export type TaskAddOutcome = 'saved' | 'sent';
 
-export const PANEL_HEAD = 'h-13 gap-0.5 pr-4 pl-4';
+export const PANEL_HEAD = 'gap-0.5 pr-4 pl-4';
 export const PANEL_HEAD_BUTTON = 'size-9 text-foreground [&_svg]:size-5.5';
 export const PANEL_TITLE = 'text-heading font-normal';
 const PANEL_TABS = 'h-7.5 gap-0.5 group-data-horizontal/tabs:h-7.5';

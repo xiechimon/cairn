@@ -74,7 +74,7 @@ export function MadeCard({
         </div>
         <div
           data-testid="made-card-preview"
-          className="pointer-events-none relative mx-3 mt-3 h-24 flex-none overflow-hidden rounded-t-(--radius-tile) border border-b-0 border-border bg-background"
+          className="pointer-events-none absolute inset-x-3 bottom-0 h-12 overflow-hidden rounded-t-(--radius-tile) border border-b-0 border-border bg-background"
         >
           {todo.previewUrl === undefined ? (
             <div

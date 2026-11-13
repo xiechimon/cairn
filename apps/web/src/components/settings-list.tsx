@@ -17,7 +17,7 @@ const SETTINGS_CARD_CLS = cn(
 export const SETTINGS_ROW_CLS =
   'settings-row flex min-h-13 items-center justify-between gap-4 px-4 py-1.5';
 
-export const SETTINGS_HINT_CLS = 'text-meta text-content-tertiary';
+export const SETTINGS_HINT_CLS = 'text-meta text-balance text-content-tertiary';
 
 export const SETTINGS_VALUE_EDITOR_CLS = 'min-w-0 flex-auto flex-col items-stretch gap-2';
 
