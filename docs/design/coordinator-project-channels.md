@@ -6,6 +6,12 @@ Status: proposed 2026-11-13 by the owner's choice of option C2 in the channel th
 
 A project channel is a filtered view of the one Coordinator thread. What the owner sends in the cairn channel also appears in the Coordinator channel, and every project shares one model context. The owner wants each project channel to be its own conversation (2026-11-13).
 
+Other symptoms of the shared thread, seen on 2026-11-13: a turn error from an unrelated main-channel test (`no_model`) turned the status mark red in the cairn channel, and when the newest 100 rows held none of a project's rows the channel showed the home greeting instead of its history, because the greeting layout has no history loader.
+
+## History
+
+Per-project Coordinator threads existed from #2500 and #2510 (2026-11-01) and were merged into one thread a day later by #2547 under owner decision D58, "one global Coordinator, with projects as filters and context" (#2532). This design reverses the "projects only filter" half of D58 at the owner's request. It keeps the other half: there is still one Coordinator, with one identity, one set of tools and one team memory, and the main channel stays its entry. The owner confirms the reversal by approving this document.
+
 ## Prior art
 
 | Product | Separation | What crosses the boundary | Source |
@@ -45,6 +51,10 @@ This design follows Claude Projects: separate conversation and context per proje
 ## Existing history
 
 The main thread keeps all 8,000+ rows, including the 779 tagged cairn. Project channels start empty; the project's memory (37 cairn entries today) carries what the Coordinator knows. No rows move: moving them would break the main session's transcript. A project channel can read old tagged rows through `channel_messages` when it needs them.
+
+## Empty channel
+
+A channel is only a conversation (owner, 2026-11-13). A channel with no messages shows no home greeting, date line or counts; those belong to the main channel's home. Instead the first row is a Coordinator bubble that greets the owner by display name and asks what they want to do in this project, worded like "Owner, what would you like to do in cairn?" through `t()`. The bubble is rendered by the client from the user's display name and the project name; it is not a model turn and is not stored, so opening a channel costs nothing and writes nothing. It disappears once the channel has a real message. The composer is focused below it.
 
 ## Failure behavior
 
