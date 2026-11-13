@@ -34,7 +34,6 @@ import {
   appendWorkBranchNote,
   buildPlanFirstRoundInstruction,
   buildTaskPromptText,
-  CHANGES_DIFF_MAX_BYTES,
   CONTINUE_PROMPTS,
   classifyAgentFailure,
   classifySkillFact,
@@ -100,7 +99,6 @@ import { clearCredentials, pushCredential } from './credentials.js';
 import { DeltaRelay } from './delta-relay.js';
 import { buildExecutorRecord } from './executor-record.js';
 import { GitPushHookError, isGitAuthFailure, withGitCredentialFallback } from './git.js';
-import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import { landLocalMerge } from './local-merge.js';
 import type { DaemonLogger } from './log.js';
@@ -115,6 +113,7 @@ import { StepAppCredential } from './step-app-credential.js';
 import { resolveStepImagesOrRaw } from './step-attachments.js';
 import { commitAndPushStep } from './step-closing-git.js';
 import { assembleStepEnv } from './step-env.js';
+import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import {
   resolveStreamLimits,
@@ -1839,52 +1838,26 @@ async function runClaimedStep(
     !isReview &&
     !attachmentVerify
   ) {
-    const ghRef = repo.kind === 'github' ? githubRepoRefOf(repo.cloneUrl) : null;
-    if (ghRef !== null) {
-      const probeHeads: string[] = [ws.branch];
-      if (branchDrift !== null) probeHeads.push(branchDrift.actual);
-      for (const b of artifactBranches) {
-        if (probeHeads.length >= 3) break;
-        if (!probeHeads.includes(b)) probeHeads.push(b);
-      }
-      for (const head of probeHeads) {
-        prProbe = await probeGithubPr({
-          owner: ghRef.owner,
-          repo: ghRef.repo,
-          branch: head,
-          baseBranch: ws.defaultBranch,
-          token: creds.git?.password ?? null,
-          tokenKind: creds.git?.kind,
-          ...(appCredential !== null
-            ? { refreshToken: async () => (await refreshGit()).password }
-            : {}),
-        }).catch((err: unknown) => {
-          logger.step(
-            `pr probe failed: ${err instanceof Error ? err.message : String(err)} (panel will show branch without PR)`,
-          );
-          return null;
-        });
-        if (prProbe !== null) {
-          logger.step(`pr probe: #${prProbe.number} for ${head}`);
-          break;
-        }
-      }
+    if (repo.kind === 'github') {
+      prProbe = await probeStepPr({
+        cloneUrl: repo.cloneUrl,
+        branch: ws.branch,
+        driftBranch: branchDrift?.actual ?? null,
+        artifactBranches,
+        baseBranch: ws.defaultBranch,
+        credential: creds.git,
+        refreshToken: appCredential !== null ? async () => (await refreshGit()).password : null,
+        log: (message) => logger.step(message),
+      });
     }
-    if (
-      (repo.kind !== 'hosted' || preservedCommits.length > 0) &&
-      deps.workspace?.diffAgainstDefault
-    ) {
-      try {
-        const diff = await deps.workspace.diffAgainstDefault(ws.cwd, ws.defaultBranch);
-        changesDiff = diff.length <= CHANGES_DIFF_MAX_BYTES ? diff : null;
-        if (changesDiff === null && diff.length > 0) {
-          logger.step(
-            `changes diff ${diff.length}B over ${CHANGES_DIFF_MAX_BYTES}B cap — projection falls back to empty`,
-          );
-        }
-      } catch (err) {
-        logger.step(`changes diff failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
+    const diffAgainstDefault = deps.workspace?.diffAgainstDefault?.bind(deps.workspace);
+    if ((repo.kind !== 'hosted' || preservedCommits.length > 0) && diffAgainstDefault) {
+      changesDiff = await boundedChangesDiff(
+        diffAgainstDefault,
+        ws.cwd,
+        ws.defaultBranch,
+        (message) => logger.step(message),
+      );
     }
   }
 
