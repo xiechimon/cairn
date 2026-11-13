@@ -57,32 +57,25 @@ async function open(page: Page, computers: unknown[], machines: unknown[] = [MAC
   return page.getByTestId('machine-agent-access');
 }
 
-test('the machine settings hold the browser and desktop switches and both write through', async ({
+test('the machine settings hold only the browser switch and it writes through', async ({
   page,
 }) => {
   const access = await open(page, [computer()]);
   await expect(access.getByRole('heading', { name: 'Agent 的权限' })).toBeVisible();
   const browser = access.getByRole('switch', { name: '浏览器' });
-  const desktop = access.getByRole('switch', { name: '桌面控制' });
+  await expect(access.getByRole('switch')).toHaveCount(1);
   await expect(browser).toBeEnabled();
   await expect(browser).not.toBeChecked();
   await browser.click();
   await expect(browser).toBeChecked();
-  await expect(desktop).toBeEnabled();
-  await desktop.click();
-  await expect(desktop).toHaveAttribute('aria-checked', 'true');
-  await desktop.click();
-  await expect(desktop).toHaveAttribute('aria-checked', 'false');
 });
 
-test('without a computer row both switches are disabled and say why', async ({ page }) => {
+test('without a computer row the browser switch still enables the first computer', async ({
+  page,
+}) => {
   const access = await open(page, []);
-  await expect(access.getByRole('switch', { name: '桌面控制' })).toBeDisabled();
-  const desktopReason = '这台机器还没有电脑记录，等桌面控制上线后才能在这里打开。';
-  await access.getByRole('button', { name: desktopReason }).click();
-  await expect(page.locator('[data-sonner-toast]', { hasText: desktopReason })).toBeVisible();
-  const browser = access.getByRole('switch', { name: '浏览器' });
-  await expect(browser).toBeEnabled();
+  await expect(access.getByRole('switch')).toHaveCount(1);
+  await expect(access.getByRole('switch', { name: '浏览器' })).toBeEnabled();
 });
 
 test('a machine that reports no browser keeps the browser switch disabled', async ({ page }) => {
@@ -92,19 +85,4 @@ test('a machine that reports no browser keeps the browser switch disabled', asyn
   await access.getByRole('button', { name: reason }).focus();
   await page.keyboard.press(' ');
   await expect(page.locator('[data-sonner-toast]', { hasText: reason })).toBeVisible();
-});
-
-test('switching desktop control off still releases after another surface replaced the lease', async ({
-  page,
-}) => {
-  const access = await open(page, [computer()]);
-  const desktop = access.getByRole('switch', { name: '桌面控制' });
-  await desktop.click();
-  await expect(desktop).toHaveAttribute('aria-checked', 'true');
-  const replaced = await page.evaluate(() =>
-    fetch('/api/teams/t1/computers/comp-1/control', { method: 'POST' }).then((res) => res.status),
-  );
-  expect(replaced).toBe(201);
-  await desktop.click();
-  await expect(desktop).toHaveAttribute('aria-checked', 'false');
 });
