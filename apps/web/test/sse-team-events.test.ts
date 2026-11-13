@@ -12,18 +12,18 @@ describe('team event → invalidation keys', () => {
   it('todo document event: existing three keys + plans (#666: plan card and phase chip converge on the same event)', () => {
     const doc = todo(7, 'confirm');
     const keys = keysOf({ type: 'todo', seq: 1, v: 3, doc });
-    expect(keys).toContain('todos');
-    expect(keys).toContain(`todo/${doc.id}`);
     expect(keys).toContain('schedules');
     expect(keys).toContain('plans');
+    expect(keys).not.toContain('todos');
+    expect(keys).not.toContain(`tasks/${TEAM}`);
   });
 
   it('todo document event refreshes the steps, build and messages of its latest build together, so a thread with its conversation stream down neither stays running nor shows steps ahead of its messages', () => {
     const doc = { ...todo(7, 'confirm'), latestBuildId: 'build-7' };
     const keys = keysOf({ type: 'todo', seq: 1, v: 3, doc });
     expect(keys).toContain('steps/build-7');
-    expect(keys).toContain('build/build-7');
     expect(keys).toContain('messages/build-7');
+    expect(keys).not.toContain('build/build-7');
     expect(keysOf({ type: 'todo', seq: 2, v: 3, doc: { ...doc, latestBuildId: null } })).not.toContain(
       'steps/null',
     );
@@ -36,11 +36,11 @@ describe('team event → invalidation keys', () => {
       v: 1,
       doc: { id: 'build-1', todoId: 'todo-7' },
     });
-    expect(keys).toContain('build/build-1');
     expect(keys).toContain('steps/build-1');
-    expect(keys).toContain('todos');
     expect(keys).toContain('todo/todo-7');
     expect(keys).toContain('plans/build-1');
+    expect(keys).not.toContain('build/build-1');
+    expect(keys).not.toContain('todos');
   });
 
   it('notification: board, threads, chief context and Tasks keys verbatim (the desktop-notification side effect is not in the map)', () => {
@@ -48,16 +48,10 @@ describe('team event → invalidation keys', () => {
       type: 'notification',
       notification: { id: 'n-1', type: 'plan_ready', entityId: 'todo-7' },
     });
-    expect(keys).toEqual([
-      `notifications/${TEAM}`,
-      `chiefThreads/${TEAM}`,
-      `chief/${TEAM}`,
-      'todos',
-      `tasks/${TEAM}`,
-    ]);
+    expect(keys).toEqual([`chiefThreads/${TEAM}`, `chief/${TEAM}`]);
   });
 
-  it('every event that refreshes the board also refreshes the Tasks panel read', () => {
+  it('no team event refetches the board lists; the stream patches those from the event', () => {
     const events: Record<string, unknown>[] = [
       { type: 'todo', seq: 1, v: 3, doc: todo(7, 'confirm') },
       { type: 'build', seq: 2, v: 1, doc: { id: 'build-1', todoId: 'todo-7' } },
@@ -66,8 +60,8 @@ describe('team event → invalidation keys', () => {
     ];
     for (const ev of events) {
       const keys = keysOf(ev);
-      expect(keys).toContain('todos');
-      expect(keys).toContain(`tasks/${TEAM}`);
+      expect(keys).not.toContain('todos');
+      expect(keys).not.toContain(`tasks/${TEAM}`);
     }
   });
 
@@ -76,8 +70,6 @@ describe('team event → invalidation keys', () => {
     expect(keysOf({ type: 'machine_presence', machineId: 'm-1', online: true })).toEqual([
       `machines/${TEAM}`,
       `computers/${TEAM}`,
-      'todos',
-      `tasks/${TEAM}`,
       `model-routing/${TEAM}`,
     ]);
     expect(keysOf({ type: 'branch_sync', sync: { buildId: 'build-1' } })).toEqual([
