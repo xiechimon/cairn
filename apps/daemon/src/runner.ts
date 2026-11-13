@@ -69,16 +69,9 @@ import { AgentTodoReporter, parseAgentTodoText } from './agent-todo.js';
 import { AskChannel } from './ask-channel.js';
 import { prepareFileAttachment } from './attach-file.js';
 import { SessionNotResumableError } from './backend/errors.js';
-import { notInConfigLine, resolveMcpEndpoints } from './backend/mcp-config.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
-import {
-  collectVisibleSkillFileMap,
-  collectVisibleSkillNames,
-  piWorktreeSkillDirs,
-  type SkillsCatalogOpts,
-  withSkillDispatchDirectives,
-} from './backend/skills.js';
+import { collectVisibleSkillFileMap, piWorktreeSkillDirs } from './backend/skills.js';
 import { prepareWebTools } from './backend/web-search.js';
 import { assertNoLegacyBrief, composeBrief } from './brief-file.js';
 import {
@@ -104,7 +97,6 @@ import { extractReviewVerdict } from './review-findings.js';
 import { buildSecretTool } from './secret-channel.js';
 import { type SealedSegment, SegmentEmitter, segmentContent } from './segment.js';
 import { readSessionJsonlForUpload } from './session-jsonl.js';
-import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
 import { resolveStepImagesOrRaw } from './step-attachments.js';
@@ -112,6 +104,11 @@ import { commitAndPushStep, preserveFailedBuild } from './step-closing-git.js';
 import { assembleStepEnv } from './step-env.js';
 import { localMergeDoneBody } from './step-local-merge.js';
 import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
+import {
+  prepareSkillLoadTool,
+  sessionInjectedSkills,
+  stepMcpEndpoints,
+} from './step-skill-tool.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { prepareStepWorkspace, prepareVerifyClone } from './step-workspace.js';
 import {
@@ -722,22 +719,7 @@ async function runClaimedStep(
         });
   const remoteTools = claimed.remoteTools;
   const claimedMcp = claimed.mcpServers;
-  const mcpSlugs = claimedMcp ?? [];
-  const mcpEndpoints =
-    mcpSlugs.length > 0
-      ? resolveMcpEndpoints(deps.mcpConfigPath, mcpSlugs, {
-          onMissing: (slug) => logger.mcp(notInConfigLine(slug)),
-        })
-      : [];
-  if (claimedMcp !== undefined) {
-    logger.mcp(
-      mcpSlugs.length > 0
-        ? `loaded from ${deps.mcpConfigPath}: ${
-            mcpEndpoints.length > 0 ? mcpEndpoints.map((e) => e.slug).join(', ') : '(none)'
-          }`
-        : 'managed-empty: strict MCP set (runtime config not inherited)',
-    );
-  }
+  const mcpEndpoints = stepMcpEndpoints(deps.mcpConfigPath, claimedMcp, (line) => logger.mcp(line));
   let teamSkillsDir: string | null = null;
   try {
     const manifest = await client.skillsManifest(stepId);
@@ -810,38 +792,21 @@ async function runClaimedStep(
   const localToolDefs = [secretTool, createTagTool, ...webTools.tools].filter(
     (t): t is LocalToolDef => t !== null,
   );
-  const injectedForSession =
-    agent.injectedSkills === undefined || agent.defaultSkill == null
-      ? agent.injectedSkills
-      : [agent.defaultSkill, ...agent.injectedSkills.filter((id) => id !== agent.defaultSkill)];
+  const injectedForSession = sessionInjectedSkills(agent);
   const skillsRootDir = deps.skillsDir;
-  const canSkillTool = isPi && skillsRootDir !== undefined;
-  if (canSkillTool) {
-    const worktreeSkillDirs = piWorktreeSkillDirs(cwd);
-    const skillScanOpts: SkillsCatalogOpts = {
+  if (isPi && skillsRootDir !== undefined) {
+    const skillLoad = prepareSkillLoadTool({
       skillsDir: skillsRootDir,
-      cwd: deps.paths.home,
-      ...(!isChief && agent.skillsAllowlist != null ? { allowlist: agent.skillsAllowlist } : {}),
-      ...(!isChief && injectedForSession !== undefined
-        ? { injectedSkills: injectedForSession }
-        : {}),
-      ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
-      worktreeSkillsDirs: worktreeSkillDirs,
-      log: (msg: string) => logger.skills(msg),
-    };
-    const skillFileMap = collectVisibleSkillFileMap(skillScanOpts);
-    const skillLoadTool = buildSkillLoadTool({
-      skillFileMap,
-      onInvoke: (name) => logger.skills(`invoke: ${name}`),
+      home: deps.paths.home,
+      cwd,
+      isChief,
+      skillsAllowlist: agent.skillsAllowlist,
+      injectedSkills: injectedForSession,
+      teamSkillsDir,
+      log: (msg) => logger.skills(msg),
     });
-    localToolDefs.push(skillLoadTool);
-    if (deliveryPrompt !== null) {
-      deliveryPrompt = withSkillDispatchDirectives(
-        deliveryPrompt,
-        collectVisibleSkillNames(skillScanOpts),
-        (msg) => logger.skills(msg),
-      );
-    }
+    localToolDefs.push(skillLoad.tool);
+    if (deliveryPrompt !== null) deliveryPrompt = skillLoad.withDispatch(deliveryPrompt);
   }
   const askChannel = new AskChannel({ client, stepId, log: (message) => logger.step(message) });
   const telemetry =
