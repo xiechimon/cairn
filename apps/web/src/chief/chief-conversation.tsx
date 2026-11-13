@@ -79,6 +79,15 @@ const SCROLLER_CONTENT_CLS =
 
 const THREAD_COMPOSER = 'thread';
 
+function workingRowLast(stream: readonly ChiefStreamItem[]): readonly ChiefStreamItem[] {
+  const at = stream.findIndex((item) => item.kind === 'streaming');
+  const working = stream[at];
+  const after = stream.slice(at + 1);
+  if (working === undefined || after.length === 0 || after.some((item) => item.kind !== 'user'))
+    return stream;
+  return [...stream.slice(0, at), ...after, working];
+}
+
 export const CHIEF_DRAFT_STORAGE_KEY = 'cairn.chief-draft';
 
 export function ChiefFollowArmed({ onAtBottom }: { onAtBottom: (atBottom: boolean) => void }) {
@@ -383,11 +392,13 @@ export function ChiefConversation({
       ? () => withdraw(waitingTurn.messageId, waitingTurn.text)
       : onStop;
   stopTurnRef.current = stopTurn;
-  const allRows = awaitingStream(chief.stream ?? [], questionPending).map((item, i) => ({
-    item,
-    i,
-  }));
-  const rows = allRows.filter(({ item }) => item.kind !== 'user' || item.pending == null);
+  const allRows = awaitingStream(workingRowLast(chief.stream ?? []), questionPending).map(
+    (item, i) => ({
+      item,
+      i,
+    }),
+  );
+  const rows = allRows.filter(({ item }) => item.kind !== 'user' || item.pending !== 'held');
   const latestUser = rows.findLast(({ item }) => item.kind === 'user');
   const latestUserKey =
     latestUser == null ? null : chiefStreamRowKey(latestUser.item, latestUser.i);
@@ -410,14 +421,14 @@ export function ChiefConversation({
     scrollToEnd();
   }, [latestUserKey, keyAtSend, sentRowPosition, latestUserPosition, scrollToEnd]);
   const queuedCapsules = allRows.flatMap(({ item }) =>
-    item.kind === 'user' && item.pending != null && item.id != null
+    item.kind === 'user' && item.pending === 'held' && item.id != null
       ? [
           {
             id: item.id,
             content: item.text,
             label: replyQuoteText(item.text),
-            ...(item.pending === 'held' ? { note: t('已存下，Coordinator 恢复后会处理') } : {}),
-            held: item.pending === 'held',
+            note: t('已存下，Coordinator 恢复后会处理'),
+            held: true,
           },
         ]
       : [],
@@ -668,8 +679,6 @@ export function ChiefConversation({
               above={answerActive ? null : capsules}
               tools={answerActive ? null : composerTools}
               menu={answerActive ? null : composerMenu}
-              canStop={canStop}
-              onStop={stopTurn}
               context={chief.context}
               threadId={chief.threadId ?? null}
               dropActive={drop.active}

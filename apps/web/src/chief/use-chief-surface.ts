@@ -1,5 +1,5 @@
 import { type AskUserAnswer, type TranscriptRow, transcriptRowSchema } from '@cairn/shared';
-import { useQueryClient } from '@tanstack/react-query';
+import { replaceEqualDeep, useQueryClient } from '@tanstack/react-query';
 import {
   useCallback,
   useEffect,
@@ -251,7 +251,19 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     ? { loading: isFetchingNextPage, failed: isFetchNextPageError, onLoad: loadEarlier }
     : undefined;
 
-  const chiefData = live ? (liveChiefWithUnsent ?? chiefDefault) : (chief ?? chiefDefault);
+  const freshChiefData = live ? (liveChiefWithUnsent ?? chiefDefault) : (chief ?? chiefDefault);
+  const sharedStreamRef = useRef(freshChiefData.stream);
+  const sharedStream = replaceEqualDeep(sharedStreamRef.current, freshChiefData.stream);
+  useLayoutEffect(() => {
+    sharedStreamRef.current = sharedStream;
+  });
+  const chiefData = useMemo(
+    () =>
+      sharedStream === freshChiefData.stream
+        ? freshChiefData
+        : { ...freshChiefData, stream: sharedStream },
+    [freshChiefData, sharedStream],
+  );
   const liveUnread = live
     ? (notificationsQ.data?.unreadThreadIds ?? []).filter((id) => id.startsWith('chief-')).length
     : 0;

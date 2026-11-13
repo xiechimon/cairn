@@ -123,6 +123,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   FakeEventSource.instances = [];
   vi.stubGlobal('EventSource', FakeEventSource);
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(cb, 16));
   liveTextStore.clear(CONV);
 });
 
