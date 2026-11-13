@@ -177,6 +177,7 @@ sync-commit: 93b9ce21
   apps/server/src/services/dispatch-eligibility.ts
   apps/server/src/services/builds.ts
   apps/server/src/services/build-abandoned-sweep.ts
+  apps/server/src/services/build-step-complete.ts
   apps/server/src/services/quota-wait.ts
   apps/server/src/services/scheduler.ts
   apps/daemon/src/machine-loop.ts
