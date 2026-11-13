@@ -36,7 +36,6 @@ import {
   credentialRedactor,
   credentialSafeEvents,
   guardCredentialOutputs,
-  prepareCredentialSessionUpload,
 } from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
 import { type StepJournal, TranscriptBuffer } from './journal.js';
@@ -45,21 +44,18 @@ import { type MachineApi, MachineApiError } from './machine-client.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
 import { resolveDeliveredPrompt } from './step-attachments.js';
-import { composeDoneBody } from './step-done-body.js';
+import { deliverStepOutcome } from './step-deliver.js';
 import { assembleStepEnv } from './step-env.js';
 import { reportStepProvenance } from './step-executor-record.js';
-import { putFinalArtifacts } from './step-final-upload.js';
 import { stepGitRunner } from './step-git-tools.js';
 import { runLocalMergeStep } from './step-local-merge.js';
 import { assembleStepLocalTools } from './step-local-tools.js';
-import { readDeliveredPlan, readInfoReport } from './step-outputs.js';
 import {
   consumeStepPassEvent,
   newStepPassState,
   resetStepPassForRetry,
   type StepPassEventContext,
 } from './step-pass-events.js';
-import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
 import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
 import { composeWorkerSystemPrompt, planStepPrompt, taskMetaOpts } from './step-prompt.js';
 import { resolveStepProvider } from './step-provider.js';
@@ -991,114 +987,43 @@ async function runClaimedStep(
     preservedCommits,
   } = settledGit;
 
-  let report: string | null = null;
-  if (isInfoBuild && !stopped && lastError === null) {
-    const read = readInfoReport(reportFile);
-    if (read.kind === 'too-large') lastError = read.error;
-    else if (read.kind === 'report') report = read.content;
-  }
-
-  const status = stopped ? 'stopped' : lastError === null ? 'success' : 'failed';
-  if (!stopped && lastError !== null) logger.step(`step failed: ${lastError}`);
-  journal.update(stepId, { state: 'awaiting-upload' });
-
-  let prProbe: { number: number; url: string } | null = null;
-  let changesDiff: string | null = null;
-  if (
-    ws !== null &&
-    ws.readonly !== true &&
-    repo !== null &&
-    (lastError === null || preservedCommits.length > 0) &&
-    !stopped &&
-    !isReview &&
-    !attachmentVerify
-  ) {
-    if (repo.kind === 'github') {
-      prProbe = await probeStepPr({
-        cloneUrl: repo.cloneUrl,
-        branch: ws.branch,
-        driftBranch: branchDrift?.actual ?? null,
-        artifactBranches,
-        baseBranch: ws.defaultBranch,
-        credential: creds.git,
-        refreshToken: appCredential !== null ? async () => (await refreshGit()).password : null,
-        log: (message) => logger.step(message),
-      });
-    }
-    const diffAgainstDefault = deps.workspace?.diffAgainstDefault?.bind(deps.workspace);
-    if ((repo.kind !== 'hosted' || preservedCommits.length > 0) && diffAgainstDefault) {
-      changesDiff = await boundedChangesDiff(
-        diffAgainstDefault,
-        ws.cwd,
-        ws.defaultBranch,
-        (message) => logger.step(message),
-      );
-    }
-  }
-
-  const messages = transcript.messages();
-  let planContent: string | null = null;
-  if (claimed.step.kind === 'plan' && !stopped) {
-    planContent = readDeliveredPlan(deps.paths.plansDir, convId, cwd);
-  }
-  const sessionIdForDone = handle?.sessionId ?? continueId;
-  const doneBody = composeDoneBody(
-    {
-      status,
-      lastError,
-      sessionId: sessionIdForDone,
-      usage,
-      hasChanges,
+  await deliverStepOutcome({
+    client,
+    journal,
+    logger,
+    workspace: deps.workspace,
+    outboxDir: deps.paths.outboxDir,
+    plansDir: deps.paths.plansDir,
+    stepId,
+    claimed,
+    convId,
+    cwd,
+    ws,
+    repo,
+    creds,
+    credentialValues,
+    refreshGitToken: appCredential !== null ? async () => (await refreshGit()).password : null,
+    transcript,
+    session: { sessionId: handle?.sessionId ?? continueId, sessionFile: handle?.sessionFile },
+    usage,
+    lastError,
+    stopped,
+    isReview,
+    attachmentVerify,
+    infoReportFile: isInfoBuild ? reportFile : null,
+    quotaBlock,
+    skillInjectionFacts: skillInjection.facts,
+    uploadedEvidence: uploadedVerifyEvidence,
+    git: {
       headCommit,
-      preservedCommits,
-      pushHookOutput,
-      prProbe,
-      changesDiff,
       branchDrift,
-      quotaBlock,
-      skillInjectionFacts: skillInjection.facts,
-      report,
+      artifactBranches,
+      hasChanges,
+      pushHookOutput,
+      preservedCommits,
     },
-    {
-      kind: claimed.step.kind,
-      messages,
-      attachmentVerify,
-      uploadedEvidence: uploadedVerifyEvidence,
-      cwd,
-    },
-  );
-  const redactedSessionFile = join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`);
-  const sessionFileForUpload = credentialValues.reduce<string | undefined>(
-    (source, credential) =>
-      prepareCredentialSessionUpload(source, credential, redactedSessionFile, (message) =>
-        logger.step(message),
-      ),
-    handle?.sessionFile,
-  );
-  journal.update(stepId, {
-    state: 'awaiting-upload',
-    doneBody,
-    planContent,
-    sessionFile: sessionFileForUpload ?? null,
+    running,
   });
-  try {
-    await putFinalArtifacts(client, logger, stepId, messages, planContent, sessionFileForUpload);
-  } catch (err) {
-    logger.step(`transcript upload failed: ${err instanceof Error ? err.message : String(err)}`);
-    clearCredentials(creds);
-    return;
-  }
-
-  try {
-    await client.done(stepId, doneBody);
-  } catch (err) {
-    logger.step(`done report failed: ${err instanceof Error ? err.message : String(err)}`);
-    clearCredentials(creds);
-    return;
-  }
-  clearCredentials(creds);
-  journal.remove(stepId);
-  logger.raw(`finished (${running - 1} running)`);
 }
 
 async function failStep(
