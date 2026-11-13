@@ -1265,7 +1265,6 @@ export const EN: Record<string, string> = {
   'Coordinator 的主模型暂时用不了，这次改用备用模型 {model} 回复，判断可能没那么准。':
     "The Coordinator's main model is unavailable, so backup model {model} is replying. Its judgment may be less sharp.",
   换模型: 'Change model',
-  '停止 Coordinator 这次回复': 'Stop this Coordinator reply',
   '可以继续说，Coordinator 恢复后会按顺序处理…':
     'Keep typing; the Coordinator handles messages in order once it is back…',
   '发出的话会直接插进 Coordinator 这一轮': 'Steer the current reply',
