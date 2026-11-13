@@ -56,7 +56,7 @@ import { type MachineApi, MachineApiError } from './machine-client.js';
 import { buildSecretTool } from './secret-channel.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
-import { resolveStepImagesOrRaw } from './step-attachments.js';
+import { resolveDeliveredPrompt, resolveStepImagesOrRaw } from './step-attachments.js';
 import { composeDoneBody } from './step-done-body.js';
 import { assembleStepEnv } from './step-env.js';
 import { reportStepProvenance } from './step-executor-record.js';
@@ -401,7 +401,7 @@ async function runClaimedStep(
   let promptImages: DeliveredImage[] | undefined;
   let skippedNoVisionCount = 0;
   if (!isChief && prompt !== null) {
-    const resolved = await resolveStepImagesOrRaw({
+    const resolved = await resolveDeliveredPrompt({
       text: prompt,
       stepId,
       client,
@@ -410,7 +410,7 @@ async function runClaimedStep(
       imageSupport,
     });
     deliveryPrompt = resolved.text;
-    if (resolved.images.length > 0) promptImages = [...resolved.images];
+    promptImages = resolved.images;
     skippedNoVisionCount = resolved.skippedNoVision;
   }
   if (skippedNoVisionCount > 0) {
@@ -859,7 +859,7 @@ async function runClaimedStep(
         let delivery = fresh;
         let images: DeliveredImage[] | undefined;
         if (!isChief) {
-          const resolved = await resolveStepImagesOrRaw({
+          const resolved = await resolveDeliveredPrompt({
             text: fresh,
             stepId,
             client,
@@ -868,7 +868,7 @@ async function runClaimedStep(
             imageSupport,
           });
           delivery = resolved.text;
-          if (resolved.images.length > 0) images = [...resolved.images];
+          images = resolved.images;
           if (resolved.skippedNoVision > 0) {
             transcript.upsert({
               id: `image-skip-${stepId}`,
