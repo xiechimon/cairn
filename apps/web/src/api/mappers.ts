@@ -35,14 +35,17 @@ import {
   classifyUserText,
   conversationBranch,
   DONE_ROW,
+  derivePlaceholderTitle,
   GATE_ANNOUNCEMENTS,
   GIT_CREDENTIAL_ROW_KIND,
   infoReportMessageSchema,
   liveQuickReplies,
   MODEL_SOURCE_RUNTIME_LABELS,
   orchestratePromptHeadOf,
+  PLACEHOLDER_TITLE_FALLBACK,
   PLAN_SECTIONS,
   REVIEW_VERDICT_KIND,
+  replyQuoteText,
   resolvedBuildPrNumber,
   reviewVerdictSchema,
   reworkNoteWithoutReason,
@@ -172,6 +175,15 @@ function rowProject(row: MessageRow): { projectId?: string | null } {
   return row.projectId === undefined ? {} : { projectId: row.projectId };
 }
 
+export function shownTaskTitle(title: string, ownerWords?: string): string {
+  if (replyQuoteText(title) === title) return title;
+  return (
+    derivePlaceholderTitle(ownerWords ?? '') ||
+    derivePlaceholderTitle(title) ||
+    PLACEHOLDER_TITLE_FALLBACK
+  );
+}
+
 export function threadContextOf(source: unknown): ChiefContextUsage | null {
   if (source == null || typeof source !== 'object') return null;
   const context = (source as { context?: unknown }).context;
@@ -188,7 +200,11 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     id: w.id,
     teamId: w.teamId,
     projectId: w.projectId,
-    title: w.title,
+    title: shownTaskTitle(
+      w.title,
+      w.request?.segments[0]?.context?.messages.find((message) => message.role === 'user')?.text ??
+        w.request?.segments[0]?.text,
+    ),
     spec: w.spec,
     ...(w.request !== undefined ? { request: w.request } : {}),
     phase: w.phase,
@@ -1384,7 +1400,10 @@ function createdTodoOf(call: ToolCallRecord): {
     todoId,
     projectId: typeof projectId === 'string' ? projectId : null,
     seq: typeof record?.seqNum === 'number' ? record.seqNum : null,
-    title: typeof record?.title === 'string' && record.title !== '' ? record.title : null,
+    title:
+      typeof record?.title === 'string' && record.title !== ''
+        ? shownTaskTitle(record.title)
+        : null,
   };
 }
 
@@ -1475,12 +1494,22 @@ function collectChiefStream(
       }
       const report = threadReportContentSchema.safeParse(parsed);
       if (report.success) {
-        items.push({ ...report.data, id: m.id, ...rowProject(m) });
+        items.push({
+          ...report.data,
+          title: shownTaskTitle(report.data.title),
+          id: m.id,
+          ...rowProject(m),
+        });
         continue;
       }
       const direct = threadMessageContentSchema.safeParse(parsed);
       if (direct.success) {
-        items.push({ ...direct.data, id: m.id, ...rowProject(m) });
+        items.push({
+          ...direct.data,
+          title: shownTaskTitle(direct.data.title),
+          id: m.id,
+          ...rowProject(m),
+        });
         continue;
       }
       const stopped = chiefTurnStoppedContentSchema.safeParse(parsed);
