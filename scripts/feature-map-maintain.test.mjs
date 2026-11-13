@@ -113,6 +113,58 @@ test('fileMaintainIssue dry-run creates without calling gh writes', () => {
   assert.match(filed.body, new RegExp(ISSUE_MARKER));
 });
 
+function passingRun(t, { args, openIssues }) {
+  const dir = makeTestTempDir('fm-pass-');
+  writeFileSync(join(dir, 'README.md'), '# map\n\n- [Theme](./theme.md)\n');
+  writeFileSync(join(dir, 'theme.md'), '# Theme\n');
+  const previousRunUrl = process.env.GITHUB_RUN_URL;
+  process.env.GITHUB_RUN_URL = 'https://example.test/run/7';
+  t.after(() => {
+    if (previousRunUrl === undefined) delete process.env.GITHUB_RUN_URL;
+    else process.env.GITHUB_RUN_URL = previousRunUrl;
+  });
+  const calls = [];
+  const aggregated = runMaintain(args, {
+    featuresDir: dir,
+    runFeatureMapCheck: () => ({ id: 'feature-map', ok: true, summary: 'ok', findings: [] }),
+    listOpenIssues: () => openIssues,
+    spawn(bin, argv) {
+      calls.push([bin, ...argv]);
+      return { status: 0, stdout: '', stderr: '' };
+    },
+  });
+  return { aggregated, calls };
+}
+
+test('a passing run closes the open maintain issue and leaves other issues alone', (t) => {
+  const { aggregated, calls } = passingRun(t, {
+    args: { fileIssue: true, dryRun: false, help: false },
+    openIssues: [
+      { number: 3272, title: ISSUE_TITLE },
+      { number: 3273, title: `${ISSUE_TITLE} (manual follow-up)` },
+    ],
+  });
+  assert.equal(aggregated.ok, true);
+  assert.equal(calls.length, 1);
+  const [bin, ...argv] = calls[0];
+  assert.equal(bin, 'gh');
+  assert.deepEqual(argv.slice(0, 3), ['issue', 'close', '3272']);
+  assert.equal(argv[argv.indexOf('--reason') + 1], 'completed');
+  assert.match(argv[argv.indexOf('--comment') + 1], /passed.*https:\/\/example\.test\/run\/7/s);
+});
+
+test('a passing run with no open maintain issue, a dry run, or no --file-issue writes nothing', (t) => {
+  for (const [args, openIssues] of [
+    [{ fileIssue: true, dryRun: false, help: false }, []],
+    [{ fileIssue: true, dryRun: true, help: false }, [{ number: 3272, title: ISSUE_TITLE }]],
+    [{ fileIssue: false, dryRun: false, help: false }, [{ number: 3272, title: ISSUE_TITLE }]],
+  ]) {
+    const { aggregated, calls } = passingRun(t, { args, openIssues });
+    assert.equal(aggregated.ok, true);
+    assert.deepEqual(calls, [], JSON.stringify(args));
+  }
+});
+
 test('runMaintain fails on a broken features index and can dry-file', () => {
   const dir = makeTestTempDir('fm-run-');
   writeFileSync(join(dir, 'README.md'), '# empty index\n');
