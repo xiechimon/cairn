@@ -46,7 +46,6 @@ import {
   isBuildStepKind,
   isIssueSourcedTask,
   LOCAL_TOOL_CREATE_TAG,
-  LocalRepoUnreachableError,
   localCommitIdentity,
   noVisionSignalOf,
   PLAN_FILE_NAME,
@@ -80,7 +79,6 @@ import {
   type SkillsCatalogOpts,
   withSkillDispatchDirectives,
 } from './backend/skills.js';
-import { createVerificationClone } from './backend/verification-clone.js';
 import { prepareWebTools } from './backend/web-search.js';
 import { assertNoLegacyBrief, composeBrief } from './brief-file.js';
 import {
@@ -115,6 +113,7 @@ import { assembleStepEnv } from './step-env.js';
 import { localMergeDoneBody } from './step-local-merge.js';
 import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
+import { prepareStepWorkspace, prepareVerifyClone } from './step-workspace.js';
 import {
   resolveStreamLimits,
   STREAM_DURATION_CAP_DEFAULT_MS,
@@ -126,7 +125,6 @@ import {
 import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
 import { extractVerifyVerdict } from './verify-verdict.js';
-import { localRepoUnreachableMessage } from './workspace.js';
 
 export interface RunStepDeps {
   client: MachineApi;
@@ -665,48 +663,22 @@ async function runClaimedStep(
       await failStep(deps, heartbeat, stepId, 'workspace ops unavailable for repo-bound step');
       return;
     }
-    try {
-      const workspace = deps.workspace;
-      const prepare = () =>
-        workspace.prepare({
-          projectId: claimed.project?.id ?? '',
-          conversationId: convId,
-          cloneUrl: repo.cloneUrl,
-          repoKind: repo.kind,
-          baseBranch: repo.baseBranch,
-          workspacesRoot: deps.workspacesDir,
-          credentials: creds.git,
-          localPath: repo.kind === 'github' ? (repo.localPath ?? null) : null,
-          machineCredentialFallback: repo.kind === 'github',
-          ...(readonlyWorkspace ? { readonly: true } : {}),
-        });
-      const prepared: { workspace: PreparedWorkspace | null } = { workspace: null };
-      await withGitCredentialFallback(
-        async () => {
-          prepared.workspace = await prepare();
-        },
-        creds.git,
-        {
-          what: 'prepare',
-          allowMachineFallback: false,
-          refresh: refreshGit,
-        },
-      );
-      ws = prepared.workspace;
-    } catch (err) {
+    const prepared = await prepareStepWorkspace({
+      workspace: deps.workspace,
+      claimed,
+      repo,
+      workspacesRoot: deps.workspacesDir,
+      credentials: creds.git,
+      readonly: readonlyWorkspace,
+      refresh: refreshGit,
+      machineName: deps.machineName ?? hostname(),
+    });
+    if ('error' in prepared) {
       clearCredentials(creds);
-      await failStep(
-        deps,
-        heartbeat,
-        stepId,
-        err instanceof LocalRepoUnreachableError
-          ? localRepoUnreachableMessage(deps.machineName ?? hostname(), err)
-          : err instanceof Error
-            ? err.message
-            : String(err),
-      );
+      await failStep(deps, heartbeat, stepId, prepared.error);
       return;
     }
+    ws = prepared.ws;
   }
   let cwd = ws?.cwd ?? join(deps.workspacesDir, convId);
   if (!ws) mkdirSync(cwd, { recursive: true });
@@ -723,35 +695,21 @@ async function runClaimedStep(
 
   const uploadedVerifyEvidence = new Set<string>();
   if (attachmentVerify) {
-    if (
-      verifyEvidenceDirectory === undefined ||
-      !/^\.cairn-verify\/[a-zA-Z0-9_-]+\/$/.test(verifyEvidenceDirectory)
-    ) {
-      await failStep(deps, heartbeat, stepId, 'Verify evidence directory unavailable or invalid');
+    const verifyClone = await prepareVerifyClone({
+      workspace: deps.workspace,
+      ws,
+      headAtStart,
+      evidenceDirectory: verifyEvidenceDirectory,
+      expectedHeadSha: verifyMeta?.expectedHeadSha,
+      cleanups: stepCleanups,
+    });
+    if ('error' in verifyClone) {
+      await failStep(deps, heartbeat, stepId, verifyClone.error);
       return;
     }
-    if (ws === null || ws.readonly === true || !deps.workspace || headAtStart === null) {
-      await failStep(deps, heartbeat, stepId, 'Verify delivery commit unavailable');
-      return;
-    }
-    try {
-      const clone = await createVerificationClone(
-        ws.cwd,
-        verifyMeta?.expectedHeadSha ?? headAtStart,
-      );
-      stepCleanups.push(clone.cleanup);
-      cwd = clone.cwd;
-      ws = { ...ws, cwd, reused: false };
-      headAtStart = await deps.workspace.headCommit(cwd);
-    } catch (error) {
-      await failStep(
-        deps,
-        heartbeat,
-        stepId,
-        error instanceof Error ? error.message : String(error),
-      );
-      return;
-    }
+    ws = verifyClone.ws;
+    cwd = verifyClone.cwd;
+    headAtStart = verifyClone.headAtStart;
   }
 
   const systemPrompt =
