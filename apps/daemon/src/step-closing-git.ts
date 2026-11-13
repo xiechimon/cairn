@@ -124,3 +124,42 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
   }
   return outcome;
 }
+
+export interface PreservedBuild {
+  headCommit: string | null;
+  commits: string[];
+}
+
+export async function preserveFailedBuild(input: {
+  git: WorktreeOps;
+  ws: PreparedWorkspace;
+  claimed: ClaimedStep;
+  push: () => Promise<GitCredentialSource>;
+  log: (message: string) => void;
+  logRaw: (message: string) => void;
+}): Promise<PreservedBuild | null> {
+  const { git, ws, claimed } = input;
+  try {
+    const currentBranch = await git.currentBranch?.(ws.cwd);
+    const pushAllowed =
+      claimed.agent?.tools === undefined || claimed.agent.tools.includes(AGENT_TOOL_PUSH);
+    if (
+      currentBranch !== ws.branch ||
+      !pushAllowed ||
+      (await git.countAhead(ws.cwd, ws.defaultBranch)) <= 0
+    )
+      return null;
+    await input.push();
+    const headCommit = await git.headCommit(ws.cwd);
+    const commits =
+      (await git.commitsAhead?.(ws.cwd, ws.defaultBranch)) ??
+      (headCommit === null ? [] : [headCommit]);
+    input.logRaw(`pushed ${ws.branch}`);
+    return { headCommit, commits };
+  } catch (err) {
+    input.log(
+      `failed build preservation failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return null;
+  }
+}
