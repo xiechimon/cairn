@@ -1,7 +1,6 @@
-import { createHash } from 'node:crypto';
 import { mkdirSync, rmSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -37,11 +36,9 @@ import {
   transcriptPromptRowId,
 } from '@cairn/shared';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
-import { z } from 'zod';
 import { createActivityTracker } from './activity.js';
 import { AgentTodoReporter } from './agent-todo.js';
 import { AskChannel } from './ask-channel.js';
-import { prepareFileAttachment } from './attach-file.js';
 import { SessionNotResumableError } from './backend/errors.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
@@ -83,6 +80,7 @@ import {
   resumeMissNote,
   taskMetaOpts,
 } from './step-prompt.js';
+import { stepRemoteToolExecutor } from './step-remote-tools.js';
 import {
   prepareSkillLoadTool,
   sessionInjectedSkills,
@@ -628,33 +626,17 @@ async function runClaimedStep(
     ...(remoteTools && remoteTools.length > 0
       ? {
           remoteTools,
-          executeRemoteTool: (name, params) => {
-            if (name === 'ask_user' && askChannel.available) return askChannel.ask(params);
-            if (name === 'attach_file' && !isChief) {
-              const prepared = prepareFileAttachment(
-                cwd,
-                params,
-                attachmentVerify ? verifyEvidenceDirectory : undefined,
-              );
-              const upload = client.relayTool(stepId, name, prepared);
-              if (!attachmentVerify) return upload;
-              const path = resolve(cwd, String(params.path));
-              const sha256 = createHash('sha256')
-                .update(Buffer.from(String(prepared.contentBase64), 'base64'))
-                .digest('hex');
-              return upload.then((result) => {
-                z.object({ id: z.string().min(1), sha256: z.literal(sha256) }).parse(
-                  JSON.parse(result),
-                );
-                uploadedVerifyEvidence.add(path);
-                return result;
-              });
-            }
-            const def = remoteTools.find((t) => t.name === name);
-            return client.relayTool(stepId, name, params, {
-              ...(def?.replaySafe ? { replaySafe: true } : {}),
-            });
-          },
+          executeRemoteTool: stepRemoteToolExecutor({
+            client,
+            stepId,
+            cwd,
+            remoteTools,
+            askChannel,
+            attachFiles: !isChief,
+            verifyEvidence: attachmentVerify
+              ? { directory: verifyEvidenceDirectory, uploaded: uploadedVerifyEvidence }
+              : null,
+          }),
         }
       : {}),
     ...(claimedMcp !== undefined ? { mcpServers: mcpEndpoints } : {}),
