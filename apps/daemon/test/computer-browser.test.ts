@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  agentCursorScript,
   browserSessionName,
   LOGIN_DETECTION_SCRIPT,
   runBrowserTool,
@@ -73,7 +74,7 @@ describe('runBrowserTool', () => {
       { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
     );
     expect(log[0]).toContain('snapshot -i');
-    expect(log[1]).toContain('click @e1');
+    expect(log.at(-1)).toContain('click @e1');
   });
 
   test('fill and type pass text without a literal -- separator', async () => {
@@ -221,12 +222,12 @@ describe('runBrowserTool', () => {
         ],
       },
       {
-        deadlineAt: 3_000,
+        deadlineAt: 5_000,
         now: () => clock,
         signal: new AbortController().signal,
       },
     );
-    expect(timeouts).toEqual([2_000, 1_600, 1_200, 800]);
+    expect(timeouts).toEqual([4_000, 3_600, 3_200, 2_800, 2_400, 2_000, 1_600, 1_200]);
   });
 
   test('aborts later batch actions once the shared deadline elapses', async () => {
@@ -265,7 +266,7 @@ describe('runBrowserTool', () => {
           ],
         },
         {
-          deadlineAt: 2_500,
+          deadlineAt: 4_000,
           now: () => clock,
           signal: new AbortController().signal,
         },
@@ -274,7 +275,7 @@ describe('runBrowserTool', () => {
       message: 'browser call deadline elapsed',
       delivery: 'unknown',
     } satisfies Partial<ComputerRefusal>);
-    expect(starts).toBe(3);
+    expect(starts).toBe(5);
   });
 });
 
@@ -506,5 +507,95 @@ describe('login form snapshot values', () => {
       { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
     );
     expect(text).not.toContain('13800000000');
+  });
+});
+
+function cursorProvider(
+  log: string[],
+  options: { box?: { text: string; code: number }; evalCode?: number } = {},
+): ComputerProvider {
+  return {
+    async execute(request) {
+      const line = request.argv.join(' ');
+      log.push(line);
+      return (async function* () {
+        if (line.includes(' get box ')) {
+          const box = options.box ?? {
+            text: JSON.stringify({
+              success: true,
+              data: { x: 100, y: 200, width: 40, height: 20 },
+            }),
+            code: 0,
+          };
+          yield { kind: 'stdout' as const, text: box.text };
+          yield { kind: 'exit' as const, code: box.code };
+          return;
+        }
+        if (line.includes(' eval ')) {
+          yield { kind: 'stdout' as const, text: '{"success":true,"data":{"result":true}}' };
+          yield { kind: 'exit' as const, code: options.evalCode ?? 0 };
+          return;
+        }
+        yield {
+          kind: 'stdout' as const,
+          text: request.argv.includes('snapshot') ? '- button "Go" [ref=e1]\n' : 'ok\n',
+        };
+        yield { kind: 'exit' as const, code: 0 };
+      })();
+    },
+    async listFiles() {
+      return [];
+    },
+    async readFile() {
+      return '';
+    },
+    async writeFile() {},
+    async killAll() {},
+  };
+}
+
+describe('agent cursor on the live screen', () => {
+  const click = (provider: ComputerProvider) =>
+    runBrowserTool(
+      provider,
+      'browser_act',
+      { actions: [{ kind: 'click', ref: 'e1' }] },
+      { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
+    );
+
+  test('a click first moves the Coordinator cursor to the centre of its target', async () => {
+    const log: string[] = [];
+    await click(cursorProvider(log));
+    const scroll = log.findIndex((line) => line.endsWith(' scrollintoview @e1'));
+    const box = log.findIndex((line) => line.endsWith('--json get box @e1'));
+    expect(scroll).toBeGreaterThan(-1);
+    expect(box).toBeGreaterThan(scroll);
+    const draw = log.findIndex(
+      (line) => line.includes('--json eval') && line.includes('__cairnAgentCursor'),
+    );
+    const act = log.findIndex((line) => line.endsWith(' click @e1'));
+    expect(box).toBeGreaterThan(-1);
+    expect(draw).toBeGreaterThan(box);
+    expect(act).toBeGreaterThan(draw);
+    expect(log[draw]).toBe(
+      `agent-browser --session s --restore --headed --json eval ${agentCursorScript(120, 210, 'click')}`,
+    );
+  });
+
+  test('the cursor never blocks the action when the box or the drawing fails', async () => {
+    const noBox: string[] = [];
+    await click(cursorProvider(noBox, { box: { text: 'not found', code: 1 } }));
+    expect(noBox.some((line) => line.includes('__cairnAgentCursor'))).toBe(false);
+    expect(noBox.at(-1)).toContain('click @e1');
+    const noDraw: string[] = [];
+    await click(cursorProvider(noDraw, { evalCode: 1 }));
+    expect(noDraw.at(-1)).toContain('click @e1');
+  });
+
+  test('the cursor is hidden from the accessibility tree and never takes a click', () => {
+    const script = agentCursorScript(1, 2, 'click');
+    expect(script).toContain("'aria-hidden', 'true'");
+    expect(script).toContain('pointer-events:none');
+    expect(() => agentCursorScript(Number.NaN, 2, 'click')).toThrow();
   });
 });
