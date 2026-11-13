@@ -125,7 +125,7 @@ export function browserSessionName(scopeKey: string | undefined): string {
 }
 
 function sessionFlag(session: string): string[] {
-  return ['--session', session];
+  return ['--session', session, '--restore'];
 }
 
 function headedFlags(): string[] {
