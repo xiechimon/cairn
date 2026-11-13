@@ -39,6 +39,7 @@ import {
   taskRowCopy,
 } from './tasks-sections.js';
 import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
+import { usePrefetchThread } from './thread-link.js';
 import { canMarkDone, useMarkDone } from './use-mark-done.js';
 
 export type TasksTab = 'active' | 'next' | 'scheduled' | 'resolved';
@@ -133,6 +134,7 @@ function PanelTaskRow({
 }) {
   const { t } = useI18n();
   const { markDone, dialogs } = useMarkDone(entry.todo);
+  const prefetch = usePrefetchThread();
   const copy: TaskRowCopy = taskRowCopy(entry, pr);
   const open = () => onOpenThread(entry.todo.id);
   const unfinishable = canMarkDone(entry.todo) ? null : unfinishableLead(entry.todo);
@@ -157,6 +159,7 @@ function PanelTaskRow({
         }
         menu={<TaskRowMenu todo={entry.todo} onOpen={open} onMarkDone={markDone} />}
         onOpen={open}
+        onIntent={() => prefetch(entry.todo.id)}
       />
       {dialogs}
     </>
