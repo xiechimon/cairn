@@ -308,7 +308,11 @@ export function toChiefThreadRecord(
 
 export const COORDINATOR_THREAD_TITLE = 'Coordinator';
 
-function existingCoordinatorThread(deps: ChiefDeps, chiefRow: ChiefRow): ThreadRow | undefined {
+function existingCoordinatorThread(
+  deps: ChiefDeps,
+  chiefRow: ChiefRow,
+  projectId: string | null = null,
+): ThreadRow | undefined {
   return deps.db
     .select()
     .from(chiefThread)
@@ -317,24 +321,27 @@ function existingCoordinatorThread(deps: ChiefDeps, chiefRow: ChiefRow): ThreadR
         eq(chiefThread.chiefId, chiefRow.id),
         ne(chiefThread.id, chiefDigestThreadId(chiefRow.id)),
         isNull(chiefThread.archivedAt),
+        projectId === null ? isNull(chiefThread.projectId) : eq(chiefThread.projectId, projectId),
       ),
     )
     .get();
 }
 
-export function coordinatorThreadRow(deps: ChiefDeps, chiefRow: ChiefRow): ThreadRow {
-  const existing = existingCoordinatorThread(deps, chiefRow);
-  if (existing) return existing;
+function insertCoordinatorThread(
+  deps: ChiefDeps,
+  chiefRow: ChiefRow,
+  scope: { id: string; name: string } | null,
+): { row: ThreadRow; created: boolean } {
   const now = nowMs();
-  deps.db
+  const inserted = deps.db
     .insert(chiefThread)
     .values({
       id: newChiefThreadId(newUuidv7()),
       chiefId: chiefRow.id,
       userId: chiefRow.userId,
       teamId: chiefRow.teamId,
-      projectId: null,
-      title: COORDINATOR_THREAD_TITLE,
+      projectId: scope?.id ?? null,
+      title: scope?.name ?? COORDINATOR_THREAD_TITLE,
       createdAt: now,
       updatedAt: now,
       lastTurnAt: null,
@@ -348,9 +355,62 @@ export function coordinatorThreadRow(deps: ChiefDeps, chiefRow: ChiefRow): Threa
     })
     .onConflictDoNothing()
     .run();
-  const row = existingCoordinatorThread(deps, chiefRow);
+  const row = existingCoordinatorThread(deps, chiefRow, scope?.id ?? null);
   if (!row) throw new Error('coordinator thread missing after insert');
-  return row;
+  return { row, created: inserted.changes > 0 };
+}
+
+export function coordinatorThreadRow(deps: ChiefDeps, chiefRow: ChiefRow): ThreadRow {
+  return (
+    existingCoordinatorThread(deps, chiefRow) ?? insertCoordinatorThread(deps, chiefRow, null).row
+  );
+}
+
+const CHANNEL_GREETING_OPEN = '【新频道】';
+
+function channelGreetingPrompt(ownerName: string, projectName: string): string {
+  return `${CHANNEL_GREETING_OPEN}用户刚打开项目「${projectName}」的新频道，还没有说话。用 1 到 3 句话、以「${ownerName}」称呼用户打招呼；系统提示「等人处理」里有属于这个项目的任务就提一句，没有就不提；最后问用户想在这个项目里做什么。不要建任务。`;
+}
+
+export function openProjectChannel(
+  deps: ChiefDeps,
+  teamId: string,
+  projectId: string,
+): { thread: ChiefThread; created: boolean } {
+  const picked = pickedProjectOf(deps.db, teamId, projectId);
+  if (picked === null) throw new HttpError(404, `project ${projectId}`);
+  requireUnarchivedProject(deps.db, picked.id);
+  const chiefRow = ensureChief(deps, teamId);
+  const existing = existingCoordinatorThread(deps, chiefRow, picked.id);
+  const { row, created } =
+    existing !== undefined
+      ? { row: existing, created: false }
+      : insertCoordinatorThread(deps, chiefRow, picked);
+  if (created && coordinatorProfile(deps.db, teamId)?.modelId) {
+    enqueueChiefStep(deps, row.id, {
+      prompt: promptWithPickedProject(
+        picked,
+        channelGreetingPrompt(deps.user.displayName, promptProjectName(picked.name)),
+      ),
+      trigger: 'user',
+      ownerMessageIds: [],
+    });
+  }
+  const thread = getChiefThread(deps, row.id) ?? row;
+  return { thread: chiefThreadView(deps, teamId, thread), created };
+}
+
+function dropUnstartedGreeting(db: Db, threadId: string): void {
+  db.delete(step)
+    .where(
+      and(
+        eq(step.buildId, threadId),
+        eq(step.kind, 'chief'),
+        eq(step.status, 'pending'),
+        like(step.prompt, `${PICKED_PROJECT_OPEN}%${CHANNEL_GREETING_OPEN}%`),
+      ),
+    )
+    .run();
 }
 
 export function chiefThreadView(deps: ChiefDeps, teamId: string, r: ThreadRow): ChiefThread {
@@ -424,8 +484,20 @@ function orchestrationOf(
 }
 
 export function listChiefThreads(deps: ChiefDeps, teamId: string): ChiefThread[] {
-  const row = existingCoordinatorThread(deps, ensureChief(deps, teamId));
-  return row === undefined ? [] : [chiefThreadView(deps, teamId, row)];
+  const chiefRow = ensureChief(deps, teamId);
+  return deps.db
+    .select()
+    .from(chiefThread)
+    .where(
+      and(
+        eq(chiefThread.chiefId, chiefRow.id),
+        ne(chiefThread.id, chiefDigestThreadId(chiefRow.id)),
+        isNull(chiefThread.archivedAt),
+      ),
+    )
+    .orderBy(sql`${chiefThread.projectId} is not null`, asc(chiefThread.createdAt))
+    .all()
+    .map((row) => chiefThreadView(deps, teamId, row));
 }
 
 export function getChiefThread(deps: { db: Db }, threadId: string): ThreadRow | undefined {
@@ -482,10 +554,14 @@ function pickedProjectOf(
   );
 }
 
+function promptProjectName(name: string): string {
+  return name.replace(/[【】\r\n]+/g, ' ').trim();
+}
+
 function promptWithPickedProject(picked: { id: string; name: string } | null, content: string) {
   return picked === null
     ? content
-    : `${PICKED_PROJECT_OPEN}${picked.name.replace(/[【】\r\n]+/g, ' ').trim()}（id: ${picked.id}）】\n${content}`;
+    : `${PICKED_PROJECT_OPEN}${promptProjectName(picked.name)}（id: ${picked.id}）】\n${content}`;
 }
 
 export function requireUnarchivedProject(db: Db, projectId: string): void {
@@ -635,11 +711,6 @@ export function submitChiefMessage(
   const replay = replayedChiefSend(deps, teamId, chiefRow, body);
   if (replay !== undefined) return { result: replay, replayed: true };
   requireCoordinatorRule(deps, teamId);
-  const picked = pickedProjectOf(deps.db, teamId, body.projectId);
-  if (body.projectId != null && picked === null) {
-    throw new HttpError(400, `project ${body.projectId} not in team`);
-  }
-  if (picked !== null) requireUnarchivedProject(deps.db, picked.id);
 
   let threadRow: ThreadRow;
   if (body.threadId !== null) {
@@ -652,6 +723,19 @@ export function submitChiefMessage(
   } else {
     threadRow = coordinatorThreadRow(deps, chiefRow);
   }
+  if (
+    threadRow.projectId !== null &&
+    body.projectId != null &&
+    body.projectId !== threadRow.projectId
+  ) {
+    throw new HttpError(400, `chief thread ${threadRow.id} belongs to another project`);
+  }
+  const projectId = threadRow.projectId ?? body.projectId;
+  const picked = pickedProjectOf(deps.db, teamId, projectId);
+  if (projectId != null && picked === null) {
+    throw new HttpError(400, `project ${projectId} not in team`);
+  }
+  if (picked !== null) requireUnarchivedProject(deps.db, picked.id);
   const now = nowMs();
   const directNote = directThreadMessagesSinceLastTurn(deps.db, threadRow.id);
 
@@ -665,6 +749,7 @@ export function submitChiefMessage(
   try {
     deps.db.transaction(() => {
       claimClientMessage(deps.db, threadRow.id, body.clientMessageId);
+      dropUnstartedGreeting(deps.db, threadRow.id);
       deps.db
         .insert(chiefMessage)
         .values({
@@ -847,7 +932,7 @@ export function enqueueChiefStep(
       machineId: null,
       status: 'pending',
       prompt,
-      scopeProjectId: opts.scopeProjectId ?? null,
+      scopeProjectId: threadRow.projectId ?? opts.scopeProjectId ?? null,
       ownerMessageIds: opts.ownerMessageIds,
       createdAt: nowMs(),
       ...(opts.trigger !== 'user' && opts.provenance.startsWith('mail:')
@@ -1021,25 +1106,38 @@ function insertThreadReport(
   options: { wakeStepId?: string; line?: string } = {},
 ): void {
   const line = options.line ?? reportLineOf(deps, todoRecord);
-  const content = {
+  const mirror = {
     kind: 'thread-report',
     todoId: todoRecord.id,
     phase,
     seqNum: todoRecord.seqNum,
     title: todoRecord.title,
-    ...(options.wakeStepId !== undefined ? { wakeStepId: options.wakeStepId } : {}),
     ...(line !== null ? { line } : {}),
   } satisfies ThreadReportContent;
-  const report = {
+  const content = {
+    ...mirror,
+    ...(options.wakeStepId !== undefined ? { wakeStepId: options.wakeStepId } : {}),
+  } satisfies ThreadReportContent;
+  const reportIn = (target: string, body: ThreadReportContent) => ({
     id: newRecordId(),
-    threadId,
+    threadId: target,
     role: 'system' as const,
-    content: JSON.stringify(content),
+    content: JSON.stringify(body),
     projectId: todoRecord.projectId,
     createdAt: nowMs(),
-  };
-  upsertChiefMessage(deps.db, report);
-  deps.convHub?.publishMessage(threadId, report);
+  });
+  const watching = getChiefThread(deps, threadId);
+  const reports = [reportIn(threadId, content)];
+  if (watching?.projectId != null) {
+    const chiefRow = deps.db.select().from(chief).where(eq(chief.id, watching.chiefId)).get();
+    if (chiefRow !== undefined) {
+      reports.push(reportIn(coordinatorThreadRow(deps, chiefRow).id, mirror));
+    }
+  }
+  deps.db.transaction(() => {
+    for (const report of reports) upsertChiefMessage(deps.db, report);
+  });
+  for (const report of reports) deps.convHub?.publishMessage(report.threadId, report);
 }
 
 function isWatched(chiefs: ChiefRow[], todoId: string): boolean {
@@ -1533,9 +1631,24 @@ export function buildChiefSystemPrompt(
   ];
   const digestSectionLines: string[] =
     digestLines.length > 0 ? ['## 之前对话的摘要（原文仍在对话里）', ...digestLines] : [];
+  const channelProject =
+    threadId === undefined
+      ? undefined
+      : projects.find((p) => p.id === getChiefThread(deps, threadId)?.projectId);
+  const channelLines: string[] =
+    channelProject === undefined
+      ? []
+      : [
+          '## 频道',
+          `- 这是项目「${promptProjectName(channelProject.name)}」（id: ${channelProject.id}）的频道，只有这个项目的对话；主频道和其他项目频道的对话不在这里。`,
+          '- 本频道新建的任务都放这个项目。项目说明和项目记忆附在每回合的消息后面。',
+          '- 用户说的规则或偏好如果对所有项目都适用，存进团队 scope 的记忆，不存进项目 scope。',
+          '',
+        ];
   const sections = [
     { name: 'static', lines: staticLines },
     { name: 'team', lines: teamLines },
+    { name: 'channel', lines: channelLines },
     { name: 'digests', lines: digestSectionLines },
   ].map(({ name, lines }) => {
     const text = lines.join('\n');

@@ -1100,6 +1100,13 @@
       "when": 1794543569020,
       "tag": "0160_computer_handoff",
       "breakpoints": true
+    },
+    {
+      "idx": 161,
+      "version": "6",
+      "when": 1794548600115,
+      "tag": "0161_coordinator_project_channels",
+      "breakpoints": true
     }
   ]
 }
