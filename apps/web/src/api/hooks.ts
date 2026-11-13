@@ -378,13 +378,18 @@ export const useMachines = (teamId: string | undefined, enabled: boolean) =>
     enabled: enabled && teamId !== undefined,
   });
 
-export function useComputers(teamId: string | undefined, enabled: boolean) {
+export function useComputers(
+  teamId: string | undefined,
+  enabled: boolean,
+  refetchIntervalMs?: number,
+) {
   const auth = useAuth();
   return useQuery({
     queryKey: computerQueryKeys(teamId, auth.generation).computers,
     queryFn: async () =>
       (await api.get<{ computers: ComputerRecord[] }>('/api/computers')).computers,
     enabled: enabled && teamId !== undefined && !auth.gateOpen,
+    ...(refetchIntervalMs !== undefined ? { refetchInterval: refetchIntervalMs } : {}),
   });
 }
 

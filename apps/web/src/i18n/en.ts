@@ -160,6 +160,7 @@ export const EN: Record<string, string> = {
   在大屏里点击和键入: 'Click and type in the enlarged screen',
   接管后才能点击和键入: 'Take control to click and type',
   接管: 'Take control',
+  需要你登录: 'Login needed',
   交还: 'Give back',
   '只看，不能点': 'Watching only',
   '你在操作，Coordinator 已暂停': 'You are in control; the Coordinator is paused',

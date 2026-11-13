@@ -27,6 +27,7 @@ const computer = (patch: Record<string, unknown> = {}) => ({
   state: 'running',
   controlHolder: 'none',
   browserEnabled: false,
+  handoffReason: null,
   machine: { id: 'm1', name: 'omarchy', online: true },
   ...patch,
 });
@@ -40,7 +41,13 @@ interface Feed {
 
 const FEED_MACHINE = { id: 'm1', name: 'omarchy', online: true, kind: 'remote', runningSteps: 0 };
 
-async function open(page: Page, feed: Feed, machines: unknown[] = [FEED_MACHINE], detail = true) {
+async function open(
+  page: Page,
+  feed: Feed,
+  machines: unknown[] = [FEED_MACHINE],
+  detail = true,
+  url = '/app?pane=machines',
+) {
   await mockLive(page, { threads: [], messages: HISTORY, machines }, (path, route, json) => {
     if (path === '/api/computers' && route.request().method() === 'GET') {
       return json({ computers: feed.computers });
@@ -68,7 +75,7 @@ async function open(page: Page, feed: Feed, machines: unknown[] = [FEED_MACHINE]
     }
     return undefined;
   });
-  await page.goto('/app?pane=machines');
+  await page.goto(url);
   const panel = page.getByRole('complementary', { name: '电脑' });
   if (detail && machines.length > 0) {
     await panel.locator('[data-slot="list-card"]').first().getByRole('button').click();
@@ -700,3 +707,43 @@ for (const theme of ['light', 'dark'] as const) {
     }
   }
 }
+
+test('a pending login handoff asks the owner to log in next to the screen', async ({ page }) => {
+  const feed: Feed = {
+    computers: [computer({ handoffReason: 'login' })],
+    commands: [command(1)],
+    controlCalls: [],
+  };
+  const panel = await open(page, feed, [
+    { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 },
+  ]);
+  const bar = panel.getByTestId('computer-control-bar');
+  await expect(bar).toHaveAttribute('data-handoff', 'login');
+  await expect(bar).toContainText('需要你登录');
+  await expect(bar.getByRole('button', { name: '接管' })).toBeVisible();
+  expect(feed.controlCalls).toEqual([]);
+});
+
+test('the push link opens the machine with its screen enlarged and view-only', async ({
+  page,
+}) => {
+  const feed: Feed = {
+    computers: [computer({ handoffReason: 'login' })],
+    commands: [command(1)],
+    controlCalls: [],
+  };
+  await open(
+    page,
+    feed,
+    [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
+    false,
+    '/app?pane=machines&machine=m1&screen=1',
+  );
+  const enlarged = page.getByTestId('machine-screen-enlarged');
+  await expect(enlarged).toBeVisible();
+  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
+    'data-interactive',
+    'false',
+  );
+  expect(feed.controlCalls).toEqual([]);
+});

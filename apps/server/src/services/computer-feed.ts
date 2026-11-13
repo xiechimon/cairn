@@ -43,6 +43,7 @@ export function listComputers(db: Db, teamId: string, userId: string): ComputerR
       state: row.state,
       controlHolder: row.controlHolder,
       browserEnabled: compatibilityBrowserEnabled(host),
+      handoffReason: row.handoffReason ?? null,
       machine: { id: row.machineId, name: machineName, online: machineOnline },
     }));
 }

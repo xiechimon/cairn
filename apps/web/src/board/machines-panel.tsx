@@ -167,11 +167,13 @@ export function MachineChip({
 function ComputerControlBar({
   held,
   busy,
+  handoff,
   compact = false,
   onTakeOver,
   onGiveBack,
 }: {
   compact?: boolean;
+  handoff: ComputerRecord['handoffReason'];
   held: boolean;
   busy: boolean;
   onTakeOver: () => void;
@@ -182,14 +184,24 @@ function ComputerControlBar({
     <div
       data-testid="computer-control-bar"
       data-held={held ? 'true' : 'false'}
+      data-handoff={handoff ?? 'none'}
       className={cn(
         'flex items-center gap-3',
         compact ? 'flex-none' : 'justify-between px-2.5 py-2',
       )}
     >
       {!compact && (
-        <span className="text-meta text-content-tertiary">
-          {held ? t('你在操作，Coordinator 已暂停') : t('只看，不能点')}
+        <span
+          className={cn(
+            'text-meta',
+            !held && handoff !== null ? 'text-foreground' : 'text-content-tertiary',
+          )}
+        >
+          {held
+            ? t('你在操作，Coordinator 已暂停')
+            : handoff !== null
+              ? t('需要你登录')
+              : t('只看，不能点')}
         </span>
       )}
       <Button
@@ -210,16 +222,21 @@ function MachineDetail({
   coordinator,
   computer,
   teamId,
+  openScreen,
 }: {
   machine: MachineRow;
   coordinator: boolean;
   computer: ComputerRecord | null;
   teamId: string | undefined;
+  openScreen: boolean;
 }) {
   const { t } = useI18n();
   const online = machine.online === true;
   const [expanded, setExpanded] = useState(false);
-  const [tab, setTab] = useState<DetailTab>('access');
+  const [screenRequested, setScreenRequested] = useState(openScreen);
+  const [tab, setTab] = useState<DetailTab>(
+    openScreen || computer?.handoffReason ? 'work' : 'access',
+  );
   const control = useComputerControl({ teamId, computer });
   const { leaseId } = control;
   const screenLive =
@@ -228,6 +245,12 @@ function MachineDetail({
   useEffect(() => {
     if (!screenLive) setExpanded(false);
   }, [screenLive]);
+
+  useEffect(() => {
+    if (!screenRequested || !screenLive) return;
+    setExpanded(true);
+    setScreenRequested(false);
+  }, [screenRequested, screenLive]);
 
   const openEnlarged = () => {
     if (screenLive) setExpanded(true);
@@ -242,6 +265,7 @@ function MachineDetail({
     <ComputerControlBar
       held={control.controlHeld}
       busy={control.busy}
+      handoff={computer?.handoffReason ?? null}
       onTakeOver={takeOver}
       onGiveBack={() => control.setHeld(false)}
     />
@@ -287,6 +311,7 @@ function MachineDetail({
             compact
             held={control.controlHeld}
             busy={control.busy}
+            handoff={computer.handoffReason}
             onTakeOver={() => control.setHeld(true)}
             onGiveBack={() => control.setHeld(false)}
           />
@@ -399,6 +424,8 @@ function MachineDetail({
 
 type DetailTab = 'work' | 'access';
 
+const COMPUTERS_PANEL_REFRESH_MS = 5_000;
+
 function RunningHere({ machine }: { machine: MachineRow }) {
   const { t } = useI18n();
   const openThread = useOpenThread();
@@ -508,7 +535,9 @@ export function MachinesPanel({
   const { live, teamId } = useLiveData();
   const auth = useAuth();
   const { search } = useLocation();
-  const computersQ = useComputers(teamId, live && !auth.gateOpen);
+  const computersQ = useComputers(teamId, live && !auth.gateOpen, COMPUTERS_PANEL_REFRESH_MS);
+  const params = new URLSearchParams(search);
+  const linkedMachine = params.get('machine');
   const computers = computersQ.data ?? [];
   const host = coordinatorMachine(machines);
   const ordered = host === null ? machines : [host, ...machines.filter((m) => m !== host)];
@@ -516,7 +545,7 @@ export function MachinesPanel({
   const computerFor = (machine: MachineRow): ComputerRecord | null =>
     computers.find((computer) => computer.machine.id === machine.id) ?? null;
   const [openKey, setOpenKey] = useState<string | null>(() =>
-    live ? null : (resolveScenario(new URLSearchParams(search)).machinesOpen ?? null),
+    live ? linkedMachine : (resolveScenario(params).machinesOpen ?? null),
   );
   const [checkedAt, setCheckedAt] = useState(() => Date.now());
   const [checking, setChecking] = useState(false);
@@ -579,6 +608,7 @@ export function MachinesPanel({
             coordinator={selected === host}
             computer={computerFor(selected)}
             teamId={teamId}
+            openScreen={params.get('screen') === '1' && keyOf(selected) === linkedMachine}
           />
           <div className="mt-7">
             <LineRow

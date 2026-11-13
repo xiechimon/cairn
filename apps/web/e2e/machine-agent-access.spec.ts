@@ -7,6 +7,7 @@ const computer = (patch: Record<string, unknown> = {}) => ({
   state: 'running',
   controlHolder: 'none',
   browserEnabled: false,
+  handoffReason: null,
   machine: { id: 'm1', name: 'omarchy', online: true },
   ...patch,
 });
