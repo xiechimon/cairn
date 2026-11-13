@@ -10,7 +10,10 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { BUILD_ABANDONED_STEP_MS, sweepAbandonedBuildSteps } from '../src/services/builds.js';
+import {
+  BUILD_ABANDONED_STEP_MS,
+  sweepAbandonedBuildSteps,
+} from '../src/services/build-abandoned-sweep.js';
 import { sweepAbandonedChiefSteps } from '../src/services/chief.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import { toTodoRecord } from '../src/services/todos.js';

@@ -17,7 +17,8 @@ import {
   todo,
 } from '../src/db/schema.js';
 import { systemGitOps } from '../src/lib/git.js';
-import { requestMerge, sweepAbandonedBuildSteps } from '../src/services/builds.js';
+import { sweepAbandonedBuildSteps } from '../src/services/build-abandoned-sweep.js';
+import { requestMerge } from '../src/services/builds.js';
 import { applyLocalMergeReport, enqueueLocalMerge } from '../src/services/local-merge.js';
 import { localGateFacts } from '../src/services/local-merge-facts.js';
 import { claimStep } from '../src/services/machine-claim.js';

@@ -10,11 +10,8 @@ import {
   stopPending as stopPendingTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import {
-  cancelBuild,
-  sweepAbandonedBuildSteps,
-  sweepZombieQueuedTodos,
-} from '../src/services/builds.js';
+import { sweepAbandonedBuildSteps } from '../src/services/build-abandoned-sweep.js';
+import { cancelBuild, sweepZombieQueuedTodos } from '../src/services/builds.js';
 import { claimStep } from '../src/services/machines.js';
 import { H, ownerTodo, registerChiefHarness, relay } from './chief-harness.js';
 import { bootServer, pinSessionRoute, seedSessionRoute, type TestServer } from './helpers.js';
