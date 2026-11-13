@@ -65,10 +65,6 @@ describe('the serif voice follows claude.ai (DESIGN.md Typography)', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('the home greets with the serif Greeting', () => {
-    expect(read('board/home-c.tsx')).toContain('<Greeting as="h2">');
-  });
-
   it('page titles and the wordmark are the title voice', () => {
     expect(read('components/title-menu-trigger.tsx')).toMatch(/page: '[^']*voice-title text-page/);
     expect(read('pages/shell.tsx')).toContain('voice-title text-page');

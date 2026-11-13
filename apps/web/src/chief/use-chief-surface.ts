@@ -21,6 +21,7 @@ import {
   useConversationMessages,
   useMachines,
   useNotifications,
+  useProjects,
 } from '../api/hooks.js';
 import { liveTextStore } from '../api/live-text.js';
 import { liveThinkingStore } from '../api/live-thinking.js';
@@ -67,6 +68,7 @@ export interface ChiefSurface {
   chiefData: ChiefContent;
   chiefUnread: number;
   chiefBusy: boolean;
+  chiefFresh: boolean;
   onSend?: (text: string, projectId: string | null) => void | Promise<void>;
   onRewind?: (messageId: string) => void;
   onAnswerQuestion?: (input: {
@@ -101,6 +103,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   const { t } = useI18n();
   const chiefQ = useChief(teamId, live);
   const chiefThreadsQ = useChiefThreads(teamId, live);
+  const projectsQ = useProjects(teamId, live);
   const notificationsQ = useNotifications(teamId, live);
   const mutations = useApiMutations(teamId);
 
@@ -127,10 +130,29 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     if (linked !== null && linked.place !== place) setLinked(null);
   }, [linked, place]);
   const liveThreads = chiefThreadsQ.data ?? [];
+  const channel = new URLSearchParams(search).get('project');
+  const channelThread =
+    channel === null
+      ? globalCoordinatorThread(liveThreads)
+      : (liveThreads.find((thread) => thread.projectId === channel) ?? null);
   const activeThread = live
-    ? (liveThreads.find((thread) => thread.id === linkedThreadId) ??
-      globalCoordinatorThread(liveThreads))
+    ? (liveThreads.find((thread) => thread.id === linkedThreadId) ?? channelThread)
     : null;
+  const openChannel = mutations.chiefOpenChannel.mutate;
+  const openedChannels = useRef(new Set<string>());
+  const channelProject = projectsQ.data?.find((row) => row.id === channel);
+  const channelMissing =
+    live &&
+    channel !== null &&
+    chiefThreadsQ.isSuccess &&
+    channelThread === null &&
+    channelProject !== undefined &&
+    channelProject.archivedAt == null;
+  useEffect(() => {
+    if (!channelMissing || channel === null || openedChannels.current.has(channel)) return;
+    openedChannels.current.add(channel);
+    openChannel(channel);
+  }, [channelMissing, channel, openChannel]);
   const deepLinkId = deepLink.threadId;
   const onDeepLinkConsumed = deepLink.onConsumed;
   useEffect(() => {
@@ -154,7 +176,6 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     setChiefView,
     place,
   ]);
-  const channel = new URLSearchParams(search).get('project');
   const [shownChannel, setShownChannel] = useState(channel);
   const [newestPageOnly, setNewestPageOnly] = useState(false);
   if (shownChannel !== channel) {
@@ -251,7 +272,16 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     ? { loading: isFetchingNextPage, failed: isFetchNextPageError, onLoad: loadEarlier }
     : undefined;
 
-  const freshChiefData = live ? (liveChiefWithUnsent ?? chiefDefault) : (chief ?? chiefDefault);
+  const fixtureChief = chief ?? chiefDefault;
+  const fixtureChannel = channel === null ? null : fixture.chiefChannels?.[channel];
+  const fixtureData = useMemo(
+    () =>
+      channel === null
+        ? fixtureChief
+        : (fixtureChannel ?? { ...fixtureChief, stream: [], streamAt: [], hasEarlier: false }),
+    [channel, fixtureChief, fixtureChannel],
+  );
+  const freshChiefData = live ? (liveChiefWithUnsent ?? chiefDefault) : fixtureData;
   const sharedStreamRef = useRef(freshChiefData.stream);
   const sharedStream = replaceEqualDeep(sharedStreamRef.current, freshChiefData.stream);
   useLayoutEffect(() => {
@@ -271,6 +301,10 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   const chiefBusy = live
     ? liveThreads.some((thread) => thread.activeRun != null)
     : fixture.chiefBusy === true;
+  const chiefFresh =
+    !live ||
+    activeThread === null ||
+    (activeThread.activeRun == null && activeThread.lastTurnAt == null);
 
   const onRewind = live
     ? (messageId: string) => {
@@ -418,17 +452,24 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
         wasReady: wasReadyRef.current,
       })
     : 'ready';
+  const channelLoad: CoordinatorLoad =
+    load === 'ready' && channelMissing
+      ? mutations.chiefOpenChannel.isError
+        ? 'error'
+        : 'loading'
+      : load;
   if (activeThread === null && chiefQ.isSuccess && chiefThreadsQ.isSuccess)
     wasReadyRef.current = true;
   else if (activeThread !== null && !chiefMessagesQ.isPending) wasReadyRef.current = false;
   const retry = () => {
+    if (channelMissing && channel !== null) openChannel(channel);
     void chiefQ.refetch();
     void chiefThreadsQ.refetch();
     if (activeThread !== null) void chiefMessagesQ.refetch();
   };
 
   return {
-    load,
+    load: channelLoad,
     earlier,
     retry,
     chiefView,
@@ -436,6 +477,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     chiefData,
     chiefUnread,
     chiefBusy,
+    chiefFresh,
     onSend,
     onRewind,
     onAnswerQuestion,

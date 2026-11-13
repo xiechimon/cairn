@@ -587,8 +587,7 @@ export function ChiefConversation({
               reserveEnd
               ref={viewportRef}
               data-testid="chief-body"
-              fade={false}
-              className="scrollbar-gutter-both"
+              className="scrollbar-gutter-both [--scroll-fade-size:32px] in-data-[chat-top=under-header]:[--scroll-fade-size-top:80px] [html[data-narrow-chrome]_&]:[--scroll-fade-size-top:80px]"
             >
               <MessageScrollerContent className={SCROLLER_CONTENT_CLS} data-testid="chief-stream">
                 <TodoGlanceContext.Provider value={glances}>

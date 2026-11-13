@@ -663,39 +663,54 @@ async function holdTakeover(
   const timeoutMs = opts.takeover?.timeoutMs ?? COMPUTER_HANDOFF_TIMEOUT_MS;
   const pollMs = opts.takeover?.pollMs ?? COMPUTER_HANDOFF_POLL_MS;
   const now = nowMs();
-  const deadlineAt = now + timeoutMs;
-  acquireExecutionLease(db, target.id, stepId, true, deadlineAt);
   const callId = computerCallId(stepId, body.toolCallId);
-  db.insert(computerCall)
-    .values({
-      id: callId,
-      teamId: thread.teamId,
-      stepId,
-      toolCallId: body.toolCallId,
-      machineId: target.machineId,
-      computerId: target.id,
-      tool: 'request_takeover',
-      replaySafe: false,
-      params: storedParams(body.params),
-      state: 'running',
-      deadlineAt,
-      createdAt: now,
-      startedAt: now,
-    })
-    .run();
+  const waiting = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  const resumed = waiting?.state === 'running';
+  const deadlineAt = resumed ? waiting.deadlineAt : now + timeoutMs;
+  const atInsert = db.select().from(computer).where(eq(computer.id, target.id)).get();
+  if (!resumed) {
+    acquireExecutionLease(db, target.id, stepId, true, deadlineAt);
+    db.insert(computerCall)
+      .values({
+        id: callId,
+        teamId: thread.teamId,
+        stepId,
+        toolCallId: body.toolCallId,
+        machineId: target.machineId,
+        computerId: target.id,
+        tool: 'request_takeover',
+        replaySafe: false,
+        params: {
+          ...storedParams(body.params),
+          controlFence: (atInsert?.controlFence ?? 0) + 1,
+          heldAtStart: atInsert !== undefined && ownerHoldsControl(atInsert, now),
+        },
+        state: 'running',
+        deadlineAt,
+        createdAt: now,
+        startedAt: now,
+      })
+      .run();
+  }
   markHandoffIfNone(db, target.id, 'model', stepId, now);
   const asked = body.params.reason;
   const reason =
     typeof asked === 'string' && asked.trim() !== '' ? redact(asked).slice(0, 200) : '';
-  pushToUserSafely(db, deps.vapidKeys ?? null, thread.userId, thread.teamId, {
-    title: 'Login needed',
-    body: reason || 'The Coordinator needs you to take over its computer.',
-    href: `/app?pane=machines&machine=${encodeURIComponent(target.machineId)}&screen=1`,
-    tag: `${thread.userId}:${callId}`,
-  });
+  if (!resumed) {
+    pushToUserSafely(db, deps.vapidKeys ?? null, thread.userId, thread.teamId, {
+      title: 'Login needed',
+      body: reason || 'The Coordinator needs you to take over its computer.',
+      href: `/app?pane=machines&machine=${encodeURIComponent(target.machineId)}&screen=1`,
+      tag: `${thread.userId}:${callId}`,
+    });
+  }
   const atStart = db.select().from(computer).where(eq(computer.id, target.id)).get();
-  const fenceAtStart = atStart?.controlFence;
-  const fenceSteps = atStart !== undefined && ownerHoldsControl(atStart, now) ? 1 : 2;
+  const storedFence = waiting?.params.controlFence;
+  const fenceAtStart = typeof storedFence === 'number' ? storedFence : atStart?.controlFence;
+  const heldAtStart = resumed
+    ? waiting.params.heldAtStart === true
+    : atStart !== undefined && ownerHoldsControl(atStart, now);
+  const fenceSteps = heldAtStart ? 1 : 2;
   let outcome: HandoffWait = 'not_done';
   try {
     for (;;) {
@@ -715,24 +730,30 @@ async function holdTakeover(
       await pause(pollMs, opts.signal);
     }
   } finally {
-    const handedBack = outcome === 'handed_back';
-    db.update(computerCall)
-      .set(
-        handedBack
-          ? { state: 'done', resultText: TAKEOVER_HANDED_BACK, finishedAt: nowMs() }
-          : {
-              state: 'error',
-              errorMessage: 'the owner did not finish',
-              errorDelivery: 'not_delivered',
-              finishedAt: nowMs(),
-            },
-      )
-      .where(eq(computerCall.id, callId))
-      .run();
-    clearHandoff(db, target.id);
-    releaseExecutionLease(db, stepId);
+    const current = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+    if (current?.state === 'running') {
+      const handedBack = outcome === 'handed_back';
+      db.update(computerCall)
+        .set(
+          handedBack
+            ? { state: 'done', resultText: TAKEOVER_HANDED_BACK, finishedAt: nowMs() }
+            : {
+                state: 'error',
+                errorMessage: 'the owner did not finish',
+                errorDelivery: 'not_delivered',
+                finishedAt: nowMs(),
+              },
+        )
+        .where(eq(computerCall.id, callId))
+        .run();
+      clearHandoff(db, target.id);
+      releaseExecutionLease(db, stepId);
+    }
   }
-  return { text: outcome === 'handed_back' ? TAKEOVER_HANDED_BACK : TAKEOVER_NOT_DONE };
+  const settled = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  return {
+    text: settled?.state === 'done' ? TAKEOVER_HANDED_BACK : TAKEOVER_NOT_DONE,
+  };
 }
 
 export async function forwardComputerCall(
@@ -771,6 +792,10 @@ export async function forwardComputerCall(
   }
   const live = pendingCalls.get(callId);
   if (live) return waitForCall(deps, live, stepId, opts.signal);
+
+  if (existing && existing.tool === 'request_takeover' && existing.state === 'running') {
+    return holdTakeover(deps, thread, stepId, body, opts);
+  }
 
   if (existing && !existing.replaySafe) {
     if (!isFinalState(existing.state)) {

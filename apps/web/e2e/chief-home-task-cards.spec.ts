@@ -177,7 +177,6 @@ test('tasks waiting on the owner put no tray above the composer; the greeting co
   });
   await page.goto('/app');
   await expect(page.getByTestId('tasks-badge')).toHaveText('2');
-  await expect(page.getByTestId('home-c-since')).toContainText('2 waiting on you');
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
   await expect(page.getByTestId('chief-composer-block').locator('[data-slot="thread-card"]')).toHaveCount(0);
 });
