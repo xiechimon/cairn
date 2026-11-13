@@ -168,7 +168,7 @@ for (const mask of MASK_CASES) {
         deviceScaleFactor: mask.dpr,
       });
 
-      test('the list has no edge fade and shares the composer column', async ({ page }) => {
+      test('the list fades softly at both edges and shares the composer column', async ({ page }) => {
         const { state, scope } = await open(page, surface);
         await sendAndReply(page, scope, state, REPLY);
         await expect(scope.getByText(REPLY, { exact: true })).toBeVisible();
@@ -189,14 +189,16 @@ for (const mask of MASK_CASES) {
           const k = composer.getBoundingClientRect();
           return {
             mask: style.maskImage,
-            webkitMask: style.webkitMaskImage,
+            fadeTop: body.style.getPropertyValue('--scroll-fade-top'),
+            fadeBottom: body.style.getPropertyValue('--scroll-fade-bottom'),
             listToComposer: Math.round(k.top - body.getBoundingClientRect().bottom),
             left: Math.abs(c.left - k.left),
             right: Math.abs(c.right - k.right),
           };
         });
-        expect(read.mask).toBe('none');
-        expect(read.webkitMask).toBe('none');
+        expect(read.mask).toContain('linear-gradient');
+        expect(read.fadeTop).toBe('80px');
+        expect(read.fadeBottom).toBe('32px');
         expect(read.listToComposer).toBe(0);
         expect(read.left).toBeLessThan(1);
         expect(read.right).toBeLessThan(1);

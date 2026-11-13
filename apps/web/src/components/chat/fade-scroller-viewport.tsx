@@ -5,12 +5,11 @@ import { MessageScrollerViewport } from '../ui/message-scroller.js';
 
 type Props = React.ComponentProps<typeof MessageScrollerViewport> & {
   reserveEnd: boolean;
-  fade?: boolean;
 };
 
-export function FadeScrollerViewport({ className, reserveEnd, fade = true, ref, ...props }: Props) {
+export function FadeScrollerViewport({ className, reserveEnd, ref, ...props }: Props) {
   const fadeRef = useRef<HTMLDivElement | null>(null);
-  useScrollFade(fadeRef, { enabled: fade });
+  useScrollFade(fadeRef);
   const setRefs = useCallback(
     (node: HTMLDivElement | null) => {
       fadeRef.current = node;
@@ -25,7 +24,7 @@ export function FadeScrollerViewport({ className, reserveEnd, fade = true, ref, 
     <MessageScrollerViewport
       ref={setRefs}
       className={[
-        fade && 'scroll-fade',
+        'scroll-fade',
         'overflow-x-hidden overscroll-none',
         reserveEnd && 'pb-(--chat-end-space)',
         FOCUS_RING_INSET,

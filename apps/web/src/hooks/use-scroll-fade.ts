@@ -8,11 +8,16 @@ export type UseScrollFadeOptions = {
   enabled?: boolean;
 };
 
-function readFadeSize(el: HTMLElement, override?: number): number {
+type FadeSide = 'top' | 'bottom' | 'left' | 'right';
+
+function readFadeSize(el: HTMLElement, side: FadeSide, override?: number): number {
   if (override != null) return override;
-  const raw = getComputedStyle(el).getPropertyValue('--scroll-fade-size').trim();
-  const n = Number.parseFloat(raw);
-  return Number.isFinite(n) && n > 0 ? n : 28;
+  const style = getComputedStyle(el);
+  for (const name of [`--scroll-fade-size-${side}`, '--scroll-fade-size']) {
+    const n = Number.parseFloat(style.getPropertyValue(name).trim());
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 28;
 }
 
 function clearFadeVars(el: HTMLElement): void {
@@ -39,21 +44,21 @@ export function useScrollFade(
   const sync = useCallback(() => {
     const el = ref.current;
     if (!el) return;
-    const size = readFadeSize(el, fadeSize);
+    const size = (side: FadeSide) => readFadeSize(el, side, fadeSize);
 
     if (orientation === 'vertical' || orientation === 'both') {
       const { scrollTop, scrollHeight, clientHeight } = el;
       const atTop = scrollTop <= 2;
       const atBottom = scrollTop + clientHeight >= scrollHeight - 2;
-      el.style.setProperty('--scroll-fade-top', atTop ? '0px' : `${size}px`);
-      el.style.setProperty('--scroll-fade-bottom', atBottom ? '0px' : `${size}px`);
+      el.style.setProperty('--scroll-fade-top', atTop ? '0px' : `${size('top')}px`);
+      el.style.setProperty('--scroll-fade-bottom', atBottom ? '0px' : `${size('bottom')}px`);
     }
     if (orientation === 'horizontal' || orientation === 'both') {
       const { scrollLeft, scrollWidth, clientWidth } = el;
       const atLeft = scrollLeft <= 2;
       const atRight = scrollLeft + clientWidth >= scrollWidth - 2;
-      el.style.setProperty('--scroll-fade-left', atLeft ? '0px' : `${size}px`);
-      el.style.setProperty('--scroll-fade-right', atRight ? '0px' : `${size}px`);
+      el.style.setProperty('--scroll-fade-left', atLeft ? '0px' : `${size('left')}px`);
+      el.style.setProperty('--scroll-fade-right', atRight ? '0px' : `${size('right')}px`);
     }
   }, [ref, orientation, fadeSize]);
 
