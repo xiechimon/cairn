@@ -12,7 +12,6 @@ import type {
   MachineHeartbeatBody,
   PreparedWorkspace,
   ProviderConfig,
-  QuotaBlock,
   SessionOpts,
   SkillInjectionFacts,
   WorkspaceHookNoteData,
@@ -78,6 +77,7 @@ import {
   resumeMissNote,
   taskMetaOpts,
 } from './step-prompt.js';
+import { stepQuotaBlock } from './step-quota-block.js';
 import { stepRemoteToolExecutor } from './step-remote-tools.js';
 import {
   prepareSkillLoadTool,
@@ -389,17 +389,6 @@ async function runClaimedStep(
     );
     return;
   }
-  const quotaBlockOf = (
-    kind: 'quota' | 'capacity',
-    reason: string,
-    retryAfterMs: number | null,
-  ): QuotaBlock => ({
-    kind,
-    providerId: provider?.providerId ?? 'unknown',
-    ...(provider?.label !== undefined ? { label: provider.label } : {}),
-    reason: reason.slice(0, 500),
-    ...(retryAfterMs !== null ? { retryAfterMs } : {}),
-  });
   const refusal = await agentStepRefusal({
     stepKind: claimed.step.kind,
     agentTools: agent.tools,
@@ -1249,17 +1238,13 @@ async function runClaimedStep(
   const stopReq = stop.settle();
   const stopped = stopReq !== null && !sawDone;
   if (stopReq !== null && sawDone) logger.step('stop arrived after completion — ignored');
-  const quotaBlock: QuotaBlock | null = (() => {
-    if (quotaTrip !== null) {
-      return quotaBlockOf(quotaTrip.kind, quotaTrip.reason, quotaTrip.retryAfterMs);
-    }
-    if (stopped || lastErrorWasProcessCrash) return null;
-    const failureText = lastModelError ?? lastError;
-    if (failureText === null) return null;
-    const failureKind = classifyAgentFailure(failureText);
-    if (failureKind !== 'quota' && failureKind !== 'capacity') return null;
-    return quotaBlockOf(failureKind, failureText, parseRetryAfterMs(failureText));
-  })();
+  const quotaBlock = stepQuotaBlock({
+    provider,
+    quotaTrip,
+    stopped,
+    processCrash: lastErrorWasProcessCrash,
+    failureText: lastModelError ?? lastError,
+  });
   if (quotaBlock !== null && lastError === null) {
     lastError = quotaBlock.reason;
   }
