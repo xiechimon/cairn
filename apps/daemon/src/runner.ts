@@ -69,7 +69,7 @@ import { prepareFileAttachment } from './attach-file.js';
 import { SessionNotResumableError } from './backend/errors.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
-import { collectVisibleSkillFileMap, piWorktreeSkillDirs } from './backend/skills.js';
+import { piWorktreeSkillDirs } from './backend/skills.js';
 import { prepareWebTools } from './backend/web-search.js';
 import { assertNoLegacyBrief, composeBrief } from './brief-file.js';
 import {
@@ -86,7 +86,6 @@ import {
 } from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
 import { DeltaRelay } from './delta-relay.js';
-import { buildExecutorRecord } from './executor-record.js';
 import { GitPushHookError, isGitAuthFailure } from './git.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
@@ -100,6 +99,7 @@ import { StepAppCredential } from './step-app-credential.js';
 import { resolveStepImagesOrRaw } from './step-attachments.js';
 import { commitAndPushStep, preserveFailedBuild } from './step-closing-git.js';
 import { assembleStepEnv } from './step-env.js';
+import { stepExecutorRecord } from './step-executor-record.js';
 import { prepareCreateTagTool, stepGitRunner } from './step-git-tools.js';
 import { localMergeDoneBody } from './step-local-merge.js';
 import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
@@ -966,37 +966,28 @@ async function runClaimedStep(
 
   if (!isChief) {
     try {
-      const skillFiles =
-        deps.skillsDir === undefined
-          ? new Map<string, string>()
-          : collectVisibleSkillFileMap({
-              skillsDir: deps.skillsDir,
-              cwd: deps.paths.home,
-              ...(sessionOpts.skillsAllowlist !== undefined
-                ? { allowlist: sessionOpts.skillsAllowlist }
-                : {}),
-              ...(injectedForSession !== undefined ? { injectedSkills: injectedForSession } : {}),
-              ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
-              ...(isPi ? { worktreeSkillsDirs: piWorktreeSkillDirs(cwd) } : {}),
-            });
-      const injectedNames = skillInjection.facts?.injected;
-      const skills = [...skillFiles]
-        .filter(([name]) => injectedNames === undefined || injectedNames.includes(name))
-        .map(([name, path]) => ({ name, content: readFileSync(path, 'utf8') }));
-      provenance.baseSha = headAtStart;
-      const executorRecord = buildExecutorRecord({
+      const executorRecord = stepExecutorRecord({
+        catalog:
+          deps.skillsDir === undefined
+            ? null
+            : {
+                skillsDir: deps.skillsDir,
+                cwd: deps.paths.home,
+                ...(sessionOpts.skillsAllowlist !== undefined
+                  ? { allowlist: sessionOpts.skillsAllowlist }
+                  : {}),
+                ...(injectedForSession !== undefined ? { injectedSkills: injectedForSession } : {}),
+                ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
+                ...(isPi ? { worktreeSkillsDirs: piWorktreeSkillDirs(cwd) } : {}),
+              },
+        injectedNames: skillInjection.facts?.injected,
         backend: backend.capabilities.name,
         model: modelKey,
         effort: agent.thinkingLevel,
-        harness: {
-          systemPrompt: systemPrompt ?? '',
-          skills,
-          tools: [...(remoteTools ?? []), ...localToolDefs].map(({ name, description }) => ({
-            name,
-            description,
-          })),
-        },
+        systemPrompt,
+        tools: [...(remoteTools ?? []), ...localToolDefs],
       });
+      provenance.baseSha = headAtStart;
       provenance.harnessHash = executorRecord.harness_sha;
       logger.step(`executor record ${JSON.stringify(executorRecord)}`);
       await client.heartbeat(stepId, provenance);
