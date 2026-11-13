@@ -1,5 +1,4 @@
 import type {
-  BuildMergePermission,
   BuildRecord,
   GithubRepoRef,
   GitIdentity,
@@ -15,8 +14,6 @@ import type {
 } from '@cairn/shared';
 import {
   ACTIVE_STEP_STATUSES,
-  AGENT_TOOL_MERGE,
-  AGENT_TOOL_PUSH,
   BUILD_FAILURE_ROW_KIND,
   CONFIRM_ANNOUNCEMENT,
   isBuildStepKind,
@@ -72,7 +69,7 @@ import type { VapidKeys } from './push.js';
 import { toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import { assertAutomaticRetryAllowed, retryIsParked } from './retry-parking.js';
-import { policyForStep, profileForStep } from './routing-rules.js';
+import { profileForStep } from './routing-rules.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
 import { type BuildStepRoute, listBuildStepRoutes } from './step-route.js';
@@ -117,8 +114,8 @@ export interface BuildDeps {
 }
 
 type BuildRow = typeof build.$inferSelect;
-type TodoRow = typeof todo.$inferSelect;
 
+export { assertMergeTools, buildMergePermission } from './build-merge-permission.js';
 export { requestMerge } from './build-merge-request.js';
 export { applyBuildStepAction } from './build-step-action.js';
 export { type CompleteStepOutcome, completeStep } from './build-step-complete.js';
@@ -584,31 +581,6 @@ export function githubPrOf(
   if (prNumber === null) return null;
   const repoRef = githubRepoOfProject(projectOfTodo(deps.db, todoRow));
   return repoRef === null ? null : { repoRef, prNumber };
-}
-
-export function buildMergePermission(deps: BuildDeps, buildId: string): BuildMergePermission {
-  const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-  if (!buildRow) throw new NotFoundError(`build ${buildId}`);
-  const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-  if (!todoRow) throw new NotFoundError(`todo ${buildRow.todoId}`);
-  const missingTools = missingMergeTools(deps, todoRow);
-  return { permitted: missingTools.length === 0, missingTools, prUrl: buildRow.prUrl };
-}
-
-function missingMergeTools(deps: BuildDeps, todoRow: TodoRow): string[] {
-  const policy = policyForStep(deps.db, todoRow, 'session');
-  if (policy === null || policy.seededFromAgentId === null) return [];
-  return [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].filter((tool) => !policy.tools.includes(tool));
-}
-
-export function assertMergeTools(deps: BuildDeps, todoRow: TodoRow): void {
-  const missingTools = missingMergeTools(deps, todoRow);
-  if (missingTools.length > 0) {
-    throw new HttpError(
-      403,
-      `The session work policy lacks 「${missingTools.join('」「')}」, so it cannot start a merge (routing settings, work policies)`,
-    );
-  }
 }
 
 export const STEP_KIND_TEXT: Record<StepKind, string> = {
