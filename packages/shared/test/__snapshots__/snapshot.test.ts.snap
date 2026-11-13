@@ -3169,6 +3169,47 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         },
       ],
     },
+    "httpSecrets": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "header": {
+            "type": "string",
+          },
+          "id": {
+            "type": "string",
+          },
+          "name": {
+            "type": "string",
+          },
+          "origin": {
+            "type": "string",
+          },
+          "revision": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer",
+          },
+          "template": {
+            "type": "string",
+          },
+          "value": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "name",
+          "revision",
+          "origin",
+          "header",
+          "template",
+          "value",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "provider": {
       "anyOf": [
         {
@@ -3312,6 +3353,12 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         "type": "string",
       },
       "type": "object",
+    },
+    "withheldSecrets": {
+      "items": {
+        "type": "string",
+      },
+      "type": "array",
     },
   },
   "required": [
@@ -10049,6 +10096,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               "type": "string",
             },
             "ownComputer": {
+              "const": true,
+              "type": "boolean",
+            },
+            "secretGateway": {
               "const": true,
               "type": "boolean",
             },

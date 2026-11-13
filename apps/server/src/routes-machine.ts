@@ -25,6 +25,7 @@ import {
   machineTranscriptRowBodySchema,
   machineUploadUrlsBodySchema,
   PLAN_FILE_NAME,
+  parseSecretSurface,
   SESSION_FILE_NAME,
   transcriptUploadSchema,
 } from '@cairn/shared';
@@ -542,7 +543,14 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/machine/token/:stepId', async (c) => {
     const row = me(c);
-    return c.json(await stepToken(deps, row.id, c.req.param('stepId')));
+    return c.json(
+      await stepToken(
+        deps,
+        row.id,
+        c.req.param('stepId'),
+        parseSecretSurface(c.req.query('surface')),
+      ),
+    );
   });
 
   app.get('/api/machine/skills/:stepId', (c) => {
