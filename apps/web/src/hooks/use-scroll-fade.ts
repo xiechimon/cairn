@@ -77,15 +77,21 @@ export function useScrollFade(
       for (const child of el.children) ro.observe(child, { box: 'border-box' });
     };
     observeBox();
+    let mutationFrame = 0;
     const mo = new MutationObserver((records) => {
       if (records.some((record) => record.target === el)) observeBox();
-      sync();
+      if (mutationFrame !== 0) return;
+      mutationFrame = requestAnimationFrame(() => {
+        mutationFrame = 0;
+        sync();
+      });
     });
     mo.observe(el, { childList: true, subtree: true, characterData: true });
     return () => {
       el.removeEventListener('scroll', sync);
       ro.disconnect();
       mo.disconnect();
+      cancelAnimationFrame(mutationFrame);
       clearFadeVars(el);
     };
   }, [ref, enabled, sync]);

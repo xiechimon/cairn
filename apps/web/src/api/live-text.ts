@@ -3,15 +3,24 @@ type Listener = () => void;
 const buffers = new Map<string, string>();
 const handoffs = new Map<string, { messageId: string; prefixLen: number }>();
 const listeners = new Set<Listener>();
+let appendFrame: number | null = null;
 
 function emit(): void {
   for (const l of listeners) l();
 }
 
+function emitOnNextFrame(): void {
+  if (appendFrame !== null) return;
+  appendFrame = requestAnimationFrame(() => {
+    appendFrame = null;
+    emit();
+  });
+}
+
 export const liveTextStore = {
   append(conversationId: string, text: string): void {
     buffers.set(conversationId, (buffers.get(conversationId) ?? '') + text);
-    emit();
+    emitOnNextFrame();
   },
   clear(conversationId: string): void {
     const hadBuffer = buffers.delete(conversationId);
