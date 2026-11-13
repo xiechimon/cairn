@@ -353,10 +353,6 @@ export const machineToolResponseSchema = z.union([
 export const secretSurfaceSchema = z.enum(['orb', 'host']);
 export type SecretSurface = z.infer<typeof secretSurfaceSchema>;
 
-export function parseSecretSurface(raw: string | undefined): SecretSurface {
-  return raw === 'orb' ? 'orb' : 'host';
-}
-
 export const httpSecretGrantSchema = z.object({
   id: z.string(),
   name: z.string(),

@@ -317,7 +317,7 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
     expect(body.secrets).toEqual({});
   });
 
-  test('a chief step token never carries http secrets, even for a gateway machine asking with orb', async () => {
+  test('a chief step token never carries http secrets, even for a gateway machine', async () => {
     const w = await setupChiefWorld();
     const claimed = await w.claim();
     w.s.db
@@ -327,12 +327,9 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
       })
       .where(eq(machineTable.id, machineIdByName(w.s, 'm4a-mbp')))
       .run();
-    const tokenRes = await call(
-      w.s.app,
-      'GET',
-      `/api/machine/token/${claimed.step.id}?surface=orb`,
-      { cred: w.token },
-    );
+    const tokenRes = await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, {
+      cred: w.token,
+    });
     expect(tokenRes.status).toBe(200);
     const body = (await tokenRes.json()) as Record<string, unknown>;
     expect(body.secrets).toEqual({});

@@ -1,5 +1,5 @@
 import type { MachineCapabilities, MachineTokenResponse } from '@cairn/shared';
-import { parseReportedCapabilities, parseSecretSurface } from '@cairn/shared';
+import { parseReportedCapabilities } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { machine as machineTable, step as stepTable } from '../src/db/schema.js';
@@ -127,13 +127,6 @@ describe('secret gateway token rule', () => {
     expect(body.secrets).toEqual({});
     expect(body).not.toHaveProperty('httpSecrets');
     expect(body).not.toHaveProperty('withheldSecrets');
-  });
-
-  test('the route reads the surface query parameter and treats anything else as host', async () => {
-    expect(parseSecretSurface('orb')).toBe('orb');
-    expect(parseSecretSurface('host')).toBe('host');
-    expect(parseSecretSurface('ORB')).toBe('host');
-    expect(parseSecretSurface(undefined)).toBe('host');
   });
 
   test('a reported secretGateway capability survives parsing only as literal true', () => {
