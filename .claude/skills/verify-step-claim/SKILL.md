@@ -181,6 +181,7 @@ sync-commit: 93b9ce21
   apps/server/src/services/scheduler.ts
   apps/daemon/src/machine-loop.ts
   apps/daemon/src/runner.ts
+  apps/daemon/src/step-final-upload.ts
   apps/daemon/src/journal.ts
   apps/daemon/src/step-stops.ts
   apps/daemon/src/workspace.ts

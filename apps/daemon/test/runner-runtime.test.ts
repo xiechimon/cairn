@@ -17,8 +17,9 @@ import type { ClaudeCodeAuthProbe } from '../src/claude-code-auth.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
-import { resumePendingUpload, runStep } from '../src/runner.js';
+import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { resumePendingUpload } from '../src/step-final-upload.js';
 import { testTempDir } from './test-temp-dir.js';
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
