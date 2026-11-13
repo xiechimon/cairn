@@ -33,6 +33,7 @@ import {
   stopUnclaimedGateSteps,
   toBuildRecord,
 } from './builds.js';
+import { AnonReadBudget } from './ci-anon-budget.js';
 import { CI_FIX_GREEN_EVENT, drainCiCorrections } from './ci-corrections.js';
 import { DONE_ROW, prClosedUnmergedRow } from './delivery-rows.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
@@ -284,30 +285,10 @@ export function createCiPoller(
   const grindKeys = new Set<string>();
   let sweeping = false;
   let sweepStartedAt = 0;
-  const anonOwn: number[] = [];
-  const anonAll: number[] = [];
-
-  function anonFree(now: number): number {
-    for (const list of [anonOwn, anonAll]) {
-      while (list.length > 0 && (list[0] ?? now) <= now - 3_600_000) list.shift();
-    }
-    return Math.min(
-      (run.anonReadsPerHour ?? CI_ANON_READS_PER_HOUR) - anonOwn.length,
-      (run.anonIpReadsPerHour ?? CI_ANON_IP_READS_PER_HOUR) - anonAll.length,
-    );
-  }
-
-  function recordGrindAnonRead(now: number, count = 1): void {
-    anonFree(now);
-    for (let i = 0; i < count; i += 1) anonAll.push(now);
-  }
-
-  function takeAnonRead(now: number, need = 1): boolean {
-    if (anonFree(now) < need) return false;
-    anonOwn.push(now);
-    anonAll.push(now);
-    return true;
-  }
+  const anonBudget = new AnonReadBudget(
+    run.anonReadsPerHour ?? CI_ANON_READS_PER_HOUR,
+    run.anonIpReadsPerHour ?? CI_ANON_IP_READS_PER_HOUR,
+  );
 
   function rowKnown(buildId: string, content: string, since: number): boolean {
     const memo = `${buildId}\u0000${since}\u0000${content}`;
@@ -427,7 +408,7 @@ export function createCiPoller(
     mergedAfter: number,
     now: number,
   ): Promise<GithubBranchPull | null | 'unreadable' | 'skipped'> {
-    if (token === null && !takeAnonRead(now)) return 'skipped';
+    if (token === null && !anonBudget.take(now)) return 'skipped';
     const list = await githubBranchPulls(run.githubFetch, token, target.owner, target.repo, {
       head: `${recorded.owner}:${branch}`,
       base: recorded.defaultBranch,
@@ -554,7 +535,7 @@ export function createCiPoller(
         const last = anonReadAt.get(key);
         if (
           (last !== undefined && now - last < CI_ANON_READ_INTERVAL_MS) ||
-          !takeAnonRead(now, 2)
+          !anonBudget.take(now, 2)
         ) {
           tally.reviewSkipped += 1;
           return;
@@ -701,7 +682,7 @@ export function createCiPoller(
             : cached.status;
         if (status === null) {
           const sendsRequest = isFullSha(checkpoint) && isFullSha(pull.headSha);
-          if (token === null && sendsRequest && !takeAnonRead(now)) {
+          if (token === null && sendsRequest && !anonBudget.take(now)) {
             tally.reviewSkipped += 1;
             return;
           }
@@ -861,7 +842,7 @@ export function createCiPoller(
       target.teamId,
       target,
     );
-    if (grindToken === null) recordGrindAnonRead(now);
+    if (grindToken === null) anonBudget.recordShared(now);
     const pullEntry = grindPullCache.get(key) ?? null;
     const pullPage = await githubPull(
       run.githubFetch,
@@ -928,7 +909,7 @@ export function createCiPoller(
         : now - required.at >= CI_REQUIRED_CHECKS_TTL_MS)
     ) {
       if (grindToken === null) {
-        recordGrindAnonRead(now, 2);
+        anonBudget.recordShared(now, 2);
       }
       const names = await githubRequiredChecks(
         run.githubFetch,
@@ -948,7 +929,7 @@ export function createCiPoller(
     const ref = own && pull.headSha !== null ? pull.headSha : branch;
     const cached = cache.get(key);
     const entry = cached?.sha === ref ? cached : null;
-    if (grindToken === null) recordGrindAnonRead(now);
+    if (grindToken === null) anonBudget.recordShared(now);
     const page = await githubCommitCheckRuns(
       run.githubFetch,
       grindToken,
