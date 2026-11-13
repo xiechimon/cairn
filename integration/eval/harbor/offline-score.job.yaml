@@ -1,3 +1,0 @@
-n_concurrent_trials: 1
-environment:
-  extra_docker_compose: []

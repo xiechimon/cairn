@@ -1,1 +1,0 @@
-ALTER TABLE `secret` ADD `projectId` text REFERENCES project(id);

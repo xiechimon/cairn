@@ -1,1 +1,0 @@
-Put the promo video here, with the fixed filename `promo.mp4` (H.264, 16:9). Once it is in place, the homepage hero switches to video automatically, with a cover taken from a board screenshot in the current theme and language; without this file the homepage only shows the screenshot.

@@ -1,1 +1,0 @@
-ALTER TABLE `plan` ADD `stepId` text;

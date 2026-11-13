@@ -1,6 +1,0 @@
-#!/usr/bin/env sh
-set -e
-updates=$(cat)
-printf '%s\n' "$updates" | node scripts/prepush-refuse-main.mjs
-printf '%s\n' "$updates" | node scripts/commit-identity.mjs pre-push
-pnpm prepush

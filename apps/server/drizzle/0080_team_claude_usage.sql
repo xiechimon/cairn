@@ -1,1 +1,0 @@
-ALTER TABLE `team` ADD `claudeUsage` text DEFAULT 'subscription-only' NOT NULL;

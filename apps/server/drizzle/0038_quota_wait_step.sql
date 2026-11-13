@@ -1,1 +1,0 @@
-ALTER TABLE `step` ADD `quotaBlock` text;

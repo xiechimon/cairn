@@ -1,1 +1,0 @@
-ALTER TABLE `step` ADD `finishedAt` integer;

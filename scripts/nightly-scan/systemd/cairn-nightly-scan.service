@@ -1,8 +1,0 @@
-[Unit]
-Description=cairn nightly whole-repo review scan
-
-[Service]
-Type=oneshot
-WorkingDirectory=%h/cairn-nightly-scan
-ExecStart=/usr/bin/node %h/cairn-nightly-scan/scripts/nightly-scan/run.mjs %h/cairn-nightly-scan
-TimeoutStartSec=45min

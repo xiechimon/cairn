@@ -1,1 +1,0 @@
-ALTER TABLE `machine` ADD `maxConcurrent` integer DEFAULT 3 NOT NULL;

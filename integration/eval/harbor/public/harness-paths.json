@@ -1,7 +1,0 @@
-{
-  "paths": [
-    "integration/eval/harbor/public/cairn_harbor/cairn_executor.py",
-    "integration/eval/harbor/public/cairn_harbor/cairn-worker-prompt.md",
-    "integration/eval/harbor/public/skills/cairn-worker/**"
-  ]
-}

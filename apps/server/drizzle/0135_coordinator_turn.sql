@@ -1,2 +1,0 @@
-ALTER TABLE `todo` ADD `coordinatorTurn` text;--> statement-breakpoint
-UPDATE `todo` SET `coordinatorTurn` = json_object('stepId', (SELECT `step`.`id` FROM `step` WHERE `step`.`kind` = 'chief' AND `step`.`prompt` LIKE '%provenance=watch:' || `todo`.`id` || char(10) || '%' ORDER BY `step`.`createdAt` DESC LIMIT 1), 'workKey', `todo`.`lastNotifiedWork`) WHERE `todo`.`lastNotifiedOwner` = 'coordinator' AND EXISTS (SELECT 1 FROM `step` WHERE `step`.`kind` = 'chief' AND `step`.`prompt` LIKE '%provenance=watch:' || `todo`.`id` || char(10) || '%');

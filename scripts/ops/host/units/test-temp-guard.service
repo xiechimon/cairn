@@ -1,9 +1,0 @@
-[Unit]
-Description=Clean stale Cairn test temp entries and warn about tmpfs pressure
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/node %h/.cairn/tools/test-temp-guard.mjs
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=cairn-test-temp-guard

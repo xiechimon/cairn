@@ -1,1 +1,0 @@
-ALTER TABLE `chief` ADD `machineId` text;

@@ -1,7 +1,0 @@
-[
-  "apps/*/test/**",
-  "apps/*/e2e/fixtures/**",
-  "apps/*/e2e/*.spec.ts",
-  "e2e/fixtures/**",
-  "scripts/public-content-gate.test.mjs"
-]

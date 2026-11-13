@@ -1,1 +1,0 @@
-ALTER TABLE `build` ADD `stop` text;

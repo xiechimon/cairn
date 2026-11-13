@@ -1,1 +1,0 @@
-ALTER TABLE `todo` ADD `decisions` text DEFAULT '[]' NOT NULL;

@@ -1,1 +1,0 @@
-ALTER TABLE `schedule` ADD `retryNotBefore` integer;
