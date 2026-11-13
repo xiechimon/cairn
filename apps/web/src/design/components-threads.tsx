@@ -12,7 +12,6 @@ import type { PrCardModel } from '../components/thread/pr-card-model.js';
 import { PrList } from '../components/thread/pr-list.js';
 import { ProposalCard } from '../components/thread/proposal-card.js';
 import { ScheduledTaskRow } from '../components/thread/scheduled-task-row.js';
-import { TaskPrLine } from '../components/thread/task-pr-line.js';
 import { TaskRow } from '../components/thread/task-row.js';
 import { UsageStrip } from '../components/thread/usage-strip.js';
 import { Button } from '../components/ui/button.js';
@@ -428,16 +427,6 @@ export function PrListSection() {
             onOpenThread={() => toastSuccess('Thread opened')}
             onViewChanges={() => toastSuccess('Changes opened')}
           />
-        </div>
-      </Specimen>
-      <Specimen
-        id="task-pr-line"
-        title="Task PR line"
-        stage="canvas"
-        code="<TaskPrLine prs={rows} now={Date.now()} />"
-      >
-        <div className="w-full max-w-110 pt-3">
-          <TaskPrLine prs={PR_LIST_ROWS} now={Date.now()} />
         </div>
       </Specimen>
     </Section>
