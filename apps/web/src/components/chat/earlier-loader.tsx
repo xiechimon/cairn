@@ -88,9 +88,11 @@ export function EarlierLoader({
     };
   }, [maybeLoad, rowCount, viewportRef]);
   const wasLoading = useRef(loading);
+  const lastRowCount = useRef(rowCount);
   useLayoutEffect(() => {
-    const settled = wasLoading.current && !loading;
+    const settled = !loading && (wasLoading.current || lastRowCount.current !== rowCount);
     wasLoading.current = loading;
+    lastRowCount.current = rowCount;
     const anchor = anchorRef.current;
     const viewport = viewportRef.current;
     if (!settled || anchor === null || viewport === null) return;

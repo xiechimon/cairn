@@ -104,4 +104,23 @@ function Button({
   );
 }
 
-export { Button, buttonVariants };
+function PlainButton({
+  className,
+  variant = 'default',
+  size = 'default',
+  type = 'button',
+  ...props
+}: ComponentProps<'button'> & VariantProps<typeof buttonVariants>) {
+  return (
+    <button
+      type={type}
+      data-slot="button"
+      data-variant={variant}
+      data-size={size}
+      className={cn(buttonVariants({ variant, size, className }))}
+      {...props}
+    />
+  );
+}
+
+export { Button, buttonVariants, PlainButton };
