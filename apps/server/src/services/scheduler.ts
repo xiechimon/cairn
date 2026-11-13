@@ -26,13 +26,12 @@ import {
   sweepStepSessions,
 } from './attachment-gc.js';
 import { releaseBlockedSteps } from './blockers.js';
+import { sweepAbandonedBuildSteps, sweepAbandonedShipSteps } from './build-abandoned-sweep.js';
 import {
   BuildContinuationPhaseError,
   type BuildDeps,
   sendBuildSteer,
   startBuilds,
-  sweepAbandonedBuildSteps,
-  sweepAbandonedShipSteps,
   sweepPlanAutoConfirm,
   sweepZombieQueuedTodos,
   toBuildRecord,

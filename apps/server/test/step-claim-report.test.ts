@@ -13,7 +13,10 @@ import {
 import { HttpError } from '../src/lib/errors.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { nowMs } from '../src/lib/ids.js';
-import { BUILD_ABANDONED_STEP_MS, sweepAbandonedBuildSteps } from '../src/services/builds.js';
+import {
+  BUILD_ABANDONED_STEP_MS,
+  sweepAbandonedBuildSteps,
+} from '../src/services/build-abandoned-sweep.js';
 import { issueStepGitCredential } from '../src/services/credentials.js';
 import { claimStep, finishStep, type MachineDeps } from '../src/services/machines.js';
 import { bootServer, seedSessionRoute } from './helpers.js';

@@ -2,7 +2,10 @@ import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { build, machine, project, pushDelivery, step, todo } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
-import { sweepAbandonedBuildSteps, sweepAbandonedShipSteps } from '../src/services/builds.js';
+import {
+  sweepAbandonedBuildSteps,
+  sweepAbandonedShipSteps,
+} from '../src/services/build-abandoned-sweep.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { finishStep } from '../src/services/machines.js';
 import { appendShipGateInstruction } from '../src/services/ship-gate.js';
