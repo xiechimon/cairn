@@ -1165,6 +1165,13 @@ test('computer image builds from the base with the host mirrorlist read-only and
       'utf8',
     );
     assert.match(agent, /^User=agent$/m);
+    assert.match(agent, /^After=.*\bnetwork-online\.target\b/m);
+    assert.match(agent, /^Wants=network-online\.target$/m);
+    assert.ok(
+      nspawn.some(
+        (call) => call.includes('enable') && call.includes('systemd-networkd-wait-online.service'),
+      ),
+    );
     assert.match(agent, /^Environment=DISPLAY=:1$/m);
     assert.match(agent, /^Environment=AGENT_BROWSER_EXECUTABLE_PATH=\/usr\/bin\/chromium$/m);
     assert.match(agent, /^Restart=always$/m);
@@ -1175,9 +1182,24 @@ test('computer image builds from the base with the host mirrorlist read-only and
           call.includes('npm') &&
           call.includes('install') &&
           call.some((arg) => /^agent-browser@/.test(arg)) &&
+          call.includes('--ignore-scripts') &&
           !call.includes('runuser'),
       ),
     );
+    const install = nspawn.findIndex((call) => call.some((arg) => /^agent-browser@/.test(arg)));
+    const chmod = nspawn.findIndex(
+      (call) =>
+        !call.includes('runuser') &&
+        call.some((arg) => /chmod 755 .*agent-browser\/bin\/agent-browser-linux-/.test(arg)),
+    );
+    const runs = nspawn.findIndex(
+      (call) =>
+        call.includes('runuser') &&
+        call.includes('agent') &&
+        call.includes('agent-browser') &&
+        call.includes('--version'),
+    );
+    assert.ok(install >= 0 && chmod > install && runs > chmod, JSON.stringify(nspawn));
     assert.match(
       agent,
       /^ExecStart=\/usr\/bin\/node \/opt\/cairn\/daemon\/cli\.mjs orb-computer --socket \/run\/cairn\/computer\.sock$/m,

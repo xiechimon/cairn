@@ -59,6 +59,21 @@ export type ComputerCall = z.infer<typeof computerCallSchema>;
 
 const frameSeq = z.number().int().positive();
 
+export const LOGIN_SIGNALS = [
+  'password',
+  'current-password',
+  'new-password',
+  'one-time-code',
+  'username',
+  'challenge',
+] as const;
+export const loginSignalSchema = z.enum(LOGIN_SIGNALS);
+export type LoginSignal = z.infer<typeof loginSignalSchema>;
+export const loginFormSchema = z.object({
+  signals: z.array(loginSignalSchema).min(1).max(LOGIN_SIGNALS.length),
+});
+export type LoginForm = z.infer<typeof loginFormSchema>;
+
 export const computerFrameSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('output'),
@@ -73,6 +88,7 @@ export const computerFrameSchema = z.discriminatedUnion('kind', [
     text: z.string().max(COMPUTER_FRAME_TEXT_MAX_CHARS),
     images: z.array(computerImageSchema).max(COMPUTER_IMAGES_MAX).optional(),
     exitCode: z.number().int().nullable().optional(),
+    loginForm: loginFormSchema.optional(),
   }),
   z.object({
     kind: z.literal('error'),

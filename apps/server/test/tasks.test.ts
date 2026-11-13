@@ -145,6 +145,17 @@ test('one Tasks read includes open rows and recently archived rows; section uses
     ['recent', 'resolved'],
     ['unarchived-old', null],
   ]);
+  const sectioned = (await (
+    await req(s.app, 'GET', `/api/tasks?teamId=${s.team.id}&sectioned=1`)
+  ).json()) as TasksQuery;
+  expect(
+    sectioned.entries
+      .map((entry) => [entry.kind === 'todo' ? entry.id : entry.requestId, entry.section])
+      .sort(),
+  ).toEqual([
+    ['open', 'up_next'],
+    ['recent', 'resolved'],
+  ]);
   expect((await req(s.app, 'GET', '/api/todos?archived=1')).status).toBe(200);
 });
 

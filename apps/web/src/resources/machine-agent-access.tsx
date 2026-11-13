@@ -6,11 +6,7 @@ import { ensureComputerBrowser, patchComputerBrowser } from '../api/computer-scr
 import { useComputers } from '../api/hooks.js';
 import { invalidateConverged } from '../api/invalidate.js';
 import { useLiveData } from '../api/provider.js';
-import { useComputerControl } from '../api/use-computer-control.js';
-import {
-  browserCapabilityInstalled,
-  desktopControlInstalled,
-} from '../board/machine-capabilities.js';
+import { browserCapabilityInstalled } from '../board/machine-capabilities.js';
 import { SettingsCard, SettingsRow, SettingsSection } from '../components/settings-list.js';
 import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch.js';
 import type { MachineRow } from '../fixtures/records.js';
@@ -47,13 +43,7 @@ function CapabilitySwitch({
   );
 }
 
-export function MachineAgentAccess({
-  machine,
-  coordinator,
-}: {
-  machine: MachineRow;
-  coordinator: boolean;
-}) {
+export function MachineAgentAccess({ machine }: { machine: MachineRow }) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const { live, teamId } = useLiveData();
@@ -64,15 +54,10 @@ export function MachineAgentAccess({
   const pinnedElsewhere = computers.some(
     (row) => machine.id !== undefined && row.machine.id !== machine.id,
   );
-  const online = machine.online !== false;
-  const control = useComputerControl({ teamId, computer, reclaim: false });
   const [browserBusy, setBrowserBusy] = useState(false);
-  const desktopInstalled = desktopControlInstalled(machine, computer);
   const browserInstalled = browserCapabilityInstalled(machine, computer);
   const browserEnabled = computer?.browserEnabled === true;
   const browserPinnedElsewhere = pinnedElsewhere && computer === null;
-  const canToggleDesktop =
-    desktopInstalled && online && computer !== null && teamId !== undefined && !control.busy;
   const canToggleBrowser =
     teamId !== undefined &&
     machine.id !== undefined &&
@@ -86,14 +71,6 @@ export function MachineAgentAccess({
       : browserEnabled
         ? t('这台机器已不再报告浏览器能力；可关闭已保存的偏好。')
         : t('这台机器还不支持浏览器。');
-  const desktopBlockedReason = !online
-    ? t('重新连接 {name} 后才能修改它的设置。', { name: machine.name })
-    : computer === null
-      ? coordinator
-        ? t('Coordinator 还没有自己的电脑。第一次需要时会自动开一台。')
-        : t('这台机器还没有电脑记录，等桌面控制上线后才能在这里打开。')
-      : undefined;
-
   const onBrowserToggle = (checked: boolean) => {
     const machineId = machine.id;
     if (teamId === undefined || machineId === undefined || browserBusy) return;
@@ -121,16 +98,6 @@ export function MachineAgentAccess({
           disabled={!canToggleBrowser}
           disabledReason={browserHint}
           onCheckedChange={canToggleBrowser ? onBrowserToggle : undefined}
-        />
-        <CapabilitySwitch
-          label={t('桌面控制')}
-          hint={t(
-            '由你接管这台电脑的桌面，在大屏里点击和键入。打开期间 agent 不能操作桌面上的应用，关掉后恢复。',
-          )}
-          checked={desktopInstalled && control.controlHeld}
-          disabled={!canToggleDesktop}
-          disabledReason={desktopBlockedReason}
-          onCheckedChange={canToggleDesktop ? control.setHeld : undefined}
         />
       </SettingsCard>
     </SettingsSection>

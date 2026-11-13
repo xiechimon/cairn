@@ -7,7 +7,7 @@ import {
 import { z } from 'zod';
 import type { DaemonLogger } from '../log.js';
 import type { MachineApi } from '../machine-client.js';
-import { type BrowserToolName, runBrowserTool } from './browser.js';
+import { type BrowserToolName, type BrowserToolResult, runBrowserTool } from './browser.js';
 import { FramePoster } from './frame-poster.js';
 import {
   desktopProtectionGuardMessage,
@@ -411,9 +411,9 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       return;
     }
     const poster = posterFor(call, controller);
-    let text: string;
+    let result: BrowserToolResult;
     try {
-      text = await runBrowserTool(route.provider, call.tool as BrowserToolName, call.params, {
+      result = await runBrowserTool(route.provider, call.tool as BrowserToolName, call.params, {
         deadlineAt: call.deadlineAt - FINAL_FRAME_MARGIN_MS,
         now,
         signal: controller.signal,
@@ -436,7 +436,11 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       return;
     }
     if (poster.abandoned) return;
-    await poster.finish({ kind: 'done', text: boundBrowserText(text) });
+    await poster.finish({
+      kind: 'done',
+      text: boundBrowserText(result.text),
+      ...(result.loginForm ? { loginForm: result.loginForm } : {}),
+    });
   }
 
   async function handle(call: ComputerCall, controller: AbortController): Promise<void> {

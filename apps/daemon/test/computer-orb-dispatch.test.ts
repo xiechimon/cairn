@@ -207,6 +207,40 @@ describe('orb routing', () => {
     }
   });
 
+  test('a login form keeps its marker line and frame field even when the snapshot is truncated', async () => {
+    const fake = fakeClient();
+    const provider: ComputerProvider = {
+      async execute(request) {
+        return (async function* () {
+          yield {
+            kind: 'stdout' as const,
+            text: request.argv.includes('eval')
+              ? JSON.stringify({ success: true, data: { result: ['password'] } })
+              : 'x'.repeat(70_000),
+          };
+          yield { kind: 'exit' as const, code: 0 };
+        })();
+      },
+      async listFiles() {
+        return [];
+      },
+      async readFile() {
+        return '';
+      },
+      async writeFile() {},
+      async killAll() {},
+    };
+    const dispatcher = createComputerDispatcher({
+      client: fake.client,
+      orb: { forScope: () => provider, async killAll() {} },
+      ...FAST,
+    });
+    await dispatcher.dispatch(call('browser_snapshot', {}, { scopeKey: 'chief:c1' }));
+    const done = fake.frames.find((frame) => frame.kind === 'done');
+    expect(done).toMatchObject({ kind: 'done', loginForm: { signals: ['password'] } });
+    if (done?.kind === 'done') expect(done.text.startsWith('[login form: password]\n')).toBe(true);
+  });
+
   test('browser refusal messages are bounded to the error frame limit', async () => {
     const fake = fakeClient();
     const huge = `boom ${'y'.repeat(5_000)}`;

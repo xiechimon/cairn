@@ -1,7 +1,13 @@
-import type { GitCredentials, MachineTokenResponse, ProviderConfig } from '@cairn/shared';
+import type {
+  GitCredentials,
+  HttpSecretGrant,
+  MachineTokenResponse,
+  ProviderConfig,
+  SecretSurface,
+} from '@cairn/shared';
 import { GITHUB_ACCESS_TOKEN_USERNAME, isBackendRuntimeId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { build, chiefThread, step, todo } from '../db/schema.js';
+import { build, chiefThread, machine, step, todo } from '../db/schema.js';
 import { githubAppTokenExpiry, isAppToken } from '../lib/github-token.js';
 import type { StepCredentialBundle } from './credentials.js';
 import {
@@ -26,6 +32,7 @@ export async function stepToken(
   deps: MachineDeps,
   machineId: string,
   stepId: string,
+  surface: SecretSurface = 'host',
 ): Promise<MachineTokenResponse> {
   const owned = ownedStep(deps, machineId, stepId);
   if (isChiefConversation(owned.buildId))
@@ -78,10 +85,59 @@ export async function stepToken(
         : null,
     provider,
     secrets: bundle.secrets,
+    ...httpSecretFields(
+      deps,
+      bundle.httpSecrets,
+      gatewayMayReceive(deps, machineId, surface, owned.status === 'claimed'),
+    ),
     ...(owned.status === 'claimed' && bundle.claudeSubscriptionToken !== undefined
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
       : {}),
     git,
+  };
+}
+
+function gatewayMayReceive(
+  deps: MachineDeps,
+  machineId: string,
+  surface: SecretSurface,
+  claimed: boolean,
+): boolean {
+  if (surface !== 'orb' || !claimed) return false;
+  const capabilities = deps.db
+    .select({ capabilities: machine.capabilities })
+    .from(machine)
+    .where(eq(machine.id, machineId))
+    .get()?.capabilities;
+  return capabilities?.secretGateway === true && capabilities.executor === 'orb';
+}
+
+function httpSecretFields(
+  deps: MachineDeps,
+  rows: StepCredentialBundle['httpSecrets'],
+  deliver: boolean,
+): Pick<MachineTokenResponse, 'httpSecrets' | 'withheldSecrets'> {
+  if (rows.length === 0) return {};
+  const httpSecrets: HttpSecretGrant[] = [];
+  const withheldSecrets: string[] = [];
+  for (const row of rows) {
+    if (!deliver || row.valueCipher === null) {
+      withheldSecrets.push(row.name);
+      continue;
+    }
+    httpSecrets.push({
+      id: row.id,
+      name: row.name,
+      revision: row.revision,
+      origin: row.policy.origin,
+      header: row.policy.header,
+      template: row.policy.template,
+      value: deps.box.open(row.valueCipher),
+    });
+  }
+  return {
+    ...(httpSecrets.length > 0 ? { httpSecrets } : {}),
+    ...(withheldSecrets.length > 0 ? { withheldSecrets } : {}),
   };
 }
 

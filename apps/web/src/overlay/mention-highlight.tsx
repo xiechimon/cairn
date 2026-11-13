@@ -50,6 +50,14 @@ function pieces(text: string, hits: DisplayMention[]) {
   return out;
 }
 
+function syncGeometry(ta: HTMLTextAreaElement, mirror: HTMLDivElement) {
+  mirror.style.left = `${ta.offsetLeft}px`;
+  mirror.style.top = `${ta.offsetTop}px`;
+  mirror.style.width = `${ta.offsetWidth}px`;
+  mirror.style.height = `${ta.offsetHeight}px`;
+  mirror.scrollTop = ta.scrollTop;
+}
+
 export function MentionHighlight({
   text,
   registry,
@@ -70,11 +78,7 @@ export function MentionHighlight({
     const sync = () => {
       const style = getComputedStyle(ta);
       for (const key of MIRRORED) mirror.style[key] = style[key];
-      mirror.style.left = `${ta.offsetLeft}px`;
-      mirror.style.top = `${ta.offsetTop}px`;
-      mirror.style.width = `${ta.offsetWidth}px`;
-      mirror.style.height = `${ta.offsetHeight}px`;
-      mirror.scrollTop = ta.scrollTop;
+      syncGeometry(ta, mirror);
     };
     sync();
     const frame = requestAnimationFrame(sync);
@@ -89,9 +93,15 @@ export function MentionHighlight({
   }, [textareaRef]);
 
   useLayoutEffect(() => {
-    const ta = textareaRef.current;
-    const mirror = mirrorRef.current;
-    if (ta != null && mirror != null) mirror.scrollTop = ta.scrollTop;
+    let current = true;
+    queueMicrotask(() => {
+      const ta = textareaRef.current;
+      const mirror = mirrorRef.current;
+      if (current && ta != null && mirror != null) syncGeometry(ta, mirror);
+    });
+    return () => {
+      current = false;
+    };
   });
 
   return (

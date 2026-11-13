@@ -35,6 +35,7 @@ interface Feed {
   computers: unknown[];
   commands: unknown[];
   holdCommands?: Promise<void>;
+  controlCalls?: string[];
 }
 
 const FEED_MACHINE = { id: 'm1', name: 'omarchy', online: true, kind: 'remote', runningSteps: 0 };
@@ -60,6 +61,9 @@ async function open(page: Page, feed: Feed, machines: unknown[] = [FEED_MACHINE]
       return json({ error: 'the computer is not connected' }, 409);
     }
     if (path === '/api/teams/t1/computers/comp-1/control') {
+      const method = route.request().method();
+      feed.controlCalls?.push(method);
+      if (method === 'DELETE') return json({ released: true });
       return json({ leaseId: 'lease-1', expiresAt: Date.now() + 60_000, controlFence: 1 }, 201);
     }
     return undefined;
@@ -580,29 +584,61 @@ test('an offline Coordinator machine reads offline in the chip and the card, wit
   await expect(panel.getByTestId('machine-screen-hint')).toHaveCount(0);
 });
 
-test('the live screen enlarges and becomes interactive once control is taken', async ({
+test('enlarging the live screen only watches; Take control and Return control drive the lease', async ({
   page,
 }) => {
-  const panel = await open(
-    page,
-    { computers: [computer()], commands: [command(1)] },
-    [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
-  );
-  const card = panel;
-  await expect(card.getByTestId('machine-screen-expand')).toBeVisible();
-  await card.getByTestId('machine-screen-expand').click();
+  const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
+  const panel = await open(page, feed, [
+    { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 },
+  ]);
+  await expect(panel.getByTestId('machine-screen-expand')).toBeVisible();
+  await panel.getByTestId('machine-screen-expand').click();
   const enlarged = page.getByTestId('machine-screen-enlarged');
   await expect(enlarged).toBeVisible();
+  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-fill', 'true');
+  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
+    'data-interactive',
+    'false',
+  );
+  const dialog = page.getByRole('dialog', { name: 'omarchy' });
+  await expect(dialog.getByRole('button', { name: '交还' })).toHaveCount(0);
+  expect(feed.controlCalls).toEqual([]);
+  await dialog.getByRole('button', { name: '接管' }).click();
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
     'data-interactive',
     'true',
     { timeout: 15_000 },
   );
-  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-fill', 'true');
   await expect(page.getByText('在大屏里点击和键入')).toBeVisible();
-  await page.getByRole('dialog', { name: 'omarchy' }).getByRole('button', { name: '关闭' }).click();
+  expect(feed.controlCalls).toEqual(['POST']);
+  await dialog.getByRole('button', { name: '交还' }).click();
+  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
+    'data-interactive',
+    'false',
+  );
+  expect(feed.controlCalls).toEqual(['POST', 'DELETE']);
+  await dialog.getByRole('button', { name: '关闭' }).click();
   await expect(enlarged).toHaveCount(0);
-  await expect(card.getByTestId('machine-screen-expand')).toBeVisible();
+});
+
+test('opening the machine while a user lease exists elsewhere does not take control, and Return control releases it', async ({
+  page,
+}) => {
+  const feed: Feed = {
+    computers: [computer({ controlHolder: 'user' })],
+    commands: [command(1)],
+    controlCalls: [],
+  };
+  const panel = await open(page, feed, [
+    { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 },
+  ]);
+  await expect(panel.getByTestId('machine-screen-expand')).toBeVisible();
+  const giveBack = panel.getByRole('button', { name: '交还' });
+  await expect(giveBack).toBeVisible();
+  await expect(panel.getByTestId('machine-screen')).toHaveAttribute('data-interactive', 'false');
+  expect(feed.controlCalls).toEqual([]);
+  await giveBack.click();
+  await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE']);
 });
 
 test('without a computer row the machine keeps the waiting placeholder and an empty access tab', async ({

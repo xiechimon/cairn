@@ -312,7 +312,7 @@ export function MachineDetailPane({
         </SettingsCard>
       </SettingsSection>
 
-      <MachineAgentAccess machine={machine} coordinator={chief.host} />
+      <MachineAgentAccess machine={machine} />
 
       {capabilities !== undefined && (
         <SettingsSection testId="machine-capabilities" title={t('能力')}>

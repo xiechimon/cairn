@@ -1,2 +1,0 @@
-docs/verify/1561/gate-before-after.txt
-scripts/single-use-helper-gate.mjs

@@ -46,4 +46,12 @@ export const COMPUTER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
       ['actions'],
     ),
   },
+  {
+    name: 'request_takeover',
+    description:
+      'Ask the owner to take over the Coordinator computer for a login, captcha, slider or code. Waits until the owner gives control back, then continue from a fresh browser_snapshot.',
+    parameters: obj({
+      reason: str('Short reason shown to the owner, for example which site needs a login.'),
+    }),
+  },
 ];

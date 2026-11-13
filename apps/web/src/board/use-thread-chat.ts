@@ -116,7 +116,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const wire = todoQ.data ?? null;
   useThreadPresence(teamId, wire?.id, live);
   useMarkThreadRead(todoId);
-  const buildId = live ? (wire?.latestBuildId ?? null) : (listed?.latestBuildId ?? null);
+  const buildId = wire !== null ? wire.latestBuildId : (listed?.latestBuildId ?? null);
   const buildQ = useBuild(buildId, live);
   const changesQ = useBuildChanges(buildId, live);
   const [changesExpanded, setChangesExpanded] = useState(true);

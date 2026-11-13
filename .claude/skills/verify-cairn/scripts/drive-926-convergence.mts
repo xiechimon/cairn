@@ -206,7 +206,8 @@ const evidence: Record<string, unknown> = { ticket: 926, generatedAt: new Date()
   check('agent_settled → 发 done', settledOut.length === 1 && settledOut[0].type === 'done', settledOut);
 }
 
-const outDir = resolve(root, 'docs/verify/926');
+const outDir =
+  process.env.VERIFY_EVIDENCE_DIR ?? resolve(root, '.claude/verify-evidence/926-convergence');
 mkdirSync(outDir, { recursive: true });
 const outPath = join(outDir, 'convergence-evidence.json');
 evidence.failures = failures;

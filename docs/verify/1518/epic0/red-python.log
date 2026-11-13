@@ -1,6 +1,0 @@
-E   FileNotFoundError: [Errno 2] No such file or directory: '/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/c2-e0-probe/integration/eval/harbor/label-task.py'
-=========================== short test summary info ============================
-ERROR test_control_probe.py
-ERROR test_label_task.py - FileNotFoundError: [Errno 2] No such file or direc...
-!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!!
-2 errors in 2.62s
