@@ -2,9 +2,11 @@ import { conversationBranch } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { build, step, threadPr } from '../db/schema.js';
 import { type GithubBranchPull, WRITE_AUTHOR_ASSOCIATIONS } from '../lib/github.js';
+import { settleAutonomousMerge } from './autonomous-merge.js';
 import {
   type BuildDeps,
   enqueueStep,
+  finishTodoDone,
   roundStart,
   stopUnclaimedGateSteps,
   toBuildRecord,
@@ -124,4 +126,61 @@ export function pickOwnBranchPull(
     (best, p) => (best === null || p.number > best.number ? p : best),
     null,
   );
+}
+
+export function outdatedPullRound(
+  deps: BuildDeps,
+  rows: KnownRows,
+  threadPrWakes: boolean,
+  cand: { buildId: string; todoId: string },
+  teamId: string,
+  pr: { prNumber: number; prUrl: string | null },
+  defaultBranch: string,
+  state: 'dirty' | 'behind',
+): 'appended' | 'hinted' {
+  if (state === 'dirty') {
+    const done = mergeConflictRound(
+      deps,
+      rows,
+      threadPrWakes,
+      cand,
+      teamId,
+      pr,
+      defaultBranch,
+      true,
+    );
+    return done === 'appended' ? 'appended' : 'hinted';
+  }
+  rows.hint(
+    cand.buildId,
+    `PR #${pr.prNumber} 落后于默认分支「${githubText(defaultBranch)}」。cairn 不替人更新分支，合并由人做：在 GitHub 上点 Update branch（即 PUT pulls/${pr.prNumber}/update-branch，带 expected_head_sha 为当前 head），CI 重跑后再合并。`,
+    roundStart(deps, cand.buildId),
+  );
+  return 'hinted';
+}
+
+export function settleMergedPull(
+  deps: BuildDeps,
+  cand: { buildId: string; todoId: string },
+  prNumber: number,
+  pull: { mergedAt: string | null; mergeCommitSha: string | null; mergedBy: string | null },
+  now: number,
+): void {
+  const mergedAt = pull.mergedAt === null ? NaN : Date.parse(pull.mergedAt);
+  settleAutonomousMerge(
+    deps.db,
+    cand.buildId,
+    'merged',
+    Number.isFinite(mergedAt) ? mergedAt : now,
+  );
+  const detail = [
+    pull.mergeCommitSha === null ? null : `合并提交 ${githubText(pull.mergeCommitSha).slice(0, 7)}`,
+    pull.mergedBy === null ? null : `由 ${githubText(pull.mergedBy)} 合并`,
+  ].filter((x) => x !== null);
+  writeSystemRow(
+    deps,
+    cand.buildId,
+    `PR #${prNumber} 已在 GitHub 合并${detail.length > 0 ? `（${detail.join('，')}）` : ''}`,
+  );
+  finishTodoDone(deps, cand.todoId, cand.buildId);
 }
