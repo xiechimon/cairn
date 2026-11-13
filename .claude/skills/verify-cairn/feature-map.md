@@ -192,7 +192,7 @@ States: The gate shows why a merge is allowed or blocked; merge permission missi
 Reach:
 
 1. `open /app/todo/<id of a thread listed by the todos API>`
-2. `click testid:work-prs`
+2. `click testid:thread-pr-panel`
 3. `click testid:accept-dialog-pr`
 
 - Web routes: none
@@ -392,7 +392,7 @@ States: No PR yet, open with checks running or failing, conflicts, merged, or a 
 Reach:
 
 1. `open /app/todo/<id of a thread listed by the todos API>`
-2. `click testid:work-prs`
+2. `click testid:thread-pr-panel`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none

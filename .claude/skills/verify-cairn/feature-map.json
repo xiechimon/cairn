@@ -710,7 +710,7 @@
       },
       "reach": [
         "open /app/todo/<id of a thread listed by the todos API>",
-        "click testid:work-prs"
+        "click testid:thread-pr-panel"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/branch-sync.md"
@@ -766,7 +766,7 @@
       },
       "reach": [
         "open /app/todo/<id of a thread listed by the todos API>",
-        "click testid:work-prs",
+        "click testid:thread-pr-panel",
         "click testid:accept-dialog-pr"
       ],
       "verify": [

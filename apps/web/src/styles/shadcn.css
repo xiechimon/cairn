@@ -30,6 +30,10 @@
   --color-running: var(--running);
   --color-running-text: var(--running-text);
   --color-running-bar: var(--running-bar);
+  --color-pr-merged: var(--pr-merged);
+  --color-pr-open: var(--pr-open);
+  --color-pr-failed: var(--pr-failed);
+  --color-pr-pending: var(--pr-pending);
   --color-tint-working: var(--tint-working);
   --color-tint-working-soft: var(--tint-working-soft);
   --color-tint-working-ink: var(--tint-working-ink);
@@ -241,6 +245,10 @@
   --spot-text-on-tint: #f2cf86;
   --running: #82b46f;
   --running-text: #9cc78b;
+  --pr-merged: #a371f7;
+  --pr-pending: #d29922;
+  --pr-open: #3fb950;
+  --pr-failed: #f85149;
   --running-bar: #6fa35c;
   --tint-working: #223a5e;
   --tint-working-soft: #1d2d49;
@@ -397,6 +405,10 @@
   --spot-text-on-tint: #6e4900;
   --running: #5f8f4f;
   --running-text: #3f6c35;
+  --pr-merged: #8250df;
+  --pr-pending: #9a6700;
+  --pr-open: #1a7f37;
+  --pr-failed: #cf222e;
   --running-bar: #55833f;
   --tint-working: #d2e4ff;
   --tint-working-soft: #e6eefb;

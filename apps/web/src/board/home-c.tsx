@@ -9,7 +9,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
-import { useApiMutations, useProjects } from '../api/hooks.js';
+import { useApiMutations, useProjects, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
 import { QuestionScopeContext } from '../chief/chief-question.js';
@@ -216,6 +216,7 @@ export function HomeC({
   const narrow = useNarrow();
   const { createTodo } = useApiMutations(teamId);
   const projectsQuery = useProjects(teamId, live);
+  usePrs(teamId, undefined, live);
   const activeProjects = splitProjectsByArchive(projectsQuery.data ?? []).active;
   const saveProjectId =
     projectId ?? (activeProjects.length === 1 ? (activeProjects[0]?.id ?? null) : null);
