@@ -1172,6 +1172,15 @@ test('computer image builds from the base with the host mirrorlist read-only and
         (call) => call.includes('enable') && call.includes('systemd-networkd-wait-online.service'),
       ),
     );
+    const waitOnline = readFileSync(
+      join(f.image, 'etc/systemd/system/systemd-networkd-wait-online.service.d/ipv4.conf'),
+      'utf8',
+    );
+    assert.match(waitOnline, /^ExecStart=$/m);
+    assert.match(
+      waitOnline,
+      /^ExecStart=\/usr\/lib\/systemd\/systemd-networkd-wait-online --ipv4 --timeout=60$/m,
+    );
     assert.match(agent, /^Environment=DISPLAY=:1$/m);
     assert.match(agent, /^Environment=AGENT_BROWSER_EXECUTABLE_PATH=\/usr\/bin\/chromium$/m);
     assert.match(agent, /^Restart=always$/m);
