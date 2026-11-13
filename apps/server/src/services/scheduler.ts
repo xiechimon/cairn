@@ -58,7 +58,7 @@ import { sweepStaleMachines } from './machines.js';
 import { purgeExpiredMemoryVersions } from './memory.js';
 import { sweepFailedRetries } from './needs-you.js';
 import { sweepIdleChiefUnread } from './notifications.js';
-import { reconcileOwners } from './owner.js';
+import { handoffUnclaimedOwnershipWake, ownershipHandoffEventId } from './owner.js';
 import { PhaseTransitionError } from './phase.js';
 import { createPrWatch, PR_WATCH_INTERVAL_MS } from './pr-watch.js';
 import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
@@ -528,7 +528,6 @@ export function createScheduler(
     sweepQuotaWaitSteps(deps, now);
     sweepUnplaceableSteps(deps, now);
     void sweepFailedRetries(deps).catch(() => {});
-    reconcileOwners(deps);
     const digestTimes = opts.pushDigestTimes ?? [];
     if (digestTimes.length > 0 && !digestSweeping) {
       const due = digestSlotsDue(now, digestTimes, lastDigestRun);
@@ -695,6 +694,13 @@ export function createScheduler(
         }
         if (after.nextRunAt <= now) return { rescheduleAt: now + opts.tickMs };
         return { rescheduleAt: after.nextRunAt };
+      },
+      'ownership-handoff': (event, now) => {
+        const prefix = ownershipHandoffEventId('');
+        if (!event.id.startsWith(prefix)) return { rescheduleAt: null };
+        return {
+          rescheduleAt: handoffUnclaimedOwnershipWake(deps, event.id.slice(prefix.length), now),
+        };
       },
       wake: (_event, now) => {
         fireDueChiefWakes(deps, now);
