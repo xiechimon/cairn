@@ -1,12 +1,9 @@
 import type {
   BuildRecord,
-  GithubRepoRef,
   GitIdentity,
   MergeReadiness,
-  ReviewGate,
   SecretBox,
   StepJournalRow,
-  StepKind,
   StepPromptOrigin,
   StepRecord,
   UserRecord,
@@ -29,10 +26,8 @@ import {
   stopUnclaimedGateSteps,
 } from './build-stop.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import { githubRepoOfProject, projectOfTodo } from './git.js';
 import type { HarnessEvalDispatchPort } from './harness-eval-coordinator.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { resolveNamedPrompt } from './named-prompts.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { planAutoApproveAt, planAwaitsAutoConfirm } from './plan-auto-confirm.js';
 import type { VapidKeys } from './push.js';
@@ -43,6 +38,12 @@ import { stepQueueProjector } from './step-queue.js';
 import { type BuildStepRoute, listBuildStepRoutes } from './step-route.js';
 import type { QuestionAnswer } from './worker-questions.js';
 
+export {
+  githubPrOf,
+  INFO_CARD_MERGE_REFUSAL,
+  reviewInstructionOf,
+  STEP_KIND_TEXT,
+} from './build-lookups.js';
 export {
   assertNamedMachineForNewTask,
   dispatchSplitChildren,
@@ -336,39 +337,6 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
 function stepRouteView(route: BuildStepRoute | undefined): StepJournalRow['route'] {
   return route === undefined ? null : { harness: route.harness, modelId: route.modelId };
 }
-
-export function reviewInstructionOf(
-  deps: BuildDeps,
-  teamId: string,
-  gate: ReviewGate,
-): string | undefined {
-  if (gate !== 'review') return undefined;
-  const prompt = resolveNamedPrompt(deps.db, teamId, 'review');
-  return prompt.overridden ? prompt.text : undefined;
-}
-
-export const INFO_CARD_MERGE_REFUSAL =
-  '信息卡的产出是报告附件，不进合并：要把内容落进仓库，请建下游代码卡走正常流程';
-
-export function githubPrOf(
-  deps: BuildDeps,
-  todoRow: { projectId: string; teamId: string },
-  prNumber: number | null,
-): { repoRef: GithubRepoRef; prNumber: number } | null {
-  if (prNumber === null) return null;
-  const repoRef = githubRepoOfProject(projectOfTodo(deps.db, todoRow));
-  return repoRef === null ? null : { repoRef, prNumber };
-}
-
-export const STEP_KIND_TEXT: Record<StepKind, string> = {
-  plan: '规划',
-  build: '执行',
-  session: '会话',
-  merge: '合并',
-  chief: '编排',
-  review: '审核',
-  verify: '验证',
-};
 
 export class NotFoundError extends Error {
   constructor(what: string) {
