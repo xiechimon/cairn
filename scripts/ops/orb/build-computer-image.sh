@@ -72,7 +72,7 @@ printf '%s\n' \
   "refuse a guest Node major other than $node_major" \
   "install agent-browser@${agent_browser_version} without install scripts, mark its native binary executable, and run it as agent" \
   'install the Chromium managed policy and the cairn-computer-desktop service for agent' \
-  'install the cairn-computer-agent service for agent after network-online, enable systemd-networkd-wait-online, and disable the inherited cairn-orb-worker service' \
+  'install the cairn-computer-agent service for agent after network-online, enable systemd-networkd-wait-online waiting for an IPv4 address, and disable the inherited cairn-orb-worker service' \
   'remove package caches; clear /etc/machine-id' \
   'write /etc/cairn-orb-computer-image completion marker' \
   'publish a world-readable copy of the marker at /var/lib/cairn-orb/computer-image for the daemon user' \
@@ -187,6 +187,11 @@ LimitCORE=0
 WantedBy=multi-user.target
 UNIT
 guest systemctl enable cairn-computer-desktop.service cairn-computer-agent.service
+write_file 644 "$stage/etc/systemd/system/systemd-networkd-wait-online.service.d/ipv4.conf" <<'WAIT'
+[Service]
+ExecStart=
+ExecStart=/usr/lib/systemd/systemd-networkd-wait-online --ipv4 --timeout=60
+WAIT
 guest systemctl enable systemd-networkd-wait-online.service
 guest systemctl disable cairn-orb-worker.service
 guest pacman -Scc --noconfirm
