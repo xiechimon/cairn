@@ -89,7 +89,6 @@ import { GitPushHookError, isGitAuthFailure } from './git.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { isTransientUploadError, type MachineApi, MachineApiError } from './machine-client.js';
-import { extractReviewVerdict } from './review-findings.js';
 import { buildSecretTool } from './secret-channel.js';
 import { type SealedSegment, SegmentEmitter, segmentContent } from './segment.js';
 import { readSessionJsonlForUpload } from './session-jsonl.js';
@@ -97,11 +96,12 @@ import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
 import { resolveStepImagesOrRaw } from './step-attachments.js';
 import { commitAndPushStep, preserveFailedBuild } from './step-closing-git.js';
+import { composeDoneBody } from './step-done-body.js';
 import { assembleStepEnv } from './step-env.js';
 import { stepExecutorRecord } from './step-executor-record.js';
 import { prepareCreateTagTool, stepGitRunner } from './step-git-tools.js';
 import { localMergeDoneBody } from './step-local-merge.js';
-import { readDeliveredPlan, readInfoReport, requireUploadedEvidence } from './step-outputs.js';
+import { readDeliveredPlan, readInfoReport } from './step-outputs.js';
 import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
 import {
   prepareSkillLoadTool,
@@ -119,7 +119,6 @@ import {
   StreamWatchdog,
 } from './stream-watchdog.js';
 import { materializeTeamSkills } from './team-skills.js';
-import { extractVerifyVerdict } from './verify-verdict.js';
 
 export interface RunStepDeps {
   client: MachineApi;
@@ -1722,45 +1721,32 @@ async function runClaimedStep(
   if (claimed.step.kind === 'plan' && !stopped) {
     planContent = readDeliveredPlan(deps.paths.plansDir, convId, cwd);
   }
-  const reviewExtraction =
-    claimed.step.kind === 'review' ? extractReviewVerdict(transcript.messages()) : null;
-  const verifyExtraction =
-    claimed.step.kind === 'verify'
-      ? extractVerifyVerdict(transcript.messages(), { strict: attachmentVerify })
-      : null;
-  if (attachmentVerify && verifyExtraction?.status === 'ok') {
-    verifyExtraction.verdict = requireUploadedEvidence(
-      verifyExtraction.verdict,
-      uploadedVerifyEvidence,
-      cwd,
-    );
-  }
   const sessionIdForDone = handle?.sessionId ?? continueId;
-  const doneBody: MachineDoneBody = {
-    status,
-    ...(lastError !== null ? { errorMessage: stripAnsiEscapes(lastError) } : {}),
-    ...(sessionIdForDone !== null ? { sessionId: sessionIdForDone } : {}),
-    usage: [...usage],
-    hasChanges,
-    ...(headCommit !== null ? { commit: headCommit } : {}),
-    ...(preservedCommits.length > 0 ? { preservedCommits } : {}),
-    ...(pushHookOutput !== null ? { pushHookOutput } : {}),
-    ...(reviewExtraction?.status === 'ok' ? { findings: reviewExtraction.verdict } : {}),
-    ...(reviewExtraction?.status === 'failed' ? { findingsError: reviewExtraction.reason } : {}),
-    ...(verifyExtraction?.status === 'ok' ? { verifyVerdict: verifyExtraction.verdict } : {}),
-    ...(verifyExtraction?.status === 'failed'
-      ? { verifyVerdictError: verifyExtraction.reason }
-      : {}),
-    ...(prProbe !== null ? { prUrl: prProbe.url, prNumber: prProbe.number } : {}),
-    ...(changesDiff !== null ? { changesDiff } : {}),
-    ...(branchDrift !== null ? { workBranchDrift: branchDrift } : {}),
-    ...(quotaBlock !== null ? { quotaBlock } : {}),
-    ...(skillInjection.facts !== null ? { skillInjectionFacts: skillInjection.facts } : {}),
-    ...(report !== null ? { report } : {}),
-    ...(status === 'success' && !messages.some((m) => m.role === 'assistant')
-      ? { noOutput: true as const }
-      : {}),
-  };
+  const doneBody = composeDoneBody(
+    {
+      status,
+      lastError,
+      sessionId: sessionIdForDone,
+      usage,
+      hasChanges,
+      headCommit,
+      preservedCommits,
+      pushHookOutput,
+      prProbe,
+      changesDiff,
+      branchDrift,
+      quotaBlock,
+      skillInjectionFacts: skillInjection.facts,
+      report,
+    },
+    {
+      kind: claimed.step.kind,
+      messages,
+      attachmentVerify,
+      uploadedEvidence: uploadedVerifyEvidence,
+      cwd,
+    },
+  );
   const redactedSessionFile = join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`);
   const sessionFileForUpload = credentialValues.reduce<string | undefined>(
     (source, credential) =>
