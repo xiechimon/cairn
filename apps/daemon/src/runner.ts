@@ -63,9 +63,9 @@ import { commitAndPushStep, preserveFailedBuild } from './step-closing-git.js';
 import { composeDoneBody } from './step-done-body.js';
 import { assembleStepEnv } from './step-env.js';
 import { reportStepProvenance } from './step-executor-record.js';
-import { putFinalArtifacts, resumePendingUpload } from './step-final-upload.js';
+import { putFinalArtifacts } from './step-final-upload.js';
 import { prepareCreateTagTool, stepGitRunner } from './step-git-tools.js';
-import { localMergeDoneBody } from './step-local-merge.js';
+import { runLocalMergeStep } from './step-local-merge.js';
 import { readDeliveredPlan, readInfoReport } from './step-outputs.js';
 import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
 import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
@@ -313,24 +313,11 @@ async function runClaimedStep(
   });
 
   if (claimed.localMerge !== undefined) {
-    const doneBody = await localMergeDoneBody(
-      claimed,
-      claimed.localMerge,
-      () => stop.request !== null,
-    );
-    const transcript = new TranscriptBuffer(deps.paths.outboxDir, stepId);
-    transcript.upsert({
-      id: `local-merge-${stepId}`,
-      role: 'system',
-      content: JSON.stringify(doneBody),
-      createdAt: now(),
+    await runLocalMergeStep(deps, claimed, claimed.localMerge, claimedEntry, {
+      stopRequested: () => stop.request !== null,
+      now,
+      running,
     });
-    journal.update(stepId, { state: 'awaiting-upload', doneBody });
-    await resumePendingUpload(
-      deps,
-      journal.get(stepId) ?? { ...claimedEntry, state: 'awaiting-upload', doneBody },
-      { running },
-    );
     return;
   }
 
