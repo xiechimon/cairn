@@ -235,7 +235,11 @@ export function sealCoordinatorTurnSnapshot(
   try {
     if (capture.overLimit) throw new Error('capture view or record limit crossed');
     const parsed = snapshotPayload.parse({ claim: capture.claim, toolViews: capture.views });
-    const redacted = redactSecrets(parsed);
+    const viewsRedacted = redactSecrets(parsed.toolViews);
+    const redacted = {
+      value: { claim: parsed.claim, toolViews: viewsRedacted.value },
+      count: viewsRedacted.count,
+    };
     const payloadText = JSON.stringify(redacted.value);
     if (Buffer.byteLength(payloadText, 'utf8') > COORDINATOR_SNAPSHOT_PAYLOAD_MAX_BYTES)
       throw new Error('payload limit exceeded');
