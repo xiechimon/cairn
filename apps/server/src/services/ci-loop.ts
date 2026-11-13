@@ -14,10 +14,9 @@ import {
   isOwnPull,
 } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
-import { recoverAutonomousMerges, settleAutonomousMerge } from './autonomous-merge.js';
+import { recoverAutonomousMerges } from './autonomous-merge.js';
 import {
   type BuildDeps,
-  finishTodoDone,
   hasActiveStep,
   lastPushedCheckpoint,
   roundStart,
@@ -61,7 +60,9 @@ import {
   adoptPull,
   CI_MERGE_CONFLICT_ROUNDS_MAX,
   mergeConflictRound,
+  outdatedPullRound,
   pickOwnBranchPull,
+  settleMergedPull,
 } from './ci-pr-rounds.js';
 import { DONE_ROW, prClosedUnmergedRow } from './delivery-rows.js';
 import { autonomousToken } from './github-autonomous-token.js';
@@ -291,27 +292,19 @@ export function createCiPoller(
         freshReviewRow(deps, cand.todoId, cand.buildId) !== null &&
         !hasActiveStep(deps, cand.buildId)
       ) {
-        if (state === 'dirty') {
-          const done = mergeConflictRound(
-            deps,
-            rows,
-            run.threadPrWakes === true,
-            cand,
-            todoRow.teamId,
-            { prNumber, prUrl: buildRow.prUrl },
-            target.baseBranch ?? pull.defaultBranch,
-            true,
-          );
-          if (done === 'appended') {
-            tally.reviewPending += 1;
-            return;
-          }
-        } else {
-          rows.hint(
-            cand.buildId,
-            `PR #${prNumber} 落后于默认分支「${githubText(target.baseBranch ?? pull.defaultBranch)}」。cairn 不替人更新分支，合并由人做：在 GitHub 上点 Update branch（即 PUT pulls/${prNumber}/update-branch，带 expected_head_sha 为当前 head），CI 重跑后再合并。`,
-            roundStart(deps, cand.buildId),
-          );
+        const round = outdatedPullRound(
+          deps,
+          rows,
+          run.threadPrWakes === true,
+          cand,
+          todoRow.teamId,
+          { prNumber, prUrl: buildRow.prUrl },
+          target.baseBranch ?? pull.defaultBranch,
+          state,
+        );
+        if (round === 'appended') {
+          tally.reviewPending += 1;
+          return;
         }
         tally.hinted += 1;
         return;
@@ -428,25 +421,7 @@ export function createCiPoller(
           return;
         }
       }
-      const mergedAt = pull.mergedAt === null ? NaN : Date.parse(pull.mergedAt);
-      settleAutonomousMerge(
-        deps.db,
-        cand.buildId,
-        'merged',
-        Number.isFinite(mergedAt) ? mergedAt : now,
-      );
-      const detail = [
-        pull.mergeCommitSha === null
-          ? null
-          : `合并提交 ${githubText(pull.mergeCommitSha).slice(0, 7)}`,
-        pull.mergedBy === null ? null : `由 ${githubText(pull.mergedBy)} 合并`,
-      ].filter((x) => x !== null);
-      writeSystemRow(
-        deps,
-        cand.buildId,
-        `PR #${prNumber} 已在 GitHub 合并${detail.length > 0 ? `（${detail.join('，')}）` : ''}`,
-      );
-      finishTodoDone(deps, cand.todoId, cand.buildId);
+      settleMergedPull(deps, cand, prNumber, pull, now);
       tally.merged += 1;
       return;
     }
