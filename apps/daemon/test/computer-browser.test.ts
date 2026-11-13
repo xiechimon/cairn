@@ -48,7 +48,9 @@ describe('runBrowserTool', () => {
       { timeoutMs: 5_000, signal: new AbortController().signal, session: 'chief:1' },
     );
     expect(text).toContain('ok');
-    expect(log[0]).toContain('agent-browser --session chief_1 --headed open https://example.com');
+    expect(log[0]).toContain(
+      'agent-browser --session chief_1 --restore --headed open https://example.com',
+    );
   });
 
   test('refuses non-http URLs before delivery', async () => {
@@ -82,7 +84,7 @@ describe('runBrowserTool', () => {
       { actions: [{ kind: 'fill', ref: '@e1', text: 'hello' }] },
       { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
     );
-    expect(log.at(-1)).toBe('agent-browser --session s --headed fill @e1 hello');
+    expect(log.at(-1)).toBe('agent-browser --session s --restore --headed fill @e1 hello');
   });
 
   test('refuses when the ref is missing from a fresh snapshot', async () => {
@@ -332,7 +334,9 @@ describe('login form detection', () => {
       detectingProvider(log, evalResult(['password', 'one-time-code'])),
       'browser_snapshot',
     );
-    expect(log[1]).toBe(`agent-browser --session s --headed --json eval ${LOGIN_DETECTION_SCRIPT}`);
+    expect(log[1]).toBe(
+      `agent-browser --session s --restore --headed --json eval ${LOGIN_DETECTION_SCRIPT}`,
+    );
     expect(result.loginForm).toEqual({ signals: ['password', 'one-time-code'] });
     expect(result.text.startsWith('[login form: password, one-time-code]\n')).toBe(true);
   });
@@ -442,9 +446,9 @@ describe('secret field guard', () => {
   test('a phone or username field is filled after the check', async () => {
     const log: string[] = [];
     await act(fieldProvider(log, { type: 'tel', autocomplete: 'tel' }), 'fill');
-    expect(log).toContain('agent-browser --session s --headed get attr @e2 type');
-    expect(log).toContain('agent-browser --session s --headed get attr @e2 autocomplete');
-    expect(log.at(-1)).toBe('agent-browser --session s --headed fill @e2 value');
+    expect(log).toContain('agent-browser --session s --restore --headed get attr @e2 type');
+    expect(log).toContain('agent-browser --session s --restore --headed get attr @e2 autocomplete');
+    expect(log.at(-1)).toBe('agent-browser --session s --restore --headed fill @e2 value');
   });
 });
 
