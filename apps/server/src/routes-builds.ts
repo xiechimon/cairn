@@ -25,7 +25,6 @@ import {
   latestBranchSyncForBuild,
   type MachineSyncHub,
 } from './services/branch-sync.js';
-import { requestMerge } from './services/build-merge-request.js';
 import {
   applyBuildStepAction,
   buildMergePermission,
@@ -33,6 +32,7 @@ import {
   listSteps,
   planAutoApproveAt,
   readSteerPending,
+  requestMerge,
   requestStop,
   startBuilds,
 } from './services/builds.js';

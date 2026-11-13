@@ -174,6 +174,7 @@ export interface BuildDeps {
 type BuildRow = typeof build.$inferSelect;
 type TodoRow = typeof todo.$inferSelect;
 
+export { requestMerge } from './build-merge-request.js';
 export { mergedPrElsewhere, planAutoApproveAt, planAwaitsAutoConfirm };
 
 export function toBuildRecord(row: BuildRow): BuildRecord {
