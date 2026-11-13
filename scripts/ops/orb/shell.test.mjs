@@ -1175,9 +1175,24 @@ test('computer image builds from the base with the host mirrorlist read-only and
           call.includes('npm') &&
           call.includes('install') &&
           call.some((arg) => /^agent-browser@/.test(arg)) &&
+          call.includes('--ignore-scripts') &&
           !call.includes('runuser'),
       ),
     );
+    const install = nspawn.findIndex((call) => call.some((arg) => /^agent-browser@/.test(arg)));
+    const chmod = nspawn.findIndex(
+      (call) =>
+        !call.includes('runuser') &&
+        call.some((arg) => /chmod 755 .*agent-browser\/bin\/agent-browser-linux-/.test(arg)),
+    );
+    const runs = nspawn.findIndex(
+      (call) =>
+        call.includes('runuser') &&
+        call.includes('agent') &&
+        call.includes('agent-browser') &&
+        call.includes('--version'),
+    );
+    assert.ok(install >= 0 && chmod > install && runs > chmod, JSON.stringify(nspawn));
     assert.match(
       agent,
       /^ExecStart=\/usr\/bin\/node \/opt\/cairn\/daemon\/cli\.mjs orb-computer --socket \/run\/cairn\/computer\.sock$/m,
