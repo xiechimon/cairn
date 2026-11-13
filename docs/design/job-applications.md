@@ -124,7 +124,7 @@ Implementation must first fail tests for: a prefilled username, one-time code, o
 
 ## Open decisions for the owner
 
-1. Host attach (recommended) versus logging in once inside the orb browser. Orb login does not meet "credentials stay in the owner's browser". Do not ship that fallback without an explicit override.
+1. Host attach (recommended) versus logging in once inside the orb browser. Orb login does not meet "credentials stay in the owner's browser". Do not ship that fallback without an explicit override. Owner override (2026-11-13): logging in happens inside the orb browser, for login only; submitting applications is still out of scope. See `docs/design/computer-login-handoff.md`.
 2. Daily cap. Recommended default 5 delivered submits per UTC day, owner-editable, agent-immutable.
 3. Per-host terms acceptance. Recommended: `refused` until the owner allows that host, with the terms risk stated on that screen. No global allow.
 4. Whether `job_submit` waits for the action-registry confirm-once, or ships the interim gate above. Recommended: interim gate now, same function called by the registry later, so there is still one mechanism.

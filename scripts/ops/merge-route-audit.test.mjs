@@ -42,6 +42,27 @@ test('removing the queued label or marking dequeued before the merge does not co
   );
 });
 
+test('a PR dequeued earlier and requeued before the merge counts as a queue merge (#4020)', () => {
+  const mergedAt = '2026-11-12T17:43:00Z';
+  const history = [
+    labeled('queued', '2026-11-12T14:48:04Z'),
+    unlabeled('queued', '2026-11-12T14:56:10Z'),
+    labeled('dequeued', '2026-11-12T14:56:13Z'),
+    unlabeled('dequeued', '2026-11-12T15:11:58Z'),
+    labeled('queued', '2026-11-12T15:46:56Z'),
+    unlabeled('queued', '2026-11-12T16:25:56Z'),
+    labeled('dequeued', '2026-11-12T16:26:00Z'),
+    labeled('queued', '2026-11-12T16:58:02Z'),
+    unlabeled('dequeued', '2026-11-12T16:59:24Z'),
+    unlabeled('queued', '2026-11-12T17:43:38Z'),
+  ];
+  assert.equal(queuedBeforeMerge(mergedAt, history), true);
+  assert.equal(
+    queuedBeforeMerge(mergedAt, [...history, labeled('dequeued', '2026-11-12T17:30:00Z')]),
+    false,
+  );
+});
+
 test('no queued label and no merge time are both violations', () => {
   assert.equal(queuedBeforeMerge('2026-11-05T19:12:23Z', [labeled('queued', 'x')]), false);
   assert.equal(queuedBeforeMerge('2026-11-05T19:12:23Z', []), false);

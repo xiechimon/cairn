@@ -1,3 +1,4 @@
+import { LOGIN_SIGNALS, type LoginForm, type LoginSignal } from '@cairn/shared';
 import { z } from 'zod';
 import type { ComputerProcessEvent, ComputerProvider } from './provider.js';
 import { ComputerRefusal } from './provider.js';
@@ -33,6 +34,70 @@ const actParams = z.object({
 });
 
 export type BrowserToolName = 'browser_navigate' | 'browser_snapshot' | 'browser_act';
+
+export interface BrowserToolResult {
+  text: string;
+  loginForm?: LoginForm;
+}
+
+const CHALLENGE_HOSTS = [
+  'hcaptcha.com',
+  'challenges.cloudflare.com',
+  'geetest.com',
+  'arkoselabs.com',
+  'funcaptcha.com',
+  'captcha.qq.com',
+  'recaptcha.net',
+];
+
+export const LOGIN_DETECTION_SCRIPT = `(() => {
+  const shown = (el) => {
+    const box = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    return box.width > 0 && box.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+  };
+  const tokens = ['current-password', 'new-password', 'one-time-code', 'username'];
+  const challengeHosts = ${JSON.stringify(CHALLENGE_HOSTS)};
+  const found = new Set();
+  for (const input of document.querySelectorAll('input')) {
+    if (!shown(input)) continue;
+    if (input.type === 'password') found.add('password');
+    const autocomplete = (input.getAttribute('autocomplete') || '').toLowerCase().split(/\\s+/);
+    for (const token of tokens) if (autocomplete.includes(token)) found.add(token);
+  }
+  for (const frame of document.querySelectorAll('iframe')) {
+    if (!shown(frame)) continue;
+    let url;
+    try { url = new URL(frame.src, location.href); } catch { continue; }
+    const host = url.hostname;
+    const challenge = challengeHosts.some((known) => host === known || host.endsWith('.' + known))
+      || (host.endsWith('google.com') && url.pathname.startsWith('/recaptcha'));
+    if (challenge) found.add('challenge');
+  }
+  return [...found];
+})()`;
+
+const SECRET_AUTOCOMPLETE = new Set(['current-password', 'new-password', 'one-time-code']);
+
+function secretField(type: string, autocomplete: string): boolean {
+  if (type.trim().toLowerCase() === 'password') return true;
+  return autocomplete
+    .toLowerCase()
+    .split(/\s+/)
+    .some((token) => SECRET_AUTOCOMPLETE.has(token));
+}
+
+function parseLoginSignals(output: string): LoginSignal[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    return null;
+  }
+  const result = (parsed as { data?: { result?: unknown } } | null)?.data?.result;
+  if (!Array.isArray(result)) return null;
+  return LOGIN_SIGNALS.filter((signal) => result.includes(signal));
+}
 
 export interface BrowserRunOptions {
   signal: AbortSignal;
@@ -148,7 +213,7 @@ export async function runBrowserTool(
   tool: BrowserToolName,
   params: Record<string, unknown>,
   options: BrowserRunOptions,
-): Promise<string> {
+): Promise<BrowserToolResult> {
   const binary = options.binary ?? AGENT_BROWSER_BINARY;
   const session = browserSessionName(options.session);
   const prefix = [binary, ...sessionFlag(session), ...headedFlags()];
@@ -160,6 +225,18 @@ export async function runBrowserTool(
     const result = await collectExecute(provider, argv, timed, started);
     started = true;
     return result;
+  };
+  const read = (argv: readonly string[]) => collectExecute(provider, argv, timed, started);
+
+  const withDetection = async (text: string): Promise<BrowserToolResult> => {
+    const detection = await read([...prefix, '--json', 'eval', LOGIN_DETECTION_SCRIPT]);
+    const signals = detection.code === 0 ? parseLoginSignals(detection.text) : null;
+    if (signals === null) return { text: `[login detection unavailable]\n${text}` };
+    if (signals.length === 0) return { text };
+    return {
+      text: `[login form: ${signals.join(', ')}]\n${text}`,
+      loginForm: { signals },
+    };
   };
 
   if (tool === 'browser_navigate') {
@@ -175,7 +252,7 @@ export async function runBrowserTool(
     if (result.code !== 0 && result.code !== null) {
       refuse(result.text || `agent-browser open failed with exit code ${result.code}`, started);
     }
-    return result.text || `opened ${url}`;
+    return withDetection(result.text || `opened ${url}`);
   }
 
   if (tool === 'browser_snapshot') {
@@ -183,7 +260,7 @@ export async function runBrowserTool(
     if (result.code !== 0 && result.code !== null) {
       refuse(result.text || `agent-browser snapshot failed with exit code ${result.code}`, started);
     }
-    return result.text || '(empty snapshot)';
+    return withDetection(result.text || '(empty snapshot)');
   }
 
   const parsed = actParams.safeParse(params);
@@ -193,13 +270,24 @@ export async function runBrowserTool(
   const lines: string[] = [];
   for (const action of parsed.data.actions) {
     if (action.ref !== undefined) {
-      const snap = await execute([...prefix, 'snapshot', '-i']);
+      const snap = await read([...prefix, 'snapshot', '-i']);
       if (snap.code !== 0 && snap.code !== null) {
         refuse(snap.text || `agent-browser snapshot failed with exit code ${snap.code}`, started);
       }
       if (!refPresent(snap.text, action.ref)) {
         refuse(
           `ref ${normalizeRef(action.ref)} was not in a fresh snapshot; take browser_snapshot again`,
+          started,
+        );
+      }
+    }
+    if ((action.kind === 'fill' || action.kind === 'type') && action.ref !== undefined) {
+      const ref = normalizeRef(action.ref);
+      const type = await read([...prefix, 'get', 'attr', ref, 'type']);
+      const autocomplete = await read([...prefix, 'get', 'attr', ref, 'autocomplete']);
+      if (secretField(type.text, autocomplete.text)) {
+        refuse(
+          `browser_act ${action.kind} refused: ${ref} is a password or one-time code field; ask the owner with request_takeover`,
           started,
         );
       }
@@ -220,5 +308,5 @@ export async function runBrowserTool(
     }
     lines.push(result.text || `${action.kind} ok`);
   }
-  return lines.join('\n');
+  return { text: lines.join('\n') };
 }

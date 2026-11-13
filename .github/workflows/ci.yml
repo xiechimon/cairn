@@ -23,7 +23,8 @@ jobs:
       has-sidecar: ${{ steps.classify.outputs.has-sidecar }}
       gates-needed: ${{ steps.classify.outputs.gates-needed }}
       ops-selftests: ${{ steps.classify.outputs.ops-selftests }}
-      e2e-tier: ${{ (github.event_name == 'push' || (github.event.pull_request.draft && github.event.pull_request.user.login == 'mergify[bot]' && startsWith(github.head_ref, 'mergify/merge-queue/'))) && 'full' || 'none' }}
+      web-ui: ${{ steps.classify.outputs.web-ui }}
+      e2e-tier: ${{ (github.event_name == 'push' || (github.event.pull_request.draft && github.event.pull_request.user.login == 'mergify[bot]' && startsWith(github.head_ref, 'mergify/merge-queue/'))) && 'full' || (github.event_name == 'pull_request' && !github.event.pull_request.draft && steps.classify.outputs.web-ui == 'true' && 'affected') || 'none' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -45,9 +46,13 @@ jobs:
           gates_needed=true
           tested_in_queue=false
           ops_selftests=true
+          web_ui=false
           if [ "$EVENT_NAME" = "pull_request" ]; then
             if ! git diff --name-only "$PREPUSH_BASE_SHA" HEAD | grep -qE '^(scripts/|\.github/|packages/shared/|\.mergify\.yml$|package\.json$|pnpm-lock\.yaml$)'; then
               ops_selftests=false
+            fi
+            if git diff --name-only "$PREPUSH_BASE_SHA" HEAD | grep -q '^apps/web/src/'; then
+              web_ui=true
             fi
             has_code=$(node scripts/prepush.mjs --has-code) || has_code=true
             has_sidecar=$(node scripts/prepush.mjs --has-sidecar) || has_sidecar=true
@@ -65,6 +70,7 @@ jobs:
           echo "tested-in-queue=$tested_in_queue" >> "$GITHUB_OUTPUT"
           echo "gates-needed=$gates_needed" >> "$GITHUB_OUTPUT"
           echo "ops-selftests=$ops_selftests" >> "$GITHUB_OUTPUT"
+          echo "web-ui=$web_ui" >> "$GITHUB_OUTPUT"
 
   # #762: branch protection treats skipped jobs as success; always() ensures aggregates report failures.
   check:
