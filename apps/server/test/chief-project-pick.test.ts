@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
   chiefMessage,
   chiefThread,
@@ -71,12 +71,17 @@ describe('composer project chip reaches the chief (#2009)', () => {
 
   test('a follow-up in an existing thread carries the chip too', async () => {
     const site = await postProject(H.s.app, 'cairn-site');
+    const publish = vi.spyOn(H.s.convHub, 'publishMessage');
     const res = await req(H.s.app, 'POST', `/api/conversations/${H.threadId}/messages`, {
       content: '再把字号也统一',
       projectId: site,
     });
     expect(res.status).toBe(201);
     expect(chiefPrompts(H.threadId).at(-1)).toContain(`cairn-site（id: ${site}）`);
+    expect(publish).toHaveBeenCalledWith(
+      H.threadId,
+      expect.objectContaining({ content: '再把字号也统一', projectId: site }),
+    );
   });
 
   test('a project name cannot break out of the chip marker', async () => {

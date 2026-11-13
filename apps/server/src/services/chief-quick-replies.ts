@@ -48,7 +48,7 @@ export function suggestQuickReplies(
     } satisfies QuickRepliesContent),
     createdAt: nowMs(),
   };
-  upsertChiefMessage(deps.db, { ...row, threadId: ctx.threadId });
-  deps.convHub?.publishMessage(ctx.threadId, row);
+  const stored = upsertChiefMessage(deps.db, { ...row, threadId: ctx.threadId });
+  deps.convHub?.publishMessage(ctx.threadId, stored);
   return JSON.stringify({ shown: sanitized.replies });
 }

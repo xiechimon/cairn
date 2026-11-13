@@ -194,11 +194,12 @@ function insertCoordinatorMarker(
     id: newRecordId(),
     role: 'system' as const,
     content: JSON.stringify(marker),
+    projectId: row.projectId,
     createdAt: nowMs(),
   };
   deps.db
     .insert(chiefMessage)
-    .values({ ...message, threadId: thread.id, projectId: row.projectId })
+    .values({ ...message, threadId: thread.id })
     .run();
   return { threadId: thread.id, message };
 }

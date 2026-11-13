@@ -132,6 +132,7 @@ function publishRow(deps: ChiefQuestionDeps, threadId: string, requestId: string
     id: row.id,
     role: row.role,
     content: row.content,
+    projectId: row.projectId,
     createdAt: row.createdAt,
   });
 }

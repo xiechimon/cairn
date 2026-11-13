@@ -7,7 +7,7 @@ import { req } from './helpers.js';
 registerChiefHarness();
 
 interface Page {
-  messages: { id: string; createdAt: number }[];
+  messages: { id: string; createdAt: number; projectId?: string | null }[];
   nextCursor: string | null;
 }
 
@@ -74,6 +74,35 @@ describe('GET /api/conversations/:chiefThread/messages pages the Coordinator his
     const page = await readPage();
     expect(page.messages.map((m) => m.id)).toEqual(ids);
     expect(page.nextCursor).toBeNull();
+  });
+
+  test('each row carries the project channel it was sent in', async () => {
+    H.s.db
+      .insert(chiefMessage)
+      .values([
+        {
+          id: 'in-site',
+          threadId: H.threadId,
+          role: 'user',
+          content: 'a',
+          projectId: 'p-site',
+          createdAt: 1,
+        },
+        {
+          id: 'in-home',
+          threadId: H.threadId,
+          role: 'user',
+          content: 'b',
+          projectId: null,
+          createdAt: 2,
+        },
+      ])
+      .run();
+    const page = await readPage();
+    expect(page.messages.map((m) => [m.id, m.projectId])).toEqual([
+      ['in-site', 'p-site'],
+      ['in-home', null],
+    ]);
   });
 
   test('limit sets the page size and is bounded', async () => {

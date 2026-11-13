@@ -42,6 +42,17 @@ describe('task opening history', () => {
     expect(toDisplayTodo(wire).request).toEqual(request);
   });
 
+  test('a task stored with the raw reply marker as its title shows the owner words instead', () => {
+    const wire = todoRecordSchema.parse({
+      id: 'task', teamId: 'team', projectId: 'project', title: '<!-- reply source=ack -->', spec: renderTaskText(request),
+      request, phase: 'todo', phaseAt: 0, seqNum: 1, orderIndex: 0, tagIds: [], latestBuildId: null,
+      lastRunAt: null, hasChanges: false, hasPlan: false, buildHistory: [], sourceTodo: null, v: 1,
+      createdBy: null, ownerId: null, sourceBuildId: null, sourceKind: null, sourceRef: null,
+    });
+    expect(toDisplayTodo(wire).title).toBe('The caret is misaligned.');
+    expect(toDisplayTodo({ ...wire, request: undefined }).title).toBe('未命名任务');
+  });
+
   test('shows the image, acknowledgment, and owner reply as attributed source messages', () => {
     const html = render(request);
     expect(html).toContain('data-role="owner"');
