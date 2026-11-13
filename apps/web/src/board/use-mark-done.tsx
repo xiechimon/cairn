@@ -8,7 +8,6 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { AcceptTaskDialog } from './accept-task-dialog.js';
 import { StopAndDoneConfirm } from './stop-and-done-confirm.js';
 
 const UNFINISHABLE_PHASES: readonly string[] = ['done', 'closed', 'failed'];
@@ -28,7 +27,7 @@ export function useMarkDone(todo: TodoRecord): { markDone: () => void; dialogs: 
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
-  const [dialog, setDialog] = useState<'accept' | 'stop' | null>(null);
+  const [dialog, setDialog] = useState<'stop' | null>(null);
   const stopAndDone = () => {
     setDialog(null);
     if (!live) {
@@ -46,30 +45,15 @@ export function useMarkDone(todo: TodoRecord): { markDone: () => void; dialogs: 
     });
   };
   const markDone = () => {
-    if (todo.phase === 'review') setDialog('accept');
-    else if ((IN_PROGRESS_PHASES as readonly string[]).includes(todo.phase)) setDialog('stop');
+    if ((IN_PROGRESS_PHASES as readonly string[]).includes(todo.phase)) setDialog('stop');
     else stopAndDone();
   };
   const dialogs = (
-    <>
-      {dialog === 'accept' && (
-        <AcceptTaskDialog
-          todo={todo}
-          buildId={todo.latestBuildId}
-          open
-          onClose={() => setDialog(null)}
-          substantiveChanges={null}
-          infoOutput={todo.output === 'info'}
-          mergeLocked={false}
-          guardDemoWrites
-        />
-      )}
-      <StopAndDoneConfirm
-        open={dialog === 'stop'}
-        onClose={() => setDialog(null)}
-        onConfirm={stopAndDone}
-      />
-    </>
+    <StopAndDoneConfirm
+      open={dialog === 'stop'}
+      onClose={() => setDialog(null)}
+      onConfirm={stopAndDone}
+    />
   );
   return { markDone, dialogs };
 }
