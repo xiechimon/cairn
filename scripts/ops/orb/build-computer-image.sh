@@ -12,7 +12,7 @@ base=$machines_dir/cairn-orb-base
 image=$machines_dir/cairn-orb-computer
 published_marker=$host_root/var/lib/cairn-orb/computer-image
 daemon_entry=/opt/cairn/daemon/cli.mjs
-packages=(xorg-server-xvfb x11vnc fluxbox xdotool chromium imagemagick npm)
+packages=(xorg-server-xvfb x11vnc fluxbox xdotool chromium imagemagick npm wqy-microhei)
 agent_browser_version=${CAIRN_AGENT_BROWSER_VERSION:-0.41.2}
 if [[ ! -f $base/etc/cairn-orb-image ]]; then
   if $dry_run; then
