@@ -32,6 +32,8 @@ describe('computer lifecycle command guard', () => {
       'bash <<< "pkill chromium"',
       '$KILLER chromium',
       'rm -rf "$TARGET/.browser-profiles/chromium"',
+      'cat ~/.agent-"browser"/sessions/chief_c1-default.json',
+      "bash -c 'cat ~/.agent-browser/sessions/x.json'",
     ]) {
       expect(isProtectedComputerLifecycleCommand(command)).toBe(true);
     }
@@ -97,6 +99,14 @@ describe('computer lifecycle command guard', () => {
       'browser profile path',
     );
     expect(protectedComputerLifecycleRefusal('rm -f /tmp/.X1-lock')).toBe('X11 path');
+    for (const command of [
+      'cat ~/.agent-browser/sessions/chief_c1-default.json',
+      'ls -la /home/agent/.agent-browser',
+      'cp -r .agent-browser /tmp/copy',
+      'tar czf /tmp/s.tgz /home/agent/.Agent-Browser/sessions',
+    ]) {
+      expect(protectedComputerLifecycleRefusal(command)).toBe('browser profile path');
+    }
     expect(protectedComputerLifecycleRefusal('rm -rf "$TARGET/.browser-profiles/chromium"')).toBe(
       'unresolved variable $TARGET',
     );
