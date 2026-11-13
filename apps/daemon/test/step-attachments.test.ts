@@ -6,6 +6,7 @@ import { describe, expect, test } from 'vitest';
 import { MachineClient } from '../src/machine-client.js';
 import {
   materializeFile,
+  resolveDeliveredPrompt,
   resolveStepImages,
   resolveStepImagesOrRaw,
 } from '../src/step-attachments.js';
@@ -741,5 +742,50 @@ describe('resolveStepImagesOrRaw', () => {
     });
     expect(resolved).toEqual({ text, images: [], skippedNoVision: 0 });
     expect(lines[1]).toBe('attachment resolve failed (delivering raw text): log sink exploded');
+  });
+});
+
+describe('resolveDeliveredPrompt', () => {
+  test('carries the delivered images when the prompt has one', async () => {
+    const s = setup();
+    const { client } = fakeClient({ id1: pngResponse() });
+    const text = formatAttachmentToken('shot.png', 'team-a/id1.png');
+    const opts = { text, stepId: 's1', client, materializeDir: s.materializeDir, log: s.log };
+    const resolved = await resolveStepImages(opts);
+    const delivered = await resolveDeliveredPrompt(opts);
+    expect(delivered.text).toBe(resolved.text);
+    expect(delivered.images).toEqual(resolved.images);
+    expect(delivered.images).toHaveLength(1);
+    expect(delivered.skippedNoVision).toBe(0);
+  });
+
+  test('leaves images undefined for a prompt without images', async () => {
+    const s = setup();
+    const { client } = fakeClient({});
+    const delivered = await resolveDeliveredPrompt({
+      text: 'plain prompt',
+      stepId: 's1',
+      client,
+      materializeDir: s.materializeDir,
+      log: s.log,
+    });
+    expect(delivered).toEqual({ text: 'plain prompt', images: undefined, skippedNoVision: 0 });
+  });
+
+  test('counts images skipped for a model without vision', async () => {
+    const s = setup();
+    const { client, requested } = fakeClient({ id1: pngResponse() });
+    const text = formatAttachmentToken('shot.png', 'team-a/id1.png');
+    const delivered = await resolveDeliveredPrompt({
+      text,
+      stepId: 's1',
+      client,
+      materializeDir: s.materializeDir,
+      log: s.log,
+      imageSupport: false,
+    });
+    expect(delivered.images).toBeUndefined();
+    expect(delivered.skippedNoVision).toBe(1);
+    expect(requested).toEqual([]);
   });
 });
