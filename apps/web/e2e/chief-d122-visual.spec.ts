@@ -51,24 +51,3 @@ test('reply headings are 15px and 600 like the body, not larger', async ({ page 
     expect(face).toEqual({ size: '15px', weight: '600' });
   }
 });
-
-test('the quick-start chips are quiet bordered pills at least 32px high with an icon', async ({
-  page,
-}) => {
-  await mockLive(page, { threads: [], messages: [], todos: [] });
-  await page.goto('/app');
-  const chips = page.getByTestId('home-c-starters').getByRole('button');
-  await expect(chips).toHaveCount(4);
-  for (const index of [0, 1, 2, 3]) {
-    const chip = chips.nth(index);
-    const box = await chip.boundingBox();
-    expect(box?.height ?? 0).toBeGreaterThanOrEqual(32);
-    await expect(chip.locator('svg')).toHaveCount(1);
-    const face = await chip.evaluate((node) => {
-      const style = getComputedStyle(node);
-      return { border: style.borderTopWidth, radius: style.borderTopLeftRadius };
-    });
-    expect(face.border).toBe('1px');
-    expect(Number.parseFloat(face.radius)).toBeGreaterThanOrEqual(16);
-  }
-});

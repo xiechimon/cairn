@@ -4,24 +4,25 @@ import { evidenceShot } from './evidence';
 import { openReplySteps, pressOpenCoordinator } from './helpers.js';
 
 test.describe('home is one continuous Coordinator chat (T1)', () => {
-  test('a fresh home shows the greeting, the composer and the running count, and no floating Coordinator', async ({
+  test('a fresh home shows a greeting bubble with starter replies, the composer, and no floating Coordinator', async ({
     page,
   }) => {
     await mockLive(page, { threads: [], messages: [] });
     await page.goto('/app');
     const home = page.getByTestId('home-c');
-    await expect(page.getByTestId('home-c-hero')).toContainText('ian');
-    await expect(page.getByTestId('home-c-since')).toContainText('1 件在进行');
+    const stream = home.getByTestId('chief-stream');
+    await expect(stream).toContainText('ian。你想让我做什么？');
+    await expect(home.getByTestId('chief-quick-reply')).toHaveText(['做个计划', '接一个仓库', '接着最近的活']);
     await expect(home.getByTestId('chief-composer-input')).toBeVisible();
     await expect(page.locator('.chief-fab')).toHaveCount(0);
     await expect(page.getByRole('complementary', { name: 'Coordinator' })).toHaveCount(0);
     const composer = await home.getByTestId('chief-composer-block').boundingBox();
-    const hero = await page.getByTestId('home-c-hero').boundingBox();
+    const greeting = await stream.getByText('ian。你想让我做什么？').boundingBox();
     const viewport = page.viewportSize();
-    expect(composer && hero && viewport).toBeTruthy();
-    if (composer && hero && viewport) {
+    expect(composer && greeting && viewport).toBeTruthy();
+    if (composer && greeting && viewport) {
       expect(composer.y + composer.height).toBeGreaterThan(viewport.height - 40);
-      expect(hero.y).toBeLessThan(composer.y);
+      expect(greeting.y).toBeLessThan(composer.y);
     }
     const input = home.getByTestId('chief-composer-input');
     await input.focus();
@@ -40,7 +41,8 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect.poll(() => sent).toEqual(['看板拖完卡片计数不对']);
     const home = page.getByTestId('home-c');
     await expect(home.getByTestId('chief-stream')).toContainText('看板拖完卡片计数不对');
-    await expect(page.getByTestId('home-c-hero')).toHaveCount(0);
+    await expect(home.getByTestId('chief-stream')).not.toContainText('你想让我做什么？');
+    await expect(home.getByTestId('chief-quick-reply')).toHaveCount(0);
     const block = home.getByTestId('chief-composer-block');
     await expect(block).toBeVisible();
     const viewport = page.viewportSize();
@@ -65,7 +67,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
       );
     });
     await page.goto('/app');
-    await expect(page.getByTestId('home-c-hero')).toBeVisible();
+    await expect(page.getByTestId('home-c').getByTestId('chief-stream')).toContainText('你想让我做什么？');
     await page.evaluate(() => {
       (window as unknown as { skeletonSeen: number }).skeletonSeen = 0;
       new MutationObserver(() => {
@@ -91,7 +93,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await input.fill('看板拖完卡片计数不对');
     await input.press('Enter');
     await expect.poll(() => sent).toEqual(['看板拖完卡片计数不对']);
-    await expect(page.getByTestId('home-c-hero')).toBeVisible();
+    await expect(page.getByTestId('home-c').getByTestId('chief-stream')).toContainText('你想让我做什么？');
     await expect(input).toHaveValue('看板拖完卡片计数不对');
   });
 
@@ -187,7 +189,11 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
         createdAt: (21 + i * 2) * minute,
       },
     ]).flat();
-    await mockLive(page, { threads: [THREAD], messages: [...projectTurns, ...coordinatorTurns] });
+    await mockLive(page, {
+      threads: [THREAD],
+      messages: coordinatorTurns,
+      channels: { 'proj-1': projectTurns },
+    });
     await page.goto('/app');
     const sidebar = page.locator('[data-slot="sidebar-nav-row"], [data-slot="sidebar-project-row"]');
     const newest = page.getByTestId('chief-stream').getByText('第 29 个回答');

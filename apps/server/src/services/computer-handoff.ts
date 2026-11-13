@@ -84,6 +84,7 @@ export function sweepComputerHandoffs(db: Db, now: number): void {
       and(
         eq(computerCall.tool, 'request_takeover'),
         inArray(computerCall.state, ['dispatched', 'running']),
+        lte(computerCall.deadlineAt, now),
       ),
     )
     .all();

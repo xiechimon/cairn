@@ -36,7 +36,8 @@ export function globalCoordinatorThread(
   const conversations = threads.filter(
     (thread) => !isOrchestrationThread(thread) && thread.projectId == null,
   );
-  const pool = conversations.length > 0 ? conversations : threads;
+  const pool =
+    conversations.length > 0 ? conversations : threads.filter((thread) => thread.projectId == null);
   return pool.reduce<ChiefThread | null>(
     (oldest, thread) => (oldest === null || thread.createdAt < oldest.createdAt ? thread : oldest),
     null,
