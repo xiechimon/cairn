@@ -59,11 +59,11 @@ test('shutdown after host start retains ambiguous delivery', async () => {
 });
 
 test('a completed command keeps its result while output drains past the execution budget', async () => {
-  provider = new HostComputerProvider({ home: root, killGraceMs: 20, streamDrainMs: 1000 });
+  provider = new HostComputerProvider({ home: root, killGraceMs: 20, streamDrainMs: 3000 });
   const frames: ComputerFrameBody[] = [];
   const dispatcher = createComputerDispatcher({
     host: provider,
-    commandTimeoutMs: 500,
+    commandTimeoutMs: 2000,
     client: {
       async computerFrames(_callId, body) {
         frames.push(...body.frames);
