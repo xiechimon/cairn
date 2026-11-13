@@ -194,17 +194,19 @@ test('a failed chip send shows the error and keeps the chips', async ({ page }) 
 });
 
 const OTHER = { ...PROJECT, id: 'proj-2', name: 'landing' };
-const PROJECT_TURNS: Row[] = [
+const OTHER_TURNS: Row[] = [
   { id: 'b1', role: 'user', content: '看一下落地页', createdAt: 2, projectId: OTHER.id },
-  { id: 'b2', role: 'assistant', content: '落地页看过了，没有问题。', createdAt: 3 },
-  ...TURN.map((row) => (row.id === 'u1' ? { ...row, projectId: PROJECT.id } : row)),
+  { id: 'b2', role: 'assistant', content: '落地页看过了，没有问题。', createdAt: 3, projectId: OTHER.id },
 ];
 
-function projectState(): MockState {
-  return state({ messages: PROJECT_TURNS, projects: [PROJECT, OTHER] });
+function projectState(projectRows: Row[] = TURN): MockState {
+  return state({
+    projects: [PROJECT, OTHER],
+    channels: { [OTHER.id]: OTHER_TURNS, [PROJECT.id]: projectRows },
+  });
 }
 
-test('suggestions belong to the turn that made them: another project view does not show them', async ({
+test('suggestions belong to the channel that made them: another project channel does not show them', async ({
   page,
 }) => {
   await mockLive(page, projectState());
@@ -215,7 +217,7 @@ test('suggestions belong to the turn that made them: another project view does n
   await expect(chips(page)).toHaveText(REPLIES);
 });
 
-test("in the owning project's view the suggestions show and send with that project", async ({ page }) => {
+test("in the owning project's channel the suggestions show and send with that project", async ({ page }) => {
   const bodies: { content?: string; projectId?: string }[] = [];
   await mockLive(page, projectState(), (path, route) => {
     if (route.request().method() === 'POST' && /\/messages$|\/chief\/threads$/.test(path))
@@ -228,11 +230,11 @@ test("in the owning project's view the suggestions show and send with that proje
   await expect.poll(() => bodies.at(-1)).toMatchObject({ content: '先只看 README', projectId: PROJECT.id });
 });
 
-test("a pending question from another project is not answerable from this project's view", async ({
+test("a pending question from another project channel is not answerable from this channel", async ({
   page,
 }) => {
   const question = { ...pendingQuestion, createdAt: 14 };
-  await mockLive(page, state({ messages: [...PROJECT_TURNS, question], projects: [PROJECT, OTHER] }));
+  await mockLive(page, projectState([...TURN, question]));
   await page.goto(`/app?project=${OTHER.id}&chat=1`);
   await expect(page.getByTestId('chief-stream')).toContainText('落地页看过了');
   await expect(page.getByTestId('chief-question')).toHaveCount(0);

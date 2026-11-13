@@ -250,6 +250,7 @@ export interface FixtureSet {
   archivedProjects?: Array<{ id: string; name: string; archivedAt: number }>;
   projectAvatars?: Record<string, { icon?: ProjectIcon; color?: ProjectColor }>;
   chief?: ChiefContent;
+  chiefChannels?: Record<string, ChiefContent>;
   github?: GithubFixture;
   tags?: Array<Pick<TagRecord, 'id' | 'name' | 'color'>>;
   machinesOpen?: string;

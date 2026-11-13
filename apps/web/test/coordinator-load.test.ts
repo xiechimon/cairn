@@ -100,4 +100,8 @@ describe('globalCoordinatorThread', () => {
     ).toBe('a');
     expect(globalCoordinatorThread([])).toBeNull();
   });
+
+  it('never takes a project channel for the main conversation', () => {
+    expect(globalCoordinatorThread([thread('chief-cairn', 'cairn', 1, 'proj-1')])).toBeNull();
+  });
 });

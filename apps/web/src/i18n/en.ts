@@ -105,7 +105,7 @@ export const EN: Record<string, string> = {
   // #351 看板更名工作台：'Workbench'（不用 'Workspace'，避撞 daemon workspaces 概念）
   工作台: 'Workbench',
   // Paper 顶栏等你处理摘要：数字单独着色，后接本串（「3 项等你处理」→「3 waiting on you」）
-  '{greeting}，{name}': '{greeting}, {name}',
+  '{greeting}，{name}！你想让我做什么？': '{greeting}, {name}! What would you like me to do?',
   夜深了: 'Good night',
   早上好: 'Good morning',
   中午好: 'Good afternoon',
@@ -1449,13 +1449,12 @@ export const EN: Record<string, string> = {
   做个计划: 'Make a plan',
   接一个仓库: 'Add a repo',
   接着最近的活: 'Pick up recent work',
-  用我的工具: 'Use my tools',
   '与 Coordinator 的对话': 'Conversation with the Coordinator',
   对话加载失败: 'Could not load the conversation',
   '对话记录还在，重试一下。': 'Your conversation is still there. Try again.',
-  '{n} 件在进行': '{n} in progress',
   待你决定: 'Needs you',
   '跟 Coordinator 说（在 {name} 里）…': 'Talk to the Coordinator (in {name})…',
+  '{name}，你想在 {project} 里做什么？': '{name}, what would you like to do in {project}?',
   首页: 'Home',
   'Claude 登录需要处理': 'Claude sign-in needs attention',
   '{kind} 步骤': '{kind} step',
