@@ -20,8 +20,6 @@ import type {
   WorktreeOps,
 } from '@cairn/shared';
 import {
-  AGENT_TOOL_MERGE,
-  AGENT_TOOL_PUSH,
   appendAnswers,
   appendPlanLocationNote,
   appendReportLocationNote,
@@ -59,11 +57,7 @@ import { RETRY_STORM_MAX } from './backend/pi-retry.js';
 import { piWorktreeSkillDirs } from './backend/skills.js';
 import { prepareWebTools } from './backend/web-search.js';
 import { assertNoLegacyBrief, composeBrief } from './brief-file.js';
-import {
-  type ClaudeCodeAuthProbe,
-  claudeCodeAuthFailureMessage,
-  probeClaudeCodeAuth,
-} from './claude-code-auth.js';
+import type { ClaudeCodeAuthProbe } from './claude-code-auth.js';
 import { claudeQuotaTrip, claudeRateLimitReport, type QuotaTrip } from './claude-quota-trip.js';
 import {
   credentialRedactor,
@@ -89,6 +83,7 @@ import { prepareCreateTagTool, stepGitRunner } from './step-git-tools.js';
 import { localMergeDoneBody } from './step-local-merge.js';
 import { readDeliveredPlan, readInfoReport } from './step-outputs.js';
 import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
+import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
 import {
   buildTaskPrompt,
   carriedAnswers,
@@ -443,54 +438,30 @@ async function runClaimedStep(
     reason: reason.slice(0, 500),
     ...(retryAfterMs !== null ? { retryAfterMs } : {}),
   });
-  const agentTools = agent.tools;
-  if (claimed.step.kind === 'merge' && agentTools !== undefined) {
-    const missing = [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].filter((t) => !agentTools.includes(t));
-    if (missing.length > 0) {
-      clearCredentials(creds);
-      await failStep(
-        deps,
-        heartbeat,
-        stepId,
-        `Agent 未获「${missing.join('」「')}」授权（Agent 详情页权限 tab），合并步拒绝执行`,
-      );
-      return;
-    }
-  }
-  if (runtimeId === 'claude-code' && creds.claudeSubscriptionToken === undefined) {
-    const auth = await (deps.claudeCodeAuthProbe ?? probeClaudeCodeAuth)();
-    if (auth.state === 'not-logged-in') {
-      clearCredentials(creds);
-      await failStep(
-        deps,
-        heartbeat,
-        stepId,
-        claudeCodeAuthFailureMessage(deps.machineName ?? hostname()),
-      );
-      return;
-    }
-    if (auth.state === 'unknown') {
-      logger.step(`claude-code auth probe inconclusive: ${auth.reason} (continuing)`);
-    }
+  const refusal = await agentStepRefusal({
+    stepKind: claimed.step.kind,
+    agentTools: agent.tools,
+    runtimeId,
+    hasSubscriptionToken: creds.claudeSubscriptionToken !== undefined,
+    authProbe: deps.claudeCodeAuthProbe,
+    machineName: () => deps.machineName ?? hostname(),
+    log: (message) => logger.step(message),
+  });
+  if (refusal !== null) {
+    clearCredentials(creds);
+    await failStep(deps, heartbeat, stepId, refusal);
+    return;
   }
   const backend = deps.backendFor(agent?.provider, agent.id);
   deps.stepSteeringSupport?.set(stepId, backend.capabilities.steering !== false);
   const modelKey = `${provider?.providerId ?? agent.provider}/${agent.modelId}`;
   logger.raw(`using model ${modelKey}`);
 
-  let imageSupport: boolean | null = null;
-  if (!isChief) {
-    try {
-      imageSupport = (await backend.modelSupportsImages?.(provider, agent.modelId)) ?? null;
-    } catch (err) {
-      imageSupport = null;
-      logger.step(
-        `image support probe failed (assuming unknown): ${
-          err instanceof Error ? err.message : String(err)
-        }`,
+  let imageSupport = isChief
+    ? null
+    : await probeModelImageSupport(backend, provider, agent.modelId, (message) =>
+        logger.step(message),
       );
-    }
-  }
   deps.stepImageSupport?.set(stepId, imageSupport);
   let activePrompt = prompt;
   let deliveryPrompt = prompt;
