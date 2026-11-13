@@ -4,6 +4,7 @@ import { expect, it } from 'vitest';
 import { openDbWithHandle } from '../../apps/server/src/db/client.js';
 import { coordinatorTurnSnapshot } from '../../apps/server/src/db/schema.js';
 import { seed } from '../../apps/server/src/db/seed.js';
+import { replayInput } from '../eval/coordinator-routing/contract.mts';
 import { buildDatasetItem, listHarvestCandidates } from '../eval/coordinator-routing/harvest.mts';
 import {
   harvestSnapshotReplayInput,
@@ -51,7 +52,27 @@ function sealedRow(overrides: Partial<SealedRow> = {}): SealedRow {
       modelId: 'm',
       thinkingLevel: null,
       volatileText: null,
-      initialTodoIds: [],
+      initialTodos: [
+        {
+          id: 'todo-seed',
+          projectId: 'p0',
+          title: 'seed task',
+          spec: 'seed spec',
+          phase: 'todo',
+          phaseAt: 5,
+          archivedAt: null,
+          seqNum: 1,
+          orderIndex: 0,
+          blockedBy: [],
+          latestBuildId: null,
+          sourceKind: null,
+          sourceRef: null,
+          request: null,
+          output: 'info',
+        },
+      ],
+      initialThreads: [],
+      initialVisible: [{ id: 'todo-seed', ownership: null, blocks: false }],
       projects: [
         {
           id: 'p0',
@@ -86,7 +107,9 @@ function sealedRow(overrides: Partial<SealedRow> = {}): SealedRow {
 it('keeps the sealed payload contract aligned with the server capture schema', () => {
   const payload = JSON.parse(sealedRow().payload as string) as { claim: Record<string, unknown> };
   expect(Object.keys(payload.claim).sort()).toEqual([
-    'initialTodoIds',
+    'initialThreads',
+    'initialTodos',
+    'initialVisible',
     'instruction',
     'memories',
     'modelId',
@@ -107,7 +130,10 @@ it('freezes a sealed snapshot into a replay input with trace provenance', () => 
   expect(input.projects[0]).toMatchObject({ id: 'p0', name: 'docs' });
   expect(input.snapshot.source).toBe('trace');
   expect(input.snapshot.sourceTraceId).toBe(otlpTraceIdOfTurn('turn-1'));
-  expect(input.snapshot.todos).toHaveLength(0);
+  expect(input.snapshot.todos).toHaveLength(1);
+  expect(input.snapshot.todos[0]).toMatchObject({ id: 'todo-seed', title: 'seed task' });
+  expect(input.snapshot.visible).toEqual([{ id: 'todo-seed', ownership: null, blocks: false }]);
+  expect(() => replayInput.parse(input)).not.toThrow();
 });
 
 it('rejects every ineligible snapshot state fail-closed', () => {
@@ -132,10 +158,11 @@ it('rejects every ineligible snapshot state fail-closed', () => {
     ['digest mismatch', { digest: 'a'.repeat(64) }, /incomplete: snapshot digest mismatch/],
     ['redacted required input', { redactionCount: 2 }, /incomplete: snapshot required redaction/],
     ['no instruction', {}, /incomplete: snapshot has no submitted instruction/],
+    ['closure ownership drift', {}, /incomplete: snapshot does not map to a replay input/],
   ];
   const defaultClaim = JSON.parse(sealedRow().payload as string).claim;
   for (const [name, overrides, pattern] of cases) {
-    const patchedPayloads = ['no instruction', 'pre-existing todos', 'tool views without closure'];
+    const patchedPayloads = ['no instruction', 'closure ownership drift'];
     const row = sealedRow(
       patchedPayloads.includes(name)
         ? {
@@ -143,20 +170,13 @@ it('rejects every ineligible snapshot state fail-closed', () => {
             payload: JSON.stringify(
               name === 'no instruction'
                 ? { claim: { ...defaultClaim, instruction: null }, toolViews: [] }
-                : name === 'pre-existing todos'
-                  ? { claim: { ...defaultClaim, initialTodoIds: ['todo-1'] }, toolViews: [] }
-                  : {
-                      claim: defaultClaim,
-                      toolViews: [
-                        {
-                          callId: 'c1',
-                          tool: 'projects',
-                          params: {},
-                          preCallTodos: [],
-                          result: [],
-                        },
-                      ],
+                : {
+                    claim: {
+                      ...defaultClaim,
+                      initialVisible: [{ id: 'todo-unknown', ownership: null, blocks: false }],
                     },
+                    toolViews: [],
+                  },
             ),
           }
         : overrides,

@@ -6,7 +6,7 @@ import type { Db } from '../../../apps/server/src/db/client.js';
 import { coordinatorTurnSnapshot } from '../../../apps/server/src/db/schema.js';
 import { type ReplayInput, replayInput } from './contract.mts';
 
-export const SNAPSHOT_SCHEMA_VERSION = 1;
+export const SNAPSHOT_SCHEMA_VERSION = 2;
 
 const sealedSnapshot = z.strictObject({
   claim: z.object({
@@ -29,7 +29,56 @@ const sealedSnapshot = z.strictObject({
         })
         .strict(),
     ),
-    initialTodoIds: z.array(z.string()),
+    initialTodos: z.array(
+      z
+        .object({
+          id: z.string(),
+          projectId: z.string(),
+          title: z.string(),
+          spec: z.string(),
+          phase: z.string(),
+          phaseAt: z.number(),
+          archivedAt: z.number().nullable(),
+          seqNum: z.number(),
+          orderIndex: z.number(),
+          blockedBy: z.array(z.string()).nullable(),
+          latestBuildId: z.string().nullable(),
+          sourceKind: z.string().nullable(),
+          sourceRef: z.string().nullable(),
+          request: z.unknown().nullable(),
+          output: z.string(),
+        })
+        .strict(),
+    ),
+    initialThreads: z.array(
+      z
+        .object({
+          id: z.string(),
+          todoId: z.string(),
+          withPlan: z.boolean(),
+          prevPhase: z.string().nullable(),
+          triggerSource: z.string(),
+          planDocId: z.string().nullable(),
+          errorMessage: z.string().nullable(),
+          prUrl: z.string().nullable(),
+          prNumber: z.number().nullable(),
+          diffHash: z.string().nullable(),
+          reportAttachmentId: z.string().nullable(),
+          stop: z.unknown().nullable(),
+          reportLine: z.string().nullable(),
+          createdAt: z.number(),
+        })
+        .strict(),
+    ),
+    initialVisible: z.array(
+      z
+        .object({
+          id: z.string(),
+          ownership: z.object({ owner: z.string(), reason: z.string() }).strict().nullable(),
+          blocks: z.boolean(),
+        })
+        .strict(),
+    ),
   }),
   toolViews: z.array(
     z.object({
@@ -86,10 +135,6 @@ export function snapshotToReplayInput(rawRow: {
   if (!parsed.success) throw new Error('incomplete: snapshot payload schema mismatch');
   if (parsed.data.claim.instruction === null)
     throw new Error('incomplete: snapshot has no submitted instruction');
-  if (parsed.data.claim.initialTodoIds.length > 0)
-    throw new Error('incomplete: snapshot carries pre-existing todos without a full closure');
-  if (parsed.data.toolViews.length > 0)
-    throw new Error('incomplete: snapshot carries tool views without a full closure');
   const input = replayInput.safeParse({
     request: parsed.data.claim.instruction,
     projects: parsed.data.claim.projects,
@@ -97,9 +142,9 @@ export function snapshotToReplayInput(rawRow: {
       source: 'trace',
       sourceTraceId: row.sourceTraceId,
       capturedAt: row.capturedAt,
-      todos: [],
-      threads: [],
-      visible: [],
+      todos: parsed.data.claim.initialTodos,
+      threads: parsed.data.claim.initialThreads,
+      visible: parsed.data.claim.initialVisible,
     },
   });
   if (!input.success) throw new Error('incomplete: snapshot does not map to a replay input');

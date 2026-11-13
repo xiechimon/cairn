@@ -174,3 +174,64 @@ describe('coordinator turn snapshot writer', () => {
     }
   });
 });
+
+it('records the full todo closure of pre-existing todos at claim time', async () => {
+  const w = await world('hello');
+  w.s.db.insert(project).values({ id: 'p-closure', teamId: w.teamId, name: 'closure' }).run();
+  w.s.db
+    .insert(todo)
+    .values({
+      id: 'todo-pre',
+      teamId: w.teamId,
+      projectId: 'p-closure',
+      title: 'pre-existing task',
+      spec: 'spec text',
+      phase: 'done',
+      phaseAt: 5,
+      seqNum: 1,
+      latestBuildId: null,
+      output: 'info',
+    })
+    .run();
+  const seeded = w.s.db.select().from(todo).where(eq(todo.id, 'todo-pre')).get();
+  expect(seeded).toBeDefined();
+  const { faux } = stub('all quiet');
+  const coordinator = boot(w, faux, {});
+  coordinator.wake(w.threadId);
+  await coordinator.idle();
+
+  const row = snapshotRow(w.s.db, w.stepId);
+  expect(row?.status).toBe('sealed');
+  const payload = JSON.parse(row?.payload ?? 'null');
+  const closure = payload?.claim?.initialTodos ?? [];
+  expect(closure).toHaveLength(1);
+  expect(closure[0]).toMatchObject({
+    id: 'todo-pre',
+    projectId: 'p-closure',
+    title: 'pre-existing task',
+    spec: 'spec text',
+    phase: 'done',
+    latestBuildId: null,
+  });
+  expect(Object.keys(closure[0]).sort()).toEqual([
+    'archivedAt',
+    'blockedBy',
+    'id',
+    'latestBuildId',
+    'orderIndex',
+    'output',
+    'phase',
+    'phaseAt',
+    'projectId',
+    'request',
+    'seqNum',
+    'sourceKind',
+    'sourceRef',
+    'spec',
+    'title',
+  ]);
+  expect(payload?.claim?.initialThreads ?? []).toHaveLength(0);
+  expect(payload?.claim?.initialVisible ?? []).toEqual([
+    expect.objectContaining({ id: 'todo-pre' }),
+  ]);
+});
