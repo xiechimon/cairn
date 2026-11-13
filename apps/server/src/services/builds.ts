@@ -20,26 +20,13 @@ import {
   type RouteOverride,
   SESSION_BRIEF,
   systemRowOf,
-  UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  gte,
-  inArray,
-  isNotNull,
-  isNull,
-  notInArray,
-  or,
-  sql,
-} from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, machine, message, project, steerPending, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import type { systemGitOps } from '../lib/git.js';
-import { type FetchLike, isFullSha } from '../lib/github.js';
+import type { FetchLike } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { BLOCKED_STEP_KINDS, blockedHold, blockedNow } from './blockers.js';
@@ -119,6 +106,14 @@ export { assertMergeTools, buildMergePermission } from './build-merge-permission
 export { requestMerge } from './build-merge-request.js';
 export { applyBuildStepAction } from './build-step-action.js';
 export { type CompleteStepOutcome, completeStep } from './build-step-complete.js';
+export {
+  assertParkedBuildIdle,
+  dispatchHeadSha,
+  hasActiveStep,
+  lastPushedCheckpoint,
+  mergingBuilds,
+  stepKindInFlight,
+} from './build-step-state.js';
 export { mergedPrElsewhere, planAutoApproveAt, planAwaitsAutoConfirm };
 
 export function toBuildRecord(row: BuildRow): BuildRecord {
@@ -592,93 +587,6 @@ export const STEP_KIND_TEXT: Record<StepKind, string> = {
   review: '审核',
   verify: '验证',
 };
-
-export const mergingBuilds = new Set<string>();
-
-export function stepKindInFlight(deps: BuildDeps, buildId: string): StepKind | null {
-  return (
-    deps.db
-      .select({ kind: step.kind })
-      .from(step)
-      .where(
-        and(
-          eq(step.buildId, buildId),
-          or(
-            eq(step.status, 'claimed'),
-            and(
-              inArray(step.status, [...UNSTARTED_STEP_STATUSES]),
-              notInArray(step.kind, ['verify', 'review']),
-            ),
-          ),
-        ),
-      )
-      .get()?.kind ?? null
-  );
-}
-
-export function hasActiveStep(deps: BuildDeps, buildId: string): boolean {
-  return mergingBuilds.has(buildId) || stepKindInFlight(deps, buildId) !== null;
-}
-
-export function assertParkedBuildIdle(deps: BuildDeps, row: BuildRow): void {
-  if (retryIsParked(row.errorMessage ?? '') && hasActiveStep(deps, row.id))
-    throw new HttpError(
-      409,
-      `${row.errorMessage} Wait for active steps to finish before retrying.`,
-    );
-}
-
-export function lastPushedCheckpoint(
-  deps: BuildDeps,
-  buildId: string,
-  opts: { mergeSteps: boolean },
-): string | null {
-  return (
-    deps.db
-      .select({ commit: step.checkpointCommit })
-      .from(step)
-      .where(
-        and(
-          eq(step.buildId, buildId),
-          notInArray(step.kind, opts.mergeSteps ? ['review'] : ['review', 'merge']),
-          eq(step.status, 'done'),
-          isNotNull(step.checkpointCommit),
-        ),
-      )
-      .orderBy(
-        desc(
-          sql`coalesce(${step.finishedAt}, ${step.lastHeartbeatAt}, ${step.claimedAt}, ${step.createdAt})`,
-        ),
-        desc(step.createdAt),
-      )
-      .get()?.commit ?? null
-  );
-}
-
-export function dispatchHeadSha(deps: BuildDeps, buildId: string): string | null {
-  const rows = deps.db
-    .select({ commit: step.checkpointCommit })
-    .from(step)
-    .where(
-      and(
-        eq(step.buildId, buildId),
-        notInArray(step.kind, ['review', 'merge', 'verify']),
-        eq(step.status, 'done'),
-        isNotNull(step.checkpointCommit),
-      ),
-    )
-    .orderBy(
-      desc(
-        sql`coalesce(${step.finishedAt}, ${step.lastHeartbeatAt}, ${step.claimedAt}, ${step.createdAt})`,
-      ),
-      desc(step.createdAt),
-    )
-    .all();
-  for (const row of rows) {
-    if (row.commit !== null && isFullSha(row.commit)) return row.commit;
-  }
-  return null;
-}
 
 export function confirmPlanAutomatically(deps: BuildDeps, buildId: string): void {
   try {
