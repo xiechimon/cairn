@@ -14,7 +14,6 @@ test('the home is one Coordinator conversation: no greeting once it has messages
   await page.goto(home('home-c'));
   await expect(page.getByTestId('chief-stream')).toBeVisible();
   await expect(page.getByTestId('home-c').locator('.voice-greeting')).toHaveCount(0);
-  await expect(page.getByTestId('home-c-since')).toHaveCount(0);
   await expect(page.getByTestId('tasks-badge')).toHaveText('3');
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
   await expect(page.getByTestId('chief-stream').getByTestId('chief-task-ref')).toHaveText([
@@ -85,14 +84,18 @@ test('a project link lands on that project conversation', async ({ page }) => {
   await expect(page.getByTestId('project-home')).toHaveCount(0);
 });
 
-test('a first run greets and offers starters, with nothing pinned', async ({ page }) => {
+test('a first run greets in a bubble and offers starter replies, with nothing pinned', async ({
+  page,
+}) => {
   await page.goto(home('home-c-empty'));
-  await expect(page.getByTestId('home-c-hero').getByRole('heading', { level: 2 })).toBeVisible();
+  await expect(page.getByTestId('chief-stream')).toContainText('What would you like me to do?');
+  await expect(page.getByTestId('home-c').getByRole('heading', { level: 2 })).toHaveCount(0);
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
-  await expect(page.getByTestId('home-c-since')).not.toContainText('waiting on you');
-  await expect(page.getByTestId('home-c-since')).not.toContainText('in progress');
-  await page.getByTestId('home-c-starters').getByRole('button', { name: 'Make a plan' }).click();
-  await expect(composer(page)).toHaveValue('Make a plan');
+  await expect(page.getByTestId('chief-quick-reply')).toHaveText([
+    'Make a plan',
+    'Add a repo',
+    'Pick up recent work',
+  ]);
 });
 
 test('at phone width the home stays one column', async ({ page }) => {
@@ -169,7 +172,7 @@ test('a failed conversation load shows Retry instead of the greeting, with no co
   await page.goto('/app');
   const error = page.getByTestId('home-c-error');
   await expect(error).toBeVisible();
-  await expect(page.getByTestId('home-c-hero')).toHaveCount(0);
+  await expect(page.getByTestId('chief-quick-reply')).toHaveCount(0);
   await expect(page.getByTestId('chief-composer-input')).toHaveCount(0);
   await page.getByTestId('home-c').getByRole('button', { name: 'Tasks' }).click();
   await expect(page.getByRole('complementary', { name: 'Tasks' })).toBeVisible();

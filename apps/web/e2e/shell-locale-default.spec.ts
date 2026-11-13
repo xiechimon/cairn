@@ -1,6 +1,4 @@
 import { expect, type Page, test } from '@playwright/test';
-import { mockLive, TASK } from './chief-home-mock';
-import { evidenceShot } from './evidence';
 
 const workbench = (page: Page, name: string) =>
   page.getByRole('complementary').getByRole('button', { name, exact: true });
@@ -35,40 +33,5 @@ test.describe('a browser set to Chinese', () => {
     await page.addInitScript(() => localStorage.setItem('cairn-locale', 'en'));
     await page.goto('/app');
     await expect(workbench(page, 'Search')).toBeVisible();
-  });
-});
-
-test.describe('English count grammar', () => {
-  test.use({ locale: 'en-US' });
-
-  for (const theme of ['light', 'dark'] as const) {
-    for (const width of [1440, 390]) {
-      test(`one running task at ${width}px in ${theme}`, async ({ page }) => {
-        await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
-        await page.emulateMedia({ colorScheme: theme });
-        await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
-        await mockLive(page, { threads: [], messages: [], todos: [TASK] });
-        await page.goto('/app');
-        await expect(page.getByTestId('home-c-since')).toContainText('1 in progress');
-        await evidenceShot(page, `after-home-${width}-${theme}.png`);
-      });
-    }
-  }
-
-  test('renders plural members and independent running counts', async ({ page }) => {
-    await mockLive(page, {
-      threads: [],
-      messages: [],
-      todos: [TASK, { ...TASK, id: 'todo-2', seqNum: 10 }],
-    });
-    await page.goto('/app');
-    await expect(page.getByTestId('home-c-since')).toContainText('2 in progress');
-  });
-
-  test('retains Chinese count rendering', async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('cairn-locale', 'zh'));
-    await mockLive(page, { threads: [], messages: [], todos: [TASK] });
-    await page.goto('/app');
-    await expect(page.getByTestId('home-c-since')).toContainText('1 件在进行');
   });
 });

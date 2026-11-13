@@ -208,6 +208,16 @@ export const homeC: FixtureSet = {
     homeTodo('home-c-done', 2201, 'Unread dot on threads', 'done', PROJECT_ID),
   ],
   chief: conversation,
+  chiefChannels: {
+    [PROJECT_ID]: {
+      ...conversation,
+      threadTitle: 'cairn',
+      threadId: 'chief-cairn',
+      hasEarlier: false,
+      stream: (conversation.stream ?? []).slice(4),
+      streamAt: (conversation.streamAt ?? []).slice(4),
+    },
+  },
   details: {
     'home-c-confirm': detailConfirm(false).detail ?? { transcript: [] },
     'home-c-review': detailReview({ userMenuOpen: false, changesExpanded: false }).detail ?? {

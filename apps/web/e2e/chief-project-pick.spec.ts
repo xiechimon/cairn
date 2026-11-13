@@ -117,8 +117,9 @@ async function mockLive(page: Page, opts: { projects?: typeof PROJECTS } = {}) {
   const projects = opts.projects ?? PROJECTS;
   const state = {
     sent: [] as Sent[],
+    sentTo: [] as string[],
     todos: [UNSTARTED, RUNNING, DONE] as Record<string, unknown>[],
-    threads: [] as (typeof THREAD)[],
+    threads: [] as (typeof THREAD & { projectId?: string })[],
     messages: [] as { id: string; role: string; content: unknown; createdAt: number }[],
   };
   await page.route('**/api/**', (route) => {
@@ -136,9 +137,18 @@ async function mockLive(page: Page, opts: { projects?: typeof PROJECTS } = {}) {
       state.messages = [{ id: 'n1', role: 'user', content: body.content, createdAt: 30 }];
       return json({ thread: THREAD }, 201);
     }
-    if (p === `/api/conversations/${THREAD.id}/messages` && request.method() === 'POST') {
+    const channel = /^\/api\/teams\/t1\/chief\/channels\/([^/]+)$/.exec(p)?.[1];
+    if (channel !== undefined && request.method() === 'POST') {
+      const name = projects.find((row) => row.id === channel)?.name ?? channel;
+      const opened = { ...THREAD, id: `chief-${channel}`, projectId: channel, title: name };
+      state.threads = [...state.threads.filter((row) => row.id !== opened.id), opened];
+      return json(opened, 201);
+    }
+    const conversation = /^\/api\/conversations\/([^/]+)\/messages$/.exec(p)?.[1];
+    if (conversation !== undefined && request.method() === 'POST') {
       state.sent.push(request.postDataJSON() as Sent);
-      return json({ thread: THREAD }, 201);
+      state.sentTo.push(conversation);
+      return json({ thread: state.threads.find((row) => row.id === conversation) ?? THREAD }, 201);
     }
     if (p === '/api/teams/t1/chief/threads') return json(state.threads);
     if (p === '/api/teams/t1/chief')
@@ -159,6 +169,7 @@ async function mockLive(page: Page, opts: { projects?: typeof PROJECTS } = {}) {
         wakes: [],
       });
     if (p === `/api/conversations/${THREAD.id}/messages`) return json({ messages: state.messages });
+    if (conversation !== undefined) return json({ messages: [] });
     if (p === '/api/todos') return json(state.todos);
     if (p === '/api/projects') return json(projects);
     if (p === '/api/teams/t1/machines') return json([{ id: 'm-ready', name: 'omarchy', online: true }]);
@@ -185,7 +196,7 @@ async function shot(page: Page, name: string) {
 const homeInput = (page: Page) => page.getByTestId('home-c').getByTestId('chief-composer-input');
 
 test.describe('the home sends to the project it is filtered to (#2531)', () => {
-  test('the home has no chip; a project-filtered home sends that projectId and the unfiltered home sends none', async ({
+  test('the home has no chip; a project channel sends to its own thread and the main home sends to none', async ({
     page,
   }) => {
     const state = await mockLive(page);
@@ -197,6 +208,7 @@ test.describe('the home sends to the project it is filtered to (#2531)', () => {
     await expect
       .poll(() => state.sent)
       .toEqual([{ content: '把按钮颜色统一一下', projectId: 'proj-2', clientMessageId: expect.any(String) }]);
+    expect(state.sentTo).toEqual(['chief-proj-2']);
     await page.goto('/app');
     await homeInput(page).fill('早上的摘要没收到');
     await homeInput(page).press('Enter');

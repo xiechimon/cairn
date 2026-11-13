@@ -169,7 +169,7 @@ test('an archived project opens read-only and unarchiving brings the composer ba
     '这个项目已归档。取消归档后才能发消息。',
   );
   await expect(block.getByRole('textbox')).toHaveCount(0);
-  await expect(page.getByTestId('home-c-starters')).toHaveCount(0);
+  await expect(page.getByTestId('chief-quick-reply')).toHaveCount(0);
   await page.getByTestId('archived-project-bar-unarchive').click();
   await expect.poll(() => calls.posts).toEqual(['/api/projects/proj-old/unarchive']);
   await expect(block.getByTestId('archived-project-bar')).toHaveCount(0);

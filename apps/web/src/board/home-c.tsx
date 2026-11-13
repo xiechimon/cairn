@@ -22,13 +22,10 @@ import { EmptyState } from '../components/empty-state.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import type { QueryLike } from '../components/query-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
-import { Greeting } from '../components/stream/greeting.js';
-import { SuggestionChip } from '../components/stream/suggestion-chip.js';
 import { SubtreeErrorBoundary } from '../components/subtree-error-boundary.js';
 import { Button } from '../components/ui/button.js';
 import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { GitBranch, History, ListLines, Puzzle } from '../icons/index.js';
 import {
   ARCHIVED_PROJECT_WRITE_REASON,
   ArchivedProjectBar,
@@ -64,7 +61,7 @@ import {
   scopeTasks,
   type TasksView,
 } from './tasks-sections.js';
-import { THREAD_PARAM, threadStatus, VIEW_PARAM } from './thread-copy.js';
+import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
 import { useOpenThread } from './thread-link.js';
 import { useNarrow } from './use-narrow.js';
 import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
@@ -83,33 +80,18 @@ export function greetingFor(hour: number): string {
   return GREETINGS.find(([until]) => hour < until)?.[1] ?? '晚上好';
 }
 
-const STARTERS = [
-  { label: '做个计划', Icon: ListLines },
-  { label: '接一个仓库', Icon: GitBranch },
-  { label: '接着最近的活', Icon: History },
-  { label: '用我的工具', Icon: Puzzle },
-] as const;
+const STARTERS = ['做个计划', '接一个仓库', '接着最近的活'] as const;
 
-const STARTER_CHIP_CLS =
-  'h-9 min-h-8 gap-1.5 rounded-full border border-(--border) bg-transparent px-3 hover:border-(--input) [&_svg]:text-(--text-tertiary)';
-
-export function streamForProject(
+export function channelStream(
   stream: readonly ChiefStreamItem[],
-  projectId: string | null,
+  fallback: string,
+  fresh: boolean,
 ): ChiefStreamItem[] {
-  if (projectId === null) return [...stream];
-  const ownProject = (item: ChiefStreamItem) => ('projectId' in item ? item.projectId : undefined);
-  if (!stream.some((item) => ownProject(item) !== undefined)) return [...stream];
-  let turn: string | null = null;
-  return stream.filter((item) => {
-    const own = ownProject(item);
-    if (item.kind === 'user') turn = own ?? null;
-    const project = own !== undefined ? own : turn;
-    return (
-      project === projectId ||
-      (project === null && item.kind === 'question' && item.status === 'pending')
-    );
-  });
+  if (stream.some((item) => item.kind === 'user')) return [...stream];
+  const opening = stream.filter((item) => item.kind !== 'error');
+  if (opening.length > 0) return opening;
+  const failed = opening.length < stream.length;
+  return fresh || failed ? [{ kind: 'robot', markdown: fallback, seconds: '' }] : [];
 }
 
 interface HomeCProps {
@@ -196,7 +178,7 @@ export function HomeC({
   tasksQuery,
   archived = null,
 }: HomeCProps) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const { user, live, teamId, teamsQuery } = useLiveData();
   const navigate = useNavigate();
   const location = useLocation();
@@ -275,10 +257,23 @@ export function HomeC({
     () => todos.filter((todo) => projectId === null || todo.projectId === projectId),
     [todos, projectId],
   );
+  const channelGreeting =
+    projectName === null
+      ? t('{greeting}，{name}。你想让我做什么？', {
+          greeting: t(greetingFor(new Date(now).getHours())),
+          name: user.displayName,
+        })
+      : t('{name}，你想在 {project} 里做什么？', { name: user.displayName, project: projectName });
   const stream = useMemo(
-    () => streamForProject(chiefData.stream ?? [], projectId),
-    [chiefData.stream, projectId],
+    () =>
+      archived !== null
+        ? (chiefData.stream ?? [])
+        : channelStream(chiefData.stream ?? [], channelGreeting, surface.chiefFresh),
+    [chiefData.stream, archived, channelGreeting, surface.chiefFresh],
   );
+  const [only, ...rest] = stream;
+  const fallbackOnly =
+    only !== undefined && rest.length === 0 && !(chiefData.stream ?? []).includes(only);
   const conversation = stream.filter(
     (item) => !(item.kind === 'question' && item.status === 'pending'),
   );
@@ -299,8 +294,11 @@ export function HomeC({
     if (at < 0 || full.slice(at).some((item) => item.kind === 'user')) return undefined;
     return full[at];
   }, [chiefData.stream]);
-  const quickReplies =
-    quickOwner !== undefined && stream.includes(quickOwner) ? chiefData.quickReplies : undefined;
+  const quickReplies = fallbackOnly
+    ? STARTERS.map((label) => t(label))
+    : quickOwner !== undefined && stream.includes(quickOwner)
+      ? chiefData.quickReplies
+      : undefined;
   const scopeQuestions = (node: ReactNode) => (
     <QuestionScopeContext.Provider value={questionScope}>{node}</QuestionScopeContext.Provider>
   );
@@ -353,55 +351,6 @@ export function HomeC({
   const [section, setSection] = useState<HTMLElement | null>(null);
   useTouchMessageTools(section);
   const thread = useComposerThreadTarget(scoped);
-  const running = scoped.filter(
-    (todo) => threadStatus(todo) === 'running' && todo.archivedAt == null,
-  );
-
-  const greeting = (
-    <Greeting as="h2">
-      {t('{greeting}，{name}', {
-        greeting: t(greetingFor(new Date(now).getHours())),
-        name: user.displayName,
-      })}
-    </Greeting>
-  );
-  const since = (
-    <p data-testid="home-c-since" className="m-0 mt-0.5 text-meta text-content-tertiary">
-      {[
-        new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'zh-CN', {
-          month: 'long',
-          day: 'numeric',
-          weekday: 'short',
-        }).format(now),
-        ...(badge > 0 ? [t('{n} 项待你处理', { n: badge })] : []),
-        ...(running.length > 0 ? [t('{n} 件在进行', { n: running.length })] : []),
-      ].join(' · ')}
-    </p>
-  );
-
-  const hero = (
-    <header
-      data-testid="home-c-hero"
-      className="mx-auto w-[calc(100%-2rem)] max-w-chat flex-none pt-[6vh]"
-    >
-      {greeting}
-      {since}
-      {badge === 0 && archived === null && (
-        <div data-testid="home-c-starters" className="mt-4 flex flex-wrap gap-2">
-          {STARTERS.map(({ label, Icon }) => (
-            <SuggestionChip
-              key={label}
-              className={STARTER_CHIP_CLS}
-              onClick={() => setPrefill({ text: t(label), key: Date.now() })}
-            >
-              <Icon width={16} height={16} />
-              {t(label)}
-            </SuggestionChip>
-          ))}
-        </div>
-      )}
-    </header>
-  );
 
   const heading = <h1 className="sr-only">{projectName ?? t('Coordinator')}</h1>;
   const paneButtons = narrow ? (
@@ -465,7 +414,7 @@ export function HomeC({
 
   const phoneChrome = narrow && (
     <NarrowChrome
-      mark={loaded ? <ChiefStatusMark chief={chiefData} large className="" /> : null}
+      mark={loaded ? <ChiefStatusMark chief={{ ...chiefData, stream }} large className="" /> : null}
       pane={pane}
       badge={badge}
       onTasks={() => togglePane('tasks')}
@@ -619,7 +568,7 @@ export function HomeC({
           className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
         >
           {paneButtons}
-          {!narrow && <ChiefStatusMark chief={chiefData} />}
+          {!narrow && <ChiefStatusMark chief={{ ...chiefData, stream }} />}
           {banner != null && (
             <div
               data-home-banner=""
@@ -656,7 +605,6 @@ export function HomeC({
                 earlier={surface.earlier}
                 onSettings={() => surface.setChiefView('settings')}
                 showBindGate={!live}
-                hero={hero}
                 todoGlances={todoGlances}
                 prefill={prefill}
                 placeholder={
