@@ -95,11 +95,12 @@ export function parkFailedBuild(deps: BuildDeps, buildId: string, now = nowMs())
         message: `Task #${owner.seqNum} (${owner.title}): ${reason}`,
         provenance: `retry-parking:${owner.id}`,
       }),
+      projectId: owner.projectId,
       createdAt: now,
     };
     deps.db
       .insert(chiefMessage)
-      .values({ ...notice, threadId: thread.id, projectId: owner.projectId })
+      .values({ ...notice, threadId: thread.id })
       .onConflictDoNothing()
       .run();
     return { threadId: thread.id, notice };

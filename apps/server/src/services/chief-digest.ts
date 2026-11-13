@@ -665,6 +665,7 @@ export function finishChiefDigest(
     threadId: thread.id,
     role: 'system' as const,
     content: JSON.stringify(content),
+    projectId: null,
     createdAt: until,
   };
   db.insert(chiefMessage).values(row).onConflictDoNothing().run();
