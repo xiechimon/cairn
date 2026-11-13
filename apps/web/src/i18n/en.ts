@@ -105,7 +105,7 @@ export const EN: Record<string, string> = {
   // #351 看板更名工作台：'Workbench'（不用 'Workspace'，避撞 daemon workspaces 概念）
   工作台: 'Workbench',
   // Paper 顶栏等你处理摘要：数字单独着色，后接本串（「3 项等你处理」→「3 waiting on you」）
-  '{greeting}，{name}！你想让我做什么？': '{greeting}, {name}! What would you like me to do?',
+  '{greeting}，{name}。你想让我做什么？': '{greeting}, {name}. What would you like me to do?',
   夜深了: 'Good night',
   早上好: 'Good morning',
   中午好: 'Good afternoon',

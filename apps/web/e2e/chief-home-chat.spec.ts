@@ -11,13 +11,13 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await page.goto('/app');
     const home = page.getByTestId('home-c');
     const stream = home.getByTestId('chief-stream');
-    await expect(stream).toContainText('ian！你想让我做什么？');
+    await expect(stream).toContainText('ian。你想让我做什么？');
     await expect(home.getByTestId('chief-quick-reply')).toHaveText(['做个计划', '接一个仓库', '接着最近的活']);
     await expect(home.getByTestId('chief-composer-input')).toBeVisible();
     await expect(page.locator('.chief-fab')).toHaveCount(0);
     await expect(page.getByRole('complementary', { name: 'Coordinator' })).toHaveCount(0);
     const composer = await home.getByTestId('chief-composer-block').boundingBox();
-    const greeting = await stream.getByText('ian！你想让我做什么？').boundingBox();
+    const greeting = await stream.getByText('ian。你想让我做什么？').boundingBox();
     const viewport = page.viewportSize();
     expect(composer && greeting && viewport).toBeTruthy();
     if (composer && greeting && viewport) {

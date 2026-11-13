@@ -259,7 +259,7 @@ export function HomeC({
   );
   const channelGreeting =
     projectName === null
-      ? t('{greeting}，{name}！你想让我做什么？', {
+      ? t('{greeting}，{name}。你想让我做什么？', {
           greeting: t(greetingFor(new Date(now).getHours())),
           name: user.displayName,
         })
