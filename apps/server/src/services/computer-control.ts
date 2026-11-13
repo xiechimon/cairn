@@ -5,6 +5,7 @@ import { computer, computerCall } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { ownedPrivateComputer } from './computer-access.js';
+import { HANDOFF_CLEARED } from './computer-handoff.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 
 export function ownedComputer(db: Db, teamId: string, userId: string, computerId: string) {
@@ -143,6 +144,7 @@ export function releaseComputerControl(
         controlLeaseId: null,
         controlLeaseExpiresAt: null,
         controlFence: row.controlFence + 1,
+        ...HANDOFF_CLEARED,
         updatedAt: Date.now(),
       })
       .where(eq(computer.id, computerId))
