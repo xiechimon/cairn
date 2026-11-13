@@ -1,9 +1,8 @@
-import { type ReactNode, useContext, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { reportStatusWord } from '../board/status-words.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { TraceChevron } from '../components/chat/trace-parts.js';
 import { Button } from '../components/ui/button.js';
-import { TodoGlanceContext } from '../detail/segments.js';
 import { useI18n } from '../i18n/provider.js';
 import { FileText } from '../icons/index.js';
 import {
@@ -52,14 +51,13 @@ export function ThreadEventLine({
 }): ReactNode {
   const { t } = useI18n();
   const sentence = useRefSentence();
-  const title = useContext(TodoGlanceContext)?.get(item.todoId)?.title ?? item.title;
   const phase = item.kind === 'thread-report' ? item.phase : undefined;
   return (
     <div className={EVENT_CLS} data-testid={testId ?? eventTestId(item)} data-phase={phase}>
       <FileText width={16} height={16} className={`${ICON_CLS} mt-0.5`} />
       <span className="min-w-0 break-words">
         {item.kind === 'thread-report'
-          ? sentence('{n}：{status}', item.todoId, title, {
+          ? sentence('{n}：{status}', item.todoId, item.title, {
               status: t(reportStatusWord(item)),
             })
           : sentence(
@@ -67,7 +65,7 @@ export function ThreadEventLine({
                 ? 'Coordinator 直接对 {n} 说：{excerpt}'
                 : '你直接对 {n} 说：{excerpt}',
               item.todoId,
-              title,
+              item.title,
               { excerpt: item.excerpt },
             )}
         {item.kind === 'thread-report' && item.line !== undefined && (
