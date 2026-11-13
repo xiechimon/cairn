@@ -4,12 +4,9 @@ import { build, threadPr, todo } from '../db/schema.js';
 import {
   type FetchLike,
   type GithubBranchPull,
-  type GithubCheckRun,
   type GithubPull,
   githubBranchPulls,
-  githubCommitCheckRuns,
   githubPull,
-  githubRequiredChecks,
   hasPullFields,
   isOwnPull,
 } from '../lib/github.js';
@@ -40,6 +37,7 @@ import {
   countMarkedRounds,
   deadLoopMessage,
 } from './ci-fix-prompts.js';
+import { CI_REQUIRED_CHECKS_TTL_MS, GrindCheckReader } from './ci-grind-checks.js';
 import { advancePassingGrind, startCiFixRound } from './ci-grind-outcome.js';
 import { KnownRows } from './ci-known-rows.js';
 import {
@@ -100,6 +98,7 @@ export {
   CI_MERGE_CONFLICT_ROUNDS_MAX,
   CI_MERGE_CONFLICT_VERIFY_NOTE,
   CI_MISSING_COMPARE_RECHECK_MS,
+  CI_REQUIRED_CHECKS_TTL_MS,
   type CiCheckFailure,
   countMarkedRounds,
   deadLoopMessage,
@@ -107,21 +106,12 @@ export {
   verdictOfCheckRuns,
 };
 
-export const CI_REQUIRED_CHECKS_TTL_MS = 600_000;
-
 export interface CiPollLogger {
   info(obj: object, msg: string): void;
 }
 
 export interface CiPoller {
   sweep(now?: number): Promise<void>;
-}
-
-interface PrChecksCacheEntry {
-  sha: string;
-  etag: string | null;
-  runs: GithubCheckRun[];
-  waitSince: number | null;
 }
 
 interface CiPollTally {
@@ -160,10 +150,8 @@ export function createCiPoller(
     anonIpReadsPerHour?: number;
   },
 ): CiPoller {
-  const cache = new Map<string, PrChecksCacheEntry>();
   const pullCache = new Map<string, PullCacheEntry>();
   const grindPullCache = new Map<string, PullCacheEntry>();
-  const requiredCache = new Map<string, { at: number; names: string[] | null }>();
   const anonReadAt = new Map<string, number>();
   const foreignListedAt = new Map<string, number>();
   const listFailures = new Map<string, number>();
@@ -183,6 +171,7 @@ export function createCiPoller(
     run.anonIpReadsPerHour ?? CI_ANON_IP_READS_PER_HOUR,
   );
   const compares = new MergedCompareCache(run.githubFetch, anonBudget);
+  const grindChecks = new GrindCheckReader(run.githubFetch, anonBudget);
 
   function stillOurs(cand: { buildId: string; todoId: string }, since: number): boolean {
     return (
@@ -583,73 +572,17 @@ export function createCiPoller(
       else tally.appended += 1;
       return;
     }
-    const reqKey = `${target.fullName}\u0000${baseBranch}`;
-    let required = requiredCache.get(reqKey);
-    if (
-      required === undefined ||
-      (required.names === null
-        ? required.at !== now
-        : now - required.at >= CI_REQUIRED_CHECKS_TTL_MS)
-    ) {
-      if (grindToken === null) {
-        anonBudget.recordShared(now, 2);
-      }
-      const names = await githubRequiredChecks(
-        run.githubFetch,
-        grindToken,
-        target.owner,
-        target.repo,
-        baseBranch,
-      );
-      required = { at: now, names };
-      requiredCache.set(reqKey, required);
-    }
-    if (required.names === null) {
-      tally.unreadable += 1;
-      return;
-    }
-    const requiredNames = required.names;
     const ref = own && pull.headSha !== null ? pull.headSha : branch;
-    const cached = cache.get(key);
-    const entry = cached?.sha === ref ? cached : null;
-    if (grindToken === null) anonBudget.recordShared(now);
-    const page = await githubCommitCheckRuns(
-      run.githubFetch,
-      grindToken,
-      target.owner,
-      target.repo,
-      ref,
-      {
-        etag: entry?.etag ?? null,
-      },
-    );
-    if (page === null) {
+    const checks = await grindChecks.read(target, key, baseBranch, ref, grindToken, now);
+    if (checks.kind === 'unreadable') {
       tally.unreadable += 1;
       return;
     }
-    const runs = page.notModified ? (entry?.runs ?? []) : page.checkRuns;
-    let verdict = verdictOfCheckRuns(runs, requiredNames);
-    const waiting =
-      verdict.state === 'empty' ||
-      (verdict.state === 'pending' &&
-        (verdict.missing !== undefined || (entry?.waitSince ?? null) !== null));
-    const waitSince = waiting ? (entry?.waitSince ?? now) : null;
-    cache.set(key, { sha: ref, etag: page.etag, runs, waitSince });
-    const inGrace = now - (waitSince ?? now) < CI_EMPTY_CHECKS_GRACE_MS;
-    if (verdict.state === 'pending') {
-      if (verdict.missing === undefined || inGrace) {
-        tally.pending += 1;
-        return;
-      }
-      verdict = {
-        state: 'blocked',
-        checks: verdict.missing.map((name) => ({ name, conclusion: 'missing' })),
-      };
-    }
-    if (verdict.state === 'empty' && inGrace) {
+    if (checks.kind === 'pending') {
       tally.pending += 1;
       return;
     }
+    const verdict = checks.verdict;
     if (freshGrindRow(deps, cand.todoId) === null || hasActiveStep(deps, cand.buildId)) {
       tally.skipped += 1;
       return;
@@ -785,7 +718,7 @@ export function createCiPoller(
         );
       }
     }
-    for (const k of cache.keys()) if (!grindKeys.has(k)) cache.delete(k);
+    grindChecks.retain(grindKeys, now);
     for (const k of grindPullCache.keys()) if (!grindKeys.has(k)) grindPullCache.delete(k);
     for (const k of pullCache.keys()) if (!liveKeys.has(k)) pullCache.delete(k);
     for (const k of anonReadAt.keys()) if (!liveKeys.has(k)) anonReadAt.delete(k);
@@ -796,8 +729,6 @@ export function createCiPoller(
     for (const k of foreignListedAt.keys())
       if (!liveKeys.has(k.slice(k.indexOf('\u0000') + 1))) foreignListedAt.delete(k);
     for (const k of listFailures.keys()) if (!liveKeys.has(k)) listFailures.delete(k);
-    for (const [k, v] of requiredCache)
-      if (now - v.at >= CI_REQUIRED_CHECKS_TTL_MS) requiredCache.delete(k);
     for (const cand of [...candidates, ...reviewCandidates]) {
       try {
         await evaluateMergeGate(deps, cand.buildId);
