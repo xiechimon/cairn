@@ -216,6 +216,15 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
     const jump = home(page).getByTestId('jump-to-latest');
     await expect(row(page, 'Latest delivery report')).toBeAttached();
     await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+    await expect
+      .poll(async () => {
+        await body.evaluate((node) => {
+          node.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
+          node.scrollTop = 0;
+        });
+        return row(page, 'Delivery review 0').count();
+      })
+      .toBe(1);
     if (activation === 'phone-light') {
       const cdp = await page.context().newCDPSession(page);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });

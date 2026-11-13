@@ -10,6 +10,7 @@ import { TriangleAlert } from 'lucide-react';
 import {
   Fragment,
   type ReactNode,
+  startTransition,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -78,6 +79,7 @@ const SCROLLER_CONTENT_CLS =
   'mx-auto flex w-full max-w-chat-gutter min-w-0 flex-col justify-end gap-0 overflow-x-clip px-4 pt-8 in-data-[chat-top=under-header]:pt-20 [overflow-wrap:anywhere]';
 
 const THREAD_COMPOSER = 'thread';
+const FIRST_ROWS = 24;
 
 function workingRowLast(stream: readonly ChiefStreamItem[]): readonly ChiefStreamItem[] {
   const at = stream.findIndex((item) => item.kind === 'streaming');
@@ -399,6 +401,17 @@ export function ChiefConversation({
     }),
   );
   const rows = allRows.filter(({ item }) => item.kind !== 'user' || item.pending !== 'held');
+  const [hiddenRows, setHiddenRows] = useState(() => Math.max(0, rows.length - FIRST_ROWS));
+  const hidden = day == null ? Math.min(hiddenRows, Math.max(0, rows.length - FIRST_ROWS)) : 0;
+  const shownRows = hidden > 0 ? rows.slice(hidden) : rows;
+  const earlierRows = useMemo<EarlierPages>(
+    () => ({
+      loading: false,
+      failed: false,
+      onLoad: () => startTransition(() => setHiddenRows(0)),
+    }),
+    [],
+  );
   const latestUser = rows.findLast(({ item }) => item.kind === 'user');
   const latestUserKey =
     latestUser == null ? null : chiefStreamRowKey(latestUser.item, latestUser.i);
@@ -596,7 +609,7 @@ export function ChiefConversation({
                   >
                     {lead}
                     {day == null ? (
-                      renderRows(rows)
+                      renderRows(shownRows)
                     ) : (
                       <>
                         <div data-testid="chief-earlier" className="opacity-60">
@@ -615,11 +628,11 @@ export function ChiefConversation({
               <ArrowDown width={20} height={20} />
               <span className="sr-only">{t('滚动到最新')}</span>
             </JumpToLatestButton>
-            {earlier != null && (
+            {(hidden > 0 || earlier != null) && (
               <EarlierLoader
-                earlier={earlier}
-                hasEarlier={chief.hasEarlier === true}
-                rowCount={rows.length}
+                earlier={hidden > 0 || earlier == null ? earlierRows : earlier}
+                hasEarlier={hidden > 0 || chief.hasEarlier === true}
+                rowCount={shownRows.length}
                 viewportRef={viewportRef}
               />
             )}
