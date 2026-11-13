@@ -408,7 +408,7 @@ export function HomeC({
   ) : (
     <header
       data-testid="home-c-pane-buttons"
-      className="flex h-12 flex-none items-center justify-end gap-1 pr-3.5 pl-5"
+      className="relative z-10 flex h-12 flex-none items-center justify-end gap-1 pr-3.5 pl-5 in-data-[chat-top=under-header]:pointer-events-none in-data-[chat-top=under-header]:-mb-12 in-data-[chat-top=under-header]:*:pointer-events-auto"
     >
       {heading}
       <IconTooltip
@@ -613,6 +613,7 @@ export function HomeC({
         <section
           ref={setSection}
           data-testid="home-c"
+          data-chat-top={!narrow && banner == null ? 'under-header' : undefined}
           aria-label={t('与 Coordinator 的对话')}
           className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
         >
