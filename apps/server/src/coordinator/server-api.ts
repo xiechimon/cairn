@@ -15,6 +15,7 @@ import {
 } from '../services/coordinator-inputs.js';
 import { bindCoordinatorRun, coordinatorRuns } from '../services/coordinator-runs.js';
 import { finishCoordinatorTurn, recordStepUsage } from '../services/coordinator-steps.js';
+import { stopStepComputer } from '../services/machine-computer.js';
 import { isChiefConversation, type MachineDeps } from '../services/machine-deps.js';
 import { executeRelayToolCall, machineAsk } from '../services/machine-relay.js';
 import {
@@ -207,6 +208,7 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
       deps.db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
       releaseUnconsumedSteer(deps.db, owned);
       finishCoordinatorTurn(deps, owned, body, observation);
+      stopStepComputer(deps, stepId);
     },
   };
 }
