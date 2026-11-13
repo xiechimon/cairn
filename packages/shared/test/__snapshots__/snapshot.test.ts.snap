@@ -8914,8 +8914,13 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "GET",
-    "note": "only the one global Coordinator thread (D58)",
+    "note": "the main Coordinator thread first, then one thread per opened project channel",
     "path": "/api/teams/{id}/chief/threads",
+  },
+  {
+    "method": "POST",
+    "note": "find or create the project channel thread; 201 with a greeting turn queued when created, 200 when it exists; 404 for a project outside the team, 409 when archived",
+    "path": "/api/teams/{id}/chief/channels/{projectId}",
   },
   {
     "method": "GET",

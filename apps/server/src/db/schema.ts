@@ -1070,7 +1070,12 @@ export const chiefThread = sqliteTable(
   (t) => [
     uniqueIndex('chief_thread_coordinator_unique')
       .on(t.chiefId)
-      .where(sql`${t.archivedAt} is null and ${t.id} not like 'chief-digest-%'`),
+      .where(
+        sql`${t.archivedAt} is null and ${t.projectId} is null and ${t.id} not like 'chief-digest-%'`,
+      ),
+    uniqueIndex('chief_thread_channel_unique')
+      .on(t.chiefId, t.projectId)
+      .where(sql`${t.archivedAt} is null and ${t.projectId} is not null`),
   ],
 );
 

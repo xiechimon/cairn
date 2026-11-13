@@ -107,6 +107,7 @@
         "server": [
           "/api/teams/:id/chief",
           "/api/teams/:id/chief/threads",
+          "/api/teams/:id/chief/channels/:projectId",
           "/api/teams/:id/chief/threads/:tid/messages/:mid",
           "/api/teams/:id/chief/threads/:tid/rewind",
           "/api/teams/:id/chief/threads/:tid/stop",
