@@ -55,11 +55,16 @@ test.describe('streaming row typing dots (scenario 26)', () => {
     });
   });
 
-  test('the elapsed time shows neither in the row nor in the composer', async ({ page }) => {
+  test('the elapsed time shows neither in the row nor in the composer; one button stops the run and turns into send once there is text', async ({
+    page,
+  }) => {
     await expect(row(page).getByText(/^\d+s$/)).toHaveCount(0);
-    await expect(page.locator('.composer-stop')).toBeVisible();
-    await expect(page.getByTestId('composer-working')).toHaveCount(0);
-    await expect(page.locator('.side-panel, .detail-center').getByText(/工作中 · \d+:\d{2}/)).toHaveCount(0);
+    await expect(page.getByText(/工作中 ·|Working ·/)).toHaveCount(0);
+    await expect(page.locator('.composer-stop')).toHaveCount(1);
+    await expect(page.locator('.composer-send')).toHaveCount(0);
+    await page.locator('.composer-input').fill('补充一句');
+    await expect(page.locator('.composer-stop')).toHaveCount(0);
+    await expect(page.locator('.composer-send')).toHaveCount(1);
   });
 
   test('prefers-reduced-motion stops the dots', async ({ page }) => {

@@ -426,10 +426,10 @@ export function ComposerSurface({
             >
               {narrow ? (
                 <span className={`${ROUND_FACE_CLS} bg-(--hover-1)`}>
-                  <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
+                  <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
                 </span>
               ) : (
-                <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
+                <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
               )}
             </Button>
           ) : (

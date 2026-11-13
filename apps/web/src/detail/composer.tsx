@@ -321,32 +321,31 @@ export function Composer({
               {t(placeholder)}
             </div>
           )}
-          {!readOnly && (
-            <>
-              {streaming && (
-                <IconTooltip
-                  label={t('停止')}
-                  trigger={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        'composer-stop',
-                        narrow ? ROUND_HIT_CLS : cn(SEND_BTN_CLS, STOP_CLS),
-                      )}
-                      onClick={onStop}
-                    />
-                  }
-                >
-                  {narrow ? (
-                    <span className={`${ROUND_FACE_CLS} bg-(--hover-1)`}>
-                      <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
-                    </span>
-                  ) : (
-                    <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
-                  )}
-                </IconTooltip>
-              )}
+          {!readOnly &&
+            (streaming && !hasContent ? (
+              <IconTooltip
+                label={t('停止')}
+                trigger={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      'composer-stop',
+                      narrow ? ROUND_HIT_CLS : cn(SEND_BTN_CLS, STOP_CLS),
+                    )}
+                    onClick={onStop}
+                  />
+                }
+              >
+                {narrow ? (
+                  <span className={`${ROUND_FACE_CLS} bg-(--hover-1)`}>
+                    <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
+                  </span>
+                ) : (
+                  <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
+                )}
+              </IconTooltip>
+            ) : (
               <IconTooltip
                 label={t('发送')}
                 trigger={
@@ -375,8 +374,7 @@ export function Composer({
                   <CornerDownLeft width={20} height={20} />
                 )}
               </IconTooltip>
-            </>
-          )}
+            ))}
         </div>
         <Input
           ref={fileInputRef}
