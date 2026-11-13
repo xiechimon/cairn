@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { claudeQuotaTrip, claudeRateLimitReport } from '../src/claude-quota-trip.js';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  claudeQuotaTrip,
+  claudeRateLimitReport,
+  forwardClaudeRateLimit,
+} from '../src/claude-quota-trip.js';
 
 describe('claudeRateLimitReport', () => {
   it('carries only the fields the notice has', () => {
@@ -50,5 +54,39 @@ describe('claudeQuotaTrip', () => {
     expect(
       claudeQuotaTrip({ status: 'rejected', resetsAt: 1_699_999_000 }, nowMs)?.retryAfterMs,
     ).toBeNull();
+  });
+});
+
+describe('forwardClaudeRateLimit', () => {
+  it('reports the notice for the step machine', async () => {
+    const reportClaudeRateLimit = vi.fn(async () => undefined);
+    forwardClaudeRateLimit({ reportClaudeRateLimit }, 'machine-1', { status: 'allowed' }, () => {});
+    expect(reportClaudeRateLimit).toHaveBeenCalledWith({
+      machineId: 'machine-1',
+      status: 'allowed',
+    });
+  });
+
+  it('skips a step without a machine', () => {
+    const reportClaudeRateLimit = vi.fn(async () => undefined);
+    forwardClaudeRateLimit({ reportClaudeRateLimit }, null, { status: 'rejected' }, () => {});
+    expect(reportClaudeRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('tolerates a client without the report endpoint', () => {
+    expect(() =>
+      forwardClaudeRateLimit({}, 'machine-1', { status: 'allowed' }, () => {}),
+    ).not.toThrow();
+  });
+
+  it('logs a failed report instead of throwing', async () => {
+    const lines: string[] = [];
+    forwardClaudeRateLimit(
+      { reportClaudeRateLimit: () => Promise.reject(new Error('offline')) },
+      'machine-1',
+      { status: 'allowed' },
+      (line) => lines.push(line),
+    );
+    await vi.waitFor(() => expect(lines).toEqual(['claude rate limit report failed: offline']));
   });
 });

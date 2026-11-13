@@ -20,6 +20,24 @@ export function claudeRateLimitReport(
   };
 }
 
+export interface ClaudeRateLimitSink {
+  reportClaudeRateLimit?(body: ClaudeRateLimitReport): Promise<void>;
+}
+
+export function forwardClaudeRateLimit(
+  sink: ClaudeRateLimitSink,
+  machineId: string | null,
+  notice: ClaudeRateLimitNotice,
+  log: (line: string) => void,
+): void {
+  if (machineId === null) return;
+  void sink
+    .reportClaudeRateLimit?.(claudeRateLimitReport(machineId, notice))
+    .catch((err: unknown) => {
+      log(`claude rate limit report failed: ${err instanceof Error ? err.message : String(err)}`);
+    });
+}
+
 export function claudeQuotaTrip(notice: ClaudeRateLimitNotice, nowMs: number): QuotaTrip | null {
   if (notice.status !== 'rejected') return null;
   const until = normalizeClaudeResetsAt(notice.resetsAt);
