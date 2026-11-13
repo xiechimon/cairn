@@ -168,15 +168,8 @@ function ghJson(args, { dryRun, spawn }) {
   return text ? JSON.parse(text) : null;
 }
 
-export function fileMaintainIssue({
-  report,
-  runUrl,
-  dryRun = false,
-  spawn = spawnSync,
-  listOpenIssues,
-} = {}) {
-  const body = buildIssueBody({ report, runUrl });
-  const openIssues =
+function openMaintainIssues({ spawn, listOpenIssues }) {
+  return (
     listOpenIssues?.() ??
     ghJson(
       [
@@ -193,7 +186,39 @@ export function fileMaintainIssue({
       ],
       { dryRun: false, spawn },
     ) ??
-    [];
+    []
+  );
+}
+
+export function closeMaintainIssues({ runUrl, spawn = spawnSync, listOpenIssues } = {}) {
+  const closed = [];
+  for (const issue of openMaintainIssues({ spawn, listOpenIssues })) {
+    if (issue.title !== ISSUE_TITLE) continue;
+    const comment = `Feature-map maintain passed${runUrl ? ` on ${runUrl}` : ''}; closing. The next failure opens a new issue.`;
+    const result = spawn(
+      'gh',
+      ['issue', 'close', String(issue.number), '--reason', 'completed', '--comment', comment],
+      { cwd: REPO_ROOT, encoding: 'utf8', env: process.env },
+    );
+    if (result.error) throw result.error;
+    if (result.status !== 0)
+      throw new Error(
+        `gh issue close #${issue.number} failed: ${(result.stderr ?? result.stdout ?? '').trim() || result.status}`,
+      );
+    closed.push(issue.number);
+  }
+  return closed;
+}
+
+export function fileMaintainIssue({
+  report,
+  runUrl,
+  dryRun = false,
+  spawn = spawnSync,
+  listOpenIssues,
+} = {}) {
+  const body = buildIssueBody({ report, runUrl });
+  const openIssues = openMaintainIssues({ spawn, listOpenIssues });
   const decision = decideIssueAction({ openIssues });
   if (dryRun) {
     return { ...decision, dryRun: true, body };
@@ -241,17 +266,31 @@ export function runMaintain(args, deps = {}) {
   checks.push(deps.checkVerifyFeaturesIndex?.() ?? checkVerifyFeaturesIndex(deps.featuresDir));
   const aggregated = aggregateChecks(checks);
   process.stdout.write(aggregated.report);
+  const runUrl =
+    process.env.GITHUB_RUN_URL ||
+    (process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID
+      ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
+      : undefined);
+  if (aggregated.ok && args.fileIssue && !args.dryRun) {
+    try {
+      const closed = closeMaintainIssues({
+        runUrl,
+        spawn: deps.spawn,
+        listOpenIssues: deps.listOpenIssues,
+      });
+      for (const number of closed)
+        process.stdout.write(`feature-map-maintain: closed #${number}\n`);
+    } catch (error) {
+      process.stderr.write(
+        `feature-map-maintain: could not close the open issue: ${error.message}\n`,
+      );
+    }
+  }
   if (!aggregated.ok && args.fileIssue) {
     try {
       const filed = fileMaintainIssue({
         report: aggregated.report,
-        runUrl:
-          process.env.GITHUB_RUN_URL ||
-          (process.env.GITHUB_SERVER_URL &&
-          process.env.GITHUB_REPOSITORY &&
-          process.env.GITHUB_RUN_ID
-            ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
-            : undefined),
+        runUrl,
         dryRun: args.dryRun,
         spawn: deps.spawn,
         listOpenIssues: deps.listOpenIssues,

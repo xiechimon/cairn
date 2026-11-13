@@ -32,7 +32,7 @@ Workflow: `.github/workflows/feature-map-daily-check.yml` (cron `17 18 * * *`, a
 1. **feature-map**: the same `generate-feature-map.mjs --check`, as a net for anything that reached main without the gates.
 2. **verify-features-index**: every `features/*.md` except `README.md` is linked from `features/README.md`, and every link target exists.
 
-On failure the job exits non-zero and opens or comments one deduped issue titled `chore: feature-map maintain failed` (labels `documentation`, `batch:next`, `by:cairn`, marker `<!-- feature-map-maintain -->`). Issue filing needs `permissions.issues: write` and `github.token` only.
+On failure the job exits non-zero and opens or comments one deduped issue titled `chore: feature-map maintain failed` (labels `documentation`, `batch:next`, `by:cairn`, marker `<!-- feature-map-maintain -->`). A passing run closes that issue as completed with a link to the run, so the issue is open only while the check is red; the next failure opens a new one. Issue filing and closing need `permissions.issues: write` and `github.token` only.
 
 ## Live maintain routine
 
