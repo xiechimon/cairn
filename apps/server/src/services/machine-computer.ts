@@ -15,7 +15,7 @@ import {
 } from '@cairn/shared';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { chief, chiefThread, computer, computerCall, machine, step } from '../db/schema.js';
+import { chiefThread, computer, computerCall, machine, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { NotFoundError } from './builds.js';
@@ -251,11 +251,6 @@ export function receiveComputerFrames(
   else if (result.pending !== null) pendingOutput.set(callId, result.pending);
   const live = pendingCalls.get(callId);
   const publishHub = live?.hub ?? hub;
-  const computerId =
-    db.select().from(computerCall).where(eq(computerCall.id, callId)).get()?.computerId ?? null;
-  if (syncObservedComputerState(db, computerId)) {
-    publishObservedComputerState(db, publishHub, computerId);
-  }
   if (result.finished) settleComputerCall(db, callId, hub);
   else if (result.publishOutput) {
     const row = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
@@ -416,14 +411,7 @@ export function settleComputerCall(db: Db, callId: string, hub?: TeamStreamHub):
     live.dispose();
   }
   const publishHub = live?.hub ?? hub;
-  if (publishHub) {
-    if (syncObservedComputerState(db, row.computerId)) {
-      publishObservedComputerState(db, publishHub, row.computerId);
-    }
-    publishFeed(db, publishHub, row);
-  } else {
-    syncObservedComputerState(db, row.computerId);
-  }
+  if (publishHub) publishFeed(db, publishHub, row);
   live?.resolve(resultOfRow(row));
 }
 
@@ -469,56 +457,6 @@ function openPending(
   };
   pendingCalls.set(call.callId, pending);
   return pending;
-}
-
-function syncObservedComputerState(db: Db, computerId: string | null): boolean {
-  if (!computerId) return false;
-  const current = db
-    .select({ state: computer.state })
-    .from(computer)
-    .where(eq(computer.id, computerId))
-    .get();
-  if (!current) return false;
-  const open = db
-    .select({ state: computerCall.state, startedAt: computerCall.startedAt })
-    .from(computerCall)
-    .where(
-      and(
-        eq(computerCall.computerId, computerId),
-        inArray(computerCall.state, ['dispatched', 'running']),
-      ),
-    )
-    .all();
-  const state =
-    open.length === 0
-      ? 'stopped'
-      : open.some((row) => row.state === 'running' || row.startedAt !== null)
-        ? 'running'
-        : 'starting';
-  if (current.state === state) return false;
-  db.update(computer).set({ state, updatedAt: nowMs() }).where(eq(computer.id, computerId)).run();
-  return true;
-}
-
-function publishObservedComputerState(
-  db: Db,
-  hub: TeamStreamHub | undefined,
-  computerId: string | null,
-): void {
-  if (!hub || !computerId) return;
-  const row = db.select().from(computer).where(eq(computer.id, computerId)).get();
-  if (!row?.scopeKey.startsWith('chief:')) return;
-  const owner = db
-    .select({ userId: chief.userId, teamId: chief.teamId })
-    .from(chief)
-    .where(eq(chief.id, row.scopeKey.slice('chief:'.length)))
-    .get();
-  if (!owner || owner.teamId !== row.teamId || owner.userId === '') return;
-  hub.publishPrivate(row.teamId, owner.userId, () => ({
-    type: 'computer.state',
-    computerId: row.id,
-    state: row.state,
-  }));
 }
 
 function releaseExecutionLease(db: Db, stepId: string): void {
@@ -725,41 +663,54 @@ async function holdTakeover(
   const timeoutMs = opts.takeover?.timeoutMs ?? COMPUTER_HANDOFF_TIMEOUT_MS;
   const pollMs = opts.takeover?.pollMs ?? COMPUTER_HANDOFF_POLL_MS;
   const now = nowMs();
-  const deadlineAt = now + timeoutMs;
-  acquireExecutionLease(db, target.id, stepId, true, deadlineAt);
   const callId = computerCallId(stepId, body.toolCallId);
-  db.insert(computerCall)
-    .values({
-      id: callId,
-      teamId: thread.teamId,
-      stepId,
-      toolCallId: body.toolCallId,
-      machineId: target.machineId,
-      computerId: target.id,
-      tool: 'request_takeover',
-      replaySafe: false,
-      params: storedParams(body.params),
-      state: 'running',
-      deadlineAt,
-      createdAt: now,
-      startedAt: now,
-    })
-    .run();
+  const waiting = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  const resumed = waiting?.state === 'running';
+  const deadlineAt = resumed ? waiting.deadlineAt : now + timeoutMs;
+  const atInsert = db.select().from(computer).where(eq(computer.id, target.id)).get();
+  if (!resumed) {
+    acquireExecutionLease(db, target.id, stepId, true, deadlineAt);
+    db.insert(computerCall)
+      .values({
+        id: callId,
+        teamId: thread.teamId,
+        stepId,
+        toolCallId: body.toolCallId,
+        machineId: target.machineId,
+        computerId: target.id,
+        tool: 'request_takeover',
+        replaySafe: false,
+        params: {
+          ...storedParams(body.params),
+          controlFence: (atInsert?.controlFence ?? 0) + 1,
+          heldAtStart: atInsert !== undefined && ownerHoldsControl(atInsert, now),
+        },
+        state: 'running',
+        deadlineAt,
+        createdAt: now,
+        startedAt: now,
+      })
+      .run();
+  }
   markHandoffIfNone(db, target.id, 'model', stepId, now);
-  if (syncObservedComputerState(db, target.id))
-    publishObservedComputerState(db, deps.hub, target.id);
   const asked = body.params.reason;
   const reason =
     typeof asked === 'string' && asked.trim() !== '' ? redact(asked).slice(0, 200) : '';
-  pushToUserSafely(db, deps.vapidKeys ?? null, thread.userId, thread.teamId, {
-    title: 'Login needed',
-    body: reason || 'The Coordinator needs you to take over its computer.',
-    href: `/app?pane=machines&machine=${encodeURIComponent(target.machineId)}&screen=1`,
-    tag: `${thread.userId}:${callId}`,
-  });
+  if (!resumed) {
+    pushToUserSafely(db, deps.vapidKeys ?? null, thread.userId, thread.teamId, {
+      title: 'Login needed',
+      body: reason || 'The Coordinator needs you to take over its computer.',
+      href: `/app?pane=machines&machine=${encodeURIComponent(target.machineId)}&screen=1`,
+      tag: `${thread.userId}:${callId}`,
+    });
+  }
   const atStart = db.select().from(computer).where(eq(computer.id, target.id)).get();
-  const fenceAtStart = atStart?.controlFence;
-  const fenceSteps = atStart !== undefined && ownerHoldsControl(atStart, now) ? 1 : 2;
+  const storedFence = waiting?.params.controlFence;
+  const fenceAtStart = typeof storedFence === 'number' ? storedFence : atStart?.controlFence;
+  const heldAtStart = resumed
+    ? waiting.params.heldAtStart === true
+    : atStart !== undefined && ownerHoldsControl(atStart, now);
+  const fenceSteps = heldAtStart ? 1 : 2;
   let outcome: HandoffWait = 'not_done';
   try {
     for (;;) {
@@ -779,27 +730,30 @@ async function holdTakeover(
       await pause(pollMs, opts.signal);
     }
   } finally {
-    const handedBack = outcome === 'handed_back';
-    db.update(computerCall)
-      .set(
-        handedBack
-          ? { state: 'done', resultText: TAKEOVER_HANDED_BACK, finishedAt: nowMs() }
-          : {
-              state: 'error',
-              errorMessage: 'the owner did not finish',
-              errorDelivery: 'not_delivered',
-              finishedAt: nowMs(),
-            },
-      )
-      .where(eq(computerCall.id, callId))
-      .run();
-    clearHandoff(db, target.id);
-    releaseExecutionLease(db, stepId);
-    if (syncObservedComputerState(db, target.id)) {
-      publishObservedComputerState(db, deps.hub, target.id);
+    const current = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+    if (current?.state === 'running') {
+      const handedBack = outcome === 'handed_back';
+      db.update(computerCall)
+        .set(
+          handedBack
+            ? { state: 'done', resultText: TAKEOVER_HANDED_BACK, finishedAt: nowMs() }
+            : {
+                state: 'error',
+                errorMessage: 'the owner did not finish',
+                errorDelivery: 'not_delivered',
+                finishedAt: nowMs(),
+              },
+        )
+        .where(eq(computerCall.id, callId))
+        .run();
+      clearHandoff(db, target.id);
+      releaseExecutionLease(db, stepId);
     }
   }
-  return { text: outcome === 'handed_back' ? TAKEOVER_HANDED_BACK : TAKEOVER_NOT_DONE };
+  const settled = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  return {
+    text: settled?.state === 'done' ? TAKEOVER_HANDED_BACK : TAKEOVER_NOT_DONE,
+  };
 }
 
 export async function forwardComputerCall(
@@ -839,6 +793,10 @@ export async function forwardComputerCall(
   const live = pendingCalls.get(callId);
   if (live) return waitForCall(deps, live, stepId, opts.signal);
 
+  if (existing && existing.tool === 'request_takeover' && existing.state === 'running') {
+    return holdTakeover(deps, thread, stepId, body, opts);
+  }
+
   if (existing && !existing.replaySafe) {
     if (!isFinalState(existing.state)) {
       db.update(computerCall)
@@ -851,12 +809,7 @@ export async function forwardComputerCall(
         .where(eq(computerCall.id, callId))
         .run();
       const interrupted = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
-      if (interrupted) {
-        if (syncObservedComputerState(db, interrupted.computerId)) {
-          publishObservedComputerState(db, deps.hub, interrupted.computerId);
-        }
-        publishFeed(db, deps.hub, interrupted);
-      }
+      if (interrupted) publishFeed(db, deps.hub, interrupted);
       return resultOfRow({ ...existing, state: 'interrupted' });
     }
     return resultOfRow(existing);
@@ -937,15 +890,10 @@ export async function forwardComputerCall(
     deadlineAt,
     ...(target.scopeKey !== undefined ? { scopeKey: target.scopeKey } : {}),
   };
-  syncObservedComputerState(db, target.computerId);
   if (!deps.machineHub.pushComputer(target.machineId, call)) {
     db.delete(computerCall).where(eq(computerCall.id, dispatchId)).run();
-    if (syncObservedComputerState(db, target.computerId)) {
-      publishObservedComputerState(db, deps.hub, target.computerId);
-    }
     throw new HttpError(409, COMPUTER_NOT_CONNECTED);
   }
-  publishObservedComputerState(db, deps.hub, target.computerId);
   const pending = openPending(deps, call);
   const row = db.select().from(computerCall).where(eq(computerCall.id, dispatchId)).get();
   if (row) publishFeed(db, deps.hub, row);

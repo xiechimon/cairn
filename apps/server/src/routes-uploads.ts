@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { isInlineAttachment, servedAttachmentMime } from '@cairn/shared';
+import { ATTACHMENT_MAX_BYTES, isInlineAttachment, servedAttachmentMime } from '@cairn/shared';
 import type { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
 import { attachmentDownloadDisposition } from './lib/attachment-disposition.js';
@@ -13,6 +14,8 @@ import {
   uploadFile as uploadAttachmentFile,
 } from './services/attachments.js';
 import { assertDeviceActive } from './services/paired-devices.js';
+
+const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
 
 export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
   const grantBodySchema = z.object({
@@ -43,7 +46,12 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
     return c.json(out, 200);
   });
 
-  app.post('/api/uploads/upload', async (c) => {
+  const boundedUpload = bodyLimit({
+    maxSize: ATTACHMENT_MAX_BYTES + MULTIPART_OVERHEAD_BYTES,
+    onError: (c) => c.json({ error: `invalid size: must be 0..${ATTACHMENT_MAX_BYTES}` }, 400),
+  });
+
+  app.post('/api/uploads/upload', boundedUpload, async (c) => {
     const form = await c.req.formData();
     const grant = form.get('grant');
     const file = form.get('file');

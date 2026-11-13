@@ -204,6 +204,81 @@ describe('attachments -- upload side', () => {
     }
   });
 
+  test('file of exactly the maximum size -> 201', async () => {
+    const s = bootServer();
+    try {
+      const g = await grant(s, { size: MAX_BYTES });
+      const bytes = new Uint8Array(MAX_BYTES).fill(97);
+      const res = await callMultipart(
+        s.app,
+        `${g.uploadUrl}/upload`,
+        { grant: g.grant },
+        { name: 'file', filename: 'spec.md', mimeType: 'text/markdown', bytes },
+      );
+      expect(res.status).toBe(201);
+    } finally {
+      s.dispose();
+    }
+  }, 30_000);
+
+  test('streamed body without content-length is rejected 400 before it is fully read', async () => {
+    const s = bootServer();
+    try {
+      const chunk = new Uint8Array(1024 * 1024);
+      const totalChunks = 64;
+      let pulled = 0;
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (pulled === totalChunks) {
+            controller.close();
+            return;
+          }
+          pulled += 1;
+          controller.enqueue(chunk);
+        },
+      });
+      const res = await s.app.request('/api/uploads/upload', {
+        method: 'POST',
+        headers: { 'content-type': 'multipart/form-data; boundary=x' },
+        body: stream,
+        duplex: 'half',
+      } as RequestInit);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: `invalid size: must be 0..${MAX_BYTES}` });
+      expect(pulled).toBeLessThan(totalChunks);
+      expect(pulled * chunk.byteLength).toBeLessThanOrEqual(MAX_BYTES + 2 * chunk.byteLength);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('declared content-length above the limit is rejected 400 without reading the body', async () => {
+    const s = bootServer();
+    try {
+      let pulled = 0;
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          pulled += 1;
+          controller.enqueue(new Uint8Array(1024));
+        },
+      });
+      const res = await s.app.request('/api/uploads/upload', {
+        method: 'POST',
+        headers: {
+          'content-type': 'multipart/form-data; boundary=x',
+          'content-length': String(MAX_BYTES * 8),
+        },
+        body: stream,
+        duplex: 'half',
+      } as RequestInit);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: `invalid size: must be 0..${MAX_BYTES}` });
+      expect(pulled).toBeLessThanOrEqual(1);
+    } finally {
+      s.dispose();
+    }
+  });
+
   test('missing grant -> 401', async () => {
     const s = bootServer();
     try {

@@ -116,8 +116,9 @@ export type Row = {
 };
 
 export interface MockState {
-  threads: (typeof THREAD)[];
+  threads: (typeof THREAD & { projectId?: string | null })[];
   messages: Row[];
+  channels?: Record<string, Row[]>;
   rejectSend?: boolean;
   todos?: unknown[];
   tasks?: unknown[];
@@ -204,6 +205,37 @@ export async function mockLive(
       return json({ thread: THREAD }, 201);
     }
     if (p === '/api/teams/t1/chief/threads') return json(state.threads);
+    const channel = /^\/api\/teams\/t1\/chief\/channels\/([^/]+)$/.exec(p)?.[1];
+    if (channel !== undefined && request.method() === 'POST') {
+      const archived = (state.projects as { id: string; archivedAt?: number | null }[] | undefined)?.some(
+        (row) => row.id === channel && row.archivedAt != null,
+      );
+      if (archived === true) return json({ error: `project ${channel} is archived` }, 409);
+      const opened = { ...THREAD, id: `chief-${channel}`, projectId: channel, title: channel };
+      state.threads = [...state.threads.filter((row) => row.id !== opened.id), opened];
+      state.channels = { ...state.channels, [channel]: state.channels?.[channel] ?? [] };
+      return json(opened, 201);
+    }
+    const channelThread = state.threads.find(
+      (row) => row.projectId != null && p === `/api/conversations/${row.id}/messages`,
+    );
+    if (channelThread?.projectId != null) {
+      const key = channelThread.projectId;
+      if (request.method() === 'POST') {
+        const content = (request.postDataJSON() as { content: string }).content;
+        sent.push(content);
+        const rows = state.channels?.[key] ?? [];
+        state.channels = {
+          ...state.channels,
+          [key]: [
+            ...rows,
+            { id: `${key}-n${rows.length + 1}`, role: 'user', content, createdAt: state.sendAt ?? Date.now() },
+          ],
+        };
+        return json({ thread: channelThread }, 201);
+      }
+      return json({ messages: state.channels?.[key] ?? [] });
+    }
     if (p === '/api/teams/t1/chief')
       return json({
         chief: {

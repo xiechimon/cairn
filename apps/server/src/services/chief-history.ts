@@ -1,8 +1,9 @@
-import { and, asc, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
+import { chiefDigestThreadId } from '@cairn/shared';
+import { and, asc, desc, eq, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefMessage, chiefThread } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { messageText } from './conversation-page.js';
+import { messageText, readConversationPage } from './conversation-page.js';
 
 const HISTORY_TRUST = 'untrusted-history';
 const SEARCH_DEFAULT_LIMIT = 10;
@@ -202,5 +203,56 @@ export function readHistory(
         nextOffset: end < text.length ? end : null,
       };
     }),
+  };
+}
+
+export const MAIN_CHANNEL = 'main';
+
+export async function channelMessages(
+  db: Db,
+  scope: HistoryScope,
+  input: { channel: string; query?: string; limit?: number; before?: string },
+) {
+  requireOwnThread(db, scope);
+  const own = db
+    .select({ chiefId: chiefThread.chiefId, projectId: chiefThread.projectId })
+    .from(chiefThread)
+    .where(eq(chiefThread.id, scope.threadId))
+    .get();
+  if (!own) throw new HttpError(404, `chief thread ${scope.threadId}`);
+  const projectId = input.channel === MAIN_CHANNEL ? null : input.channel;
+  if (projectId === (own.projectId ?? null))
+    throw new HttpError(
+      400,
+      'invalid params.channel: that is this channel; use search_history or read_history',
+    );
+  const target = db
+    .select({ id: chiefThread.id })
+    .from(chiefThread)
+    .where(
+      and(
+        eq(chiefThread.chiefId, own.chiefId),
+        eq(chiefThread.userId, scope.userId),
+        ne(chiefThread.id, chiefDigestThreadId(own.chiefId)),
+        isNull(chiefThread.archivedAt),
+        projectId === null ? isNull(chiefThread.projectId) : eq(chiefThread.projectId, projectId),
+      ),
+    )
+    .get();
+  if (!target) return { trust: HISTORY_TRUST, channel: input.channel, opened: false, messages: [] };
+  const targetScope = { ...scope, threadId: target.id };
+  if (input.query !== undefined && input.query.trim() !== '') {
+    const found = await searchHistory(db, targetScope, {
+      query: input.query,
+      ...(input.limit !== undefined ? { limit: input.limit } : {}),
+      ...(input.before !== undefined ? { before: input.before } : {}),
+    });
+    return { channel: input.channel, opened: true, ...found };
+  }
+  return {
+    trust: HISTORY_TRUST,
+    channel: input.channel,
+    opened: true,
+    ...readConversationPage(db, target.id, input.before),
   };
 }

@@ -5,7 +5,7 @@ import { describe, expect, test } from 'vitest';
 const ROOT = join(import.meta.dirname, '..', '..', '..');
 const SOURCE_DIRS = ['apps/server/src', 'apps/daemon/src', 'apps/web/src', 'packages/shared/src'];
 const RENDERER_HOME = 'packages/shared/src/records/prompts.ts';
-const RENDERER_CALLER = 'apps/daemon/src/runner.ts';
+const RENDERER_CALLER = 'apps/daemon/src/step-prompt.ts';
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {

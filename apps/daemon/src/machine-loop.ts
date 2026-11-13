@@ -373,7 +373,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
 
   let networkFailures = 0;
   const presenceReporter = new ComputerPresenceReporter({
-    source: opts.computerPresence,
+    source: opts.computerPresence ?? computerOrbs,
     body: () => ({
       cliVersion: DAEMON_VERSION,
       claudeCode: claudeReport(),
