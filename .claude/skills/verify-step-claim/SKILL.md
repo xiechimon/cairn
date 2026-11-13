@@ -178,6 +178,7 @@ sync-commit: 93b9ce21
   apps/server/src/services/builds.ts
   apps/server/src/services/build-abandoned-sweep.ts
   apps/server/src/services/build-step-complete.ts
+  apps/server/src/services/build-step-failure.ts
   apps/server/src/services/quota-wait.ts
   apps/server/src/services/scheduler.ts
   apps/daemon/src/machine-loop.ts
@@ -188,4 +189,4 @@ sync-commit: 93b9ce21
   apps/daemon/src/workspace.ts
 ```
 
-Covered functions: `machines.ts`'s `tryClaim`, `claimStep`, `heartbeatStep`, `ownedStep`, `finishStep`, `fetchStop`, `markPresence`, `sweepStaleMachines`, `recoverSteps`; `build-abandoned-sweep.ts`'s `sweepAbandonedBuildSteps`, `releaseClaimedStep`; `builds.ts`'s `stopActiveStepsAfterExit`, `prepareStopFor`, `stopStepKeepPhase`, `applyStoppedStep`, `applyStepFailure`, `completeStep` (only up to the step-status write and the `hasLeftExecution` judgment); `quota-wait.ts`'s `applyQuotaWaitStep`, `sweepQuotaWaitSteps`; `scheduler.ts`'s `tick` sweep order; `machine-loop.ts`'s startup presence, recover (including the `stopRequest` branch), `deliverStop`, claim loop; `runner.ts`'s stop-bit registration and disk write, `journal.claim`, heartbeat start/stop, `workspace.prepare` and session registration / the pre-session-open stop check ordering, stop-bit read, finish report; `journal.ts`'s status and `stopRequest`; `step-stops.ts`'s `RunStop`, `StepStops`; `workspace.ts`'s session directory and project lock.
+Covered functions: `machines.ts`'s `tryClaim`, `claimStep`, `heartbeatStep`, `ownedStep`, `finishStep`, `fetchStop`, `markPresence`, `sweepStaleMachines`, `recoverSteps`; `build-abandoned-sweep.ts`'s `sweepAbandonedBuildSteps`, `releaseClaimedStep`; `builds.ts`'s `stopActiveStepsAfterExit`, `prepareStopFor`, `stopStepKeepPhase`, `applyStoppedStep`, `completeStep` (only up to the step-status write and the `hasLeftExecution` judgment); `build-step-failure.ts`'s `applyStepFailure`; `quota-wait.ts`'s `applyQuotaWaitStep`, `sweepQuotaWaitSteps`; `scheduler.ts`'s `tick` sweep order; `machine-loop.ts`'s startup presence, recover (including the `stopRequest` branch), `deliverStop`, claim loop; `runner.ts`'s stop-bit registration and disk write, `journal.claim`, heartbeat start/stop, `workspace.prepare` and session registration / the pre-session-open stop check ordering, stop-bit read, finish report; `journal.ts`'s status and `stopRequest`; `step-stops.ts`'s `RunStop`, `StepStops`; `workspace.ts`'s session directory and project lock.
