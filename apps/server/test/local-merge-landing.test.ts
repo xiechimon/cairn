@@ -18,7 +18,7 @@ import {
 } from '../src/db/schema.js';
 import { systemGitOps } from '../src/lib/git.js';
 import { sweepAbandonedBuildSteps } from '../src/services/build-abandoned-sweep.js';
-import { requestMerge } from '../src/services/builds.js';
+import { requestMerge } from '../src/services/build-merge-request.js';
 import { applyLocalMergeReport, enqueueLocalMerge } from '../src/services/local-merge.js';
 import { localGateFacts } from '../src/services/local-merge-facts.js';
 import { claimStep } from '../src/services/machine-claim.js';

@@ -4,7 +4,8 @@ import { expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { build, step, todo } from '../src/db/schema.js';
 import { runGit, systemGitOps } from '../src/lib/git.js';
-import { enqueueStep, requestMerge } from '../src/services/builds.js';
+import { requestMerge } from '../src/services/build-merge-request.js';
+import { enqueueStep } from '../src/services/builds.js';
 import { applyMergeLanding } from '../src/services/machine-merge-landing.js';
 import { bootServer, issueApiKey, req, seedSessionRoute } from './helpers.js';
 

@@ -13,11 +13,11 @@ import {
 } from '../src/db/schema.js';
 import { githubBranchPulls, githubCompareStatus, githubPull } from '../src/lib/github.js';
 import { BLOCKED_BY_HOLD } from '../src/services/blockers.js';
+import { requestMerge } from '../src/services/build-merge-request.js';
 import {
   applyBuildStepAction,
   completeStep,
   finishTodoDone,
-  requestMerge,
   startBuilds,
 } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';

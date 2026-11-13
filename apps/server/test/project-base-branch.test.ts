@@ -4,7 +4,7 @@ import { expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { build, message, project, step, todo } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
-import { requestMerge } from '../src/services/builds.js';
+import { requestMerge } from '../src/services/build-merge-request.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { finishStep } from '../src/services/machine-finish-step.js';
