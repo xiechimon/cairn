@@ -31,6 +31,7 @@ import { cacheUserMessage } from './message-cache.js';
 import { connect } from './sse-connection.js';
 import { streamGuards } from './sse-guards.js';
 import { teamEventInvalidations } from './sse-team-events.js';
+import { applyTeamStreamEvent, notePatchedEvent } from './team-stream-cache.js';
 
 async function streamUrl(path: string): Promise<string> {
   if (DEMO_MODE) return path;
@@ -79,8 +80,12 @@ export function startTeamStream(
   const disconnect = connect(
     resolvePath ?? withTicket(`/api/teams/${teamId}/stream`, ticket),
     (ev) => {
+      const patched = applyTeamStreamEvent(qc, teamId, ev);
       for (const queryKey of teamEventInvalidations(ev, teamId)) {
         void invalidateConverged(qc, { queryKey });
+      }
+      if (patched) {
+        notePatchedEvent(qc, teamId);
       }
       if (ev.type === 'computer.command') {
         const prior = computerFeedStore.snapshot();
