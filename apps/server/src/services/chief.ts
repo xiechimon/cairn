@@ -659,6 +659,7 @@ export function submitChiefMessage(
     id: newRecordId(),
     role: 'user' as const,
     content: body.content,
+    projectId: picked?.id ?? null,
     createdAt: now,
   };
   try {
@@ -671,7 +672,7 @@ export function submitChiefMessage(
           threadId: threadRow.id,
           role: 'user',
           content: body.content,
-          projectId: picked?.id ?? null,
+          projectId: message.projectId,
           createdAt: now,
         })
         .run();
@@ -1034,9 +1035,10 @@ function insertThreadReport(
     threadId,
     role: 'system' as const,
     content: JSON.stringify(content),
+    projectId: todoRecord.projectId,
     createdAt: nowMs(),
   };
-  upsertChiefMessage(deps.db, { ...report, projectId: todoRecord.projectId });
+  upsertChiefMessage(deps.db, report);
   deps.convHub?.publishMessage(threadId, report);
 }
 
@@ -1663,12 +1665,13 @@ export function upsertChiefMessage(
     projectId?: string | null;
   },
 ) {
-  const stored = { ...row, content: scrubMailFenceContent(row.content) };
+  const stored = {
+    ...row,
+    content: scrubMailFenceContent(row.content),
+    projectId: row.projectId === undefined ? writingTurnProjectId(db, row) : row.projectId,
+  };
   db.insert(chiefMessage)
-    .values({
-      ...stored,
-      projectId: row.projectId === undefined ? writingTurnProjectId(db, row) : row.projectId,
-    })
+    .values(stored)
     .onConflictDoUpdate({
       target: chiefMessage.id,
       set: { role: stored.role, content: stored.content, createdAt: stored.createdAt },
