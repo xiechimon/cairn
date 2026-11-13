@@ -64,8 +64,13 @@ A legacy `## Verified` aliases Proof. The complete legacy six-section shape
 Upstream and an Acceptance task) may omit Review and is exempt from the cap.
 Use the new shape for new bodies. Any unchecked task outside fenced code and
 HTML comments still makes the task gate red, including inside details.
-Closing keywords belong in commit messages. For a multi-segment ticket,
-only the closing segment's commit message carries the parent closing keyword.
+When the title names a ticket (`scope(N): ...`), put `Closes #N` on its own
+line in the body, outside code and HTML comments, if the PR finishes the
+ticket, or `Part of #N` if it is one segment. GitHub closes the issue when the
+PR merges into `main`, whatever the merge method. The `pr-evidence` step
+`Check the PR links its title ticket` fails a ticket title with neither; a
+line in a commit message also counts. For a multi-segment ticket, only the
+last segment says `Closes #N`; every earlier one says `Part of #N`.
 
 ## Evidence card (backend and API changes)
 

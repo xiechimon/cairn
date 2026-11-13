@@ -170,6 +170,15 @@ jobs:
         if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
         run: node scripts/english-only-gate.mjs --text "$RUNNER_TEMP/pr-body.md"
 
+      - name: Check the PR links its title ticket
+        if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
+        run: |
+          BASE_SHA="$(jq -r '.base.sha' "$RUNNER_TEMP/pr.json")"
+          HEAD_SHA="$(jq -r '.head.sha' "$RUNNER_TEMP/pr.json")"
+          MERGE_BASE="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+          git log --format=%B "$MERGE_BASE..$HEAD_SHA" > "$RUNNER_TEMP/commit-messages.txt"
+          node scripts/pr-ticket-link.mjs --title "$(jq -r '.title' "$RUNNER_TEMP/pr.json")" --body "$RUNNER_TEMP/pr-body.md" --commits "$RUNNER_TEMP/commit-messages.txt"
+
       # A paused repository must not be racing an armed auto-merge. Any other
       # red leaves auto-merge as it is: the required check already blocks the
       # merge and clears when the author fixes it. Disabling an unarmed

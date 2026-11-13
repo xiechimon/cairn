@@ -72,7 +72,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - Review PRs with `docs/pr-review.md`; read diffs without switching branches in a shared worktree.
 - Small changes need no issue or overlap lookup. Reuse an existing issue or PR when it already covers the request.
 - Write PR bodies per `.claude/skills/pr-cairn/SKILL.md`: Proof first, then What, with Review and Risk collapsed; visible prose is capped at 600 characters.
-- Commit format: `<scope>(<ticket>): <subject>`, in English. Put `closes #N` in the commit message for the closing segment, never only in the PR body; do not close a parent ticket from an intermediate segment.
+- Commit format: `<scope>(<ticket>): <subject>`, in English. A PR whose title names a ticket puts `Closes #N` on its own line in the PR body when it finishes the ticket, or `Part of #N` when it is one segment; GitHub closes the issue when the PR merges into `main`, whatever the merge method, and `pr-evidence` fails a ticket title with neither (a commit message line also counts). Only the last segment closes a parent ticket.
 
 ## Harness profile (spec 30)
 
