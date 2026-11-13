@@ -25,6 +25,7 @@ export interface TaskRowProps {
   why?: string;
   menu?: ReactNode;
   onOpen?: () => void;
+  onIntent?: () => void;
 }
 
 const ROW_DESCRIPTION_DELAY = 600;
@@ -52,6 +53,7 @@ export function TaskRow({
   why,
   menu,
   onOpen,
+  onIntent,
 }: TaskRowProps) {
   const descriptionId = useId();
   const checkable = check !== undefined && check !== 'none';
@@ -68,6 +70,8 @@ export function TaskRow({
             data-waiting={waiting ? '' : undefined}
             aria-describedby={descriptionId}
             onClick={onOpen}
+            onPointerEnter={onIntent}
+            onFocus={onIntent}
             className={cn(
               'h-auto w-full items-start justify-start gap-4 rounded-(--radius-tile) px-2.5 py-2 text-left font-normal whitespace-normal hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)',
               menu != null && 'pointer-coarse:pr-12',

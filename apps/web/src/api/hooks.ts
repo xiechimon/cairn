@@ -77,6 +77,7 @@ import {
 } from '@cairn/shared';
 import {
   type InfiniteData,
+  infiniteQueryOptions,
   keepPreviousData,
   type QueryClient,
   useInfiniteQuery,
@@ -95,6 +96,7 @@ import { resumeRefreshDelayMs } from './resume-refresh-delay.js';
 
 const CHIEF_THREADS_INFLIGHT_POLL_MS = 3000;
 const BACKUP_HEALTH_POLL_MS = 5 * 60 * 1000;
+const PREFETCH_FRESH_MS = 10_000;
 
 export type { ApiKeyRow, PlanRow };
 export type StepRow = StepJournalRow;
@@ -174,12 +176,13 @@ export const useTasks = (teamId: string | undefined, enabled: boolean) =>
     enabled: enabled && teamId !== undefined,
   });
 
+const todoQuery = (id: string | undefined) => ({
+  queryKey: ['todo', id],
+  queryFn: () => api.get<TodoRecord>(`/api/todos/${id}`),
+});
+
 export const useTodo = (id: string | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['todo', id],
-    queryFn: () => api.get<TodoRecord>(`/api/todos/${id}`),
-    enabled: enabled && id !== undefined,
-  });
+  useQuery({ ...todoQuery(id), enabled: enabled && id !== undefined });
 
 export const useBuild = (id: string | null | undefined, enabled: boolean) =>
   useQuery({
@@ -229,11 +232,8 @@ export const useSteps = (buildId: string | null | undefined, enabled: boolean) =
     enabled: enabled && buildId != null,
   });
 
-export function useConversationMessages(
-  conversationId: string | null | undefined,
-  enabled: boolean,
-) {
-  const query = useInfiniteQuery({
+const conversationMessagesQuery = (conversationId: string | null | undefined) =>
+  infiniteQueryOptions({
     queryKey: ['messages', conversationId, 'pages'],
     queryFn: ({ pageParam }) =>
       api.get<ConversationMessagesResponse>(
@@ -243,6 +243,26 @@ export function useConversationMessages(
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => (typeof last.nextCursor === 'string' ? last.nextCursor : null),
+  });
+
+export function prefetchThread(qc: QueryClient, teamId: string, todoId: string): void {
+  void qc.prefetchQuery({ ...todoQuery(todoId), staleTime: PREFETCH_FRESH_MS });
+  const buildId = qc
+    .getQueryData<TodoRecord[]>(['todos', teamId])
+    ?.find((todo) => todo.id === todoId)?.latestBuildId;
+  if (buildId == null) return;
+  void qc.prefetchInfiniteQuery({
+    ...conversationMessagesQuery(buildId),
+    staleTime: PREFETCH_FRESH_MS,
+  });
+}
+
+export function useConversationMessages(
+  conversationId: string | null | undefined,
+  enabled: boolean,
+) {
+  const query = useInfiniteQuery({
+    ...conversationMessagesQuery(conversationId),
     enabled: enabled && conversationId != null,
   });
   const messages = useMemo(
