@@ -170,6 +170,7 @@ export const computerRecordSchema = z.object({
   state: z.enum(COMPUTER_STATES),
   controlHolder: z.enum(COMPUTER_CONTROL_HOLDERS),
   browserEnabled: z.boolean(),
+  handoffReason: z.enum(['login', 'model']).nullable(),
   machine: z.object({ id: z.string(), name: z.string(), online: z.boolean() }),
 });
 export type ComputerRecord = z.infer<typeof computerRecordSchema>;

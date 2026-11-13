@@ -163,10 +163,24 @@ describe('computer feed routes', () => {
           state: 'running',
           controlHolder: 'none',
           browserEnabled: false,
+          handoffReason: null,
           machine: { id: 'm1', name: 'name-m1', online: false },
         },
       ],
     });
+  });
+
+  test('a pending login handoff is listed so the panel can ask the owner to log in', async () => {
+    const s = boot();
+    addMachine(s, s.team.id, 'm1', false);
+    addComputer(s, s.team.id, 'c1', 'm1');
+    s.db
+      .update(computerTable)
+      .set({ handoffReason: 'login', handoffStepId: 'step-a', handoffRequestedAt: 1 })
+      .run();
+    const res = await req(s.app, 'GET', '/api/computers');
+    const body = (await res.json()) as { computers: { handoffReason: string | null }[] };
+    expect(body.computers[0]?.handoffReason).toBe('login');
   });
 
   test('PATCH enables and disables browser tools on the owned computer', async () => {
