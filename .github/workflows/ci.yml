@@ -565,7 +565,7 @@ jobs:
           node scripts/generate-feature-map.mjs --check
 
       - name: Gardener sweep self-test (#1617)
-        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
+        if: ${{ !cancelled() }}
         run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs scripts/issue-coverage.test.mjs scripts/feature-map-maintain.test.mjs scripts/generate-feature-map.test.mjs
 
       - name: Nightly scan self-test (§11.1)
