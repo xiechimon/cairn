@@ -20,7 +20,8 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
-import { flushVerdictDigests, maybeEnqueueVerifyStep } from '../src/services/builds.js';
+import { flushVerdictDigests } from '../src/services/build-gate-verdict.js';
+import { maybeEnqueueVerifyStep } from '../src/services/builds.js';
 import { bootServer, issueApiKey, postProject, seedRoute, seedSessionRoute } from './helpers.js';
 import { rejectingGithubFetch } from './network-guard.js';
 

@@ -18,7 +18,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
-import { flushVerdictDigests } from '../src/services/builds.js';
+import { flushVerdictDigests } from '../src/services/build-gate-verdict.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { compareFilesFromResponse, computePatchDigest } from '../src/services/merge-gate/digest.js';
 import {
