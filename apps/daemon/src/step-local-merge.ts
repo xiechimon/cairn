@@ -1,6 +1,9 @@
 import type { ClaimedStep, LocalMergeCommand, MachineDoneBody } from '@cairn/shared';
 import { AGENT_TOOL_MERGE, AGENT_TOOL_PUSH } from '@cairn/shared';
+import { type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import { landLocalMerge } from './local-merge.js';
+import type { RunStepDeps } from './runner.js';
+import { resumePendingUpload } from './step-final-upload.js';
 
 export async function localMergeDoneBody(
   claimed: ClaimedStep,
@@ -35,4 +38,27 @@ export async function localMergeDoneBody(
       errorMessage: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+export async function runLocalMergeStep(
+  deps: Pick<RunStepDeps, 'client' | 'journal' | 'logger' | 'paths' | 'sessionHandles'>,
+  claimed: ClaimedStep,
+  command: LocalMergeCommand,
+  claimedEntry: StepJournalEntry,
+  opts: { stopRequested: () => boolean; now: () => number; running: number },
+): Promise<void> {
+  const stepId = claimed.step.id;
+  const doneBody = await localMergeDoneBody(claimed, command, opts.stopRequested);
+  new TranscriptBuffer(deps.paths.outboxDir, stepId).upsert({
+    id: `local-merge-${stepId}`,
+    role: 'system',
+    content: JSON.stringify(doneBody),
+    createdAt: opts.now(),
+  });
+  deps.journal.update(stepId, { state: 'awaiting-upload', doneBody });
+  await resumePendingUpload(
+    deps,
+    deps.journal.get(stepId) ?? { ...claimedEntry, state: 'awaiting-upload', doneBody },
+    { running: opts.running },
+  );
 }
