@@ -4,6 +4,7 @@ import { Archive, Box, ChevronDown, ChevronRight, Folder } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { PROJECT_ICON_COMPONENTS } from '../../board/project-icon-map.js';
 import { Button } from '../ui/button.js';
+import { Skeleton } from '../ui/skeleton.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.js';
 
 export type TreePlace = 'only' | 'first' | 'middle' | 'last';
@@ -188,6 +189,18 @@ export function SidebarProjectRow({
         </Tooltip>
       )}
       {menu != null && <SidebarRowActions>{menu}</SidebarRowActions>}
+    </div>
+  );
+}
+
+export function SidebarProjectRowSkeleton({ place }: { place: TreePlace }) {
+  return (
+    <div className="relative ml-5.5 flex flex-none">
+      <TreeGuide place={place} />
+      <div className={cn(SIDEBAR_ROW, 'flex items-center pr-2 pl-2.5')}>
+        <Skeleton className="size-5 flex-none" />
+        <Skeleton className="h-3.5 w-28" />
+      </div>
     </div>
   );
 }
