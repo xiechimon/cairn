@@ -101,9 +101,12 @@ const events = {
 };
 const fullTier = new Set(['merge-queue draft', 'push to main']);
 
-function plan(github, hasCode) {
+function plan(github, hasCode, webUi = 'false') {
   const changes = { 'needs.changes.outputs.has-code': hasCode };
-  changes['needs.changes.outputs.e2e-tier'] = evaluate(tierExpression, github);
+  changes['needs.changes.outputs.e2e-tier'] = evaluate(tierExpression, {
+    ...github,
+    'steps.classify.outputs.web-ui': webUi,
+  });
   const context = { ...github, ...changes };
   return {
     tier: changes['needs.changes.outputs.e2e-tier'],
@@ -159,6 +162,20 @@ test('the full 4-shard e2e runs exactly on merge-queue drafts and pushes', () =>
   }
 });
 
+test('a ready pull request that changes web source runs the affected tier, nothing else does', () => {
+  for (const [name, github] of Object.entries(events)) {
+    const { tier, e2e, 'e2e-affected': affected } = plan(github, 'true', 'true');
+    const ready =
+      github['github.event_name'] === 'pull_request' &&
+      github['github.event.pull_request.draft'] === false;
+    const expected = fullTier.has(name) ? 'full' : ready ? 'affected' : 'none';
+    assert.equal(tier, expected, name);
+    assert.equal(e2e, tier === 'full', `${name}: e2e`);
+    assert.equal(affected, tier === 'affected', `${name}: e2e-affected`);
+  }
+  assert.equal(plan(events['ordinary PR'], 'true', 'false').tier, 'none');
+});
+
 test('no e2e tier runs when the classifier found nothing left to test', () => {
   for (const [name, github] of Object.entries(events)) {
     const { e2e, 'e2e-affected': affected } = plan(github, 'false');
@@ -182,8 +199,12 @@ test('e2e-gate passes only when the tier it picked ran and succeeded', () => {
   const outcomes = ['success', 'failure', 'cancelled'];
   const scenarios = [];
   for (const [name, github] of Object.entries(events))
-    for (const hasCode of ['true', 'false']) {
-      const ran = plan(github, hasCode);
+    for (const [hasCode, webUi] of [
+      ['true', 'false'],
+      ['true', 'true'],
+      ['false', 'false'],
+    ]) {
+      const ran = plan(github, hasCode, webUi);
       for (const e2e of ran.e2e ? outcomes : ['skipped'])
         for (const affected of ran['e2e-affected'] ? outcomes : ['skipped'])
           scenarios.push({

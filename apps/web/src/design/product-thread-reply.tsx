@@ -45,7 +45,7 @@ function CardWithReply({
         reason={card.reason}
         primaryLabel={open ? 'Collapse' : 'Reply'}
         onPrimary={() => setOpen(!open)}
-        footer={open ? <ThreadReply seq={card.seq} delivery={card.delivery} onSend={send} /> : null}
+        footer={open ? <ThreadReply delivery={card.delivery} onSend={send} /> : null}
       />
     </div>
   );

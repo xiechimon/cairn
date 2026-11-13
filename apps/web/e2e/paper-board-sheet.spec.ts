@@ -20,6 +20,8 @@ const sheetOf = (page: Page, selector: string) =>
       sidebarBg: sidebarCs.backgroundColor,
       sidebarBorderRightW: sidebarCs.borderRightWidth,
       sidebarBorderRightColor: sidebarCs.borderRightColor,
+      borderLeftWidth: cs.borderLeftWidth,
+      borderTopWidth: cs.borderTopWidth,
     };
   });
 
@@ -28,7 +30,7 @@ test.use({ viewport: { width: 1440, height: 900 } });
 for (const theme of ['light', 'dark'] as const) {
   for (const rail of [false, true]) {
     const label = `${theme}${rail ? ', rail' : ''}`;
-    test(`home sheet is the same inset sheet as the page shell (${label})`, async ({ page }) => {
+    test(`home sheet is the same flat sheet as the page shell (${label})`, async ({ page }) => {
       await page.addInitScript(
         ([t, r]) => {
           localStorage.setItem('cairn-theme', t);
@@ -41,14 +43,16 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto(SCHEDULES);
       const pages = await sheetOf(page, '.page-main');
 
-      const left = (rail ? 40 : 248) + 8;
-      expect(home.box).toEqual({ x: left, y: 8, w: 1440 - left - 8, h: 900 - 16 });
+      const left = rail ? 48 : 220;
+      expect(home.box).toEqual({ x: left, y: 0, w: 1440 - left, h: 900 });
       expect(home).toEqual(pages);
-      expect(home.radius).toBe('12px');
+      expect(home.radius).toBe('0px');
+      expect(home.borderLeftWidth).toBe('1px');
+      expect(home.borderTopWidth).toBe('0px');
       expect(home.shadow).toBe('none');
       expect(home.selfShadow).toBe('none');
       expect(home.sidebarBorderRightW).toBe('0px');
-      expect(home.canvas).toBe(home.sidebarBg);
+      expect(home.sidebarBg).toBe(home.bg);
       expect(home.canvas).not.toBe(home.bg);
     });
   }
@@ -60,7 +64,7 @@ test('chief settings swaps in inside the same sheet', async ({ page }) => {
   await expect(heading).toBeVisible();
   await expect(page.getByTestId('home-c')).toHaveCount(0);
   const sheet = await sheetOf(page, '.board-sheet');
-  expect(sheet.box).toEqual({ x: 256, y: 8, w: 1176, h: 884 });
+  expect(sheet.box).toEqual({ x: 220, y: 0, w: 1220, h: 900 });
 });
 
 test.describe('on a 2x screen', () => {

@@ -20,16 +20,25 @@ async function open(
   projects: Project[],
   tasks: unknown[] = [],
   patches: { id: string; body: unknown }[] = [],
+  fail: { patch?: boolean } = {},
 ) {
   const todos = tasks.map((row) => ({ ...(row as Record<string, unknown>), kind: undefined }));
   await mockLive(page, { threads: [THREAD], messages: [], todos, tasks, projects }, (path, route, json) => {
     const m = /^\/api\/projects\/([^/]+)$/.exec(path);
-    if (m === null || route.request().method() !== 'PATCH') return undefined;
-    const body = route.request().postDataJSON() as { group: string | null };
+    const method = route.request().method();
+    if (m === null || (method !== 'PATCH' && method !== 'DELETE')) return undefined;
+    const index = projects.findIndex((row) => row.id === m[1]);
+    if (method === 'DELETE') {
+      patches.push({ id: m[1]!, body: 'DELETE' });
+      if (index >= 0) projects.splice(index, 1);
+      return json({});
+    }
+    const body = route.request().postDataJSON() as Partial<Project>;
     patches.push({ id: m[1]!, body });
-    const target = projects.find((row) => row.id === m[1]);
+    if (fail.patch === true) return json({ error: 'boom' }, 500);
+    const target = projects[index];
     if (target === undefined) return json({ error: 'nope' }, 404);
-    target.group = body.group;
+    Object.assign(target, body);
     return json(target);
   });
   await page.goto('/app');
@@ -51,7 +60,8 @@ test('the sidebar lists the Coordinator row and projects only, with no count on 
   await expect(coordinator).toBeVisible();
   await expect(coordinator).toHaveText('Coordinator');
   await expect(rows(page)).toHaveText(['cairn']);
-  await expect(sidebar(page).locator('nav').getByRole('button')).toHaveText(['项目', 'cairn']);
+  await expect(sidebar(page).locator('nav').getByRole('button')).toHaveText(['Coordinator', 'cairn']);
+  await expect(sidebar(page).getByText('项目', { exact: true })).toHaveCount(0);
   await expect(sidebar(page).locator('[data-slot="thread-row"], [data-slot="task-row"]')).toHaveCount(0);
 });
 
@@ -64,7 +74,7 @@ test('archived projects are not listed in the sidebar', async ({ page }) => {
   ]);
   await expect(rows(page)).toHaveText(['cairn', 'dogfood-sandbox']);
   await expect(sidebar(page)).not.toContainText('pacman-gh-probe');
-  await expect(sidebar(page)).not.toContainText('已归档');
+  await expect(page.getByTestId('sidebar-archived-page')).toHaveCount(0);
   await expect(groupHeaders(page)).toHaveCount(0);
 });
 
@@ -133,6 +143,7 @@ test('Move to group files a project under a new group, then back out', async ({ 
   for (const name of ['cairn', 'dogfood-sandbox']) {
     await rows(page).filter({ hasText: name }).hover();
     await page.getByRole('button', { name: `${name} 的菜单` }).click();
+    await page.getByRole('menuitem', { name: '移到分组' }).click();
     await page.getByRole('menuitem', { name: '移出分组' }).click();
   }
   await expect(groupHeaders(page)).toHaveCount(0);
@@ -140,6 +151,149 @@ test('Move to group files a project under a new group, then back out', async ({ 
     { id: 'proj-1', body: { group: 'Sandboxes' } },
     { id: 'proj-1', body: { group: null } },
     { id: 'proj-2', body: { group: null } },
+  ]);
+});
+
+const openMenu = async (page: Page, name: string) => {
+  await rows(page).filter({ hasText: name }).hover();
+  await page.getByRole('button', { name: `${name} 的菜单` }).click();
+};
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`a disabled Save stays a dimmed primary button beside the grey Cancel pill (${theme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: theme });
+    await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
+    await open(page, [PROJECT]);
+    await openMenu(page, 'cairn');
+    await page.getByRole('menuitem', { name: '重命名' }).click();
+    const dialog = page.getByRole('dialog', { name: '重命名项目' });
+    const save = dialog.getByRole('button', { name: '保存' });
+    await expect(save).toBeDisabled();
+    const look = await dialog.evaluate((el) => {
+      const token = (name: string, alpha = '') => {
+        const probe = document.createElement('span');
+        probe.style.color =
+          alpha === '' ? `var(${name})` : `color-mix(in oklab, var(${name}) ${alpha}, transparent)`;
+        document.body.append(probe);
+        const value = getComputedStyle(probe).color;
+        probe.remove();
+        return value;
+      };
+      const [cancel, save] = [...el.querySelectorAll('[data-testid="dialog-foot"] button')].map(
+        (button) => getComputedStyle(button),
+      );
+      return {
+        cancelFill: cancel!.backgroundColor,
+        cancelInk: cancel!.color,
+        saveFill: save!.backgroundColor,
+        saveInk: save!.color,
+        saveOpacity: save!.opacity,
+        secondary: token('--secondary'),
+        foreground: token('--foreground'),
+        primary: token('--primary'),
+        primaryInk: token('--primary-foreground'),
+      };
+    });
+    expect(look.cancelFill).toBe(look.secondary);
+    expect(look.cancelInk).toBe(look.foreground);
+    expect(look.saveFill).toBe(look.primary);
+    expect(look.saveInk).toBe(look.primaryInk);
+    expect(look.saveOpacity).toBe('0.4');
+    expect(look.saveFill).not.toBe(look.cancelFill);
+    expect(look.saveInk).not.toBe(look.cancelInk);
+  });
+}
+
+test('Rename saves the new name and keeps the input when the save fails', async ({ page }) => {
+  const projects = [PROJECT, project('proj-2', 'dogfood-sandbox')];
+  const patches: { id: string; body: unknown }[] = [];
+  const fail = { patch: true };
+  await open(page, projects, [], patches, fail);
+  await openMenu(page, 'dogfood-sandbox');
+  await page.getByRole('menuitem', { name: '重命名' }).click();
+  const dialog = page.getByRole('dialog', { name: '重命名项目' });
+  await expect(dialog.getByText('项目名称', { exact: true })).toBeVisible();
+  await dialog.getByRole('textbox', { name: '项目名称' }).fill('sandbox');
+  await dialog.getByRole('button', { name: '保存' }).click();
+  await expect(page.getByText('无法重命名项目。')).toBeVisible();
+  await expect(dialog.getByRole('textbox')).toHaveValue('sandbox');
+  fail.patch = false;
+  await dialog.getByRole('button', { name: '保存' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(rows(page)).toHaveText(['cairn', 'sandbox']);
+  expect(patches).toEqual([
+    { id: 'proj-2', body: { name: 'sandbox' } },
+    { id: 'proj-2', body: { name: 'sandbox' } },
+  ]);
+});
+
+test('Delete asks for the name, then removes the project', async ({ page }) => {
+  const projects = [PROJECT, project('proj-2', 'dogfood-sandbox')];
+  const patches: { id: string; body: unknown }[] = [];
+  await open(page, projects, [], patches);
+  await openMenu(page, 'dogfood-sandbox');
+  await page.getByRole('menuitem', { name: '删除' }).click();
+  const confirm = page.getByRole('alertdialog', { name: '删除项目' });
+  await expect(confirm.getByRole('button', { name: '删除' })).toBeDisabled();
+  await confirm.getByRole('textbox').fill('dogfood-sandbox');
+  await confirm.getByRole('button', { name: '删除' }).click();
+  await expect(rows(page)).toHaveText(['cairn']);
+  expect(patches).toEqual([{ id: 'proj-2', body: 'DELETE' }]);
+});
+
+test('the row menu keeps the project home, tasks and settings pages reachable', async ({ page }) => {
+  await open(page, [PROJECT]);
+  await openMenu(page, 'cairn');
+  await page.getByRole('menuitem', { name: '项目主页' }).click();
+  await expect(page).toHaveURL(/\/app\?(?!.*chat=1).*project=proj-1/);
+  await page.goBack();
+  await openMenu(page, 'cairn');
+  await page.getByRole('menuitem', { name: '任务' }).click();
+  await expect(page).toHaveURL(/\/app\/project\/proj-1\/tasks(\?|$)/);
+  await page.goBack();
+  await openMenu(page, 'cairn');
+  await page.getByRole('menuitem', { name: '项目设置' }).click();
+  await expect(page).toHaveURL(/\/app\/project\/proj-1\/settings(\?|$)/);
+});
+
+test('Project instructions opens the memory tab of the project settings', async ({ page }) => {
+  await open(page, [PROJECT]);
+  await openMenu(page, 'cairn');
+  await page.getByRole('menuitem', { name: '项目说明' }).click();
+  await expect(page).toHaveURL(/\/app\/project\/proj-1\/settings\?tab=memory$/);
+  await expect(page.getByText('像 AGENTS.md：本项目的每个 thread 和 Coordinator 都会读到并遵守。')).toBeVisible();
+});
+
+test('the group menu renames a group and ungroups its projects', async ({ page }) => {
+  const projects = [
+    PROJECT,
+    project('proj-2', 'atlas', { group: 'Side' }),
+    project('proj-3', 'site', { group: 'Side' }),
+  ];
+  const patches: { id: string; body: unknown }[] = [];
+  await open(page, projects, [], patches);
+  await groupHeaders(page).hover();
+  await page.getByRole('button', { name: '分组 Side 的菜单' }).click();
+  await page.getByRole('menuitem', { name: '重命名分组' }).click();
+  const dialog = page.getByRole('dialog', { name: '重命名分组' });
+  await dialog.getByRole('textbox').fill('Clients');
+  await dialog.getByRole('button', { name: '保存' }).click();
+  await expect(groupHeaders(page)).toHaveText(['Clients']);
+  await groupHeaders(page).hover();
+  await page.getByRole('button', { name: '分组 Clients 的菜单' }).click();
+  await page.getByRole('menuitem', { name: '解散分组' }).click();
+  await expect(groupHeaders(page)).toHaveCount(0);
+  await expect(rows(page)).toHaveText(['cairn', 'atlas', 'site']);
+  const byId = (list: typeof patches) => [...list].sort((a, b) => a.id.localeCompare(b.id));
+  expect(byId(patches.slice(0, 2))).toEqual([
+    { id: 'proj-2', body: { group: 'Clients' } },
+    { id: 'proj-3', body: { group: 'Clients' } },
+  ]);
+  expect(byId(patches.slice(2))).toEqual([
+    { id: 'proj-2', body: { group: null } },
+    { id: 'proj-3', body: { group: null } },
   ]);
 });
 
@@ -163,6 +317,9 @@ test.describe('on a touch screen', () => {
     const header = groupHeaders(page).filter({ hasText: 'Side' });
     await expect(header).toBeVisible();
     await expect(page.getByRole('button', { name: 'cairn 的菜单' })).toBeVisible();
+    await page.evaluate(() =>
+      Promise.all(document.getAnimations().map((animation) => animation.finished)),
+    );
     const boxes = await page.locator('aside.board-sidebar').evaluate((aside) => {
       const rect = (node: Element | null) => {
         const box = node!.getBoundingClientRect();

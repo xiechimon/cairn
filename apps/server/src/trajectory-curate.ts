@@ -8,6 +8,8 @@ import {
   type GuardCandidate,
   guardCandidateSchema,
   ISSUE_FENCE_OPEN,
+  MAIL_FENCE_OPEN,
+  MEMORY_INDEX_TITLE,
   PROMOTION_MIN_BUILDS,
   SKILL_ENTRY_FILE,
   type SkillDraft,
@@ -19,7 +21,8 @@ import type { Db } from './db/client.js';
 import { build, memoryCandidate, todo } from './db/schema.js';
 import { HttpError } from './lib/errors.js';
 import { newRecordId, nowMs } from './lib/ids.js';
-import { memoriesInScope, overlaps, saveMemoryEntry } from './services/memory.js';
+import { memoriesInScope, overlaps } from './services/memory.js';
+import { rememberMemoryFile } from './services/memory-documents.js';
 import { memoryOwnerOf } from './services/routing-rules.js';
 import { resolveLocalSkill } from './services/skills.js';
 
@@ -75,31 +78,72 @@ function writeJsonlAtomic(path: string, rows: unknown[]) {
   renameSync(temporary, path);
 }
 
+function candidateMemories(db: Db, scope: Parameters<typeof memoriesInScope>[1]) {
+  return db.transaction((tx) => [
+    ...memoriesInScope(tx, scope).flatMap((row) =>
+      row.title === MEMORY_INDEX_TITLE
+        ? row.content
+            .split('\n')
+            .filter((line) => line.trim() && !/^- \[.*\]\([^)]+\)$/.test(line))
+            .map((line) => {
+              const entry = /^- (.*?)：(.*)$/.exec(line);
+              return {
+                id: row.id,
+                title: entry?.[1] ?? '',
+                content: entry?.[2] ?? line.replace(/^- /, ''),
+              };
+            })
+        : [row],
+    ),
+    ...memoriesInScope(tx, { ...scope, layer: 'searchable' }),
+  ]);
+}
+
+function candidateConflicts(
+  memories: ReturnType<typeof candidateMemories>,
+  row: { title: string; content: string },
+) {
+  return [
+    ...new Set(
+      memories
+        .filter(
+          (memory) => overlaps(memory.title, row.title) || overlaps(memory.content, row.content),
+        )
+        .map((memory) => memory.id),
+    ),
+  ];
+}
+
 function promote(
   db: Db,
   row: CandidateRow,
   sourceBuildId: string,
-  force: boolean,
+  force = false,
 ): { promoted: true; memoryId: string } | { promoted: false; conflictIds: string[] } {
-  const source = db.select().from(build).where(eq(build.id, sourceBuildId)).get();
-  const saved = saveMemoryEntry(db, {
-    agentId: row.agentId,
-    teamId: row.teamId,
-    projectId: row.projectId,
-    title: row.title,
-    content: row.content,
-    sourceTodoId: source?.todoId ?? null,
-    sourceBuildId,
-    force,
-  });
-  if ('status' in saved) {
-    const conflictIds = saved.candidates.map((memory) => memory.id);
+  const memories = candidateMemories(db, row);
+  if (memories.some((memory) => memory.content === row.content))
+    throw new HttpError(409, 'memory already exists; use update_memory');
+  const conflictIds = candidateConflicts(memories, row);
+  if (!force && conflictIds.length > 0) {
     db.update(memoryCandidate)
       .set({ conflictIds, updatedAt: nowMs() })
       .where(eq(memoryCandidate.id, row.id))
       .run();
     return { promoted: false, conflictIds };
   }
+  const source = db.select().from(build).where(eq(build.id, sourceBuildId)).get();
+  const saved = rememberMemoryFile(
+    db,
+    {
+      agentId: row.agentId,
+      teamId: row.teamId,
+      projectId: row.projectId,
+      sourceTodoId: source?.todoId ?? null,
+      sourceBuildId,
+    },
+    row.title,
+    row.content,
+  );
   db.update(memoryCandidate)
     .set({ status: 'promoted', memoryId: saved.id, updatedAt: nowMs() })
     .where(eq(memoryCandidate.id, row.id))
@@ -134,7 +178,10 @@ export function curateCandidates(
 
   db.transaction((tx) => {
     for (const candidate of candidates) {
-      if (`${candidate.title}\n${candidate.content}`.includes(ISSUE_FENCE_OPEN)) {
+      if (
+        `${candidate.title}\n${candidate.content}`.includes(ISSUE_FENCE_OPEN) ||
+        `${candidate.title}\n${candidate.content}`.includes(MAIL_FENCE_OPEN)
+      ) {
         summary.rejected++;
         continue;
       }
@@ -212,7 +259,7 @@ export function curateCandidates(
         agentId: memoryOwnerOf(tx, scope.teamId, 'build'),
         projectId: placement.projectId,
       };
-      const memories = memoriesInScope(tx, memoryScope);
+      const memories = candidateMemories(tx, memoryScope);
       if (memories.some((memory) => memory.content === candidate.content)) {
         summary.memoryKnown++;
         continue;
@@ -239,13 +286,7 @@ export function curateCandidates(
             content: candidate.content,
             buildIds: merged.buildIds,
             evidence: merged.evidence,
-            conflictIds: memories
-              .filter(
-                (memory) =>
-                  overlaps(memory.title, candidate.title) ||
-                  overlaps(memory.content, candidate.content),
-              )
-              .map((memory) => memory.id),
+            conflictIds: candidateConflicts(memories, candidate),
             createdAt: now,
             updatedAt: now,
           })
@@ -267,7 +308,7 @@ export function curateCandidates(
         merged.buildIds.length >= PROMOTION_MIN_BUILDS
       ) {
         try {
-          const result = promote(db, { ...existing, ...merged }, candidate.buildId, false);
+          const result = promote(db, { ...existing, ...merged }, candidate.buildId);
           if (result.promoted) summary.memoryPromoted++;
         } catch (error) {
           if (!(error instanceof HttpError)) throw error;
@@ -284,7 +325,7 @@ export function curateCandidates(
   return summary;
 }
 
-export function confirmCandidate(db: Db, id: string, force: boolean) {
+export function confirmCandidate(db: Db, id: string, force = false) {
   const row = db.select().from(memoryCandidate).where(eq(memoryCandidate.id, id)).get();
   if (row === undefined) throw new CurateError(`Candidate ${id} not found`);
   if (row.status !== 'pending')

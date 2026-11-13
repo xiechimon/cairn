@@ -1,7 +1,8 @@
 import type { BuildRecord } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { shouldExpandLastWork } from '../src/detail/work-expansion.js';
-import { inlineSegments, type MessageRow, mapTranscript } from '../src/api/mappers.js';
+import { type MessageRow, mapTranscript } from '../src/api/mappers.js';
+import { inlineSegments } from '../src/lib/markdown.js';
 import type { TranscriptItem } from '../src/fixtures/records.js';
 import { NOW, todo } from './helpers.js';
 
@@ -252,7 +253,9 @@ describe('task thread hierarchy', () => {
     });
     const fails = items.filter((item) => item.kind === 'fail');
     expect(fails).toHaveLength(1);
-    expect(fails[0]).toMatchObject({ body: '请将其重新上线，或重新运行任务以改派其他机器。' });
+    expect(fails[0]).toMatchObject({
+      body: '请将这台机器重新上线。这一步不会改派到其他机器。',
+    });
   });
 
   test('a failure with several preserved commits carries every one, oldest first', () => {

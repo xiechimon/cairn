@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isUsableTimestamp, joinMeta, relativeTime } from '../src/board/rel-time.js';
+import { compactAge, isUsableTimestamp, joinMeta, relativeTime } from '../src/board/rel-time.js';
 import { EN } from '../src/i18n/en.js';
 import { translate, type TVars } from '../src/i18n/translate.js';
 
@@ -39,6 +39,25 @@ describe('relativeTime en (dict fallback)', () => {
     expect(relativeTime(NOW - 3 * HOUR, NOW, en)).toBe('3h ago');
     expect(relativeTime(NOW - 33 * HOUR, NOW, en)).toBe('yesterday');
     expect(relativeTime(NOW - 46 * HOUR, NOW, en)).toBe('2d ago');
+  });
+});
+
+describe('compactAge', () => {
+  it('names the largest whole unit on each side of its boundary', () => {
+    expect(compactAge(NOW - 20_000, NOW)).toBe('1m');
+    expect(compactAge(NOW - 59 * MINUTE, NOW)).toBe('59m');
+    expect(compactAge(NOW - 60 * MINUTE, NOW)).toBe('1h');
+    expect(compactAge(NOW - 23 * HOUR - 59 * MINUTE, NOW)).toBe('23h');
+    expect(compactAge(NOW - 24 * HOUR, NOW)).toBe('1d');
+    expect(compactAge(NOW - 7 * 24 * HOUR + MINUTE, NOW)).toBe('6d');
+    expect(compactAge(NOW - 7 * 24 * HOUR, NOW)).toBe('1w');
+    expect(compactAge(NOW - 400 * 24 * HOUR, NOW)).toBe('1y');
+  });
+
+  it('is empty without a usable start and never negative', () => {
+    expect(compactAge(0, NOW)).toBe('');
+    expect(compactAge(null, NOW)).toBe('');
+    expect(compactAge(NOW + 5 * MINUTE, NOW)).toBe('1m');
   });
 });
 

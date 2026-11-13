@@ -121,6 +121,7 @@ export function bootServer(
     for (const dir of ownedDirs.splice(0)) releaseTestTempDir(dir);
   };
   const oauthStates: AppContext['oauthStates'] = new Map();
+  const xaiDeviceStates: AppContext['xaiDeviceStates'] = new Map();
   try {
     const appContext: AppContext = {
       remote: {
@@ -146,6 +147,7 @@ export function bootServer(
       uploads: new Map(),
       enrollments: new Map(),
       oauthStates,
+      xaiDeviceStates,
       oauthClient: opts.oauthClient ?? null,
       ...(opts.oauthFetch !== undefined ? { oauthFetch: opts.oauthFetch } : {}),
       ...(opts.providerTestTimeoutMs === undefined
@@ -172,6 +174,26 @@ export function bootServer(
       mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
     };
     const app = createApp(appContext, opts.logger);
+    const rawRequest = app.request.bind(app);
+    app.request = ((
+      input: Parameters<typeof app.request>[0],
+      init?: RequestInit,
+      ...rest: unknown[]
+    ) => {
+      const forward = (next: RequestInit | undefined) => rawRequest(input, next, ...(rest as []));
+      if (init?.method !== 'POST' || typeof init.body !== 'string' || typeof input !== 'string') {
+        return forward(init);
+      }
+      if (new Headers(init.headers).get('x-cairn-raw-send') === '1') return forward(init);
+      try {
+        const parsed = JSON.parse(init.body) as unknown;
+        const stamped = stampPersonSendBody(input.split('?')[0] ?? input, parsed);
+        if (stamped === parsed) return forward(init);
+        return forward({ ...init, body: JSON.stringify(stamped) });
+      } catch {
+        return forward(init);
+      }
+    }) as typeof app.request;
     try {
       onTestFinished(dispose);
     } catch {
@@ -192,6 +214,7 @@ export function bootServer(
       skillsDir,
       skillSourcesPath,
       oauthStates,
+      xaiDeviceStates,
       svc: {
         db,
         hub,
@@ -230,6 +253,23 @@ export async function issueApiKey(s: ReturnType<typeof bootServer>): Promise<str
 export type TestServer = ReturnType<typeof bootServer>;
 
 const jsonHeaders = { 'content-type': 'application/json' };
+
+let personSendStamp = 0;
+
+export function stampPersonSendBody(path: string, body: unknown): unknown {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return body;
+  const record = body as Record<string, unknown>;
+  if (record.clientMessageId !== undefined || typeof record.queuedMessageId === 'string')
+    return body;
+  const bare = path.split('?')[0] ?? path;
+  const send =
+    bare.endsWith('/coordinator/messages') ||
+    bare.endsWith('/chief/threads') ||
+    /\/conversations\/[^/]+\/messages$/.test(bare);
+  if (!send) return body;
+  personSendStamp += 1;
+  return { ...record, clientMessageId: `test-send-${personSendStamp}` };
+}
 
 export function req(app: Hono, method: string, path: string, body?: unknown): Promise<Response> {
   return Promise.resolve(

@@ -159,3 +159,21 @@ export const oauthAuthorizeResponseSchema = z.object({
   authorizationUrl: z.string(),
 });
 export type OAuthAuthorizeResponse = z.infer<typeof oauthAuthorizeResponseSchema>;
+
+export const xaiDeviceStartResponseSchema = z.object({
+  state: z.string(),
+  userCode: z.string(),
+  verificationUri: z.string().url(),
+  intervalSeconds: z.number().positive(),
+  expiresInSeconds: z.number().positive(),
+});
+export type XaiDeviceStartResponse = z.infer<typeof xaiDeviceStartResponseSchema>;
+
+export const xaiDevicePollResponseSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('pending'), intervalSeconds: z.number().positive() }),
+  z.object({ status: z.literal('complete') }),
+  z.object({ status: z.literal('superseded') }),
+  z.object({ status: z.literal('denied') }),
+  z.object({ status: z.literal('expired') }),
+]);
+export type XaiDevicePollResponse = z.infer<typeof xaiDevicePollResponseSchema>;

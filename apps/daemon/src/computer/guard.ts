@@ -17,7 +17,7 @@ import {
   resolveExecutionPath,
   teeDestinationPaths,
 } from './guard-heredoc.js';
-import { quotedHeredocLifecycleHazard } from './guard-quoted.js';
+import { BROWSER_STATE_PATHS, quotedHeredocLifecycleHazard } from './guard-quoted.js';
 import { parseShellWords, preserveShellCommandBoundaries } from './guard-shell-parse.js';
 import {
   assignmentEntries,
@@ -551,7 +551,7 @@ function protectedWordRefusal(
   }
   for (const word of words) {
     const folded = word.toLowerCase();
-    if (/(?:\.browser-profiles|--user-data-dir)/.test(folded)) return 'browser profile path';
+    if (BROWSER_STATE_PATHS.some((path) => folded.includes(path))) return 'browser profile path';
     if (/(?:\/tmp\/\.x11-unix|\/tmp\/\.x\d+-lock)/.test(folded)) return 'X11 path';
   }
   for (let index = 0; index < words.length; index += 1) {

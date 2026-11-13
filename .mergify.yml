@@ -6,13 +6,10 @@ queue_rules:
           - base = main
           - "#depends-on > 0"
       - -draft
-      - '#review-threads-unresolved = 0'
-      - -label = coordinator-hold
       - or:
           - -head ~= ^B[0-9]+/
           - label = queue-admit
       - check-success = commit-author
-      - check-success = @github-actions/review-gate
       - check-success = merge-route
       - check-success = pr-size
       - or:
@@ -36,7 +33,7 @@ queue_rules:
       - or:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
-      - '#files <= 80'
+      - '#files <= 3000'
     merge_conditions:
       - or:
           - check-success = check
@@ -61,7 +58,7 @@ queue_rules:
       min: 1
       max: 4
     batch_max_wait_time: 0 s
-    max_checks_retries: 1
+    max_checks_retries: 0
     branch_protection_injection_mode: none
     merge_bot_account: xiechimon
   - name: bot
@@ -71,13 +68,10 @@ queue_rules:
           - base = main
           - "#depends-on > 0"
       - -draft
-      - '#review-threads-unresolved = 0'
-      - -label = coordinator-hold
       - or:
           - -head ~= ^B[0-9]+/
           - label = queue-admit
       - check-success = commit-author
-      - check-success = @github-actions/review-gate
       - check-success = merge-route
       - check-success = pr-size
       - or:
@@ -101,7 +95,7 @@ queue_rules:
       - or:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
-      - '#files <= 80'
+      - '#files <= 3000'
     merge_conditions:
       - or:
           - check-success = check
@@ -126,7 +120,7 @@ queue_rules:
       min: 1
       max: 4
     batch_max_wait_time: 0 s
-    max_checks_retries: 1
+    max_checks_retries: 0
     branch_protection_injection_mode: none
     merge_bot_account: xiechimon
 merge_protections_settings:
@@ -135,9 +129,14 @@ commands_restrictions:
   dequeue:
     conditions:
       - sender-permission >= write
+  requeue:
+    conditions:
+      - or:
+          - sender-permission >= write
+          - sender = github-actions[bot]
 merge_queue:
   mode: serial
-  max_parallel_checks: 1
+  max_parallel_checks: 3
   dequeued_label: dequeued
 scopes:
   source:

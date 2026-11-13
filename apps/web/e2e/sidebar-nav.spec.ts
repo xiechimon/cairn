@@ -112,7 +112,7 @@ test('hover tints the row — dark default + light theme', async ({ page }) => {
     .locator('[data-slot="sidebar-project-row"]')
     .first();
   await lightRow.hover();
-  await expect.poll(() => pillBg(lightRow)).toBe('rgba(0, 0, 0, 0.05)');
+  await expect.poll(() => pillBg(lightRow)).toBe('rgba(0, 0, 0, 0.06)');
 });
 
 test('rail hover tints the row', async ({ page }) => {
@@ -154,12 +154,11 @@ for (const locale of ['zh', 'en']) {
       if (layout === 'phone') await page.getByRole('button', { name: locale === 'zh' ? '展开侧边栏' : 'Expand sidebar' }).click();
       const sidebar = page.locator('.board-sidebar');
       await expect(sidebar.locator('[aria-current="page"]')).toHaveAccessibleName(new RegExp(home));
-      await expect(sidebar.getByRole('button', {
-        name: layout === 'rail'
-          ? locale === 'zh' ? '收起项目' : 'Collapse Project'
-          : locale === 'zh' ? '项目' : 'Project',
+      await expect(sidebar.getByRole('link', {
+        name: locale === 'zh' ? '新建项目' : 'New project',
         exact: true,
       })).toBeVisible();
+      await expect(sidebar.getByRole('button', { name: locale === 'zh' ? '项目' : 'Project', exact: true })).toHaveCount(0);
       await page.goto('/app/schedules?scenario=01');
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(locale === 'zh' ? '定时' : 'Schedules');
       if (layout === 'phone') await page.getByRole('button', { name: locale === 'zh' ? '展开侧边栏' : 'Expand sidebar' }).click();

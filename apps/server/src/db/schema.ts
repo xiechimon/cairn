@@ -21,6 +21,9 @@ import type {
   EvidenceStore,
   INTAKE_SOURCE_KIND,
   MachineCapabilities,
+  MailAccountStatus,
+  MailEventStatus,
+  MailRank,
   MemoryCandidateStatus,
   MemoryLayer,
   ModelRef,
@@ -41,6 +44,7 @@ import type {
   RouteUse,
   ScheduleKind,
   ScheduleReport,
+  SecretDelivery,
   ShipRoute,
   SkillInjectionRecord,
   SnoozeMode,
@@ -253,6 +257,7 @@ export const build = sqliteTable('build', {
     .references(() => todo.id, { onDelete: 'cascade' }),
   withPlan: bool('withPlan').notNull(),
   prevPhase: text('prevPhase').$type<Phase | null>(),
+  afterStopPhase: text('afterStopPhase').$type<'done' | 'keep' | null>(),
   triggerSource: text('triggerSource').$type<TriggerSource>().notNull(),
   scheduledBy: text('scheduledBy'),
   planDocId: text('planDocId'),
@@ -410,6 +415,9 @@ export const computer = sqliteTable(
     controlFence: integer('controlFence').notNull().default(0),
     screenGeneration: integer('screenGeneration').notNull().default(0),
     browserEnabled: bool('browserEnabled').notNull().default(false),
+    handoffReason: text('handoffReason').$type<'login' | 'model'>(),
+    handoffStepId: text('handoffStepId'),
+    handoffRequestedAt: epochMs('handoffRequestedAt'),
     createdAt: epochMs('createdAt').notNull(),
     updatedAt: epochMs('updatedAt').notNull(),
   },
@@ -655,12 +663,6 @@ export const dataMigration = sqliteTable('data_migration', {
   detail: text('detail').notNull(),
 });
 
-export const memorySaveConflict = sqliteTable('memory_save_conflict', {
-  id: text('id').primaryKey(),
-  candidateIds: json<string[]>('candidateIds').notNull(),
-  createdAt: epochMs('createdAt').notNull(),
-});
-
 export const memoryCandidate = sqliteTable(
   'memory_candidate',
   {
@@ -778,16 +780,30 @@ export const provider = sqliteTable('provider', {
   updatedAt: epochMs('updatedAt').notNull(),
 });
 
-export const secret = sqliteTable('secret', {
-  id: text('id').primaryKey(),
-  teamId: text('teamId')
-    .notNull()
-    .references(() => team.id),
-  projectId: text('projectId').references(() => project.id),
-  name: text('name').notNull(),
-  description: text('description'),
-  valueCipher: text('valueCipher'),
-});
+export const secret = sqliteTable(
+  'secret',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    projectId: text('projectId').references(() => project.id),
+    name: text('name').notNull(),
+    description: text('description'),
+    valueCipher: text('valueCipher'),
+    delivery: text('delivery').$type<SecretDelivery>().notNull().default('plaintext'),
+    httpOrigin: text('httpOrigin'),
+    httpHeader: text('httpHeader'),
+    httpTemplate: text('httpTemplate'),
+    policyRevision: integer('policyRevision').notNull().default(1),
+  },
+  (t) => [
+    check(
+      'secret_delivery_policy',
+      sql`(${t.delivery} = 'http' AND ${t.httpOrigin} IS NOT NULL AND ${t.httpHeader} IS NOT NULL AND ${t.httpTemplate} IS NOT NULL) OR (${t.delivery} = 'plaintext' AND ${t.httpOrigin} IS NULL AND ${t.httpHeader} IS NULL AND ${t.httpTemplate} IS NULL)`,
+    ),
+  ],
+);
 
 export const apiKey = sqliteTable('api_key', {
   id: text('id').primaryKey(),
@@ -820,6 +836,32 @@ export const pairedDevice = sqliteTable(
   (t) => [uniqueIndex('paired_device_tokenHash_unique').on(t.tokenHash)],
 );
 
+export const pairingGrant = sqliteTable(
+  'pairing_grant',
+  {
+    id: text('id').primaryKey(),
+    codeHash: text('codeHash').notNull(),
+    expiresAt: epochMs('expiresAt').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    revokedAt: epochMs('revokedAt'),
+    redeemedAt: epochMs('redeemedAt'),
+  },
+  (t) => [uniqueIndex('pairing_grant_codeHash_unique').on(t.codeHash)],
+);
+
+export const browserSession = sqliteTable(
+  'browser_session',
+  {
+    id: text('id').primaryKey(),
+    tokenHash: text('tokenHash').notNull(),
+    kind: text('kind').notNull(),
+    deviceId: text('deviceId').references(() => pairedDevice.id, { onDelete: 'cascade' }),
+    expiresAt: epochMs('expiresAt').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [uniqueIndex('browser_session_tokenHash_unique').on(t.tokenHash)],
+);
+
 export const machine = sqliteTable(
   'machine',
   {
@@ -840,6 +882,8 @@ export const machine = sqliteTable(
     maxConcurrentOverridden: bool('maxConcurrentOverridden').notNull().default(false),
     lastSeenAt: epochMs('lastSeenAt'),
     capabilities: json<MachineCapabilities | null>('capabilities'),
+    browserOverride: bool('browserOverride'),
+    desktopOverride: bool('desktopOverride'),
   },
   (t) => [index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt)],
 );
@@ -952,6 +996,7 @@ export const coordinatorConversation = sqliteTable('coordinator_conversation', {
   storeId: text('storeId'),
   threadId: text('threadId').primaryKey(),
   conversationId: text('conversationId').notNull(),
+  mailOwnerConversationId: text('mailOwnerConversationId'),
   lastMirroredEntryId: text('lastMirroredEntryId'),
   lastColdSlimAt: epochMs('lastColdSlimAt'),
   lastColdSlimStepId: text('lastColdSlimStepId'),
@@ -1025,7 +1070,12 @@ export const chiefThread = sqliteTable(
   (t) => [
     uniqueIndex('chief_thread_coordinator_unique')
       .on(t.chiefId)
-      .where(sql`${t.archivedAt} is null and ${t.id} not like 'chief-digest-%'`),
+      .where(
+        sql`${t.archivedAt} is null and ${t.projectId} is null and ${t.id} not like 'chief-digest-%'`,
+      ),
+    uniqueIndex('chief_thread_channel_unique')
+      .on(t.chiefId, t.projectId)
+      .where(sql`${t.archivedAt} is null and ${t.projectId} is not null`),
   ],
 );
 
@@ -1428,5 +1478,220 @@ export const coordinatorTurnSnapshot = sqliteTable(
        AND ${t.digest} IS NULL AND ${t.reason} IS NOT NULL
        AND length(${t.reason}) BETWEEN 1 AND 128)`,
     ),
+  ],
+);
+
+export const actionJournal = sqliteTable(
+  'action_journal',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    actionId: text('actionId').notNull(),
+    targetId: text('targetId').notNull(),
+    actor: text('actor').$type<'user' | 'coordinator'>().notNull(),
+    surface: text('surface').notNull(),
+    kind: text('kind').$type<'run' | 'undo' | 'undo-refused' | 'error'>().notNull(),
+    inputHash: text('inputHash').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    index('action_journal_team_idx').on(t.teamId, t.createdAt),
+    check('action_journal_actor', sql`${t.actor} in ('user', 'coordinator')`),
+    check('action_journal_kind', sql`${t.kind} in ('run', 'undo', 'undo-refused', 'error')`),
+  ],
+);
+
+export const actionProposal = sqliteTable(
+  'action_proposal',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    actionId: text('actionId').notNull(),
+    targetId: text('targetId').notNull(),
+    inputJson: text('inputJson').notNull(),
+    inputHash: text('inputHash').notNull(),
+    status: text('status')
+      .$type<'pending' | 'refused' | 'executed' | 'failed' | 'expired' | 'superseded'>()
+      .notNull(),
+    decision: text('decision').$type<'refuse' | 'allow-once' | 'always' | null>(),
+    expiresAt: epochMs('expiresAt').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    decidedBy: text('decidedBy'),
+    decidedAt: epochMs('decidedAt'),
+  },
+  (t) => [
+    uniqueIndex('action_proposal_pending_idx')
+      .on(t.teamId, t.actionId, t.targetId)
+      .where(sql`${t.status} = 'pending'`),
+    index('action_proposal_expiry_idx').on(t.status, t.expiresAt),
+  ],
+);
+
+export const actionSubscriber = sqliteTable(
+  'action_subscriber',
+  {
+    id: text('id').primaryKey(),
+    proposalId: text('proposalId')
+      .notNull()
+      .references(() => actionProposal.id, { onDelete: 'cascade' }),
+    threadId: text('threadId').notNull(),
+    wakeStepId: text('wakeStepId').notNull(),
+    scopeProjectId: text('scopeProjectId'),
+  },
+  (t) => [uniqueIndex('action_subscriber_proposal_thread_idx').on(t.proposalId, t.threadId)],
+);
+
+export const actionWakeOutbox = sqliteTable(
+  'action_wake_outbox',
+  {
+    id: text('id').primaryKey(),
+    proposalId: text('proposalId')
+      .notNull()
+      .references(() => actionProposal.id, { onDelete: 'cascade' }),
+    threadId: text('threadId').notNull(),
+    outcome: text('outcome').notNull(),
+    state: text('state').$type<'pending' | 'delivered' | 'undeliverable'>().notNull(),
+  },
+  (t) => [uniqueIndex('action_wake_outbox_proposal_thread_idx').on(t.proposalId, t.threadId)],
+);
+
+export const hostedCleanupOutbox = sqliteTable(
+  'hosted_cleanup_outbox',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    projectId: text('projectId').notNull(),
+    repoName: text('repoName').notNull(),
+    state: text('state').$type<'pending' | 'retrying' | 'conflict' | 'done'>().notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: epochMs('nextAttemptAt').notNull(),
+    lastError: text('lastError'),
+  },
+  (t) => [
+    uniqueIndex('hosted_cleanup_unresolved_idx')
+      .on(t.teamId, t.repoName)
+      .where(sql`${t.state} != 'done'`),
+  ],
+);
+
+export const threadConversation = sqliteTable('thread_conversation', {
+  threadId: text('threadId').primaryKey(),
+  storeId: text('storeId').notNull(),
+  conversationId: text('conversationId').notNull(),
+  lastMirroredEntryId: text('lastMirroredEntryId'),
+  updatedAt: epochMs('updatedAt').notNull(),
+});
+
+export const threadEntry = sqliteTable(
+  'thread_entry',
+  {
+    messageId: text('messageId').primaryKey(),
+    threadId: text('threadId').notNull(),
+    conversationId: text('conversationId').notNull(),
+    entryId: text('entryId').notNull(),
+  },
+  (t) => [index('thread_entry_thread_idx').on(t.threadId, t.conversationId)],
+);
+
+export const jobApplication = sqliteTable('job_application', {
+  userId: text('userId')
+    .primaryKey()
+    .references(() => user.id),
+  document: json<Record<string, unknown>>('document').notNull(),
+});
+
+export const mailAccount = sqliteTable(
+  'mail_account',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    userId: text('userId')
+      .notNull()
+      .references(() => user.id),
+    provider: text('provider').$type<'gmail' | 'imap'>().notNull(),
+    mailbox: text('mailbox').notNull(),
+    status: text('status').$type<MailAccountStatus>().notNull(),
+    generation: integer('generation').notNull().default(0),
+    historyWatermark: text('historyWatermark'),
+    uidValidity: text('uidValidity'),
+    lastReconciledUid: integer('lastReconciledUid'),
+    pushServiceAccountEmail: text('pushServiceAccountEmail'),
+    secretId: text('secretId').references(() => secret.id),
+    watchExpiration: epochMs('watchExpiration'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    index('mail_account_team_idx').on(t.teamId),
+    check(
+      'mail_account_status',
+      sql`${t.status} in ('disconnected', 'connecting', 'watching', 'degraded', 'revoked')`,
+    ),
+    check('mail_account_provider', sql`${t.provider} in ('gmail', 'imap')`),
+  ],
+);
+
+export const mailEvent = sqliteTable(
+  'mail_event',
+  {
+    id: text('id').primaryKey(),
+    accountId: text('accountId')
+      .notNull()
+      .references(() => mailAccount.id),
+    externalId: text('externalId').notNull(),
+    status: text('status').$type<MailEventStatus>().notNull(),
+    rank: text('rank').$type<MailRank | null>(),
+    ruleId: text('ruleId'),
+    ruleName: text('ruleName'),
+    dropReason: text('dropReason'),
+    generation: integer('generation').notNull(),
+    displayName: text('displayName'),
+    fromAddress: text('fromAddress'),
+    subject: text('subject'),
+    excerpt: text('excerpt'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('mail_event_account_external_unique').on(t.accountId, t.externalId),
+    check('mail_event_status', sql`${t.status} in ('received', 'ranked', 'delivered', 'dropped')`),
+    check(
+      'mail_event_rank',
+      sql`${t.rank} is null or ${t.rank} in ('needs_you', 'can_wait', 'drop')`,
+    ),
+    check('mail_event_drop_reason', sql`${t.status} != 'dropped' or ${t.dropReason} is not null`),
+    check(
+      'mail_event_dropped_body',
+      sql`${t.status} != 'dropped' or (${t.excerpt} is null and ${t.subject} is null and ${t.displayName} is null and ${t.fromAddress} is null)`,
+    ),
+  ],
+);
+
+export const mailRule = sqliteTable(
+  'mail_rule',
+  {
+    id: text('id').primaryKey(),
+    accountId: text('accountId')
+      .notNull()
+      .references(() => mailAccount.id),
+    name: text('name').notNull(),
+    matchKind: text('matchKind').$type<'sender_allow' | 'subject_contains'>().notNull(),
+    pattern: text('pattern').notNull(),
+    rank: text('rank').$type<MailRank>().notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    index('mail_rule_account_idx').on(t.accountId, t.createdAt, t.id),
+    check('mail_rule_kind', sql`${t.matchKind} in ('sender_allow', 'subject_contains')`),
+    check('mail_rule_rank', sql`${t.rank} in ('needs_you', 'can_wait', 'drop')`),
+    check('mail_rule_pattern', sql`length(trim(${t.pattern})) > 0`),
   ],
 );

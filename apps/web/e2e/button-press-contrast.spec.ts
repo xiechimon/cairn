@@ -61,27 +61,27 @@ async function pressedColors(page: Page, control: Locator) {
   return pressed;
 }
 
-async function expectReadable(page: Page, control: Locator, label: string) {
+async function expectReadable(page: Page, control: Locator, label: string, min = 4.5) {
   const { fg, bg } = await pressedColors(page, control);
   const ratio = contrast([fg[0], fg[1], fg[2], 1], [bg[0], bg[1], bg[2], 1]);
-  expect(ratio, `${label} pressed contrast`).toBeGreaterThanOrEqual(4.5);
+  expect(ratio, `${label} pressed contrast`).toBeGreaterThanOrEqual(min);
 }
 
 for (const theme of ['light', 'dark'] as const) {
   test.describe(theme, () => {
     test.use({ colorScheme: theme });
 
-    test('the Coordinator answer button stays readable while pressed', async ({ page }) => {
+    test('the Coordinator answer send icon keeps non-text contrast while pressed', async ({ page }) => {
       await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
       await page.goto('/app?scenario=chief-question');
       await page.getByTestId('home-c').locator('.chief-composer textarea, .chief-composer [contenteditable]').first().fill('hello');
-      await expectReadable(page, page.getByTestId('chief-question-primary'), 'chief answer');
+      await expectReadable(page, page.getByTestId('chief-question-primary'), 'chief answer icon', 3);
     });
 
     test('the thread composer Send button stays readable while pressed', async ({ page }) => {
       await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
       await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=16');
-      await page.locator('.composer-send').first().waitFor();
+      await page.getByTestId('composer-card').first().waitFor();
       await page.getByTestId('composer-toolbar').locator('xpath=ancestor::*[1]').locator('textarea, [contenteditable]').first().fill('hello');
       await expectReadable(page, page.locator('.composer-send').first(), 'thread send');
     });

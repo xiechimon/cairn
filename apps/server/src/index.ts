@@ -27,6 +27,7 @@ import { loopbackOwnerFor } from './lib/loopback-owner.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { localWorkspaceRoot } from './lib/workspace-root.js';
 import { shutdownRuntimeOtel } from './runtime-otel.js';
+import { sweepComputerHandoffs } from './services/computer-handoff.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import {
   setCoordinatorInServer,
@@ -140,6 +141,7 @@ const app = createApp(
     uploads: new Map(),
     enrollments: new Map(),
     oauthStates: new Map(),
+    xaiDeviceStates: new Map(),
     oauthClient: config.githubOauth,
     githubAppTokenSocket: config.githubAppTokenSocket,
     githubAppIdentity: config.githubAppIdentity,
@@ -259,6 +261,7 @@ const server = serve(
 const drainHttp = createHttpDrain(server);
 const computerScreens = computerScreensOf({ db, machineHub, secretBox });
 computerScreens.recover();
+sweepComputerHandoffs(db, Date.now());
 computerScreens.attach(server);
 
 const tsnetStarting = startTsnetRemote({

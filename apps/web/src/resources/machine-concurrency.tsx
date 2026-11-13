@@ -18,7 +18,7 @@ function BasisRow({ label, value }: { label: string; value: string }) {
   return (
     <span className="flex items-baseline justify-between gap-3">
       <span className="text-content-tertiary">{label}</span>
-      <span className="tabular-nums text-content-secondary">{value}</span>
+      <span className="tabular-nums text-foreground">{value}</span>
     </span>
   );
 }

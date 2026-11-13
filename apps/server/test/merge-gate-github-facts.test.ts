@@ -1175,3 +1175,35 @@ describe('recording facts (#1783)', () => {
     expect(large.evidence).toContainEqual({ sha: HEAD, path: video, present: false });
   });
 });
+
+describe('read cache bound', () => {
+  test('a collection stays at 500 and a later read misses an evicted key', async () => {
+    const cache = newGateReadCache();
+    const pullKey = 'pull:xiechimon/cairn#7';
+    const presentKey = `xiechimon/cairn@${HEAD}:${SHOT}`;
+    const pauseKey = 'xiechimon/cairn';
+    cache.bodies.set(pullKey, { etag: '"stale"', body: prBody({ draft: true }) });
+    cache.present.add(presentKey);
+    cache.autonomyPause.set(pauseKey, { at: 1, paused: true });
+    for (let i = 0; i < 500; i += 1) {
+      cache.bodies.set(`pull:other/repo#${i}`, { etag: `"e${i}"`, body: { i } });
+      cache.present.add(`other/repo@${'c'.repeat(40)}:docs/verify/${i}.png`);
+      cache.autonomyPause.set(`other/${i}`, { at: 1, paused: false });
+    }
+    expect(cache.bodies.size).toBe(500);
+    expect(cache.present.size).toBe(500);
+    expect(cache.autonomyPause.size).toBe(500);
+    expect(cache.bodies.has(pullKey)).toBe(false);
+    expect(cache.present.has(presentKey)).toBe(false);
+    expect(cache.autonomyPause.get(pauseKey)).toBeUndefined();
+    expect(cache.bodies.has('pull:other/repo#499')).toBe(true);
+    expect(cache.present.has(`other/repo@${'c'.repeat(40)}:docs/verify/499.png`)).toBe(true);
+    expect(cache.autonomyPause.get('other/499')?.paused).toBe(false);
+
+    const fetched = await read({}, cache);
+    expect(fetched.log[0]).toEqual(['pull', 7, { etag: null }]);
+    expect(names(fetched.log)).toContain('contents');
+    expect(fetched.pr?.draft).toBe(false);
+    expect(fetched.evidence).toEqual([{ sha: HEAD, path: SHOT, present: true }]);
+  });
+});

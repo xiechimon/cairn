@@ -27,6 +27,7 @@ const app = createApp({
   uploads: new Map(),
   enrollments: new Map(),
   oauthStates: new Map(),
+  xaiDeviceStates: new Map(),
   oauthClient: null,
   authToken: null,
   reposDir: join(dataDir, 'repos'),

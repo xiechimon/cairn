@@ -1,3 +1,4 @@
+import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -27,6 +28,7 @@ import { ConversationStreamHub, TeamStreamHub } from '../../apps/server/src/serv
 import { MachineWakeHub } from '../../apps/server/src/services/machine-wake-hub.js';
 import { createScheduler } from '../../apps/server/src/services/scheduler.js';
 import { setTodoPhase } from '../../apps/server/src/services/todos.js';
+import { stampPersonSendBody } from '../../apps/server/test/helpers.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../scripts/test-tmpdir.mjs';
 
 export const AGENT_ID = 'agent-it-1';
@@ -129,6 +131,7 @@ export async function bootRealServer(opts: {
       uploads: new Map(),
       enrollments: new Map(),
       oauthStates: new Map(),
+      xaiDeviceStates: new Map(),
       oauthClient: null,
       reposDir,
       attachmentsDir,
@@ -168,10 +171,13 @@ export async function bootRealServer(opts: {
       ) {
         const res = await app.fetch(input as never, init);
         if (res.status === 200) {
-          const body = (await res
-            .clone()
-            .json()
-            .catch(() => null)) as {
+          const copy = res.clone();
+          const encoding = copy.headers.get('content-encoding');
+          const decoded =
+            encoding === 'gzip' || encoding === 'deflate'
+              ? new Response(copy.body?.pipeThrough(new DecompressionStream(encoding)))
+              : copy;
+          const body = (await decoded.json().catch(() => null)) as {
             machineId?: string;
           } | null;
           if (typeof body?.machineId === 'string') {
@@ -294,10 +300,11 @@ export async function api(
   path: string,
   body?: unknown,
 ): Promise<{ status: number; body: unknown }> {
+  const stamped = method === 'POST' ? stampPersonSendBody(path, body) : body;
   const res = await fetch(`${url}${path}`, {
     method,
-    headers: body !== undefined ? { 'content-type': 'application/json' } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    headers: stamped !== undefined ? { 'content-type': 'application/json' } : undefined,
+    body: stamped !== undefined ? JSON.stringify(stamped) : undefined,
   });
   const text = await res.text();
   return { status: res.status, body: text === '' ? null : (JSON.parse(text) as unknown) };
@@ -338,6 +345,35 @@ export async function seedWorld(
   const todoId = (res.body as { id: string }).id;
   return { projectId, todoId };
 }
+
+type ConfinementPreflight = NonNullable<
+  import('../../apps/daemon/src/machine-loop.js').MachineLoopOpts['confinementPreflight']
+>;
+
+export const CONFINEMENT_READY_LAUNCH: ConfinementPreflight = async (options) => {
+  const [command, ...args] = options.command;
+  const child = spawn(command ?? process.execPath, args, {
+    stdio: ['pipe', 'pipe', 'pipe'],
+  }) as ChildProcessWithoutNullStreams;
+  const completed = new Promise<void>((resolve) => {
+    child.once('close', () => {
+      options.released?.();
+      resolve();
+    });
+  });
+  options.reserve?.({
+    unit: 'cairn-confine-test.service',
+    eventsPath: '/sys/fs/cgroup/user.slice/test/app.slice/cairn-confine-test.service/cgroup.events',
+  });
+  return {
+    unit: 'cairn-confine-test.service',
+    process: child,
+    completed,
+    stop: async () => {
+      child.kill('SIGKILL');
+    },
+  };
+};
 
 export function daemonLogLines(daemonLog: string): string[] {
   try {

@@ -5,7 +5,7 @@ import { describe, expect, test } from 'vitest';
 const SRC = new URL('../src/', import.meta.url).pathname;
 const ICON_DIR = new URL('../src/icons/', import.meta.url);
 const HEAVY_GLYPHS = new Set(['PlusSmall.tsx']);
-const ICON_SIZES = new Set(['3.5', '4', '4.5']);
+const ICON_SIZES = new Set(['4', '5', '5.5']);
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -39,7 +39,7 @@ describe('icon stroke', () => {
     expect(css).toMatch(/svg\.lucide\s*\{[^}]*stroke-width:\s*1\.75\s*;/);
   });
 
-  test('V14: lucide icons are sized 14, 16 or 18 px', () => {
+  test('V14: lucide icons are sized 16, 20 or 22 px', () => {
     const offenders: string[] = [];
     for (const { path, text } of sources) {
       const names = new Set<string>();

@@ -15,6 +15,7 @@ import { openResearchThread } from '../src/services/research-thread.js';
 import { profileForStep } from '../src/services/routing-rules.js';
 import {
   bootServer,
+  insertMachine,
   postProject,
   seedRoute,
   seedSessionRoute,
@@ -41,6 +42,7 @@ const supported = {
 
 async function world(withChecker = true, report = source) {
   const s = bootServer();
+  insertMachine(s);
   disposables.push(() => s.dispose());
   const projectId = await postProject(s.app, 'citations');
   seedSessionRoute(s, { provider: 'claude-code', modelId: 'claude-sonnet-5-5' });

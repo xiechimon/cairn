@@ -14,11 +14,11 @@ import {
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { pairedDevice, pushSubscription } from '../src/db/schema.js';
+import { pairedDevice, pairingGrant, pushSubscription } from '../src/db/schema.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from '../src/lib/environment-id.js';
 import { listenOnTailnetSocket } from '../src/lib/tailnet-listener.js';
 import type { SidecarStatus } from '../src/lib/tsnet-sidecar.js';
-import { createPairingBook } from '../src/services/paired-devices.js';
+import { createPairingBook, pairFromGrant } from '../src/services/paired-devices.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 const OWNER = 'remote-access-owner-token-0123456789abcdef';
@@ -59,6 +59,52 @@ function readyStatus(overrides: Partial<SidecarStatus> = {}): SidecarStatus {
     ...overrides,
   };
 }
+
+test('a failed device insert does not consume the pairing code', async () => {
+  const s = bootServer({ authToken: OWNER });
+  const code = await issueCode(s);
+  expect(() => pairFromGrant(s.db, { code, teamId: 'missing-team', name: 'phone' })).toThrow();
+  const retry = await call(s, 'POST', '/api/remote/pair', { body: { code, name: 'phone' } });
+  expect(retry.status).toBe(201);
+  expect(s.db.select().from(pairedDevice).all()).toHaveLength(1);
+});
+
+test('issuing a pairing code deletes expired, redeemed and revoked grants', async () => {
+  const s = bootServer({ authToken: OWNER });
+  const now = Date.now();
+  s.db
+    .insert(pairingGrant)
+    .values([
+      { id: 'expired-grant', codeHash: 'a'.repeat(64), expiresAt: now - 1, createdAt: now - 1 },
+      {
+        id: 'redeemed-grant',
+        codeHash: 'b'.repeat(64),
+        expiresAt: now + 60_000,
+        createdAt: now,
+        redeemedAt: now,
+      },
+      {
+        id: 'revoked-grant',
+        codeHash: 'c'.repeat(64),
+        expiresAt: now + 60_000,
+        createdAt: now,
+        revokedAt: now,
+      },
+    ])
+    .run();
+  expect((await call(s, 'POST', '/api/remote/pairing', { headers: ownerHeaders })).status).toBe(
+    201,
+  );
+  const ids = s.db
+    .select()
+    .from(pairingGrant)
+    .all()
+    .map((row) => row.id);
+  expect(ids).toHaveLength(1);
+  expect(ids).not.toContain('expired-grant');
+  expect(ids).not.toContain('redeemed-grant');
+  expect(ids).not.toContain('revoked-grant');
+});
 
 async function issueCode(s: TestServer): Promise<string> {
   const res = await call(s, 'POST', '/api/remote/pairing', { headers: ownerHeaders });
@@ -311,6 +357,19 @@ describe('F-P1 pairing: code to per-device token', () => {
     expect(stream.status).toBe(401);
   });
 
+  test('a ticket minted before revoke cannot open a stream after the device is gone', async () => {
+    const s = bootServer({ authToken: OWNER });
+    const paired = await pairDevice(s);
+    const issued = await call(s, 'POST', '/api/auth/stream-ticket', {
+      headers: { authorization: `Bearer ${paired.token}` },
+    });
+    expect(issued.status).toBe(200);
+    const ticket = ((await issued.json()) as { ticket: string }).ticket;
+    await call(s, 'DELETE', `/api/remote/devices/${paired.deviceId}`, { headers: ownerHeaders });
+    const stream = await call(s, 'GET', `/api/teams/${s.team.id}/stream?ticket=${ticket}`);
+    expect(stream.status).toBe(401);
+  });
+
   test('revoking one device leaves the others working', async () => {
     const s = bootServer({ authToken: OWNER });
     const first = await pairDevice(s, 'first');
@@ -402,12 +461,15 @@ describe('F-P1 pairing: code to per-device token', () => {
 });
 
 describe('F-P2 pairing authority stays with the owner token', () => {
-  test('a device token cannot mint codes, list devices, revoke devices or confirm machine enrollment', async () => {
+  test('a device token can see paired devices but cannot mint codes, revoke devices or confirm machine enrollment', async () => {
     const s = bootServer({ authToken: OWNER });
     const paired = await pairDevice(s);
     const device = { authorization: `Bearer ${paired.token}` };
     expect((await call(s, 'POST', '/api/remote/pairing', { headers: device })).status).toBe(403);
-    expect((await call(s, 'GET', '/api/remote/devices', { headers: device })).status).toBe(403);
+    const listed = await call(s, 'GET', '/api/remote/devices', { headers: device });
+    expect(listed.status).toBe(200);
+    const rows = (await listed.json()) as { id: string }[];
+    expect(rows.some((row) => row.id === paired.deviceId)).toBe(true);
     expect(
       (await call(s, 'DELETE', `/api/remote/devices/${paired.deviceId}`, { headers: device }))
         .status,
@@ -804,7 +866,6 @@ describe('F-C1 credentials and grants are owner-only', () => {
     ['POST', '/api/machines/any/revoke', {}],
     ['POST', '/api/machines/any/evacuate', {}],
     ['POST', '/api/remote/pairing', {}],
-    ['GET', '/api/remote/devices', undefined],
     ['DELETE', '/api/remote/devices/any', undefined],
   ];
 

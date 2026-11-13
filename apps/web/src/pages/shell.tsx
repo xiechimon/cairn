@@ -8,7 +8,7 @@ import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft } from '../icons/index.js';
 
 export const SHEET_PANEL =
-  'relative isolate m-2 flex min-w-0 flex-1 overflow-hidden rounded-(--radius-card) border border-border bg-background max-[640px]:m-0 max-[640px]:rounded-none max-[640px]:border-0';
+  'relative isolate flex min-w-0 flex-1 overflow-hidden border-l border-border bg-background max-[640px]:border-0';
 
 export const EmbeddedShell = createContext(false);
 
@@ -87,7 +87,7 @@ export function PageShell({
           {embedded ? (
             <div
               data-testid="page-toolbar"
-              className="mx-auto flex w-192 max-w-full flex-none items-center gap-3 px-4 pt-4 empty:hidden"
+              className="flex w-full flex-none items-center gap-3 px-4 pt-1 empty:hidden"
             >
               {tabs != null && tab != null && <TabGroup tabs={tabs} tab={tab} onTab={onTab} />}
               <div className="ml-auto flex flex-none items-center gap-0.5 empty:hidden">
@@ -105,7 +105,7 @@ export function PageShell({
                   to={back}
                   aria-label={t('返回')}
                 >
-                  <ChevronLeft width={16} height={16} />
+                  <ChevronLeft width={20} height={20} />
                 </Link>
               )}
               <h1 className="min-w-0 truncate voice-title text-page text-foreground">{title}</h1>
@@ -119,7 +119,10 @@ export function PageShell({
             {bleed ? (
               children
             ) : (
-              <div data-testid="page-col" className="mx-auto w-192 max-w-full pt-4">
+              <div
+                data-testid="page-col"
+                className={embedded ? 'w-full pt-1' : 'mx-auto w-192 max-w-full pt-4'}
+              >
                 {children}
               </div>
             )}

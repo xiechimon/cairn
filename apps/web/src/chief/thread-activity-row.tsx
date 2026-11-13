@@ -1,8 +1,9 @@
 import { type ReactNode, useState } from 'react';
 import { reportStatusWord } from '../board/status-words.js';
 import { ThreadLink } from '../board/thread-link.js';
-import { TraceTriangle } from '../components/chat/trace-parts.js';
+import { TraceChevron } from '../components/chat/trace-parts.js';
 import { Button } from '../components/ui/button.js';
+import { REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
 import { FileText } from '../icons/index.js';
 import {
@@ -13,34 +14,30 @@ import {
 } from './thread-activity.js';
 
 const REF_MARK = '\u0001';
-const REF_PATTERN = `#${REF_MARK}`;
 
-const ROW_CLS =
-  'flex min-h-6 min-w-0 items-center gap-1.5 text-meta leading-5 text-(--text-tertiary)';
-const EVENT_CLS =
-  'flex min-h-6 min-w-0 items-start gap-1.5 text-meta leading-5 text-(--text-tertiary)';
+const BUBBLE_CLS = `${REPLY_BUBBLE_CLS} min-w-0 text-ui leading-5 text-(--foreground)`;
+const ROW_CLS = 'flex min-w-0 items-center gap-1.5';
+const EVENT_CLS = `${BUBBLE_CLS} flex items-start gap-1.5`;
 const ICON_CLS = 'flex-none text-(--text-tertiary)';
 const TOGGLE_CLS =
-  "-my-0.5 size-6 min-h-0 flex-none cursor-pointer justify-center rounded-md border-0 bg-transparent p-0 text-meta font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
+  "-my-0.5 size-6 min-h-0 flex-none cursor-pointer justify-center rounded-(--radius-control) border-0 bg-transparent p-0 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent aria-expanded:hover:bg-(--menu-hover) dark:aria-expanded:hover:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
 const REF_CLS = 'cursor-pointer hover:text-(--foreground) hover:underline';
-const EVENT_LIST_CLS = 'mt-0.5 ml-5 flex min-w-0 flex-col gap-0.5 border-s border-(--border) ps-3';
+const EVENT_LIST_CLS =
+  'mt-1 mb-0.5 ml-5 flex min-w-0 flex-col gap-0.5 border-s border-(--border) ps-3';
 
 function useRefSentence() {
   const { t } = useI18n();
-  return (
-    source: string,
-    todoId: string,
-    seqNum: number,
-    vars: Record<string, string | number>,
-  ) => {
+  return (source: string, todoId: string, title: string, vars: Record<string, string | number>) => {
     const text = t(source, { ...vars, n: REF_MARK });
-    const at = text.indexOf(REF_PATTERN);
+    const at = text.indexOf(REF_MARK);
     if (at < 0) return text;
     return (
       <>
         {text.slice(0, at)}
-        <ThreadLink todoId={todoId} className={REF_CLS}>{`#${seqNum}`}</ThreadLink>
-        {text.slice(at + REF_PATTERN.length)}
+        <ThreadLink todoId={todoId} className={REF_CLS}>
+          {title}
+        </ThreadLink>
+        {text.slice(at + REF_MARK.length)}
       </>
     );
   };
@@ -58,19 +55,18 @@ export function ThreadEventLine({
   const phase = item.kind === 'thread-report' ? item.phase : undefined;
   return (
     <div className={EVENT_CLS} data-testid={testId ?? eventTestId(item)} data-phase={phase}>
-      <FileText width={14} height={14} className={`${ICON_CLS} mt-0.5`} />
+      <FileText width={16} height={16} className={`${ICON_CLS} mt-0.5`} />
       <span className="min-w-0 break-words">
         {item.kind === 'thread-report'
-          ? sentence('任务 #{n} {title}：{status}', item.todoId, item.seqNum, {
-              title: item.title,
+          ? sentence('{n}：{status}', item.todoId, item.title, {
               status: t(reportStatusWord(item)),
             })
           : sentence(
               item.by === 'coordinator'
-                ? 'Coordinator 直接对 #{n} 说：{excerpt}'
-                : '你直接对 #{n} 说：{excerpt}',
+                ? 'Coordinator 直接对 {n} 说：{excerpt}'
+                : '你直接对 {n} 说：{excerpt}',
               item.todoId,
-              item.seqNum,
+              item.title,
               { excerpt: item.excerpt },
             )}
         {item.kind === 'thread-report' && item.line !== undefined && (
@@ -95,7 +91,7 @@ function ExpandedEvent({ item }: { item: ThreadEventItem }) {
         });
   return (
     <div
-      className="min-w-0 truncate text-meta leading-5 text-(--text-tertiary)"
+      className="min-w-0 truncate text-meta leading-5 text-(--text-secondary)"
       data-testid="thread-activity-event"
       title={body}
     >
@@ -113,7 +109,7 @@ function SummaryText({ summary, todoId }: { summary: ActivitySummary; todoId: st
   ];
   return (
     <>
-      {sentence('任务 #{n}', todoId, summary.seqNum, {})}
+      {sentence('{n}', todoId, summary.title, {})}
       {parts.map((part) => (
         <span key={part}>{` · ${part}`}</span>
       ))}
@@ -128,9 +124,9 @@ export function ThreadActivityRow({ activity }: { activity: ThreadActivity }) {
   if (activity.events.length === 1 && only !== undefined) return <ThreadEventLine item={only} />;
   const summary = activitySummary(activity);
   return (
-    <div className="flex min-w-0 flex-col" data-testid="thread-activity">
+    <div className={`${BUBBLE_CLS} flex flex-col`} data-testid="thread-activity">
       <div className={ROW_CLS}>
-        <FileText width={14} height={14} className={ICON_CLS} />
+        <FileText width={16} height={16} className={ICON_CLS} />
         <span className="min-w-0 truncate" data-testid="thread-activity-summary">
           <SummaryText summary={summary} todoId={activity.todoId} />
         </span>
@@ -142,7 +138,7 @@ export function ThreadActivityRow({ activity }: { activity: ThreadActivity }) {
           onClick={() => setOpen(!open)}
           data-testid="thread-activity-toggle"
         >
-          <TraceTriangle open={open} />
+          <TraceChevron open={open} />
         </Button>
       </div>
       {open && (

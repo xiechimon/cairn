@@ -11,9 +11,10 @@ import { type BuildDeps, requestMerge, startBuilds } from '../src/services/build
 import { resumeAutonomyPauses } from '../src/services/github-autonomy-brake.js';
 import { parseShipGateInstruction, reverifyShip } from '../src/services/ship-gate.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, pauseTeamForTest, postProject, req } from './helpers.js';
+import { bootServer, insertMachine, pauseTeamForTest, postProject, req } from './helpers.js';
 
 const s = bootServer();
+insertMachine(s);
 afterAll(() => s.dispose());
 
 const HEAD = 'a'.repeat(40);

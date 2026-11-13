@@ -7,11 +7,11 @@ vi.mock('react', () => ({
 
 test('accepted tokens and gate boundaries advance a private cache generation without including the token', () => {
   const initial = useAuth();
-  passGate('synthetic-first-token');
+  passGate();
   const first = useAuth();
   expect(first.generation).toBe(initial.generation + 1);
   expect(first.gateOpen).toBe(false);
-  passGate('synthetic-replacement-token');
+  passGate();
   const replacement = useAuth();
   expect(replacement.generation).toBe(first.generation + 1);
   demandGate();
@@ -21,7 +21,7 @@ test('accepted tokens and gate boundaries advance a private cache generation wit
   rejectGate();
   beginGateProbe();
   expect(useAuth().generation).toBe(gated.generation);
-  passGate('synthetic-next-token');
+  passGate();
   expect(useAuth().generation).toBe(gated.generation + 1);
   expect(JSON.stringify(useAuth())).not.toContain('synthetic');
 });

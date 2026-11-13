@@ -428,7 +428,7 @@ async function openChiefThread(page: Page) {
   return coordinator;
 }
 
-test('transcript: mention and attachment tokens in a user row render as chips, never literal (FM7)', async ({
+test('transcript: an agent mention renders as its name and an attachment as a card above the bubble, never literal (FM7)', async ({
   page,
 }) => {
   const coordinator = await openChiefThread(page);
@@ -436,11 +436,14 @@ test('transcript: mention and attachment tokens in a user row render as chips, n
   const bubble = coordinator.getByTestId('chief-bubble').first();
   await expect(bubble).toHaveAttribute('data-md', '');
 
-  const mention = bubble.locator('.mention-chip--agent');
+  const mention = bubble.locator('[data-slot="agent-mention"]');
   await expect(mention).toHaveCount(1);
   await expect(mention).toHaveText('builder');
-  const attachment = bubble.locator('.spec-chip');
+  await expect(bubble.locator('.mention-chip')).toHaveCount(0);
+  await expect(bubble.locator('.spec-chip')).toHaveCount(0);
+  const attachment = coordinator.getByTestId('chief-sent-attachment');
   await expect(attachment).toHaveCount(1);
+  await expect(attachment.getByRole('img', { name: 'shot.png' })).toBeAttached();
   // No literal markdown leaked (the degraded form this pin exists for).
   await expect(bubble).not.toContainText('[builder]');
   await expect(bubble).not.toContainText('![shot.png]');

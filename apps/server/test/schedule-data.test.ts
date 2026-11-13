@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { schedule, team } from '../src/db/schema.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { computeNextRunAt, createSchedule } from '../src/services/schedules.js';
-import { bootServer, postProject, req, type TestServer } from './helpers.js';
+import { bootServer, insertMachine, postProject, req, type TestServer } from './helpers.js';
 
 const servers: TestServer[] = [];
 const tz = 'Asia/Shanghai';
@@ -15,6 +15,7 @@ afterEach(() => {
 
 async function setup() {
   const server = bootServer();
+  insertMachine(server);
   servers.push(server);
   const projectId = await postProject(server.app, 'Schedule data');
   const created = await req(server.app, 'POST', `/api/projects/${projectId}/todos`, {

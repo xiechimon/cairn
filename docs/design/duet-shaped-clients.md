@@ -87,6 +87,8 @@ Duet is waitlisted, so nothing here comes from operating it. Every Duet row is S
 
 ### 2.3 Channels are projects, and a channel is a lens
 
+Superseded 2026-11-13 (owner): each project channel is its own conversation and context; see `coordinator-project-channels.md`. The text below records the earlier decision.
+
 Duet channels are separate chats that share one memory (Read). cairn should not add a chat per project, because the owner's rule is one Coordinator entry and D58 already says "projects as filters and context" (Read, `mobile-information-architecture.md`). So:
 
 - Selecting a project shows the same Coordinator conversation filtered to messages whose `chief_message.projectId` is that project, plus that project's task cards. `chief_message` already has a nullable `projectId` column (Read, `apps/server/src/db/schema.ts`). Whether every owner message and every task card gets one written today is not verified; PR 3 checks it and writes it.
@@ -127,7 +129,7 @@ Layout of the Tasks surface, same on all three clients:
 
 - A task opens as a sub-thread: web `?thread=<todoId>` in the main pane (existing, Read, `thread-link.tsx`); iOS a pushed full-screen view (existing, Read, `ThreadScreens.swift`); desktop the same web route.
 - Header: back, title, status word from `section` and the reason, `…` menu (Duet, Seen). Body: the owner's verbatim request as the first block (`coordinator-routes-verbatim.md`), then the task conversation and inline cards (question, plan approval, PR).
-- In the Coordinator conversation, a task card shows title, status word, `N updates` and the latest step, and opens the sub-thread (Duet, Seen). The card replaces today's plain "created task" line.
+- In the Coordinator conversation, a task card shows title, status word, `N updates` and the latest step, and opens the sub-thread (Duet, Seen). The card replaces today's plain "created task" line. Superseded 2026-11-12 (owner): the card repeated the task reference row and is gone; the reference row above the reply is the task's one mark in the conversation (`apps/web/DESIGN.md`, Coordinator chat).
 
 ### 2.6 Layout sketches
 
@@ -311,6 +313,8 @@ The desktop borrows from Duet rather than copying it: it keeps the wide web layo
 Row 2 implementation: [#3586](https://github.com/xiechimon/cairn/pull/3586).
 
 Each PR is independent off `main` unless it says otherwise, and each ends with screenshots from a live verify stack.
+
+Owner decision on 2026-11-12: the web app is settled first, and iOS follows it. The iOS rows (8, 9 and 11) start once the web app is settled, not in parallel with its polish, whatever their listed dependencies allow. The decision did not restate where the desktop row sits.
 
 | # | PR | Area | Depends on |
 |---|---|---|---|

@@ -1129,6 +1129,33 @@ describe('a green PR waiting for queue conditions wakes its owner with what is u
     expect(prompts(f).filter((p) => p.includes('[queue-wait]'))).toHaveLength(1);
   });
 
+  test('an older success of a check does not hide a newer failure', async () => {
+    const f = fixture();
+    green(f, unmet, [
+      {
+        id: 2,
+        name: 'unit',
+        status: 'completed',
+        conclusion: 'failure',
+        summary: 'broken',
+        completedAt: new Date(T0).toISOString(),
+      },
+    ]);
+    const runs = f.mock.checks.get(f.pull.head) ?? [];
+    for (const run of runs) {
+      if (run.name === 'unit' && run.conclusion === 'success') {
+        run.id = 1;
+        run.completedAt = new Date(minutes(-20)).toISOString();
+      }
+    }
+    await watchFor(f.s, f.mock).sweep(minutes(11));
+    const fix = prompts(f).filter((p) => p.includes('[ci-fix]'));
+    expect(fix).toHaveLength(1);
+    expect(fix[0]).toContain('unit');
+    expect(fix[0]).toContain('broken');
+    expect(prompts(f).filter((p) => p.includes('[queue-wait]'))).toHaveLength(0);
+  });
+
   test.each([
     [
       'a pending check',

@@ -1,5 +1,10 @@
 import { accountsDefault, accountsEmpty } from './accounts.js';
 import { activityFixture, activityManyFixture } from './activity.js';
+import { chiefBubbleRuns } from './chief-bubble-runs.js';
+import { chiefDraft, sidebarRef } from './chief-draft.js';
+import { CHIEF_FILES_SCENARIOS } from './chief-files.js';
+import { CHIEF_MARK_SCENARIOS } from './chief-mark.js';
+import { chiefQuickReplies } from './chief-quick-replies.js';
 import { demoFixture } from './demo.js';
 import {
   agentTodoLive,
@@ -23,6 +28,7 @@ import {
   chiefFabAvatarOverride,
   chiefGated,
   chiefMarkdown,
+  chiefMarkdownRef,
   chiefQuestion,
   chiefReady,
   chiefScrollLong,
@@ -92,17 +98,27 @@ import {
   sidebarThreadStatuses,
   sidebarThreads,
   sidebarUnread,
-  skillInject,
-  skillInjectZero,
   skillsRouting,
   teamGrid,
   versionCompareWithChanges,
   versionMenuV2,
   versionMenuV3,
 } from './fixtures.js';
-import { homeC, homeCEmpty } from './home-c.js';
+import {
+  homeC,
+  homeCEmpty,
+  homeCEngine,
+  homeCMachines,
+  homeCMade,
+  homeCMadeMany,
+  homeCQuiet,
+  makeRef,
+  sessionsRef,
+  sessionsRefDetail,
+} from './home-c.js';
 import type { FixtureSet } from './records.js';
 import { RESOURCES } from './resources.js';
+import { sidebarArchived } from './sidebar-archived.js';
 
 export const SCENARIO_PARAM = 'scenario';
 
@@ -147,6 +163,15 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'activity-many': activityManyFixture,
       'activity-empty': { ...homeC, todos: [] },
       'home-c-empty': homeCEmpty,
+      'home-c-quiet': homeCQuiet,
+      'home-c-unread': { ...homeC, unreadThreadIds: ['home-c-working-c'] },
+      'home-c-made': homeCMade,
+      'home-c-made-many': homeCMadeMany,
+      'home-c-machines': homeCMachines,
+      'home-c-engine': homeCEngine,
+      'sessions-ref': sessionsRef,
+      'sessions-ref-detail': sessionsRefDetail,
+      'make-ref': makeRef,
       'sidebar-thread-statuses': sidebarThreadStatuses,
       'board-inbox': boardInbox,
       'quota-wait': boardQuotaWait,
@@ -170,8 +195,6 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'md-toolout': mdToolout,
       'agent-todo': agentTodoLive,
       'skills-routing': skillsRouting,
-      'skill-inject': skillInject,
-      'skill-inject-zero': skillInjectZero,
       'detail-unread': { ...detailPlanning, chiefUnread: 3 },
       'spinner-quiescent': detailSpinnerQuiescent(),
       'diff-word-stress': detailDiffWordStress(),
@@ -360,12 +383,21 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'chief-threads-long': chiefThreadsLong,
       'chief-scroll-long': chiefScrollLong,
       'chief-md': chiefMarkdown,
+      'chief-md-ref': chiefMarkdownRef,
       'chief-code': chiefCode,
       'chief-question': chiefQuestion,
+      'chief-quick-replies': chiefQuickReplies,
+      'chief-bubble-runs': chiefBubbleRuns,
+      'chief-draft': chiefDraft,
+      'sidebar-ref': sidebarRef,
+      'sidebar-archived': sidebarArchived,
+      'archived-project-view': sidebarArchived,
       'secrets-list': secretsList,
       'chief-agent-chip': chiefAgentChip,
       'fab-avatar': chiefFabAvatar,
       'fab-avatar-override': chiefFabAvatarOverride,
+      ...CHIEF_MARK_SCENARIOS,
+      ...CHIEF_FILES_SCENARIOS,
     } as Record<string, FixtureSet>)
   : {};
 

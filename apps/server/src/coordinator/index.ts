@@ -11,6 +11,7 @@ import {
 } from '@cairn/shared';
 import { and, asc, desc, eq, inArray, like, ne, not, sql } from 'drizzle-orm';
 import {
+  build,
   chief,
   chiefMessage,
   chiefSummary,
@@ -18,17 +19,22 @@ import {
   coordinatorConversation,
   coordinatorEntry,
   coordinatorInput,
+  project,
   step,
+  todo,
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { blockedNow } from '../services/blockers.js';
 import { isChiefDigestStep } from '../services/chief-digest.js';
 import { hasEarlierLiveChiefStep } from '../services/chief-turns.js';
 import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
 import { migrateUnfetchedCoordinatorInputs } from '../services/coordinator-input-upgrade.js';
 import { coordinatorInputIsLive } from '../services/coordinator-inputs.js';
 import { chiefTurnContext, claimPendingChiefStep } from '../services/coordinator-steps.js';
+import { captureClaimInputs } from '../services/coordinator-turn-capture.js';
 import { serverTakesTurn } from '../services/machine-claim.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
+import { ownershipOf } from '../services/owner.js';
 import { stepScopeProjectId } from '../services/picked-project.js';
 import { chiefRemoteTools } from '../services/routing-rules.js';
 import {
@@ -38,6 +44,7 @@ import {
   scrubProviderError,
 } from './credentials.js';
 import { acquireLease, type Lease, LeaseHeldError } from './lease.js';
+import { settleInterruptedMailConversation } from './mail-owner.js';
 import { createMemoryFlush } from './memory-flush.js';
 import {
   COLD_RECENT_EXCHANGES,
@@ -305,6 +312,17 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           .where(eq(coordinatorConversation.threadId, threadId))
           .run();
       },
+      setConversation: (threadId, conversationId, watermark, restoreOwnerId) => {
+        db.update(coordinatorConversation)
+          .set({
+            conversationId,
+            mailOwnerConversationId: restoreOwnerId,
+            ...(watermark === null ? {} : { lastMirroredEntryId: watermark }),
+            updatedAt: nowMs(),
+          })
+          .where(eq(coordinatorConversation.threadId, threadId))
+          .run();
+      },
       onReconciled: (threadId, outcome, stale) => {
         logger.info({ threadId, outcome, stale }, 'coordinator store reconciled');
       },
@@ -419,6 +437,95 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       },
       'coordinator memory injected',
     );
+    captureClaimInputs(row.id, {
+      initialTodos: db
+        .select()
+        .from(todo)
+        .where(eq(todo.teamId, threadRow.teamId))
+        .all()
+        .map((t) => ({
+          id: t.id,
+          projectId: t.projectId,
+          title: t.title,
+          spec: t.spec,
+          phase: t.phase,
+          phaseAt: t.phaseAt,
+          archivedAt: t.archivedAt ?? null,
+          seqNum: t.seqNum,
+          orderIndex: t.orderIndex,
+          blockedBy: t.blockedBy ?? null,
+          latestBuildId: t.latestBuildId ?? null,
+          sourceKind: t.sourceKind ?? null,
+          sourceRef: t.sourceRef ?? null,
+          request: t.request ?? null,
+          output: t.output,
+        })),
+      initialThreads: (() => {
+        const todosRow = db.select().from(todo).where(eq(todo.teamId, threadRow.teamId)).all();
+        const buildIds = todosRow
+          .map((t) => t.latestBuildId)
+          .filter((id): id is string => id !== null);
+        if (buildIds.length === 0) return [];
+        return db
+          .select()
+          .from(build)
+          .where(inArray(build.id, buildIds))
+          .all()
+          .map((b) => ({
+            id: b.id,
+            todoId: b.todoId,
+            withPlan: b.withPlan,
+            prevPhase: b.prevPhase ?? null,
+            triggerSource: b.triggerSource,
+            planDocId: b.planDocId ?? null,
+            errorMessage: b.errorMessage ?? null,
+            prUrl: b.prUrl ?? null,
+            prNumber: b.prNumber ?? null,
+            diffHash: b.diffHash ?? null,
+            reportAttachmentId: b.reportAttachmentId ?? null,
+            stop: b.stop ?? null,
+            reportLine: b.reportLine ?? null,
+            createdAt: b.createdAt,
+          }));
+      })(),
+      initialVisible: db
+        .select()
+        .from(todo)
+        .where(eq(todo.teamId, threadRow.teamId))
+        .all()
+        .map((t) => {
+          const ownership = ownershipOf(db, t);
+          return {
+            id: t.id,
+            ownership:
+              ownership === null ? null : { owner: ownership.owner, reason: ownership.reason },
+            blocks: blockedNow(db, { blockedBy: [t.id] }),
+          };
+        }),
+      projects: db
+        .select()
+        .from(project)
+        .where(eq(project.teamId, threadRow.teamId))
+        .all()
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description ?? null,
+          repoKind: p.repoKind ?? null,
+          archivedAt: p.archivedAt ?? null,
+        })),
+      systemPrompt: context.systemPrompt,
+      instruction:
+        row.prompt === null || context.trigger === 'user'
+          ? row.prompt
+          : withHistoryMarker(row.prompt, eventRowId),
+      trigger: context.trigger,
+      memories: context.memories.map((m) => `- ${m.title}：${m.content}`),
+      provider: providers.router.provider,
+      modelId: providers.router.modelId,
+      thinkingLevel: thinkingLevelOf(providers.router.thinkingLevel),
+      volatileText: volatileParts.length === 0 ? null : volatileParts.join('\n\n'),
+    });
     return {
       claimed: {
         step: {
@@ -611,6 +718,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       if (closing) return;
       dirty.delete(threadId);
       if (heldLease(threadId) === null) return;
+      settleInterruptedMailConversation(db, threadId);
       if (!runtime.isOpen(threadId)) migrateUnfetchedCoordinatorInputs(db, threadId, owner);
       const pending = db
         .select()

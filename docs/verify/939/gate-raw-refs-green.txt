@@ -1,4 +1,0 @@
-pr-evidence: sections: 2/2 answered
-pr-evidence: scanned 0 image link(s)
-pr-evidence: GREEN
-exit=0

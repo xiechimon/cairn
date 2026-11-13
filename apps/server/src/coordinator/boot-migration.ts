@@ -6,7 +6,7 @@ import type { MachineDeps } from '../services/machine-deps.js';
 import { revokeMachineToken } from '../services/machine-revoke.js';
 import type { CoordinatorLogger } from './index.js';
 
-const STORE_SUFFIXES = ['', '-wal', '-shm'];
+const STORE_SUFFIXES = ['-shm', '-wal', ''];
 
 export interface SidecarMigrationInput {
   machine: Pick<MachineDeps, 'db' | 'hub' | 'machineHub'>;

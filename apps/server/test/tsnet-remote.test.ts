@@ -236,7 +236,7 @@ describe('enabled', () => {
       parseLocalStatus(
         '{"BackendState":"Running","Self":{"UserID":9007199254740993},"User":{"9007199254740993":{"LoginName":"owner@example.com"},"9007199254740992":{"LoginName":"other@example.com"}}}',
       ),
-      200,
+      401,
     ],
     [
       'untagged Self owner',
@@ -245,7 +245,7 @@ describe('enabled', () => {
         Self: { UserID: 7, DNSName: 'cairn.tail.example.' },
         User: { '7': { LoginName: 'owner@example.com' }, '8': { LoginName: 'other@example.com' } },
       },
-      200,
+      401,
     ],
     [
       'tagged Self',
@@ -298,7 +298,7 @@ describe('enabled', () => {
   test.each([
     ['100.64.0.7', 401],
     ['fd7a:115c:a1e0::7', 401],
-    ['100.64.0.9', 200],
+    ['100.64.0.9', 401],
   ])(
     'socket-only identity from source %s on the serving node gives %i',
     async (source, expected) => {
@@ -404,7 +404,7 @@ describe('enabled', () => {
     vi.useRealTimers();
     expect(remote?.status().ownerLogin).toBeNull();
     expect(await selfTrafficStatus(home, '100.64.0.7')).toBe(401);
-    expect(await selfTrafficStatus(home, '100.64.0.9')).toBe(200);
+    expect(await selfTrafficStatus(home, '100.64.0.9')).toBe(401);
   });
   test('socket-only startup needs no binary, spawns nothing and uses explicit allowlist when LocalAPI is unavailable', async () => {
     const home = freshHome();
@@ -439,10 +439,10 @@ describe('enabled', () => {
       req.on('error', reject);
       req.end();
     });
-    expect(status).toBe(200);
+    expect(status).toBe(401);
   });
 
-  test('ready owner metadata reaches authentication and is withdrawn on sidecar exit', async () => {
+  test('ready owner metadata does not authenticate and stays refused after sidecar exit', async () => {
     const home = freshHome();
     installBinary(home);
     const { paths, spawner } = await start(home);
@@ -466,7 +466,7 @@ describe('enabled', () => {
     spawner.spawned[0]?.child.stdout.write(
       `${JSON.stringify({ type: 'ready', dnsName: 'cairn.tail.example', ownerLogin: 'owner@example.com', selfTagged: false })}\n`,
     );
-    expect(await statusOf()).toBe(200);
+    expect(await statusOf()).toBe(401);
     spawner.spawned[0]?.child.emit('exit', 1, null);
     expect(await statusOf()).toBe(401);
   });

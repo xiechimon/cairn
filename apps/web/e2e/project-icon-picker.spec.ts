@@ -47,7 +47,7 @@ test('the project avatar picker sets an icon that reaches the sidebar, then rese
   await expect(picker.locator('[data-icon]')).toHaveCount(1);
   await picker.getByRole('button', { name: 'rocket' }).click();
   await expect(sidebarRow.locator('[data-project-icon="rocket"]')).toBeVisible();
-  await expect(sidebarRow.locator('[data-project-icon]')).toHaveCSS('width', '16px');
+  await expect(sidebarRow.locator('[data-project-icon]')).toHaveCSS('width', '20px');
 
   await picker.getByRole('button', { name: '重置图标' }).click();
   await expect(sidebarRow.locator('[data-project-icon]')).toHaveCount(0);

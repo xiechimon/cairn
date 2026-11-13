@@ -57,6 +57,7 @@ function principalApp(s: TestServer, principal: UserRecord) {
     uploads: new Map(),
     enrollments: new Map(),
     oauthStates: new Map(),
+    xaiDeviceStates: new Map(),
     oauthClient: null,
     authToken: AUTH,
     mcpConfigPath: '/tmp/private-audience-absent.json',

@@ -17,6 +17,7 @@ import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   api,
   bootRealServer,
+  CONFINEMENT_READY_LAUNCH,
   daemonLogLines,
   type RealServer,
   seedWorld,
@@ -95,6 +96,8 @@ beforeAll(async () => {
     proxyEnv: {},
     claimBackoffBaseMs: 50,
     heartbeatIntervalMs: 500,
+
+    confinementPreflight: CONFINEMENT_READY_LAUNCH,
   });
   await waitFor(() => logLines().includes('[wake] push channel connected'), 30_000);
 }, 120_000);
@@ -148,7 +151,7 @@ describe('pi session policy (#925 trust/telemetry/settings + #927 cost/cache)', 
     expect(flat).not.toContain('PI-TRUST-HIJACK-MARKER');
 
     expect(flat).toContain(TASK_SPEC);
-    expect(flat).toContain('You are an expert coding assistant operating inside pi');
+    expect(flat).toContain('You are a coding assistant running inside pi');
     expect(flat).toContain('repository-policy-guidance-sentinel');
     expect(flat).toContain('For UI tasks, attach light and dark screenshots');
     const workspace = join(paths.workspacesDir, buildId);

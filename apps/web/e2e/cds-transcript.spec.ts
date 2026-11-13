@@ -26,7 +26,7 @@ test('CDS transcript: tokens, fade, follow 40 / jump 120', async ({ page }) => {
   expect(m.chatMaxW).toBe('768px');
   expect(m.chatExtra).toBe('35vh');
   expect(m.fadeSize).toBe('28px');
-  expect(m.radiusBubble).toBe('12px');
+  expect(m.radiusBubble).toBe('18px');
   expect(m.cdsRadiusXl).toBe('12px');
   expect(m.hasScrollFade).toBe(true);
   expect(m.contentMaxW).toBe('768px');
@@ -111,7 +111,7 @@ test('CDS transcript: thinking trigger 12/16 medium; code block 12px radius, 14 
     expect(Number(styles.thinkingWeight)).toBeGreaterThanOrEqual(500);
   }
   if (styles.codeRadius != null) {
-    expect(styles.codeRadius).toBe('12px');
+    expect(styles.codeRadius).toBe('10px');
     expect(styles.codeFontSize).toBe('14px');
     expect(styles.codeLineHeight).toBe('22.75px');
   }

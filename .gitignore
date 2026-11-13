@@ -112,6 +112,8 @@ playwright-report/
 /PROGRESS.md
 /BLOCKED.md
 /plan.md
+/artifacts/
+/.codex-probe
 
 # gardener weekly sweep output (#1617): local run default; CI uploads it as an artifact
 .gardener/

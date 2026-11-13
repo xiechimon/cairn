@@ -1,9 +1,11 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo } from 'react';
-import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router';
+import { type RouteObject, useNavigate, useRoutes } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { useOpenComposer } from '../board/open-composer.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { isEditableTarget } from '../overlay/hotkeys.js';
+import { SettingsDialog } from '../settings/settings-page.js';
+import { useSettingsOverlay } from '../settings/use-settings-overlay.js';
 import { questionDockState } from './question-dock-state.js';
 import { questionDraftKey } from './question-drafts.js';
 import { type OriginChiefQuestion, originChiefQuestions } from './question-origin.js';
@@ -42,9 +44,11 @@ function useOpenCoordinatorKey(): void {
   }, [openComposer]);
 }
 
-export function ChiefRoot() {
-  const [searchParams] = useSearchParams();
-  const { pathname, search } = useLocation();
+export function ChiefRoot({ routes }: { routes: RouteObject[] }) {
+  const settings = useSettingsOverlay();
+  const { pathname = '/app', search = '' } = settings.pageLocation;
+  const searchParams = useMemo(() => new URLSearchParams(search), [search]);
+  const page = useRoutes(routes, settings.pageLocation);
   const navigate = useNavigate();
   const fixture = resolveScenario(searchParams);
   const onHome = pathname === '/app';
@@ -92,7 +96,12 @@ export function ChiefRoot() {
   );
   return (
     <ChiefRootContext.Provider value={api}>
-      <Outlet />
+      <div className="contents" inert={settings.section !== null}>
+        {page}
+      </div>
+      {settings.section !== null && (
+        <SettingsDialog section={settings.section} onClose={settings.close} />
+      )}
     </ChiefRootContext.Provider>
   );
 }

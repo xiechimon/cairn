@@ -76,7 +76,6 @@ for (const theme of ['light', 'dark'] as const) {
       ['0px', '0px'],
     ]);
 
-    // Fixture rows: #1 review (needs you, accent), #2 done (ink-3).
     const accent = await resolveColor(page, 'var(--card-button)');
     const ink3 = await resolveColor(page, 'var(--text-tertiary)');
     const ink = await resolveColor(page, 'var(--foreground)');
@@ -94,11 +93,14 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(title, 'T4').toHaveCSS('font-size', '14px');
     await expect(title, 'T4').toHaveCSS('color', ink);
     const meta = rows.nth(0).getByTestId('task-meta');
-    await expect(meta, 'T4').toHaveText(/^#1 · .+前$/);
+    await expect(meta, 'T4').toHaveText(/^.+前$/);
     await expect(meta, 'T4').toHaveCSS('font-size', '13px');
     await expect(meta, 'T4').toHaveCSS('color', ink3);
 
-    await expect(rows.nth(1).getByRole('link'), 'T5').toHaveCSS('color', ink3);
+    await expect(rows.nth(1).getByRole('link'), 'T5: a settled title steps to ink-2, never to meta ink').toHaveCSS(
+      'color',
+      await resolveColor(page, 'var(--text-secondary)'),
+    );
 
     await page.locator('.prj-tasks-view-btn').nth(1).click();
     const card = page.getByTestId('task-card').first();

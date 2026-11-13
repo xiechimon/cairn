@@ -166,7 +166,7 @@ function transcript12(stamp: string): TranscriptItem[] {
     {
       kind: 'fail',
       title: '运行该任务的机器已离线',
-      body: '请将其重新上线，或重新运行任务以改派其他机器。',
+      body: '请将这台机器重新上线。这一步不会改派到其他机器。',
     },
   ];
 }
@@ -484,7 +484,7 @@ const RUN1_FAILED: TranscriptItem[] = [
   {
     kind: 'fail',
     title: '运行该任务的机器已离线',
-    body: '请将其重新上线，或重新运行任务以改派其他机器。',
+    body: '请将这台机器重新上线。这一步不会改派到其他机器。',
   },
 ];
 
@@ -685,62 +685,6 @@ export const skillsRouting: FixtureSet = {
   now: r7(13, 40),
   detail: {
     transcript: SKILLS_ROUTING_TRANSCRIPT,
-    doc: DOC_V2,
-    changes: probeChanges(true),
-  },
-};
-
-const SKILL_INJECT_TRANSCRIPT: TranscriptItem[] = [
-  { kind: 'run', at: '13:35', machine: 'xmonsMac-3574' },
-  {
-    kind: 'injected-skills',
-    skills: [
-      {
-        id: 'better-typography',
-        reason: '任务文本与技能同域「前端界面」（任务命中「字号」，技能描述命中「ui」）',
-      },
-      { id: 'tdd', reason: '任务文本显式点名「tdd」' },
-    ],
-  },
-  {
-    kind: 'user',
-    text: '修复看板卡片的字号过小与换行溢出',
-    seq: 9,
-    title: '字号与换行修复',
-  },
-  {
-    kind: 'robot',
-    paragraphs: [[{ text: '已修复字号与换行。' }]],
-    footer: { seconds: 12 },
-  },
-];
-
-const SKILL_INJECT_ZERO_TRANSCRIPT: TranscriptItem[] = [
-  { kind: 'run', at: '13:35', machine: 'xmonsMac-3574' },
-  { kind: 'injected-skills', skills: [] },
-  {
-    kind: 'user',
-    text: '把首页轮播图换成静态图',
-    seq: 10,
-    title: '轮播图静态化',
-  },
-];
-
-export const skillInject: FixtureSet = {
-  todos: [probeTodo('review', r7(13, 37))],
-  now: r7(13, 40),
-  detail: {
-    transcript: SKILL_INJECT_TRANSCRIPT,
-    doc: DOC_V2,
-    changes: probeChanges(true),
-  },
-};
-
-export const skillInjectZero: FixtureSet = {
-  todos: [probeTodo('review', r7(13, 37))],
-  now: r7(13, 40),
-  detail: {
-    transcript: SKILL_INJECT_ZERO_TRANSCRIPT,
     doc: DOC_V2,
     changes: probeChanges(true),
   },

@@ -16,6 +16,7 @@ import { newRecordId, nowMs } from '../src/lib/ids.js';
 import { NotFoundError, startBuilds } from '../src/services/builds.js';
 import { executeChiefTool, executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import { readBuildChangeFile } from '../src/services/git.js';
+import { memoryDocumentVersion } from '../src/services/memory-documents.js';
 import { PhaseTransitionError } from '../src/services/phase.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { createSchedule } from '../src/services/schedules.js';
@@ -212,7 +213,8 @@ describe('#1497 delete_memory: deletes only own-team entries', () => {
         id,
         agentId,
         teamId,
-        title: 't',
+        title: id,
+        layer: 'searchable',
         content: 'c',
         projectId: null,
         sourceTodoId: null,
@@ -237,7 +239,13 @@ describe('#1497 delete_memory: deletes only own-team entries', () => {
         conversationId: 'chief-1497',
       },
       'delete_memory',
-      { memoryId },
+      {
+        scope: 'team',
+        file: memoryId,
+        baseVersion: memoryDocumentVersion(
+          s.db.select().from(agentMemory).where(eq(agentMemory.id, memoryId)).get()!,
+        ),
+      },
     );
   }
 
@@ -260,7 +268,13 @@ describe('#1497 delete_memory: deletes only own-team entries', () => {
         attachmentsDir: s.attachmentsDir,
       },
       'delete_memory',
-      { memoryId },
+      {
+        scope: 'team',
+        file: memoryId,
+        baseVersion: memoryDocumentVersion(
+          s.db.select().from(agentMemory).where(eq(agentMemory.id, memoryId)).get()!,
+        ),
+      },
     ).then(
       () => null,
       (e: unknown) => e,
@@ -307,6 +321,8 @@ describe('#1497 delete_memory: deletes only own-team entries', () => {
     const { s } = await world();
     const own = insertMemory(s, OWNER_ID, s.team.id);
     await chiefDelete(s, own);
-    expect(exists(s, own)).toBe(false);
+    expect(s.db.select().from(agentMemory).where(eq(agentMemory.id, own)).get()?.invalidAt).toEqual(
+      expect.any(Number),
+    );
   });
 });

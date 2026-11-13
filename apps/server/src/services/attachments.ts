@@ -8,7 +8,12 @@ import {
   writeSync,
 } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
-import { ATTACHMENT_MAX_BYTES } from '@cairn/shared';
+import {
+  ATTACHMENT_MAX_BYTES,
+  attachmentExtOf,
+  attachmentKindOf,
+  resolveAttachmentMime,
+} from '@cairn/shared';
 import { and, eq, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { attachment } from '../db/schema.js';
@@ -26,80 +31,7 @@ import { TEAM_ATTACHMENTS_QUOTA_BYTES, teamAttachmentBytes } from './attachment-
 
 const MAX_BYTES = ATTACHMENT_MAX_BYTES;
 
-const ALLOWED_MIME_PREFIXES = ['text/', 'image/'];
-const ALLOWED_MIME_EXACT = new Set(['application/json', 'application/pdf', 'application/xml']);
-
-export function isAllowedMime(mime: string): boolean {
-  if (ALLOWED_MIME_EXACT.has(mime)) return true;
-  return ALLOWED_MIME_PREFIXES.some((p) => mime.startsWith(p));
-}
-
-const ALLOWED_EXTS = new Set([
-  'md',
-  'txt',
-  'markdown',
-  'rst',
-  'adoc',
-  'json',
-  'yaml',
-  'yml',
-  'toml',
-  'xml',
-  'csv',
-  'tsv',
-  'html',
-  'htm',
-  'css',
-  'scss',
-  'less',
-  'js',
-  'jsx',
-  'ts',
-  'tsx',
-  'mjs',
-  'cjs',
-  'py',
-  'rb',
-  'go',
-  'rs',
-  'java',
-  'kt',
-  'swift',
-  'm',
-  'mm',
-  'c',
-  'h',
-  'cpp',
-  'hpp',
-  'cs',
-  'sh',
-  'bash',
-  'zsh',
-  'ps1',
-  'sql',
-  'graphql',
-  'proto',
-  'png',
-  'jpg',
-  'jpeg',
-  'gif',
-  'webp',
-  'svg',
-  'bmp',
-  'ico',
-  'avif',
-  'pdf',
-  'log',
-  'diff',
-  'patch',
-]);
-
-export function extOf(fileName: string): string {
-  const lastDot = fileName.lastIndexOf('.');
-  if (lastDot < 0 || lastDot === fileName.length - 1) return '';
-  const ext = fileName.slice(lastDot + 1).toLowerCase();
-  return /^[a-z0-9]{1,8}$/.test(ext) ? ext : '';
-}
+export { attachmentExtOf as extOf } from '@cairn/shared';
 
 export function isValidFileName(fileName: string): boolean {
   if (fileName.length === 0 || fileName.length > 200) return false;
@@ -140,15 +72,14 @@ export function validateAttachmentUpload(
   if (!isValidFileName(input.fileName)) {
     throw new HttpError(400, `invalid fileName: ${JSON.stringify(input.fileName)}`);
   }
-  if (!Number.isInteger(input.size) || input.size <= 0 || input.size > MAX_BYTES) {
-    throw new HttpError(400, `invalid size: must be 1..${MAX_BYTES}`);
+  if (!Number.isInteger(input.size) || input.size < 0 || input.size > MAX_BYTES) {
+    throw new HttpError(400, `invalid size: must be 0..${MAX_BYTES}`);
   }
-  if (!isAllowedMime(input.mimeType)) {
-    throw new HttpError(400, `mime not allowed: ${input.mimeType}`);
-  }
-  const ext = extOf(input.fileName);
-  if (ext === '' || !ALLOWED_EXTS.has(ext)) {
-    throw new HttpError(400, `file extension not allowed: ${ext || '(none)'}`);
+  if (resolveAttachmentMime(input.fileName, input.mimeType) === null) {
+    throw new HttpError(
+      400,
+      `file extension not allowed: ${attachmentExtOf(input.fileName) || '(none)'}`,
+    );
   }
   const usedBytes = teamAttachmentBytes(deps.db, deps.teamId);
   if (usedBytes + input.size > TEAM_ATTACHMENTS_QUOTA_BYTES) {
@@ -161,7 +92,8 @@ export function validateAttachmentUpload(
 
 export function grantUpload(deps: AttachmentDeps, input: GrantInput): GrantOutput {
   validateAttachmentUpload(deps, input);
-  const ext = extOf(input.fileName);
+  const ext = attachmentExtOf(input.fileName);
+  const mimeType = resolveAttachmentMime(input.fileName, input.mimeType) ?? '';
   const id = newRecordId();
   const storageKey = `${deps.teamId}/${id}.${ext}`;
   const now = nowMs();
@@ -172,7 +104,7 @@ export function grantUpload(deps: AttachmentDeps, input: GrantInput): GrantOutpu
     grantId,
     key: storageKey,
     sizeBytes: input.size,
-    mimeType: input.mimeType,
+    mimeType,
     scope: input.scope,
     exp: now + ATTACHMENT_GRANT_TTL_MS,
   };
@@ -183,7 +115,7 @@ export function grantUpload(deps: AttachmentDeps, input: GrantInput): GrantOutpu
       teamId: deps.teamId,
       createdBy: deps.userId,
       fileName: input.fileName,
-      mimeType: input.mimeType,
+      mimeType,
       sizeBytes: input.size,
       storageKey,
       grantId,
@@ -227,16 +159,20 @@ export function uploadFile(deps: AttachmentDeps, input: UploadInput): UploadOutp
   if (payload.teamId !== deps.teamId) {
     throw new HttpError(401, 'grant team mismatch');
   }
-  if (!isAllowedMime(payload.mimeType) || !isAllowedMime(input.fileMimeType)) {
-    throw new HttpError(400, `mime not allowed: ${input.fileMimeType}`);
+  const uploadedMime = resolveAttachmentMime(input.fileName, input.fileMimeType);
+  if (uploadedMime === null) {
+    throw new HttpError(
+      400,
+      `file extension not allowed: ${attachmentExtOf(input.fileName) || '(none)'}`,
+    );
   }
   if (
     !Number.isInteger(payload.sizeBytes) ||
-    payload.sizeBytes <= 0 ||
+    payload.sizeBytes < 0 ||
     payload.sizeBytes > MAX_BYTES ||
     input.fileBytes.byteLength > MAX_BYTES
   ) {
-    throw new HttpError(400, `invalid size: must be 1..${MAX_BYTES}`);
+    throw new HttpError(400, `invalid size: must be 0..${MAX_BYTES}`);
   }
   if (input.fileBytes.byteLength !== payload.sizeBytes) {
     throw new HttpError(
@@ -244,11 +180,11 @@ export function uploadFile(deps: AttachmentDeps, input: UploadInput): UploadOutp
       `uploaded size ${input.fileBytes.byteLength} ≠ grant ${payload.sizeBytes}`,
     );
   }
-  if (input.fileMimeType !== payload.mimeType) {
-    throw new HttpError(409, `uploaded mime ${input.fileMimeType} ≠ grant ${payload.mimeType}`);
+  if (uploadedMime !== payload.mimeType) {
+    throw new HttpError(409, `uploaded mime ${uploadedMime} ≠ grant ${payload.mimeType}`);
   }
   const grantExt = payload.key.split('.').pop() ?? '';
-  const fileExt = extOf(input.fileName);
+  const fileExt = attachmentExtOf(input.fileName);
   if (fileExt !== '' && grantExt !== fileExt) {
     throw new HttpError(409, `uploaded ext ${fileExt} ≠ grant ${grantExt}`);
   }
@@ -403,7 +339,7 @@ export function readAttachmentMeta(
 } {
   const row = requireAttachmentRow(deps.db, teamId, attachmentId);
   const bytes = readFileSync(join(deps.attachmentsDir, row.storageKey));
-  const isText = row.mimeType.startsWith('text/') || ALLOWED_MIME_EXACT.has(row.mimeType);
+  const isText = attachmentKindOf(row.storageKey) === 'text';
   return {
     id: row.id,
     fileName: row.fileName,

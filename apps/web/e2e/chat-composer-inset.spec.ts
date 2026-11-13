@@ -85,9 +85,10 @@ async function clearance(page: Page, scope: ReturnType<Surface['scope']>) {
     const composer = root.querySelector('.chief-composer');
     const body = root.querySelector('[data-testid="chief-body"]');
     if (!last || !composer || !body) throw new Error('chat surfaces missing');
-    const fade = Number.parseFloat(getComputedStyle(body).getPropertyValue('--scroll-fade-size'));
+    const fade = Number.parseFloat((body as HTMLElement).style.getPropertyValue('--scroll-fade-bottom')) || 0;
+    const next = composer;
     return {
-      room: composer.getBoundingClientRect().top - fade - last.getBoundingClientRect().bottom,
+      room: next.getBoundingClientRect().top - fade - last.getBoundingClientRect().bottom,
       gap: body.scrollHeight - body.scrollTop - body.clientHeight,
     };
   });
@@ -96,6 +97,7 @@ async function clearance(page: Page, scope: ReturnType<Surface['scope']>) {
 async function expectClear(page: Page, scope: ReturnType<Surface['scope']>) {
   await expect.poll(async () => (await clearance(page, scope)).gap).toBeLessThanOrEqual(2);
   await expect.poll(async () => (await clearance(page, scope)).room).toBeGreaterThanOrEqual(0);
+  expect((await clearance(page, scope)).room).toBeLessThanOrEqual(40);
 }
 
 for (const viewport of VIEWPORTS) {
@@ -166,80 +168,38 @@ for (const mask of MASK_CASES) {
         deviceScaleFactor: mask.dpr,
       });
 
-      test('the bottom fade is off whenever the list is within 2px of the end', async ({
-        page,
-      }) => {
+      test('the list has no edge fade and shares the composer column', async ({ page }) => {
         const { state, scope } = await open(page, surface);
+        await sendAndReply(page, scope, state, REPLY);
+        await expect(scope.getByText(REPLY, { exact: true })).toBeVisible();
         const body = scope.getByTestId('chief-body');
         await body.evaluate((node) => {
-          const log: { gap: number; fade: string }[] = [];
-          (window as unknown as { __maskLog: typeof log }).__maskLog = log;
-          const tick = () => {
-            log.push({
-              gap: node.scrollHeight - node.scrollTop - node.clientHeight,
-              fade: node.style.getPropertyValue('--scroll-fade-bottom'),
-            });
-            requestAnimationFrame(tick);
+          const content = node.querySelector('[data-testid="chief-stream"]') as HTMLElement;
+          content.style.paddingBottom = '600px';
+          node.scrollTop = 300;
+        });
+        await page.waitForTimeout(300);
+        const read = await scope.evaluate((root) => {
+          const body = root.querySelector('[data-testid="chief-body"]') as HTMLElement;
+          const style = getComputedStyle(body);
+          const column = root.querySelector('[data-testid="chief-msg"]');
+          const composer = root.querySelector('.chief-composer');
+          if (!column || !composer) throw new Error('chat surfaces missing');
+          const c = column.getBoundingClientRect();
+          const k = composer.getBoundingClientRect();
+          return {
+            mask: style.maskImage,
+            webkitMask: style.webkitMaskImage,
+            listToComposer: Math.round(k.top - body.getBoundingClientRect().bottom),
+            left: Math.abs(c.left - k.left),
+            right: Math.abs(c.right - k.right),
           };
-          requestAnimationFrame(tick);
         });
-        await sendAndReply(page, scope, state, REPLY);
-        await expect(scope.getByText(REPLY, { exact: true })).toBeVisible();
-        await page.waitForTimeout(1500);
-        const log = await page.evaluate(
-          () => (window as unknown as { __maskLog: { gap: number; fade: string }[] }).__maskLog,
-        );
-        const stale = log.filter((s) => s.gap <= 2 && s.fade !== '0px');
-        expect(stale).toEqual([]);
-        const settled = await body.evaluate((node) => ({
-          gap: node.scrollHeight - node.scrollTop - node.clientHeight,
-          fade: node.style.getPropertyValue('--scroll-fade-bottom'),
-        }));
-        expect(settled.gap).toBeLessThanOrEqual(2);
-        expect(settled.fade).toBe('0px');
-      });
-
-      test('the bottom fade follows layout changes that fire no scroll or DOM event', async ({
-        page,
-      }) => {
-        const { state, scope } = await open(page, surface);
-        await sendAndReply(page, scope, state, REPLY);
-        await expect(scope.getByText(REPLY, { exact: true })).toBeVisible();
-        const body = scope.getByTestId('chief-body');
-        const read = () =>
-          body.evaluate((node) => ({
-            gap: Math.round(node.scrollHeight - node.scrollTop - node.clientHeight),
-            fade: node.style.getPropertyValue('--scroll-fade-bottom'),
-          }));
-        await expect.poll(read).toEqual({ gap: 0, fade: '0px' });
-        await body.evaluate(
-          (node) =>
-            new Promise<void>((resolve) => {
-              let steady = 0;
-              let last = '';
-              const frame = () => {
-                const now = `${node.scrollHeight}:${node.scrollTop}:${node.hasAttribute('data-autoscrolling')}`;
-                steady = now === last ? steady + 1 : 0;
-                last = now;
-                if (steady >= 30) resolve();
-                else requestAnimationFrame(frame);
-              };
-              requestAnimationFrame(frame);
-            }),
-        );
-        await body.evaluate((node) => node.dispatchEvent(new WheelEvent('wheel', { bubbles: true })));
-
-        await body.evaluate((node) => {
-          const content = node.querySelector('[data-testid="chief-stream"]') as HTMLElement;
-          content.style.paddingBottom = '12px';
-        });
-        await expect.poll(read).toEqual({ gap: 12, fade: '28px' });
-
-        await body.evaluate((node) => {
-          const content = node.querySelector('[data-testid="chief-stream"]') as HTMLElement;
-          content.style.paddingBottom = '';
-        });
-        await expect.poll(read).toEqual({ gap: 0, fade: '0px' });
+        expect(read.mask).toBe('none');
+        expect(read.webkitMask).toBe('none');
+        expect(read.listToComposer).toBe(0);
+        expect(read.left).toBeLessThan(1);
+        expect(read.right).toBeLessThan(1);
       });
     });
   }

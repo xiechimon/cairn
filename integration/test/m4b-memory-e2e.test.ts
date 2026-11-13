@@ -6,12 +6,13 @@ import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { step as stepTable, todo as todoTable } from '../../apps/server/src/db/schema.js';
-import { listMemoryEntries } from '../../apps/server/src/services/memory.js';
+import { listStoredMemoryEntries } from '../../apps/server/src/services/memory.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   AGENT_ID,
   api,
   bootRealServer,
+  CONFINEMENT_READY_LAUNCH,
   daemonLogLines,
   type RealServer,
   seedWorld,
@@ -19,6 +20,10 @@ import {
 } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
+const listFiles = (
+  db: Parameters<typeof listStoredMemoryEntries>[0],
+  scope: Parameters<typeof listStoredMemoryEntries>[1],
+) => listStoredMemoryEntries(db, scope).filter((r) => r.layer === 'searchable');
 const MEMORY_TITLE = 'README 只在末尾追加小节';
 const MEMORY_CONTENT = 'README.md 约定：新增说明一律在文件末尾追加二级标题小节。';
 
@@ -41,7 +46,7 @@ beforeAll(async () => {
     {
       toolCall: {
         name: 'save_memory',
-        arguments: { title: MEMORY_TITLE, content: MEMORY_CONTENT },
+        arguments: { scope: 'team', file: MEMORY_TITLE, content: MEMORY_CONTENT },
       },
     },
     {
@@ -79,6 +84,8 @@ beforeAll(async () => {
     proxyEnv: {},
     claimBackoffBaseMs: 50,
     heartbeatIntervalMs: 500,
+
+    confinementPreflight: CONFINEMENT_READY_LAUNCH,
   });
   await waitFor(() => logLines().includes('[wake] push channel connected'), 30_000);
 }, 120_000);
@@ -113,7 +120,7 @@ describe('M4b memory E2E: instruction-triggered + mid-step write + provenance + 
     build1 = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
     await waitFor(() => {
-      const rows = listMemoryEntries(server.db, { teamId: server.teamId, agentId: AGENT_ID });
+      const rows = listFiles(server.db, { teamId: server.teamId, agentId: AGENT_ID });
       if (rows.length > 0) {
         if (stepStatusAtWrite === null) {
           stepStatusAtWrite =
@@ -126,22 +133,20 @@ describe('M4b memory E2E: instruction-triggered + mid-step write + provenance + 
     }, 120_000);
     expect(stepStatusAtWrite).toBe('claimed');
 
-    const rows = listMemoryEntries(server.db, { teamId: server.teamId, agentId: AGENT_ID });
+    const rows = listFiles(server.db, { teamId: server.teamId, agentId: AGENT_ID });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       agentId: AGENT_ID,
       teamId: server.teamId,
       title: MEMORY_TITLE,
       content: MEMORY_CONTENT,
-      projectId: world1.projectId,
+      projectId: null,
       sourceTodoId: world1.todoId,
       sourceBuildId: build1,
     });
 
     await waitFor(() => server.todoPhase(world1.todoId) === 'review', 120_000);
-    expect(listMemoryEntries(server.db, { teamId: server.teamId, agentId: AGENT_ID })).toHaveLength(
-      1,
-    );
+    expect(listFiles(server.db, { teamId: server.teamId, agentId: AGENT_ID })).toHaveLength(1);
   }, 150_000);
 
   test('no-instruction turn: zero writes + read-side injection trace visible on the wire (04 appendix A)', async () => {
@@ -157,9 +162,7 @@ describe('M4b memory E2E: instruction-triggered + mid-step write + provenance + 
 
     await waitFor(() => server.todoPhase(world2.todoId) === 'review', 120_000);
 
-    expect(listMemoryEntries(server.db, { teamId: server.teamId, agentId: AGENT_ID })).toHaveLength(
-      1,
-    );
+    expect(listFiles(server.db, { teamId: server.teamId, agentId: AGENT_ID })).toHaveLength(1);
     const todo2 = server.db.select().from(todoTable).where(eq(todoTable.id, world2.todoId)).get();
     expect(todo2?.phase).toBe('review');
 
@@ -167,7 +170,7 @@ describe('M4b memory E2E: instruction-triggered + mid-step write + provenance + 
     expect(task2Requests.length).toBeGreaterThan(0);
     const wire = JSON.stringify(task2Requests[0]);
     expect(wire).toContain('## 记忆');
-    expect(wire).toContain(MEMORY_TITLE);
-    expect(wire).toContain(MEMORY_CONTENT);
+    expect(wire).toContain('MEMORY.md');
+    expect(wire).not.toContain(MEMORY_CONTENT);
   }, 150_000);
 });

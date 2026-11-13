@@ -21,7 +21,7 @@ export function ScreenPlaceholder({ online, label }: { online: boolean; label: s
       className={`grid place-items-center bg-(--surface-1) px-6 text-center text-meta text-content-tertiary ${online ? 'aspect-[16/10]' : 'h-16'}`}
     >
       <span className={`flex items-center gap-2 ${online ? 'flex-col' : ''}`}>
-        <MonitorSmartphone aria-hidden="true" className="size-4.5 opacity-60" />
+        <MonitorSmartphone aria-hidden="true" className="size-5.5 opacity-60" />
         {label}
       </span>
     </div>
@@ -146,7 +146,7 @@ export function MachineScreenSurface({
       {status !== 'connected' && (
         <div className="absolute inset-0 grid place-items-center px-6 text-center text-meta text-content-tertiary">
           <span className="flex flex-col items-center gap-2">
-            <MonitorSmartphone aria-hidden="true" className="size-4.5 opacity-60" />
+            <MonitorSmartphone aria-hidden="true" className="size-5.5 opacity-60" />
             {status === 'connecting'
               ? t('正在连接屏幕')
               : status === 'failed'
@@ -168,7 +168,7 @@ export function MachineScreenSurface({
             onExpand();
           }}
         >
-          <Maximize2 aria-hidden="true" className="size-3.5" />
+          <Maximize2 aria-hidden="true" className="size-4" />
         </Button>
       )}
     </div>

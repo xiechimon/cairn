@@ -6,6 +6,7 @@ import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js'
 import {
   claudeSubscription,
   machine as machineTable,
+  routingRule,
   step,
   stepRoute,
   todo as todoTable,
@@ -16,6 +17,7 @@ import { decideStepRoute, recordStepRoute, routedModelRunsOn } from '../src/serv
 import {
   bootServer,
   issueApiKey,
+  pinSessionRoute,
   postProject,
   req,
   seedRoute,
@@ -346,6 +348,7 @@ describe('a routed model only runs on a machine that can host it', () => {
       .set({ enabledRuntimes: ['claude-code', 'pi'], capabilities: { mcpServers: [], skills: [] } })
       .where(eq(machineTable.id, other))
       .run();
+    pinSessionRoute(w.s, w.machineId);
     const hard = await buildTodo(w, `difficulty:hard ${'migrate the queue '.repeat(10)}`);
     expect(profileForStep(w.s.db, hard, 'build')).toMatchObject({
       provider: 'openai-codex',
@@ -389,7 +392,15 @@ describe('the router leaves the execution constraints of the rule alone', () => 
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: true });
     const todoRow = await buildTodo(w, 'rename one label');
-    expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ machineId: null });
+    expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ machineId: w.machineId });
+    expect(
+      w.s.db
+        .select()
+        .from(routingRule)
+        .where(eq(routingRule.teamId, w.s.team.id))
+        .all()
+        .every((rule) => rule.machineId === null),
+    ).toBe(true);
   });
 });
 

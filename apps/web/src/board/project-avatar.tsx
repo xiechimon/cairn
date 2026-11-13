@@ -26,11 +26,11 @@ export function ProjectAvatar({
         'project-avatar grid flex-none place-items-center text-content-tertiary',
         tiled
           ? 'size-8 rounded-lg bg-foreground/8 text-content-secondary [&>svg]:size-1/2'
-          : 'size-4',
+          : 'size-5',
         className,
       )}
     >
-      <Icon className={tiled ? undefined : 'size-4'} />
+      <Icon className={tiled ? undefined : 'size-5'} />
     </span>
   );
 }

@@ -9,7 +9,14 @@ import {
   dueBackoffMs,
 } from '../src/services/due-events.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { bootServer, postProject, req, seedSessionRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  insertMachine,
+  postProject,
+  req,
+  seedSessionRoute,
+  type TestServer,
+} from './helpers.js';
 
 class FakeClock implements DueClock {
   time: number;
@@ -62,6 +69,7 @@ class FakeClock implements DueClock {
 const servers: TestServer[] = [];
 function boot() {
   const server = bootServer();
+  insertMachine(server);
   servers.push(server);
   return server;
 }

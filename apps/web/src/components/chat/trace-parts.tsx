@@ -1,6 +1,8 @@
 import { cn } from 'cn';
+import { ChevronRight } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import type { TFunc } from '../../i18n/translate.js';
+import { StatusGlyph } from '../status-glyph.js';
 import { Button } from '../ui/button.js';
 
 export interface TraceCounts {
@@ -28,7 +30,7 @@ export const EMPTY_TRACE_COUNTS: TraceCounts = {
 };
 
 const SUMMARY_BTN =
-  "chat-interaction h-auto min-h-0 w-fit max-w-full cursor-pointer justify-start gap-1 rounded-md border-0 bg-transparent px-0 py-0.5 text-left font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
+  "chat-interaction h-7 min-h-0 w-fit max-w-full cursor-pointer justify-start gap-2 rounded-(--radius-control) border-0 bg-transparent px-3 py-0 text-left text-ui leading-5 font-normal text-(--text-secondary) hover:bg-(--menu-hover) hover:text-(--text-secondary) dark:hover:bg-(--menu-hover) dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-secondary) aria-expanded:hover:bg-(--menu-hover) dark:aria-expanded:hover:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
 
 const ROW_BTN =
   "chat-interaction flex h-9 min-h-9 w-full min-w-0 cursor-pointer justify-start gap-1.5 rounded-(--cds-radius-xs) border-0 bg-transparent px-3 text-left font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-tertiary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) dark:hover:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
@@ -96,39 +98,60 @@ export function TraceTriangle({ open }: { open: boolean }) {
   );
 }
 
+export function TraceChevron({ open }: { open: boolean }) {
+  return (
+    <ChevronRight
+      aria-hidden="true"
+      data-trace-triangle={open ? 'open' : 'closed'}
+      className={cn('size-4 flex-none text-(--text-tertiary)', open && 'rotate-90')}
+    />
+  );
+}
+
 export function TraceGroupSummary({
   summary,
+  more,
   failed,
   open,
   summaryTitle,
   running = false,
-  compact = false,
   className,
   ...props
 }: Omit<ComponentProps<typeof Button>, 'children'> & {
   summary: ReactNode;
+  more?: string | null;
   failed?: string | null;
   summaryTitle?: string;
   open: boolean;
   running?: boolean;
-  compact?: boolean;
 }) {
+  const state = running ? 'running' : failed != null ? 'failed' : 'done';
   return (
     <Button
       variant="ghost"
       aria-expanded={open}
-      className={cn(SUMMARY_BTN, compact ? 'text-meta leading-5' : 'text-ui leading-6', className)}
+      data-trace-state={state}
+      className={cn(SUMMARY_BTN, className)}
       {...props}
     >
+      <StatusGlyph
+        kind={state === 'running' ? 'progress' : state}
+        className={state === 'failed' ? 'text-destructive' : 'text-(--text-tertiary)'}
+      />
       <span className="min-w-0 truncate" data-trace-summary="" title={summaryTitle}>
         <span className={cn(running && 'shimmer motion-reduce:shimmer-none')}>{summary}</span>
-        {failed != null && (
-          <span className="ml-1" data-trace-failed="">
-            {failed}
-          </span>
-        )}
       </span>
-      <TraceTriangle open={open} />
+      {more != null && (
+        <span className="-ml-1 flex-none text-(--text-tertiary)" data-trace-more="">
+          {more}
+        </span>
+      )}
+      {failed != null && (
+        <span className="-ml-1 flex-none text-destructive" data-trace-failed="">
+          {failed}
+        </span>
+      )}
+      <TraceChevron open={open} />
     </Button>
   );
 }

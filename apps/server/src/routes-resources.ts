@@ -7,6 +7,7 @@ import {
   evacuateMachineBodySchema,
   githubReposResponseSchema,
   importSkillBodySchema,
+  type MachineRunningThread,
   PHASE_VALUES,
   patchMachineBodySchema,
   patchProviderBodySchema,
@@ -18,10 +19,11 @@ import {
   THINKING_LEVELS,
   testProviderBodySchema,
 } from '@cairn/shared';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, ne } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
-import { machine, provider, routingRule, todo } from './db/schema.js';
+import type { Db } from './db/client.js';
+import { build, machine, provider, routingRule, step, todo } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubUserRepos } from './lib/github.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
@@ -93,6 +95,7 @@ import {
   scanLocalSkills,
   updateLocalSkill,
 } from './services/skills.js';
+import { pollXaiDeviceLogin, startXaiDeviceLogin } from './services/xai-device-login.js';
 
 export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
@@ -165,7 +168,13 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const id = c.req.param('id');
     requireTeam(ctx, id);
     const rows = ctx.db.select().from(machine).where(eq(machine.teamId, id)).all();
-    return c.json(rows.map((r) => toMachineRecord(r, machineRunningCount(ctx.db, r.id))));
+    const running = runningThreadsByMachine(ctx.db, id);
+    return c.json(
+      rows.map((r) => ({
+        ...toMachineRecord(r, machineRunningCount(ctx.db, r.id)),
+        running: running.get(r.id) ?? [],
+      })),
+    );
   });
 
   app.patch('/api/machines/:id', async (c) => {
@@ -174,7 +183,18 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     if (!row) throw notFound(`machine ${id}`);
     requireTeam(ctx, row.teamId);
     const body = parseWith(patchMachineBodySchema, await jsonBody(c), 'body');
+    if (body.browserOverride !== undefined || body.desktopOverride !== undefined) {
+      if (!c.get('ownerIdentity')) throw new HttpError(403, 'owner session required');
+      if (
+        (body.browserOverride === true && row.capabilities?.browser !== true) ||
+        (body.desktopOverride === true && row.capabilities?.computer !== true)
+      ) {
+        throw new HttpError(409, 'machine does not report the requested capability');
+      }
+    }
     const patch = {
+      ...(body.browserOverride !== undefined ? { browserOverride: body.browserOverride } : {}),
+      ...(body.desktopOverride !== undefined ? { desktopOverride: body.desktopOverride } : {}),
       ...(body.enabledRuntimes !== undefined ? { enabledRuntimes: body.enabledRuntimes } : {}),
       ...(body.maxConcurrent !== undefined ? machineConcurrencyPatch(row, body.maxConcurrent) : {}),
     };
@@ -459,6 +479,33 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     client: ctx.oauthClient,
   });
 
+  const xaiDeviceDeps = () => ({
+    db: ctx.db,
+    box: ctx.secretBox,
+    fetch: ctx.oauthFetch ?? globalThis.fetch,
+    states: ctx.xaiDeviceStates,
+  });
+
+  app.post('/api/teams/:id/providers/oauth/xai/device', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const started = await startXaiDeviceLogin(xaiDeviceDeps(), {
+      teamId,
+      createdBy: ctx.user.id,
+    });
+    return c.json(started);
+  });
+
+  app.post('/api/teams/:id/providers/oauth/xai/device/poll', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = (await jsonBody(c)) as { state?: unknown };
+    if (typeof body.state !== 'string' || body.state === '') {
+      throw new HttpError(400, 'state required');
+    }
+    return c.json(await pollXaiDeviceLogin(xaiDeviceDeps(), { teamId, state: body.state }));
+  });
+
   app.post('/api/teams/:id/providers/oauth/:preset/authorize', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
@@ -607,6 +654,8 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       description: body.description ?? null,
       value: body.value,
       projectId: body.projectId ?? null,
+      ...(body.delivery !== undefined ? { delivery: body.delivery } : {}),
+      ...(body.http !== undefined ? { http: body.http } : {}),
     });
     return c.json(record, 201);
   });
@@ -647,4 +696,48 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     });
     return c.json(created, 201);
   });
+}
+
+function runningThreadsByMachine(db: Db, teamId: string): Map<string, MachineRunningThread[]> {
+  const rows = db
+    .select({
+      machineId: machine.id,
+      threadId: todo.id,
+      title: todo.title,
+      projectId: todo.projectId,
+      claimedAt: step.claimedAt,
+      createdAt: step.createdAt,
+    })
+    .from(step)
+    .innerJoin(build, eq(step.buildId, build.id))
+    .innerJoin(todo, eq(build.todoId, todo.id))
+    .innerJoin(machine, eq(step.machineId, machine.id))
+    .where(
+      and(
+        eq(step.status, 'claimed'),
+        ne(step.kind, 'chief'),
+        eq(machine.teamId, teamId),
+        eq(todo.teamId, teamId),
+      ),
+    )
+    .all();
+  const grouped = new Map<string, MachineRunningThread[]>();
+  for (const row of rows) {
+    const startedAt = row.claimedAt ?? row.createdAt;
+    const threads = grouped.get(row.machineId) ?? [];
+    const listed = threads.find((thread) => thread.threadId === row.threadId);
+    if (listed === undefined) {
+      threads.push({
+        threadId: row.threadId,
+        title: row.title,
+        projectId: row.projectId,
+        startedAt,
+      });
+      grouped.set(row.machineId, threads);
+    } else if (startedAt < listed.startedAt) {
+      listed.startedAt = startedAt;
+    }
+  }
+  for (const threads of grouped.values()) threads.sort((a, b) => a.startedAt - b.startedAt);
+  return grouped;
 }

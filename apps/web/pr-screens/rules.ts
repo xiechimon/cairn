@@ -146,7 +146,7 @@ const V3 = staticRule(
   `
 const found = [];
 for (const el of document.querySelectorAll('body *')) {
-  if (!visible(el) || el.classList.contains('bubble-gradient')) continue;
+  if (!visible(el)) continue;
   const s = getComputedStyle(el);
   if (/gradient\\(/.test(s.backgroundImage)) found.push({ key: keyOf(el) + ':gradient', text: 'gradient background on ' + keyOf(el) });
   if (/blur\\(/.test(s.backdropFilter + ' ' + s.filter)) found.push({ key: keyOf(el) + ':blur', text: 'blur on ' + keyOf(el) });

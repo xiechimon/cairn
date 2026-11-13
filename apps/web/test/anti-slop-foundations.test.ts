@@ -47,25 +47,21 @@ describe('V11 identity carries no colour', () => {
 });
 
 describe('V16 no texture or gradient surfaces', () => {
-  const bubbleUtility = appCss.match(/@utility bubble-gradient \{[\s\S]*?\n\}\n/)?.[0] ?? '';
-
-  test('the owner bubble is the one gradient surface', () => {
-    expect(bubbleUtility).toMatch(/radial-gradient/);
-    expect(appCss.replace(bubbleUtility, '')).not.toMatch(/feTurbulence|radial-gradient|conic-gradient/);
+  test('no surface carries a gradient or a noise texture', () => {
+    expect(appCss).not.toMatch(/feTurbulence|radial-gradient|conic-gradient/);
   });
 
-  test('only user message rows wear the bubble', () => {
-    expect(offenders(/bubble-gradient/).sort()).toEqual([
-      'components/chat/user-message-bubble.tsx',
-      'styles/app.css',
-    ]);
+  test('the user bubble is one flat token fill', () => {
+    const bubble =
+      sourceFiles.find(({ path }) => path === 'components/chat/user-message-bubble.tsx')?.text ?? '';
+    expect(bubble).toMatch(/bg-\(--bubble-fill\)/);
+    expect(offenders(/bubble-gradient|--bubble-(base|wash|rim)/)).toEqual([]);
   });
 });
 
-describe('V3 blur only on the measured claude.ai selection bar', () => {
-  test('the selection bar is the one blurred surface', () => {
+describe('V3 no blurred surfaces', () => {
+  test('only the pristine dialog overlays carry a blur class', () => {
     expect(offenders(/backdrop-blur|backdrop-filter:\s*blur|filter:\s*blur\(/).sort()).toEqual([
-      'chief/selection-reply.tsx',
       'components/ui/alert-dialog.tsx',
       'components/ui/dialog.tsx',
     ]);
@@ -75,11 +71,6 @@ describe('V3 blur only on the measured claude.ai selection bar', () => {
     expect(appCss).toMatch(
       /\[data-slot="dialog-overlay"\],\s*\[data-slot="alert-dialog-overlay"\] \{[^}]*backdrop-filter: none;/,
     );
-  });
-
-  test('it blurs by the measured 8px', () => {
-    const bar = sourceFiles.find(({ path }) => path === 'chief/selection-reply.tsx')?.text ?? '';
-    expect(bar.match(/backdrop-blur[\w-]*/g)).toEqual(['backdrop-blur-sm']);
   });
 });
 
@@ -99,10 +90,10 @@ describe('DESIGN-RULES carries the anti-slop rules', () => {
     },
   );
 
-  test('V3 and V16 name the owner bubble as their one exception', () => {
+  test('V3 and V16 grant the user bubble no gradient exception', () => {
     for (const id of ['V3', 'V16']) {
       const row = rules.split('\n').find((line) => line.startsWith(`| ${id} |`));
-      expect(row).toMatch(/`bubble-gradient`/);
+      expect(row).not.toMatch(/`bubble-gradient`/);
     }
   });
 });

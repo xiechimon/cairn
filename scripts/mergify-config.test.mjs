@@ -10,7 +10,7 @@ const config = readFileSync(configPath, 'utf8');
 
 test('.mergify.yml is generated from merge-gate-paths.json, pr-gate.js and merge-checks.mjs', () => {
   assert.equal(config, mergifyConfig(prGate, gatePaths), 'run node scripts/mergify-config.mjs');
-  assert.match(config, /^ {2}max_parallel_checks: 1$/m);
+  assert.match(config, /^ {2}max_parallel_checks: 3$/m);
 });
 
 test('negative control: a limit changed in merge-gate-paths.json changes .mergify.yml', () => {
@@ -21,12 +21,12 @@ test('negative control: a limit changed in merge-gate-paths.json changes .mergif
   assert.notEqual(mergifyConfig(prGate, changed), config);
 });
 
-test('the queue starts a batch immediately, admits 80 files, and accepts a stack dependency', () => {
-  assert.equal(gatePaths.limits.maxQueueFiles, 80);
+test('the queue starts a batch immediately, admits 3000 files, and accepts a stack dependency', () => {
+  assert.equal(gatePaths.limits.maxQueueFiles, 3000);
   assert.match(config, /batch_max_wait_time: 0 s\n/);
   for (const name of ['default', 'bot']) {
     const [queue] = rules[name].split('    merge_conditions:\n');
-    assert.match(queue, /- '#files <= 80'\n/, name);
+    assert.match(queue, /- '#files <= 3000'\n/, name);
     assert.doesNotMatch(queue, /#added-lines|#deleted-lines/, name);
     assert.match(queue, /- or:\n {10}- base = main\n {10}- "#depends-on > 0"\n/, name);
   }
@@ -48,11 +48,9 @@ for (const [name, author, method] of [
   ['default', '- -author = cairnwright[bot]', 'fast-forward'],
   ['bot', '- author = cairnwright[bot]', 'fast-forward'],
 ])
-  test(`the ${name} rule requires the review-gate check from GitHub Actions and keeps PR-only gates off the draft`, () => {
+  test(`the ${name} rule requires merge-route and keeps PR-only gates off the draft`, () => {
     const [queue, merge] = rules[name].split('    merge_conditions:\n');
     assert.ok(queue.includes(`      ${author}\n`));
-    assert.match(queue, /- check-success = @github-actions\/review-gate\n/);
-    assert.doesNotMatch(queue, /status-success = review-gate/);
     assert.match(queue, /- check-success = merge-route\n/);
     assert.doesNotMatch(queue, /check-skipped = merge-route/);
     assert.doesNotMatch(queue, /owner-route/);
@@ -63,7 +61,7 @@ for (const [name, author, method] of [
     for (const check of ['pr-evidence', 'merge-route'])
       assert.doesNotMatch(merge, new RegExp(check));
     assert.match(merge, new RegExp(`merge_method: ${method}\\n`));
-    assert.match(merge, /max_checks_retries: 1$/m);
+    assert.match(merge, /max_checks_retries: 0$/m);
   });
 
 test('neither queue caps commit count, and both fast-forward the tested draft commit', () => {
@@ -87,7 +85,7 @@ test('eligible PRs enter the queue on their own, and no merge protection rule ca
 test('merge conditions never require a PR-only fact the queue draft cannot carry', () => {
   for (const name of ['default', 'bot']) {
     const merge = rules[name].split('    merge_conditions:\n')[1];
-    for (const fact of ['review-gate', 'merge-route', 'pr-evidence', 'commit-author', 'pr-size'])
+    for (const fact of ['merge-route', 'pr-evidence', 'commit-author', 'pr-size'])
       assert.doesNotMatch(merge, new RegExp(fact), `${name}: ${fact}`);
   }
 });
@@ -112,20 +110,23 @@ test('queue entry needs a green commit-author check, and batch PRs need the admi
   }
 });
 
-test('a PR the coordinator holds never enters the queue', () => {
+test('no review verdict, review thread count or hold label decides queue entry', () => {
+  assert.doesNotMatch(
+    config,
+    /review-gate|review-threads|approved-reviews|changes-requested|coordinator-hold|needs-decision/,
+  );
   for (const name of ['default', 'bot']) {
     const [queue] = rules[name].split('    merge_conditions:\n');
-    assert.match(queue, /- -label = coordinator-hold\n/, name);
-    assert.doesNotMatch(queue, /needs-decision/, name);
+    assert.match(queue, /- -draft\n {6}- or:\n {10}- -head ~= /, name);
   }
 });
 
-test('only writers may dequeue by command; the review-gate bot leaves it to the queue conditions', () => {
+test('only writers may dequeue by command; the workflow bot may only requeue, for the autonomy brake', () => {
   assert.match(
     config,
-    /commands_restrictions:\n {2}dequeue:\n {4}conditions:\n {6}- sender-permission >= write\nmerge_queue:/,
+    /commands_restrictions:\n {2}dequeue:\n {4}conditions:\n {6}- sender-permission >= write\n {2}requeue:\n {4}conditions:\n {6}- or:\n {10}- sender-permission >= write\n {10}- sender = github-actions\[bot\]\nmerge_queue:/,
   );
-  assert.doesNotMatch(config, /github-actions\[bot\]/);
+  assert.equal(config.match(/github-actions\[bot\]/g)?.length, 1);
 });
 
 test('both queues size batches dynamically from one to four pull requests', () => {
@@ -144,14 +145,6 @@ test('queue entry needs a green pr-size check, and batch PRs are not held to it'
   }
 });
 
-test('both queues require zero unresolved review threads exactly once immediately after draft', () => {
-  for (const name of ['default', 'bot']) {
-    const [queue] = rules[name].split('    merge_conditions:\n');
-    assert.match(queue, /- -draft\n {6}- '#review-threads-unresolved = 0'\n/, name);
-    assert.equal(queue.match(/#review-threads-unresolved = 0/g)?.length, 1, name);
-  }
-});
-
 test('no tracked code or workflow posts a Mergify command; the queue conditions drive the queue', () => {
   const sources = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
     .split('\0')
@@ -162,5 +155,11 @@ test('no tracked code or workflow posts a Mergify command; the queue conditions 
         !path.startsWith('docs/'),
     );
   const posting = sources.filter((path) => /@mergifyio\s+[a-z]/.test(readFileSync(path, 'utf8')));
-  assert.deepEqual(posting, []);
+  assert.deepEqual(posting, ['scripts/autonomy-brake.mjs']);
+  assert.deepEqual(
+    [...readFileSync('scripts/autonomy-brake.mjs', 'utf8').matchAll(/@mergifyio\s+([a-z]+)/g)].map(
+      (match) => match[1],
+    ),
+    ['requeue', 'requeue'],
+  );
 });

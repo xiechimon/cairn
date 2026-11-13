@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { ChiefDigestRow } from '../chief/chief-digest-row.js';
 import { ChiefIdentity } from '../chief/chief-identity.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from '../chief/chief-outage-banner.js';
-import { ChiefQuestionCard } from '../chief/chief-question-card.js';
+import { QuestionAnsweredLine, QuestionAsked } from '../chief/question-answered-line.js';
+import { QuestionChips } from '../chief/question-chips.js';
+import { answerLines } from '../chief/question-lifecycle.js';
+import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
 import {
   DIGEST_ITEMS,
@@ -24,17 +27,19 @@ export function ProductChiefSection() {
       lede="The Coordinator's parts: questions it asks you, the conversation digest, the home summary line, its identity, and outage banners."
     >
       <Specimen
-        id="question-card"
-        title="Question card"
-        note={last ?? 'ChiefQuestionCard: answer with clicks or the number keys'}
+        id="question-chips"
+        title="Question chips"
+        note={
+          last ??
+          'QuestionChips: a chip answers, digits pick, the composer types a free answer; answered, the questions stay as reply bubbles above one owner bubble'
+        }
         stage="canvas"
         className="flex-col"
       >
         <Labeled label="Pending, two steps, the second is multi-select">
           <div className="w-160">
-            <ChiefQuestionCard
+            <QuestionChips
               item={QUESTION_PENDING}
-              numberKeys
               onAnswer={({ answers }) =>
                 setLast(
                   `Answered: ${answers.map((a) => a.choices?.join(' + ') ?? a.text).join(' / ')}`,
@@ -45,13 +50,18 @@ export function ProductChiefSection() {
           </div>
         </Labeled>
         <Labeled label="Answered">
-          <div className="w-160">
-            <ChiefQuestionCard item={QUESTION_ANSWERED} />
+          <div className="flex w-160 flex-col gap-6">
+            <QuestionAsked item={QUESTION_ANSWERED} />
+            <div className="flex justify-end">
+              <UserMessageBubble className="w-fit max-w-full whitespace-pre-line">
+                {answerLines(QUESTION_ANSWERED).join('\n')}
+              </UserMessageBubble>
+            </div>
           </div>
         </Labeled>
         <Labeled label="Cancelled">
           <div className="w-160">
-            <ChiefQuestionCard item={QUESTION_CANCELLED} />
+            <QuestionAnsweredLine item={QUESTION_CANCELLED} />
           </div>
         </Labeled>
       </Specimen>
@@ -78,9 +88,6 @@ export function ProductChiefSection() {
       <Specimen id="identity" title="Identity" note="ChiefIdentity" stage="canvas">
         <Cell label="Identity, idle">
           <ChiefIdentity agent={CHIEF} />
-        </Cell>
-        <Cell label="Identity, busy">
-          <ChiefIdentity agent={CHIEF} busy />
         </Cell>
         <Cell label="Identity, not linked">
           <ChiefIdentity agent={{ displayName: 'Coordinator', avatarUrl: null }} />

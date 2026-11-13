@@ -31,6 +31,7 @@ import { conflict, HttpError } from '../lib/errors.js';
 import { githubBranchPulls } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import { emitRuntimeStepSpan } from '../runtime-otel.js';
+import { reportedVerdictHeads } from './build-gate-verdict.js';
 import {
   applyStepFailure,
   applyStoppedStep,
@@ -38,7 +39,6 @@ import {
   enqueueStep,
   mergedPrElsewhere,
   noteDeliveredPlanResidual,
-  reportedVerdictHeads,
   settleParkedStep,
   toBuildRecord,
 } from './builds.js';

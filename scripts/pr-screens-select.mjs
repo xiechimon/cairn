@@ -7,13 +7,7 @@ const REPO_ROOT = resolve(import.meta.dirname, '..');
 const SOURCES_FILE = 'apps/web/pr-screens/route-sources.json';
 const AUDIT_PAGES = 'apps/web/e2e/audit-pages.ts';
 const STATE_PAGES = 'apps/web/pr-screens/state-pages.ts';
-const IGNORED = [
-  'apps/web/e2e/',
-  'apps/web/test/',
-  'apps/web/src/design/',
-  'apps/web/src/demo/',
-  'apps/web/docs/',
-];
+const IGNORED = ['apps/web/e2e/', 'apps/web/test/', 'apps/web/src/design/', 'apps/web/src/demo/'];
 const IGNORED_FILES = /\.(?:md|test\.tsx?)$/;
 
 export function slugOf(name) {

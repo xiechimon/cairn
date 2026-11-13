@@ -174,12 +174,16 @@ test('work groups consecutive thinking and calls, with only the last block expan
   await stubWorld(page);
   const summaries = page.getByTestId('work-summary');
   await expect(summaries).toHaveCount(2);
-  await expect(summaries.first()).toContainText('思考 1 次');
-  await expect(summaries.first()).toContainText('读了 1 个文件');
-  await expect(summaries.first()).toContainText('搜索 1 次');
-  await expect(summaries.first()).toContainText('跑了 1 条命令');
-  await expect(summaries.first()).toContainText('改了 2 个文件');
-  await expect(summaries.first()).toContainText('调用 1 个工具');
+  const words = summaries.first().locator('[data-trace-summary]');
+  await expect(words).toHaveText('Find readiness checks，Verify changes');
+  await expect(summaries.first().locator('[data-trace-more]')).toHaveText('· 7 步');
+  await expect(summaries.first().locator('[data-trace-failed]')).toHaveText('（1 个失败）');
+  await expect(summaries.first()).toHaveAttribute('data-trace-state', 'failed');
+  for (const count of ['思考 1 次', '读了 1 个文件', '搜索 1 次', '跑了 1 条命令', '改了 2 个文件', '调用 1 个工具'])
+    await expect(words).toHaveAttribute('title', new RegExp(count));
+  await expect(summaries.last().locator('[data-trace-summary]')).toHaveText('Check formatting');
+  await expect(summaries.last().locator('[data-trace-more]')).toHaveCount(0);
+  await expect(summaries.last()).toHaveAttribute('data-trace-state', 'running');
   await expect(summaries.first()).toHaveAttribute('aria-expanded', 'false');
   await expect(summaries.last()).toHaveAttribute('aria-expanded', 'true');
   await summaries.first().click();
@@ -190,7 +194,7 @@ test('work groups consecutive thinking and calls, with only the last block expan
   await expect(read).toContainText('1.3s');
   await expect(read).not.toContainText('/home/user');
   await read.click();
-  await expect(block.getByTestId('tool-output')).toContainText('export const ready = true;');
+  await expect(read.locator('..').getByTestId('tool-output')).toContainText('export const ready = true;');
   await block.getByTestId('work-think').click();
   await expect(block.getByTestId('thinking-body')).toHaveText(LONG_THINKING);
   await expect(page.getByTestId('work-block').last().getByTestId('work-spinner')).toBeVisible();
@@ -205,8 +209,8 @@ test('call details preserve commands, cap output and show edit lines', async ({ 
   await expect(run).toContainText('Verify changes');
   await expect(run).toContainText('12s');
   await run.click();
-  const output = block.getByTestId('tool-output');
-  await expect(block.locator('.work-code-header')).toContainText('$ pnpm test');
+  const output = run.locator('..').getByTestId('tool-output');
+  await expect(run.locator('..').locator('.work-code-header')).toContainText('$ pnpm test');
   await expect(output).toContainText('output line 40');
   await expect(output).not.toContainText('output line 41');
   await expect(block).toContainText('还有 5 行');
@@ -214,12 +218,12 @@ test('call details preserve commands, cap output and show edit lines', async ({ 
   await expect(edit).toContainText('+2');
   await expect(edit).toContainText('−1');
   await edit.click();
-  await expect(block.getByTestId('tool-output').last()).toContainText('old line');
-  await expect(block.getByTestId('tool-output').last()).toContainText('new line');
+  await expect(edit.locator('..').getByTestId('tool-output')).toContainText('old line');
+  await expect(edit.locator('..').getByTestId('tool-output')).toContainText('new line');
   await expect(block.getByTestId('work-call').last()).toContainText('docs · lookup');
   const failed = block.getByTestId('work-call').filter({ hasText: 'src/other.ts' });
   await expect(failed.getByText('失败')).toBeVisible();
-  await failed.click();
+  await expect(failed).toHaveAttribute('aria-expanded', 'true');
   await expect(block.getByTestId('edit-error')).toHaveText('old_string not found in src/other.ts');
 });
 

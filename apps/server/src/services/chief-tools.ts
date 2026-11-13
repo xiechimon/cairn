@@ -6,6 +6,7 @@ import type {
   UserRecord,
 } from '@cairn/shared';
 import {
+  actionByToolName,
   CHIEF_NOTICE_KIND,
   coordinatorCreateTodoParamsSchema,
   coordinatorUpdateTodoParamsSchema,
@@ -14,10 +15,9 @@ import {
   IN_PROGRESS_PHASES,
   isChiefConversationId,
   isWaitingPhase,
-  MEMORY_LAYERS,
   MERGE_HUMAN_ONLY_COPY,
-  type MemoryLayer,
   MODEL_SOURCE_RUNTIME_LABELS,
+  SUGGEST_REPLIES_TOOL_NAME,
   snoozeTodoBodySchema,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
@@ -36,9 +36,15 @@ import {
 import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { executeAction } from './action-registry.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta, resolveToolAttachmentId } from './attachments.js';
-import { applyBuildStepAction, cancelBuild, stopActiveStepsAfterExit } from './builds.js';
+import {
+  applyBuildStepAction,
+  assertNamedMachineForNewTask,
+  cancelBuild,
+  stopActiveStepsAfterExit,
+} from './builds.js';
 import {
   addChiefWatch,
   clearChiefWake,
@@ -50,21 +56,18 @@ import {
 } from './chief.js';
 import { readHistory, searchHistory } from './chief-history.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
+import { suggestQuickReplies } from './chief-quick-replies.js';
 import { assertToolNotRemoved, executeRouterTool, isRouterTool } from './chief-router-tools.js';
 import { readConversationPage } from './conversation-page.js';
 import { createRequestTodo, updateRequestTodo } from './coordinator-request.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
+import { readFillableProfile } from './job-applications.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { refuseMailTurnTool } from './mail.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
-import {
-  deleteMemoryEntry,
-  listMemoryEntries,
-  saveMemoryEntry,
-  searchMemoryEntries,
-  updateMemoryEntry,
-} from './memory.js';
+import { executeMemoryDocumentTool } from './memory-documents.js';
 import { notifyChiefMessage } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
@@ -146,22 +149,6 @@ function num(params: Params, key: string): number | undefined {
   }
   return v;
 }
-function bool(params: Params, key: string, fallback: boolean): boolean {
-  const v = params[key];
-  if (v === undefined || v === null) return fallback;
-  if (typeof v !== 'boolean') throw new HttpError(400, `invalid params.${key}: expected boolean`);
-  return v;
-}
-
-function memoryLayer(params: Params): MemoryLayer {
-  const v = params.layer;
-  if (v === undefined || v === null) return 'core';
-  if (typeof v !== 'string' || !(MEMORY_LAYERS as readonly string[]).includes(v)) {
-    throw new HttpError(400, 'invalid params.layer');
-  }
-  return v as MemoryLayer;
-}
-
 function json(result: unknown): string {
   return JSON.stringify(result ?? null);
 }
@@ -296,6 +283,7 @@ export async function executeChiefTool(
   name: string,
   params: Params,
 ): Promise<string> {
+  refuseMailTurnTool(ctx.turnPrompt ?? null, name);
   const { db } = deps;
   const svc = {
     db,
@@ -316,6 +304,24 @@ export async function executeChiefTool(
   assertToolNotRemoved(name);
   requireUnarchivedTargets(db, ctx.teamId, name, params);
   if (isRouterTool(name)) return executeRouterTool(deps, ctx, name, params);
+  if (name === SUGGEST_REPLIES_TOOL_NAME) return suggestQuickReplies(deps, ctx, params);
+  const action = actionByToolName(name);
+  if (action?.surfaces.includes('coordinator') === true) {
+    return json(
+      executeAction(
+        { db, reposDir: deps.reposDir },
+        {
+          id: action.id,
+          input: params,
+          actor: 'coordinator',
+          surface: 'coordinator',
+          teamId: ctx.teamId,
+          threadId: ctx.threadId,
+          scopeProjectId: ctx.turnScopeProjectId ?? null,
+        },
+      ),
+    );
+  }
   switch (name) {
     case 'projects': {
       const rows = db.select().from(project).where(eq(project.teamId, ctx.teamId)).all();
@@ -580,6 +586,7 @@ export async function executeChiefTool(
     case 'create_todo': {
       const body = parseWith(coordinatorCreateTodoParamsSchema, params, 'params');
       requireProjectRow(db, body.projectId, ctx.teamId);
+      assertNamedMachineForNewTask(svc, ctx.teamId);
       const record = createRequestTodo(svc, ctx, body, {
         createdBy:
           ctx.turnPrompt !== undefined && parseChiefTrigger(ctx.turnPrompt) === 'user'
@@ -719,6 +726,18 @@ export async function executeChiefTool(
       const existing = listSecrets(keysvc, ctx.teamId).find(
         (s) => s.name === name && s.projectId === projectId,
       );
+      if (
+        listSecrets(keysvc, ctx.teamId).some(
+          (s) =>
+            s.name === name &&
+            s.delivery === 'http' &&
+            (s.projectId === null || projectId === null || s.projectId === projectId),
+        )
+      )
+        throw new HttpError(
+          400,
+          `secret ${name} uses http delivery and can only be changed in settings`,
+        );
       const value = str(params, 'value');
       const description = optStr(params, 'description') ?? null;
       if (existing) {
@@ -871,8 +890,7 @@ export async function executeChiefTool(
         } satisfies ChiefNoticeContent),
         createdAt: nowMs(),
       };
-      upsertChiefMessage(db, notice);
-      deps.convHub?.publishMessage(ctx.threadId, notice);
+      deps.convHub?.publishMessage(ctx.threadId, upsertChiefMessage(db, notice));
       notifyChiefMessage(
         { db, hub: deps.hub, user: deps.user },
         {
@@ -883,75 +901,26 @@ export async function executeChiefTool(
       );
       return json({ notified: true });
     }
-    case 'save_memory': {
+    case 'save_memory':
+    case 'update_memory':
+    case 'delete_memory':
+    case 'memories': {
       if (ctx.chiefAgentId === null)
         throw new HttpError(409, 'no coordinator routing rule — memory has no store');
-      const explicitProject = optStr(params, 'projectId');
-      if (explicitProject === undefined && ctx.turnScopeMixed === true) {
-        throw new HttpError(
-          400,
-          'this turn now covers more than one project: pass projectId so the memory lands in the right project',
-        );
-      }
-      const projectId = explicitProject ?? ctx.turnScopeProjectId ?? null;
-      const sourceTodoId = optStr(params, 'sourceTodoId') ?? null;
-      if (projectId !== null) {
-        requireProjectRow(db, projectId, ctx.teamId);
-        requireUnarchivedTargets(db, ctx.teamId, name, { projectId });
-      }
-      if (sourceTodoId !== null) requireTeamTodo(db, sourceTodoId, ctx.teamId);
-      const layer = memoryLayer(params);
-      const row = saveMemoryEntry(db, {
-        agentId: ctx.chiefAgentId,
-        teamId: ctx.teamId,
-        title: str(params, 'title'),
-        content: str(params, 'content'),
-        force: bool(params, 'force', false),
-        projectId,
-        sourceTodoId,
-        sourceBuildId: ctx.conversationId,
-        source: 'Coordinator',
-        layer,
-        threadId: layer === 'scratchpad' ? ctx.threadId : null,
-      });
-      return json(row);
-    }
-    case 'update_memory': {
-      const memoryId = str(params, 'memoryId');
-      if (ctx.chiefAgentId === null) throw new HttpError(404, `memory ${memoryId}`);
       return json(
-        updateMemoryEntry(db, {
-          memoryId,
-          agentId: ctx.chiefAgentId,
-          teamId: ctx.teamId,
-          threadId: ctx.threadId,
-          content: str(params, 'content'),
-        }),
+        executeMemoryDocumentTool(
+          db,
+          {
+            agentId: ctx.chiefAgentId,
+            teamId: ctx.teamId,
+            projectId: ctx.turnScopeProjectId ?? null,
+            source: 'Coordinator',
+            sourceBuildId: ctx.conversationId,
+          },
+          name,
+          params,
+        ),
       );
-    }
-    case 'delete_memory': {
-      const memoryId = str(params, 'memoryId');
-      const removed =
-        ctx.chiefAgentId === null
-          ? 0
-          : deleteMemoryEntry(db, {
-              memoryId,
-              agentId: ctx.chiefAgentId,
-              teamId: ctx.teamId,
-              threadId: ctx.threadId,
-            });
-      if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
-      return json({ deleted: memoryId });
-    }
-    case 'memories': {
-      if (ctx.chiefAgentId === null) return json([]);
-      const entries = listMemoryEntries(
-        db,
-        { agentId: ctx.chiefAgentId, teamId: ctx.teamId, threadId: ctx.threadId },
-        bool(params, 'includeInvalid', false),
-      );
-      const query = optStr(params, 'query');
-      return json(query === undefined ? entries : searchMemoryEntries(entries, query));
     }
     case 'watch_todos': {
       const todoIds = strArr(params, 'todoIds');
@@ -997,6 +966,8 @@ export async function executeChiefTool(
       return json({ cleared: ok });
     }
 
+    case 'job_profile':
+      return json(readFillableProfile(db, ctx.userId));
     default:
       throw new HttpError(400, `unknown chief tool: ${name}`);
   }
@@ -1142,66 +1113,27 @@ export async function executeWorkerMemoryTool(
   params: Params,
 ): Promise<string> {
   switch (name) {
-    case 'save_memory': {
-      const projectId = optStr(params, 'projectId');
-      const sourceTodoId = optStr(params, 'sourceTodoId');
-      if (projectId !== undefined) requireProjectRow(db, projectId, ctx.teamId);
-      if (sourceTodoId !== undefined) requireTeamTodo(db, sourceTodoId, ctx.teamId);
-      const layer = memoryLayer(params);
-      const row = saveMemoryEntry(db, {
-        agentId: ctx.agentId,
-        teamId: ctx.teamId,
-        title: str(params, 'title'),
-        content: str(params, 'content'),
-        force: bool(params, 'force', false),
-        projectId: projectId ?? ctx.projectId,
-        sourceTodoId: sourceTodoId ?? ctx.todoId,
-        sourceBuildId: ctx.buildId,
-        source: ctx.sourceName,
-        layer,
-        threadId: layer === 'scratchpad' ? ctx.todoId : null,
-        teamScoped: ctx.teamScoped,
-      });
-      return json(row);
-    }
-    case 'update_memory': {
+    case 'save_memory':
+    case 'update_memory':
+    case 'delete_memory':
+    case 'memories':
       return json(
-        updateMemoryEntry(db, {
-          memoryId: str(params, 'memoryId'),
-          agentId: ctx.agentId,
-          teamId: ctx.teamId,
-          threadId: ctx.todoId,
-          content: str(params, 'content'),
-          teamScoped: ctx.teamScoped,
-        }),
-      );
-    }
-    case 'delete_memory': {
-      const memoryId = str(params, 'memoryId');
-      const removed = deleteMemoryEntry(db, {
-        memoryId,
-        agentId: ctx.agentId,
-        teamId: ctx.teamId,
-        threadId: ctx.todoId,
-        teamScoped: ctx.teamScoped,
-      });
-      if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
-      return json({ deleted: memoryId });
-    }
-    case 'memories': {
-      return json(
-        listMemoryEntries(
+        executeMemoryDocumentTool(
           db,
           {
             agentId: ctx.agentId,
             teamId: ctx.teamId,
-            threadId: ctx.todoId,
+            projectId: ctx.projectId,
             teamScoped: ctx.teamScoped,
+            workerScope: true,
+            source: ctx.sourceName,
+            sourceTodoId: ctx.todoId,
+            sourceBuildId: ctx.buildId,
           },
-          bool(params, 'includeInvalid', false),
+          name,
+          params,
         ),
       );
-    }
     case 'attachment': {
       const attachmentId = resolveToolAttachmentId(db, ctx.teamId, str(params, 'attachmentId'));
       if (!todoAuthorizesAttachment(db, ctx.todoId, attachmentId)) {

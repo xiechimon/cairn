@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { ATTACHMENT_MAX_BYTES } from '@cairn/shared';
+import { ATTACHMENT_MAX_BYTES, isInlineAttachment, servedAttachmentMime } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
+import { attachmentDownloadDisposition } from './lib/attachment-disposition.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody } from './routes-helpers.js';
@@ -14,14 +15,6 @@ import {
 } from './services/attachments.js';
 import { assertDeviceActive } from './services/paired-devices.js';
 
-const INLINE_ATTACHMENT_MIME_TYPES = new Set([
-  'image/png',
-  'image/jpeg',
-  'image/gif',
-  'image/webp',
-  'application/pdf',
-]);
-
 const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
 
 export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
@@ -29,7 +22,7 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
     kind: z.literal('attachment'),
     fileName: z.string(),
     mimeType: z.string(),
-    size: z.number().int().positive(),
+    size: z.number().int().nonnegative(),
     scope: z.enum(['spec', 'message']).optional(),
   });
 
@@ -55,7 +48,7 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
 
   const boundedUpload = bodyLimit({
     maxSize: ATTACHMENT_MAX_BYTES + MULTIPART_OVERHEAD_BYTES,
-    onError: (c) => c.json({ error: `invalid size: must be 1..${ATTACHMENT_MAX_BYTES}` }, 400),
+    onError: (c) => c.json({ error: `invalid size: must be 0..${ATTACHMENT_MAX_BYTES}` }, 400),
   });
 
   app.post('/api/uploads/upload', boundedUpload, async (c) => {
@@ -90,6 +83,7 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/attachments/:id', async (c) => {
     const id = c.req.param('id');
+    const download = c.req.query('download') === '1';
     const { row, absPath } = readAttachment(
       {
         db: ctx.db,
@@ -101,17 +95,20 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
       id,
     );
     const bytes = readFileSync(absPath);
+    const inlineDisposition = isInlineAttachment(row.storageKey, row.mimeType)
+      ? 'inline'
+      : 'attachment';
     return new Response(bytes, {
       status: 200,
       headers: {
-        'content-type': row.mimeType,
+        'content-type': servedAttachmentMime(row.storageKey),
         'content-length': String(row.sizeBytes),
         'cache-control': 'private, max-age=300',
         'x-content-type-options': 'nosniff',
         'content-security-policy': "sandbox; default-src 'none'",
-        'content-disposition': INLINE_ATTACHMENT_MIME_TYPES.has(row.mimeType)
-          ? 'inline'
-          : 'attachment',
+        'content-disposition': download
+          ? attachmentDownloadDisposition(row.fileName)
+          : inlineDisposition,
       },
     });
   });

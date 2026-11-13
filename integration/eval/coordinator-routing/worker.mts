@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { startCoordinator } from '../../../apps/server/src/coordinator/index.js';
 import { openDbWithHandle } from '../../../apps/server/src/db/client.js';
-import { chiefMessage, step, todo } from '../../../apps/server/src/db/schema.js';
+import { chiefMessage, machine, step, todo } from '../../../apps/server/src/db/schema.js';
 import { seed } from '../../../apps/server/src/db/seed.js';
 import { createEphemeralSecretBox } from '../../../apps/server/src/lib/secret-box.js';
 import { buildChiefSystemPrompt } from '../../../apps/server/src/services/chief.js';
@@ -39,6 +39,15 @@ try {
   setCoordinatorServerContextEnabled(true);
   const { db, close } = openDbWithHandle(':memory:');
   const { user, team } = seed(db);
+  db.insert(machine)
+    .values({
+      id: 'eval-machine',
+      teamId: team.id,
+      name: 'eval',
+      online: true,
+      enabledRuntimes: ['pi', 'claude-code'],
+    })
+    .run();
   const box = createEphemeralSecretBox();
   const home = process.cwd();
   for (const name of ['repos', 'attachments', 'skills']) mkdirSync(join(home, name));

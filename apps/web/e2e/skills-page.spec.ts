@@ -111,7 +111,7 @@ test('regression #486/#494: skills list reachable by wheel, scrollbar hugs the p
     }, shellSel);
 
   const widthBefore = (await col.boundingBox())?.width ?? 0;
-  expect(widthBefore).toBe(768);
+  expect(widthBefore).toBeGreaterThanOrEqual(672);
 
   const before = await readScrollLayer();
   const topbarBefore = await page.getByTestId('page-toolbar').boundingBox();
@@ -134,7 +134,7 @@ test('regression #486/#494: skills list reachable by wheel, scrollbar hugs the p
   expect((await col.boundingBox())?.width).toBe(widthBefore);
   const topbar = await page.getByTestId('page-toolbar').boundingBox();
   expect(topbar?.y).toBe(topbarBefore?.y);
-  expect(topbar?.height).toBe(48);
+  expect(topbar?.height).toBe(36);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });
 

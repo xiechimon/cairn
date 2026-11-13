@@ -34,7 +34,7 @@ test('archived projects are listed newest archive first with when they were arch
   await expect(rows(page).nth(0)).toContainText('probe-newer');
   await expect(rows(page).nth(0)).toContainText('归档于');
   await expect(rows(page).nth(1)).toContainText('probe-older');
-  await expect(page.getByText(PROJECT.name, { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: '设置' }).getByText(PROJECT.name, { exact: true })).toHaveCount(0);
 });
 
 test('unarchive takes the row out of the list and the project returns to the sidebar', async ({ page }) => {

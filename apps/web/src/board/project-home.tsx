@@ -19,11 +19,17 @@ import { Greeting } from '../components/stream/greeting.js';
 import { ScheduledTaskRow } from '../components/thread/scheduled-task-row.js';
 import { ThreadRow } from '../components/thread/thread-row.js';
 import { Button } from '../components/ui/button.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import type { ScheduleRecord, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { scheduleSummary } from '../pages/schedule-summary.js';
 import { SECRETS_HREF } from '../resources/secrets-page.js';
 import { ScheduleDetailController } from '../schedules/schedule-detail-dialog.js';
+import {
+  ARCHIVED_PROJECT_WRITE_REASON,
+  ArchivedProjectBar,
+  type ArchivedProjectState,
+} from './archived-project-bar.js';
 import { needsYouThreads } from './needs-you.js';
 import { ProjectAvatar } from './project-avatar.js';
 import { relativeTime } from './rel-time.js';
@@ -49,7 +55,7 @@ function CardHead({ icon, title, action }: { icon: ReactNode; title: string; act
       <span aria-hidden="true" className="text-content-tertiary">
         {icon}
       </span>
-      <h3 className="m-0 mr-auto text-meta font-medium text-content-secondary">{title}</h3>
+      <h3 className="m-0 mr-auto text-meta font-medium text-foreground">{title}</h3>
       {action}
     </div>
   );
@@ -65,12 +71,14 @@ export function ProjectHome({
   schedules,
   now,
   chatHref,
+  archived = null,
 }: {
   project: ProjectHomeProject;
   todos: readonly TodoRecord[];
   schedules: readonly ScheduleRecord[];
   now: number;
   chatHref: string;
+  archived?: ArchivedProjectState | null;
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -119,7 +127,7 @@ export function ProjectHome({
               className="text-meta text-content-secondary"
               render={<Link to={`/app/project/${project.id}/tasks`} />}
             >
-              <ListTodo aria-hidden="true" className="size-3.5" />
+              <ListTodo aria-hidden="true" className="size-4" />
               {t('任务')}
             </Button>
             <Button
@@ -128,7 +136,7 @@ export function ProjectHome({
               className="text-meta text-content-secondary"
               render={<Link to={`/app/project/${project.id}/settings`} />}
             >
-              <Settings2 aria-hidden="true" className="size-3.5" />
+              <Settings2 aria-hidden="true" className="size-4" />
               {t('项目设置')}
             </Button>
           </nav>
@@ -165,15 +173,19 @@ export function ProjectHome({
                 { value: String(mergedThisWeek), label: t('本周合并') },
               ]}
             />
-            <Button
-              variant="outline"
-              data-testid="project-home-ask"
-              className="mt-5 h-11 w-full max-w-160 justify-start gap-2 rounded-xl bg-card text-ui font-normal text-content-secondary shadow-(--e1)"
-              render={<Link to={chatHref} />}
-            >
-              <MessageSquare aria-hidden="true" className="size-4" />
-              {t('问 Coordinator 关于 {name} 的事…', { name: project.name })}
-            </Button>
+            {archived === null ? (
+              <Button
+                variant="outline"
+                data-testid="project-home-ask"
+                className="mt-5 h-11 w-full max-w-160 justify-start gap-2 rounded-xl bg-card text-ui font-normal text-content-secondary shadow-(--e1)"
+                render={<Link to={chatHref} />}
+              >
+                <MessageSquare aria-hidden="true" className="size-5" />
+                {t('问 Coordinator 关于 {name} 的事…', { name: project.name })}
+              </Button>
+            ) : (
+              <ArchivedProjectBar state={archived} className="mt-5 w-full max-w-160" />
+            )}
             <div className="mt-8 grid grid-cols-[minmax(0,1fr)_20rem] gap-6 max-[960px]:grid-cols-1">
               <section aria-label="Threads">
                 {own.length === 0 ? (
@@ -221,17 +233,39 @@ export function ProjectHome({
               <aside className="flex flex-col gap-4">
                 <ListCard>
                   <CardHead
-                    icon={<BookText className="size-3.5" />}
+                    icon={<BookText className="size-4" />}
                     title={t('项目说明')}
                     action={
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        className="text-meta text-content-secondary"
-                        render={<Link to={`/app/project/${project.id}/settings`} />}
-                      >
-                        {t('编辑')}
-                      </Button>
+                      archived === null ? (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          className="text-meta text-content-secondary"
+                          render={<Link to={`/app/project/${project.id}/settings`} />}
+                        >
+                          {t('编辑')}
+                        </Button>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <Button
+                                variant="ghost"
+                                size="xs"
+                                data-testid="project-home-edit-blocked"
+                                aria-disabled
+                                aria-description={t(ARCHIVED_PROJECT_WRITE_REASON)}
+                                className="cursor-not-allowed text-meta text-content-tertiary hover:bg-transparent"
+                              />
+                            }
+                          >
+                            {t('编辑')}
+                          </TooltipTrigger>
+                          <TooltipContent side="top" sideOffset={6}>
+                            {t(ARCHIVED_PROJECT_WRITE_REASON)}
+                          </TooltipContent>
+                        </Tooltip>
+                      )
                     }
                   />
                   {project.instructions != null && project.instructions !== '' ? (
@@ -250,13 +284,13 @@ export function ProjectHome({
                   )}
                 </ListCard>
                 <ListCard>
-                  <CardHead icon={<Brain className="size-3.5" />} title={t('项目记忆')} />
+                  <CardHead icon={<Brain className="size-4" />} title={t('项目记忆')} />
                   <CardNote>
                     {t('Coordinator 在本项目学到的事会记在这里，默认只在本项目内使用。即将上线。')}
                   </CardNote>
                 </ListCard>
                 <ListCard>
-                  <CardHead icon={<Layers className="size-3.5" />} title={t('定时任务')} />
+                  <CardHead icon={<Layers className="size-4" />} title={t('定时任务')} />
                   {ownSchedules.length === 0 ? (
                     <CardNote>{t('没有定时任务')}</CardNote>
                   ) : (
@@ -286,7 +320,7 @@ export function ProjectHome({
                 <ListCard>
                   <Link to={SECRETS_HREF} className="text-inherit no-underline">
                     <ListRow
-                      icon={<KeyRound className="size-4" />}
+                      icon={<KeyRound className="size-5" />}
                       title={t('密钥')}
                       subtitle={t('目前用团队密钥')}
                     />
@@ -296,7 +330,7 @@ export function ProjectHome({
                     className="text-inherit no-underline"
                   >
                     <ListRow
-                      icon={<Gauge className="size-4" />}
+                      icon={<Gauge className="size-5" />}
                       title={t('并发与优先级')}
                       subtitle={t('目前跟随机器上限')}
                     />

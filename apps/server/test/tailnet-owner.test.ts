@@ -91,12 +91,15 @@ test('A1: forged identity over TCP loopback cannot authenticate', async () => {
   expect(response.status).toBe(401);
 });
 
-test('A2: owner identity gets teams without a token and reports the signed-in login', async () => {
+test('A2: owner identity no longer gets teams or a signed-in login', async () => {
   const s = await setup();
-  expect((await call(s.socketPath, '/api/teams')).status).toBe(200);
-  expect((await call(s.socketPath, '/api/remote/identity')).body).toEqual({
-    login: LOGIN,
-    via: 'tailscale',
+  expect((await call(s.socketPath, '/api/teams')).status).toBe(401);
+  expect(
+    (await call(s.socketPath, '/api/remote/identity', 'GET', { authorization: `Bearer ${TOKEN}` }))
+      .body,
+  ).toEqual({
+    login: null,
+    via: null,
   });
 });
 
@@ -113,11 +116,11 @@ test.each(['other@example.com', 'sharee@example.com', ''])(
 test.each<Record<string, string>>([
   {},
   { 'sec-fetch-site': 'cross-site', origin: 'https://evil.example' },
-])('A5: unsafe ambient requests fail CSRF with %j', async (headers) => {
+])('A5: identity is not an owner session, so pairing is refused with %j', async (headers) => {
   const s = await setup();
   expect(
     (await call(s.socketPath, '/api/remote/pairing', 'POST', { ...identity, ...headers })).status,
-  ).toBe(403);
+  ).toBe(401);
   expect(
     (
       await call(
@@ -128,7 +131,7 @@ test.each<Record<string, string>>([
         { enrollId: 'missing' },
       )
     ).status,
-  ).toBe(403);
+  ).toBe(401);
 });
 
 test.each(['cross-site', 'same-site'])(
@@ -138,17 +141,17 @@ test.each(['cross-site', 'same-site'])(
     expect(
       (await call(s.socketPath, '/api/teams', 'GET', { ...identity, 'sec-fetch-site': site }))
         .status,
-    ).toBe(403);
+    ).toBe(401);
   },
 );
 
 test.each<Record<string, string>>([{ 'sec-fetch-site': 'same-origin' }, { origin: ORIGIN }])(
-  'owner can create pairing codes with CSRF proof %j',
+  'identity cannot create pairing codes even with %j',
   async (headers) => {
     const s = await setup();
     expect(
       (await call(s.socketPath, '/api/remote/pairing', 'POST', { ...identity, ...headers })).status,
-    ).toBe(201);
+    ).toBe(401);
   },
 );
 
@@ -174,11 +177,11 @@ test('A6: missing owner metadata fails closed, explicit allowlist is fallback, o
   });
   expect((await call(s.socketPath, '/api/teams')).status).toBe(401);
   s.policy.allowedLogins.push(LOGIN);
-  expect((await call(s.socketPath, '/api/teams')).status).toBe(200);
+  expect((await call(s.socketPath, '/api/teams')).status).toBe(401);
   s.policy.ownerLogin = 'different@example.com';
   expect((await call(s.socketPath, '/api/teams')).status).toBe(401);
   s.policy.selfTagged = true;
-  expect((await call(s.socketPath, '/api/teams')).status).toBe(200);
+  expect((await call(s.socketPath, '/api/teams')).status).toBe(401);
   s.policy.allowedLogins.length = 0;
   expect((await call(s.socketPath, '/api/teams')).status).toBe(401);
 });
@@ -192,7 +195,7 @@ test('A7: an existing socket with widened mode is refused, never repaired or rep
 test('an active private socket is never unlinked by a second listener', async () => {
   const s = await setup();
   await expect(listenOnTailnetSocket(s.app, s.socketPath)).rejects.toThrow(/in use/);
-  expect((await call(s.socketPath, '/api/teams')).status).toBe(200);
+  expect((await call(s.socketPath, '/api/teams')).status).toBe(401);
 });
 
 test('A7: another uid cannot adopt the socket', async () => {
@@ -235,7 +238,7 @@ test.each([
         s.socketPath,
         '/api/machine/enroll/confirm',
         'POST',
-        { ...identity, origin: ORIGIN },
+        { authorization: `Bearer ${TOKEN}`, origin: ORIGIN },
         { enrollId: started.body.enrollId },
       )
     ).status,

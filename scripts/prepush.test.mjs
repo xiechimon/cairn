@@ -71,7 +71,7 @@ for (const [name, paths, expected] of [
     ['docs/verify/1/drive.tsx', 'docs/verify/1/run', 'docs/verify/1/notes.yaml'],
     true,
   ],
-  ['data beside an executable check', ['docs/verify/2136/fixture.json'], true],
+  ['data beside an executable file', ['docs/design/memory-inplace-prototype/fixture.json'], true],
   [
     'the #2188 lessons and evidence change',
     [
@@ -583,7 +583,7 @@ test('local code checks retain fast checks and advisory dead-class', () => {
     'pnpm typecheck',
     'pnpm spec:parse',
     'node scripts/e2e-affected.mjs --check-coverage',
-    'node --test docs/verify/1542/reach.test.mjs',
+    'node --test scripts/probe-reach.test.mjs',
   ])
     assert.ok(commands.includes(command), command);
 });
@@ -626,7 +626,7 @@ test('code changes keep suites in CI and out of local plans', () => {
         ['pnpm', 'typecheck'],
         ['pnpm', 'spec:parse'],
         ['node', 'scripts/e2e-affected.mjs', '--check-coverage'],
-        ['node', '--test', 'docs/verify/1542/reach.test.mjs'],
+        ['node', '--test', 'scripts/probe-reach.test.mjs'],
         ['node', '--test', 'scripts/escape-trace.test.mjs'],
         ['node', 'scripts/escape-trace.mjs', 'validate-cases', 'integration/eval/review/cases'],
         ['node', '--test', 'scripts/review-escapes.test.mjs'],
@@ -677,7 +677,7 @@ test('executable evidence keeps code checks and data evidence keeps document rea
 });
 
 test('a docs-only data change still runs every test that reads the changed file', () => {
-  const data = 'docs/verify/920/wire-new/manifest-new.json';
+  const data = 'docs/ops/agent-bot-identity.md';
   assert.deepEqual(prepushPlan(['docs/lessons/README.md', data], 'ci'), [
     ['node', 'scripts/english-only-gate.mjs'],
     ['node', 'scripts/public-content-gate.mjs'],
@@ -695,7 +695,7 @@ test('a docs-only data change still runs every test that reads the changed file'
         return result.status === 0 ? result.stdout.split('\n').filter(Boolean) : [];
       },
       [],
-    ).vitest.includes('apps/daemon/test/skills-version-skew.test.ts'),
+    ).vitest.includes('apps/server/test/codeowners.test.ts'),
   );
 });
 

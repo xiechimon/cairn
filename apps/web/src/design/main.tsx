@@ -5,7 +5,7 @@ import { TooltipProvider } from '../components/ui/tooltip.js';
 import { I18nProvider } from '../i18n/provider.js';
 import { trackPointerFocus } from '../pointer-focus.js';
 import { safeLocalStorage } from '../safe-storage.js';
-import { readStoredTheme } from '../theme.js';
+import { resolveStoredTheme } from '../theme.js';
 import '../styles/fonts.css';
 import '../styles/motion.css';
 import '../styles/app.css';
@@ -14,7 +14,7 @@ import { readGalleryParams } from './gallery-params.js';
 
 trackPointerFocus();
 const params = readGalleryParams(window.location.search);
-const theme = params.theme ?? readStoredTheme(safeLocalStorage());
+const theme = params.theme ?? resolveStoredTheme(safeLocalStorage());
 document.documentElement.classList.toggle('light', theme === 'light');
 
 const container = document.getElementById('root');

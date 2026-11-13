@@ -8,9 +8,11 @@ for (const theme of ['light', 'dark'] as const) {
       reducedMotion: 'reduce',
     });
 
-    test('sheet border and conversation divider remain visible at one CSS pixel', async ({ page }) => {
+    test('sheet hairline and conversation divider remain visible at one CSS pixel', async ({ page }) => {
       await page.goto('/app?scenario=home-c&thread=home-c-review');
       await expect(page.getByTestId('side-chat')).toBeVisible();
+      await page.getByTestId('sidebar-reopen').click();
+      await expect(page.locator('.board-sidebar')).toBeVisible();
       const lines = await page.evaluate(() => {
         const sheet = document.querySelector('.board-sheet');
         const panel = document.querySelector('.side-panel');
@@ -40,13 +42,13 @@ for (const theme of ['light', 'dark'] as const) {
           visible: divider.visibility === 'visible' && divider.display !== 'none' && divider.opacity === '1',
         };
       });
-      expect.soft(lines.widths).toEqual(['1px', '1px', '1px', '1px']);
-      expect.soft(lines.colors).toEqual(Array(4).fill(lines.color));
-      expect.soft(lines.styles).toEqual(Array(4).fill('solid'));
+      expect.soft(lines.widths).toEqual(['0px', '0px', '0px', '1px']);
+      expect.soft(lines.colors[3]).toBe(lines.color);
+      expect.soft(lines.styles[3]).toBe('solid');
       expect.soft(lines.color).not.toMatch(/transparent|rgba\([^)]*, 0\)/);
       expect.soft(lines.color).not.toBe(lines.cardBackground);
       expect.soft(lines.color).not.toBe(lines.panelBackground);
-      expect.soft(lines.radius).toBe('12px');
+      expect.soft(lines.radius).toBe('0px');
       expect.soft(lines.dividerWidth).toBe('1px');
       expect.soft(lines.dividerColor).toBe(lines.color);
       expect.soft(lines.dividerStyle).toBe('solid');
@@ -55,9 +57,11 @@ for (const theme of ['light', 'dark'] as const) {
       expect(lines.visible).toBe(true);
     });
 
-    test('sidebar and inset sheet share one unpainted canvas gutter', async ({ page }) => {
+    test('the flat sheet meets the sidebar edge to edge with no gutter', async ({ page }) => {
       await page.goto('/app?scenario=home-c&thread=home-c-review');
       await expect(page.getByTestId('side-chat')).toBeVisible();
+      await page.getByTestId('sidebar-reopen').click();
+      await expect(page.locator('.board-sidebar')).toBeVisible();
       const canvas = await page.evaluate(() => {
         const sidebar = document.querySelector('.board-sidebar');
         const sheet = document.querySelector('.board-sheet');
@@ -84,12 +88,11 @@ for (const theme of ['light', 'dark'] as const) {
           panelBottom: panel.getBoundingClientRect().bottom - card.bottom,
         };
       });
-      expect.soft(canvas.gutter).toBe(canvas.sidebar);
-      expect.soft(canvas.gap).toBe(8);
-      expect.soft([canvas.top, canvas.bottom, canvas.right]).toEqual([8, 8, 8]);
+      expect.soft(canvas.gap).toBe(0);
+      expect.soft([canvas.top, canvas.bottom, canvas.right]).toEqual([0, 0, 0]);
       expect.soft(canvas.shadow).toBe('none');
       expect.soft(canvas.panelShadow).toBe('none');
-      expect([canvas.panelTop, canvas.panelBottom]).toEqual([9, -1]);
+      expect([canvas.panelTop, canvas.panelBottom]).toEqual([0, 0]);
     });
   });
 }
@@ -104,9 +107,9 @@ for (const theme of ['light', 'dark'] as const) {
       for (const thread of [false, true]) {
         if (thread) {
           await page.goto('/app?scenario=home-c&thread=home-c-review');
-          await expect(page.getByTestId('side-chat-action')).toBeVisible();
+          await expect(page.locator('.side-panel .composer')).toBeVisible();
         }
-        const clipped = await page.locator('[data-slot="thread-card"], [data-slot="task-card"], .chief-composer, .side-panel .composer, [data-testid="side-chat-action"], .side-panel [data-trace-card]').evaluateAll((nodes) => {
+        const clipped = await page.locator('[data-slot="thread-card"], [data-testid="chief-task-ref"], .chief-composer, .side-panel .composer, [data-testid="side-chat-action"], .side-panel [data-trace-card]').evaluateAll((nodes) => {
           const failures: string[] = [];
           for (const node of nodes) {
             const box = node.getBoundingClientRect();

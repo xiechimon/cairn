@@ -30,21 +30,28 @@ function visibleComposeTarget(): HTMLTextAreaElement | null {
   return usable[0] ?? null;
 }
 
-export function useTypeToCompose(): void {
+export function useTypeToFocus(
+  fieldNow: () => HTMLInputElement | HTMLTextAreaElement | null,
+  blocked: () => boolean,
+): void {
   useLayoutEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (!isTypedCharacter(event)) return;
       if (isEditableTarget(event.target)) return;
-      if (blockingLayerOpen()) return;
-      const target = visibleComposeTarget();
-      if (target === null) return;
-      target.focus({ preventScroll: true });
-      const end = target.value.length;
-      target.setSelectionRange(end, end);
+      if (blocked()) return;
+      const field = fieldNow();
+      if (field === null) return;
+      field.focus({ preventScroll: true });
+      const end = field.value.length;
+      field.setSelectionRange(end, end);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [fieldNow, blocked]);
+}
+
+export function useTypeToCompose(): void {
+  useTypeToFocus(visibleComposeTarget, blockingLayerOpen);
 }

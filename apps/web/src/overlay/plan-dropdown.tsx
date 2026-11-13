@@ -68,9 +68,9 @@ export function PaneViewButtons({
           )}
         >
           {view === 'plan' ? (
-            <FileText width={15} height={15} />
+            <FileText width={18} height={18} />
           ) : (
-            <DiffSquare width={15} height={15} />
+            <DiffSquare width={18} height={18} />
           )}
         </Button>
       ))}

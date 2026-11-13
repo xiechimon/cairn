@@ -21,7 +21,7 @@ async function open(page: Page) {
 
 const rows = (page: Page) => page.locator('aside [data-slot="sidebar-project-row"]');
 
-test('archive takes the project out of the sidebar with no archived section', async ({ page }) => {
+test('archive takes the project out of the sidebar and leaves the list on the active view', async ({ page }) => {
   const calls = await open(page);
   await expect(rows(page)).toHaveCount(2);
   await rows(page).filter({ hasText: 'probe-old' }).hover();
@@ -29,7 +29,7 @@ test('archive takes the project out of the sidebar with no archived section', as
   await page.getByRole('menuitem', { name: '归档' }).click();
   await expect(rows(page).filter({ hasText: 'probe-old' })).toHaveCount(0);
   await expect(rows(page)).toHaveCount(1);
-  await expect(page.locator('aside')).not.toContainText('已归档');
+  await expect(page.getByTestId('sidebar-archived-page')).toHaveCount(0);
   expect(calls).toEqual(['/api/projects/proj-2/archive']);
 });
 
@@ -54,4 +54,15 @@ test('archiving never issues a delete', async ({ page }) => {
   await page.getByRole('menuitem', { name: '归档' }).click();
   await expect(rows(page).filter({ hasText: 'probe-old' })).toHaveCount(0);
   expect(deletes).toEqual([]);
+});
+
+test('archive toast names the project and Undo brings it back', async ({ page }) => {
+  const calls = await open(page);
+  await rows(page).filter({ hasText: 'probe-old' }).hover();
+  await page.getByRole('button', { name: 'probe-old 的菜单' }).click();
+  await page.getByRole('menuitem', { name: '归档' }).click();
+  await expect(page.getByText('已归档「probe-old」')).toBeVisible();
+  await page.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(rows(page).filter({ hasText: 'probe-old' })).toHaveCount(1);
+  expect(calls).toEqual(['/api/projects/proj-2/archive', '/api/projects/proj-2/unarchive']);
 });

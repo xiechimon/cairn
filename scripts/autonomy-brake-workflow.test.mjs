@@ -17,7 +17,7 @@ function runStep(t, file, name, env) {
   writeFileSync(calls, '');
   writeFileSync(
     join(dir, 'node'),
-    `#!/bin/sh\necho "$*" >> "$CALLS"\ncase "$*" in\n *status) echo '{"paused":'"$PAUSED"'}';;\n *check-pr*) if [ "$PAUSED" = true ]; then exit "$RECOVERY_EXIT"; fi;;\n *verify-recovery*) exit "$RECOVERY_EXIT";;\nesac\n`,
+    `#!/bin/sh\necho "$*" >> "$CALLS"\ncase "$*" in\n *status) echo '{"paused":'"$PAUSED"'}';;\n *check-pr*) if [ "$PAUSED" = true ]; then exit "$RECOVERY_EXIT"; fi;;\n *verify-recovery*) exit "$RECOVERY_EXIT";;\n *rerun-failed*) if [ "$RERUN_EXIT" = 1 ]; then exit 1; fi;;\nesac\n`,
     { mode: 0o755 },
   );
   writeFileSync(join(dir, 'git'), '#!/bin/sh\necho base-brake\n', { mode: 0o755 });
@@ -72,6 +72,8 @@ test('a cancelled main ci run does not pause or sweep', (t) => {
     EVENT_NAME: 'workflow_run',
     CONCLUSION: 'cancelled',
     HEAD_BRANCH: 'main',
+    RUN_ATTEMPT: '1',
+    RUN_ID: '43087659803',
   });
   assert.equal(f.result.status, 0, f.result.stderr);
   assert.equal(f.calls(), '');
@@ -108,6 +110,57 @@ test('failed main workflow pauses and synchronizes the brake', (t) => {
   assert.equal(f.result.status, 0, f.result.stderr);
   assert.match(f.calls(), /pause --reason.*abc.*https:\/\/example.com\/run/);
 });
+for (const conclusion of ['failure', 'timed_out', 'startup_failure', 'action_required'])
+  test(`attempt 1 ${conclusion} reruns failed jobs and does not pause`, (t) => {
+    const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+      EVENT_NAME: 'workflow_run',
+      CONCLUSION: conclusion,
+      HEAD_BRANCH: 'main',
+      FAILED_SHA: 'abc',
+      RUN_URL: 'https://example.com/run',
+      RUN_ATTEMPT: '1',
+      RUN_ID: '43087659803',
+    });
+    assert.equal(f.result.status, 0, f.result.stderr);
+    assert.match(f.calls(), /rerun-failed --run 43087659803 --sha abc/);
+    assert.doesNotMatch(f.calls(), /pause --reason/);
+    assert.doesNotMatch(f.calls(), /(?:^|\n)run rerun/);
+  });
+for (const attempt of ['2', '3'])
+  test(`attempt ${attempt} of the same SHA pauses without another rerun`, (t) => {
+    const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+      EVENT_NAME: 'workflow_run',
+      CONCLUSION: 'failure',
+      HEAD_BRANCH: 'main',
+      FAILED_SHA: 'abc',
+      RUN_URL: 'https://example.com/run',
+      RUN_ATTEMPT: attempt,
+      RUN_ID: '43087659803',
+    });
+    assert.equal(f.result.status, 0, f.result.stderr);
+    assert.match(f.calls(), /pause --reason.*abc.*https:\/\/example.com\/run/);
+    assert.doesNotMatch(f.calls(), /rerun-failed/);
+  });
+test('a failed first rerun still pauses', (t) => {
+  const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+    EVENT_NAME: 'workflow_run',
+    CONCLUSION: 'failure',
+    HEAD_BRANCH: 'main',
+    FAILED_SHA: 'abc',
+    RUN_URL: 'https://example.com/run',
+    RUN_ATTEMPT: '1',
+    RUN_ID: '43087659803',
+    RERUN_EXIT: '1',
+  });
+  assert.equal(f.result.status, 0, f.result.stderr);
+  assert.match(f.calls(), /rerun-failed --run 43087659803 --sha abc/);
+  assert.match(f.calls(), /pause --reason.*abc.*https:\/\/example.com\/run/);
+});
+test('the workflow forwards run_attempt and the run id', () => {
+  const text = readFileSync('.github/workflows/autonomy-brake.yml', 'utf8');
+  assert.match(text, /RUN_ATTEMPT: \$\{\{ github\.event\.workflow_run\.run_attempt \}\}/);
+  assert.match(text, /RUN_ID: \$\{\{ github\.event\.workflow_run\.id \}\}/);
+});
 for (const valid of [false, true])
   test(`paused PR recovery=${valid} gates and disarms correctly`, (t) => {
     const f = runStep(t, '.github/workflows/pr-evidence.yml', 'Check the autonomy brake', {
@@ -117,7 +170,7 @@ for (const valid of [false, true])
     });
     assert.equal(f.result.status, valid ? 0 : 1, f.result.stderr);
     const disarm = readFileSync('.github/workflows/pr-evidence.yml', 'utf8')
-      .split('      - name: Mark the decision pending and disarm auto-merge')[1]
+      .split('      - name: Disarm auto-merge while the autonomy brake is on')[1]
       .split('        run: |\n')[1]
       .replace(/^ {10}/gm, '');
     const r = spawnSync('bash', ['-e', '-c', disarm], {
@@ -139,7 +192,8 @@ test('required check shape retains unconditional job, trigger coverage, and brak
   assert.ok(
     text.indexOf('name: Check the autonomy brake') < text.indexOf('name: Check PR body evidence'),
   );
-  assert.match(text, /hold\.flag.*autonomy-paused\.flag/);
+  assert.match(text, /if \[ ! -f autonomy-paused\.flag \]; then/);
+  assert.doesNotMatch(text, /hold\.flag|coordinator-hold/);
 });
 
 test('paused schedule sweeps and workflow permissions and triggers retain the outage path', (t) => {

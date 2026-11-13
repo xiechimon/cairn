@@ -114,7 +114,8 @@ for (const width of [360, 390]) {
 
     test('M7 审批弹层：合并对话框在视口内可关', async ({ page }) => {
       await page.goto(DETAIL_REVIEW);
-      await page.getByTestId('side-chat-action').getByRole('button').last().click();
+      await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
+      await page.getByRole('menuitem', { name: '完成' }).click();
       const dialog = page.getByRole('dialog', { name: '完成任务' });
       await expect(dialog).toBeVisible();
       const box = (await dialog.boundingBox()) as {

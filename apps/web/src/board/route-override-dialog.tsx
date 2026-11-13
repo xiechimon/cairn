@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useMachines, useMcpServers } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { useRoutingSettings } from '../api/routing-settings.js';
 import { MachineName, machineLabel } from '../components/machine-label.js';
 import {
   SETTINGS_HINT_CLS,
@@ -67,7 +68,10 @@ export function RouteOverrideDialog({
   const mutations = useApiMutations(teamId);
   const active = open === true;
   const machinesQ = useMachines(teamId, live && active);
+  const routingQ = useRoutingSettings(teamId, live && active);
   const mcpQ = useMcpServers(teamId, live && active);
+  const sessionHasMachine =
+    routingQ.data?.rules?.some((rule) => rule.use === 'session' && rule.machineId != null) === true;
   const [machineId, setMachineId] = useState<string | null>(initial?.machineId ?? null);
   const [requireOrb, setRequireOrb] = useState(initial?.requiredCapabilities?.executor === 'orb');
   const [mcpServers, setMcpServers] = useState<string[]>(
@@ -154,14 +158,16 @@ export function RouteOverrideDialog({
               >
                 <SelectValue>
                   {machineId === null
-                    ? t('不固定')
+                    ? t(machines.length > 1 && !sessionHasMachine ? '选择机器' : '不固定')
                     : pickedMachine === undefined
                       ? machineId
                       : machineLabel(pickedMachine, machines)}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={null}>{t('不固定')}</SelectItem>
+                {machines.length > 1 && !sessionHasMachine ? null : (
+                  <SelectItem value={null}>{t('不固定')}</SelectItem>
+                )}
                 {machines.map((machine) => (
                   <SelectItem key={machine.id} value={machine.id}>
                     <MachineName machine={machine} all={machines} />

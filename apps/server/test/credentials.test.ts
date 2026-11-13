@@ -65,6 +65,7 @@ async function withRoutedStack(
   const todoDoc = (await (
     await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title: '跑任务', spec: '' })
   ).json()) as { id: string };
+  insertMachine(s);
   const builds = startBuilds(
     { db: s.db, hub: s.hub, user: s.user },
     {

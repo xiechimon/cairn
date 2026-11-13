@@ -35,6 +35,10 @@ function row(id: string) {
   return H.s.db.select().from(todo).where(eq(todo.id, id)).get()!;
 }
 
+function retarget(id: string, machineId: string) {
+  H.s.db.update(todo).set({ routeOverride: { machineId } }).where(eq(todo.id, id)).run();
+}
+
 function sessions(id: string) {
   const latest = row(id).latestBuildId;
   if (latest === null) return [];
@@ -212,6 +216,25 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
     expect(row(id).blockedBy ?? []).toEqual([]);
   });
 
+  test('create_todo with two online machines and no pin creates nothing', async () => {
+    const before = H.s.db.select().from(todo).all().length;
+    H.s.db
+      .insert(machine)
+      .values({
+        ...readyMachine({
+          teamId: H.teamId,
+          name: 'second-online',
+          cliVersion: '0.1.0',
+        }),
+        id: 'second-online',
+        online: true,
+      })
+      .run();
+    H.s.db.update(machine).set({ online: true }).where(eq(machine.teamId, H.teamId)).run();
+    await expect(create()).rejects.toMatchObject({ status: 409 });
+    expect(H.s.db.select().from(todo).all()).toHaveLength(before);
+  });
+
   test('create_todo with an invalid blockedBy creates nothing', async () => {
     const before = H.s.db.select().from(todo).all().length;
     await expect(create({ blockedBy: ['missing-task'] })).rejects.toMatchObject({ status: 400 });
@@ -276,6 +299,7 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
         .run();
       seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
       seedRoute(H.s, 'review', { provider: 'stub-gw', modelId: 'stub-model', machineId });
+      retarget(id, machineId);
       const [session] = sessions(id);
       H.s.db.update(step).set({ kind }).where(eq(step.id, session!.id)).run();
       applyQuotaWaitStep(toolDeps(), sessions(id)[0]!, {
@@ -325,6 +349,7 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
       .where(eq(step.id, session!.id))
       .run();
     await relay('update_todo', { todoId: id, blockedBy: [blocker] });
+    H.s.db.update(todo).set({ routeOverride: null }).where(eq(todo.id, id)).run();
     refreshClaudeRateParks(
       {
         ...H.s.svc,
@@ -364,6 +389,7 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
         .run();
       seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
       seedRoute(H.s, 'review', { provider: 'stub-gw', modelId: 'stub-model', machineId });
+      retarget(id, machineId);
       H.s.db
         .update(step)
         .set({ kind })
@@ -430,6 +456,7 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
         .run();
       seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
       seedRoute(H.s, 'review', { provider: 'stub-gw', modelId: 'stub-model', machineId });
+      retarget(id, machineId);
       const pending = sessions(id)[0]!;
       H.s.db
         .update(step)

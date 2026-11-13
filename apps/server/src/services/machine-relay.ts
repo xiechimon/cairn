@@ -25,10 +25,17 @@ import {
 } from './chief-questions.js';
 import { executeChiefTool, executeWorkerMemoryTool } from './chief-tools.js';
 import { steeredMessageScopes } from './chief-turns.js';
+import {
+  capturePreCallWorld,
+  captureToolResult,
+  existingTurnCapture,
+  isCaptureTool,
+} from './coordinator-turn-capture.js';
 import { projectOfTodo } from './git.js';
 import { resolveProjectGithubLabelIds } from './github-labels.js';
 import { forwardComputerCall } from './machine-computer.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
+import { refuseMailTurnTool } from './mail.js';
 import { stepScopeProjectId } from './picked-project.js';
 import {
   coordinatorProfile,
@@ -51,6 +58,7 @@ export async function machineAsk(
   opts: { holdMs: number; signal?: AbortSignal } = { holdMs: ASK_HOLD_MS },
 ): Promise<MachineAskResponse> {
   const row = ownedStep(deps, machineId, stepId);
+  refuseMailTurnTool(row.prompt, 'ask_user');
   if (row.kind === 'session') {
     return askWorkerQuestion(deps, row, body, opts);
   }
@@ -100,7 +108,8 @@ export async function executeRelayToolCall(
   signal?: AbortSignal,
 ): Promise<string> {
   const row = ownedStep(deps, machineId, stepId);
-  if (isComputerBrowserTool(name)) {
+  refuseMailTurnTool(row.prompt, name);
+  if (isComputerBrowserTool(name) || name === 'request_takeover') {
     if (row.kind !== 'chief') {
       throw new HttpError(400, 'browser tools require a chief step');
     }
@@ -152,39 +161,54 @@ export async function executeRelayToolCall(
   if (!threadRow) throw new NotFoundError(`chief thread ${threadId}`);
   const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
   if (!chiefRow) throw new NotFoundError(`chief ${threadRow.chiefId}`);
-  return executeChiefTool(
-    {
-      db: deps.db,
-      hub: deps.hub,
-      machineHub: deps.machineHub,
-      box: deps.box,
-      githubAppTokenSocket: deps.githubAppTokenSocket,
-      githubAppIdentity: deps.githubAppIdentity,
-      user: deps.user,
-      vapidKeys: deps.vapidKeys,
-      reposDir: deps.reposDir,
-      workspacesDir: deps.workspacesDir,
-      attachmentsDir: deps.attachmentsDir,
-      skillsDir: deps.skillsDir,
-      ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
-      ...(deps.mcpConfigPath !== undefined ? { mcpConfigPath: deps.mcpConfigPath } : {}),
-      ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
-    },
-    {
-      teamId: threadRow.teamId,
-      userId: threadRow.userId,
-      chiefId: chiefRow.id,
-      threadId,
-      chiefAgentId: coordinatorProfile(deps.db, threadRow.teamId)?.id ?? null,
-      conversationId: threadId,
-      turnPrompt: row.prompt,
-      turnMessageIds: row.ownerMessageIds ?? [],
-      turnScopeProjectId: stepScopeProjectId(row),
-      turnScopeMixed: steeredFromAnotherScope(deps, row),
-    },
-    name,
-    params,
-  );
+  const tool = isCaptureTool(name) ? name : undefined;
+  const captured = tool !== undefined ? existingTurnCapture(stepId) : undefined;
+  if (captured !== undefined && tool !== undefined)
+    capturePreCallWorld(deps.db, stepId, threadRow.teamId, tool, toolCallId, params);
+  let result: string;
+  try {
+    result = await executeChiefTool(
+      {
+        db: deps.db,
+        hub: deps.hub,
+        machineHub: deps.machineHub,
+        box: deps.box,
+        githubAppTokenSocket: deps.githubAppTokenSocket,
+        githubAppIdentity: deps.githubAppIdentity,
+        user: deps.user,
+        vapidKeys: deps.vapidKeys,
+        reposDir: deps.reposDir,
+        workspacesDir: deps.workspacesDir,
+        attachmentsDir: deps.attachmentsDir,
+        skillsDir: deps.skillsDir,
+        ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
+        ...(deps.mcpConfigPath !== undefined ? { mcpConfigPath: deps.mcpConfigPath } : {}),
+        ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
+      },
+      {
+        teamId: threadRow.teamId,
+        userId: threadRow.userId,
+        chiefId: chiefRow.id,
+        threadId,
+        chiefAgentId: coordinatorProfile(deps.db, threadRow.teamId)?.id ?? null,
+        conversationId: threadId,
+        turnPrompt: row.prompt,
+        turnMessageIds: row.ownerMessageIds ?? [],
+        turnScopeProjectId: stepScopeProjectId(row),
+        turnScopeMixed: steeredFromAnotherScope(deps, row),
+      },
+      name,
+      params,
+    );
+  } catch (error) {
+    if (captured !== undefined && tool !== undefined)
+      captureToolResult(stepId, tool, {
+        toolError: error instanceof Error ? error.message : String(error),
+      });
+    throw error;
+  }
+  if (captured !== undefined && tool !== undefined) captureToolResult(stepId, tool, result);
+  return result;
 }
 
 export function steeredFromAnotherScope(deps: MachineDeps, row: typeof step.$inferSelect): boolean {

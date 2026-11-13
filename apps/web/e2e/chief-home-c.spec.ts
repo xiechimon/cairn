@@ -8,17 +8,23 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
 });
 
-test('the home is one Coordinator conversation: serif greeting, the conversation with task cards, and the composer, with no in-progress pill', async ({
+test('the home is one Coordinator conversation: no greeting once it has messages, the conversation with task references, and the composer, with no in-progress pill', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
-  const greeting = page.getByTestId('home-c').getByRole('heading', { level: 2 }).first();
-  await expect(greeting).toHaveCSS('font-family', /sourceSerif4/);
-  await expect(page.getByTestId('home-c-since')).toContainText('3 waiting on you · 3 in progress');
+  await expect(page.getByTestId('chief-stream')).toBeVisible();
+  await expect(page.getByTestId('home-c').locator('.voice-greeting')).toHaveCount(0);
+  await expect(page.getByTestId('home-c-since')).toHaveCount(0);
+  await expect(page.getByTestId('tasks-badge')).toHaveText('3');
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
-  await expect(page.getByTestId('chief-stream').locator('[data-slot="task-card"]')).toHaveCount(2);
+  await expect(page.getByTestId('chief-stream').getByTestId('chief-task-ref')).toHaveText([
+    /^Orb canary round 7/,
+    /^Fold finished turns into purpose and duration/,
+  ]);
+  await expect(page.getByTestId('chief-stream').locator('[data-slot="task-card"]')).toHaveCount(0);
   await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
-  await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question-dock')).toBeVisible();
+  await expect(page.getByTestId('chief-stream').getByTestId('chief-question')).toBeVisible();
+  await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question')).toHaveCount(0);
   await expect(page.getByTestId('chief-stream')).toContainText('Run the orb canary until it passes');
   await expect(page.getByTestId('in-progress-pill')).toHaveCount(0);
   await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('Coordinator');
@@ -52,30 +58,31 @@ test('the Tasks panel lists running threads and a running row opens its thread',
   await expect(page.getByTestId('side-chat')).toContainText('Push for finished threads');
 });
 
-test('the sidebar lists project names only, and the project chat filters the task cards and the conversation', async ({
+test('the sidebar lists project names only, and the project chat filters the task references and the conversation', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
   const rows = page.locator('[data-slot="sidebar-project-row"]');
   await expect(rows).toHaveCount(2);
   await rows.filter({ hasText: 'cairn' }).click();
-  await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}`));
-  await expect(page.getByTestId('project-home')).toBeVisible();
-  await page.goto(home('home-c', `&project=${PROJECT_ID}&chat=1`));
-  await expect(page.getByTestId('home-c-since')).toContainText('2 waiting on you · 2 in progress');
-  const cards = page.getByTestId('chief-stream').locator('[data-slot="task-card"]');
-  await expect(cards).toHaveCount(1);
-  await expect(cards).toContainText('Fold finished turns into purpose and duration');
+  await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}&chat=1`));
+  await expect(page.getByTestId('project-home')).toHaveCount(0);
+  await expect(page.getByTestId('tasks-badge')).toHaveText('2');
+  const refs = page.getByTestId('chief-stream').getByTestId('chief-task-ref');
+  await expect(refs).toHaveCount(1);
+  await expect(refs).toContainText('Fold finished turns into purpose and duration');
   await expect(page.getByTestId('chief-stream')).not.toContainText('Run the orb canary until it passes');
   await expect(page.getByTestId('chief-stream')).toContainText('Fold finished turns before review');
   await expect(composer(page)).toHaveAttribute('placeholder', /in cairn|Type your own answer/);
   await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('cairn');
 });
 
-test('a project link lands on that project home', async ({ page }) => {
+test('a project link lands on that project conversation', async ({ page }) => {
   await page.goto(`/app/project/${PROJECT_ID}?scenario=home-c`);
-  await expect(page).toHaveURL(new RegExp(`/app\\?.*project=${PROJECT_ID}`));
-  await expect(page.getByTestId('project-home')).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/app\\?scenario=home-c&project=${PROJECT_ID}&chat=1$`));
+  await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('cairn');
+  await expect(composer(page)).toBeVisible();
+  await expect(page.getByTestId('project-home')).toHaveCount(0);
 });
 
 test('a first run greets and offers starters, with nothing pinned', async ({ page }) => {
@@ -172,20 +179,11 @@ test('a failed conversation load shows Retry instead of the greeting, with no co
   await expect(composer(page)).toBeVisible();
 });
 
-test('a project chat links to that project home, tasks and settings', async ({ page }) => {
+test('a project chat has no links row above the conversation', async ({ page }) => {
   await page.goto(home('home-c', `&project=${PROJECT_ID}&chat=1`));
-  const links = page.getByTestId('home-c-project-links');
-  await expect(links.getByRole('link', { name: 'Files' })).toHaveCount(0);
-  await links.getByRole('link', { name: 'Tasks' }).click();
-  await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_ID}/tasks`));
-  await page.goBack();
-  await links.getByRole('link', { name: 'Project settings' }).click();
-  await expect(page).toHaveURL(new RegExp(`/app/project/${PROJECT_ID}/settings`));
-  await page.goBack();
-  await links.getByRole('link', { name: 'Project home' }).click();
-  await expect(page.getByTestId('project-home')).toBeVisible();
-  await page.goto(home('home-c'));
+  await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(page.getByTestId('home-c-project-links')).toHaveCount(0);
+  await expect(page.getByTestId('home-c-lead')).toHaveCount(0);
 });
 
 test('the home lands at the newest message', async ({
@@ -207,11 +205,12 @@ test('the tab title carries the Tasks count on every page and the sidebar carrie
   await expect(page).toHaveTitle('(3) Cairn');
 });
 
-test('the earlier-messages divider shows only when the conversation reports earlier messages', async ({
+test('nothing sits above the first loaded message, also when the conversation has earlier messages', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
-  await expect(page.getByTestId('home-c-earlier')).toHaveText('Scroll up for earlier messages');
-  await page.goto(home('home-c-empty'));
-  await expect(page.getByTestId('home-c-earlier')).toHaveCount(0);
+  await expect(page.getByTestId('chief-stream')).toContainText('Run the orb canary until it passes');
+  await expect(page.getByTestId('home-c-lead')).toHaveCount(0);
+  await expect(page.getByTestId('home-c')).not.toContainText('Scroll up for earlier messages');
 });
+

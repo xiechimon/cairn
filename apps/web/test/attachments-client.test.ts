@@ -52,17 +52,16 @@ describe('attachFile local preflight (FM5: rejected means no request sent)', () 
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('size = 0 = rejected (reason=size)', async () => {
+  it('size = 0 passes the local preflight and asks for a grant', async () => {
     const fetchMock = stubFetch();
-    const err = await attachFile({ file: pngFile(0), scope: 'spec' }).catch((e) => e);
-    expect((err as AttachmentError).reason).toBe('size');
-    expect(fetchMock).not.toHaveBeenCalled();
+    await attachFile({ file: pngFile(0), scope: 'spec' }).catch(() => undefined);
+    expect(fetchMock).toHaveBeenCalled();
   });
 
-  it('mime outside the whitelist (application/zip) = rejected (reason=mime, zero fetch calls)', async () => {
+  it('extension outside the allowlist (.exe) = rejected (reason=mime, zero fetch calls)', async () => {
     const fetchMock = stubFetch();
-    const zip = new File([new Uint8Array(10)], 'a.zip', { type: 'application/zip' });
-    const err = await attachFile({ file: zip, scope: 'message' }).catch((e) => e);
+    const exe = new File([new Uint8Array(10)], 'a.exe', { type: 'application/x-msdownload' });
+    const err = await attachFile({ file: exe, scope: 'message' }).catch((e) => e);
     expect((err as AttachmentError).reason).toBe('mime');
     expect(fetchMock).not.toHaveBeenCalled();
   });

@@ -20,9 +20,23 @@ import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { NotFoundError } from './builds.js';
 import { computerCallOwnerUserId } from './computer-access.js';
+import {
+  COMPUTER_HANDOFF_POLL_MS,
+  COMPUTER_HANDOFF_TIMEOUT_MS,
+  clearHandoff,
+  HANDOFF_CLEARED,
+  handoffRefusal,
+  markHandoffIfNone,
+  ownerHoldsControl,
+  pause,
+  TAKEOVER_HANDED_BACK,
+  TAKEOVER_NO_COMPUTER,
+  TAKEOVER_NOT_DONE,
+} from './computer-handoff.js';
 import type { TeamStreamHub } from './events.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { pushToUserSafely } from './push.js';
 
 export const COMPUTER_OUTPUT_HEAD_CHARS = 16 * 1024;
 export const COMPUTER_OUTPUT_TAIL_CHARS = 48 * 1024;
@@ -218,6 +232,14 @@ export function receiveComputerFrames(
     }
     const { patch, pending } = applyFrames(row, fresh, nowMs());
     tx.update(computerCall).set(patch).where(eq(computerCall.id, callId)).run();
+    if (
+      row.computerId !== null &&
+      !cancelled &&
+      isComputerBrowserTool(row.tool) &&
+      fresh.some((frame) => frame.kind === 'done' && frame.loginForm !== undefined)
+    ) {
+      markHandoffIfNone(tx, row.computerId, 'login', row.stepId, nowMs());
+    }
     return {
       response: { ok: true as const, cancelled },
       pending,
@@ -504,6 +526,10 @@ function releaseExecutionLease(db: Db, stepId: string): void {
     .set({ executionStepId: null, executionLeaseExpiresAt: null, updatedAt: nowMs() })
     .where(eq(computer.executionStepId, stepId))
     .run();
+  db.update(computer)
+    .set({ ...HANDOFF_CLEARED, updatedAt: nowMs() })
+    .where(eq(computer.handoffStepId, stepId))
+    .run();
 }
 
 export function stopStepComputer(
@@ -534,6 +560,24 @@ export function stopStepComputer(
   releaseExecutionLease(db, stepId);
 }
 
+function machineAcceptsTool(row: typeof machine.$inferSelect, tool: ComputerTool): boolean {
+  if (isComputerBrowserTool(tool)) {
+    return row.browserOverride !== false && row.capabilities?.browser === true;
+  }
+  return row.desktopOverride !== false && row.capabilities?.computer === true;
+}
+
+function assertMachineGrant(db: Db, machineId: string, tool: ComputerTool): void {
+  const host = db.select().from(machine).where(eq(machine.id, machineId)).get();
+  if (isComputerBrowserTool(tool)) {
+    if (host?.browserOverride === false) throw new HttpError(403, COMPUTER_BROWSER_DISABLED);
+    if (host?.capabilities?.browser !== true)
+      throw new HttpError(403, COMPUTER_BROWSER_UNAVAILABLE);
+  } else if (host?.desktopOverride === false || host?.capabilities?.computer !== true) {
+    throw new HttpError(403, 'Orb desktop tools are off or unavailable for this machine');
+  }
+}
+
 function selectTarget(
   deps: MachineDeps,
   teamId: string,
@@ -551,10 +595,11 @@ function selectTarget(
     .orderBy(desc(machine.lastSeenAt))
     .all()
     .filter(capable);
-  const live = fleet.filter((row) => machineHub.isConnected(row.id));
+  const connected = fleet.filter((row) => machineHub.isConnected(row.id));
+  const live = connected.filter((row) => machineAcceptsTool(row, tool));
 
   if (wantsOwn) {
-    const chosen = live[0];
+    const chosen = connected[0];
     if (chosen) return { machineId: chosen.id, computerId: null };
     throw new HttpError(
       409,
@@ -567,6 +612,7 @@ function selectTarget(
   const scopeKey = `chief:${chiefId}`;
   const existing = db.select().from(computer).where(eq(computer.scopeKey, scopeKey)).get();
   if (existing) {
+    assertMachineGrant(db, existing.machineId, tool);
     if (!machineHub.isConnected(existing.machineId)) {
       throw new HttpError(409, COMPUTER_NOT_CONNECTED);
     }
@@ -574,6 +620,7 @@ function selectTarget(
   }
   const chosen = live[0];
   if (!chosen) {
+    if (connected[0]) assertMachineGrant(db, connected[0].id, tool);
     throw new HttpError(
       409,
       fleet.length === 0
@@ -581,6 +628,7 @@ function selectTarget(
         : COMPUTER_NOT_CONNECTED,
     );
   }
+  assertMachineGrant(db, chosen.id, tool);
   const now = nowMs();
   const id = newRecordId();
   db.insert(computer)
@@ -658,12 +706,112 @@ export const refuseOwnComputerUntilGated: OwnComputerGate = () => {
   throw new HttpError(403, OWN_COMPUTER_UNGATED_MESSAGE);
 };
 
+type HandoffWait = 'handed_back' | 'not_done';
+
+async function holdTakeover(
+  deps: MachineDeps,
+  thread: typeof chiefThread.$inferSelect,
+  stepId: string,
+  body: MachineComputerRelayBody,
+  opts: { signal?: AbortSignal; takeover?: { timeoutMs?: number; pollMs?: number } },
+): Promise<ComputerRelayResult> {
+  const { db } = deps;
+  const target = db
+    .select()
+    .from(computer)
+    .where(eq(computer.scopeKey, `chief:${thread.chiefId}`))
+    .get();
+  if (!target) return { text: TAKEOVER_NO_COMPUTER };
+  const timeoutMs = opts.takeover?.timeoutMs ?? COMPUTER_HANDOFF_TIMEOUT_MS;
+  const pollMs = opts.takeover?.pollMs ?? COMPUTER_HANDOFF_POLL_MS;
+  const now = nowMs();
+  const deadlineAt = now + timeoutMs;
+  acquireExecutionLease(db, target.id, stepId, true, deadlineAt);
+  const callId = computerCallId(stepId, body.toolCallId);
+  db.insert(computerCall)
+    .values({
+      id: callId,
+      teamId: thread.teamId,
+      stepId,
+      toolCallId: body.toolCallId,
+      machineId: target.machineId,
+      computerId: target.id,
+      tool: 'request_takeover',
+      replaySafe: false,
+      params: storedParams(body.params),
+      state: 'running',
+      deadlineAt,
+      createdAt: now,
+      startedAt: now,
+    })
+    .run();
+  markHandoffIfNone(db, target.id, 'model', stepId, now);
+  if (syncObservedComputerState(db, target.id))
+    publishObservedComputerState(db, deps.hub, target.id);
+  const asked = body.params.reason;
+  const reason =
+    typeof asked === 'string' && asked.trim() !== '' ? redact(asked).slice(0, 200) : '';
+  pushToUserSafely(db, deps.vapidKeys ?? null, thread.userId, thread.teamId, {
+    title: 'Login needed',
+    body: reason || 'The Coordinator needs you to take over its computer.',
+    href: `/app?pane=machines&machine=${encodeURIComponent(target.machineId)}&screen=1`,
+    tag: `${thread.userId}:${callId}`,
+  });
+  const atStart = db.select().from(computer).where(eq(computer.id, target.id)).get();
+  const fenceAtStart = atStart?.controlFence;
+  const fenceSteps = atStart !== undefined && ownerHoldsControl(atStart, now) ? 1 : 2;
+  let outcome: HandoffWait = 'not_done';
+  try {
+    for (;;) {
+      const call = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+      const owner = db.select().from(step).where(eq(step.id, stepId)).get();
+      const row = db.select().from(computer).where(eq(computer.id, target.id)).get();
+      if (call?.state !== 'running' || owner?.status !== 'claimed' || !row) break;
+      if (
+        row.controlHolder === 'none' &&
+        fenceAtStart !== undefined &&
+        row.controlFence >= fenceAtStart + fenceSteps
+      ) {
+        outcome = 'handed_back';
+        break;
+      }
+      if (opts.signal?.aborted || nowMs() >= deadlineAt) break;
+      await pause(pollMs, opts.signal);
+    }
+  } finally {
+    const handedBack = outcome === 'handed_back';
+    db.update(computerCall)
+      .set(
+        handedBack
+          ? { state: 'done', resultText: TAKEOVER_HANDED_BACK, finishedAt: nowMs() }
+          : {
+              state: 'error',
+              errorMessage: 'the owner did not finish',
+              errorDelivery: 'not_delivered',
+              finishedAt: nowMs(),
+            },
+      )
+      .where(eq(computerCall.id, callId))
+      .run();
+    clearHandoff(db, target.id);
+    releaseExecutionLease(db, stepId);
+    if (syncObservedComputerState(db, target.id)) {
+      publishObservedComputerState(db, deps.hub, target.id);
+    }
+  }
+  return { text: outcome === 'handed_back' ? TAKEOVER_HANDED_BACK : TAKEOVER_NOT_DONE };
+}
+
 export async function forwardComputerCall(
   deps: MachineDeps,
   machineId: string | null,
   stepId: string,
   body: MachineComputerRelayBody,
-  opts: { signal?: AbortSignal; ownComputerGate?: OwnComputerGate } = {},
+  opts: {
+    signal?: AbortSignal;
+    ownComputerGate?: OwnComputerGate;
+    takeover?: { timeoutMs?: number; pollMs?: number };
+  } = {},
 ): Promise<ComputerRelayResult> {
   const { db } = deps;
   const stepRow = ownedStep(deps, machineId, stepId);
@@ -714,17 +862,18 @@ export async function forwardComputerCall(
     return resultOfRow(existing);
   }
 
-  if (isComputerBrowserTool(tool)) {
-    const scopeKey = `chief:${thread.chiefId}`;
-    const preferred = db.select().from(computer).where(eq(computer.scopeKey, scopeKey)).get();
-    if (preferred === undefined || !preferred.browserEnabled) {
-      throw new HttpError(403, COMPUTER_BROWSER_DISABLED);
-    }
-    const host = db.select().from(machine).where(eq(machine.id, preferred.machineId)).get();
-    if (host?.capabilities?.browser !== true) {
-      throw new HttpError(403, COMPUTER_BROWSER_UNAVAILABLE);
-    }
-  }
+  if (tool === 'request_takeover') return holdTakeover(deps, thread, stepId, body, opts);
+  const refusal = handoffRefusal(
+    db
+      .select()
+      .from(computer)
+      .where(eq(computer.scopeKey, `chief:${thread.chiefId}`))
+      .get(),
+    tool,
+    nowMs(),
+  );
+  if (refusal !== null) return { text: refusal };
+
   const target = selectTarget(deps, thread.teamId, thread.chiefId, tool);
   const now = nowMs();
   const deadlineAt = now + computerDeadlineMs(tool, body.params);

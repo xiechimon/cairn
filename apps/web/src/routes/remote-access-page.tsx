@@ -1,11 +1,13 @@
 import { type PairingCodeResponse, pairingLink } from '@cairn/shared';
-import { useQuery } from '@tanstack/react-query';
 import { Smartphone } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useAuth } from '../api/auth.js';
-import { api } from '../api/client.js';
-import { useRemoteDevices, useRemoteMutations, useRemoteRoutes } from '../api/hooks.js';
+import {
+  usePairingGrants,
+  useRemoteDevices,
+  useRemoteMutations,
+  useRemoteRoutes,
+} from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
 import { QrCode } from '../components/qr-code.js';
@@ -102,16 +104,9 @@ export function RemoteAccessPage() {
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
   const { live } = useLiveData();
-  const auth = useAuth();
-  const identityQ = useQuery({
-    queryKey: ['remoteIdentity', auth.generation],
-    queryFn: () =>
-      api.get<{ login: string | null; via: 'tailscale' | null }>('/api/remote/identity'),
-    enabled: live,
-    refetchInterval: 30_000,
-  });
   const routesQ = useRemoteRoutes(live);
   const devicesQ = useRemoteDevices(live);
+  const grantsQ = usePairingGrants(live);
   const mutations = useRemoteMutations();
   const [pairing, setPairing] = useState<PairingCodeResponse | null>(null);
   const routes = routesQ.data?.routes ?? [];
@@ -121,6 +116,7 @@ export function RemoteAccessPage() {
   const tailnet = routesQ.data?.tailnet;
   const awaitingTailnetLogin = tailnet?.state === 'needs-login' && tailnet.authUrl !== null;
   const devices = devicesQ.data ?? [];
+  const grants = grantsQ.data ?? [];
   const startPairing = () =>
     mutations.createPairingCode.mutate(undefined, {
       onSuccess: setPairing,
@@ -145,16 +141,6 @@ export function RemoteAccessPage() {
         ) : null
       }
     >
-      {identityQ.isSuccess &&
-        identityQ.data.via === 'tailscale' &&
-        identityQ.data.login !== null && (
-          <p
-            className="m-0 mt-3 text-meta break-all text-content-tertiary"
-            data-testid="tailnet-owner-identity"
-          >
-            {t('已通过 Tailscale 登录为 {login}', { login: identityQ.data.login })}
-          </p>
-        )}
       {pairingBlocked && (
         <p className="m-0 mt-3 text-meta text-content-secondary" data-testid="pairing-blocked">
           {t(
@@ -188,6 +174,30 @@ export function RemoteAccessPage() {
                 <RowTitle className="font-mono">{route.url}</RowTitle>
                 <RowDesc>{route.kind === 'tailnet' ? t('Tailscale') : t('局域网')}</RowDesc>
               </RowText>
+            </ResourceRow>
+          ))}
+        </ResourceList>
+      )}
+      {grants.length > 0 && (
+        <ResourceList>
+          {grants.map((grant) => (
+            <ResourceRow key={grant.id}>
+              <RowText>
+                <RowTitle>{t('未使用的配对码')}</RowTitle>
+                <RowDesc>{new Date(grant.expiresAt).toISOString()}</RowDesc>
+              </RowText>
+              <Button
+                variant="ghost"
+                className={DIALOG_PRIMARY_BUTTON}
+                disabled={mutations.revokePairingCode.isPending}
+                onClick={() =>
+                  mutations.revokePairingCode.mutate(grant.id, {
+                    onError: (error) => toastError(t('撤销设备失败，请重试。'), error),
+                  })
+                }
+              >
+                {t('作废配对码')}
+              </Button>
             </ResourceRow>
           ))}
         </ResourceList>

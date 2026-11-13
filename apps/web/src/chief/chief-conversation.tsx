@@ -8,6 +8,7 @@ import {
 } from '@cairn/shared';
 import { TriangleAlert } from 'lucide-react';
 import {
+  Fragment,
   type ReactNode,
   useCallback,
   useEffect,
@@ -23,7 +24,6 @@ import { useLiveData } from '../api/provider.js';
 import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
-import { useLiveSeconds } from '../components/chat/live-row.js';
 import { machineSecondary } from '../components/machine-label.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
@@ -35,41 +35,58 @@ import {
 import {
   MessageScroller,
   MessageScrollerContent,
+  MessageScrollerItem,
   MessageScrollerProvider,
   useMessageScroller,
   useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefContent, ChiefStreamItem, Phase } from '../fixtures/records.js';
-import { useScrollFade } from '../hooks/use-scroll-fade.js';
+import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { ArrowDown } from '../icons/index.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
+import { useFileDrop } from '../overlay/file-drop.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { AnswerComposer } from './answer-composer.js';
+import { type BubbleRun, bubbleRuns } from './bubble-runs.js';
 import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
 import {
   ChiefConnectionBanner,
   ChiefFallbackBanner,
   ChiefOutageBanner,
 } from './chief-outage-banner.js';
-import { ChiefQuestionDock, useAnswerKey, useQuestionDockVisible } from './chief-question-dock.js';
+import { ChiefQuestion, useAnswerKey, useQuestionPending } from './chief-question.js';
+import { foldTaskCards } from './chief-task-refs.js';
 import { serverDraftBinding } from './composer-binding.js';
 import { composerMode } from './composer-mode.js';
 import { ComposerSurface, type ComposerSurfaceHandle } from './composer-surface.js';
+import type { UnsentSends } from './outbox.js';
 import { outstandingReportIds } from './outstanding-reports.js';
 import { questionDockState } from './question-dock-state.js';
 import { awaitingStream } from './question-lifecycle.js';
-import { ReplyQuoteBlock } from './reply-quote-block.js';
-import { type ReplyQuoteDraft, SelectionReply } from './selection-reply.js';
+import { QuickReplies } from './quick-replies.js';
+import { ReplyingToBar } from './reply-quote-block.js';
+import { type ReplyQuoteDraft, ReplySourceHighlightContext } from './reply-source-highlight.js';
 import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
+import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
 const SCROLLER_CONTENT_CLS =
-  'mx-auto block w-full max-w-190 min-w-0 gap-0 px-4 pt-3.5 [overflow-wrap:anywhere]';
+  'mx-auto flex w-full max-w-chat-gutter min-w-0 flex-col justify-end gap-0 overflow-x-clip px-4 pt-8 in-data-[chat-top=under-header]:pt-20 [overflow-wrap:anywhere]';
 
 const THREAD_COMPOSER = 'thread';
+
+function workingRowLast(stream: readonly ChiefStreamItem[]): readonly ChiefStreamItem[] {
+  const at = stream.findIndex((item) => item.kind === 'streaming');
+  const working = stream[at];
+  const after = stream.slice(at + 1);
+  if (working === undefined || after.length === 0 || after.some((item) => item.kind !== 'user'))
+    return stream;
+  return [...stream.slice(0, at), ...after, working];
+}
 
 export const CHIEF_DRAFT_STORAGE_KEY = 'cairn.chief-draft';
 
@@ -101,6 +118,7 @@ export interface ChiefConversationProps {
   onSend?: (text: string) => void | Promise<void>;
   onRewind?: (messageId: string) => void;
   onWithdraw?: (messageId: string) => Promise<void>;
+  unsent?: UnsentSends | undefined;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
   earlier?: EarlierPages;
@@ -118,6 +136,7 @@ export interface ChiefConversationProps {
   composerError?: string | null;
   composerReplacement?: ReactNode;
   composerTools?: ReactNode;
+  composerMenu?: ReactNode;
   targetPlaceholder?: string | null;
   showBindGate?: boolean;
 }
@@ -128,6 +147,7 @@ export function ChiefConversation({
   onSend,
   onRewind,
   onWithdraw,
+  unsent,
   onSteer,
   onStop,
   earlier,
@@ -145,25 +165,33 @@ export function ChiefConversation({
   composerError = null,
   composerReplacement,
   composerTools,
+  composerMenu,
   targetPlaceholder = null,
   showBindGate = true,
 }: ChiefConversationProps) {
-  const questionAttached = useQuestionDockVisible();
-  const { t } = useI18n();
+  const questionPending = useQuestionPending();
+  const { t, locale } = useI18n();
+  const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
+  const [highlightedSource, setHighlightedSource] = useState<ReplyQuoteDraft | null>(null);
+  const quickKey = (chief.quickReplies ?? []).join('\n');
+  const [preview, setPreview] = useState<{ key: string; text: string } | null>(null);
+  const previewReply = preview !== null && preview.key === quickKey ? preview.text : null;
   const composerPlaceholder =
+    previewReply ??
     targetPlaceholder ??
-    (chief.outage != null
-      ? t('可以继续说，Coordinator 恢复后会按顺序处理…')
-      : chief.waitingTurn !== undefined
-        ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
-        : chief.running === true
-          ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
-          : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
+    (replyQuote !== null
+      ? t('回复这条消息')
+      : chief.outage != null
+        ? t('可以继续说，Coordinator 恢复后会按顺序处理…')
+        : chief.waitingTurn !== undefined
+          ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
+          : chief.running === true
+            ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
+            : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const answerHere = targetPlaceholder === null;
   const answerKey = useAnswerKey();
   const [threadOverride, setThreadOverride] = useState(false);
-  const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
   const mode = composerMode({
     answerHere,
     questionPending: answerKey !== null,
@@ -200,6 +228,7 @@ export function ChiefConversation({
     onSend != null ? (files: File[]) => uploadMessageAttachments(files, t) : undefined;
   const { scrollToEnd } = useMessageScroller();
   const followSentRef = useRef(false);
+  const [enteringKey, setEnteringKey] = useState<string | number | null>(null);
   const latestUserKeyRef = useRef<string | number | null>(null);
   const userKeyAtSendRef = useRef<string | number | null>(null);
   const prevThreadRef = useRef(chief.threadTitle);
@@ -212,18 +241,17 @@ export function ChiefConversation({
     null,
   );
   const [toolsOpen, setToolsOpen] = useState<Set<number>>(() => new Set());
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const copyText = useCallback((key: string, text: string) => {
-    const clip = navigator.clipboard;
-    if (!clip) return;
-    void clip.writeText(text).then(
-      () => {
-        setCopiedKey(key);
-        window.setTimeout(() => setCopiedKey((cur) => (cur === key ? null : cur)), 1500);
-      },
-      () => {},
-    );
-  }, []);
+  const copyText = useCallback(
+    (text: string) => {
+      const clip = navigator.clipboard;
+      if (!clip) return;
+      void clip.writeText(text).then(
+        () => toastSuccess(t('已复制')),
+        () => {},
+      );
+    },
+    [t],
+  );
   const toggleTools = useCallback(
     (i: number) =>
       setToolsOpen((cur) => {
@@ -249,6 +277,11 @@ export function ChiefConversation({
   const surfaceRef = useRef<ComposerSurfaceHandle | null>(null);
   const answerSurfaceRef = useRef<ComposerSurfaceHandle | null>(null);
   const activeComposer = answerActive ? answerKey : THREAD_COMPOSER;
+  const drop = useFileDrop(
+    onAttachment === undefined || composerReplacement != null
+      ? undefined
+      : (files) => (answerActive ? answerSurfaceRef : surfaceRef).current?.attach(files),
+  );
   const focusedComposerRef = useRef<string | null>(null);
   const leaveComposer = useCallback(() => {
     focusedComposerRef.current = null;
@@ -324,33 +357,32 @@ export function ChiefConversation({
     [todoGlances, todosQ.data],
   );
   const empty = (chief.stream?.length ?? 0) === 0;
-  const heroLayout = empty && !heroCollapsed;
-  const heroScrollRef = useRef<HTMLDivElement | null>(null);
+  const heroLayout = empty && !heroCollapsed && !questionPending;
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  useScrollFade(heroScrollRef, { enabled: heroLayout });
   const canStop = targetPlaceholder === null && chief.running === true && onStop != null;
-  const liveTurn =
-    chief.running === true
-      ? chief.stream?.findLast((item) => item.kind === 'streaming')
-      : undefined;
   const connected = useConnected();
-  const turnTick = useLiveSeconds(liveTurn?.kind === 'streaming' ? liveTurn.startedAt : null);
-  const turnElapsed = questionAttached
-    ? null
-    : (turnTick ?? (liveTurn?.kind === 'streaming' ? liveTurn.seconds : undefined) ?? null);
+  const restoreSent = (text: string) => {
+    followSentRef.current = false;
+    const reply = parseReplyQuote(text);
+    const body = reply?.body ?? text;
+    if (reply !== null)
+      setReplyQuote({ sourceMessageId: reply.sourceMessageId ?? '', quote: reply.quote });
+    restoreToThread((cur) => (cur === '' ? body : `${cur}\n${body}`));
+  };
+  const restoreSentRef = useRef(restoreSent);
+  restoreSentRef.current = restoreSent;
+  useEffect(() => {
+    for (const entry of unsent?.failed ?? []) {
+      const text = unsent?.discard(entry.key) ?? null;
+      if (text !== null) restoreSentRef.current(text);
+    }
+  }, [unsent]);
   const withdraw =
     onWithdraw == null
       ? undefined
       : (messageId: string, text: string) => {
           onWithdraw(messageId).then(
-            () => {
-              followSentRef.current = false;
-              const reply = parseReplyQuote(text);
-              const body = reply?.body ?? text;
-              if (reply !== null)
-                setReplyQuote({ sourceMessageId: reply.sourceMessageId ?? '', quote: reply.quote });
-              restoreToThread((cur) => (cur === '' ? body : `${cur}\n${body}`));
-            },
+            () => restoreSent(text),
             () => {},
           );
         };
@@ -360,14 +392,13 @@ export function ChiefConversation({
       ? () => withdraw(waitingTurn.messageId, waitingTurn.text)
       : onStop;
   stopTurnRef.current = stopTurn;
-  const allRows = awaitingStream(chief.stream ?? [], questionAttached).map((item, i) => ({
-    item,
-    i,
-  }));
-  const rows = allRows.filter(({ item }) => item.kind !== 'user' || item.pending == null);
-  const latestMessage = rows.findLast(
-    ({ item }) => item.kind === 'user' || (item.kind === 'robot' && item.typing !== true),
+  const allRows = awaitingStream(workingRowLast(chief.stream ?? []), questionPending).map(
+    (item, i) => ({
+      item,
+      i,
+    }),
   );
+  const rows = allRows.filter(({ item }) => item.kind !== 'user' || item.pending !== 'held');
   const latestUser = rows.findLast(({ item }) => item.kind === 'user');
   const latestUserKey =
     latestUser == null ? null : chiefStreamRowKey(latestUser.item, latestUser.i);
@@ -386,17 +417,18 @@ export function ChiefConversation({
     }
     if (latestUserPosition <= sentRowPosition) return;
     followSentRef.current = false;
+    setEnteringKey(latestUserKey);
     scrollToEnd();
   }, [latestUserKey, keyAtSend, sentRowPosition, latestUserPosition, scrollToEnd]);
   const queuedCapsules = allRows.flatMap(({ item }) =>
-    item.kind === 'user' && item.pending != null && item.id != null
+    item.kind === 'user' && item.pending === 'held' && item.id != null
       ? [
           {
             id: item.id,
             content: item.text,
             label: replyQuoteText(item.text),
-            ...(item.pending === 'held' ? { note: t('已存下，Coordinator 恢复后会处理') } : {}),
-            held: item.pending === 'held',
+            note: t('已存下，Coordinator 恢复后会处理'),
+            held: true,
           },
         ]
       : [],
@@ -405,7 +437,11 @@ export function ChiefConversation({
   const capsules = (
     <>
       {replyQuote !== null && (
-        <ReplyQuoteBlock quote={replyQuote.quote} onRemove={() => setReplyQuote(null)} />
+        <ReplyingToBar
+          quote={replyQuote.quote}
+          onRemove={() => setReplyQuote(null)}
+          onHighlight={(on) => setHighlightedSource(on ? replyQuote : null)}
+        />
       )}
       <QueuedCapsules
         messages={queuedCapsules}
@@ -415,28 +451,115 @@ export function ChiefConversation({
       />
     </>
   );
-  const streamRow = ({ item, i }: GroupedRow) => (
+  const lastUserText = latestUser?.item.kind === 'user' ? latestUser.item.text : null;
+  const resend = useCallback(
+    (text: string) => {
+      if (onSend == null) return;
+      followSentRef.current = true;
+      Promise.resolve(onSend(text)).catch((error: unknown) => {
+        followSentRef.current = false;
+        toastError(t('没发出去，再试一次。'), error);
+      });
+    },
+    [onSend, t],
+  );
+  const retryLastUser = useMemo(
+    () => (onSend == null || lastUserText === null ? undefined : () => resend(lastUserText)),
+    [onSend, lastUserText, resend],
+  );
+  const clock = useMinuteClock();
+  const dividerClock = { previousAt: null as number | null };
+  const streamRow = (
+    { item, i }: GroupedRow,
+    run: BubbleRun | undefined,
+    startedTasks: readonly string[] | undefined,
+  ) => {
+    const at = 'createdAt' in item && typeof item.createdAt === 'number' ? item.createdAt : null;
+    const divider =
+      at !== null && needsTimeDivider(dividerClock.previousAt, at) ? (
+        <MessageScrollerItem key={`divider-${chiefStreamRowKey(item, i)}`}>
+          <div
+            data-testid="chief-time-divider"
+            className="mt-5 text-center text-caption text-(--text-tertiary)"
+          >
+            <time dateTime={new Date(at).toISOString()}>
+              {timeDividerLabel(at, clock, locale, t)}
+            </time>
+          </div>
+        </MessageScrollerItem>
+      ) : null;
+    if (at !== null) dividerClock.previousAt = at;
+    return (
+      <Fragment key={chiefStreamRowKey(item, i)}>
+        {divider}
+        {row(item, i, run, startedTasks)}
+      </Fragment>
+    );
+  };
+  const row = (
+    item: GroupedRow['item'],
+    i: number,
+    run: BubbleRun | undefined,
+    startedTasks: readonly string[] | undefined,
+  ) => (
     <ChiefStreamRow
-      key={chiefStreamRowKey(item, i)}
       item={item}
       index={i}
-      latest={i === latestMessage?.i}
       replyable={item.kind === 'thread-report' && outstandingReports.has(item.id)}
-      runningTool={chief.runningTool}
-      copiedKey={copiedKey}
       onCopy={copyText}
       toolsOpen={toolsOpen}
       onToggleTools={toggleTools}
       onRewindRequest={requestRewind}
+      entering={enteringKey !== null && chiefStreamRowKey(item, i) === enteringKey}
+      onRetry={latestUser != null && i > latestUser.i ? retryLastUser : undefined}
+      onReply={onSend != null && composerReplacement == null ? stageReply : undefined}
+      joinsPrev={run?.joinsPrev === true}
+      joinsNext={run?.joinsNext === true}
+      {...(startedTasks !== undefined ? { startedTasks } : {})}
     />
   );
   const keepsOwnRow = (item: ChiefStreamItem) =>
     item.kind === 'thread-report' && outstandingReports.has(item.id);
-  const renderRows = (list: StreamRow[]) => groupThreadEvents(list, keepsOwnRow).map(streamRow);
+  const lastRobotIndex = rows.findLastIndex(
+    ({ item }) => item.kind === 'robot' && item.typing !== true,
+  );
+  const quickAfter =
+    lastRobotIndex >= 0 && !rows.slice(lastRobotIndex).some(({ item }) => item.kind === 'user')
+      ? rows[lastRobotIndex]?.item
+      : undefined;
+  const quickReplies = (
+    <QuickReplies
+      replies={chief.quickReplies}
+      hidden={questionPending || answerActive || !answerHere}
+      onPreview={(text) => setPreview(text === null ? null : { key: quickKey, text })}
+      onSend={
+        onSend == null
+          ? undefined
+          : (text) => {
+              followSentRef.current = true;
+              userKeyAtSendRef.current = latestUserKeyRef.current;
+              return onSend(text);
+            }
+      }
+    />
+  );
+  const renderRows = (list: StreamRow[]) => {
+    const { rows: grouped, startedBy } = foldTaskCards(
+      groupThreadEvents(list, keepsOwnRow),
+      glances,
+    );
+    const runs = bubbleRuns(grouped, dividerClock.previousAt);
+    return grouped.map((entry, n) => (
+      <Fragment key={chiefStreamRowKey(entry.item, entry.i)}>
+        {streamRow(entry, runs[n], startedBy.get(entry.item))}
+        {quickAfter !== undefined && entry.item === quickAfter && quickReplies}
+      </Fragment>
+    ));
+  };
   const intro = !chief.bound && showBindGate && (
     <div
       data-testid="chief-gate"
-      className="mx-auto mt-4 flex h-14 w-[calc(100%-2rem)] max-w-182 flex-none items-center gap-3 rounded-(--radius-card) bg-(--card) pr-3 pl-4 text-ui text-(--text-secondary) ring-1 ring-(--border)"
+      className="mx-auto mt-4 flex h-14 w-[calc(100%-2rem)] max-w-chat flex-none items-center gap-3 rounded-(--radius-card) bg-(--card) pr-3 pl-4 text-ui text-(--text-secondary) ring-1 ring-(--border)"
     >
       <span>{t('请先在工作路由里配置 Coordinator。')}</span>
       <Button className={`ml-auto cursor-pointer ${DIALOG_PRIMARY_BUTTON}`} onClick={onSettings}>
@@ -448,9 +571,9 @@ export function ChiefConversation({
     <>
       {heroLayout ? (
         <div
-          ref={heroScrollRef}
+          {...drop.bind}
           data-testid="chief-home-scroll"
-          className="scroll-fade min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none pb-6"
+          className="min-h-0 min-w-0 flex-1 in-data-[chat-top=under-header]:pt-12 overflow-x-hidden overflow-y-auto overscroll-none pb-6"
         >
           {hero}
           {intro}
@@ -459,34 +582,40 @@ export function ChiefConversation({
       ) : (
         <>
           {intro}
-          <MessageScroller className={SCROLLER_ROOT_CLS}>
-            <FadeScrollerViewport reserveEnd ref={viewportRef} data-testid="chief-body">
+          <MessageScroller className={SCROLLER_ROOT_CLS} {...drop.bind}>
+            <FadeScrollerViewport
+              reserveEnd
+              ref={viewportRef}
+              data-testid="chief-body"
+              fade={false}
+              className="scrollbar-gutter-both"
+            >
               <MessageScrollerContent className={SCROLLER_CONTENT_CLS} data-testid="chief-stream">
                 <TodoGlanceContext.Provider value={glances}>
-                  {lead}
-                  {day == null ? (
-                    renderRows(rows)
-                  ) : (
-                    <>
-                      <div data-testid="chief-earlier" className="opacity-60">
-                        {renderRows(rows.slice(0, day.earlier))}
-                      </div>
-                      {day.today}
-                      {renderRows(rows.slice(day.earlier))}
-                    </>
-                  )}
+                  <ReplySourceHighlightContext.Provider
+                    value={highlightedSource === replyQuote ? highlightedSource : null}
+                  >
+                    {lead}
+                    {day == null ? (
+                      renderRows(rows)
+                    ) : (
+                      <>
+                        <div data-testid="chief-earlier" className="opacity-60">
+                          {renderRows(rows.slice(0, day.earlier))}
+                        </div>
+                        {day.today}
+                        {renderRows(rows.slice(day.earlier))}
+                      </>
+                    )}
+                    <ChiefQuestion bound={answerHere} />
+                  </ReplySourceHighlightContext.Provider>
                 </TodoGlanceContext.Provider>
               </MessageScrollerContent>
             </FadeScrollerViewport>
             <JumpToLatestButton>
-              <ArrowDown width={16} height={16} />
+              <ArrowDown width={20} height={20} />
               <span className="sr-only">{t('滚动到最新')}</span>
             </JumpToLatestButton>
-            <SelectionReply
-              containerRef={viewportRef}
-              enabled={onSend != null && composerReplacement == null}
-              onReply={stageReply}
-            />
             {earlier != null && (
               <EarlierLoader
                 earlier={earlier}
@@ -509,19 +638,19 @@ export function ChiefConversation({
         )
       )}
       <div
+        {...drop.bind}
         data-testid="chief-composer-block"
         className="group/composer flex max-h-[65%] min-h-0 flex-none flex-col"
       >
-        <ChiefQuestionDock bound={answerHere} ownFooter={mode === 'thread'} />
         {composerReplacement ?? (
           <>
             {composerError != null && (
               <p
                 role="alert"
                 data-testid="chief-composer-error"
-                className={`mx-auto mt-2 mb-0 flex w-[calc(100%-2rem)] max-w-182 max-h-12 items-start gap-1.5 overflow-y-auto text-meta text-destructive`}
+                className={`mx-auto my-2 flex w-[calc(100%-2rem)] max-w-chat max-h-12 items-start gap-1.5 overflow-y-auto text-meta text-destructive`}
               >
-                <TriangleAlert aria-hidden="true" className="size-3.5 flex-none" />
+                <TriangleAlert aria-hidden="true" className="size-4 flex-none" />
                 {composerError}
               </p>
             )}
@@ -539,21 +668,21 @@ export function ChiefConversation({
                 onStop: () => stopTurnRef.current?.(),
               }}
               active={!answerActive}
-              attached={questionAttached && answerHere}
               onFocusEnter={() => {
                 focusedComposerRef.current = THREAD_COMPOSER;
               }}
               onFocusLeave={leaveComposer}
+              onCancelReply={replyQuote === null ? undefined : () => setReplyQuote(null)}
               placeholder={composerPlaceholder}
               invalid={composerError != null}
               composerRef={answerActive ? undefined : composerRef}
               above={answerActive ? null : capsules}
               tools={answerActive ? null : composerTools}
-              canStop={canStop}
-              onStop={stopTurn}
-              running={chief.running === true}
-              turnElapsed={turnElapsed}
+              menu={answerActive ? null : composerMenu}
+              context={chief.context}
               threadId={chief.threadId ?? null}
+              dropActive={drop.active}
+              seededFiles={live ? undefined : chief.composerFiles}
             />
             {answerKey !== null && (
               <AnswerComposer
@@ -561,7 +690,6 @@ export function ChiefConversation({
                 answerKey={answerKey}
                 handleRef={answerSurfaceRef}
                 active={answerActive}
-                attached={questionAttached}
                 onFocusEnter={() => {
                   focusedComposerRef.current = answerKey;
                 }}
@@ -571,9 +699,10 @@ export function ChiefConversation({
                 composerRef={answerActive ? composerRef : undefined}
                 above={answerActive ? capsules : null}
                 tools={answerActive ? composerTools : null}
-                running={chief.running === true}
-                turnElapsed={turnElapsed}
+                menu={answerActive ? composerMenu : null}
+                context={chief.context}
                 threadId={chief.threadId ?? null}
+                dropActive={drop.active}
               />
             )}
           </>

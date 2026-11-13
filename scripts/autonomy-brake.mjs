@@ -37,10 +37,11 @@ function assertExactRevertTree(dir, { baseSha, headSha, names, history }) {
 
 export const repo = process.env.GITHUB_REPOSITORY;
 if (!/^[\w.-]+\/[\w.-]+$/.test(repo ?? '')) throw new Error('GITHUB_REPOSITORY is required');
-export const api = (path, payload, method = 'POST') => {
+export const api = (path, payload, method) => {
+  const verb = method ?? (payload ? 'POST' : undefined);
   const output = execFileSync(
     'gh',
-    ['api', path, ...(payload ? ['--method', method, '--input', '-'] : [])],
+    ['api', path, ...(verb ? ['--method', verb] : []), ...(payload ? ['--input', '-'] : [])],
     {
       encoding: 'utf8',
       maxBuffer: 512 * 1024 * 1024,
@@ -167,11 +168,18 @@ export function disarmAutoMerge(pr) {
 
 function sweep(paused) {
   let failed = false;
+  let windows;
+  const pauseHistory = () => {
+    windows ??= pauseWindows();
+    return windows;
+  };
   for (const pr of pages(`repos/${repo}/pulls?state=open&per_page=100`).flat()) {
     const errors = [];
     let allowed = !paused;
+    let published = false;
     try {
       allowed = checkPull(pr, paused);
+      published = true;
     } catch (error) {
       errors.push(error);
     }
@@ -213,6 +221,13 @@ function sweep(paused) {
     } catch (error) {
       errors.push(error);
     }
+    if (!paused && published) {
+      try {
+        requeueBrakeDequeue(pr, pauseHistory);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
     if (errors.length) {
       failed = true;
       for (const error of errors) console.error(error.message);
@@ -223,6 +238,107 @@ function sweep(paused) {
 }
 
 const autoResumeMarker = '<!-- autonomy-brake: auto-resume -->';
+const mergifyStart = '-*- Mergify Payload -*-';
+const mergifyEnd = '-*- Mergify Payload End -*-';
+
+function mergifyState(body) {
+  const start = body?.indexOf(mergifyStart) ?? -1;
+  const end = body?.indexOf(mergifyEnd) ?? -1;
+  if (start < 0 || end < start) return undefined;
+  try {
+    return JSON.parse(body.slice(start + mergifyStart.length, end).trim());
+  } catch {
+    return null;
+  }
+}
+
+function rerunFailed(runId, sha) {
+  if (!/^[1-9]\d*$/.test(runId ?? '')) throw new Error('A run id is required');
+  if (!shaPattern.test(sha ?? '')) throw new Error('Invalid SHA');
+  const current = api(`repos/${repo}/actions/runs/${runId}`);
+  if (current.head_sha !== sha) throw new Error('Run SHA mismatch');
+  if (current.conclusion === 'success') {
+    console.log(`autonomy: run ${runId} already succeeded`);
+    return;
+  }
+  if (Number(current.run_attempt) > 1) {
+    if (current.status !== 'completed') {
+      console.log(`autonomy: run ${runId} attempt ${current.run_attempt} still running`);
+      return;
+    }
+    throw new Error(`Run ${runId} attempt ${current.run_attempt} failed`);
+  }
+  const mainSha = api(`repos/${repo}/branches/main`).commit?.sha;
+  if (!shaPattern.test(mainSha ?? '')) throw new Error('Main SHA is missing');
+  if (mainSha !== sha) {
+    console.log(`autonomy: not rerunning ${runId}; main is ${mainSha}`);
+    return;
+  }
+  try {
+    execFileSync('gh', ['run', 'rerun', runId, '--failed', '--repo', repo], {
+      encoding: 'utf8',
+      maxBuffer: 512 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    throw new Error(String(error.stderr || error.message).trim(), { cause: error });
+  }
+  console.log(`autonomy: reran failed jobs of ${runId}`);
+}
+
+const pauseWindows = () =>
+  pages(`repos/${repo}/issues?state=all&labels=autonomy-paused&per_page=100`)
+    .flat()
+    .filter((issue) => !issue.pull_request)
+    .map((issue) => ({
+      from: Date.parse(issue.created_at),
+      to: issue.closed_at ? Date.parse(issue.closed_at) : Number.POSITIVE_INFINITY,
+    }));
+
+const pauseChecks = new Set(['autonomy-brake', 'pr-evidence']);
+
+function dequeuedByPause(state, windows) {
+  if (state?.state !== 'dequeued' || state.dequeue_reason?.code !== 'CHECKS_FAILED') return false;
+  const checks = state.dequeue_reason.checks;
+  if (Array.isArray(checks) && checks.length && checks.every((check) => check === 'autonomy-brake'))
+    return true;
+  if (checks !== undefined && !(Array.isArray(checks) && checks.every((c) => pauseChecks.has(c))))
+    return false;
+  const leftAt = Date.parse(state.left_at ?? '');
+  return (
+    Number.isFinite(leftAt) &&
+    windows().some((window) => window.from <= leftAt && leftAt <= window.to)
+  );
+}
+
+const disallowed = (comment) =>
+  comment.user?.login === 'mergify[bot]' && /Command disallowed/.test(comment.body ?? '');
+
+function requeueBrakeDequeue(pr, windows) {
+  if (!pr.labels?.some((label) => label.name === 'dequeued')) return;
+  const comments = pages(`repos/${repo}/issues/${pr.number}/comments?per_page=100`).flat();
+  let latest;
+  for (const comment of comments) {
+    if (comment.user?.login !== 'mergify[bot]') continue;
+    const state = mergifyState(comment.body);
+    if (state === undefined) continue;
+    latest = { state, created_at: comment.created_at };
+  }
+  if (!latest || !dequeuedByPause(latest.state, windows)) return;
+  const asked = comments.some(
+    (comment, index) =>
+      comment.body?.trim() === '@mergifyio requeue' &&
+      latest.created_at &&
+      comment.created_at >= latest.created_at &&
+      !comments.slice(index + 1).some(disallowed),
+  );
+  if (asked) {
+    console.log(`#${pr.number}: requeue already asked`);
+    return;
+  }
+  api(`repos/${repo}/issues/${pr.number}/comments`, { body: '@mergifyio requeue' });
+  console.log(`#${pr.number}: requeued`);
+}
 
 function resume() {
   const open = markers();
@@ -288,7 +404,14 @@ if (
       if (!checkPull({ ...pr, number: Number(args[0]) }, markers().length > 0))
         throw new Error('autonomy-paused: autonomous merging is paused');
     } else if (command === 'verify-recovery') verifyRecovery(args[0]);
-    else throw new Error('Expected status, pause, resume, sweep, check-pr, or verify-recovery');
+    else if (command === 'rerun-failed') {
+      const runAt = args.indexOf('--run');
+      const shaAt = args.indexOf('--sha');
+      rerunFailed(runAt >= 0 ? args[runAt + 1] : '', shaAt >= 0 ? args[shaAt + 1] : '');
+    } else
+      throw new Error(
+        'Expected status, pause, resume, sweep, check-pr, verify-recovery, or rerun-failed',
+      );
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;

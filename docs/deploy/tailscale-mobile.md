@@ -20,7 +20,7 @@ CAIRN_TSNET=socket npx @xiechimon/cairn
 
 For a service, set `CAIRN_TSNET=socket` in its environment and restart it. This opens `<CAIRN_HOME>/tsnet/tailnet.sock` with mode `0600` in a private directory, without spawning the tsnet sidecar. The default `CAIRN_HOME` is `$HOME/.cairn`.
 
-Owner identity is resolved from LocalAPI status: the profile in `User` matching `Self.UserID`, only when the backend is running and `Self` is untagged. The server refreshes that status every 30 seconds. If the owner is unavailable, an explicit comma-separated `CAIRN_TAILSCALE_USERS` allowlist applies on this socket only; otherwise the token gate remains. For a tagged server, only the explicit allowlist applies. A known untagged owner takes priority over the allowlist.
+Tailscale Serve only makes the server reachable. It does not sign the browser in. `CAIRN_TAILSCALE_USERS` is ignored and does not grant access. Another device signs in with a one-time pairing code from Remote access. A browser on the server machine exchanges a loopback bootstrap for an HttpOnly session and does not paste the owner token.
 
 On Linux, LocalAPI is read through `/var/run/tailscale/tailscaled.sock`; on macOS, `/var/run/tailscaled.socket`. Failure to read status grants no implicit identity access. The macOS App Store variant and a real Mac-to-Unix-Serve browser path remain unverified.
 
@@ -49,10 +49,10 @@ It never provides ambient owner login, even if identity headers are present.
 
 1. Install Tailscale, sign in to the tailnet, and connect.
 2. Open `https://<machine>.<tailnet>.ts.net/app` from another untagged device owned by the server's Tailscale user.
-3. With the socket target active, `/api/teams` succeeds without a token; Settings → Remote access shows the signed-in login. The owner can create pairing codes and approve browser enrollment.
+3. The phone sees the pairing page, not a signed-in Tailscale login. `/api/teams` is 401 until a pairing code is entered. Create that code on the server machine in Settings → Remote access, or with the owner token against `POST /api/remote/pairing`.
 4. Use "Add to Home Screen" for the standalone PWA and iOS web push.
 
-Other users, tagged sources, missing identity, self-requests without identity headers, and public traffic still need the access token or a QR-paired device token. Pairing remains per-device and individually revocable. Paired-device tokens cannot manage pairing or approve machine enrollment. An existing Bearer credential takes precedence over ambient identity, so a device token does not become an owner credential on the tailnet.
+Tailscale only makes the server reachable. It does not sign the browser in. Pairing remains per-device and individually revocable. Paired-device tokens cannot manage pairing or approve machine enrollment.
 
 ## Authentication boundary
 
@@ -60,7 +60,7 @@ The private accepting listener, not TCP peer address, establishes header trust. 
 
 Any process that can reach the private socket can claim an identity. Mode `0600`, the owning uid, and its private parent directory are security boundaries. Same-uid processes and root are trusted; other local accounts are not. Startup refuses a socket owned by another uid or with a mode other than `0600`; do not widen permissions to make a proxy connect.
 
-Ambient owner identity needs `Sec-Fetch-Site: same-origin` or an `Origin` equal to the tailnet origin for methods other than GET, HEAD and OPTIONS. Bearer-authenticated requests are exempt from that ambient CSRF check. Existing WebSocket same-origin and subprotocol checks remain required. No primary session cookie, cloud account or check-mode step-up is introduced.
+A browser signs in with a pairing code or, on the Linux server machine, a loopback bootstrap. That becomes an HttpOnly session cookie. Cookie writes need same-origin proof. Bearer requests, including the owner token and device tokens, are exempt from that check. Tailscale identity headers do not admit a browser.
 
 ## Public-internet alternative
 

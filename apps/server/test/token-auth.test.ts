@@ -224,21 +224,33 @@ describe('token auth: the /api/mcp exempt surface (failure modes 11/12, the XMON
   });
 });
 
-describe('token auth: the SSE stream ?token= exception (failure mode 7)', () => {
-  test('on + the team stream with the correct ?token= -> the stream is established (SSE surface)', async () => {
+async function streamTicket(s: TestServer): Promise<string> {
+  const issued = await reqWith(s, 'POST', '/api/auth/stream-ticket', authHeaders);
+  expect(issued.status).toBe(200);
+  return ((await issued.json()) as { ticket: string }).ticket;
+}
+
+describe('token auth: SSE uses a short ticket, not the owner token', () => {
+  test('on + the team stream refuses ?token= and opens with a ticket', async () => {
     const s = bootServer({ authToken: TOKEN, pingIntervalMs: 50 });
+    const refused = await req(s.app, 'GET', `/api/teams/${s.team.id}/stream?token=${TOKEN}`);
+    expect(refused.status).toBe(401);
+    const ticket = await streamTicket(s);
     const res = await Promise.resolve(
-      s.app.request(`/api/teams/${s.team.id}/stream?token=${TOKEN}`),
+      s.app.request(`/api/teams/${s.team.id}/stream?ticket=${ticket}`),
     );
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/event-stream');
     void res.body?.cancel().catch(() => {});
   });
 
-  test('on + the conversation stream with the correct ?token= -> the stream is established', async () => {
+  test('on + the conversation stream refuses ?token= and opens with a ticket', async () => {
     const s = bootServer({ authToken: TOKEN, pingIntervalMs: 50 });
+    const refused = await req(s.app, 'GET', `/api/conversations/conv-probe/stream?token=${TOKEN}`);
+    expect(refused.status).toBe(401);
+    const ticket = await streamTicket(s);
     const res = await Promise.resolve(
-      s.app.request(`/api/conversations/conv-probe/stream?token=${TOKEN}`),
+      s.app.request(`/api/conversations/conv-probe/stream?ticket=${ticket}`),
     );
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/event-stream');
@@ -414,7 +426,7 @@ describe('token startup guidance without credentials', () => {
       );
       expect(calls.some((line) => line.includes(TOKEN) || line.includes('#token='))).toBe(false);
       expect(calls).toContain(
-        'token auth enabled — run `cairn token` on this machine to print a login link',
+        'token auth enabled — run `cairn token` on this machine to print the owner token; other devices use a pairing code',
       );
     },
   );

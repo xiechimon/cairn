@@ -13,17 +13,17 @@ async function tokenRadius(page: Page) {
   );
 }
 
-test('the account settings card rides --radius-card (R1, R3)', async ({ page }) => {
+test('the account settings group is a flat divided list inside the settings window, as in the recording (R1, R3)', async ({ page }) => {
   await setTheme(page, 'light');
   await page.goto('/app/account?scenario=13');
   const card = page.locator('.account-card');
   await expect(card).toBeVisible();
   expect(await tokenRadius(page), 'R1').toBe('12px');
-  await expect(card, 'R3').toHaveCSS('border-top-left-radius', await tokenRadius(page));
+  await expect(card, 'R3').toHaveCSS('border-top-left-radius', '0px');
   await expect(card).toHaveClass(/settings-card/);
 });
 
-test('account settings rows are equal 52px with no doubled edge divider (S1, S2)', async ({
+test('account settings rows are equal 54px with no doubled edge divider (S1, S2)', async ({
   page,
 }) => {
   await setTheme(page, 'light');
@@ -43,7 +43,7 @@ test('account settings rows are equal 52px with no doubled edge divider (S1, S2)
   expect(
     faces.map((f) => f.h),
     'S1',
-  ).toEqual([52, 52]);
+  ).toEqual([54, 54]);
   expect(
     faces.map((f) => f.top),
     'S2: no row draws a top divider',

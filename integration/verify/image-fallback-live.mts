@@ -34,7 +34,7 @@ const sourceHead = execFileSync('git', ['rev-parse', 'HEAD'], {
   encoding: 'utf8',
 }).trim();
 const sourceManifest = JSON.parse(
-  readFileSync(join(root, 'docs/verify/1671/reviewed-source-hashes.json'), 'utf8'),
+  readFileSync(join(root, 'integration/verify/image-fallback-reviewed-source-hashes.json'), 'utf8'),
 ) as { files: Record<string, string> };
 for (const [path, expected] of Object.entries(sourceManifest.files)) {
   if (
@@ -235,7 +235,7 @@ const project = projectRecordSchema.pick({ id: true }).parse(
     repoKind: 'hosted',
   }),
 );
-const bytes = readFileSync(join(root, 'docs/verify/1244/after-checkbox-dark.png'));
+const bytes = readFileSync(join(root, 'integration/verify/image-fallback-checkbox-dark.png'));
 const grant = (await create('/api/uploads/grant', {
   kind: 'attachment',
   fileName: 'tiny-existing-screenshot.png',

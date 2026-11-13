@@ -32,13 +32,20 @@ for (const surface of SURFACES) {
   test(`a pressed button never moves on ${surface}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(surface);
-    const buttons = page.locator('[data-slot="button"]:visible');
+    const buttons = page.locator('button:is([data-slot="button"], [data-slot="tooltip-trigger"]):visible');
     await expect(buttons.first()).toBeVisible();
-    const handles = (await buttons.elementHandles()).slice(0, 30);
-    expect(handles.length).toBeGreaterThan(3);
+    const total = Math.min(await buttons.count(), 30);
+    expect(total).toBeGreaterThan(3);
+    const landed = page.url();
     const moved: string[] = [];
     let pressedCount = 0;
-    for (const handle of handles) {
+    for (let index = 0; index < total; index++) {
+      if (page.url() !== landed) {
+        await page.goto(surface);
+        await expect(buttons.first()).toBeVisible();
+      }
+      const handle = await buttons.nth(index).elementHandle({ timeout: 2000 }).catch(() => null);
+      if (handle === null) continue;
       const attached = await handle.scrollIntoViewIfNeeded().then(
         () => true,
         () => false,

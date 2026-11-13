@@ -228,7 +228,7 @@ function ComputerHead({ computer }: { computer: ComputerRecord }) {
   const { t } = useI18n();
   return (
     <div className="flex items-center gap-3 px-3.5 py-3">
-      <Terminal aria-hidden="true" className="size-4.5 flex-none text-content-secondary" />
+      <Terminal aria-hidden="true" className="size-5.5 flex-none text-content-secondary" />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-ui font-medium text-foreground">
           {t('Coordinator 的电脑')}

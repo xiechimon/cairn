@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ComposerAttachmentTile } from '../components/composer-attachment-tile.js';
 import { attachmentIdFromKey } from '../detail/chat-markdown.js';
+import type { ComposerFileSeed } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import {
-  formatFileSize,
+  attachmentKind,
   type PendingAttachment,
   parseAttachmentTokens,
 } from './attachment-paste.js';
@@ -16,44 +17,66 @@ interface PreviewTarget {
 
 const IMAGE_KEY = /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i;
 
-function fileKind(name: string): string {
-  const dot = name.lastIndexOf('.');
-  return dot > 0 ? name.slice(dot + 1).toUpperCase() : 'FILE';
-}
-
 export function ComposerAttachments({
   tokens,
   pending,
   onRemove,
+  onDismissPending,
+  seeded = [],
+  onDismissSeeded,
 }: {
   tokens: string[];
   pending: PendingAttachment[];
   onRemove: (index: number) => void;
+  onDismissPending?: (uid: string) => void;
+  seeded?: ComposerFileSeed[];
+  onDismissSeeded?: (index: number) => void;
 }) {
   const { t } = useI18n();
   const settled = useMemo(() => parseAttachmentTokens(tokens.join('\n')), [tokens]);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
-  if (pending.length === 0 && settled.length === 0) return null;
+  const stripRef = useRef<HTMLDivElement | null>(null);
+  const thenFocusInput = (remove: () => void) => () => {
+    const host = stripRef.current?.parentElement ?? null;
+    remove();
+    requestAnimationFrame(() => host?.querySelector<HTMLTextAreaElement>('textarea')?.focus());
+  };
+  if (pending.length === 0 && settled.length === 0 && seeded.length === 0) return null;
   return (
     <div
+      ref={stripRef}
       data-testid="composer-attachments"
-      className="flex max-h-36 flex-wrap gap-2 overflow-y-auto pt-1.5 pb-2.5"
+      className="flex max-h-64 flex-wrap gap-2 overflow-y-auto pt-2 pr-2 pb-2.5"
       role="status"
       aria-label={t('附件')}
     >
+      {seeded.map((entry, index) => (
+        <ComposerAttachmentTile
+          key={`seed-${entry.name}`}
+          {...(entry.state === 'ready' ? {} : { testId: 'attachment-pending' })}
+          name={entry.name}
+          kind={attachmentKind(entry.name)}
+          state={entry.state}
+          {...(entry.state !== 'uploading' && onDismissSeeded !== undefined
+            ? { onRemove: thenFocusInput(() => onDismissSeeded(index)) }
+            : {})}
+        />
+      ))}
       {pending.map((entry) => (
         <ComposerAttachmentTile
           key={entry.uid}
           testId="attachment-pending"
           name={entry.name}
-          kind={fileKind(entry.name)}
-          state="uploading"
-          detail={formatFileSize(entry.size)}
+          kind={attachmentKind(entry.name)}
+          state={entry.failed ? 'error' : 'uploading'}
           {...(entry.url !== null
             ? {
                 imageSrc: entry.url,
                 onPreview: () => setPreview({ name: entry.name, src: entry.url ?? '' }),
               }
+            : {})}
+          {...(entry.failed && onDismissPending !== undefined
+            ? { onRemove: thenFocusInput(() => onDismissPending(entry.uid)) }
             : {})}
         />
       ))}
@@ -64,9 +87,9 @@ export function ComposerAttachments({
           <ComposerAttachmentTile
             key={`${token.key}#${index}`}
             name={token.name}
-            kind={fileKind(token.name)}
+            kind={attachmentKind(token.name)}
             state="ready"
-            onRemove={() => onRemove(index)}
+            onRemove={thenFocusInput(() => onRemove(index))}
             {...(isImage
               ? {
                   imageSrc: source,

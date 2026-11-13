@@ -6,6 +6,8 @@ export type GlyphKind =
   | 'queued'
   | 'ring'
   | 'working'
+  | 'progress'
+  | 'attention'
   | 'quarter'
   | 'half'
   | 'three-quarter'
@@ -31,13 +33,15 @@ export function StatusGlyph({
   kind,
   label,
   className,
+  outlined = false,
 }: {
   kind: GlyphKind;
   label?: string;
   className?: string;
+  outlined?: boolean;
 }) {
   const maskId = useId();
-  const cut = CUT[kind];
+  const cut = outlined && kind === 'failed' ? undefined : CUT[kind];
   const pie = PIE[kind];
   return (
     <svg
@@ -46,7 +50,7 @@ export function StatusGlyph({
       role={label == null ? undefined : 'img'}
       aria-label={label}
       aria-hidden={label == null ? true : undefined}
-      className={cn('size-3.5 flex-none', className)}
+      className={cn('size-4 flex-none', className)}
     >
       {cut != null ? (
         <>
@@ -65,11 +69,13 @@ export function StatusGlyph({
         </>
       ) : (
         <>
-          <circle
-            {...RING}
-            strokeDasharray={kind === 'todo' ? '2.2 2' : undefined}
-            opacity={kind === 'working' ? 0.25 : undefined}
-          />
+          {kind !== 'progress' && (
+            <circle
+              {...RING}
+              strokeDasharray={kind === 'todo' ? '2.2 2' : undefined}
+              opacity={kind === 'working' ? 0.25 : undefined}
+            />
+          )}
           {kind === 'working' && (
             <path
               className="glyph-working origin-center motion-safe:animate-spin"
@@ -80,6 +86,15 @@ export function StatusGlyph({
               strokeLinecap="round"
             />
           )}
+          {kind === 'progress' && (
+            <circle
+              {...RING}
+              className="origin-center motion-safe:animate-spin"
+              strokeDasharray="25.9 8.7"
+              strokeLinecap="round"
+            />
+          )}
+          {kind === 'attention' && <circle cx="7" cy="7" r="1.7" fill="currentColor" />}
           {kind === 'queued' && (
             <path
               d="M7 4.2V7l1.8 1.2"
@@ -90,6 +105,15 @@ export function StatusGlyph({
             />
           )}
           {pie != null && <path d={pie} fill="currentColor" />}
+          {outlined && kind === 'failed' && (
+            <path
+              d={CUT.failed}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          )}
         </>
       )}
     </svg>

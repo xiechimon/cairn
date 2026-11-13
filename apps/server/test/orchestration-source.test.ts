@@ -17,7 +17,14 @@ import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { flushSelfIssueWrites, updateAutonomousTodo } from '../src/services/todos.js';
-import { bootServer, postProject, req, seedRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  insertMachine,
+  postProject,
+  req,
+  seedRoute,
+  type TestServer,
+} from './helpers.js';
 import { ownerTodoParams } from './owner-message.js';
 
 const AGENT_ID = 'agent-orch-1';
@@ -139,6 +146,7 @@ beforeEach(async () => {
     };
   };
   s = bootServer({ githubFetch: ghFetch });
+  insertMachine(s);
   teamId = s.team.id;
   userId = s.user.id;
   chiefId = `chief-${userId}-${teamId}`;

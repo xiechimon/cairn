@@ -13,15 +13,15 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `account` | `设置` (Settings) › `账号` (Account) | [Account and team](#account-and-team) |
 | `appearance` | `设置` (Settings) › `外观` (Appearance) | [Appearance and visual system](#appearance) |
 | `projects` | `设置` (Settings) › `项目` | [Projects](#projects) |
-| `providers` | `设置` (Settings) › `模型与账户` (Models & accounts) › `模型服务` (Providers) | [Model providers and subscriptions](#providers) |
-| `routing` | `设置` (Settings) › `模型与账户` (Models & accounts) › `用量与连接` (Usage & connections) | [Model and work routing](#routing) |
-| `work-routing` | `设置` (Settings) › `模型与账户` (Models & accounts) › `规则与策略` (Rules & policies) | [Model and work routing](#routing) |
+| `providers` | `设置` (Settings) › `模型` (Model) › `模型服务` (Providers) | [Model providers and subscriptions](#providers) |
+| `routing` | `设置` (Settings) › `模型` (Model) › `用量与连接` (Usage & connections) | [Model and work routing](#routing) |
+| `work-routing` | `设置` (Settings) › `模型` (Model) › `规则与策略` (Rules & policies) | [Model and work routing](#routing) |
 | `machines` | `设置` (Settings) › `执行环境` (Execution) › `机器` (Machines) | [Machines](#machines) |
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
 | `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
-| `secrets` | `设置` (Settings) › `执行环境` (Execution) › `密钥` (Secrets) | [Secrets](#secrets) |
-| `api-keys` | `设置` (Settings) › `团队与访问` (Team & access) › `API 密钥` (API keys) | [API keys](#api-keys) |
-| `remote` | `设置` (Settings) › `团队与访问` (Team & access) › `远程访问` (Remote access) | [Remote access over the tailnet](#remote-access) |
+| `secrets` | `设置` (Settings) › `安全` (Security) › `密钥` (Secrets) | [Secrets](#secrets) |
+| `api-keys` | `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys) | [API keys](#api-keys) |
+| `remote` | `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access) | [Remote access over the tailnet](#remote-access) |
 
 ## Features
 
@@ -40,7 +40,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-screen`, `machine-screen-enlarged`, `machine-screen-expand`, `machine-screen-hint`, `machines-button`, `machines-online-dot`
+- Test ids in its code: `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-control-bar`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-access`, `machine-detail-status`, `machine-edit`, `machine-folder`, `machine-folders-empty`, `machine-hostname`, `machine-list-row`, `machine-running-empty`, `machine-running-row`, `machine-screen`, `machine-screen-enlarged`, `machine-screen-expand`, `machine-screen-hint`, `machine-status-dot`, `machine-work`, `machines-add`, `machines-button`, `machines-recheck`
 - Research: [docs/research/coordinator-computer.md](../../../docs/research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](../../../docs/research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](../../../docs/research/user-computer-model-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the computer feed, screen view, browser toggle and control handover have no design
 - Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
@@ -50,7 +50,7 @@ Reach:
 
 **Coordinator chat** (shipped, centrality 1). The one never-ending Coordinator conversation on the home page, where the user dispatches work and reads reports.
 
-States: Empty home with starters, streaming reply with a stop control, finished reply with an action row, and a connection-lost banner when the stream drops.
+States: Empty home with starters, streaming reply with a stop control, finished reply with an action row and, when the Coordinator offered them, quick-reply chips above the composer, and a connection-lost banner when the stream drops.
 
 Reach:
 
@@ -59,12 +59,12 @@ Reach:
 3. `type a request and press Enter`
 
 - Web routes: `/app`
-- Keyboard shortcuts in its code: `Enter`
-- Test ids in its code: `chief-body`, `chief-bubble`, `chief-chip-agent`, `chief-chip-todo`, `chief-composer-block`, `chief-composer-error`, `chief-composer-input`, `chief-composer-placeholder`, `chief-composer-working`, `chief-digest`, `chief-digest-card`, `chief-digest-group`, `chief-digest-item`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-home-scroll`, `chief-msg`, `chief-msg-col`, `chief-msg-foot`, `chief-msg-stamp`, `chief-msg-tools`, `chief-note`, `chief-outage`, `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-line`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-position`, `chief-question-prev`, `chief-question-primary`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`, `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`, `chief-routing-row`, `chief-settings-col`, `chief-settings-topbar`, `chief-stopped`, `chief-stream`, `chief-task-card`, `chief-task-created`, `chief-turn-tools`, `composer-context-meter`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `home-c`, `home-c-earlier`, `home-c-error`, `home-c-hero`, `home-c-lead`, `home-c-pane-buttons`, `home-c-project-links`, `home-c-since`, `home-c-starters`, `memory-list`, `project-instructions-input`, `reply-quote`, `selection-reply`, `selection-reply-bar`, `tasks-badge`, `tasks-toggle`, `thread-activity`, `thread-activity-event`, `thread-activity-summary`, `thread-activity-toggle`, `thread-report-reply`
+- Keyboard shortcuts in its code: none
+- Test ids in its code: `chief-body`, `chief-bubble`, `chief-composer-block`, `chief-composer-error`, `chief-composer-input`, `chief-composer-placeholder`, `chief-digest`, `chief-digest-card`, `chief-digest-group`, `chief-digest-item`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-home-scroll`, `chief-msg`, `chief-msg-block-tools`, `chief-msg-col`, `chief-msg-copy`, `chief-msg-foot`, `chief-msg-more`, `chief-msg-reply`, `chief-msg-sending`, `chief-msg-stamp`, `chief-msg-steps`, `chief-msg-tools-touch`, `chief-note`, `chief-outage`, `chief-question`, `chief-question-asked`, `chief-question-chips`, `chief-question-dismiss`, `chief-question-error`, `chief-question-input-*`, `chief-question-line`, `chief-question-option-*`, `chief-question-submit`, `chief-question-text`, `chief-question-tools`, `chief-question-tools-touch`, `chief-quick-replies`, `chief-quick-reply`, `chief-reply`, `chief-reply-bubble`, `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`, `chief-routing-row`, `chief-sent-attachment`, `chief-sent-attachments`, `chief-settings-col`, `chief-settings-topbar`, `chief-status-live`, `chief-status-mark`, `chief-status-pill`, `chief-stopped`, `chief-stream`, `chief-task-created`, `chief-task-ref`, `chief-task-refs`, `chief-task-started`, `chief-time-divider`, `chief-turn-error`, `chief-turn-retry`, `composer-context-meter`, `composer-plus`, `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `home-c`, `home-c-error`, `home-c-hero`, `home-c-pane-buttons`, `home-c-since`, `home-c-starters`, `memory-list`, `panel-error`, `project-instructions-input`, `reply-quote`, `tasks-badge`, `tasks-toggle`, `thread-activity`, `thread-activity-event`, `thread-activity-summary`, `thread-activity-toggle`, `thread-report-reply`
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-segments.md](features/chief-segments.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md)
 - Research: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/research/dsh-sig-walk-2026-11.md](../../../docs/research/dsh-sig-walk-2026-11.md), [docs/research/pi-durable-spike.md](../../../docs/research/pi-durable-spike.md) (not on main), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
-- Backend design: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/spec/26-pi-session-runtime-and-trust-surface.md](../../../docs/spec/26-pi-session-runtime-and-trust-surface.md)
+- Backend design: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/spec/26-pi-session-runtime-and-trust-surface.md](../../../docs/spec/26-pi-session-runtime-and-trust-surface.md), [docs/design/coordinator-quick-replies.md](../../../docs/design/coordinator-quick-replies.md)
 - Evidence: `apps/web/e2e/chief-home-chat.spec.ts`, `apps/web/e2e/chief-home-c.spec.ts`, `apps/server/test/coordinator-turns.test.ts`, `apps/server/test/coordinator/turn.test.ts`
 
 ### coordinator-context
@@ -104,7 +104,7 @@ Reach:
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-dispatch-judgment.md](features/chief-dispatch-judgment.md)
 - Research: [docs/research/cairn-dogfood-feasibility-2026-11-06.md](../../../docs/research/cairn-dogfood-feasibility-2026-11-06.md), [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md), [docs/research/r15-agent-responsibility-default.md](../../../docs/research/r15-agent-responsibility-default.md)
 - Frontend design: n/a: dispatch shows as threads and report rows inside the Coordinator chat
-- Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/spec/21-single-machine-orchestration-defaults.md](../../../docs/spec/21-single-machine-orchestration-defaults.md)
+- Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md)
 - Evidence: `apps/server/test/chief-dispatch.test.ts`, `integration/test/chief-dispatch-policy-binding.test.ts`, `apps/server/test/agent-removal.test.ts`
 
 ### daily-report
@@ -125,6 +125,26 @@ Reach:
 - Frontend design: **gap**: the report row and retro proposal card have no design
 - Backend design: **gap**: no design for report content, timing, quiet rules and retro proposal storage
 - Evidence: `apps/web/e2e/chief-daily-report.spec.ts`, `apps/server/test/chief-report.test.ts`, `apps/server/test/chief-digest.test.ts`
+
+### engine-view
+
+**Engine run in a task thread** (partial, centrality 1). A run that a task thread dispatched to an engine (Claude Code, Codex) is the thread's own conversation, with time and cost in the usage popover and a read-only raw output view and takeover in the thread menu. A web prototype on fixture data: no backend sends a run yet.
+
+States: Running with the plan checklist, trace rows and the typing bubble; waiting on a question with allow once, refuse and take over; finished with time and cost; failed with the failed command open; taken over with a hand back control; an unknown event as a row that opens its raw payload; a long step list that folds its earlier steps; no tail when the thread carries no run.
+
+Reach:
+
+1. `open /app/todo/<id of a thread listed by the todos API>`
+2. `click label:更多操作…`
+3. `click label:接管`
+
+- Web routes: none
+- Keyboard shortcuts in its code: none
+- Test ids in its code: `engine-question`, `engine-raw`, `engine-raw-copy`, `engine-raw-view`, `engine-take-over-confirm`
+- Research: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md)
+- Frontend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/references/thread-review](../../../docs/design/references/thread-review)
+- Backend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/home-redesign-backend-todo.md](../../../docs/design/home-redesign-backend-todo.md)
+- Evidence: `apps/web/e2e/chief-home-engine-run.spec.ts`, `apps/web/test/engine-run.test.ts`
 
 ### eval-gated-harness
 
@@ -161,14 +181,14 @@ Reach:
 - Verify recipes: [.claude/skills/verify-cairn/features/local-daemon-executor.md](features/local-daemon-executor.md)
 - Research: [docs/research/1607-acp-execution-surface.md](../../../docs/research/1607-acp-execution-surface.md), [docs/research/r4-foundation.md](../../../docs/research/r4-foundation.md), [docs/research/r10-multica-runtime.md](../../../docs/research/r10-multica-runtime.md), [docs/research/r11-runtime-gap.md](../../../docs/research/r11-runtime-gap.md), [docs/research/herdr-multica-parity.md](../../../docs/research/herdr-multica-parity.md)
 - Frontend design: n/a: harness choice surfaces through routing settings and the thread's model line
-- Backend design: [docs/spec/17-dual-runtime-execution-surface.md](../../../docs/spec/17-dual-runtime-execution-surface.md), [docs/spec/24-run-brief-written-to-worktree-file.md](../../../docs/spec/24-run-brief-written-to-worktree-file.md), [docs/spec/26-pi-session-runtime-and-trust-surface.md](../../../docs/spec/26-pi-session-runtime-and-trust-surface.md)
+- Backend design: [docs/spec/17-dual-runtime-execution-surface.md](../../../docs/spec/17-dual-runtime-execution-surface.md), [docs/design/runtime-memory-out-of-tree.md](../../../docs/design/runtime-memory-out-of-tree.md), [docs/spec/26-pi-session-runtime-and-trust-surface.md](../../../docs/spec/26-pi-session-runtime-and-trust-surface.md)
 - Evidence: `apps/daemon/test/acp.test.ts`, `apps/daemon/test/runner-runtime.test.ts`, `integration/test/pi-session-policy.test.ts`
 
 ### memory
 
-**Memory** (shipped, centrality 1). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. D123 plans direct in-place edits of MEMORY.md and memory files.
+**Memory** (shipped, centrality 1). Team and project memories the Coordinator writes, consolidates, promotes and injects into later turns and threads. A design plans direct in-place edits of MEMORY.md and memory files.
 
-States: Shipped: Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete. Planned D123 replacement: input, working, applied, awaiting input, partial, stopped, error and offline; page and focused-file composers.
+States: Shipped: Coordinator settings, Memory tab, list team memory; each project settings page has a Memory tab with the project instructions and that project's memory. Core rows are read by every thread, searchable rows are memory files; a row opens a detail dialog with Delete. Planned replacement: input, working, applied, awaiting input, partial, stopped, error and offline; page and focused-file composers.
 
 Reach:
 
@@ -192,7 +212,7 @@ States: The gate shows why a merge is allowed or blocked; merge permission missi
 Reach:
 
 1. `open /app/todo/<id of a thread listed by the todos API>`
-2. `click testid:work-prs`
+2. `click testid:thread-pr-panel`
 3. `click testid:accept-dialog-pr`
 
 - Web routes: none
@@ -206,18 +226,18 @@ Reach:
 
 ### needs-you
 
-**Task cards and needs-you** (shipped, centrality 1). A task the Coordinator creates shows as a card in the conversation with its status, update count and latest line; the Tasks toggle carries the needs-you count.
+**Task references and needs-you** (shipped, centrality 1). A task the Coordinator creates or mentions shows as one reference row above the reply, tinted by its status, and opens the task panel; the Tasks toggle carries the needs-you count.
 
-States: A card per created task after the reply that announced it (waiting, working, resolved); a one-line link when the Tasks read no longer lists the task; no tray above the composer.
+States: One reference row per task per reply (working, waiting, resolved, failed tint; unread dot); a lone row without a connector when the turn has no reply yet; a one-line link when the page no longer knows the task; no tray above the composer.
 
 Reach:
 
 1. `open /app`
-2. `click testid:chief-task-card`
+2. `click testid:chief-task-ref`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: none
+- Test ids in its code: `chief-task-ref`
 - Research: [docs/research/link-roundup-2026-11-01.md](../../../docs/research/link-roundup-2026-11-01.md), [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main), [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md)
 - Frontend design: [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md)
 - Backend design: **gap**: no design for which records enter the tray, their order and when they leave
@@ -291,12 +311,12 @@ States: A question card sits above the composer with numbered options and a reco
 Reach:
 
 1. `open /app`
-2. `click testid:chief-question-card`
+2. `click testid:chief-question-option-0-0`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `chief-composer-block`, `chief-question-answer-*`, `chief-question-card`, `chief-question-collapse`, `chief-question-dismiss`, `chief-question-dock`, `chief-question-error`, `chief-question-hint`, `chief-question-input-*`, `chief-question-leaving`, `chief-question-more`, `chief-question-next`, `chief-question-option-*`, `chief-question-position`, `chief-question-prev`, `chief-question-recommended`, `chief-question-status`, `chief-question-text`
-- Research: **gap**: the Codex CLI and t3code question patterns behind D85 and D119 were never written up
+- Test ids in its code: `chief-question`, `chief-question-chips`, `chief-question-error`, `chief-question-input-*`, `chief-question-option-*`, `chief-question-submit`, `chief-question-text`, `chief-question-tools`, `chief-question-tools-touch`
+- Research: **gap**: the Codex CLI and t3code question patterns were never written up
 - Frontend design: [docs/design/qcard-variants/README.md](../../../docs/design/qcard-variants/README.md) (not on main), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
 - Backend design: **gap**: no design for the question lifecycle: parking, late answers, cancel and resume
 - Evidence: `apps/web/e2e/chief-home-questions.spec.ts`, `apps/server/test/chief-questions.test.ts`, `apps/web/test/question-lifecycle.test.ts`
@@ -314,7 +334,7 @@ Reach:
 3. `settings work-routing`
 
 - Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`, `/app/settings/team`, `/app/team`
-- Settings: `设置` (Settings) › `模型与账户` (Models & accounts) › `用量与连接` (Usage & connections); `设置` (Settings) › `模型与账户` (Models & accounts) › `规则与策略` (Rules & policies)
+- Settings: `设置` (Settings) › `模型` (Model) › `用量与连接` (Usage & connections); `设置` (Settings) › `模型` (Model) › `规则与策略` (Rules & policies)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-orb`, `route-override-save`, `routing-empty`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
 - Research: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](../../../docs/research/agent-machine-routing.md) (not on main)
@@ -324,23 +344,23 @@ Reach:
 
 ### selection-reply
 
-**Selection reply** (shipped, centrality 1). Select text in a Coordinator message and press Reply to quote it above the composer; the sent message carries the quote and its source message id.
+**Reply quote** (shipped, centrality 1). Press Reply in a Coordinator message's hover tools to quote it above the composer; the sent message carries the quote and its source message id. Selecting text shows no reply bar.
 
-States: Bar above the selection, quote staged above the composer, sent bubble with the quote, no bar on touch selections, light and dark, 1440 and 390 wide.
+States: Quote staged above the composer, source marked while the quote bar is hovered and unmarked once it is removed, sent bubble with the quote, light and dark, 1440 and 390 wide.
 
 Reach:
 
 1. `open /app`
-2. `type select two or more characters inside one Coordinator reply`
-3. `click testid:selection-reply`
+2. `hover testid:chief-reply-bubble`
+3. `click testid:chief-msg-reply`
 
 - Web routes: `/app`
-- Keyboard shortcuts in its code: `Enter`
-- Test ids in its code: `composer-reply-quote`, `composer-reply-quote-remove`, `reply-quote`, `selection-reply`, `selection-reply-bar`
+- Keyboard shortcuts in its code: none
+- Test ids in its code: `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `reply-quote`
 - Research: [docs/research/selection-reply-2026-11-08.md](../../../docs/research/selection-reply-2026-11-08.md)
 - Frontend design: [docs/design/selection-reply-2026-11-08.md](../../../docs/design/selection-reply-2026-11-08.md)
 - Backend design: [docs/design/selection-reply-2026-11-08.md](../../../docs/design/selection-reply-2026-11-08.md)
-- Evidence: `apps/web/e2e/chief-selection-reply.spec.ts`, `packages/shared/test/reply-quote.test.ts`, `apps/web/test/selection-reply-model.test.ts`
+- Evidence: `apps/web/e2e/chief-reply-quote.spec.ts`, `packages/shared/test/reply-quote.test.ts`
 
 ### steer-queue-stop
 
@@ -357,7 +377,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `composer-card`, `composer-placeholder`, `composer-toolbar`, `composer-working`
+- Test ids in its code: `composer-card`, `composer-placeholder`, `composer-plus`, `composer-toolbar`
 - Verify recipes: [.claude/skills/verify-cairn/features/stop-button.md](features/stop-button.md)
 - Research: **gap**: no note on how Amp, Claude Code and Codex steer, queue and interrupt
 - Frontend design: **gap**: the queued-message list, steer affordance and stop confirmation have no design
@@ -380,7 +400,7 @@ Reach:
 - Test ids in its code: none
 - Research: [docs/research/machine-execution-plane.md](../../../docs/research/machine-execution-plane.md), [docs/research/r13-multica-runtime-verify.md](../../../docs/research/r13-multica-runtime-verify.md)
 - Frontend design: n/a: a protocol between server and daemon with no user surface
-- Backend design: [docs/spec/02-architecture-parity.md](../../../docs/spec/02-architecture-parity.md), [docs/research/2513-tla-statecharts.md](../../../docs/research/2513-tla-statecharts.md)
+- Backend design: [docs/research/2513-tla-statecharts.md](../../../docs/research/2513-tla-statecharts.md)
 - Evidence: `apps/server/test/machine-pool-claim.test.ts`, `apps/server/test/machine-zombie-claim.test.ts`, `apps/daemon/test/machine-claim.test.ts`
 
 ### thread-pr-panel
@@ -392,7 +412,7 @@ States: No PR yet, open with checks running or failing, conflicts, merged, or a 
 Reach:
 
 1. `open /app/todo/<id of a thread listed by the todos API>`
-2. `click testid:work-prs`
+2. `click testid:thread-pr-panel`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
@@ -416,7 +436,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `agent-text`, `agent-todo`, `automation-completed`, `edit-error`, `fail-raw-error`, `info-report`, `injected-skills`, `injected-skills-chip`, `made-empty`, `msg-actions`, `msg-stamp`, `queued-capsules-standalone`, `schedule-wake-marker`, `scheduled-turn`, `side-chat`, `side-chat-changes`, `side-chat-changes-view`, `side-chat-plan`, `side-chat-send-error`, `side-chat-status`, `side-chat-unavailable`, `skill-line`, `skills-summary`, `step-prompt-raw`, `taskline`, `thinking-body`, `tool-output`, `transcript-note`, `transcript-question`, `transcript-step-prompt`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`, `worked-for-rule`
+- Test ids in its code: `agent-text`, `agent-todo`, `automation-completed`, `edit-error`, `engine-run`, `fail-raw-error`, `home-c`, `info-report`, `left`, `live-row`, `made-archived-empty`, `made-archived-note`, `made-empty`, `made-group`, `made-group-count`, `made-no-match`, `made-search-toggle`, `made-tabs`, `msg-actions`, `msg-stamp`, `msg-tools`, `msg-tools-touch`, `queued-capsules-standalone`, `right`, `schedule-wake-marker`, `scheduled-turn`, `side-chat`, `side-chat-back`, `side-chat-changes`, `side-chat-changes-view`, `side-chat-panel`, `side-chat-plan`, `side-chat-send-error`, `side-chat-status`, `side-chat-unavailable`, `skill-line`, `skills-summary`, `step-prompt-raw`, `thinking-body`, `tool-output`, `transcript-note`, `transcript-question`, `transcript-step-prompt`, `transcript-time-divider`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-earlier`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`
 - Verify recipes: [.claude/skills/verify-cairn/features/detail-right-pane.md](features/detail-right-pane.md)
 - Research: [docs/research/r15-multica-run-rendering.md](../../../docs/research/r15-multica-run-rendering.md), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/thread-review](../../../docs/design/references/thread-review)
@@ -438,16 +458,16 @@ Reach:
 
 - Web routes: `/app/todo/:id`
 - Keyboard shortcuts in its code: `B`, `C`, `P`
-- Test ids in its code: `accept-dialog-pr`, `agent-text`, `agent-todo`, `automation-completed`, `composer-card`, `composer-placeholder`, `composer-toolbar`, `composer-working`, `diff-fold`, `diff-full`, `doc-body`, `doc-pane`, `edit-error`, `fail-raw-error`, `info-report`, `injected-skills`, `injected-skills-chip`, `md-code`, `md-code-block`, `md-code-copy`, `md-code-lang`, `md-item-bullet`, `md-item-ordered`, `md-list-bullet`, `md-list-ordered`, `md-table`, `md-task`, `md-tasks`, `msg-actions`, `msg-stamp`, `schedule-wake-marker`, `scheduled-turn`, `side-chat-action`, `skill-line`, `skills-summary`, `source-issue-drift`, `source-issue-echo`, `source-issue-pending`, `source-issue-retry`, `source-orchestration`, `source-orchestration-link`, `step-prompt-raw`, `taskline`, `thinking-body`, `tool-output`, `transcript-col`, `transcript-note`, `transcript-question`, `transcript-step-prompt`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`, `worked-for-rule`
+- Test ids in its code: `accept-dialog-pr`, `agent-text`, `agent-todo`, `automation-completed`, `chief-reply-bubble`, `composer-card`, `composer-placeholder`, `composer-plus`, `composer-toolbar`, `diff-fold`, `diff-full`, `doc-body`, `doc-pane`, `edit-error`, `fail-raw-error`, `info-report`, `left`, `live-row`, `md-checkbox`, `md-code`, `md-code-block`, `md-code-copy`, `md-code-dialog-body`, `md-code-dialog-copy`, `md-code-done`, `md-code-expand`, `md-code-lang`, `md-item-bullet`, `md-item-ordered`, `md-item-task`, `md-list-bullet`, `md-list-ordered`, `md-list-task`, `md-quote`, `md-table`, `md-task`, `md-task-children`, `md-tasks`, `msg-actions`, `msg-stamp`, `msg-tools`, `msg-tools-touch`, `right`, `schedule-wake-marker`, `scheduled-turn`, `side-chat-action`, `skill-line`, `skills-summary`, `source-issue-drift`, `source-issue-echo`, `source-issue-pending`, `source-issue-retry`, `source-orchestration`, `source-orchestration-link`, `step-prompt-raw`, `thinking-body`, `tool-output`, `transcript-col`, `transcript-note`, `transcript-question`, `transcript-step-prompt`, `transcript-time-divider`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-earlier`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`
 - Verify recipes: [.claude/skills/verify-cairn/features/board-new-task.md](features/board-new-task.md), [.claude/skills/verify-cairn/features/agent-detail.md](features/agent-detail.md)
 - Research: [docs/research/r12-save-and-start-behavior.md](../../../docs/research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/research/duet-proactive-coordinator.md](../../../docs/research/duet-proactive-coordinator.md)
 - Frontend design: [docs/design/references/thread-review](../../../docs/design/references/thread-review), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
-- Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](../../../docs/spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/spec/24-run-brief-written-to-worktree-file.md](../../../docs/spec/24-run-brief-written-to-worktree-file.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md)
+- Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](../../../docs/spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/design/runtime-memory-out-of-tree.md](../../../docs/design/runtime-memory-out-of-tree.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md)
 - Evidence: `apps/web/e2e/detail-continue-thread.spec.ts`, `apps/web/e2e/detail-archive.spec.ts`, `apps/server/test/snooze.test.ts`, `apps/server/test/archive.test.ts`, `apps/server/test/tasks.test.ts`
 
 ### desktop-app
 
-**Desktop app** (planned, centrality 2). D45 and D100: a web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.
+**Desktop app** (planned, centrality 2). A web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.
 
 
 - Web routes: none
@@ -521,7 +541,7 @@ Reach:
 
 **Mobile web and PWA** (shipped, centrality 2). The web app installed on a phone: narrow layouts, the service worker and the home-screen app.
 
-States: At phone width the Coordinator home has bottom tabs for chat and Tasks, the sidebar becomes a drawer whose project rows carry one status line, and settings collapse to a list; the app can be installed to the home screen.
+States: At phone width the Coordinator home has no header bar: a round menu button, the bare status mark and one round Tasks button with its count badge float at the top, a floating pill tab bar switches chat, Tasks and results with a round computers button beside it, every side panel is a full-screen tab between them, the composer is one row, settings and activity live in the drawer footer, touch message tools appear on a tap, and the sidebar drawer pushes the conversation back as a dimmed card; settings collapse to a list; the app can be installed to the home screen.
 
 Reach:
 
@@ -529,15 +549,15 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `tasks-badge`
+- Test ids in its code: `narrow-menu`, `tasks-badge`, `tasks-toggle`
 - Research: **gap**: no note on how Amp, t3code and Claude handle mobile web and PWA install
 - Frontend design: [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
 - Backend design: n/a: served by the same server; push is its own feature
-- Evidence: `apps/web/e2e/mobile-narrow.spec.ts`, `apps/web/e2e/chief-home-phone-tabs.spec.ts`, `apps/web/test/pwa.test.ts`
+- Evidence: `apps/web/e2e/mobile-narrow.spec.ts`, `apps/web/e2e/chief-home-phone-tabs.spec.ts`, `apps/web/e2e/chief-home-narrow-shell.spec.ts`, `apps/web/test/pwa.test.ts`
 
 ### own-key-sandboxes
 
-**Own-key cloud sandboxes** (partial, centrality 2). D101 execution target: orbs on E2B or Daytona with the user's own key, called outbound by the daemon.
+**Own-key cloud sandboxes** (partial, centrality 2). Execution target: orbs on E2B or Daytona with the user's own key, called outbound by the daemon.
 
 States: Not exposed in the UI yet; the daemon selects E2B when configured.
 
@@ -567,7 +587,7 @@ Reach:
 3. `click testid:subscription-verify`
 
 - Web routes: `/app/resources/providers`
-- Settings: `设置` (Settings) › `模型与账户` (Models & accounts) › `模型服务` (Providers)
+- Settings: `设置` (Settings) › `模型` (Model) › `模型服务` (Providers)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `providers-empty`, `providers-partial-error`, `resource-new`, `subscription-label`, `subscription-token`
 - Verify recipes: [.claude/skills/verify-cairn/features/providers-tabs.md](features/providers-tabs.md), [.claude/skills/verify-cairn/features/provider-picker.md](features/provider-picker.md)
@@ -589,9 +609,9 @@ Reach:
 3. `click testid:pairing-route-select`
 
 - Web routes: none
-- Settings: `设置` (Settings) › `团队与访问` (Team & access) › `远程访问` (Remote access)
+- Settings: `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `pair-new-device`, `pairing-blocked`, `pairing-route-select`, `remote-routes-empty`, `tailnet-owner-identity`
+- Test ids in its code: `pair-new-device`, `pairing-blocked`, `pairing-route-select`, `remote-routes-empty`
 - Research: [docs/research/remote-access-tsnet.md](../../../docs/research/remote-access-tsnet.md), [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the remote access page, route list and pairing flow have no design
 - Backend design: [docs/research/remote-access-tsnet.md](../../../docs/research/remote-access-tsnet.md)
@@ -647,7 +667,7 @@ Reach:
 2. `click testid:keys-empty`
 
 - Web routes: `/app/api-keys`
-- Settings: `设置` (Settings) › `团队与访问` (Team & access) › `API 密钥` (API keys)
+- Settings: `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `keys-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/api-keys.md](features/api-keys.md)
@@ -660,17 +680,16 @@ Reach:
 
 **App shell and settings window** (shipped, centrality 3). The served single-page app, the live team event stream, and the settings window that hosts every section.
 
-States: The settings window with grouped navigation, a search field reached by slash, a breadcrumb, and the live stream reconnecting after a drop.
+States: The settings window with grouped navigation, a search field that typing with nothing focused fills, a breadcrumb, and the live stream reconnecting after a drop.
 
 Reach:
 
 1. `open /app/settings`
 2. `click testid:settings-search`
-3. `press /`
 
 - Web routes: `/app/settings/:section?`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `settings-backdrop`, `settings-body`, `settings-breadcrumb`, `settings-content`
+- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `settings-backdrop`, `settings-body`, `settings-content`, `settings-head`, `settings-title`
 - Verify recipes: [.claude/skills/verify-cairn/features/hotkeys.md](features/hotkeys.md), [.claude/skills/verify-cairn/features/persona-verify.md](features/persona-verify.md)
 - Research: [docs/research/ai-frontend-quality-2026-11-06.md](../../../docs/research/ai-frontend-quality-2026-11-06.md) (not on main), [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/settings](../../../docs/design/references/settings)
@@ -699,23 +718,23 @@ Reach:
 
 ### attachments
 
-**Attachments** (shipped, centrality 3). Files pasted or attached to messages and files agents attach to threads, uploaded by grant and reclaimed later.
+**Attachments** (shipped, centrality 3). Files dropped, pasted or picked into a composer and files agents attach to threads, uploaded by grant and reclaimed later; a sent attachment is a card above the user's message that opens in the right-hand file preview panel.
 
-States: Pending upload, attached card with preview, and agent attachments in the thread transcript.
+States: Composer tile uploading (grey pulse), ready, failed (removable) and the drop-target outline; sent attachment card; file preview panel for text with line numbers, an empty file, an image, an unsupported type, loading and a load error; agent attachments in the thread transcript.
 
 Reach:
 
 1. `open /app`
-2. `click label:添加附件`
+2. `click testid:chief-sent-attachment`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `attachment-pending`, `composer-attachments`
+- Test ids in its code: `attachment-pending`, `chief-sent-attachment`, `chief-sent-attachments`, `composer-attachments`, `file-preview-broken`, `file-preview-copy`, `file-preview-download`, `file-preview-image`, `file-preview-markdown`, `file-preview-name`, `file-preview-panel`, `file-preview-pdf`, `file-preview-source-toggle`, `file-preview-text`, `file-preview-truncated`, `file-preview-unsupported`
 - Verify recipes: [.claude/skills/verify-cairn/features/attachments.md](features/attachments.md)
-- Research: **gap**: no note on attachment handling in reference products
-- Frontend design: **gap**: attachment cards and previews have no design
-- Backend design: [docs/spec/20-attachment-reclaim-strategy.md](../../../docs/spec/20-attachment-reclaim-strategy.md)
-- Evidence: `apps/web/e2e/attachment-strip.spec.ts`, `apps/web/e2e/detail-agent-attachments.spec.ts`, `apps/server/test/attachments.test.ts`
+- Research: [docs/research/file-preview-reference-2026-11-11.md](../../../docs/research/file-preview-reference-2026-11-11.md)
+- Frontend design: [docs/design/references/coordinator-chat/claude-duet-composer-attachment.jpg](../../../docs/design/references/coordinator-chat/claude-duet-composer-attachment.jpg), [docs/design/references/coordinator-chat/claude-duet-file-preview-panel.jpg](../../../docs/design/references/coordinator-chat/claude-duet-file-preview-panel.jpg), [docs/design/references/coordinator-chat/claude-duet-sent-attachment-uploading.jpg](../../../docs/design/references/coordinator-chat/claude-duet-sent-attachment-uploading.jpg)
+- Backend design: [docs/spec/20-attachment-reclaim-strategy.md](../../../docs/spec/20-attachment-reclaim-strategy.md), [docs/design/side-panels-backend-gaps.md](../../../docs/design/side-panels-backend-gaps.md)
+- Evidence: `apps/web/e2e/attachment-strip.spec.ts`, `apps/web/e2e/chief-files.spec.ts`, `apps/web/e2e/detail-agent-attachments.spec.ts`, `apps/server/test/attachments.test.ts`
 
 ### composer
 
@@ -731,11 +750,11 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `chief-composer-input`, `chief-composer-placeholder`, `chief-composer-working`
+- Test ids in its code: `chief-composer-input`, `chief-composer-placeholder`, `composer-plus`
 - Verify recipes: [.claude/skills/verify-cairn/features/mentions.md](features/mentions.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md), [.claude/skills/verify-cairn/features/hotkeys.md](features/hotkeys.md)
 - Research: **gap**: no note comparing composers in claude.ai, Amp and t3code
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat)
-- Backend design: **gap**: no design for server drafts (D110) and named prompts
+- Backend design: **gap**: no design for server drafts  and named prompts
 - Evidence: `apps/web/e2e/composer-slash.spec.ts`, `apps/web/e2e/chief-draft-persist.spec.ts`, `apps/server/test/composer-drafts.test.ts`
 
 ### coordinator-mcp
@@ -753,7 +772,7 @@ Reach:
 - Test ids in its code: none
 - Research: **gap**: the t3code comparison of plan §21 is not in the repository
 - Frontend design: n/a: an API for other harnesses with no page
-- Backend design: [docs/spec/02-architecture-parity.md](../../../docs/spec/02-architecture-parity.md)
+- Backend design: [docs/research/desktop-mobile-mcp-forms-2026-11-08.md](../../../docs/research/desktop-mobile-mcp-forms-2026-11-08.md)
 - Evidence: `apps/server/test/mcp-face.test.ts`, `integration/test/m4b-mcp-e2e.test.ts`
 
 ### git-hosting
@@ -837,7 +856,7 @@ Reach:
 
 ### projects
 
-**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings, and delete.
+**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings or the sidebar's archived filter, an archived project opened read-only, and delete.
 
 States: A new-project form for a local folder or a GitHub repository, a project home, settings for base branch, concurrency, autonomy and instructions, archived or deleted.
 
@@ -853,7 +872,7 @@ Reach:
 - Web routes: `/app/project/:id`, `/app/project/:id/settings`, `/app/project/:id/tasks`, `/app/project/new`
 - Settings: `设置` (Settings) › `项目`
 - Keyboard shortcuts in its code: `A`, `D`, `G`, `L`, `P`, `R`, `T`
-- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`, `project-home`, `project-home-ask`, `project-home-empty`, `project-home-instructions`, `project-home-links`, `task-card`, `task-meta`, `task-row`, `task-status`
+- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`, `project-home`, `project-home-ask`, `project-home-edit-blocked`, `project-home-empty`, `project-home-instructions`, `project-home-links`, `task-card`, `task-meta`, `task-row`, `task-status`
 - Verify recipes: [.claude/skills/verify-cairn/features/project-new-form.md](features/project-new-form.md), [.claude/skills/verify-cairn/features/github-oauth-picker.md](features/github-oauth-picker.md), [.claude/skills/verify-cairn/features/local-repo-api.md](features/local-repo-api.md)
 - Research: [docs/research/project-coordinators.md](../../../docs/research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
@@ -911,7 +930,7 @@ Reach:
 - Web routes: `/app/schedules`
 - Keyboard shortcuts in its code: `D`
 - Test ids in its code: `schedule-detail-body`, `schedules-error`, `schedules-loading`
-- Research: **gap**: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model behind D56
+- Research: **gap**: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model
 - Frontend design: **gap**: the schedules page and detail dialog have no design
 - Backend design: **gap**: no design for due events, missed runs and continue-thread schedules
 - Evidence: `apps/web/e2e/schedules-live.spec.ts`, `apps/server/test/schedules.test.ts`, `apps/server/test/due-events.test.ts`
@@ -951,7 +970,7 @@ Reach:
 3. `click testid:secret-scope`
 
 - Web routes: `/app/resources/secrets`
-- Settings: `设置` (Settings) › `执行环境` (Execution) › `密钥` (Secrets)
+- Settings: `设置` (Settings) › `安全` (Security) › `密钥` (Secrets)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `resource-empty`, `secret-scope`
 - Research: [docs/research/1775-gateway-prior-art.md](../../../docs/research/1775-gateway-prior-art.md)
@@ -980,23 +999,25 @@ Reach:
 
 ### sidebar
 
-**Sidebar** (shipped, centrality 3). The sidebar with the Coordinator row, unarchived projects with a needs-you dot, owner-made project groups and the project menu with Move to group.
+**Sidebar** (shipped, centrality 3). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive, delete) and the machine-status footer.
 
-States: Projects listed flat with no group, ungrouped projects then collapsible groups in name order, an ochre dot on a project with a task waiting on the owner, and loading or error rows.
+States: Projects under the Coordinator with no group, ungrouped projects then groups in name order, a folded group with its count, an ochre dot on a project with a task waiting on the owner, the open row menu, loading or error rows, the filter on archived (note, archived rows with their groups, back row) or empty archived, the filter on all with archived rows marked, an archived project opened read-only with the unarchive bar, and the 48px rail.
 
 Reach:
 
 1. `open /app`
-2. `click testid:project-group`
-3. `click testid:project-group-header`
+2. `click testid:project-group-header`
+3. `click testid:sidebar-project-filter`
+4. `click testid:sidebar-project-filter-archived`
+5. `click testid:archived-project-bar-unarchive`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `project-group`, `sidebar-activity`, `sidebar-attention`, `sidebar-footer`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-settings`, `team-row`
-- Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main)
-- Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
+- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-activity`, `sidebar-archived-delete-all`, `sidebar-archived-empty`, `sidebar-archived-note`, `sidebar-archived-page`, `sidebar-attention`, `sidebar-footer`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-reopen`, `sidebar-settings`, `team-row`
+- Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
+- Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
 - Backend design: **gap**: no design for unread and read marks across devices
-- Evidence: `apps/web/e2e/sidebar-nav.spec.ts`, `apps/web/e2e/sidebar-projects.spec.ts`, `apps/server/test/unread-notifications.test.ts`
+- Evidence: `apps/web/e2e/sidebar-nav.spec.ts`, `apps/web/e2e/sidebar-projects.spec.ts`, `apps/web/e2e/sidebar-visual.spec.ts`, `apps/web/e2e/sidebar-archived.spec.ts`, `apps/server/test/unread-notifications.test.ts`
 
 ### skills
 
@@ -1040,15 +1061,28 @@ Reach:
 
 ### ios-app
 
-**iOS app** (planned, centrality 4). D22: a native phone app with Live Activities, forked from Optio or t3code when the time comes.
+**iOS app** (planned, centrality 4). A native phone app with Live Activities, forked from Optio or t3code when the time comes.
 
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: none
-- Research: **gap**: the Optio and t3code comparison of D22 has not been done
+- Research: **gap**: the Optio and t3code comparison has not been done
 - Frontend design: **gap**: not designed
 - Backend design: **gap**: not designed
+- Evidence: none
+
+### job-applications
+
+**Job applications** (planned, centrality 4). Owner-gated host allow, profile and daily cap for a later host-browser submit.
+
+
+- Web routes: none
+- Keyboard shortcuts in its code: none
+- Test ids in its code: none
+- Research: n/a: the owner design is the source; no reference product is copied
+- Frontend design: n/a: this slice has no product UI
+- Backend design: [docs/design/job-applications.md](../../../docs/design/job-applications.md)
 - Evidence: none
 
 ### thread-tags

@@ -6,7 +6,7 @@ const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks';
 const ROUTING_POLICIES = '/app/settings/work-routing?scenario=routing-settings';
 const ACCEPT = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34';
 
-const BADGES = '/app?scenario=home-c&pane=machines';
+const BADGES = '/design.html';
 const SCHEDULES = '/app/schedules?scenario=r3-92';
 
 interface FocusInfo {
@@ -18,7 +18,6 @@ interface FocusInfo {
   boxShadow: string;
   borderTopColor: string;
   focusRing: string;
-  focusHalo: string;
   inputColor: string;
   primaryColor: string;
   ringColor: string;
@@ -44,14 +43,6 @@ async function readFocus(locator: Locator): Promise<FocusInfo> {
       boxShadow: cs.boxShadow,
       borderTopColor: cs.borderTopColor,
       focusRing: root.getPropertyValue('--focus-ring').trim(),
-      focusHalo: (() => {
-        const probe = document.createElement('div');
-        probe.style.color = 'var(--focus-halo)';
-        document.body.append(probe);
-        const color = getComputedStyle(probe).color;
-        probe.remove();
-        return color;
-      })(),
       inputColor: root.getPropertyValue('--input').trim(),
       primaryColor: root.getPropertyValue('--primary').trim(),
       ringColor: root.getPropertyValue('--ring').trim(),
@@ -91,7 +82,7 @@ function expectFieldRing(info: FocusInfo) {
   expect(info.focusVisible).toBe(true);
   expect(info.outlineStyle).toBe('none');
   expect(info.borderTopColor).toBe(hexToRgb(info.focusRing));
-  expect(info.boxShadow).toBe(`${info.focusHalo} 0px 0px 0px 3px`);
+  expect(info.boxShadow).toBe('none');
 }
 
 async function themed(page: Page, theme: 'dark' | 'light', url: string) {
@@ -149,7 +140,7 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
     expectFieldRing(await readFocus(input));
   });
 
-  test('aria-invalid focus draws a destructive border and a 3px danger halo, no outline', async ({
+  test('aria-invalid focus draws only a destructive border, no outline or halo', async ({
     page,
   }) => {
     const dialog = await openSkillDialog(page, 'dark');
@@ -158,25 +149,23 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
     await input.evaluate((el) => el.setAttribute('aria-invalid', 'true'));
     await settleTransitions(page);
     const info = await readFocus(input);
-    const probes = await page.evaluate(() => {
-      const read = (value: string) => {
-        const probe = document.createElement('div');
-        probe.style.color = value;
-        document.body.append(probe);
-        const out = getComputedStyle(probe).color;
-        probe.remove();
-        return out;
-      };
-      return { destructive: read('var(--destructive)'), halo: read('var(--danger-halo)') };
+    const destructive = await page.evaluate(() => {
+      const probe = document.createElement('div');
+      probe.style.color = 'var(--destructive)';
+      document.body.append(probe);
+      const out = getComputedStyle(probe).color;
+      probe.remove();
+      return out;
     });
     expect(info.outlineStyle).toBe('none');
-    expect(info.borderTopColor).toBe(probes.destructive);
-    expect(info.boxShadow).toBe(`${probes.halo} 0px 0px 0px 3px`);
+    expect(info.borderTopColor).toBe(destructive);
+    expect(info.boxShadow).toBe('none');
   });
 
   test('checkbox, switch, and badge use the global outline', async ({ page }) => {
     await themed(page, 'dark', ACCEPT);
-    await page.getByTestId('side-chat-action').getByRole('button', { name: '完成…' }).click();
+    await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
+    await page.getByRole('menuitem', { name: '完成' }).click();
     const checkbox = page.getByRole('dialog', { name: '完成任务' }).locator('[data-slot="checkbox"]');
     await expect(checkbox).toBeVisible();
     await focusKeyboard(checkbox);

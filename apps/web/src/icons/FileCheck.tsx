@@ -1,6 +1,6 @@
 import type { SVGProps } from 'react';
 
-export function FileCheck({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
+export function FileCheck({ width = 20, height = 20, ...props }: SVGProps<SVGSVGElement>) {
   return (
     <svg
       aria-hidden="true"

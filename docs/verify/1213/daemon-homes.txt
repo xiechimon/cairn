@@ -1,2 +1,0 @@
-A=/tmp/pacman-1213-daemon-a-1791730621740
-B=/tmp/pacman-1213-daemon-b-1791730621740

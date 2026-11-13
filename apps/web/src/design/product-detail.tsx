@@ -1,16 +1,22 @@
 import { PHASE_VALUES } from '@cairn/shared';
 import { cn } from 'cn';
 import { useState } from 'react';
+import { TaskRefRow } from '../chief/chief-task-ref-row.js';
 import { ComposerAttachmentTile } from '../components/composer-attachment-tile.js';
 import { Button } from '../components/ui/button.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
 import { Composer } from '../detail/composer.js';
 import { DocPane } from '../detail/docpane.js';
-import { Segments, TodoStatus } from '../detail/segments.js';
+import {
+  Segments,
+  TaskMentionAsLinkContext,
+  TodoGlanceContext,
+  TodoStatus,
+} from '../detail/segments.js';
 import { SourceIssueLine } from '../detail/source-issue.js';
 import { SpecBlock } from '../detail/spec-block.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
-import { InjectedSkills, WorkTrace } from '../detail/work-trace.js';
+import { WorkTrace } from '../detail/work-trace.js';
 import { useI18n } from '../i18n/provider.js';
 import { serializeMention } from '../overlay/mention-token.js';
 import type { DocView } from '../overlay/plan-dropdown.js';
@@ -92,13 +98,12 @@ function ComposerSpecimen() {
           />
         </div>
       </Cell>
-      <Cell label="Attachment tile states: file, image, uploading, over the size limit">
+      <Cell label="Attachment tile states: file, image, uploading, upload failed">
         <div className="flex w-160 flex-wrap gap-2 rounded-(--radius-composer) bg-card px-3.5 pt-3.5 pb-3 shadow-(--shadow-composer)">
           <ComposerAttachmentTile
             name="error.log"
             kind="LOG"
             state="ready"
-            detail="212 lines"
             href="#"
             onRemove={noop}
           />
@@ -110,29 +115,22 @@ function ComposerSpecimen() {
             onPreview={noop}
             onRemove={noop}
           />
-          <ComposerAttachmentTile
-            name="screen-recording.mov"
-            kind="MOV"
-            state="uploading"
-            progress={45}
-          />
+          <ComposerAttachmentTile name="screen-recording.mov" kind="MOV" state="uploading" />
           <ComposerAttachmentTile
             name="build.zip"
             kind="ZIP"
             state="error"
-            detail="80 MB"
             errorReason="Over 50 MB"
             onRemove={noop}
           />
         </div>
       </Cell>
-      <Cell label="Agent running: timer and stop beside send; sending queues the message">
+      <Cell label="Agent running: stop beside send; sending queues the message">
         <div className="w-160 pt-2">
           <Composer
             placeholder={PHASE_UI.building.placeholder ?? ''}
             aiReview={false}
             streaming
-            workingFor={{ seconds: 72 }}
             editable
             mentionGroups={MENTION_GROUPS}
             onQueue={(text) => setSent((all) => [...all, `queued: ${text}`])}
@@ -251,6 +249,9 @@ function DialogsSpecimen() {
   );
 }
 
+const TASK_REF_TITLE = 'Read the cairn repo';
+const TASK_REF_PHASES = ['building', 'review', 'done', 'failed', 'todo'] as const;
+
 export function ProductDetailSection() {
   const { t } = useI18n();
   const [queued, setQueued] = useState([
@@ -326,7 +327,7 @@ export function ProductDetailSection() {
       <Specimen
         id="work-trace"
         title="Work trace"
-        note="WorkTrace collapsed and expanded, InjectedSkills"
+        note="WorkTrace collapsed and expanded"
         stage="sheet"
         className="flex-col"
       >
@@ -338,17 +339,6 @@ export function ProductDetailSection() {
         <Cell label="Expanded: think, read, search, edit, failed run, running">
           <div className="w-160">
             <WorkTrace item={TRANSCRIPT_WORK} defaultExpanded entering={new Set()} t={t} />
-          </div>
-        </Cell>
-        <Cell label="Injected skills chip">
-          <div className="w-160">
-            <InjectedSkills
-              skills={[
-                { id: 'frontend-design', reason: 'UI task' },
-                { id: 'verify', reason: 'acceptance' },
-              ]}
-              t={t}
-            />
           </div>
         </Cell>
       </Specimen>
@@ -366,7 +356,6 @@ export function ProductDetailSection() {
             placeholder={PHASE_UI.building.placeholder ?? ''}
             aiReview={false}
             streaming
-            workingFor={{ seconds: 72 }}
             editable
             queuedMessages={queued}
             onSendQueuedNow={(id) => settle(`send now ${id}`)}
@@ -406,8 +395,6 @@ export function ProductDetailSection() {
                   mentionKind: 'todo',
                   mentionId: 'gallery-44',
                 },
-                { text: ' with ' },
-                { text: 'reviewer', style: 'mention', mentionKind: 'agent', mentionId: 'reviewer' },
                 { text: ', see ' },
                 { text: 'PR #1190', style: 'link' },
                 { text: ', ' },
@@ -416,6 +403,48 @@ export function ProductDetailSection() {
             />
           </p>
         </Cell>
+      </Specimen>
+      <Specimen
+        id="task-references"
+        title="Task references"
+        note="Reference row above a Coordinator reply, per task state: a tinted tile and the title. In the sentence the task is its title as a plain link"
+        className="flex-col items-start"
+      >
+        {TASK_REF_PHASES.map((phase) => (
+          <Cell key={phase} label={phase}>
+            <TodoGlanceContext.Provider
+              value={new Map([[`gallery-ref-${phase}`, { phase, seq: 12, title: TASK_REF_TITLE }]])}
+            >
+              <div className="flex w-110 flex-col gap-1">
+                <TaskRefRow
+                  taskRef={{
+                    todoId: `gallery-ref-${phase}`,
+                    seq: 12,
+                    title: TASK_REF_TITLE,
+                    phase,
+                  }}
+                />
+                <p className="m-0 text-ui leading-[22px]">
+                  <TaskMentionAsLinkContext.Provider value>
+                    <Segments
+                      codeClassName="chat-code"
+                      segments={[
+                        { text: 'Added the repository, and the test task ' },
+                        {
+                          text: TASK_REF_TITLE,
+                          style: 'mention',
+                          mentionKind: 'todo',
+                          mentionId: `gallery-ref-${phase}`,
+                        },
+                        { text: ' is set up and reading it now.' },
+                      ]}
+                    />
+                  </TaskMentionAsLinkContext.Provider>
+                </p>
+              </div>
+            </TodoGlanceContext.Provider>
+          </Cell>
+        ))}
       </Specimen>
       <Specimen
         id="plan-and-changes"

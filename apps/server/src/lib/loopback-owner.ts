@@ -24,8 +24,6 @@ const RELAY_HEADERS = [
   'cf-connecting-ip',
   'true-client-ip',
 ];
-const RELAY_HEADER_PREFIX = 'tailscale-';
-
 export interface LoopbackConnection {
   remoteAddress: string;
   remotePort: number;
@@ -156,9 +154,7 @@ function loopbackHostsFor(port: number): Set<string> {
 
 function relayed(c: Context): boolean {
   const headers = c.req.header();
-  return Object.keys(headers).some(
-    (name) => RELAY_HEADERS.includes(name) || name.startsWith(RELAY_HEADER_PREFIX),
-  );
+  return Object.keys(headers).some((name) => RELAY_HEADERS.includes(name));
 }
 
 const peerUidBySocket = new WeakMap<object, number | null>();

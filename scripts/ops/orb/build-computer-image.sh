@@ -10,6 +10,7 @@ host_root=${CAIRN_ORB_ROOT:-}
 machines_dir=$host_root/var/lib/machines
 base=$machines_dir/cairn-orb-base
 image=$machines_dir/cairn-orb-computer
+published_marker=$host_root/var/lib/cairn-orb/computer-image
 daemon_entry=/opt/cairn/daemon/cli.mjs
 packages=(xorg-server-xvfb x11vnc fluxbox xdotool chromium imagemagick npm)
 agent_browser_version=${CAIRN_AGENT_BROWSER_VERSION:-0.41.2}
@@ -32,6 +33,16 @@ filesystem=$(stat -f -c %T -- "$filesystem_path")
 image_type() {
   if [[ $filesystem == btrfs && $(stat -c %i -- "$1") == 256 ]]; then printf 'subvolume'; else printf 'directory'; fi
 }
+publish_marker() {
+  local directory
+  directory=$(dirname -- "$published_marker")
+  [[ -d $directory ]] || install -d -m 755 -- "$directory"
+  local staged
+  staged=$(mktemp "$published_marker.XXXXXX")
+  cat -- "$image/etc/cairn-orb-computer-image" > "$staged"
+  chmod 644 "$staged"
+  mv -f -T -- "$staged" "$published_marker"
+}
 remove_image() {
   if [[ $(image_type "$1") == subvolume ]]; then btrfs subvolume delete -R "$1"; else rm -rf -- "$1"; fi
 }
@@ -44,6 +55,7 @@ fi
 previous_marker=
 if [[ -d $image ]]; then
   if [[ -f $image/etc/cairn-orb-computer-image && $(cat "$image/etc/cairn-orb-computer-image") == "$expected" ]]; then
+    publish_marker
     printf '0 changes\n'
     exit 0
   fi
@@ -58,11 +70,12 @@ printf '%s\n' \
   'snapshot cairn-orb-base into a locked staging image under /var/lib/machines' \
   "install with systemd-nspawn and the host mirrorlist read-only: pacman -Syu ${packages[*]}" \
   "refuse a guest Node major other than $node_major" \
-  "install agent-browser@${agent_browser_version} for the agent user" \
+  "install agent-browser@${agent_browser_version} without install scripts, mark its native binary executable, and run it as agent" \
   'install the Chromium managed policy and the cairn-computer-desktop service for agent' \
-  'install the cairn-computer-agent service for agent and disable the inherited cairn-orb-worker service' \
+  'install the cairn-computer-agent service for agent after network-online, enable systemd-networkd-wait-online, and disable the inherited cairn-orb-worker service' \
   'remove package caches; clear /etc/machine-id' \
   'write /etc/cairn-orb-computer-image completion marker' \
+  'publish a world-readable copy of the marker at /var/lib/cairn-orb/computer-image for the daemon user' \
   'register cairn-orb-computer only after mounts are gone'
 if $dry_run; then printf '1 planned changes\n'; exit 0; fi
 stage=$(mktemp -d "$machines_dir/.cairn-orb-computer-build.XXXXXX")
@@ -102,8 +115,9 @@ guest_major=$(guest /usr/bin/node -p 'process.versions.node.split(".")[0]' | tr 
 for binary in Xvfb x11vnc fluxbox xdotool chromium import; do
   guest runuser -u agent -- sh -c "command -v $binary" > /dev/null || { printf '%s is not runnable by agent\n' "$binary" >&2; exit 1; }
 done
-guest npm install -g "agent-browser@${agent_browser_version}"
-guest runuser -u agent -- sh -c 'command -v agent-browser' > /dev/null || {
+guest npm install -g --ignore-scripts --no-audit --no-fund "agent-browser@${agent_browser_version}"
+guest sh -c 'chmod 755 "$(npm root -g)"/agent-browser/bin/agent-browser-linux-*'
+guest runuser -u agent -- agent-browser --version > /dev/null || {
   printf 'agent-browser is not runnable by agent\n' >&2
   exit 1
 }
@@ -152,7 +166,8 @@ UNIT
 write_file 644 "$stage/etc/systemd/system/cairn-computer-agent.service" <<UNIT
 [Unit]
 Description=Cairn computer agent
-After=local-fs.target
+After=local-fs.target network-online.target
+Wants=network-online.target
 StartLimitIntervalSec=0
 
 [Service]
@@ -172,6 +187,7 @@ LimitCORE=0
 WantedBy=multi-user.target
 UNIT
 guest systemctl enable cairn-computer-desktop.service cairn-computer-agent.service
+guest systemctl enable systemd-networkd-wait-online.service
 guest systemctl disable cairn-orb-worker.service
 guest pacman -Scc --noconfirm
 : > "$stage/etc/machine-id"
@@ -201,4 +217,6 @@ if [[ -n $backup ]]; then
   remove_image "$backup"
 fi
 machinectl list-images --no-legend --no-pager | awk '$1 == "cairn-orb-computer" {found=1} END {exit !found}'
+publish_marker
+printf 'publish %s\n' "$published_marker"
 printf '1 changes\n'

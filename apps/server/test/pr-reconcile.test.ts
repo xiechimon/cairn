@@ -24,7 +24,7 @@ import { createCiPoller } from '../src/services/ci-loop.js';
 import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { updateTodo } from '../src/services/todos.js';
-import { bootServer, seedRoute, type TestServer } from './helpers.js';
+import { bootServer, insertMachine, seedRoute, type TestServer } from './helpers.js';
 
 const globalFetch = vi.fn(() => Promise.reject(new Error('Unexpected global fetch')));
 beforeEach(() => {
@@ -1908,6 +1908,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
         blockedBy: [w.todoId],
       })
       .run();
+    insertMachine(w.s);
     const [siblingBuild] = startBuilds(w.s.svc, {
       projectId: w.projectId,
       todoIds: [siblingId],

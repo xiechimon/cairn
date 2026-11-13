@@ -23,13 +23,27 @@ export interface SidebarProjectLayout<T> {
   groups: ProjectGroup<T>[];
 }
 
+export const PROJECT_FILTERS = ['active', 'archived', 'all'] as const;
+
+export type ProjectFilter = (typeof PROJECT_FILTERS)[number];
+
+export function isProjectFilter(value: unknown): value is ProjectFilter {
+  return PROJECT_FILTERS.some((filter) => filter === value);
+}
+
+function shownBy(filter: ProjectFilter, project: GroupableProject): boolean {
+  if (filter === 'all') return true;
+  return isArchivedProject(project) === (filter === 'archived');
+}
+
 export function sidebarProjects<T extends GroupableProject>(
   projects: readonly T[],
+  filter: ProjectFilter = 'active',
 ): SidebarProjectLayout<T> {
   const ungrouped: T[] = [];
   const byGroup = new Map<string, T[]>();
   for (const project of projects) {
-    if (isArchivedProject(project)) continue;
+    if (!shownBy(filter, project)) continue;
     if (project.group == null) {
       ungrouped.push(project);
       continue;

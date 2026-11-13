@@ -1,5 +1,10 @@
 import type { ClaimedStep } from '@cairn/shared';
-import { CHIEF_ROUTER_TOOL_NAMES, CHIEF_TOOL_COUNT, claimedStepSchema } from '@cairn/shared';
+import {
+  CHIEF_REPLY_TOOLS,
+  CHIEF_ROUTER_TOOL_NAMES,
+  CHIEF_TOOL_COUNT,
+  claimedStepSchema,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -8,6 +13,7 @@ import {
   build as buildTable,
   chiefMessage,
   chiefThread,
+  machine as machineTable,
   notification as notificationTable,
   step as stepTable,
   todo as todoTable,
@@ -139,7 +145,9 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
     expect(claimed.conversationId).toBe(w.threadId);
     expect(claimed.chief?.threadId).toBe(w.threadId);
     expect(claimed.chief?.systemPrompt).toContain('Coordinator');
-    expect(claimed.remoteTools).toHaveLength(CHIEF_TOOL_COUNT + CHIEF_ROUTER_TOOL_NAMES.length);
+    expect(claimed.remoteTools).toHaveLength(
+      CHIEF_TOOL_COUNT + CHIEF_ROUTER_TOOL_NAMES.length + CHIEF_REPLY_TOOLS.length,
+    );
     expect(claimed.agent?.id).toBe(w.coordinatorRouteId);
     expect(claimed.agent?.modelId).toBe('stub-model');
     expect(claimed.agent?.skillsAllowlist).toBeUndefined();
@@ -309,6 +317,26 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
     expect(body.secrets).toEqual({});
   });
 
+  test('a chief step token never carries http secrets, even for a gateway machine', async () => {
+    const w = await setupChiefWorld();
+    const claimed = await w.claim();
+    w.s.db
+      .update(machineTable)
+      .set({
+        capabilities: { mcpServers: [], skills: [], executor: 'orb', secretGateway: true },
+      })
+      .where(eq(machineTable.id, machineIdByName(w.s, 'm4a-mbp')))
+      .run();
+    const tokenRes = await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, {
+      cred: w.token,
+    });
+    expect(tokenRes.status).toBe(200);
+    const body = (await tokenRes.json()) as Record<string, unknown>;
+    expect(body.secrets).toEqual({});
+    expect(body).not.toHaveProperty('httpSecrets');
+    expect(body).not.toHaveProperty('withheldSecrets');
+  });
+
   test('a chief step token carries the configured App commit identity', async () => {
     const bot = {
       name: 'cairnwright[bot]',
@@ -328,7 +356,9 @@ describe('Coordinator router tools over the machine protocol (D60)', () => {
   test('the claim carries the router tools, open_thread starts a session, run_builds says removed under D60', async () => {
     const w = await setupChiefWorld();
     const claimed = await w.claim();
-    expect(claimed.remoteTools).toHaveLength(CHIEF_TOOL_COUNT + CHIEF_ROUTER_TOOL_NAMES.length);
+    expect(claimed.remoteTools).toHaveLength(
+      CHIEF_TOOL_COUNT + CHIEF_ROUTER_TOOL_NAMES.length + CHIEF_REPLY_TOOLS.length,
+    );
     const names = claimed.remoteTools?.map((t) => t.name) ?? [];
     for (const name of CHIEF_ROUTER_TOOL_NAMES) expect(names).toContain(name);
     expect(claimed.chief?.systemPrompt).toContain('open_thread');

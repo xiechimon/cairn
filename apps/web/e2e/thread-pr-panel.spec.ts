@@ -190,115 +190,51 @@ test('a failed PR request shows one plain line with a retry, not the raw error',
   await evidencePanelShot(page, 'thread-pr-error-light.png', page.locator('.side-panel'));
 });
 
-test('the PR list shows every thread-owned PR with counts, a row menu and Show more', async ({ page }) => {
-  const rows = Array.from({ length: 7 }, (_, i) =>
-    prRow({
-      buildId: `build-${i}`,
-      threadId: i === 0 ? 'todo-1' : `todo-x${i}`,
-      number: 3060 - i,
-      url: `https://github.com/xiechimon/cairn/pull/${3060 - i}`,
-      title: `docs(${3000 + i}): keep live counts in sync`,
-      state: i === 4 ? 'merged' : 'open',
-      checks: { passed: 22 - i, failed: i === 2 ? 1 : 0, running: i === 1 ? 2 : 0, total: 23, failedNames: i === 2 ? ['lint'] : [] },
-      additions: 10 * (i + 1),
-      deletions: 8,
-    }),
-  );
-  const extraTodos = rows
-    .filter((r) => r.threadId !== 'todo-1')
-    .map((r, i) => ({ ...TASK, id: r.threadId, title: `Thread ${i}`, phase: 'review', phaseAt: Date.now(), seqNum: 20 + i }));
-  await setup(page, { rows }, 'light', { todos: extraTodos });
-  await page.goto('/app?pane=tasks');
-  const list = page.getByTestId('work-prs');
-  await expect(list.locator('[data-slot="pr-list-row"]')).toHaveCount(5);
-  await expect(list.locator('[data-slot="pr-list-row"]').first()).toContainText('cairn #3060');
-  await expect(list.locator('[data-slot="pr-list-row"]').first()).toContainText('+10');
-  await expect(list.locator('[data-slot="pr-checks"]').first()).toHaveText('22/23');
-  await expect(list.locator('[data-slot="pr-list-row"][data-state="merged"]')).toHaveCount(1);
-  await list.getByRole('button', { name: 'Menu for PR #3060' }).click();
-  await expect(page.getByRole('menuitem', { name: 'Open on GitHub' })).toHaveAttribute('href', /pull\/3060$/);
-  await expect(page.getByRole('menuitem', { name: 'Copy link' })).toBeVisible();
-  await expect(page.getByRole('menuitem', { name: 'Show changes' })).toBeVisible();
-  await expect(page.getByRole('menuitemcheckbox')).toHaveCount(0);
-  await evidencePanelShot(page, 'pr-list-menu-light.png', page.locator('.side-panel'));
-  await page.keyboard.press('Escape');
-  await list.getByRole('button', { name: 'Show more' }).click();
-  await expect(list.locator('[data-slot="pr-list-row"]')).toHaveCount(7);
-  await evidencePanelShot(page, 'pr-list-light.png', page.locator('.side-panel'));
-});
-
-test('a project-filtered tasks pane lists only that project’s PRs, the unfiltered home lists all', async ({ page }) => {
-  const other = { ...TASK, id: 'todo-2', projectId: 'proj-2', title: 'Other project thread', phase: 'review', phaseAt: Date.now(), seqNum: 10 };
+test('a task row lists its own PRs under it: open PRs with their state, merged ones folded into one count', async ({ page }) => {
   const rows = [
-    prRow({ buildId: 'build-1', threadId: 'todo-1', number: 42, title: 'docs(1): project one change' }),
-    prRow({ buildId: 'build-2', threadId: 'todo-2', projectId: 'proj-2', number: 77, title: 'docs(2): project two change' }),
+    prRow({ buildId: 'build-1', number: 42, checks: { passed: 6, failed: 2, running: 0, total: 8, failedNames: ['lint'] } }),
+    ...[51, 52, 53].map((n) => prRow({ buildId: `build-m${n}`, number: n, state: 'merged', title: `docs(${n}): merged change` })),
+    prRow({ buildId: 'build-x', threadId: 'todo-other', number: 99, title: 'docs(99): another thread' }),
   ];
-  await setup(page, { rows }, 'light', {
-    todos: [other],
-    projects: [PROJECT, { ...PROJECT, id: 'proj-2', name: 'other' }],
-  });
-  await page.goto('/app?project=proj-2&pane=tasks&chat=1');
-  const list = page.getByTestId('work-prs');
-  await expect(list.locator('[data-slot="pr-list-row"]')).toHaveCount(1);
-  await expect(list).toContainText('project two change');
-  await expect(list).not.toContainText('project one change');
-  await expect(list.getByRole('heading')).toContainText('1');
-  await page.goto('/app?pane=tasks');
-  await expect(page.getByTestId('work-prs').locator('[data-slot="pr-list-row"]')).toHaveCount(2);
-});
-
-test('an open PR of an archived thread stays in the home list and under its project, and the count stays', async ({ page }) => {
-  const rows = [
-    prRow({ buildId: 'build-1', threadId: 'todo-1', number: 42, title: 'docs(1): live thread change' }),
-    prRow({ buildId: 'build-2', threadId: 'todo-2', projectId: 'proj-2', number: 77, title: 'docs(2): archived thread change' }),
-  ];
-  const more = { projects: [PROJECT, { ...PROJECT, id: 'proj-2', name: 'other' }] };
-  await setup(page, { rows }, 'light', more);
-  await page.goto('/app?pane=tasks');
-  const list = page.getByTestId('work-prs');
-  await expect(list.locator('[data-slot="pr-list-row"]')).toHaveCount(2);
-  await expect(list).toContainText('archived thread change');
-  await expect(list.getByRole('heading')).toContainText('2');
-  await page.goto('/app?project=proj-2&pane=tasks&chat=1');
-  await expect(page.getByTestId('work-prs').locator('[data-slot="pr-list-row"]')).toHaveCount(1);
-  await expect(page.getByTestId('work-prs')).toContainText('archived thread change');
-});
-
-test('a project with no PRs shows the empty line even when other projects have some', async ({ page }) => {
-  const other = { ...TASK, id: 'todo-2', projectId: 'proj-2', title: 'Other project thread', phase: 'review', phaseAt: Date.now(), seqNum: 10 };
-  await setup(page, { rows: [prRow()] }, 'light', {
-    todos: [other],
-    projects: [PROJECT, { ...PROJECT, id: 'proj-2', name: 'other' }],
-  });
-  await page.goto('/app?project=proj-2&pane=tasks&chat=1');
-  await expect(page.getByTestId('work-prs')).toContainText('PRs opened by threads are listed here.');
-});
-
-test('the PR list says what is missing when no thread has a PR', async ({ page }) => {
-  await setup(page, { rows: [] });
-  await page.goto('/app?pane=tasks');
-  await expect(page.getByTestId('work-prs')).toContainText('PRs opened by threads are listed here.');
-});
-
-test('the same PR reaches the Tasks list and the finish dialog', async ({ page }) => {
-  await setup(page, { rows: [prRow()] });
-  await page.goto('/app?pane=tasks');
-  await expect(page.getByTestId('work-prs').locator('[data-slot="pr-list-row"]')).toContainText('#42');
-  await page.goto('/app?thread=todo-1');
-  await page.getByRole('button', { name: 'Finish…' }).click();
-  await expect(page.getByTestId('accept-dialog-pr').getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
-});
-
-test('a task row in the Tasks panel links its PR beside the row', async ({ page }) => {
-  await setup(page, { rows: [prRow()] }, 'light', {
-    tasks: [REVIEW_ENTRY],
-  });
+  await setup(page, { rows }, 'light', { tasks: [REVIEW_ENTRY] });
   await page.goto('/app?pane=tasks');
   const row = page.locator('[data-slot="task-row-frame"]').filter({ hasText: REVIEW_TASK.title });
-  await expect(row.getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
-  await evidencePanelShot(page, 'tasks-row-pr-link-light.png', page.locator('.side-panel'));
-  await row.getByRole('button').click();
-  await expect(page).toHaveURL(/[?&]thread=todo-1/);
+  const line = row.locator('[data-slot="task-pr-line"]');
+  const open = line.locator('[data-slot="task-pr"][data-state="open"]');
+  await expect(open).toHaveText('#42 — Checks failed');
+  await expect(open).toHaveAttribute('data-tone', 'failed');
+  await expect(open).toHaveAttribute('href', /pull\/42$/);
+  await expect(line.locator('[data-slot="task-pr-merged"]')).toHaveText('3 merged');
+  await expect(line).not.toContainText('#99');
+  await expect(page.getByTestId('work-prs')).toHaveCount(0);
+  await evidencePanelShot(page, 'tasks-row-pr-line-light.png', page.locator('.side-panel'));
+  await open.hover();
+  const card = page.locator('[data-slot="popover-content"]').filter({ visible: true });
+  await expect(card).toContainText('the thread-owned PR panel');
+  const panelLeft = (await page.locator('.side-panel').boundingBox())?.x ?? 0;
+  const cardBox = await card.boundingBox();
+  expect((cardBox?.x ?? 0) + (cardBox?.width ?? 0)).toBeLessThanOrEqual(panelLeft);
+  await page.mouse.move(5, 5);
+  await line.locator('[data-slot="task-pr-merged"]').hover();
+  await expect(page.locator('[data-slot="popover-content"]').filter({ visible: true }).getByRole('link')).toHaveCount(3);
+});
+
+test('a task row shows its age as a compact stamp', async ({ page }) => {
+  await setup(page, { rows: [] }, 'light', { tasks: [{ ...REVIEW_ENTRY, phaseAt: Date.now() - 7 * 60_000 }] });
+  await page.goto('/app?pane=tasks');
+  const row = page.locator('[data-slot="task-row-frame"]').filter({ hasText: REVIEW_TASK.title });
+  await expect(row.locator('[data-slot="task-row-stamp"]')).toHaveText('7m');
+  await expect(row.locator('[data-slot="task-pr-line"]')).toHaveCount(0);
+});
+
+test('the same PR reaches the Tasks row and the finish dialog', async ({ page }) => {
+  await setup(page, { rows: [prRow()] }, 'light', { tasks: [REVIEW_ENTRY] });
+  await page.goto('/app?pane=tasks');
+  await expect(page.locator('[data-slot="task-pr-line"]')).toContainText('#42');
+  await page.goto('/app?thread=todo-1');
+  await page.getByTestId('side-chat').getByRole('button', { name: 'More actions…' }).click();
+  await page.getByRole('menuitem', { name: 'Complete' }).click();
+  await expect(page.getByTestId('accept-dialog-pr').getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
 });
 
 test('a finished task in Made links its newest PR', async ({ page }) => {

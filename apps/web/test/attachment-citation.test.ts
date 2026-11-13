@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { inlineSegments } from '../src/api/mappers.js';
 import { isImageAttachmentKey } from '../src/detail/attachment-chip.js';
-import { parseChatMarkdown } from '../src/detail/chat-markdown.js';
+import { inlineSegments, parseChatMarkdown } from '../src/lib/markdown.js';
 
 const KEY = 'lIH2x-iaJ8NjTCJdW-vcF/hg4lgHMHQLnQBHR3CImra.md';
 const NOTICE = `[#173](todo:swkW7vZcIv5mv9rMwz_c7) 调研与方案已验收，尚未实现。

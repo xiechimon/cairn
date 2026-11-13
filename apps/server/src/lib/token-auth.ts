@@ -1,9 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import type { Context, Hono } from 'hono';
+import { AUTH_COOKIE, type ResolvedBrowserSession } from '../services/browser-session.js';
 import { sha256Hex } from './crypto.js';
-import { type LoopbackOwner, loopbackOwnerOriginOf } from './loopback-owner.js';
-import { tailnetOriginOf, tailnetOwnerIdentityOf } from './tailnet-listener.js';
 
 const LOOPBACK_PEER_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
@@ -13,8 +12,9 @@ const STREAM_PATH_PATTERNS = [
 ];
 
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-const AMBIENT_FETCH_SITES = new Set(['same-origin', 'none']);
 const OWNER_ONLY_PATTERNS = [
+  /^\/api\/computers(?:\/[^/]+)?$/,
+  /^\/api\/job-applications(?:\/|$)/,
   /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions)(?:\/|$)/,
   /^\/api\/teams\/[^/]+\/github\/(?:oauth|connection)(?:\/|$)/,
   /^\/api\/machines\/[^/]+(?:\/|$)/,
@@ -24,7 +24,8 @@ export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
   if (
     pathname === '/api/machine/enroll/confirm' ||
     pathname === '/api/remote/pairing' ||
-    pathname.startsWith('/api/remote/devices')
+    pathname.startsWith('/api/remote/pairing/') ||
+    (pathname.startsWith('/api/remote/devices') && !READ_METHODS.has(method.toUpperCase()))
   )
     return true;
   if (READ_METHODS.has(method.toUpperCase())) return false;
@@ -47,6 +48,7 @@ function isExempt(pathname: string): boolean {
     return true;
   if (pathname === '/api/mcp') return true;
   if (pathname === '/api/oauth/callback') return true;
+  if (pathname === '/api/auth/bootstrap') return true;
   if (isOpenRemotePath(pathname)) return true;
   return false;
 }
@@ -75,10 +77,11 @@ export function isLoopbackPeer(c: Context): boolean {
 
 export interface TokenAuthOptions {
   resolveDeviceId?: (provided: string) => string | null;
-  loopbackOwner?: LoopbackOwner | null;
+  resolveSession?: (cookie: string) => ResolvedBrowserSession | null;
+  redeemTicket?: (ticket: string) => ResolvedBrowserSession | null;
 }
 
-export type OwnerIdentity = { via: 'tailscale'; login: string } | { via: 'loopback' };
+export type OwnerIdentity = { via: 'session' };
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -87,26 +90,39 @@ declare module 'hono' {
   }
 }
 
-interface AmbientOwner {
-  identity: OwnerIdentity;
-  origin: string | null;
-}
-
-function ambientOwnerOf(c: Context, loopbackOwner: LoopbackOwner | null): AmbientOwner | null {
-  const tailnet = tailnetOwnerIdentityOf(c);
-  if (tailnet !== null) {
-    return { identity: { via: 'tailscale', login: tailnet.login }, origin: tailnetOriginOf(c) };
-  }
-  if (loopbackOwner === null || !isLoopbackPeer(c)) return null;
-  const origin = loopbackOwnerOriginOf(c, loopbackOwner);
-  return origin === null ? null : { identity: { via: 'loopback' }, origin };
-}
-
-function provesSameOrigin(c: Context, origin: string | null): boolean {
+function cookieWriteAllowed(c: Context): boolean {
   const site = c.req.header('sec-fetch-site');
-  if (site !== undefined && !AMBIENT_FETCH_SITES.has(site)) return false;
-  if (READ_METHODS.has(c.req.method.toUpperCase())) return true;
-  return site === 'same-origin' || (origin !== null && c.req.header('origin') === origin);
+  if (site === 'same-origin' || site === 'none') return true;
+  if (site !== undefined) return false;
+  const origin = c.req.header('origin');
+  if (origin === undefined) return false;
+  try {
+    const expected = new URL(c.req.url);
+    const actual = new URL(origin);
+    return actual.protocol === expected.protocol && actual.host === expected.host;
+  } catch {
+    return false;
+  }
+}
+
+function cookieValue(c: Context, name: string): string | undefined {
+  const header = c.req.header('cookie');
+  if (header === undefined) return undefined;
+  for (const part of header.split(';')) {
+    const [rawName, ...rest] = part.trim().split('=');
+    if (rawName === name) return decodeURIComponent(rest.join('='));
+  }
+  return undefined;
+}
+
+function applySession(c: Context, session: ResolvedBrowserSession): Response | null {
+  if (session.kind === 'owner') {
+    c.set('ownerIdentity', { via: 'session' });
+    return null;
+  }
+  if (session.deviceId === null) return c.json({ error: 'Unauthorized' }, 401);
+  c.set('pairedDeviceId', session.deviceId);
+  return null;
 }
 
 export function pairedDeviceIdOf(c: Context): string | null {
@@ -120,10 +136,12 @@ export function registerTokenAuth(
 ): void {
   if (token === null) return;
   const verifyOwner = makeVerifier(token);
-  const loopbackOwner = options.loopbackOwner ?? null;
   app.use('*', async (c, next) => {
     const verify = (provided: string): boolean => {
-      if (verifyOwner(provided)) return true;
+      if (verifyOwner(provided)) {
+        c.set('ownerIdentity', { via: 'session' });
+        return true;
+      }
       const deviceId = options.resolveDeviceId?.(provided) ?? null;
       if (deviceId === null) return false;
       c.set('pairedDeviceId', deviceId);
@@ -142,16 +160,25 @@ export function registerTokenAuth(
       if (match !== null && verify(match[1] ?? '')) return admit();
     }
     if (STREAM_PATH_PATTERNS.some((pattern) => pattern.test(pathname))) {
-      const queryToken = url.searchParams.get('token');
-      if (queryToken !== null && verify(queryToken)) return admit();
-    }
-    const ambient = ambientOwnerOf(c, loopbackOwner);
-    if (ambient !== null) {
-      if (!provesSameOrigin(c, ambient.origin)) {
-        return c.json({ error: 'same-origin proof required for ambient owner identity' }, 403);
+      const ticket = url.searchParams.get('ticket');
+      const session = ticket === null ? null : (options.redeemTicket?.(ticket) ?? null);
+      if (session !== null) {
+        const denied = applySession(c, session);
+        if (denied !== null) return denied;
+        return admit();
       }
-      c.set('ownerIdentity', ambient.identity);
-      return next();
+    }
+    const cookie = cookieValue(c, AUTH_COOKIE);
+    if (cookie !== undefined) {
+      const session = options.resolveSession?.(cookie) ?? null;
+      if (session !== null) {
+        const denied = applySession(c, session);
+        if (denied !== null) return denied;
+        if (!READ_METHODS.has(c.req.method.toUpperCase()) && !cookieWriteAllowed(c)) {
+          return c.json({ error: 'same-origin proof required' }, 403);
+        }
+        return admit();
+      }
     }
     return c.json({ error: 'Unauthorized' }, 401);
   });

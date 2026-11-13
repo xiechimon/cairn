@@ -1,4 +1,5 @@
-import type { AskUserAnswer, TranscriptRow } from '@cairn/shared';
+import { type AskUserAnswer, type TranscriptRow, transcriptRowSchema } from '@cairn/shared';
+import { replaceEqualDeep, useQueryClient } from '@tanstack/react-query';
 import {
   useCallback,
   useEffect,
@@ -8,23 +9,25 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { useLocation } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { activityStore } from '../api/activity.js';
 import { isCoordinatorNotReady, toastCoordinatorNotReady } from '../api/coordinator-not-ready.js';
 import {
+  keepNewestMessagesPage,
   useApiMutations,
   useChief,
   useChiefThreads,
   useConversationMessages,
+  useMachines,
   useNotifications,
 } from '../api/hooks.js';
 import { liveTextStore } from '../api/live-text.js';
 import { liveThinkingStore } from '../api/live-thinking.js';
 import { chiefTurnErrorOfContent, mapChief } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { useRoutingSettings } from '../api/routing-settings.js';
 import { useConversationStream } from '../api/sse.js';
-import { useSendKey } from '../api/use-send-key.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import type { EarlierPages } from '../components/chat/earlier-loader.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -38,11 +41,14 @@ import {
   type GestureEvent,
   getGestureStore,
 } from '../overlay/gesture-machine.js';
+import { settingsHref } from '../settings/settings-href.js';
 import {
   type CoordinatorLoad,
   coordinatorLoad,
   globalCoordinatorThread,
 } from './coordinator-load.js';
+import { needsMachineName } from './needs-machine-name.js';
+import { chiefOutbox, type OutboxEntry, type UnsentSends, unlandedItems } from './outbox.js';
 import {
   questionActionThread,
   questionDraftKey,
@@ -70,6 +76,7 @@ export interface ChiefSurface {
   }) => void;
   onCancelQuestion?: (requestId: string, threadId?: string) => void;
   onWithdraw?: (messageId: string) => Promise<void>;
+  unsent?: UnsentSends;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
 }
@@ -88,12 +95,14 @@ function placeOf(pathname: string, search: string): string {
 
 export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): ChiefSurface {
   const { live, teamId } = useLiveData();
+  const navigate = useNavigate();
+  const machinesQ = useMachines(teamId, live);
+  const routingQ = useRoutingSettings(teamId, live);
   const { t } = useI18n();
   const chiefQ = useChief(teamId, live);
   const chiefThreadsQ = useChiefThreads(teamId, live);
   const notificationsQ = useNotifications(teamId, live);
   const mutations = useApiMutations(teamId);
-  const sendKey = useSendKey();
 
   const chief = fixture.chief;
   getGestureStore(chief?.view ?? 'none');
@@ -145,10 +154,32 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     setChiefView,
     place,
   ]);
-  const { query: chiefMessagesQ, messages: chiefMessages } = useConversationMessages(
+  const channel = new URLSearchParams(search).get('project');
+  const [shownChannel, setShownChannel] = useState(channel);
+  const [newestPageOnly, setNewestPageOnly] = useState(false);
+  if (shownChannel !== channel) {
+    setShownChannel(channel);
+    setNewestPageOnly(channel === null);
+  }
+  const { query: chiefMessagesQ, messages: loadedChiefMessages } = useConversationMessages(
     live ? (activeThread?.id ?? null) : null,
     live,
   );
+  const newestPage = chiefMessagesQ.data?.pages[0];
+  const chiefMessages = useMemo(
+    () => (newestPageOnly ? (newestPage?.messages ?? []) : loadedChiefMessages),
+    [newestPageOnly, newestPage, loadedChiefMessages],
+  );
+  const queryClient = useQueryClient();
+  const activeThreadId = live ? (activeThread?.id ?? null) : null;
+  useEffect(() => {
+    if (!newestPageOnly) return;
+    const trimmed =
+      activeThreadId === null
+        ? Promise.resolve()
+        : keepNewestMessagesPage(queryClient, activeThreadId);
+    void trimmed.finally(() => setNewestPageOnly(false));
+  }, [newestPageOnly, activeThreadId, queryClient]);
   const streamHandlers = useMemo(
     () => ({
       onMessage: (row: TranscriptRow) => {
@@ -160,7 +191,6 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     [t],
   );
   useConversationStream(live ? (activeThread?.id ?? undefined) : undefined, live, streamHandlers);
-  const activeThreadId = live ? (activeThread?.id ?? null) : null;
   const knownChiefIds = useMemo(() => new Set(chiefMessages.map((m) => m.id)), [chiefMessages]);
   const liveText = useSyncExternalStore(liveTextStore.subscribe, () =>
     activeThreadId !== null ? liveTextStore.getVisible(activeThreadId, knownChiefIds) : '',
@@ -202,6 +232,17 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     liveThinking,
     activity,
   ]);
+  const outbox = useSyncExternalStore(chiefOutbox.subscribe, chiefOutbox.entries);
+  useEffect(() => {
+    if (live) chiefOutbox.settle(activeThreadId, knownChiefIds);
+  }, [live, outbox, activeThreadId, knownChiefIds]);
+  const liveChiefWithUnsent = useMemo(() => {
+    if (liveChief === null) return null;
+    const unlanded = unlandedItems(outbox, activeThreadId, knownChiefIds);
+    return unlanded.length === 0
+      ? liveChief
+      : { ...liveChief, stream: [...(liveChief.stream ?? []), ...unlanded] };
+  }, [liveChief, outbox, activeThreadId, knownChiefIds]);
   const { fetchNextPage, isFetchingNextPage, isFetchNextPageError } = chiefMessagesQ;
   const loadEarlier = useCallback(() => {
     void fetchNextPage();
@@ -210,7 +251,19 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     ? { loading: isFetchingNextPage, failed: isFetchNextPageError, onLoad: loadEarlier }
     : undefined;
 
-  const chiefData = live ? (liveChief ?? chiefDefault) : (chief ?? chiefDefault);
+  const freshChiefData = live ? (liveChiefWithUnsent ?? chiefDefault) : (chief ?? chiefDefault);
+  const sharedStreamRef = useRef(freshChiefData.stream);
+  const sharedStream = replaceEqualDeep(sharedStreamRef.current, freshChiefData.stream);
+  useLayoutEffect(() => {
+    sharedStreamRef.current = sharedStream;
+  });
+  const chiefData = useMemo(
+    () =>
+      sharedStream === freshChiefData.stream
+        ? freshChiefData
+        : { ...freshChiefData, stream: sharedStream },
+    [freshChiefData, sharedStream],
+  );
   const liveUnread = live
     ? (notificationsQ.data?.unreadThreadIds ?? []).filter((id) => id.startsWith('chief-')).length
     : 0;
@@ -298,28 +351,56 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
       }
     : undefined;
 
+  const deliver = (entry: OutboxEntry) =>
+    mutations.chiefSend
+      .mutateAsync({
+        threadId: entry.threadId,
+        content: entry.text,
+        projectId: entry.projectId,
+        clientMessageId: entry.key,
+      })
+      .then(
+        (result) => ({
+          threadId: result.thread.id,
+          messageId: transcriptRowSchema.safeParse(result.message).data?.id ?? null,
+        }),
+        (error: unknown) => {
+          if (isCoordinatorNotReady(error))
+            toastCoordinatorNotReady(
+              t('Coordinator 还不能回答'),
+              t('点输入框下方的按钮，把模型来源、机器和 Coordinator 接上，再发一次。'),
+            );
+          else toastError(t('发送失败，请重试。'), error);
+          throw error;
+        },
+      );
+  const unsent = useMemo<UnsentSends | undefined>(
+    () =>
+      live
+        ? {
+            failed: outbox.filter((entry) => entry.state === 'failed'),
+            discard: (outboxKey) => chiefOutbox.discard(outboxKey)?.text ?? null,
+          }
+        : undefined,
+    [live, outbox],
+  );
   const onSend = live
     ? (text: string, projectId: string | null) => {
-        const { key } = sendKey.attempt([projectId ?? '', text].join('\n'), 'chief');
-        return mutations.chiefSend
-          .mutateAsync({
-            threadId: activeThread?.id ?? null,
-            content: text,
-            projectId,
-            clientMessageId: key,
-          })
-          .then(() => sendKey.settle())
-          .catch((error: unknown) => {
-            if (isCoordinatorNotReady(error)) {
-              toastCoordinatorNotReady(
-                t('Coordinator 还不能回答'),
-                t('点输入框下方的按钮，把模型来源、机器和 Coordinator 接上，再发一次。'),
-              );
-            } else {
-              toastError(t('发送失败，请重试。'), error);
-            }
-            throw error;
+        const sessionMachineId = routingQ.data?.rules?.find(
+          (rule) => rule.use === 'session',
+        )?.machineId;
+        if (activeThread == null && needsMachineName(machinesQ.data, sessionMachineId)) {
+          toast.warning(t('先选择机器'), {
+            description: t('多台机器在线时，开工前要在规则里点名一台。'),
+            action: {
+              label: t('去选择'),
+              onClick: () => navigate(settingsHref('work-routing')),
+            },
           });
+          return Promise.reject(new Error('Name a machine first'));
+        }
+        chiefOutbox.enqueue({ threadId: activeThread?.id ?? null, projectId, text }, deliver);
+        return Promise.resolve();
       }
     : DEMO_MODE
       ? () => {
@@ -360,6 +441,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     onAnswerQuestion,
     onCancelQuestion,
     onWithdraw,
+    ...(unsent !== undefined ? { unsent } : {}),
     onSteer,
     onStop,
   };

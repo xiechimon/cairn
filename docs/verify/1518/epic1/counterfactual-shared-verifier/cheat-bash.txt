@@ -1,3 +1,0 @@
-preseeded_reward=ok
-planted_grader=ok
-replaced_runtime=ok

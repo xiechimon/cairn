@@ -77,11 +77,13 @@ describe('the serif voice follows claude.ai (DESIGN.md Typography)', () => {
     expect(read('board/sidebar.tsx')).toMatch(/sidebar-team-name[^"]*voice-title text-brand/);
   });
 
-  it('agent replies are the response voice and user messages are not', () => {
-    expect(read('chief/chief-message-rows.tsx')).toMatch(/BUBBLE_ROBOT_CLS = '[^']*voice-response/);
+  it('agent replies are sans like the approved chat draft, not the response voice', () => {
+    const rows = read('chief/chief-message-rows.tsx');
+    expect(rows).toMatch(/BUBBLE_WRAP_CLS = [`'][^`']*font-sans/);
+    expect(rows).not.toContain('voice-response');
     const transcript = read('detail/transcript.tsx');
-    expect(transcript).toMatch(/voice-response[^"]*"\s*data-testid="agent-text"/);
-    expect(transcript).toMatch(/voice-response[^"]*"\s*data-testid="info-report"/);
-    expect(transcript).not.toMatch(/voice-response[^"]*"\s*data-testid="user-bubble"/);
+    expect(transcript).toMatch(/font-sans[^"]*"\s*data-testid="agent-text"/);
+    expect(transcript).toMatch(/font-sans[^"]*"\s*data-testid="info-report"/);
+    expect(transcript).not.toContain('voice-response');
   });
 });

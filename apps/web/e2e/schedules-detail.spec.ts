@@ -168,14 +168,19 @@ test('Run now schedules the actual run endpoint and reports queued status', asyn
   expect(probe.calls).toContainEqual({ method: 'POST', path: '/api/schedules/schedule-1/run', body: {} });
 });
 
-test('the Tasks panel lists schedules in the Schedules tab only, with a link to the schedules page', async ({ page }) => {
+test('the Tasks panel lists schedules in the Schedules tab only, and a row menu opens the schedules page', async ({ page }) => {
   await setup(page, { kind: 'once', nextRunAt: null });
   await page.goto('/app?pane=tasks');
   const panel = page.getByRole('complementary', { name: 'Tasks', exact: true });
-  await expect(panel.getByRole('link', { name: 'Manage schedules' })).toHaveCount(0);
+  await expect(panel.locator('[data-slot="schedule-row"]')).toHaveCount(0);
   await panel.getByRole('tab', { name: 'Schedules' }).click();
-  await expect(panel.getByRole('link', { name: 'Manage schedules' })).toHaveAttribute('href', '/app/schedules');
   await expect(panel.locator('[data-slot="schedule-row"]')).toContainText('Nightly release checks');
+  await expect(panel).not.toContainText('Manage schedules');
+  const frame = panel.locator('[data-slot="schedule-row-frame"]').first();
+  await frame.hover();
+  await frame.getByTestId('schedule-row-menu-button').click();
+  await page.getByRole('menuitem', { name: /Manage schedules/ }).click();
+  await expect(page).toHaveURL(/\/app\/schedules$/);
 });
 
 test('the Schedules tab lists schedules while the tasks request has failed', async ({ page }) => {

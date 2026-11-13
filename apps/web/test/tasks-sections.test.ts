@@ -89,7 +89,7 @@ describe('a needs-you row says what is waiting and where to act', () => {
   });
 
   test('a standalone Coordinator question points at the question card', () => {
-    expect(questionRowCopy()).toMatchObject({ waiting: true, where: '在问题卡里选' });
+    expect(questionRowCopy()).toMatchObject({ waiting: true, where: '在对话里回答' });
   });
 
   test('no row says the old "ready, waiting for your review" line', () => {
@@ -247,6 +247,21 @@ describe('a question row opens the question in the Coordinator thread that asked
 
   test('a question in the open thread focuses its card', () => {
     expect(questionOpenStep({ requestId: 'r1', threadId: 'chief-a' }, view())).toEqual({
+      kind: 'focus',
+      at: 1,
+    });
+  });
+
+  test('focus counts only the questions the project view shows', () => {
+    const stream = [pending('a1'), pending('b1'), pending('b2')];
+    const shown = new Set(['b1', 'b2']);
+    expect(
+      questionOpenStep({ requestId: 'b1', threadId: 'chief-a' }, view({ stream, shown })),
+    ).toEqual({ kind: 'focus', at: 0 });
+    expect(
+      questionOpenStep({ requestId: 'b2', threadId: 'chief-a' }, view({ stream, shown })),
+    ).toEqual({ kind: 'focus', at: 1 });
+    expect(questionOpenStep({ requestId: 'b1', threadId: 'chief-a' }, view({ stream }))).toEqual({
       kind: 'focus',
       at: 1,
     });

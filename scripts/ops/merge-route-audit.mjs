@@ -13,27 +13,21 @@ export function queuedBeforeMerge(mergedAt, timeline) {
   if (typeof mergedAt !== 'string') return false;
   const mergeTime = Date.parse(mergedAt);
   if (Number.isNaN(mergeTime)) return false;
-  const beforeMerge = (event) => {
-    const at = eventTime(event);
-    return !Number.isNaN(at) && at < mergeTime;
+  const labelAtMerge = (name) => {
+    const changes = timeline
+      .filter((event) => {
+        const at = eventTime(event);
+        return (
+          (event.event === 'labeled' || event.event === 'unlabeled') &&
+          event.label?.name === name &&
+          !Number.isNaN(at) &&
+          at < mergeTime
+        );
+      })
+      .sort((a, b) => eventTime(a) - eventTime(b));
+    return changes.at(-1)?.event === 'labeled';
   };
-  if (
-    timeline.some(
-      (event) =>
-        event.event === 'labeled' && event.label?.name === 'dequeued' && beforeMerge(event),
-    )
-  ) {
-    return false;
-  }
-  const queued = timeline.filter(
-    (event) =>
-      (event.event === 'labeled' || event.event === 'unlabeled') &&
-      event.label?.name === 'queued' &&
-      beforeMerge(event),
-  );
-  if (queued.length === 0) return false;
-  queued.sort((a, b) => eventTime(a) - eventTime(b));
-  return queued.at(-1).event === 'labeled';
+  return labelAtMerge('queued') && !labelAtMerge('dequeued');
 }
 
 export function auditPull(repo, number) {
@@ -57,17 +51,65 @@ const requiredDraftChecks = [
   'ops-backup-test',
 ];
 
+const queueDraftHead = 'mergify/merge-queue/';
+
+function isQueueDraft(pull) {
+  const ref = pull.head?.ref;
+  return (
+    pull.user?.login === 'mergify[bot]' && typeof ref === 'string' && ref.startsWith(queueDraftHead)
+  );
+}
+
+function listedNumbers(list) {
+  return [...list.matchAll(/\d+/g)].map((match) => Number(match[0]));
+}
+
+function originalNumbers(pull) {
+  const title = pull.title ?? '';
+  const body = pull.body ?? '';
+  const found = [];
+  const titled = title.match(/^(?:Merge of #|merge queue:\s+merged\s+#)(\d+(?:\s*,\s*#\d+)*)/i);
+  if (titled) found.push(...listedNumbers(titled[1]));
+  for (const match of body.matchAll(/Merge of #(\d+(?:\s*,\s*#\d+)*)/gi)) {
+    found.push(...listedNumbers(match[1]));
+  }
+  const lines = body.split(/\r?\n/);
+  const header = lines.findIndex((line) => line.trim() === 'pull_requests:');
+  if (header >= 0) {
+    for (const line of lines.slice(header + 1)) {
+      if (line.trim() === '') continue;
+      const item = /^\s*-\s+number:\s*(\d+)\s*$/.exec(line);
+      if (!item) break;
+      found.push(Number(item[1]));
+    }
+  }
+  return [...new Set(found)];
+}
+
 export function pullNumbersForCommit(repo, sha) {
   if (!shaPattern.test(sha ?? '')) throw new Error('A full 40-hex commit SHA is required');
   const pulls = JSON.parse(gh('api', `repos/${repo}/commits/${sha}/pulls`));
-  return pulls.filter((pull) => pull.state === 'closed').map((pull) => pull.number);
+  const numbers = [];
+  for (const pull of pulls) {
+    if (pull.state !== 'closed') continue;
+    if (!isQueueDraft(pull)) {
+      numbers.push(pull.number);
+      continue;
+    }
+    const originals = originalNumbers(pull);
+    if (originals.length === 0) {
+      throw new Error(`queue draft #${pull.number} does not name its original pull request`);
+    }
+    numbers.push(...originals);
+  }
+  return [...new Set(numbers)];
 }
 
 function passedDraftNumber(comments) {
   let draft = null;
   for (const comment of comments) {
     if (comment.user?.login !== 'mergify[bot]' || typeof comment.body !== 'string') continue;
-    for (const match of comment.body.matchAll(/Passed · draft #(\d+)/g)) {
+    for (const match of comment.body.matchAll(/Passed\*{0,2}\s*·\s*draft #(\d+)/g)) {
       draft = Number(match[1]);
     }
   }

@@ -28,7 +28,7 @@ export function CheckedButton({
     <RefreshCw
       aria-hidden
       strokeWidth={1.75}
-      className={cn('size-3.5', fetching && 'animate-spin')}
+      className={cn('size-4', fetching && 'animate-spin')}
     />
   );
   if (onRefresh === undefined) {

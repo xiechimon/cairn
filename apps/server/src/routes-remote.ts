@@ -6,12 +6,14 @@ import { HttpError, parseWith } from './lib/errors.js';
 import { buildRemoteRoutes } from './lib/remote-routes.js';
 import { matchesAuthToken } from './lib/token-auth.js';
 import { jsonBody } from './routes-helpers.js';
+import { requestIsSecure, setAuthCookie } from './services/browser-session.js';
 import {
-  createPairedDevice,
-  createPairingBook,
-  hasRoomForDevice,
+  issuePairingGrant,
   listPairedDevices,
+  listPairingGrants,
+  pairFromGrant,
   revokePairedDevice,
+  revokePairingGrant,
 } from './services/paired-devices.js';
 
 function bearerToken(c: Context): string | null {
@@ -22,7 +24,6 @@ function bearerToken(c: Context): string | null {
 export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
   const remote = ctx.remote;
   if (remote === undefined) return;
-  const book = createPairingBook();
 
   const requireOwner = (c: Context): void => {
     if (ctx.authToken === null) {
@@ -37,8 +38,7 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/remote/identity', (c) => {
     c.header('cache-control', 'no-store');
-    const owner = c.get('ownerIdentity');
-    return c.json(owner?.via === 'tailscale' ? owner : { login: null, via: null });
+    return c.json({ login: null, via: null });
   });
 
   app.get('/api/remote/descriptor', (c) => {
@@ -62,11 +62,25 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     );
   });
 
+  app.get('/api/remote/pairing', (c) => {
+    requireOwner(c);
+    c.header('cache-control', 'no-store');
+    return c.json(listPairingGrants(ctx.db));
+  });
+
   app.post('/api/remote/pairing', (c) => {
     requireOwner(c);
     c.header('cache-control', 'no-store');
-    const issued = book.issue();
+    const issued = issuePairingGrant(ctx.db);
     return c.json({ ...issued, environmentId: remote.environmentId }, 201);
+  });
+
+  app.delete('/api/remote/pairing/:id', (c) => {
+    requireOwner(c);
+    if (!revokePairingGrant(ctx.db, c.req.param('id'))) {
+      throw new HttpError(404, 'pairing code not found');
+    }
+    return c.body(null, 204);
   });
 
   app.post('/api/remote/pair', async (c) => {
@@ -75,21 +89,25 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
       throw new HttpError(409, 'pairing needs token auth, which is turned off');
     }
     const body = parseWith(pairBodySchema, await jsonBody(c), 'body');
-    if (!hasRoomForDevice(ctx.db)) {
-      throw new HttpError(409, 'too many paired devices; revoke one first');
-    }
-    if (!book.redeem(body.code)) {
-      throw new HttpError(401, 'pairing code is invalid or expired');
-    }
-    const { device, token } = createPairedDevice(ctx.db, {
+    const paired = pairFromGrant(ctx.db, {
+      code: body.code,
       teamId: ctx.team.id,
       name: body.name,
     });
-    return c.json({ token, deviceId: device.id, environmentId: remote.environmentId }, 201);
+    if (paired === null) {
+      throw new HttpError(401, 'pairing code is invalid or expired');
+    }
+    setAuthCookie(c, paired.sessionToken, requestIsSecure(c));
+    return c.json(
+      { token: paired.token, deviceId: paired.device.id, environmentId: remote.environmentId },
+      201,
+    );
   });
 
   app.get('/api/remote/devices', (c) => {
-    requireOwner(c);
+    if (ctx.authToken === null) {
+      throw new HttpError(409, 'pairing needs token auth, which is turned off');
+    }
     return c.json(listPairedDevices(ctx.db, ctx.team.id));
   });
 

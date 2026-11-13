@@ -13,13 +13,14 @@ import {
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { readNotifyPref } from '../board/notify-pref.js';
+import { DEMO_MODE } from '../demo/demo-gate.js';
 import { EN } from '../i18n/en.js';
 import { readStoredLocale } from '../i18n/locale.js';
 import { translate } from '../i18n/translate.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { activityStore } from './activity.js';
 import { agentTodoStore } from './agent-todo.js';
-import { readStoredToken, useAuth } from './auth.js';
+import { useAuth } from './auth.js';
 import { computerFeedStore } from './computer-feed.js';
 import { computerQueryKeys } from './computer-query-scope.js';
 import { invalidateConverged } from './invalidate.js';
@@ -31,9 +32,18 @@ import { connect } from './sse-connection.js';
 import { streamGuards } from './sse-guards.js';
 import { teamEventInvalidations } from './sse-team-events.js';
 
-function streamUrl(path: string): string {
-  const token = readStoredToken();
-  return token === null ? path : `${path}?token=${encodeURIComponent(token)}`;
+async function streamUrl(path: string): Promise<string> {
+  if (DEMO_MODE) return path;
+  const res = await fetch('/api/auth/stream-ticket', { method: 'POST' });
+  if (!res.ok) return path;
+  const body = (await res.json()) as { ticket?: string };
+  if (body.ticket === undefined || body.ticket === '') return path;
+  return `${path}?ticket=${encodeURIComponent(body.ticket)}`;
+}
+
+function withTicket(path: string, ticket: string | null): string {
+  if (ticket === null || ticket === '') return path;
+  return `${path}?ticket=${encodeURIComponent(ticket)}`;
 }
 
 export function useTeamStream(teamId: string | undefined, enabled: boolean): void {
@@ -44,11 +54,22 @@ export function useTeamStream(teamId: string | undefined, enabled: boolean): voi
       computerFeedStore.clear();
       return;
     }
-    return startTeamStream(teamId, qc, auth.generation);
+    const stop = startTeamStream(teamId, qc, auth.generation, null, () =>
+      streamUrl(`/api/teams/${teamId}/stream`),
+    );
+    return () => {
+      stop();
+    };
   }, [teamId, enabled, qc, auth]);
 }
 
-export function startTeamStream(teamId: string, qc: QueryClient, generation = 0): () => void {
+export function startTeamStream(
+  teamId: string,
+  qc: QueryClient,
+  generation = 0,
+  ticket: string | null = null,
+  resolvePath: (() => Promise<string>) | null = null,
+): () => void {
   computerFeedStore.clear();
   const resync = () => {
     computerFeedStore.clear();
@@ -56,7 +77,7 @@ export function startTeamStream(teamId: string, qc: QueryClient, generation = 0)
   };
   const guards = streamGuards(qc);
   const disconnect = connect(
-    streamUrl(`/api/teams/${teamId}/stream`),
+    resolvePath ?? withTicket(`/api/teams/${teamId}/stream`, ticket),
     (ev) => {
       for (const queryKey of teamEventInvalidations(ev, teamId)) {
         void invalidateConverged(qc, { queryKey });
@@ -147,11 +168,7 @@ function fireDesktopNotification(record: NotificationRecord): void {
               : record.type === 'no_machine'
                 ? t('没有机器能跑')
                 : record.entityRef.title;
-  const body =
-    record.snippet ??
-    (record.entityRef.seqNum !== null
-      ? `#${record.entityRef.seqNum} ${record.entityRef.title}`
-      : record.entityRef.title);
+  const body = record.snippet ?? record.entityRef.title;
   const href = notificationHref(record);
   void showViaServiceWorker(title, body, record.id, href).then((shown) => {
     if (shown) return;
@@ -181,7 +198,12 @@ export function useConversationStream(
   const auth = useAuth();
   useEffect(() => {
     if (conversationId === undefined || !enabled || auth.gateOpen) return;
-    return startConversationStream(conversationId, qc, { onMessage, onStep });
+    const stop = startConversationStream(conversationId, qc, { onMessage, onStep }, null, () =>
+      streamUrl(`/api/conversations/${conversationId}/stream`),
+    );
+    return () => {
+      stop();
+    };
   }, [conversationId, enabled, qc, onMessage, onStep, auth]);
 }
 
@@ -189,6 +211,8 @@ export function startConversationStream(
   conversationId: string,
   qc: QueryClient,
   handlers: ConversationStreamHandlers,
+  ticket: string | null = null,
+  resolvePath: (() => Promise<string>) | null = null,
 ): () => void {
   const onMessage = handlers.onMessage;
   const onStep = handlers.onStep;
@@ -204,7 +228,7 @@ export function startConversationStream(
     void invalidateConverged(qc);
   };
   return connect(
-    streamUrl(`/api/conversations/${conversationId}/stream`),
+    resolvePath ?? withTicket(`/api/conversations/${conversationId}/stream`, ticket),
     (ev) => {
       switch (ev.type) {
         case 'text_delta':

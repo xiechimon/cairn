@@ -192,6 +192,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     convHub: ctx.convHub,
     oauthClient: ctx.oauthClient,
     ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
+    ...(ctx.oauthFetch !== undefined ? { oauthFetch: ctx.oauthFetch } : {}),
   };
 
   app.use('/api/machine/*', async (c, next) => {

@@ -1,26 +1,32 @@
 import { canOrchestrate } from '@cairn/shared';
+import { cn } from 'cn';
 import { Ellipsis } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
-import { useApiMutations, useBuildGate, useChiefThreads, usePrs } from '../api/hooks.js';
+import { useApiMutations, useChiefThreads } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
+import { REPLY_CHIP_CLS } from '../chief/quick-replies.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Spinner } from '../components/ui/spinner.js';
-import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { toastError } from '../components/ui/toaster.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
-import { AcceptDialog } from '../detail/accept-dialog.js';
 import { substantiveChangesOf } from '../detail/empty-commit.js';
-import { mergePreselected, mergeRejectCopy } from '../detail/merge-gate.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { MoreMenu } from '../overlay/more-menu.js';
+import { AcceptTaskDialog } from './accept-task-dialog.js';
+import { toastArchived } from './archive-toast.js';
 import { RouteOverrideDialog } from './route-override-dialog.js';
+import { MoveToProjectSub } from './task-move-menu.js';
+import { RenameDialog } from './task-row-menu.js';
 import type { ThreadChat } from './use-thread-chat.js';
 
-export type ThreadActionKind = 'start' | 'approve' | 'finish' | 'retry' | 'unarchive';
+export type ThreadActionKind = 'start' | 'approve' | 'retry' | 'unarchive';
 
 export function threadActionOf(todo: TodoRecord, running: boolean): ThreadActionKind | null {
   if (todo.archivedAt != null) return 'unarchive';
@@ -30,8 +36,6 @@ export function threadActionOf(todo: TodoRecord, running: boolean): ThreadAction
       return 'start';
     case 'confirm':
       return 'approve';
-    case 'review':
-      return 'finish';
     case 'failed':
       return 'retry';
     default:
@@ -42,10 +46,14 @@ export function threadActionOf(todo: TodoRecord, running: boolean): ThreadAction
 const ACTION_COPY: Record<ThreadActionKind, { reason: string; primary: string }> = {
   start: { reason: '还没开始。', primary: '开始' },
   approve: { reason: '计划已就绪。要改计划，直接在下面回复。', primary: '批准计划' },
-  finish: { reason: '已就绪，等你审阅。要改，直接在下面回复。', primary: '完成…' },
   retry: { reason: '失败了。可以重试，或在下面回复说明怎么改。', primary: '重试' },
-  unarchive: { reason: '已归档。', primary: '取消归档' },
+  unarchive: { reason: '这个任务已归档。取消归档后才能发消息。', primary: '取消归档' },
 };
+
+export interface EngineMenu {
+  onViewRaw: () => void;
+  takeOver?: { label: string; onClick: () => void };
+}
 
 export interface ThreadActions {
   card: ReactNode;
@@ -57,26 +65,25 @@ export function useThreadActions({
   chat,
   onGone,
   onViewPlan,
+  engine,
 }: {
   todo: TodoRecord;
   chat: ThreadChat;
   onGone: () => void;
   onViewPlan: (() => void) | undefined;
+  engine?: EngineMenu | undefined;
 }): ThreadActions {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
   const orchestrateStart = useOrchestrateStart();
   const chiefThreadsQ = useChiefThreads(teamId, live);
-  const pr = usePrs(teamId, todo.id, live).data?.[0];
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dialog, setDialog] = useState<'accept' | 'delete' | 'stop' | 'route-override' | null>(
-    null,
-  );
-  const [acceptError, setAcceptError] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<
+    'accept' | 'delete' | 'stop' | 'route-override' | 'rename' | null
+  >(null);
   const moreRef = useRef<HTMLButtonElement | null>(null);
   const { buildId, running } = chat;
-  const gate = useBuildGate(buildId, live && dialog === 'accept' && pr !== undefined).data?.state;
   const phase = todo.phase;
   const archived = todo.archivedAt != null;
 
@@ -101,10 +108,9 @@ export function useThreadActions({
         {
           onSuccess: () => {
             if (next)
-              toastSuccess(t('Task archived'), {
-                label: t('Undo'),
-                onClick: () => mutations.setTodoArchived.mutate({ id: todo.id, archived: false }),
-              });
+              toastArchived(t, todo.title, (handlers) =>
+                mutations.setTodoArchived.mutate({ id: todo.id, archived: false }, handlers),
+              );
           },
           onError: (error) =>
             toastError(next ? t('Could not archive task.') : t('Could not unarchive task.'), error),
@@ -113,35 +119,7 @@ export function useThreadActions({
     });
   const openAccept = () => {
     setMenuOpen(false);
-    setAcceptError(null);
     setDialog('accept');
-  };
-  const confirmAccept = (merge: boolean) => {
-    if (buildId == null) {
-      setAcceptError(t('任务数据未就绪，完成请求未送出。请刷新页面后重试。'));
-      return;
-    }
-    if (!merge) {
-      mutations.patchTodo.mutate(
-        { id: todo.id, body: { phase: 'done' } },
-        {
-          onSuccess: () => {
-            setDialog(null);
-            toastSuccess(t('任务已完成，改动保留在会话分支。'));
-          },
-          onError: (error) =>
-            setAcceptError(mergeRejectCopy(error, t, t('完成请求未送出，请重试。'))),
-        },
-      );
-      return;
-    }
-    mutations.mergeBuild.mutate(buildId, {
-      onSuccess: () => {
-        setDialog(null);
-        toastSuccess(t('已发起合并，合并完成后任务进入已完成。'));
-      },
-      onError: (error) => setAcceptError(mergeRejectCopy(error, t)),
-    });
   };
   const closeTask = guard(() => {
     setMenuOpen(false);
@@ -183,44 +161,60 @@ export function useThreadActions({
   const runPrimary: Record<ThreadActionKind, () => void> = {
     start: orchestrate,
     approve,
-    finish: openAccept,
     retry: orchestrate,
     unarchive: setArchived(false),
   };
-  const canFinishFailed = !archived && phase === 'failed' && chat.buildLegDone;
 
   const card =
-    kind === null ? null : (
+    kind === null ? null : kind === 'unarchive' ? (
+      <div
+        data-testid="side-chat-action"
+        data-action="unarchive"
+        className="mx-4 mb-4 flex flex-none flex-col items-start gap-2 rounded-(--radius-tile) border border-border px-4 py-3"
+      >
+        <p className="m-0 text-ui text-foreground">{t(ACTION_COPY.unarchive.reason)}</p>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={runPrimary.unarchive}
+          disabled={pending}
+          className="h-7.5 px-3 text-ui font-normal"
+        >
+          {pending && <Spinner data-icon="inline-start" />}
+          {t(ACTION_COPY.unarchive.primary)}
+        </Button>
+      </div>
+    ) : (
       <div
         data-testid="side-chat-action"
         data-action={kind}
-        className="mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-card) bg-card px-3.5 py-2.5 shadow-(--e1)"
+        className="mx-auto mb-4 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-wrap gap-3"
       >
-        <p className="m-0 min-w-0 flex-1 basis-48 text-meta text-content-secondary">
-          {t(ACTION_COPY[kind].reason)}
-        </p>
-        <div className="flex flex-none gap-2">
-          {kind === 'approve' && onViewPlan !== undefined && (
-            <Button size="sm" variant="outline" onClick={onViewPlan} className="h-7 px-2.5">
-              {t('查看计划')}
-            </Button>
-          )}
-          {canFinishFailed && (
-            <Button size="sm" variant="outline" onClick={openAccept} className="h-7 px-2.5">
-              {t('完成…')}
-            </Button>
-          )}
-          <Button
-            size="sm"
-            onClick={runPrimary[kind]}
-            disabled={pending || orchestrating}
-            data-orchestrating={orchestrating ? 'true' : undefined}
-            className="h-7 px-2.5"
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                onClick={runPrimary[kind]}
+                disabled={pending || orchestrating}
+                data-orchestrating={orchestrating ? 'true' : undefined}
+                aria-description={t(ACTION_COPY[kind].reason)}
+                className={cn(REPLY_CHIP_CLS, 'w-auto')}
+              />
+            }
           >
             {(pending || orchestrating) && <Spinner data-icon="inline-start" />}
             {orchestrating ? t('编排中') : t(ACTION_COPY[kind].primary)}
+          </TooltipTrigger>
+          <TooltipContent side="top" sideOffset={6}>
+            {t(ACTION_COPY[kind].reason)}
+          </TooltipContent>
+        </Tooltip>
+        {kind === 'approve' && onViewPlan !== undefined && (
+          <Button variant="ghost" onClick={onViewPlan} className={cn(REPLY_CHIP_CLS, 'w-auto')}>
+            {t('查看计划')}
           </Button>
-        </div>
+        )}
       </div>
     );
 
@@ -228,18 +222,23 @@ export function useThreadActions({
     phase === 'review' || phase === 'confirm' || (phase === 'failed' && chat.buildLegDone);
   const menu = (
     <>
-      <Button
-        ref={moreRef}
-        variant="ghost"
-        size="icon-sm"
-        aria-label={t('更多操作…')}
-        aria-haspopup="menu"
-        aria-expanded={menuOpen}
-        onClick={() => setMenuOpen(!menuOpen)}
-        className="text-content-tertiary hover:text-foreground max-[640px]:size-8"
+      <IconTooltip
+        label={t('更多操作…')}
+        side="bottom"
+        trigger={
+          <Button
+            ref={moreRef}
+            variant="ghost"
+            size="icon"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-5.5 max-[640px]:size-8"
+          />
+        }
       >
         <Ellipsis aria-hidden="true" />
-      </Button>
+      </IconTooltip>
       <MoreMenu
         open={menuOpen}
         anchor={moreRef}
@@ -265,16 +264,36 @@ export function useThreadActions({
           setMenuOpen(false);
           setDialog('route-override');
         }}
+        onRename={() => {
+          setMenuOpen(false);
+          setDialog('rename');
+        }}
+        {...(engine !== undefined
+          ? {
+              onViewRaw: () => {
+                setMenuOpen(false);
+                engine.onViewRaw();
+              },
+              ...(engine.takeOver !== undefined
+                ? {
+                    takeOver: {
+                      label: engine.takeOver.label,
+                      onClick: () => {
+                        setMenuOpen(false);
+                        engine.takeOver?.onClick();
+                      },
+                    },
+                  }
+                : {}),
+            }
+          : {})}
+        moveSub={<MoveToProjectSub todo={todo} />}
       />
+      {dialog === 'rename' && <RenameDialog todo={todo} open onClose={() => setDialog(null)} />}
       <DeleteConfirm
         open={dialog === 'delete'}
         title={t('确定删除该任务？此操作不可撤销。')}
-        summary={
-          <>
-            <span className="text-(--text-tertiary)">#{todo.seqNum}</span>
-            {todo.title}
-          </>
-        }
+        summary={todo.title}
         ariaLabel={t('删除任务')}
         onClose={() => setDialog(null)}
         onConfirm={deleteTask}
@@ -285,19 +304,14 @@ export function useThreadActions({
         onClose={() => setDialog(null)}
         onConfirm={stop}
       />
-      <AcceptDialog
+      <AcceptTaskDialog
+        todo={todo}
+        buildId={buildId}
         open={dialog === 'accept'}
         onClose={() => setDialog(null)}
-        rejectReason={acceptError}
-        substantiveChanges={
-          live ? substantiveChangesOf(chat.changes.reported, chat.changes.settled) : null
-        }
+        substantiveChanges={substantiveChangesOf(chat.changes.reported, chat.changes.settled)}
         mergeLocked={phase === 'failed'}
-        mergeByDefault={!live || mergePreselected({ hasPr: pr !== undefined, gate: gate ?? null })}
         infoOutput={chat.infoOutput}
-        {...(pr !== undefined ? { pr: { number: pr.number, url: pr.url } } : {})}
-        confirming={mutations.mergeBuild.isPending || mutations.patchTodo.isPending}
-        {...(live ? { onConfirm: confirmAccept } : {})}
       />
       <RouteOverrideDialog
         open={dialog === 'route-override'}

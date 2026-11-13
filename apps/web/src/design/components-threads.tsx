@@ -12,6 +12,7 @@ import type { PrCardModel } from '../components/thread/pr-card-model.js';
 import { PrList } from '../components/thread/pr-list.js';
 import { ProposalCard } from '../components/thread/proposal-card.js';
 import { ScheduledTaskRow } from '../components/thread/scheduled-task-row.js';
+import { TaskPrLine } from '../components/thread/task-pr-line.js';
 import { TaskRow } from '../components/thread/task-row.js';
 import { UsageStrip } from '../components/thread/usage-strip.js';
 import { Button } from '../components/ui/button.js';
@@ -429,6 +430,16 @@ export function PrListSection() {
           />
         </div>
       </Specimen>
+      <Specimen
+        id="task-pr-line"
+        title="Task PR line"
+        stage="canvas"
+        code="<TaskPrLine prs={rows} now={Date.now()} />"
+      >
+        <div className="w-full max-w-110 pt-3">
+          <TaskPrLine prs={PR_LIST_ROWS} now={Date.now()} />
+        </div>
+      </Specimen>
     </Section>
   );
 }
@@ -522,55 +533,55 @@ export function TaskRowSection() {
     <Section
       id="task-row"
       title="Task row"
-      lede="A row in the Tasks panel: status glyph, title and age, then the status word with what is waiting, then where to act. Only rows waiting on the owner take the accent and an action line; a running row carries the 6px running dot."
+      lede="A row in the Tasks panel: status glyph, title and age, then the status word with what is waiting, then where to act. A row the owner can mark done leads with the checkbox; any other row leads with one quiet glyph in the same spot whose tooltip says why. Only rows waiting on the owner add an action line."
     >
       <Specimen
         id="task-row"
         title="Task row"
         stage="canvas"
-        code="<TaskRow title glyph word what where age waiting running onOpen />"
+        code="<TaskRow title glyph why word what where age waiting onOpen />"
       >
         <div className="flex w-full max-w-110 flex-col">
           <TaskRow
             title="Inventory MCP servers across machines and keep secrets local"
             glyph="three-quarter"
+            check={{ label: 'Mark done', onCheck: () => toastSuccess('Marked done') }}
             word="Ready for review"
             what="PR #3558: all checks passed (41/41)"
             where="Merge on the PR card"
             age="22 min ago"
             waiting
-            running={false}
             onOpen={() => toastSuccess('Task opened')}
           />
           <TaskRow
             title="Remove Feishu entirely, or keep the notification channel?"
             glyph="question"
+            why="A question from the Coordinator; answer it in the conversation"
             word="Needs input"
             what="Coordinator asks before creating a task"
             where="Choose on the question card"
             age="8 min ago"
             waiting
-            running={false}
           />
           <TaskRow
             title="Enforce public-content checks in hooks and CI"
-            glyph="ring"
-            word="Working"
-            what="Building."
+            glyph="failed"
+            why="The run failed; rerun it first"
+            word="Failed"
+            what="The build failed"
             where={null}
             age="12 min"
             waiting={false}
-            running
           />
           <TaskRow
             title="Unify the task issue lifecycle"
             glyph="done"
+            why="Done"
             word="Done"
             what="PR #3551 merged"
             where={null}
             age="2 h ago"
             waiting={false}
-            running={false}
             muted
           />
         </div>

@@ -103,7 +103,12 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   {
     method: 'GET',
     path: '/api/teams/{id}/chief/threads',
-    note: 'only the one global Coordinator thread (D58)',
+    note: 'the main Coordinator thread first, then one thread per opened project channel',
+  },
+  {
+    method: 'POST',
+    path: '/api/teams/{id}/chief/channels/{projectId}',
+    note: 'find or create the project channel thread; 201 with a greeting turn queued when created, 200 when it exists; 404 for a project outside the team, 409 when archived',
   },
   {
     method: 'GET',
@@ -114,7 +119,7 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   {
     method: 'POST',
     path: '/api/teams/{id}/coordinator/messages',
-    note: 'body {content, projectId?, clientMessageId?}; projectId only tags the turn, 409 when that project is archived; a repeated clientMessageId returns the first response and starts no new turn',
+    note: 'body {content, projectId?, clientMessageId}; a missing clientMessageId is 400; projectId only tags the turn, 409 when that project is archived; a repeated clientMessageId returns the first response and starts no new turn',
   },
   { method: 'GET', path: '/api/projects', query: ['teamId'] },
   { method: 'GET', path: '/api/projects/{id}/todos' },
@@ -127,7 +132,7 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: '02 §9.3 在册不设计；触发条件 = 04 册附录 B',
   },
   { method: 'GET', path: '/api/todos', query: ['teamId'] },
-  { method: 'GET', path: '/api/tasks', query: ['teamId'] },
+  { method: 'GET', path: '/api/tasks', query: ['teamId', 'sectioned'] },
   { method: 'GET', path: '/api/todos/{id}' },
   {
     method: 'POST',
@@ -241,6 +246,16 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     method: 'POST',
     path: '/api/teams/{id}/providers/oauth/{preset}/authorize',
     note: '#231 [设计]：签发授权 URL（state 入册，TTL 10min 单次核销）',
+  },
+  {
+    method: 'POST',
+    path: '/api/teams/{id}/providers/oauth/xai/device',
+    note: 'SuperGrok device-code start; device_code stays on the server',
+  },
+  {
+    method: 'POST',
+    path: '/api/teams/{id}/providers/oauth/xai/device/poll',
+    note: 'SuperGrok device-code poll; stores the refresh token, not the access token',
   },
   {
     method: 'GET',

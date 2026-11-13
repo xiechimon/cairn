@@ -128,15 +128,15 @@ test('the home composer can talk to a running thread directly, and back to the C
   ]);
   const coordinatorPosts = await recordCoordinatorSends(page);
   await page.goto('/app');
-  await page.getByRole('button', { name: 'Talk to a thread' }).click();
-  const menu = page.getByRole('menu', { name: 'Talk to a thread' });
+  await page.locator('[data-testid="composer-plus"]:visible').click();
+  const menu = page.getByRole('menu');
   await expect(menu.getByRole('menuitemradio')).toHaveText([
     /Coordinator/,
-    /#9 Research the queue design/,
+    /^Research the queue design/,
   ]);
-  await menu.getByRole('menuitemradio', { name: /#9/ }).click();
-  await expect(page.getByRole('button', { name: 'Talking to #9' })).toBeVisible();
-  await expect(composer(page)).toHaveAttribute('placeholder', 'Goes straight to #9, into its current turn.');
+  await menu.getByRole('menuitemradio', { name: /Research the queue design/ }).click();
+  await expect(page.getByRole('button', { name: 'Talking to “Research the queue design”' })).toBeVisible();
+  await expect(composer(page)).toHaveAttribute('placeholder', 'Goes straight to this task, into its current turn.');
   await expect(composer(page)).toBeFocused();
   await composer(page).fill('Compare it with a ring buffer');
   await composer(page).press('Enter');
@@ -145,23 +145,23 @@ test('the home composer can talk to a running thread directly, and back to the C
     { todoId: 'todo-9', body: { content: 'Compare it with a ring buffer', clientMessageId: expect.any(String) } },
   ]);
   expect(coordinatorPosts).toEqual([]);
-  await expect(page.getByRole('button', { name: 'Talking to #9' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Talking to “Research the queue design”' })).toBeVisible();
   await page.getByRole('button', { name: 'Back to the Coordinator' }).click();
-  await expect(page.getByRole('button', { name: 'Talk to a thread' })).toBeVisible();
-  await expect(composer(page)).not.toHaveAttribute('placeholder', /#9/);
+  await expect(page.getByTestId('composer-thread-target')).toHaveCount(0);
+  await expect(composer(page)).not.toHaveAttribute('placeholder', /this task/);
 });
 
 test('a refused direct message keeps the draft and the target and says it was not sent', async ({ page }) => {
   await stubHome(page, [todo('todo-9', 9, 'Research the queue design', 'building', 'build-9')], 409);
   const coordinatorPosts = await recordCoordinatorSends(page);
   await page.goto('/app');
-  await page.getByRole('button', { name: 'Talk to a thread' }).click();
-  await page.getByRole('menuitemradio', { name: /#9/ }).click();
+  await page.locator('[data-testid="composer-plus"]:visible').click();
+  await page.getByRole('menuitemradio', { name: /Research the queue design/ }).click();
   await composer(page).fill('Keep this text');
   await composer(page).press('Enter');
-  await expect(page.getByTestId('chief-composer-error')).toHaveText('Not sent to #9. Try again.');
+  await expect(page.getByTestId('chief-composer-error')).toHaveText('Not sent to “Research the queue design”. Try again.');
   await expect(composer(page)).toHaveValue('Keep this text');
-  await expect(page.getByRole('button', { name: 'Talking to #9' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Talking to “Research the queue design”' })).toBeVisible();
   expect(coordinatorPosts).toEqual([]);
 });
 
@@ -169,7 +169,8 @@ test('with no thread that can take a message there is no thread target', async (
   await stubHome(page, [todo('todo-3', 3, 'Not started yet', 'queued', null)]);
   await page.goto('/app');
   await expect(composer(page)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Talk to a thread' })).toHaveCount(0);
+  await page.locator('[data-testid="composer-plus"]:visible').click();
+  await expect(page.getByRole('menuitemradio')).toHaveCount(0);
 });
 
 test('a target that stops taking messages blocks the send instead of handing it to the Coordinator', async ({
@@ -184,18 +185,18 @@ test('a target that stops taking messages blocks the send instead of handing it 
   const sent = await stubHome(page, todos, 201, hold);
   const coordinatorPosts = await recordCoordinatorSends(page);
   await page.goto('/app');
-  await page.getByRole('button', { name: 'Talk to a thread' }).click();
-  await page.getByRole('menuitemradio', { name: /#9/ }).click();
+  await page.locator('[data-testid="composer-plus"]:visible').click();
+  await page.getByRole('menuitemradio', { name: /Research the queue design/ }).click();
   await composer(page).fill('First note');
   await composer(page).press('Enter');
   await expect.poll(() => sent.length).toBe(1);
   todos[0] = { ...building, archivedAt: Date.now() };
   release();
   await expect(page.getByTestId('chief-composer-error')).toHaveText(
-    '#9 cannot take a message now. Switch back to the Coordinator or pick another thread.',
+    '“Research the queue design” cannot take a message now. Switch back to the Coordinator or pick another thread.',
   );
-  await expect(composer(page)).toHaveAttribute('placeholder', /#9 cannot take a message now/);
-  await expect(page.getByRole('button', { name: 'Talking to #9' })).toBeVisible();
+  await expect(composer(page)).toHaveAttribute('placeholder', /cannot take a message now/);
+  await expect(page.getByRole('button', { name: 'Talking to “Research the queue design”' })).toBeVisible();
   await composer(page).fill('Meant for #9');
   await composer(page).press('Enter');
   await expect(composer(page)).toHaveValue('Meant for #9');
@@ -218,14 +219,14 @@ test('a late failure for one thread does not show under another thread', async (
     hold,
   );
   await page.goto('/app');
-  await page.getByRole('button', { name: 'Talk to a thread' }).click();
-  await page.getByRole('menuitemradio', { name: /#9/ }).click();
+  await page.locator('[data-testid="composer-plus"]:visible').click();
+  await page.getByRole('menuitemradio', { name: /Research the queue design/ }).click();
   await composer(page).fill('For nine');
   await composer(page).press('Enter');
   await expect.poll(() => sent.length).toBe(1);
-  await page.getByRole('button', { name: 'Talking to #9' }).click();
-  await page.getByRole('menuitemradio', { name: /#7/ }).click();
-  await expect(page.getByRole('button', { name: 'Talking to #7' })).toBeVisible();
+  await page.getByRole('button', { name: 'Talking to “Research the queue design”' }).click();
+  await page.getByRole('menuitemradio', { name: /Split the routing migration/ }).click();
+  await expect(page.getByRole('button', { name: 'Talking to “Split the routing migration”' })).toBeVisible();
   const refused = page.waitForResponse((response) => response.url().includes('/api/todos/todo-9/messages'));
   release();
   await refused;

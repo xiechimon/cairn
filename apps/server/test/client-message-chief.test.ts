@@ -65,11 +65,15 @@ describe.each(entryPoints)('%s with a client message id', (_name, urlOf) => {
     expect(chiefSteps()).toHaveLength(2);
   });
 
-  test('no key keeps today behaviour: two sends are two messages and two steps', async () => {
-    await post(urlOf(), { content: 'hello' });
-    await post(urlOf(), { content: 'hello' });
-    expect(userMessages()).toHaveLength(2);
-    expect(chiefSteps()).toHaveLength(2);
+  test('a missing clientMessageId is rejected and writes nothing', async () => {
+    const res = await H.s.app.request(urlOf(), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cairn-raw-send': '1' },
+      body: JSON.stringify({ content: 'hello' }),
+    });
+    expect(res.status).toBe(400);
+    expect(userMessages()).toEqual([]);
+    expect(chiefSteps()).toEqual([]);
   });
 
   test('a key reused with different content returns the ORIGINAL response and stores nothing new', async () => {
@@ -256,5 +260,23 @@ describe('POST /api/todos/:id/messages with a client message id', () => {
     await send('todo-a', { content: 'Use the index', clientMessageId: 'key-1' });
     expect(userMessages()).toHaveLength(1);
     expect(steered('build-a')).toHaveLength(1);
+  });
+
+  test('a conversation send with the same key does not swallow the thread send', async () => {
+    seedThread('todo-a', 'build-a');
+    const direct = await req(H.s.app, 'POST', '/api/conversations/build-a/messages', {
+      content: 'direct steer',
+      clientMessageId: 'key-1',
+    });
+    expect(direct.status).toBe(201);
+    const nested = await send('todo-a', { content: 'thread steer', clientMessageId: 'key-1' });
+    expect(nested.status).toBe(201);
+    expect(steered('build-a').map((row) => row.content)).toEqual(['direct steer', 'thread steer']);
+    expect(markers()).toHaveLength(1);
+    const retry = await send('todo-a', { content: 'thread steer', clientMessageId: 'key-1' });
+    expect(retry.status).toBe(201);
+    expect(await retry.json()).toEqual(await nested.json());
+    expect(steered('build-a')).toHaveLength(2);
+    expect(markers()).toHaveLength(1);
   });
 });

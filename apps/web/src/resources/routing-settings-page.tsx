@@ -93,6 +93,7 @@ function RuleEditor({
     (rule?.thinkingLevel as ThinkingLevel | null | undefined) ?? 'off',
   );
   const [machineId, setMachineId] = useState(rule?.machineId ?? null);
+  const mustNameMachine = use === 'session' && machines.length > 1;
   const pickedMachine = machines.find((m) => m.id === machineId);
   const dirty =
     rule === null ||
@@ -160,14 +161,14 @@ function RuleEditor({
             >
               <SelectValue>
                 {machineId === null
-                  ? t('不固定')
+                  ? t(mustNameMachine ? '选择机器' : '不固定')
                   : pickedMachine === undefined
                     ? undefined
                     : (machineLabel(pickedMachine, machines) ?? machineId)}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={null}>{t('不固定')}</SelectItem>
+              {mustNameMachine ? null : <SelectItem value={null}>{t('不固定')}</SelectItem>}
               {machines.map((machine) => (
                 <SelectItem key={machine.id} value={machine.id}>
                   <MachineName machine={machine} all={machines} />
@@ -188,7 +189,12 @@ function RuleEditor({
             }
           >
             <Button
-              disabled={!dirty || provider == null || modelId == null}
+              disabled={
+                !dirty ||
+                provider == null ||
+                modelId == null ||
+                (mustNameMachine && machineId == null)
+              }
               onClick={() => {
                 if (provider == null || modelId == null) return;
                 onSave({

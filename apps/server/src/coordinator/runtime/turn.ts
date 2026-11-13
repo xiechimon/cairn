@@ -2,8 +2,11 @@ import {
   type ClaimedStep,
   contextTokensOf,
   estimateTokens,
+  isMailWakeText,
   type MachineDoneBody,
   type ModelUsage,
+  mailFenceBlock,
+  mailSharedTranscript,
   type OtelObservation,
 } from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
@@ -139,6 +142,7 @@ export async function runCoordinatorTurn(
   let rootKey: string | null = null;
   let watch: Awaited<ReturnType<Conversation['watch']>> | undefined;
   try {
+    const mailTurn = isMailWakeText(claimed.instruction ?? '');
     const root = await activeConversation(harness, deps.conversationId, context);
     if (root === undefined) {
       return done({ status: 'failed', errorMessage: 'Coordinator conversation is missing' });
@@ -146,7 +150,14 @@ export async function runCoordinatorTurn(
     rootKey = String(root.id);
     const conversationKey = deps.inputs?.key(rootKey) ?? rootKey;
     deps.conversationGate?.set(rootKey, stepId);
-    deps.volatile?.set(rootKey, deps.volatileText ?? null);
+    const storedInstruction = mailTurn
+      ? mailSharedTranscript(claimed.instruction ?? '')
+      : claimed.instruction;
+    const mailExcerpt = mailTurn ? mailFenceBlock(claimed.instruction ?? '') : null;
+    const volatileText = [deps.volatileText, mailExcerpt]
+      .filter((part): part is string => part != null && part !== '')
+      .join('\n\n');
+    deps.volatile?.set(rootKey, volatileText === '' ? null : volatileText);
     deps.volatile?.setStep(rootKey, stepId);
     deps.volatile?.setColdSlim(rootKey, deps.coldSlim ?? null);
     let stopping: Promise<void> | null = null;
@@ -167,7 +178,7 @@ export async function runCoordinatorTurn(
     let inFlight = false;
     let steerTask: Promise<void> | null = null;
     const admitted = new Set<string>();
-    if (api.inputs !== undefined) {
+    if (!mailTurn && api.inputs !== undefined) {
       for (const input of await api.inputs.list(claimed.chief.threadId)) {
         if (
           input.stepId !== stepId ||
@@ -184,6 +195,7 @@ export async function runCoordinatorTurn(
       }
     }
     const drainSteers = async () => {
+      if (mailTurn) return;
       while (inFlight && stopping === null && api.steer !== undefined) {
         const steer = await api.steer(stepId, api.inputs === undefined ? undefined : [...admitted]);
         if (steer === null) return;
@@ -214,14 +226,16 @@ export async function runCoordinatorTurn(
         await deps.inputs?.barrier();
       }
     };
-    steerPoll = setInterval(() => {
-      if (!inFlight || steerTask !== null || stopping !== null) return;
-      steerTask = drainSteers()
-        .catch(() => {})
-        .finally(() => {
-          steerTask = null;
-        });
-    }, deps.stopPollMs ?? STOP_POLL_MS);
+    if (!mailTurn) {
+      steerPoll = setInterval(() => {
+        if (!inFlight || steerTask !== null || stopping !== null) return;
+        steerTask = drainSteers()
+          .catch(() => {})
+          .finally(() => {
+            steerTask = null;
+          });
+      }, deps.stopPollMs ?? STOP_POLL_MS);
+    }
     await foldBeforeModelSwitch(
       deps,
       root,
@@ -242,11 +256,13 @@ export async function runCoordinatorTurn(
       {
         ...api,
         transcriptRow: async (...args) => {
+          if (mailTurn) return;
           await deps.inputs?.barrier();
           await api.inputs?.assertConversation(threadId, conversationKey);
           await api.transcriptRow(...args);
         },
         transcriptDelta: async (...args) => {
+          if (mailTurn) return;
           await deps.inputs?.barrier();
           await api.inputs?.assertConversation(threadId, conversationKey);
           await api.transcriptDelta(...args);
@@ -286,13 +302,13 @@ export async function runCoordinatorTurn(
     const initial = await api.inputs?.prepare(
       stepId,
       conversationKey,
-      claimed.instruction ?? '',
+      storedInstruction ?? '',
       prior?.entry === undefined ? undefined : String(prior.entry),
     );
     const submission = await root.submit(
       {
         type: 'input',
-        content: initial?.content ?? claimed.instruction ?? '',
+        content: initial?.content ?? storedInstruction ?? '',
         requestId: initial?.id ?? stepId,
       },
       context,
@@ -350,7 +366,7 @@ export async function runCoordinatorTurn(
       } while (cursor !== undefined);
     }
     await mirror.flush(turnEntries);
-    await deps.afterMirror?.();
+    if (!mailTurn) await deps.afterMirror?.();
     const ordered = [...turnEntries].sort((a, b) => Number(a.id) - Number(b.id));
     observation = {
       input: ordered.flatMap((entry) =>
@@ -377,6 +393,7 @@ export async function runCoordinatorTurn(
       { threadId: claimed.chief.threadId, stepId, provider, model: modelId },
       turnEntries,
       deps.now,
+      mailTurn,
     );
     clearInterval(stopPoll);
     if (stopping !== null) {

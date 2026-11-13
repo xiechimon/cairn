@@ -1,19 +1,15 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
-  AgentTodoItem,
   AgentTokenUsage,
-  AnswerDeliveryVia,
-  BoundGitCredentials,
   ClaimedStep,
   CommitIdentity,
   DeliveredImage,
   LocalToolDef,
-  MachineAskBody,
   MachineDoneBody,
   MachineHeartbeatBody,
   PreparedWorkspace,
@@ -35,10 +31,8 @@ import {
   appendPlanLocationNote,
   appendReportLocationNote,
   appendWorkBranchNote,
-  BRAND,
   buildPlanFirstRoundInstruction,
   buildTaskPromptText,
-  CHANGES_DIFF_MAX_BYTES,
   CONTINUE_PROMPTS,
   classifyAgentFailure,
   classifySkillFact,
@@ -46,14 +40,10 @@ import {
   composeTaskPromptWithInstruction,
   conversationBranch,
   gitCredentialRowContent,
-  INFO_REPORT_MAX_BYTES,
   isBackendRuntimeId,
   isBuildStepKind,
   isIssueSourcedTask,
-  LOCAL_TOOL_CREATE_TAG,
-  LocalRepoUnreachableError,
   localCommitIdentity,
-  normalizeClaudeResetsAt,
   noVisionSignalOf,
   PLAN_FILE_NAME,
   parseRetryAfterMs,
@@ -63,31 +53,22 @@ import {
   REPORT_FILE_NAME,
   type ReviewGate,
   SESSION_FILE_NAME,
-  STREAM_TIMEOUTS_MS,
   skillCallName,
   stepTakesSecrets,
   stripAnsiEscapes,
-  subscriptionKeyOf,
   transcriptPromptRowId,
-  withCoAuthor,
   workspaceHookRowContent,
 } from '@cairn/shared';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { z } from 'zod';
 import { createActivityTracker } from './activity.js';
-import { parseAgentTodoText } from './agent-todo.js';
+import { AgentTodoReporter, parseAgentTodoText } from './agent-todo.js';
+import { AskChannel } from './ask-channel.js';
 import { prepareFileAttachment } from './attach-file.js';
 import { SessionNotResumableError } from './backend/errors.js';
-import { notInConfigLine, resolveMcpEndpoints } from './backend/mcp-config.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
-import {
-  collectVisibleSkillFileMap,
-  collectVisibleSkillNames,
-  piWorktreeSkillDirs,
-  type SkillsCatalogOpts,
-} from './backend/skills.js';
-import { createVerificationClone } from './backend/verification-clone.js';
+import { piWorktreeSkillDirs } from './backend/skills.js';
 import { prepareWebTools } from './backend/web-search.js';
 import { assertNoLegacyBrief, composeBrief } from './brief-file.js';
 import {
@@ -95,6 +76,7 @@ import {
   claudeCodeAuthFailureMessage,
   probeClaudeCodeAuth,
 } from './claude-code-auth.js';
+import { claudeQuotaTrip, claudeRateLimitReport, type QuotaTrip } from './claude-quota-trip.js';
 import {
   credentialRedactor,
   credentialSafeEvents,
@@ -102,31 +84,41 @@ import {
   prepareCredentialSessionUpload,
 } from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
-import { buildExecutorRecord } from './executor-record.js';
-import {
-  GitPushHookError,
-  gitCredentialEnv,
-  isGitAuthFailure,
-  withGitCredentialFallback,
-} from './git.js';
-import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
+import { DeltaRelay } from './delta-relay.js';
+import { GitPushHookError, isGitAuthFailure } from './git.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
-import { landLocalMerge } from './local-merge.js';
 import type { DaemonLogger } from './log.js';
 import { isTransientUploadError, type MachineApi, MachineApiError } from './machine-client.js';
-import { extractReviewVerdict } from './review-findings.js';
 import { buildSecretTool } from './secret-channel.js';
-import { type SealedSegment, SegmentBuffer, segmentContent } from './segment.js';
+import { type SealedSegment, SegmentEmitter, segmentContent } from './segment.js';
 import { readSessionJsonlForUpload } from './session-jsonl.js';
-import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
-import { resolveStepImages } from './step-attachments.js';
+import { resolveStepImagesOrRaw } from './step-attachments.js';
+import { commitAndPushStep, preserveFailedBuild } from './step-closing-git.js';
+import { composeDoneBody } from './step-done-body.js';
+import { assembleStepEnv } from './step-env.js';
+import { stepExecutorRecord } from './step-executor-record.js';
+import { prepareCreateTagTool, stepGitRunner } from './step-git-tools.js';
+import { localMergeDoneBody } from './step-local-merge.js';
+import { readDeliveredPlan, readInfoReport } from './step-outputs.js';
+import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
+import {
+  prepareSkillLoadTool,
+  sessionInjectedSkills,
+  stepMcpEndpoints,
+} from './step-skill-tool.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
-import { buildCreateTagTool } from './tag-tool.js';
+import { prepareStepWorkspace, prepareVerifyClone } from './step-workspace.js';
+import {
+  resolveStreamLimits,
+  STREAM_DURATION_CAP_DEFAULT_MS,
+  STREAM_DURATION_CAP_ENV,
+  STREAM_FIRST_EVENT_ENV,
+  STREAM_IDLE_ENV,
+  StreamWatchdog,
+} from './stream-watchdog.js';
 import { materializeTeamSkills } from './team-skills.js';
-import { extractVerifyVerdict } from './verify-verdict.js';
-import { localRepoUnreachableMessage } from './workspace.js';
 
 export interface RunStepDeps {
   client: MachineApi;
@@ -170,36 +162,12 @@ export function combineTimeoutWithRootCause(timeoutText: string, rootCause: stri
   return rootCause !== null ? `${timeoutText}；根因: ${rootCause}` : timeoutText;
 }
 
-export const STREAM_DURATION_CAP_DEFAULT_MS = 3_600_000;
-
-export const STREAM_DURATION_CAP_ENV = 'CAIRN_STREAM_DURATION_CAP_MS';
-export const STREAM_IDLE_ENV = 'CAIRN_STREAM_IDLE_MS';
-export const STREAM_FIRST_EVENT_ENV = 'CAIRN_STREAM_FIRST_EVENT_MS';
-
-function envPositiveMs(name: string): number | null {
-  const raw = process.env[name];
-  if (raw === undefined) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-export type StreamTimeoutArm = 'first' | 'idle' | 'body' | 'duration';
-
-export function streamTimeoutMessage(
-  arm: StreamTimeoutArm,
-  timeouts: { first: number; idle: number; body: number; durationCap: number },
-): string {
-  const value =
-    arm === 'first'
-      ? timeouts.first
-      : arm === 'idle'
-        ? timeouts.idle
-        : arm === 'body'
-          ? timeouts.body
-          : timeouts.durationCap;
-  const label = arm === 'duration' ? 'cap' : arm;
-  return `stream timeout (arm=${arm}, ${label}=${value}ms)`;
-}
+export {
+  STREAM_DURATION_CAP_DEFAULT_MS,
+  STREAM_DURATION_CAP_ENV,
+  STREAM_FIRST_EVENT_ENV,
+  STREAM_IDLE_ENV,
+};
 
 export function buildTaskPrompt(claimed: ClaimedStep): string {
   const todo = claimed.todo;
@@ -232,12 +200,6 @@ function resumeMissNote(sessionId: string, claimed: ClaimedStep): string {
   }
   return `本机找不到会话 ${sessionId}，无法续接。已改开新会话，按原任务继续。`;
 }
-
-const READONLY_GIT_ENV: Record<string, string> = {
-  GIT_CONFIG_COUNT: '1',
-  GIT_CONFIG_KEY_0: 'url.cairn-readonly-workspace-denied://.pushInsteadOf',
-  GIT_CONFIG_VALUE_0: '',
-};
 
 function confirmedPlanFile(plansDir: string, convId: string): string | null {
   const planFile = join(plansDir, convId, PLAN_FILE_NAME);
@@ -454,31 +416,15 @@ async function runClaimedStep(
   });
   activity.setPhase('preparing');
 
-  let agentTodoRelayWarned = false;
-  let lastAgentTodo: AgentTodoItem[] | null = null;
-  const reportAgentTodo = (items: readonly AgentTodoItem[]): void => {
-    if (items.length === 0) return;
-    if (
-      lastAgentTodo !== null &&
-      lastAgentTodo.length === items.length &&
-      lastAgentTodo.every((it, i) => {
-        const next = items[i];
-        return next !== undefined && it.text === next.text && it.state === next.state;
-      })
-    ) {
-      return;
-    }
-    lastAgentTodo = items.map((it) => ({ ...it }));
-    client.agentTodo?.(stepId, { items: items.map((it) => ({ ...it })) })?.catch((err: unknown) => {
-      if (agentTodoRelayWarned) return;
-      agentTodoRelayWarned = true;
+  const agentTodo = new AgentTodoReporter({
+    send: (items) => client.agentTodo?.(stepId, { items }),
+    onFirstError: (err) =>
       logger.step(
         `agent todo relay failed (suppressed until next step): ${
           err instanceof Error ? err.message : String(err)
         }`,
-      );
-    });
-  };
+      ),
+  });
 
   const isChief = claimed.step.kind === 'chief';
   const isReview = claimed.step.kind === 'review';
@@ -542,37 +488,11 @@ async function runClaimedStep(
   });
 
   if (claimed.localMerge !== undefined) {
-    const command = claimed.localMerge;
-    const repo = claimed.project?.repo;
-    let doneBody: MachineDoneBody;
-    try {
-      if (
-        claimed.step.kind !== 'merge' ||
-        repo?.kind !== 'local' ||
-        claimed.project?.id !== command.projectId ||
-        claimed.step.buildId !== command.buildId
-      )
-        throw new Error('Local merge command does not match the claim');
-      if (
-        claimed.agent?.tools !== undefined &&
-        [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].some((tool) => !claimed.agent?.tools?.includes(tool))
-      )
-        throw new Error('Local merge requires merge and push permission');
-      const result =
-        stop.request !== null
-          ? { outcome: 'held' as const, reason: 'stopped' }
-          : await landLocalMerge(repo.cloneUrl, command, () => stop.request !== null);
-      doneBody = {
-        status: 'success',
-        localMerge: { command, result },
-        ...(result.outcome === 'merged' ? { commit: result.commit } : {}),
-      };
-    } catch (err) {
-      doneBody = {
-        status: 'failed',
-        errorMessage: err instanceof Error ? err.message : String(err),
-      };
-    }
+    const doneBody = await localMergeDoneBody(
+      claimed,
+      claimed.localMerge,
+      () => stop.request !== null,
+    );
     const transcript = new TranscriptBuffer(deps.paths.outboxDir, stepId);
     transcript.upsert({
       id: `local-merge-${stepId}`,
@@ -709,25 +629,17 @@ async function runClaimedStep(
   let promptImages: DeliveredImage[] | undefined;
   let skippedNoVisionCount = 0;
   if (!isChief && prompt !== null) {
-    try {
-      const resolved = await resolveStepImages({
-        text: prompt,
-        stepId,
-        client,
-        materializeDir: deps.paths.stepAttachmentsDir,
-        log: (line) => logger.step(line),
-        imageSupport,
-      });
-      deliveryPrompt = resolved.text;
-      if (resolved.images.length > 0) promptImages = [...resolved.images];
-      skippedNoVisionCount = resolved.skippedNoVision;
-    } catch (err) {
-      logger.step(
-        `attachment resolve failed (delivering raw text): ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
-    }
+    const resolved = await resolveStepImagesOrRaw({
+      text: prompt,
+      stepId,
+      client,
+      materializeDir: deps.paths.stepAttachmentsDir,
+      log: (line) => logger.step(line),
+      imageSupport,
+    });
+    deliveryPrompt = resolved.text;
+    if (resolved.images.length > 0) promptImages = [...resolved.images];
+    skippedNoVisionCount = resolved.skippedNoVision;
   }
   if (skippedNoVisionCount > 0) {
     logger.step(
@@ -745,48 +657,22 @@ async function runClaimedStep(
       await failStep(deps, heartbeat, stepId, 'workspace ops unavailable for repo-bound step');
       return;
     }
-    try {
-      const workspace = deps.workspace;
-      const prepare = () =>
-        workspace.prepare({
-          projectId: claimed.project?.id ?? '',
-          conversationId: convId,
-          cloneUrl: repo.cloneUrl,
-          repoKind: repo.kind,
-          baseBranch: repo.baseBranch,
-          workspacesRoot: deps.workspacesDir,
-          credentials: creds.git,
-          localPath: repo.kind === 'github' ? (repo.localPath ?? null) : null,
-          machineCredentialFallback: repo.kind === 'github',
-          ...(readonlyWorkspace ? { readonly: true } : {}),
-        });
-      const prepared: { workspace: PreparedWorkspace | null } = { workspace: null };
-      await withGitCredentialFallback(
-        async () => {
-          prepared.workspace = await prepare();
-        },
-        creds.git,
-        {
-          what: 'prepare',
-          allowMachineFallback: false,
-          refresh: refreshGit,
-        },
-      );
-      ws = prepared.workspace;
-    } catch (err) {
+    const prepared = await prepareStepWorkspace({
+      workspace: deps.workspace,
+      claimed,
+      repo,
+      workspacesRoot: deps.workspacesDir,
+      credentials: creds.git,
+      readonly: readonlyWorkspace,
+      refresh: refreshGit,
+      machineName: deps.machineName ?? hostname(),
+    });
+    if ('error' in prepared) {
       clearCredentials(creds);
-      await failStep(
-        deps,
-        heartbeat,
-        stepId,
-        err instanceof LocalRepoUnreachableError
-          ? localRepoUnreachableMessage(deps.machineName ?? hostname(), err)
-          : err instanceof Error
-            ? err.message
-            : String(err),
-      );
+      await failStep(deps, heartbeat, stepId, prepared.error);
       return;
     }
+    ws = prepared.ws;
   }
   let cwd = ws?.cwd ?? join(deps.workspacesDir, convId);
   if (!ws) mkdirSync(cwd, { recursive: true });
@@ -803,35 +689,21 @@ async function runClaimedStep(
 
   const uploadedVerifyEvidence = new Set<string>();
   if (attachmentVerify) {
-    if (
-      verifyEvidenceDirectory === undefined ||
-      !/^\.cairn-verify\/[a-zA-Z0-9_-]+\/$/.test(verifyEvidenceDirectory)
-    ) {
-      await failStep(deps, heartbeat, stepId, 'Verify evidence directory unavailable or invalid');
+    const verifyClone = await prepareVerifyClone({
+      workspace: deps.workspace,
+      ws,
+      headAtStart,
+      evidenceDirectory: verifyEvidenceDirectory,
+      expectedHeadSha: verifyMeta?.expectedHeadSha,
+      cleanups: stepCleanups,
+    });
+    if ('error' in verifyClone) {
+      await failStep(deps, heartbeat, stepId, verifyClone.error);
       return;
     }
-    if (ws === null || ws.readonly === true || !deps.workspace || headAtStart === null) {
-      await failStep(deps, heartbeat, stepId, 'Verify delivery commit unavailable');
-      return;
-    }
-    try {
-      const clone = await createVerificationClone(
-        ws.cwd,
-        verifyMeta?.expectedHeadSha ?? headAtStart,
-      );
-      stepCleanups.push(clone.cleanup);
-      cwd = clone.cwd;
-      ws = { ...ws, cwd, reused: false };
-      headAtStart = await deps.workspace.headCommit(cwd);
-    } catch (error) {
-      await failStep(
-        deps,
-        heartbeat,
-        stepId,
-        error instanceof Error ? error.message : String(error),
-      );
-      return;
-    }
+    ws = verifyClone.ws;
+    cwd = verifyClone.cwd;
+    headAtStart = verifyClone.headAtStart;
   }
 
   const systemPrompt =
@@ -844,22 +716,7 @@ async function runClaimedStep(
         });
   const remoteTools = claimed.remoteTools;
   const claimedMcp = claimed.mcpServers;
-  const mcpSlugs = claimedMcp ?? [];
-  const mcpEndpoints =
-    mcpSlugs.length > 0
-      ? resolveMcpEndpoints(deps.mcpConfigPath, mcpSlugs, {
-          onMissing: (slug) => logger.mcp(notInConfigLine(slug)),
-        })
-      : [];
-  if (claimedMcp !== undefined) {
-    logger.mcp(
-      mcpSlugs.length > 0
-        ? `loaded from ${deps.mcpConfigPath}: ${
-            mcpEndpoints.length > 0 ? mcpEndpoints.map((e) => e.slug).join(', ') : '(none)'
-          }`
-        : 'managed-empty: strict MCP set (runtime config not inherited)',
-    );
-  }
+  const mcpEndpoints = stepMcpEndpoints(deps.mcpConfigPath, claimedMcp, (line) => logger.mcp(line));
   let teamSkillsDir: string | null = null;
   try {
     const manifest = await client.skillsManifest(stepId);
@@ -895,149 +752,46 @@ async function runClaimedStep(
   const appIdentity: CommitIdentity | null = tokenRes.commitIdentity ?? null;
   const stepIdentity: CommitIdentity =
     appIdentity ?? localCommitIdentity(claimed.agent?.displayName ?? 'cairn-agent');
-  const withStepGit = async (
-    operation: (credential: BoundGitCredentials | null) => Promise<void>,
-  ) => {
-    let refreshed = false;
-    const refresh = async () => {
-      if (refreshed) throw new Error('App credential authentication failed after refresh');
-      refreshed = true;
-      return refreshGit();
-    };
-    if (appCredential?.needsRefresh()) await refreshGit();
-    return withGitCredentialFallback(operation, creds.git, {
-      what: 'push',
-      allowMachineFallback: repo?.kind === 'github',
-      refresh,
-      onFallback: (reason) =>
-        logger.step(
-          `git push auth failed (per-step token), retrying with machine credentials: ${reason}`,
-        ),
-    });
-  };
-  const createTagTool = (claimed.localTools ?? []).includes(LOCAL_TOOL_CREATE_TAG)
-    ? buildCreateTagTool({
-        repoDir: ws?.cwd ?? null,
-        cred: creds.git,
-        identity: stepIdentity,
-        withCredentials: async (operation) => {
-          try {
-            await withStepGit(operation);
-          } catch (error) {
-            throw new Error(redact(error instanceof Error ? error.message : String(error)));
-          }
-        },
-      })
-    : null;
+  const withStepGit = stepGitRunner({
+    credential: creds.git,
+    appCredential,
+    refresh: refreshGit,
+    allowMachineFallback: repo?.kind === 'github',
+    log: (line) => logger.step(line),
+  });
+  const createTagTool = prepareCreateTagTool({
+    localTools: claimed.localTools,
+    repoDir: ws?.cwd ?? null,
+    credential: creds.git,
+    identity: stepIdentity,
+    runGit: withStepGit,
+    redact,
+  });
   const localToolDefs = [secretTool, createTagTool, ...webTools.tools].filter(
     (t): t is LocalToolDef => t !== null,
   );
-  const injectedForSession =
-    agent.injectedSkills === undefined || agent.defaultSkill == null
-      ? agent.injectedSkills
-      : [agent.defaultSkill, ...agent.injectedSkills.filter((id) => id !== agent.defaultSkill)];
+  const injectedForSession = sessionInjectedSkills(agent);
   const skillsRootDir = deps.skillsDir;
-  const canSkillTool = isPi && skillsRootDir !== undefined;
-  if (canSkillTool) {
-    const worktreeSkillDirs = piWorktreeSkillDirs(cwd);
-    const skillScanOpts: SkillsCatalogOpts = {
+  if (isPi && skillsRootDir !== undefined) {
+    const skillLoad = prepareSkillLoadTool({
       skillsDir: skillsRootDir,
-      cwd: deps.paths.home,
-      ...(!isChief && agent.skillsAllowlist != null ? { allowlist: agent.skillsAllowlist } : {}),
-      ...(!isChief && injectedForSession !== undefined
-        ? { injectedSkills: injectedForSession }
-        : {}),
-      ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
-      worktreeSkillsDirs: worktreeSkillDirs,
-      log: (msg: string) => logger.skills(msg),
-    };
-    const skillFileMap = collectVisibleSkillFileMap(skillScanOpts);
-    const skillLoadTool = buildSkillLoadTool({
-      skillFileMap,
-      onInvoke: (name) => logger.skills(`invoke: ${name}`),
+      home: deps.paths.home,
+      cwd,
+      isChief,
+      skillsAllowlist: agent.skillsAllowlist,
+      injectedSkills: injectedForSession,
+      teamSkillsDir,
+      log: (msg) => logger.skills(msg),
     });
-    localToolDefs.push(skillLoadTool);
-    if (deliveryPrompt !== null) {
-      const visibleNames = collectVisibleSkillNames(skillScanOpts);
-      const slashPattern = /\b\/([a-z][a-z0-9-]*)\b/g;
-      const matched: string[] = [];
-      let m = slashPattern.exec(deliveryPrompt);
-      while (m !== null) {
-        const name = m[1] ?? '';
-        if (visibleNames.has(name)) {
-          matched.push(name);
-        } else {
-          logger.skills(`unknown-dispatch: ${name}`);
-        }
-        m = slashPattern.exec(deliveryPrompt);
-      }
-      if (matched.length > 0) {
-        const uniqueMatched = [...new Set(matched)];
-        const directives = uniqueMatched
-          .map((n) => `Before proceeding, use the Skill tool to load "${n}".`)
-          .join('\n');
-        deliveryPrompt = `${directives}\n\n${deliveryPrompt}`;
-        logger.skills(`dispatch: ${uniqueMatched.map((n) => `/${n}`).join(', ')}`);
-      }
-    }
+    localToolDefs.push(skillLoad.tool);
+    if (deliveryPrompt !== null) deliveryPrompt = skillLoad.withDispatch(deliveryPrompt);
   }
-  const askAbort = new AbortController();
+  const askChannel = new AskChannel({ client, stepId, log: (message) => logger.step(message) });
   const telemetry =
     deps.otel != null
       ? deps.otel.contextFor(claimed.step.buildId, stepId, claimed.step.kind)
       : undefined;
-  let askKeepAlive: (() => void) | null = null;
-  const answeredPolls = new Set<string>();
-  const ackAnswers = async (answerIds: readonly string[], via: AnswerDeliveryVia) => {
-    if (answerIds.length === 0) return;
-    await client.steerAck?.(stepId, { answerIds: [...answerIds], via }).catch((err: unknown) => {
-      logger.step(`answer ack failed: ${err instanceof Error ? err.message : String(err)}`);
-    });
-  };
-  const runAskChannel = async (params: Record<string, unknown>): Promise<string> => {
-    if (client.askUser === undefined) throw new Error('ask channel unavailable');
-    const requestId = `ask-${randomUUID()}`;
-    const keepAlive = setInterval(() => askKeepAlive?.(), 30_000);
-    keepAlive.unref?.();
-    try {
-      const response = await client.askUser(
-        stepId,
-        {
-          requestId,
-          questions: (params.questions ?? []) as MachineAskBody['questions'],
-          ...(typeof params.provenance === 'string' ? { provenance: params.provenance } : {}),
-        },
-        { signal: askAbort.signal },
-      );
-      if (response.status === 'answered' && !askAbort.signal.aborted) {
-        answeredPolls.add(requestId);
-      }
-      return JSON.stringify(response);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return JSON.stringify({
-        status: 'cancelled',
-        requestId,
-        answers: null,
-        reason: `ask channel aborted: ${msg}`,
-      });
-    } finally {
-      clearInterval(keepAlive);
-    }
-  };
   const skillInjection: { facts: SkillInjectionFacts | null } = { facts: null };
-  const stepGitEnv: Record<string, string> =
-    repo?.kind === 'github' && creds.git !== null
-      ? (appCredential?.env() ?? {
-          ...Object.fromEntries(
-            Object.entries(gitCredentialEnv(creds.git)).filter(
-              (entry): entry is [string, string] => entry[1] !== undefined,
-            ),
-          ),
-          GH_TOKEN: creds.git.password,
-          GITHUB_TOKEN: creds.git.password,
-        })
-      : {};
   let temporary: ReturnType<typeof createTempEnvironment>;
   try {
     temporary = createTempEnvironment({ ...process.env, ...opts.env });
@@ -1051,28 +805,16 @@ async function runClaimedStep(
     return;
   }
   stepCleanups.push(temporary.cleanup);
-  const stepEnv: Record<string, string> = {
-    ...opts.env,
-    ...temporary.env,
-    ...stepGitEnv,
-    ...(readonlyWorkspace || attachmentVerify ? READONLY_GIT_ENV : {}),
-  };
-  stepCleanups.push(() => {
-    for (const key of Object.keys(stepGitEnv)) {
-      delete stepEnv[key];
-      delete stepGitEnv[key];
-    }
+  const { env: stepEnv, dropGitCredentials } = assembleStepEnv({
+    inherited: opts.env,
+    temporary: temporary.env,
+    git: repo?.kind === 'github' ? creds.git : null,
+    appCredential,
+    readonlyGit: readonlyWorkspace || attachmentVerify,
+    claudeSubscriptionToken:
+      runtimeId === 'claude-code' ? creds.claudeSubscriptionToken : undefined,
   });
-  if (appCredential !== null) {
-    delete stepEnv.GH_TOKEN;
-    delete stepEnv.GITHUB_TOKEN;
-    delete stepEnv.CAIRN_GIT_CRED_PASSWORD;
-  }
-  delete stepEnv.CLAUDE_CODE_OAUTH_TOKEN;
-  if (runtimeId === 'claude-code' && creds.claudeSubscriptionToken !== undefined) {
-    stepEnv.CLAUDE_CODE_OAUTH_TOKEN = creds.claudeSubscriptionToken;
-    if (opts.env?.CAIRN_ORB !== '1') stepEnv.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = '1';
-  }
+  stepCleanups.push(dropGitCredentials);
   const sessionOpts: SessionOpts = {
     provider,
     modelId: agent.modelId,
@@ -1086,7 +828,7 @@ async function runClaimedStep(
       ? {
           remoteTools,
           executeRemoteTool: (name, params) => {
-            if (name === 'ask_user' && client.askUser) return runAskChannel(params);
+            if (name === 'ask_user' && askChannel.available) return askChannel.ask(params);
             if (name === 'attach_file' && !isChief) {
               const prepared = prepareFileAttachment(
                 cwd,
@@ -1223,37 +965,28 @@ async function runClaimedStep(
 
   if (!isChief) {
     try {
-      const skillFiles =
-        deps.skillsDir === undefined
-          ? new Map<string, string>()
-          : collectVisibleSkillFileMap({
-              skillsDir: deps.skillsDir,
-              cwd: deps.paths.home,
-              ...(sessionOpts.skillsAllowlist !== undefined
-                ? { allowlist: sessionOpts.skillsAllowlist }
-                : {}),
-              ...(injectedForSession !== undefined ? { injectedSkills: injectedForSession } : {}),
-              ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
-              ...(isPi ? { worktreeSkillsDirs: piWorktreeSkillDirs(cwd) } : {}),
-            });
-      const injectedNames = skillInjection.facts?.injected;
-      const skills = [...skillFiles]
-        .filter(([name]) => injectedNames === undefined || injectedNames.includes(name))
-        .map(([name, path]) => ({ name, content: readFileSync(path, 'utf8') }));
-      provenance.baseSha = headAtStart;
-      const executorRecord = buildExecutorRecord({
+      const executorRecord = stepExecutorRecord({
+        catalog:
+          deps.skillsDir === undefined
+            ? null
+            : {
+                skillsDir: deps.skillsDir,
+                cwd: deps.paths.home,
+                ...(sessionOpts.skillsAllowlist !== undefined
+                  ? { allowlist: sessionOpts.skillsAllowlist }
+                  : {}),
+                ...(injectedForSession !== undefined ? { injectedSkills: injectedForSession } : {}),
+                ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
+                ...(isPi ? { worktreeSkillsDirs: piWorktreeSkillDirs(cwd) } : {}),
+              },
+        injectedNames: skillInjection.facts?.injected,
         backend: backend.capabilities.name,
         model: modelKey,
         effort: agent.thinkingLevel,
-        harness: {
-          systemPrompt: systemPrompt ?? '',
-          skills,
-          tools: [...(remoteTools ?? []), ...localToolDefs].map(({ name, description }) => ({
-            name,
-            description,
-          })),
-        },
+        systemPrompt,
+        tools: [...(remoteTools ?? []), ...localToolDefs],
       });
+      provenance.baseSha = headAtStart;
       provenance.harnessHash = executorRecord.harness_sha;
       logger.step(`executor record ${JSON.stringify(executorRecord)}`);
       await client.heartbeat(stepId, provenance);
@@ -1277,25 +1010,19 @@ async function runClaimedStep(
   let zeroProgressRetries = 0;
   let retryStorm = false;
   const retryStormMax = opts.retryStormMax ?? RETRY_STORM_MAX;
-  let quotaTrip: {
-    kind: 'quota' | 'capacity';
-    reason: string;
-    retryAfterMs: number | null;
-  } | null = null;
+  let quotaTrip: QuotaTrip | null = null;
   let networkRetries = 0;
   const networkRetryDelays =
     claimed.step.kind === 'plan' || isBuildStepKind(claimed.step.kind)
       ? PROVIDER_NETWORK_RETRY_DELAYS_MS
       : [0, 5_000];
-  const envFirstMs = envPositiveMs(STREAM_FIRST_EVENT_ENV);
-  const envIdleMs = envPositiveMs(STREAM_IDLE_ENV);
   let noVisionDegraded = false;
   const retryWithoutImages = async (failureText: string): Promise<boolean> => {
     if (
       noVisionDegraded ||
       sawProgress ||
       priorPassMadeProgress ||
-      timedOut ||
+      watchdog.trippedArm !== null ||
       stop.request !== null ||
       quotaTrip !== null ||
       promptImages === undefined ||
@@ -1314,25 +1041,15 @@ async function runClaimedStep(
         : isInfoBuild
           ? appendReportLocationNote(buildTaskPrompt(claimed), reportFile)
           : degradedFreshPrompt(claimed, deps.paths.plansDir, convId);
-    let degradedText = retryPrompt;
-    try {
-      const resolved = await resolveStepImages({
-        text: retryPrompt,
-        stepId,
-        client,
-        materializeDir: deps.paths.stepAttachmentsDir,
-        log: (line) => logger.step(line),
-        imageSupport: false,
-      });
-      degradedText = resolved.text;
-    } catch (err) {
-      logger.step(
-        `attachment resolve failed (delivering raw text): ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
-    }
-    sessionOpts.prompt = degradedText;
+    const degraded = await resolveStepImagesOrRaw({
+      text: retryPrompt,
+      stepId,
+      client,
+      materializeDir: deps.paths.stepAttachmentsDir,
+      log: (line) => logger.step(line),
+      imageSupport: false,
+    });
+    sessionOpts.prompt = degraded.text;
     continueId = null;
     journal.update(stepId, { prompt: retryPrompt, sessionAction: 'new', sessionId: null });
     delete sessionOpts.promptImages;
@@ -1347,111 +1064,47 @@ async function runClaimedStep(
     deps.sessionHandles?.delete(stepId);
     return true;
   };
-  const streamTimeouts = {
-    first: envFirstMs ?? opts.streamTimeouts?.first ?? STREAM_TIMEOUTS_MS.streamFirstEvent,
-    idle: envIdleMs ?? opts.streamTimeouts?.idle ?? STREAM_TIMEOUTS_MS.streamIdle,
-    body: Math.max(
-      opts.streamTimeouts?.body ?? STREAM_TIMEOUTS_MS.streamBodyTimeout,
-      envFirstMs ?? 0,
-      envIdleMs ?? 0,
-    ),
-  };
-  const absoluteDurationCapMs = envPositiveMs(STREAM_DURATION_CAP_ENV);
-  const streamDurationCapMs =
-    absoluteDurationCapMs ?? opts.streamDurationCapMs ?? STREAM_DURATION_CAP_DEFAULT_MS;
-  const progressResetsDuration =
-    isBuildStepKind(claimed.step.kind) && absoluteDurationCapMs === null;
-  let timedOut = false;
-  let timeoutArm: StreamTimeoutArm | null = null;
-  const runningToolCalls = new Set<string>();
+  const streamLimits = resolveStreamLimits({
+    ...(opts.streamTimeouts !== undefined ? { timeouts: opts.streamTimeouts } : {}),
+    ...(opts.streamDurationCapMs !== undefined ? { durationCapMs: opts.streamDurationCapMs } : {}),
+  });
   const toolStartedAt = new Map<string, number>();
-  let watchdog: NodeJS.Timeout | null = null;
-  let bodyTimeout: NodeJS.Timeout | null = null;
-  let durationCap: NodeJS.Timeout | null = null;
-  const tripTimeout = (arm: StreamTimeoutArm) => {
-    timedOut = true;
-    timeoutArm = arm;
-    askAbort.abort();
-    void handle?.stop();
-  };
-  const armWatchdog = (ms: number, arm: 'first' | 'idle') => {
-    if (watchdog) clearTimeout(watchdog);
-    watchdog = null;
-    if (arm === 'idle' && runningToolCalls.size > 0) return;
-    watchdog = setTimeout(() => tripTimeout(arm), ms);
-    watchdog.unref?.();
-  };
-  const armBodyTimeout = () => {
-    if (bodyTimeout) clearTimeout(bodyTimeout);
-    bodyTimeout = null;
-    if (runningToolCalls.size > 0) return;
-    bodyTimeout = setTimeout(() => tripTimeout('body'), streamTimeouts.body);
-    bodyTimeout.unref?.();
-  };
-  const armDurationCap = () => {
-    if (durationCap && absoluteDurationCapMs !== null) return;
-    if (durationCap) clearTimeout(durationCap);
-    durationCap = setTimeout(() => tripTimeout('duration'), streamDurationCapMs);
-    durationCap.unref?.();
-  };
-  askKeepAlive = () => {
-    armWatchdog(streamTimeouts.idle, 'idle');
-    armBodyTimeout();
-    armDurationCap();
-  };
-  const segments = new SegmentBuffer();
-  let sealedInMessage = false;
+  const watchdog = new StreamWatchdog({
+    timeouts: streamLimits.timeouts,
+    durationCapMs: streamLimits.durationCapMs,
+    durationCapIsAbsolute: streamLimits.durationCapIsAbsolute,
+    progressExtendsDuration:
+      isBuildStepKind(claimed.step.kind) && !streamLimits.durationCapIsAbsolute,
+    onTrip: () => {
+      askChannel.abort();
+      void handle?.stop();
+    },
+  });
+  askChannel.keepAlive = () => watchdog.keepAlive();
   let lastRowCreatedAt = 0;
   const rowCreatedAt = (): number => {
     lastRowCreatedAt = Math.max(now(), lastRowCreatedAt + 1);
     return lastRowCreatedAt;
   };
-  let deltaBuf = '';
-  let deltaTimer: NodeJS.Timeout | null = null;
-  const flushDeltasNow = async (): Promise<void> => {
-    if (deltaTimer !== null) {
-      clearTimeout(deltaTimer);
-      deltaTimer = null;
-    }
-    const text = deltaBuf;
-    deltaBuf = '';
-    if (text === '') return;
-    try {
-      await client.transcriptDelta(stepId, text);
-    } catch (err: unknown) {
+  const textDeltas = new DeltaRelay({
+    flushMs: TRANSCRIPT_DELTA_FLUSH_MS,
+    send: (text) => client.transcriptDelta(stepId, text),
+    onError: (err) =>
       logger.step(
         `transcript delta relay failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-  };
-  const flushDeltas = (): void => {
-    void flushDeltasNow();
-  };
-  let thinkingBuf = '';
-  let thinkingTimer: NodeJS.Timeout | null = null;
-  const flushThinkingNow = async (): Promise<void> => {
-    if (thinkingTimer !== null) {
-      clearTimeout(thinkingTimer);
-      thinkingTimer = null;
-    }
-    const text = thinkingBuf;
-    thinkingBuf = '';
-    if (text === '' || client.thinkingDelta === undefined) return;
-    try {
-      await client.thinkingDelta(stepId, text);
-    } catch (err: unknown) {
+      ),
+  });
+  const thinkingDeltas = new DeltaRelay({
+    flushMs: TRANSCRIPT_DELTA_FLUSH_MS,
+    send: (text) => client.thinkingDelta?.(stepId, text),
+    onError: (err) =>
       logger.step(
         `thinking delta relay failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-  };
-  const flushThinking = (): void => {
-    void flushThinkingNow();
-  };
+      ),
+  });
   const emitSegment = async (seg: SealedSegment): Promise<void> => {
-    await flushThinkingNow();
-    await flushDeltasNow();
-    sealedInMessage = true;
+    await thinkingDeltas.flushNow();
+    await textDeltas.flushNow();
     messageSeq += 1;
     const row = {
       id: `msg-${stepId}-${messageSeq}`,
@@ -1467,58 +1120,26 @@ async function runClaimedStep(
     }
     if (seg.kind === 'text') {
       const items = parseAgentTodoText(seg.text);
-      if (items !== null) reportAgentTodo(items);
+      if (items !== null) agentTodo.report(items);
     }
   };
-  const sealSegment = async (): Promise<void> => {
-    const seg = segments.seal();
-    if (seg !== null) await emitSegment(seg);
-  };
-  const sealFromContent = async (content: unknown): Promise<void> => {
-    const blocks = Array.isArray(content) ? content : [content];
-    for (const block of blocks) {
-      if (typeof block === 'string') {
-        const sealedText = segments.append('text', block);
-        if (sealedText !== null) await emitSegment(sealedText);
-        continue;
-      }
-      if (block === null || typeof block !== 'object') continue;
-      const b = block as { type?: string; text?: string; thinking?: string };
-      const sealed =
-        b.type === 'thinking' && typeof b.thinking === 'string'
-          ? segments.replace('thinking', b.thinking)
-          : b.type === 'text' && typeof b.text === 'string'
-            ? segments.append('text', b.text)
-            : null;
-      if (sealed !== null) await emitSegment(sealed);
-    }
-    await sealSegment();
-  };
+  const segments = new SegmentEmitter(emitSegment);
   let handle: AgentSessionHandle | null = null;
   sessionOpts.onClaudeRateLimit = (notice) => {
     const machineId = claimed.step.machineId;
     if (machineId !== null) {
       void client
-        .reportClaudeRateLimit?.({
-          machineId,
-          status: notice.status,
-          ...(notice.rateLimitType !== undefined ? { rateLimitType: notice.rateLimitType } : {}),
-          ...(notice.utilization !== undefined ? { utilization: notice.utilization } : {}),
-          ...(notice.resetsAt !== undefined ? { resetsAt: notice.resetsAt } : {}),
-        })
+        .reportClaudeRateLimit?.(claudeRateLimitReport(machineId, notice))
         .catch((err: unknown) => {
           logger.step(
             `claude rate limit report failed: ${err instanceof Error ? err.message : String(err)}`,
           );
         });
     }
-    if (notice.status !== 'rejected' || quotaTrip !== null) return;
-    const until = normalizeClaudeResetsAt(notice.resetsAt);
-    quotaTrip = {
-      kind: 'quota',
-      reason: `Claude subscription ${subscriptionKeyOf(notice.rateLimitType)} rejected`,
-      retryAfterMs: until !== null && until > Date.now() ? Math.max(1, until - Date.now()) : null,
-    };
+    if (quotaTrip !== null) return;
+    const trip = claudeQuotaTrip(notice, Date.now());
+    if (trip === null) return;
+    quotaTrip = trip;
     void handle?.stop();
   };
   const openSession = (): Promise<AgentSessionHandle> => {
@@ -1554,31 +1175,23 @@ async function runClaimedStep(
         let delivery = fresh;
         let images: DeliveredImage[] | undefined;
         if (!isChief) {
-          try {
-            const resolved = await resolveStepImages({
-              text: fresh,
-              stepId,
-              client,
-              materializeDir: deps.paths.stepAttachmentsDir,
-              log: (line) => logger.step(line),
-              imageSupport,
+          const resolved = await resolveStepImagesOrRaw({
+            text: fresh,
+            stepId,
+            client,
+            materializeDir: deps.paths.stepAttachmentsDir,
+            log: (line) => logger.step(line),
+            imageSupport,
+          });
+          delivery = resolved.text;
+          if (resolved.images.length > 0) images = [...resolved.images];
+          if (resolved.skippedNoVision > 0) {
+            transcript.upsert({
+              id: `image-skip-${stepId}`,
+              role: 'system',
+              content: `图片未被模型读取：模型 ${modelKey} 不支持图片输入，${resolved.skippedNoVision} 张图片未下载（步骤继续执行，请以文字描述或改用支持图片的模型）`,
+              createdAt: now(),
             });
-            delivery = resolved.text;
-            if (resolved.images.length > 0) images = [...resolved.images];
-            if (resolved.skippedNoVision > 0) {
-              transcript.upsert({
-                id: `image-skip-${stepId}`,
-                role: 'system',
-                content: `图片未被模型读取：模型 ${modelKey} 不支持图片输入，${resolved.skippedNoVision} 张图片未下载（步骤继续执行，请以文字描述或改用支持图片的模型）`,
-                createdAt: now(),
-              });
-            }
-          } catch (resolveErr) {
-            logger.step(
-              `attachment resolve failed (delivering raw text): ${
-                resolveErr instanceof Error ? resolveErr.message : String(resolveErr)
-              }`,
-            );
           }
         }
         sessionOpts.prompt = delivery;
@@ -1604,21 +1217,12 @@ async function runClaimedStep(
       lastErrorWasProcessCrash = false;
       sawDone = false;
       sawProgress = false;
-      timedOut = false;
-      timeoutArm = null;
+      watchdog.clearTrip();
       zeroProgressRetries = 0;
       retryStorm = false;
       usage = [];
-      if (thinkingTimer !== null) {
-        clearTimeout(thinkingTimer);
-        thinkingTimer = null;
-      }
-      thinkingBuf = '';
-      if (deltaTimer !== null) {
-        clearTimeout(deltaTimer);
-        deltaTimer = null;
-      }
-      deltaBuf = '';
+      thinkingDeltas.discard();
+      textDeltas.discard();
     }
     if (stop.request !== null) break;
     activity.setPhase('starting', pass > 0 ? { resetLive: true } : undefined);
@@ -1627,8 +1231,8 @@ async function runClaimedStep(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (await retryWithoutImages(message)) continue;
-      flushDeltas();
-      flushThinking();
+      textDeltas.flush();
+      thinkingDeltas.flush();
       clearCredentials(creds);
       await failStep(deps, heartbeat, stepId, message);
       return;
@@ -1651,63 +1255,42 @@ async function runClaimedStep(
     stop.attach(handle).catch((err: unknown) => {
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     });
-    runningToolCalls.clear();
-    armWatchdog(streamTimeouts.first, 'first');
-    armBodyTimeout();
-    if (pass === 0) armDurationCap();
+    watchdog.startPass(pass === 0);
     try {
       for await (const ev of credentialSafeEvents(handle.events, () => credentialValues)) {
         if (!promptDelivered) {
           promptDelivered = true;
-          await ackAnswers(claimed.answerIds ?? [], 'session-start');
+          await askChannel.ackAnswers(claimed.answerIds ?? [], 'session-start');
         }
         if (ev.type === 'toolcall_end') {
-          if (ev.call.result === undefined) runningToolCalls.add(ev.call.id);
-          else runningToolCalls.delete(ev.call.id);
-          if (ev.call.result !== undefined && answeredPolls.size > 0) {
-            const result = JSON.stringify(ev.call.result);
-            const reached = [...answeredPolls].filter((id) => result.includes(id));
-            for (const id of reached) answeredPolls.delete(id);
-            await ackAnswers(reached, 'poll');
-          }
+          watchdog.noteToolCall(ev.call.id, ev.call.result === undefined);
+          if (ev.call.result !== undefined) await askChannel.ackPollsReachedBy(ev.call.result);
         }
-        armWatchdog(streamTimeouts.idle, 'idle');
-        armBodyTimeout();
+        watchdog.noteEvent();
         activity.noteEvent();
         switch (ev.type) {
           case 'text_delta': {
-            if (progressResetsDuration) armDurationCap();
+            watchdog.noteProgress();
             sawProgress = true;
             zeroProgressRetries = 0;
             activity.setPhase('responding');
-            deltaBuf += ev.text;
-            if (deltaTimer === null) {
-              deltaTimer = setTimeout(flushDeltas, TRANSCRIPT_DELTA_FLUSH_MS);
-              deltaTimer.unref?.();
-            }
-            const sealedText = segments.append('text', ev.text);
-            if (sealedText !== null) await emitSegment(sealedText);
+            textDeltas.push(ev.text);
+            await segments.append('text', ev.text);
             break;
           }
           case 'thinking_delta': {
-            if (progressResetsDuration) armDurationCap();
+            watchdog.noteProgress();
             sawProgress = true;
             zeroProgressRetries = 0;
             activity.setPhase('thinking');
-            thinkingBuf += ev.text;
-            if (thinkingTimer === null) {
-              thinkingTimer = setTimeout(flushThinking, TRANSCRIPT_DELTA_FLUSH_MS);
-              thinkingTimer.unref?.();
-            }
-            const sealedThinking = segments.append('thinking', ev.text);
-            if (sealedThinking !== null) await emitSegment(sealedThinking);
+            thinkingDeltas.push(ev.text);
+            await segments.append('thinking', ev.text);
             break;
           }
           case 'thinking': {
-            if (progressResetsDuration) armDurationCap();
+            watchdog.noteProgress();
             activity.setPhase('thinking');
-            const sealedFull = segments.replace('thinking', ev.text);
-            if (sealedFull !== null) await emitSegment(sealedFull);
+            await segments.replace('thinking', ev.text);
             break;
           }
           case 'toolcall_end': {
@@ -1725,13 +1308,13 @@ async function runClaimedStep(
               };
               toolStartedAt.delete(ev.call.id);
             }
-            if (progressResetsDuration) armDurationCap();
+            watchdog.noteProgress();
             sawProgress = true;
             zeroProgressRetries = 0;
             if (ev.call.name && CHANGE_TOOLS.has(ev.call.name.toLowerCase())) {
               sawChangeTool = true;
             }
-            await sealSegment();
+            await segments.seal();
             if (ev.call.result === undefined) {
               const skillName = skillCallName(ev.call);
               activity.toolStarted(
@@ -1743,7 +1326,7 @@ async function runClaimedStep(
               const skillFact = classifySkillFact(ev.call);
               if (skillFact !== null) activity.noteSkill(skillFact);
             }
-            if (ev.call.todo !== undefined) reportAgentTodo(ev.call.todo);
+            if (ev.call.todo !== undefined) agentTodo.report(ev.call.todo);
             transcript.upsert({
               id: ev.call.id,
               role: 'assistant',
@@ -1791,7 +1374,7 @@ async function runClaimedStep(
               );
             }
             if (ev.message.role === 'assistant' && ev.message.stopReason !== 'error') {
-              if (progressResetsDuration) armDurationCap();
+              watchdog.noteProgress();
               sawProgress = true;
               zeroProgressRetries = 0;
             }
@@ -1805,14 +1388,7 @@ async function runClaimedStep(
               });
               break;
             }
-            const hadRows = sealedInMessage;
-            sealedInMessage = false;
-            const trailing = segments.seal();
-            if (hadRows || trailing !== null) {
-              if (trailing !== null) await emitSegment(trailing);
-            } else {
-              await sealFromContent(ev.message.content);
-            }
+            await segments.endAssistantMessage(ev.message.content);
             break;
           }
           case 'error':
@@ -1916,7 +1492,7 @@ async function runClaimedStep(
       if (
         failureText !== null &&
         (lastError !== null ||
-          (timedOut && lastModelError !== null) ||
+          (watchdog.trippedArm !== null && lastModelError !== null) ||
           (retryStorm && lastModelError !== null))
       ) {
         const amended: ProviderConfig | null =
@@ -1939,22 +1515,15 @@ async function runClaimedStep(
     break;
   }
   deps.sessionHandles?.delete(stepId);
-  await sealSegment();
-  flushDeltas();
-  flushThinking();
+  await segments.seal();
+  textDeltas.flush();
+  thinkingDeltas.flush();
   if (opts.env?.CAIRN_ORB !== '1') clearInterval(heartbeat);
-  if (watchdog) clearTimeout(watchdog);
-  if (bodyTimeout) clearTimeout(bodyTimeout);
-  if (durationCap) clearTimeout(durationCap);
-  askAbort.abort();
-  if (timedOut && timeoutArm !== null) {
-    lastError = combineTimeoutWithRootCause(
-      streamTimeoutMessage(timeoutArm, {
-        ...streamTimeouts,
-        durationCap: streamDurationCapMs,
-      }),
-      lastError ?? lastModelError,
-    );
+  watchdog.stop();
+  askChannel.abort();
+  const timeoutText = watchdog.message();
+  if (timeoutText !== null) {
+    lastError = combineTimeoutWithRootCause(timeoutText, lastError ?? lastModelError);
   } else if (retryStorm && lastError === null && lastModelError !== null) {
     lastError = lastModelError;
   }
@@ -1975,7 +1544,7 @@ async function runClaimedStep(
   if (quotaBlock !== null && lastError === null) {
     lastError = quotaBlock.reason;
   }
-  if (!timedOut && !stopped && !sawProgress && !sawDone && lastError === null) {
+  if (watchdog.trippedArm === null && !stopped && !sawProgress && !sawDone && lastError === null) {
     lastError =
       'agent session ended with zero progress and no terminal outcome (silent no-op round)';
     logger.step('zero-event round: session stream exhausted without progress, done, or error');
@@ -2038,97 +1607,28 @@ async function runClaimedStep(
     !attachmentVerify
   ) {
     const git = deps.workspace;
-    try {
-      const headBranch = (await git.currentBranch?.(ws.cwd)) ?? null;
-      if (headBranch !== null && headBranch !== ws.branch) {
-        branchDrift = { expected: ws.branch, actual: headBranch };
-        logger.step(`work branch drift: HEAD on ${headBranch}, contract branch ${ws.branch}`);
-        transcript.upsert({
-          id: `branch-drift-${stepId}`,
-          role: 'system',
-          content: `检测到工作分支偏离：收尾时 HEAD 在「${headBranch}」，契约工作分支是「${ws.branch}」。本步产物判定已按步窗口内有新提交的任意分支放宽；交付（提交/推送/PR head）应留在契约分支上。`,
-          createdAt: now(),
-        });
-      }
-      const commitMessage = `${claimed.step.kind}: ${claimed.todo?.title ?? claimed.conversationId}`;
-      const committed = await git.commitAll(
-        ws.cwd,
-        withCoAuthor(commitMessage, tokenRes.coAuthor ?? null),
-        stepIdentity,
-      );
-      if (committed.setupDrift.length > 0) {
-        transcript.upsert({
-          id: `setup-drift-${stepId}`,
-          role: 'system',
-          content: `Workspace setup changed ${committed.setupDrift.join(', ')}; these changes were left out of the commit because the agent did not make them.`,
-          createdAt: now(),
-        });
-      }
-      if (claimed.step.kind === 'merge') {
-        const merged = await git.mergeDefaultBranch(ws.cwd, ws.defaultBranch, creds.git);
-        transcript.upsert({
-          id: `merge-${stepId}`,
-          role: 'system',
-          content: `git merge origin/${ws.defaultBranch} 结果为 "${merged.output || 'OK'}"`,
-          createdAt: now(),
-        });
-      }
-      const pushDenied =
-        claimed.agent?.tools !== undefined && !claimed.agent.tools.includes(AGENT_TOOL_PUSH);
-      const pushWarranted =
-        committed.committed ||
-        claimed.step.kind === 'merge' ||
-        (await git.countAhead(ws.cwd, ws.defaultBranch)) > 0;
-      if (pushWarranted && pushDenied) {
-        transcript.upsert({
-          id: `push-skip-${stepId}`,
-          role: 'system',
-          content: `Agent 未获「${AGENT_TOOL_PUSH}」授权——本轮提交保留在本地工作分支 ${ws.branch}，未推送到远端`,
-          createdAt: now(),
-        });
-        logger.step(`push skipped: agent lacks ${AGENT_TOOL_PUSH} permission`);
-      } else if (pushWarranted) {
-        const pushSource = await pushStep(git, ws);
-        if (pushSource === 'machine') {
-          transcript.upsert({
-            id: `git-credential-${stepId}`,
-            role: 'system',
-            content: gitCredentialRowContent('machine'),
-            createdAt: now(),
-          });
-        }
-        logger.raw(`pushed ${ws.branch}`);
-        try {
-          const leaked = (await git.briefMarkerInRef?.(ws.cwd, ws.branch)) ?? [];
-          if (leaked.length > 0) {
-            logger.step(`brief marker found in the pushed branch: ${leaked.join(', ')}`);
-            transcript.upsert({
-              id: `brief-in-history-${stepId}`,
-              role: 'system',
-              content: `分支 ${ws.branch} 的历史里带着运行简报的标记块（${leaked.join('、')}）——agent 在步内自行提交时 daemon 拦不住。合并前请确认这些文件不该进交付物`,
-              createdAt: now(),
-            });
-          }
-        } catch (err) {
-          logger.step(
-            `brief marker scan failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
-      }
-      headCommit = await git.headCommit(ws.cwd);
-      const headAhead = await git.countAhead(ws.cwd, ws.defaultBranch);
-      if (headAhead === 0 && headAtStart !== null && git.branchesWithNewCommits) {
-        try {
-          const candidates = await git.branchesWithNewCommits(ws.cwd, headAtStart, stepStartMs);
-          artifactBranches = candidates.filter(
-            (b) => b === ws.branch || !b.startsWith(BRAND.branchPrefix),
-          );
-        } catch (err) {
-          logger.step(`branch scan failed: ${err instanceof Error ? err.message : String(err)}`);
-        }
-      }
-      hasChanges = headAhead > 0 || artifactBranches.length > 0;
-    } catch (err) {
+    const workspace = ws;
+    const closing = await commitAndPushStep({
+      git,
+      ws: workspace,
+      claimed,
+      stepId,
+      coAuthor: tokenRes.coAuthor ?? null,
+      identity: stepIdentity,
+      mergeCredential: creds.git,
+      headAtStart,
+      stepStartMs,
+      push: () => pushStep(git, workspace),
+      note: (id, content) => transcript.upsert({ id, role: 'system', content, createdAt: now() }),
+      log: (message) => logger.step(message),
+      logRaw: (message) => logger.raw(message),
+    });
+    headCommit = closing.headCommit;
+    branchDrift = closing.branchDrift;
+    artifactBranches = closing.artifactBranches;
+    if (closing.hasChanges !== null) hasChanges = closing.hasChanges;
+    if (closing.error !== null) {
+      const err = closing.error;
       if (err instanceof GitPushHookError) closingPushHookError = err;
       lastError = err instanceof Error ? err.message : String(err);
     }
@@ -2155,38 +1655,27 @@ async function runClaimedStep(
     deps.workspace
   ) {
     const git = deps.workspace;
-    try {
-      const currentBranch = await git.currentBranch?.(ws.cwd);
-      const pushAllowed =
-        claimed.agent?.tools === undefined || claimed.agent.tools.includes(AGENT_TOOL_PUSH);
-      if (
-        currentBranch === ws.branch &&
-        pushAllowed &&
-        (await git.countAhead(ws.cwd, ws.defaultBranch)) > 0
-      ) {
-        await pushStep(git, ws);
-        headCommit = await git.headCommit(ws.cwd);
-        preservedCommits =
-          (await git.commitsAhead?.(ws.cwd, ws.defaultBranch)) ??
-          (headCommit === null ? [] : [headCommit]);
-        hasChanges = true;
-        logger.raw(`pushed ${ws.branch}`);
-      }
-    } catch (err) {
-      logger.step(
-        `failed build preservation failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+    const workspace = ws;
+    const preserved = await preserveFailedBuild({
+      git,
+      ws: workspace,
+      claimed,
+      push: () => pushStep(git, workspace),
+      log: (message) => logger.step(message),
+      logRaw: (message) => logger.raw(message),
+    });
+    if (preserved !== null) {
+      headCommit = preserved.headCommit;
+      preservedCommits = preserved.commits;
+      hasChanges = true;
     }
   }
 
   let report: string | null = null;
-  if (isInfoBuild && !stopped && lastError === null && existsSync(reportFile)) {
-    const content = readFileSync(reportFile, 'utf8');
-    if (Buffer.byteLength(content, 'utf8') > INFO_REPORT_MAX_BYTES) {
-      lastError = `${REPORT_FILE_NAME} 超过上限 ${INFO_REPORT_MAX_BYTES} 字节，请压缩报告后重试`;
-    } else if (content.trim() !== '') {
-      report = content;
-    }
+  if (isInfoBuild && !stopped && lastError === null) {
+    const read = readInfoReport(reportFile);
+    if (read.kind === 'too-large') lastError = read.error;
+    else if (read.kind === 'report') report = read.content;
   }
 
   const status = stopped ? 'stopped' : lastError === null ? 'success' : 'failed';
@@ -2204,112 +1693,60 @@ async function runClaimedStep(
     !isReview &&
     !attachmentVerify
   ) {
-    const ghRef = repo.kind === 'github' ? githubRepoRefOf(repo.cloneUrl) : null;
-    if (ghRef !== null) {
-      const probeHeads: string[] = [ws.branch];
-      if (branchDrift !== null) probeHeads.push(branchDrift.actual);
-      for (const b of artifactBranches) {
-        if (probeHeads.length >= 3) break;
-        if (!probeHeads.includes(b)) probeHeads.push(b);
-      }
-      for (const head of probeHeads) {
-        prProbe = await probeGithubPr({
-          owner: ghRef.owner,
-          repo: ghRef.repo,
-          branch: head,
-          baseBranch: ws.defaultBranch,
-          token: creds.git?.password ?? null,
-          tokenKind: creds.git?.kind,
-          ...(appCredential !== null
-            ? { refreshToken: async () => (await refreshGit()).password }
-            : {}),
-        }).catch((err: unknown) => {
-          logger.step(
-            `pr probe failed: ${err instanceof Error ? err.message : String(err)} (panel will show branch without PR)`,
-          );
-          return null;
-        });
-        if (prProbe !== null) {
-          logger.step(`pr probe: #${prProbe.number} for ${head}`);
-          break;
-        }
-      }
+    if (repo.kind === 'github') {
+      prProbe = await probeStepPr({
+        cloneUrl: repo.cloneUrl,
+        branch: ws.branch,
+        driftBranch: branchDrift?.actual ?? null,
+        artifactBranches,
+        baseBranch: ws.defaultBranch,
+        credential: creds.git,
+        refreshToken: appCredential !== null ? async () => (await refreshGit()).password : null,
+        log: (message) => logger.step(message),
+      });
     }
-    if (
-      (repo.kind !== 'hosted' || preservedCommits.length > 0) &&
-      deps.workspace?.diffAgainstDefault
-    ) {
-      try {
-        const diff = await deps.workspace.diffAgainstDefault(ws.cwd, ws.defaultBranch);
-        changesDiff = diff.length <= CHANGES_DIFF_MAX_BYTES ? diff : null;
-        if (changesDiff === null && diff.length > 0) {
-          logger.step(
-            `changes diff ${diff.length}B over ${CHANGES_DIFF_MAX_BYTES}B cap — projection falls back to empty`,
-          );
-        }
-      } catch (err) {
-        logger.step(`changes diff failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
+    const diffAgainstDefault = deps.workspace?.diffAgainstDefault?.bind(deps.workspace);
+    if ((repo.kind !== 'hosted' || preservedCommits.length > 0) && diffAgainstDefault) {
+      changesDiff = await boundedChangesDiff(
+        diffAgainstDefault,
+        ws.cwd,
+        ws.defaultBranch,
+        (message) => logger.step(message),
+      );
     }
   }
 
   const messages = transcript.messages();
   let planContent: string | null = null;
   if (claimed.step.kind === 'plan' && !stopped) {
-    const readAt = (p: string): string | null => {
-      if (!existsSync(p)) return null;
-      const content = readFileSync(p, 'utf8');
-      return content.trim() !== '' ? content : null;
-    };
-    const planPath = join(deps.paths.plansDir, convId, PLAN_FILE_NAME);
-    planContent =
-      (existsSync(planPath) ? readAt(planPath) : readAt(join(cwd, PLAN_FILE_NAME))) ?? null;
-  }
-  const reviewExtraction =
-    claimed.step.kind === 'review' ? extractReviewVerdict(transcript.messages()) : null;
-  const verifyExtraction =
-    claimed.step.kind === 'verify'
-      ? extractVerifyVerdict(transcript.messages(), { strict: attachmentVerify })
-      : null;
-  if (attachmentVerify && verifyExtraction?.status === 'ok' && verifyExtraction.verdict.passed) {
-    const evidence = verifyExtraction.verdict.evidence;
-    if (
-      evidence.length === 0 ||
-      evidence.some((item) => !uploadedVerifyEvidence.has(resolve(cwd, item.path)))
-    ) {
-      verifyExtraction.verdict = {
-        ...verifyExtraction.verdict,
-        passed: false,
-        conclusion: `${verifyExtraction.verdict.conclusion}\nAttachment evidence is missing or was not successfully uploaded by this verification step.`,
-      };
-    }
+    planContent = readDeliveredPlan(deps.paths.plansDir, convId, cwd);
   }
   const sessionIdForDone = handle?.sessionId ?? continueId;
-  const doneBody: MachineDoneBody = {
-    status,
-    ...(lastError !== null ? { errorMessage: stripAnsiEscapes(lastError) } : {}),
-    ...(sessionIdForDone !== null ? { sessionId: sessionIdForDone } : {}),
-    usage: [...usage],
-    hasChanges,
-    ...(headCommit !== null ? { commit: headCommit } : {}),
-    ...(preservedCommits.length > 0 ? { preservedCommits } : {}),
-    ...(pushHookOutput !== null ? { pushHookOutput } : {}),
-    ...(reviewExtraction?.status === 'ok' ? { findings: reviewExtraction.verdict } : {}),
-    ...(reviewExtraction?.status === 'failed' ? { findingsError: reviewExtraction.reason } : {}),
-    ...(verifyExtraction?.status === 'ok' ? { verifyVerdict: verifyExtraction.verdict } : {}),
-    ...(verifyExtraction?.status === 'failed'
-      ? { verifyVerdictError: verifyExtraction.reason }
-      : {}),
-    ...(prProbe !== null ? { prUrl: prProbe.url, prNumber: prProbe.number } : {}),
-    ...(changesDiff !== null ? { changesDiff } : {}),
-    ...(branchDrift !== null ? { workBranchDrift: branchDrift } : {}),
-    ...(quotaBlock !== null ? { quotaBlock } : {}),
-    ...(skillInjection.facts !== null ? { skillInjectionFacts: skillInjection.facts } : {}),
-    ...(report !== null ? { report } : {}),
-    ...(status === 'success' && !messages.some((m) => m.role === 'assistant')
-      ? { noOutput: true as const }
-      : {}),
-  };
+  const doneBody = composeDoneBody(
+    {
+      status,
+      lastError,
+      sessionId: sessionIdForDone,
+      usage,
+      hasChanges,
+      headCommit,
+      preservedCommits,
+      pushHookOutput,
+      prProbe,
+      changesDiff,
+      branchDrift,
+      quotaBlock,
+      skillInjectionFacts: skillInjection.facts,
+      report,
+    },
+    {
+      kind: claimed.step.kind,
+      messages,
+      attachmentVerify,
+      uploadedEvidence: uploadedVerifyEvidence,
+      cwd,
+    },
+  );
   const redactedSessionFile = join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`);
   const sessionFileForUpload = credentialValues.reduce<string | undefined>(
     (source, credential) =>

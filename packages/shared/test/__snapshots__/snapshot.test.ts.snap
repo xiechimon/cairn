@@ -946,6 +946,26 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "confinement": {
+      "additionalProperties": false,
+      "properties": {
+        "generation": {
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "type": "integer",
+        },
+        "invocation": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "invocation",
+        "generation",
+      ],
+      "type": "object",
+    },
     "maxWorkers": {
       "maximum": 9007199254740991,
       "minimum": 1,
@@ -3149,6 +3169,47 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         },
       ],
     },
+    "httpSecrets": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "header": {
+            "type": "string",
+          },
+          "id": {
+            "type": "string",
+          },
+          "name": {
+            "type": "string",
+          },
+          "origin": {
+            "type": "string",
+          },
+          "revision": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer",
+          },
+          "template": {
+            "type": "string",
+          },
+          "value": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "name",
+          "revision",
+          "origin",
+          "header",
+          "template",
+          "value",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "provider": {
       "anyOf": [
         {
@@ -3292,6 +3353,12 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         "type": "string",
       },
       "type": "object",
+    },
+    "withheldSecrets": {
+      "items": {
+        "type": "string",
+      },
+      "type": "array",
     },
   },
   "required": [
@@ -4761,6 +4828,11 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
               "minimum": -9007199254740991,
               "type": "integer",
             },
+            "finishedAt": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
             "id": {
               "type": "string",
             },
@@ -4995,6 +5067,43 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
               ],
               "type": "object",
             },
+            "route": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "harness": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "claude-code",
+                            "pi",
+                          ],
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "modelId": {
+                      "type": [
+                        "string",
+                        "null",
+                      ],
+                    },
+                  },
+                  "required": [
+                    "harness",
+                    "modelId",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
             "skillInjection": {
               "anyOf": [
                 {
@@ -5039,6 +5148,11 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                   "type": "null",
                 },
               ],
+            },
+            "startedAt": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
             },
             "status": {
               "enum": [
@@ -5926,11 +6040,38 @@ exports[`body/envelope schema snapshots > setSecretBody > setSecretBody.json 1`]
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "delivery": {
+      "enum": [
+        "plaintext",
+        "http",
+      ],
+      "type": "string",
+    },
     "description": {
       "type": [
         "string",
         "null",
       ],
+    },
+    "http": {
+      "additionalProperties": false,
+      "properties": {
+        "header": {
+          "type": "string",
+        },
+        "origin": {
+          "type": "string",
+        },
+        "template": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "origin",
+        "header",
+        "template",
+      ],
+      "type": "object",
     },
     "name": {
       "type": "string",
@@ -6173,6 +6314,11 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
       "minimum": -9007199254740991,
       "type": "integer",
     },
+    "finishedAt": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
+    },
     "id": {
       "type": "string",
     },
@@ -6407,6 +6553,43 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
       ],
       "type": "object",
     },
+    "route": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "harness": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "claude-code",
+                    "pi",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "modelId": {
+              "type": [
+                "string",
+                "null",
+              ],
+            },
+          },
+          "required": [
+            "harness",
+            "modelId",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
     "skillInjection": {
       "anyOf": [
         {
@@ -6451,6 +6634,11 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
           "type": "null",
         },
       ],
+    },
+    "startedAt": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
     },
     "status": {
       "enum": [
@@ -8017,6 +8205,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
   "ENV_VARS": {
     "apiKey": "CAIRN_API_KEY",
     "auth": "CAIRN_AUTH",
+    "confinementPlatform": "CAIRN_CONFINEMENT_PLATFORM",
     "coordinatorInServer": "CAIRN_COORDINATOR_IN_SERVER",
     "coordinatorMachineId": "CAIRN_COORDINATOR_MACHINE_ID",
     "coordinatorServerContext": "CAIRN_COORDINATOR_SERVER_CONTEXT",
@@ -8477,8 +8666,14 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > step lifecycle li
 
 exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table list (01 §6) 1`] = `
 [
+  "action_journal",
+  "action_proposal",
+  "action_subscriber",
+  "action_wake_outbox",
+  "hosted_cleanup_outbox",
   "user",
   "team",
+  "job_application",
   "project",
   "todo",
   "tag",
@@ -8501,6 +8696,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "secret",
   "api_key",
   "paired_device",
+  "pairing_grant",
+  "browser_session",
   "machine",
   "token_usage",
   "chief",
@@ -8520,7 +8717,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "member_activity",
   "build_feedback",
   "build_outcome_backfill",
-  "memory_save_conflict",
   "memory_candidate",
   "push_subscription",
   "push_digest_item",
@@ -8540,6 +8736,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "harness_profile",
   "composer_draft",
   "thread_pr",
+  "thread_conversation",
+  "thread_entry",
   "coordinator_conversation",
   "coordinator_entry",
   "coordinator_input",
@@ -8549,6 +8747,9 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "data_migration",
   "task_issue_close",
   "deploy_lease",
+  "mail_account",
+  "mail_event",
+  "mail_rule",
 ]
 `;
 
@@ -8713,8 +8914,13 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "GET",
-    "note": "only the one global Coordinator thread (D58)",
+    "note": "the main Coordinator thread first, then one thread per opened project channel",
     "path": "/api/teams/{id}/chief/threads",
+  },
+  {
+    "method": "POST",
+    "note": "find or create the project channel thread; 201 with a greeting turn queued when created, 200 when it exists; 404 for a project outside the team, 409 when archived",
+    "path": "/api/teams/{id}/chief/channels/{projectId}",
   },
   {
     "method": "GET",
@@ -8728,7 +8934,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
-    "note": "body {content, projectId?, clientMessageId?}; projectId only tags the turn, 409 when that project is archived; a repeated clientMessageId returns the first response and starts no new turn",
+    "note": "body {content, projectId?, clientMessageId}; a missing clientMessageId is 400; projectId only tags the turn, 409 when that project is archived; a repeated clientMessageId returns the first response and starts no new turn",
     "path": "/api/teams/{id}/coordinator/messages",
   },
   {
@@ -8770,6 +8976,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "path": "/api/tasks",
     "query": [
       "teamId",
+      "sectioned",
     ],
   },
   {
@@ -8975,6 +9182,16 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "POST",
     "note": "#231 [设计]：签发授权 URL（state 入册，TTL 10min 单次核销）",
     "path": "/api/teams/{id}/providers/oauth/{preset}/authorize",
+  },
+  {
+    "method": "POST",
+    "note": "SuperGrok device-code start; device_code stays on the server",
+    "path": "/api/teams/{id}/providers/oauth/xai/device",
+  },
+  {
+    "method": "POST",
+    "note": "SuperGrok device-code poll; stores the refresh token, not the access token",
+    "path": "/api/teams/{id}/providers/oauth/xai/device/poll",
   },
   {
     "method": "GET",
@@ -9800,6 +10017,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "browserOverride": {
+      "type": [
+        "boolean",
+        "null",
+      ],
+    },
     "capabilities": {
       "anyOf": [
         {
@@ -9835,6 +10058,85 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
             "computer": {
               "const": true,
               "type": "boolean",
+            },
+            "confinement": {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "generation": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "invocation": {
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                      "type": "string",
+                    },
+                    "revision": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "state": {
+                      "enum": [
+                        "checking",
+                        "ready",
+                        "not-applicable",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "invocation",
+                    "generation",
+                    "state",
+                    "revision",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "generation": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "invocation": {
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                      "type": "string",
+                    },
+                    "reason": {
+                      "enum": [
+                        "startup-failed",
+                        "cleanup-failed",
+                        "unsupported-platform",
+                      ],
+                      "type": "string",
+                    },
+                    "revision": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "state": {
+                      "const": "unavailable",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "invocation",
+                    "generation",
+                    "state",
+                    "revision",
+                    "reason",
+                  ],
+                  "type": "object",
+                },
+              ],
             },
             "executor": {
               "enum": [
@@ -9885,7 +10187,19 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               },
               "type": "array",
             },
+            "osPlatform": {
+              "enum": [
+                "linux",
+                "darwin",
+                "other",
+              ],
+              "type": "string",
+            },
             "ownComputer": {
+              "const": true,
+              "type": "boolean",
+            },
+            "secretGateway": {
               "const": true,
               "type": "boolean",
             },
@@ -9958,6 +10272,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
       ],
       "type": "string",
     },
+    "desktopOverride": {
+      "type": [
+        "boolean",
+        "null",
+      ],
+    },
     "enabledRuntimes": {
       "items": {
         "type": "string",
@@ -10010,6 +10330,35 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
       "type": "integer",
+    },
+    "running": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "projectId": {
+            "type": "string",
+          },
+          "startedAt": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer",
+          },
+          "threadId": {
+            "type": "string",
+          },
+          "title": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "threadId",
+          "title",
+          "projectId",
+          "startedAt",
+        ],
+        "type": "object",
+      },
+      "type": "array",
     },
     "runningSteps": {
       "maximum": 9007199254740991,
@@ -10721,10 +11070,44 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sec
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "delivery": {
+      "enum": [
+        "plaintext",
+        "http",
+      ],
+      "type": "string",
+    },
     "description": {
       "type": [
         "string",
         "null",
+      ],
+    },
+    "http": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "header": {
+              "type": "string",
+            },
+            "origin": {
+              "type": "string",
+            },
+            "template": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "origin",
+            "header",
+            "template",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
       ],
     },
     "id": {
@@ -10732,6 +11115,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sec
     },
     "name": {
       "type": "string",
+    },
+    "policyRevision": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer",
     },
     "projectId": {
       "type": [

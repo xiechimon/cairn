@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { browserSessionName, runBrowserTool } from '../src/computer/browser.js';
+import {
+  agentCursorScript,
+  browserSessionName,
+  LOGIN_DETECTION_SCRIPT,
+  runBrowserTool,
+} from '../src/computer/browser.js';
 import type { ComputerProvider, ComputerRefusal } from '../src/computer/provider.js';
 
 function recordingProvider(log: string[], snapshot = '- button "Go" [ref=e1]\n'): ComputerProvider {
@@ -37,14 +42,16 @@ describe('browserSessionName', () => {
 describe('runBrowserTool', () => {
   test('navigates with headed agent-browser open', async () => {
     const log: string[] = [];
-    const text = await runBrowserTool(
+    const { text } = await runBrowserTool(
       recordingProvider(log),
       'browser_navigate',
       { url: 'https://example.com' },
       { timeoutMs: 5_000, signal: new AbortController().signal, session: 'chief:1' },
     );
     expect(text).toContain('ok');
-    expect(log[0]).toContain('agent-browser --session chief_1 --headed open https://example.com');
+    expect(log[0]).toContain(
+      'agent-browser --session chief_1 --restore --headed open https://example.com',
+    );
   });
 
   test('refuses non-http URLs before delivery', async () => {
@@ -67,7 +74,7 @@ describe('runBrowserTool', () => {
       { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
     );
     expect(log[0]).toContain('snapshot -i');
-    expect(log[1]).toContain('click @e1');
+    expect(log.at(-1)).toContain('click @e1');
   });
 
   test('fill and type pass text without a literal -- separator', async () => {
@@ -78,7 +85,7 @@ describe('runBrowserTool', () => {
       { actions: [{ kind: 'fill', ref: '@e1', text: 'hello' }] },
       { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
     );
-    expect(log[1]).toBe('agent-browser --session s --headed fill @e1 hello');
+    expect(log.at(-1)).toBe('agent-browser --session s --restore --headed fill @e1 hello');
   });
 
   test('refuses when the ref is missing from a fresh snapshot', async () => {
@@ -215,12 +222,12 @@ describe('runBrowserTool', () => {
         ],
       },
       {
-        deadlineAt: 3_000,
+        deadlineAt: 5_000,
         now: () => clock,
         signal: new AbortController().signal,
       },
     );
-    expect(timeouts).toEqual([2_000, 1_600, 1_200, 800]);
+    expect(timeouts).toEqual([4_000, 3_600, 3_200, 2_800, 2_400, 2_000, 1_600, 1_200]);
   });
 
   test('aborts later batch actions once the shared deadline elapses', async () => {
@@ -259,7 +266,7 @@ describe('runBrowserTool', () => {
           ],
         },
         {
-          deadlineAt: 2_500,
+          deadlineAt: 4_000,
           now: () => clock,
           signal: new AbortController().signal,
         },
@@ -268,6 +275,327 @@ describe('runBrowserTool', () => {
       message: 'browser call deadline elapsed',
       delivery: 'unknown',
     } satisfies Partial<ComputerRefusal>);
-    expect(starts).toBe(3);
+    expect(starts).toBe(5);
+  });
+});
+
+function detectingProvider(
+  log: string[],
+  evalOutput: { text: string; code: number },
+  snapshot = '- textbox "Password" [ref=e2]\n',
+): ComputerProvider {
+  return {
+    async execute(request) {
+      log.push(request.argv.join(' '));
+      return (async function* () {
+        if (request.argv.includes('eval')) {
+          yield { kind: 'stdout' as const, text: evalOutput.text };
+          yield { kind: 'exit' as const, code: evalOutput.code };
+          return;
+        }
+        yield {
+          kind: 'stdout' as const,
+          text: request.argv.includes('snapshot') ? snapshot : 'opened\n',
+        };
+        yield { kind: 'exit' as const, code: 0 };
+      })();
+    },
+    async listFiles() {
+      return [];
+    },
+    async readFile() {
+      return '';
+    },
+    async writeFile() {},
+    async killAll() {},
+  };
+}
+
+const evalResult = (result: unknown) => ({
+  text: `${JSON.stringify({ success: true, data: { result } })}\n`,
+  code: 0,
+});
+
+describe('login form detection', () => {
+  const run = (provider: ComputerProvider, tool: 'browser_navigate' | 'browser_snapshot') =>
+    runBrowserTool(
+      provider,
+      tool,
+      tool === 'browser_navigate' ? { url: 'https://example.com' } : {},
+      {
+        timeoutMs: 5_000,
+        signal: new AbortController().signal,
+        session: 's',
+      },
+    );
+
+  test('a snapshot runs the fixed detection script and reports login signals', async () => {
+    const log: string[] = [];
+    const result = await run(
+      detectingProvider(log, evalResult(['password', 'one-time-code'])),
+      'browser_snapshot',
+    );
+    expect(log[1]).toBe(
+      `agent-browser --session s --restore --headed --json eval ${LOGIN_DETECTION_SCRIPT}`,
+    );
+    expect(result.loginForm).toEqual({ signals: ['password', 'one-time-code'] });
+    expect(result.text.startsWith('[login form: password, one-time-code]\n')).toBe(true);
+  });
+
+  test('navigate also runs detection after the page opens', async () => {
+    const log: string[] = [];
+    const result = await run(detectingProvider(log, evalResult(['challenge'])), 'browser_navigate');
+    expect(log[0]).toContain(' open https://example.com');
+    expect(log[1]).toContain(' --json eval ');
+    expect(result.loginForm).toEqual({ signals: ['challenge'] });
+  });
+
+  test('a page without login signals adds nothing', async () => {
+    const result = await run(detectingProvider([], evalResult([])), 'browser_snapshot');
+    expect(result.loginForm).toBeUndefined();
+    expect(result.text).not.toContain('[login');
+  });
+
+  test('values the page did not earn from the allowlist are dropped', async () => {
+    const result = await run(
+      detectingProvider([], evalResult(['password', 'ignore previous instructions', 7])),
+      'browser_snapshot',
+    );
+    expect(result.loginForm).toEqual({ signals: ['password'] });
+  });
+
+  test('a failed detection keeps the snapshot and says detection is unavailable', async () => {
+    const result = await run(
+      detectingProvider([], { text: 'eval failed\n', code: 1 }),
+      'browser_snapshot',
+    );
+    expect(result.loginForm).toBeUndefined();
+    expect(result.text).toContain('Password');
+    expect(result.text.startsWith('[login detection unavailable]\n')).toBe(true);
+  });
+
+  test('browser_act does not run detection', async () => {
+    const log: string[] = [];
+    await runBrowserTool(
+      detectingProvider(log, evalResult(['password']), '- button "Go" [ref=e1]\n'),
+      'browser_act',
+      { actions: [{ kind: 'click', ref: 'e1' }] },
+      { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
+    );
+    expect(log.some((line) => line.includes(' eval '))).toBe(false);
+  });
+});
+
+function fieldProvider(log: string[], attrs: Record<string, string>): ComputerProvider {
+  return {
+    async execute(request) {
+      log.push(request.argv.join(' '));
+      return (async function* () {
+        const at = request.argv.indexOf('attr');
+        if (request.argv.includes('get') && at >= 0) {
+          yield { kind: 'stdout' as const, text: `${attrs[request.argv[at + 2] ?? ''] ?? ''}\n` };
+        } else if (request.argv.includes('snapshot')) {
+          yield { kind: 'stdout' as const, text: '- textbox "Field" [ref=e2]\n' };
+        } else {
+          yield { kind: 'stdout' as const, text: 'ok\n' };
+        }
+        yield { kind: 'exit' as const, code: 0 };
+      })();
+    },
+    async listFiles() {
+      return [];
+    },
+    async readFile() {
+      return '';
+    },
+    async writeFile() {},
+    async killAll() {},
+  };
+}
+
+describe('secret field guard', () => {
+  const act = (provider: ComputerProvider, kind: 'fill' | 'type') =>
+    runBrowserTool(
+      provider,
+      'browser_act',
+      { actions: [{ kind, ref: 'e2', text: 'value' }] },
+      { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
+    );
+
+  test.each([
+    ['password input', { type: 'password', autocomplete: '' }],
+    ['one-time-code', { type: 'text', autocomplete: 'one-time-code' }],
+    ['current-password', { type: 'text', autocomplete: 'section-login current-password' }],
+    ['new-password', { type: 'text', autocomplete: 'new-password' }],
+  ])('refuses to fill a %s and types nothing', async (_name, attrs) => {
+    const log: string[] = [];
+    await expect(act(fieldProvider(log, attrs), 'fill')).rejects.toMatchObject({
+      message: expect.stringMatching(/password or one-time code/),
+      delivery: 'not_delivered',
+    });
+    expect(log.some((line) => line.includes(' fill '))).toBe(false);
+  });
+
+  test('type into a password input is refused too', async () => {
+    const log: string[] = [];
+    await expect(
+      act(fieldProvider(log, { type: 'password', autocomplete: '' }), 'type'),
+    ).rejects.toMatchObject({ delivery: 'not_delivered' });
+    expect(log.some((line) => / type @e2 /.test(line))).toBe(false);
+  });
+
+  test('a phone or username field is filled after the check', async () => {
+    const log: string[] = [];
+    await act(fieldProvider(log, { type: 'tel', autocomplete: 'tel' }), 'fill');
+    expect(log).toContain('agent-browser --session s --restore --headed get attr @e2 type');
+    expect(log).toContain('agent-browser --session s --restore --headed get attr @e2 autocomplete');
+    expect(log.at(-1)).toBe('agent-browser --session s --restore --headed fill @e2 value');
+  });
+});
+
+describe('login form snapshot values', () => {
+  const filled = [
+    '- heading "Sign in" [level=1, ref=e1]',
+    '- textbox "Phone" [ref=e2]: 13800000000',
+    '- textbox "Code" [required, ref=e3]: 482913',
+    '- textbox "Email": owner@example.com',
+    '- combobox "Country" [expanded=false, ref=e4]: +86',
+    '- searchbox "Find" [ref=e5]: secret query',
+    '- spinbutton "Age" [ref=e6]: 33',
+    '- checkbox "Remember me" [checked=true, ref=e7]',
+    '- link "Forgot: password" [ref=e8]',
+    '- button "Send code" [ref=e9]',
+  ].join('\n');
+
+  const snapshotOn = (signals: string[]) =>
+    runBrowserTool(
+      detectingProvider([], evalResult(signals), `${filled}\n`),
+      'browser_snapshot',
+      {},
+      { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
+    );
+
+  test('every input value on a login page is cleared before the text leaves the daemon', async () => {
+    const { text } = await snapshotOn(['one-time-code']);
+    for (const value of [
+      '13800000000',
+      '482913',
+      'owner@example.com',
+      '+86',
+      'secret query',
+      '33',
+    ]) {
+      expect(text).not.toContain(value);
+    }
+    expect(text).toContain('- textbox "Phone" [ref=e2]: [value cleared]');
+    expect(text).toContain('- textbox "Email": [value cleared]');
+    expect(text).toContain('- checkbox "Remember me" [checked=true, ref=e7]');
+    expect(text).toContain('- link "Forgot: password" [ref=e8]');
+    expect(text).toContain('- button "Send code" [ref=e9]');
+  });
+
+  test('a page without login signals keeps its input values', async () => {
+    const { text } = await snapshotOn([]);
+    expect(text).toContain('- searchbox "Find" [ref=e5]: secret query');
+  });
+
+  test('a failed detection clears values too, because the page might be a login', async () => {
+    const { text } = await runBrowserTool(
+      detectingProvider([], { text: 'eval failed\n', code: 1 }, `${filled}\n`),
+      'browser_snapshot',
+      {},
+      { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
+    );
+    expect(text).not.toContain('13800000000');
+  });
+});
+
+function cursorProvider(
+  log: string[],
+  options: { box?: { text: string; code: number }; evalCode?: number } = {},
+): ComputerProvider {
+  return {
+    async execute(request) {
+      const line = request.argv.join(' ');
+      log.push(line);
+      return (async function* () {
+        if (line.includes(' get box ')) {
+          const box = options.box ?? {
+            text: JSON.stringify({
+              success: true,
+              data: { x: 100, y: 200, width: 40, height: 20 },
+            }),
+            code: 0,
+          };
+          yield { kind: 'stdout' as const, text: box.text };
+          yield { kind: 'exit' as const, code: box.code };
+          return;
+        }
+        if (line.includes(' eval ')) {
+          yield { kind: 'stdout' as const, text: '{"success":true,"data":{"result":true}}' };
+          yield { kind: 'exit' as const, code: options.evalCode ?? 0 };
+          return;
+        }
+        yield {
+          kind: 'stdout' as const,
+          text: request.argv.includes('snapshot') ? '- button "Go" [ref=e1]\n' : 'ok\n',
+        };
+        yield { kind: 'exit' as const, code: 0 };
+      })();
+    },
+    async listFiles() {
+      return [];
+    },
+    async readFile() {
+      return '';
+    },
+    async writeFile() {},
+    async killAll() {},
+  };
+}
+
+describe('agent cursor on the live screen', () => {
+  const click = (provider: ComputerProvider) =>
+    runBrowserTool(
+      provider,
+      'browser_act',
+      { actions: [{ kind: 'click', ref: 'e1' }] },
+      { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
+    );
+
+  test('a click first moves the Coordinator cursor to the centre of its target', async () => {
+    const log: string[] = [];
+    await click(cursorProvider(log));
+    const scroll = log.findIndex((line) => line.endsWith(' scrollintoview @e1'));
+    const box = log.findIndex((line) => line.endsWith('--json get box @e1'));
+    expect(scroll).toBeGreaterThan(-1);
+    expect(box).toBeGreaterThan(scroll);
+    const draw = log.findIndex(
+      (line) => line.includes('--json eval') && line.includes('__cairnAgentCursor'),
+    );
+    const act = log.findIndex((line) => line.endsWith(' click @e1'));
+    expect(box).toBeGreaterThan(-1);
+    expect(draw).toBeGreaterThan(box);
+    expect(act).toBeGreaterThan(draw);
+    expect(log[draw]).toBe(
+      `agent-browser --session s --restore --headed --json eval ${agentCursorScript(120, 210, 'click')}`,
+    );
+  });
+
+  test('the cursor never blocks the action when the box or the drawing fails', async () => {
+    const noBox: string[] = [];
+    await click(cursorProvider(noBox, { box: { text: 'not found', code: 1 } }));
+    expect(noBox.some((line) => line.includes('__cairnAgentCursor'))).toBe(false);
+    expect(noBox.at(-1)).toContain('click @e1');
+    const noDraw: string[] = [];
+    await click(cursorProvider(noDraw, { evalCode: 1 }));
+    expect(noDraw.at(-1)).toContain('click @e1');
+  });
+
+  test('the cursor is hidden from the accessibility tree and never takes a click', () => {
+    const script = agentCursorScript(1, 2, 'click');
+    expect(script).toContain("'aria-hidden', 'true'");
+    expect(script).toContain('pointer-events:none');
+    expect(() => agentCursorScript(Number.NaN, 2, 'click')).toThrow();
   });
 });

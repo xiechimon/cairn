@@ -43,6 +43,7 @@ interface Row {
 interface SendBody {
   content: string;
   clientMessageId?: string;
+  path?: string;
 }
 
 async function mockCoordinator(
@@ -78,7 +79,7 @@ async function mockCoordinator(
     const json = (body: unknown, status = 200) =>
       route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     if ((path === '/api/conversations/chief-home/messages' || path === '/api/teams/t1/chief/threads') && request.method() === 'POST') {
-      const body = JSON.parse(request.postData() ?? '{}') as SendBody;
+      const body = { ...(JSON.parse(request.postData() ?? '{}') as SendBody), path };
       posts.push(body);
       if (postDelay > 0) await new Promise((resolve) => setTimeout(resolve, postDelay));
       if (rejectFirst && posts.length === 1) return json({ error: 'Submission refused' }, 503);
@@ -156,27 +157,46 @@ test('the first confirmed message does not wait for slow thread discovery', asyn
   await expect(bubbles(page).filter({ hasText: 'First confirmed message' })).toBeVisible({ timeout: 700 });
 });
 
-test('slow rejected submissions preserve the draft and suppress duplicate submission', async ({ page }) => {
-  const { posts, ledger } = await mockCoordinator(page, false, { postDelay: 1000, rejectFirst: true });
+const sending = (page: Page) => page.getByTestId('home-c').locator('[data-delivery="sending"]');
+
+test('a sent message shows at once and dimmed, and the composer clears before the server answers', async ({
+  page,
+}) => {
+  const { posts } = await mockCoordinator(page, false, { postDelay: 1500 });
   await page.goto('/app');
   await expect(bubbles(page)).toHaveCount(1);
-  await composer(page).fill('Do not lose this draft');
+  await composer(page).fill('Show me before the server answers');
   await composer(page).press('Enter');
+  await expect(sending(page)).toHaveText('Show me before the server answers', { timeout: 700 });
+  await expect(composer(page)).toHaveValue('', { timeout: 700 });
   await composer(page).press('Enter');
-  await expect.poll(() => posts.length).toBe(1);
-  await expect(composer(page)).toHaveValue('Do not lose this draft');
+  await expect(sending(page)).toHaveCount(0);
+  await expect(bubbles(page).filter({ hasText: 'Show me before the server answers' })).toHaveCount(1);
+  expect(posts).toHaveLength(1);
+});
+
+test('a rejected send returns the text to the composer, and sending it again reuses the client message id', async ({
+  page,
+}) => {
+  const { posts, ledger } = await mockCoordinator(page, false, { rejectFirst: true });
+  await page.goto('/app');
   await expect(bubbles(page)).toHaveCount(1);
+  await composer(page).fill('Do not lose this message');
+  await composer(page).press('Enter');
   await expect(page.getByText('发送失败，请重试。')).toBeVisible();
+  await expect(composer(page)).toHaveValue('Do not lose this message');
+  await expect(bubbles(page)).toHaveCount(1);
   expect(ledger.size).toBe(0);
   await composer(page).press('Enter');
-  await expect(bubbles(page).filter({ hasText: 'Do not lose this draft' })).toHaveCount(1);
+  await expect(bubbles(page).filter({ hasText: 'Do not lose this message' })).toHaveCount(1);
   await expect(composer(page)).toHaveValue('');
+  await expect(sending(page)).toHaveCount(0);
   expect(posts).toHaveLength(2);
   expect(posts[1]?.clientMessageId).toBe(posts[0]?.clientMessageId);
   expect(ledger.size).toBe(1);
 });
 
-test('a send whose response is lost is retried with the same client message id and shows one message', async ({
+test('a send whose response is lost is sent again with the same client message id and shows one message', async ({
   page,
 }) => {
   const { posts, ledger } = await mockCoordinator(page, true);
@@ -184,8 +204,6 @@ test('a send whose response is lost is retried with the same client message id a
   await expect(bubbles(page)).toHaveCount(1);
   await composer(page).fill('Retry me');
   await composer(page).press('Enter');
-  await expect.poll(() => posts.length).toBe(1);
-  await expect(page.getByText('发送失败，请重试。')).toBeVisible();
   await expect(composer(page)).toHaveValue('Retry me');
   await composer(page).press('Enter');
   await expect.poll(() => posts.length).toBe(2);
@@ -193,9 +211,74 @@ test('a send whose response is lost is retried with the same client message id a
   expect(first?.clientMessageId).toEqual(expect.any(String));
   expect(second?.clientMessageId).toBe(first?.clientMessageId);
   expect(ledger.size).toBe(1);
+  await expect(composer(page)).toHaveValue('');
   await expect(bubbles(page)).toHaveCount(2);
   await expect(bubbles(page).filter({ hasText: 'Retry me' })).toHaveCount(1);
+});
+
+test('a returned message that is edited is sent under a new client message id', async ({ page }) => {
+  const { posts } = await mockCoordinator(page, false, { rejectFirst: true });
+  await page.goto('/app');
+  await expect(bubbles(page)).toHaveCount(1);
+  await composer(page).fill('Fix my typo');
+  await composer(page).press('Enter');
+  await expect(composer(page)).toHaveValue('Fix my typo');
+  await expect(bubbles(page)).toHaveCount(1);
+  await composer(page).fill('Fixed my typo');
+  await composer(page).press('Enter');
+  await expect(bubbles(page).filter({ hasText: 'Fixed my typo' })).toHaveCount(1);
+  await expect.poll(() => posts.length).toBe(2);
+  expect(posts[1]?.clientMessageId).not.toBe(posts[0]?.clientMessageId);
+});
+
+test('text typed after sending is kept when that send fails', async ({ page }) => {
+  await mockCoordinator(page, false, { rejectFirst: true, postDelay: 600 });
+  await page.goto('/app');
+  await expect(bubbles(page)).toHaveCount(1);
+  await composer(page).fill('Sent first');
+  await composer(page).press('Enter');
+  await expect(sending(page)).toHaveText('Sent first');
+  await composer(page).fill('Typed while it was sending');
+  await expect(page.getByText('发送失败，请重试。')).toBeVisible();
+  await expect(composer(page)).toHaveValue('Typed while it was sending\nSent first');
+  await expect(bubbles(page)).toHaveCount(1);
+});
+
+test('messages sent back to back are posted one at a time, in the order they were sent', async ({
+  page,
+}) => {
+  const { posts } = await mockCoordinator(page, false, { postDelay: 600 });
+  await page.goto('/app');
+  await expect(bubbles(page)).toHaveCount(1);
+  await composer(page).fill('First of two');
+  await composer(page).press('Enter');
   await expect(composer(page)).toHaveValue('');
+  await composer(page).fill('Second of two');
+  await composer(page).press('Enter');
+  await expect(sending(page)).toHaveCount(2);
+  expect(posts).toHaveLength(1);
+  await expect(sending(page)).toHaveCount(0);
+  await expect(bubbles(page)).toHaveText(['Earlier note', 'First of two', 'Second of two']);
+  expect(posts.map((post) => post.content)).toEqual(['First of two', 'Second of two']);
+});
+
+test('a second message sent while the first one is still creating the conversation joins it', async ({
+  page,
+}) => {
+  const { posts } = await mockCoordinator(page, false, { firstThread: true, postDelay: 600 });
+  await page.goto('/app');
+  await expect(composer(page)).toBeEditable();
+  await composer(page).fill('Opening message');
+  await composer(page).press('Enter');
+  await expect(composer(page)).toHaveValue('');
+  await composer(page).fill('Follow-up message');
+  await composer(page).press('Enter');
+  await expect(bubbles(page)).toHaveText(['Opening message', 'Follow-up message']);
+  await expect(sending(page)).toHaveCount(0);
+  expect(posts.map((post) => post.path)).toEqual([
+    '/api/teams/t1/chief/threads',
+    '/api/conversations/chief-home/messages',
+  ]);
 });
 
 test('a new send after a delivered one gets a fresh client message id even with identical text', async ({
@@ -210,7 +293,7 @@ test('a new send after a delivered one gets a fresh client message id even with 
   await composer(page).fill('Same words');
   await composer(page).press('Enter');
   await expect(bubbles(page)).toHaveCount(3);
-  expect(posts).toHaveLength(2);
+  await expect.poll(() => posts.length).toBe(2);
   expect(posts[0]?.clientMessageId).not.toBe(posts[1]?.clientMessageId);
   expect(ledger.size).toBe(2);
 });

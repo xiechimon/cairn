@@ -28,6 +28,8 @@ import {
   requireTeam,
   svcOf,
 } from './routes-helpers.js';
+import { answerProposal } from './services/action-proposals.js';
+import { executeAction } from './services/action-registry.js';
 import { patchAutonomy, readAutonomy } from './services/autonomy-gates.js';
 import { toBuildRecord } from './services/builds.js';
 import { listDir } from './services/fs-list.js';
@@ -46,10 +48,8 @@ import {
 import { importGithubIssue, listProjectGithubIssues } from './services/github-issues.js';
 import { listNamedPrompts, putNamedPrompt, resetNamedPrompt } from './services/named-prompts.js';
 import {
-  deleteProject,
   projectMergeConfigOf,
   projectShipRouteOf,
-  setProjectArchived,
   updateProject,
   updateProjectMergeConfig,
   updateProjectShipRoute,
@@ -253,14 +253,24 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     return c.json({ report: latestScheduleReport(ctx.db, row.id) });
   });
 
-  for (const [action, archived] of [
-    ['archive', true],
-    ['unarchive', false],
+  for (const [action, id] of [
+    ['archive', 'project.archive'],
+    ['unarchive', 'project.unarchive'],
   ] as const) {
     app.post(`/api/projects/:id/${action}`, (c) => {
       const row = requireProject(ctx, c.req.param('id'));
       if (row.teamId !== ctx.team.id) throw notFound(`project ${row.id}`);
-      const updated = setProjectArchived(ctx.db, row.id, archived);
+      executeAction(
+        { db: ctx.db, reposDir: ctx.reposDir },
+        {
+          id,
+          input: { projectId: row.id },
+          actor: 'user',
+          surface: 'web',
+          teamId: ctx.team.id,
+        },
+      );
+      const updated = ctx.db.select().from(project).where(eq(project.id, row.id)).get();
       if (updated === undefined) throw notFound(`project ${row.id}`);
       return c.json(toProjectRecord(updated, requestOrigin(c)));
     });
@@ -268,9 +278,40 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
 
   app.delete('/api/projects/:id', (c) => {
     const id = c.req.param('id');
-    if (!deleteProject({ db: ctx.db, reposDir: ctx.reposDir }, id)) {
-      throw notFound(`project ${id}`);
-    }
+    const row = requireProject(ctx, id);
+    if (row.teamId !== ctx.team.id) throw notFound(`project ${id}`);
+    executeAction(
+      { db: ctx.db, reposDir: ctx.reposDir },
+      {
+        id: 'project.delete',
+        input: { projectId: id },
+        actor: 'user',
+        surface: 'web',
+        teamId: ctx.team.id,
+      },
+    );
     return c.body(null, 204);
+  });
+
+  app.post('/api/actions/proposals/:id/answer', async (c) => {
+    const body = await jsonBody(c);
+    if (body !== null && typeof body === 'object' && 'input' in body) {
+      throw new HttpError(400, 'answer must not include input');
+    }
+    const decision = (body as { decision?: unknown } | null)?.decision;
+    if (decision !== 'refuse' && decision !== 'allow-once' && decision !== 'always') {
+      throw new HttpError(400, 'invalid decision');
+    }
+    return c.json(
+      answerProposal(
+        { db: ctx.db, reposDir: ctx.reposDir },
+        {
+          proposalId: c.req.param('id'),
+          teamId: ctx.team.id,
+          decision,
+          decidedBy: ctx.user.id,
+        },
+      ),
+    );
   });
 }

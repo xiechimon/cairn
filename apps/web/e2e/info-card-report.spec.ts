@@ -178,9 +178,8 @@ async function useTheme(page: Page, theme: 'light' | 'dark') {
 async function openCompleteDialogFromDetail(page: Page, cardId: string, theme: string) {
   await page.goto(`/app/todo/${cardId}`);
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
-  const action = page.getByTestId('side-chat-action').getByRole('button').last();
-  await expect(action).toBeVisible();
-  await action.click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
+  await page.getByRole('menuitem', { name: '完成' }).click();
   const dialog = page.getByRole('dialog', { name: '完成任务' });
   await expect(dialog).toBeVisible();
   return dialog;

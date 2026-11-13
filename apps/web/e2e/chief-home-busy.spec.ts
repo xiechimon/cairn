@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
-import { verticalGap } from './helpers.js';
+import { openReplySteps, verticalGap } from './helpers.js';
 
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: 'ian', avatarUrl: null };
@@ -293,49 +293,34 @@ test.describe('chief unavailable (T4)', () => {
   });
 });
 
-test.describe('queue, steer and stop while the Coordinator is replying (T5)', () => {
-  test('messages queued from outside the composer wait after the live reply, in server order', async ({
+test.describe('send and stop while the Coordinator is replying (T5)', () => {
+  test('messages sent during a running turn stay in the conversation, in server order, with no queue capsules', async ({
     page,
   }) => {
     await mockLive(page, busyState());
     await page.goto('/app');
     const home = page.getByTestId('home-c');
-    const queued = home.getByTestId('queued-message');
-    await expect(queued).toHaveCount(2);
-    await expect(queued.first()).toContainText('只看 cairn 项目就行');
-    await expect(queued.first()).toHaveAttribute('data-state', 'queued');
-    await expect(queued.nth(1)).toContainText('再顺便看下空列提示');
-    await expect(home.getByTestId('chief-stream').getByTestId('queued-message')).toHaveCount(0);
-    await expect(home.getByTestId('chief-msg').filter({ hasText: '只看 cairn 项目就行' })).toHaveCount(0);
-    await evidenceShot(page, 'queued.png');
-    await page.reload();
-    await expect(home.getByTestId('queued-message').first()).toContainText('只看 cairn 项目就行');
+    const stream = home.getByTestId('chief-stream');
+    const first = stream.getByTestId('chief-msg').filter({ hasText: '只看 cairn 项目就行' });
+    const second = stream.getByTestId('chief-msg').filter({ hasText: '再顺便看下空列提示' });
+    await expect(first).toHaveCount(1);
+    await expect(second).toHaveCount(1);
+    expect(await verticalGap(page, first, second)).toBeGreaterThanOrEqual(0);
+    const working = stream.getByTestId('chief-msg').last();
+    await expect(working).not.toContainText('再顺便看下空列提示');
+    expect(await verticalGap(page, second, working)).toBeGreaterThanOrEqual(0);
+    await expect(home.getByTestId('queued-message')).toHaveCount(0);
+    await evidenceShot(page, 'sent-mid-turn.png');
   });
 
-  test('`现在插话` steers the queued message into the running reply', async ({ page }) => {
-    const calls = await mockLive(page, busyState());
-    await page.goto('/app');
-    await page
-      .getByTestId('queued-message')
-      .first()
-      .getByRole('button', { name: '现在插话' })
-      .click();
-    await expect.poll(() => calls).toContain('POST /messages/m3/steer');
-  });
-
-  test('the send button is a stop square only while busy with an empty input', async ({ page }) => {
-    const calls = await mockLive(page, busyState());
+  test('a busy Coordinator keeps the send button and never shows a stop square', async ({ page }) => {
+    await mockLive(page, busyState());
     await page.goto('/app');
     const home = page.getByTestId('home-c');
-    const stop = home.getByRole('button', { name: '停止 Coordinator 这次回复' });
-    await expect(stop).toBeVisible();
-    const input = home.getByTestId('chief-composer-input');
-    await input.fill('再加一句');
-    await expect(stop).toHaveCount(0);
     await expect(home.getByRole('button', { name: '发送' })).toBeVisible();
-    await input.fill('');
-    await home.getByRole('button', { name: '停止 Coordinator 这次回复' }).click();
-    await expect.poll(() => calls).toContain('POST /stop');
+    await expect(home.getByRole('button', { name: '停止 Coordinator 这次回复' })).toHaveCount(0);
+    await home.getByTestId('chief-composer-input').fill('再加一句');
+    await expect(home.getByRole('button', { name: '发送' })).toBeVisible();
   });
 
   test('Esc in the composer and `/stop` both stop the running reply', async ({ page }) => {
@@ -383,10 +368,12 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
     await page.goto('/app');
     const home = page.getByTestId('home-c');
     await expect(home.getByTestId('chief-msg').last()).toContainText('studio-mac.local');
-    await home.getByRole('button', { name: '停止 Coordinator 这次回复' }).click();
+    const input = home.getByTestId('chief-composer-input');
+    await input.focus();
+    await input.press('Escape');
     await expect.poll(() => calls).toContain('DELETE /messages/m1');
     expect(calls).not.toContain('POST /stop');
-    await expect(home.getByTestId('chief-composer-input')).toHaveValue(FIRST.content);
+    await expect(input).toHaveValue(FIRST.content);
     await expect(home.getByRole('button', { name: '发送' })).toBeVisible();
     await evidenceShot(page, 'stop-queued-turn.png');
   });
@@ -454,7 +441,8 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
     const home = page.getByTestId('home-c');
     const reply = home.getByTestId('chief-msg').filter({ hasText: '已派发 #9。' });
     await expect(reply).toHaveCount(1);
-    await reply.getByTestId('chief-tools-toggle').click();
+    await expect(reply.getByTestId('chief-turn-tools')).toHaveCount(0);
+    await openReplySteps(page, reply);
     await evidenceShot(page, 'tools-once.png');
     const question = home.getByTestId('chief-msg').filter({ hasText: '？' }).first();
     expect(await verticalGap(page, question, reply)).toBeLessThan(48);
@@ -509,35 +497,35 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
     const stopped = page.getByTestId('chief-stopped');
     await expect(stopped).toContainText('已停止。停之前已经建了任务');
     await evidenceShot(page, 'stopped-with-task.png');
-    await stopped.getByRole('link', { name: /#9/ }).click();
+    await stopped.getByRole('link', { name: TASK.title }).click();
     await expect(page).toHaveURL(/[?&]thread=todo-1/);
   });
 });
 
-test.describe('queued messages never push the input out of the composer', () => {
+test.describe('held messages never push the input out of the composer', () => {
   for (const target of [{ name: 'home at 600px height', url: '/app', width: 1440, height: 600 }]) {
-    test(`ten queued messages keep the input and send button in view (${target.name})`, async ({
+    test(`ten held messages keep the input and send button in view (${target.name})`, async ({
       page,
     }) => {
       await page.setViewportSize({ width: target.width, height: target.height });
-      const queued = Array.from({ length: 10 }, (_, n) => ({
+      const held = Array.from({ length: 10 }, (_, n) => ({
         id: `q${n}`,
         role: 'user',
-        content: `Queued message number ${n + 1} with enough words to look like a real follow-up`,
+        content: `Held message number ${n + 1} with enough words to look like a real follow-up`,
         createdAt: 12 + n,
       }));
       await mockLive(page, {
         activeRun: { phase: 'chief' },
-        pending: queued.map((row) => ({ messageId: row.id, state: 'queued' as const })),
+        pending: held.map((row) => ({ messageId: row.id, state: 'held' as const })),
         fallbackModel: null,
-        outage: null,
-        messages: [FIRST, ...queued],
+        outage: { reason: 'quota', model: 'relay-a/claude-opus', retryAt: RETRY_AT },
+        messages: [FIRST, ...held],
       });
       await page.goto(target.url);
       const root = page.getByTestId('home-c');
       await expect(root.getByTestId('queued-message')).toHaveCount(10);
       await expect(root.getByTestId('chief-composer-input')).toBeInViewport({ ratio: 1 });
-      await expect(root.getByRole('button', { name: '停止 Coordinator 这次回复' })).toBeInViewport({ ratio: 1 });
+      await expect(root.getByRole('button', { name: '发送' })).toBeInViewport({ ratio: 1 });
       const capsules = await root.getByTestId('queued-capsules').evaluate((node) => node.scrollHeight > node.clientHeight);
       expect(capsules).toBe(true);
     });

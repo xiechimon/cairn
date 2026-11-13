@@ -8,7 +8,7 @@ import {
   type ProjectRecord,
   type TodoRecord as SharedTodoRecord,
 } from '@cairn/shared';
-import type { ChiefQuestionItem } from '../chief/chief-question-card.js';
+import type { ChiefQuestionItem } from '../chief/question-chips.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
 import type {
   ChangesContent,
@@ -316,7 +316,12 @@ export const PLAN_DOC: DocBlock[] = [
     kind: 'bullet',
     segments: [
       { text: 'Keep the badge hidden while ' },
-      { text: '#44', style: 'mention', mentionKind: 'todo', mentionId: 'gallery-44' },
+      {
+        text: 'Fix the stale branch badge on cards',
+        style: 'mention',
+        mentionKind: 'todo',
+        mentionId: 'gallery-44',
+      },
       { text: ' is still building' },
     ],
   },

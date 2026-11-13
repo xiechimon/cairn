@@ -1,10 +1,11 @@
 import { pairingLink } from '@cairn/shared';
 import { useId, useState } from 'react';
+import { StatusMarkFloat } from '../chief/chief-status-mark.js';
+import { STATUS_MARK_IDS, STATUS_MARK_LABELS } from '../chief/status-mark.js';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { LivePulse, LiveRow } from '../components/chat/live-row.js';
-import { StatusLine } from '../components/chat/status-line.js';
 import { TraceGroup, type TraceStep, TraceSteps } from '../components/chat/trace-steps.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -272,7 +273,7 @@ export function StreamSection() {
     <Section
       id="stream"
       title="Live stream"
-      lede="What a running agent looks like: the open group is the live row, spoken in the present tense with a shimmer; a small pulse sits under the last line; the elapsed time lives in the composer next to stop. When the turn ends the pulse goes, the group turns past tense, and a long turn closes with a Worked for rule."
+      lede="What a running agent looks like: the open group is the live row, spoken in the present tense with a shimmer; a small pulse sits under the last line; no elapsed time shows. When the turn ends the pulse goes and the group turns past tense."
     >
       <Specimen
         id="live-row"
@@ -282,17 +283,8 @@ export function StreamSection() {
         <Cell label="detail: in the task transcript">
           <LiveRow variant="detail" label="Running tests" />
         </Cell>
-        <Cell label="Coordinator: under a reply, click to expand">
-          <LiveRow
-            variant="chief"
-            label="Planning the next step"
-            disclosure={{ expand: 'Show details', collapse: 'Hide details' }}
-          >
-            <p className="m-0 mt-2 max-w-100 text-meta text-content-tertiary">
-              Reading the failing log, then deciding between regenerating the lockfile and pinning
-              the dependency.
-            </p>
-          </LiveRow>
+        <Cell label="Coordinator: typing dots only">
+          <LiveRow variant="chief" label="Planning the next step" />
         </Cell>
         <Cell label="the open group is the live row">
           <div className="w-100">
@@ -300,12 +292,28 @@ export function StreamSection() {
             <LivePulse className="mt-1 ml-0.5" />
           </div>
         </Cell>
-        <Cell label="the turn ended: past tense, no pulse, Worked for status line">
+        <Cell label="the turn ended: past tense, no pulse">
           <div className="w-100">
             <TraceGroup steps={FINISHED_STEPS} />
-            <StatusLine className="mt-3">Worked for 4 minutes</StatusLine>
           </div>
         </Cell>
+      </Specimen>
+      <Specimen
+        id="status-mark"
+        title="Status mark"
+        note="One hand-drawn line on a quiet disc at the top of the Coordinator conversation; the old line erases along its path, the new one draws in; the pill fades after a few seconds"
+        code={`<ChiefStatusMark chief={chiefData} />`}
+      >
+        {STATUS_MARK_IDS.map((id) => (
+          <Cell key={id} label={id}>
+            <div className="w-36 pb-1">
+              <StatusMarkFloat
+                view={{ id, label: STATUS_MARK_LABELS[id], announce: false }}
+                pinned
+              />
+            </div>
+          </Cell>
+        ))}
       </Specimen>
       <Specimen
         id="agent-transcript"
@@ -338,7 +346,7 @@ export function StreamSection() {
                 </MessageScrollerContent>
               </FadeScrollerViewport>
               <JumpToLatestButton aria-label="Jump to latest">
-                <ArrowDown width={16} height={16} />
+                <ArrowDown width={20} height={20} />
               </JumpToLatestButton>
             </MessageScroller>
           </MessageScrollerProvider>

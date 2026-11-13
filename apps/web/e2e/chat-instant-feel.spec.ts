@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { mockLive, THREAD, toolRow } from './chief-home-mock.js';
+import { openReplySteps } from './helpers.js';
 
 const command = `git diff -- ${'long-unbroken-command'.repeat(80)}`;
 
@@ -20,6 +21,7 @@ for (const width of [1440, 375]) {
       const scroller = page.getByTestId('home-c').getByTestId('chief-body');
       await expect(scroller).toBeVisible();
       await page.evaluate((light) => document.documentElement.classList.toggle('light', light), theme === 'light');
+      await openReplySteps(page, page.getByTestId('home-c').getByTestId('chief-msg').last());
       const summary = page.getByTestId('chief-tools-toggle').first();
       await summary.scrollIntoViewIfNeeded();
       await scroller.getByTestId('md-code').scrollIntoViewIfNeeded();
@@ -46,6 +48,8 @@ for (const width of [1440, 375]) {
       expect(await scroller.evaluate((el) => el.scrollLeft)).toBe(0);
       for (const button of await page.getByTestId('home-c').locator('button').all()) {
         if (!(await button.isVisible()) || !(await button.isEnabled()) || await button.getAttribute('aria-hidden') === 'true') continue;
+        const block = button.locator('xpath=ancestor::*[@data-slot="reply-block"][1]');
+        if ((await block.count()) > 0) await block.hover({ position: { x: 4, y: 4 } });
         await button.hover();
         await expect(button).toHaveCSS('transition-duration', '0s');
         await expect(button).toHaveCSS('box-shadow', 'none');

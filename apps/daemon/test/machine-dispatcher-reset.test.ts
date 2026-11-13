@@ -10,25 +10,27 @@ class ScriptedPresenceApi extends FakeMachineApi {
   constructor(private readonly script: Outcome[]) {
     super();
   }
-  async presence() {
+  async presence(body?: Parameters<FakeMachineApi['presence']>[0]) {
     const outcome = this.script[this.attempts] ?? 'ok';
     this.attempts += 1;
     if (outcome === 'network') throw new TypeError('fetch failed');
     if (outcome === 'http') throw new MachineApiError(502, 'bad gateway');
     if (outcome === 'hang') await new Promise<never>(() => {});
+    await super.presence(body);
   }
 }
 
 async function run(script: Outcome[], attemptsWanted: number) {
-  const api = new ScriptedPresenceApi(['ok', ...script]);
+  const api = new ScriptedPresenceApi(['ok', 'ok', ...script]);
   const { handle, lines } = await boot({
     api,
     presenceIntervalMs: 50,
     presenceTimeoutMs: 30,
   });
   const before = getGlobalDispatcher();
+  const initialAttempts = api.attempts;
   try {
-    await waitFor(() => api.attempts > attemptsWanted, 5_000);
+    await waitFor(() => api.attempts - initialAttempts >= attemptsWanted, 5_000);
     await new Promise((r) => setTimeout(r, 100));
     const resets = lines.filter((l) =>
       l.includes('http dispatcher reset after 3 network failures'),

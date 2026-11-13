@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, CircleDashed } from 'lucide-react';
+import { CircleDashed } from 'lucide-react';
 import { useState } from 'react';
 import {
   EMPTY_TRACE_COUNTS,
@@ -10,9 +10,14 @@ import {
   TraceRowButton,
   traceSummary,
 } from '../components/chat/trace-parts.js';
-import { Button } from '../components/ui/button.js';
 import type { TranscriptItem, WorkStep } from '../fixtures/records.js';
 import type { TFunc } from '../i18n/translate.js';
+
+const TAIL_STEPS = 5;
+
+export function earlierStepCount(total: number): number {
+  return total > TAIL_STEPS + 1 ? total - TAIL_STEPS : 0;
+}
 
 const DONE_VERBS = {
   read: '读取了',
@@ -39,13 +44,26 @@ export function formatWorkDuration(seconds: number | null): string {
   return `${Math.floor(rounded / 60)}m ${rounded % 60}s`;
 }
 
+export function workPurposes(steps: readonly WorkStep[], running: boolean, t: TFunc): string[] {
+  const purposes = steps.flatMap((step) => {
+    if (step.kind !== 'call' || step.command === undefined || step.description === undefined)
+      return [];
+    if (running && !step.running) return [];
+    const purpose = (step.localized === true ? t(step.description) : step.description).trim();
+    return purpose === '' || purpose === (step.command.split('\n')[0] ?? '').trim()
+      ? []
+      : [purpose];
+  });
+  return [...new Set(purposes)];
+}
+
 function stepTarget(step: Extract<WorkStep, { kind: 'call' }>): string {
   if (step.description !== undefined) return step.description;
   return (step.command ?? step.target ?? '').split('\n')[0] ?? '';
 }
 
 function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TFunc }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(step.kind === 'call' && step.error);
   const [animate] = useState(enter);
   const call = step.kind === 'call' ? step : null;
   const lines = call
@@ -116,7 +134,7 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
             )}
             {call?.unfinished === true && !running && call.cancelled !== true && (
               <CircleDashed
-                className="size-3.5"
+                className="size-4"
                 data-testid="work-unfinished"
                 aria-label={t('未完成')}
               />
@@ -192,8 +210,11 @@ export function WorkTrace({
   const [disclosure, setDisclosure] = useState<{ defaultExpanded: boolean; open: boolean } | null>(
     null,
   );
+  const [showsEarlier, setShowsEarlier] = useState(false);
   const expanded =
     disclosure?.defaultExpanded === defaultExpanded ? disclosure.open : defaultExpanded;
+  const earlier = disclosure === null ? earlierStepCount(item.steps.length) : 0;
+  const shown = showsEarlier ? item.steps : item.steps.slice(earlier);
   const counts = { ...EMPTY_TRACE_COUNTS };
   const readPaths = new Set<string>();
   const editPaths = new Set<string>();
@@ -212,12 +233,18 @@ export function WorkTrace({
   counts.read = readPaths.size;
   counts.edit = editPaths.size;
   const { text, failed } = traceSummary(t, counts, running);
+  const purposes = workPurposes(item.steps, running, t);
   return (
     <div className="my-2 min-w-0" data-testid="work-block">
       <div className="flex items-center gap-1">
         <TraceGroupSummary
           data-testid="work-summary"
-          summary={text}
+          summary={purposes.length > 0 ? purposes.join(t('，')) : text}
+          more={
+            !running && purposes.length > 0 && item.steps.length > purposes.length
+              ? t('· {n} 步', { n: item.steps.length })
+              : null
+          }
           summaryTitle={failed === null ? text : `${text} ${failed}`}
           failed={failed}
           open={expanded}
@@ -227,48 +254,21 @@ export function WorkTrace({
       </div>
       {expanded && (
         <TraceCard>
-          {item.steps.map((step) => (
+          {earlier > 0 && (
+            <div>
+              <TraceRowButton
+                data-testid="work-earlier"
+                verb={t(showsEarlier ? '收起之前的 {n} 步' : '之前的 {n} 步', { n: earlier })}
+                expandable
+                open={showsEarlier}
+                onClick={() => setShowsEarlier((value) => !value)}
+              />
+            </div>
+          )}
+          {shown.map((step) => (
             <WorkStepRow key={step.id} step={step} enter={entering.has(step.id)} t={t} />
           ))}
         </TraceCard>
-      )}
-    </div>
-  );
-}
-
-export function InjectedSkills({
-  skills,
-  t,
-}: {
-  skills: { id: string; reason: string }[];
-  t: TFunc;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="mx-auto mt-3.5 max-w-[68ch] text-center text-meta text-(--text-tertiary)">
-      <Button
-        variant="secondary"
-        className="h-6 rounded-(--cds-radius-sm) px-2 text-meta font-normal"
-        data-testid="injected-skills-chip"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        {t('已加载 {n} 个技能', { n: skills.length })}
-        {open ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
-      </Button>
-      {open && (
-        <div
-          data-testid="injected-skills"
-          className="mt-1.5 flex flex-wrap justify-center gap-1.5 [overflow-wrap:anywhere]"
-        >
-          {skills.length > 0
-            ? skills.map((skill) => (
-                <span key={skill.id}>
-                  {skill.id}（{skill.reason}）
-                </span>
-              ))
-            : t('未注入技能（任务文本未命中任何技能）')}
-        </div>
       )}
     </div>
   );

@@ -1,14 +1,4 @@
-import {
-  Activity,
-  Archive,
-  CalendarClock,
-  Clock,
-  FolderGit2,
-  Inbox,
-  LayoutGrid,
-  Plus,
-  Search,
-} from 'lucide-react';
+import { Archive, CalendarClock, FolderGit2, Inbox, LayoutGrid } from 'lucide-react';
 import { useState } from 'react';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { ListCard, ListRow } from '../components/list-card.js';
@@ -42,59 +32,48 @@ export function SidebarSection() {
     <Section
       id="sidebar"
       title="Sidebar parts"
-      lede="The sidebar sits on the canvas: nav rows with key hints, project rows with an ochre dot when a task waits on the owner, and owner-made project groups that fold."
+      lede="The sidebar shares the main surface: the Coordinator row, its projects hung under it with a tree guide, owner-made groups that fold to a count, and an ochre dot when a task waits on the owner."
     >
       <Specimen
         id="sidebar"
         title="Sidebar"
         note="Click a project"
         stage="canvas"
-        code={`<SidebarNavRow icon={<Plus />} label="New" shortcut="C" />\n<SidebarProjectRow name="cairn" active waiting="A task is waiting on you" />\n<SidebarProjectGroupHeader name="Side projects" expanded onToggle={toggle} />\n<SidebarProjectRow name="site" nested />`}
+        code={`<SidebarNavRow icon={<BrandGlyph />} label="Coordinator" active />\n<SidebarProjectRow name="cairn" place="first" waiting="A task is waiting on you" />\n<SidebarProjectGroupHeader name="Side projects" count={1} expanded onToggle={toggle} spaced />\n<SidebarProjectRow name="site" place="only" />`}
       >
-        <div className="flex w-62 flex-col gap-0.5 py-1">
-          <SidebarNavRow icon={<Plus className="size-4" />} label="New" shortcut="C" />
-          <SidebarNavRow icon={<Search className="size-4" />} label="Search" shortcut="⌘K" />
-          <SidebarNavRow icon={<LayoutGrid className="size-4" />} label="Projects" />
+        <div className="flex w-55 flex-col gap-0.5 px-2 py-1">
           <SidebarNavRow
-            icon={<Clock className="size-4" />}
-            label="Scheduled"
-            active={active === 'scheduled'}
-            onClick={() => setActive('scheduled')}
+            icon={<BrandGlyph className="size-5" />}
+            label="Coordinator"
+            active={active === 'coordinator'}
+            onClick={() => setActive('coordinator')}
           />
-          <SidebarNavRow icon={<Activity className="size-4" />} label="Activity" />
-          <div className="flex items-center px-2 pt-4.5 pb-1.5 text-meta font-medium text-content-tertiary">
-            Projects
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              aria-label="New project"
-              className="ml-auto text-content-tertiary"
-              onClick={() => toastSuccess('New project')}
-            >
-              <Plus />
-            </Button>
-          </div>
           <SidebarProjectRow
             name="cairn"
             icon="mountain"
+            place="first"
             waiting="A task is waiting on you"
+            status="Needs you · Approve the plan"
             active={active === 'cairn'}
             onClick={() => setActive('cairn')}
           />
           <SidebarProjectRow
             name="api-latency"
+            place="last"
             active={active === 'api'}
             onClick={() => setActive('api')}
           />
           <SidebarProjectGroupHeader
             name="Side projects"
+            count={1}
+            spaced
             expanded={sideOpen}
             onToggle={() => setSideOpen((open) => !open)}
           />
           {sideOpen && (
             <SidebarProjectRow
               name="site"
-              nested
+              place="only"
               active={active === 'site'}
               onClick={() => setActive('site')}
             />
@@ -158,19 +137,19 @@ export function ProjectsSection() {
       >
         <ListCard className="w-full max-w-130">
           <ListRow
-            icon={<Inbox className="size-4" />}
+            icon={<Inbox className="size-5" />}
             title="batch-b2-plan.md"
             subtitle="Coordinator · 12 KB"
             trailing="2h ago"
           />
           <ListRow
-            icon={<FolderGit2 className="size-4" />}
+            icon={<FolderGit2 className="size-5" />}
             title="screenshots"
             subtitle="Thread 2235 · 6 files"
             trailing="Yesterday"
           />
           <ListRow
-            icon={<CalendarClock className="size-4" />}
+            icon={<CalendarClock className="size-5" />}
             title="weekly-report.md"
             subtitle="Scheduled task · 3 KB"
             trailing="Oct 27"
@@ -195,7 +174,7 @@ export function ProjectsSection() {
                 label: 'Coordinator',
                 icon: <BrandGlyph className="size-5" />,
               },
-              { id: 'projects', label: 'Projects', icon: <LayoutGrid className="size-4.5" /> },
+              { id: 'projects', label: 'Projects', icon: <LayoutGrid className="size-5.5" /> },
             ]}
           />
         </div>

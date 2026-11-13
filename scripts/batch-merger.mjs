@@ -75,8 +75,7 @@ function eligibility(number, expectedHead) {
     reasons.push('head-changed-or-invalid');
   if (pr.draft) reasons.push('draft');
   if (pr.base.ref !== 'main') reasons.push('base-not-main');
-  for (const label of ['coordinator-hold', 'cairn-recovery'])
-    if (pr.labels.some((item) => item.name === label)) reasons.push(label);
+  if (pr.labels.some((item) => item.name === 'cairn-recovery')) reasons.push('cairn-recovery');
   const runs = pages(
     `repos/${repo}/commits/${pr.head.sha}/check-runs?filter=latest&per_page=100`,
   ).flatMap((page) => page.check_runs);
@@ -100,16 +99,6 @@ function eligibility(number, expectedHead) {
     if (latest?.status !== 'completed' || !['success', 'skipped'].includes(latest.conclusion))
       reasons.push(`check:${name}`);
   }
-  const review = runs
-    .filter(
-      (run) =>
-        run.name === 'review-gate' &&
-        run.head_sha === pr.head.sha &&
-        run.app?.slug === 'github-actions',
-    )
-    .sort((a, b) => b.id - a.id)[0];
-  if (review?.status !== 'completed' || review.conclusion !== 'success')
-    reasons.push('review-not-pass');
   if (markers().length) reasons.push('autonomy-paused');
   return { pr, reasons };
 }

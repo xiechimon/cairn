@@ -15,7 +15,7 @@ test('merge instructions require the pr-gate auto-merge verdict', () => {
       guidance
         .split('\n')
         .includes(
-          `- Both paths require a pr-gate go with \`mergedBy: 'auto-merge'\` (path class does not route to ian), ${tasks} and no \`coordinator-hold\` label. After merging, verify the resulting main commit's author and its \`commit-author\` Actions result.`,
+          `- Both paths require a pr-gate go with \`mergedBy: 'auto-merge'\` (path class does not route to ian), and ${tasks}. After merging, verify the resulting main commit's author and its \`commit-author\` Actions result.`,
         ),
       file,
     );
@@ -26,20 +26,30 @@ test('merge instructions require the pr-gate auto-merge verdict', () => {
   const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
   assert.match(agents, /pr-gate[^\n]*go[^\n]*`mergedBy: 'auto-merge'`/);
   assert.match(agents, /Protected-path PRs enter the merge queue/);
-  assert.match(agents, /Protected paths require Codex cloud code review on the PR head/);
   assert.ok(!agents.includes('codex exec` from Claude'));
 });
 
-test('the security review is not part of the merge route', () => {
+test('security surfaces merge on the queue after a recorded security review', () => {
   const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
-  assert.match(agents, /Codex security review is no longer part of the merge route/);
+  assert.match(agents, /\/security-review/);
+  assert.match(agents, /fixed or recorded/);
+  assert.match(agents, /`pr-evidence` fails without that line/);
+  assert.match(agents, /cairnwright\[bot\]` author uses the bot queue/);
   assert.doesNotMatch(agents, /Codex `security_review` state on the exact head/);
+  assert.doesNotMatch(agents, /still mark protected paths for routing and ownership/);
+  assert.doesNotMatch(agents, /no separate security approval is required/);
+  assert.doesNotMatch(agents, /which are owner-routed/);
 });
 
-test('AGENTS.md and pr-cairn agree that coordinator-hold is the only hold label', () => {
+test('AGENTS.md and pr-cairn agree that no label or review verdict holds a PR', () => {
   for (const file of ['AGENTS.md', '.claude/skills/pr-cairn/SKILL.md']) {
     const guidance = readFileSync(join(ROOT, file), 'utf8');
-    assert.ok(!guidance.includes('needs-decision'), file);
+    assert.doesNotMatch(
+      guidance,
+      /needs-decision|coordinator-hold|review-gate|review-threads/,
+      file,
+    );
+    assert.match(guidance, /a draft does not queue/, file);
     assert.match(guidance, /decide by [^\n]*recommendation[^\n]*say [^\n]*chat/i, file);
     assert.ok(guidance.includes('gh pr merge <n> --disable-auto'), file);
     assert.ok(guidance.includes("mergedBy: 'auto-merge'"), file);
@@ -69,14 +79,13 @@ test('agents admin-merge only a PR ian named in chat', () => {
   assert.match(skill, /an agent uses `--admin` only on a PR ian named in chat/);
 });
 
-test('the review rules use the heading Codex reads and agree with the thread gate', () => {
+test('the review rules use the heading Codex reads and keep findings advisory', () => {
   const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
   assert.match(agents, /^## Code Review Rules$/m);
   assert.doesNotMatch(agents, /^## Review guidelines$/m);
   assert.doesNotMatch(agents, /P2\/P3 findings do not block/);
-  assert.match(agents, /#review-threads-unresolved = 0/);
-  assert.match(agents, /P0\/P1 findings must be fixed/);
-  assert.match(agents, /`valid, out of scope for this PR, tracked in #N`/);
+  assert.match(agents, /Findings are advisory at every severity/);
+  assert.match(agents, /No review verdict, review thread or label holds a PR/);
   assert.match(agents, /Never post Mergify commands/);
   assert.match(agents, /Do not open a PR whose base is another open PR's branch/);
   assert.match(agents, /Design first for a change to persisted state/);

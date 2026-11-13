@@ -1,11 +1,23 @@
-import { legacyDone, legacyReview, MACHINE_NAME, r7 } from './core.js';
+import { at, legacyDone, legacyReview, MACHINE_NAME, R3_DAY, r7 } from './core.js';
 import type {
   ChiefContent,
   ChiefSettingsTab,
   ChiefStreamItem,
   ChiefThreadRef,
   FixtureSet,
+  TodoRecord,
 } from './records.js';
+
+const contributingGuide: TodoRecord = {
+  ...legacyReview,
+  id: 'r3-contributing',
+  title: '编写 CONTRIBUTING.md 贡献指南',
+  spec: '编写 CONTRIBUTING.md 贡献指南，放到项目根目录。',
+  phase: 'building',
+  phaseAt: at(R3_DAY, 17, 27),
+  seqNum: 11,
+  orderIndex: 2,
+};
 
 const CHIEF_DRAFT =
   '我想做一个能在浏览器里直接玩的网页小游戏 （比如贪吃蛇或打砖块）： 单文件 HTML + Canvas， 不用任何构建工具，做完能在项目的文件页直接试玩。请在现有的入门项目里做， 组建 Agent 团队把游戏逻辑、 画面手感、 难度调优拆成并行任务， 然后向我汇报方案， 等我确认后再开始动工。';
@@ -81,7 +93,7 @@ export const chiefWorking: FixtureSet = {
 };
 
 export const chiefThread: FixtureSet = {
-  todos: [legacyReview, legacyDone],
+  todos: [legacyReview, legacyDone, contributingGuide],
   now: r7(13, 14),
   chief: {
     view: 'none',
@@ -98,13 +110,7 @@ export const chiefThread: FixtureSet = {
       {
         kind: 'robot',
         paragraphs: [
-          [
-            { text: '已创建并派工 ' },
-            { text: '', todo: 11 },
-            { text: ' 「编写 CONTRIBUTING.md 贡献指南」， 由文档专职 Agent ' },
-            { text: '', agent: 'r5-scribe' },
-            { text: ' 承接，正在编写中。' },
-          ],
+          [{ text: '已创建并派工 ' }, { text: '', todo: 11 }, { text: '，正在编写中。' }],
           [
             {
               text: '要求内容涵盖：如何给 Agent 提任务、如何验收改动，文件写入项目根目录 CONTRIBUTING.md。完成或需要确认时我会跟进汇报。',
@@ -122,7 +128,7 @@ export const chiefThread: FixtureSet = {
 };
 
 export const chiefThreadsOpen: FixtureSet = {
-  todos: [legacyReview, legacyDone],
+  todos: [legacyReview, legacyDone, { ...contributingGuide, phase: 'review' }],
   now: r7(13, 14),
   chief: {
     view: 'none',
@@ -241,7 +247,7 @@ const CHIEF_MD_REPLY = [
   '三项检查已完成，**全部通过**，输出细节在 `docs/verify/` 目录。',
   '',
   '- **项目**: 凭证链路验证',
-  '- 次要点: 由 [r5-scribe](agent:a1) 承接复核',
+  '- 次要点: 复核在任务里进行',
   '- 关联任务: [#1](todo:r3-legacy-1) 已进入复核；prose #12 与 [伪链](todos:t2) 保持字面',
   '',
   '1. 第一步：读取配置',
@@ -275,6 +281,81 @@ export const chiefMarkdown: FixtureSet = {
         markdown: '正在复核 **relay 通道** 的重试预算',
         typing: true,
         seconds: '',
+      },
+    ],
+  },
+};
+
+const CHIEF_MD_REF_REPLY = [
+  '这是一段测试用的 Markdown：',
+  '',
+  '# 一级标题',
+  '',
+  '## 二级标题',
+  '',
+  '**粗体**、*斜体*、~~删除线~~、`行内代码`',
+  '',
+  '| 名称 | 数量 | 状态 |',
+  '| --- | ---: | --- |',
+  '| 苹果 | 3 | 有货 |',
+  '| 香蕉 | 12 | 缺货 |',
+  '',
+  '- 无序列表一',
+  '- 无序列表二',
+  '  - 嵌套项',
+  '',
+  '1. 有序列表一',
+  '2. 有序列表二',
+  '',
+  '> 这是一段引用',
+  '',
+  '[链接示例](https://example.com)',
+  '',
+  '```python',
+  'from collections import Counter',
+  '',
+  'counts = Counter(text.split())',
+  '```',
+  '',
+  '- [ ] 未完成',
+  '- [x] 已完成',
+].join('\n');
+
+export const chiefMarkdownRef: FixtureSet = {
+  todos: [legacyReview, legacyDone],
+  now: r7(14, 52),
+  chief: {
+    view: 'none',
+    bound: true,
+    modelSlot: 'claude-sonnet-5 · 默认',
+    threadTitle: '输出表格和其他 Markdown…',
+    stream: [
+      {
+        kind: 'user',
+        id: 'md-ref-ask',
+        text: '给我展示你的所有功能',
+        createdAt: r7(14, 50),
+      },
+      {
+        kind: 'robot',
+        id: 'md-ref-intro',
+        markdown:
+          '我在这里帮你把事情办完，发消息给我就行。\n- 在 cairn 仓库里修 bug、写功能、开 PR\n- 调研一个问题，或为会议和决定做准备\n- 做个小页面或看板，比如 cairn 的 PR 进度\n\n连上邮箱、日历或 Linear，我还能帮你盯回复和项目进度。',
+        seconds: '6s',
+        createdAt: r7(14, 50) + 20_000,
+      },
+      {
+        kind: 'user',
+        id: 'md-ref-user',
+        text: '输出表格，还有其他的一些markdown，我来测试',
+        createdAt: r7(14, 52),
+      },
+      {
+        kind: 'robot',
+        id: 'md-ref-reply',
+        markdown: CHIEF_MD_REF_REPLY,
+        seconds: '9s',
+        createdAt: r7(14, 52) + 30_000,
       },
     ],
   },
@@ -333,6 +414,28 @@ export const chiefQuestion: FixtureSet = {
           },
         ],
         answers: [{ header: '目标平台', choices: ['桌面浏览器'] }],
+      },
+      {
+        kind: 'question',
+        id: 'q-answered-group',
+        requestId: 'q-answered-group',
+        status: 'answered',
+        questions: [
+          {
+            header: '棋盘',
+            question: '棋盘做多大？',
+            options: [{ label: '20 × 20' }, { label: '30 × 30' }],
+          },
+          {
+            header: '撞墙',
+            question: '撞到墙算结束，还是从另一边穿出来？',
+            options: [{ label: '撞墙就结束' }, { label: '从另一边穿出来' }],
+          },
+        ],
+        answers: [
+          { header: '棋盘', choices: ['20 × 20'] },
+          { header: '撞墙', choices: ['撞墙就结束'] },
+        ],
       },
       {
         kind: 'robot',

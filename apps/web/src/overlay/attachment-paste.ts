@@ -79,10 +79,9 @@ export function joinDraft(tokens: string[], text: string): string {
   return tokens.join('\n') + (text === '' ? '' : `\n${text}`);
 }
 
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+export function attachmentKind(name: string): string {
+  const dot = name.lastIndexOf('.');
+  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1).toUpperCase() : 'FILE';
 }
 
 export interface PendingAttachment {
@@ -91,6 +90,7 @@ export interface PendingAttachment {
   mime: string;
   size: number;
   url: string | null;
+  failed: boolean;
 }
 
 export function isGenericClipboardName(name: string): boolean {

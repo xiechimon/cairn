@@ -9,7 +9,7 @@ import {
   setCoordinatorWake,
 } from '../../src/services/coordinator-context.js';
 import { createProvider } from '../../src/services/providers.js';
-import { bootServer, req, type TestServer } from '../helpers.js';
+import { bootServer, insertMachine, req, type TestServer } from '../helpers.js';
 
 export const KEY = 'sk-stub-secret-key-0123456789';
 const dirs: string[] = [];
@@ -38,6 +38,7 @@ export interface World {
 
 export async function world(content = 'hello', apiKey = KEY): Promise<World> {
   const s = bootServer();
+  insertMachine(s);
   closers.push(() => s.dispose());
   const teamId = s.team.id;
   createProvider(

@@ -29,6 +29,7 @@ import {
   CI_POLL_INTERVAL_MS,
   type CiCheckFailure,
   createCiPoller,
+  verdictOfCheckRuns,
 } from '../src/services/ci-loop.js';
 import { DONE_ROW, prClosedUnmergedRow } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
@@ -38,6 +39,7 @@ import { openCitationCheck } from '../src/services/research-citations.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import {
   bootServer,
+  insertMachine,
   seedRoute,
   seedSessionRoute,
   type TestServer,
@@ -46,6 +48,37 @@ import {
 
 const disposables: (() => void)[] = [];
 let throttleHome: string;
+
+const checkRun = (
+  name: string,
+  conclusion: string,
+  extra: { id?: number; completedAt?: number } = {},
+) => ({
+  name,
+  status: 'completed',
+  conclusion,
+  outputTitle: null,
+  outputSummary: null,
+  ...extra,
+});
+
+describe('verdictOfCheckRuns ordering', () => {
+  test('an unordered success still passes when a sibling of that name failed', () => {
+    expect(
+      verdictOfCheckRuns([checkRun('check', 'failure'), checkRun('check', 'success')], ['check'])
+        .state,
+    ).toBe('green');
+  });
+
+  test('a newer failure by id still hides an older success', () => {
+    expect(
+      verdictOfCheckRuns([
+        checkRun('lint', 'success', { id: 1, completedAt: 1 }),
+        checkRun('lint', 'failure', { id: 2, completedAt: 2 }),
+      ]).state,
+    ).toBe('red');
+  });
+});
 beforeAll(async () => {
   throttleHome = makeTestTempDir('ci-loop-');
   vi.stubEnv('CAIRN_HOME', throttleHome);
@@ -62,6 +95,8 @@ export interface CheckSpec {
   status: string;
   conclusion?: string;
   summary?: string;
+  id?: number;
+  completedAt?: string;
 }
 
 function res(status: number, etag: string, body: unknown) {
@@ -139,9 +174,11 @@ class CheckRunsMock {
       res(200, etag, {
         total_count: this.state.checks.length,
         check_runs: this.state.checks.map((c) => ({
+          ...(c.id === undefined ? {} : { id: c.id }),
           name: c.name,
           status: c.status,
           conclusion: c.conclusion ?? null,
+          completed_at: c.completedAt ?? null,
           output: { title: null, summary: c.summary ?? null },
         })),
       }),
@@ -183,6 +220,7 @@ interface PrWorld {
 
 function makePrWorld(opts: WorldOpts = {}): PrWorld {
   const s = bootServer();
+  insertMachine(s);
   disposables.push(() => s.dispose());
   const rnd = Math.random().toString(36).slice(2, 8);
   const base = Date.now();
@@ -715,6 +753,57 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
     });
     expect(rounds[0]?.status).toBe('pending');
     expect(w.todoRow().phase).toBe('building');
+  });
+
+  test('an older success does not hide a newer failure of the same check', async () => {
+    const w = makePrWorld({
+      checks: [
+        {
+          id: 1,
+          name: 'lint',
+          status: 'completed',
+          conclusion: 'success',
+          completedAt: '2026-11-10T00:00:00.000Z',
+        },
+        {
+          id: 2,
+          name: 'lint',
+          status: 'completed',
+          conclusion: 'failure',
+          summary: 'biome 2 errors',
+          completedAt: '2026-11-10T00:10:00.000Z',
+        },
+      ],
+    });
+    await w.poller.sweep();
+    const rounds = w.fixRoundSteps();
+    expect(rounds).toHaveLength(1);
+    expect(rounds[0]?.prompt).toContain('lint');
+    expect(rounds[0]?.prompt).toContain('failure');
+    expect(w.todoRow().phase).toBe('building');
+  });
+
+  test('an older success does not hide a newer failure when check run ids are absent', async () => {
+    const w = makePrWorld({
+      checks: [
+        {
+          name: 'lint',
+          status: 'completed',
+          conclusion: 'success',
+          completedAt: '2026-11-10T00:00:00.000Z',
+        },
+        {
+          name: 'lint',
+          status: 'completed',
+          conclusion: 'failure',
+          summary: 'biome 2 errors',
+          completedAt: '2026-11-10T00:10:00.000Z',
+        },
+      ],
+    });
+    await w.poller.sweep();
+    expect(w.fixRoundSteps()).toHaveLength(1);
+    expect(w.fixRoundSteps()[0]?.prompt).toContain('lint');
   });
 
   test('fix step in flight -> not double-dispatched (idempotent): the same round sweep does not append a second', async () => {

@@ -2,7 +2,7 @@ import type { MachineRuntime, ModelSource, ProviderRecord } from '@cairn/shared'
 import { MACHINE_RUNTIMES } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Cpu, Plus } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
+import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { accountStatusOf, type Verification } from '../api/account-verification.js';
 import {
@@ -41,7 +41,6 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { PageShell } from '../pages/shell.js';
 import { AddClaudeSubscriptionDialog } from './claude-subscriptions.js';
-import { CreateProviderDialog } from './create-provider-dialog.js';
 import { PROVIDERS_HREF } from './hrefs.js';
 import {
   ClaudeCodeEditor,
@@ -66,6 +65,9 @@ interface Entry {
 }
 
 const CLAUDE_SUBSCRIPTION_ADD = 'claude-subscription';
+const CreateProviderDialog = lazy(async () => ({
+  default: (await import('./create-provider-dialog.js')).CreateProviderDialog,
+}));
 
 const isMachineRuntime = (value: string): value is MachineRuntime =>
   (MACHINE_RUNTIMES as readonly string[]).includes(value);
@@ -245,11 +247,22 @@ export function ProvidersPage() {
   const renameSubscription = useRenameClaudeSubscription(teamId);
   const verification = useSubscriptionVerification(teamId);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createDialogWanted, setCreateDialogWanted] = useState(false);
+  if (createOpen && !createDialogWanted) setCreateDialogWanted(true);
   const [addingSubscription, setAddingSubscription] = useState(false);
   const [removingSubscription, setRemovingSubscription] = useState<SubscriptionAccount | null>(
     null,
   );
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [xaiDevice, setXaiDevice] = useState<{
+    state: string;
+    userCode: string;
+    verificationUri: string;
+    intervalSeconds: number;
+  } | null>(null);
+  const [xaiDeviceError, setXaiDeviceError] = useState<string | null>(null);
+  const pollXai = useRef(mutations.pollXaiDevice);
+  pollXai.current = mutations.pollXaiDevice;
 
   const sources = live
     ? (sourcesQ.data?.sources ?? [])
@@ -295,6 +308,41 @@ export function ProvidersPage() {
     next.delete('reason');
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, t]);
+
+  useEffect(() => {
+    if (!createOpen || xaiDevice === null) return;
+    let stopped = false;
+    const timer = setInterval(() => {
+      void pollXai.current.mutateAsync(xaiDevice.state).then(
+        (result) => {
+          if (stopped) return;
+          if (result.status === 'complete') {
+            setXaiDevice(null);
+            setXaiDeviceError(null);
+            setCreateOpen(false);
+            return;
+          }
+          if (result.status === 'denied') {
+            setXaiDevice(null);
+            setXaiDeviceError(t('xAI 登录被拒绝。'));
+          } else if (result.status === 'superseded') {
+            setXaiDevice(null);
+            setXaiDeviceError(t('已有更新的 xAI 凭证，这次登录没有覆盖它。'));
+          } else if (result.status === 'expired') {
+            setXaiDevice(null);
+            setXaiDeviceError(t('验证码已过期，请重试。'));
+          }
+        },
+        () => {
+          if (!stopped) setXaiDeviceError(t('xAI 登录失败，请重试。'));
+        },
+      );
+    }, xaiDevice.intervalSeconds * 1000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [createOpen, t, xaiDevice]);
 
   useEffect(() => {
     const add = searchParams.get('add');
@@ -504,45 +552,65 @@ export function ProvidersPage() {
           {selected?.editor}
         </ProviderPanel>
       </div>
-      <CreateProviderDialog
-        open={createOpen}
-        onClose={() => {
-          setCreateOpen(false);
-          setConnectError(null);
-        }}
-        pending={mutations.createProvider.isPending}
-        onCreate={
-          live
-            ? (body) =>
-                mutations.createProvider.mutate(body, {
-                  onSuccess: () => setCreateOpen(false),
-                  onError: (error) => toastError(t('添加模型服务失败，请重试。'), error),
-                })
-            : undefined
-        }
-        onConnect={
-          live
-            ? (presetId) => {
-                setConnectError(null);
-                mutations.startProviderOAuth.mutate(presetId, {
-                  onSuccess: (data) => window.location.assign(data.authorizationUrl),
-                  onError: (err) => setConnectError(err.message),
-                });
-              }
-            : undefined
-        }
-        connectPending={mutations.startProviderOAuth.isPending}
-        connectError={connectError}
-        onPickClaudeSubscription={
-          live
-            ? () => {
-                setCreateOpen(false);
-                createSubscription.reset();
-                setAddingSubscription(true);
-              }
-            : undefined
-        }
-      />
+      {createDialogWanted ? (
+        <Suspense fallback={null}>
+          <CreateProviderDialog
+            open={createOpen}
+            onClose={() => {
+              setCreateOpen(false);
+              setConnectError(null);
+              setXaiDevice(null);
+              setXaiDeviceError(null);
+            }}
+            onXaiSignIn={
+              live
+                ? () => {
+                    setXaiDeviceError(null);
+                    mutations.startXaiDevice.mutate(undefined, {
+                      onSuccess: (started) => setXaiDevice(started),
+                      onError: () => setXaiDeviceError(t('xAI 登录失败，请重试。')),
+                    });
+                  }
+                : undefined
+            }
+            xaiSignInPending={mutations.startXaiDevice.isPending}
+            xaiDevice={xaiDevice}
+            xaiDeviceError={xaiDeviceError}
+            pending={mutations.createProvider.isPending}
+            onCreate={
+              live
+                ? (body) =>
+                    mutations.createProvider.mutate(body, {
+                      onSuccess: () => setCreateOpen(false),
+                      onError: (error) => toastError(t('添加模型服务失败，请重试。'), error),
+                    })
+                : undefined
+            }
+            onConnect={
+              live
+                ? (presetId) => {
+                    setConnectError(null);
+                    mutations.startProviderOAuth.mutate(presetId, {
+                      onSuccess: (data) => window.location.assign(data.authorizationUrl),
+                      onError: (err) => setConnectError(err.message),
+                    });
+                  }
+                : undefined
+            }
+            connectPending={mutations.startProviderOAuth.isPending}
+            connectError={connectError}
+            onPickClaudeSubscription={
+              live
+                ? () => {
+                    setCreateOpen(false);
+                    createSubscription.reset();
+                    setAddingSubscription(true);
+                  }
+                : undefined
+            }
+          />
+        </Suspense>
+      ) : null}
       {addingSubscription && (
         <AddClaudeSubscriptionDialog
           onClose={() => {

@@ -59,21 +59,18 @@ for (const theme of ['light', 'dark'] as const) {
         const teams = page.waitForResponse((res) => new URL(res.url()).pathname === '/api/teams');
         void teams.catch(() => {});
         await page.goto(`${origin}/app/settings/remote`);
-        expect((await teams).status()).toBe(200);
-        await expect(page.locator('.token-gate')).toHaveCount(0);
-        await expect(page.getByTestId('tailnet-owner-identity')).toHaveText('Signed in as owner@example.com via Tailscale');
+        expect((await teams).status()).toBe(401);
+        await expect(page.locator('.token-gate')).toBeVisible();
+        await expect(page.locator('.token-gate-title')).toHaveText('Pair this computer');
+        await expect(page.getByTestId('tailnet-owner-identity')).toHaveCount(0);
         expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-        await page.screenshot({ path: testInfo.outputPath(`owner-${theme}-${width}.png`), fullPage: true });
-        const pairing = page.waitForResponse((res) => new URL(res.url()).pathname === '/api/remote/pairing');
-        await page.getByTestId('pair-new-device').click();
-        expect((await pairing).status()).toBe(201);
-        await expect(page.getByLabel('Pairing QR code')).toBeVisible();
+        await page.screenshot({ path: testInfo.outputPath(`pair-${theme}-${width}.png`), fullPage: true });
         const identity = await page.evaluate(async () => {
           const response = await fetch('/api/remote/identity');
-          return { status: response.status, body: await response.json() as { login: string; via: string } };
+          return { status: response.status, body: await response.json() as { login: null; via: null } };
         });
-        expect(identity.body).toEqual({ login: 'owner@example.com', via: 'tailscale' });
+        expect(identity.status).toBe(401);
         const transcript = testInfo.outputPath('calls.txt');
         writeFileSync(transcript, [
           'Isolated live server; synthetic sidecar metadata and HTTPS identity proxy.',
@@ -86,10 +83,7 @@ for (const theme of ['light', 'dark'] as const) {
           `HTTP ${identity.status}`,
           JSON.stringify(identity.body),
           '',
-          'POST /api/remote/pairing',
-          'Sec-Fetch-Site: same-origin',
-          `HTTP ${(await pairing).status()}`,
-          'Pairing QR rendered; one-time code omitted from evidence.',
+          'Pair page shown. Tailscale identity did not sign the browser in.',
         ].join('\n'));
         const viewer = await context.newPage();
         await viewer.goto(pathToFileURL(transcript).href);

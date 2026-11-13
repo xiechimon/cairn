@@ -4,9 +4,10 @@ import { afterAll, describe, expect, test } from 'vitest';
 import { project as projectTable, step as stepTable, todo as todoTable } from '../src/db/schema.js';
 import { startBuilds } from '../src/services/builds.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, postProject, req, seedRoute } from './helpers.js';
+import { bootServer, insertMachine, postProject, req, seedRoute } from './helpers.js';
 
 const s = bootServer();
+insertMachine(s);
 afterAll(() => s.dispose());
 
 interface PromptRow {

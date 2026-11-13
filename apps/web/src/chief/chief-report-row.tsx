@@ -15,9 +15,9 @@ import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 
 const CARD_CLS =
-  'mb-3 flex flex-col gap-3 rounded-(--radius-card) border border-border bg-card px-3.5 py-3 text-ui leading-6 text-content-secondary';
-const SECTION_CLS = 'grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5';
-const LABEL_CLS = 'truncate pt-px text-meta text-content-tertiary';
+  'mt-6 flex flex-col gap-5 rounded-(--radius-reply) bg-(--reply-bubble-fill) px-4 py-3.5 text-ui leading-6 text-foreground';
+const SECTION_CLS = 'flex min-w-0 flex-col gap-1';
+const LABEL_CLS = 'text-meta text-content-tertiary';
 const REF_CLS = 'text-foreground hover:underline';
 const ONE_LINE_CLS = 'my-3 text-center text-meta text-content-tertiary';
 
@@ -27,7 +27,7 @@ function TodoRefs({ refs }: { refs: readonly ChiefReportTodoRef[] }) {
     <span className="flex flex-wrap gap-x-2">
       {refs.map((ref) => (
         <ThreadLink key={ref.id} todoId={ref.id} className={REF_CLS}>
-          #{ref.seq} {ref.title}
+          {ref.title}
         </ThreadLink>
       ))}
     </span>
@@ -285,7 +285,7 @@ export function ChiefReportRow({ report }: { report: ChiefReportContent }) {
             {report.retro.length === 0 ? (
               <span>{t('昨天的对话里没找到值得改的地方')}</span>
             ) : (
-              <ul className="m-0 flex list-none flex-col gap-3 p-0">
+              <ul className="m-0 flex list-none flex-col gap-4 p-0">
                 {report.retro.map((proposal) => (
                   <ProposalItem key={proposal.id} proposal={proposal} />
                 ))}
@@ -296,7 +296,7 @@ export function ChiefReportRow({ report }: { report: ChiefReportContent }) {
         {report.status === 'posted' && intake.length > 0 && (
           <div className={SECTION_CLS} data-testid="chief-report-intake">
             <span className={LABEL_CLS}>{t('外部动态')}</span>
-            <ul className="m-0 flex list-none flex-col gap-3 p-0">
+            <ul className="m-0 flex list-none flex-col gap-4 p-0">
               {intake.map((item) => (
                 <IntakeRow key={item.id} item={item} />
               ))}
@@ -304,7 +304,7 @@ export function ChiefReportRow({ report }: { report: ChiefReportContent }) {
           </div>
         )}
         {(report.truncated.length > 0 || report.retro.length > 0) && (
-          <p className="m-0 border-t border-border pt-2.5 text-meta text-content-tertiary">
+          <p className="m-0 text-meta text-content-tertiary">
             {report.truncated.length > 0 &&
               t('这些来源太长，只读了后面的部分：{sources}。', {
                 sources: report.truncated.join('、'),

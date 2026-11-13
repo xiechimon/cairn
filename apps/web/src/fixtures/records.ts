@@ -25,9 +25,11 @@ import {
   type TodoOutputKind,
   type TodoOwner,
   type TodoSection,
+  type TokenUsage,
   type UsageCost,
 } from '@cairn/shared';
 import type { MachineProvider } from '../api/claude-accounts.js';
+import type { EngineRun, EngineRunStage } from '../board/engine-run.js';
 import type { AccountsContent } from './accounts.js';
 
 export type { Phase };
@@ -46,6 +48,8 @@ export interface BuildRef {
   buildId: string;
   createdAt: number;
 }
+
+export type MadeKind = 'document' | 'design' | 'page' | 'code';
 
 export interface TodoRecord {
   id: string;
@@ -78,10 +82,14 @@ export interface TodoRecord {
   sourceKind?: string | null;
   sourceRef?: string | null;
   usageCost?: UsageCost;
+  context?: ChiefContextUsage | null;
   verified?: boolean;
   owner?: TodoOwner;
   output?: TodoOutputKind;
   section?: TodoSection | null;
+  madeKind?: MadeKind;
+  previewUrl?: string;
+  visibility?: 'private' | 'team';
   routeOverride?: {
     machineId?: string;
     requiredCapabilities?: {
@@ -238,11 +246,14 @@ export interface FixtureSet {
   apiKeys?: ApiKeysContent;
   resources?: ResourcesContent;
   projectNames?: Record<string, string>;
+  projectGroups?: Record<string, string>;
   archivedProjects?: Array<{ id: string; name: string; archivedAt: number }>;
   projectAvatars?: Record<string, { icon?: ProjectIcon; color?: ProjectColor }>;
   chief?: ChiefContent;
   github?: GithubFixture;
   tags?: Array<Pick<TagRecord, 'id' | 'name' | 'color'>>;
+  machinesOpen?: string;
+  attachments?: Record<string, { text?: string; src?: string }>;
 }
 
 export interface GithubFixture {
@@ -292,6 +303,21 @@ export interface MachineRow {
   concurrencySource?: 'measured' | 'estimate' | 'manual';
   claudeLogin?: ClaudeLogin;
   providers?: MachineProvider[];
+  hostname?: string;
+  folders?: MachineFolder[];
+  runningHere?: MachineRunningThread[];
+}
+
+export interface MachineFolder {
+  path: string;
+  enabled: boolean;
+}
+
+export interface MachineRunningThread {
+  threadId: string;
+  title: string;
+  projectId: string;
+  startedAt: number;
 }
 
 export interface ResourcesContent {
@@ -308,10 +334,12 @@ export interface ResourcesContent {
 
 export interface DocSegment {
   text: string;
-  style?: 'code' | 'link' | 'mention' | 'strong' | 'anchor' | 'attachment';
+  style?: 'code' | 'link' | 'mention' | 'strong' | 'anchor' | 'attachment' | 'break';
   href?: string;
   attachmentKey?: string;
   strong?: boolean;
+  em?: boolean;
+  del?: boolean;
   mentionKind?: 'todo' | 'skill' | 'agent' | 'project' | 'machine';
   mentionId?: string;
 }
@@ -378,7 +406,6 @@ export type TranscriptItem =
       skills?: SkillFact[];
     }
   | { kind: 'skills'; read: string[]; denied: string[] }
-  | { kind: 'injected-skills'; skills: { id: string; reason: string }[] }
   | { kind: 'plan'; title: string; preview: string; seconds?: number; createdAt?: number }
   | { kind: 'work'; id: string; steps: WorkStep[]; expanded?: boolean; createdAt?: number }
   | { kind: 'elapsed'; seconds: number }
@@ -495,6 +522,9 @@ export interface DetailContent {
   planDiff?: PlanDiffContent;
   compareTarget?: PlanDiffContent;
   revision?: RevisionStep;
+  usage?: { rows: TokenUsage[]; machines: string[] };
+  engineRun?: EngineRun;
+  engineStage?: EngineRunStage;
 }
 
 export interface PlanVersion {
@@ -525,7 +555,6 @@ export interface ChiefSegment {
   text: string;
   code?: boolean;
   todo?: number;
-  agent?: string;
   strong?: boolean;
 }
 
@@ -562,6 +591,8 @@ export type ChiefStreamItem =
       id?: string;
       markdown?: string;
       pending?: 'queued' | 'held';
+      delivery?: 'sending';
+      outboxKey?: string;
       at?: string;
       createdAt?: number;
       projectId?: string | null;
@@ -637,6 +668,12 @@ export interface ModelOption {
   liveness?: 'alive' | 'dead' | 'unknown';
 }
 
+export interface ChiefContextUsage {
+  tokens: number;
+  contextWindow: number;
+  resume?: 'warm' | 'cold' | 'compacted' | 'idle';
+}
+
 export interface ChiefContent {
   view: 'settings' | 'none';
   tab?: ChiefSettingsTab;
@@ -656,4 +693,12 @@ export interface ChiefContent {
   outage?: { reason: 'quota' | 'capacity'; model: string | null; retryAt: number | null };
   fallbackModel?: string;
   hasEarlier?: boolean;
+  quickReplies?: string[];
+  context?: ChiefContextUsage;
+  composerFiles?: ComposerFileSeed[];
+}
+
+export interface ComposerFileSeed {
+  name: string;
+  state: 'ready' | 'uploading' | 'error';
 }

@@ -26,6 +26,7 @@ import { liveTextStore } from '../api/live-text.js';
 import { liveThinkingStore } from '../api/live-thinking.js';
 import { mapPlanDoc, mapPlanVersions, mapTranscript, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { useRoutingSettings } from '../api/routing-settings.js';
 import { useConversationStream } from '../api/sse.js';
 import { useSendKey } from '../api/use-send-key.js';
 import type { EarlierPages } from '../components/chat/earlier-loader.js';
@@ -38,6 +39,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { useThreadPresence } from '../pwa/thread-presence.js';
+import type { EngineRun, EngineRunStage } from './engine-run.js';
 import { deriveThreadChanges, type ThreadChanges } from './thread-changes.js';
 import { useMarkThreadRead } from './use-mark-thread-read.js';
 
@@ -56,6 +58,8 @@ export interface ThreadChat {
   planDoc: DocBlock[] | undefined;
   planVersions: PlanVersion[] | undefined;
   changes: ThreadChanges;
+  engineRun?: EngineRun;
+  engineStage?: EngineRunStage;
   changesExpanded: boolean;
   toggleChangesExpanded: () => void;
   retryChanges: () => void;
@@ -64,7 +68,6 @@ export interface ThreadChat {
   locked: boolean;
   running: boolean;
   waitingOnChecks: boolean;
-  workingFor: { startedAt?: number; seconds?: number } | undefined;
   machineName: string | null;
   stopped: boolean;
   sendError: string | null;
@@ -113,7 +116,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const wire = todoQ.data ?? null;
   useThreadPresence(teamId, wire?.id, live);
   useMarkThreadRead(todoId);
-  const buildId = live ? (wire?.latestBuildId ?? null) : (listed?.latestBuildId ?? null);
+  const buildId = wire !== null ? wire.latestBuildId : (listed?.latestBuildId ?? null);
   const buildQ = useBuild(buildId, live);
   const changesQ = useBuildChanges(buildId, live);
   const [changesExpanded, setChangesExpanded] = useState(true);
@@ -121,6 +124,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const { query: messagesQ, messages, newest } = useConversationMessages(buildId, live);
   const plansQ = usePlans(buildId, live);
   const machinesQ = useMachines(teamId, live);
+  const routingQ = useRoutingSettings(teamId, live);
 
   const known = useMemo(() => new Set(messages.map((m) => m.id)), [messages]);
   const liveText = useSyncExternalStore(liveTextStore.subscribe, () =>
@@ -168,10 +172,15 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     stopRequested.current = false;
   }, [buildId]);
 
-  const machineName = useMemo(
-    () => machinesQ.data?.find((m) => steps.some((s) => s.machineId === m.id))?.name ?? null,
-    [machinesQ.data, steps],
-  );
+  const machineName = useMemo(() => {
+    const claimed = machinesQ.data?.find((m) => steps.some((s) => s.machineId === m.id))?.name;
+    if (claimed != null) return claimed;
+    const pinned =
+      listed?.routeOverride?.machineId ??
+      routingQ.data?.rules?.find((rule) => rule.use === 'session')?.machineId ??
+      null;
+    return machinesQ.data?.find((m) => m.id === pinned)?.name ?? null;
+  }, [machinesQ.data, steps, listed?.routeOverride?.machineId, routingQ.data]);
   const todo = live ? (wire != null ? toDisplayTodo(wire) : (listed ?? null)) : (listed ?? null);
   const fixture = resolveScenario(searchParams);
   const fixtureDetail = fixture.details?.[todoId] ?? fixture.detail;
@@ -312,8 +321,6 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     void fetchNextPage();
   }, [fetchNextPage]);
 
-  const streamingItem = transcript.findLast((item) => item.kind === 'streaming');
-
   return {
     load,
     todo,
@@ -337,6 +344,9 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       : fixtureDetail?.doc,
     planVersions: live ? mapPlanVersions(plans) : fixtureDetail?.planVersions,
     changes,
+    ...(!live && fixtureDetail?.engineRun !== undefined
+      ? { engineRun: fixtureDetail.engineRun, engineStage: fixtureDetail.engineStage }
+      : {}),
     changesExpanded,
     toggleChangesExpanded: () => setChangesExpanded((value) => !value),
     retryChanges: () => {
@@ -360,10 +370,6 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       !running &&
       buildQ.data != null &&
       resolvedBuildPrNumber(buildQ.data) != null,
-    workingFor:
-      running && streamingItem?.kind === 'streaming'
-        ? { startedAt: streamingItem.startedAt, seconds: streamingItem.seconds }
-        : undefined,
     machineName,
     stopped: buildQ.data?.errorMessage === STOP_MESSAGE,
     sendError: mutations.messageThread.isError

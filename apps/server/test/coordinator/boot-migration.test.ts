@@ -86,6 +86,32 @@ describe('Coordinator sidecar boot migration', () => {
     ).toEqual([]);
   });
 
+  it('leaves the legacy main file in place when the WAL move fails', () => {
+    const { home, storage } = dirsFor();
+    const legacy = join(home, 'coordinator', 'threads');
+    mkdirSync(legacy, { recursive: true });
+    writeFileSync(join(legacy, 'chief-a.sqlite'), 'a');
+    writeFileSync(join(legacy, 'chief-a.sqlite-wal'), 'wal');
+    mkdirSync(join(storage, 'chief-a.sqlite-wal'), { recursive: true });
+    writeFileSync(join(storage, 'chief-a.sqlite-wal', 'blocker'), 'x');
+    const s = bootServer();
+    disposers.push(() => s.dispose());
+
+    expect(() =>
+      migrateSidecarState({
+        machine: s,
+        homeDir: home,
+        storageDir: storage,
+        sidecarMachineId: null,
+        logger,
+      }),
+    ).toThrow();
+
+    expect(existsSync(join(legacy, 'chief-a.sqlite'))).toBe(true);
+    expect(readFileSync(join(legacy, 'chief-a.sqlite'), 'utf8')).toBe('a');
+    expect(existsSync(join(storage, 'chief-a.sqlite'))).toBe(false);
+  });
+
   it('revokes the machine named by the retired CAIRN_COORDINATOR_MACHINE_ID', async () => {
     const { home, storage } = dirsFor();
     const s = bootServer();

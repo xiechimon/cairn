@@ -1,6 +1,8 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
 import { Hono } from 'hono';
+import { compress } from 'hono/compress';
 import type { Logger } from 'pino';
 import type { AppContext } from './context.js';
 import { HttpError } from './lib/errors.js';
@@ -10,8 +12,13 @@ import { registerRoutes } from './routes.js';
 import { registerMachineRoutes } from './routes-machine.js';
 import { registerRemoteRoutes } from './routes-remote.js';
 import { countsAsMemberWrite, recordMemberWrite } from './services/autonomy-gates.js';
+import { redeemStreamTicket, resolveBrowserSession } from './services/browser-session.js';
 import { NotFoundError } from './services/builds.js';
-import { pairedDeviceIdOfToken } from './services/paired-devices.js';
+import {
+  deviceStreams,
+  pairedDeviceExists,
+  pairedDeviceIdOfToken,
+} from './services/paired-devices.js';
 import { PhaseTransitionError } from './services/phase.js';
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -35,11 +42,14 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 const API_PREFIXES = ['/api/', '/git/', '/_mp/'];
+const HASHED_ASSET_PREFIX = 'assets/';
+const HASHED_ASSET_CACHE = 'public, max-age=31536000, immutable';
+const UNHASHED_FILE_CACHE = 'public, max-age=3600';
 
 function registerStaticSpa(app: Hono, webDir: string): void {
   const root = resolve(webDir);
   const indexFile = join(root, 'index.html');
-  app.get('/*', (c) => {
+  app.get('/*', compress(), async (c) => {
     const { pathname } = new URL(c.req.url);
     let decoded: string;
     try {
@@ -58,15 +68,21 @@ function registerStaticSpa(app: Hono, webDir: string): void {
     if (existsSync(filePath) && statSync(filePath).isDirectory()) {
       filePath = join(filePath, 'index.html');
     }
-    let isIndex = false;
     if (!existsSync(filePath) || !statSync(filePath).isFile()) {
       if (!existsSync(indexFile)) return c.json({ error: 'Not found' }, 404);
       filePath = indexFile;
-      isIndex = true;
     }
-    const body = readFileSync(filePath);
+    const isIndex = filePath === indexFile;
+    const body = await readFile(filePath);
     c.header('content-type', CONTENT_TYPES[extname(filePath)] ?? 'application/octet-stream');
-    c.header('cache-control', isIndex ? 'no-cache' : 'public, max-age=3600');
+    c.header(
+      'cache-control',
+      isIndex
+        ? 'no-cache'
+        : rel.startsWith(HASHED_ASSET_PREFIX)
+          ? HASHED_ASSET_CACHE
+          : UNHASHED_FILE_CACHE,
+    );
     return c.body(new Uint8Array(body));
   });
 }
@@ -85,9 +101,22 @@ export function createApp(ctx: AppContext, logger?: Logger): Hono {
   const app = new Hono();
   registerTokenAuth(app, ctx.authToken, {
     resolveDeviceId: (provided) => pairedDeviceIdOfToken(ctx.db, provided),
-    loopbackOwner: ctx.loopbackOwner ?? null,
+    resolveSession: (cookie) => resolveBrowserSession(ctx.db, cookie),
+    redeemTicket: (ticket) => {
+      const session = redeemStreamTicket(ticket);
+      if (session?.kind !== 'device') return session;
+      if (
+        session.deviceId === null ||
+        deviceStreams.isRevoked(session.deviceId) ||
+        !pairedDeviceExists(ctx.db, session.deviceId)
+      ) {
+        return null;
+      }
+      return session;
+    },
   });
   registerMemberActivity(app, ctx);
+  app.use('/api/*', compress());
   registerRoutes(app, ctx);
   registerMachineRoutes(app, ctx);
   registerRemoteRoutes(app, ctx);

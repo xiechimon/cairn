@@ -9,7 +9,14 @@ import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-lo
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { build as buildTable, step as stepTable } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { api, bootRealServer, type RealServer, seedWorld, waitFor } from './helpers.js';
+import {
+  api,
+  bootRealServer,
+  CONFINEMENT_READY_LAUNCH,
+  type RealServer,
+  seedWorld,
+  waitFor,
+} from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const BIOME_FIXTURE = fileURLToPath(new URL('./fixtures/biome-ansi-coloured.txt', import.meta.url));
@@ -72,6 +79,8 @@ describe('#1262 E2E: lint-failed commit → errorMessage persisted as plain text
       proxyEnv: {},
       claimBackoffBaseMs: 50,
       heartbeatIntervalMs: 500,
+
+      confinementPreflight: CONFINEMENT_READY_LAUNCH,
     });
     await waitFor(
       () =>

@@ -1,9 +1,11 @@
 import { cn } from 'cn';
-import { ArrowRight } from 'lucide-react';
-import { ACCENT_INK } from '../../phase.js';
+import { type ReactNode, useId } from 'react';
 import { BrandGlyph } from '../brand-glyph.js';
+import { IconTooltip } from '../icon-tooltip.js';
 import { type GlyphKind, StatusGlyph } from '../status-glyph.js';
 import { Button } from '../ui/button.js';
+import { Checkbox } from '../ui/checkbox.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.js';
 import { PrLink } from './pr-link.js';
 
 export type TaskRowGlyph = GlyphKind | 'question';
@@ -15,17 +17,27 @@ export interface TaskRowProps {
   what: string;
   where: string | null;
   age: string;
+  stamp?: string;
+  date?: string;
   waiting: boolean;
-  running: boolean;
   muted?: boolean;
   prLink?: { number: number; url: string };
+  check?: { label: string; onCheck: () => void; checked?: boolean } | 'none';
+  why?: string;
+  menu?: ReactNode;
+  below?: ReactNode;
   onOpen?: () => void;
+  onIntent?: () => void;
 }
 
-function Glyph({ glyph, waiting }: { glyph: TaskRowGlyph; waiting: boolean }) {
-  const ink = waiting ? ACCENT_INK : 'text-content-tertiary';
-  if (glyph === 'question') return <BrandGlyph className={cn('size-3.5 flex-none', ink)} />;
-  return <StatusGlyph kind={glyph} className={ink} />;
+const ROW_DESCRIPTION_DELAY = 600;
+
+const LEAD_BOX = 'flex size-7 flex-none items-center justify-center';
+
+function Glyph({ glyph }: { glyph: TaskRowGlyph }) {
+  if (glyph === 'question')
+    return <BrandGlyph className="size-4 flex-none text-content-tertiary" />;
+  return <StatusGlyph kind={glyph} outlined className="text-content-tertiary" />;
 }
 
 export function TaskRow({
@@ -35,80 +47,161 @@ export function TaskRow({
   what,
   where,
   age,
+  stamp,
+  date,
   waiting,
-  running,
   muted = false,
   prLink,
+  check,
+  why,
+  menu,
+  below,
   onOpen,
+  onIntent,
 }: TaskRowProps) {
-  const linkRoom = prLink != null ? 'pr-16' : undefined;
+  const descriptionId = useId();
+  const checkable = check !== undefined && check !== 'none';
+  const status = `${word} · ${what}${waiting && where !== null ? ` → ${where}` : ''}${age === '' ? '' : ` · ${age}`}`;
+  const dated = date !== undefined && date !== '';
+  const stamped = !dated && stamp !== undefined && stamp !== '';
   const row = (
-    <Button
-      variant="ghost"
-      data-slot="task-row"
-      data-waiting={waiting ? '' : undefined}
-      onClick={onOpen}
-      className="h-auto w-full items-start justify-start gap-2.5 rounded-(--radius-control) px-2.5 py-2 text-left font-normal whitespace-normal hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)"
-    >
-      <span className="mt-0.75 flex-none">
-        <Glyph glyph={glyph} waiting={waiting} />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex min-w-0 items-baseline gap-3">
-          <span
-            data-slot="task-row-title"
+    <Tooltip>
+      <TooltipTrigger
+        delay={ROW_DESCRIPTION_DELAY}
+        render={
+          <Button
+            variant="ghost"
+            data-slot="task-row"
+            data-waiting={waiting ? '' : undefined}
+            aria-describedby={descriptionId}
+            onClick={onOpen}
+            onPointerEnter={onIntent}
+            onFocus={onIntent}
             className={cn(
-              'line-clamp-2 min-w-0 flex-1 text-ui leading-5',
-              muted ? 'text-content-secondary' : 'font-medium text-foreground',
+              'h-auto w-full items-start justify-start gap-4 rounded-(--radius-tile) px-2.5 py-2 text-left font-normal whitespace-normal hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)',
+              menu != null && 'pointer-coarse:pr-12',
+              prLink != null && 'pr-16',
+              below != null && 'hover:bg-transparent dark:hover:bg-transparent',
             )}
-          >
-            {title}
-          </span>
-          <span className="flex flex-none items-center gap-1.5 text-meta leading-5 text-content-tertiary tabular-nums">
-            {running && (
+          />
+        }
+      >
+        <span data-slot="task-row-lead" className={LEAD_BOX}>
+          {!checkable && why === undefined && <Glyph glyph={glyph} />}
+        </span>
+        <span className="flex min-h-7 min-w-0 flex-1 flex-col justify-center">
+          <span className="flex min-w-0 items-center gap-3">
+            <span
+              data-slot="task-row-title"
+              className={cn(
+                'min-w-0 flex-1 truncate text-ui leading-5',
+                muted ? 'text-content-secondary' : 'text-foreground',
+              )}
+            >
+              {title}
+            </span>
+            {dated && (
               <span
-                aria-hidden
-                data-slot="task-row-running"
-                className="size-1.5 rounded-full bg-running"
-              />
+                className={cn(
+                  'flex-none text-caption leading-5 text-content-tertiary tabular-nums',
+                  menu != null &&
+                    'pointer-fine:group-hover/task:invisible pointer-fine:group-focus-within/task:invisible pointer-fine:group-has-aria-expanded/task:invisible',
+                )}
+              >
+                {date}
+              </span>
             )}
-            {age}
-          </span>
-        </span>
-        <span
-          data-slot="task-row-what"
-          className={cn('text-meta leading-5 text-content-secondary', where === null && linkRoom)}
-        >
-          <span className={waiting ? `${ACCENT_INK} font-medium` : 'text-content-tertiary'}>
-            {word}
-          </span>
-          <span className="text-content-tertiary"> · </span>
-          {what}
-        </span>
-        {where !== null && (
-          <span
-            data-slot="task-row-where"
-            className={cn(
-              'flex items-center gap-1 text-meta leading-5 font-medium text-foreground',
-              linkRoom,
+            {stamped && (
+              <span
+                data-slot="task-row-stamp"
+                className={cn(
+                  'flex-none text-caption leading-5 text-content-tertiary tabular-nums',
+                  menu != null &&
+                    'pointer-fine:group-hover/task:mr-7 pointer-fine:group-focus-within/task:mr-7 pointer-fine:group-has-aria-expanded/task:mr-7',
+                )}
+              >
+                {stamp}
+              </span>
             )}
-          >
-            <ArrowRight aria-hidden className="size-3.5 text-content-tertiary" strokeWidth={1.75} />
-            {where}
           </span>
-        )}
-      </span>
-    </Button>
+          {waiting && (
+            <span
+              data-slot="task-row-what"
+              className="min-w-0 truncate text-meta leading-4.5 text-content-tertiary"
+            >
+              {what}
+            </span>
+          )}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="left" sideOffset={8} data-slot="task-row-tooltip">
+        {status}
+      </TooltipContent>
+    </Tooltip>
   );
-  if (prLink == null) return row;
   return (
-    <div data-slot="task-row-frame" className="relative">
+    <div
+      data-slot="task-row-frame"
+      className={cn(
+        'group/task relative',
+        below != null && 'rounded-(--radius-tile) hover:bg-(--menu-hover)',
+        checkable && check.checked === true && 'rounded-(--radius-tile) bg-(--menu-hover)',
+      )}
+    >
       {row}
-      <PrLink
-        number={prLink.number}
-        url={prLink.url}
-        className="absolute right-2.5 bottom-2 text-meta leading-5"
-      />
+      {below}
+      <span id={descriptionId} data-slot="task-row-description" className="sr-only">
+        {`${word} · ${what}`}
+        {waiting && where !== null && <span data-slot="task-row-where">{` → ${where}`}</span>}
+        {age !== '' && ` · ${age}`}
+      </span>
+      {checkable && (
+        <Checkbox
+          aria-label={check.label}
+          checked={check.checked ?? false}
+          onCheckedChange={check.onCheck}
+          data-waiting={waiting ? '' : undefined}
+          className="absolute top-3.5 left-4 data-waiting:border-(--card-button)"
+        />
+      )}
+      {!checkable && why !== undefined && (
+        <IconTooltip
+          label={why}
+          trigger={
+            <Button
+              variant="ghost"
+              tabIndex={-1}
+              data-slot="task-row-why"
+              onClick={onOpen}
+              className={cn(
+                LEAD_BOX,
+                'absolute top-2 left-2.5 rounded-(--radius-control) p-0 hover:bg-transparent dark:hover:bg-transparent',
+              )}
+            />
+          }
+        >
+          <Glyph glyph={glyph} />
+        </IconTooltip>
+      )}
+      {prLink != null && (
+        <PrLink
+          number={prLink.number}
+          url={prLink.url}
+          className={cn(
+            'absolute top-3 right-2.5 text-caption leading-5',
+            menu != null &&
+              'pointer-coarse:right-12 pointer-fine:group-hover/task:right-10 pointer-fine:group-focus-within/task:right-10',
+          )}
+        />
+      )}
+      {menu != null && (
+        <div
+          data-slot="task-row-menu"
+          className="absolute top-3 right-2 opacity-0 group-focus-within/task:opacity-100 group-hover/task:opacity-100 has-aria-expanded:opacity-100 pointer-coarse:top-0.5 pointer-coarse:right-0 pointer-coarse:opacity-100"
+        >
+          {menu}
+        </div>
+      )}
     </div>
   );
 }

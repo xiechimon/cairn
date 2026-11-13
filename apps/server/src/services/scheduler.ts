@@ -18,6 +18,7 @@ import {
   type ReflectCurateLogger,
   sweepReflectCurate,
 } from '../trajectory-reflect-curate.js';
+import { dispatchActionWakes, sweepExpiredActionProposals } from './action-proposals.js';
 import {
   ATTACHMENT_GC_INTERVAL_MS,
   type GcLogger,
@@ -48,6 +49,7 @@ import {
 import { createDueRunner, type DueClock } from './due-events.js';
 import { projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
+import { dispatchHostedCleanup } from './hosted-cleanup.js';
 import {
   createIssueIntake,
   ISSUE_INTAKE_INTERVAL_MS,
@@ -488,6 +490,9 @@ export function createScheduler(
   }
 
   function runTick(now: number): Promise<void> {
+    sweepExpiredActionProposals(deps.db, now);
+    dispatchActionWakes(deps);
+    if (deps.reposDir) dispatchHostedCleanup(deps.db, deps.reposDir, now);
     const pending: Promise<void>[] = [];
     if (!alertsSweeping) {
       alertsSweeping = true;
@@ -520,7 +525,7 @@ export function createScheduler(
     sweepAbandonedBuildSteps(deps, now);
     void sweepAbandonedShipSteps(deps, now).catch(() => {});
     sweepZombieQueuedTodos(deps, now);
-    sweepPlanAutoConfirm(deps, now);
+    sweepPlanAutoConfirm(deps);
     sweepQuotaWaitSteps(deps, now);
     sweepUnplaceableSteps(deps, now);
     void sweepFailedRetries(deps).catch(() => {});
@@ -780,6 +785,9 @@ export function createScheduler(
     start() {
       if (dueStarted) return;
       dueStarted = true;
+      sweepExpiredActionProposals(deps.db);
+      dispatchActionWakes(deps);
+      if (deps.reposDir) dispatchHostedCleanup(deps.db, deps.reposDir);
       setScheduleClockListener(() => dueRunner.arm());
       ensureDue('sweep:main', 'sweep', opts.tickMs);
       ensureDue(

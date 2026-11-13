@@ -21,6 +21,7 @@ import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { MachineAgentAccess } from './machine-agent-access.js';
 import { CONCURRENCY_SOURCE_LABEL, MachineConcurrencySelect } from './machine-concurrency.js';
 import { offlineGuidance } from './machine-offline.js';
 
@@ -250,7 +251,7 @@ export function MachineDetailPane({
                 <TriangleAlert
                   aria-hidden
                   strokeWidth={1.75}
-                  className="mt-0.5 size-3.5 flex-none text-content-secondary"
+                  className="mt-0.5 size-4 flex-none text-content-secondary"
                 />
                 <span>
                   <TextWithCode text={loginWarning} />
@@ -310,6 +311,8 @@ export function MachineDetailPane({
           ))}
         </SettingsCard>
       </SettingsSection>
+
+      <MachineAgentAccess machine={machine} />
 
       {capabilities !== undefined && (
         <SettingsSection testId="machine-capabilities" title={t('能力')}>

@@ -11,7 +11,7 @@ import { type Db, MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { startBuilds } from '../src/services/builds.js';
-import { bootServer, postProject, req, type TestServer } from './helpers.js';
+import { bootServer, insertMachine, postProject, req, type TestServer } from './helpers.js';
 
 const GATE_TABLES = ['gate_digest', 'gate_round', 'gate_verdict', 'gate_state'] as const;
 const D1 = `pd2:${'a'.repeat(64)}`;
@@ -504,6 +504,7 @@ describe('F7 the existing delete paths succeed with gate rows present', () => {
         await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title: 'g', spec: 'x' })
       ).json(),
     );
+    insertMachine(s);
     const [b] = startBuilds(s.svc, {
       projectId,
       todoIds: [todo.id],
@@ -600,6 +601,11 @@ describe('F7 the existing delete paths succeed with gate rows present', () => {
 
   test('deleting a project (steps and todos deleted in the transaction)', async () => {
     const { s, projectId, buildId } = await started();
+    s.db
+      .update(schema.step)
+      .set({ status: 'done', finishedAt: 11 })
+      .where(eq(schema.step.buildId, buildId))
+      .run();
     const res = await req(s.app, 'DELETE', `/api/projects/${projectId}`);
     expect(res.status).toBe(204);
     expectGone(s, buildId);

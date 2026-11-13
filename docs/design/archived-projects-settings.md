@@ -4,7 +4,7 @@ Issue [#3610](https://github.com/xiechimon/cairn/issues/3610). Research: [archiv
 
 ## Surface
 
-A settings section `项目` (id `projects`, route `/app/settings/projects`, lucide `Archive` icon) in the first nav group after `外观`. It is the only web entry for archived projects.
+A settings section `项目` (id `projects`, route `/app/settings/projects`, lucide `Archive` icon) in the first nav group after `外观`. Since 2026-11-11 the sidebar's project filter (`已归档` / `全部`, `apps/web/DESIGN.md` Sidebar 6b) is the second entry: it lists archived projects with a `取消归档` / `删除` menu and opens one read-only; this section keeps working unchanged.
 
 ## Frontend
 

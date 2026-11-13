@@ -186,7 +186,7 @@ async function stubWorld(page: Page, recordedSession = false) {
 test('1. task text appears exactly once: the description area carries it, the bubble does not repeat it (nesting fix)', async ({ page }) => {
   await stubWorld(page);
 
-  await expect(page.getByTestId('transcript-col').locator('section')).toContainText(
+  await expect(page.getByTestId('transcript-col').locator('.spec-block')).toContainText(
     '任务目标',
   );
   await expect(
@@ -236,9 +236,8 @@ test('5. a one-line message keeps the one-line bubble height (no geometry drift)
     const r = el.getBoundingClientRect();
     return { h: Math.round(r.height), font: getComputedStyle(el).fontSize };
   });
-  expect(box.h).toBeGreaterThanOrEqual(37);
-  expect(box.h).toBeLessThanOrEqual(38);
-  expect(box.font).toBe('15px');
+  expect(box.h).toBe(36);
+  expect(box.font).toBe('14px');
 });
 
 test('6. taskline does not mis-attach: after the task text row retires no #seq row residue remains', async ({ page }) => {
@@ -248,7 +247,7 @@ test('6. taskline does not mis-attach: after the task text row retires no #seq r
 
 test('a renamed task does not repeat its recorded startup prompt before the answer', async ({ page }) => {
   await stubWorld(page, true);
-  await expect(page.getByTestId('transcript-col').locator('section')).toContainText('任务目标');
+  await expect(page.getByTestId('transcript-col').locator('.spec-block')).toContainText('任务目标');
   await expect(page.getByTestId('user-bubble')).toHaveCount(2);
   await expect(page.getByTestId('user-bubble').filter({ hasText: '任务目标' })).toHaveCount(0);
   await expect(page.getByTestId('user-bubble').filter({ hasText: '本步的交接物是' })).toHaveCount(0);

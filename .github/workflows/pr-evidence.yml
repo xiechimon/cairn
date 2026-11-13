@@ -1,20 +1,12 @@
 name: pr-evidence
 
-# The hold guard: a PR carrying the `coordinator-hold` label is red here
-# until the label is removed, and while the label is on, a run also
-# disarms GitHub auto-merge on the PR. An unchecked task only turns the
-# pr-tasks step red and never adds the label. This keeps a merge from landing
-# while a human decision is pending, which happened on 2026-10-21 (#1435: auto-merge was armed, the
-# orchestrator edited the body green while still asking the user, and the
-# merge fired when `check` passed; this job was advisory then). The job is a
-# required status check on main (pinned to the Actions app), so a red run
-# blocks both auto-merge and `gh pr merge`. Only a label-state red disarms
-# auto-merge: a link or wording red is already blocked by the required check
-# and clears itself when the lane fixes it, and nobody re-arms auto-merge on
-# a lane's behalf.
+# The job is a required status check on main (pinned to the Actions app), so
+# a red run blocks both auto-merge and `gh pr merge`. No label holds a PR
+# here (ian, 2026-11-12): an unchecked task turns the pr-tasks step red, and
+# a link or wording red clears itself when the author fixes it.
 #
 # The autonomy brake rejects paused repositories before body checks unless the
-# PR is an exact recovery revert. Brake failures also disarm auto-merge.
+# PR is an exact recovery revert. Only a brake failure disarms auto-merge.
 #
 # The trigger has no `paths:` and the job skips only the draft PRs Mergify
 # opens to test a queued batch: a skipped run counts as a passing required
@@ -25,9 +17,9 @@ name: pr-evidence
 # editable, so `edited`, `labeled` and `unlabeled` must be listed explicitly.
 # Putting `types:` on ci.yml would re-trigger the whole pipeline on every body
 # edit; here only this job runs. `auto_merge_enabled` is listed so that arming
-# auto-merge on a labelled PR is undone within one run instead of waiting for
-# the next edit or push; `ready_for_review` so a draft's unchecked items are
-# judged the moment it stops being a draft.
+# auto-merge on a paused repository is undone within one run instead of
+# waiting for the next edit or push; `ready_for_review` so a draft's unchecked
+# items are judged the moment it stops being a draft.
 #
 # Third-party actions are pinned to full commit SHAs with trailing version
 # comments (#1076): a floating tag can be re-pointed upstream, which would
@@ -103,21 +95,8 @@ jobs:
         run: |
           gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pr.json"
           jq -r '.body // ""' "$RUNNER_TEMP/pr.json" > "$RUNNER_TEMP/pr-body.md"
-          echo "labels=$(jq -r '[.labels[].name] | join(",")' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
           echo "draft=$(jq -r '.draft' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
         id: pr
-
-      - name: Refuse while a hold is on (coordinator-hold label)
-        env:
-          LABELS: ${{ steps.pr.outputs.labels }}
-        run: |
-          case ",$LABELS," in
-            *,coordinator-hold,*)
-              touch hold.flag
-              echo "FAIL coordinator-hold: the coordinator asked for changes or a person's decision is pending; this PR merges only after the label is removed"
-              exit 1 ;;
-          esac
-          echo "pr-decision: GREEN (no coordinator-hold label)"
 
       - name: Check the autonomy brake
         if: ${{ !cancelled() }}
@@ -154,6 +133,22 @@ jobs:
           git diff --name-only "$MERGE_BASE" "$HEAD_SHA" > "$RUNNER_TEMP/changed-files.txt"
           python3 scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md" --changed-files "$RUNNER_TEMP/changed-files.txt" "${schema_args[@]}" "${baseline_args[@]}"
 
+      - name: Check security-review disposition on a security surface
+        if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
+        run: |
+          BASE_SHA="$(jq -r '.base.sha' "$RUNNER_TEMP/pr.json")"
+          HEAD_SHA="$(jq -r '.head.sha' "$RUNNER_TEMP/pr.json")"
+          MERGE_BASE="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+          git diff --name-status --find-renames "$MERGE_BASE" "$HEAD_SHA" > "$RUNNER_TEMP/name-status.txt"
+          git show "$BASE_SHA:packages/shared/merge-gate-paths.json" > "$RUNNER_TEMP/gate-paths.json"
+          if ! git cat-file -e "$BASE_SHA:scripts/security-review-disposition.mjs"; then
+            echo "security-review-disposition: base has no checker yet; not running the PR copy"
+            exit 0
+          fi
+          git show "$BASE_SHA:scripts/security-review-disposition.mjs" > "$RUNNER_TEMP/security-review-disposition.mjs"
+          git show "$BASE_SHA:scripts/pr_body.py" > "$RUNNER_TEMP/pr_body.py"
+          node "$RUNNER_TEMP/security-review-disposition.mjs" --body "$RUNNER_TEMP/pr-body.md" --name-status "$RUNNER_TEMP/name-status.txt" --head "$HEAD_SHA" --paths "$RUNNER_TEMP/gate-paths.json"
+
       - name: Check PR body tasks (no unchecked task anywhere)
         if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
         run: |
@@ -166,17 +161,16 @@ jobs:
         if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
         run: node scripts/english-only-gate.mjs --text "$RUNNER_TEMP/pr-body.md"
 
-      # A pending decision must not be racing an armed auto-merge: whenever
-      # the coordinator-hold label is on, auto-merge is disarmed. An unchecked
-      # task only turns the pr-tasks step red and never adds the
-      # label, so checking the item turns the PR green with no manual label
-      # removal. Disabling an unarmed auto-merge is a no-op and uses the
-      # workflow token, so it does not trigger another workflow run.
-      - name: Mark the decision pending and disarm auto-merge
+      # A paused repository must not be racing an armed auto-merge. Any other
+      # red leaves auto-merge as it is: the required check already blocks the
+      # merge and clears when the author fixes it. Disabling an unarmed
+      # auto-merge is a no-op and uses the workflow token, so it does not
+      # trigger another workflow run.
+      - name: Disarm auto-merge while the autonomy brake is on
         if: ${{ failure() }}
         run: |
-          if [ ! -f hold.flag ] && [ ! -f autonomy-paused.flag ]; then
-            echo "pr-decision: red without a pending decision; auto-merge left as it is"
+          if [ ! -f autonomy-paused.flag ]; then
+            echo "pr-decision: red without the autonomy brake; auto-merge left as it is"
             exit 0
           fi
           if gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --disable-auto 2>disable-auto.err; then
@@ -185,6 +179,6 @@ jobs:
             echo "pr-decision: auto-merge was not armed"
           else
             cat disable-auto.err
-            echo "FAIL disarm: auto-merge may still be armed on a PR with a pending decision"
+            echo "FAIL disarm: auto-merge may still be armed on a paused repository"
             exit 1
           fi

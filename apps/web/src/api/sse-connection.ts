@@ -10,7 +10,7 @@ export interface StreamGuards {
 }
 
 export function connect(
-  path: string,
+  path: string | (() => Promise<string>),
   onEvent: (ev: Record<string, unknown>) => void,
   onResync: () => void,
   guards: StreamGuards,
@@ -22,6 +22,16 @@ export function connect(
   let bizTimer: ReturnType<typeof setTimeout> | null = null;
   let bizWindow = SSE_BIZ_SILENCE_BASE_MS;
   let lastSeq = 0;
+  let retryDelay = 1_000;
+
+  const scheduleRetry = (): void => {
+    if (disposed) return;
+    const delay = retryDelay;
+    retryDelay = Math.min(retryDelay * 2, 30_000);
+    setTimeout(() => {
+      if (!disposed) open();
+    }, delay);
+  };
 
   const armWatchdog = (): void => {
     if (watchdog !== null) clearTimeout(watchdog);
@@ -53,8 +63,31 @@ export function connect(
 
   function open(): void {
     if (disposed) return;
-    es = new EventSource(path);
+    const resolved = typeof path === 'function' ? path() : path;
+    if (typeof resolved !== 'string') {
+      void resolved.then(
+        (url) => {
+          if (disposed) return;
+          attach(url);
+        },
+        () => scheduleRetry(),
+      );
+      return;
+    }
+    attach(resolved);
+  }
+
+  function attach(url: string): void {
+    if (disposed) return;
+    es?.close();
+    es = new EventSource(url);
+    es.onerror = () => {
+      es?.close();
+      if (typeof path === 'function') scheduleRetry();
+      else open();
+    };
     es.onopen = () => {
+      retryDelay = 1_000;
       if (openedOnce) onResync();
       openedOnce = true;
       lastSeq = 0;

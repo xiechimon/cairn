@@ -1,11 +1,30 @@
-import { AGENT_TODO_LINE_RE, AGENT_TODO_MARKER_STATES, type AgentTodoState } from '@cairn/shared';
-import { Fragment, useEffect, useMemo, useState } from 'react';
-import { inlineSegments } from '../api/mappers.js';
+import { cn } from 'cn';
+import {
+  createContext,
+  Fragment,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
+import { Checkbox } from '../components/ui/checkbox.js';
+import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
 import type { DocSegment } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, Copy } from '../icons/index.js';
-import { ATTACHMENT_LINE } from '../overlay/attachment-paste.js';
+import { Check, ChiefExpand, Copy } from '../icons/index.js';
+import {
+  type ChatBlock,
+  type ChatBubbleGroup,
+  chatBubbleGroups,
+  type ListItem,
+  parseChatMarkdown,
+  type TableAlign,
+  type TaskItem,
+  type TaskState,
+} from '../lib/markdown.js';
 import { AttachmentPreview } from '../overlay/attachment-preview.js';
 import {
   AttachmentChip,
@@ -18,280 +37,18 @@ import { Segments } from './segments.js';
 
 export { attachmentIdFromKey, COMPOSER_CHIP_LABEL };
 
-export type TableAlign = 'left' | 'center' | 'right' | null;
-
-export type ChatBlock =
-  | { kind: 'para'; segments: DocSegment[] }
-  | { kind: 'head'; level: number; segments: DocSegment[] }
-  | { kind: 'ordered'; depth: number; ordinal: number; segments: DocSegment[] }
-  | { kind: 'bullet'; depth: number; segments: DocSegment[] }
-  | { kind: 'tasks'; items: TaskItem[] }
-  | { kind: 'code'; lang?: string; text: string }
-  | { kind: 'attachment'; name: string; key: string }
-  | {
-      kind: 'table';
-      header: DocSegment[][];
-      align: TableAlign[];
-      rows: DocSegment[][][];
-    };
-
-export type TaskState = AgentTodoState;
-export type TaskItem = { state: TaskState; segments: DocSegment[] };
-
-function depthOf(indent: string): number {
-  return Math.floor(indent.replace(/\t/g, '  ').length / 2);
-}
-
-const FENCE = /^ {0,3}(`{3,}|~{3,})\s*(\S*)\s*$/;
-const HEADING = /^ {0,3}(#{1,6})\s+(.*)$/;
-const ORDERED = /^(\s*)(\d+)[.)]\s+(.*)$/;
-const BULLET = /^(\s*)[-*•]\s+(.*)$/;
-const TABLE_ROW = /^\s*\|.*\|\s*$/;
-const TABLE_SEP_CELL = /^:?-{1,}:?$/;
-
-export function splitTableCells(line: string): string[] {
-  const trimmed = line.trim();
-  const parts = trimmed.split('|');
-  if (parts[0]?.trim() === '') parts.shift();
-  if (parts.length > 0 && parts[parts.length - 1]?.trim() === '') parts.pop();
-  return parts.map((part) => part.trim());
-}
-
-function isSeparatorCells(cells: string[]): boolean {
-  return cells.length > 0 && cells.every((cell) => TABLE_SEP_CELL.test(cell));
-}
-
-export function parseTableAlign(cell: string): TableAlign {
-  const left = cell.startsWith(':');
-  const right = cell.endsWith(':');
-  if (left && right) return 'center';
-  if (right) return 'right';
-  if (left) return 'left';
-  return null;
-}
-
-function tableRowSegments(cells: string[]): DocSegment[][] {
-  return cells.map((cell) => inlineSegments(cell));
-}
-
-function sameColumnCount(rows: string[][], cols: number): boolean {
-  return rows.every((row) => row.length === cols);
-}
-
-export function expandCollapsedTableLine(line: string): string[] | null {
-  const trimmed = line.trim();
-  if (!trimmed.includes('||') || !TABLE_ROW.test(trimmed)) return null;
-  const expanded = trimmed.replace(/\|\|/g, '|\n|').split('\n');
-  if (expanded.length < 2) return null;
-  const parsed = expanded.map(splitTableCells);
-  const sepIdx = parsed.findIndex(isSeparatorCells);
-  if (sepIdx < 1) return null;
-  const cols = parsed[sepIdx]?.length ?? 0;
-  if (cols === 0 || !sameColumnCount(parsed, cols)) return null;
-  return expanded;
-}
-
-function tryConsumeTable(
-  lines: string[],
-  start: number,
-): { block: Extract<ChatBlock, { kind: 'table' }>; next: number } | null {
-  const headerLine = lines[start] ?? '';
-  const fromCollapsed = expandCollapsedTableLine(headerLine);
-  const tableLines = fromCollapsed ?? [headerLine];
-  let next = start + 1;
-
-  if (fromCollapsed === null) {
-    const sepLine = lines[start + 1] ?? '';
-    if (!TABLE_ROW.test(headerLine) || !TABLE_ROW.test(sepLine)) return null;
-    const headerCells = splitTableCells(headerLine);
-    const sepCells = splitTableCells(sepLine);
-    if (
-      !isSeparatorCells(sepCells) ||
-      headerCells.length === 0 ||
-      headerCells.length !== sepCells.length
-    ) {
-      return null;
-    }
-    tableLines.push(sepLine);
-    next = start + 2;
-    while (next < lines.length) {
-      const body = lines[next] ?? '';
-      if (!TABLE_ROW.test(body)) break;
-      const cells = splitTableCells(body);
-      if (cells.length !== headerCells.length) break;
-      tableLines.push(body);
-      next += 1;
-    }
-  }
-
-  const headerCells = splitTableCells(tableLines[0] ?? '');
-  const sepCells = splitTableCells(tableLines[1] ?? '');
-  if (
-    !isSeparatorCells(sepCells) ||
-    headerCells.length === 0 ||
-    headerCells.length !== sepCells.length
-  ) {
-    return null;
-  }
-  const rows: DocSegment[][][] = [];
-  for (let r = 2; r < tableLines.length; r += 1) {
-    const cells = splitTableCells(tableLines[r] ?? '');
-    if (cells.length !== headerCells.length) return null;
-    rows.push(tableRowSegments(cells));
-  }
-  return {
-    block: {
-      kind: 'table',
-      header: tableRowSegments(headerCells),
-      align: sepCells.map(parseTableAlign),
-      rows,
-    },
-    next,
-  };
-}
-
-export function parseChatMarkdown(text: string): ChatBlock[] {
-  const lines = text.split('\n');
-  const blocks: ChatBlock[] = [];
-  let para: string[] = [];
-  const flushPara = () => {
-    if (para.length > 0) {
-      blocks.push({ kind: 'para', segments: inlineSegments(para.join(' ')) });
-      para = [];
-    }
-  };
-
-  let i = 0;
-  while (i < lines.length) {
-    const raw = lines[i] ?? '';
-    const trimmed = raw.trim();
-
-    const fence = FENCE.exec(raw);
-    if (fence !== null) {
-      flushPara();
-      const marker = fence[1] ?? '```';
-      const lang = fence[2] !== undefined && fence[2] !== '' ? fence[2] : undefined;
-      const buf: string[] = [];
-      i += 1;
-      const close = new RegExp(`^ {0,3}${marker[0] === '`' ? '`{3,}' : '~{3,}'}\\s*$`);
-      while (i < lines.length && !close.test(lines[i] ?? '')) {
-        buf.push(lines[i] ?? '');
-        i += 1;
-      }
-      i += 1;
-      blocks.push({ kind: 'code', ...(lang !== undefined ? { lang } : {}), text: buf.join('\n') });
-      continue;
-    }
-
-    if (trimmed === '') {
-      flushPara();
-      i += 1;
-      continue;
-    }
-
-    const attachment = ATTACHMENT_LINE.exec(raw);
-    if (attachment !== null) {
-      flushPara();
-      blocks.push({
-        kind: 'attachment',
-        name: attachment[1] ?? '',
-        key: attachment[2] ?? '',
-      });
-      i += 1;
-      continue;
-    }
-
-    const head = HEADING.exec(raw);
-    if (head !== null) {
-      flushPara();
-      blocks.push({
-        kind: 'head',
-        level: (head[1] ?? '#').length,
-        segments: inlineSegments((head[2] ?? '').trim()),
-      });
-      i += 1;
-      continue;
-    }
-
-    const ordered = ORDERED.exec(raw);
-    if (ordered !== null) {
-      flushPara();
-      blocks.push({
-        kind: 'ordered',
-        depth: depthOf(ordered[1] ?? ''),
-        ordinal: Number(ordered[2]),
-        segments: inlineSegments((ordered[3] ?? '').trim()),
-      });
-      i += 1;
-      continue;
-    }
-
-    const task = AGENT_TODO_LINE_RE.exec(raw);
-    if (task !== null) {
-      flushPara();
-      const item: TaskItem = {
-        state: AGENT_TODO_MARKER_STATES[task[1] ?? ' '] ?? 'todo',
-        segments: inlineSegments((task[2] ?? '').trim()),
-      };
-      const last = blocks[blocks.length - 1];
-      if (last?.kind === 'tasks') last.items.push(item);
-      else blocks.push({ kind: 'tasks', items: [item] });
-      i += 1;
-      continue;
-    }
-
-    const bullet = BULLET.exec(raw);
-    if (bullet !== null) {
-      flushPara();
-      blocks.push({
-        kind: 'bullet',
-        depth: depthOf(bullet[1] ?? ''),
-        segments: inlineSegments((bullet[2] ?? '').trim()),
-      });
-      i += 1;
-      continue;
-    }
-
-    if (TABLE_ROW.test(raw) || trimmed.includes('||')) {
-      const table = tryConsumeTable(lines, i);
-      if (table !== null) {
-        flushPara();
-        blocks.push(table.block);
-        i = table.next;
-        continue;
-      }
-    }
-
-    para.push(trimmed);
-    i += 1;
-  }
-  flushPara();
-  return blocks;
-}
-
 const HEAD_SIZE: Record<number, string> = {
-  1: 'text-page',
+  1: 'text-md-h1',
   2: 'text-heading',
   3: 'text-card-title',
-  4: 'text-ui',
-  5: 'text-ui',
-  6: 'text-ui',
 };
 
-function HeadingTag({
-  level,
-  segments,
-  conversational,
-}: {
-  level: number;
-  segments: DocSegment[];
-  conversational: boolean;
-}) {
+function HeadingTag({ level, segments }: { level: number; segments: DocSegment[] }) {
   const clamped = Math.min(6, Math.max(1, level));
   const Tag = `h${clamped}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
   return (
     <Tag
-      className={`chat-md-head chat-md-head--${clamped} mt-3 mb-1 font-semibold text-(--foreground) first:mt-0 ${conversational ? 'text-card-title' : (HEAD_SIZE[clamped] ?? 'text-ui')}`}
+      className={`chat-md-head chat-md-head--${clamped} m-0 font-semibold text-(--foreground) ${HEAD_SIZE[clamped] ?? 'text-ui'}`}
     >
       <Segments segments={segments} codeClassName="chat-code" />
     </Tag>
@@ -323,24 +80,28 @@ function TaskIcon({ state }: { state: TaskState }) {
 export function TaskCard({ items }: { items: TaskItem[] }) {
   return (
     <ul
-      className="my-2 flex list-none flex-col gap-2 rounded-2xl border border-(--border) bg-(--card) px-4 py-3.5 font-sans font-normal shadow-sm"
+      className="flex list-none flex-col gap-2 rounded-2xl border border-(--border) bg-(--card) px-4 py-3.5 font-sans font-normal shadow-sm"
       data-testid="md-tasks"
     >
       {items.map((item, i) => (
-        <li
-          key={i}
-          className="flex items-start gap-3 text-ui"
-          data-testid="md-task"
-          data-state={item.state}
-        >
-          <TaskIcon state={item.state} />
-          <span
-            className={`min-w-0 ${
-              item.state === 'done' ? 'text-(--text-tertiary) line-through' : 'text-(--foreground)'
-            }`}
-          >
-            <Segments segments={item.segments} codeClassName="chat-code" />
-          </span>
+        <li key={i} className="flex flex-col text-ui" data-testid="md-task" data-state={item.state}>
+          <div className="flex items-start gap-3">
+            <TaskIcon state={item.state} />
+            <span
+              className={`min-w-0 ${
+                item.state === 'done'
+                  ? 'text-(--text-tertiary) line-through'
+                  : 'text-(--foreground)'
+              }`}
+            >
+              <Segments segments={item.segments} codeClassName="chat-code" />
+            </span>
+          </div>
+          {item.blocks.length > 0 && (
+            <div className="mt-1 min-w-0 pl-7 text-(--foreground)" data-testid="md-task-children">
+              <MarkdownBlocks blocks={item.blocks} depth={1} flow="list" />
+            </div>
+          )}
         </li>
       ))}
     </ul>
@@ -359,14 +120,17 @@ function cellAlignClass(align: TableAlign | undefined): string {
 
 function MarkdownTable({ block }: { block: Extract<ChatBlock, { kind: 'table' }> }) {
   return (
-    <div className="my-2 max-w-full overflow-x-auto" data-testid="md-table">
-      <table className="w-full border-collapse text-ui text-(--foreground)">
-        <thead>
-          <tr className="border-b border-(--border)">
+    <div
+      className="w-fit max-w-full overflow-x-auto rounded-(--radius-control) border border-border bg-background"
+      data-testid="md-table"
+    >
+      <table className="border-collapse text-ui text-(--foreground)">
+        <thead className="bg-secondary">
+          <tr className="border-b border-border">
             {block.header.map((cell, ci) => (
               <th
                 key={ci}
-                className={`px-2.5 py-1.5 font-semibold ${cellAlignClass(block.align[ci])}`}
+                className={`px-3 py-1.5 font-semibold whitespace-nowrap ${cellAlignClass(block.align[ci])}`}
               >
                 <Segments segments={cell} codeClassName="chat-code" />
               </th>
@@ -375,9 +139,9 @@ function MarkdownTable({ block }: { block: Extract<ChatBlock, { kind: 'table' }>
         </thead>
         <tbody>
           {block.rows.map((row, ri) => (
-            <tr key={ri} className="border-b border-(--border) last:border-b-0">
+            <tr key={ri} className="border-b border-border last:border-b-0">
               {row.map((cell, ci) => (
-                <td key={ci} className={`px-2.5 py-1.5 ${cellAlignClass(block.align[ci])}`}>
+                <td key={ci} className={`px-3 py-1.5 ${cellAlignClass(block.align[ci])}`}>
                   <Segments segments={cell} codeClassName="chat-code" />
                 </td>
               ))}
@@ -389,118 +153,176 @@ function MarkdownTable({ block }: { block: Extract<ChatBlock, { kind: 'table' }>
   );
 }
 
-type ListBlock = Extract<ChatBlock, { kind: 'bullet' | 'ordered' }>;
-type ListEntry = { block: ListBlock; children: ListNode[] };
-export type ListNode = { ordered: boolean; depth: number; entries: ListEntry[] };
-type RenderPart =
-  | { kind: 'block'; block: ChatBlock; index: number }
-  | { kind: 'list'; list: ListNode; index: number; followsList: boolean };
-
-function isListBlock(block: ChatBlock): block is ListBlock {
-  return block.kind === 'bullet' || block.kind === 'ordered';
-}
-
-export function nestLists(items: ListBlock[]): ListNode[] {
-  const roots: ListNode[] = [];
-  const open: ListNode[] = [];
-  for (const block of items) {
-    const ordered = block.kind === 'ordered';
-    while ((open.at(-1)?.depth ?? -1) > block.depth) open.pop();
-    const sameLevel = open.at(-1);
-    if (sameLevel?.depth === block.depth && sameLevel.ordered !== ordered) open.pop();
-    let list = open.at(-1);
-    if (list === undefined || list.depth < block.depth) {
-      const created: ListNode = { ordered, depth: block.depth, entries: [] };
-      const parentEntry = list?.entries.at(-1);
-      if (parentEntry !== undefined) parentEntry.children.push(created);
-      else roots.push(created);
-      open.push(created);
-      list = created;
-    }
-    list.entries.push({ block, children: [] });
-  }
-  return roots;
-}
-
-function renderParts(blocks: ChatBlock[]): RenderPart[] {
-  const parts: RenderPart[] = [];
-  let run: ListBlock[] = [];
-  let runStart = 0;
-  const flushRun = () => {
-    for (const [n, list] of nestLists(run).entries())
-      parts.push({ kind: 'list', list, index: runStart, followsList: n > 0 });
-    run = [];
-  };
-  blocks.forEach((block, index) => {
-    if (isListBlock(block)) {
-      if (run.length === 0) runStart = index;
-      run.push(block);
-      return;
-    }
-    flushRun();
-    parts.push({ kind: 'block', block, index });
-  });
-  flushRun();
-  return parts;
-}
-
-export const MD_LIST = 'm-0 ps-list-indent';
-export const MD_LIST_ITEM = 'mt-list-step ps-list-item first:mt-0 marker:text-(--foreground)';
-
 const BULLET_STYLES = ['list-disc', 'list-[circle]', 'list-[square]'] as const;
 const ORDINAL_STYLES = ['list-decimal', 'list-[lower-alpha]', 'list-[lower-roman]'] as const;
 
-function listStyle(ordered: boolean, sameKindRun: number): string {
+const ListRun = createContext<{ ordered: boolean; run: number } | null>(null);
+
+function listStyle(ordered: boolean, depth: number): string {
   const styles = ordered ? ORDINAL_STYLES : BULLET_STYLES;
-  return styles[Math.min(sameKindRun, styles.length - 1)] ?? styles[0];
+  return styles[Math.min(depth, styles.length - 1)] ?? styles[0];
+}
+
+function TaskBox({ checked }: { checked: boolean }) {
+  return (
+    <Checkbox
+      checked={checked}
+      readOnly
+      disabled
+      className="mt-0.5 size-4 cursor-default rounded-full border-[1.5px] border-dashed border-(--text-tertiary) bg-transparent data-checked:border-solid data-checked:border-(--text-tertiary) data-checked:bg-(--text-tertiary) data-checked:text-(--card) dark:bg-transparent dark:data-checked:border-(--text-tertiary) dark:data-checked:bg-(--text-tertiary) data-disabled:opacity-100 [&_svg]:size-2.5!"
+      data-testid="md-checkbox"
+    />
+  );
 }
 
 function MarkdownList({
-  list,
-  sameKindRun,
-  className,
+  block,
+  depth,
 }: {
-  list: ListNode;
-  sameKindRun: number;
-  className: string;
+  block: Extract<ChatBlock, { kind: 'list' }>;
+  depth: number;
 }) {
-  const Tag = list.ordered ? 'ol' : 'ul';
-  const first = list.entries[0]?.block;
+  const Tag = block.ordered ? 'ol' : 'ul';
+  const parent = useContext(ListRun);
+  const run = parent !== null && parent.ordered === block.ordered ? parent.run + 1 : 0;
+  const taskList = block.items.every((item) => item.checked !== null);
   return (
     <Tag
-      className={`${MD_LIST} ${listStyle(list.ordered, sameKindRun)} ${className}`}
-      data-testid={list.ordered ? 'md-list-ordered' : 'md-list-bullet'}
-      {...(list.ordered && first?.kind === 'ordered' ? { start: first.ordinal } : {})}
+      className={cn('m-0', taskList ? 'list-none ps-2' : `ps-9 ${listStyle(block.ordered, run)}`)}
+      data-testid={block.ordered ? 'md-list-ordered' : taskList ? 'md-list-task' : 'md-list-bullet'}
+      {...(block.ordered && block.start !== 1 ? { start: block.start } : {})}
     >
-      {list.entries.map((entry, i) => (
-        <li
-          key={i}
-          className={`${list.ordered ? 'chat-md-item chat-md-item--ordered' : 'chat-md-item chat-md-item--bullet'} ${MD_LIST_ITEM}`}
-          data-testid={list.ordered ? 'md-item-ordered' : 'md-item-bullet'}
-          data-depth={entry.block.depth}
-          {...(entry.block.kind === 'ordered' ? { value: entry.block.ordinal } : {})}
-        >
-          <Segments segments={entry.block.segments} codeClassName="chat-code" />
-          {entry.children.map((child, j) => (
-            <MarkdownList
-              key={j}
-              list={child}
-              sameKindRun={child.ordered === list.ordered ? sameKindRun + 1 : 0}
-              className="mt-list-step"
-            />
-          ))}
-        </li>
-      ))}
+      <ListRun.Provider value={{ ordered: block.ordered, run }}>
+        {block.items.map((item, i) => (
+          <MarkdownListItem
+            key={i}
+            item={item}
+            ordered={block.ordered}
+            depth={depth}
+            value={block.start + i}
+          />
+        ))}
+      </ListRun.Provider>
     </Tag>
   );
 }
 
-function listGap(part: Extract<RenderPart, { kind: 'list' }>): string {
-  if (part.followsList) return 'mt-list-break';
-  return part.index === 0 ? 'mt-0' : 'mt-prose-flow';
+function MarkdownListItem({
+  item,
+  ordered,
+  depth,
+  value,
+}: {
+  item: ListItem;
+  ordered: boolean;
+  depth: number;
+  value: number;
+}) {
+  const body = <MarkdownBlocks blocks={item.blocks} depth={depth + 1} flow="list" />;
+  return (
+    <li
+      className={cn(
+        'chat-md-item marker:text-(--foreground)',
+        ordered ? 'chat-md-item--ordered' : 'chat-md-item--bullet',
+        item.checked !== null && 'flex items-start gap-3',
+        item.checked === true && 'text-(--text-tertiary) line-through',
+      )}
+      data-testid={
+        item.checked !== null ? 'md-item-task' : ordered ? 'md-item-ordered' : 'md-item-bullet'
+      }
+      data-depth={depth}
+      {...(ordered ? { value } : {})}
+    >
+      {item.checked !== null ? (
+        <>
+          <TaskBox checked={item.checked} />
+          <div className="min-w-0">{body}</div>
+        </>
+      ) : (
+        body
+      )}
+    </li>
+  );
+}
+
+function AttachmentBlock({ name, attachmentKey }: { name: string; attachmentKey: string }) {
+  const onPreview = useContext(AttachmentPreviewHandler);
+  return (
+    <div className="chat-md-attachment">
+      <AttachmentChip
+        name={name}
+        attachmentKey={attachmentKey}
+        {...(onPreview !== undefined ? { onPreview } : {})}
+      />
+    </div>
+  );
+}
+
+type Flow = 'prose' | 'bubble' | 'list';
+
+const FLOW_GAP: Record<Flow, string> = {
+  prose: 'mt-prose-flow',
+  bubble: 'mt-1',
+  list: 'mt-0.5',
+};
+
+function MarkdownBlock({ block, depth }: { block: ChatBlock; depth: number }) {
+  switch (block.kind) {
+    case 'head':
+      return <HeadingTag level={block.level} segments={block.segments} />;
+    case 'tasks':
+      return <TaskCard items={block.items} />;
+    case 'code':
+      return (
+        <CodeBlock {...(block.lang !== undefined ? { lang: block.lang } : {})} text={block.text} />
+      );
+    case 'attachment':
+      return <AttachmentBlock name={block.name} attachmentKey={block.key} />;
+    case 'table':
+      return <MarkdownTable block={block} />;
+    case 'list':
+      return <MarkdownList block={block} depth={depth} />;
+    case 'quote':
+      return (
+        <blockquote
+          className="m-0 ms-2 border-s-3 border-border ps-3.5 text-(--text-secondary)"
+          data-testid="md-quote"
+        >
+          <MarkdownBlocks blocks={block.blocks} depth={depth} flow="bubble" />
+        </blockquote>
+      );
+    case 'rule':
+      return <hr className="m-0 w-full border-0 border-t border-border" />;
+    case 'para':
+      return (
+        <p className="chat-para m-0">
+          <Segments segments={block.segments} codeClassName="chat-code" />
+        </p>
+      );
+  }
+}
+
+function MarkdownBlocks({
+  blocks,
+  depth,
+  flow,
+}: {
+  blocks: ChatBlock[];
+  depth: number;
+  flow: Flow;
+}) {
+  return blocks.map((block, i) => (
+    <div key={i} className={cn('chat-md-block', i > 0 && FLOW_GAP[flow])} data-kind={block.kind}>
+      <MarkdownBlock block={block} depth={depth} />
+    </div>
+  ));
 }
 
 const COPIED_MS = 1500;
+
+function capitalize(lang: string): string {
+  return lang.charAt(0).toUpperCase() + lang.slice(1);
+}
 
 function useCodeTokens(text: string, lang: string | undefined): CodeToken[][] | null {
   const [highlighted, setHighlighted] = useState<{
@@ -523,128 +345,214 @@ function useCodeTokens(text: string, lang: string | undefined): CodeToken[][] | 
     : null;
 }
 
-function CodeBlock({ lang, text }: { lang?: string; text: string }) {
-  const { t } = useI18n();
+function CodeLines({ lines, text }: { lines: CodeToken[][] | null; text: string }) {
+  if (lines === null) return text;
+  return lines.map((line, row) => (
+    <Fragment key={row}>
+      {row > 0 && '\n'}
+      {line.map((token, col) =>
+        token.color === undefined ? (
+          token.content
+        ) : (
+          <span key={col} style={{ color: token.color }}>
+            {token.content}
+          </span>
+        ),
+      )}
+    </Fragment>
+  ));
+}
+
+const CODE_BTN_CLS =
+  'size-8 flex-none cursor-pointer rounded-(--radius-control) text-foreground transition-none hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
+
+function useCopied(text: string) {
   const [copied, setCopied] = useState(false);
-  const lines = useCodeTokens(text, lang);
   useEffect(() => {
     if (!copied) return;
     const timer = window.setTimeout(() => setCopied(false), COPIED_MS);
     return () => window.clearTimeout(timer);
   }, [copied]);
+  const copy = () => {
+    void navigator.clipboard.writeText(text).then(() => setCopied(true));
+  };
+  return { copied, copy };
+}
+
+export function CopyCodeButton({
+  text,
+  className,
+  testId,
+}: {
+  text: string;
+  className?: string;
+  testId: string;
+}) {
+  const { t } = useI18n();
+  const { copied, copy } = useCopied(text);
+  return (
+    <IconTooltip
+      label={t('复制')}
+      trigger={
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(CODE_BTN_CLS, className)}
+          data-testid={testId}
+          onClick={copy}
+        />
+      }
+    >
+      {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+    </IconTooltip>
+  );
+}
+
+function CodeBlock({ lang, text }: { lang?: string; text: string }) {
+  const { t } = useI18n();
+  const [expanded, setExpanded] = useState(false);
+  const lines = useCodeTokens(text, lang);
+  const title = lang === undefined ? t('代码') : t('{lang} 代码', { lang: capitalize(lang) });
   return (
     <div
-      className="group/code relative my-2 min-w-0 max-w-full rounded-(--cds-radius-xl) border-[0.5px] border-(--prose-code-line) bg-(--prose-code-surface)"
+      className="w-fit min-w-48 max-w-full rounded-(--radius-code) border border-border bg-background"
       data-testid="md-code-block"
     >
-      {lang !== undefined && (
-        <div
-          className="px-3.5 pt-3.5 font-sans text-code-lang text-(--text-secondary)"
+      <div className="flex h-10 items-center gap-0 border-b border-border pr-1.5 pl-5">
+        <span
+          className="min-w-0 flex-1 truncate font-sans text-code-lang text-content-secondary"
           data-testid="md-code-lang"
         >
           {lang}
-        </div>
-      )}
-      <div className="absolute top-2 right-0 z-10 inline-flex h-8 items-center px-2">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="rounded-(--cds-radius-lg) text-(--foreground) opacity-0 transition-none hover:bg-(--prose-code-fill) dark:hover:bg-(--prose-code-fill) group-hover/code:opacity-100 group-focus-within/code:opacity-100 pointer-coarse:opacity-100"
-          aria-label={t('复制代码')}
-          data-testid="md-code-copy"
-          onClick={() => {
-            void navigator.clipboard.writeText(text).then(() => setCopied(true));
-          }}
+        </span>
+        <IconTooltip
+          label={t('展开')}
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon"
+              className={CODE_BTN_CLS}
+              data-testid="md-code-expand"
+              onClick={() => setExpanded(true)}
+            />
+          }
         >
-          {copied ? <Check width={16} height={16} /> : <Copy width={16} height={16} />}
-        </Button>
+          <ChiefExpand className="size-4" />
+        </IconTooltip>
+        <CopyCodeButton text={text} testId="md-code-copy" />
       </div>
       <div className="overflow-x-auto overscroll-x-contain">
         <pre
-          className="chat-md-code m-0 p-3.5 font-prose-mono text-code-block whitespace-pre text-(--foreground)"
+          className="chat-md-code m-0 px-5 py-3 font-prose-mono text-code whitespace-pre text-(--foreground)"
           data-lang={lang ?? ''}
           data-testid="md-code"
         >
-          {lines === null
-            ? text
-            : lines.map((line, row) => (
-                <Fragment key={row}>
-                  {row > 0 && '\n'}
-                  {line.map((token, col) =>
-                    token.color === undefined ? (
-                      token.content
-                    ) : (
-                      <span key={col} style={{ color: token.color }}>
-                        {token.content}
-                      </span>
-                    ),
-                  )}
-                </Fragment>
-              ))}
+          <CodeLines lines={lines} text={text} />
         </pre>
       </div>
+      <DialogShell
+        open={expanded}
+        onClose={() => setExpanded(false)}
+        title={title}
+        width="min(100% - 2rem, var(--dialog-w-xl))"
+        footer={
+          <Button
+            variant="secondary"
+            className={DIALOG_PRIMARY_BUTTON}
+            data-testid="md-code-done"
+            onClick={() => setExpanded(false)}
+          >
+            {t('完成')}
+          </Button>
+        }
+      >
+        <div
+          className="relative rounded-(--cds-radius-xl) border border-border bg-secondary"
+          data-testid="md-code-dialog-body"
+        >
+          <CopyCodeButton
+            text={text}
+            testId="md-code-dialog-copy"
+            className="absolute top-2 right-2 z-10"
+          />
+          <div className="overflow-x-auto overscroll-x-contain">
+            <pre className="m-0 px-5 py-3 font-prose-mono text-code whitespace-pre text-(--foreground)">
+              <CodeLines lines={lines} text={text} />
+            </pre>
+          </div>
+        </div>
+      </DialogShell>
+    </div>
+  );
+}
+
+export const REPLY_BUBBLE_CLS =
+  'w-fit max-w-[min(100%,var(--container-reply-bubble))] rounded-(--radius-reply) bg-(--reply-bubble-fill) px-3.5 py-1.75';
+export const REPLY_BLOCK_CLS =
+  'group/reply-block relative w-fit max-w-[min(100%,var(--container-reply-bubble))]';
+
+function ReplyGroup({
+  group,
+  tools,
+  highlighted,
+}: {
+  group: ChatBubbleGroup;
+  tools: ReactNode;
+  highlighted: boolean;
+}) {
+  return (
+    <div
+      className={group.bubble ? REPLY_BLOCK_CLS : 'group/reply-block relative w-fit max-w-full'}
+      data-slot="reply-block"
+      data-bubble={group.bubble ? 'true' : 'false'}
+    >
+      {group.bubble ? (
+        <div
+          className={cn(REPLY_BUBBLE_CLS, 'data-reply-highlight:bg-(--reply-bubble-highlight)')}
+          data-slot="reply-bubble"
+          data-testid="chief-reply-bubble"
+          {...(highlighted ? { 'data-reply-highlight': '' } : {})}
+        >
+          <MarkdownBlocks blocks={group.blocks} depth={0} flow="bubble" />
+        </div>
+      ) : (
+        <MarkdownBlocks blocks={group.blocks} depth={0} flow="bubble" />
+      )}
+      {tools}
     </div>
   );
 }
 
 export function ChatMarkdown({
   text,
-  conversational = false,
+  bubbles = false,
+  bubbleTools,
+  highlight,
 }: {
   text: string;
-  conversational?: boolean;
+  bubbles?: boolean;
+  bubbleTools?: (group: ChatBubbleGroup, index: number) => ReactNode;
+  highlight?: (group: ChatBubbleGroup) => boolean;
 }) {
-  const parts = useMemo(() => renderParts(parseChatMarkdown(text)), [text]);
+  const groups = useMemo(() => (bubbles ? chatBubbleGroups(text) : null), [bubbles, text]);
+  const blocks = useMemo(() => (bubbles ? null : parseChatMarkdown(text)), [bubbles, text]);
   const [preview, setPreview] = useState<{ name: string; src: string } | null>(null);
   return (
     <AttachmentPreviewHandler.Provider value={(name, src) => setPreview({ name, src })}>
-      {parts.map((part, i) => {
-        if (part.kind === 'list')
-          return (
-            <MarkdownList key={i} list={part.list} sameKindRun={0} className={listGap(part)} />
-          );
-        const block = part.block;
-        switch (block.kind) {
-          case 'head':
-            return (
-              <HeadingTag
-                key={i}
-                level={block.level}
-                segments={block.segments}
-                conversational={conversational}
-              />
-            );
-          case 'tasks':
-            return <TaskCard key={i} items={block.items} />;
-          case 'code':
-            return (
-              <CodeBlock
-                key={i}
-                {...(block.lang !== undefined ? { lang: block.lang } : {})}
-                text={block.text}
-              />
-            );
-          case 'attachment':
-            return (
-              <div key={i} className="chat-md-attachment my-2">
-                <AttachmentChip
-                  name={block.name}
-                  attachmentKey={block.key}
-                  onPreview={(name, src) => setPreview({ name, src })}
-                />
-              </div>
-            );
-          case 'table':
-            return <MarkdownTable key={i} block={block} />;
-          case 'para':
-            return (
-              <p key={i} className="chat-para m-0">
-                <Segments segments={block.segments} codeClassName="chat-code" />
-              </p>
-            );
-        }
-        return null;
-      })}
+      {groups !== null ? (
+        <div className="flex flex-col items-start gap-1" data-slot="reply-blocks">
+          {groups.map((group, i) => (
+            <ReplyGroup
+              key={i}
+              group={group}
+              tools={bubbleTools?.(group, i)}
+              highlighted={highlight?.(group) === true}
+            />
+          ))}
+        </div>
+      ) : (
+        <MarkdownBlocks blocks={blocks ?? []} depth={0} flow="prose" />
+      )}
       {preview !== null && (
         <AttachmentPreview name={preview.name} src={preview.src} onClose={() => setPreview(null)} />
       )}

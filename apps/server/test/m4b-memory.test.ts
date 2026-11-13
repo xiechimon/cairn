@@ -1,4 +1,4 @@
-import { type ClaimedStep, MEMORY_QUOTA_PER_TEAM, memoryRecordSchema } from '@cairn/shared';
+import { type ClaimedStep, memoryRecordSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -74,12 +74,19 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
   test('save_memory during an execution step: three-level provenance defaults to the running todo/build/project', async () => {
     const { s, token, step, projectId, todoId } = await world();
     const res = await relay(s.app, token, step.step.id, 'save_memory', {
-      title: 'README 只在末尾追加小节',
+      scope: projectId,
+      file: 'README 只在末尾追加小节',
       content: 'README.md 约定：新增说明一律在文件末尾追加二级标题小节。',
     });
     expect(res.status).toBe(200);
     const { text } = (await res.json()) as { text: string };
-    const saved = memoryRecordSchema.parse(JSON.parse(text));
+    const saved = memoryRecordSchema.parse(
+      s.db
+        .select()
+        .from(agentMemory)
+        .all()
+        .find((row) => row.id === JSON.parse(text).id),
+    );
     expect(saved).toMatchObject({
       agentId: OWNER_ID,
       teamId: s.team.id,
@@ -94,100 +101,6 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
     s.dispose();
   });
 
-  test('candidate retry returns HTTP 409, updated history readable over REST', async () => {
-    const { s, token, step } = await world();
-    try {
-      const first = await relay(s.app, token, step.step.id, 'save_memory', {
-        title: '包管理器',
-        content: '本仓使用 npm',
-      });
-      expect(first.status).toBe(200);
-      const { id } = JSON.parse(((await first.json()) as { text: string }).text) as { id: string };
-      const params = { title: '包管理器', content: '本仓使用 pnpm' };
-      const conflict = await relay(s.app, token, step.step.id, 'save_memory', params);
-      expect(conflict.status).toBe(200);
-      expect(JSON.parse(((await conflict.json()) as { text: string }).text)).toMatchObject({
-        status: 'candidates',
-        candidates: [{ id }],
-      });
-      const retry = await relay(s.app, token, step.step.id, 'save_memory', params);
-      expect(retry.status).toBe(409);
-      const update = await relay(s.app, token, step.step.id, 'update_memory', {
-        memoryId: id,
-        content: params.content,
-      });
-      expect(update.status).toBe(200);
-      const list = await call(s.app, 'GET', `/api/teams/${s.team.id}/memories`);
-      expect(await list.json()).toMatchObject([
-        { content: '本仓使用 pnpm', history: [{ content: '本仓使用 npm' }] },
-      ]);
-      const all = await call(s.app, 'GET', `/api/teams/${s.team.id}/memories?includeInvalid=true`);
-      expect(await all.json()).toMatchObject([
-        { id, content: '本仓使用 npm', supersededBy: expect.any(String) },
-        { content: '本仓使用 pnpm' },
-      ]);
-    } finally {
-      s.dispose();
-    }
-  });
-
-  test('after REST deletes the candidate, retrying the same body is treated as a new entry', async () => {
-    const { s, token, step } = await world();
-    try {
-      const first = await relay(s.app, token, step.step.id, 'save_memory', {
-        title: '包管理器',
-        content: '本仓使用 npm',
-      });
-      const { id } = JSON.parse(((await first.json()) as { text: string }).text) as { id: string };
-      const params = { title: '包管理器', content: '本仓使用 pnpm' };
-      await relay(s.app, token, step.step.id, 'save_memory', params);
-      const removed = await call(s.app, 'DELETE', `/api/teams/${s.team.id}/memories/${id}`);
-      expect(removed.status).toBe(204);
-      const retry = await relay(s.app, token, step.step.id, 'save_memory', params);
-      expect(retry.status).toBe(200);
-      expect(JSON.parse(((await retry.json()) as { text: string }).text)).toMatchObject({
-        content: params.content,
-      });
-    } finally {
-      s.dispose();
-    }
-  });
-
-  test('explicit sourceTodoId/projectId params win (recording cross-task experience [design])', async () => {
-    const { s, token, step } = await world();
-    const otherProject = await postProject(s.app, 'other');
-    const otherTodoRes = await call(s.app, 'POST', `/api/projects/${otherProject}/todos`, {
-      body: { title: '另一任务', spec: '' },
-    });
-    const { id: otherTodo } = (await otherTodoRes.json()) as { id: string };
-    const res = await relay(s.app, token, step.step.id, 'save_memory', {
-      title: 't',
-      content: 'c',
-      projectId: otherProject,
-      sourceTodoId: otherTodo,
-    });
-    const saved = memoryRecordSchema.parse(
-      JSON.parse(((await res.json()) as { text: string }).text),
-    );
-    expect(saved.projectId).toBe(otherProject);
-    expect(saved.sourceTodoId).toBe(otherTodo);
-    s.dispose();
-  });
-
-  test('memories / delete_memory: only this team entries (out-of-scope defense)', async () => {
-    const { s, token, step } = await world();
-    await relay(s.app, token, step.step.id, 'save_memory', { title: 't', content: 'c' });
-    const listRes = await relay(s.app, token, step.step.id, 'memories', {});
-    const rows = JSON.parse(((await listRes.json()) as { text: string }).text) as { id: string }[];
-    expect(rows).toHaveLength(1);
-    const del = await relay(s.app, token, step.step.id, 'delete_memory', { memoryId: rows[0]!.id });
-    expect(JSON.parse(((await del.json()) as { text: string }).text)).toEqual({
-      deleted: rows[0]!.id,
-    });
-    expect(listMemoryEntries(s.db, { agentId: OWNER_ID, teamId: s.team.id })).toHaveLength(0);
-    s.dispose();
-  });
-
   test('chief 51-vocabulary does not leak out: worker step relay with a non-memory tool = 400 (org/execution surfaces chief-only)', async () => {
     const { s, token, step } = await world();
     for (const name of ['create_todo', 'run_builds', 'projects', 'schedule_todo', 'models']) {
@@ -198,32 +111,52 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
     s.dispose();
   });
 
-  test(`quota ${MEMORY_QUOTA_PER_TEAM}/team: over = 409 (UI "memory n/100" same source)`, async () => {
-    const { s, token, step } = await world();
-    const now = Date.now();
-    for (let i = 0; i < MEMORY_QUOTA_PER_TEAM; i++) {
-      s.db
-        .insert(agentMemory)
-        .values({
-          id: `mem-${i}`,
-          agentId: OWNER_ID,
-          teamId: s.team.id,
-          title: `t${i}`,
-          content: 'c',
-          projectId: null,
-          sourceTodoId: null,
-          sourceBuildId: null,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .run();
-    }
-    const res = await relay(s.app, token, step.step.id, 'save_memory', {
-      title: 't',
-      content: 'c',
+  test('HTTP worker relay rejects missing, stale and reserved writes', async () => {
+    const { s, token, step, projectId } = await world();
+    const send = (name: string, params: Record<string, unknown>) =>
+      relay(s.app, token, step.step.id, name, params);
+    const saved = await send('save_memory', {
+      scope: projectId,
+      file: 'lesson.md',
+      content: 'first',
     });
-    expect(res.status).toBe(409);
-    expect(((await res.json()) as { error: string }).error).toContain('memory quota exceeded');
+    expect(saved.status).toBe(200);
+    const first = JSON.parse(((await saved.json()) as { text: string }).text) as {
+      id: string;
+      baseVersion: string;
+    };
+    expect(
+      (await send('save_memory', { scope: projectId, file: 'lesson.md', content: 'overwrite' }))
+        .status,
+    ).toBe(409);
+    expect(
+      (await send('save_memory', { scope: projectId, file: 'MEMORY.md', content: 'reserved' }))
+        .status,
+    ).toBe(400);
+    expect(
+      (await send('update_memory', { scope: projectId, file: 'lesson.md', content: 'missing' }))
+        .status,
+    ).toBe(400);
+    const updated = await send('update_memory', {
+      scope: projectId,
+      file: 'lesson.md',
+      baseVersion: first.baseVersion,
+      content: 'second',
+    });
+    expect(updated.status).toBe(200);
+    expect(
+      (
+        await send('delete_memory', {
+          scope: projectId,
+          file: 'lesson.md',
+          baseVersion: first.baseVersion,
+        })
+      ).status,
+    ).toBe(409);
+    const listed = await send('memories', { scope: projectId });
+    expect(listed.status).toBe(200);
+    expect(JSON.parse(((await listed.json()) as { text: string }).text).documents).toHaveLength(2);
+    expect((await send('create_project', { name: 'forbidden' })).status).toBe(400);
     s.dispose();
   });
 
@@ -242,7 +175,7 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
 
   test('read-side injection shape (04 appendix A verification surface): next-round claim payload agent.memories carries stored entries', async () => {
     const { s, token, step, todoId, projectId } = await world();
-    await relay(s.app, token, step.step.id, 'save_memory', {
+    await editIndex(s.app, token, step.step.id, projectId, {
       title: '注入验证',
       content: '第二轮应见我',
     });
@@ -261,7 +194,7 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
 
   test('read-side narrows by project (#1494): entries from other projects not injected, global entries (empty projectId) still injected', async () => {
     const { s, token, step, projectId } = await world();
-    await relay(s.app, token, step.step.id, 'save_memory', { title: '项目一', content: 'p1' });
+    await editIndex(s.app, token, step.step.id, projectId, { title: '项目一', content: 'p1' });
     await call(s.app, 'POST', `/api/machine/done/${step.step.id}`, {
       cred: token,
       body: { status: 'success', sessionId: 'sess-1', hasChanges: true },
@@ -292,7 +225,7 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
 
   test('invalidated entries do not enter the claim payload; only actually-injected entries record lastInjectedAt', async () => {
     const { s, token, step, projectId } = await world();
-    await relay(s.app, token, step.step.id, 'save_memory', { title: '项目一', content: 'p1' });
+    await editIndex(s.app, token, step.step.id, projectId, { title: '项目一', content: 'p1' });
     await call(s.app, 'POST', `/api/machine/done/${step.step.id}`, {
       cred: token,
       body: { status: 'success', sessionId: 'sess-1', hasChanges: true },
@@ -349,4 +282,21 @@ async function claimNextTask(
   const { step } = (await claimRes.json()) as { step: ClaimedStep | null };
   if (!step) throw new Error('no step claimed');
   return step;
+}
+
+async function editIndex(
+  app: Hono,
+  token: string,
+  stepId: string,
+  scope: string,
+  params: { title: string; content: string },
+) {
+  const res = await relay(app, token, stepId, 'memories', { scope, file: 'MEMORY.md' });
+  const row = JSON.parse(((await res.json()) as { text: string }).text) as { baseVersion: string };
+  return relay(app, token, stepId, 'update_memory', {
+    scope,
+    file: 'MEMORY.md',
+    content: `- ${params.title}：${params.content}`,
+    baseVersion: row.baseVersion,
+  });
 }

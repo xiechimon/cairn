@@ -1,15 +1,20 @@
 import { expect, test } from '@playwright/test';
 
-test('a running coordinator turn shows its elapsed time in the composer', async ({
-  page,
-}) => {
-  await page.goto('/app?scenario=chief-working');
-  const working = page.getByTestId('chief-composer-working');
-  await expect(working).toHaveText(/^Working · 1:12$|^工作中 · 1:12$/);
+test('the line under the composer shows context usage, not a turn timer', async ({ page }) => {
+  await page.goto('/app?scenario=chief-draft');
+  const line = page.getByTestId('home-c');
+  const meter = line.getByTestId('composer-context-meter');
+  await expect(meter).toBeVisible();
+  await expect(meter).toHaveText('12%');
+  await expect(meter).toHaveAttribute('aria-label', /12%/);
+  await expect(line.getByText(/工作中 ·|Working ·/)).toHaveCount(0);
+  await meter.hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('上下文 12%');
 });
 
-test('an idle coordinator shows no timer', async ({ page }) => {
+test('an idle coordinator shows the same context line and still no timer', async ({ page }) => {
   await page.goto('/app?scenario=111');
   await expect(page.getByTestId('chief-composer-input')).toBeVisible();
-  await expect(page.getByTestId('chief-composer-working')).toHaveCount(0);
+  await expect(page.getByTestId('home-c').getByTestId('composer-context-meter')).toBeVisible();
+  await expect(page.getByText(/工作中 ·|Working ·/)).toHaveCount(0);
 });

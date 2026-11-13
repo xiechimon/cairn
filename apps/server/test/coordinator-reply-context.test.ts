@@ -145,6 +145,7 @@ describe('quoted Coordinator context at dispatch', () => {
       const built = await req(H.s.app, 'POST', `/api/projects/${H.projectId}/builds`, {
         todoIds: [task.id],
         withPlan: false,
+        routeOverride: { machineId: machine.machineId },
       });
       expect(built.status).toBe(201);
       const claimed = await H.s.app.request('/api/machine/tasks/claim', {

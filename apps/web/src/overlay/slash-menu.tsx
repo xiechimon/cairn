@@ -21,7 +21,7 @@ export interface SlashMenuProps {
   listboxId: string;
 }
 
-const ANCHOR_CLS = 'absolute bottom-[calc(100%+8px)] left-0 z-40 w-60 max-w-full';
+const ANCHOR_CLS = 'absolute bottom-[calc(100%+10px)] left-0 z-40 w-60 max-w-full';
 
 const MENU_CLS =
   'slash-menu max-h-62 overflow-auto rounded-(--radius-popover) bg-popover p-(--menu-pad) shadow-(--shadow-popover)';

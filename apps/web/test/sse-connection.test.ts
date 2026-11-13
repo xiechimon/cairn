@@ -52,6 +52,47 @@ function advanceWithPings(
 
 const URL = '/api/teams/team-1/stream';
 
+it('a rejected ticket resolver retries instead of staying disconnected', async () => {
+  let attempts = 0;
+  const dispose = connect(
+    () => {
+      attempts += 1;
+      return Promise.reject(new Error('offline'));
+    },
+    () => {},
+    () => {},
+    { inFlight: () => false, reconcile: () => {} },
+  );
+  await Promise.resolve();
+  expect(attempts).toBe(1);
+  expect(FakeEventSource.instances).toHaveLength(0);
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(attempts).toBe(2);
+  dispose();
+});
+
+it('a failed stream backs off instead of retrying every second', async () => {
+  const dispose = connect(
+    () => Promise.resolve(URL),
+    () => {},
+    () => {},
+    { inFlight: () => false, reconcile: () => {} },
+  );
+  await vi.advanceTimersByTimeAsync(0);
+  expect(FakeEventSource.instances).toHaveLength(1);
+  FakeEventSource.instances[0]?.onerror?.();
+  await vi.advanceTimersByTimeAsync(999);
+  expect(FakeEventSource.instances).toHaveLength(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(FakeEventSource.instances).toHaveLength(2);
+  FakeEventSource.instances[1]?.onerror?.();
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(FakeEventSource.instances).toHaveLength(2);
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(FakeEventSource.instances).toHaveLength(3);
+  dispose();
+});
+
 function openStream(
   guards: StreamGuards,
   onEvent: (ev: Record<string, unknown>) => void = () => {},

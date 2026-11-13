@@ -209,7 +209,7 @@ export function MachineRowView({
               aria-hidden
               strokeWidth={1.75}
               className={cn(
-                'size-3.5 flex-none text-content-tertiary transition-transform duration-(--dur-fast)',
+                'size-4 flex-none text-content-tertiary transition-transform duration-(--dur-fast)',
                 expanded && 'rotate-90',
               )}
             />
@@ -253,7 +253,7 @@ export function MachineRowView({
               variant="link"
               data-testid="machine-open-runtime"
               onClick={() => onOpenSection('runtime')}
-              className="relative z-10 h-auto rounded-sm p-0 text-meta font-normal text-content-tertiary no-underline hover:text-foreground"
+              className="relative z-10 h-auto rounded-sm p-0 text-meta font-normal text-content-tertiary no-underline after:absolute after:-inset-y-1 after:inset-x-0 hover:text-foreground"
             >
               {t('运行时')} ›
             </Button>
@@ -266,7 +266,7 @@ export function MachineRowView({
                   variant="link"
                   data-testid="machine-open-capabilities"
                   onClick={() => onOpenSection('capabilities')}
-                  className="relative z-10 h-auto rounded-sm p-0 text-meta font-normal text-content-tertiary no-underline hover:text-foreground"
+                  className="relative z-10 h-auto rounded-sm p-0 text-meta font-normal text-content-tertiary no-underline after:absolute after:-inset-y-1 after:inset-x-0 hover:text-foreground"
                 >
                   {t('能力')} ›
                 </Button>

@@ -1,5 +1,5 @@
-import { Archive, CircleStop, Route, Undo2 } from 'lucide-react';
-import type { ComponentProps } from 'react';
+import { Archive, CircleStop, Hand, Pencil, Route, ScrollText, Undo2 } from 'lucide-react';
+import type { ComponentProps, ReactNode } from 'react';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { DropdownMenu, DropdownMenuSeparator } from '../components/ui/dropdown-menu.js';
 import { useI18n } from '../i18n/provider.js';
@@ -18,6 +18,10 @@ interface MoreMenuProps {
   onReject?: () => void;
   onDiscard?: () => void;
   onRouteOverride?: () => void;
+  onRename?: () => void;
+  onViewRaw?: () => void;
+  takeOver?: { label: string; onClick: () => void };
+  moveSub?: ReactNode;
   anchor?: ComponentProps<typeof KeyedMenuContent>['anchor'];
 }
 
@@ -36,6 +40,10 @@ export function MoreMenu({
   onReject,
   onDiscard,
   onRouteOverride,
+  onRename,
+  onViewRaw,
+  takeOver,
+  moveSub,
   anchor,
 }: MoreMenuProps) {
   const { t } = useI18n();
@@ -52,6 +60,45 @@ export function MoreMenu({
       disabled: !canComplete,
       onClick: onComplete,
     },
+    ...(onRename !== undefined
+      ? [
+          {
+            key: 'rename',
+            shortcut: 'N',
+            label: t('重命名'),
+            Icon: Pencil,
+            action: 'rename',
+            disabled: false,
+            onClick: onRename,
+          },
+        ]
+      : []),
+    ...(onViewRaw !== undefined
+      ? [
+          {
+            key: 'view-raw',
+            shortcut: 'V',
+            label: t('原始输出'),
+            Icon: ScrollText,
+            action: 'view-raw',
+            disabled: false,
+            onClick: onViewRaw,
+          },
+        ]
+      : []),
+    ...(takeOver !== undefined
+      ? [
+          {
+            key: 'take-over',
+            shortcut: 'T',
+            label: takeOver.label,
+            Icon: Hand,
+            action: 'take-over',
+            disabled: false,
+            onClick: takeOver.onClick,
+          },
+        ]
+      : []),
     ...(onReject !== undefined
       ? [
           {
@@ -185,6 +232,7 @@ export function MoreMenu({
             <row.Icon />
             {row.label}
           </KeyedMenuItem>,
+          row.key === 'complete' && moveSub,
         ])}
       </KeyedMenuContent>
     </DropdownMenu>

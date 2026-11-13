@@ -43,7 +43,7 @@ import {
   readQueuedMessages,
 } from '../src/services/task-message-queue.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
-import { bootServer, req, seedSessionRoute, type TestServer } from './helpers.js';
+import { bootServer, insertMachine, req, seedSessionRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -63,6 +63,7 @@ function openWorld(phase: 'building' | 'confirm' | 'review' = 'building'): World
   const s = bootServer();
   disposables.push(() => s.dispose());
   seedSessionRoute(s);
+  insertMachine(s);
   const suffix = newRecordId(8);
   const projectId = `proj-${suffix}`;
   const todoId = `todo-${suffix}`;

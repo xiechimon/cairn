@@ -6,7 +6,7 @@ import { useGithubConnection, useProjects, useTodos } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useOpenComposer } from '../board/open-composer.js';
-import { joinMeta, relativeTime } from '../board/rel-time.js';
+import { relativeTime } from '../board/rel-time.js';
 import { threadHrefFrom } from '../board/thread-copy.js';
 import { EmptyState } from '../components/empty-state.js';
 import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
@@ -267,14 +267,14 @@ function TasksPane({
                 <Link
                   className={cn(
                     "prj-task-link truncate text-ui no-underline after:absolute after:inset-0 after:content-['']",
-                    isSettled(todo.phase) ? 'text-content-tertiary' : 'text-foreground',
+                    isSettled(todo.phase) ? 'text-content-secondary' : 'text-foreground',
                   )}
                   to={threadHrefFrom(todo.id, search)}
                 >
                   {todo.title}
                 </Link>
                 <span data-testid="task-meta" className="truncate text-meta text-content-tertiary">
-                  {joinMeta([`#${todo.seqNum}`, relativeTime(todo.phaseAt, now, t)])}
+                  {relativeTime(todo.phaseAt, now, t)}
                 </span>
               </span>
               <TaskStatus phase={todo.phase} />
@@ -302,7 +302,7 @@ function TasksPane({
                 className={cn(
                   "prj-task-link line-clamp-2 text-card-title no-underline after:absolute after:inset-0 after:content-['']",
                   isSettled(todo.phase)
-                    ? 'font-normal text-content-tertiary'
+                    ? 'font-normal text-content-secondary'
                     : 'font-medium text-foreground',
                 )}
                 to={threadHrefFrom(todo.id, search)}
@@ -310,7 +310,7 @@ function TasksPane({
                 {todo.title}
               </Link>
               <span data-testid="task-meta" className="text-meta text-content-tertiary">
-                {joinMeta([`#${todo.seqNum}`, relativeTime(todo.phaseAt, now, t)])}
+                {relativeTime(todo.phaseAt, now, t)}
               </span>
             </Card>
           ))}

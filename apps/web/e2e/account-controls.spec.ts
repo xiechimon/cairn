@@ -239,18 +239,17 @@ for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 });
       await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
       await page.goto('/app/account?scenario=13');
-      const account = page.locator('.account-avatar img');
-      await expect(account).toBeVisible();
+      const account = page.locator('.account-avatar [data-slot="avatar-initial"]');
+      await expect(account).toHaveText('X');
       if (process.env.AVATAR_EVIDENCE) {
         await page.screenshot({ animations: 'disabled', path: `${process.env.AVATAR_EVIDENCE}/${process.env.AVATAR_PHASE}-${width}-${theme}.png` });
       }
-      await expect.poll(() => account.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true);
       await expect(page.locator('.account-header')).not.toContainText('头像与名称');
       await page.locator('.account-header').getByRole('button', { name: '编辑名称' }).click();
       await page.locator('.account-header input').fill('Fixture Rename');
       await page.locator('.account-header input').press('Enter');
       await expect(page.locator('.account-header').getByRole('heading', { name: 'Fixture Rename' })).toBeVisible();
-      await expect.poll(() => account.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true);
+      await expect(account).toHaveText('F');
     });
   }
 }
@@ -266,7 +265,8 @@ for (const avatar of ['supplied', 'missing', 'broken']) {
       return route.fulfill({ json: { id: 'user-1', displayName, avatarUrl, type: 'user' } });
     });
     await page.goto('/app/account');
-    const account = page.locator('.account-avatar img');
+    const picture = page.locator('.account-avatar img');
+    const initial = page.locator('.account-avatar [data-slot="avatar-initial"]');
     for (const name of ['Avatar User', 'Renamed User']) {
       if (name === 'Renamed User') {
         await page.locator('.account-header').getByRole('button', { name: '编辑名称' }).click();
@@ -274,9 +274,14 @@ for (const avatar of ['supplied', 'missing', 'broken']) {
         await page.locator('.account-header input').press('Enter');
       }
       await expect(page.locator('.account-header').getByRole('heading', { name, exact: true })).toBeVisible();
-      await expect.poll(() => account.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true);
-      if (avatar === 'broken') await expect(account).toHaveAttribute('src', '/avatar-user.png');
-      if (avatar === 'supplied') await expect(account).toHaveAttribute('src', '/avatar-supplied.png');
+      if (avatar === 'supplied') {
+        await expect(picture).toHaveAttribute('src', '/avatar-supplied.png');
+        await expect.poll(() => picture.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true);
+        await expect(initial).toHaveCount(0);
+      } else {
+        await expect(initial).toHaveText(name.charAt(0));
+        await expect(picture).toHaveCount(0);
+      }
     }
   });
 }

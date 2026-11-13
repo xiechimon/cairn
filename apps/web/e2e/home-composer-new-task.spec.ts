@@ -40,6 +40,11 @@ test('a toast lands over the main column, clear of the sidebar and the composer'
   const composerBox = (await page.getByTestId('home-c').locator('.chief-composer').boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(sidebar.x + sidebar.width);
   expect(box.y + box.height).toBeLessThanOrEqual(composerBox.y);
+  const toaster = page.locator('[data-sonner-toaster]');
+  await expect(toaster).toHaveAttribute('data-y-position', 'bottom');
+  await expect(toaster).toHaveAttribute('data-x-position', 'right');
+  expect(page.viewportSize()!.width - (box.x + box.width)).toBeCloseTo(16, 0);
+  await expect(toast.locator('[data-close-button]')).toBeVisible();
 });
 
 test('at phone width a toast lands below the menu button and clear of the composer', async ({
@@ -55,7 +60,7 @@ test('at phone width a toast lands below the menu button and clear of the compos
   await page.waitForTimeout(500);
   const box = (await toast.boundingBox())!;
   const composerBox = (await page.getByTestId('home-c').locator('.chief-composer').boundingBox())!;
-  const menu = (await page.locator('.app-menu-trigger').boundingBox())!;
+  const menu = (await page.getByTestId('narrow-menu').boundingBox())!;
   expect(box.y).toBeGreaterThanOrEqual(menu.y + menu.height);
   expect(box.y + box.height).toBeLessThanOrEqual(composerBox.y);
 });

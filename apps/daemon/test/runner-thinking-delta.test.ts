@@ -238,6 +238,24 @@ describe('runner thinking_delta throttled forwarding (#1308)', () => {
   });
 });
 
+describe('runner transcript rows for full messages (#4064)', () => {
+  test('a full assistant message after a streamed one still writes its row', async () => {
+    const client = await run([
+      { type: 'text_delta', text: 'streamed' },
+      { type: 'message_end', message: { role: 'assistant', content: 'streamed' } },
+      {
+        type: 'message_end',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'full only' }] },
+      },
+      { type: 'done', usage: [] },
+    ]);
+    expect(client.rows.map((row) => row.content)).toEqual([
+      [{ type: 'text', text: 'streamed' }],
+      [{ type: 'text', text: 'full only' }],
+    ]);
+  });
+});
+
 describe('runner tool call timestamps', () => {
   test('persists and relays independent start and end times for overlapping calls', async () => {
     let time = 1_000;

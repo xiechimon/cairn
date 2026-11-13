@@ -7,6 +7,7 @@ import {
   buildTaskPromptText,
   claudeLoginBlocksClaim,
   claudeRateBlock,
+  confinementDispatchReady,
   fencedTitle,
   isBuildStepKind,
   LOCAL_TOOL_CREATE_TAG,
@@ -40,6 +41,7 @@ import { autonomousMergePolicy } from './autonomous-merge.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { holdBlockedBuild } from './blockers.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
+import { turnProvenance } from './chief.js';
 import {
   CHIEF_DIGEST_MIN_CLI_VERSION,
   CHIEF_DIGEST_REMOTE_TOOLS,
@@ -253,7 +255,9 @@ function chiefClaimPayload(
     threadRow,
     agentRow.id,
   );
-  const chiefMcp = digest
+  const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
+  const locked = digest || mailTurn;
+  const chiefMcp = locked
     ? []
     : claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
   return {
@@ -288,9 +292,9 @@ function chiefClaimPayload(
       systemPrompt,
       trigger,
     },
-    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : chiefRemoteTools())],
+    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : mailTurn ? [] : chiefRemoteTools())],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
-    ...(digest ? { remoteToolsOnly: true as const } : {}),
+    ...(locked ? { remoteToolsOnly: true as const } : {}),
   };
 }
 
@@ -329,7 +333,8 @@ function claimChiefTurn(
   for (const cand of cands) {
     if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
     if (
-      isChiefDigestStep(cand.stepRow) &&
+      (isChiefDigestStep(cand.stepRow) ||
+        turnProvenance(cand.stepRow.prompt)?.startsWith('mail:') === true) &&
       !cliVersionAtLeast(machineRow.latestCliVersion, CHIEF_DIGEST_MIN_CLI_VERSION)
     ) {
       continue;
@@ -691,7 +696,23 @@ export async function claimStep(
   body?: MachineClaimBody,
   authorized: () => boolean = () => true,
 ): Promise<ClaimedStep | null> {
-  const stillAuthorized = () => authorized() && readDeployLease(deps.db).status === 'accepting';
+  const stillAuthorized = () => {
+    const capabilities = deps.db
+      .select()
+      .from(machine)
+      .where(eq(machine.id, machineId))
+      .get()?.capabilities;
+    const report = capabilities?.confinement;
+    return (
+      authorized() &&
+      !signal?.aborted &&
+      readDeployLease(deps.db).status === 'accepting' &&
+      confinementDispatchReady(capabilities) &&
+      (capabilities?.osPlatform !== 'linux' ||
+        (report?.generation === body?.confinement?.generation &&
+          report?.invocation === body?.confinement?.invocation))
+    );
+  };
   if (signal?.aborted || !stillAuthorized()) return null;
   const sinceWake = deps.machineHub.wakeSeq(teamId);
   const first = await tryClaim(

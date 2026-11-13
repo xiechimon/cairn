@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 const DONE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36';
 const CONFIRM = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b';
 
-test('chat body reads at 15px (text-card-title) on the 21/15 type line height', async ({
+test('chat body reads at 14px (text-ui) on the fixed 20px line of the main conversation bubbles', async ({
   page,
 }) => {
   await page.goto(DONE);
@@ -19,12 +19,12 @@ test('chat body reads at 15px (text-card-title) on the 21/15 type line height', 
     (el as HTMLElement).style.fontSize = '';
     return { ...before, scaled };
   });
-  expect(cs.fontSize).toBe('15px');
-  expect(cs.lineHeight).toBe('21px');
-  expect(cs.scaled).toBe('28px');
+  expect(cs.fontSize).toBe('14px');
+  expect(cs.lineHeight).toBe('20px');
+  expect(cs.scaled).toBe('20px');
 });
 
-test('68ch measure cap binds the body text and the centered note', async ({ page }) => {
+test('reply bubbles cap at the reply-bubble width and the centred note at 68ch', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await page.goto(DONE);
   await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
@@ -51,21 +51,29 @@ test('68ch measure cap binds the body text and the centered note', async ({ page
       const used = Number.parseFloat(getComputedStyle(el).maxWidth);
       return used / zeroWidth(el);
     };
+    const bubbles = [...document.querySelectorAll('.side-panel [data-testid="agent-text"]')];
+    const probe = document.createElement('span');
+    probe.style.width = 'var(--container-reply-bubble)';
+    probe.style.position = 'absolute';
+    document.body.append(probe);
+    const cap = probe.getBoundingClientRect().width;
+    probe.remove();
     return {
-      text: ratio('[data-testid="agent-text"]'),
+      widest: Math.max(...bubbles.map((el) => el.getBoundingClientRect().width)),
+      cap,
       note: ratio('[data-testid="transcript-note"] > span'),
     };
   });
-  for (const r of [caps.text, caps.note]) {
-    expect(r).toBeGreaterThan(67.5);
-    expect(r).toBeLessThanOrEqual(68.5);
-  }
+  expect(caps.cap).toBe(512);
+  expect(caps.widest).toBeLessThanOrEqual(caps.cap + 0.5);
+  expect(caps.note).toBeGreaterThan(67.5);
+  expect(caps.note).toBeLessThanOrEqual(68.5);
   const note = await page.getByTestId('transcript-note').first().evaluate((el) => {
     const s = getComputedStyle(el);
     const text = el.firstElementChild!.getBoundingClientRect();
     const line = el.getBoundingClientRect();
     return {
-      leftGap: text.left - line.left,
+      leftGap: Math.abs(text.left - line.left - (line.right - text.right)),
       before: getComputedStyle(el, '::before').content,
       after: getComputedStyle(el, '::after').content,
       fontSize: s.fontSize,
@@ -74,11 +82,11 @@ test('68ch measure cap binds the body text and the centered note', async ({ page
       secondary: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim(),
     };
   });
-  expect(note.leftGap).toBe(0);
+  expect(note.leftGap).toBeLessThanOrEqual(1);
   expect(note.before).toBe('none');
   expect(note.after).toBe('none');
-  expect(note.fontSize).toBe('15px');
-  expect(note.lineHeight).toBe('21px');
+  expect(note.fontSize).toBe('13px');
+  expect(note.lineHeight).toBe('18px');
   // the capped measure must not push the column into horizontal overflow
   const overflow = await page.evaluate(() => {
     const col = document.querySelector('.side-panel [data-testid="transcript-col"]')!;
@@ -87,22 +95,22 @@ test('68ch measure cap binds the body text and the centered note', async ({ page
   expect(overflow.scroll).toBeLessThanOrEqual(overflow.client + 1);
 });
 
-test('composer placeholder sits at 15px (text-card-title)', async ({ page }) => {
+test('composer placeholder sits at 14px (text-ui)', async ({ page }) => {
   await page.goto('/app?scenario=home-c&thread=home-c-idle');
   const placeholder = page.locator('.side-panel [data-testid="composer-placeholder"]');
-  await expect(placeholder).toHaveCSS('font-size', '15px');
+  await expect(placeholder).toHaveCSS('font-size', '14px');
 });
 
-test('agent text sits at 15px', async ({ page }) => {
+test('agent text sits at 14px', async ({ page }) => {
   await page.goto(CONFIRM);
   await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
   await expect(page.locator('.side-panel [data-testid="agent-text"]').first()).toHaveCSS(
     'font-size',
-    '15px',
+    '14px',
   );
 });
 
-test('bubble / footer keep their own geometry, replies carry no avatar column', async ({ page }) => {
+test('the bubble keeps its geometry, tools sit beside it with no footer row, replies carry no avatar column', async ({ page }) => {
   await page.goto(DONE);
   await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
   await page.locator('.side-panel [data-testid=\"transcript-col\"]').waitFor();
@@ -110,25 +118,27 @@ test('bubble / footer keep their own geometry, replies carry no avatar column', 
     const bubble = document.querySelector('.side-panel [data-testid="user-bubble"]')!;
     const avatars = document.querySelectorAll('.side-panel [data-testid="msg-avatar"]').length;
     const userItem = bubble.closest('[data-slot="message-scroller-item"]')!;
-    const userFooter = userItem.querySelector('[data-testid="msg-actions"]')!;
-    const footer = [...document.querySelectorAll('.side-panel [data-testid="msg-actions"]')].find(
-      (el) => !userItem.contains(el),
-    )!;
+    const userTools = userItem.querySelector('[data-testid="msg-tools"]')!;
+    const replyTools = [...document.querySelectorAll('.side-panel [data-row="agent"] [data-testid="msg-tools"]')][0]!;
+    const replyBubble = replyTools.parentElement!.firstElementChild!;
     const b = bubble.getBoundingClientRect();
     return {
       bubbleH: Math.round(b.height),
       bubbleFont: getComputedStyle(bubble).fontSize,
       avatars,
-      footerPad: getComputedStyle(footer).paddingLeft,
-      userFooterAlign: getComputedStyle(userFooter).justifyContent,
+      footers: userItem.querySelectorAll('[data-testid="msg-actions"]').length,
+      userToolsLeftOfBubble: userTools.getBoundingClientRect().right <= b.left + 1,
+      replyToolsRightOfBubble:
+        replyTools.getBoundingClientRect().left >= replyBubble.getBoundingClientRect().right - 1,
     };
   });
-  expect(geo.bubbleH).toBeGreaterThanOrEqual(37);
-  expect(geo.bubbleH).toBeLessThanOrEqual(38);
-  expect(geo.bubbleFont).toBe('15px');
+  expect(geo.bubbleH).toBeGreaterThanOrEqual(36);
+  expect(geo.bubbleH).toBeLessThanOrEqual(37);
+  expect(geo.bubbleFont).toBe('14px');
   expect(geo.avatars).toBe(0);
-  expect(geo.footerPad).toBe('0px');
-  expect(geo.userFooterAlign).toBe('flex-end');
+  expect(geo.footers).toBe(0);
+  expect(geo.userToolsLeftOfBubble).toBe(true);
+  expect(geo.replyToolsRightOfBubble).toBe(true);
 });
 
 test('turn boundary is air, not a rule: no divider between a user turn and the agent row', async ({
@@ -159,12 +169,12 @@ test('turn boundary is air, not a rule: no divider between a user turn and the a
         const prev = item.previousElementSibling;
         return (
           item.querySelector('[data-row="agent"]') != null &&
-          prev?.lastElementChild?.getAttribute('data-testid') === 'msg-actions'
+          prev?.querySelector('[data-testid="user-bubble"]') != null
         );
       })
       .map((item) => {
         const row = item.querySelector('[data-row="agent"]')!;
-        const prev = item.previousElementSibling!.lastElementChild!;
+        const prev = item.previousElementSibling!.querySelector('[data-testid="user-bubble"]')!;
         const cs = getComputedStyle(row);
         const rect = row.getBoundingClientRect();
         return {

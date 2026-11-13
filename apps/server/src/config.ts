@@ -274,7 +274,7 @@ export function insecureBindWarning(config: ServerConfig): string | null {
 export function ignoredTailscaleUsersWarning(env: NodeJS.ProcessEnv = process.env): string | null {
   const raw = env[ENV_VARS.tailscaleUsers];
   if (raw === undefined || raw.trim() === '') return null;
-  return `${ENV_VARS.tailscaleUsers} applies only to the private tailnet Unix socket when no untagged node owner is known; Tailscale-User-Login on TCP never grants access`;
+  return `${ENV_VARS.tailscaleUsers} is ignored and does not grant access; Tailscale is only a route, sign in with a pairing code`;
 }
 
 export function authOffRefusal(config: ServerConfig): string | null {
@@ -333,12 +333,12 @@ export function tokenAuthStartupLines(config: ServerConfig): string[] {
   if (config.requireToken) {
     return [
       `token auth enabled — token source: ${source}; manage it with \`${BRAND.cliCommandName} token\` (\`${BRAND.cliCommandName} token --rotate\` writes a new one; restart the server to apply)`,
-      `container mode (${ENV_VARS.requireToken}=1): the token value and one-time login link are never written to logs (hosted log dashboards are shared) — run \`${BRAND.cliCommandName} token\` on the host machine to see the current token`,
+      `container mode (${ENV_VARS.requireToken}=1): the token value is never written to logs (hosted log dashboards are shared) — run \`${BRAND.cliCommandName} token\` on the host machine to see the current token`,
     ];
   }
   return [
     `token auth enabled — token source: ${source}; manage it with \`${BRAND.cliCommandName} token\` (\`${BRAND.cliCommandName} token --rotate\` writes a new one; restart the server to apply)`,
-    `token auth enabled — run \`${BRAND.cliCommandName} token\` on this machine to print a login link`,
+    `token auth enabled — run \`${BRAND.cliCommandName} token\` on this machine to print the owner token; other devices use a pairing code`,
   ];
 }
 

@@ -66,6 +66,8 @@ import type {
   TranscriptRow,
   UpdateSkillBody,
   UserRecord,
+  XaiDevicePollResponse,
+  XaiDeviceStartResponse,
 } from '@cairn/shared';
 import {
   backupHealthSchema,
@@ -74,7 +76,10 @@ import {
   tasksQuerySchema,
 } from '@cairn/shared';
 import {
+  type InfiniteData,
+  infiniteQueryOptions,
   keepPreviousData,
+  type QueryClient,
   useInfiniteQuery,
   useMutation,
   useQueries,
@@ -91,6 +96,8 @@ import { resumeRefreshDelayMs } from './resume-refresh-delay.js';
 
 const CHIEF_THREADS_INFLIGHT_POLL_MS = 3000;
 const BACKUP_HEALTH_POLL_MS = 5 * 60 * 1000;
+const STREAM_KEPT_FRESH_MS = 60_000;
+const PREFETCH_FRESH_MS = 10_000;
 
 export type { ApiKeyRow, PlanRow };
 export type StepRow = StepJournalRow;
@@ -154,21 +161,32 @@ export const useTodos = (teamId: string | undefined, enabled: boolean) =>
     queryKey: ['todos', teamId],
     queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}`),
     enabled: enabled && teamId !== undefined,
+    staleTime: STREAM_KEPT_FRESH_MS,
+  });
+
+export const useArchivedTodos = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['todos', teamId, 'archived'],
+    queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}&archived=1`),
+    enabled: enabled && teamId !== undefined,
   });
 
 export const useTasks = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['tasks', teamId],
-    queryFn: async () => tasksQuerySchema.parse(await api.get(`/api/tasks?teamId=${teamId}`)),
+    queryFn: async () =>
+      tasksQuerySchema.parse(await api.get(`/api/tasks?teamId=${teamId}&sectioned=1`)),
     enabled: enabled && teamId !== undefined,
+    staleTime: STREAM_KEPT_FRESH_MS,
   });
 
+const todoQuery = (id: string | undefined) => ({
+  queryKey: ['todo', id],
+  queryFn: () => api.get<TodoRecord>(`/api/todos/${id}`),
+});
+
 export const useTodo = (id: string | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['todo', id],
-    queryFn: () => api.get<TodoRecord>(`/api/todos/${id}`),
-    enabled: enabled && id !== undefined,
-  });
+  useQuery({ ...todoQuery(id), enabled: enabled && id !== undefined });
 
 export const useBuild = (id: string | null | undefined, enabled: boolean) =>
   useQuery({
@@ -218,11 +236,8 @@ export const useSteps = (buildId: string | null | undefined, enabled: boolean) =
     enabled: enabled && buildId != null,
   });
 
-export function useConversationMessages(
-  conversationId: string | null | undefined,
-  enabled: boolean,
-) {
-  const query = useInfiniteQuery({
+const conversationMessagesQuery = (conversationId: string | null | undefined) =>
+  infiniteQueryOptions({
     queryKey: ['messages', conversationId, 'pages'],
     queryFn: ({ pageParam }) =>
       api.get<ConversationMessagesResponse>(
@@ -232,6 +247,26 @@ export function useConversationMessages(
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => (typeof last.nextCursor === 'string' ? last.nextCursor : null),
+  });
+
+export function prefetchThread(qc: QueryClient, teamId: string, todoId: string): void {
+  void qc.prefetchQuery({ ...todoQuery(todoId), staleTime: PREFETCH_FRESH_MS });
+  const buildId = qc
+    .getQueryData<TodoRecord[]>(['todos', teamId])
+    ?.find((todo) => todo.id === todoId)?.latestBuildId;
+  if (buildId == null) return;
+  void qc.prefetchInfiniteQuery({
+    ...conversationMessagesQuery(buildId),
+    staleTime: PREFETCH_FRESH_MS,
+  });
+}
+
+export function useConversationMessages(
+  conversationId: string | null | undefined,
+  enabled: boolean,
+) {
+  const query = useInfiniteQuery({
+    ...conversationMessagesQuery(conversationId),
     enabled: enabled && conversationId != null,
   });
   const messages = useMemo(
@@ -239,6 +274,22 @@ export function useConversationMessages(
     [query.data],
   );
   return { query, messages, newest: query.data?.pages[0] };
+}
+
+type MessagePages = InfiniteData<ConversationMessagesResponse, string | null>;
+
+export async function keepNewestMessagesPage(
+  queryClient: QueryClient,
+  conversationId: string,
+): Promise<void> {
+  const queryKey = ['messages', conversationId, 'pages'];
+  if ((queryClient.getQueryData<MessagePages>(queryKey)?.pages.length ?? 0) <= 1) return;
+  await queryClient.cancelQueries({ queryKey, exact: true });
+  queryClient.setQueryData<MessagePages>(queryKey, (data) =>
+    data === undefined || data.pages.length <= 1
+      ? data
+      : { pages: data.pages.slice(0, 1), pageParams: data.pageParams.slice(0, 1) },
+  );
 }
 
 export const usePlans = (buildId: string | null | undefined, enabled: boolean) =>
@@ -330,13 +381,18 @@ export const useMachines = (teamId: string | undefined, enabled: boolean) =>
     enabled: enabled && teamId !== undefined,
   });
 
-export function useComputers(teamId: string | undefined, enabled: boolean) {
+export function useComputers(
+  teamId: string | undefined,
+  enabled: boolean,
+  refetchIntervalMs?: number,
+) {
   const auth = useAuth();
   return useQuery({
     queryKey: computerQueryKeys(teamId, auth.generation).computers,
     queryFn: async () =>
       (await api.get<{ computers: ComputerRecord[] }>('/api/computers')).computers,
     enabled: enabled && teamId !== undefined && !auth.gateOpen,
+    ...(refetchIntervalMs !== undefined ? { refetchInterval: refetchIntervalMs } : {}),
   });
 }
 
@@ -491,13 +547,27 @@ export function useRemoteMutations() {
   return {
     createPairingCode: useMutation({
       mutationFn: () => api.post<PairingCodeResponse>('/api/remote/pairing', {}),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pairingGrants'] }),
     }),
     revokeDevice: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/remote/devices/${encodeURIComponent(id)}`),
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ['remoteDevices'] }),
     }),
+    revokePairingCode: useMutation({
+      mutationFn: (id: string) => api.del<void>(`/api/remote/pairing/${encodeURIComponent(id)}`),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pairingGrants'] }),
+    }),
   };
 }
+
+export const usePairingGrants = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['pairingGrants'],
+    queryFn: () =>
+      api.get<Array<{ id: string; expiresAt: number; createdAt: number }>>('/api/remote/pairing'),
+    enabled,
+    refetchInterval: DEVICES_POLL_MS,
+  });
 
 export const useMcpServers = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
@@ -651,6 +721,15 @@ export function useApiMutations(teamId: string | undefined) {
         };
       }) => api.patch<TodoRecord>(`/api/todos/${input.id}`, input.body),
       onSuccess: invalidateAll,
+    }),
+    stopAndDoneTodo: useMutation({
+      mutationFn: (id: string) =>
+        api.post<{ state: 'stopping' | 'done'; todo: TodoRecord }>(
+          `/api/todos/${id}/stop-and-done`,
+          {},
+        ),
+      onSuccess: invalidateAll,
+      onError: invalidateAll,
     }),
     resetTodo: useMutation({
       mutationFn: (input: { id: string; expectedPhase: string; expectedBuildId: string | null }) =>
@@ -921,6 +1000,19 @@ export function useApiMutations(teamId: string | undefined) {
           `/api/teams/${teamId}/providers/oauth/${presetId}/authorize`,
           {},
         ),
+    }),
+    startXaiDevice: useMutation({
+      mutationFn: () =>
+        api.post<XaiDeviceStartResponse>(`/api/teams/${teamId}/providers/oauth/xai/device`, {}),
+    }),
+    pollXaiDevice: useMutation({
+      mutationFn: (state: string) =>
+        api.post<XaiDevicePollResponse>(`/api/teams/${teamId}/providers/oauth/xai/device/poll`, {
+          state,
+        }),
+      onSuccess: (result) => {
+        if (result.status === 'complete') invalidateAll();
+      },
     }),
     startGithubOAuth: useMutation({
       mutationFn: () =>

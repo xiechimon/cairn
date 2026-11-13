@@ -10,6 +10,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
+import { startBuilds } from '../src/services/builds.js';
 import { claimStep } from '../src/services/machines.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import { bootServer, issueApiKey, postProject, type TestServer } from './helpers.js';
@@ -409,6 +410,37 @@ describe('a worker step runs only on its named machine', () => {
     setOverride(w, stepId, { requiredCapabilities: { executor: 'orb' } });
     expect(await claimOn(w, mac)).toBeNull();
     expect(statusOf(w, stepId)).toBe('pending');
+  });
+
+  test('two online machines and no name: start is refused; one online machine is pinned', async () => {
+    const w = await world();
+    const omarchy = await machineOf(w, 'omarchy');
+    const mac = await machineOf(w, 'mac');
+    routeOf(w, null);
+    const todoId = `todo-start-${++seq}`;
+    w.s.db
+      .insert(todoTable)
+      .values({
+        id: todoId,
+        teamId: w.s.team.id,
+        projectId: w.projectId,
+        seqNum: seq,
+        title: 'start',
+        spec: 'probe',
+        phase: 'todo',
+        phaseAt: Date.now(),
+      })
+      .run();
+    expect(() => startBuilds(w.s.svc, { projectId: w.projectId, todoIds: [todoId] })).toThrow(
+      /Name a machine/,
+    );
+    w.s.db.update(machineTable).set({ online: false }).where(eq(machineTable.id, mac)).run();
+    startBuilds(w.s.svc, { projectId: w.projectId, todoIds: [todoId] });
+    expect(
+      w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()?.routeOverride,
+    ).toEqual({
+      machineId: omarchy,
+    });
   });
 });
 

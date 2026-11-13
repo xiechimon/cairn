@@ -3,7 +3,7 @@ import { join, relative } from 'node:path';
 import { ANSWERS_CONTINUE_PROMPT, type AnswerDeliveryVia } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { message, steerPending, step, todo } from '../src/db/schema.js';
+import { machine, message, steerPending, step, todo } from '../src/db/schema.js';
 import { completeStep, sendBuildSteer, startBuilds } from '../src/services/builds.js';
 import { ackSteer, claimStep, fetchSteer } from '../src/services/machines.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
@@ -33,6 +33,9 @@ function deps() {
 }
 
 function startSession() {
+  const machineId =
+    H.s.db.select({ id: machine.id }).from(machine).where(eq(machine.teamId, H.teamId)).get()?.id ??
+    insertMachine(H.s);
   const todoId = `todo-${Math.random().toString(36).slice(2, 8)}`;
   H.s.db
     .insert(todo)
@@ -50,7 +53,6 @@ function startSession() {
   const [started] = startBuilds(deps(), { projectId: H.projectId, todoIds: [todoId] });
   const buildId = started!.id;
   const first = H.s.db.select().from(step).where(eq(step.buildId, buildId)).get()!;
-  const machineId = insertMachine(H.s);
   H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
   H.s.db.update(step).set({ status: 'claimed', machineId }).where(eq(step.id, first.id)).run();
   const stepRow = H.s.db.select().from(step).where(eq(step.id, first.id)).get()!;

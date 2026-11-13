@@ -14,6 +14,7 @@ import {
   CLAIM_POLL_INTERVAL_MS,
   type ClaudeLogin,
   classifyClaudeCodeLogin,
+  ENV_VARS,
   isBackendRuntimeId,
   MACHINE_ORB_CONVERSATIONS_LIMIT,
   ORPHAN_WORKTREE_TTL_MS,
@@ -21,6 +22,7 @@ import {
 import { configuredAcpBackends, createGeminiBackend } from './backend/acp.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
+import { ConfinementAvailability } from './backend/confinement-availability.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
 import { backfillRepositoryCaches } from './backend/repo-cache-backfill.js';
@@ -48,8 +50,8 @@ import { type MachineApi, MachineApiError, MachineClient } from './machine-clien
 import { enrollThroughBrowser } from './machine-enroll.js';
 import { ComputerOrbs, computerImageOffersBrowser } from './orb/computer.js';
 import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
-import { NspawnOrbProvider, type OrbProvider } from './orb/provider.js';
-import { createOrbProvider } from './orb/select.js';
+import type { OrbProvider } from './orb/provider.js';
+import { createComputerOrbProvider, createOrbProvider } from './orb/select.js';
 import { relayOrbStopped, runOrbStep } from './orb/step.js';
 import { ensurePrivateDir } from './private-fs.js';
 import { setupProxy } from './proxy.js';
@@ -97,12 +99,15 @@ export interface MachineLoopOpts {
   orphanTtlMs?: number;
   hookTimeoutMs?: number;
   otel?: DaemonOtel | null;
+  confinementPlatform?: string;
+  confinementPreflight?: ConstructorParameters<typeof ConfinementAvailability>[0]['launch'];
 }
 
 export interface MachineHandle {
   machineId: string;
   stop(cause?: string): Promise<void>;
   done: Promise<void>;
+  recheckConfinement(): Promise<void>;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -157,17 +162,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }
 
   let backend: AgentBackend | undefined = opts.backend;
-  const claudeBin: ClaudeBinInfo | null = await probeClaudeBin();
-  logger.machine(
-    claudeBin
-      ? `claude binary: ${claudeBin.path}${claudeBin.version !== null ? ` (${claudeBin.version})` : ''}${claudeBin.source === 'well-known' ? ' [well-known fallback]' : ''}`
-      : 'claude binary: not found on PATH or well-known dirs',
-  );
+  const platformOverride =
+    opts.capEnv?.[ENV_VARS.confinementPlatform] ?? process.env[ENV_VARS.confinementPlatform];
+  const platform = opts.confinementPlatform ?? platformOverride ?? process.platform;
+  let claudeBin: ClaudeBinInfo | null = platform === 'darwin' ? await probeClaudeBin() : null;
+  let availability: ConfinementAvailability | undefined;
   let claudeAuth: ClaudeCodeAuthProbe | null = null;
   let claudeLogin: ClaudeLogin | null = null;
   let loginProbe: Promise<ClaudeCodeAuthProbe> | null = null;
   const readExpiresAt = opts.readClaudeOauthExpiresAt ?? readDefaultClaudeOauthExpiresAt;
   const probeAuthAndRemember = (): Promise<ClaudeCodeAuthProbe> => {
+    if (platform !== 'darwin' && !availability?.ready)
+      return Promise.resolve({ state: 'unknown', reason: 'confinement unavailable' });
     if (loginProbe) return loginProbe;
     const pending = (async () => {
       const probe = await (opts.claudeCodeAuthProbe ?? probeClaudeCodeAuth)();
@@ -192,7 +198,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ...(claudeAuth !== null ? { auth: claudeAuth } : {}),
       ...(claudeLogin !== null ? { login: claudeLogin } : {}),
     });
-  claudeAuth = await probeAuthAndRemember();
+
+  if (platform === 'darwin') await probeAuthAndRemember();
 
   const capEnv = opts.capEnv ?? process.env;
   const orbProvider = opts.orbProvider ?? createOrbProvider(capEnv, paths.home);
@@ -207,32 +214,35 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     (capEnv.CAIRN_OWN_COMPUTER === '1' ? new HostComputerProvider() : undefined);
   const hostScreen = opts.hostScreen ?? createHostScreenFromEnv(capEnv);
   const enrolledIdentity = { machineId: '' };
+  const computerHost = createComputerOrbProvider(capEnv, orbProvider);
   const computerOrbs =
-    opts.orbComputer === undefined && orbProvider instanceof NspawnOrbProvider
+    opts.orbComputer === undefined && computerHost
       ? new ComputerOrbs({
           stateFile: join(paths.home, 'orb-state', 'computers.json'),
-          runtimeRoot: orbProvider.runtimeRoot,
+          runtimeRoot: computerHost.runtimeRoot,
         })
       : undefined;
   const computerInputLocks = join(paths.home, 'computer-input');
   if (computerOrbs) ensurePrivateDir(computerInputLocks);
   const orbComputer =
     opts.orbComputer ??
-    (computerOrbs && orbProvider instanceof NspawnOrbProvider
+    (computerOrbs && computerHost
       ? new OrbComputerProvider({
           orbs: computerOrbs,
-          runtimeRoot: orbProvider.runtimeRoot,
+          runtimeRoot: computerHost.runtimeRoot,
           inputFence: new ComputerInputFence(computerInputLocks, () => enrolledIdentity.machineId),
           release: {
-            publish: () => orbProvider.publishRelease(),
+            publish: () => computerHost.publishRelease(),
             authenticated: (machine, release) =>
-              orbProvider.retainComputerRelease(machine, release),
+              computerHost.retainComputerRelease(machine, release),
           },
           onError: (message) => logger.machine(message),
         })
       : undefined);
   const capabilitiesReport = (): MachineCapabilities => ({
     ...capabilitiesProbe(),
+    osPlatform: platform === 'linux' || platform === 'darwin' ? platform : 'other',
+    confinement: availability?.observation(),
     codexLogin: readCodexLogin(paths.agentRuntimeDir),
     executor: orbProvider.kind,
     ...(orbComputer ? { computer: true as const } : {}),
@@ -356,8 +366,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     serverUrl: config.serverUrl,
     getToken: () => inMemoryToken,
     provider: createComputerScreenProvider({
-      runtimeRoot:
-        orbProvider instanceof NspawnOrbProvider ? () => orbProvider.runtimeRoot : '/run/cairn-orb',
+      runtimeRoot: computerHost ? () => computerHost.runtimeRoot : '/run/cairn-orb',
       ...(computerOrbs ? { ensureComputer: (scopeKey) => computerOrbs.ensure(scopeKey) } : {}),
     }),
   });
@@ -377,6 +386,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     },
     onFailure: (err) => {
       if (err instanceof MachineApiError) {
+        if (err.status === 409) availability?.invalidate();
         networkFailures = 0;
       } else {
         networkFailures += 1;
@@ -393,8 +403,27 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       logger.machine(`presence failed: ${err instanceof Error ? err.message : String(err)}`);
     },
   });
+  availability = new ConfinementAvailability({
+    home: paths.home,
+    platform,
+    launch: opts.confinementPreflight,
+    me: () => client.me(),
+    send: () => presenceReporter.send(),
+  });
+  const probeHarnesses = async () => {
+    if (!availability?.ready) return;
+    if (platform !== 'darwin') claudeBin = await probeClaudeBin();
+    logger.machine(
+      claudeBin
+        ? `claude binary: ${claudeBin.path}${claudeBin.version !== null ? ` (${claudeBin.version})` : ''}${claudeBin.source === 'well-known' ? ' [well-known fallback]' : ''}`
+        : 'claude binary: not found on PATH or well-known dirs',
+    );
+
+    if (claudeAuth === null) await probeAuthAndRemember();
+  };
   try {
-    await presenceReporter.send();
+    await availability.recheck();
+    await probeHarnesses();
   } catch (error) {
     await presenceReporter.close();
     throw error;
@@ -564,49 +593,55 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     : undefined;
   computerSweepTimer?.unref?.();
 
-  const recovered = await client.recover();
-  if (recovered.steps.length === 0) {
-    logger.recover('no pending steps found');
-  } else {
-    logger.recover(`${recovered.steps.length} pending step(s) found — resuming`);
-    for (const stepRecord of recovered.steps) {
-      const entry = journal.get(stepRecord.id);
-      if (entry?.claimed) {
-        if (entry.state === 'awaiting-upload' && entry.doneBody != null) {
-          await resumePendingUpload(stepDeps(), entry, {
+  let recoveryPending = true;
+  const recover = async () => {
+    if (!availability?.ready || !recoveryPending) return;
+    recoveryPending = false;
+    const recovered = await client.recover();
+    if (recovered.steps.length === 0) {
+      logger.recover('no pending steps found');
+    } else {
+      logger.recover(`${recovered.steps.length} pending step(s) found — resuming`);
+      for (const stepRecord of recovered.steps) {
+        const entry = journal.get(stepRecord.id);
+        if (entry?.claimed) {
+          if (entry.state === 'awaiting-upload' && entry.doneBody != null) {
+            await resumePendingUpload(stepDeps(), entry, {
+              running: 1,
+              failOnRejectedDone: orbProvider.kind === 'orb' && entry.kind !== 'chief',
+            });
+            continue;
+          }
+          const priorMachineId = entry.claimed.session.priorMachineId;
+          const stillPriorSession =
+            priorMachineId !== undefined &&
+            entry.sessionId !== null &&
+            entry.sessionId === entry.claimed.session.sessionId;
+          const claimed: ClaimedStep = {
+            ...entry.claimed,
+            session: {
+              action: entry.sessionId ? 'continue' : 'new',
+              sessionId: entry.sessionId,
+              ...(stillPriorSession ? { priorMachineId } : {}),
+            },
+          };
+          await runOrbStep(orbs, stepDeps(), claimed, {
+            resume: { sessionId: entry.sessionId, prompt: entry.prompt },
             running: 1,
-            failOnRejectedDone: orbProvider.kind === 'orb' && entry.kind !== 'chief',
+            ...(entry.stopRequest != null ? { stopRequest: entry.stopRequest } : {}),
+            ...(claimed.step.kind === 'chief' ? {} : { env: workerEnv(stepRecord.id) }),
           });
-          continue;
+        } else {
+          logger.recover(`step ${stepRecord.id} has no local journal — reporting failed`);
+          await client.done(stepRecord.id, {
+            status: 'failed',
+            errorMessage: 'daemon journal lost across restart',
+          });
         }
-        const priorMachineId = entry.claimed.session.priorMachineId;
-        const stillPriorSession =
-          priorMachineId !== undefined &&
-          entry.sessionId !== null &&
-          entry.sessionId === entry.claimed.session.sessionId;
-        const claimed: ClaimedStep = {
-          ...entry.claimed,
-          session: {
-            action: entry.sessionId ? 'continue' : 'new',
-            sessionId: entry.sessionId,
-            ...(stillPriorSession ? { priorMachineId } : {}),
-          },
-        };
-        await runOrbStep(orbs, stepDeps(), claimed, {
-          resume: { sessionId: entry.sessionId, prompt: entry.prompt },
-          running: 1,
-          ...(entry.stopRequest != null ? { stopRequest: entry.stopRequest } : {}),
-          ...(claimed.step.kind === 'chief' ? {} : { env: workerEnv(stepRecord.id) }),
-        });
-      } else {
-        logger.recover(`step ${stepRecord.id} has no local journal — reporting failed`);
-        await client.done(stepRecord.id, {
-          status: 'failed',
-          errorMessage: 'daemon journal lost across restart',
-        });
       }
     }
-  }
+  };
+  await recover();
 
   const streamCtrl = new AbortController();
   const deliverSteer = async (stepId: string): Promise<void> => {
@@ -702,6 +737,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   void (async () => {
     let backoff = 1_000;
     let announced = false;
+    let reportedDown = false;
     while (!streamCtrl.signal.aborted) {
       try {
         await client.stream(
@@ -717,12 +753,19 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           () => {
             if (!announced) {
               announced = true;
+              reportedDown = false;
               logger.wake('push channel connected');
             }
           },
         );
         backoff = 1_000;
-      } catch {}
+      } catch (err) {
+        if (!reportedDown && !streamCtrl.signal.aborted) {
+          reportedDown = true;
+          announced = false;
+          logger.wake(`push channel down: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
       if (streamCtrl.signal.aborted) return;
       await sleep(backoff);
       backoff = nextBackoffMs(backoff);
@@ -739,6 +782,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }, opts.presenceIntervalMs ?? 30_000);
   presenceTimer.unref?.();
 
+  let resumeClaims: (() => void) | undefined;
   let stopping = false;
   const claimCtrl = new AbortController();
   const claimTimeoutMs = opts.claimTimeoutMs ?? CLAIM_POLL_INTERVAL_MS + 15_000;
@@ -774,6 +818,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     const backoffBase = opts.claimBackoffBaseMs ?? 1_000;
     let backoff = backoffBase;
     while (!stopping) {
+      if (!availability?.ready) {
+        await new Promise<void>((resolve) => {
+          resumeClaims = resolve;
+        });
+        continue;
+      }
       const workersInFlight = inFlight.size - inFlightChief.size;
       if (
         (orbProvider.kind === 'orb' && inFlight.size >= localCap) ||
@@ -786,7 +836,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       try {
         step = await client.claim(
           AbortSignal.any([claimCtrl.signal, AbortSignal.timeout(claimTimeoutMs)]),
-          { maxWorkers: localCap },
+          { maxWorkers: localCap, confinement: availability.report },
         );
         backoff = backoffBase;
       } catch (err) {
@@ -831,6 +881,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   async function stop(cause?: string): Promise<void> {
     if (stopping) return;
     stopping = true;
+    resumeClaims?.();
     logger.machine(`Shutting down…${cause ? ` (${cause})` : ''}`);
     clearInterval(presenceTimer);
     clearInterval(orphanTimer);
@@ -848,5 +899,15 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     if (orbComputer instanceof OrbComputerProvider) await orbComputer.close();
   }
 
-  return { machineId, stop, done };
+  return {
+    machineId,
+    stop,
+    done,
+    async recheckConfinement() {
+      await availability.recheck();
+      await probeHarnesses();
+      await recover();
+      resumeClaims?.();
+    },
+  };
 }

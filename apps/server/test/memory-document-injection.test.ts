@@ -2,7 +2,7 @@ import { type ClaimedStep, chiefDigestThreadId } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
-import { agentMemory, chiefThread, step } from '../src/db/schema.js';
+import { agentMemory, chiefThread, routingRule, step, todo } from '../src/db/schema.js';
 import { buildChiefSystemPrompt, enqueueChiefStep } from '../src/services/chief.js';
 import { chiefTurnContext } from '../src/services/coordinator-steps.js';
 import {
@@ -171,8 +171,18 @@ async function machineToken() {
     ),
   });
   expect(enrolled.status).toBe(200);
-  const { token } = (await enrolled.json()) as { token: string };
-  return token;
+  const body = (await enrolled.json()) as { token: string; machineId: string };
+  H.s.db
+    .update(routingRule)
+    .set({ machineId: body.machineId })
+    .where(eq(routingRule.teamId, H.teamId))
+    .run();
+  H.s.db
+    .update(todo)
+    .set({ routeOverride: { machineId: body.machineId } })
+    .where(eq(todo.teamId, H.teamId))
+    .run();
+  return body;
 }
 async function machineClaim(token: string) {
   const response = await H.s.app.request('/api/machine/tasks/claim', {
@@ -186,7 +196,7 @@ async function machineClaim(token: string) {
 }
 test('machine HTTP claim delivers bounded Coordinator system and step prompts', async () => {
   seed();
-  const token = await machineToken();
+  const { token } = await machineToken();
   const ownerMessageId = seedOwnerMessage(H.s.db, H.threadId, 'hello');
   const id = enqueueChiefStep(H.s.svc, H.threadId, {
     prompt: 'hello',
@@ -203,7 +213,7 @@ test('machine HTTP claim delivers bounded Coordinator system and step prompts', 
 test('machine HTTP worker claim delivers separate bounded indexes and matching todo scratchpad', async () => {
   seed();
   seed(H.projectId);
-  const token = await machineToken();
+  const { token, machineId } = await machineToken();
   const todoResponse = await req(H.s.app, 'POST', `/api/projects/${H.projectId}/todos`, {
     title: 'memory',
     spec: 'read index',
@@ -216,6 +226,7 @@ test('machine HTTP worker claim delivers separate bounded indexes and matching t
   });
   const build = await req(H.s.app, 'POST', `/api/projects/${H.projectId}/builds`, {
     todoIds: [todoId],
+    routeOverride: { machineId },
   });
   expect(build.status).toBe(201);
   const claimed = await machineClaim(token);

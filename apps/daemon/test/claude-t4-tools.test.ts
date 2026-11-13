@@ -54,8 +54,11 @@ describe('parametersToShape (failure modes 2/3)', () => {
     });
   });
 
-  test('boolean/number slots (memories includeInvalid / set_wake at)', () => {
-    const threads = roundTrip(byName('memories').parameters);
+  test('boolean/number slots', () => {
+    const threads = roundTrip({
+      type: 'object',
+      properties: { includeInvalid: { type: 'boolean' } },
+    });
     const includeInvalid = must(
       (threads.properties as Record<string, Record<string, unknown>>).includeInvalid,
       'includeInvalid',

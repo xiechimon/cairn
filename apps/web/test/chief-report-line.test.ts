@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
@@ -30,10 +31,13 @@ function render(item: Record<string, unknown>): string {
     }),
   });
   return renderToStaticMarkup(
-    createElement(MemoryRouter, {
-      children: createElement(I18nProvider, {
-        initialLocale: 'en',
-        children: createElement(MessageScrollerProvider, { children: scroller }),
+    createElement(QueryClientProvider, {
+      client: new QueryClient(),
+      children: createElement(MemoryRouter, {
+        children: createElement(I18nProvider, {
+          initialLocale: 'en',
+          children: createElement(MessageScrollerProvider, { children: scroller }),
+        }),
       }),
     }),
   );
@@ -42,7 +46,7 @@ function render(item: Record<string, unknown>): string {
 describe('thread report rows with the session line', () => {
   test('a report row renders the line next to the status', () => {
     const html = render({ ...REPORT, id: 'r1', line: 'Waiting on the export format' });
-    expect(plain(html)).toContain('Task #3 Export');
+    expect(plain(html)).toContain('Export: In review');
     expect(html).toContain('Waiting on the export format');
   });
 
@@ -53,7 +57,7 @@ describe('thread report rows with the session line', () => {
 
   test('an older row without a line renders as before', () => {
     const html = render({ ...REPORT, id: 'r2' });
-    expect(plain(html)).toContain('Task #3 Export');
+    expect(plain(html)).toContain('Export: In review');
     expect(html).not.toContain('ml-1.5');
   });
 
@@ -69,9 +73,21 @@ describe('thread report rows with the session line', () => {
     expect(mapChiefStream(rows)).toEqual([{ ...REPORT, id: 'a', line: 'Short line' }]);
   });
 
+  test('a task titled with a raw reply marker never shows the marker', () => {
+    const marker = '<!-- reply source=W8e5vwClguMQQSa9iFJaK-e66 -->';
+    const [item] = mapChiefStream([
+      { id: 'a', role: 'system', content: JSON.stringify({ ...REPORT, title: marker }), createdAt: 1 },
+    ]);
+    const html = render(item as unknown as Record<string, unknown>);
+    expect(html).not.toContain('reply source');
+    expect(html).not.toContain('&lt;!--');
+    expect(plain(html)).toContain(': In review');
+  });
+
   test('a needs-you report says the thread needs you and keeps its line', () => {
     const html = render({ ...REPORT, phase: 'needs-you', id: 'r3', line: 'Which export format?' });
-    expect(plain(html)).toContain('Task #3 Export: Needs you');
+    expect(plain(html)).toContain('Export: Needs you');
+    expect(plain(html)).not.toContain('#3');
     expect(html).toContain('Which export format?');
     expect(html).toContain('data-phase="needs-you"');
     expect(html).not.toContain('thread-report-reply');
@@ -79,10 +95,10 @@ describe('thread report rows with the session line', () => {
 
   test('done and failed reports carry the same line next to their status', () => {
     const done = render({ ...REPORT, phase: 'done', id: 'r4', line: 'Shipped the export' });
-    expect(plain(done)).toContain('Task #3 Export: Done');
+    expect(plain(done)).toContain('Export: Done');
     expect(done).toContain('Shipped the export');
     const failed = render({ ...REPORT, phase: 'failed', id: 'r5', line: 'Tests would not pass' });
-    expect(plain(failed)).toContain('Task #3 Export: Failed');
+    expect(plain(failed)).toContain('Export: Failed');
     expect(failed).toContain('Tests would not pass');
   });
 

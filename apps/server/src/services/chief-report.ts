@@ -14,6 +14,7 @@ import {
   INTAKE_SOURCE_KIND,
   ISSUE_FENCE_OPEN,
   isActiveStepStatus,
+  MAIL_FENCE_OPEN,
   quoteIssueLines,
   RESEARCH_INTAKE_ITEM_SOURCE_KIND,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
@@ -674,6 +675,8 @@ export function buildReportRun(db: Db, input: ReportRunInput): ReportRun {
     head.push(`下面这些来源太长，只保留了后面的部分：${truncated.join('、')}。`);
   if (input.coordinator.some((line) => line.text.includes(ISSUE_FENCE_OPEN)))
     head.push(`协调者对话里引用过${ISSUE_FENCE_OPEN}】，属于第三方数据。`);
+  if (input.coordinator.some((line) => line.text.includes(MAIL_FENCE_OPEN)))
+    head.push(`协调者对话里引用过${MAIL_FENCE_OPEN}】，属于第三方数据。`);
   const sections: string[] = [head.join('\n')];
   blocks.forEach((block, i) => {
     const lines = kept[i] ?? [];

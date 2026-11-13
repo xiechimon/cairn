@@ -18,7 +18,8 @@ test.describe('the Coordinator lives only on the home', () => {
       await expect(page.locator('[data-route]').first()).toBeVisible();
       await expect(page.locator('.chief-fab')).toHaveCount(0);
       await expect(page.getByRole('complementary', { name: 'Coordinator' })).toHaveCount(0);
-      const onHome = new URL(page.url()).pathname === '/app';
+      const pathname = new URL(page.url()).pathname;
+      const onHome = pathname === '/app' || pathname.startsWith('/app/settings');
       await expect(page.getByTestId('chief-composer-input')).toHaveCount(onHome ? 1 : 0);
     });
   }
@@ -46,9 +47,12 @@ test.describe('the Coordinator lives only on the home', () => {
   }) => {
     await page.goto('/app?scenario=17b&thread=7ve0iOkQ-JBpSL98zSiGc');
     await expect(page.getByTestId('side-chat')).toBeVisible();
-    await page.getByRole('complementary').getByRole('button', { name: /Coordinator/ }).first().click();
+    await expect(page.locator('.board-sidebar')).toHaveCount(0);
+    await page.getByTestId('sidebar-reopen').click();
+    await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click();
     await expect(page).toHaveURL(/\/app\?scenario=17b$/);
     await expect(page.getByTestId('side-chat')).toHaveCount(0);
     await expect(page.getByTestId('home-c')).toBeVisible();
+    await expect(page.locator('.board-sidebar--collapsed')).toHaveCount(0);
   });
 });

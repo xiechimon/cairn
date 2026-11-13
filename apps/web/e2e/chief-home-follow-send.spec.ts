@@ -21,14 +21,15 @@ async function mockSlowSend(page: Page, total = 250): Promise<Row[]> {
       const content = (route.request().postDataJSON() as { content: string }).content;
       return new Promise<void>((resolve) =>
         setTimeout(() => {
-          history.push({
+          const message: Row = {
             id: `s-${history.length}`,
             role: 'user',
             content,
             createdAt: 1_000 + history.length,
-          });
+          };
+          history.push(message);
           running = true;
-          void json({ thread: THREAD }, 201).then(resolve);
+          void json({ thread: THREAD, message }, 201).then(resolve);
         }, 300),
       );
     }
@@ -78,13 +79,17 @@ test('a sent message scrolls into view even when the reader was scrolled up', as
   await expect(home(page).getByText('typing back')).toBeInViewport();
   await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
   await expect(row(page, 'follow me down')).toBeInViewport();
+  await messageOf(page, 'follow me down')
+    .getByTestId('chief-msg-tools')
+    .getByTestId('chief-msg-more')
+    .focus();
   await expect
     .poll(() => opacityOf(messageOf(page, 'follow me down').getByTestId('chief-msg-tools')))
     .toBe(1);
   await evidenceShot(page, 'chief-follow-send.png');
 });
 
-test('only the newest message keeps its actions visible; older ones show them on hover', async ({
+test('every message, the newest included, shows its actions only on hover', async ({
   page,
 }) => {
   await mockSlowSend(page, 6);
@@ -99,14 +104,16 @@ test('only the newest message keeps its actions visible; older ones show them on
   const olderFoot = messageOf(page, 'answer 3').getByTestId('chief-msg-foot');
   const olderUserTools = messageOf(page, 'question 4').getByTestId('chief-msg-tools');
 
-  await expect.poll(() => opacityOf(newestFoot)).toBe(1);
+  await expect.poll(() => opacityOf(newestFoot)).toBe(0);
   await expect.poll(() => opacityOf(olderFoot)).toBe(0);
   await expect.poll(() => opacityOf(olderUserTools)).toBe(0);
 
-  await messageOf(page, 'answer 3').hover();
+  await messageOf(page, 'answer 3').getByTestId('chief-reply-bubble').first().hover();
   await expect.poll(() => opacityOf(olderFoot)).toBe(1);
-  await messageOf(page, 'question 4').hover();
+  await messageOf(page, 'question 4').getByTestId('chief-bubble').hover();
   await expect.poll(() => opacityOf(olderUserTools)).toBe(1);
+  await messageOf(page, 'answer 5').getByTestId('chief-reply-bubble').first().hover();
+  await expect.poll(() => opacityOf(newestFoot)).toBe(1);
 });
 
 const gapToBottom = (page: Page) =>
@@ -133,10 +140,10 @@ async function sendAtBottom(page: Page) {
   return history;
 }
 
-test('the status line after a send is visible without scrolling', async ({ page }) => {
+test('the typing dots after a send are visible without scrolling', async ({ page }) => {
   await sendAtBottom(page);
   await emit(page, { type: 'activity', activity: { phase: 'starting' } });
-  const status = home(page).getByText('正在连接模型...');
+  const status = home(page).getByTestId('typing-dots');
   await expect(status).toBeInViewport({ ratio: 1 });
   await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
   await evidenceShot(page, 'chief-stick-status.png');
@@ -196,8 +203,6 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
   }) => {
     if (activation === 'reduced-motion') await page.emulateMedia({ reducedMotion: 'reduce' });
     if (activation === 'phone-light') {
-      const cdp = await page.context().newCDPSession(page);
-      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
       await page.setViewportSize({ width: 390, height: 844 });
       await page.emulateMedia({ colorScheme: 'light' });
     }
@@ -211,6 +216,10 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
     const jump = home(page).getByTestId('jump-to-latest');
     await expect(row(page, 'Latest delivery report')).toBeAttached();
     await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+    if (activation === 'phone-light') {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    }
     await body.evaluate((node) => {
       node.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
       for (const item of node.querySelectorAll<HTMLElement>(
@@ -315,5 +324,29 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
     await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
     await expect(jump).toHaveAttribute('data-active', 'false');
     expect(await body.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+  });
+}
+
+for (const reduced of [false, true]) {
+  test(`a sent message rises in over 160ms, history rows do not (reduced motion: ${reduced})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' });
+    await mockSlowSend(page, 6);
+    await page.goto('/app');
+    await expect(row(page, 'answer 5')).toBeVisible();
+    const animationOf = (text: string) =>
+      messageOf(page, text).evaluate((node) => {
+        const style = getComputedStyle(node);
+        return { name: style.animationName, duration: style.animationDuration };
+      });
+    expect((await animationOf('question 4')).name).toBe('none');
+    const input = home(page).getByTestId('chief-composer-input');
+    await input.fill('rise in');
+    await input.press('Enter');
+    await expect(row(page, 'rise in')).toBeVisible();
+    const shown = await animationOf('rise in');
+    if (reduced) expect(shown.name).toBe('none');
+    else expect(shown).toEqual({ name: 'message-enter', duration: '0.16s' });
   });
 }

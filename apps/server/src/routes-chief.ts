@@ -6,8 +6,10 @@ import {
   coordinatorSendBodySchema,
   patchChiefBodySchema,
 } from '@cairn/shared';
+import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
+import { chiefMessage } from './db/schema.js';
 import { notFound, parseWith } from './lib/errors.js';
 import { jsonBody, requireTeam, svcOf } from './routes-helpers.js';
 import { sendBuildSteer } from './services/builds.js';
@@ -16,6 +18,7 @@ import {
   getChiefEnvelope,
   getChiefThread,
   listChiefThreads,
+  openProjectChannel,
   patchChief,
   rewindChiefThread,
   sendChiefMessageFromComposer,
@@ -24,6 +27,7 @@ import { cancelQuestion, parseAnswerBody } from './services/chief-questions.js';
 import { decideRetroProposal } from './services/chief-report.js';
 import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
 import { readCoordinatorPage } from './services/coordinator.js';
+import { isJobOwnerCaller, jobSubmitAnswerActor } from './services/job-applications.js';
 import { isChiefConversation } from './services/machines.js';
 import {
   cancelQueuedMessage,
@@ -97,6 +101,13 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     return c.json(result, 201);
   });
 
+  app.post('/api/teams/:id/chief/channels/:projectId', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const { thread, created } = openProjectChannel(svc, teamId, c.req.param('projectId'));
+    return c.json(thread, created ? 201 : 200);
+  });
+
   app.post('/api/teams/:id/chief/threads/:tid/rewind', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
@@ -129,11 +140,22 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     const thread = getChiefThread(svc, threadId);
     if (!thread || thread.teamId !== teamId) throw notFound(`chief thread ${threadId}`);
     const answers = parseAnswerBody(await jsonBody(c));
+    const requestId = c.req.param('requestId');
+    const waiting = ctx.db
+      .select()
+      .from(chiefMessage)
+      .where(and(eq(chiefMessage.id, requestId), eq(chiefMessage.threadId, threadId)))
+      .get();
+    const answeredBy = jobSubmitAnswerActor(
+      waiting?.content,
+      isJobOwnerCaller(c.get('pairedDeviceId'), c.get('ownerIdentity'), ctx.authToken),
+    );
     return c.json(
       answerChiefQuestion(svc, teamId, {
         threadId,
-        requestId: c.req.param('requestId'),
+        requestId,
         answers,
+        ...(answeredBy === undefined ? {} : { answeredBy }),
       }),
     );
   });

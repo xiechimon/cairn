@@ -67,5 +67,6 @@
   "scripts/test-tmpdir.test.mjs": 1,
   "scripts/ui-debt-gate.test.mjs": 1,
   "scripts/ui-page-style-gate.test.mjs": 1,
-  "scripts/vp-video.test.mjs": 2
+  "scripts/vp-video.test.mjs": 2,
+  "scripts/merge-queue-audit-workflow.test.mjs": 1
 }

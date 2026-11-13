@@ -1,4 +1,0 @@
-pnpm exec vitest run test/coordinator/cold-slim.test.ts
-19 passed (includes: keeps cold first-shot estimated tokens well under the 22.5k miss cliff)
-Estimator: ceil(JSON.stringify(messages).length / 4)
-Cap: COLD_FIRST_SHOT_MAX_ESTIMATED_TOKENS = 22500

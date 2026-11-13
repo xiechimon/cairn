@@ -11,14 +11,35 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
 });
 
-test('clicking a project opens its home, not the Coordinator chat', async ({ page }) => {
+test('clicking a project opens its conversation, not a project home', async ({ page }) => {
   await page.goto('/app?scenario=home-c');
   await page.locator('[data-slot="sidebar-project-row"]', { hasText: 'cairn' }).click();
-  await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}`));
-  await expect(home(page)).toBeVisible();
-  await expect(home(page).getByRole('heading', { level: 2 })).toHaveText('cairn');
-  await expect(page.getByTestId('home-c')).toHaveCount(0);
-  await expect(page.getByTestId('chief-composer-input')).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}&chat=1`));
+  await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('cairn');
+  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeVisible();
+  await expect(home(page)).toHaveCount(0);
+  await expect(
+    page.locator('[data-slot="sidebar-project-row"]', { hasText: 'cairn' }),
+  ).toHaveAttribute('aria-current', 'page');
+});
+
+test('a project picked in search opens its conversation', async ({ page }) => {
+  await page.goto('/app?scenario=home-c');
+  await page.getByRole('complementary').getByRole('button', { name: 'Search' }).click();
+  const search = page.getByRole('dialog', { name: 'Search' });
+  await search.getByRole('textbox').fill('cairn');
+  await search.locator('[data-row-kind="project"]', { hasText: 'cairn' }).click();
+  await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}&chat=1$`));
+  await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('cairn');
+  await expect(home(page)).toHaveCount(0);
+});
+
+test('the back link of the project settings opens the project conversation', async ({ page }) => {
+  await page.goto(`/app/project/${PROJECT_ID}/settings?scenario=home-c`);
+  await page.getByTestId('page-topbar').getByRole('link', { name: 'Back' }).click();
+  await expect(page).toHaveURL(new RegExp(`/app\\?scenario=home-c&project=${PROJECT_ID}&chat=1$`));
+  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeVisible();
+  await expect(home(page)).toHaveCount(0);
 });
 
 test('the threads are this project only, grouped by state with counts', async ({ page }) => {
@@ -62,16 +83,18 @@ test('the ask link opens the project chat scoped to this project', async ({ page
     'placeholder',
     /cairn|Type your own answer/,
   );
-  await page.getByTestId('home-c-project-links').getByRole('link', { name: 'Project home' }).click();
-  await expect(home(page)).toBeVisible();
+  await expect(page.getByTestId('home-c-project-links')).toHaveCount(0);
 });
 
-test('from a project chat, clicking a sidebar project opens that project home', async ({ page }) => {
+test('from a project chat, clicking another sidebar project opens that project conversation', async ({
+  page,
+}) => {
   await page.goto(projectHome('&chat=1'));
   await expect(page.getByTestId('home-c')).toBeVisible();
   await page.locator('[data-slot="sidebar-project-row"]', { hasText: 'Credential relay' }).click();
-  await expect(home(page)).toBeVisible();
-  await expect(page).not.toHaveURL(/chat=1/);
+  await expect(page).toHaveURL(new RegExp(`project=${CRED_PROJECT_ID}&chat=1`));
+  await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('Credential relay');
+  await expect(home(page)).toHaveCount(0);
 });
 
 test('the Coordinator shortcut on a project home opens the project chat with the composer focused', async ({

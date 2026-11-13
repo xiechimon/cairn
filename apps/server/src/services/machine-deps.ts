@@ -32,6 +32,7 @@ export interface MachineDeps {
   mcpConfigPath?: string;
   convHub?: ConversationStreamHub;
   githubFetch?: FetchLike;
+  oauthFetch?: FetchLike;
   oauthClient?: OAuthClientConfig | null;
 }
 
@@ -113,6 +114,6 @@ export function upsertChiefRow(
   deps: { db: Db; convHub?: ConversationStreamHub },
   row: MessageRowInput & { threadId: string },
 ): void {
-  upsertChiefMessage(deps.db, row);
-  deps.convHub?.publishMessage(row.threadId, row);
+  const stored = upsertChiefMessage(deps.db, row);
+  deps.convHub?.publishMessage(row.threadId, stored);
 }

@@ -1,7 +1,6 @@
 import type { RequiredCapabilities, RouteOverride } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
-import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   chief as chiefTable,
@@ -55,14 +54,12 @@ async function enrollMachineRest(
   const res = await w.s.app.request('/api/machine/enroll', {
     method: 'POST',
     headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-    body: JSON.stringify(
-      readyMachine({
-        teamId: w.s.team.id,
-        name: opts.name,
-        cliVersion: '0.1.0',
-        ...(opts.capabilities !== undefined ? { capabilities: opts.capabilities } : {}),
-      }),
-    ),
+    body: JSON.stringify({
+      teamId: w.s.team.id,
+      name: opts.name,
+      cliVersion: '0.1.0',
+      ...(opts.capabilities !== undefined ? { capabilities: opts.capabilities } : {}),
+    }),
   });
   expect(res.status).toBe(200);
   const body = (await res.json()) as { machineId: string; token: string };

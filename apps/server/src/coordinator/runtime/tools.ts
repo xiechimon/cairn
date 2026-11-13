@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto';
 import {
   CHIEF_REMOTE_TOOLS,
+  CHIEF_REPLY_TOOLS,
   CHIEF_ROUTER_TOOLS,
   COMPUTER_REMOTE_TOOLS,
   coordinatorToolSourceId,
   type MachineAskBody,
   type RemoteToolDef,
+  SLICE1_ACTIONS,
 } from '@cairn/shared';
 import {
   defineExtension,
@@ -183,10 +185,37 @@ export function coordinatorToolsExtension(
     storeId?: () => string | undefined;
   } = {},
 ) {
+  const actionCopy: Record<string, string> = {
+    archive_project: 'Archive a project. It stays readable and can be unarchived.',
+    unarchive_project: 'Unarchive a project so it can be changed again.',
+  };
+  const actionTools: RemoteToolDef[] = SLICE1_ACTIONS.filter(
+    (entry) => entry.surfaces.includes('coordinator') && entry.toolName !== 'delete_project',
+  ).map((entry) => {
+    const description = actionCopy[entry.toolName];
+    if (description === undefined) throw new Error(`no Coordinator copy for ${entry.toolName}`);
+    return {
+      name: entry.toolName,
+      description,
+      parameters: {
+        type: 'object',
+        properties: {
+          projectId: { type: 'string', description: 'Project id' },
+        },
+        required: ['projectId'],
+      },
+    };
+  });
   const defs =
     options.routerTools === false
-      ? [...CHIEF_REMOTE_TOOLS, ...COMPUTER_REMOTE_TOOLS]
-      : [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS, ...COMPUTER_REMOTE_TOOLS];
+      ? [...CHIEF_REMOTE_TOOLS, ...CHIEF_REPLY_TOOLS, ...COMPUTER_REMOTE_TOOLS, ...actionTools]
+      : [
+          ...CHIEF_REMOTE_TOOLS,
+          ...CHIEF_ROUTER_TOOLS,
+          ...CHIEF_REPLY_TOOLS,
+          ...COMPUTER_REMOTE_TOOLS,
+          ...actionTools,
+        ];
   return defineExtension({
     name: 'cairn-coordinator-tools',
     hooks: [

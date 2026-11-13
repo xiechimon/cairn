@@ -125,7 +125,7 @@ function FolderList({
   return (
     <>
       <div className="-mx-2.5 -mt-2.5 mb-1 flex h-10 items-center gap-2 border-b border-border px-3 text-content-tertiary">
-        <Search width={15} height={15} />
+        <Search width={18} height={18} />
         <Input
           autoFocus
           aria-label={t('查找文件夹或粘贴路径')}
@@ -156,7 +156,7 @@ function FolderList({
             data-selected={at === 0 ? '' : undefined}
             onClick={() => onPick(typedPath)}
           >
-            <Folder aria-hidden="true" className="size-4 flex-none text-icon" />
+            <Folder aria-hidden="true" className="size-5 flex-none text-icon" />
             <span className="truncate">{t('使用 {path}', { path: typedPath })}</span>
           </Button>
         )}
@@ -174,7 +174,7 @@ function FolderList({
                   title={folder.path}
                   onClick={() => onPick(folder.path)}
                 >
-                  <Folder aria-hidden="true" className="size-4 flex-none text-icon" />
+                  <Folder aria-hidden="true" className="size-5 flex-none text-icon" />
                   <span className="flex-none">{baseName(folder.path)}</span>
                   <span className="ml-auto min-w-0 truncate pl-3 text-meta text-content-tertiary">
                     {folder.path}
@@ -202,7 +202,7 @@ function FolderList({
           data-selected={at === actions.length - 1 ? '' : undefined}
           onClick={onBrowse}
         >
-          <ChevronRight aria-hidden="true" className="size-4 flex-none text-icon" />
+          <ChevronRight aria-hidden="true" className="size-5 flex-none text-icon" />
           {t('浏览文件夹…')}
         </Button>
       </div>
@@ -286,7 +286,7 @@ function FolderTree({ onPick, onBack }: { onPick: (path: string) => void; onBack
           className="flex-none self-start text-content-tertiary"
           onClick={onBack}
         >
-          <ChevronLeft width={14} height={14} />
+          <ChevronLeft width={16} height={16} />
         </Button>
         <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5 border-b border-border pb-1.5">
           {crumbs.map((seg, i) => (
@@ -322,7 +322,7 @@ function FolderTree({ onPick, onBack }: { onPick: (path: string) => void; onBack
                 className="group flex h-8 items-center gap-2 rounded-(--radius-menu-item) px-1.5 hover:bg-(--menu-hover)"
                 key={entry.name}
               >
-                <Folder aria-hidden="true" className="size-4 flex-none text-icon" />
+                <Folder aria-hidden="true" className="size-5 flex-none text-icon" />
                 <Button
                   variant="ghost"
                   aria-label={entry.name}

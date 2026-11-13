@@ -15,9 +15,18 @@ import type { AppContext } from './context.js';
 import { team, user } from './db/schema.js';
 import { toTeamRecord } from './db/seed.js';
 import { parseWith } from './lib/errors.js';
+import { loopbackOwnerOriginOf } from './lib/loopback-owner.js';
 import { isOpenRemotePath, pairedDeviceIdOf } from './lib/token-auth.js';
 import { githubAppOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { readBackupHealth } from './services/backup-status.js';
+import {
+  AUTH_COOKIE,
+  issueBrowserSession,
+  issueStreamTicket,
+  requestIsSecure,
+  resolveBrowserSession,
+  setAuthCookie,
+} from './services/browser-session.js';
 import { readDeployStatus } from './services/deploy-status.js';
 import { createSerialConnection } from './services/events.js';
 import { readFirstPrReportPrompt, setFirstPrReportPrompt } from './services/first-pr-report.js';
@@ -46,6 +55,32 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       setCookie(c, SESSION_COOKIE, ctx.user.id, { httpOnly: true, path: '/' });
     }
     await next();
+  });
+
+  app.post('/api/auth/bootstrap', (c) => {
+    if (ctx.loopbackOwner == null || loopbackOwnerOriginOf(c, ctx.loopbackOwner) === null) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const site = c.req.header('sec-fetch-site');
+    if (site !== undefined && site !== 'same-origin' && site !== 'none') {
+      return c.json({ error: 'same-origin proof required' }, 403);
+    }
+    const existing = resolveBrowserSession(ctx.db, getCookie(c, AUTH_COOKIE) ?? '');
+    if (existing?.kind === 'owner') return c.json({ ok: true });
+    const session = issueBrowserSession(ctx.db, 'owner');
+    setAuthCookie(c, session.token, requestIsSecure(c));
+    return c.json({ ok: true });
+  });
+
+  app.post('/api/auth/stream-ticket', (c) => {
+    const deviceId = pairedDeviceIdOf(c);
+    const owner = c.get('ownerIdentity');
+    if (owner === undefined && deviceId === null) return c.json({ error: 'Unauthorized' }, 401);
+    const ticket = issueStreamTicket(
+      owner !== undefined ? { kind: 'owner', deviceId: null } : { kind: 'device', deviceId },
+    );
+    c.header('cache-control', 'no-store');
+    return c.json(ticket);
   });
 
   app.get('/api/auth/session', (c) => c.json(ctx.user));

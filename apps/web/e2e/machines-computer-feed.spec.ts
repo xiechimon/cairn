@@ -27,6 +27,7 @@ const computer = (patch: Record<string, unknown> = {}) => ({
   state: 'running',
   controlHolder: 'none',
   browserEnabled: false,
+  handoffReason: null,
   machine: { id: 'm1', name: 'omarchy', online: true },
   ...patch,
 });
@@ -35,9 +36,18 @@ interface Feed {
   computers: unknown[];
   commands: unknown[];
   holdCommands?: Promise<void>;
+  controlCalls?: string[];
 }
 
-async function open(page: Page, feed: Feed, machines: unknown[] = []) {
+const FEED_MACHINE = { id: 'm1', name: 'omarchy', online: true, kind: 'remote', runningSteps: 0 };
+
+async function open(
+  page: Page,
+  feed: Feed,
+  machines: unknown[] = [FEED_MACHINE],
+  detail = true,
+  url = '/app?pane=machines',
+) {
   await mockLive(page, { threads: [], messages: HISTORY, machines }, (path, route, json) => {
     if (path === '/api/computers' && route.request().method() === 'GET') {
       return json({ computers: feed.computers });
@@ -58,12 +68,20 @@ async function open(page: Page, feed: Feed, machines: unknown[] = []) {
       return json({ error: 'the computer is not connected' }, 409);
     }
     if (path === '/api/teams/t1/computers/comp-1/control') {
+      const method = route.request().method();
+      feed.controlCalls?.push(method);
+      if (method === 'DELETE') return json({ released: true });
       return json({ leaseId: 'lease-1', expiresAt: Date.now() + 60_000, controlFence: 1 }, 201);
     }
     return undefined;
   });
-  await page.goto('/app?pane=machines');
-  return page.getByRole('complementary', { name: '电脑' });
+  await page.goto(url);
+  const panel = page.getByRole('complementary', { name: '电脑' });
+  if (detail && machines.length > 0) {
+    await panel.locator('[data-slot="list-card"]').first().getByRole('button').click();
+    await panel.getByRole('tab', { name: '在这台工作' }).click();
+  }
+  return panel;
 }
 
 async function emit(page: Page, event: unknown) {
@@ -357,19 +375,47 @@ test('reconnect replaces an old live result with the current persisted history',
 test('private REST history disappears at the auth gate and a late old response cannot replace the next scope', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.addInitScript(() => localStorage.setItem('cairn.token', 'scope-first'));
   let rejectFirst = false;
   let holdFirstHistory = false;
   let historyStarted = false;
   let release: () => void = () => {};
-  const held = new Promise<void>((resolve) => { release = resolve; });
-  await mockLive(page, { threads: [], messages: HISTORY, machines: [] }, (path, route, json) => {
-    const authorization = route.request().headers().authorization;
-    const first = authorization === 'Bearer scope-first';
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const scopeOf = (route: {
+    request: () => { headers: () => { cookie?: string } };
+  }): 'first' | 'second' | 'none' => {
+    const cookie = route.request().headers().cookie ?? '';
+    if (cookie.includes('cairn_auth=scope-second')) return 'second';
+    if (cookie.includes('cairn_auth=scope-first')) return 'first';
+    return 'none';
+  };
+  await mockLive(page, { threads: [], messages: HISTORY, machines: [FEED_MACHINE] }, (path, route, json) => {
+    const request = route.request();
+    if (path === '/api/auth/bootstrap' && request.method() === 'POST') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true }),
+        headers: { 'set-cookie': 'cairn_auth=scope-first; Path=/' },
+      });
+    }
+    if (path === '/api/remote/descriptor') return json({ environmentId: 'env-1', version: 1 });
+    if (path === '/api/remote/pair' && request.method() === 'POST') {
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ token: 'device', deviceId: 'd1', environmentId: 'env-1' }),
+        headers: { 'set-cookie': 'cairn_auth=scope-second; Path=/' },
+      });
+    }
+    if (path === '/api/auth/stream-ticket' && request.method() === 'POST') {
+      return json({ ticket: 'ticket-1', expiresAt: Date.now() + 60_000 });
+    }
+    const scope = scopeOf(route);
+    const first = scope === 'first';
     if (path === '/api/teams') {
-      return ['Bearer scope-first', 'Bearer scope-second'].includes(authorization ?? '')
-        ? json([TEAM])
-        : json({ error: 'Unauthorized' }, 401);
+      return scope === 'none' ? json({ error: 'Unauthorized' }, 401) : json([TEAM]);
     }
     if (path === '/api/computers') {
       return first && rejectFirst
@@ -381,7 +427,13 @@ test('private REST history disappears at the auth gate and a late old response c
         historyStarted = true;
         return held.then(() => json({ commands: [command(1, { command: 'first-owner-only' })] }));
       }
-      return json({ commands: [command(first ? 1 : 2, { command: first ? 'first-owner-only' : 'second-owner-only' })] });
+      return json({
+        commands: [
+          command(first ? 1 : 2, {
+            command: first ? 'first-owner-only' : 'second-owner-only',
+          }),
+        ],
+      });
     }
     return undefined;
   });
@@ -389,6 +441,8 @@ test('private REST history disappears at the auth gate and a late old response c
   try {
     await page.goto('/app?pane=machines');
     const panel = page.getByRole('complementary', { name: '电脑' });
+    await panel.locator('[data-slot="list-card"]').first().getByRole('button').click();
+    await panel.getByRole('tab', { name: '在这台工作' }).click();
     await expect(entries(panel)).toContainText(['first-owner-only']);
     holdFirstHistory = true;
     await emit(page, { type: 'ping', seq: 1 });
@@ -404,7 +458,11 @@ test('private REST history disappears at the auth gate and a late old response c
     await page.locator('.token-gate-submit').click();
     await expect(page.locator('.token-gate')).toHaveCount(0);
     await expect(entries(panel)).toContainText(['second-owner-only']);
-    const late = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/computers/comp-1/commands' && response.request().headers().authorization === 'Bearer scope-first');
+    const late = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/api/computers/comp-1/commands' &&
+        (response.request().headers().cookie ?? '').includes('cairn_auth=scope-first'),
+    );
     release();
     await late;
     await expect(entries(panel)).toContainText(['second-owner-only']);
@@ -493,17 +551,22 @@ test('with a machine listed the panel still shows its card and the screen placeh
       },
     ],
   );
-  await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(2);
-  const card = panel.locator('[data-slot="list-card"]').nth(1);
+  const card = panel;
   await expect(card.getByTestId('machine-screen')).toBeVisible();
+  await card.getByRole('tab', { name: 'Agent 的权限' }).click();
   await expect(card.getByText('已安装')).toHaveCount(0);
   await expect(card.getByText('未安装')).toHaveCount(0);
-  await expect(card.getByRole('switch', { name: '桌面控制' })).toBeEnabled();
-  const browser = card.getByRole('switch', { name: '浏览器' });
-  await expect(browser).toBeEnabled();
-  await expect(browser).not.toBeChecked();
-  await browser.click();
-  await expect(browser).toBeChecked();
+  await expect(card.getByRole('switch')).toHaveCount(0);
+  await expect(card.getByRole('heading', { name: '能力' })).toHaveCount(0);
+});
+
+test('with no machines the list is only the add row and the hint', async ({ page }) => {
+  const panel = await open(page, { computers: [], commands: [] }, [], false);
+  await expect(panel.getByRole('heading', { name: '你的电脑' })).toBeVisible();
+  await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(1);
+  await expect(panel.getByTestId('machine-list-row')).toHaveCount(0);
+  await expect(panel.getByTestId('machines-add').getByRole('link', { name: '添加电脑' })).toBeVisible();
+  await expect(panel).toContainText('没有其他电脑时，任务都在 Coordinator 这台电脑上跑。');
 });
 
 test('an offline Coordinator machine reads offline in the chip and the card, with no running count', async ({
@@ -513,49 +576,79 @@ test('an offline Coordinator machine reads offline in the chip and the card, wit
     page,
     { computers: [], commands: [] },
     [{ id: 'm1', name: 'omarchy', online: false, runningSteps: 3 }],
+    false,
   );
   const chip = page.getByTestId('machines-button');
   await expect(chip).toHaveAccessibleName(/omarchy/);
   await expect(chip).toHaveAccessibleName(/离线/);
   await expect(chip).not.toHaveAccessibleName(/在跑/);
-  await expect(page.getByTestId('machines-online-dot')).toHaveCount(0);
-  const card = panel.locator('[data-slot="list-card"]').nth(0);
-  await expect(card).toContainText('离线');
-  await expect(card.getByTestId('machine-screen')).toHaveCount(0);
-  await expect(card.getByTestId('machine-screen-hint')).toHaveCount(0);
+  await expect(chip.locator('span')).toHaveCount(0);
+  const row = panel.locator('[data-slot="list-card"]').first();
+  await expect(row).toContainText('离线');
+  await expect(row).not.toContainText('在跑');
+  await row.getByRole('button').click();
+  await expect(panel.getByTestId('machine-screen')).toHaveCount(0);
+  await expect(panel.getByTestId('machine-screen-hint')).toHaveCount(0);
 });
 
-test('the live screen enlarges and becomes interactive after desktop control is on', async ({
+test('enlarging the live screen only watches; Take control and Return control drive the lease', async ({
   page,
 }) => {
-  const panel = await open(
-    page,
-    { computers: [computer()], commands: [command(1)] },
-    [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
-  );
-  const card = panel.locator('[data-slot="list-card"]').nth(1);
-  await expect(card.getByTestId('machine-screen-expand')).toBeVisible();
-  await card.getByRole('switch', { name: '桌面控制' }).click();
-  await expect(card.getByRole('switch', { name: '桌面控制' })).toHaveAttribute(
-    'aria-checked',
-    'true',
-  );
-  await card.getByTestId('machine-screen-expand').click();
+  const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
+  const panel = await open(page, feed, [
+    { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 },
+  ]);
+  await expect(panel.getByTestId('machine-screen-expand')).toBeVisible();
+  await panel.getByTestId('machine-screen-expand').click();
   const enlarged = page.getByTestId('machine-screen-enlarged');
   await expect(enlarged).toBeVisible();
+  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-fill', 'true');
+  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
+    'data-interactive',
+    'false',
+  );
+  const dialog = page.getByRole('dialog', { name: 'omarchy' });
+  await expect(dialog.getByRole('button', { name: '交还' })).toHaveCount(0);
+  expect(feed.controlCalls).toEqual([]);
+  await dialog.getByRole('button', { name: '接管' }).click();
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
     'data-interactive',
     'true',
     { timeout: 15_000 },
   );
-  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-fill', 'true');
   await expect(page.getByText('在大屏里点击和键入')).toBeVisible();
-  await page.getByRole('dialog', { name: 'omarchy' }).getByRole('button', { name: '关闭' }).click();
+  expect(feed.controlCalls).toEqual(['POST']);
+  await dialog.getByRole('button', { name: '交还' }).click();
+  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
+    'data-interactive',
+    'false',
+  );
+  expect(feed.controlCalls).toEqual(['POST', 'DELETE']);
+  await dialog.getByRole('button', { name: '关闭' }).click();
   await expect(enlarged).toHaveCount(0);
-  await expect(card.getByTestId('machine-screen-expand')).toBeVisible();
 });
 
-test('without a computer row the machine keeps the waiting placeholder and disabled toggles', async ({
+test('opening the machine while a user lease exists elsewhere does not take control, and Return control releases it', async ({
+  page,
+}) => {
+  const feed: Feed = {
+    computers: [computer({ controlHolder: 'user' })],
+    commands: [command(1)],
+    controlCalls: [],
+  };
+  const panel = await open(page, feed, [
+    { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 },
+  ]);
+  await expect(panel.getByTestId('machine-screen-expand')).toBeVisible();
+  const giveBack = panel.getByRole('button', { name: '交还' });
+  await expect(giveBack).toBeVisible();
+  await expect(panel.getByTestId('machine-screen')).toHaveAttribute('data-interactive', 'false');
+  expect(feed.controlCalls).toEqual([]);
+  await giveBack.click();
+  await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE']);
+});
+
+test('without a computer row the machine keeps the waiting placeholder and an empty access tab', async ({
   page,
 }) => {
   const panel = await open(
@@ -563,27 +656,21 @@ test('without a computer row the machine keeps the waiting placeholder and disab
     { computers: [], commands: [] },
     [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
   );
-  const card = panel.locator('[data-slot="list-card"]').nth(0);
+  const card = panel;
   await expect(card.getByTestId('machine-screen')).toHaveCount(0);
   await expect(card.getByTestId('machine-screen-hint')).toBeVisible();
-  await expect(card.getByRole('switch', { name: '桌面控制' })).toBeDisabled();
-  await expect(card.getByText('已安装')).toHaveCount(0);
-  await expect(card.getByText('未安装')).toHaveCount(0);
-  const desktopReason = 'Coordinator 还没有自己的电脑。第一次需要时会自动开一台。';
-  await card.getByRole('button', { name: desktopReason }).click();
-  await expect(page.locator('[data-sonner-toast]', { hasText: desktopReason })).toBeVisible();
-  const browserReason = '这台机器还不支持浏览器。';
-  await card.getByRole('button', { name: browserReason }).focus();
-  await page.keyboard.press(' ');
-  await expect(page.locator('[data-sonner-toast]', { hasText: browserReason })).toBeVisible();
+  await card.getByRole('tab', { name: 'Agent 的权限' }).click();
+  await expect(card.getByRole('switch')).toHaveCount(0);
+  await expect(card.getByTestId('machine-folders-empty')).toBeVisible();
 });
 
 const LONG_OUTPUT = `${'x'.repeat(4000)}\n${'line of output\n'.repeat(300)}`.slice(-4096);
 
 const MACHINE = { id: 'm1', name: 'omarchy', online: true, kind: 'remote', maxConcurrent: 4, runningSteps: 1 };
 
-const SHOT_SCENES: Record<string, { feed: Feed; expand: number | null; machines?: unknown[] }> = {
+const SHOT_SCENES: Record<string, { feed: Feed; expand: number | null; machines?: unknown[]; detail?: boolean }> = {
   machines: { feed: HISTORY_FEED, expand: null, machines: [MACHINE] },
+  list: { feed: HISTORY_FEED, expand: null, machines: [MACHINE], detail: false },
   empty: { feed: { computers: [], commands: [] }, expand: null },
   history: { feed: HISTORY_FEED, expand: 1 },
   offline: {
@@ -604,12 +691,12 @@ const SHOT_SCENES: Record<string, { feed: Feed; expand: number | null; machines?
 
 for (const theme of ['light', 'dark'] as const) {
   for (const width of [1280, 390]) {
-    for (const [scene, { feed, expand, machines }] of Object.entries(SHOT_SCENES)) {
+    for (const [scene, { feed, expand, machines, detail }] of Object.entries(SHOT_SCENES)) {
       test(`screenshots ${scene} ${theme} ${width}`, async ({ page }) => {
         test.skip(!SHOTS, 'screenshots only on request');
         await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
         await page.setViewportSize({ width, height: 900 });
-        const panel = await open(page, feed, machines);
+        const panel = await open(page, feed, machines, detail);
         if (expand !== null) {
           await entries(panel).nth(expand).getByRole('button', { name: '输出' }).click();
         }
@@ -620,3 +707,43 @@ for (const theme of ['light', 'dark'] as const) {
     }
   }
 }
+
+test('a pending login handoff asks the owner to log in next to the screen', async ({ page }) => {
+  const feed: Feed = {
+    computers: [computer({ handoffReason: 'login' })],
+    commands: [command(1)],
+    controlCalls: [],
+  };
+  const panel = await open(page, feed, [
+    { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 },
+  ]);
+  const bar = panel.getByTestId('computer-control-bar');
+  await expect(bar).toHaveAttribute('data-handoff', 'login');
+  await expect(bar).toContainText('需要你登录');
+  await expect(bar.getByRole('button', { name: '接管' })).toBeVisible();
+  expect(feed.controlCalls).toEqual([]);
+});
+
+test('the push link opens the machine with its screen enlarged and view-only', async ({
+  page,
+}) => {
+  const feed: Feed = {
+    computers: [computer({ handoffReason: 'login' })],
+    commands: [command(1)],
+    controlCalls: [],
+  };
+  await open(
+    page,
+    feed,
+    [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
+    false,
+    '/app?pane=machines&machine=m1&screen=1',
+  );
+  const enlarged = page.getByTestId('machine-screen-enlarged');
+  await expect(enlarged).toBeVisible();
+  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
+    'data-interactive',
+    'false',
+  );
+  expect(feed.controlCalls).toEqual([]);
+});

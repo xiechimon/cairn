@@ -54,6 +54,7 @@ export * from './prompts.js';
 export * from './provider.js';
 export * from './provider-presets.js';
 export * from './push.js';
+export * from './quick-replies.js';
 export * from './recording-trigger.js';
 export * from './report.js';
 export * from './research-prompts.js';

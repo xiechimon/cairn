@@ -30,4 +30,27 @@ describe('question dock state', () => {
     questionDockState.endUpload();
     expect(questionDockState.uploading()).toBe(false);
   });
+
+  test('a reveal bumps the reveal count and notifies subscribers', () => {
+    let heard = 0;
+    const stop = questionDockState.subscribe(() => {
+      heard += 1;
+    });
+    const before = questionDockState.reveals();
+    questionDockState.reveal();
+    expect(questionDockState.reveals()).toBe(before + 1);
+    expect(heard).toBe(1);
+    stop();
+  });
+
+  test('focus does not move while an answer upload is in flight', () => {
+    questionDockState.setFocus(0);
+    questionDockState.beginUpload();
+    questionDockState.setFocus(1);
+    expect(questionDockState.focus()).toBe(0);
+    questionDockState.endUpload();
+    questionDockState.setFocus(1);
+    expect(questionDockState.focus()).toBe(1);
+    questionDockState.setFocus(0);
+  });
 });

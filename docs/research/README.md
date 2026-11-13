@@ -4,6 +4,8 @@ Research notes archived per ticket. Once written they are not maintained; cite t
 
 The notes and captures from the early study of todos.dev (the r1 to r9 series and their `assets/r*/` folders) were removed from the working tree. They remain in git history at `e95b775`; read one with `git show e95b775:docs/research/<file>`.
 
+The screenshots and recordings that the remaining notes embed (493 `png`, `jpg` and `gif` files, 35 MB) were removed from the working tree on 2026-11-12 to keep clones small. The notes keep their image links as the index of what was captured. The files remain in git history at `3d238b2`; restore one with `git show 3d238b2:docs/research/<path> > <file>`.
+
 ## Index
 
 ### Foundation
@@ -52,6 +54,7 @@ The notes and captures from the early study of todos.dev (the r1 to r9 series an
 | [xmon48-filter-panel-closure.md](xmon48-filter-panel-closure.md) | none | XMON-48 board filter interaction research, wrap-up and decision material |
 | [r15-agent-responsibility-default.md](r15-agent-responsibility-default.md) | none | Default responsibility text for the first agent: evidence from seven ecosystems' sources and the trade-off (t-0198; shares a number with r15-multica-run-rendering but is a different ticket) |
 | [research-loop-plan.md](research-loop-plan.md) | none | Design plan for agents that research outward (D63, on D60's thread model): research threads before a stuck build's last retry and before new mechanisms, a search tool for pi, sourced expiring memory, daily intake; spikes, cost and open decisions |
+| [review-gate-prior-art-2026-11-11.md](review-gate-prior-art-2026-11-11.md) | none | Why `review-gate` exists, how other teams gate on AI review, and what the 13 PRs on the night of 2026-11-11 actually cost. Recommendation only |
 
 ### Recovered research (2026-11-06 to 2026-11-09)
 

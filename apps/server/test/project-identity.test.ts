@@ -17,7 +17,7 @@ import {
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { bootServer, issueApiKey, req, seedSessionRoute } from './helpers.js';
+import { bootServer, insertMachine, issueApiKey, req, seedSessionRoute } from './helpers.js';
 
 interface GhRoute {
   status?: number;
@@ -48,6 +48,7 @@ function ghMock(initial: Record<string, GhRoute>) {
 const REACHABLE: Record<string, GhRoute> = { '/repos/octo/conv': { body: { id: 1 } } };
 
 const s = bootServer({ claimHoldMs: 200, githubFetch: ghMock(REACHABLE).impl });
+insertMachine(s);
 afterAll(() => s.dispose());
 
 interface ProjectReply {
@@ -459,6 +460,7 @@ describe('PATCH /api/projects/{id} -- githubRepo retarget on a github project (#
   ): { srv: ReturnType<typeof bootServer>; mock: ReturnType<typeof ghMock> } {
     const mock = ghMock(routes);
     const srv = bootServer({ githubFetch: mock.impl, ...(logger !== undefined ? { logger } : {}) });
+    insertMachine(srv);
     retargetDisposables.push(() => srv.dispose());
     return { srv, mock };
   }

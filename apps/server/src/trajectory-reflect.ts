@@ -3,6 +3,7 @@ import {
   experienceProposalSchema,
   fenceIssueText,
   ISSUE_FENCE_OPEN,
+  MAIL_FENCE_OPEN,
   parseGithubIssueSourceRef,
   type TrajectoryPack,
   trajectoryPackSchema,
@@ -121,7 +122,11 @@ export async function reflectPacks(
       for (const proposal of proposals) {
         const text = `${proposal.title}\n${proposal.content}`;
         const quoted = normalizeQuoted(text);
-        if (text.includes(ISSUE_FENCE_OPEN) || issueLines.some((line) => quoted.includes(line))) {
+        if (
+          text.includes(ISSUE_FENCE_OPEN) ||
+          text.includes(MAIL_FENCE_OPEN) ||
+          issueLines.some((line) => quoted.includes(line))
+        ) {
           summary.rejected++;
           continue;
         }

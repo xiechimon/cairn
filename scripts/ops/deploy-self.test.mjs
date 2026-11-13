@@ -19,6 +19,7 @@ const DEPLOY = join(import.meta.dirname, 'deploy-self.sh');
 const WATCH = join(import.meta.dirname, 'deploy-watch.sh');
 const BOOTSTRAP = join(import.meta.dirname, 'bootstrap-deploy.sh');
 const SYSTEM_PATH = '/usr/bin:/bin';
+const OWNER_TOKEN = 'fixture-owner-token';
 
 function git(cwd, ...args) {
   return execFileSync('git', args, {
@@ -97,7 +98,10 @@ function fixture({ claimed = 0, digestClaimed = 0, heartbeatAgeMs = null, seedFi
   const backups = join(dir, 'backups');
   const fake = join(dir, 'fake');
   const bin = join(dir, 'bin');
-  for (const path of [work, data, fake, bin]) mkdirSync(path, { recursive: true });
+  const tokenFile = join(dir, '.cairn', 'token');
+  for (const path of [work, data, fake, bin, join(dir, '.cairn')])
+    mkdirSync(path, { recursive: true });
+  writeFileSync(tokenFile, `CAIRN_TOKEN=${OWNER_TOKEN}\n`, { mode: 0o600 });
   git(dir, 'init', '-q', '--bare', '-b', 'main', origin);
   git(work, 'init', '-q', '-b', 'main');
   const previous = commit(work, 'previous', { files: seedFiles });
@@ -224,16 +228,27 @@ exit 0`,
   writeFileSync(
     join(fake, 'lease-api.mjs'),
     `
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 const args = process.argv.slice(2);
 const value = (flag) => args[args.indexOf(flag) + 1];
 const method = args.includes('-X') ? value('-X') : 'GET';
 const sql = (query) => execFileSync('sqlite3', ['${db}', query], { encoding: 'utf8' }).trim();
+const ownerToken = existsSync('${fake}/lease-owner-token') ? readFileSync('${fake}/lease-owner-token', 'utf8') : '${OWNER_TOKEN}';
+const authorized = readFileSync(0, 'utf8').includes('header = "Authorization: Bearer ' + ownerToken + '"');
+appendFileSync('${fake}/lease-requests.log', method + ' ' + (authorized ? 'owner' : 'anonymous') + ' ' + JSON.stringify(args) + '\\n');
+if (existsSync('${fake}/lease-timeout')) {
+  process.stderr.write('curl: (28) Operation timed out after 10002 milliseconds with 0 bytes received\\n');
+  process.stdout.write('000');
+  process.exit(28);
+}
 let status = 200;
 let row = JSON.parse(sql("select json_object('owner',owner,'status',status,'expiresAt',expiresAt) from deploy_lease where id='server'") || '{"owner":null,"status":"accepting","expiresAt":0}');
 if (existsSync('${fake}/lease-unsupported')) status = 404;
-else if (method === 'DELETE' && existsSync('${fake}/lease-delete-fail')) status = 503;
+else if (!authorized) {
+  status = 401;
+  row = { error: 'Unauthorized' };
+} else if (method === 'DELETE' && existsSync('${fake}/lease-delete-fail')) status = 503;
 else if (method === 'DELETE' && row.owner === JSON.parse(value('--data-binary')).owner) {
   row = { ...row, status: 'accepting', expiresAt: 0 };
   sql("update deploy_lease set status='accepting',expiresAt=0 where id='server'");
@@ -282,7 +297,7 @@ else printf 000; fi`,
     spawnSync('/bin/bash', [script, ...args], { encoding: 'utf8', env: { ...env, ...extra } });
   const log = (name) =>
     existsSync(join(fake, name)) ? readFileSync(join(fake, name), 'utf8') : '';
-  return { dir, work, checkout, data, db, state, backups, fake, previous, run, log };
+  return { dir, work, checkout, data, db, state, backups, fake, previous, run, log, tokenFile };
 }
 
 function pushTarget(f, message = 'target', options) {
@@ -1142,8 +1157,103 @@ test('daemon changes fail closed against a server without lease support', () => 
   writeFileSync(join(f.fake, 'lease-unsupported'), '');
   const result = f.run(DEPLOY, [pushTarget(f)]);
   assert.equal(result.status, 2, result.stderr);
-  assert.match(result.stderr, /lease endpoint/);
+  assert.match(result.stderr, /lacks the deployment lease endpoint \(HTTP 404\)/);
   assert.equal(f.log('systemctl.log'), '');
+});
+
+test('a daemon deploy authenticates every lease request as the owner and keeps the token out of argv', () => {
+  const f = fixture();
+  const result = f.run(DEPLOY, [pushTarget(f)]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(
+    f
+      .log('lease-requests.log')
+      .trim()
+      .split('\n')
+      .map((line) => line.split(' ').slice(0, 2).join(' ')),
+    ['GET owner', 'PUT owner', 'DELETE owner'],
+  );
+  assert.doesNotMatch(
+    f.log('lease-requests.log') + result.stdout + result.stderr,
+    /fixture-owner-token/,
+  );
+});
+
+const REJECTED_LEASE_CASES = [
+  {
+    name: 'the token file has no token value',
+    arrange: (f) => writeFileSync(f.tokenFile, '# rotated\nCAIRN_TOKEN=\nCAIRN_TOKEN=later\n'),
+    cause: /that file has no CAIRN_TOKEN value/,
+  },
+  {
+    name: 'the health URL is not loopback',
+    extra: { CAIRN_HEALTH_URL: 'http://cairn.example.invalid:8787' },
+    cause: /it is sent only to a loopback CAIRN_HEALTH_URL/,
+  },
+  {
+    name: 'the token file is missing',
+    arrange: (f) => unlinkSync(f.tokenFile),
+    cause: /that file is missing or unreadable/,
+  },
+  {
+    name: 'the server does not accept the stored token',
+    arrange: (f) => writeFileSync(f.tokenFile, 'CAIRN_TOKEN=stale-owner-token\n'),
+    cause: /the server did not accept it/,
+  },
+];
+
+for (const { name, arrange, extra, cause } of REJECTED_LEASE_CASES) {
+  test(`a 401 from the lease request names the cause when ${name}`, () => {
+    const f = fixture();
+    arrange?.(f);
+    const result = f.run(DEPLOY, [pushTarget(f)], extra);
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /rejected the deployment lease request \(HTTP 401\)/);
+    assert.match(result.stderr, cause);
+    assert.doesNotMatch(result.stderr, /lease endpoint|stale-owner-token/);
+    assert.match(f.log('lease-requests.log'), /^GET anonymous /);
+    assert.equal(f.log('systemctl.log'), '');
+  });
+}
+
+test('a lease request that gets no response refuses as unreachable, not as a missing endpoint', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'lease-timeout'), '');
+  const result = f.run(DEPLOY, [pushTarget(f)]);
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(
+    result.stderr,
+    /refused: no response to the deployment lease request at http:\/\/127\.0\.0\.1:8787/,
+  );
+  assert.doesNotMatch(result.stderr, /lease endpoint/);
+  assert.equal(f.log('systemctl.log'), '');
+});
+
+test('daemon changes present the owner token from the token file to a server that requires it', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'lease-owner-token'), 'owner-secret');
+  mkdirSync(join(f.dir, '.cairn'), { recursive: true });
+  writeFileSync(join(f.dir, '.cairn', 'token'), '# access token\nCAIRN_TOKEN="owner-secret"\n');
+  const target = pushTarget(f);
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), target);
+  assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
+});
+
+test('daemon changes name the rejected owner token instead of a missing lease endpoint', () => {
+  for (const tokenFile of [null, 'CAIRN_TOKEN=stale\n']) {
+    const f = fixture();
+    writeFileSync(join(f.fake, 'lease-owner-token'), 'owner-secret');
+    const path = join(f.dir, 'elsewhere-token');
+    if (tokenFile !== null) writeFileSync(path, tokenFile);
+    const result = f.run(DEPLOY, [pushTarget(f)], { CAIRN_DEPLOY_TOKEN_FILE: path });
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /rejected the deployment lease request \(HTTP 401\)/);
+    assert.ok(result.stderr.includes(path), result.stderr);
+    assert.doesNotMatch(result.stderr, /lease endpoint/);
+    assert.equal(f.log('systemctl.log'), '');
+  }
 });
 
 test('bounded drain timeout resumes claims without stopping services and names starvation in the lag alarm', () => {

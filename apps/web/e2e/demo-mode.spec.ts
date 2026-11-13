@@ -180,7 +180,7 @@ test('write: sending in the detail composer is blocked', async ({ page }) => {
 test('write: the primary action and the delete confirm are blocked', async ({ page }) => {
   const traffic = watchTraffic(page);
   await page.goto(`${demo.base}/app/todo/${DEMO.cartMerge}`);
-  await page.getByTestId('side-chat-action').getByRole('button').last().click();
+  await page.getByTestId('side-chat-action').getByRole('button').first().click();
   await expect(toast(page)).toBeVisible();
   await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
 

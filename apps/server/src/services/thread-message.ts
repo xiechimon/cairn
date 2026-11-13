@@ -7,7 +7,7 @@ import {
   type ThreadMessageResult,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
-import { chiefMessage, step, todo } from '../db/schema.js';
+import { build, chiefMessage, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
@@ -22,12 +22,12 @@ import { coordinatorThreadRow, ensureChief } from './chief.js';
 import {
   claimClientMessage,
   coalesceClientMessage,
+  completeClientMessage,
   findClientMessage,
   replayAfterConflict,
 } from './client-message.js';
 import { assertProjectWritable } from './project-writable.js';
 import { holdCodeThreadForPriorResearch } from './research-before-plan.js';
-import { holdSecondRejectionRework } from './research-stuck.js';
 import { pendingWorkerQuestionIds, pendingWorkerQuestions } from './worker-question-store.js';
 import { settleQuestionAnswers } from './worker-questions.js';
 
@@ -36,6 +36,10 @@ type TodoRow = typeof todo.$inferSelect;
 export type ThreadMessageOrigin = { origin: 'user' } | { origin: 'coordinator'; actor: string };
 
 const USER_ORIGIN: ThreadMessageOrigin = { origin: 'user' };
+
+function nestedLedgerId(todoId: string, clientMessageId: string): string {
+  return `nested:${todoId}:${clientMessageId}`;
+}
 
 function excerptOf(content: string): string {
   const flat = tidyText(redactSecrets(content).value as string);
@@ -60,11 +64,22 @@ function hasClaimedStep(deps: BuildDeps, buildId: string): boolean {
   );
 }
 
-function latestBuildOf(deps: BuildDeps, todoId: string): string | null {
-  return (
-    deps.db.select({ id: todo.latestBuildId }).from(todo).where(eq(todo.id, todoId)).get()?.id ??
-    null
-  );
+function storedDelivery(
+  receipt: unknown,
+): { conversationId: string; delivered: ThreadMessageDelivery } | undefined {
+  if (receipt === null || typeof receipt !== 'object') return undefined;
+  const delivered = (receipt as { delivered?: unknown }).delivered;
+  const conversationId = (receipt as { conversationId?: unknown }).conversationId;
+  if (
+    (delivered === 'steer' ||
+      delivered === 'new-turn' ||
+      delivered === 'revision' ||
+      delivered === 'restart') &&
+    typeof conversationId === 'string'
+  ) {
+    return { conversationId, delivered };
+  }
+  return undefined;
 }
 
 export function startThreadBuild(
@@ -90,7 +105,9 @@ async function deliver(
   buildId: string,
   body: ThreadMessageBody,
   origin: ThreadMessageOrigin,
+  beforeCommit?: () => void,
 ): Promise<{ conversationId: string; delivered: ThreadMessageDelivery }> {
+  const nestedId = nestedLedgerId(row.id, body.clientMessageId);
   const pending = pendingWorkerQuestionIds(deps.db, buildId);
   if (origin.origin === 'coordinator' && pending.length > 0) {
     throw new HttpError(
@@ -103,8 +120,8 @@ async function deliver(
     const sent = await sendBuildSteer(
       deps,
       buildId,
-      { content: body.content, clientMessageId: body.clientMessageId },
-      { human: true, afterTurn: true },
+      { content: body.content, clientMessageId: nestedId },
+      { human: true, afterTurn: true, beforeCommit },
     );
     return { conversationId: sent.conversationId, delivered: sent.delivered };
   }
@@ -112,8 +129,11 @@ async function deliver(
     const sent = await sendBuildSteer(
       deps,
       buildId,
-      { content: body.content, clientMessageId: body.clientMessageId },
-      origin.origin === 'user' ? { human: true } : { human: false, actor: origin.actor },
+      { content: body.content, clientMessageId: nestedId },
+      {
+        ...(origin.origin === 'user' ? { human: true } : { human: false, actor: origin.actor }),
+        beforeCommit,
+      },
     );
     return { conversationId: sent.conversationId, delivered: sent.delivered };
   }
@@ -125,38 +145,40 @@ async function deliver(
         action: 'revision',
         side: 'plan',
         feedback: body.content,
-        clientMessageId: body.clientMessageId,
+        clientMessageId: nestedId,
       },
       ...stepActionAttribution(origin),
+      beforeCommit,
     );
-    holdSecondRejectionRework(deps, buildId);
-    return { conversationId: latestBuildOf(deps, row.id) ?? buildId, delivered: 'revision' };
+    const revised = storedDelivery(findClientMessage(deps.db, buildId, nestedId));
+    if (revised === undefined) throw new Error('revision receipt missing');
+    return revised;
   }
   if (row.phase === 'failed') {
     await applyBuildStepAction(
       deps,
       buildId,
-      { action: 'restart', feedback: body.content, clientMessageId: body.clientMessageId },
+      { action: 'restart', feedback: body.content, clientMessageId: nestedId },
       ...stepActionAttribution(origin),
+      beforeCommit,
     );
-    return { conversationId: latestBuildOf(deps, row.id) ?? buildId, delivered: 'restart' };
-  }
-  if (stoppedBeforeFirstRun(deps.db, row)) {
-    return {
-      conversationId: startThreadBuild(deps, row, origin, body.content),
-      delivered: 'restart',
-    };
+    const restarted = storedDelivery(findClientMessage(deps.db, buildId, nestedId));
+    if (restarted === undefined) throw new Error('restart receipt missing');
+    return restarted;
   }
   throw new HttpError(409, `thread #${row.seqNum} cannot take a message while ${row.phase}`);
 }
 
-function recordInCoordinator(
+function insertCoordinatorMarker(
   deps: BuildDeps,
   row: TodoRow,
   body: ThreadMessageBody,
   sent: { conversationId: string; delivered: ThreadMessageDelivery },
   origin: ThreadMessageOrigin,
-): void {
+): {
+  threadId: string;
+  message: { id: string; role: 'system'; content: string; createdAt: number };
+} {
   const thread = coordinatorThreadRow(deps, ensureChief(deps, row.teamId));
   const marker: ThreadMessageContent = {
     kind: 'thread-message',
@@ -172,16 +194,107 @@ function recordInCoordinator(
     id: newRecordId(),
     role: 'system' as const,
     content: JSON.stringify(marker),
+    projectId: row.projectId,
     createdAt: nowMs(),
   };
-  deps.db.transaction(() => {
+  deps.db
+    .insert(chiefMessage)
+    .values({ ...message, threadId: thread.id })
+    .run();
+  return { threadId: thread.id, message };
+}
+
+function recordInCoordinator(
+  deps: BuildDeps,
+  row: TodoRow,
+  body: ThreadMessageBody,
+  sent: { conversationId: string; delivered: ThreadMessageDelivery },
+  origin: ThreadMessageOrigin,
+): void {
+  const published = deps.db.transaction(() => {
     claimClientMessage(deps.db, row.id, body.clientMessageId, { todoId: row.id, ...sent });
-    deps.db
-      .insert(chiefMessage)
-      .values({ ...message, threadId: thread.id, projectId: row.projectId })
-      .run();
+    return insertCoordinatorMarker(deps, row, body, sent, origin);
   });
-  deps.convHub?.publishMessage(thread.id, message);
+  deps.convHub?.publishMessage(published.threadId, published.message);
+}
+
+function commitStoppedRestart(
+  deps: BuildDeps,
+  row: TodoRow,
+  body: ThreadMessageBody,
+  origin: ThreadMessageOrigin,
+): ThreadMessageResult {
+  let result: ThreadMessageResult = {
+    todoId: row.id,
+    conversationId: row.latestBuildId ?? row.id,
+    delivered: 'restart',
+  };
+  const published = deps.db.transaction(() => {
+    claimClientMessage(deps.db, row.id, body.clientMessageId);
+    const conversationId = startThreadBuild(deps, row, origin, body.content);
+    result = { todoId: row.id, conversationId, delivered: 'restart' };
+    completeClientMessage(deps.db, row.id, body.clientMessageId, result);
+    return insertCoordinatorMarker(deps, row, body, result, origin);
+  });
+  deps.convHub?.publishMessage(published.threadId, published.message);
+  return result;
+}
+
+function nestedSendReceipt(
+  deps: BuildDeps,
+  row: TodoRow,
+  clientMessageId: string,
+): { conversationId: string; delivered: ThreadMessageDelivery } | undefined {
+  const ledgerId = nestedLedgerId(row.id, clientMessageId);
+  const builds = deps.db.select({ id: build.id }).from(build).where(eq(build.todoId, row.id)).all();
+  for (const candidate of builds) {
+    const stored = storedDelivery(findClientMessage(deps.db, candidate.id, ledgerId));
+    if (stored !== undefined) return stored;
+  }
+  return undefined;
+}
+
+function settleStoredSend(
+  deps: BuildDeps,
+  row: TodoRow,
+  body: ThreadMessageBody,
+  origin: ThreadMessageOrigin,
+): ThreadMessageResult | undefined {
+  const outer = findClientMessage<ThreadMessageResult>(deps.db, row.id, body.clientMessageId);
+  if (outer !== undefined) return outer;
+  const nested = nestedSendReceipt(deps, row, body.clientMessageId);
+  if (nested === undefined) return undefined;
+  try {
+    recordInCoordinator(deps, row, body, nested, origin);
+  } catch (error) {
+    return replayAfterConflict<ThreadMessageResult>(deps.db, row.id, body.clientMessageId, error);
+  }
+  return { todoId: row.id, ...nested };
+}
+
+function bindRouteReceipt(
+  deps: BuildDeps,
+  row: TodoRow,
+  body: ThreadMessageBody,
+  origin: ThreadMessageOrigin,
+  buildId: string,
+): { write: () => void; publish: () => void } {
+  let published: ReturnType<typeof insertCoordinatorMarker> | undefined;
+  const write = () => {
+    const sent = storedDelivery(
+      findClientMessage(deps.db, buildId, nestedLedgerId(row.id, body.clientMessageId)),
+    );
+    if (sent === undefined) throw new Error('send receipt missing');
+    claimClientMessage(deps.db, row.id, body.clientMessageId, { todoId: row.id, ...sent });
+    published = insertCoordinatorMarker(deps, row, body, sent, origin);
+  };
+  return {
+    write,
+    publish: () => {
+      if (published === undefined) return;
+      deps.convHub?.publishMessage(published.threadId, published.message);
+    },
+  };
 }
 
 export async function messageThreadAsUser(
@@ -197,8 +310,8 @@ export async function messageThreadAsUser(
     .where(and(eq(todo.id, todoId), eq(todo.teamId, teamId)))
     .get();
   if (!row) throw new HttpError(404, `todo ${todoId}`);
-  const replay = findClientMessage<ThreadMessageResult>(deps.db, row.id, body.clientMessageId);
-  if (replay !== undefined) return replay;
+  const stored = settleStoredSend(deps, row, body, origin);
+  if (stored !== undefined) return stored;
   if (row.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
   assertProjectWritable(deps.db, row.teamId, row.projectId);
   if (row.latestBuildId === null) {
@@ -206,7 +319,25 @@ export async function messageThreadAsUser(
   }
   const buildId = row.latestBuildId;
   return coalesceClientMessage(deps.db, row.id, body.clientMessageId, async () => {
-    const sent = await deliver(deps, row, buildId, body, origin);
+    const again = settleStoredSend(deps, row, body, origin);
+    if (again !== undefined) return again;
+    if (stoppedBeforeFirstRun(deps.db, row)) {
+      try {
+        return commitStoppedRestart(deps, row, body, origin);
+      } catch (error) {
+        return replayAfterConflict<ThreadMessageResult>(
+          deps.db,
+          row.id,
+          body.clientMessageId,
+          error,
+        );
+      }
+    }
+    const bound = bindRouteReceipt(deps, row, body, origin, buildId);
+    const sent = await deliver(deps, row, buildId, body, origin, bound.write);
+    bound.publish();
+    const committed = findClientMessage<ThreadMessageResult>(deps.db, row.id, body.clientMessageId);
+    if (committed !== undefined) return committed;
     try {
       recordInCoordinator(deps, row, body, sent, origin);
     } catch (error) {

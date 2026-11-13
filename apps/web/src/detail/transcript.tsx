@@ -1,8 +1,8 @@
 import type { StepPromptOrigin } from '@cairn/shared';
-import { useEffect, useRef, useState } from 'react';
-import { inlineSegments } from '../api/mappers.js';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { MessageToolbar } from '../chief/message-toolbar.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
-import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
+import { LiveRow, LiveSignal, TypingDots } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
 import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Button } from '../components/ui/button.js';
@@ -17,10 +17,11 @@ import type { RobotPara, TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { Clock, Copy, ExternalLink, FileTab } from '../icons/index.js';
-import { ChatMarkdown, TaskCard } from './chat-markdown.js';
+import { inlineSegments } from '../lib/markdown.js';
+import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS, TaskCard } from './chat-markdown.js';
 import { Segments } from './segments.js';
 import { shouldExpandLastWork } from './work-expansion.js';
-import { InjectedSkills, WorkTrace } from './work-trace.js';
+import { WorkTrace } from './work-trace.js';
 
 export interface LiveStep {
   step: string;
@@ -32,6 +33,7 @@ interface TranscriptProps {
   liveStep?: LiveStep | null;
   agent?: { displayName: string; avatarUrl: string | null } | null;
   onOpenPlan?: () => void;
+  result?: ReactNode;
 }
 
 function formatElapsed(seconds: number, t: TFunc): string {
@@ -39,14 +41,12 @@ function formatElapsed(seconds: number, t: TFunc): string {
   return t('完成 {elapsed}', { elapsed });
 }
 
-const ROW_BASE = 'chat-row flex items-start';
-const AGENT_ROW = 'chat-row chat-row--agent flex flex-col items-start';
+const ROW_BASE = 'flex items-start';
+const AGENT_ROW = 'chat-row--agent group/message flex flex-col items-start';
+const USER_ROW = 'chat-row--user group/message flex flex-col items-end';
+const TOOLS_ROW = '-mx-4 overflow-x-clip px-4';
 
 const SCROLLER_ITEM_STYLE = { contentVisibility: 'visible' } as const;
-
-function prevRunningWork(prev: TranscriptItem | undefined): boolean {
-  return prev?.kind === 'work' && prev.steps.some((step) => step.kind === 'call' && step.running);
-}
 
 function endsWithAgentRow(item: TranscriptItem | undefined): boolean {
   if (item == null) return false;
@@ -62,11 +62,11 @@ function rowMargin(item: TranscriptItem, prev: TranscriptItem | undefined): stri
     case 'streaming':
     case 'review':
     case 'report':
-      return endsWithAgentRow(prev) ? 'mt-3' : 'mt-5';
+      return endsWithAgentRow(prev) ? 'mt-1' : 'mt-5';
     case 'chief':
       return 'mt-1';
     case 'user':
-      return 'mt-4';
+      return prev?.kind === 'user' ? 'mt-1' : 'mt-5';
     default:
       return prev?.kind === 'step-prompt' ? 'mt-1.5' : '';
   }
@@ -79,51 +79,67 @@ function ActionRow({
   seconds,
   bare,
   copy,
-  stamp,
   t,
-  align = 'start',
 }: {
   seconds?: number;
   bare?: boolean;
-  copy?: string;
-  stamp?: string;
+  copy: string;
   t: TFunc;
-  align?: 'start' | 'end';
 }) {
   return (
     <div
-      className={`chat-row-icons mt-1.5 flex items-center gap-3.5 text-(--text-tertiary) ${align === 'end' ? 'justify-end' : ''}`}
+      className="chat-row-icons mt-1.5 flex items-center gap-3.5 text-(--text-tertiary)"
       data-testid="msg-actions"
     >
-      {stamp != null && (
-        <span className="text-caption tabular-nums" data-testid="msg-stamp">
-          {stamp}
-        </span>
-      )}
       {(seconds != null || bare === true) && (
         <span className="text-meta whitespace-nowrap text-(--text-tertiary)">
           {seconds != null ? formatElapsed(seconds, t) : t('完成')}
         </span>
       )}
-      {copy != null && (
-        <Button
-          variant="ghost"
-          className="chat-copy h-auto justify-start rounded-none border-none bg-transparent p-0 hover:bg-transparent hover:text-inherit dark:hover:bg-transparent dark:hover:text-inherit [&_svg:not([class*='size-'])]:size-auto"
-          aria-label={t('复制')}
-          onClick={() => {
-            void navigator.clipboard.writeText(copy);
-          }}
-        >
-          <Copy width={13} height={13} />
-        </Button>
-      )}
+      <Button
+        variant="ghost"
+        className="chat-copy h-auto justify-start rounded-none border-none bg-transparent p-0 hover:bg-transparent hover:text-inherit dark:hover:bg-transparent dark:hover:text-inherit [&_svg:not([class*='size-'])]:size-auto"
+        aria-label={t('复制')}
+        onClick={() => {
+          void navigator.clipboard.writeText(copy);
+        }}
+      >
+        <Copy width={13} height={13} />
+      </Button>
     </div>
+  );
+}
+
+function RowTools({
+  placement,
+  copy,
+  stamp,
+}: {
+  placement: 'right' | 'left' | 'below-start' | 'below-end';
+  copy: string;
+  stamp?: string | undefined;
+}) {
+  return (
+    <MessageToolbar
+      placement={placement}
+      testId={placement === 'right' || placement === 'left' ? 'msg-tools' : 'msg-tools-touch'}
+      stamp={
+        stamp == null ? null : (
+          <span className="text-caption whitespace-nowrap tabular-nums" data-testid="msg-stamp">
+            {stamp}
+          </span>
+        )
+      }
+      onCopy={() => {
+        void navigator.clipboard.writeText(copy);
+      }}
+    />
   );
 }
 
 function Para({ para, gap = false }: { para: RobotPara; gap?: boolean }) {
   const quoteSkin =
-    'border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 [background-clip:content-box] text-(--text-secondary)';
+    'border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 [background-clip:content-box] text-foreground';
   if (para.quote === true) {
     return (
       <p className={`${PARA} ${quoteSkin}${gap ? ` ${PARA_GAP}` : ''}`}>
@@ -158,6 +174,7 @@ function Row({
   liveStep,
   defaultExpanded,
   entering,
+  enteringUser,
 }: {
   item: TranscriptItem;
   prev: TranscriptItem | undefined;
@@ -167,33 +184,24 @@ function Row({
   liveStep: LiveStep | null;
   defaultExpanded: boolean;
   entering: Set<string>;
+  enteringUser: string | null;
 }) {
   const margin = rowMargin(item, prev);
   switch (item.kind) {
     case 'run':
       return (
-        <div className="flex-none text-center text-meta text-(--text-tertiary)">
-          {item.at != null && <div>{item.at}</div>}
-          {item.machine != null && (
-            <div className="mt-1 text-caption leading-3 text-(--text-tertiary) [&_span]:underline">
-              {t('运行在 {m} 上', { m: item.machine ?? '' })
-                .split(item.machine ?? '')
-                .map((part, i) =>
-                  i === 0 ? (
-                    <span key={i}>
-                      {part}
-                      <span>{item.machine}</span>
-                    </span>
-                  ) : (
-                    <span key={i}>{part}</span>
-                  ),
-                )}
-            </div>
-          )}
+        <div
+          data-testid="transcript-time-divider"
+          className="mt-5 w-full text-center text-caption text-(--text-tertiary)"
+        >
+          {[item.at, item.machine != null ? t('运行在 {m} 上', { m: item.machine }) : null]
+            .filter((part) => part != null)
+            .join(' · ')}
           {item.cancelled === true && (
-            <div className="chat-stamp-cancelled mt-1 text-caption leading-3 text-(--fail-fg)">
+            <span className="chat-stamp-cancelled text-(--fail-fg)">
+              {item.at != null || item.machine != null ? ' · ' : ''}
               {t('已取消')}
-            </div>
+            </span>
           )}
         </div>
       );
@@ -201,14 +209,14 @@ function Row({
       return (
         <div
           data-testid="transcript-question"
-          className="mt-3.5 flex flex-col gap-2 rounded-(--radius-card) border border-border bg-card px-3.5 py-3 text-ui"
+          className={`mt-5 flex flex-col gap-2 py-2 text-ui ${REPLY_BUBBLE_CLS}`}
         >
           {item.questions.map((q) => (
             <div key={q.header} className="flex flex-col gap-1">
               <div className="text-meta text-(--text-tertiary)">{q.header}</div>
               <div className="text-foreground">{q.question}</div>
               {q.options.length > 0 && (
-                <ul className="list-disc pl-5 text-(--text-secondary)">
+                <ul className="list-disc pl-5 text-foreground">
                   {q.options.map((o) => (
                     <li key={o.label}>
                       {o.label}
@@ -230,7 +238,7 @@ function Row({
       );
     case 'note':
       return (
-        <StatusLine className="mt-5" testId="transcript-note">
+        <StatusLine className="mt-5 justify-center text-center" testId="transcript-note">
           {t(item.text)}
         </StatusLine>
       );
@@ -266,20 +274,25 @@ function Row({
           {t('完成')}
         </div>
       );
-    case 'injected-skills':
-      return <InjectedSkills skills={item.skills} t={t} />;
     case 'chief':
       return (
         <div className={`${ROW_BASE} ${margin}`}>
           <StatusLine className="w-full">{t('由 Coordinator 发起')}</StatusLine>
         </div>
       );
-    case 'user':
+    case 'user': {
+      const copy = item.markdown ?? item.text;
       return (
-        <>
-          <div className={`${ROW_BASE} chat-row--user justify-end ${margin}`}>
+        <div
+          className={`${USER_ROW} ${TOOLS_ROW} ${margin} ${item.id != null && item.id === enteringUser ? 'message-enter' : ''}`}
+          data-tools-root=""
+        >
+          <div
+            className="group/reply-block relative max-w-[min(85%,42rem)]"
+            data-slot="reply-block"
+          >
             <UserMessageBubble
-              className={`chat-bubble max-w-[min(85%,42rem)] break-words ${
+              className={`chat-bubble w-fit max-w-full break-words ${
                 item.markdown != null
                   ? 'whitespace-normal [&>:first-child]:mt-0 [&>:last-child]:mb-0'
                   : 'whitespace-pre-wrap'
@@ -289,62 +302,60 @@ function Row({
             >
               {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
             </UserMessageBubble>
+            <RowTools placement="left" copy={copy} stamp={item.at} />
           </div>
-          {item.seq != null && item.title != null && (
-            <div className="mt-1.5 flex items-center justify-end" data-testid="taskline">
-              <span className="flex h-5 flex-none items-center rounded-(--cds-radius-sm) bg-(--muted) px-2 text-caption text-(--text-secondary)">
-                #{item.seq}
-              </span>
-              <span className="ml-1 min-w-0 break-words text-card-title leading-5 font-medium text-(--foreground)">
-                {item.title}
-              </span>
-            </div>
-          )}
-          <ActionRow copy={item.markdown ?? item.text} stamp={item.at} t={t} align="end" />
-        </>
+          <RowTools placement="below-end" copy={copy} stamp={item.at} />
+        </div>
       );
-    case 'robot':
+    }
+    case 'robot': {
+      const copy = robotCopyText(item);
       return (
-        <>
-          <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
-            <span
-              className="chat-text -mt-px agent-measure min-w-0 voice-response text-card-title break-words text-(--foreground)"
+        <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
+          {item.markdown != null ? (
+            <div
+              className="chat-text min-w-0 max-w-full font-sans text-ui leading-5 break-words text-(--foreground)"
               data-testid="agent-text"
             >
-              {item.markdown != null ? (
-                <ChatMarkdown text={item.markdown} />
-              ) : (
-                (item.paragraphs ?? []).map((raw, i) => (
+              <ChatMarkdown
+                text={item.markdown}
+                bubbles
+                bubbleTools={(group) => <RowTools placement="right" copy={group.source} />}
+              />
+            </div>
+          ) : (
+            <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
+              <div
+                className={`chat-text min-w-0 font-sans text-ui leading-5 break-words text-(--foreground) ${REPLY_BUBBLE_CLS}`}
+                data-slot="reply-bubble"
+                data-testid="agent-text"
+              >
+                {(item.paragraphs ?? []).map((raw, i) => (
                   <Para key={i} para={Array.isArray(raw) ? { segments: raw } : raw} gap={i > 0} />
-                ))
-              )}
-            </span>
-            {item.footer != null && (
-              <ActionRow seconds={item.footer.seconds} copy={robotCopyText(item)} t={t} />
-            )}
-          </div>
-          {item.footer?.seconds != null && item.footer.seconds >= 60 && (
-            <StatusLine className="mt-3" testId="worked-for-rule">
-              {t('已工作 {n} 分钟', { n: Math.floor(item.footer.seconds / 60) })}
-            </StatusLine>
+                ))}
+              </div>
+              <RowTools placement="right" copy={copy} />
+            </div>
           )}
-        </>
+          <RowTools placement="below-start" copy={copy} />
+        </div>
       );
+    }
     case 'report':
       return (
         <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
-          <span
-            className="chat-text -mt-px agent-measure min-w-0 voice-response text-card-title break-words text-(--foreground)"
+          <div
+            className="chat-text min-w-0 max-w-full font-sans text-ui leading-5 break-words text-(--foreground)"
             data-testid="info-report"
           >
-            <ChatMarkdown text={item.markdown} />
-          </span>
+            <ChatMarkdown text={item.markdown} bubbles />
+          </div>
         </div>
       );
     case 'thinking':
       return (
         <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
-          <span className="chat-text -mt-px agent-measure min-w-0 text-card-title break-words text-(--foreground)">
+          <span className="chat-text -mt-px agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)">
             <ThinkingRow text={item.text} />
           </span>
         </div>
@@ -356,6 +367,7 @@ function Row({
             items={item.items.map((it) => ({
               state: it.state,
               segments: inlineSegments(it.text),
+              blocks: [],
             }))}
           />
         </div>
@@ -364,17 +376,16 @@ function Row({
       return <FailRow item={item} margin={margin} t={t} />;
     case 'streaming':
       return (
-        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
-          <LiveRow
-            variant="detail"
-            label={item.label}
-            labelVars={item.labelVars}
-            quiet={prevRunningWork(prev) && liveStep == null}
-            disclosure={
-              liveStep != null ? { expand: '展开实时步骤', collapse: '收起实时步骤' } : null
-            }
-          >
-            {liveStep != null && (
+        <div className={`${AGENT_ROW} ${margin} [&>*]:max-w-full`} data-row="agent">
+          {liveStep == null ? (
+            <TypingDots testId="live-row" label={t(item.label, item.labelVars)} />
+          ) : (
+            <LiveRow
+              variant="detail"
+              label={item.label}
+              labelVars={item.labelVars}
+              disclosure={{ expand: '展开实时步骤', collapse: '收起实时步骤' }}
+            >
               <div className="mt-1 flex flex-col gap-0.5 text-meta text-(--text-tertiary)">
                 <span className="[overflow-wrap:anywhere]">
                   {t('本步：{n}', { n: liveStep.step })}
@@ -397,15 +408,15 @@ function Row({
                 ))}
                 <LiveSignal at={item.signalAt} className="[overflow-wrap:anywhere]" />
               </div>
-            )}
-          </LiveRow>
+            </LiveRow>
+          )}
         </div>
       );
     case 'plan':
       return (
         <>
-          <div className="chat-plan mt-3.5 flex items-center text-meta text-(--text-secondary) [&_svg]:text-(--text-tertiary)">
-            <FileTab width={14} height={14} />
+          <div className="chat-plan mt-3.5 flex items-center text-meta text-foreground [&_svg]:text-(--text-tertiary)">
+            <FileTab width={16} height={16} />
             <span className="chat-plan-title ml-1.5">{item.title}</span>
             {onOpenPlan != null ? (
               <Button
@@ -422,7 +433,7 @@ function Row({
               </span>
             )}
           </div>
-          <div className="chat-preview mt-2 max-h-10 flex-none overflow-hidden pr-6 text-meta leading-5 text-(--text-tertiary) [mask-image:linear-gradient(to_bottom,black_50%,transparent)]">
+          <div className="mt-2 max-h-10 flex-none overflow-hidden pr-6 text-meta leading-5 text-foreground [mask-image:linear-gradient(to_bottom,black_50%,transparent)]">
             {item.preview}
           </div>
           <ActionRow
@@ -445,135 +456,148 @@ function Row({
         </StatusLine>
       );
     case 'elapsed':
-      return <ActionRow seconds={item.seconds} t={t} />;
+      return null;
     case 'review':
       return (
-        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
-          <span
-            className="chat-text -mt-px agent-measure min-w-0 text-card-title break-words text-(--foreground)"
-            data-testid="agent-text"
-          >
-            <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
-              <span
-                className={`chat-review-tag flex-shrink-0 rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px text-caption leading-[1.5] font-semibold text-content-secondary${
-                  item.extractionError !== undefined
-                    ? ' chat-review-tag--error bg-(--danger-soft) text-destructive'
-                    : ''
-                }`}
-              >
-                {t(item.extractionError !== undefined ? '判定提取失败' : '审核结论')}
-              </span>
-              <Segments
-                segments={inlineSegments(item.extractionError ?? item.conclusion)}
-                codeClassName="chat-code"
-              />
-            </p>
-            {item.findings.map((f) => (
-              <div
-                key={f.id}
-                className={`chat-review-finding chat-review-finding--${f.severity} mt-1 mb-2 border-l-[3px] pl-2.5 ${
-                  f.severity === 'blocking'
-                    ? '[border-left-color:var(--destructive)]'
-                    : f.severity === 'suggestion'
-                      ? '[border-left-color:var(--badge-attention)]'
-                      : '[border-left-color:var(--border)]'
-                }`}
-              >
-                <p
-                  className={`${PARA} relative pl-5`}
-                  data-ordinal={Number.parseInt(f.id, 10) || 0}
+        <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
+          <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
+            <div
+              className={`chat-text min-w-0 text-ui leading-5 break-words text-(--foreground) ${REPLY_BUBBLE_CLS}`}
+              data-slot="reply-bubble"
+              data-testid="agent-text"
+            >
+              <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
+                <span
+                  className={`chat-review-tag flex-shrink-0 rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px text-caption leading-[1.5] font-semibold text-content-secondary${
+                    item.extractionError !== undefined
+                      ? ' chat-review-tag--error bg-(--danger-soft) text-destructive'
+                      : ''
+                  }`}
                 >
-                  <span className="absolute left-0">{f.id}.</span>
-                  <span
-                    className={`ml-1.5 inline-block text-caption font-semibold ${
-                      f.severity === 'blocking'
-                        ? 'text-destructive'
-                        : f.severity === 'suggestion'
-                          ? 'text-(--badge-attention)'
-                          : 'text-(--text-secondary)'
-                    }`}
-                  >
-                    {t(`(${f.severity})` as '(blocking)' | '(suggestion)' | '(info)')}
-                  </span>
-                  <Segments segments={inlineSegments(f.summary)} codeClassName="chat-code" />
-                </p>
-                {f.description !== undefined && f.description !== '' && (
-                  <p className={`${PARA} ${PARA_GAP}`}>
-                    <Segments segments={inlineSegments(f.description)} codeClassName="chat-code" />
-                  </p>
-                )}
-                {(f.file !== undefined || f.line !== undefined) && (
+                  {t(item.extractionError !== undefined ? '判定提取失败' : '审核结论')}
+                </span>
+                <Segments
+                  segments={inlineSegments(item.extractionError ?? item.conclusion)}
+                  codeClassName="chat-code"
+                />
+              </p>
+              {item.findings.map((f) => (
+                <div
+                  key={f.id}
+                  className={`chat-review-finding chat-review-finding--${f.severity} mt-1 mb-2 border-l-[3px] pl-2.5 ${
+                    f.severity === 'blocking'
+                      ? '[border-left-color:var(--destructive)]'
+                      : f.severity === 'suggestion'
+                        ? '[border-left-color:var(--badge-attention)]'
+                        : '[border-left-color:var(--border)]'
+                  }`}
+                >
                   <p
-                    className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 text-meta [background-clip:content-box] text-(--text-secondary)`}
+                    className={`${PARA} relative pl-5`}
+                    data-ordinal={Number.parseInt(f.id, 10) || 0}
                   >
-                    <Segments
-                      segments={inlineSegments(
-                        `${f.file ?? ''}${f.line !== undefined ? `:${f.line}` : ''}`,
-                      )}
-                      codeClassName="chat-code"
-                    />
+                    <span className="absolute left-0">{f.id}.</span>
+                    <span
+                      className={`ml-1.5 inline-block text-caption font-semibold ${
+                        f.severity === 'blocking'
+                          ? 'text-destructive'
+                          : f.severity === 'suggestion'
+                            ? 'text-(--badge-attention)'
+                            : 'text-(--text-secondary)'
+                      }`}
+                    >
+                      {t(`(${f.severity})` as '(blocking)' | '(suggestion)' | '(info)')}
+                    </span>
+                    <Segments segments={inlineSegments(f.summary)} codeClassName="chat-code" />
                   </p>
-                )}
-                {f.suggestion !== undefined && f.suggestion !== '' && (
-                  <p
-                    className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 text-meta [background-clip:content-box] text-(--text-secondary)`}
-                  >
-                    <Segments
-                      segments={inlineSegments(t('建议：{body}', { body: f.suggestion }))}
-                      codeClassName="chat-code"
-                    />
-                  </p>
-                )}
-              </div>
-            ))}
-          </span>
-          <ActionRow copy={reviewCopyText(item)} t={t} />
+                  {f.description !== undefined && f.description !== '' && (
+                    <p className={`${PARA} ${PARA_GAP}`}>
+                      <Segments
+                        segments={inlineSegments(f.description)}
+                        codeClassName="chat-code"
+                      />
+                    </p>
+                  )}
+                  {(f.file !== undefined || f.line !== undefined) && (
+                    <p
+                      className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 text-meta [background-clip:content-box] text-foreground`}
+                    >
+                      <Segments
+                        segments={inlineSegments(
+                          `${f.file ?? ''}${f.line !== undefined ? `:${f.line}` : ''}`,
+                        )}
+                        codeClassName="chat-code"
+                      />
+                    </p>
+                  )}
+                  {f.suggestion !== undefined && f.suggestion !== '' && (
+                    <p
+                      className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 text-meta [background-clip:content-box] text-foreground`}
+                    >
+                      <Segments
+                        segments={inlineSegments(t('建议：{body}', { body: f.suggestion }))}
+                        codeClassName="chat-code"
+                      />
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <RowTools placement="right" copy={reviewCopyText(item)} />
+          </div>
+          <RowTools placement="below-start" copy={reviewCopyText(item)} />
         </div>
       );
     case 'verify':
       return (
-        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
-          <span
-            className="chat-text -mt-px agent-measure min-w-0 text-card-title break-words text-(--foreground)"
-            data-testid="agent-text"
-          >
-            <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
-              <span
-                className={`chat-review-tag flex-shrink-0 rounded-(--cds-radius-sm) px-1.5 py-px text-caption leading-[1.5] font-semibold ${
-                  item.extractionError !== undefined
-                    ? 'bg-(--danger-soft) text-destructive'
-                    : item.passed
-                      ? 'bg-secondary text-content-secondary'
-                      : 'bg-(--danger-soft) text-destructive'
-                }`}
-              >
-                {t(
-                  item.extractionError !== undefined
-                    ? '判定提取失败'
-                    : item.passed
-                      ? '验证通过'
-                      : '验证未通过',
-                )}
-              </span>
-              <Segments
-                segments={inlineSegments(item.extractionError ?? item.conclusion)}
-                codeClassName="chat-code"
-              />
-            </p>
-            {item.evidence.map((e) => (
-              <p
-                key={e.path}
-                className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 text-meta [background-clip:content-box] text-(--text-secondary)`}
-                data-testid="verify-evidence"
-              >
+        <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
+          <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
+            <div
+              className={`chat-text min-w-0 text-ui leading-5 break-words text-(--foreground) ${REPLY_BUBBLE_CLS}`}
+              data-slot="reply-bubble"
+              data-testid="agent-text"
+            >
+              <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
+                <span
+                  className={`chat-review-tag flex-shrink-0 rounded-(--cds-radius-sm) px-1.5 py-px text-caption leading-[1.5] font-semibold ${
+                    item.extractionError !== undefined
+                      ? 'bg-(--danger-soft) text-destructive'
+                      : item.passed
+                        ? 'bg-secondary text-content-secondary'
+                        : 'bg-(--danger-soft) text-destructive'
+                  }`}
+                >
+                  {t(
+                    item.extractionError !== undefined
+                      ? '判定提取失败'
+                      : item.passed
+                        ? '验证通过'
+                        : '验证未通过',
+                  )}
+                </span>
                 <Segments
-                  segments={inlineSegments(e.note !== undefined ? `${e.path} — ${e.note}` : e.path)}
+                  segments={inlineSegments(item.extractionError ?? item.conclusion)}
                   codeClassName="chat-code"
                 />
               </p>
-            ))}
-          </span>
-          <ActionRow copy={verifyCopyText(item)} t={t} />
+              {item.evidence.map((e) => (
+                <p
+                  key={e.path}
+                  className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 text-meta [background-clip:content-box] text-foreground`}
+                  data-testid="verify-evidence"
+                >
+                  <Segments
+                    segments={inlineSegments(
+                      e.note !== undefined ? `${e.path} — ${e.note}` : e.path,
+                    )}
+                    codeClassName="chat-code"
+                  />
+                </p>
+              ))}
+            </div>
+            <RowTools placement="right" copy={verifyCopyText(item)} />
+          </div>
+          <RowTools placement="below-start" copy={verifyCopyText(item)} />
         </div>
       );
   }
@@ -606,12 +630,12 @@ function FailRow({
   return (
     <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
       <span
-        className="chat-text -mt-px agent-measure min-w-0 text-card-title break-words text-(--foreground)"
+        className="chat-text -mt-px agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
         data-testid="agent-text"
       >
         <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{title}</p>
         {item.body !== '' && (
-          <p className={`${PARA} ${PARA_GAP} text-(--text-tertiary)`}>{t(item.body)}</p>
+          <p className={`${PARA} ${PARA_GAP} text-foreground`}>{t(item.body)}</p>
         )}
         {item.title !== '' && (
           <p
@@ -744,6 +768,7 @@ export function Transcript({
   agent = null,
   onOpenPlan,
   liveStep = null,
+  result,
 }: TranscriptProps) {
   const { t } = useI18n();
   const previous = useRef<{ live: boolean; ids: Set<string> }>({ live: false, ids: new Set() });
@@ -766,27 +791,48 @@ export function Transcript({
   useEffect(() => {
     previous.current = { live, ids };
   });
+  const lastUserId =
+    transcript
+      .flatMap((item) => (item.kind === 'user' && item.id != null ? [item.id] : []))
+      .at(-1) ?? null;
+  const shownBefore = useRef({ lastUserId, rows: transcript.length });
+  const [enteringUser, setEnteringUser] = useState<string | null>(null);
+  useEffect(() => {
+    const before = shownBefore.current;
+    shownBefore.current = { lastUserId, rows: transcript.length };
+    if (before.lastUserId !== lastUserId && before.rows > 0) setEnteringUser(lastUserId);
+  }, [lastUserId, transcript.length]);
   const lastWork = shouldExpandLastWork(workItems) ? workItems.at(-1) : undefined;
+  const resultAt =
+    transcript.at(-1)?.kind === 'streaming' ? transcript.length - 1 : transcript.length;
+  const rows = transcript.map((item, index) => {
+    const id = 'id' in item ? item.id : undefined;
+    return (
+      <MessageScrollerItem key={id ?? index} messageId={id} style={SCROLLER_ITEM_STYLE}>
+        <Row
+          item={item}
+          prev={transcript[index - 1]}
+          t={t}
+          onOpenPlan={onOpenPlan}
+          agent={agent}
+          liveStep={liveStep}
+          defaultExpanded={item === lastWork}
+          entering={entering}
+          enteringUser={enteringUser}
+        />
+      </MessageScrollerItem>
+    );
+  });
 
   return (
     <>
-      {transcript.map((item, index) => {
-        const id = 'id' in item ? item.id : undefined;
-        return (
-          <MessageScrollerItem key={id ?? index} messageId={id} style={SCROLLER_ITEM_STYLE}>
-            <Row
-              item={item}
-              prev={transcript[index - 1]}
-              t={t}
-              onOpenPlan={onOpenPlan}
-              agent={agent}
-              liveStep={liveStep}
-              defaultExpanded={item === lastWork}
-              entering={entering}
-            />
-          </MessageScrollerItem>
-        );
-      })}
+      {rows.slice(0, resultAt)}
+      {result != null && (
+        <MessageScrollerItem key="transcript-result" style={SCROLLER_ITEM_STYLE}>
+          {result}
+        </MessageScrollerItem>
+      )}
+      {rows.slice(resultAt)}
     </>
   );
 }

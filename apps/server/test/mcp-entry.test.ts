@@ -23,7 +23,7 @@ import { createApiKey } from '../src/services/api-keys.js';
 import { sendChiefMessage } from '../src/services/chief.js';
 import { createOrGetQuestion } from '../src/services/chief-questions.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
-import { bootServer, postProject, type TestServer } from './helpers.js';
+import { bootServer, insertMachine, postProject, type TestServer } from './helpers.js';
 
 const READ = [
   'Threads Waiting on Me',
@@ -98,6 +98,7 @@ function bindCoordinator(s: TestServer, teamId = s.team.id) {
 
 async function world() {
   const s = bootServer();
+  insertMachine(s);
   bindCoordinator(s);
   const projectId = await postProject(s.app);
   const client = await connect(s);

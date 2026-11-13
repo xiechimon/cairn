@@ -18,7 +18,7 @@ export function GoalLine({ children, onEdit }: { children: ReactNode; onEdit?: (
           onClick={onEdit}
           className="size-5.5 flex-none text-content-tertiary hover:text-foreground"
         >
-          <Pencil className="size-3.5" />
+          <Pencil className="size-4" />
         </Button>
       )}
     </p>

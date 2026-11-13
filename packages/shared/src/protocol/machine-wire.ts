@@ -5,6 +5,7 @@ import { blockerHandoffSchema } from '../blocker-handoff-record.js';
 import { claudeRateLimitReportSchema } from '../records/claude-rate-limit.js';
 import { epochMs, recordId } from '../records/common.js';
 import { machineRecordSchema } from '../records/machine.js';
+import { confinementIdentitySchema } from '../records/machine-capabilities.js';
 import {
   answerDeliveryViaSchema,
   messageRoleSchema,
@@ -97,6 +98,7 @@ export const machineRecoverResponseSchema = z.object({
 export type MachineRecoverResponse = z.infer<typeof machineRecoverResponseSchema>;
 
 export const machineClaimBodySchema = z.object({
+  confinement: confinementIdentitySchema.optional(),
   verifyAttachments: z.literal(true).optional(),
   maxWorkers: z.number().int().min(1).optional(),
   role: z.literal('coordinator').optional(),
@@ -348,6 +350,20 @@ export const machineToolResponseSchema = z.union([
   machineToolRelayResponseSchema,
 ]);
 
+export const secretSurfaceSchema = z.enum(['orb', 'host']);
+export type SecretSurface = z.infer<typeof secretSurfaceSchema>;
+
+export const httpSecretGrantSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  revision: z.number().int().positive(),
+  origin: z.string(),
+  header: z.string(),
+  template: z.string(),
+  value: z.string(),
+});
+export type HttpSecretGrant = z.infer<typeof httpSecretGrantSchema>;
+
 export const machineTokenResponseSchema = z.object({
   commitIdentity: z.object({ name: z.string(), email: z.string() }).nullable().optional(),
   coAuthor: z
@@ -357,6 +373,8 @@ export const machineTokenResponseSchema = z.object({
   claudeSubscriptionToken: z.string().optional(),
   provider: providerConfigSchema.nullable(),
   secrets: z.record(z.string(), z.string()),
+  httpSecrets: z.array(httpSecretGrantSchema).optional(),
+  withheldSecrets: z.array(z.string()).optional(),
   git: z
     .object({
       username: z.string(),

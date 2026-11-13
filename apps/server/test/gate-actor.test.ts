@@ -10,7 +10,7 @@ import {
 import { startBuilds } from '../src/services/builds.js';
 import { executeChiefTool, transitionTodos } from '../src/services/chief-tools.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, postProject, req, type TestServer } from './helpers.js';
+import { bootServer, insertMachine, postProject, req, type TestServer } from './helpers.js';
 
 async function withConfirmTodo(): Promise<TestServer & { todoId: string; buildId: string }> {
   const s = bootServer();
@@ -18,6 +18,7 @@ async function withConfirmTodo(): Promise<TestServer & { todoId: string; buildId
   const todoDoc = (await (
     await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title: '写周报', spec: '' })
   ).json()) as { id: string };
+  insertMachine(s);
   startBuilds(s.svc, {
     projectId,
     todoIds: [todoDoc.id],

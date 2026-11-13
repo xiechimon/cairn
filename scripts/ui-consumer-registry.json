@@ -19,7 +19,7 @@
     },
     {
       "file": "apps/web/src/board/app-sidebar.tsx",
-      "anchor": "top-0 left-0 flex h-full w-72",
+      "anchor": "app-drawer top-0 left-0 flex h-full",
       "kind": "deviation",
       "reason": "Phone sidebar drawer: a full-height Dialog panel pinned to the left screen edge, as on claude.ai mobile. Its top, left and bottom edges sit on the viewport edge, where rounded corners would leave slivers of the page showing, so the box stays square; the sidebar inside keeps its own surface."
     },
@@ -38,25 +38,11 @@
   ],
   "brandInkText": [
     {
-      "file": "apps/web/src/board/sidebar.tsx",
-      "anchor": "const RAIL_ACTIVE = `bg-(--hover-1) text-(--card-button)",
-      "role": "indicator",
-      "reason": "Collapsed-rail twin of the active row icon (icon-only rows).",
-      "contrast": "measured 2026-10-25 in the fixture build (light / dark): same fill as the expanded active row (9.14 / 6.90); non-text glyph, 3:1 gate"
-    },
-    {
       "file": "apps/web/src/phase.ts",
       "anchor": "const ACCENT_INK = 'text-(--card-button)'",
       "role": "indicator",
       "reason": "PHASE_STATUS ink for the three needs-you phases (icon + 失败/确认/审核), read by the detail top bar (paper-redesign-plan PR 7) and the project page task rows and cards (#1397). Same rule as the board card footer flag: DESIGN.md 颜色 reserves the accent for needs-you states; every status = icon + color + label.",
       "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet and on card 4.99, AA for 12px and 13.5px text)"
-    },
-    {
-      "file": "apps/web/src/chief/chief-question-card.tsx",
-      "anchor": "const STATUS_WAITING_INK = 'text-(--card-button)';",
-      "role": "indicator",
-      "reason": "Coordinator question card status for a question waiting on the user (icon + 等你回答, #1398). A needs-you state: DESIGN.md 颜色 reserves the accent for needs-you states; every status = icon + color + label. 已回答 / 已取消 stay ink-3.",
-      "contrast": "apps/web/DESIGN.md 颜色 (accent on card 4.99, AA for 12px text)"
     },
     {
       "file": "apps/web/src/components/notice-banner.tsx",
@@ -67,7 +53,7 @@
     },
     {
       "file": "apps/web/src/chief/chief-outage-banner.tsx",
-      "anchor": "size-4.5 flex-none text-(--card-button)",
+      "anchor": "size-5.5 flex-none text-(--card-button)",
       "role": "indicator",
       "reason": "Coordinator outage banner alert glyph: non-text 18px icon, same warning tone as NoticeBanner.",
       "contrast": "docs/verify/988/ (sealed) re-attested in docs/verify/1055/colors/incremental.md"

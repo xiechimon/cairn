@@ -20,22 +20,22 @@ export interface MentionInlineProps {
 function InlineKindIcon({ kind }: { kind: InlineCompletionRow['kind'] }) {
   switch (kind) {
     case 'todo':
-      return <FileCheck width={14} height={14} />;
+      return <FileCheck width={16} height={16} />;
     case 'skill':
-      return <Puzzle width={14} height={14} />;
+      return <Puzzle width={16} height={16} />;
     case 'project':
-      return <Layers width={14} height={14} />;
+      return <Layers width={16} height={16} />;
     case 'machine':
-      return <Server width={14} height={14} />;
+      return <Server width={16} height={16} />;
     case 'file':
-      return <FileText width={14} height={14} />;
+      return <FileText width={16} height={16} />;
     case 'agent':
       return null;
   }
 }
 
 const INLINE_PANEL_CLS =
-  'mention-inline absolute left-0 w-120 max-w-full bottom-[calc(100%+8px)] z-40 max-h-62 overflow-auto rounded-(--radius-popover) bg-popover p-(--menu-pad) shadow-(--shadow-popover)';
+  'mention-inline absolute left-0 w-120 max-w-full bottom-[calc(100%+10px)] z-40 max-h-62 overflow-auto rounded-(--radius-popover) bg-popover p-(--menu-pad) shadow-(--shadow-popover)';
 
 const INLINE_ROW_CLS =
   'mention-inline-row flex h-7 w-full cursor-pointer items-center justify-start gap-2 rounded-(--radius-menu-item) border-0 bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground focus:bg-transparent dark:hover:bg-transparent aria-expanded:bg-transparent';

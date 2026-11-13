@@ -14,22 +14,23 @@ const slideInDone = (page: Page) =>
     .locator('.side-panel')
     .evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
 
-test('a task row opens its thread beside the Coordinator, and closing it returns to the list', async ({
+test('a task row opens its thread beside the Coordinator, and going back returns to the list', async ({
   page,
 }) => {
   await page.goto(`${HOME}&pane=tasks`);
   await tasksPanel(page).getByText('Push for finished threads').click();
   await expect(page).toHaveURL(/[?&]thread=home-c-working-a/);
   await expect(page).toHaveURL(/\/app\?/);
-  await expect(sideChat(page)).toContainText('#2302');
-  await expect(sideChat(page)).toContainText('Push for finished threads');
+  await expect(sideChat(page).locator('h2')).toHaveText('Push for finished threads');
+  await expect(sideChat(page).locator('h2')).toHaveAccessibleName('Push for finished threads');
+  await expect(sideChat(page)).not.toContainText('#2302');
   await expect(page.getByTestId('side-chat-status')).toContainText('运行中');
   await expect(page.getByTestId('transcript-col')).toBeVisible();
   await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(tasksPanel(page)).toHaveCount(0);
   expect(await panelWidth(page)).toBe(420);
 
-  await sideChat(page).getByRole('button', { name: '关闭' }).click();
+  await sideChat(page).getByRole('button', { name: '返回' }).click();
   await expect(sideChat(page)).toHaveCount(0);
   await expect(page).not.toHaveURL(/thread=/);
   await expect(tasksPanel(page)).toBeVisible();
@@ -57,6 +58,8 @@ test('the panel is resizable by keyboard and by drag, shared with Tasks, and rem
 }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
   await expect(handle(page)).toHaveAttribute('aria-valuenow', '420');
+  await handle(page).hover();
+  await expect(page.locator('[data-slot="side-panel-resize-tip"]')).toHaveText('拖动调宽');
   await handle(page).focus();
   await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('ArrowLeft');
@@ -94,7 +97,7 @@ test('the panel is resizable by keyboard and by drag, shared with Tasks, and rem
 test('a thread that has not started says so and takes no message', async ({ page }) => {
   await page.goto(`${HOME}&thread=home-c-idle`);
   await expect(page.locator('.side-panel').getByTestId('composer-placeholder')).toHaveText(
-    '开始后才能回复 #2240',
+    '开始后才能回复',
   );
   await expect(page.locator('.side-panel textarea')).toHaveCount(0);
 });
@@ -145,11 +148,12 @@ test.describe('phone width', () => {
 
 const action = (page: Page) => page.getByTestId('side-chat-action');
 
-test('each waiting phase puts its next step in a card above the composer', async ({ page }) => {
+test('start, approve and retry put the next step in a chip above the composer; review does not', async ({
+  page,
+}) => {
   const cases = [
     ['home-c-idle', 'start', '开始'],
     ['home-c-confirm', 'approve', '批准计划'],
-    ['home-c-review', 'finish', '完成…'],
     ['home-c-failed', 'retry', '重试'],
   ] as const;
   for (const [id, kind, label] of cases) {
@@ -157,14 +161,17 @@ test('each waiting phase puts its next step in a card above the composer', async
     await expect(action(page), id).toHaveAttribute('data-action', kind);
     await expect(action(page).getByRole('button', { name: label })).toBeVisible();
   }
-  await page.goto(`${HOME}&thread=home-c-working-a`);
-  await expect(sideChat(page)).toBeVisible();
-  await expect(action(page)).toHaveCount(0);
+  for (const id of ['home-c-working-a', 'home-c-review']) {
+    await page.goto(`${HOME}&thread=${id}`);
+    await expect(sideChat(page)).toBeVisible();
+    await expect(action(page), id).toHaveCount(0);
+  }
 });
 
 test('finishing a reviewed thread asks to merge or keep the branch', async ({ page }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
-  await action(page).getByRole('button', { name: '完成…' }).click();
+  await sideChat(page).getByRole('button', { name: '更多操作…' }).click();
+  await page.getByRole('menuitem', { name: '完成' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -202,35 +209,53 @@ test('a plan waiting for approval opens in full from the card and from the trans
   await expect(sideChat(page)).toBeVisible();
 });
 
-const changesButton = (page: Page) => page.getByTestId('side-chat-changes');
+const changesCard = (page: Page) => page.getByTestId('side-chat-changes');
 
-test('a reviewed thread shows its diff counts in the header and swaps the transcript for the changes', async ({
+test('a reviewed thread shows its changes as one card in the conversation, and the card swaps the transcript for the changes', async ({
   page,
 }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
-  const button = changesButton(page);
-  await expect(button).toHaveAttribute('aria-pressed', 'false');
-  await expect(button).toContainText('+1');
-  await expect(page.getByTestId('transcript-col')).toBeVisible();
+  await expect(sideChat(page).getByTestId('side-chat-changes')).toHaveCount(0);
+  const card = page.getByTestId('transcript-col').getByTestId('side-chat-changes');
+  await expect(card).toHaveCount(1);
+  await expect(card).toHaveText('改动 1 个文件+1');
+  const place = await card.evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    const trace = [...document.querySelectorAll('.side-panel [data-trace-card]')]
+      .filter((node) => !node.contains(el))
+      .at(-1)!;
+    const column = document.querySelector('.side-panel [data-testid="transcript-col"]')!;
+    const style = getComputedStyle(column);
+    return {
+      afterWork: box.top >= trace.getBoundingClientRect().bottom,
+      left: Math.round(
+        box.left - column.getBoundingClientRect().left - Number.parseFloat(style.paddingLeft),
+      ),
+      height: Math.round(box.height),
+      compact: box.width < column.getBoundingClientRect().width / 2,
+    };
+  });
+  expect(place).toEqual({ afterWork: true, left: 0, height: 40, compact: true });
 
-  await button.click();
-  await expect(button).toHaveAttribute('aria-pressed', 'true');
+  await card.click();
   await expect(page.getByTestId('side-chat-changes-view').getByTestId('doc-pane')).toBeVisible();
   await expect(page.getByTestId('side-chat-changes-view')).toContainText('README.md');
   await expect(page.getByTestId('doc-pane').getByRole('button', { name: /^v\d/ })).toHaveCount(0);
   await expect(page.getByTestId('transcript-col')).toHaveCount(0);
+  await expect(sideChat(page).getByTestId('side-chat-changes')).toHaveCount(0);
 
-  await button.click();
-  await expect(button).toHaveAttribute('aria-pressed', 'false');
+  await sideChat(page).getByRole('button', { name: '返回对话' }).click();
+  await expect(sideChat(page)).toBeVisible();
   await expect(page.getByTestId('transcript-col')).toBeVisible();
   await expect(page.getByTestId('side-chat-changes-view')).toHaveCount(0);
+  await expect(changesCard(page)).toBeVisible();
 });
 
-test('a thread without build changes has no changes button', async ({ page }) => {
+test('a thread without build changes has no changes card', async ({ page }) => {
   for (const id of ['home-c-idle', 'home-c-working-a', 'home-c-confirm']) {
     await page.goto(`${HOME}&thread=${id}`);
     await expect(sideChat(page), id).toBeVisible();
-    await expect(changesButton(page), id).toHaveCount(0);
+    await expect(changesCard(page), id).toHaveCount(0);
   }
 });
 
@@ -238,7 +263,7 @@ test('Escape leaves the changes first and closes the panel on the second press',
   page,
 }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
-  await changesButton(page).click();
+  await changesCard(page).click();
   await expect(page.getByTestId('side-chat-changes-view')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('side-chat-changes-view')).toHaveCount(0);
@@ -252,7 +277,7 @@ test('the composer stays usable while the changes show, and switching threads re
   page,
 }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
-  await changesButton(page).click();
+  await changesCard(page).click();
   const input = page.locator('.side-panel textarea');
   await input.fill('looks good');
   await expect(input).toHaveValue('looks good');
@@ -262,29 +287,34 @@ test('the composer stays usable while the changes show, and switching threads re
   await expect(page.getByTestId('transcript-col')).toBeVisible();
   await expect(page.getByTestId('side-chat-changes-view')).toHaveCount(0);
   await page.goto(`${HOME}&thread=home-c-review`);
-  await expect(changesButton(page)).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId('transcript-col')).toBeVisible();
+  await expect(changesCard(page)).toBeVisible();
 });
 
 test.describe('phone width changes', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test('the changes view and header fit the screen', async ({ page }) => {
+  test('the changes card is a touch target and the changes view fits the screen', async ({
+    page,
+  }) => {
     await page.goto(`${HOME}&thread=home-c-review`);
-    await changesButton(page).click();
+    const box = await changesCard(page).boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(40);
+    await changesCard(page).click();
     await expect(page.getByTestId('side-chat-changes-view')).toBeVisible();
     const overflow = await page
       .locator('aside.side-panel')
       .evaluate((node) => node.scrollWidth - node.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
-    const box = await changesButton(page).boundingBox();
-    expect(box?.height ?? 0).toBeGreaterThanOrEqual(32);
+    await sideChat(page).getByRole('button', { name: '返回对话' }).click();
+    await expect(page.getByTestId('transcript-col')).toBeVisible();
   });
 });
 
 test('with a thread open, digits leave the Coordinator question alone', async ({ page }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
   await expect(sideChat(page)).toBeVisible();
-  const option = page.getByTestId('chief-question-dock').getByTestId('chief-question-option-0-0');
+  const option = page.getByTestId('chief-question').getByTestId('chief-question-option-0-0');
   await expect(option).toBeVisible();
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press('1');

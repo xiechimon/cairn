@@ -38,7 +38,7 @@ for (const [route, scenario] of [
   test(`sidebar destination renders no back arrow — ${route}`, async ({ page }) => {
     await page.goto(`${route}?scenario=${scenario}`);
     await expect(
-      page.locator('[data-testid="page-topbar"], [data-testid="settings-breadcrumb"]').first(),
+      page.locator('[data-testid="page-topbar"], [data-testid="settings-head"]').first(),
     ).toBeVisible();
     await expect(page.locator('[data-testid="page-topbar"] [aria-label="返回"]')).toHaveCount(0);
   });
@@ -61,7 +61,7 @@ for (const [route, scenario] of [
 for (const [route, backTo] of [
   [
     '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c',
-    /\/app\?scenario=r2-24c&project=ZAQczKCu0MOAzC1ZqcFlX$/,
+    /\/app\?scenario=r2-24c&project=ZAQczKCu0MOAzC1ZqcFlX&chat=1$/,
   ],
 ] as const) {
   test(`detail back owns its hit area and navigates to the parent — ${route}`, async ({ page }) => {

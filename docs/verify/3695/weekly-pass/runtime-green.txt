@@ -1,7 +1,0 @@
-{"result":{"merged":0,"expired":0,"skipped":1},"row":{"id":"doc","agentId":"a","teamId":"t","title":"MEMORY.md","content":"- release：Squash only.\n- review：Attach proof.","projectId":null,"sourceTodoId":null,"sourceBuildId":null,"source":null,"layer":"core","threadId":null,"adoptedFrom":null,"independent":false,"history":[],"invalidAt":null,"supersededBy":null,"lastInjectedAt":null,"createdAt":1000,"updatedAt":1000}}
-PASS stale document survives queued expiry
-{"scopes":4,"due":false}
-PASS documents never count toward legacy scheduling
-{"lastInjectedAt":8000}
-PASS fold preserves latest source usage
-memory-pass runtime probe: 3/3 passed
