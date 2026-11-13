@@ -5,7 +5,6 @@ import { describe, expect, test } from 'vitest';
 import { ChiefIdentity } from '../src/chief/chief-identity.js';
 import { AVATAR_IMG_CLS } from '../src/chief/recipes.js';
 import type { ChiefContent } from '../src/fixtures/records.js';
-import { spiralAvatarUrl } from '../src/lib/spiral-avatar.js';
 
 type BoundAgent = NonNullable<ChiefContent['agent']>;
 
@@ -50,11 +49,11 @@ describe('chief robot row identity chip (#741)', () => {
     expect(markup).toContain('href="/app/resources/routing-settings?scenario=chief-agent-chip"');
   });
 
-  test('F-U10: avatar slot keeps the XMON-105 single source (AVATAR_IMG_CLS + SeededAvatar img)', () => {
+  test('F-U10: avatar slot keeps the XMON-105 single source (AVATAR_IMG_CLS + SeededAvatar initial)', () => {
     const markup = render(WITH_ID);
 
     expect(markup).toContain(AVATAR_IMG_CLS.replaceAll('&', '&amp;'));
-    expect(markup).toContain('<img');
-    expect(markup).toContain(spiralAvatarUrl(WITH_ID.displayName).replaceAll('&', '&amp;'));
+    expect(markup).not.toContain('<img');
+    expect(markup).toMatch(/<span data-slot="avatar-initial"[^>]*>R<\/span>/);
   });
 });

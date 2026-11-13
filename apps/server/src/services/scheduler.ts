@@ -525,7 +525,7 @@ export function createScheduler(
     sweepAbandonedBuildSteps(deps, now);
     void sweepAbandonedShipSteps(deps, now).catch(() => {});
     sweepZombieQueuedTodos(deps, now);
-    sweepPlanAutoConfirm(deps, now);
+    sweepPlanAutoConfirm(deps);
     sweepQuotaWaitSteps(deps, now);
     sweepUnplaceableSteps(deps, now);
     void sweepFailedRetries(deps).catch(() => {});

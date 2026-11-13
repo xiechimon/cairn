@@ -93,7 +93,9 @@ test('a reply that both mentions and created a task shows exactly one reference 
   await page.goto('/app');
   const stream = page.getByTestId('chief-stream');
   const reply = stream.getByTestId('chief-msg').filter({ hasText: 'in cairn and forwarded your words.' });
-  await expect(reply.locator('a.mention-chip--todo')).toHaveCount(1);
+  await expect(reply.locator('a[data-slot="task-mention"]')).toHaveCount(1);
+  await expect(reply.locator('.mention-chip--todo')).toHaveCount(0);
+  await expect(reply.locator('svg[data-glyph]')).toHaveCount(1);
   await expect(reply.getByTestId('chief-task-refs')).toHaveCount(1);
   await expect(reply.getByTestId('chief-task-ref')).toHaveCount(1);
   await expect(stream.getByTestId('chief-task-ref')).toHaveCount(1);
@@ -161,7 +163,7 @@ test('a created task the page no longer knows falls back to a one-line link', as
   const stream = page.getByTestId('chief-stream');
   await expect(stream.getByTestId('chief-task-ref')).toHaveCount(0);
   await expect(stream.locator('[data-slot="task-card"]')).toHaveCount(0);
-  await expect(stream.getByTestId('chief-task-created')).toHaveText(`Created task #${TASK.seqNum} ${TASK.title}`);
+  await expect(stream.getByTestId('chief-task-created')).toHaveText(`Created task ${TASK.title}`);
 });
 
 test('tasks waiting on the owner put no tray above the composer; the greeting count is the Tasks badge', async ({

@@ -4,158 +4,158 @@
   "issues": {
     "1793": {
       "destination": "close",
-      "reason": "superseded by D60 (no preset role agents; dispatch ablation varies the retired roster)",
+      "reason": "superseded by (no preset role agents; dispatch ablation varies the retired roster)",
       "since": "2026-11-04"
     },
     "1860": {
       "destination": "close",
-      "reason": "superseded by D60 (no preset role agents; dispatch ablation varies the retired roster)",
+      "reason": "superseded by (no preset role agents; dispatch ablation varies the retired roster)",
       "since": "2026-11-04"
     },
     "2583": {
       "destination": "close",
-      "reason": "premise retired: D67 (GLM/pi channels dropped), D72, D77 (lanes run on Claude Code)",
+      "reason": "premise retired: the GLM and pi channels were dropped, and lanes run on Claude Code",
       "since": "2026-11-04"
     },
     "2560": {
       "destination": "close",
-      "reason": "premise retired: D67 (GLM/pi channels dropped), D72, D77 (lanes run on Claude Code)",
+      "reason": "premise retired: the GLM and pi channels were dropped, and lanes run on Claude Code",
       "since": "2026-11-04"
     },
     "2557": {
       "destination": "close",
-      "reason": "premise retired: D67 (GLM/pi channels dropped), D72, D77 (lanes run on Claude Code)",
+      "reason": "premise retired: the GLM and pi channels were dropped, and lanes run on Claude Code",
       "since": "2026-11-04"
     },
     "2434": {
       "destination": "close",
-      "reason": "premise retired: D67 (GLM/pi channels dropped), D72, D77 (lanes run on Claude Code)",
+      "reason": "premise retired: the GLM and pi channels were dropped, and lanes run on Claude Code",
       "since": "2026-11-04"
     },
     "2575": {
       "destination": "close",
-      "reason": "premise retired: omarchy timer reviewer and gate-audit replaced by the D73 review-gate check; metrics moved to the delivery report (#1909)",
+      "reason": "premise retired: omarchy timer reviewer and gate-audit replaced by the review-gate check; metrics moved to the delivery report (#1909)",
       "since": "2026-11-04"
     },
     "2007": {
       "destination": "close",
-      "reason": "premise retired: omarchy timer reviewer and gate-audit replaced by the D73 review-gate check; metrics moved to the delivery report (#1909)",
+      "reason": "premise retired: omarchy timer reviewer and gate-audit replaced by the review-gate check; metrics moved to the delivery report (#1909)",
       "since": "2026-11-04"
     },
     "2522": {
       "destination": "close",
-      "reason": "superseded by D72: Coordinator compaction lives in apps/coordinator; #2559/#2563/#2637 closed",
+      "reason": "superseded: Coordinator compaction lives in apps/coordinator; #2559/#2563/#2637 closed",
       "since": "2026-11-04"
     },
     "1744": {
       "destination": "close",
-      "reason": "superseded by D67/D72: bounded recovery exists in compaction-ceiling.ts, Coordinator compaction in the sidecar",
+      "reason": "superseded: bounded recovery exists in compaction-ceiling.ts, and Coordinator compaction lives in the sidecar",
       "since": "2026-11-04"
     },
     "2080": {
       "destination": "close",
-      "reason": "premise retired: needs the GLM relay route (D67); fold remaining harness evidence into C2 epic 1",
+      "reason": "premise retired: needs the GLM relay route ; fold remaining harness evidence into C2 epic 1",
       "since": "2026-11-04"
     },
     "1836": {
       "destination": "hold",
-      "reason": "D60 candidate supersession, low confidence: ian decides whether the merge gate absorbs it"
+      "reason": "candidate supersession, low confidence: ian decides whether the merge gate absorbs it"
     },
     "1623": {
       "destination": "hold",
-      "reason": "D60 candidate supersession, low confidence: ian decides whether the merge gate absorbs it"
+      "reason": "candidate supersession, low confidence: ian decides whether the merge gate absorbs it"
     },
     "1866": {
       "destination": "phase-2",
-      "reason": "plan section 11.4.1 second phase or D59 phase-2 decision"
+      "reason": "plan section 11.4.1 second phase or phase-2 decision"
     },
     "1851": {
       "destination": "phase-2",
-      "reason": "plan section 11.4.1 second phase or D59 phase-2 decision"
+      "reason": "plan section 11.4.1 second phase or phase-2 decision"
     },
     "1687": {
       "destination": "phase-2",
-      "reason": "plan section 11.4.1 second phase or D59 phase-2 decision"
+      "reason": "plan section 11.4.1 second phase or phase-2 decision"
     },
     "1976": {
       "destination": "phase-2",
-      "reason": "plan section 11.4.1 second phase or D59 phase-2 decision"
+      "reason": "plan section 11.4.1 second phase or phase-2 decision"
     },
     "1978": {
       "destination": "phase-2",
-      "reason": "plan section 11.4.1 second phase or D59 phase-2 decision"
+      "reason": "plan section 11.4.1 second phase or phase-2 decision"
     },
     "1683": {
       "destination": "phase-2",
-      "reason": "plan section 11.4.1 second phase or D59 phase-2 decision"
+      "reason": "plan section 11.4.1 second phase or phase-2 decision"
     },
     "1667": {
       "destination": "phase-2",
-      "reason": "plan section 11.4.1 second phase or D59 phase-2 decision"
+      "reason": "plan section 11.4.1 second phase or phase-2 decision"
     },
     "1612": {
       "destination": "phase-2",
-      "reason": "plan section 11.4.1 second phase or D59 phase-2 decision"
+      "reason": "plan section 11.4.1 second phase or phase-2 decision"
     },
     "1997": {
       "destination": "phase-2",
-      "reason": "plan section 11.4.1 second phase or D59 phase-2 decision"
+      "reason": "plan section 11.4.1 second phase or phase-2 decision"
     },
     "2065": {
       "destination": "phase-2",
-      "reason": "plan section 11.4.1 second phase or D59 phase-2 decision"
+      "reason": "plan section 11.4.1 second phase or phase-2 decision"
     },
     "2066": {
       "destination": "phase-2",
-      "reason": "plan section 11.4.1 second phase or D59 phase-2 decision"
+      "reason": "plan section 11.4.1 second phase or phase-2 decision"
     },
     "1963": {
       "destination": "hold",
-      "reason": "parked (D59 item 4 / plan 11.4.1) until the stated trigger"
+      "reason": "parked (item 4 / plan 11.4.1) until the stated trigger"
     },
     "1965": {
       "destination": "hold",
-      "reason": "parked (D59 item 4 / plan 11.4.1) until the stated trigger"
+      "reason": "parked (item 4 / plan 11.4.1) until the stated trigger"
     },
     "1967": {
       "destination": "hold",
-      "reason": "parked (D59 item 4 / plan 11.4.1) until the stated trigger"
+      "reason": "parked (item 4 / plan 11.4.1) until the stated trigger"
     },
     "1968": {
       "destination": "hold",
-      "reason": "parked (D59 item 4 / plan 11.4.1) until the stated trigger"
+      "reason": "parked (item 4 / plan 11.4.1) until the stated trigger"
     },
     "1809": {
       "destination": "hold",
-      "reason": "parked (D59 item 4 / plan 11.4.1) until the stated trigger"
+      "reason": "parked (item 4 / plan 11.4.1) until the stated trigger"
     },
     "1573": {
       "destination": "hold",
-      "reason": "parked (D59 item 4 / plan 11.4.1) until the stated trigger"
+      "reason": "parked (item 4 / plan 11.4.1) until the stated trigger"
     },
     "1571": {
       "destination": "hold",
-      "reason": "parked (D59 item 4 / plan 11.4.1) until the stated trigger"
+      "reason": "parked (item 4 / plan 11.4.1) until the stated trigger"
     },
     "1532": {
       "destination": "hold",
-      "reason": "parked (D59 item 4 / plan 11.4.1) until the stated trigger"
+      "reason": "parked (item 4 / plan 11.4.1) until the stated trigger"
     },
     "1682": {
       "destination": "hold",
-      "reason": "parked (D59 item 4 / plan 11.4.1) until the stated trigger"
+      "reason": "parked (item 4 / plan 11.4.1) until the stated trigger"
     },
     "2494": {
       "destination": "hold",
-      "reason": "sequenced after #2487 (D55/D56)"
+      "reason": "sequenced after #2487"
     },
     "2493": {
       "destination": "hold",
-      "reason": "sequenced after #2487 (D55/D56)"
+      "reason": "sequenced after #2487"
     },
     "2492": {
       "destination": "hold",
-      "reason": "sequenced after #2487 (D55/D56)"
+      "reason": "sequenced after #2487"
     },
     "2057": {
       "destination": "hold",
@@ -347,11 +347,11 @@
     },
     "2853": {
       "destination": "existing-executors",
-      "reason": "D85 assigns question deferral to B-UI lane 6; gallery drafts and measured browser evidence await the owner design choice before production work"
+      "reason": "assigns question deferral to B-UI lane 6; gallery drafts and measured browser evidence await the owner design choice before production work"
     },
     "2844": {
       "destination": "hold",
-      "reason": "B2 seed-cache follow-up depends on #2278 and lane 8 D69 runtime integration; coordinate seed.ts ownership with #2761 before implementation"
+      "reason": "B2 seed-cache follow-up depends on #2278 and lane 8 runtime integration; coordinate seed.ts ownership with #2761 before implementation"
     },
     "1517": {
       "destination": "existing-executors",

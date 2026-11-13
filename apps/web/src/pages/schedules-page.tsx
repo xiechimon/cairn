@@ -57,7 +57,7 @@ function ScheduleCard({
         className="h-auto min-w-0 flex-1 justify-start rounded-none p-0 text-left font-normal hover:bg-transparent dark:hover:bg-transparent"
       >
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-ui text-foreground">{`#${schedule.todo.seqNum} ${schedule.todo.title}`}</span>
+          <span className="truncate text-ui text-foreground">{schedule.todo.title}</span>
           <span className="truncate text-meta text-content-tertiary">{`${schedule.enabled === false ? (schedule.pausedReason ?? t('已暂停')) : scheduleSummary(schedule, now, t)} · ${schedule.todo.projectName}`}</span>
         </span>
       </Button>
@@ -163,7 +163,7 @@ function ScheduleForm({
         <div className="sched-form-row flex h-8 items-center justify-between gap-3 rounded-md border border-border bg-card px-3 shadow-xs dark:bg-input/30">
           <span className="text-ui text-foreground">{t('任务')}</span>
           <span className="min-w-0 truncate text-ui text-foreground">
-            {todo === undefined ? '—' : `#${todo.seqNum} ${todo.title}`}
+            {todo === undefined ? '—' : todo.title}
           </span>
         </div>
         {setupState !== 'ready' && (
@@ -411,14 +411,7 @@ export function SchedulesPage() {
       <DeleteConfirm
         open={confirmOpen}
         title={t('确定删除该定时？此操作不可撤销。')}
-        summary={
-          deleteTarget === null ? null : (
-            <>
-              <span className="text-content-tertiary">#{deleteTarget.todo.seqNum}</span>
-              {deleteTarget.todo.title}
-            </>
-          )
-        }
+        summary={deleteTarget === null ? null : deleteTarget.todo.title}
         ariaLabel={t('删除定时')}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => {

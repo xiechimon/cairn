@@ -1,11 +1,23 @@
-import { legacyDone, legacyReview, MACHINE_NAME, r7 } from './core.js';
+import { at, legacyDone, legacyReview, MACHINE_NAME, R3_DAY, r7 } from './core.js';
 import type {
   ChiefContent,
   ChiefSettingsTab,
   ChiefStreamItem,
   ChiefThreadRef,
   FixtureSet,
+  TodoRecord,
 } from './records.js';
+
+const contributingGuide: TodoRecord = {
+  ...legacyReview,
+  id: 'r3-contributing',
+  title: '编写 CONTRIBUTING.md 贡献指南',
+  spec: '编写 CONTRIBUTING.md 贡献指南，放到项目根目录。',
+  phase: 'building',
+  phaseAt: at(R3_DAY, 17, 27),
+  seqNum: 11,
+  orderIndex: 2,
+};
 
 const CHIEF_DRAFT =
   '我想做一个能在浏览器里直接玩的网页小游戏 （比如贪吃蛇或打砖块）： 单文件 HTML + Canvas， 不用任何构建工具，做完能在项目的文件页直接试玩。请在现有的入门项目里做， 组建 Agent 团队把游戏逻辑、 画面手感、 难度调优拆成并行任务， 然后向我汇报方案， 等我确认后再开始动工。';
@@ -81,7 +93,7 @@ export const chiefWorking: FixtureSet = {
 };
 
 export const chiefThread: FixtureSet = {
-  todos: [legacyReview, legacyDone],
+  todos: [legacyReview, legacyDone, contributingGuide],
   now: r7(13, 14),
   chief: {
     view: 'none',
@@ -98,13 +110,7 @@ export const chiefThread: FixtureSet = {
       {
         kind: 'robot',
         paragraphs: [
-          [
-            { text: '已创建并派工 ' },
-            { text: '', todo: 11 },
-            { text: ' 「编写 CONTRIBUTING.md 贡献指南」， 由文档专职 Agent ' },
-            { text: '', agent: 'r5-scribe' },
-            { text: ' 承接，正在编写中。' },
-          ],
+          [{ text: '已创建并派工 ' }, { text: '', todo: 11 }, { text: '，正在编写中。' }],
           [
             {
               text: '要求内容涵盖：如何给 Agent 提任务、如何验收改动，文件写入项目根目录 CONTRIBUTING.md。完成或需要确认时我会跟进汇报。',
@@ -122,7 +128,7 @@ export const chiefThread: FixtureSet = {
 };
 
 export const chiefThreadsOpen: FixtureSet = {
-  todos: [legacyReview, legacyDone],
+  todos: [legacyReview, legacyDone, { ...contributingGuide, phase: 'review' }],
   now: r7(13, 14),
   chief: {
     view: 'none',
@@ -241,7 +247,7 @@ const CHIEF_MD_REPLY = [
   '三项检查已完成，**全部通过**，输出细节在 `docs/verify/` 目录。',
   '',
   '- **项目**: 凭证链路验证',
-  '- 次要点: 由 [r5-scribe](agent:a1) 承接复核',
+  '- 次要点: 复核在任务里进行',
   '- 关联任务: [#1](todo:r3-legacy-1) 已进入复核；prose #12 与 [伪链](todos:t2) 保持字面',
   '',
   '1. 第一步：读取配置',

@@ -18,6 +18,7 @@ export const ORB_IMAGE_ENV = 'CAIRN_ORB_IMAGE';
 export const E2B_API_KEY_ENV = 'E2B_API_KEY';
 export const E2B_TEMPLATE_ENV = 'CAIRN_E2B_TEMPLATE';
 export const E2B_TIMEOUT_ENV = 'CAIRN_E2B_TIMEOUT_MS';
+export const COMPUTER_ENV = 'CAIRN_COMPUTER';
 
 type OrbBackendName = 'nspawn' | 'e2b' | OrbRuntimeName;
 
@@ -113,4 +114,16 @@ export function createOrbProvider(env: NodeJS.ProcessEnv, home: string): OrbProv
   throw new Error(
     `${ORB_RUNTIME_ENV}=${runtime} is not implemented yet; only nspawn, podman and e2b are available`,
   );
+}
+
+export function createComputerOrbProvider(
+  env: NodeJS.ProcessEnv,
+  executor: OrbProvider,
+): NspawnOrbProvider | undefined {
+  if (executor instanceof NspawnOrbProvider) return executor;
+  const value = env[COMPUTER_ENV];
+  if (value === undefined || value === '') return undefined;
+  if (value !== 'orb')
+    throw new Error(`${COMPUTER_ENV} must be orb (got ${JSON.stringify(value)})`);
+  return new NspawnOrbProvider();
 }

@@ -14,7 +14,7 @@ test('the working row is typing dots with no text label and no steps control', a
   await expect(page.getByTestId('chief-status-mark')).toHaveAttribute('data-state', 'run');
 });
 
-test('the task reference row and inline chip carry the spinner ring, with the state in the accessible name only', async ({
+test('the task reference row carries the one spinner ring, with the state in the accessible name only', async ({
   page,
 }) => {
   await page.goto('/app?scenario=chief-draft');
@@ -22,5 +22,6 @@ test('the task reference row and inline chip carry the spinner ring, with the st
   const ref = stream.getByTestId('chief-task-ref');
   await expect(ref).not.toContainText('In progress');
   await expect(ref.locator('svg[data-glyph="progress"]')).toHaveCount(1);
-  await expect(stream.locator('a.mention-chip svg[data-glyph="progress"]')).toHaveCount(1);
+  await expect(stream.locator('svg[data-glyph="progress"]')).toHaveCount(1);
+  await expect(stream.locator('a.mention-chip')).toHaveCount(0);
 });

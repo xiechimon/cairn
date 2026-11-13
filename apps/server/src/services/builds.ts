@@ -21,7 +21,6 @@ import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
   ANSWERS_CONTINUE_PROMPT,
-  ASK_USER_QUESTION_KIND,
   BUILD_FAILURE_ROW_KIND,
   buildFailureRowContent,
   buildPlanContractRewritePrompt,
@@ -124,6 +123,7 @@ import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
 import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
 import { BLOCKED_STEP_KINDS, blockedHold, blockedNow } from './blockers.js';
 import { recordBuildFeedback } from './build-provenance.js';
+import { askUndeliveredOnce, undeliveredEnd } from './build-undelivered.js';
 import { askQuestionContentOf } from './chief-questions.js';
 import {
   claimClientMessage,
@@ -196,7 +196,6 @@ import {
   blockingWorkerQuestions,
   cancelPendingWorkerQuestions,
   pendingWorkerQuestions,
-  writeWorkerQuestion,
 } from './worker-question-store.js';
 import {
   type QuestionAnswer,
@@ -2981,8 +2980,6 @@ function planContractOfStep(
   return checkPlanContract(latest.content);
 }
 
-export const PLAN_AUTO_CONFIRM_GRACE_MS = 10 * 60_000;
-
 type PlanAutoConfirmation =
   | { eligible: true; planId: string; deadline: number }
   | { eligible: false; reason: string };
@@ -3068,10 +3065,17 @@ function planAutoConfirmation(deps: Pick<BuildDeps, 'db'>, buildId: string): Pla
       .some((row) => askQuestionContentOf(row.content)?.status === 'pending');
   if (pendingQuestion)
     return { eligible: false, reason: 'A pending Chief question requires a user answer' };
+  const queuedFeedback = deps.db
+    .select({ id: queuedMessage.id })
+    .from(queuedMessage)
+    .where(and(eq(queuedMessage.conversationId, buildId), isNull(queuedMessage.error)))
+    .get();
+  if (queuedFeedback !== undefined)
+    return { eligible: false, reason: 'A queued user message is waiting for the planning turn' };
   return {
     eligible: true,
     planId: latestPlan.id,
-    deadline: todoRow.phaseAt + PLAN_AUTO_CONFIRM_GRACE_MS,
+    deadline: todoRow.phaseAt,
   };
 }
 
@@ -3082,57 +3086,39 @@ export function planAutoApproveAt(deps: BuildDeps, planId: string): number | nul
   return eligibility.eligible && eligibility.planId === planId ? eligibility.deadline : null;
 }
 
-export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): void {
-  const waiting = deps.db.select().from(todo).where(eq(todo.phase, 'confirm')).all();
-  for (const todoRow of waiting) {
-    if (todoRow.latestBuildId === null) continue;
-    const buildId = todoRow.latestBuildId;
-    const eligibility = planAutoConfirmation(deps, buildId);
-    if (!eligibility.eligible || now < eligibility.deadline) continue;
-    try {
-      applyBuildConfirm(deps, buildId, 'server');
-    } catch (error) {
-      if (
-        !(
-          error instanceof HttpError &&
-          error.status === 409 &&
-          (error.message.startsWith('agent-label-privileged:') ||
-            error.message.startsWith('intake-label-assignment-failed:'))
-        )
+function confirmPlanAutomatically(deps: BuildDeps, buildId: string): void {
+  try {
+    applyBuildConfirm(deps, buildId, 'server');
+  } catch (error) {
+    if (
+      !(
+        error instanceof HttpError &&
+        error.status === 409 &&
+        (error.message.startsWith('agent-label-privileged:') ||
+          error.message.startsWith('intake-label-assignment-failed:'))
       )
-        throw error;
-    }
+    )
+      throw error;
   }
 }
 
-const UNDELIVERED_EXCERPT_MAX = 1_200;
-
-type Undelivered = 'no-commits' | 'no-pr';
-
-function undeliveredEnd(
-  deps: BuildDeps,
-  stepRow: typeof step.$inferSelect,
-  todoRow: TodoRow,
-  buildRow: BuildRow,
-  outcome: { hasChanges?: boolean; workBranchDrift?: unknown },
-): Undelivered | null {
-  if (!isBuildStepKind(stepRow.kind) || todoRow.output === 'info') return null;
-  if (outcome.workBranchDrift !== undefined) return null;
-  if (outcome.hasChanges === false) return 'no-commits';
-  const githubProject = githubRepoOfProject(projectOfTodo(deps.db, todoRow)) !== null;
-  return githubProject && buildRow.prNumber === null ? 'no-pr' : null;
+function confirmDeliveredPlan(deps: BuildDeps, buildId: string): void {
+  try {
+    deps.db.transaction(() => {
+      if (planAutoConfirmation(deps, buildId).eligible) confirmPlanAutomatically(deps, buildId);
+    });
+  } catch {
+    return;
+  }
 }
 
-function spokenText(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (!Array.isArray(content)) return '';
-  return content
-    .flatMap((block: unknown) => {
-      if (block === null || typeof block !== 'object') return [];
-      const { type, text } = block as { type?: unknown; text?: unknown };
-      return type === 'text' && typeof text === 'string' ? [text] : [];
-    })
-    .join('\n');
+export function sweepPlanAutoConfirm(deps: BuildDeps): void {
+  const waiting = deps.db.select().from(todo).where(eq(todo.phase, 'confirm')).all();
+  for (const todoRow of waiting) {
+    if (todoRow.latestBuildId === null) continue;
+    if (planAutoConfirmation(deps, todoRow.latestBuildId).eligible)
+      confirmPlanAutomatically(deps, todoRow.latestBuildId);
+  }
 }
 
 function hasFailureRow(deps: BuildDeps, buildId: string, reason: string): boolean {
@@ -3145,63 +3131,6 @@ function hasFailureRow(deps: BuildDeps, buildId: string, reason: string): boolea
       const parsed = systemRowOf(row.content);
       return parsed?.kind === BUILD_FAILURE_ROW_KIND && parsed.reason === reason;
     });
-}
-
-function lastAgentMessage(deps: BuildDeps, buildId: string): string | null {
-  const rows = deps.db
-    .select({ content: message.content })
-    .from(message)
-    .where(and(eq(message.conversationId, buildId), eq(message.role, 'assistant')))
-    .orderBy(desc(message.createdAt))
-    .all();
-  for (const row of rows) {
-    const text = spokenText(row.content).trim();
-    if (text !== '') return text;
-  }
-  return null;
-}
-
-function excerptOf(text: string | null, missing: string): string {
-  if (text === null || text.trim() === '') return missing;
-  return text.length > UNDELIVERED_EXCERPT_MAX
-    ? `${text.slice(0, UNDELIVERED_EXCERPT_MAX - 1)}…`
-    : text;
-}
-
-const UNDELIVERED_SUMMARY: Record<Undelivered, string> = {
-  'no-commits': 'The step ended without committing anything.',
-  'no-pr': 'The step ended without opening a pull request.',
-};
-
-function askUndeliveredOnce(deps: BuildDeps, buildRow: BuildRow, kind: Undelivered): void {
-  const asked = deps.db
-    .select({ id: message.id })
-    .from(message)
-    .where(inArray(message.id, [`no-deliverable-${buildRow.id}`, `no-change-${buildRow.id}`]))
-    .get();
-  if (asked !== undefined) return;
-  const reportLine = excerptOf(buildRow.reportLine, '(no report line)');
-  const last = excerptOf(lastAgentMessage(deps, buildRow.id), '(the agent left no message)');
-  const requestId = `no-deliverable-${buildRow.id}`;
-  writeWorkerQuestion(
-    deps,
-    buildRow.id,
-    requestId,
-    {
-      kind: ASK_USER_QUESTION_KIND,
-      requestId,
-      status: 'pending',
-      questions: [
-        {
-          header: 'Not delivered',
-          question: `Report line: ${reportLine}\n${UNDELIVERED_SUMMARY[kind]} The agent's last message:\n${last}\nAnswer with what is missing and who supplies it, or say what the task should deliver instead.`,
-          options: [],
-        },
-      ],
-      answers: null,
-    },
-    nowMs(),
-  );
 }
 
 export function completeStep(
@@ -3346,6 +3275,7 @@ export function completeStep(
       return;
     }
     setTodoPhase(deps, todoRow.id, 'confirm', { hasPlan: true });
+    confirmDeliveredPlan(deps, stepRow.buildId);
     return;
   }
   if (

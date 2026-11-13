@@ -61,7 +61,7 @@ The map does not write implementation details, only user paths, stable handles, 
 
 ## Features
 
-- [GitHub emulator](./github-emulator.md): D109 poller, checks, review feedback and merge over real loopback HTTP.
+- [GitHub emulator](./github-emulator.md): PR-watch poller, checks, review feedback and merge over real loopback HTTP.
 
 - [Control Glass five journeys](./glass-journeys.md) new task, dispatch to chief, review diff, request changes, merge. One-shot script `node .cursor/skills/verify-cairn/scripts/glass.mjs`.
 - [New task (workbench)](./board-new-task.md) workbench shell rendering (4 columns since #351), new-task dialog, automatic default-project creation when none, persistence triple truth.
@@ -69,7 +69,7 @@ The map does not write implementation details, only user paths, stable handles, 
 - [API evidence card](./api-evidence-card.md) live-stack driver for backend Proof cards (calls screenshot, transcript, Before/After request table).
 - [Search](./search.md) sidebar entry -> panel input -> hit task rows.
 - [Theme](./theme.md) cairn-theme persistence, light/dark both ways.
-- [Avatars (local spiral seal)](./avatars.md) seeded spiral-seal avatar data URL, busy rotation, Root fixed-size box after #1003; custom probe `scripts/drive-avatars.mjs` (#387 / #1429).
+- [Avatars (tinted initial)](./avatars.md) tinted initial seeded by name, no busy variant, Root fixed-size box after #1003; custom probe `scripts/drive-avatars.mjs` (#387 / #1429).
 - [Stop button (detail page)](./stop-button.md) the full-stack running interruption chain (server+web+real daemon+stub LLM gated wheel): #318 unified start dialog -> streaming -> confirmation popup -> stopping... -> cancelled -> gate fallback; custom probe `scripts/drive-stop.mjs` (#308).
 - [AI review launch (detail page)](./review-modal.md) confirm/review-phase composer `AI 审核` button -> 560-modal agent selection -> launch -> review step enqueued + REVIEW_ANNOUNCEMENT; custom probe `scripts/drive-review.mjs` (#312); the blocking auto-revision loop `scripts/drive-review-blocking.mjs` (#330/#332).
 - [review-700 verdict extraction real chain](./review-700.md) real daemon full-chain verdict JSON + set_task_meta same-round order; custom probe `scripts/drive-review-700.mjs` (#700).

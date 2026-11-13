@@ -26,29 +26,32 @@ test.describe('Coordinator replies carry no identity row (D122)', () => {
   });
 });
 
-test.describe('agent mention chip (fixture, #741 gap 2)', () => {
+test.describe('agent mention in an old message (fixture, #741 gap 2)', () => {
   test.beforeEach(async ({ page }) => {
     await stubDicebear(page);
   });
 
-  test('F-E5: Coordinator agent mention chips stay lazy spans', async ({ page }) => {
+  test('F-E5: a Coordinator agent mention is plain text, with no chip and no link', async ({ page }) => {
     await page.goto(SCENARIO);
     await expect(page.getByTestId('home-c')).toBeVisible();
-    const chip = page.getByTestId('chief-stream').locator('.mention-chip--agent');
-    await expect(chip).toHaveCount(1);
-    await expect(chip).toHaveText('r5-scribe');
+    const stream = page.getByTestId('chief-stream');
+    const mention = stream.locator('[data-slot="agent-mention"]');
+    await expect(mention).toHaveCount(1);
+    await expect(mention).toHaveText('r5-scribe');
+    await expect(stream.locator('.mention-chip--agent')).toHaveCount(0);
 
-    expect(await chip.evaluate((el) => el.tagName)).toBe('SPAN');
-    await expect(chip).not.toHaveAttribute('href', /.*/);
+    expect(await mention.evaluate((el) => el.tagName)).toBe('SPAN');
+    await expect(mention).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(mention.locator('svg, img')).toHaveCount(0);
   });
 
   test('F-E6: side chat transcript face follows the same law (second consumer of the single-source segments)', async ({ page }) => {
     await page.goto('/app/todo/r3-legacy-1?scenario=chief-agent-chip');
 
-    const chip = page.locator('.side-panel .mention-chip--agent');
-    await expect(chip).toHaveCount(1);
-    expect(await chip.evaluate((el) => el.tagName)).toBe('SPAN');
-    await expect(chip).not.toHaveAttribute('href', /.*/);
+    const mention = page.locator('.side-panel [data-slot="agent-mention"]');
+    await expect(mention).toHaveCount(1);
+    await expect(page.locator('.side-panel .mention-chip--agent')).toHaveCount(0);
+    expect(await mention.evaluate((el) => el.tagName)).toBe('SPAN');
   });
 
   test('F-E7: skill/project/machine mentions stay lazy spans (literal negative cases)', async ({ page }) => {
@@ -62,7 +65,7 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
       await expect(chip, kind).not.toHaveAttribute('href', /.*/);
     }
 
-    await expect(stream.locator('.mention-chip--todo')).toHaveAttribute(
+    await expect(stream.locator('a[data-slot="task-mention"]')).toHaveAttribute(
       'href',
       /^\/app\?(scenario=[^&]+&)?thread=r3-legacy-1$/,
     );
@@ -70,7 +73,7 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
 });
 
 test.describe('lazy face zero change (#741 negative case)', () => {
-  test('F-E8: robot rows without an agent projection carry no face and zero anchors (frozen capture face r5 114)', async ({
+  test('F-E8: robot rows without an agent projection carry no face, and only the task links (frozen capture face r5 114)', async ({
     page,
   }) => {
     await stubDicebear(page);
@@ -80,9 +83,10 @@ test.describe('lazy face zero change (#741 negative case)', () => {
 
     await expect(stream.getByTestId('chief-msg').locator('> svg')).toHaveCount(0);
 
-    await expect(stream.getByRole('link')).toHaveCount(0);
-    await expect(
-      stream.getByTestId('chief-msg').filter({ has: page.getByRole('link') }),
-    ).toHaveCount(0);
+    const links = stream.getByRole('link');
+    await expect(links).toHaveCount(2);
+    for (const link of await links.all())
+      await expect(link).toHaveAttribute('href', /[?&]thread=r3-contributing$/);
+    await expect(stream).not.toContainText('r5-scribe');
   });
 });

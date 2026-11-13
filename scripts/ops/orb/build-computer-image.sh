@@ -10,6 +10,7 @@ host_root=${CAIRN_ORB_ROOT:-}
 machines_dir=$host_root/var/lib/machines
 base=$machines_dir/cairn-orb-base
 image=$machines_dir/cairn-orb-computer
+published_marker=$host_root/var/lib/cairn-orb/computer-image
 daemon_entry=/opt/cairn/daemon/cli.mjs
 packages=(xorg-server-xvfb x11vnc fluxbox xdotool chromium imagemagick npm)
 agent_browser_version=${CAIRN_AGENT_BROWSER_VERSION:-0.41.2}
@@ -32,6 +33,16 @@ filesystem=$(stat -f -c %T -- "$filesystem_path")
 image_type() {
   if [[ $filesystem == btrfs && $(stat -c %i -- "$1") == 256 ]]; then printf 'subvolume'; else printf 'directory'; fi
 }
+publish_marker() {
+  local directory
+  directory=$(dirname -- "$published_marker")
+  [[ -d $directory ]] || install -d -m 755 -- "$directory"
+  local staged
+  staged=$(mktemp "$published_marker.XXXXXX")
+  cat -- "$image/etc/cairn-orb-computer-image" > "$staged"
+  chmod 644 "$staged"
+  mv -f -T -- "$staged" "$published_marker"
+}
 remove_image() {
   if [[ $(image_type "$1") == subvolume ]]; then btrfs subvolume delete -R "$1"; else rm -rf -- "$1"; fi
 }
@@ -44,6 +55,7 @@ fi
 previous_marker=
 if [[ -d $image ]]; then
   if [[ -f $image/etc/cairn-orb-computer-image && $(cat "$image/etc/cairn-orb-computer-image") == "$expected" ]]; then
+    publish_marker
     printf '0 changes\n'
     exit 0
   fi
@@ -63,6 +75,7 @@ printf '%s\n' \
   'install the cairn-computer-agent service for agent and disable the inherited cairn-orb-worker service' \
   'remove package caches; clear /etc/machine-id' \
   'write /etc/cairn-orb-computer-image completion marker' \
+  'publish a world-readable copy of the marker at /var/lib/cairn-orb/computer-image for the daemon user' \
   'register cairn-orb-computer only after mounts are gone'
 if $dry_run; then printf '1 planned changes\n'; exit 0; fi
 stage=$(mktemp -d "$machines_dir/.cairn-orb-computer-build.XXXXXX")
@@ -201,4 +214,6 @@ if [[ -n $backup ]]; then
   remove_image "$backup"
 fi
 machinectl list-images --no-legend --no-pager | awk '$1 == "cairn-orb-computer" {found=1} END {exit !found}'
+publish_marker
+printf 'publish %s\n' "$published_marker"
 printf '1 changes\n'

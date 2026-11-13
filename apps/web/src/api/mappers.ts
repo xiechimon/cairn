@@ -23,6 +23,7 @@ import {
   BRAND,
   BUILD_FAILURE_ROW_KIND,
   CHIEF_TURN_ERROR_KIND,
+  CONFIRM_ANNOUNCEMENT,
   chiefDigestContentSchema,
   chiefModelFallbackContentSchema,
   chiefNoticeContentSchema,
@@ -87,6 +88,7 @@ import type {
   UsageCostContent,
   WorkStep,
 } from '../fixtures/records.js';
+import { dateTimeFormat } from '../lib/date-format.js';
 import { inlineSegments } from '../lib/markdown.js';
 import { activityLabel } from './activity.js';
 import type { MachineProvider } from './claude-accounts.js';
@@ -251,7 +253,7 @@ export function mapUsageCost(cost: UsageCost | undefined): UsageCostContent | nu
 }
 
 export function clockTime(ms: number): string {
-  return new Intl.DateTimeFormat('zh-CN', {
+  return dateTimeFormat('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
@@ -639,6 +641,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       }
       if (stepPromptIds.has(m.id)) continue;
       if (GATE_ANNOUNCEMENTS.includes(text)) {
+        if (text === CONFIRM_ANNOUNCEMENT && m.actor === SERVER_ACTOR) continue;
         entries.push({
           at: m.createdAt,
           item: { kind: 'note', text: `${m.actor ?? userName} ${text}`, id: m.id },
@@ -761,8 +764,12 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     });
   });
   if (build?.withPlan === true) {
+    const confirmations = messages.filter(
+      (m) => m.role === 'user' && textOfContent(m.content).trim() === CONFIRM_ANNOUNCEMENT,
+    );
     for (const s of steps) {
-      if (s.kind === 'build' && !scheduledStepIds.has(s.id)) {
+      const confirmedBy = confirmations.findLast((m) => m.createdAt <= s.createdAt)?.actor;
+      if (s.kind === 'build' && !scheduledStepIds.has(s.id) && confirmedBy !== SERVER_ACTOR) {
         entries.push({
           at: s.createdAt,
           item: { kind: 'user', text: '确认', createdAt: s.createdAt },
@@ -917,6 +924,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   return folded;
 }
 
+const SERVER_ACTOR = 'server';
 const REWORK_REUSE_HEAD = '返工回到本分支继续';
 
 const CREDENTIAL_SOURCE_DETAIL = {

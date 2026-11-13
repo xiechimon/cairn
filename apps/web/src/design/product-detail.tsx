@@ -7,7 +7,12 @@ import { Button } from '../components/ui/button.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
 import { Composer } from '../detail/composer.js';
 import { DocPane } from '../detail/docpane.js';
-import { Segments, TodoGlanceContext, TodoStatus } from '../detail/segments.js';
+import {
+  Segments,
+  TaskMentionAsLinkContext,
+  TodoGlanceContext,
+  TodoStatus,
+} from '../detail/segments.js';
 import { SourceIssueLine } from '../detail/source-issue.js';
 import { SpecBlock } from '../detail/spec-block.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
@@ -120,7 +125,7 @@ function ComposerSpecimen() {
           />
         </div>
       </Cell>
-      <Cell label="Agent running: timer and stop beside send; sending queues the message">
+      <Cell label="Agent running: stop beside send; sending queues the message">
         <div className="w-160 pt-2">
           <Composer
             placeholder={PHASE_UI.building.placeholder ?? ''}
@@ -390,8 +395,6 @@ export function ProductDetailSection() {
                   mentionKind: 'todo',
                   mentionId: 'gallery-44',
                 },
-                { text: ' with ' },
-                { text: 'reviewer', style: 'mention', mentionKind: 'agent', mentionId: 'reviewer' },
                 { text: ', see ' },
                 { text: 'PR #1190', style: 'link' },
                 { text: ', ' },
@@ -404,7 +407,7 @@ export function ProductDetailSection() {
       <Specimen
         id="task-references"
         title="Task references"
-        note="Reference row above a Coordinator reply and the inline chip, per task state: a tinted tile or pill, the status word only while working"
+        note="Reference row above a Coordinator reply, per task state: a tinted tile and the title. In the sentence the task is its title as a plain link"
         className="flex-col items-start"
       >
         {TASK_REF_PHASES.map((phase) => (
@@ -422,19 +425,21 @@ export function ProductDetailSection() {
                   }}
                 />
                 <p className="m-0 text-ui leading-[22px]">
-                  <Segments
-                    codeClassName="chat-code"
-                    segments={[
-                      { text: 'Added the repository, and the test task ' },
-                      {
-                        text: TASK_REF_TITLE,
-                        style: 'mention',
-                        mentionKind: 'todo',
-                        mentionId: `gallery-ref-${phase}`,
-                      },
-                      { text: ' is set up and reading it now.' },
-                    ]}
-                  />
+                  <TaskMentionAsLinkContext.Provider value>
+                    <Segments
+                      codeClassName="chat-code"
+                      segments={[
+                        { text: 'Added the repository, and the test task ' },
+                        {
+                          text: TASK_REF_TITLE,
+                          style: 'mention',
+                          mentionKind: 'todo',
+                          mentionId: `gallery-ref-${phase}`,
+                        },
+                        { text: ' is set up and reading it now.' },
+                      ]}
+                    />
+                  </TaskMentionAsLinkContext.Provider>
                 </p>
               </div>
             </TodoGlanceContext.Provider>
