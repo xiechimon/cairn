@@ -43,7 +43,7 @@ import { piWorktreeSkillDirs } from './backend/skills.js';
 import { prepareWebTools } from './backend/web-search.js';
 import { assertNoLegacyBrief, composeBrief } from './brief-file.js';
 import type { ClaudeCodeAuthProbe } from './claude-code-auth.js';
-import { claudeQuotaTrip, claudeRateLimitReport, type QuotaTrip } from './claude-quota-trip.js';
+import { claudeQuotaTrip, forwardClaudeRateLimit, type QuotaTrip } from './claude-quota-trip.js';
 import {
   credentialRedactor,
   credentialSafeEvents,
@@ -837,16 +837,7 @@ async function runClaimedStep(
   const segments = stream.segments;
   let handle: AgentSessionHandle | null = null;
   sessionOpts.onClaudeRateLimit = (notice) => {
-    const machineId = claimed.step.machineId;
-    if (machineId !== null) {
-      void client
-        .reportClaudeRateLimit?.(claudeRateLimitReport(machineId, notice))
-        .catch((err: unknown) => {
-          logger.step(
-            `claude rate limit report failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        });
-    }
+    forwardClaudeRateLimit(client, claimed.step.machineId, notice, (line) => logger.step(line));
     if (quotaTrip !== null) return;
     const trip = claudeQuotaTrip(notice, Date.now());
     if (trip === null) return;
