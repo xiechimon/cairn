@@ -647,6 +647,7 @@ export function HomeC({
                 }
                 onRewind={archived === null ? surface.onRewind : undefined}
                 onWithdraw={archived === null ? surface.onWithdraw : undefined}
+                unsent={archived === null && thread.picked === null ? surface.unsent : undefined}
                 onSteer={archived === null ? surface.onSteer : undefined}
                 onStop={archived === null ? surface.onStop : undefined}
                 composerReplacement={archivedBar}

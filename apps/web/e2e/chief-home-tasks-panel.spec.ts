@@ -50,7 +50,7 @@ test('rows are one quiet line; a row waiting on the owner adds what waits, and e
   const question = panel(page)
     .locator('[data-section="needs_input"] [data-slot="task-row"]')
     .first();
-  await expect(question).toContainText('Credential relay · #74');
+  await expect(question).toContainText('Relay model');
   await expect(question).toHaveAccessibleDescription(/在对话里回答/);
   await expect(
     panel(page).locator('[data-slot="task-row"]').filter({ hasText: 'Connect a Claude' }),
@@ -120,7 +120,7 @@ test('every row leads with the same 28px box and no tile: a checkbox when it can
       expect(lead.ink).toBe(tertiary);
     }
   }
-  const question = frames.filter({ hasText: 'Credential relay · #74' });
+  const question = frames.filter({ hasText: 'Relay model' });
   await expect(question.locator('[data-slot="checkbox"]')).toHaveCount(0);
   await question.locator('[data-slot="task-row-why"]').hover();
   await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText(

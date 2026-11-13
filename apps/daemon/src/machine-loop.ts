@@ -50,8 +50,8 @@ import { type MachineApi, MachineApiError, MachineClient } from './machine-clien
 import { enrollThroughBrowser } from './machine-enroll.js';
 import { ComputerOrbs, computerImageOffersBrowser } from './orb/computer.js';
 import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
-import { NspawnOrbProvider, type OrbProvider } from './orb/provider.js';
-import { createOrbProvider } from './orb/select.js';
+import type { OrbProvider } from './orb/provider.js';
+import { createComputerOrbProvider, createOrbProvider } from './orb/select.js';
 import { relayOrbStopped, runOrbStep } from './orb/step.js';
 import { ensurePrivateDir } from './private-fs.js';
 import { setupProxy } from './proxy.js';
@@ -214,26 +214,27 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     (capEnv.CAIRN_OWN_COMPUTER === '1' ? new HostComputerProvider() : undefined);
   const hostScreen = opts.hostScreen ?? createHostScreenFromEnv(capEnv);
   const enrolledIdentity = { machineId: '' };
+  const computerHost = createComputerOrbProvider(capEnv, orbProvider);
   const computerOrbs =
-    opts.orbComputer === undefined && orbProvider instanceof NspawnOrbProvider
+    opts.orbComputer === undefined && computerHost
       ? new ComputerOrbs({
           stateFile: join(paths.home, 'orb-state', 'computers.json'),
-          runtimeRoot: orbProvider.runtimeRoot,
+          runtimeRoot: computerHost.runtimeRoot,
         })
       : undefined;
   const computerInputLocks = join(paths.home, 'computer-input');
   if (computerOrbs) ensurePrivateDir(computerInputLocks);
   const orbComputer =
     opts.orbComputer ??
-    (computerOrbs && orbProvider instanceof NspawnOrbProvider
+    (computerOrbs && computerHost
       ? new OrbComputerProvider({
           orbs: computerOrbs,
-          runtimeRoot: orbProvider.runtimeRoot,
+          runtimeRoot: computerHost.runtimeRoot,
           inputFence: new ComputerInputFence(computerInputLocks, () => enrolledIdentity.machineId),
           release: {
-            publish: () => orbProvider.publishRelease(),
+            publish: () => computerHost.publishRelease(),
             authenticated: (machine, release) =>
-              orbProvider.retainComputerRelease(machine, release),
+              computerHost.retainComputerRelease(machine, release),
           },
           onError: (message) => logger.machine(message),
         })
@@ -365,8 +366,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     serverUrl: config.serverUrl,
     getToken: () => inMemoryToken,
     provider: createComputerScreenProvider({
-      runtimeRoot:
-        orbProvider instanceof NspawnOrbProvider ? () => orbProvider.runtimeRoot : '/run/cairn-orb',
+      runtimeRoot: computerHost ? () => computerHost.runtimeRoot : '/run/cairn-orb',
       ...(computerOrbs ? { ensureComputer: (scopeKey) => computerOrbs.ensure(scopeKey) } : {}),
     }),
   });

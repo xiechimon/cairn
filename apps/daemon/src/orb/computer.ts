@@ -15,30 +15,8 @@ export const COMPUTER_TAKEOVER_GRACE_MS = 30 * 60_000;
 
 const computerNamePattern = /^cairn-orb-computer-[a-f0-9]{40}$/;
 
-export function computerMachinesDir(root = process.env.CAIRN_ORB_ROOT ?? ''): string {
-  return root === '' ? '/var/lib/machines' : join(root, 'var/lib/machines');
-}
-
-export function computerImageMarkerPath(
-  name: string,
-  root = process.env.CAIRN_ORB_ROOT ?? '',
-): string {
-  return join(computerMachinesDir(root), name, 'etc', 'cairn-orb-computer-image');
-}
-
-export function readComputerImageMarker(
-  name: string,
-  options: {
-    root?: string;
-    readFileSync?: (path: string, encoding: 'utf8') => string;
-  } = {},
-): string | null {
-  const root = options.root ?? process.env.CAIRN_ORB_ROOT ?? '';
-  try {
-    return (options.readFileSync ?? readFileSync)(computerImageMarkerPath(name, root), 'utf8');
-  } catch {
-    return null;
-  }
+export function computerImagePublishedMarkerPath(root = process.env.CAIRN_ORB_ROOT ?? ''): string {
+  return join(root === '' ? '/' : root, 'var/lib/cairn-orb/computer-image');
 }
 
 export function computerImageOffersBrowser(
@@ -50,8 +28,16 @@ export function computerImageOffersBrowser(
 ): boolean {
   const version =
     options.version ?? process.env.CAIRN_AGENT_BROWSER_VERSION ?? PINNED_AGENT_BROWSER_VERSION;
-  const text = readComputerImageMarker(COMPUTER_TEMPLATE, options);
-  return text?.split('\n').includes(`agent-browser=${version}`) === true;
+  let text: string;
+  try {
+    text = (options.readFileSync ?? readFileSync)(
+      computerImagePublishedMarkerPath(options.root),
+      'utf8',
+    );
+  } catch {
+    return false;
+  }
+  return text.split('\n').includes(`agent-browser=${version}`);
 }
 
 const computerStateSchema = z.array(
@@ -60,6 +46,7 @@ const computerStateSchema = z.array(
     name: z.string().regex(computerNamePattern),
     lastUsedAt: z.number(),
     holdUntil: z.number(),
+    imageMarker: z.string().optional(),
   }),
 );
 type ComputerState = z.infer<typeof computerStateSchema>[number];
@@ -72,7 +59,7 @@ export function computerMachineName(scopeKey: string): string {
 export class ComputerOrbs {
   private readonly runner: OrbCommandRunner;
   private readonly runtimeRoot: string;
-  private readonly machinesRoot: string;
+  private readonly imageMarkerPath: string;
   private readonly stateFile: string | undefined;
   private readonly runtimeDirectoryTimeoutMs: number;
   private readonly shutdownTimeoutMs: number;
@@ -88,7 +75,7 @@ export class ComputerOrbs {
     options: {
       runner?: OrbCommandRunner;
       runtimeRoot?: string;
-      machinesRoot?: string;
+      imageMarkerPath?: string;
       stateFile?: string;
       runtimeDirectoryTimeoutMs?: number;
       shutdownTimeoutMs?: number;
@@ -98,7 +85,7 @@ export class ComputerOrbs {
   ) {
     this.runner = options.runner ?? runOrbCommand;
     this.runtimeRoot = options.runtimeRoot ?? '/run/cairn-orb';
-    this.machinesRoot = options.machinesRoot ?? computerMachinesDir();
+    this.imageMarkerPath = options.imageMarkerPath ?? computerImagePublishedMarkerPath();
     this.stateFile = options.stateFile;
     this.runtimeDirectoryTimeoutMs = options.runtimeDirectoryTimeoutMs ?? 60_000;
     this.shutdownTimeoutMs = options.shutdownTimeoutMs ?? 30_000;
@@ -207,14 +194,19 @@ export class ComputerOrbs {
 
   private async ensureRunning(scopeKey: string): Promise<string> {
     const name = computerMachineName(scopeKey);
+    const template = this.readTemplateMarker();
+    const recorded = this.computers.get(scopeKey)?.imageMarker;
+    let cloned = false;
     if ((await this.images()).has(name)) {
-      if (this.cloneNeedsRefresh(name)) {
+      if (template !== null && recorded !== template) {
         if ((await this.runningMachines()).has(name)) await this.stop(name);
         await this.command(['machinectl', 'remove', name]);
         await this.command(['machinectl', 'clone', COMPUTER_TEMPLATE, name]);
+        cloned = true;
       }
     } else {
       await this.command(['machinectl', 'clone', COMPUTER_TEMPLATE, name]);
+      cloned = true;
     }
     const computer = this.computers.get(scopeKey) ?? {
       scopeKey,
@@ -222,6 +214,7 @@ export class ComputerOrbs {
       lastUsedAt: this.now(),
       holdUntil: 0,
     };
+    if (cloned) computer.imageMarker = template ?? undefined;
     computer.lastUsedAt = this.now();
     this.computers.set(scopeKey, computer);
     this.save();
@@ -237,16 +230,9 @@ export class ComputerOrbs {
     return name;
   }
 
-  private cloneNeedsRefresh(name: string): boolean {
-    const template = this.readMarker(COMPUTER_TEMPLATE);
-    if (template === null) return false;
-    const clone = this.readMarker(name);
-    return clone !== template;
-  }
-
-  private readMarker(name: string): string | null {
+  private readTemplateMarker(): string | null {
     try {
-      return readFileSync(join(this.machinesRoot, name, 'etc', 'cairn-orb-computer-image'), 'utf8');
+      return readFileSync(this.imageMarkerPath, 'utf8');
     } catch {
       return null;
     }

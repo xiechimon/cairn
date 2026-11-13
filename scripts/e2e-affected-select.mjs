@@ -87,7 +87,7 @@ const DETAIL = [
   'ticket-cost',
   'accent-typo',
   'attachment-strip',
-  'avatar-spiral',
+  'avatar-initial',
   'cds-composer',
   'cds-dialogs',
   'cds-transcript',

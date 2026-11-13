@@ -266,6 +266,7 @@ test('checkout fake rejects registry installs and commands targeting another che
       '--dir',
       f.root,
       'deploy',
+      '--legacy',
       '--filter',
       '@xiechimon/cairn-cli',
       '--prod',
