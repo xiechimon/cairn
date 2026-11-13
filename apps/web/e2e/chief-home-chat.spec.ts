@@ -108,14 +108,18 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(handoff).toContainText('已转给任务');
     await expect(handoff).toContainText('修复看板拖拽后计数不刷新');
     await expect(handoff).not.toContainText('#9');
+    const reply = stream.getByTestId('chief-reply-bubble').first();
+    const replyLook = await reply.evaluate((el) => ({
+      fill: getComputedStyle(el).backgroundColor,
+      left: el.getBoundingClientRect().left,
+    }));
     const handoffLine = await handoff.evaluate((el) => ({
-      align: getComputedStyle(el).textAlign,
+      fill: getComputedStyle(el).backgroundColor,
+      left: el.getBoundingClientRect().left,
       rule: getComputedStyle(el, '::before').content,
       chips: el.querySelectorAll('.mention-chip').length,
-      leftGap:
-        el.firstElementChild!.getBoundingClientRect().left - el.getBoundingClientRect().left,
     }));
-    expect(handoffLine).toEqual({ align: 'left', rule: 'none', chips: 0, leftGap: 0 });
+    expect(handoffLine).toEqual({ ...replyLook, rule: 'none', chips: 0 });
     await expect(handoff.getByRole('link', { name: '修复看板拖拽后计数不刷新' })).toHaveAttribute('data-phase', 'building');
     await expect(stream.getByTestId('chief-turn-tools')).toHaveCount(0);
     await openReplySteps(page, stream.getByTestId('chief-msg').filter({ hasText: '已经补给它了' }));
