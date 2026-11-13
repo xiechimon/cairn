@@ -14,21 +14,18 @@ import type {
 } from '@cairn/shared';
 import {
   ACTIVE_STEP_STATUSES,
-  BUILD_FAILURE_ROW_KIND,
   CONFIRM_ANNOUNCEMENT,
   isBuildStepKind,
   type RouteOverride,
   SESSION_BRIEF,
-  systemRowOf,
 } from '@cairn/shared';
-import { and, asc, desc, eq, gte, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, machine, message, project, steerPending, step, todo } from '../db/schema.js';
+import { build, machine, project, steerPending, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import type { systemGitOps } from '../lib/git.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
-import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { BLOCKED_STEP_KINDS, blockedHold, blockedNow } from './blockers.js';
 import { mergedPrElsewhere } from './build-pr-probe.js';
 import { type BuildSteerResult, sendBuildSteer } from './build-steer.js';
@@ -38,9 +35,7 @@ import {
   settleAfterStopPhase,
   stopUnclaimedGateSteps,
 } from './build-stop.js';
-import { DONE_ROW } from './delivery-rows.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import { markFirstPrPromptDue } from './first-pr-report.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import type { HarnessEvalDispatchPort } from './harness-eval-coordinator.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -61,7 +56,7 @@ import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
 import { type BuildStepRoute, listBuildStepRoutes } from './step-route.js';
 import { childrenOfTodo, getTodo, setTodoPhase } from './todos.js';
-import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
+import { insertGateAnnouncement } from './transcript.js';
 import type { QuestionAnswer } from './worker-questions.js';
 
 export {
@@ -104,6 +99,7 @@ type BuildRow = typeof build.$inferSelect;
 
 export { assertMergeTools, buildMergePermission } from './build-merge-permission.js';
 export { requestMerge } from './build-merge-request.js';
+export { finishTodoDone, hasFailureRow, hasMessageRow, roundStart } from './build-rows.js';
 export { applyBuildStepAction } from './build-step-action.js';
 export { type CompleteStepOutcome, completeStep } from './build-step-complete.js';
 export {
@@ -611,71 +607,6 @@ export function sweepPlanAutoConfirm(deps: BuildDeps): void {
     if (planAutoConfirmation(deps, todoRow.latestBuildId).eligible)
       confirmPlanAutomatically(deps, todoRow.latestBuildId);
   }
-}
-
-export function hasFailureRow(deps: BuildDeps, buildId: string, reason: string): boolean {
-  return deps.db
-    .select({ content: message.content })
-    .from(message)
-    .where(and(eq(message.conversationId, buildId), eq(message.role, 'system')))
-    .all()
-    .some((row) => {
-      const parsed = systemRowOf(row.content);
-      return parsed?.kind === BUILD_FAILURE_ROW_KIND && parsed.reason === reason;
-    });
-}
-
-export function roundStart(deps: BuildDeps, buildId: string): number {
-  return (
-    deps.db
-      .select({ at: step.createdAt })
-      .from(step)
-      .where(and(eq(step.buildId, buildId), inArray(step.kind, ['build', 'session', 'plan'])))
-      .orderBy(desc(step.createdAt))
-      .get()?.at ?? 0
-  );
-}
-
-export function hasMessageRow(
-  deps: BuildDeps,
-  buildId: string,
-  role: 'system' | 'user',
-  content: string,
-  since = 0,
-): boolean {
-  return (
-    deps.db
-      .select({ id: message.id })
-      .from(message)
-      .where(
-        and(
-          eq(message.conversationId, buildId),
-          eq(message.role, role),
-          eq(message.content, content),
-          gte(message.createdAt, since),
-        ),
-      )
-      .get() !== undefined
-  );
-}
-
-export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string): void {
-  const current = deps.db
-    .select({ phase: todo.phase })
-    .from(todo)
-    .where(eq(todo.id, todoId))
-    .get()?.phase;
-  if (current !== undefined) assertPhaseTransition(current, 'done');
-  stopUnclaimedGateSteps(deps, buildId);
-  setTodoPhase(deps, todoId, 'done', {}, { landedMerge: true });
-  insertMessageRow(deps, buildId, {
-    id: newRecordId(),
-    role: 'system',
-    content: DONE_ROW,
-    createdAt: nowMs(),
-  });
-  emitRuntimeBuildSpan(deps.db, buildId, 'done');
-  markFirstPrPromptDue(deps.db, buildId);
 }
 
 export class NotFoundError extends Error {
