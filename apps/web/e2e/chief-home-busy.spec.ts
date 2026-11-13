@@ -483,6 +483,15 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
     await page.goto('/app');
     const home = page.getByTestId('home-c');
     await expect(home.getByTestId('chief-stopped')).toHaveText('已停止，没有建任务。');
+    const fills = await home.getByTestId('chief-stopped').evaluate((el) => {
+      const probe = document.createElement('div');
+      probe.style.background = 'var(--reply-bubble-fill)';
+      document.body.append(probe);
+      const reply = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return { stopped: getComputedStyle(el).backgroundColor, reply };
+    });
+    expect(fills.stopped).toBe(fills.reply);
     await expect(home.getByRole('alert')).toHaveCount(0);
     await expect(home.getByRole('button', { name: '发送' })).toBeVisible();
   });

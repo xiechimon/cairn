@@ -98,6 +98,17 @@ const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = `w-full max-w-full font-sans ${CHAT_BODY_CLS}`;
 const MARKER_ERROR_CLS = 'my-2.5 gap-1.5 text-meta text-(--destructive)';
+const SAID_CLS = `${REPLY_BUBBLE_CLS} min-w-0 font-sans ${CHAT_BODY_CLS} text-(--foreground) [overflow-wrap:anywhere]`;
+
+function CoordinatorSaid({ testId, children }: { testId: string; children: ReactNode }) {
+  return (
+    <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
+      <div className={SAID_CLS} data-testid={testId}>
+        {children}
+      </div>
+    </MessageScrollerItem>
+  );
+}
 
 function segmentsText(segments: ChiefSegment[]): string {
   return segments.map((s) => (s.todo != null ? `#${s.todo}` : (s.text ?? ''))).join('');
@@ -209,14 +220,12 @@ function TaskStartedRow({
     );
   }
   return (
-    <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
-      <StatusLine testId="chief-task-created">
-        {t('已建任务')}{' '}
-        <ThreadLink todoId={todoId} className={STATUS_REF_CLS}>
-          {title ?? t('任务')}
-        </ThreadLink>
-      </StatusLine>
-    </MessageScrollerItem>
+    <CoordinatorSaid testId="chief-task-created">
+      {t('已建任务')}{' '}
+      <ThreadLink todoId={todoId} className={STATUS_REF_CLS}>
+        {title ?? t('任务')}
+      </ThreadLink>
+    </CoordinatorSaid>
   );
 }
 
@@ -224,14 +233,12 @@ function HandoffRow({ todoId }: { todoId: string }) {
   const { t } = useI18n();
   const glance = useContext(TodoGlanceContext)?.get(todoId);
   return (
-    <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
-      <StatusLine testId="chief-handoff">
-        {t('已转给任务')}{' '}
-        <ThreadLink todoId={todoId} className={STATUS_REF_CLS} data-phase={glance?.phase}>
-          {glance?.title ?? t('任务')}
-        </ThreadLink>
-      </StatusLine>
-    </MessageScrollerItem>
+    <CoordinatorSaid testId="chief-handoff">
+      {t('已转给任务')}{' '}
+      <ThreadLink todoId={todoId} className={STATUS_REF_CLS} data-phase={glance?.phase}>
+        {glance?.title ?? t('任务')}
+      </ThreadLink>
+    </CoordinatorSaid>
   );
 }
 
@@ -280,25 +287,23 @@ const NO_TEXT = {};
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
   const { t } = useI18n();
   return (
-    <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
-      <StatusLine testId="chief-stopped">
-        {todos.length === 0 ? (
-          t('已停止，没有建任务。')
-        ) : (
-          <>
-            {t('已停止。停之前已经建了任务')}
-            {todos.map((todo, n) => (
-              <span key={todo.id}>
-                {n === 0 ? ' ' : '、'}
-                <ThreadLink todoId={todo.id} className={STATUS_REF_CLS}>
-                  {todo.title}
-                </ThreadLink>
-              </span>
-            ))}
-          </>
-        )}
-      </StatusLine>
-    </MessageScrollerItem>
+    <CoordinatorSaid testId="chief-stopped">
+      {todos.length === 0 ? (
+        t('已停止，没有建任务。')
+      ) : (
+        <>
+          {t('已停止。停之前已经建了任务')}
+          {todos.map((todo, n) => (
+            <span key={todo.id}>
+              {n === 0 ? ' ' : '、'}
+              <ThreadLink todoId={todo.id} className={STATUS_REF_CLS}>
+                {todo.title}
+              </ThreadLink>
+            </span>
+          ))}
+        </>
+      )}
+    </CoordinatorSaid>
   );
 }
 
