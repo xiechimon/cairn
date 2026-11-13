@@ -100,7 +100,6 @@ import { DeltaRelay } from './delta-relay.js';
 import { buildExecutorRecord } from './executor-record.js';
 import { GitPushHookError, isGitAuthFailure, withGitCredentialFallback } from './git.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
-import { landLocalMerge } from './local-merge.js';
 import type { DaemonLogger } from './log.js';
 import { isTransientUploadError, type MachineApi, MachineApiError } from './machine-client.js';
 import { extractReviewVerdict } from './review-findings.js';
@@ -111,8 +110,9 @@ import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
 import { resolveStepImagesOrRaw } from './step-attachments.js';
-import { commitAndPushStep } from './step-closing-git.js';
+import { commitAndPushStep, preserveFailedBuild } from './step-closing-git.js';
 import { assembleStepEnv } from './step-env.js';
+import { localMergeDoneBody } from './step-local-merge.js';
 import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import {
@@ -496,37 +496,11 @@ async function runClaimedStep(
   });
 
   if (claimed.localMerge !== undefined) {
-    const command = claimed.localMerge;
-    const repo = claimed.project?.repo;
-    let doneBody: MachineDoneBody;
-    try {
-      if (
-        claimed.step.kind !== 'merge' ||
-        repo?.kind !== 'local' ||
-        claimed.project?.id !== command.projectId ||
-        claimed.step.buildId !== command.buildId
-      )
-        throw new Error('Local merge command does not match the claim');
-      if (
-        claimed.agent?.tools !== undefined &&
-        [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].some((tool) => !claimed.agent?.tools?.includes(tool))
-      )
-        throw new Error('Local merge requires merge and push permission');
-      const result =
-        stop.request !== null
-          ? { outcome: 'held' as const, reason: 'stopped' }
-          : await landLocalMerge(repo.cloneUrl, command, () => stop.request !== null);
-      doneBody = {
-        status: 'success',
-        localMerge: { command, result },
-        ...(result.outcome === 'merged' ? { commit: result.commit } : {}),
-      };
-    } catch (err) {
-      doneBody = {
-        status: 'failed',
-        errorMessage: err instanceof Error ? err.message : String(err),
-      };
-    }
+    const doneBody = await localMergeDoneBody(
+      claimed,
+      claimed.localMerge,
+      () => stop.request !== null,
+    );
     const transcript = new TranscriptBuffer(deps.paths.outboxDir, stepId);
     transcript.upsert({
       id: `local-merge-${stepId}`,
@@ -1789,27 +1763,19 @@ async function runClaimedStep(
     deps.workspace
   ) {
     const git = deps.workspace;
-    try {
-      const currentBranch = await git.currentBranch?.(ws.cwd);
-      const pushAllowed =
-        claimed.agent?.tools === undefined || claimed.agent.tools.includes(AGENT_TOOL_PUSH);
-      if (
-        currentBranch === ws.branch &&
-        pushAllowed &&
-        (await git.countAhead(ws.cwd, ws.defaultBranch)) > 0
-      ) {
-        await pushStep(git, ws);
-        headCommit = await git.headCommit(ws.cwd);
-        preservedCommits =
-          (await git.commitsAhead?.(ws.cwd, ws.defaultBranch)) ??
-          (headCommit === null ? [] : [headCommit]);
-        hasChanges = true;
-        logger.raw(`pushed ${ws.branch}`);
-      }
-    } catch (err) {
-      logger.step(
-        `failed build preservation failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+    const workspace = ws;
+    const preserved = await preserveFailedBuild({
+      git,
+      ws: workspace,
+      claimed,
+      push: () => pushStep(git, workspace),
+      log: (message) => logger.step(message),
+      logRaw: (message) => logger.raw(message),
+    });
+    if (preserved !== null) {
+      headCommit = preserved.headCommit;
+      preservedCommits = preserved.commits;
+      hasChanges = true;
     }
   }
 
