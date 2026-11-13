@@ -19,7 +19,7 @@ export function TaskRefRow({ taskRef, elbow = true }: { taskRef: TaskRef; elbow?
             data-phase={taskRef.phase}
             data-testid="chief-task-ref"
             className={cn(
-              'relative flex h-5 w-fit cursor-pointer items-center gap-1.5 text-ui font-normal text-(--foreground) no-underline hover:underline',
+              'relative -my-0.5 flex h-6 w-fit cursor-pointer items-center gap-1.5 text-ui font-normal text-(--foreground) no-underline hover:underline',
               elbow ? 'ml-8 max-w-[calc(100%-2rem)]' : 'max-w-full',
             )}
           />
@@ -30,7 +30,7 @@ export function TaskRefRow({ taskRef, elbow = true }: { taskRef: TaskRef; elbow?
             aria-hidden="true"
             data-slot="task-ref-elbow"
             viewBox="0 0 12 16"
-            className="pointer-events-none absolute top-2.25 -left-3.75 h-4 w-3 overflow-visible text-(--task-ref-line)"
+            className="pointer-events-none absolute top-2.75 -left-3.75 h-4 w-3 overflow-visible text-(--task-ref-line)"
           >
             <path
               d="M1 14.25V7A6 6 0 0 1 7 1H10.75"

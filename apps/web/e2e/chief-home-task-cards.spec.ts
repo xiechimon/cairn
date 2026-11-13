@@ -74,9 +74,9 @@ test('a task the Coordinator created is one reference row above the reply that a
   await expect(stream.getByTestId('chief-task-created')).toHaveCount(0);
   await expect(stream).not.toContainText('Latest:');
   await expect(stream).not.toContainText('updates:');
-  const refBox = await ref.boundingBox();
+  const tileBox = await ref.locator('span.grid').boundingBox();
   const bubbleBox = await reply.getByTestId('chief-reply-bubble').boundingBox();
-  expect(bubbleBox!.y - (refBox!.y + refBox!.height)).toBe(8);
+  expect(bubbleBox!.y - (tileBox!.y + tileBox!.height)).toBe(8);
   await ref.click();
   await expect(page).toHaveURL(new RegExp(`thread=${TASK.id}`));
 });
@@ -201,7 +201,7 @@ test.describe('at phone width', () => {
     await expect(stream.locator('[data-slot="task-card"]')).toHaveCount(0);
     await expect(ref).toHaveText(new RegExp(`^${TASK.title}`));
     const box = await ref.boundingBox();
-    expect(box!.height).toBe(20);
+    expect(box!.height).toBe(24);
     expect(box!.x + box!.width).toBeLessThanOrEqual(390 - 16);
     await ref.click();
     await expect(page).toHaveURL(new RegExp(`thread=${TASK.id}`));
