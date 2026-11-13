@@ -2021,4 +2021,21 @@ export const EN: Record<string, string> = {
   设计: 'Designs',
   网页: 'Web pages',
   代码改动: 'Code changes',
+  '之前的 {n} 步': '{n} earlier steps',
+  '收起之前的 {n} 步': 'Hide {n} earlier steps',
+  已允许这一次: 'Allowed once',
+  已拒绝: 'Refused',
+  回答引擎: 'Answer the engine',
+  允许这一次: 'Allow once',
+  拒绝: 'Refuse',
+  原始输出: 'Raw output',
+  接管这次运行: 'Take over this run',
+  '终端接入后，接管会让引擎停下，把它的终端交给你直接操作；交还后它从你停下的地方继续。':
+    'Once the terminal is connected, taking over pauses the engine and hands you its terminal; when you hand it back, it continues from where you stopped.',
+  '终端还没有接入：现在接管只把这次运行标记为由你处理，随时可以交还。':
+    'The terminal is not connected yet: for now, taking over only marks this run as yours, and you can hand it back at any time.',
+  自动播放: 'Autoplay',
+  暂停播放: 'Pause',
+  重来: 'Restart',
+  '事件 {n} / {total}': 'Event {n} / {total}',
 };

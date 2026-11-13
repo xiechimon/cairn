@@ -15,11 +15,11 @@
 
 | Item | Count |
 |---|---|
-| Features | 54 |
+| Features | 55 |
 | status shipped | 44 |
-| status partial | 7 |
+| status partial | 8 |
 | status planned | 3 |
-| research, frontend design and backend design all present or not applicable | 23 |
+| research, frontend design and backend design all present or not applicable | 24 |
 | Research gaps | 14 |
 | Frontend design gaps | 19 |
 | Backend design gaps | 19 |
@@ -34,6 +34,7 @@
 | [Coordinator context and compaction](#coordinator-context) | 1 | shipped | yes | n/a | yes |  |
 | [Coordinator dispatch](#coordinator-dispatch) | 1 | shipped | yes | n/a | yes |  |
 | [Daily report and retro](#daily-report) | 1 | shipped | yes | gap | gap | B2 |
+| [Engine run in a task thread](#engine-view) | 1 | partial | yes | yes | yes |  |
 | [Eval-gated harness changes](#eval-gated-harness) | 1 | partial | yes | n/a | yes |  |
 | [Harness dispatch](#harness-dispatch) | 1 | shipped | yes | n/a | yes |  |
 | [Memory](#memory) | 1 | shipped | yes | yes (not on main) | yes |  |
@@ -237,6 +238,14 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Research: [docs/research/duet-proactive-coordinator.md](research/duet-proactive-coordinator.md)
 - Frontend design: **gap**: the report row and retro proposal card have no design
 - Backend design: **gap**: no design for report content, timing, quiet rules and retro proposal storage
+
+### engine-view
+
+**Engine run in a task thread** (partial). A run that a task thread dispatched to an engine (Claude Code, Codex) is the thread's own conversation, with time and cost in the usage popover and a read-only raw output view and takeover in the thread menu. A web prototype on fixture data: no backend sends a run yet.
+
+- Research: [docs/design/durable-threads-and-engines.md](design/durable-threads-and-engines.md)
+- Frontend design: [docs/design/durable-threads-and-engines.md](design/durable-threads-and-engines.md), [docs/design/references/thread-review](design/references/thread-review)
+- Backend design: [docs/design/durable-threads-and-engines.md](design/durable-threads-and-engines.md), [docs/design/home-redesign-backend-todo.md](design/home-redesign-backend-todo.md)
 
 ### eval-gated-harness
 
