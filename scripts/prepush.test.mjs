@@ -677,7 +677,7 @@ test('executable evidence keeps code checks and data evidence keeps document rea
 });
 
 test('a docs-only data change still runs every test that reads the changed file', () => {
-  const data = 'docs/verify/920/wire-new/manifest-new.json';
+  const data = 'docs/ops/agent-bot-identity.md';
   assert.deepEqual(prepushPlan(['docs/lessons/README.md', data], 'ci'), [
     ['node', 'scripts/english-only-gate.mjs'],
     ['node', 'scripts/public-content-gate.mjs'],
@@ -695,7 +695,7 @@ test('a docs-only data change still runs every test that reads the changed file'
         return result.status === 0 ? result.stdout.split('\n').filter(Boolean) : [];
       },
       [],
-    ).vitest.includes('apps/daemon/test/skills-version-skew.test.ts'),
+    ).vitest.includes('apps/server/test/codeowners.test.ts'),
   );
 });
 

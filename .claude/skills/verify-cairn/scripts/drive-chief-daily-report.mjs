@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const REPO = process.env.VERIFY_REPO_ROOT ?? resolve(SCRIPT_DIR, '../../..');
+const REPO = process.env.VERIFY_REPO_ROOT ?? resolve(SCRIPT_DIR, '../../../..');
 const RUN_DIR = process.env.VERIFY_RUN_DIR ?? join(REPO, '.claude/verify-run');
 const portsFile = join(RUN_DIR, 'ports.json');
 if (!existsSync(portsFile)) {

@@ -36,9 +36,9 @@ const OLD_BUNDLE_200 = {
   ],
 };
 
-function archived(relFromRepoRoot: string): unknown {
+function archived(fixtureName: string): unknown {
   return JSON.parse(
-    readFileSync(fileURLToPath(new URL(`../../../${relFromRepoRoot}`, import.meta.url)), 'utf8'),
+    readFileSync(fileURLToPath(new URL(`./fixtures/${fixtureName}`, import.meta.url)), 'utf8'),
   ) as unknown;
 }
 
@@ -57,7 +57,7 @@ describe('skills distribution wire version skew (#919 seam: new daemon × old se
   });
 
   test('V3 old daemon × new server: the frozen old schema cleanly rejects the machine-captured new manifest shape', () => {
-    const golden = archived('docs/verify/920/wire-new/manifest-new.json') as {
+    const golden = archived('skills-manifest-new.json') as {
       manifest: unknown;
     };
     const result = frozenOldMachineSkillsResponseSchema.safeParse(golden.manifest);
@@ -69,14 +69,14 @@ describe('skills distribution wire version skew (#919 seam: new daemon × old se
   });
 
   test('V4 current schema passes the machine-captured new manifest golden sample (#920 archive, independent source)', () => {
-    const golden = archived('docs/verify/920/wire-new/manifest-new.json') as {
+    const golden = archived('skills-manifest-new.json') as {
       manifest: unknown;
     };
     expect(machineSkillsManifestResponseSchema.safeParse(golden.manifest).success).toBe(true);
   });
 
   test('V5 old server byte-gate 400 archived shape is still "non-2xx + body.error naming the root cause"', () => {
-    const old400 = archived('docs/verify/920/wire-old-before/manifest-old-400.json') as {
+    const old400 = archived('skills-manifest-old-400.json') as {
       status: number;
       body: { error: string };
     };

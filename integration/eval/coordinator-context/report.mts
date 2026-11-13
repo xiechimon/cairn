@@ -22,7 +22,7 @@ interface Row {
 }
 
 const { values: args } = parseArgs({
-  options: { raw: { type: 'string', default: 'docs/verify/2522/raw' } },
+  options: { raw: { type: 'string', default: 'integration/eval/coordinator-context/raw' } },
 });
 
 function quantile(xs: number[], q: number): string {
