@@ -1,8 +1,9 @@
 import { cn } from 'cn';
 import { Ellipsis, ListChecks, Reply, X } from 'lucide-react';
-import { type ReactNode, useLayoutEffect, useRef } from 'react';
+import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { IconTooltip } from '../components/icon-tooltip.js';
-import { Button } from '../components/ui/button.js';
+import { Button, PlainButton } from '../components/ui/button.js';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +18,9 @@ export type ToolbarPlacement = 'right' | 'left' | 'below-start' | 'below-end';
 
 const TOOL_BTN_CLS =
   "size-8 cursor-pointer rounded-(--radius-control) border-none bg-transparent text-(--foreground) transition-none hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) [&_svg:not([class*='size-'])]:size-auto";
+
+const PILL_CLS =
+  'flex flex-none items-center rounded-(--radius-tile) bg-popover p-px shadow-(--e2)';
 
 const HOVER_REVEAL =
   'pointer-events-none opacity-0 group-hover/reply-block:pointer-events-auto group-hover/reply-block:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 has-[[aria-expanded=true]]:pointer-events-auto has-[[aria-expanded=true]]:opacity-100 pointer-coarse:hidden';
@@ -51,8 +55,38 @@ function clipEdges(node: HTMLElement): { left: number; right: number; top: numbe
   return { left, right, top };
 }
 
-function useKeepInside(placement: ToolbarPlacement) {
-  const ref = useRef<HTMLDivElement | null>(null);
+function useArmed(ref: RefObject<HTMLDivElement | null>): boolean {
+  const [armed, setArmed] = useState(false);
+  const focusTool = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const node = ref.current;
+    const block = node?.parentElement;
+    if (armed || node == null || block == null) return;
+    const arm = (event: Event) => {
+      const tool = event.target instanceof Element ? event.target.closest('[data-tool]') : null;
+      if (event.type === 'focusin' && tool !== null)
+        focusTool.current = tool.getAttribute('data-tool');
+      flushSync(() => setArmed(true));
+    };
+    node.addEventListener('pointerenter', arm);
+    node.addEventListener('focusin', arm);
+    block.addEventListener('pointerdown', arm);
+    return () => {
+      node.removeEventListener('pointerenter', arm);
+      node.removeEventListener('focusin', arm);
+      block.removeEventListener('pointerdown', arm);
+    };
+  }, [armed, ref]);
+  useLayoutEffect(() => {
+    const tool = focusTool.current;
+    if (!armed || tool === null) return;
+    focusTool.current = null;
+    ref.current?.querySelector<HTMLElement>(`[data-tool="${tool}"]`)?.focus();
+  }, [armed, ref]);
+  return armed;
+}
+
+function useKeepInside(ref: RefObject<HTMLDivElement | null>, placement: ToolbarPlacement) {
   useLayoutEffect(() => {
     const node = ref.current;
     const block = node?.parentElement;
@@ -77,8 +111,7 @@ function useKeepInside(placement: ToolbarPlacement) {
       block.removeEventListener('pointerenter', fit);
       block.removeEventListener('focusin', fit);
     };
-  }, [placement]);
-  return ref;
+  }, [placement, ref]);
 }
 
 export function MessageToolbar({
@@ -103,12 +136,38 @@ export function MessageToolbar({
   testId: string;
 }) {
   const { t } = useI18n();
-  const keepInside = useKeepInside(placement);
-  const pill = (
-    <div
-      className="flex flex-none items-center rounded-(--radius-tile) bg-popover p-px shadow-(--e2)"
-      data-slot="message-toolbar-pill"
-    >
+  const ref = useRef<HTMLDivElement | null>(null);
+  const armed = useArmed(ref);
+  useKeepInside(ref, placement);
+  const pill = !armed ? (
+    <div className={PILL_CLS} data-slot="message-toolbar-pill">
+      {onReply !== undefined && (
+        <PlainButton
+          variant="ghost"
+          size="icon"
+          className={TOOL_BTN_CLS}
+          aria-label={t('回复')}
+          data-testid="chief-msg-reply"
+          data-tool="reply"
+        >
+          <Reply width={22} height={22} />
+        </PlainButton>
+      )}
+      <PlainButton
+        variant="ghost"
+        size="icon"
+        className={TOOL_BTN_CLS}
+        aria-label={t('更多')}
+        aria-haspopup="menu"
+        aria-expanded="false"
+        data-testid="chief-msg-more"
+        data-tool="more"
+      >
+        <Ellipsis width={22} height={22} />
+      </PlainButton>
+    </div>
+  ) : (
+    <div className={PILL_CLS} data-slot="message-toolbar-pill">
       {onReply !== undefined && (
         <IconTooltip
           label={t('回复')}
@@ -118,6 +177,7 @@ export function MessageToolbar({
               size="icon"
               className={TOOL_BTN_CLS}
               data-testid="chief-msg-reply"
+              data-tool="reply"
               onClick={onReply}
             />
           }
@@ -137,6 +197,7 @@ export function MessageToolbar({
                     className={TOOL_BTN_CLS}
                     aria-label={t('更多')}
                     data-testid="chief-msg-more"
+                    data-tool="more"
                   />
                 }
               />
@@ -191,7 +252,7 @@ export function MessageToolbar({
     );
   return (
     <div
-      ref={keepInside}
+      ref={ref}
       className={cn('group/toolbar flex items-center gap-3', PLACEMENT_CLS[placement])}
       data-testid={testId}
       data-placement={placement}
