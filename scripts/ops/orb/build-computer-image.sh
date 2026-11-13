@@ -70,7 +70,7 @@ printf '%s\n' \
   'snapshot cairn-orb-base into a locked staging image under /var/lib/machines' \
   "install with systemd-nspawn and the host mirrorlist read-only: pacman -Syu ${packages[*]}" \
   "refuse a guest Node major other than $node_major" \
-  "install agent-browser@${agent_browser_version} for the agent user" \
+  "install agent-browser@${agent_browser_version} without install scripts, mark its native binary executable, and run it as agent" \
   'install the Chromium managed policy and the cairn-computer-desktop service for agent' \
   'install the cairn-computer-agent service for agent and disable the inherited cairn-orb-worker service' \
   'remove package caches; clear /etc/machine-id' \
@@ -115,8 +115,9 @@ guest_major=$(guest /usr/bin/node -p 'process.versions.node.split(".")[0]' | tr 
 for binary in Xvfb x11vnc fluxbox xdotool chromium import; do
   guest runuser -u agent -- sh -c "command -v $binary" > /dev/null || { printf '%s is not runnable by agent\n' "$binary" >&2; exit 1; }
 done
-guest npm install -g "agent-browser@${agent_browser_version}"
-guest runuser -u agent -- sh -c 'command -v agent-browser' > /dev/null || {
+guest npm install -g --ignore-scripts --no-audit --no-fund "agent-browser@${agent_browser_version}"
+guest sh -c 'chmod 755 "$(npm root -g)"/agent-browser/bin/agent-browser-linux-*'
+guest runuser -u agent -- agent-browser --version > /dev/null || {
   printf 'agent-browser is not runnable by agent\n' >&2
   exit 1
 }
