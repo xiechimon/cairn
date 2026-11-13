@@ -41,11 +41,16 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     const home = page.getByTestId('home-c');
     await expect(home.getByTestId('chief-stream')).toContainText('看板拖完卡片计数不对');
     await expect(page.getByTestId('home-c-hero')).toHaveCount(0);
-    const composer = await home.getByTestId('chief-composer-block').boundingBox();
+    const block = home.getByTestId('chief-composer-block');
+    await expect(block).toBeVisible();
     const viewport = page.viewportSize();
-    expect(composer).not.toBeNull();
     expect(viewport).not.toBeNull();
-    if (composer && viewport) expect(composer.y + composer.height).toBeGreaterThan(viewport.height - 40);
+    await expect
+      .poll(async () => {
+        const composer = await block.boundingBox();
+        return composer === null ? null : composer.y + composer.height;
+      })
+      .toBeGreaterThan((viewport?.height ?? 0) - 40);
   });
 
   test('the first send from home never brings the loading skeleton back, even when the messages arrive late', async ({
