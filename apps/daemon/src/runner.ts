@@ -21,7 +21,6 @@ import {
   classifyAgentFailure,
   classifySkillFact,
   classifyStepFailure,
-  isBackendRuntimeId,
   isBuildStepKind,
   localCommitIdentity,
   noVisionSignalOf,
@@ -77,6 +76,7 @@ import {
   resumeMissNote,
   taskMetaOpts,
 } from './step-prompt.js';
+import { resolveStepProvider } from './step-provider.js';
 import { stepQuotaBlock } from './step-quota-block.js';
 import { stepRemoteToolExecutor } from './step-remote-tools.js';
 import {
@@ -373,12 +373,9 @@ async function runClaimedStep(
   logger = guardCredentialOutputs(logger, redact);
   deps = { ...deps, client, journal, logger };
   const agent = claimed.agent;
-  const runtimeId = isBackendRuntimeId(agent?.provider) ? agent.provider : null;
-  let provider: ProviderConfig | null =
-    runtimeId !== null
-      ? { kind: 'api_key', providerId: runtimeId }
-      : (creds.provider ??
-        (agent?.provider ? { kind: 'api_key', providerId: agent.provider } : null));
+  const resolvedProvider = resolveStepProvider(agent?.provider, creds.provider);
+  const runtimeId = resolvedProvider.runtimeId;
+  let provider = resolvedProvider.provider;
   if (!agent?.modelId || !provider) {
     clearCredentials(creds);
     await failStep(
