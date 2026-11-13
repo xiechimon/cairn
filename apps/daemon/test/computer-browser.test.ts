@@ -82,7 +82,7 @@ describe('runBrowserTool', () => {
       { actions: [{ kind: 'fill', ref: '@e1', text: 'hello' }] },
       { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
     );
-    expect(log[1]).toBe('agent-browser --session s --headed fill @e1 hello');
+    expect(log.at(-1)).toBe('agent-browser --session s --headed fill @e1 hello');
   });
 
   test('refuses when the ref is missing from a fresh snapshot', async () => {
@@ -378,5 +378,72 @@ describe('login form detection', () => {
       { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
     );
     expect(log.some((line) => line.includes(' eval '))).toBe(false);
+  });
+});
+
+function fieldProvider(log: string[], attrs: Record<string, string>): ComputerProvider {
+  return {
+    async execute(request) {
+      log.push(request.argv.join(' '));
+      return (async function* () {
+        const at = request.argv.indexOf('attr');
+        if (request.argv.includes('get') && at >= 0) {
+          yield { kind: 'stdout' as const, text: `${attrs[request.argv[at + 2] ?? ''] ?? ''}\n` };
+        } else if (request.argv.includes('snapshot')) {
+          yield { kind: 'stdout' as const, text: '- textbox "Field" [ref=e2]\n' };
+        } else {
+          yield { kind: 'stdout' as const, text: 'ok\n' };
+        }
+        yield { kind: 'exit' as const, code: 0 };
+      })();
+    },
+    async listFiles() {
+      return [];
+    },
+    async readFile() {
+      return '';
+    },
+    async writeFile() {},
+    async killAll() {},
+  };
+}
+
+describe('secret field guard', () => {
+  const act = (provider: ComputerProvider, kind: 'fill' | 'type') =>
+    runBrowserTool(
+      provider,
+      'browser_act',
+      { actions: [{ kind, ref: 'e2', text: 'value' }] },
+      { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
+    );
+
+  test.each([
+    ['password input', { type: 'password', autocomplete: '' }],
+    ['one-time-code', { type: 'text', autocomplete: 'one-time-code' }],
+    ['current-password', { type: 'text', autocomplete: 'section-login current-password' }],
+    ['new-password', { type: 'text', autocomplete: 'new-password' }],
+  ])('refuses to fill a %s and types nothing', async (_name, attrs) => {
+    const log: string[] = [];
+    await expect(act(fieldProvider(log, attrs), 'fill')).rejects.toMatchObject({
+      message: expect.stringMatching(/password or one-time code/),
+      delivery: 'not_delivered',
+    });
+    expect(log.some((line) => line.includes(' fill '))).toBe(false);
+  });
+
+  test('type into a password input is refused too', async () => {
+    const log: string[] = [];
+    await expect(
+      act(fieldProvider(log, { type: 'password', autocomplete: '' }), 'type'),
+    ).rejects.toMatchObject({ delivery: 'not_delivered' });
+    expect(log.some((line) => / type @e2 /.test(line))).toBe(false);
+  });
+
+  test('a phone or username field is filled after the check', async () => {
+    const log: string[] = [];
+    await act(fieldProvider(log, { type: 'tel', autocomplete: 'tel' }), 'fill');
+    expect(log).toContain('agent-browser --session s --headed get attr @e2 type');
+    expect(log).toContain('agent-browser --session s --headed get attr @e2 autocomplete');
+    expect(log.at(-1)).toBe('agent-browser --session s --headed fill @e2 value');
   });
 });
