@@ -45,6 +45,7 @@ export interface ServerRuntimeConfig {
   fixedProviders?: readonly Provider[];
   stopPollMs?: number;
   factsFor(threadId: string): ReconcileFacts;
+  providersFor?(threadId: string): readonly ProviderBinding[];
   recordConversation?(threadId: string, conversationId: string, entryId: number): void;
   setConversation?(
     threadId: string,
@@ -101,6 +102,9 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     if (existing !== undefined) return existing;
     const facts = config.factsFor(threadId);
     const models = createCoordinatorModels(config.fixedProviders);
+    for (const binding of config.providersFor?.(threadId) ?? []) {
+      models.useProvider(binding.config, binding.resolveKey);
+    }
     const gate = createConversationGate();
     const inputs =
       api.inputs === undefined
