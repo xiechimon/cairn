@@ -10,7 +10,7 @@ const config = readFileSync(configPath, 'utf8');
 
 test('.mergify.yml is generated from merge-gate-paths.json, pr-gate.js and merge-checks.mjs', () => {
   assert.equal(config, mergifyConfig(prGate, gatePaths), 'run node scripts/mergify-config.mjs');
-  assert.match(config, /^ {2}max_parallel_checks: 1$/m);
+  assert.match(config, /^ {2}max_parallel_checks: 3$/m);
 });
 
 test('negative control: a limit changed in merge-gate-paths.json changes .mergify.yml', () => {
@@ -61,7 +61,7 @@ for (const [name, author, method] of [
     for (const check of ['pr-evidence', 'merge-route'])
       assert.doesNotMatch(merge, new RegExp(check));
     assert.match(merge, new RegExp(`merge_method: ${method}\\n`));
-    assert.match(merge, /max_checks_retries: 1$/m);
+    assert.match(merge, /max_checks_retries: 0$/m);
   });
 
 test('neither queue caps commit count, and both fast-forward the tested draft commit', () => {
