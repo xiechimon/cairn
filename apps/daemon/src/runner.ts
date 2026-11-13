@@ -65,7 +65,7 @@ import { resolveStepImagesOrRaw } from './step-attachments.js';
 import { commitAndPushStep, preserveFailedBuild } from './step-closing-git.js';
 import { composeDoneBody } from './step-done-body.js';
 import { assembleStepEnv } from './step-env.js';
-import { stepExecutorRecord } from './step-executor-record.js';
+import { reportStepProvenance } from './step-executor-record.js';
 import { putFinalArtifacts, resumePendingUpload } from './step-final-upload.js';
 import { prepareCreateTagTool, stepGitRunner } from './step-git-tools.js';
 import { localMergeDoneBody } from './step-local-merge.js';
@@ -721,8 +721,8 @@ async function runClaimedStep(
   }
 
   if (!isChief) {
-    try {
-      const executorRecord = stepExecutorRecord({
+    await reportStepProvenance({
+      record: () => ({
         catalog:
           deps.skillsDir === undefined
             ? null
@@ -742,16 +742,12 @@ async function runClaimedStep(
         effort: agent.thinkingLevel,
         systemPrompt,
         tools: [...(remoteTools ?? []), ...localToolDefs],
-      });
-      provenance.baseSha = headAtStart;
-      provenance.harnessHash = executorRecord.harness_sha;
-      logger.step(`executor record ${JSON.stringify(executorRecord)}`);
-      await client.heartbeat(stepId, provenance);
-    } catch (err: unknown) {
-      logger.step(
-        `build provenance report failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
+      }),
+      provenance,
+      baseSha: headAtStart,
+      heartbeat: (body) => client.heartbeat(stepId, body),
+      log: (line) => logger.step(line),
+    });
   }
 
   let usage: AgentTokenUsage = [];
