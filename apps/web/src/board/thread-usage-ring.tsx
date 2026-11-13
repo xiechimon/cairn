@@ -29,7 +29,9 @@ export function threadUsageShown(summary: ThreadUsageSummary, state: ThreadUsage
     summary.cost !== UNKNOWN ||
     summary.tokens !== UNKNOWN ||
     summary.models.length > 0 ||
-    summary.machines.length > 0
+    summary.machines.length > 0 ||
+    summary.duration !== '' ||
+    summary.engines.length > 0
   );
 }
 
@@ -51,6 +53,8 @@ export function ThreadUsageDetails({
   const { t } = useI18n();
   const rows = [
     { label: t('上下文'), value: threadContextReading(context) },
+    { label: t('引擎'), value: summary.engines.join(' · ') },
+    { label: t('时长'), value: summary.duration },
     { label: t('花费'), value: summary.cost },
     { label: t('Token 数'), value: summary.tokens },
     { label: t('缓存命中'), value: summary.cached },
@@ -84,7 +88,7 @@ export function ThreadUsageDetails({
         ))}
       </dl>
       <p className="m-0 text-caption text-content-tertiary">
-        {t('包含全部运行；总时长暂不可用。')}
+        {summary.duration === '' ? t('包含全部运行；总时长暂不可用。') : t('包含全部运行。')}
       </p>
       {state !== 'ready' && (
         <p
