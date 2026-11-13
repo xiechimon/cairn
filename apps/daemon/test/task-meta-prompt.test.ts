@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { composeTaskMetaInstruction, composeWorkerSystemPrompt } from '../src/runner.js';
+import { composeTaskMetaInstruction, composeWorkerSystemPrompt } from '../src/step-prompt.js';
 
 describe('composeTaskMetaInstruction', () => {
   it('instructs ordinary workers to set a title without category arguments or vocabulary', () => {
