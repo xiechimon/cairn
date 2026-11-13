@@ -2,19 +2,25 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ClaimedStep } from '@cairn/shared';
 import {
+  appendAnswers,
   appendBlockerHandoff,
   appendConfirmedPlanNote,
   appendDecisionsNote,
   appendPlanLocationNote,
+  appendReportLocationNote,
   appendWorkBranchNote,
   buildPlanFirstRoundInstruction,
   buildTaskPromptText,
+  CONTINUE_PROMPTS,
   composeTaskPromptWithInstruction,
   conversationBranch,
   isBuildStepKind,
   isIssueSourcedTask,
   PLAN_FILE_NAME,
+  parseReviewPromptMeta,
   parseVerifyPromptMeta,
+  REPORT_FILE_NAME,
+  type ReviewGate,
 } from '@cairn/shared';
 
 export function buildTaskPrompt(claimed: ClaimedStep): string {
@@ -145,4 +151,76 @@ export function composeWorkerSystemPrompt(
     parts.push(composeTaskMetaInstruction(opts.taskMeta.currentTitle, opts.taskMeta.meta));
   }
   return parts.length > 0 ? parts.join('\n\n') : undefined;
+}
+
+export interface StepPromptPlan {
+  isChief: boolean;
+  isReview: boolean;
+  verifyMeta: ReturnType<typeof parseVerifyPromptMeta> | null;
+  attachmentVerify: boolean;
+  verifyEvidenceDirectory: string | undefined;
+  reviewGate: ReviewGate;
+  isInfoBuild: boolean;
+  readonlyWorkspace: boolean;
+  reportFile: string;
+  prompt: string;
+}
+
+export function planStepPrompt(
+  claimed: ClaimedStep,
+  resumePrompt: string | null | undefined,
+  paths: { plansDir: string; reportsDir: string },
+): StepPromptPlan {
+  const convId = claimed.conversationId;
+  const isChief = claimed.step.kind === 'chief';
+  const isReview = claimed.step.kind === 'review';
+  const isVerify = claimed.step.kind === 'verify';
+  const verifyMeta = isVerify ? parseVerifyPromptMeta(claimed.instruction ?? null) : null;
+  const attachmentVerify = verifyMeta?.evidence === 'attachments';
+  const reviewGate: ReviewGate =
+    (isReview ? parseReviewPromptMeta(claimed.instruction ?? null)?.gate : undefined) ?? 'confirm';
+  const basePrompt =
+    resumePrompt ??
+    (isChief || isReview || isVerify
+      ? (claimed.instruction ?? '')
+      : claimed.session.action === 'continue' && claimed.session.sessionId
+        ? appendAnswers(
+            claimed.instruction ?? CONTINUE_PROMPTS[claimed.step.kind],
+            carriedAnswers(claimed),
+          )
+        : buildTaskPrompt(claimed));
+  const isInfoBuild = isBuildStepKind(claimed.step.kind) && claimed.todo?.output === 'info';
+  const reportFile = join(paths.reportsDir, convId, REPORT_FILE_NAME);
+  const promptWithPlanNote =
+    basePrompt !== null && claimed.step.kind === 'plan'
+      ? appendPlanLocationNote(basePrompt, join(paths.plansDir, convId, PLAN_FILE_NAME))
+      : basePrompt !== null && isInfoBuild
+        ? appendReportLocationNote(basePrompt, reportFile)
+        : basePrompt;
+  const prompt =
+    promptWithPlanNote !== null &&
+    promptWithPlanNote.trim() !== '' &&
+    !isInfoBuild &&
+    (isBuildStepKind(claimed.step.kind) ||
+      claimed.step.kind === 'merge' ||
+      (claimed.step.kind === 'verify' && !attachmentVerify)) &&
+    (claimed.project?.repo ?? null) !== null
+      ? appendWorkBranchNote(
+          promptWithPlanNote,
+          conversationBranch(convId),
+          claimed.project?.repo?.baseBranch,
+        )
+      : promptWithPlanNote;
+  return {
+    isChief,
+    isReview,
+    verifyMeta,
+    attachmentVerify,
+    verifyEvidenceDirectory: verifyMeta?.evidenceDirectory,
+    reviewGate,
+    isInfoBuild,
+    readonlyWorkspace: !isChief && claimed.todo?.output === 'info',
+    reportFile,
+    prompt,
+  };
 }

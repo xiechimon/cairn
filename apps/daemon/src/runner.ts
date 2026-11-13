@@ -20,26 +20,17 @@ import type {
   WorktreeOps,
 } from '@cairn/shared';
 import {
-  appendAnswers,
-  appendPlanLocationNote,
   appendReportLocationNote,
-  appendWorkBranchNote,
-  CONTINUE_PROMPTS,
   classifyAgentFailure,
   classifySkillFact,
   classifyStepFailure,
-  conversationBranch,
   isBackendRuntimeId,
   isBuildStepKind,
   localCommitIdentity,
   noVisionSignalOf,
   PLAN_FILE_NAME,
   parseRetryAfterMs,
-  parseReviewPromptMeta,
-  parseVerifyPromptMeta,
   REMOTE_TOOL_RETRY_DELAYS_MS,
-  REPORT_FILE_NAME,
-  type ReviewGate,
   skillCallName,
   stepTakesSecrets,
   stripAnsiEscapes,
@@ -86,9 +77,9 @@ import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
 import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
 import {
   buildTaskPrompt,
-  carriedAnswers,
   composeWorkerSystemPrompt,
   degradedFreshPrompt,
+  planStepPrompt,
   resumeMissNote,
   taskMetaOpts,
 } from './step-prompt.js';
@@ -289,47 +280,18 @@ async function runClaimedStep(
       ),
   });
 
-  const isChief = claimed.step.kind === 'chief';
-  const isReview = claimed.step.kind === 'review';
-  const isVerify = claimed.step.kind === 'verify';
-  const verifyMeta = isVerify ? parseVerifyPromptMeta(claimed.instruction ?? null) : null;
-  const attachmentVerify = verifyMeta?.evidence === 'attachments';
-  const verifyEvidenceDirectory = verifyMeta?.evidenceDirectory;
-  const reviewGate: ReviewGate =
-    (isReview ? parseReviewPromptMeta(claimed.instruction ?? null)?.gate : undefined) ?? 'confirm';
-  const basePrompt =
-    opts.resume?.prompt ??
-    (isChief || isReview || isVerify
-      ? (claimed.instruction ?? '')
-      : claimed.session.action === 'continue' && claimed.session.sessionId
-        ? appendAnswers(
-            claimed.instruction ?? CONTINUE_PROMPTS[claimed.step.kind],
-            carriedAnswers(claimed),
-          )
-        : buildTaskPrompt(claimed));
-  const isInfoBuild = isBuildStepKind(claimed.step.kind) && claimed.todo?.output === 'info';
-  const readonlyWorkspace = !isChief && claimed.todo?.output === 'info';
-  const reportFile = join(deps.paths.reportsDir, convId, REPORT_FILE_NAME);
-  const promptWithPlanNote =
-    basePrompt !== null && claimed.step.kind === 'plan'
-      ? appendPlanLocationNote(basePrompt, join(deps.paths.plansDir, convId, PLAN_FILE_NAME))
-      : basePrompt !== null && isInfoBuild
-        ? appendReportLocationNote(basePrompt, reportFile)
-        : basePrompt;
-  const prompt =
-    promptWithPlanNote !== null &&
-    promptWithPlanNote.trim() !== '' &&
-    !isInfoBuild &&
-    (isBuildStepKind(claimed.step.kind) ||
-      claimed.step.kind === 'merge' ||
-      (claimed.step.kind === 'verify' && !attachmentVerify)) &&
-    (claimed.project?.repo ?? null) !== null
-      ? appendWorkBranchNote(
-          promptWithPlanNote,
-          conversationBranch(convId),
-          claimed.project?.repo?.baseBranch,
-        )
-      : promptWithPlanNote;
+  const {
+    isChief,
+    isReview,
+    verifyMeta,
+    attachmentVerify,
+    verifyEvidenceDirectory,
+    reviewGate,
+    isInfoBuild,
+    readonlyWorkspace,
+    reportFile,
+    prompt,
+  } = planStepPrompt(claimed, opts.resume?.prompt, deps.paths);
   if (claimed.step.kind === 'plan') {
     mkdirSync(join(deps.paths.plansDir, convId), { recursive: true });
   }
