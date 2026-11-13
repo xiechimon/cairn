@@ -266,7 +266,7 @@
     ) {
     outline: none;
     border-color: var(--focus-field-border);
-    box-shadow: 0 0 0 3px var(--focus-halo);
+    box-shadow: none;
   }
 
   :root
@@ -289,7 +289,7 @@
   :root [data-slot="input-group"]:has([aria-invalid="true"]:focus-visible) {
     outline: none;
     border-color: var(--destructive);
-    box-shadow: 0 0 0 3px var(--danger-halo);
+    box-shadow: none;
   }
 }
 

@@ -97,19 +97,28 @@ const ringOf = (locator: Locator) =>
   locator.evaluate((el) => {
     const css = getComputedStyle(el);
     const shadow = css.boxShadow.replace(/rgba\(0, 0, 0, 0\) 0px 0px 0px 0px(, )?/g, '').trim();
-    return { outline: css.outlineStyle, shadow: shadow === '' ? 'none' : shadow };
+    const probe = document.createElement('div');
+    probe.style.color = 'var(--focus-ring)';
+    document.body.append(probe);
+    const focusRing = getComputedStyle(probe).color;
+    probe.remove();
+    return {
+      outline: css.outlineStyle,
+      shadow: shadow === '' ? 'none' : shadow,
+      focusBorder: css.borderTopColor === focusRing,
+    };
   });
 
-test('search shows one ring on the whole pill while focused, and Esc clears and blurs it', async ({
+test('search turns the pill border to the focus ring while focused, and Esc clears and blurs it', async ({
   page,
 }) => {
   await page.goto(MACHINES);
   const search = settings(page).getByLabel('搜索设置');
   const pill = settings(page).getByTestId('settings-search');
-  expect(await ringOf(pill)).toMatchObject({ shadow: 'none' });
+  expect(await ringOf(pill)).toMatchObject({ shadow: 'none', focusBorder: false });
   await search.focus();
   await expect(search).toBeFocused();
-  expect((await ringOf(pill)).shadow).not.toBe('none');
+  await expect.poll(() => ringOf(pill)).toMatchObject({ shadow: 'none', focusBorder: true });
   const focusedInput = await ringOf(search);
   expect(focusedInput.outline).toBe('none');
   expect(focusedInput.shadow).toBe('none');
@@ -118,7 +127,7 @@ test('search shows one ring on the whole pill while focused, and Esc clears and 
   await expect(search).not.toBeFocused();
   await expect(search).toHaveValue('');
   await expect(settings(page)).toBeVisible();
-  expect(await ringOf(pill)).toMatchObject({ shadow: 'none' });
+  await expect.poll(() => ringOf(pill)).toMatchObject({ shadow: 'none', focusBorder: false });
   const idleInput = await ringOf(search);
   expect(idleInput.outline).toBe('none');
   expect(idleInput.shadow).toBe('none');
