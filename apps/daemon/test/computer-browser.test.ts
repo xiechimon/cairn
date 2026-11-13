@@ -597,5 +597,8 @@ describe('agent cursor on the live screen', () => {
     expect(script).toContain("'aria-hidden', 'true'");
     expect(script).toContain('pointer-events:none');
     expect(() => agentCursorScript(Number.NaN, 2, 'click')).toThrow();
+    const styles = [...script.matchAll(/cssText = '([^']*)'/g)].map((match) => match[1] ?? '');
+    expect(styles.length).toBeGreaterThanOrEqual(4);
+    for (const style of styles) expect(style).toContain('pointer-events:none');
   });
 });
