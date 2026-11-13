@@ -1165,6 +1165,13 @@ test('computer image builds from the base with the host mirrorlist read-only and
       'utf8',
     );
     assert.match(agent, /^User=agent$/m);
+    assert.match(agent, /^After=.*\bnetwork-online\.target\b/m);
+    assert.match(agent, /^Wants=network-online\.target$/m);
+    assert.ok(
+      nspawn.some(
+        (call) => call.includes('enable') && call.includes('systemd-networkd-wait-online.service'),
+      ),
+    );
     assert.match(agent, /^Environment=DISPLAY=:1$/m);
     assert.match(agent, /^Environment=AGENT_BROWSER_EXECUTABLE_PATH=\/usr\/bin\/chromium$/m);
     assert.match(agent, /^Restart=always$/m);
