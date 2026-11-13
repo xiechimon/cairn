@@ -172,7 +172,8 @@ export const useArchivedTodos = (teamId: string | undefined, enabled: boolean) =
 export const useTasks = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['tasks', teamId],
-    queryFn: async () => tasksQuerySchema.parse(await api.get(`/api/tasks?teamId=${teamId}`)),
+    queryFn: async () =>
+      tasksQuerySchema.parse(await api.get(`/api/tasks?teamId=${teamId}&sectioned=1`)),
     enabled: enabled && teamId !== undefined,
   });
 

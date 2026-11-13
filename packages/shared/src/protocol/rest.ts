@@ -127,7 +127,7 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: '02 §9.3 在册不设计；触发条件 = 04 册附录 B',
   },
   { method: 'GET', path: '/api/todos', query: ['teamId'] },
-  { method: 'GET', path: '/api/tasks', query: ['teamId'] },
+  { method: 'GET', path: '/api/tasks', query: ['teamId', 'sectioned'] },
   { method: 'GET', path: '/api/todos/{id}' },
   {
     method: 'POST',
