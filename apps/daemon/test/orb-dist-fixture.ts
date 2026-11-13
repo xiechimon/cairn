@@ -56,6 +56,7 @@ export function createOrbCheckout(root: string) {
         '--dir',
         checkout,
         'deploy',
+        '--legacy',
         '--filter',
         '@xiechimon/cairn-cli',
         '--prod',
