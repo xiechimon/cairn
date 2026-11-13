@@ -1,6 +1,6 @@
-import { ACTIVE_STEP_STATUSES, conversationBranch } from '@cairn/shared';
-import { and, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
-import { build, step, threadPr, todo } from '../db/schema.js';
+import { conversationBranch } from '@cairn/shared';
+import { and, eq, isNotNull, isNull } from 'drizzle-orm';
+import { build, threadPr, todo } from '../db/schema.js';
 import {
   type FetchLike,
   type GithubBranchPull,
@@ -17,13 +17,9 @@ import { nowMs } from '../lib/ids.js';
 import { recoverAutonomousMerges, settleAutonomousMerge } from './autonomous-merge.js';
 import {
   type BuildDeps,
-  enqueueStep,
   finishTodoDone,
   hasActiveStep,
-  hasMessageRow,
   lastPushedCheckpoint,
-  maybeEnqueueIndependentReview,
-  maybeEnqueueVerifyStep,
   roundStart,
   stopUnclaimedGateSteps,
 } from './builds.js';
@@ -34,7 +30,7 @@ import {
   latestCompletedCheckRuns,
   verdictOfCheckRuns,
 } from './ci-check-verdict.js';
-import { CI_FIX_GREEN_EVENT, drainCiCorrections } from './ci-corrections.js';
+import { drainCiCorrections } from './ci-corrections.js';
 import {
   buildCiFixPrompt,
   buildMergeConflictPrompt,
@@ -45,6 +41,7 @@ import {
   countMarkedRounds,
   deadLoopMessage,
 } from './ci-fix-prompts.js';
+import { advancePassingGrind, startCiFixRound } from './ci-grind-outcome.js';
 import { KnownRows } from './ci-known-rows.js';
 import {
   CI_EMPTY_CHECKS_GRACE_MS,
@@ -72,8 +69,7 @@ import { syncAutonomyPauses } from './github-autonomy-brake.js';
 import { recoverRedAutonomousMain } from './github-recovery.js';
 import { githubText } from './github-text.js';
 import { evaluateMergeGate } from './merge-gate-run.js';
-import { holdLastCiFixForResearch } from './research-stuck.js';
-import { CI_FIX_PROMPT_HEAD, retryLessonsOf } from './retry-lessons.js';
+import { CI_FIX_PROMPT_HEAD } from './retry-lessons.js';
 import { setTodoPhase } from './todos.js';
 import { blockingWorkerQuestions } from './worker-question-store.js';
 
@@ -701,78 +697,28 @@ export function createCiPoller(
         deps.db.select().from(threadPr).where(eq(threadPr.buildId, cand.buildId)).get()
       )
         return;
-      const rounds = countMarkedRounds(deps.db, cand.buildId, CI_FIX_PROMPT_HEAD);
-      if (rounds >= CI_FIX_ROUNDS_MAX) {
-        failWithMessage(deps, cand, todoRow.teamId, deadLoopMessage(rounds));
-        tally.failed += 1;
-        return;
-      }
-      if (holdLastCiFixForResearch(deps, cand.buildId, rounds, CI_FIX_ROUNDS_MAX, now)) {
-        tally.pending += 1;
-        return;
-      }
-      const lessons = retryLessonsOf(deps.db, cand.buildId);
-      const fixPrompt = buildCiFixPrompt({
-        prNumber: buildRow.prNumber,
-        prUrl: buildRow.prUrl,
-        round: rounds + 1,
-        failures: verdict.failures,
-      });
-      enqueueStep(
+      const outcome = startCiFixRound(
         deps,
-        cand.buildId,
-        'build',
+        cand,
         todoRow.teamId,
-        lessons === null ? fixPrompt : `${fixPrompt}\n\n${lessons}`,
-        undefined,
-        undefined,
-        { kind: 'ci-fix', trigger: 'ci-checks', round: rounds + 1, roundsMax: CI_FIX_ROUNDS_MAX },
+        { prNumber: buildRow.prNumber, prUrl: buildRow.prUrl },
+        verdict.failures,
+        now,
       );
-      tally.appended += 1;
+      if (outcome === 'failed') tally.failed += 1;
+      else if (outcome === 'held') tally.pending += 1;
+      else tally.appended += 1;
       return;
     }
-    if (
-      verdict.state === 'green' &&
-      own &&
-      countMarkedRounds(deps.db, cand.buildId, CI_FIX_PROMPT_HEAD) > 0
-    ) {
-      rows.hint(cand.buildId, CI_FIX_GREEN_EVENT, 0);
-    }
-    maybeEnqueueIndependentReview(deps, todoRow, cand.buildId);
-    const lastVerifyAt = deps.db
-      .select({ at: step.createdAt })
-      .from(step)
-      .where(and(eq(step.buildId, cand.buildId), eq(step.kind, 'verify')))
-      .orderBy(desc(step.createdAt))
-      .get()?.at;
-    maybeEnqueueVerifyStep(deps, todoRow, cand.buildId, {
-      reverify:
-        lastVerifyAt !== undefined &&
-        hasMessageRow(
-          deps,
-          cand.buildId,
-          'system',
-          CI_MERGE_CONFLICT_VERIFY_NOTE,
-          lastVerifyAt + 1,
-        ),
-    });
-    const gateStepQueued = deps.db
-      .select({ id: step.id })
-      .from(step)
-      .where(
-        and(
-          eq(step.buildId, cand.buildId),
-          inArray(step.kind, ['review', 'verify']),
-          inArray(step.status, [...ACTIVE_STEP_STATUSES]),
-        ),
-      )
-      .get();
-    if (gateStepQueued !== undefined) {
-      tally.pending += 1;
-      return;
-    }
-    setTodoPhase(deps, cand.todoId, 'review');
-    tally.advanced += 1;
+    const advanced = advancePassingGrind(
+      deps,
+      rows,
+      todoRow,
+      cand,
+      verdict.state === 'green' && own,
+    );
+    if (advanced === 'pending') tally.pending += 1;
+    else tally.advanced += 1;
   }
 
   async function sweep(now: number = nowMs()): Promise<void> {
