@@ -14,7 +14,7 @@ Rollback: optional one line, for migrations, auth or billing: how to undo it and
 
 ## What
 
-<!-- One line: what changed, why, ticket and overlap result. -->
+<!-- One line: what changed, why, ticket and overlap result. When the title names a ticket, add `Closes #N` (finishes it) or `Part of #N` (one segment) on its own line. -->
 
 <details><summary>Review and risk</summary>
 

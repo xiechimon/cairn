@@ -51,7 +51,7 @@ Fill in every section of the [pull request template](./.github/PULL_REQUEST_TEMP
 - **Review**: vendor, model, fresh context, head SHA, rounds, verdict, and unfixed findings with reasons.
 - **Risk**: one-way or two-way door, blast radius, and whether the owner must merge.
 
-Upstream is optional and belongs only on PRs that add a mechanism. Closing keywords belong only in commit messages. No tasks are required; any unchecked task outside fenced code and HTML comments blocks merging.
+Upstream is optional and belongs only on PRs that add a mechanism. When the title names a ticket, such as `server(1570): ...`, the body says `Closes #1570` if the PR finishes it or `Part of #1570` if it is one segment; the `pr-evidence` check fails without one. No tasks are required; any unchecked task outside fenced code and HTML comments blocks merging.
 
 Commit messages follow `area(issue): summary`, for example `server(1570): skip already-pushed traces`.
 
