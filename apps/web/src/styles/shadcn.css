@@ -250,6 +250,8 @@
   --tint-fail-ink: var(--destructive);
   --switch-on: var(--card-button);
   --tag-tint: 22%;
+  --avatar-tint: 26%;
+  --avatar-ink: 55%;
   --code-pill-bg: #2a2a2a;
   --prose-code-surface: rgb(32 32 32 / 0.5);
   --prose-code-line: rgb(255 255 255 / 0.04);
@@ -400,6 +402,8 @@
   --tint-fail-ink: var(--destructive);
   --switch-on: var(--card-button);
   --tag-tint: 12%;
+  --avatar-tint: 15%;
+  --avatar-ink: 80%;
   --code-pill-bg: #f2f2f2;
   --bubble-fill: #f3ead6;
   --bubble-highlight: #e6ddc9;

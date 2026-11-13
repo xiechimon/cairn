@@ -27,7 +27,7 @@ function TodoRefs({ refs }: { refs: readonly ChiefReportTodoRef[] }) {
     <span className="flex flex-wrap gap-x-2">
       {refs.map((ref) => (
         <ThreadLink key={ref.id} todoId={ref.id} className={REF_CLS}>
-          #{ref.seq} {ref.title}
+          {ref.title}
         </ThreadLink>
       ))}
     </span>

@@ -1,5 +1,4 @@
 import { parseReplyQuote } from '@cairn/shared';
-import { cn } from 'cn';
 import { CircleAlert } from 'lucide-react';
 import { type CSSProperties, memo, type ReactNode, useContext } from 'react';
 import { isUsableTimestamp } from '../board/rel-time.js';
@@ -15,17 +14,15 @@ import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import {
+  TaskMentionAsLinkContext,
+  TaskMentionLink,
   type TodoGlance,
   TodoGlanceContext,
-  TodoStatus,
-  taskChipClass,
 } from '../detail/segments.js';
 import type { ChiefSegment, ChiefStreamItem, ChiefToolRow } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
-import { FileText } from '../icons/index.js';
 import { dateTimeFormat } from '../lib/date-format.js';
-import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefReportRow } from './chief-report-row.js';
@@ -102,11 +99,8 @@ const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 const BUBBLE_WRAP_CLS = `w-full max-w-full font-sans ${CHAT_BODY_CLS}`;
 const MARKER_ERROR_CLS = 'my-2.5 gap-1.5 text-meta text-(--destructive)';
 
-const CHIP_INLINE_CLS =
-  'mx-0.5 inline-flex items-center gap-1 rounded-(--cds-radius-sm) px-1.5 py-px align-[1px] font-sans text-meta';
-
 function segmentsText(segments: ChiefSegment[]): string {
-  return segments.map((s) => (s.todo != null ? `#${s.todo}` : (s.agent ?? s.text ?? ''))).join('');
+  return segments.map((s) => (s.todo != null ? `#${s.todo}` : (s.text ?? ''))).join('');
 }
 
 function robotText(item: {
@@ -120,33 +114,16 @@ function robotText(item: {
   return lines.join('\n');
 }
 
-function TodoSegmentChip({ seq }: { seq: number }) {
+function TodoSegmentLink({ seq }: { seq: number }) {
+  const { t } = useI18n();
   const glances = useContext(TodoGlanceContext);
   const known = [...(glances ?? [])].find(([, glance]) => glance.seq === seq);
-  const chip = (
-    <>
-      {known !== undefined ? (
-        <TodoStatus phase={known[1].phase} />
-      ) : (
-        <FileText width={11} height={11} />
-      )}
-      {seq}
-    </>
-  );
-  const cls = `${CHIP_INLINE_CLS} bg-secondary text-content-secondary`;
   return known === undefined ? (
-    <span data-testid="chief-chip-todo" className={cls}>
-      {chip}
-    </span>
+    <span>{t('任务')}</span>
   ) : (
-    <ThreadLink
-      todoId={known[0]}
-      data-testid="chief-chip-todo"
-      data-phase={known[1].phase}
-      className={cn(cls, taskChipClass(known[1].phase))}
-    >
-      {chip}
-    </ThreadLink>
+    <TaskMentionLink todoId={known[0]} phase={known[1].phase}>
+      {known[1].title ?? t('任务')}
+    </TaskMentionLink>
   );
 }
 
@@ -173,18 +150,7 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
   return (
     <>
       {segments.map((s, i) => {
-        if (s.todo != null) return <TodoSegmentChip key={i} seq={s.todo} />;
-        if (s.agent != null)
-          return (
-            <span
-              key={i}
-              data-testid="chief-chip-agent"
-              className={`${CHIP_INLINE_CLS} bg-(--seg-active) text-(--text-secondary)`}
-            >
-              <img src={spiralAvatarUrl(s.agent)} alt="" className="size-3 rounded-full" />
-              {s.agent}
-            </span>
-          );
+        if (s.todo != null) return <TodoSegmentLink key={i} seq={s.todo} />;
         if (s.code)
           return (
             <code
@@ -247,9 +213,8 @@ function TaskStartedRow({
       <StatusLine testId="chief-task-created">
         {t('已建任务')}{' '}
         <ThreadLink todoId={todoId} className={STATUS_REF_CLS}>
-          {seq != null ? `#${seq}` : t('任务')}
+          {title ?? t('任务')}
         </ThreadLink>
-        {title != null ? ` ${title}` : null}
       </StatusLine>
     </MessageScrollerItem>
   );
@@ -263,7 +228,7 @@ function HandoffRow({ todoId }: { todoId: string }) {
       <StatusLine testId="chief-handoff">
         {t('已转给任务')}{' '}
         <ThreadLink todoId={todoId} className={STATUS_REF_CLS} data-phase={glance?.phase}>
-          {glance?.seq != null ? `#${glance.seq}` : t('任务')}
+          {glance?.title ?? t('任务')}
         </ThreadLink>
       </StatusLine>
     </MessageScrollerItem>
@@ -276,6 +241,7 @@ export function chiefStreamRowKey(
 ): string | number {
   switch (item.kind) {
     case 'user':
+      return item.outboxKey != null ? `outbox-${item.outboxKey}` : (item.id ?? index);
     case 'robot':
     case 'thinking':
     case 'question':
@@ -325,7 +291,7 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
               <span key={todo.id}>
                 {n === 0 ? ' ' : '、'}
                 <ThreadLink todoId={todo.id} className={STATUS_REF_CLS}>
-                  {`#${todo.seq} ${todo.title}`}
+                  {todo.title}
                 </ThreadLink>
               </span>
             ))}
@@ -430,6 +396,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     const sentFiles = parseAttachmentTokens(split.tokens.join('\n'));
     const bubbleText = sentFiles.length > 0 ? split.text.trim() : split.text;
     const showBubble = bubbleText !== '' || reply != null || sentFiles.length === 0;
+    const sending = item.delivery === 'sending';
+    const fade = sending ? 'opacity-55' : '';
     const userTools = (placement: 'left' | 'below-end', testId: string) => (
       <MessageToolbar
         placement={placement}
@@ -456,9 +424,12 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             data-testid="chief-msg-col"
           >
             {sentFiles.length > 0 && (
-              <div className="group/reply-block relative max-w-full" data-slot="reply-block">
+              <div
+                className={`group/reply-block relative max-w-full ${fade}`}
+                data-slot="reply-block"
+              >
                 <SentAttachments files={sentFiles} />
-                {!showBubble && userTools('left', 'chief-msg-tools')}
+                {!showBubble && !sending && userTools('left', 'chief-msg-tools')}
               </div>
             )}
             {showBubble && (
@@ -469,15 +440,22 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                   data-md={shown != null ? '' : undefined}
                   {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
                   {...highlight(item.id)}
-                  className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''}`}
+                  {...(sending ? { 'data-delivery': 'sending' } : {})}
+                  className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''} ${fade}`}
                 >
                   {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
                   {shown != null ? <ChatMarkdown text={bubbleText} /> : bubbleText}
                 </UserMessageBubble>
-                {userTools('left', 'chief-msg-tools')}
+                {!sending && userTools('left', 'chief-msg-tools')}
               </div>
             )}
-            {userTools('below-end', 'chief-msg-tools-touch')}
+            {sending ? (
+              <span role="status" className="sr-only" data-testid="chief-msg-sending">
+                {t('发送中')}
+              </span>
+            ) : (
+              userTools('below-end', 'chief-msg-tools-touch')
+            )}
           </MessageContent>
         </Message>
       </MessageScrollerItem>
@@ -622,21 +600,23 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
           >
             {item.markdown != null ? (
-              <ChatMarkdown
-                text={item.markdown}
-                bubbles
-                bubbleTools={(group, n) =>
-                  robotTools(
-                    'right',
-                    group.source,
-                    n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools',
-                  )
-                }
-                highlight={(group) =>
-                  sourceHighlighted &&
-                  (group.source.includes(quoted) || quoted.includes(group.source))
-                }
-              />
+              <TaskMentionAsLinkContext.Provider value>
+                <ChatMarkdown
+                  text={item.markdown}
+                  bubbles
+                  bubbleTools={(group, n) =>
+                    robotTools(
+                      'right',
+                      group.source,
+                      n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools',
+                    )
+                  }
+                  highlight={(group) =>
+                    sourceHighlighted &&
+                    (group.source.includes(quoted) || quoted.includes(group.source))
+                  }
+                />
+              </TaskMentionAsLinkContext.Provider>
             ) : (
               <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
                 <div

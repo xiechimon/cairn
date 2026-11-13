@@ -14,7 +14,6 @@ import {
 } from './thread-activity.js';
 
 const REF_MARK = '\u0001';
-const REF_PATTERN = `#${REF_MARK}`;
 
 const BUBBLE_CLS = `${REPLY_BUBBLE_CLS} min-w-0 text-ui leading-5 text-(--foreground)`;
 const ROW_CLS = 'flex min-w-0 items-center gap-1.5';
@@ -28,20 +27,17 @@ const EVENT_LIST_CLS =
 
 function useRefSentence() {
   const { t } = useI18n();
-  return (
-    source: string,
-    todoId: string,
-    seqNum: number,
-    vars: Record<string, string | number>,
-  ) => {
+  return (source: string, todoId: string, title: string, vars: Record<string, string | number>) => {
     const text = t(source, { ...vars, n: REF_MARK });
-    const at = text.indexOf(REF_PATTERN);
+    const at = text.indexOf(REF_MARK);
     if (at < 0) return text;
     return (
       <>
         {text.slice(0, at)}
-        <ThreadLink todoId={todoId} className={REF_CLS}>{`#${seqNum}`}</ThreadLink>
-        {text.slice(at + REF_PATTERN.length)}
+        <ThreadLink todoId={todoId} className={REF_CLS}>
+          {title}
+        </ThreadLink>
+        {text.slice(at + REF_MARK.length)}
       </>
     );
   };
@@ -62,16 +58,15 @@ export function ThreadEventLine({
       <FileText width={16} height={16} className={`${ICON_CLS} mt-0.5`} />
       <span className="min-w-0 break-words">
         {item.kind === 'thread-report'
-          ? sentence('任务 #{n} {title}：{status}', item.todoId, item.seqNum, {
-              title: item.title,
+          ? sentence('{n}：{status}', item.todoId, item.title, {
               status: t(reportStatusWord(item)),
             })
           : sentence(
               item.by === 'coordinator'
-                ? 'Coordinator 直接对 #{n} 说：{excerpt}'
-                : '你直接对 #{n} 说：{excerpt}',
+                ? 'Coordinator 直接对 {n} 说：{excerpt}'
+                : '你直接对 {n} 说：{excerpt}',
               item.todoId,
-              item.seqNum,
+              item.title,
               { excerpt: item.excerpt },
             )}
         {item.kind === 'thread-report' && item.line !== undefined && (
@@ -114,7 +109,7 @@ function SummaryText({ summary, todoId }: { summary: ActivitySummary; todoId: st
   ];
   return (
     <>
-      {sentence('任务 #{n}', todoId, summary.seqNum, {})}
+      {sentence('{n}', todoId, summary.title, {})}
       {parts.map((part) => (
         <span key={part}>{` · ${part}`}</span>
       ))}

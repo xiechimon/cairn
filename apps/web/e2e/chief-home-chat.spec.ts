@@ -90,18 +90,24 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(input).toHaveValue('看板拖完卡片计数不对');
   });
 
-  test('a reply carries a live task chip, a hand-off row and an expandable trace; reload keeps it', async ({
+  test('a reply carries a live task reference, a hand-off row and an expandable trace; reload keeps it', async ({
     page,
   }) => {
     await mockLive(page, { threads: [THREAD], messages: HISTORY });
     await page.goto('/app');
     const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-    const chip = stream.locator('a.mention-chip--todo').first();
-    await expect(chip).toHaveAttribute('data-phase', 'building');
-    await expect(chip.getByRole('img', { name: '执行中' })).toBeVisible();
+    const ref = stream.getByTestId('chief-task-ref').first();
+    await expect(ref).toHaveAttribute('data-phase', 'building');
+    await expect(ref.getByRole('img', { name: '执行中' })).toBeVisible();
+    await expect(stream.locator('a[data-slot="task-mention"]').first()).toHaveAttribute(
+      'data-phase',
+      'building',
+    );
+    await expect(stream.locator('.mention-chip--todo')).toHaveCount(0);
     const handoff = stream.getByTestId('chief-handoff');
     await expect(handoff).toContainText('已转给任务');
-    await expect(handoff).toContainText('#9');
+    await expect(handoff).toContainText('修复看板拖拽后计数不刷新');
+    await expect(handoff).not.toContainText('#9');
     const handoffLine = await handoff.evaluate((el) => ({
       align: getComputedStyle(el).textAlign,
       rule: getComputedStyle(el, '::before').content,
@@ -110,7 +116,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
         el.firstElementChild!.getBoundingClientRect().left - el.getBoundingClientRect().left,
     }));
     expect(handoffLine).toEqual({ align: 'left', rule: 'none', chips: 0, leftGap: 0 });
-    await expect(handoff.getByRole('link', { name: '#9' })).toHaveAttribute('data-phase', 'building');
+    await expect(handoff.getByRole('link', { name: '修复看板拖拽后计数不刷新' })).toHaveAttribute('data-phase', 'building');
     await expect(stream.getByTestId('chief-turn-tools')).toHaveCount(0);
     await openReplySteps(page, stream.getByTestId('chief-msg').filter({ hasText: '已经补给它了' }));
     await expect(stream.getByTestId('chief-turn-tools').first()).toBeVisible();
@@ -119,7 +125,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(page.getByTestId('home-c').getByTestId('chief-stream')).toContainText(
       '已经补给它了',
     );
-    await page.getByTestId('home-c').locator('a.mention-chip--todo').first().click();
+    await page.getByTestId('home-c').locator('a[data-slot="task-mention"]').first().click();
     await expect(page).toHaveURL(/[?&]thread=todo-1/);
   });
 

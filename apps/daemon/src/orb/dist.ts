@@ -125,6 +125,7 @@ export async function publishOrbDist(
             '--dir',
             checkout,
             'deploy',
+            '--legacy',
             '--filter',
             '@xiechimon/cairn-cli',
             '--prod',

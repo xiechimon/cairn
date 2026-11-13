@@ -1,4 +1,4 @@
-import type { AskUserAnswer, TranscriptRow } from '@cairn/shared';
+import { type AskUserAnswer, type TranscriptRow, transcriptRowSchema } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useCallback,
@@ -28,7 +28,6 @@ import { chiefTurnErrorOfContent, mapChief } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
 import { useConversationStream } from '../api/sse.js';
-import { useSendKey } from '../api/use-send-key.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import type { EarlierPages } from '../components/chat/earlier-loader.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -49,6 +48,7 @@ import {
   globalCoordinatorThread,
 } from './coordinator-load.js';
 import { needsMachineName } from './needs-machine-name.js';
+import { chiefOutbox, type OutboxEntry, type UnsentSends, unlandedItems } from './outbox.js';
 import {
   questionActionThread,
   questionDraftKey,
@@ -76,6 +76,7 @@ export interface ChiefSurface {
   }) => void;
   onCancelQuestion?: (requestId: string, threadId?: string) => void;
   onWithdraw?: (messageId: string) => Promise<void>;
+  unsent?: UnsentSends;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
 }
@@ -102,7 +103,6 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   const chiefThreadsQ = useChiefThreads(teamId, live);
   const notificationsQ = useNotifications(teamId, live);
   const mutations = useApiMutations(teamId);
-  const sendKey = useSendKey();
 
   const chief = fixture.chief;
   getGestureStore(chief?.view ?? 'none');
@@ -232,6 +232,17 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     liveThinking,
     activity,
   ]);
+  const outbox = useSyncExternalStore(chiefOutbox.subscribe, chiefOutbox.entries);
+  useEffect(() => {
+    if (live) chiefOutbox.settle(activeThreadId, knownChiefIds);
+  }, [live, outbox, activeThreadId, knownChiefIds]);
+  const liveChiefWithUnsent = useMemo(() => {
+    if (liveChief === null) return null;
+    const unlanded = unlandedItems(outbox, activeThreadId, knownChiefIds);
+    return unlanded.length === 0
+      ? liveChief
+      : { ...liveChief, stream: [...(liveChief.stream ?? []), ...unlanded] };
+  }, [liveChief, outbox, activeThreadId, knownChiefIds]);
   const { fetchNextPage, isFetchingNextPage, isFetchNextPageError } = chiefMessagesQ;
   const loadEarlier = useCallback(() => {
     void fetchNextPage();
@@ -240,7 +251,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     ? { loading: isFetchingNextPage, failed: isFetchNextPageError, onLoad: loadEarlier }
     : undefined;
 
-  const chiefData = live ? (liveChief ?? chiefDefault) : (chief ?? chiefDefault);
+  const chiefData = live ? (liveChiefWithUnsent ?? chiefDefault) : (chief ?? chiefDefault);
   const liveUnread = live
     ? (notificationsQ.data?.unreadThreadIds ?? []).filter((id) => id.startsWith('chief-')).length
     : 0;
@@ -328,6 +339,39 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
       }
     : undefined;
 
+  const deliver = (entry: OutboxEntry) =>
+    mutations.chiefSend
+      .mutateAsync({
+        threadId: entry.threadId,
+        content: entry.text,
+        projectId: entry.projectId,
+        clientMessageId: entry.key,
+      })
+      .then(
+        (result) => ({
+          threadId: result.thread.id,
+          messageId: transcriptRowSchema.safeParse(result.message).data?.id ?? null,
+        }),
+        (error: unknown) => {
+          if (isCoordinatorNotReady(error))
+            toastCoordinatorNotReady(
+              t('Coordinator 还不能回答'),
+              t('点输入框下方的按钮，把模型来源、机器和 Coordinator 接上，再发一次。'),
+            );
+          else toastError(t('发送失败，请重试。'), error);
+          throw error;
+        },
+      );
+  const unsent = useMemo<UnsentSends | undefined>(
+    () =>
+      live
+        ? {
+            failed: outbox.filter((entry) => entry.state === 'failed'),
+            discard: (outboxKey) => chiefOutbox.discard(outboxKey)?.text ?? null,
+          }
+        : undefined,
+    [live, outbox],
+  );
   const onSend = live
     ? (text: string, projectId: string | null) => {
         const sessionMachineId = routingQ.data?.rules?.find(
@@ -343,26 +387,8 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
           });
           return Promise.reject(new Error('Name a machine first'));
         }
-        const { key } = sendKey.attempt([projectId ?? '', text].join('\n'), 'chief');
-        return mutations.chiefSend
-          .mutateAsync({
-            threadId: activeThread?.id ?? null,
-            content: text,
-            projectId,
-            clientMessageId: key,
-          })
-          .then(() => sendKey.settle())
-          .catch((error: unknown) => {
-            if (isCoordinatorNotReady(error)) {
-              toastCoordinatorNotReady(
-                t('Coordinator 还不能回答'),
-                t('点输入框下方的按钮，把模型来源、机器和 Coordinator 接上，再发一次。'),
-              );
-            } else {
-              toastError(t('发送失败，请重试。'), error);
-            }
-            throw error;
-          });
+        chiefOutbox.enqueue({ threadId: activeThread?.id ?? null, projectId, text }, deliver);
+        return Promise.resolve();
       }
     : DEMO_MODE
       ? () => {
@@ -403,6 +429,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     onAnswerQuestion,
     onCancelQuestion,
     onWithdraw,
+    ...(unsent !== undefined ? { unsent } : {}),
     onSteer,
     onStop,
   };
