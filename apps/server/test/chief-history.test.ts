@@ -481,7 +481,7 @@ describe('cache-stable system prompt', () => {
         .trimEnd(),
     );
     expect(composeChiefSystemPrompt(resource(), H.teamId, H.threadId)).toBe(built.text);
-    expect(built.sections.map((s) => s.name)).toEqual(['static', 'team', 'digests']);
+    expect(built.sections.map((s) => s.name)).toEqual(['static', 'team', 'channel', 'digests']);
     for (const section of built.sections) expect(section.hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
