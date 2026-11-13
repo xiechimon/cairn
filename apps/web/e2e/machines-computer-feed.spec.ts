@@ -747,3 +747,63 @@ test('the push link opens the machine with its screen enlarged and view-only', a
   );
   expect(feed.controlCalls).toEqual([]);
 });
+
+test.describe('on a touch phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('the control bar under the screen sits above the bottom navigation without scrolling', async ({
+    page,
+  }) => {
+    const feed: Feed = {
+      computers: [computer({ handoffReason: 'login' })],
+      commands: [command(1)],
+      controlCalls: [],
+    };
+    const panel = await open(page, feed, [
+      { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 },
+    ]);
+    const bar = panel.getByTestId('computer-control-bar');
+    await expect(bar).toBeVisible();
+    const tabs = await page.locator('[data-slot="phone-tabs"]').boundingBox();
+    const box = await bar.boundingBox();
+    expect(tabs).not.toBeNull();
+    expect(box).not.toBeNull();
+    if (!tabs || !box) return;
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(tabs.y);
+  });
+
+  test('Give back in the enlarged screen header releases control and keeps the screen open', async ({
+    page,
+  }) => {
+    const feed: Feed = {
+      computers: [computer({ handoffReason: 'login' })],
+      commands: [command(1)],
+      controlCalls: [],
+    };
+    await open(
+      page,
+      feed,
+      [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
+      false,
+      '/app?pane=machines&machine=m1&screen=1',
+    );
+    const enlarged = page.getByTestId('machine-screen-enlarged');
+    await expect(enlarged).toBeVisible();
+    const dialog = page.getByRole('dialog', { name: 'omarchy' });
+    await dialog.getByRole('button', { name: '接管' }).tap();
+    await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
+      'data-interactive',
+      'true',
+      { timeout: 15_000 },
+    );
+    expect(feed.controlCalls).toEqual(['POST']);
+    await dialog.getByRole('button', { name: '交还' }).tap();
+    await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE']);
+    await expect(enlarged).toBeVisible();
+    await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
+      'data-interactive',
+      'false',
+    );
+  });
+});
