@@ -205,13 +205,35 @@ export function deleteSecret(deps: SecretDeps, teamId: string, id: string): bool
   return true;
 }
 
+export interface HttpSecretRow {
+  id: string;
+  name: string;
+  revision: number;
+  policy: SecretHttpPolicy;
+  valueCipher: string | null;
+}
+
+export interface SecretGrants {
+  values: Record<string, string>;
+  http: HttpSecretRow[];
+}
+
 export function openSecretValues(
   deps: SecretDeps,
   teamId: string,
   ids: readonly string[],
   projectId: string | null,
 ): Record<string, string> {
-  if (ids.length === 0) return {};
+  return openSecretGrants(deps, teamId, ids, projectId).values;
+}
+
+export function openSecretGrants(
+  deps: SecretDeps,
+  teamId: string,
+  ids: readonly string[],
+  projectId: string | null,
+): SecretGrants {
+  if (ids.length === 0) return { values: {}, http: [] };
   const linked = linkedMailSecretIds(deps.db, teamId);
   const granted = deps.db
     .select()
@@ -240,6 +262,7 @@ export function openSecretValues(
           )
           .all();
   const values: Record<string, string> = {};
+  const http = new Map<string, HttpSecretRow>();
   for (const row of [
     ...granted.filter((r) => r.projectId === null),
     ...projectRows,
@@ -247,10 +270,21 @@ export function openSecretValues(
   ]) {
     if (row.delivery === 'http') {
       delete values[row.name];
+      const policy = httpPolicyOf(row);
+      if (policy === null) http.delete(row.name);
+      else
+        http.set(row.name, {
+          id: row.id,
+          name: row.name,
+          revision: row.policyRevision,
+          policy,
+          valueCipher: row.valueCipher,
+        });
       continue;
     }
     if (row.valueCipher === null || isMailSecretName(row.name) || linked.has(row.id)) continue;
+    http.delete(row.name);
     values[row.name] = deps.box.open(row.valueCipher);
   }
-  return values;
+  return { values, http: [...http.values()] };
 }

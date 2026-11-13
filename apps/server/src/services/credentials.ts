@@ -13,7 +13,7 @@ import { createApiKey } from './api-keys.js';
 import { openClaudeSubscription } from './claude-subscriptions.js';
 import { openProviderKey, type ProviderDeps } from './providers.js';
 import { coordinatorProfile, profileForStep } from './routing-rules.js';
-import { openSecretValues, type SecretDeps } from './secrets.js';
+import { type HttpSecretRow, openSecretGrants, type SecretDeps } from './secrets.js';
 
 export interface CredentialsDeps {
   db: Db;
@@ -61,6 +61,7 @@ export interface StepCredentialBundle {
     modelId: string | null;
   } | null;
   secrets: Record<string, string>;
+  httpSecrets: HttpSecretRow[];
   git: null;
 }
 
@@ -98,14 +99,15 @@ export function resolveStepCredentials(
     }
   }
 
-  const secrets =
+  const grants =
     agentRow && stepTakesSecrets(stepRow.kind)
-      ? openSecretValues(boxDeps, todoRow.teamId, agentRow.secrets, todoRow.projectId)
-      : {};
+      ? openSecretGrants(boxDeps, todoRow.teamId, agentRow.secrets, todoRow.projectId)
+      : { values: {}, http: [] };
 
   return {
     provider,
-    secrets,
+    secrets: grants.values,
+    httpSecrets: grants.http,
     git: null,
     claudeSubscriptionToken: openClaudeSubscription(
       deps,
@@ -148,6 +150,7 @@ export function resolveChiefStepCredentials(
   return {
     provider,
     secrets: {},
+    httpSecrets: [],
     git: null,
     claudeSubscriptionToken: openClaudeSubscription(
       deps,

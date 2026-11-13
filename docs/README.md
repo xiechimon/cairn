@@ -24,5 +24,5 @@ This directory holds two kinds of things: **long-lived documents** (specs, decis
 
 | Directory | Content | Discipline |
 |---|---|---|
-| `verify/<ticket>/` | Optional verification archives (screenshots, probe output, mechanism diagrams) | Historical. The weekly prune that removed folders older than 14 days last ran on 2026-10-26; do not treat a folder here as current, and do not add one. New evidence goes to `.claude/verify-evidence/` and is archived with `vp.mjs archive` only when a reviewer needs it. Merged PR bodies keep working because their raw links pin a commit. |
+| `verify/<ticket>/` | Removed from `main` on 2026-11-12 | Verify evidence for tasks cairn runs is stored as attachments on the task, and PR screenshots live on `pr-assets/<pr-number>` side branches that never merge. Older documents still name `docs/verify/<ticket>/...` paths; read those files from history: `git log --diff-filter=D --format=%H -1 -- docs/verify/<ticket>` gives the commit that removed the folder, then `git show <sha>^:docs/verify/<ticket>/<file>` |
 | `research/` | Research notes archived per ticket (`r*.md`, measurement records) | Archived once written. Cite them as historical material; do not read them as current specs |

@@ -32,10 +32,8 @@ import {
   appendPlanLocationNote,
   appendReportLocationNote,
   appendWorkBranchNote,
-  BRAND,
   buildPlanFirstRoundInstruction,
   buildTaskPromptText,
-  CHANGES_DIFF_MAX_BYTES,
   CONTINUE_PROMPTS,
   classifyAgentFailure,
   classifySkillFact,
@@ -48,7 +46,6 @@ import {
   isBuildStepKind,
   isIssueSourcedTask,
   LOCAL_TOOL_CREATE_TAG,
-  LocalRepoUnreachableError,
   localCommitIdentity,
   noVisionSignalOf,
   PLAN_FILE_NAME,
@@ -63,7 +60,6 @@ import {
   stepTakesSecrets,
   stripAnsiEscapes,
   transcriptPromptRowId,
-  withCoAuthor,
   workspaceHookRowContent,
 } from '@cairn/shared';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
@@ -73,17 +69,9 @@ import { AgentTodoReporter, parseAgentTodoText } from './agent-todo.js';
 import { AskChannel } from './ask-channel.js';
 import { prepareFileAttachment } from './attach-file.js';
 import { SessionNotResumableError } from './backend/errors.js';
-import { notInConfigLine, resolveMcpEndpoints } from './backend/mcp-config.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
-import {
-  collectVisibleSkillFileMap,
-  collectVisibleSkillNames,
-  piWorktreeSkillDirs,
-  type SkillsCatalogOpts,
-  withSkillDispatchDirectives,
-} from './backend/skills.js';
-import { createVerificationClone } from './backend/verification-clone.js';
+import { collectVisibleSkillFileMap, piWorktreeSkillDirs } from './backend/skills.js';
 import { prepareWebTools } from './backend/web-search.js';
 import { assertNoLegacyBrief, composeBrief } from './brief-file.js';
 import {
@@ -102,21 +90,27 @@ import { clearCredentials, pushCredential } from './credentials.js';
 import { DeltaRelay } from './delta-relay.js';
 import { buildExecutorRecord } from './executor-record.js';
 import { GitPushHookError, isGitAuthFailure, withGitCredentialFallback } from './git.js';
-import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
-import { landLocalMerge } from './local-merge.js';
 import type { DaemonLogger } from './log.js';
 import { isTransientUploadError, type MachineApi, MachineApiError } from './machine-client.js';
 import { extractReviewVerdict } from './review-findings.js';
 import { buildSecretTool } from './secret-channel.js';
 import { type SealedSegment, SegmentEmitter, segmentContent } from './segment.js';
 import { readSessionJsonlForUpload } from './session-jsonl.js';
-import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
 import { resolveStepImagesOrRaw } from './step-attachments.js';
+import { commitAndPushStep, preserveFailedBuild } from './step-closing-git.js';
 import { assembleStepEnv } from './step-env.js';
+import { localMergeDoneBody } from './step-local-merge.js';
+import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
+import {
+  prepareSkillLoadTool,
+  sessionInjectedSkills,
+  stepMcpEndpoints,
+} from './step-skill-tool.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
+import { prepareStepWorkspace, prepareVerifyClone } from './step-workspace.js';
 import {
   resolveStreamLimits,
   STREAM_DURATION_CAP_DEFAULT_MS,
@@ -128,7 +122,6 @@ import {
 import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
 import { extractVerifyVerdict } from './verify-verdict.js';
-import { localRepoUnreachableMessage } from './workspace.js';
 
 export interface RunStepDeps {
   client: MachineApi;
@@ -498,37 +491,11 @@ async function runClaimedStep(
   });
 
   if (claimed.localMerge !== undefined) {
-    const command = claimed.localMerge;
-    const repo = claimed.project?.repo;
-    let doneBody: MachineDoneBody;
-    try {
-      if (
-        claimed.step.kind !== 'merge' ||
-        repo?.kind !== 'local' ||
-        claimed.project?.id !== command.projectId ||
-        claimed.step.buildId !== command.buildId
-      )
-        throw new Error('Local merge command does not match the claim');
-      if (
-        claimed.agent?.tools !== undefined &&
-        [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].some((tool) => !claimed.agent?.tools?.includes(tool))
-      )
-        throw new Error('Local merge requires merge and push permission');
-      const result =
-        stop.request !== null
-          ? { outcome: 'held' as const, reason: 'stopped' }
-          : await landLocalMerge(repo.cloneUrl, command, () => stop.request !== null);
-      doneBody = {
-        status: 'success',
-        localMerge: { command, result },
-        ...(result.outcome === 'merged' ? { commit: result.commit } : {}),
-      };
-    } catch (err) {
-      doneBody = {
-        status: 'failed',
-        errorMessage: err instanceof Error ? err.message : String(err),
-      };
-    }
+    const doneBody = await localMergeDoneBody(
+      claimed,
+      claimed.localMerge,
+      () => stop.request !== null,
+    );
     const transcript = new TranscriptBuffer(deps.paths.outboxDir, stepId);
     transcript.upsert({
       id: `local-merge-${stepId}`,
@@ -693,48 +660,22 @@ async function runClaimedStep(
       await failStep(deps, heartbeat, stepId, 'workspace ops unavailable for repo-bound step');
       return;
     }
-    try {
-      const workspace = deps.workspace;
-      const prepare = () =>
-        workspace.prepare({
-          projectId: claimed.project?.id ?? '',
-          conversationId: convId,
-          cloneUrl: repo.cloneUrl,
-          repoKind: repo.kind,
-          baseBranch: repo.baseBranch,
-          workspacesRoot: deps.workspacesDir,
-          credentials: creds.git,
-          localPath: repo.kind === 'github' ? (repo.localPath ?? null) : null,
-          machineCredentialFallback: repo.kind === 'github',
-          ...(readonlyWorkspace ? { readonly: true } : {}),
-        });
-      const prepared: { workspace: PreparedWorkspace | null } = { workspace: null };
-      await withGitCredentialFallback(
-        async () => {
-          prepared.workspace = await prepare();
-        },
-        creds.git,
-        {
-          what: 'prepare',
-          allowMachineFallback: false,
-          refresh: refreshGit,
-        },
-      );
-      ws = prepared.workspace;
-    } catch (err) {
+    const prepared = await prepareStepWorkspace({
+      workspace: deps.workspace,
+      claimed,
+      repo,
+      workspacesRoot: deps.workspacesDir,
+      credentials: creds.git,
+      readonly: readonlyWorkspace,
+      refresh: refreshGit,
+      machineName: deps.machineName ?? hostname(),
+    });
+    if ('error' in prepared) {
       clearCredentials(creds);
-      await failStep(
-        deps,
-        heartbeat,
-        stepId,
-        err instanceof LocalRepoUnreachableError
-          ? localRepoUnreachableMessage(deps.machineName ?? hostname(), err)
-          : err instanceof Error
-            ? err.message
-            : String(err),
-      );
+      await failStep(deps, heartbeat, stepId, prepared.error);
       return;
     }
+    ws = prepared.ws;
   }
   let cwd = ws?.cwd ?? join(deps.workspacesDir, convId);
   if (!ws) mkdirSync(cwd, { recursive: true });
@@ -751,35 +692,21 @@ async function runClaimedStep(
 
   const uploadedVerifyEvidence = new Set<string>();
   if (attachmentVerify) {
-    if (
-      verifyEvidenceDirectory === undefined ||
-      !/^\.cairn-verify\/[a-zA-Z0-9_-]+\/$/.test(verifyEvidenceDirectory)
-    ) {
-      await failStep(deps, heartbeat, stepId, 'Verify evidence directory unavailable or invalid');
+    const verifyClone = await prepareVerifyClone({
+      workspace: deps.workspace,
+      ws,
+      headAtStart,
+      evidenceDirectory: verifyEvidenceDirectory,
+      expectedHeadSha: verifyMeta?.expectedHeadSha,
+      cleanups: stepCleanups,
+    });
+    if ('error' in verifyClone) {
+      await failStep(deps, heartbeat, stepId, verifyClone.error);
       return;
     }
-    if (ws === null || ws.readonly === true || !deps.workspace || headAtStart === null) {
-      await failStep(deps, heartbeat, stepId, 'Verify delivery commit unavailable');
-      return;
-    }
-    try {
-      const clone = await createVerificationClone(
-        ws.cwd,
-        verifyMeta?.expectedHeadSha ?? headAtStart,
-      );
-      stepCleanups.push(clone.cleanup);
-      cwd = clone.cwd;
-      ws = { ...ws, cwd, reused: false };
-      headAtStart = await deps.workspace.headCommit(cwd);
-    } catch (error) {
-      await failStep(
-        deps,
-        heartbeat,
-        stepId,
-        error instanceof Error ? error.message : String(error),
-      );
-      return;
-    }
+    ws = verifyClone.ws;
+    cwd = verifyClone.cwd;
+    headAtStart = verifyClone.headAtStart;
   }
 
   const systemPrompt =
@@ -792,22 +719,7 @@ async function runClaimedStep(
         });
   const remoteTools = claimed.remoteTools;
   const claimedMcp = claimed.mcpServers;
-  const mcpSlugs = claimedMcp ?? [];
-  const mcpEndpoints =
-    mcpSlugs.length > 0
-      ? resolveMcpEndpoints(deps.mcpConfigPath, mcpSlugs, {
-          onMissing: (slug) => logger.mcp(notInConfigLine(slug)),
-        })
-      : [];
-  if (claimedMcp !== undefined) {
-    logger.mcp(
-      mcpSlugs.length > 0
-        ? `loaded from ${deps.mcpConfigPath}: ${
-            mcpEndpoints.length > 0 ? mcpEndpoints.map((e) => e.slug).join(', ') : '(none)'
-          }`
-        : 'managed-empty: strict MCP set (runtime config not inherited)',
-    );
-  }
+  const mcpEndpoints = stepMcpEndpoints(deps.mcpConfigPath, claimedMcp, (line) => logger.mcp(line));
   let teamSkillsDir: string | null = null;
   try {
     const manifest = await client.skillsManifest(stepId);
@@ -880,38 +792,21 @@ async function runClaimedStep(
   const localToolDefs = [secretTool, createTagTool, ...webTools.tools].filter(
     (t): t is LocalToolDef => t !== null,
   );
-  const injectedForSession =
-    agent.injectedSkills === undefined || agent.defaultSkill == null
-      ? agent.injectedSkills
-      : [agent.defaultSkill, ...agent.injectedSkills.filter((id) => id !== agent.defaultSkill)];
+  const injectedForSession = sessionInjectedSkills(agent);
   const skillsRootDir = deps.skillsDir;
-  const canSkillTool = isPi && skillsRootDir !== undefined;
-  if (canSkillTool) {
-    const worktreeSkillDirs = piWorktreeSkillDirs(cwd);
-    const skillScanOpts: SkillsCatalogOpts = {
+  if (isPi && skillsRootDir !== undefined) {
+    const skillLoad = prepareSkillLoadTool({
       skillsDir: skillsRootDir,
-      cwd: deps.paths.home,
-      ...(!isChief && agent.skillsAllowlist != null ? { allowlist: agent.skillsAllowlist } : {}),
-      ...(!isChief && injectedForSession !== undefined
-        ? { injectedSkills: injectedForSession }
-        : {}),
-      ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
-      worktreeSkillsDirs: worktreeSkillDirs,
-      log: (msg: string) => logger.skills(msg),
-    };
-    const skillFileMap = collectVisibleSkillFileMap(skillScanOpts);
-    const skillLoadTool = buildSkillLoadTool({
-      skillFileMap,
-      onInvoke: (name) => logger.skills(`invoke: ${name}`),
+      home: deps.paths.home,
+      cwd,
+      isChief,
+      skillsAllowlist: agent.skillsAllowlist,
+      injectedSkills: injectedForSession,
+      teamSkillsDir,
+      log: (msg) => logger.skills(msg),
     });
-    localToolDefs.push(skillLoadTool);
-    if (deliveryPrompt !== null) {
-      deliveryPrompt = withSkillDispatchDirectives(
-        deliveryPrompt,
-        collectVisibleSkillNames(skillScanOpts),
-        (msg) => logger.skills(msg),
-      );
-    }
+    localToolDefs.push(skillLoad.tool);
+    if (deliveryPrompt !== null) deliveryPrompt = skillLoad.withDispatch(deliveryPrompt);
   }
   const askChannel = new AskChannel({ client, stepId, log: (message) => logger.step(message) });
   const telemetry =
@@ -1743,97 +1638,28 @@ async function runClaimedStep(
     !attachmentVerify
   ) {
     const git = deps.workspace;
-    try {
-      const headBranch = (await git.currentBranch?.(ws.cwd)) ?? null;
-      if (headBranch !== null && headBranch !== ws.branch) {
-        branchDrift = { expected: ws.branch, actual: headBranch };
-        logger.step(`work branch drift: HEAD on ${headBranch}, contract branch ${ws.branch}`);
-        transcript.upsert({
-          id: `branch-drift-${stepId}`,
-          role: 'system',
-          content: `检测到工作分支偏离：收尾时 HEAD 在「${headBranch}」，契约工作分支是「${ws.branch}」。本步产物判定已按步窗口内有新提交的任意分支放宽；交付（提交/推送/PR head）应留在契约分支上。`,
-          createdAt: now(),
-        });
-      }
-      const commitMessage = `${claimed.step.kind}: ${claimed.todo?.title ?? claimed.conversationId}`;
-      const committed = await git.commitAll(
-        ws.cwd,
-        withCoAuthor(commitMessage, tokenRes.coAuthor ?? null),
-        stepIdentity,
-      );
-      if (committed.setupDrift.length > 0) {
-        transcript.upsert({
-          id: `setup-drift-${stepId}`,
-          role: 'system',
-          content: `Workspace setup changed ${committed.setupDrift.join(', ')}; these changes were left out of the commit because the agent did not make them.`,
-          createdAt: now(),
-        });
-      }
-      if (claimed.step.kind === 'merge') {
-        const merged = await git.mergeDefaultBranch(ws.cwd, ws.defaultBranch, creds.git);
-        transcript.upsert({
-          id: `merge-${stepId}`,
-          role: 'system',
-          content: `git merge origin/${ws.defaultBranch} 结果为 "${merged.output || 'OK'}"`,
-          createdAt: now(),
-        });
-      }
-      const pushDenied =
-        claimed.agent?.tools !== undefined && !claimed.agent.tools.includes(AGENT_TOOL_PUSH);
-      const pushWarranted =
-        committed.committed ||
-        claimed.step.kind === 'merge' ||
-        (await git.countAhead(ws.cwd, ws.defaultBranch)) > 0;
-      if (pushWarranted && pushDenied) {
-        transcript.upsert({
-          id: `push-skip-${stepId}`,
-          role: 'system',
-          content: `Agent 未获「${AGENT_TOOL_PUSH}」授权——本轮提交保留在本地工作分支 ${ws.branch}，未推送到远端`,
-          createdAt: now(),
-        });
-        logger.step(`push skipped: agent lacks ${AGENT_TOOL_PUSH} permission`);
-      } else if (pushWarranted) {
-        const pushSource = await pushStep(git, ws);
-        if (pushSource === 'machine') {
-          transcript.upsert({
-            id: `git-credential-${stepId}`,
-            role: 'system',
-            content: gitCredentialRowContent('machine'),
-            createdAt: now(),
-          });
-        }
-        logger.raw(`pushed ${ws.branch}`);
-        try {
-          const leaked = (await git.briefMarkerInRef?.(ws.cwd, ws.branch)) ?? [];
-          if (leaked.length > 0) {
-            logger.step(`brief marker found in the pushed branch: ${leaked.join(', ')}`);
-            transcript.upsert({
-              id: `brief-in-history-${stepId}`,
-              role: 'system',
-              content: `分支 ${ws.branch} 的历史里带着运行简报的标记块（${leaked.join('、')}）——agent 在步内自行提交时 daemon 拦不住。合并前请确认这些文件不该进交付物`,
-              createdAt: now(),
-            });
-          }
-        } catch (err) {
-          logger.step(
-            `brief marker scan failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
-      }
-      headCommit = await git.headCommit(ws.cwd);
-      const headAhead = await git.countAhead(ws.cwd, ws.defaultBranch);
-      if (headAhead === 0 && headAtStart !== null && git.branchesWithNewCommits) {
-        try {
-          const candidates = await git.branchesWithNewCommits(ws.cwd, headAtStart, stepStartMs);
-          artifactBranches = candidates.filter(
-            (b) => b === ws.branch || !b.startsWith(BRAND.branchPrefix),
-          );
-        } catch (err) {
-          logger.step(`branch scan failed: ${err instanceof Error ? err.message : String(err)}`);
-        }
-      }
-      hasChanges = headAhead > 0 || artifactBranches.length > 0;
-    } catch (err) {
+    const workspace = ws;
+    const closing = await commitAndPushStep({
+      git,
+      ws: workspace,
+      claimed,
+      stepId,
+      coAuthor: tokenRes.coAuthor ?? null,
+      identity: stepIdentity,
+      mergeCredential: creds.git,
+      headAtStart,
+      stepStartMs,
+      push: () => pushStep(git, workspace),
+      note: (id, content) => transcript.upsert({ id, role: 'system', content, createdAt: now() }),
+      log: (message) => logger.step(message),
+      logRaw: (message) => logger.raw(message),
+    });
+    headCommit = closing.headCommit;
+    branchDrift = closing.branchDrift;
+    artifactBranches = closing.artifactBranches;
+    if (closing.hasChanges !== null) hasChanges = closing.hasChanges;
+    if (closing.error !== null) {
+      const err = closing.error;
       if (err instanceof GitPushHookError) closingPushHookError = err;
       lastError = err instanceof Error ? err.message : String(err);
     }
@@ -1860,27 +1686,19 @@ async function runClaimedStep(
     deps.workspace
   ) {
     const git = deps.workspace;
-    try {
-      const currentBranch = await git.currentBranch?.(ws.cwd);
-      const pushAllowed =
-        claimed.agent?.tools === undefined || claimed.agent.tools.includes(AGENT_TOOL_PUSH);
-      if (
-        currentBranch === ws.branch &&
-        pushAllowed &&
-        (await git.countAhead(ws.cwd, ws.defaultBranch)) > 0
-      ) {
-        await pushStep(git, ws);
-        headCommit = await git.headCommit(ws.cwd);
-        preservedCommits =
-          (await git.commitsAhead?.(ws.cwd, ws.defaultBranch)) ??
-          (headCommit === null ? [] : [headCommit]);
-        hasChanges = true;
-        logger.raw(`pushed ${ws.branch}`);
-      }
-    } catch (err) {
-      logger.step(
-        `failed build preservation failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+    const workspace = ws;
+    const preserved = await preserveFailedBuild({
+      git,
+      ws: workspace,
+      claimed,
+      push: () => pushStep(git, workspace),
+      log: (message) => logger.step(message),
+      logRaw: (message) => logger.raw(message),
+    });
+    if (preserved !== null) {
+      headCommit = preserved.headCommit;
+      preservedCommits = preserved.commits;
+      hasChanges = true;
     }
   }
 
@@ -1909,52 +1727,26 @@ async function runClaimedStep(
     !isReview &&
     !attachmentVerify
   ) {
-    const ghRef = repo.kind === 'github' ? githubRepoRefOf(repo.cloneUrl) : null;
-    if (ghRef !== null) {
-      const probeHeads: string[] = [ws.branch];
-      if (branchDrift !== null) probeHeads.push(branchDrift.actual);
-      for (const b of artifactBranches) {
-        if (probeHeads.length >= 3) break;
-        if (!probeHeads.includes(b)) probeHeads.push(b);
-      }
-      for (const head of probeHeads) {
-        prProbe = await probeGithubPr({
-          owner: ghRef.owner,
-          repo: ghRef.repo,
-          branch: head,
-          baseBranch: ws.defaultBranch,
-          token: creds.git?.password ?? null,
-          tokenKind: creds.git?.kind,
-          ...(appCredential !== null
-            ? { refreshToken: async () => (await refreshGit()).password }
-            : {}),
-        }).catch((err: unknown) => {
-          logger.step(
-            `pr probe failed: ${err instanceof Error ? err.message : String(err)} (panel will show branch without PR)`,
-          );
-          return null;
-        });
-        if (prProbe !== null) {
-          logger.step(`pr probe: #${prProbe.number} for ${head}`);
-          break;
-        }
-      }
+    if (repo.kind === 'github') {
+      prProbe = await probeStepPr({
+        cloneUrl: repo.cloneUrl,
+        branch: ws.branch,
+        driftBranch: branchDrift?.actual ?? null,
+        artifactBranches,
+        baseBranch: ws.defaultBranch,
+        credential: creds.git,
+        refreshToken: appCredential !== null ? async () => (await refreshGit()).password : null,
+        log: (message) => logger.step(message),
+      });
     }
-    if (
-      (repo.kind !== 'hosted' || preservedCommits.length > 0) &&
-      deps.workspace?.diffAgainstDefault
-    ) {
-      try {
-        const diff = await deps.workspace.diffAgainstDefault(ws.cwd, ws.defaultBranch);
-        changesDiff = diff.length <= CHANGES_DIFF_MAX_BYTES ? diff : null;
-        if (changesDiff === null && diff.length > 0) {
-          logger.step(
-            `changes diff ${diff.length}B over ${CHANGES_DIFF_MAX_BYTES}B cap — projection falls back to empty`,
-          );
-        }
-      } catch (err) {
-        logger.step(`changes diff failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
+    const diffAgainstDefault = deps.workspace?.diffAgainstDefault?.bind(deps.workspace);
+    if ((repo.kind !== 'hosted' || preservedCommits.length > 0) && diffAgainstDefault) {
+      changesDiff = await boundedChangesDiff(
+        diffAgainstDefault,
+        ws.cwd,
+        ws.defaultBranch,
+        (message) => logger.step(message),
+      );
     }
   }
 

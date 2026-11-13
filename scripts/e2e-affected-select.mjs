@@ -104,7 +104,6 @@ const DETAIL = [
   'review-dialog-list',
   'registry-focus-ring',
   'review-reject',
-  'skill-inject',
   'spec-flow',
   'thinking-row-truncate',
   'hotkeys-ready',

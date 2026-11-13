@@ -26,7 +26,7 @@ Preconditions: all proxy env unset (loopback through a proxy = false positive); 
 - The argv credential discipline + the workspace landing surface: `cd apps/daemon && npx vitest run test/local-executor.test.ts` (PATH-shim capture of the fork+exec command line).
 - The server claim/token wiring: `cd apps/server && npx vitest run test/g2t2-executor-wire.test.ts`.
 - The unreachable fail-loud unit-test surface: `cd apps/daemon && npx vitest run test/workspace-local-unreachable.test.ts test/runner-local.test.ts` (L1-L5 + failure modes 10/11).
-- The unreachable fail-loud live surface (real daemon + stub LLM): `node docs/verify/1210/drive-1210-local-unreachable.mjs` (launch.mjs first; two legs = mv the repo directory away and the step fails explicitly + mv it back and materialization is normal; recipe and reading guide = docs/verify/1210/README.md).
+- The unreachable fail-loud live surface (real daemon + stub LLM): `node .claude/skills/verify-cairn/archive/1210/drive-1210-local-unreachable.mjs` (launch.mjs first; two legs = mv the repo directory away and the step fails explicitly + mv it back and materialization is normal; recipe and reading guide = .claude/skills/verify-cairn/archive/1210/README.md).
 - The live re-probe (an isolated stack's real daemon walking the full chain of creating a local project through the UI) is pending.
 
 ## Gotchas

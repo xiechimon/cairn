@@ -1,9 +1,0 @@
-{
-  "vendor": "openai",
-  "model": "gpt-6.1-sol",
-  "verdict": "accept",
-  "reason": "The tests cover named exemptions without declaration text, required nonblank reasons, rejection of nonexistent names, and parameter/body changes to an existing large function. They also retain the added-helper negative controls, matching the issue\u2019s requirements without imposing unrelated behavior.",
-  "labeledAt": "2026-11-04T03:42:52Z",
-  "promptSha256": "a1df95f19ef2f3d325ea387442ef7b615bc232cdc5f709ceca2d4682e95fee50",
-  "route": "direct-codex-exec"
-}

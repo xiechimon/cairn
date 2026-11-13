@@ -13,6 +13,7 @@ import {
   build as buildTable,
   chiefMessage,
   chiefThread,
+  machine as machineTable,
   notification as notificationTable,
   step as stepTable,
   todo as todoTable,
@@ -314,6 +315,26 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
     };
     expect(typeof body.secrets).toBe('object');
     expect(body.secrets).toEqual({});
+  });
+
+  test('a chief step token never carries http secrets, even for a gateway machine', async () => {
+    const w = await setupChiefWorld();
+    const claimed = await w.claim();
+    w.s.db
+      .update(machineTable)
+      .set({
+        capabilities: { mcpServers: [], skills: [], executor: 'orb', secretGateway: true },
+      })
+      .where(eq(machineTable.id, machineIdByName(w.s, 'm4a-mbp')))
+      .run();
+    const tokenRes = await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, {
+      cred: w.token,
+    });
+    expect(tokenRes.status).toBe(200);
+    const body = (await tokenRes.json()) as Record<string, unknown>;
+    expect(body.secrets).toEqual({});
+    expect(body).not.toHaveProperty('httpSecrets');
+    expect(body).not.toHaveProperty('withheldSecrets');
   });
 
   test('a chief step token carries the configured App commit identity', async () => {

@@ -160,7 +160,6 @@
   "@cairn/web:test/i18n-scan.test.ts": 18,
   "@cairn/web:test/i18n.test.ts": 25,
   "@cairn/web:test/icon-stroke.test.ts": 16,
-  "@cairn/web:test/injected-skills-row.test.ts": 44,
   "@cairn/web:test/invalidate-converged.test.ts": 25,
   "@cairn/web:test/mention-display.test.ts": 11,
   "@cairn/web:test/mention-token.test.ts": 36,

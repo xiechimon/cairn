@@ -15,6 +15,8 @@ test('detail composer tools name themselves on hover', async ({ page }) => {
   const toolbar = page.getByTestId('composer-toolbar');
   const plus = page.locator('.side-panel [data-testid="composer-plus"]');
   await expectTip(page, plus, '更多');
+  await expectTip(page, toolbar.getByRole('button', { name: '停止' }), '停止');
+  await page.locator('.composer-input').fill('one more thing');
   await expectTip(page, toolbar.getByRole('button', { name: '发送' }), '发送');
   await plus.click();
   await expect(page.getByRole('menuitem', { name: '添加附件' })).toBeVisible();

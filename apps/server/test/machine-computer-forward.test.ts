@@ -4,6 +4,7 @@ import type { ComputerCall, ComputerFrame, ComputerTool, MachineStreamEvent } fr
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { computerMachineName as daemonComputerMachineName } from '../../daemon/src/orb/computer.js';
+import { createCoordinatorServerApi } from '../src/coordinator/server-api.js';
 import {
   chief as chiefTable,
   chiefThread as chiefThreadTable,
@@ -753,6 +754,16 @@ describe('stop and finish', () => {
     void forwardComputerCall(ctx.deps, 'sidecar', 'step-a', shell('ls'));
     expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBe('step-a');
     stopStepComputer(ctx.deps, 'step-a');
+    expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBeNull();
+  });
+
+  test('an in-server Coordinator turn that finishes releases the computer lease', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    connect(ctx.s, 'omarchy');
+    void forwardComputerCall(ctx.deps, 'sidecar', 'step-a', shell('ls'));
+    expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBe('step-a');
+    await createCoordinatorServerApi(ctx.deps).done('step-a', { status: 'success' });
     expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBeNull();
   });
 

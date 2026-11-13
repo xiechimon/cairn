@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
@@ -30,10 +31,13 @@ function render(item: Record<string, unknown>): string {
     }),
   });
   return renderToStaticMarkup(
-    createElement(MemoryRouter, {
-      children: createElement(I18nProvider, {
-        initialLocale: 'en',
-        children: createElement(MessageScrollerProvider, { children: scroller }),
+    createElement(QueryClientProvider, {
+      client: new QueryClient(),
+      children: createElement(MemoryRouter, {
+        children: createElement(I18nProvider, {
+          initialLocale: 'en',
+          children: createElement(MessageScrollerProvider, { children: scroller }),
+        }),
       }),
     }),
   );

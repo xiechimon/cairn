@@ -109,7 +109,7 @@ export async function executeRelayToolCall(
 ): Promise<string> {
   const row = ownedStep(deps, machineId, stepId);
   refuseMailTurnTool(row.prompt, name);
-  if (isComputerBrowserTool(name)) {
+  if (isComputerBrowserTool(name) || name === 'request_takeover') {
     if (row.kind !== 'chief') {
       throw new HttpError(400, 'browser tools require a chief step');
     }
