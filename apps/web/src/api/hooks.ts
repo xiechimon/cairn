@@ -937,6 +937,19 @@ export function useApiMutations(teamId: string | undefined) {
         invalidateAll();
       },
     }),
+    chiefOpenChannel: useMutation({
+      mutationFn: (projectId: string) =>
+        api.post<ChiefThread>(`/api/teams/${teamId}/chief/channels/${projectId}`, {}),
+      onSuccess: (thread) => {
+        void qc.cancelQueries({ queryKey: ['chiefThreads', teamId] });
+        qc.setQueryData<ChiefThread[]>(['chiefThreads', teamId], (threads) => {
+          const current = threads ?? [];
+          return current.some((row) => row.id === thread.id)
+            ? current.map((row) => (row.id === thread.id ? thread : row))
+            : [...current, thread];
+        });
+      },
+    }),
     chiefRewind: useMutation({
       mutationFn: (input: { threadId: string; messageId: string }) =>
         api.post<{ deletedCount: number; thread: ChiefThread }>(

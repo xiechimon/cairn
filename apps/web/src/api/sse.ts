@@ -89,15 +89,6 @@ export function startTeamStream(
           void invalidateConverged(qc, { queryKey: ['computers', teamId] });
         }
       }
-      if (
-        ev.type === 'computer.state' &&
-        (ev.state === 'stopped' ||
-          ev.state === 'starting' ||
-          ev.state === 'running' ||
-          ev.state === 'failed')
-      ) {
-        void invalidateConverged(qc, { queryKey: ['computers', teamId] });
-      }
       if (ev.type === 'notification') {
         fireDesktopNotification(ev.notification as NotificationRecord);
       }

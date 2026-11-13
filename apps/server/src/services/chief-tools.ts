@@ -54,7 +54,7 @@ import {
   setChiefWake,
   upsertChiefMessage,
 } from './chief.js';
-import { readHistory, searchHistory } from './chief-history.js';
+import { channelMessages, readHistory, searchHistory } from './chief-history.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
 import { suggestQuickReplies } from './chief-quick-replies.js';
 import { assertToolNotRemoved, executeRouterTool, isRouterTool } from './chief-router-tools.js';
@@ -580,6 +580,15 @@ export async function executeChiefTool(
         readHistory(db, ctx, strArr(params, 'ids'), {
           offset: num(params, 'offset'),
           maxChars: num(params, 'maxChars'),
+        }),
+      );
+    case 'channel_messages':
+      return json(
+        await channelMessages(db, ctx, {
+          channel: str(params, 'channel'),
+          query: optStr(params, 'query'),
+          limit: num(params, 'limit'),
+          before: optStr(params, 'before'),
         }),
       );
 
