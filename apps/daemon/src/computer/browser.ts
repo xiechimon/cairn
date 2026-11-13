@@ -77,6 +77,16 @@ export const LOGIN_DETECTION_SCRIPT = `(() => {
   return [...found];
 })()`;
 
+const SECRET_AUTOCOMPLETE = new Set(['current-password', 'new-password', 'one-time-code']);
+
+function secretField(type: string, autocomplete: string): boolean {
+  if (type.trim().toLowerCase() === 'password') return true;
+  return autocomplete
+    .toLowerCase()
+    .split(/\s+/)
+    .some((token) => SECRET_AUTOCOMPLETE.has(token));
+}
+
 function parseLoginSignals(output: string): LoginSignal[] | null {
   let parsed: unknown;
   try {
@@ -216,9 +226,10 @@ export async function runBrowserTool(
     started = true;
     return result;
   };
+  const read = (argv: readonly string[]) => collectExecute(provider, argv, timed, started);
 
   const withDetection = async (text: string): Promise<BrowserToolResult> => {
-    const detection = await execute([...prefix, '--json', 'eval', LOGIN_DETECTION_SCRIPT]);
+    const detection = await read([...prefix, '--json', 'eval', LOGIN_DETECTION_SCRIPT]);
     const signals = detection.code === 0 ? parseLoginSignals(detection.text) : null;
     if (signals === null) return { text: `[login detection unavailable]\n${text}` };
     if (signals.length === 0) return { text };
@@ -259,13 +270,24 @@ export async function runBrowserTool(
   const lines: string[] = [];
   for (const action of parsed.data.actions) {
     if (action.ref !== undefined) {
-      const snap = await execute([...prefix, 'snapshot', '-i']);
+      const snap = await read([...prefix, 'snapshot', '-i']);
       if (snap.code !== 0 && snap.code !== null) {
         refuse(snap.text || `agent-browser snapshot failed with exit code ${snap.code}`, started);
       }
       if (!refPresent(snap.text, action.ref)) {
         refuse(
           `ref ${normalizeRef(action.ref)} was not in a fresh snapshot; take browser_snapshot again`,
+          started,
+        );
+      }
+    }
+    if ((action.kind === 'fill' || action.kind === 'type') && action.ref !== undefined) {
+      const ref = normalizeRef(action.ref);
+      const type = await read([...prefix, 'get', 'attr', ref, 'type']);
+      const autocomplete = await read([...prefix, 'get', 'attr', ref, 'autocomplete']);
+      if (secretField(type.text, autocomplete.text)) {
+        refuse(
+          `browser_act ${action.kind} refused: ${ref} is a password or one-time code field; ask the owner with request_takeover`,
           started,
         );
       }
