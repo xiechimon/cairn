@@ -107,6 +107,7 @@ import {
 import {
   homeC,
   homeCEmpty,
+  homeCEngine,
   homeCMachines,
   homeCMade,
   homeCMadeMany,
@@ -167,6 +168,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'home-c-made': homeCMade,
       'home-c-made-many': homeCMadeMany,
       'home-c-machines': homeCMachines,
+      'home-c-engine': homeCEngine,
       'sessions-ref': sessionsRef,
       'sessions-ref-detail': sessionsRefDetail,
       'make-ref': makeRef,

@@ -50,6 +50,11 @@ const ACTION_COPY: Record<ThreadActionKind, { reason: string; primary: string }>
   unarchive: { reason: '这个任务已归档。取消归档后才能发消息。', primary: '取消归档' },
 };
 
+export interface EngineMenu {
+  onViewRaw: () => void;
+  takeOver?: { label: string; onClick: () => void };
+}
+
 export interface ThreadActions {
   card: ReactNode;
   menu: ReactNode;
@@ -60,11 +65,13 @@ export function useThreadActions({
   chat,
   onGone,
   onViewPlan,
+  engine,
 }: {
   todo: TodoRecord;
   chat: ThreadChat;
   onGone: () => void;
   onViewPlan: (() => void) | undefined;
+  engine?: EngineMenu | undefined;
 }): ThreadActions {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
@@ -261,6 +268,25 @@ export function useThreadActions({
           setMenuOpen(false);
           setDialog('rename');
         }}
+        {...(engine !== undefined
+          ? {
+              onViewRaw: () => {
+                setMenuOpen(false);
+                engine.onViewRaw();
+              },
+              ...(engine.takeOver !== undefined
+                ? {
+                    takeOver: {
+                      label: engine.takeOver.label,
+                      onClick: () => {
+                        setMenuOpen(false);
+                        engine.takeOver?.onClick();
+                      },
+                    },
+                  }
+                : {}),
+            }
+          : {})}
         moveSub={<MoveToProjectSub todo={todo} />}
       />
       {dialog === 'rename' && <RenameDialog todo={todo} open onClose={() => setDialog(null)} />}

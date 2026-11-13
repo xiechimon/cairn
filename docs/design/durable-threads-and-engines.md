@@ -42,11 +42,11 @@ An engine plans for itself. When the plan includes an action that cannot be undo
 
 ## The engine view
 
-Owner decision on 2026-11-12. When a thread has dispatched work to an engine, the thread shows the run as one card in its conversation.
+Owner decisions on 2026-11-12 and 2026-11-13. When a thread has dispatched work to an engine, the run has no card of its own: its events are the thread's own conversation, Raw output and takeover are items of the thread's `…` menu; the engine, time and cost sit in the thread's usage popover, filled from the build's steps on a live thread.
 
-- Default view: the engine's structured event stream rendered with cairn's own conversation components (reply text, the plan checklist, read, edit and run rows, a diff card, the running bubble). It is the same family as the thread itself and works on the phone.
+- Default view: the engine's structured event stream rendered with cairn's own conversation components (reply text, the plan checklist, read, edit and run rows, the running row). It is the same family as the thread itself and works on the phone.
 - Nothing is lost silently. An event type the adapter does not know renders as a generic row that names the type and opens its raw content. An engine that waits for input the adapter cannot map shows that it is waiting and offers takeover. Every unknown type is counted and reported, and each adapter is tested by replaying recorded streams per engine version.
-- A read-only raw output view (the engine's plain text log) is always available from the card.
+- A read-only raw output view (the engine's plain text log) is always available from the thread's menu.
 - A real terminal (a pseudo-terminal streamed to a maintained terminal component in the browser) is built later, for takeover and for engines in an interactive screen. It replaces the raw output view when it exists. It crosses the machine and command boundary, so it is owner-routed and needs its own design.
 - A thread's header carries the title and one status line only. Code changes, documents and pull requests are results: a compact card in the conversation that opens the result, never a control in the header. Most tasks have no code changes.
 
@@ -85,7 +85,7 @@ Proposal:
 
 - The difficulty is decided by rule first (the risk list in this document), then by the owner's explicit setting, which always wins.
 - It can only be raised during the work: a failed attempt, a check that does not pass or a plan that grows moves the task up one level and the next dispatch uses the higher row. It is never lowered silently.
-- The chosen model, effort and the reason are recorded on the dispatch and shown in the engine card, so the owner sees why a task cost what it did.
+- The chosen model, effort and the reason are recorded on the dispatch and shown in the thread's usage popover, so the owner sees why a task cost what it did.
 - Effort maps to whatever each engine calls it (thinking level, reasoning effort); an engine that has no such control ignores it and the dispatch record says so.
 - A run still never switches model because a quota ran out; that pauses the work, as today.
 

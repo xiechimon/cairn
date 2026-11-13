@@ -13,6 +13,12 @@ import {
 import type { TranscriptItem, WorkStep } from '../fixtures/records.js';
 import type { TFunc } from '../i18n/translate.js';
 
+const TAIL_STEPS = 5;
+
+export function earlierStepCount(total: number): number {
+  return total > TAIL_STEPS + 1 ? total - TAIL_STEPS : 0;
+}
+
 const DONE_VERBS = {
   read: '读取了',
   search: '搜索了',
@@ -57,7 +63,7 @@ function stepTarget(step: Extract<WorkStep, { kind: 'call' }>): string {
 }
 
 function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TFunc }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(step.kind === 'call' && step.error);
   const [animate] = useState(enter);
   const call = step.kind === 'call' ? step : null;
   const lines = call
@@ -204,8 +210,11 @@ export function WorkTrace({
   const [disclosure, setDisclosure] = useState<{ defaultExpanded: boolean; open: boolean } | null>(
     null,
   );
+  const [showsEarlier, setShowsEarlier] = useState(false);
   const expanded =
     disclosure?.defaultExpanded === defaultExpanded ? disclosure.open : defaultExpanded;
+  const earlier = disclosure === null ? earlierStepCount(item.steps.length) : 0;
+  const shown = showsEarlier ? item.steps : item.steps.slice(earlier);
   const counts = { ...EMPTY_TRACE_COUNTS };
   const readPaths = new Set<string>();
   const editPaths = new Set<string>();
@@ -245,7 +254,18 @@ export function WorkTrace({
       </div>
       {expanded && (
         <TraceCard>
-          {item.steps.map((step) => (
+          {earlier > 0 && (
+            <div>
+              <TraceRowButton
+                data-testid="work-earlier"
+                verb={t(showsEarlier ? '收起之前的 {n} 步' : '之前的 {n} 步', { n: earlier })}
+                expandable
+                open={showsEarlier}
+                onClick={() => setShowsEarlier((value) => !value)}
+              />
+            </div>
+          )}
+          {shown.map((step) => (
             <WorkStepRow key={step.id} step={step} enter={entering.has(step.id)} t={t} />
           ))}
         </TraceCard>
