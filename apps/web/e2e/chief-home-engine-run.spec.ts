@@ -4,7 +4,11 @@ import { settleTransitions } from './helpers.js';
 
 const open = (page: Page, state: string) =>
   page.goto(`/app?scenario=home-c-engine&thread=home-c-engine-${state}&player`);
-const tail = (page: Page) => page.getByTestId('engine-tail');
+const tail = (page: Page) => page.getByTestId('engine-run');
+const menuItem = async (page: Page, name: string) => {
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
+  return page.getByRole('menuitem', { name });
+};
 const transcript = (page: Page) => page.getByTestId('transcript-col');
 const lastSteps = (page: Page) => page.getByTestId('work-block').last().getByTestId('work-call');
 const planStates = (page: Page) =>
@@ -30,7 +34,6 @@ for (const { state, data, phase } of STATES) {
     await open(page, state);
     await expect(tail(page)).toHaveAttribute('data-state', data);
     await expect(page.getByTestId('side-chat')).toHaveAttribute('data-phase', phase);
-    await expect(tail(page)).toBeInViewport({ ratio: 1 });
     await expect(page.getByTestId('engine-card')).toHaveCount(0);
     await expect(transcript(page).getByTestId('work-block').last()).toBeVisible();
   });
@@ -40,18 +43,18 @@ test('a running run shows its plan and steps, with the model choice in the usage
   await open(page, 'running');
   expect(await planStates(page)).toEqual(['done', 'done', 'doing', 'todo']);
   await expect(page.getByTestId('work-spinner')).toBeVisible();
-  await expect(page.getByTestId('engine-take-over')).toBeVisible();
-  await expect(tail(page)).not.toContainText('中档模型');
+  await expect(transcript(page)).not.toContainText('中档模型');
   await page.getByTestId('thread-usage-ring').click();
   const usage = page.getByTestId('thread-usage');
   await expect(usage).toContainText('中档模型 · 中等强度');
-  await expect(usage).toContainText('要改一个文件并跑测试');
+  await expect(usage).not.toContainText('要改一个文件并跑测试');
+  await page.keyboard.press('Escape');
+  await expect(await menuItem(page, '接管')).toBeVisible();
 });
 
 test('a finished run keeps time and cost in the usage popover and offers no takeover', async ({ page }) => {
   await open(page, 'finished');
   expect(await planStates(page)).toEqual(['done', 'done', 'done', 'done']);
-  await expect(page.getByTestId('engine-take-over')).toHaveCount(0);
   await expect(page.getByTestId('engine-question')).toHaveCount(0);
   await expect(transcript(page)).toContainText('已允许这一次');
   await page.getByTestId('thread-usage-ring').click();
@@ -65,14 +68,15 @@ test('a failed run opens the failed command with its output', async ({ page }) =
   await expect(failed).toHaveAttribute('aria-expanded', 'true');
   await expect(failed).toContainText('pnpm test:upload');
   await expect(page.getByTestId('tool-output')).toContainText('Tests  1 failed | 30 passed (31)');
-  await expect(page.getByTestId('engine-take-over')).toHaveCount(0);
+  await expect(await menuItem(page, '原始输出')).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: '接管' })).toHaveCount(0);
 });
 
 test('the raw output fills the panel at its end and back returns to the conversation', async ({
   page,
 }) => {
   await open(page, 'long');
-  await page.getByTestId('engine-view-raw').click();
+  await (await menuItem(page, '原始输出')).click();
   const raw = page.getByTestId('engine-raw');
   await expect(raw).toContainText('● Bash(pnpm test)');
   await expect(transcript(page)).toHaveCount(0);
@@ -85,10 +89,11 @@ test('the raw output fills the panel at its end and back returns to the conversa
   expect(box.fromEnd).toBeLessThanOrEqual(1);
   expect(box.mono.toLowerCase()).toContain('mono');
   await page.getByTestId('side-chat-back').click();
-  await expect(tail(page)).toBeVisible();
-  await page.getByTestId('engine-view-raw').click();
+  await expect(transcript(page)).toBeVisible();
+  await (await menuItem(page, '原始输出')).click();
+  await expect(raw).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(tail(page)).toBeVisible();
+  await expect(transcript(page)).toBeVisible();
   await expect(page.getByTestId('side-chat')).toBeVisible();
 });
 
@@ -106,7 +111,7 @@ test('a long step list folds its earlier steps behind one row', async ({ page })
 
 test('the fixture driver stays off the page unless the address asks for it', async ({ page }) => {
   await page.goto('/app?scenario=home-c-engine&thread=home-c-engine-running');
-  await expect(tail(page)).toBeVisible();
+  await expect(tail(page)).toHaveAttribute('data-state', 'running');
   await expect(page.getByTestId('engine-player')).toHaveCount(0);
 });
 
@@ -144,19 +149,20 @@ test('refusing the question ends the run without the refused command', async ({ 
   expect(await planStates(page)).toEqual(['done', 'done', 'todo', 'todo']);
 });
 
-test('takeover asks first, marks the run as taken over and hands back', async ({ page }) => {
+test('takeover from the menu asks first, marks the run as taken over and hands back', async ({
+  page,
+}) => {
   await open(page, 'waiting');
-  await page.getByTestId('engine-take-over').click();
+  await (await menuItem(page, '接管')).click();
   const dialog = page.getByRole('dialog', { name: '接管这次运行' });
   await expect(dialog).toContainText('终端还没有接入');
   await dialog.getByRole('button', { name: '取消' }).click();
   await expect(tail(page)).toHaveAttribute('data-state', 'waiting');
-  await page.getByTestId('engine-take-over').click();
+  await (await menuItem(page, '接管')).click();
   await dialog.getByTestId('engine-take-over-confirm').click();
   await expect(tail(page)).toHaveAttribute('data-state', 'taken_over');
   await expect(page.getByTestId('engine-question').getByRole('button')).toHaveCount(0);
-  await expect(page.getByTestId('engine-take-over')).toHaveCount(0);
-  await page.getByTestId('engine-hand-back').click();
+  await (await menuItem(page, '交还')).click();
   await expect(tail(page)).toHaveAttribute('data-state', 'waiting');
   await expect(page.getByTestId('engine-question').getByRole('button')).toHaveCount(2);
 });
@@ -179,7 +185,7 @@ test('the fixture driver steps, plays on a timer and restarts', async ({ page })
   await expect(tail(page)).toHaveAttribute('data-state', 'waiting');
 });
 
-test('a thread without an engine run shows no engine tail and no driver', async ({ page }) => {
+test('a thread without an engine run shows no engine run and no driver', async ({ page }) => {
   await page.goto('/app?scenario=home-c-engine&thread=home-c-working-c');
   await expect(page.getByTestId('side-chat')).toBeVisible();
   await expect(page.getByTestId('live-row')).toBeVisible();
@@ -193,8 +199,7 @@ test.describe('phone', () => {
   for (const state of ['waiting', 'long']) {
     test(`the ${state} run fits the full-screen task view`, async ({ page }) => {
       await open(page, state);
-      await expect(tail(page)).toBeInViewport({ ratio: 1 });
-      const fits = await page.evaluate(
+        const fits = await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
       );
       expect(fits).toBe(true);

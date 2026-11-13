@@ -128,18 +128,19 @@ Reach:
 
 ### engine-view
 
-**Engine run in a task thread** (partial, centrality 1). A run that a task thread dispatched to an engine (Claude Code, Codex) is the thread's own conversation, with one tail line for cost, model choice, a read-only raw output view and takeover. A web prototype on fixture data: no backend sends a run yet.
+**Engine run in a task thread** (partial, centrality 1). A run that a task thread dispatched to an engine (Claude Code, Codex) is the thread's own conversation, with time and cost in the usage popover and a read-only raw output view and takeover in the thread menu. A web prototype on fixture data: no backend sends a run yet.
 
 States: Running with the plan checklist, trace rows and the typing bubble; waiting on a question with allow once, refuse and take over; finished with time and cost; failed with the failed command open; taken over with a hand back control; an unknown event as a row that opens its raw payload; a long step list that folds its earlier steps; no tail when the thread carries no run.
 
 Reach:
 
 1. `open /app/todo/<id of a thread listed by the todos API>`
-2. `click testid:engine-take-over`
+2. `click label:更多操作…`
+3. `click label:接管`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `engine-hand-back`, `engine-question`, `engine-raw`, `engine-raw-view`, `engine-tail`, `engine-take-over`, `engine-take-over-confirm`, `engine-view-raw`
+- Test ids in its code: `engine-question`, `engine-raw`, `engine-raw-copy`, `engine-raw-view`, `engine-take-over-confirm`
 - Research: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md)
 - Frontend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/references/thread-review](../../../docs/design/references/thread-review)
 - Backend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/home-redesign-backend-todo.md](../../../docs/design/home-redesign-backend-todo.md)
@@ -435,7 +436,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `agent-text`, `agent-todo`, `automation-completed`, `edit-error`, `fail-raw-error`, `home-c`, `info-report`, `left`, `live-row`, `made-archived-empty`, `made-archived-note`, `made-empty`, `made-group`, `made-group-count`, `made-no-match`, `made-search-toggle`, `made-tabs`, `msg-actions`, `msg-stamp`, `msg-tools`, `msg-tools-touch`, `queued-capsules-standalone`, `right`, `schedule-wake-marker`, `scheduled-turn`, `side-chat`, `side-chat-back`, `side-chat-changes`, `side-chat-changes-view`, `side-chat-panel`, `side-chat-plan`, `side-chat-send-error`, `side-chat-status`, `side-chat-unavailable`, `skill-line`, `skills-summary`, `step-prompt-raw`, `thinking-body`, `tool-output`, `transcript-note`, `transcript-question`, `transcript-step-prompt`, `transcript-time-divider`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-earlier`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`
+- Test ids in its code: `agent-text`, `agent-todo`, `automation-completed`, `edit-error`, `engine-run`, `fail-raw-error`, `home-c`, `info-report`, `left`, `live-row`, `made-archived-empty`, `made-archived-note`, `made-empty`, `made-group`, `made-group-count`, `made-no-match`, `made-search-toggle`, `made-tabs`, `msg-actions`, `msg-stamp`, `msg-tools`, `msg-tools-touch`, `queued-capsules-standalone`, `right`, `schedule-wake-marker`, `scheduled-turn`, `side-chat`, `side-chat-back`, `side-chat-changes`, `side-chat-changes-view`, `side-chat-panel`, `side-chat-plan`, `side-chat-send-error`, `side-chat-status`, `side-chat-unavailable`, `skill-line`, `skills-summary`, `step-prompt-raw`, `thinking-body`, `tool-output`, `transcript-note`, `transcript-question`, `transcript-step-prompt`, `transcript-time-divider`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-earlier`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`
 - Verify recipes: [.claude/skills/verify-cairn/features/detail-right-pane.md](features/detail-right-pane.md)
 - Research: [docs/research/r15-multica-run-rendering.md](../../../docs/research/r15-multica-run-rendering.md), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/thread-review](../../../docs/design/references/thread-review)

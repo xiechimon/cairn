@@ -379,7 +379,7 @@ function useCopied(text: string) {
   return { copied, copy };
 }
 
-function CopyCodeButton({
+export function CopyCodeButton({
   text,
   className,
   testId,

@@ -67,7 +67,6 @@ export function ThreadUsageDetails({
             label: t('模型档位'),
             value: `${t(ENGINE_CHOICE_WORDS.modelTier[engineRun.choice.modelTier])} · ${t(ENGINE_CHOICE_WORDS.effort[engineRun.choice.effort])}`,
           },
-          { label: t('选择理由'), value: engineRun.choice.reason },
         ]),
     { label: t('花费'), value: engineCost(engineRun?.costUsd ?? null) ?? summary.cost },
     { label: t('Token 数'), value: summary.tokens },

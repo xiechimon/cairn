@@ -2019,7 +2019,6 @@ export const EN: Record<string, string> = {
   代码改动: 'Code changes',
   时长: 'Duration',
   模型档位: 'Model tier',
-  选择理由: 'Why this model',
   经济模型: 'Inexpensive model',
   中档模型: 'Mid-range model',
   强模型: 'Strong model',

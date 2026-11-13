@@ -22,8 +22,8 @@ import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
-import { type EngineRunView, engineTranscript } from './engine-run.js';
-import { EngineRawView, EngineRunTail } from './engine-run-view.js';
+import { type EngineRunView, engineCanTakeOver, engineTranscript } from './engine-run.js';
+import { EngineQuestion, EngineRawView, TakeOverDialog } from './engine-run-view.js';
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { STATUS_WORDS } from './status-words.js';
@@ -251,7 +251,6 @@ function ThreadBody({
   actions,
   view,
   onViewChanges,
-  onViewRaw,
   now,
   updates,
   origin,
@@ -266,7 +265,6 @@ function ThreadBody({
   actions: ThreadActions;
   view: ThreadView;
   onViewChanges: () => void;
-  onViewRaw: () => void;
   now: number;
   updates: ThreadUpdates | null;
   origin: ThreadOrigin | null;
@@ -318,7 +316,9 @@ function ThreadBody({
               <>
                 {engine?.controls}
                 {engine !== undefined && (
-                  <EngineRunTail run={engine.run} actions={engine.actions} onViewRaw={onViewRaw} />
+                  <div data-testid="engine-run" data-state={engine.run.state}>
+                    <EngineQuestion run={engine.run} actions={engine.actions} />
+                  </div>
                 )}
                 {(chat.changes.status === 'ready' || chat.changes.status === 'error') && (
                   <ChangesCard changes={chat.changes} onOpen={onViewChanges} />
@@ -525,7 +525,27 @@ function ReadyThread({
   const [planOpen, setPlanOpen] = useState(false);
   const openPlan = chat.planDoc !== undefined ? () => setPlanOpen(true) : undefined;
   const usage = useThreadUsage(todo);
-  const actions = useThreadActions({ todo, chat, onGone: onClose, onViewPlan: openPlan });
+  const [takingOver, setTakingOver] = useState(false);
+  const engineActions = engine?.actions;
+  const actions = useThreadActions({
+    todo,
+    chat,
+    onGone: onClose,
+    onViewPlan: openPlan,
+    engine:
+      engine === undefined
+        ? undefined
+        : {
+            onViewRaw: () => onView('raw'),
+            ...(engineActions === undefined
+              ? {}
+              : engine.run.state === 'taken_over'
+                ? { takeOver: { label: t('交还'), onClick: engineActions.handBack } }
+                : engineCanTakeOver(engine.run.state)
+                  ? { takeOver: { label: t('接管'), onClick: () => setTakingOver(true) } }
+                  : {}),
+          },
+  });
   const { live, teamId } = useLiveData();
   const prs = usePrs(teamId, todo.id, live);
   const prRows = prs.data ?? [];
@@ -576,7 +596,6 @@ function ReadyThread({
         actions={actions}
         view={view}
         onViewChanges={() => onView('changes')}
-        onViewRaw={() => onView('raw')}
         now={now}
         updates={updates}
         origin={origin}
@@ -597,6 +616,11 @@ function ReadyThread({
               }
             : null
         }
+      />
+      <TakeOverDialog
+        open={takingOver}
+        onClose={() => setTakingOver(false)}
+        onConfirm={() => engineActions?.takeOver()}
       />
       <DialogShell
         open={planOpen}

@@ -241,7 +241,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### engine-view
 
-**Engine run in a task thread** (partial). A run that a task thread dispatched to an engine (Claude Code, Codex) is the thread's own conversation, with one tail line for cost, model choice, a read-only raw output view and takeover. A web prototype on fixture data: no backend sends a run yet.
+**Engine run in a task thread** (partial). A run that a task thread dispatched to an engine (Claude Code, Codex) is the thread's own conversation, with time and cost in the usage popover and a read-only raw output view and takeover in the thread menu. A web prototype on fixture data: no backend sends a run yet.
 
 - Research: [docs/design/durable-threads-and-engines.md](design/durable-threads-and-engines.md)
 - Frontend design: [docs/design/durable-threads-and-engines.md](design/durable-threads-and-engines.md), [docs/design/references/thread-review](design/references/thread-review)

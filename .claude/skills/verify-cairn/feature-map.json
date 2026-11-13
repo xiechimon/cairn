@@ -632,7 +632,7 @@
     {
       "id": "engine-view",
       "name": "Engine run in a task thread",
-      "summary": "A run that a task thread dispatched to an engine (Claude Code, Codex) is the thread's own conversation, with one tail line for cost, model choice, a read-only raw output view and takeover. A web prototype on fixture data: no backend sends a run yet.",
+      "summary": "A run that a task thread dispatched to an engine (Claude Code, Codex) is the thread's own conversation, with time and cost in the usage popover and a read-only raw output view and takeover in the thread menu. A web prototype on fixture data: no backend sends a run yet.",
       "states": "Running with the plan checklist, trace rows and the typing bubble; waiting on a question with allow once, refuse and take over; finished with time and cost; failed with the failed command open; taken over with a hand back control; an unknown event as a row that opens its raw payload; a long step list that folds its earlier steps; no tail when the thread carries no run.",
       "centrality": 1,
       "status": "partial",
@@ -644,7 +644,8 @@
       },
       "reach": [
         "open /app/todo/<id of a thread listed by the todos API>",
-        "click testid:engine-take-over"
+        "click label:更多操作…",
+        "click label:接管"
       ],
       "research": [
         "docs/design/durable-threads-and-engines.md"

@@ -1,22 +1,16 @@
 import { cn } from 'cn';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { REPLY_CHIP_CLS } from '../chief/quick-replies.js';
-import { TraceOutput } from '../components/chat/trace-parts.js';
 import { Button } from '../components/ui/button.js';
 import {
   DIALOG_PRIMARY_BUTTON,
   DIALOG_TEXT_BUTTON,
   DialogShell,
 } from '../components/ui/dialog-shell.js';
-import { REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
+import { CopyCodeButton, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import { useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
-import {
-  type EngineRun,
-  type EngineRunActions,
-  engineCanTakeOver,
-  enginePendingQuestion,
-} from './engine-run.js';
+import { type EngineRun, type EngineRunActions, enginePendingQuestion } from './engine-run.js';
 
 const END_SLACK = 24;
 const KEYBOARD_SCROLLABLE = { tabIndex: 0 } as const;
@@ -45,33 +39,32 @@ function useStickToEnd<T extends HTMLElement>() {
 }
 
 export function EngineRawView({ run }: { run: EngineRun }) {
+  const { t } = useI18n();
+  const scroller = useStickToEnd<HTMLPreElement>();
   return (
-    <div data-testid="engine-raw-view" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <RawOutput text={run.rawOutput} fill />
+    <div data-testid="engine-raw-view" className="flex min-h-0 flex-1 flex-col px-4 pt-3 pb-4">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-(--radius-code) border border-border bg-background">
+        <div className="flex h-10 flex-none items-center border-b border-border pr-1.5 pl-5">
+          <span className="min-w-0 flex-1 truncate font-sans text-code-lang text-content-secondary">
+            {t('原始输出')}
+          </span>
+          <CopyCodeButton text={run.rawOutput} testId="engine-raw-copy" />
+        </div>
+        <pre
+          {...scroller}
+          role="log"
+          aria-label={t('原始输出')}
+          data-testid="engine-raw"
+          className="scroll-fade m-0 min-h-0 flex-1 overflow-auto px-5 py-3 font-prose-mono text-code whitespace-pre-wrap text-(--foreground) [overflow-wrap:anywhere]"
+        >
+          <span className="block">{run.rawOutput}</span>
+        </pre>
+      </div>
     </div>
   );
 }
 
-function RawOutput({ text, fill = false }: { text: string; fill?: boolean }) {
-  const { t } = useI18n();
-  const scroller = useStickToEnd<HTMLPreElement>();
-  return (
-    <TraceOutput
-      {...scroller}
-      role="log"
-      aria-label={t('原始输出')}
-      data-testid="engine-raw"
-      className={cn(
-        'scroll-fade text-foreground',
-        fill ? 'max-h-none min-h-0 flex-1 px-4 py-3' : 'max-h-96 px-3 py-3',
-      )}
-    >
-      <span className="block">{text}</span>
-    </TraceOutput>
-  );
-}
-
-function TakeOverDialog({
+export function TakeOverDialog({
   open,
   onClose,
   onConfirm,
@@ -115,94 +108,42 @@ function TakeOverDialog({
   );
 }
 
-const TAIL_LINK =
-  'h-6 min-h-0 flex-none rounded-(--radius-control) px-1.5 text-meta font-normal text-(--text-secondary)';
-
-export function EngineRunTail({
+export function EngineQuestion({
   run,
   actions,
-  onViewRaw,
 }: {
   run: EngineRun;
-  actions?: EngineRunActions;
-  onViewRaw: () => void;
+  actions?: EngineRunActions | undefined;
 }) {
   const { t } = useI18n();
-  const [confirming, setConfirming] = useState(false);
   const question = enginePendingQuestion(run);
+  if (question === null) return null;
   return (
-    <>
-      {question !== null && (
-        <div data-testid="engine-question" data-answer="pending" className="mt-5">
-          <div
-            className={cn('w-fit max-w-full text-ui leading-5 text-foreground', REPLY_BUBBLE_CLS)}
-          >
-            {question.text}
-          </div>
-          {actions !== undefined && run.state !== 'taken_over' && (
-            <fieldset
-              aria-label={t('回答引擎')}
-              className="m-0 mt-3 flex min-w-0 flex-wrap gap-3 border-0 p-0 pb-0.5"
-            >
-              <Button
-                variant="ghost"
-                className={REPLY_CHIP_CLS}
-                onClick={() => actions.answer(question.id, 'allowed')}
-              >
-                {t('允许这一次')}
-              </Button>
-              <Button
-                variant="ghost"
-                className={REPLY_CHIP_CLS}
-                onClick={() => actions.answer(question.id, 'refused')}
-              >
-                {t('拒绝')}
-              </Button>
-            </fieldset>
-          )}
-        </div>
-      )}
-      <div
-        data-testid="engine-tail"
-        data-state={run.state}
-        className="mt-4 flex min-w-0 items-center text-meta leading-5"
-      >
-        <span className="-ml-1.5 flex flex-none items-center">
+    <div data-testid="engine-question" data-answer="pending" className="mt-5">
+      <div className={cn('w-fit max-w-full text-ui leading-5 text-foreground', REPLY_BUBBLE_CLS)}>
+        {question.text}
+      </div>
+      {actions !== undefined && run.state !== 'taken_over' && (
+        <fieldset
+          aria-label={t('回答引擎')}
+          className="m-0 mt-3 flex min-w-0 flex-wrap gap-3 border-0 p-0 pb-0.5"
+        >
           <Button
             variant="ghost"
-            data-testid="engine-view-raw"
-            className={TAIL_LINK}
-            onClick={onViewRaw}
+            className={REPLY_CHIP_CLS}
+            onClick={() => actions.answer(question.id, 'allowed')}
           >
-            {t('原始输出')}
+            {t('允许这一次')}
           </Button>
-          {actions !== undefined && run.state === 'taken_over' && (
-            <Button
-              variant="ghost"
-              data-testid="engine-hand-back"
-              className={TAIL_LINK}
-              onClick={actions.handBack}
-            >
-              {t('交还')}
-            </Button>
-          )}
-          {actions !== undefined && engineCanTakeOver(run.state) && (
-            <Button
-              variant="ghost"
-              data-testid="engine-take-over"
-              className={TAIL_LINK}
-              onClick={() => setConfirming(true)}
-            >
-              {t('接管')}
-            </Button>
-          )}
-        </span>
-      </div>
-      <TakeOverDialog
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        onConfirm={() => actions?.takeOver()}
-      />
-    </>
+          <Button
+            variant="ghost"
+            className={REPLY_CHIP_CLS}
+            onClick={() => actions.answer(question.id, 'refused')}
+          >
+            {t('拒绝')}
+          </Button>
+        </fieldset>
+      )}
+    </div>
   );
 }
