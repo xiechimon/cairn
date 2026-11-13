@@ -97,7 +97,6 @@ export function AnswerComposer({
       above={above}
       tools={tools}
       menu={menu}
-      canStop={false}
       context={context}
       threadId={threadId}
       dropActive={dropActive}
