@@ -6,7 +6,6 @@ import type {
   AgentBackend,
   AgentSessionHandle,
   AgentTokenUsage,
-  BoundGitCredentials,
   ClaimedStep,
   CommitIdentity,
   DeliveredImage,
@@ -45,7 +44,6 @@ import {
   isBackendRuntimeId,
   isBuildStepKind,
   isIssueSourcedTask,
-  LOCAL_TOOL_CREATE_TAG,
   localCommitIdentity,
   noVisionSignalOf,
   PLAN_FILE_NAME,
@@ -89,7 +87,7 @@ import {
 import { clearCredentials, pushCredential } from './credentials.js';
 import { DeltaRelay } from './delta-relay.js';
 import { buildExecutorRecord } from './executor-record.js';
-import { GitPushHookError, isGitAuthFailure, withGitCredentialFallback } from './git.js';
+import { GitPushHookError, isGitAuthFailure } from './git.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { isTransientUploadError, type MachineApi, MachineApiError } from './machine-client.js';
@@ -102,6 +100,7 @@ import { StepAppCredential } from './step-app-credential.js';
 import { resolveStepImagesOrRaw } from './step-attachments.js';
 import { commitAndPushStep, preserveFailedBuild } from './step-closing-git.js';
 import { assembleStepEnv } from './step-env.js';
+import { prepareCreateTagTool, stepGitRunner } from './step-git-tools.js';
 import { localMergeDoneBody } from './step-local-merge.js';
 import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
 import {
@@ -119,7 +118,6 @@ import {
   STREAM_IDLE_ENV,
   StreamWatchdog,
 } from './stream-watchdog.js';
-import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
 import { extractVerifyVerdict } from './verify-verdict.js';
 
@@ -755,40 +753,21 @@ async function runClaimedStep(
   const appIdentity: CommitIdentity | null = tokenRes.commitIdentity ?? null;
   const stepIdentity: CommitIdentity =
     appIdentity ?? localCommitIdentity(claimed.agent?.displayName ?? 'cairn-agent');
-  const withStepGit = async (
-    operation: (credential: BoundGitCredentials | null) => Promise<void>,
-  ) => {
-    let refreshed = false;
-    const refresh = async () => {
-      if (refreshed) throw new Error('App credential authentication failed after refresh');
-      refreshed = true;
-      return refreshGit();
-    };
-    if (appCredential?.needsRefresh()) await refreshGit();
-    return withGitCredentialFallback(operation, creds.git, {
-      what: 'push',
-      allowMachineFallback: repo?.kind === 'github',
-      refresh,
-      onFallback: (reason) =>
-        logger.step(
-          `git push auth failed (per-step token), retrying with machine credentials: ${reason}`,
-        ),
-    });
-  };
-  const createTagTool = (claimed.localTools ?? []).includes(LOCAL_TOOL_CREATE_TAG)
-    ? buildCreateTagTool({
-        repoDir: ws?.cwd ?? null,
-        cred: creds.git,
-        identity: stepIdentity,
-        withCredentials: async (operation) => {
-          try {
-            await withStepGit(operation);
-          } catch (error) {
-            throw new Error(redact(error instanceof Error ? error.message : String(error)));
-          }
-        },
-      })
-    : null;
+  const withStepGit = stepGitRunner({
+    credential: creds.git,
+    appCredential,
+    refresh: refreshGit,
+    allowMachineFallback: repo?.kind === 'github',
+    log: (line) => logger.step(line),
+  });
+  const createTagTool = prepareCreateTagTool({
+    localTools: claimed.localTools,
+    repoDir: ws?.cwd ?? null,
+    credential: creds.git,
+    identity: stepIdentity,
+    runGit: withStepGit,
+    redact,
+  });
   const localToolDefs = [secretTool, createTagTool, ...webTools.tools].filter(
     (t): t is LocalToolDef => t !== null,
   );
