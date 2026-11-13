@@ -1,5 +1,5 @@
 import { ACTIVE_STEP_STATUSES, conversationBranch } from '@cairn/shared';
-import { and, desc, eq, inArray, isNotNull, isNull, like, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, step, threadPr, todo } from '../db/schema.js';
 import {
@@ -17,8 +17,7 @@ import {
   isOwnPull,
   WRITE_AUTHOR_ASSOCIATIONS,
 } from '../lib/github.js';
-import { newRecordId, nowMs } from '../lib/ids.js';
-import { emitRuntimeBuildSpan } from '../runtime-otel.js';
+import { nowMs } from '../lib/ids.js';
 import { recoverAutonomousMerges, settleAutonomousMerge } from './autonomous-merge.js';
 import {
   type BuildDeps,
@@ -35,8 +34,16 @@ import {
 } from './builds.js';
 import { AnonReadBudget } from './ci-anon-budget.js';
 import { CI_FIX_GREEN_EVENT, drainCiCorrections } from './ci-corrections.js';
+import {
+  CI_EMPTY_CHECKS_GRACE_MS,
+  failWithMessage,
+  freshGrindRow,
+  freshReviewRow,
+  githubTarget,
+  pushNotSeen,
+  writeSystemRow,
+} from './ci-loop-rows.js';
 import { DONE_ROW, prClosedUnmergedRow } from './delivery-rows.js';
-import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
 import { syncAutonomyPauses } from './github-autonomy-brake.js';
 import { recoverRedAutonomousMain } from './github-recovery.js';
@@ -50,14 +57,11 @@ import {
   retryLessonsOf,
 } from './retry-lessons.js';
 import { setTodoPhase } from './todos.js';
-import { insertMessageRow } from './transcript.js';
 import { blockingWorkerQuestions } from './worker-question-store.js';
 
 export const CI_POLL_INTERVAL_MS = 60_000;
 
 export const CI_FIX_ROUNDS_MAX = 3;
-
-export const CI_EMPTY_CHECKS_GRACE_MS = 300_000;
 
 export const CI_ANON_READ_INTERVAL_MS = 300_000;
 
@@ -73,7 +77,7 @@ export const CI_FOREIGN_RELIST_ANON_MS = 3_600_000;
 
 export const CI_CLOSED_CONFIRM_MS = 50_000;
 
-export { CI_FIX_PROMPT_HEAD };
+export { CI_EMPTY_CHECKS_GRACE_MS, CI_FIX_PROMPT_HEAD };
 
 export const CI_MERGE_CONFLICT_PROMPT_HEAD = '[merge-conflict]';
 
@@ -300,31 +304,10 @@ export function createCiPoller(
 
   function stillOurs(cand: { buildId: string; todoId: string }, since: number): boolean {
     return (
-      freshReviewRow(cand.todoId, cand.buildId) !== null &&
+      freshReviewRow(deps, cand.todoId, cand.buildId) !== null &&
       !hasActiveStep(deps, cand.buildId) &&
       !rowKnown(cand.buildId, DONE_ROW, since)
     );
-  }
-
-  function failWithMessage(
-    cand: { buildId: string; todoId: string },
-    teamId: string,
-    text: string,
-  ) {
-    deps.db.update(build).set({ errorMessage: text }).where(eq(build.id, cand.buildId)).run();
-    const row = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
-    if (row) deps.hub.publishBuildDoc(teamId, toBuildRecord(row));
-    setTodoPhase(deps, cand.todoId, 'failed');
-    emitRuntimeBuildSpan(deps.db, cand.buildId, 'failed');
-  }
-
-  function writeSystemRow(buildId: string, content: string): void {
-    insertMessageRow(deps, buildId, {
-      id: newRecordId(),
-      role: 'system',
-      content,
-      createdAt: nowMs(),
-    });
   }
 
   function mergeConflictRound(
@@ -343,7 +326,7 @@ export function createCiPoller(
     if (rounds >= CI_MERGE_CONFLICT_ROUNDS_MAX) {
       const text = `PR #${pr.prNumber} 与默认分支「${githubText(defaultBranch)}」冲突，已自动解冲突 ${rounds} 轮仍冲突：不再派解冲突步，由人处理（在 GitHub 上解决冲突，或打回重做）。`;
       if (!fromReview) {
-        failWithMessage(cand, teamId, text);
+        failWithMessage(deps, cand, teamId, text);
         return 'failed';
       }
       hintOnce(cand.buildId, text, roundStart(deps, cand.buildId));
@@ -367,37 +350,14 @@ export function createCiPoller(
       undefined,
       { kind: 'merge-conflict', round: rounds + 1, roundsMax: CI_MERGE_CONFLICT_ROUNDS_MAX },
     );
-    if (reverify) writeSystemRow(cand.buildId, CI_MERGE_CONFLICT_VERIFY_NOTE);
-    if (stopsReview) writeSystemRow(cand.buildId, CI_MERGE_CONFLICT_REVIEW_NOTE);
+    if (reverify) writeSystemRow(deps, cand.buildId, CI_MERGE_CONFLICT_VERIFY_NOTE);
+    if (stopsReview) writeSystemRow(deps, cand.buildId, CI_MERGE_CONFLICT_REVIEW_NOTE);
     return 'appended';
-  }
-
-  function pushNotSeen(buildId: string, headSha: string | null, now: number): boolean {
-    const last = deps.db
-      .select({ sha: step.checkpointCommit, at: step.finishedAt })
-      .from(step)
-      .where(
-        and(
-          eq(step.buildId, buildId),
-          eq(step.status, 'done'),
-          ne(step.kind, 'review'),
-          isNotNull(step.checkpointCommit),
-          isNotNull(step.finishedAt),
-        ),
-      )
-      .orderBy(desc(step.finishedAt))
-      .get();
-    return (
-      last?.sha != null &&
-      last.at != null &&
-      last.sha !== headSha &&
-      now - last.at < CI_EMPTY_CHECKS_GRACE_MS
-    );
   }
 
   function hintOnce(buildId: string, content: string, since: number): void {
     if (rowKnown(buildId, content, since)) return;
-    writeSystemRow(buildId, content);
+    writeSystemRow(deps, buildId, content);
   }
 
   async function ownBranchPull(
@@ -463,43 +423,18 @@ export function createCiPoller(
     return true;
   }
 
-  function freshGrindRow(todoId: string) {
-    const row = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
-    return row !== undefined && row.archivedAt === null && row.phase === 'building' ? row : null;
-  }
-
-  function freshReviewRow(todoId: string, buildId: string) {
-    const row = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
-    return row !== undefined && row.phase === 'review' && row.latestBuildId === buildId
-      ? row
-      : null;
-  }
-
-  function githubTarget(todoRow: { projectId: string; teamId: string }) {
-    const projRow = projectOfTodo(deps.db, todoRow);
-    const ref = githubRepoOfProject(projRow);
-    if (projRow === undefined || ref === null) return null;
-    return {
-      teamId: projRow.teamId,
-      baseBranch: projRow.baseBranch,
-      fullName: `${ref.owner}/${ref.repo}`,
-      owner: ref.owner,
-      repo: ref.repo,
-    };
-  }
-
   async function reconcileOne(
     cand: { buildId: string; todoId: string },
     now: number,
     tally: CiPollTally,
   ): Promise<void> {
-    const todoRow = freshReviewRow(cand.todoId, cand.buildId);
+    const todoRow = freshReviewRow(deps, cand.todoId, cand.buildId);
     const buildRow = deps.db
       .select({ prNumber: build.prNumber, prUrl: build.prUrl })
       .from(build)
       .where(eq(build.id, cand.buildId))
       .get();
-    const target = todoRow === null ? null : githubTarget(todoRow);
+    const target = todoRow === null ? null : githubTarget(deps, todoRow);
     if (
       todoRow === null ||
       buildRow === undefined ||
@@ -565,10 +500,10 @@ export function createCiPoller(
         hasPullFields(pull) &&
         isOwnPull(pull, branch) &&
         pull.baseRef === (target.baseBranch ?? pull.defaultBranch) &&
-        freshReviewRow(cand.todoId, cand.buildId)?.archivedAt === null &&
+        freshReviewRow(deps, cand.todoId, cand.buildId)?.archivedAt === null &&
         (state === 'dirty' || state === 'behind') &&
-        !pushNotSeen(cand.buildId, pull.headSha, now) &&
-        freshReviewRow(cand.todoId, cand.buildId) !== null &&
+        !pushNotSeen(deps, cand.buildId, pull.headSha, now) &&
+        freshReviewRow(deps, cand.todoId, cand.buildId) !== null &&
         !hasActiveStep(deps, cand.buildId)
       ) {
         if (state === 'dirty') {
@@ -596,7 +531,10 @@ export function createCiPoller(
       tally.reviewPending += 1;
       return;
     }
-    if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(deps, cand.buildId)) {
+    if (
+      freshReviewRow(deps, cand.todoId, cand.buildId) === null ||
+      hasActiveStep(deps, cand.buildId)
+    ) {
       forgetClose(key);
       tally.reviewSkipped += 1;
       return;
@@ -624,7 +562,7 @@ export function createCiPoller(
         const own = await ownBranchPull(branch, target, token, recorded, 0, now);
         if (own !== 'skipped') foreignListedAt.set(listKey, now);
         if (
-          freshReviewRow(cand.todoId, cand.buildId) === null ||
+          freshReviewRow(deps, cand.todoId, cand.buildId) === null ||
           hasActiveStep(deps, cand.buildId)
         ) {
           tally.reviewSkipped += 1;
@@ -743,6 +681,7 @@ export function createCiPoller(
         pull.mergedBy === null ? null : `由 ${githubText(pull.mergedBy)} 合并`,
       ].filter((x) => x !== null);
       writeSystemRow(
+        deps,
         cand.buildId,
         `PR #${prNumber} 已在 GitHub 合并${detail.length > 0 ? `（${detail.join('，')}）` : ''}`,
       );
@@ -780,7 +719,10 @@ export function createCiPoller(
     }
     const found = sibling === 'unreadable' ? null : sibling;
     forgetClose(key);
-    if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(deps, cand.buildId)) {
+    if (
+      freshReviewRow(deps, cand.todoId, cand.buildId) === null ||
+      hasActiveStep(deps, cand.buildId)
+    ) {
       tally.reviewSkipped += 1;
       return;
     }
@@ -802,9 +744,9 @@ export function createCiPoller(
       else tally.reviewSkipped += 1;
       return;
     }
-    writeSystemRow(cand.buildId, closedText);
+    writeSystemRow(deps, cand.buildId, closedText);
     stopUnclaimedGateSteps(deps, cand.buildId);
-    failWithMessage(cand, todoRow.teamId, closedText);
+    failWithMessage(deps, cand, todoRow.teamId, closedText);
     tally.closedUnmerged += 1;
   }
 
@@ -813,7 +755,7 @@ export function createCiPoller(
     now: number,
     tally: CiPollTally,
   ): Promise<void> {
-    const todoRow = freshGrindRow(cand.todoId);
+    const todoRow = freshGrindRow(deps, cand.todoId);
     if (todoRow === null) {
       tally.skipped += 1;
       return;
@@ -823,7 +765,7 @@ export function createCiPoller(
       .from(build)
       .where(eq(build.id, cand.buildId))
       .get();
-    const target = githubTarget(todoRow);
+    const target = githubTarget(deps, todoRow);
     if (buildRow === undefined || buildRow.prNumber === null || target === null) {
       tally.skipped += 1;
       return;
@@ -861,7 +803,7 @@ export function createCiPoller(
     }
     grindPullCache.set(key, { etag: pullPage.etag, pull });
     if (pull.state !== 'open') {
-      if (freshGrindRow(cand.todoId) === null || hasActiveStep(deps, cand.buildId)) {
+      if (freshGrindRow(deps, cand.todoId) === null || hasActiveStep(deps, cand.buildId)) {
         tally.skipped += 1;
         return;
       }
@@ -880,12 +822,12 @@ export function createCiPoller(
       tally.unreadable += 1;
       return;
     }
-    if (own && pushNotSeen(cand.buildId, pull.headSha, now)) {
+    if (own && pushNotSeen(deps, cand.buildId, pull.headSha, now)) {
       tally.pending += 1;
       return;
     }
     if (own && pull.mergeableState === 'dirty') {
-      if (freshGrindRow(cand.todoId) === null || hasActiveStep(deps, cand.buildId)) {
+      if (freshGrindRow(deps, cand.todoId) === null || hasActiveStep(deps, cand.buildId)) {
         tally.skipped += 1;
         return;
       }
@@ -967,7 +909,7 @@ export function createCiPoller(
       tally.pending += 1;
       return;
     }
-    if (freshGrindRow(cand.todoId) === null || hasActiveStep(deps, cand.buildId)) {
+    if (freshGrindRow(deps, cand.todoId) === null || hasActiveStep(deps, cand.buildId)) {
       tally.skipped += 1;
       return;
     }
@@ -991,7 +933,7 @@ export function createCiPoller(
         return;
       const rounds = countMarkedRounds(deps.db, cand.buildId, CI_FIX_PROMPT_HEAD);
       if (rounds >= CI_FIX_ROUNDS_MAX) {
-        failWithMessage(cand, todoRow.teamId, deadLoopMessage(rounds));
+        failWithMessage(deps, cand, todoRow.teamId, deadLoopMessage(rounds));
         tally.failed += 1;
         return;
       }
