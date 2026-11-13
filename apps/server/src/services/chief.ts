@@ -1644,6 +1644,7 @@ export function buildChiefSystemPrompt(
           `- 这是项目「${promptProjectName(channelProject.name)}」（id: ${channelProject.id}）的频道，只有这个项目的对话；主频道和其他项目频道的对话不在这里。`,
           '- 本频道新建的任务都放这个项目。项目说明和项目记忆附在每回合的消息后面。',
           '- 用户说的规则或偏好如果对所有项目都适用，存进团队 scope 的记忆，不存进项目 scope。',
+          '- 要看主频道或别的项目频道说过什么，用 channel_messages。',
           '',
         ];
   const sections = [

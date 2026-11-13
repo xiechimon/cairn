@@ -2,6 +2,7 @@ import { threadReportContentSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { chiefMessage, chiefThread, project, routingRule, step } from '../src/db/schema.js';
+import { HttpError } from '../src/lib/errors.js';
 import { newUuidv7, nowMs } from '../src/lib/ids.js';
 import {
   addChiefWatch,
@@ -11,7 +12,7 @@ import {
   sendChiefMessage,
 } from '../src/services/chief.js';
 import { getTodo } from '../src/services/todos.js';
-import { H, registerChiefHarness, toolDeps } from './chief-harness.js';
+import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { postProject, req } from './helpers.js';
 
 registerChiefHarness();
@@ -232,5 +233,62 @@ describe('Coordinator project channels (docs/design/coordinator-project-channels
     expect(archived.archivedAt).not.toBeNull();
     const main = H.s.db.select().from(chiefThread).where(eq(chiefThread.id, H.threadId)).get()!;
     expect(main.archivedAt).toBeNull();
+  });
+
+  test('channel_messages reads and searches another channel and refuses its own', async () => {
+    const channel = await openChannel();
+    const at = nowMs();
+    const seed = (
+      threadId: string,
+      id: string,
+      content: string,
+      offset: number,
+      projectId?: string,
+    ) =>
+      H.s.db
+        .insert(chiefMessage)
+        .values({
+          id,
+          threadId,
+          role: 'user',
+          content,
+          projectId: projectId ?? null,
+          createdAt: at + offset,
+        })
+        .run();
+    seed(H.threadId, 'main-old', 'Export the board as CSV', 1, H.projectId);
+    seed(H.threadId, 'main-new', 'Pause all merges tonight', 2);
+    seed(channel.body.id, 'chan-1', 'Ship the CSV export first', 3);
+    const fromChannel = { threadId: channel.body.id, conversationId: channel.body.id };
+    const list = (await relay('channel_messages', { channel: 'main' }, fromChannel)) as {
+      trust: string;
+      opened: boolean;
+      messages: { id: string }[];
+    };
+    expect(list.trust).toBe('untrusted-history');
+    expect(list.opened).toBe(true);
+    expect(list.messages.slice(0, 2).map((m) => m.id)).toEqual(['main-new', 'main-old']);
+    expect(list.messages.map((m) => m.id)).not.toContain('chan-1');
+    const found = (await relay(
+      'channel_messages',
+      { channel: 'main', query: 'csv' },
+      fromChannel,
+    )) as {
+      hits: { id: string; projectId: string | null }[];
+    };
+    expect(found.hits.map((h) => [h.id, h.projectId])).toEqual([['main-old', H.projectId]]);
+    const back = (await relay('channel_messages', { channel: H.projectId, query: 'csv' })) as {
+      hits: { id: string }[];
+    };
+    expect(back.hits.map((h) => h.id)).toEqual(['chan-1']);
+    expect(await relay('channel_messages', { channel: 'no-such-project' })).toMatchObject({
+      opened: false,
+      messages: [],
+    });
+    const refused = await relay('channel_messages', { channel: H.projectId }, fromChannel).then(
+      () => 0,
+      (err: unknown) => (err instanceof HttpError ? err.status : -1),
+    );
+    expect(refused).toBe(400);
   });
 });
