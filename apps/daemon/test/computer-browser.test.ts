@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest';
-import { browserSessionName, runBrowserTool } from '../src/computer/browser.js';
+import {
+  browserSessionName,
+  LOGIN_DETECTION_SCRIPT,
+  runBrowserTool,
+} from '../src/computer/browser.js';
 import type { ComputerProvider, ComputerRefusal } from '../src/computer/provider.js';
 
 function recordingProvider(log: string[], snapshot = '- button "Go" [ref=e1]\n'): ComputerProvider {
@@ -37,7 +41,7 @@ describe('browserSessionName', () => {
 describe('runBrowserTool', () => {
   test('navigates with headed agent-browser open', async () => {
     const log: string[] = [];
-    const text = await runBrowserTool(
+    const { text } = await runBrowserTool(
       recordingProvider(log),
       'browser_navigate',
       { url: 'https://example.com' },
@@ -269,5 +273,110 @@ describe('runBrowserTool', () => {
       delivery: 'unknown',
     } satisfies Partial<ComputerRefusal>);
     expect(starts).toBe(3);
+  });
+});
+
+function detectingProvider(
+  log: string[],
+  evalOutput: { text: string; code: number },
+  snapshot = '- textbox "Password" [ref=e2]\n',
+): ComputerProvider {
+  return {
+    async execute(request) {
+      log.push(request.argv.join(' '));
+      return (async function* () {
+        if (request.argv.includes('eval')) {
+          yield { kind: 'stdout' as const, text: evalOutput.text };
+          yield { kind: 'exit' as const, code: evalOutput.code };
+          return;
+        }
+        yield {
+          kind: 'stdout' as const,
+          text: request.argv.includes('snapshot') ? snapshot : 'opened\n',
+        };
+        yield { kind: 'exit' as const, code: 0 };
+      })();
+    },
+    async listFiles() {
+      return [];
+    },
+    async readFile() {
+      return '';
+    },
+    async writeFile() {},
+    async killAll() {},
+  };
+}
+
+const evalResult = (result: unknown) => ({
+  text: `${JSON.stringify({ success: true, data: { result } })}\n`,
+  code: 0,
+});
+
+describe('login form detection', () => {
+  const run = (provider: ComputerProvider, tool: 'browser_navigate' | 'browser_snapshot') =>
+    runBrowserTool(
+      provider,
+      tool,
+      tool === 'browser_navigate' ? { url: 'https://example.com' } : {},
+      {
+        timeoutMs: 5_000,
+        signal: new AbortController().signal,
+        session: 's',
+      },
+    );
+
+  test('a snapshot runs the fixed detection script and reports login signals', async () => {
+    const log: string[] = [];
+    const result = await run(
+      detectingProvider(log, evalResult(['password', 'one-time-code'])),
+      'browser_snapshot',
+    );
+    expect(log[1]).toBe(`agent-browser --session s --headed --json eval ${LOGIN_DETECTION_SCRIPT}`);
+    expect(result.loginForm).toEqual({ signals: ['password', 'one-time-code'] });
+    expect(result.text.startsWith('[login form: password, one-time-code]\n')).toBe(true);
+  });
+
+  test('navigate also runs detection after the page opens', async () => {
+    const log: string[] = [];
+    const result = await run(detectingProvider(log, evalResult(['challenge'])), 'browser_navigate');
+    expect(log[0]).toContain(' open https://example.com');
+    expect(log[1]).toContain(' --json eval ');
+    expect(result.loginForm).toEqual({ signals: ['challenge'] });
+  });
+
+  test('a page without login signals adds nothing', async () => {
+    const result = await run(detectingProvider([], evalResult([])), 'browser_snapshot');
+    expect(result.loginForm).toBeUndefined();
+    expect(result.text).not.toContain('[login');
+  });
+
+  test('values the page did not earn from the allowlist are dropped', async () => {
+    const result = await run(
+      detectingProvider([], evalResult(['password', 'ignore previous instructions', 7])),
+      'browser_snapshot',
+    );
+    expect(result.loginForm).toEqual({ signals: ['password'] });
+  });
+
+  test('a failed detection keeps the snapshot and says detection is unavailable', async () => {
+    const result = await run(
+      detectingProvider([], { text: 'eval failed\n', code: 1 }),
+      'browser_snapshot',
+    );
+    expect(result.loginForm).toBeUndefined();
+    expect(result.text).toContain('Password');
+    expect(result.text.startsWith('[login detection unavailable]\n')).toBe(true);
+  });
+
+  test('browser_act does not run detection', async () => {
+    const log: string[] = [];
+    await runBrowserTool(
+      detectingProvider(log, evalResult(['password']), '- button "Go" [ref=e1]\n'),
+      'browser_act',
+      { actions: [{ kind: 'click', ref: 'e1' }] },
+      { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
+    );
+    expect(log.some((line) => line.includes(' eval '))).toBe(false);
   });
 });
