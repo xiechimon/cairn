@@ -32,7 +32,6 @@ import {
   appendPlanLocationNote,
   appendReportLocationNote,
   appendWorkBranchNote,
-  BRAND,
   buildPlanFirstRoundInstruction,
   buildTaskPromptText,
   CHANGES_DIFF_MAX_BYTES,
@@ -63,7 +62,6 @@ import {
   stepTakesSecrets,
   stripAnsiEscapes,
   transcriptPromptRowId,
-  withCoAuthor,
   workspaceHookRowContent,
 } from '@cairn/shared';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
@@ -115,6 +113,7 @@ import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
 import { resolveStepImagesOrRaw } from './step-attachments.js';
+import { commitAndPushStep } from './step-closing-git.js';
 import { assembleStepEnv } from './step-env.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import {
@@ -1743,97 +1742,28 @@ async function runClaimedStep(
     !attachmentVerify
   ) {
     const git = deps.workspace;
-    try {
-      const headBranch = (await git.currentBranch?.(ws.cwd)) ?? null;
-      if (headBranch !== null && headBranch !== ws.branch) {
-        branchDrift = { expected: ws.branch, actual: headBranch };
-        logger.step(`work branch drift: HEAD on ${headBranch}, contract branch ${ws.branch}`);
-        transcript.upsert({
-          id: `branch-drift-${stepId}`,
-          role: 'system',
-          content: `检测到工作分支偏离：收尾时 HEAD 在「${headBranch}」，契约工作分支是「${ws.branch}」。本步产物判定已按步窗口内有新提交的任意分支放宽；交付（提交/推送/PR head）应留在契约分支上。`,
-          createdAt: now(),
-        });
-      }
-      const commitMessage = `${claimed.step.kind}: ${claimed.todo?.title ?? claimed.conversationId}`;
-      const committed = await git.commitAll(
-        ws.cwd,
-        withCoAuthor(commitMessage, tokenRes.coAuthor ?? null),
-        stepIdentity,
-      );
-      if (committed.setupDrift.length > 0) {
-        transcript.upsert({
-          id: `setup-drift-${stepId}`,
-          role: 'system',
-          content: `Workspace setup changed ${committed.setupDrift.join(', ')}; these changes were left out of the commit because the agent did not make them.`,
-          createdAt: now(),
-        });
-      }
-      if (claimed.step.kind === 'merge') {
-        const merged = await git.mergeDefaultBranch(ws.cwd, ws.defaultBranch, creds.git);
-        transcript.upsert({
-          id: `merge-${stepId}`,
-          role: 'system',
-          content: `git merge origin/${ws.defaultBranch} 结果为 "${merged.output || 'OK'}"`,
-          createdAt: now(),
-        });
-      }
-      const pushDenied =
-        claimed.agent?.tools !== undefined && !claimed.agent.tools.includes(AGENT_TOOL_PUSH);
-      const pushWarranted =
-        committed.committed ||
-        claimed.step.kind === 'merge' ||
-        (await git.countAhead(ws.cwd, ws.defaultBranch)) > 0;
-      if (pushWarranted && pushDenied) {
-        transcript.upsert({
-          id: `push-skip-${stepId}`,
-          role: 'system',
-          content: `Agent 未获「${AGENT_TOOL_PUSH}」授权——本轮提交保留在本地工作分支 ${ws.branch}，未推送到远端`,
-          createdAt: now(),
-        });
-        logger.step(`push skipped: agent lacks ${AGENT_TOOL_PUSH} permission`);
-      } else if (pushWarranted) {
-        const pushSource = await pushStep(git, ws);
-        if (pushSource === 'machine') {
-          transcript.upsert({
-            id: `git-credential-${stepId}`,
-            role: 'system',
-            content: gitCredentialRowContent('machine'),
-            createdAt: now(),
-          });
-        }
-        logger.raw(`pushed ${ws.branch}`);
-        try {
-          const leaked = (await git.briefMarkerInRef?.(ws.cwd, ws.branch)) ?? [];
-          if (leaked.length > 0) {
-            logger.step(`brief marker found in the pushed branch: ${leaked.join(', ')}`);
-            transcript.upsert({
-              id: `brief-in-history-${stepId}`,
-              role: 'system',
-              content: `分支 ${ws.branch} 的历史里带着运行简报的标记块（${leaked.join('、')}）——agent 在步内自行提交时 daemon 拦不住。合并前请确认这些文件不该进交付物`,
-              createdAt: now(),
-            });
-          }
-        } catch (err) {
-          logger.step(
-            `brief marker scan failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
-      }
-      headCommit = await git.headCommit(ws.cwd);
-      const headAhead = await git.countAhead(ws.cwd, ws.defaultBranch);
-      if (headAhead === 0 && headAtStart !== null && git.branchesWithNewCommits) {
-        try {
-          const candidates = await git.branchesWithNewCommits(ws.cwd, headAtStart, stepStartMs);
-          artifactBranches = candidates.filter(
-            (b) => b === ws.branch || !b.startsWith(BRAND.branchPrefix),
-          );
-        } catch (err) {
-          logger.step(`branch scan failed: ${err instanceof Error ? err.message : String(err)}`);
-        }
-      }
-      hasChanges = headAhead > 0 || artifactBranches.length > 0;
-    } catch (err) {
+    const workspace = ws;
+    const closing = await commitAndPushStep({
+      git,
+      ws: workspace,
+      claimed,
+      stepId,
+      coAuthor: tokenRes.coAuthor ?? null,
+      identity: stepIdentity,
+      mergeCredential: creds.git,
+      headAtStart,
+      stepStartMs,
+      push: () => pushStep(git, workspace),
+      note: (id, content) => transcript.upsert({ id, role: 'system', content, createdAt: now() }),
+      log: (message) => logger.step(message),
+      logRaw: (message) => logger.raw(message),
+    });
+    headCommit = closing.headCommit;
+    branchDrift = closing.branchDrift;
+    artifactBranches = closing.artifactBranches;
+    if (closing.hasChanges !== null) hasChanges = closing.hasChanges;
+    if (closing.error !== null) {
+      const err = closing.error;
       if (err instanceof GitPushHookError) closingPushHookError = err;
       lastError = err instanceof Error ? err.message : String(err);
     }
