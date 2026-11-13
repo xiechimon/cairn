@@ -164,6 +164,47 @@ export function MachineChip({
   );
 }
 
+function ComputerControlBar({
+  held,
+  busy,
+  compact = false,
+  onTakeOver,
+  onGiveBack,
+}: {
+  compact?: boolean;
+  held: boolean;
+  busy: boolean;
+  onTakeOver: () => void;
+  onGiveBack: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div
+      data-testid="computer-control-bar"
+      data-held={held ? 'true' : 'false'}
+      className={cn(
+        'flex items-center gap-3',
+        compact ? 'flex-none' : 'justify-between px-2.5 py-2',
+      )}
+    >
+      {!compact && (
+        <span className="text-meta text-content-tertiary">
+          {held ? t('你在操作，Coordinator 已暂停') : t('只看，不能点')}
+        </span>
+      )}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={busy}
+        onClick={held ? onGiveBack : onTakeOver}
+      >
+        {held ? t('交还') : t('接管')}
+      </Button>
+    </div>
+  );
+}
+
 function MachineDetail({
   machine,
   coordinator,
@@ -178,38 +219,33 @@ function MachineDetail({
   const { t } = useI18n();
   const online = machine.online === true;
   const [expanded, setExpanded] = useState(false);
-  const [expandAfterLease, setExpandAfterLease] = useState(false);
   const [tab, setTab] = useState<DetailTab>('access');
-  const control = useComputerControl({ teamId, computer, reclaim: true });
-  const { leaseId, busy } = control;
+  const control = useComputerControl({ teamId, computer });
+  const { leaseId } = control;
   const screenLive =
     computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
 
   useEffect(() => {
-    if (!screenLive) {
-      setExpanded(false);
-      setExpandAfterLease(false);
-    }
+    if (!screenLive) setExpanded(false);
   }, [screenLive]);
 
-  useEffect(() => {
-    if (!expandAfterLease || leaseId === null) return;
-    setExpanded(true);
-    setExpandAfterLease(false);
-  }, [expandAfterLease, leaseId]);
-
   const openEnlarged = () => {
-    if (!screenLive || teamId === undefined || computer === null) return;
-    if (leaseId !== null) {
-      setExpanded(true);
-      return;
-    }
-    setExpandAfterLease(true);
-    if (busy) return;
-    void control.acquire().catch(() => {
-      setExpandAfterLease(false);
-    });
+    if (screenLive) setExpanded(true);
   };
+
+  const takeOver = () => {
+    control.setHeld(true);
+    setExpanded(true);
+  };
+
+  const controlBar = screenLive && (
+    <ComputerControlBar
+      held={control.controlHeld}
+      busy={control.busy}
+      onTakeOver={takeOver}
+      onGiveBack={() => control.setHeld(false)}
+    />
+  );
 
   const screen = screenLive && (
     <ListCard outlined className="flex-none">
@@ -224,6 +260,7 @@ function MachineDetail({
           onExpand={openEnlarged}
         />
       )}
+      {controlBar}
     </ListCard>
   );
   const enlarged = expanded && screenLive && computer !== null && teamId !== undefined && (
@@ -242,9 +279,18 @@ function MachineDetail({
             {machine.name}
           </div>
           <p className="mt-0.5 text-meta text-content-tertiary">
-            {leaseId !== null ? t('在大屏里点击和键入') : t('打开桌面控制后再操作')}
+            {leaseId !== null ? t('在大屏里点击和键入') : t('接管后才能点击和键入')}
           </p>
         </div>
+        {screenLive && (
+          <ComputerControlBar
+            compact
+            held={control.controlHeld}
+            busy={control.busy}
+            onTakeOver={() => control.setHeld(true)}
+            onGiveBack={() => control.setHeld(false)}
+          />
+        )}
         <Button
           type="button"
           variant="ghost"

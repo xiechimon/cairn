@@ -153,17 +153,16 @@ export const EN: Record<string, string> = {
   'Coordinator 的电脑': "Coordinator's computer",
   'Coordinator 还没有自己的电脑。第一次需要时会自动开一台。':
     'The Coordinator has no computer of its own yet. One opens the first time it needs one.',
-  '这台机器还没有电脑记录，等桌面控制上线后才能在这里打开。':
-    'This machine has no computer record yet. Desktop control can open here once it comes online.',
   电脑离线: 'Computer offline',
   'Coordinator 在这台': 'Coordinator runs here',
-  桌面控制: 'Desktop control',
   放大屏幕: 'Enlarge screen',
   屏幕已放大: 'Screen is enlarged',
   在大屏里点击和键入: 'Click and type in the enlarged screen',
-  打开桌面控制后再操作: 'Turn on desktop control to click and type',
-  '由你接管这台电脑的桌面，在大屏里点击和键入。打开期间 agent 不能操作桌面上的应用，关掉后恢复。':
-    'You take over this computer’s desktop and click and type in the large view. While it is on, the agent cannot operate desktop apps; turning it off lets it resume.',
+  接管后才能点击和键入: 'Take control to click and type',
+  接管: 'Take control',
+  交还: 'Give back',
+  '只看，不能点': 'Watching only',
+  '你在操作，Coordinator 已暂停': 'You are in control; the Coordinator is paused',
   浏览器: 'Browser',
   '让 agent 打开网页、点击和填表。': 'Lets agents open pages, click and fill forms.',
   '这台机器还不支持浏览器。': 'This machine does not support the browser yet.',
