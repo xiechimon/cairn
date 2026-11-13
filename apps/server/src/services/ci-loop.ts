@@ -10,6 +10,7 @@ import {
   hasPullFields,
   isOwnPull,
 } from '../lib/github.js';
+import type { AutonomousToken } from '../lib/github-token.js';
 import { nowMs } from '../lib/ids.js';
 import { recoverAutonomousMerges } from './autonomous-merge.js';
 import {
@@ -140,6 +141,35 @@ interface PullCacheEntry {
   pull: GithubPull | null;
 }
 
+type ReviewTarget = NonNullable<ReturnType<typeof githubTarget>>;
+
+type ReadPull = GithubPull & {
+  headRef: string;
+  baseRef: string;
+  defaultBranch: string;
+  baseRepoId: number;
+};
+
+interface RecordedPull {
+  number: number;
+  baseRepoId: number;
+  defaultBranch: string;
+  owner: string;
+}
+
+interface ReviewCase {
+  cand: { buildId: string; todoId: string };
+  key: string;
+  prNumber: number;
+  target: ReviewTarget;
+  token: AutonomousToken | null;
+  pull: ReadPull;
+  teamId: string;
+  since: number;
+  now: number;
+  tally: CiPollTally;
+}
+
 export function createCiPoller(
   deps: BuildDeps,
   run: {
@@ -196,6 +226,167 @@ export function createCiPoller(
     });
     if (list === null) return 'unreadable';
     return pickOwnBranchPull(list, branch, recorded, mergedAfter);
+  }
+
+  async function reconcileForeign(review: ReviewCase, recorded: RecordedPull): Promise<void> {
+    const { cand, key, prNumber, target, token, teamId, since, now, tally } = review;
+    const branch = conversationBranch(cand.buildId);
+    const foreignText = `PR #${prNumber} 的 head 不是本任务在 ${target.fullName} 的工作分支「${branch}」，可能是别人 fork 里同名分支开的 PR。对账不据它收尾或打回；任务留在审核关口，由人核对这张 PR。`;
+    const listKey = `${cand.buildId}\u0000${key}`;
+    const listedAt = foreignListedAt.get(listKey);
+    const relistMs = token === null ? CI_FOREIGN_RELIST_ANON_MS : CI_FOREIGN_RELIST_MS;
+    if (listedAt === undefined || now - listedAt >= relistMs) {
+      const own = await ownBranchPull(branch, target, token, recorded, 0, now);
+      if (own !== 'skipped') foreignListedAt.set(listKey, now);
+      if (
+        freshReviewRow(deps, cand.todoId, cand.buildId) === null ||
+        hasActiveStep(deps, cand.buildId)
+      ) {
+        tally.reviewSkipped += 1;
+        return;
+      }
+      if (own !== null && own !== 'unreadable' && own !== 'skipped') {
+        const adopted = adoptPull(
+          deps,
+          rows,
+          cand.buildId,
+          teamId,
+          target.fullName,
+          prNumber,
+          own,
+          '的 head 不是本任务的工作分支',
+          since,
+        );
+        if (adopted) tally.adopted += 1;
+        else tally.reviewSkipped += 1;
+        return;
+      }
+    }
+    rows.hint(cand.buildId, foreignText, since);
+    tally.reviewForeign += 1;
+  }
+
+  async function reconcileMerged(review: ReviewCase): Promise<void> {
+    const { cand, key, prNumber, target, token, pull, since, now, tally } = review;
+    if (pull.baseRef !== (target.baseBranch ?? pull.defaultBranch)) {
+      rows.hint(
+        cand.buildId,
+        `PR #${prNumber} 合并进了分支「${githubText(pull.baseRef)}」，不是默认分支「${githubText(target.baseBranch ?? pull.defaultBranch)}」，改动还没进默认分支。任务留在审核关口，由人决定下一步。`,
+        since,
+      );
+      tally.hinted += 1;
+      return;
+    }
+    const checkpoint = lastPushedCheckpoint(deps, cand.buildId, { mergeSteps: false });
+    if (checkpoint !== null && pull.headSha === null) {
+      pullCache.delete(key);
+      tally.reviewUnreadable += 1;
+      return;
+    }
+    if (checkpoint !== null && pull.headSha !== null && checkpoint !== pull.headSha) {
+      const read = await compares.read(key, target, token, checkpoint, pull.headSha, now);
+      if (read === 'skipped') {
+        tally.reviewSkipped += 1;
+        return;
+      }
+      if (read.status === 'unreadable') {
+        if (read.failures >= 2 && stillOurs(cand, since)) {
+          rows.hint(
+            cand.buildId,
+            mergedCheckpointHint(prNumber, read.status, checkpoint, pull.headSha),
+            since,
+          );
+        }
+        tally.reviewUnreadable += 1;
+        return;
+      }
+      if (!stillOurs(cand, since)) {
+        tally.reviewSkipped += 1;
+        return;
+      }
+      if (read.status !== 'ahead' && read.status !== 'identical') {
+        rows.hint(
+          cand.buildId,
+          mergedCheckpointHint(prNumber, read.status, checkpoint, pull.headSha),
+          since,
+        );
+        tally.hinted += 1;
+        return;
+      }
+    }
+    settleMergedPull(deps, cand, prNumber, pull, now);
+    tally.merged += 1;
+  }
+
+  async function reconcileClosed(
+    review: ReviewCase,
+    recorded: RecordedPull,
+    readAt: number,
+  ): Promise<void> {
+    const { cand, key, prNumber, target, token, pull, teamId, since, now, tally } = review;
+    const branch = conversationBranch(cand.buildId);
+    const closedText = prClosedUnmergedRow(prNumber);
+    const seen = closedSeenAt.get(key);
+    if (seen === undefined || readAt - seen < CI_CLOSED_CONFIRM_MS) {
+      if (seen === undefined) closedSeenAt.set(key, readAt);
+      tally.reviewPending += 1;
+      return;
+    }
+    if (pull.baseRef !== (target.baseBranch ?? pull.defaultBranch)) {
+      rows.hint(
+        cand.buildId,
+        `PR #${prNumber} 的目标分支是「${githubText(pull.baseRef)}」，不是默认分支「${githubText(target.baseBranch ?? pull.defaultBranch)}」；它在 GitHub 关闭且未合并，可能是从工作分支往别的分支开的另一张 PR。对账不据它打回；任务留在审核关口，由人核对这张 PR。`,
+        since,
+      );
+      tally.hinted += 1;
+      return;
+    }
+    const sibling = await ownBranchPull(branch, target, token, recorded, prNumber, now);
+    if (sibling === 'unreadable') {
+      const failures = (listFailures.get(key) ?? 0) + 1;
+      if (failures < 2) {
+        listFailures.set(key, failures);
+        tally.reviewUnreadable += 1;
+        return;
+      }
+    }
+    if (sibling === 'skipped') {
+      tally.reviewSkipped += 1;
+      return;
+    }
+    const found = sibling === 'unreadable' ? null : sibling;
+    forgetClose(key);
+    if (
+      freshReviewRow(deps, cand.todoId, cand.buildId) === null ||
+      hasActiveStep(deps, cand.buildId)
+    ) {
+      tally.reviewSkipped += 1;
+      return;
+    }
+    if (found?.number === prNumber) {
+      tally.reviewPending += 1;
+      return;
+    }
+    if (found !== null) {
+      const adopted = adoptPull(
+        deps,
+        rows,
+        cand.buildId,
+        teamId,
+        target.fullName,
+        prNumber,
+        found,
+        '在 GitHub 关闭且未合并',
+        since,
+      );
+      if (adopted) tally.adopted += 1;
+      else tally.reviewSkipped += 1;
+      return;
+    }
+    writeSystemRow(deps, cand.buildId, closedText);
+    stopUnclaimedGateSteps(deps, cand.buildId);
+    failWithMessage(deps, cand, teamId, closedText);
+    tally.closedUnmerged += 1;
   }
 
   async function reconcileOne(
@@ -317,46 +508,26 @@ export function createCiPoller(
       tally.reviewUnreadable += 1;
       return;
     }
-    const recorded = {
+    const recorded: RecordedPull = {
       number: prNumber,
       baseRepoId: pull.baseRepoId,
       defaultBranch: target.baseBranch ?? pull.defaultBranch,
       owner: pull.baseOwner ?? target.owner,
     };
+    const review: ReviewCase = {
+      cand,
+      key,
+      prNumber,
+      target,
+      token,
+      pull,
+      teamId: todoRow.teamId,
+      since,
+      now,
+      tally,
+    };
     if (foreign) {
-      const foreignText = `PR #${prNumber} 的 head 不是本任务在 ${target.fullName} 的工作分支「${branch}」，可能是别人 fork 里同名分支开的 PR。对账不据它收尾或打回；任务留在审核关口，由人核对这张 PR。`;
-      const listKey = `${cand.buildId}\u0000${key}`;
-      const listedAt = foreignListedAt.get(listKey);
-      const relistMs = token === null ? CI_FOREIGN_RELIST_ANON_MS : CI_FOREIGN_RELIST_MS;
-      if (listedAt === undefined || now - listedAt >= relistMs) {
-        const own = await ownBranchPull(branch, target, token, recorded, 0, now);
-        if (own !== 'skipped') foreignListedAt.set(listKey, now);
-        if (
-          freshReviewRow(deps, cand.todoId, cand.buildId) === null ||
-          hasActiveStep(deps, cand.buildId)
-        ) {
-          tally.reviewSkipped += 1;
-          return;
-        }
-        if (own !== null && own !== 'unreadable' && own !== 'skipped') {
-          const adopted = adoptPull(
-            deps,
-            rows,
-            cand.buildId,
-            todoRow.teamId,
-            target.fullName,
-            prNumber,
-            own,
-            '的 head 不是本任务的工作分支',
-            since,
-          );
-          if (adopted) tally.adopted += 1;
-          else tally.reviewSkipped += 1;
-          return;
-        }
-      }
-      rows.hint(cand.buildId, foreignText, since);
-      tally.reviewForeign += 1;
+      await reconcileForeign(review, recorded);
       return;
     }
     if (rows.has(cand.buildId, pull.merged ? DONE_ROW : closedText, since)) {
@@ -364,117 +535,10 @@ export function createCiPoller(
       return;
     }
     if (pull.merged) {
-      if (pull.baseRef !== (target.baseBranch ?? pull.defaultBranch)) {
-        rows.hint(
-          cand.buildId,
-          `PR #${prNumber} 合并进了分支「${githubText(pull.baseRef)}」，不是默认分支「${githubText(target.baseBranch ?? pull.defaultBranch)}」，改动还没进默认分支。任务留在审核关口，由人决定下一步。`,
-          since,
-        );
-        tally.hinted += 1;
-        return;
-      }
-      const checkpoint = lastPushedCheckpoint(deps, cand.buildId, { mergeSteps: false });
-      if (checkpoint !== null && pull.headSha === null) {
-        pullCache.delete(key);
-        tally.reviewUnreadable += 1;
-        return;
-      }
-      if (checkpoint !== null && pull.headSha !== null && checkpoint !== pull.headSha) {
-        const read = await compares.read(key, target, token, checkpoint, pull.headSha, now);
-        if (read === 'skipped') {
-          tally.reviewSkipped += 1;
-          return;
-        }
-        if (read.status === 'unreadable') {
-          if (read.failures >= 2 && stillOurs(cand, since)) {
-            rows.hint(
-              cand.buildId,
-              mergedCheckpointHint(prNumber, read.status, checkpoint, pull.headSha),
-              since,
-            );
-          }
-          tally.reviewUnreadable += 1;
-          return;
-        }
-        if (!stillOurs(cand, since)) {
-          tally.reviewSkipped += 1;
-          return;
-        }
-        if (read.status !== 'ahead' && read.status !== 'identical') {
-          rows.hint(
-            cand.buildId,
-            mergedCheckpointHint(prNumber, read.status, checkpoint, pull.headSha),
-            since,
-          );
-          tally.hinted += 1;
-          return;
-        }
-      }
-      settleMergedPull(deps, cand, prNumber, pull, now);
-      tally.merged += 1;
+      await reconcileMerged(review);
       return;
     }
-    const seen = closedSeenAt.get(key);
-    if (seen === undefined || readAt - seen < CI_CLOSED_CONFIRM_MS) {
-      if (seen === undefined) closedSeenAt.set(key, readAt);
-      tally.reviewPending += 1;
-      return;
-    }
-    if (pull.baseRef !== (target.baseBranch ?? pull.defaultBranch)) {
-      rows.hint(
-        cand.buildId,
-        `PR #${prNumber} 的目标分支是「${githubText(pull.baseRef)}」，不是默认分支「${githubText(target.baseBranch ?? pull.defaultBranch)}」；它在 GitHub 关闭且未合并，可能是从工作分支往别的分支开的另一张 PR。对账不据它打回；任务留在审核关口，由人核对这张 PR。`,
-        since,
-      );
-      tally.hinted += 1;
-      return;
-    }
-    const sibling = await ownBranchPull(branch, target, token, recorded, prNumber, now);
-    if (sibling === 'unreadable') {
-      const failures = (listFailures.get(key) ?? 0) + 1;
-      if (failures < 2) {
-        listFailures.set(key, failures);
-        tally.reviewUnreadable += 1;
-        return;
-      }
-    }
-    if (sibling === 'skipped') {
-      tally.reviewSkipped += 1;
-      return;
-    }
-    const found = sibling === 'unreadable' ? null : sibling;
-    forgetClose(key);
-    if (
-      freshReviewRow(deps, cand.todoId, cand.buildId) === null ||
-      hasActiveStep(deps, cand.buildId)
-    ) {
-      tally.reviewSkipped += 1;
-      return;
-    }
-    if (found?.number === prNumber) {
-      tally.reviewPending += 1;
-      return;
-    }
-    if (found !== null) {
-      const adopted = adoptPull(
-        deps,
-        rows,
-        cand.buildId,
-        todoRow.teamId,
-        target.fullName,
-        prNumber,
-        found,
-        '在 GitHub 关闭且未合并',
-        since,
-      );
-      if (adopted) tally.adopted += 1;
-      else tally.reviewSkipped += 1;
-      return;
-    }
-    writeSystemRow(deps, cand.buildId, closedText);
-    stopUnclaimedGateSteps(deps, cand.buildId);
-    failWithMessage(deps, cand, todoRow.teamId, closedText);
-    tally.closedUnmerged += 1;
+    await reconcileClosed(review, recorded, readAt);
   }
 
   async function pollOne(
