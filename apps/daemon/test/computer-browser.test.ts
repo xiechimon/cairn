@@ -447,3 +447,60 @@ describe('secret field guard', () => {
     expect(log.at(-1)).toBe('agent-browser --session s --headed fill @e2 value');
   });
 });
+
+describe('login form snapshot values', () => {
+  const filled = [
+    '- heading "Sign in" [level=1, ref=e1]',
+    '- textbox "Phone" [ref=e2]: 13800000000',
+    '- textbox "Code" [required, ref=e3]: 482913',
+    '- textbox "Email": owner@example.com',
+    '- combobox "Country" [expanded=false, ref=e4]: +86',
+    '- searchbox "Find" [ref=e5]: secret query',
+    '- spinbutton "Age" [ref=e6]: 33',
+    '- checkbox "Remember me" [checked=true, ref=e7]',
+    '- link "Forgot: password" [ref=e8]',
+    '- button "Send code" [ref=e9]',
+  ].join('\n');
+
+  const snapshotOn = (signals: string[]) =>
+    runBrowserTool(
+      detectingProvider([], evalResult(signals), `${filled}\n`),
+      'browser_snapshot',
+      {},
+      { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
+    );
+
+  test('every input value on a login page is cleared before the text leaves the daemon', async () => {
+    const { text } = await snapshotOn(['one-time-code']);
+    for (const value of [
+      '13800000000',
+      '482913',
+      'owner@example.com',
+      '+86',
+      'secret query',
+      '33',
+    ]) {
+      expect(text).not.toContain(value);
+    }
+    expect(text).toContain('- textbox "Phone" [ref=e2]: [value cleared]');
+    expect(text).toContain('- textbox "Email": [value cleared]');
+    expect(text).toContain('- checkbox "Remember me" [checked=true, ref=e7]');
+    expect(text).toContain('- link "Forgot: password" [ref=e8]');
+    expect(text).toContain('- button "Send code" [ref=e9]');
+  });
+
+  test('a page without login signals keeps its input values', async () => {
+    const { text } = await snapshotOn([]);
+    expect(text).toContain('- searchbox "Find" [ref=e5]: secret query');
+  });
+
+  test('a failed detection clears values too, because the page might be a login', async () => {
+    const { text } = await runBrowserTool(
+      detectingProvider([], { text: 'eval failed\n', code: 1 }, `${filled}\n`),
+      'browser_snapshot',
+      {},
+      { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
+    );
+    expect(text).not.toContain('13800000000');
+  });
+});
