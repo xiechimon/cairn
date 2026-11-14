@@ -387,7 +387,7 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
           {shown.map((todo) => (
             <li key={todo.id}>
               <ThreadLink todoId={todo.id} className={STATUS_REF_CLS}>
-                {`#${todo.seqNum} ${todo.title}`}
+                {todo.title}
               </ThreadLink>
               {todo.state === 'moved' && (
                 <span className="text-content-tertiary"> · {t('已改到其他 Runner')}</span>
