@@ -105,6 +105,7 @@ export const LANGFUSE_ATTR = {
   sessionId: LangfuseOtelSpanAttributes.TRACE_SESSION_ID,
   environment: LangfuseOtelSpanAttributes.ENVIRONMENT,
   costDetails: LangfuseOtelSpanAttributes.OBSERVATION_COST_DETAILS,
+  completionStartTime: LangfuseOtelSpanAttributes.OBSERVATION_COMPLETION_START_TIME,
   deploymentEnvironment: 'deployment.environment',
 } as const;
 

@@ -1,6 +1,7 @@
 import type {
   ConversationActivityEvent,
   ConversationAgentTodoEvent,
+  ConversationMessagesResponse,
   ConversationStepEvent,
   NotificationRecord,
   TranscriptRow,
@@ -10,7 +11,7 @@ import {
   isChiefConversationId,
   SILENT_NOTIFICATION_TYPES,
 } from '@cairn/shared';
-import { type QueryClient, useQueryClient } from '@tanstack/react-query';
+import { type InfiniteData, type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { readNotifyPref } from '../board/notify-pref.js';
 import { DEMO_MODE } from '../demo/demo-gate.js';
@@ -212,6 +213,10 @@ export function startConversationStream(
 ): () => void {
   const onMessage = handlers.onMessage;
   const onStep = handlers.onStep;
+  const guards = streamGuards(qc);
+  const messagesKey = ['messages', conversationId, 'pages'];
+  let businessRevision = 0;
+  let disposed = false;
   liveTextStore.clear(conversationId);
   liveThinkingStore.clear(conversationId);
   activityStore.clear(conversationId);
@@ -223,9 +228,10 @@ export function startConversationStream(
     agentTodoStore.clear(conversationId);
     void invalidateConverged(qc);
   };
-  return connect(
+  const disconnect = connect(
     resolvePath ?? withTicket(`/api/conversations/${conversationId}/stream`, ticket),
     (ev) => {
+      if (ev.type !== 'ping') businessRevision++;
       switch (ev.type) {
         case 'text_delta':
           liveTextStore.append(conversationId, ev.text as string);
@@ -287,7 +293,12 @@ export function startConversationStream(
           void invalidateConverged(qc, { queryKey: ['changes', conversationId] });
           void invalidateConverged(qc, { queryKey: ['plans'] });
           if (isChiefConversationId(conversationId)) {
-            if (step.status === 'claimed') {
+            if (
+              step.status === 'claimed' ||
+              step.status === 'done' ||
+              step.status === 'failed' ||
+              step.status === 'stopped'
+            ) {
               void invalidateConverged(qc, { queryKey: ['messages', conversationId] });
             }
             void invalidateConverged(qc, { queryKey: ['chiefThreads'] });
@@ -303,6 +314,34 @@ export function startConversationStream(
       }
     },
     resync,
-    streamGuards(qc),
+    {
+      inFlight: () =>
+        guards.inFlight() ||
+        liveTextStore.get(conversationId) !== '' ||
+        liveThinkingStore.get(conversationId) !== '',
+      reconcile: async () => {
+        const revision = businessRevision;
+        const before = qc.getQueryState(messagesKey)?.dataUpdateCount;
+        await guards.reconcile();
+        const read = qc.getQueryState<InfiniteData<ConversationMessagesResponse>>(messagesKey);
+        if (
+          disposed ||
+          !isChiefConversationId(conversationId) ||
+          revision !== businessRevision ||
+          read?.dataUpdateCount === before ||
+          read?.isInvalidated !== false ||
+          read.data?.pages[0]?.activeRun !== null
+        )
+          return;
+        liveTextStore.clear(conversationId);
+        liveThinkingStore.clear(conversationId);
+        activityStore.clear(conversationId);
+        agentTodoStore.clear(conversationId);
+      },
+    },
   );
+  return () => {
+    disposed = true;
+    disconnect();
+  };
 }

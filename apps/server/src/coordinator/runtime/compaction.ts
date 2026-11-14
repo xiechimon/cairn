@@ -13,7 +13,7 @@ import {
   defineExtension,
   hook,
 } from '@earendil-works/pi-durable';
-import { reportCompactionFailure } from './failure-report.js';
+import { recordCompactionSuccess, reportCompactionFailure } from './failure-report.js';
 
 export const BACKGROUND_COMPACTION_AT = 150_000;
 export const COMPACTION_RESERVE_TOKENS = 16_384;
@@ -196,6 +196,7 @@ export function coordinatorCompactionExtension(
     hooks: [
       hook(CompactionTask, {
         beforeCompact: async (compaction, api, context) => {
+          let startAt = Date.now();
           try {
             const cached = await api.memo<string>(SUMMARY_MEMO, context);
             if (cached !== undefined) return { summary: cached };
@@ -204,17 +205,22 @@ export function coordinatorCompactionExtension(
             const lines = transcriptLines(rest);
             const flusher = flush();
             if (flusher !== null && (await api.memo<boolean>(FLUSH_MEMO, context)) === undefined) {
+              const flushStartAt = Date.now();
               try {
                 await flusher.run(flushTranscript(lines), summarize);
+                recordCompactionSuccess(scope, 'memory-flush', flushStartAt);
               } catch (error) {
-                reportCompactionFailure(scope, 'memory-flush', error);
+                reportCompactionFailure(scope, 'memory-flush', error, flushStartAt);
               }
               await api.memo(FLUSH_MEMO, true, context);
             }
+            startAt = Date.now();
             const summary = await foldSummary(previous, summaryBatches(lines), summarize);
-            return { summary: await api.memo(SUMMARY_MEMO, summary, context) };
+            const result = { summary: await api.memo(SUMMARY_MEMO, summary, context) };
+            recordCompactionSuccess(scope, 'summary-fold', startAt);
+            return result;
           } catch (error) {
-            reportCompactionFailure(scope, 'summary-fold', error);
+            reportCompactionFailure(scope, 'summary-fold', error, startAt);
             throw error;
           }
         },
