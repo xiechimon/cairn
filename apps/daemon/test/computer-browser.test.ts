@@ -582,6 +582,40 @@ describe('agent cursor on the live screen', () => {
     );
   });
 
+  test('the cursor rests on its target before the click so the owner can see it', async () => {
+    const log: string[] = [];
+    const at: number[] = [];
+    const provider = cursorProvider(log);
+    const timed: ComputerProvider = {
+      ...provider,
+      async execute(request) {
+        at.push(Date.now());
+        return provider.execute(request);
+      },
+    };
+    await click(timed);
+    const draw = log.findIndex((line) => line.includes('__cairnAgentCursor'));
+    const act = log.findIndex((line) => line.endsWith(' click @e1'));
+    expect((at[act] ?? 0) - (at[draw] ?? 0)).toBeGreaterThanOrEqual(600);
+  });
+
+  test('without a drawn cursor the click does not wait', async () => {
+    const log: string[] = [];
+    const at: number[] = [];
+    const provider = cursorProvider(log, { box: { text: 'not found', code: 1 } });
+    const timed: ComputerProvider = {
+      ...provider,
+      async execute(request) {
+        at.push(Date.now());
+        return provider.execute(request);
+      },
+    };
+    await click(timed);
+    const box = log.findIndex((line) => line.endsWith('--json get box @e1'));
+    const act = log.findIndex((line) => line.endsWith(' click @e1'));
+    expect((at[act] ?? 0) - (at[box] ?? 0)).toBeLessThan(300);
+  });
+
   test('the cursor never blocks the action when the box or the drawing fails', async () => {
     const noBox: string[] = [];
     await click(cursorProvider(noBox, { box: { text: 'not found', code: 1 } }));

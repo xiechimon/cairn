@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { LOGIN_SIGNALS, type LoginForm, type LoginSignal } from '@cairn/shared';
 import { z } from 'zod';
 import type { ComputerProcessEvent, ComputerProvider } from './provider.js';
@@ -5,6 +6,8 @@ import { ComputerRefusal } from './provider.js';
 
 export const AGENT_BROWSER_BINARY = 'agent-browser';
 export const AGENT_BROWSER_SESSION = 'cairn';
+const AGENT_CURSOR_DWELL_MS = 650;
+const AGENT_CURSOR_DWELL_HEADROOM_MS = 2_000;
 
 const navigateParams = z.object({
   url: z.string().min(1).max(8_192),
@@ -304,12 +307,19 @@ export async function runBrowserTool(
       return;
     }
     const { x, y, width, height } = parsed.data;
-    await read([
+    const drawn = await read([
       ...prefix,
       '--json',
       'eval',
       agentCursorScript(x + width / 2, y + height / 2, kind),
     ]);
+    const clock = options.now ?? Date.now;
+    if (
+      drawn.code !== 0 ||
+      remainingTimeoutMs(deadlineAt, clock) < AGENT_CURSOR_DWELL_MS + AGENT_CURSOR_DWELL_HEADROOM_MS
+    )
+      return;
+    await sleep(AGENT_CURSOR_DWELL_MS, undefined, { signal: options.signal }).catch(() => {});
   };
 
   const withDetection = async (text: string): Promise<BrowserToolResult> => {
