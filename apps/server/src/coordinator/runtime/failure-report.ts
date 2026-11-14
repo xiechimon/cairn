@@ -1,5 +1,5 @@
 import { otelErrorMessage } from '@cairn/shared';
-import { emitCompactionFailureSpan } from '../../runtime-otel.js';
+import { emitCompactionSpan } from '../../runtime-otel.js';
 
 export type CompactionStage =
   | 'memory-flush'
@@ -47,10 +47,21 @@ export function resetCompactionFailureCounts(): void {
 
 export const COMPACTION_FAILURE_LOG = 'coordinator compaction step failed';
 
+export function recordCompactionSuccess(
+  scope: FailureScope,
+  stage: CompactionStage,
+  startAt: number,
+): void {
+  const stepId =
+    scope.stepId ?? (scope.threadId === undefined ? null : sink.stepOf(scope.threadId));
+  emitCompactionSpan({ ...scope, stepId: stepId ?? undefined, stage, startAt });
+}
+
 export function reportCompactionFailure(
   scope: FailureScope,
   stage: CompactionStage,
   error: unknown,
+  startAt?: number,
 ): void {
   const count = (counts.get(stage) ?? 0) + 1;
   counts.set(stage, count);
@@ -74,8 +85,9 @@ export function reportCompactionFailure(
       COMPACTION_FAILURE_LOG,
     );
   } finally {
-    emitCompactionFailureSpan({
+    emitCompactionSpan({
       stage,
+      startAt,
       errorClass,
       message: message ?? 'failed',
       count,

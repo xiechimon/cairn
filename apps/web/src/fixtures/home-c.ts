@@ -400,45 +400,21 @@ export const sessionsRef: FixtureSet = {
         id: 'ref-macbook',
         kind: 'local',
         name: '工作室的 MacBook Air',
-        hostname: 'studio-mbp-01',
         online: true,
         runningSteps: 2,
         maxConcurrent: 8,
-        folders: [
-          { path: 'tmp', enabled: true },
-          { path: '~/Code', enabled: true },
-        ],
-        runningHere: [
-          {
-            threadId: 'home-c-working-a',
-            title: 'Push for finished threads',
-            projectId: PROJECT_ID,
-            startedAt: Date.now() - 12 * MINUTE_MS,
-          },
-          {
-            threadId: 'home-c-working-c',
-            title: 'Orb canary round 7',
-            projectId: HOME_C_CRED,
-            startedAt: Date.now() - 41 * MINUTE_MS,
-          },
-        ],
       },
       {
         id: 'ref-huihui',
         kind: 'local',
         name: '办公室 Mac mini',
-        hostname: 'huihui-mbp',
         online: false,
         lastSeenAt: Date.now() - 114 * MINUTE_MS,
         maxConcurrent: 4,
-        folders: [{ path: '~/Projects', enabled: false }],
-        runningHere: [],
       },
     ],
   },
 };
-
-export const sessionsRefDetail: FixtureSet = { ...sessionsRef, machinesOpen: 'ref-macbook' };
 
 const PREVIEW_INK = 'rgb(38 38 38)';
 const PREVIEW_LINE = 'rgb(214 214 214)';

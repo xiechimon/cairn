@@ -140,7 +140,7 @@ export function MachineScreenSurface({
       data-status={status}
       data-interactive={interactive ? 'true' : 'false'}
       data-fill={fill ? 'true' : 'false'}
-      className={`relative overflow-hidden bg-(--surface-1) ${fill ? 'h-full min-h-0 w-full rounded-md ring-1 ring-border/60' : 'aspect-[16/10]'} ${interactive ? 'cursor-none touch-none' : 'cursor-default'}`}
+      className={`relative overflow-hidden ${fill ? 'h-full w-full' : 'aspect-[16/10] bg-(--surface-1)'} ${interactive ? 'cursor-none touch-none' : 'cursor-default'}`}
     >
       <div ref={host} className="h-full w-full overflow-hidden [&_canvas]:outline-none" />
       {status !== 'connected' && (
@@ -161,7 +161,7 @@ export function MachineScreenSurface({
           variant="secondary"
           size="icon-sm"
           data-testid="machine-screen-expand"
-          aria-label={t('放大屏幕')}
+          aria-label={t('全屏查看')}
           className="absolute top-2 right-2 z-10 shadow-sm"
           onClick={(event) => {
             event.stopPropagation();

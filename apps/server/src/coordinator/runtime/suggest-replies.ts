@@ -10,6 +10,7 @@ import type { Models } from '@earendil-works/pi-ai/models';
 import { emitCoordinatorTurnSpans } from '../../runtime-otel.js';
 import type { ModelRef } from './compaction.js';
 import type { Conversation } from './conversations.js';
+import { modelResponseTiming } from './models.js';
 
 const SUGGEST_TIMEOUT_MS = 8_000;
 const SUGGEST_REPLY_MAX_CHARS = 32;
@@ -158,7 +159,7 @@ function recordSuggestionSpan(
   emitCoordinatorTurnSpans({ ...scope, provider: ref.provider, model: ref.modelId }, [
     {
       kind: 'chat',
-      at: reply.timestamp,
+      ...modelResponseTiming(reply),
       provider: reply.provider,
       model: reply.model,
       finishReason: reply.stopReason,

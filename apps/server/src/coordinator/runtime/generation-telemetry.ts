@@ -7,6 +7,7 @@ import {
 import { getSystemMessageText } from '@earendil-works/pi-ai';
 import { defineExtension, GenerationTask, hook } from '@earendil-works/pi-durable';
 import { emitCoordinatorTurnSpans } from '../../runtime-otel.js';
+import { modelResponseTiming } from './models.js';
 
 export function generationTelemetryExtension(
   turnFor: (conversationId: string) => Promise<{ threadId: string; stepId: string }>,
@@ -44,7 +45,7 @@ export function generationTelemetryExtension(
               [
                 {
                   kind: 'chat',
-                  at: message.timestamp,
+                  ...modelResponseTiming(message),
                   provider: message.provider,
                   model: message.model,
                   responseModel: message.responseModel,

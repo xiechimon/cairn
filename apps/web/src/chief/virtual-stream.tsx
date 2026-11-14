@@ -5,8 +5,19 @@ import {
   useVirtualizer,
   type VirtualItem,
 } from '@tanstack/react-virtual';
-import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { FOLLOW_THRESHOLD } from '../components/chat/jump-to-latest.js';
+import {
+  useMessageScroller,
+  useMessageScrollerScrollable,
+} from '../components/ui/message-scroller.js';
 import { safeSessionStorage } from '../safe-storage.js';
 
 const ESTIMATED_ROW_HEIGHT = 120;
@@ -65,6 +76,8 @@ export function VirtualStream({
   const listRef = useRef<HTMLDivElement | null>(null);
   const [restored] = useState(() => readSnapshot(cacheKey));
   const [scrollMargin, setScrollMargin] = useState(restored?.scrollMargin ?? 0);
+  const { end } = useMessageScrollerScrollable();
+  const { scrollToEnd } = useMessageScroller();
   const virtualizer = useVirtualizer({
     count: keys.length,
     getScrollElement: () => viewportRef.current,
@@ -78,6 +91,17 @@ export function VirtualStream({
     ...(restored?.rect != null ? { initialRect: restored.rect } : {}),
     scrollEndThreshold: FOLLOW_THRESHOLD,
     scrollMargin,
+  });
+  const measureNewestRow = useCallback(
+    (node: HTMLDivElement | null) => {
+      virtualizer.measureElement(node);
+      if (node !== null)
+        virtualizer.resizeItem(virtualizer.indexFromElement(node), node.offsetHeight);
+    },
+    [virtualizer],
+  );
+  useLayoutEffect(() => {
+    if (!end) scrollToEnd();
   });
   useLayoutEffect(() => {
     const list = listRef.current;
@@ -115,7 +139,7 @@ export function VirtualStream({
         <div
           key={item.key}
           data-index={item.index}
-          ref={virtualizer.measureElement}
+          ref={item.index === keys.length - 1 ? measureNewestRow : virtualizer.measureElement}
           className="absolute top-0 left-0 flex w-full min-w-0 flex-col"
           style={{ transform: `translateY(${item.start - scrollMargin}px)` }}
         >

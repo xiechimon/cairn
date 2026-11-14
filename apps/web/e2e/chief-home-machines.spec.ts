@@ -1,5 +1,4 @@
 import { expect, type Page, test } from '@playwright/test';
-import { HISTORY, mockLive, PROJECT } from './chief-home-mock';
 
 const HOME = '/app?scenario=home-c';
 const MIDDAY_IN_BEIJING = Date.UTC(2026, 10, 12, 4);
@@ -30,7 +29,7 @@ test('the chip opens a list with one row per computer, the Coordinator machine f
   await expect(chip(page)).toHaveAttribute('aria-pressed', 'true');
 
   await expect(panel(page).getByRole('heading', { name: '你的电脑' })).toBeVisible();
-  const rows = panel(page).getByRole('button', { name: /xmonsMac|omarchy/ });
+  const rows = panel(page).getByTestId('machine-list-row');
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toContainText('xmonsMac');
   await expect(rows.nth(0)).toHaveText('xmonsMac2 个在跑');
@@ -46,37 +45,20 @@ test('the chip opens a list with one row per computer, the Coordinator machine f
   await expect(page).toHaveURL(/\/app\/settings\/machines/);
 });
 
-test('a row opens that computer in the same panel and the back controls return to the list', async ({
+test('each computer is one card in the list with no detail page, tabs or back control', async ({
   page,
 }) => {
   await page.goto(`${HOME}&pane=machines`);
-  await panel(page).getByRole('button', { name: /xmonsMac/ }).click();
-  await expect(page).toHaveURL(/[?&]pane=machines/);
-  await expect(panel(page).getByRole('heading', { name: 'xmonsMac' })).toBeVisible();
-  await expect(panel(page).getByTestId('machine-detail-status')).toHaveText(
-    '在线 · Coordinator 在这台',
-  );
-  await expect(panel(page).getByTestId('machine-hostname')).toHaveCount(0);
-  await expect(panel(page).getByRole('tab', { name: 'Agent 的权限' })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
-  await expect(panel(page).getByRole('heading', { name: '能力' })).toHaveCount(0);
+  await expect(panel(page).getByTestId('machine-card')).toHaveCount(2);
+  await expect(panel(page).getByRole('tab')).toHaveCount(0);
+  await expect(panel(page).getByRole('button', { name: /xmonsMac|omarchy/ })).toHaveCount(0);
+  await expect(panel(page).getByRole('button', { name: '所有电脑' })).toHaveCount(0);
+  await expect(panel(page).getByText('Agent 的权限')).toHaveCount(0);
   await expect(panel(page).getByRole('switch')).toHaveCount(0);
-  await expect(panel(page).getByTestId('machine-folders-empty')).toBeVisible();
-  await expect(panel(page).getByText('已安装')).toHaveCount(0);
-  await expect(panel(page).getByText('未安装')).toHaveCount(0);
-  await expect(panel(page).getByRole('heading', { name: '你的电脑' })).toHaveCount(0);
-
-  await panel(page).getByRole('button', { name: '所有电脑' }).first().click();
-  await expect(panel(page).getByRole('heading', { name: '你的电脑' })).toBeVisible();
-
-  await panel(page).getByRole('button', { name: /omarchy/ }).click();
-  await expect(panel(page).getByRole('heading', { name: 'omarchy' })).toBeVisible();
-  await expect(panel(page)).toContainText('离线');
-  await expect(panel(page).getByTestId('machine-screen-hint')).toHaveCount(0);
-  await panel(page).getByRole('button', { name: '所有电脑' }).first().click();
-  await expect(panel(page).getByRole('heading', { name: '你的电脑' })).toBeVisible();
+  const offline = panel(page).getByTestId('machine-card').filter({ hasText: 'omarchy' });
+  await expect(offline).toContainText('离线');
+  await expect(offline.getByTestId('machine-screen')).toHaveCount(0);
+  await expect(offline.getByTestId('machine-screen-hint')).toHaveCount(0);
 });
 
 test('the chip badge is green when every computer is online and the sidebar has no computers link', async ({
@@ -162,17 +144,10 @@ test('computers share one group, each glyph carries its status dot, and the add 
   );
 });
 
-test('a computer page puts the status under the header and links its settings from Edit', async ({
-  page,
-}) => {
+test('Edit on a computer card opens that computer in settings', async ({ page }) => {
   await page.goto('/app?scenario=home-c-machines&pane=machines');
-  await panel(page).getByRole('button', { name: /Office Mac mini/ }).click();
-  const status = panel(page).getByTestId('machine-detail-status');
-  await expect(status).toHaveText(/^离线 · 12\d 分钟前检查过$/);
-  await expect(status.getByTestId('machine-status-dot')).toHaveAttribute('data-online', 'false');
-  await expect(panel(page).locator('[data-panel-head]')).not.toContainText('离线');
-  await expect(panel(page).getByRole('switch')).toHaveCount(0);
-  await panel(page).getByRole('link', { name: '编辑' }).click();
+  const card = panel(page).getByTestId('machine-card').filter({ hasText: 'Office Mac mini' });
+  await card.getByRole('link', { name: '编辑 Office Mac mini' }).click();
   await expect(page).toHaveURL(/\/app\/settings\/machines\?machine=home-c-office/);
 });
 
@@ -200,82 +175,4 @@ test('the reference list says what runs on an online computer and how long an of
   await expect(rows.nth(0)).toHaveText('工作室的 MacBook Air2 个在跑');
   await expect(rows.nth(1)).toHaveText(/^办公室 Mac mini离线 · \d+ (分钟|小时)前$/);
   await expect(panel(page).getByRole('button', { name: /云|cloud/i })).toHaveCount(0);
-});
-
-test('the reference detail names the host, lists folders under access, and work here opens running threads', async ({
-  page,
-}) => {
-  await page.goto('/app?scenario=sessions-ref-detail&pane=machines');
-  await expect(panel(page).getByRole('heading', { name: '工作室的 MacBook Air' })).toBeVisible();
-  await expect(panel(page).getByTestId('machine-hostname')).toHaveText('它自称 studio-mbp-01');
-  await expect(panel(page).getByTestId('machine-detail-status')).toHaveText('在线 · Coordinator 在这台');
-  const folders = panel(page).getByTestId('machine-folder');
-  await expect(folders).toHaveText(['tmp已开放', '~/Code已开放']);
-  await expect(folders.first().locator('.font-mono')).toHaveText('tmp');
-  await expect(panel(page).getByRole('switch')).toHaveCount(0);
-
-  await panel(page).getByRole('tab', { name: '在这台工作' }).click();
-  await expect(panel(page).getByTestId('machine-folder')).toHaveCount(0);
-  const running = panel(page).getByTestId('machine-running-row');
-  await expect(running).toHaveCount(2);
-  await expect(running.nth(0)).toContainText('Push for finished threads');
-  await expect(running.nth(0)).toContainText('cairn · 12 分钟前开始');
-  await running.nth(0).click();
-  await expect(page).toHaveURL(/[?&]thread=home-c-working-a/);
-});
-
-test('an offline reference computer says nothing runs there and shows its folders as off', async ({
-  page,
-}) => {
-  await page.goto(REF);
-  await panel(page).getByRole('button', { name: /办公室 Mac mini/ }).click();
-  await expect(panel(page).getByTestId('machine-detail-status')).toHaveText(/^离线 · 11[45] 分钟前检查过$/);
-  await expect(panel(page).getByTestId('machine-folder')).toHaveText(['~/Projects未开放']);
-  await panel(page).getByRole('tab', { name: '在这台工作' }).click();
-  await expect(panel(page).getByTestId('machine-running-empty')).toHaveText(
-    '这台电脑上现在没有在跑的任务。',
-  );
-});
-
-test('a live computer without the running list falls back to its running count on work here', async ({
-  page,
-}) => {
-  await page.goto(`${HOME}&pane=machines`);
-  await panel(page).getByRole('button', { name: /xmonsMac/ }).click();
-  await panel(page).getByRole('tab', { name: '在这台工作' }).click();
-  await expect(panel(page).getByTestId('machine-running-empty')).toHaveText('这台电脑上有 2 个任务在跑。');
-  await expect(panel(page).getByTestId('machine-running-row')).toHaveCount(0);
-  await panel(page).getByRole('tab', { name: 'Agent 的权限' }).click();
-  await expect(panel(page).getByText('Agent 在这台电脑上能用的文件夹')).toBeVisible();
-  await expect(panel(page).getByTestId('machine-folders-empty')).toHaveText('还没有开放任何文件夹');
-});
-
-test('a live computer lists the threads the server reports running on it', async ({ page }) => {
-  const startedAt = Date.now() - 20 * 60_000;
-  await mockLive(page, {
-    threads: [],
-    messages: HISTORY,
-    machines: [
-      {
-        id: 'm1',
-        name: 'omarchy',
-        online: true,
-        kind: 'remote',
-        enabledRuntimes: ['pi'],
-        runningSteps: 2,
-        running: [
-          { threadId: 'todo-1', title: 'Orb canary round 7', projectId: PROJECT.id, startedAt },
-          { threadId: 'todo-2', title: 'Serif greeting fix', projectId: PROJECT.id, startedAt },
-        ],
-      },
-    ],
-  });
-  await page.goto('/app?pane=machines');
-  await panel(page).getByRole('button', { name: /omarchy/ }).click();
-  await panel(page).getByRole('tab', { name: '在这台工作' }).click();
-  const running = panel(page).getByTestId('machine-running-row');
-  await expect(running).toHaveCount(2);
-  await expect(running.first()).toContainText('Orb canary round 7');
-  await expect(running.first()).toContainText('cairn');
-  await expect(panel(page).getByTestId('machine-running-empty')).toHaveCount(0);
 });
