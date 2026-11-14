@@ -55,6 +55,7 @@ import {
   stripAnsiEscapes,
   stripSkillRouteSection,
   systemRowOf,
+  TAKEOVER_HANDED_BACK,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   threadMessageContentSchema,
   threadReportContentSchema,
@@ -1383,6 +1384,23 @@ function chiefUserText(raw: string): string {
   return stripSkillRouteSection(raw.replace(WAKE_MARKER_PREFIX_RE, '')).trim();
 }
 
+function takeoverItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {
+  const reason = (call.arguments as { reason?: unknown } | null)?.reason;
+  const finished = call.result !== undefined || call.endedAt !== undefined || call.isError === true;
+  const handedBack =
+    finished &&
+    call.isError !== true &&
+    (toolResultText(call.result) ?? '').includes(TAKEOVER_HANDED_BACK);
+  return {
+    kind: 'takeover',
+    id,
+    reason: typeof reason === 'string' ? reason : '',
+    startedAt: call.startedAt ?? null,
+    endedAt: call.endedAt ?? null,
+    outcome: !finished ? 'waiting' : handedBack ? 'handed-back' : 'not-done',
+  };
+}
+
 function handoffTodoOf(call: ToolCallRecord): string | null {
   if (call.name !== 'message_todo' || call.result === undefined || call.isError === true)
     return null;
@@ -1564,6 +1582,10 @@ function collectChiefStream(
     }
     const call = toolCallOfContent(m.content);
     if (call?.name === SUGGEST_REPLIES_TOOL_NAME) continue;
+    if (call?.name === 'request_takeover') {
+      items.push(takeoverItemOf(call, m.id));
+      continue;
+    }
     if (call !== null) {
       const created = createdTodoOf(call);
       if (created !== null)

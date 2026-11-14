@@ -43,6 +43,7 @@ import {
   ReplySourceHighlightContext,
 } from './reply-source-highlight.js';
 import { SentAttachments } from './sent-attachments.js';
+import { TakeoverCard } from './takeover-card.js';
 import type { ThreadActivity } from './thread-activity.js';
 import { messageStampLabel } from './time-dividers.js';
 
@@ -268,6 +269,7 @@ export function chiefStreamRowKey(
     case 'thinking':
     case 'question':
     case 'handoff':
+    case 'takeover':
     case 'task-card':
     case 'digest':
     case 'runner-offline':
@@ -455,6 +457,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
+  if (item.kind === 'takeover') return <TakeoverCard item={item} />;
   if (item.kind === 'task-card')
     return <TaskStartedRow todoId={item.todoId} seq={item.seq} title={item.title} />;
   if (item.kind === 'digest')

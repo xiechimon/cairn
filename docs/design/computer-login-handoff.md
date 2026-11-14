@@ -7,13 +7,19 @@ Owner decisions (2026-11-13):
 - The job board logs in inside the orb browser on the Coordinator computer, scoped to login. This overrides open decision 1 of `docs/design/job-applications.md` for login only.
 - Handoff timeout is 15 minutes; then the attempt stops, with no retry.
 - The push opens the machine page with the screen enlarged and view-only; the owner presses Take control.
+
+Owner decision (2026-11-14, superseding the push line above; research: `docs/research/takeover-card-2026-11-14.md`):
+
+- `request_takeover` shows a card in the Coordinator conversation: `需要你登录`, the reason, the time left, `接管` and `停止这一步`. The card follows the call: waiting, owner in control (`交还`, `打开画面`), handed back, not finished.
+- The push opens the conversation at that card and is sent through `sendMustReachAlert`, so every takeover leaves a `push_delivery` row. It never takes control by itself; pressing `接管` on the card takes control and opens the screen ready to use.
+- When this device has no push subscription, the card says so and offers to turn push on.
 - The owner wants the agent to fill his password and hand over only for human verification. That ships as a second milestone (M2b below), after this handoff, because it needs its own security-surface change.
 - M2b fills a saved login without a per-fill confirmation; the login is bound to one origin and the activity row says "filled from saved login".
 - Session persistence for M4: `--restore` with an encryption key the daemon passes only to browser commands, and the agent's shell refuses `.agent-browser/` paths. The residual risk below is accepted until the browser runs as a separate user.
 
 ## Goal
 
-When a page in the Coordinator browser needs a login or a human check, the agent stops driving it. The owner gets a push that opens the live screen. While the owner holds control, the agent issues no browser action and no screen capture. When the owner gives control back, the agent continues from a fresh snapshot. Passwords, one-time codes and cookies never reach the model.
+When a page in the Coordinator browser needs a login or a human check, the agent stops driving it. The owner gets a card in the conversation and a push that opens it. While the owner holds control, the agent issues no browser action and no screen capture. When the owner gives control back, the agent continues from a fresh snapshot. Passwords, one-time codes and cookies never reach the model.
 
 ## Detection (daemon, `apps/daemon/src/computer/browser.ts`)
 
