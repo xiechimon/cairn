@@ -97,6 +97,7 @@ export function openDbWithHandle(
   const sqlite = new Database(dbPath);
   sqlite.pragma('busy_timeout = 10000');
   sqlite.pragma('journal_mode = WAL');
+  sqlite.pragma('cache_size = -131072');
   sqlite.pragma('foreign_keys = ON');
   exportLegacyTables(sqlite, opts.legacyExportDir);
   const db = drizzle(sqlite, { schema });
