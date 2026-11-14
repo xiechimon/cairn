@@ -49,7 +49,7 @@ for (const name of [
       assert.equal(result.cloneStartStop, 'ok');
       assert.equal(result.egress, 'ok');
       assert.equal(result.firewall, 'ok');
-      assert.equal(result.memoryMax, 4294967296);
+      assert.equal(result.memoryUnlimited, true);
       assert.equal(result.homeVisible, false);
       assert.equal(result.negativeControl, 'denied');
     }
@@ -60,7 +60,8 @@ test('ambiguous or unsafe outputs never pass', () => {
   const input = JSON.parse(readFileSync(new URL('./fixtures/pass.json', import.meta.url)));
   for (const change of [
     { images: 'cairn-orb-base-old directory no' },
-    { memory: 'MemoryMax=infinity' },
+    { memory: 'MemoryMax=4294967296\n' },
+    { memory: '' },
     { homeExit: 1 },
     { homeExit: null },
     { negativeExit: 0 },
@@ -121,7 +122,7 @@ function fakeHost(
     if (failAt && args.includes(failAt)) return { status: 1, stderr: 'fixture failure' };
     let stdout = '';
     if (args.includes('list-images')) stdout = 'cairn-orb-base directory no\n';
-    if (args.includes('show')) stdout = 'MemoryMax=4294967296\n';
+    if (args.includes('show')) stdout = 'MemoryMax=infinity\n';
     if (args.includes('is-active'))
       stdout = args.some((arg) => arg.startsWith('systemd-nspawn@')) ? 'inactive\n' : 'active\n';
     if (args.includes('start')) {
