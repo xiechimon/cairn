@@ -204,6 +204,7 @@ test('a task row lists its own PRs under it: open PRs with their state, merged o
   await expect(open).toHaveText('#42 — Checks failed');
   await expect(open).toHaveAttribute('data-tone', 'failed');
   await expect(open).toHaveAttribute('href', /pull\/42$/);
+  await expect(open).toHaveRole('link');
   await expect(line.locator('[data-slot="task-pr-merged"]')).toHaveText('3 merged');
   await expect(line).not.toContainText('#99');
   await expect(page.getByTestId('work-prs')).toHaveCount(0);
