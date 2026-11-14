@@ -114,7 +114,7 @@ struct SignInView: View {
 }
 
 private struct LabeledField<Content: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     @ViewBuilder var content: Content
 
     var body: some View {

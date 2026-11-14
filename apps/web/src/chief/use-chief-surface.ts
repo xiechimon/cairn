@@ -22,6 +22,7 @@ import {
   useMachines,
   useNotifications,
   useProjects,
+  useWarmConversationMessages,
 } from '../api/hooks.js';
 import { liveTextStore } from '../api/live-text.js';
 import { liveThinkingStore } from '../api/live-thinking.js';
@@ -193,6 +194,10 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   );
   const queryClient = useQueryClient();
   const activeThreadId = live ? (activeThread?.id ?? null) : null;
+  useWarmConversationMessages(
+    live ? (globalCoordinatorThread(liveThreads)?.id ?? null) : null,
+    channel !== null,
+  );
   useEffect(() => {
     if (!newestPageOnly) return;
     const trimmed =

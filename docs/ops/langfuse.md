@@ -320,6 +320,42 @@ Every failure leaves a `job_executions` row in `ERROR` and no score, which is ho
 
 The evaluator can write only to its 16 MiB `/tmp`. The environment it can read holds the emulator's own values and nothing from this stack.
 
+### The Coordinator routing evaluator
+
+`integration/eval/coordinator-routing/evaluator/routing.ts` is the code evaluator the routing experiments are scored by. It is published to Langfuse unchanged, and only the owner edits the published copy. It compares the runner's decision record (`output`) with the dataset item's `expectedOutput` and returns one boolean score per applicable check:
+
+| Score | Scored when the item expects | `true` when |
+|---|---|---|
+| `routing.decision_ok` | any decision | the observed decision equals the expected `route`, `ask` or `answer` |
+| `routing.projects_ok` | `route` | the observed part projects equal the expected ones as a multiset, in any order |
+| `routing.split_ok` | `route` | the observed part count equals the expected count |
+| `routing.ask_ok` | `ask` | the Coordinator asked, and the asked candidates equal the expected set |
+| `routing.blocked_by_ok` | `route` with a non-empty `blockedBy` | the observed dependency edges equal the expected `[from, to]` part-index pairs |
+
+An item that expects `answer` is scored on `routing.decision_ok` alone, and an item that expects no dependency is never scored on `routing.blocked_by_ok`, so dependency scoring starts when the first dependency case is curated. A missing or malformed expected output or runner output throws, which leaves an `ERROR` execution and no scores; the gate treats that as unscored, not as a pass.
+
+Publish it and attach it to the dataset's experiment runs with an owner key in your shell, then check that the scores appear after the next experiment:
+
+```sh
+curl -sS -u "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" -H 'content-type: application/json' \
+  -d "$(jq -n --rawfile source integration/eval/coordinator-routing/evaluator/routing.ts \
+    '{name: "routing", type: "code", sourceCodeLanguage: "TYPESCRIPT", sourceCode: $source}')" \
+  "$LANGFUSE_HOST/api/public/v2/evaluators"
+
+DATASET_ID=$(curl -sS -u "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" "$LANGFUSE_HOST/api/public/datasets/coordinator-routing" | jq -r .id)
+curl -sS -u "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" -H 'content-type: application/json' \
+  -d "$(jq -n --arg dataset "$DATASET_ID" --arg evaluator "$EVALUATOR_ID" '{
+    name: "coordinator-routing", enabled: true, sampling: 1,
+    filter: [
+      {type: "boolean", column: "isExperimentItemRootSpan", operator: "=", value: true},
+      {type: "stringOptions", column: "datasetId", operator: "any of", value: [$dataset]}
+    ],
+    evaluatorAssignments: [{evaluatorId: $evaluator}]}')" \
+  "$LANGFUSE_HOST/api/public/v2/evaluation-rules"
+```
+
+`EVALUATOR_ID` is the `id` the first call returns. Saving a new version of the evaluator takes effect immediately for every rule that uses it, so a comparison between two runs is only valid when both were scored by the same version. Read the scores back with `GET /api/public/v3/scores`; on this v4 deployment `/api/public/v2/scores` is unavailable.
+
 ## Binding to this machine or the LAN
 
 By default `BIND_ADDRESS=127.0.0.1`, so only processes on omarchy itself can reach the UI and OTLP.
