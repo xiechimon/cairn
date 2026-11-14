@@ -26,9 +26,15 @@ Labels: **Read** means retrieved first-party material or local source; **Inferre
 - **Read:** `apps/web/src/routes/remote-access-page.tsx` cannot generate a useful phone QR from a loopback-only installation; it needs a ready public route and recoverable connector states.
 - **Proposed:** add a dedicated public-entry listener and connector supervisor, extend the existing route vocabulary and Remote access page, and isolate the allocation Worker under `apps/connect`. Model/provider runtime code does not change.
 
+## Review-driven protocol constraints
+
+- **Read:** `lib/token-auth.ts` exempts machine routes other than enrollment confirmation, MCP, OAuth callback, bootstrap/access and non-API paths. Git has independent Basic auth in `routes-git-hosting.ts`. These are distinct authentication contracts, not evidence of an authentication bypass. **Proposed:** the [design exposure matrix](../design/cairn-connect.md#public-route-and-authentication-contract) positively lists methods/templates, denies those protocols and owner credentials on public entry, and requires raw-path/Host/upgrade checks before dispatch.
+- **Read:** `apps/web/src/api/provider.tsx`, `api/hooks.ts` and `api/sse.ts` consume personal-instance identity, task/chat and SSE routes. **Proposed:** begin with an explicit first-result subset; hide unsupported remote controls and validate the real SPA flow rather than opening all APIs for compatibility.
+- **Proposed:** local durable intent generations fence allocation/start/probe completions. Disable retains late allocations dormant; remove keeps an allocation-scoped cleanup journal. A provider mutation possibly issued before a lost D1 checkpoint cannot be swept as an unused reservation; uncertain resources retain quota until reconciliation proves retirement. The [failure contract](../design/cairn-connect.md#state-ownership-transitions-and-failure-contract) records paused-callback and provider/checkpoint fault acceptance cases. These tests have not run because implementation awaits protocol clearance.
+
 ## Deliberate omissions and unverified claims
 
-**Proposed:** start with a capped invitation pilot rather than anonymous resource creation or a new identity-provider account. An allocation invitation admits one host; it never signs a browser in. Open enrollment and account-based device recovery are product decisions, not prerequisites for QR pairing.
+**Approved scope:** start with an invitation-only pilot of at most 100 hosts, personal use only, rather than anonymous resource creation or a new identity-provider account. An allocation invitation admits one host; it never signs a browser in. Open enrollment, team features and account-based discovery are deferred. Management-capability recovery and supported-platform/executor onboarding need a separate protocol delta before those implementations.
 
 **Inferred:** Cloudflare is a confidentiality and integrity dependency. TLS ends at its edge; tunnel traffic is not end-to-end encrypted against Cloudflare. A compromised broker with DNS/tunnel authority could also redirect the application's origin. Local session ownership does not make that compromise harmless.
 
