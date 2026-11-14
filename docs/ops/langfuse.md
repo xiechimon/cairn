@@ -356,6 +356,33 @@ curl -sS -u "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" -H 'content-type: applic
 
 `EVALUATOR_ID` is the `id` the first call returns. Saving a new version of the evaluator takes effect immediately for every rule that uses it, so a comparison between two runs is only valid when both were scored by the same version. Read the scores back with `GET /api/public/v3/scores`; on this v4 deployment `/api/public/v2/scores` is unavailable.
 
+### Adding curated cases to the routing dataset
+
+List what can become a case, then write the answers you decide on. Work from a copy of the production database, never the live file:
+
+```sh
+sqlite3 -readonly ~/.cairn/server/server.db ".backup /tmp/cand.db"
+cd integration
+pnpm exec tsx eval/coordinator-routing/harvest.mts /tmp/cand.db "$TEAM_ID"
+```
+
+Each line says whether a sealed snapshot is eligible and, when it is not, why. Keep the answers in a file outside the repository, one entry per chosen turn, with project names exactly as the snapshot shows them:
+
+```json
+[{"turnId": "<turn id>", "expectedOutput": {"decision": "route", "parts": [{"project": "<name>"}], "askCandidates": [], "blockedBy": []}}]
+```
+
+`upload.mts` checks every entry against its frozen snapshot and the expected-output schema, and prints a dry run by default. Nothing is sent unless `--apply` is given, and one invalid entry stops the whole file. At most 60 items fit one file, the same limit the runner enforces.
+
+```sh
+pnpm exec tsx eval/coordinator-routing/upload.mts /tmp/cand.db "$TEAM_ID" ~/routing-cases.json
+LANGFUSE_BASE_URL=... LANGFUSE_PUBLIC_KEY=... LANGFUSE_SECRET_KEY=... \
+  pnpm exec tsx eval/coordinator-routing/upload.mts /tmp/cand.db "$TEAM_ID" ~/routing-cases.json --apply
+rm /tmp/cand.db
+```
+
+Items are keyed `cairn-routing-<turn id>`, so uploading the same file again updates them instead of adding copies. The dataset is `routing` unless `--dataset <name>` says otherwise, and it must already exist.
+
 ## Binding to this machine or the LAN
 
 By default `BIND_ADDRESS=127.0.0.1`, so only processes on omarchy itself can reach the UI and OTLP.
