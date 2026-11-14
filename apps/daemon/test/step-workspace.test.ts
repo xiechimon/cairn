@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   type ClaimedStep,
   LocalRepoUnreachableError,
@@ -5,7 +7,13 @@ import {
   type WorktreeOps,
 } from '@cairn/shared';
 import { describe, expect, it } from 'vitest';
-import { prepareStepWorkspace, prepareVerifyClone, type StepRepo } from '../src/step-workspace.js';
+import {
+  prepareStepWorkspace,
+  prepareVerifyClone,
+  type StepRepo,
+  setUpStepWorkspace,
+} from '../src/step-workspace.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const claimed = {
   conversationId: 'conv_1',
@@ -101,5 +109,54 @@ describe('prepareVerifyClone', () => {
   it('rejects a missing start head', async () => {
     const result = await prepareVerifyClone({ ...base, headAtStart: null });
     expect(result).toEqual({ error: 'Verify delivery commit unavailable' });
+  });
+});
+
+describe('setUpStepWorkspace', () => {
+  const setup = (overrides: Partial<Parameters<typeof setUpStepWorkspace>[0]>) =>
+    setUpStepWorkspace({
+      workspace: undefined,
+      claimed,
+      repo: null,
+      workspacesRoot: testTempDir('step-workspace-setup'),
+      credentials: null,
+      readonly: false,
+      refresh: undefined,
+      machineName: 'box',
+      attachmentVerify: false,
+      evidenceDirectory: undefined,
+      expectedHeadSha: undefined,
+      cleanups: [],
+      ...overrides,
+    });
+
+  it('creates a conversation directory when the step has no repository', async () => {
+    const root = testTempDir('step-workspace-setup');
+    const result = await setup({ workspacesRoot: root });
+    expect(result).toMatchObject({ ws: null, cwd: join(root, 'conv_1'), headAtStart: null });
+    expect(existsSync(join(root, 'conv_1'))).toBe(true);
+  });
+
+  it('refuses a repository step without workspace ops', async () => {
+    expect(await setup({ repo })).toEqual({
+      error: 'workspace ops unavailable for repo-bound step',
+    });
+  });
+
+  it('records the head of a writable workspace', async () => {
+    const ws = { cwd: '/tmp/ws/conv_1' } as PreparedWorkspace;
+    const result = await setup({ repo, workspace: ops(async () => ws) });
+    expect(result).toMatchObject({ ws, cwd: ws.cwd, headAtStart: 'a'.repeat(40) });
+  });
+
+  it('skips the head of a readonly workspace', async () => {
+    const ws = { cwd: '/tmp/ws/conv_1', readonly: true } as PreparedWorkspace;
+    const result = await setup({ repo, readonly: true, workspace: ops(async () => ws) });
+    expect(result).toMatchObject({ ws, headAtStart: null });
+  });
+
+  it('passes a verify clone failure through', async () => {
+    const result = await setup({ attachmentVerify: true, evidenceDirectory: 'bad' });
+    expect(result).toEqual({ error: 'Verify evidence directory unavailable or invalid' });
   });
 });

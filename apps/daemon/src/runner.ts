@@ -8,7 +8,6 @@ import type {
   CommitIdentity,
   DeliveredImage,
   MachineHeartbeatBody,
-  PreparedWorkspace,
   ProviderConfig,
   SessionOpts,
   SkillInjectionFacts,
@@ -75,11 +74,7 @@ import { sessionInjectedSkills, stepMcpEndpoints } from './step-skill-tool.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { seedStepTranscript } from './step-transcript-seed.js';
 import { StepTranscriptStream } from './step-transcript-stream.js';
-import {
-  prepareStepWorkspace,
-  prepareVerifyClone,
-  resetFreshSessionWorkspace,
-} from './step-workspace.js';
+import { resetFreshSessionWorkspace, setUpStepWorkspace } from './step-workspace.js';
 import {
   resolveStreamLimits,
   STREAM_DURATION_CAP_DEFAULT_MS,
@@ -380,63 +375,29 @@ async function runClaimedStep(
   }
 
   logger.workspace('准备工作区...');
-  let ws: PreparedWorkspace | null = null;
   const checkout = isReview && reviewGate === 'review';
   const repo = isChief || (isReview && !checkout) ? null : (claimed.project?.repo ?? null);
-  if (repo !== null) {
-    if (!deps.workspace) {
-      clearCredentials(creds);
-      await failStep(deps, heartbeat, stepId, 'workspace ops unavailable for repo-bound step');
-      return;
-    }
-    const prepared = await prepareStepWorkspace({
-      workspace: deps.workspace,
-      claimed,
-      repo,
-      workspacesRoot: deps.workspacesDir,
-      credentials: creds.git,
-      readonly: readonlyWorkspace,
-      refresh: refreshGit,
-      machineName: deps.machineName ?? hostname(),
-    });
-    if ('error' in prepared) {
-      clearCredentials(creds);
-      await failStep(deps, heartbeat, stepId, prepared.error);
-      return;
-    }
-    ws = prepared.ws;
+  const setup = await setUpStepWorkspace({
+    workspace: deps.workspace,
+    claimed,
+    repo,
+    workspacesRoot: deps.workspacesDir,
+    credentials: creds.git,
+    readonly: readonlyWorkspace,
+    refresh: refreshGit,
+    machineName: deps.machineName ?? hostname(),
+    attachmentVerify,
+    evidenceDirectory: verifyEvidenceDirectory,
+    expectedHeadSha: verifyMeta?.expectedHeadSha,
+    cleanups: stepCleanups,
+  });
+  if ('error' in setup) {
+    clearCredentials(creds);
+    await failStep(deps, heartbeat, stepId, setup.error);
+    return;
   }
-  let cwd = ws?.cwd ?? join(deps.workspacesDir, convId);
-  if (!ws) mkdirSync(cwd, { recursive: true });
-
-  const stepStartMs = Date.now();
-  let headAtStart: string | null = null;
-  if (ws !== null && ws.readonly !== true && deps.workspace) {
-    try {
-      headAtStart = await deps.workspace.headCommit(ws.cwd);
-    } catch {
-      headAtStart = null;
-    }
-  }
-
+  const { ws, cwd, headAtStart, stepStartMs } = setup;
   const uploadedVerifyEvidence = new Set<string>();
-  if (attachmentVerify) {
-    const verifyClone = await prepareVerifyClone({
-      workspace: deps.workspace,
-      ws,
-      headAtStart,
-      evidenceDirectory: verifyEvidenceDirectory,
-      expectedHeadSha: verifyMeta?.expectedHeadSha,
-      cleanups: stepCleanups,
-    });
-    if ('error' in verifyClone) {
-      await failStep(deps, heartbeat, stepId, verifyClone.error);
-      return;
-    }
-    ws = verifyClone.ws;
-    cwd = verifyClone.cwd;
-    headAtStart = verifyClone.headAtStart;
-  }
 
   const systemPrompt =
     isChief && claimed.chief
