@@ -40,9 +40,9 @@ test('English scope copy names all machines and keeps rules and policies in the 
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
   await page.goto('/app/settings/providers?scenario=providers-fleet');
   const selector = page.getByRole('combobox', { name: 'Settings apply to' });
-  await expect(selector).toContainText('All machines');
+  await expect(selector).toContainText('All Runners');
   await selector.click();
-  await expect(page.getByRole('option', { name: 'All machines', exact: true })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'All Runners', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('link', { name: 'Rules & policies', exact: true })).toBeVisible();
 });
@@ -50,7 +50,7 @@ test('English scope copy names all machines and keeps rules and policies in the 
 test('gallery scope preserves duplicate suffixes and offline markers with icons', async ({ page }) => {
   await page.goto('/design.html?only=settings-scope&theme=light&w=390');
   const selector = page.getByRole('combobox', { name: 'Settings apply to' });
-  await expect(selector).toContainText('All machines');
+  await expect(selector).toContainText('All Runners');
   await selector.click();
   const twins = page.getByRole('option').filter({ hasText: 'build-box' });
   await expect(twins).toHaveCount(2);
