@@ -6,6 +6,7 @@ import {
   chiefMessage,
   machine as machineTable,
   notification as notificationTable,
+  project as projectTable,
   routingRule,
   step as stepTable,
   todo as todoTable,
@@ -322,6 +323,27 @@ describe('an offline Runner with waiting tasks raises one Coordinator notice per
     expect(res.status).toBe(409);
     const row = w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
     expect(row?.routeOverride ?? null).toBeNull();
+  });
+
+  test('a local-path project offers no other Runner and refuses the action', async () => {
+    const w = await world();
+    const omarchy = await machineOf(w, 'omarchy', { online: false });
+    const mac = await machineOf(w, 'mac');
+    routeOf(w, omarchy);
+    w.s.db
+      .update(projectTable)
+      .set({ repoKind: 'local' })
+      .where(eq(projectTable.id, w.projectId))
+      .run();
+    const stepId = pendingStep(w);
+    const todoId = `todo-${stepId.slice('step-'.length)}`;
+    const now = Date.now();
+    lastSeen(w, omarchy, now - RUNNER_OFFLINE_NOTICE_MS - 1_000);
+    lastSeen(w, mac, now, true);
+    sweepOfflineRunners(w.s.svc, now);
+    expect(notices(w)[0]?.alternative).toBeNull();
+    const res = await req(w.s.app, 'POST', `/api/todos/${todoId}/runner`, { machineId: mac });
+    expect(res.status).toBe(409);
   });
 
   test('the action is refused once the task has been claimed', async () => {
