@@ -62,6 +62,10 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
+export function authSnapshot(): AuthSnapshot {
+  return snapshot;
+}
+
 export function useAuth(): AuthSnapshot {
   return useSyncExternalStore(subscribe, () => snapshot);
 }
