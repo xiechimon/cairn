@@ -292,6 +292,34 @@ describe('research citation handoff', () => {
     expect(checkers.some((row) => row.sourceRef?.startsWith(generic.buildId))).toBe(false);
   });
 
+  test('a tier-2 report kept while its research waits on the person is audited only once it finishes', async () => {
+    const { s } = await world();
+    const waiting = openResearchThread(s.svc, {
+      teamId: s.team.id,
+      projectId: s.db.select().from(todo).all()[0]!.projectId,
+      tier: 2,
+      title: 'Merge strategy',
+      question: 'Three-way merge or CRDT?',
+    });
+    land(s, waiting.buildId, source, 'claude-sonnet-5-5');
+    s.db.update(todo).set({ phase: 'needs_input' }).where(eq(todo.id, waiting.todoId)).run();
+    const checkersOf = () =>
+      s.db
+        .select()
+        .from(todo)
+        .all()
+        .filter(
+          (row) =>
+            row.sourceKind === 'research-citation-check' &&
+            row.sourceRef?.startsWith(waiting.buildId) === true,
+        );
+    planResearchCitationChecks(s.svc);
+    expect(checkersOf()).toHaveLength(0);
+    s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, waiting.todoId)).run();
+    planResearchCitationChecks(s.svc);
+    expect(checkersOf()).toHaveLength(1);
+  });
+
   test('promoting a reused source to tier 2 schedules its audit and cannot be downgraded', async () => {
     const { s, opened } = await world();
     s.db.update(todo).set({ archivedAt: Date.now() }).where(eq(todo.id, opened.todoId)).run();

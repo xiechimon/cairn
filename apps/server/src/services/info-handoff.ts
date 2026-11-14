@@ -52,7 +52,10 @@ export function storeInfoReport(
       content: JSON.stringify(reportMessage),
       createdAt,
     })
-    .onConflictDoUpdate({ target: message.id, set: { content: JSON.stringify(reportMessage) } })
+    .onConflictDoUpdate({
+      target: message.id,
+      set: { content: JSON.stringify(reportMessage), createdAt },
+    })
     .run();
   return id;
 }
