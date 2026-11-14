@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-virtual';
 import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react';
 import { FOLLOW_THRESHOLD } from '../components/chat/jump-to-latest.js';
+import { safeSessionStorage } from '../safe-storage.js';
 
 const ESTIMATED_ROW_HEIGHT = 120;
 const OVERSCAN = 4;
@@ -25,6 +26,30 @@ interface StreamSnapshot {
 }
 
 const snapshots = new Map<string, StreamSnapshot>();
+const STORED_ROWS = 200;
+const storageKey = (cacheKey: string) => `cairn.chief-stream.${cacheKey}`;
+
+function readSnapshot(cacheKey: string): StreamSnapshot | undefined {
+  const cached = snapshots.get(cacheKey);
+  if (cached !== undefined || cacheKey === '') return cached;
+  try {
+    const raw = safeSessionStorage()?.getItem(storageKey(cacheKey));
+    return raw == null ? undefined : (JSON.parse(raw) as StreamSnapshot);
+  } catch {
+    return undefined;
+  }
+}
+
+function saveSnapshot(cacheKey: string, snapshot: StreamSnapshot): void {
+  snapshots.set(cacheKey, snapshot);
+  if (cacheKey === '') return;
+  try {
+    safeSessionStorage()?.setItem(
+      storageKey(cacheKey),
+      JSON.stringify({ ...snapshot, items: snapshot.items.slice(-STORED_ROWS) }),
+    );
+  } catch {}
+}
 
 export function VirtualStream({
   cacheKey,
@@ -38,7 +63,7 @@ export function VirtualStream({
   viewportRef: RefObject<HTMLDivElement | null>;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
-  const [restored] = useState(() => snapshots.get(cacheKey));
+  const [restored] = useState(() => readSnapshot(cacheKey));
   const [scrollMargin, setScrollMargin] = useState(restored?.scrollMargin ?? 0);
   const virtualizer = useVirtualizer({
     count: keys.length,
@@ -71,7 +96,7 @@ export function VirtualStream({
   }, []);
   useLayoutEffect(
     () => () => {
-      snapshots.set(cacheKey, {
+      saveSnapshot(cacheKey, {
         items: virtualizer.takeSnapshot(),
         rect: virtualizer.scrollRect,
         scrollMargin: virtualizer.options.scrollMargin,
