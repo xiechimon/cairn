@@ -260,6 +260,7 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
       '## 章程',
       '## 工作约定',
       '### 路由',
+      '### 决策边界',
       '### 项目归属',
       '### 回答',
       '### 事件回合',

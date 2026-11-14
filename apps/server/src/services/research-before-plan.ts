@@ -8,8 +8,10 @@ import { updateAutonomousTodo } from './todos.js';
 
 const TIER2_CHARS = 4_000;
 
-const PERFORMANCE = /\b(faster|performance|latency|slow(?:er|ness)?)\b/i;
-const MECHANISM = /\b(new mechanism|dependenc(?:y|ies)|technology choice)\b/i;
+const PERFORMANCE =
+  /\b(faster|performance|latency|slow(?:er|ness)?)\b|性能|变慢|太慢|更快|提速|加速|延迟|卡顿/i;
+const MECHANISM =
+  /\b(new mechanism|dependenc(?:y|ies)|technology choice)\b|新机制|引入依赖|新增依赖|选型|技术方案|架构设计/i;
 
 export function researchBeforePlanReason(
   title: string,

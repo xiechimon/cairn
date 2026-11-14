@@ -61,6 +61,16 @@ describe('the taskMeta switch of composeWorkerSystemPrompt', () => {
   });
 });
 
+describe('composeWorkerSystemPrompt decision boundary', () => {
+  it('adds the product rule only when asked, after the agent description', () => {
+    const on = composeWorkerSystemPrompt('builder', undefined, { decisionBoundary: true });
+    expect(on).toContain('## 决策边界（Cairn 默认规则）');
+    expect(on).toContain('git clone --depth 1 --filter=blob:none');
+    expect(on?.indexOf('builder')).toBeLessThan(on?.indexOf('## 决策边界') ?? -1);
+    expect(composeWorkerSystemPrompt('builder', undefined)).toBe('builder');
+  });
+});
+
 describe('composeWorkerSystemPrompt project instructions (D74 P1)', () => {
   it('adds the project instructions after the agent description and before memories', () => {
     const text = composeWorkerSystemPrompt('builder', [{ title: 'm', content: 'remembered' }], {
