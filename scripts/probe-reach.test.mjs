@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
@@ -66,7 +66,9 @@ test('discovers committed, staged and untracked additions from the base', () => 
       mkdirSync(dirname(join(root, file)), { recursive: true });
       cpSync(resolve(file), join(root, file));
     }
+    symlinkSync(resolve('node_modules'), join(root, 'node_modules'), 'dir');
     git('init', '-q');
+    writeFileSync(join(root, '.git/info/exclude'), 'node_modules\n');
     git('add', selector, ...selectorDeps, gate, registry);
     git(
       '-c',

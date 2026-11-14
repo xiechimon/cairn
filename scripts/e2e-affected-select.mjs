@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, posix, relative, resolve } from 'node:path';
+import { parseAllDocuments } from 'yaml';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const WEB_DIR = join(REPO_ROOT, 'apps/web');
@@ -489,45 +490,13 @@ const BUILD_SETTINGS = new Set([
   'neverBuiltDependencies',
 ]);
 
-function unquote(scalar) {
-  if (scalar.startsWith("'")) return scalar.slice(1, -1).replaceAll("''", "'");
-  if (scalar.startsWith('"')) return JSON.parse(scalar);
-  return scalar;
-}
-
 export function parseYamlDocuments(text) {
-  const documents = [{}];
-  let stack = [{ indent: -1, node: documents[0] }];
-  for (const [index, raw] of text.split('\n').entries()) {
-    const line = raw.trimEnd();
-    if (line === '---') {
-      documents.push({});
-      stack = [{ indent: -1, node: documents.at(-1) }];
-      continue;
-    }
-    const body = line.trimStart();
-    if (body === '' || body.startsWith('#')) continue;
-    const indent = line.length - body.length;
-    while (stack.at(-1).indent >= indent) stack.pop();
-    const parent = stack.at(-1).node;
-    if (body.startsWith('- ')) {
-      parent[`- ${unquote(body.slice(2).trim())}`] = true;
-      continue;
-    }
-    const match = body.match(/^('(?:[^']|'')*'|"(?:[^"\\]|\\.)*"|[^'"\s:][^:]*?):(?:\s+(.*))?$/);
-    if (match == null || /^[|>]/.test(match[2] ?? '')) {
-      throw new Error(`line ${index + 1} is not a plain mapping entry`);
-    }
-    const key = unquote(match[1]);
-    if (match[2] === undefined) {
-      const child = {};
-      parent[key] = child;
-      stack.push({ indent, node: child });
-    } else {
-      parent[key] = unquote(match[2]);
-    }
-  }
-  return documents.filter((document) => Object.keys(document).length > 0);
+  return parseAllDocuments(text).flatMap((document) => {
+    const [error] = document.errors;
+    if (error !== undefined) throw new Error(error.message);
+    const value = document.toJS();
+    return value !== null && typeof value === 'object' ? [value] : [];
+  });
 }
 
 function lockfileDocument(text) {
@@ -586,13 +555,14 @@ function changedBuildPackages(before, after) {
     if (LOCKFILE_RESOLVED_SETTINGS.has(key)) continue;
     if (!BUILD_SETTINGS.has(key)) throw new Error(`pnpm-workspace.yaml changes ${key}`);
     const [was, now] = [before[key], after[key]].map((value) => {
-      if (value === undefined) return {};
+      if (value === undefined || value === null) return {};
+      if (Array.isArray(value)) return Object.fromEntries(value.map((name) => [name, true]));
       if (typeof value === 'object') return value;
       throw new Error(`pnpm-workspace.yaml writes ${key} inline`);
     });
     for (const entry of new Set([...Object.keys(was), ...Object.keys(now)])) {
       if (was[entry] === now[entry]) continue;
-      names.add(entry.replace(/^- /, '').replace(/(?<=.)@.*$/, ''));
+      names.add(entry.replace(/(?<=.)@.*$/, ''));
     }
   }
   return names;

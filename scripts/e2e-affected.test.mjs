@@ -208,7 +208,7 @@ test('a build permission change on a package the web build installs runs everyth
   assert.equal(impact(workspaceWith('esbuild: true', 'esbuild: false')).specs, null);
 });
 
-test('a build setting written inline cannot be read, so its change runs everything', () => {
+test('a build setting written as a flow map or list is read like a block one', () => {
   const inline = (sqlite) => ({
     workspace: WORKSPACE.replace(
       'allowBuilds:\n  better-sqlite3: true\n  esbuild: true\n',
@@ -216,8 +216,12 @@ test('a build setting written inline cannot be read, so its change runs everythi
     ),
   });
   assert.notEqual(inline(true).workspace, WORKSPACE);
-  assert.equal(impact(inline(false), { lockfile: LOCKFILE, ...inline(true) }).specs, null);
+  assert.deepEqual(
+    impact(inline(false), { lockfile: LOCKFILE, ...inline(true) }).specs,
+    LIVE_SERVER,
+  );
   assert.equal(impact({ workspace: `${WORKSPACE}onlyBuiltDependencies: [esbuild]\n` }).specs, null);
+  assert.equal(impact({ workspace: `${WORKSPACE}onlyBuiltDependencies: esbuild\n` }).specs, null);
 });
 
 test('a workspace edit that resolves no different package selects nothing', () => {
@@ -418,14 +422,19 @@ test('the committed lockfile and workspace parse, and their closures reach the p
   assert.deepEqual(reach('docs/README.md'), null);
 });
 
-test('the yaml reader keeps documents, quoted keys, flow values and list items apart', () => {
+test('the yaml reader keeps documents, quoted keys, flow values, lists and block scalars', () => {
   const [first, second] = parseYamlDocuments(
-    "---\na: 1\n---\n'@x/y@1(z@2)':\n  resolution: {integrity: q}\n  list:\n    - 'one'\n    - two\n",
+    "---\na: 1\n---\n'@x/y@1(z@2)':\n  resolution: {integrity: q}\n  list:\n    - 'one'\n    - two\n  note: |\n    line one\n    line two\n",
   );
-  assert.deepEqual(first, { a: '1' });
+  assert.deepEqual(first, { a: 1 });
   assert.deepEqual(second, {
-    '@x/y@1(z@2)': { resolution: '{integrity: q}', list: { '- one': true, '- two': true } },
+    '@x/y@1(z@2)': {
+      resolution: { integrity: 'q' },
+      list: ['one', 'two'],
+      note: 'line one\nline two\n',
+    },
   });
+  assert.throws(() => parseYamlDocuments('a: [1\n'));
 });
 
 test('every selected spec lands on exactly one shard, whatever order or shard count', () => {
