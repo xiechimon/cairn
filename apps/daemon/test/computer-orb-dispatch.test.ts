@@ -1,3 +1,5 @@
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import type {
   ComputerCall,
   ComputerFrame,
@@ -314,7 +316,7 @@ describe('orb routing', () => {
     const fake = fakeClient();
     const dispatcher = createComputerDispatcher({
       client: fake.client,
-      orb: { ...fakeOrb(log), onHost: true },
+      orb: { ...fakeOrb(log), hostRoot: join(homedir(), '.cairn', 'desktops') },
       ...FAST,
     });
     const scoped = { scopeKey: 'chief:c1' };
@@ -324,6 +326,40 @@ describe('orb routing', () => {
     expect(errors).toHaveLength(1);
     expect((errors[0] as { message: string }).message).toContain('desktop-protection guard');
     expect(log).toEqual(['orb[chief:c1]:execute:echo ok']);
+  });
+
+  test('host shells cannot name the agent desktops, which hold its logins', async () => {
+    const log: string[] = [];
+    const fake = fakeClient();
+    const root = join(homedir(), '.cairn', 'desktops');
+    const dispatcher = createComputerDispatcher({
+      client: fake.client,
+      host: fakeProvider(log, 'host'),
+      orb: { ...fakeOrb(log), hostRoot: root },
+      ...FAST,
+    });
+    for (const command of [
+      `cat ${root}/0123/home/.config/chromium/Default/Cookies`,
+      'tar czf /tmp/x.tgz ~/.cairn/desktops',
+      'cp -r "$HOME"/".cairn"/desktops /tmp',
+      'ls ~/.cairn/./desktops',
+      'ls ~/.cairn//desktops/',
+    ]) {
+      await dispatcher.dispatch(call('user_computer_shell', { command }));
+    }
+    await dispatcher.dispatch(call('user_computer_shell', { command: 'ls ~/.cairn/logs' }));
+    await dispatcher.dispatch(
+      call('shell', { command: `ls ${root}/0123/home/Downloads` }, { scopeKey: 'chief:c1' }),
+    );
+    const errors = fake.frames.filter((frame) => frame.kind === 'error');
+    expect(errors).toHaveLength(5);
+    for (const error of errors) {
+      expect((error as { message: string }).message).toContain('agent computer path');
+    }
+    expect(log).toEqual([
+      'host:execute:ls ~/.cairn/logs',
+      `orb[chief:c1]:execute:ls ${root}/0123/home/Downloads`,
+    ]);
   });
 
   test('the two guard entry points differ only by the cairn host rules', () => {

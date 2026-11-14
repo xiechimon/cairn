@@ -41,7 +41,7 @@ export interface ComputerProvider {
 }
 
 export interface ScopedComputerProviders {
-  readonly onHost?: boolean;
+  readonly hostRoot?: string;
   forScope(scopeKey: string): ComputerProvider;
   killAll(): Promise<void>;
 }
