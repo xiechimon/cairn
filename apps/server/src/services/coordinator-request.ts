@@ -221,6 +221,7 @@ export function createRequestTodo(
     difficulty: params.difficulty ?? null,
     titleSource: segments[0]?.author ?? 'owner',
     titleSourceRef: segments[0]?.sourceRef ?? null,
+    ...(params.research !== undefined ? { research: params.research } : {}),
   };
   const record = createAutonomousTodo(deps, {
     teamId: ctx.teamId,

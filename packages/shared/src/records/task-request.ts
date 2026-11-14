@@ -68,6 +68,7 @@ export const taskRequestSchema = z.object({
   difficulty: z.enum(TASK_REQUEST_DIFFICULTIES).nullable(),
   titleSource: z.enum(['owner', 'third-party', 'worker', 'coordinator']),
   titleSourceRef: z.string().nullable(),
+  research: z.object({ reason: z.string().trim().min(1).max(200) }).optional(),
 });
 export type TaskRequest = z.infer<typeof taskRequestSchema>;
 
