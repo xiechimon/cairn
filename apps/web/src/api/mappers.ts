@@ -45,6 +45,7 @@ import {
   PLACEHOLDER_TITLE_FALLBACK,
   PLAN_SECTIONS,
   REVIEW_VERDICT_KIND,
+  RUNNER_OS_LABELS,
   replyQuoteText,
   resolvedBuildPrNumber,
   reviewVerdictSchema,
@@ -108,6 +109,27 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
     return {
       label: '等额度：模型额度用尽，挂起等待恢复（下次尝试 {time}）',
       vars: { time: clockTime(queue.hold.retryAt) },
+    };
+  }
+  const platform = queue.blocked?.platform;
+  if (
+    platform !== undefined &&
+    queue.blocked?.kind === 'capability-missing' &&
+    queue.waitingFor == null
+  ) {
+    return {
+      label: '排队中：还没有 {platform} Runner · 需要 {platform}',
+      vars: { platform: RUNNER_OS_LABELS[platform] },
+    };
+  }
+  if (
+    platform !== undefined &&
+    queue.blocked?.kind === 'machine-offline' &&
+    queue.waitingFor != null
+  ) {
+    return {
+      label: '排队中：等 {machine} 上线 · 需要 {platform}（前面 {ahead} 个）',
+      vars: { machine: queue.waitingFor.name, platform: RUNNER_OS_LABELS[platform], ahead },
     };
   }
   if (queue.blocked?.kind === 'capability-missing') {

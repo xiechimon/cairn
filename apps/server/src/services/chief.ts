@@ -1580,6 +1580,7 @@ export function buildChiefSystemPrompt(
     ...COORDINATOR_DECISION_RULES.map((rule) => `- ${rule}`),
     '',
     '### 项目归属',
+    '- 运行平台：只有活必须在某个系统上构建或运行时才给 create_todo 传 platform：iOS/macOS App、Xcode、SwiftUI 传 macos，Windows 原生程序或安装包传 windows。其余不传，任务在默认 Runner 上跑。传了以后任务只在那个系统的 Runner 上跑，没有就等着，不会换到别的系统。',
     '- create_todo 前先定 projectId。',
     '- 用户消息以「【输入框选定项目：X（id: …）】」开头时，本回合新建的任务都放 X，不再调查也不问，回复里说「放在 X（你选的）」。',
     '- 用户点名项目就用它。没点名时先查再定：对照下面项目列表的名称和说明，必要时用 docs 读候选项目的文件、用 todos 看各项目已有的任务，按证据选一个，回复里说「放在 X，因为 Y」。',

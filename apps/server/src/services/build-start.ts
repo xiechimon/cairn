@@ -19,13 +19,18 @@ export function assertNamedMachineForNewTask(deps: BuildDeps, teamId: string): v
 
 function namedMachineForStart(
   deps: BuildDeps,
-  todoRecord: { teamId: string; routeOverride?: { machineId?: string } | null },
-  routeOverride: { machineId?: string } | undefined,
+  todoRecord: { teamId: string; routeOverride?: RouteOverride | null },
+  routeOverride: RouteOverride | undefined,
 ): { machineId: string; pin: boolean } | null {
   const profile = profileForStep(deps.db, todoRecord, 'session', null);
   const named =
     routeOverride?.machineId ?? todoRecord.routeOverride?.machineId ?? profile?.machineId ?? null;
   if (named !== null) return { machineId: named, pin: false };
+  if (
+    (routeOverride?.requiredCapabilities?.os ?? profile?.requiredCapabilities?.os) !== undefined
+  ) {
+    return null;
+  }
   if (teamDefaultMachineId(deps.db, todoRecord.teamId) !== null) return null;
   const registered = deps.db
     .select({ id: machine.id, online: machine.online })

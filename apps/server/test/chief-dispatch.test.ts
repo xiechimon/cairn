@@ -45,6 +45,21 @@ describe('open_thread dispatch', () => {
   });
 });
 
+describe('Coordinator platform need', () => {
+  test('create_todo with a platform stores it on the task, and update_todo any clears it', async () => {
+    const created = (await relay('create_todo', {
+      ...ownerTodo('打包 iOS 版本'),
+      platform: 'macos',
+    })) as { id: string };
+    const overrideOf = () =>
+      H.s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get()?.routeOverride ??
+      null;
+    expect(overrideOf()).toEqual({ requiredCapabilities: { os: 'macos' } });
+    await relay('update_todo', { todoId: created.id, platform: 'any' });
+    expect(overrideOf()).toBeNull();
+  });
+});
+
 describe('merge_builds machine entry hard-refused (#1256)', () => {
   test('chief calls merge_builds -> refusal JSON, text names the human exit, no merge step landed', async () => {
     const todoRec = (await relay('create_todo', ownerTodo('合并只由人触发'))) as { id: string };

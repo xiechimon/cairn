@@ -66,7 +66,10 @@ function machineSatisfies(
   if (constraints.machineId !== null && constraints.machineId !== row.id) return false;
   const missing = missingCapabilityItems(row, constraints.required);
   return (
-    missing.executor === undefined && missing.mcpServers.length === 0 && missing.models.length === 0
+    missing.executor === undefined &&
+    missing.os === undefined &&
+    missing.mcpServers.length === 0 &&
+    missing.models.length === 0
   );
 }
 

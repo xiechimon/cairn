@@ -1,4 +1,10 @@
-import { claudeLoginBlocksClaim, claudeRateBlock, isBuildStepKind } from '@cairn/shared';
+import {
+  claudeLoginBlocksClaim,
+  claudeRateBlock,
+  isBuildStepKind,
+  type RunnerOs,
+  runnerOsOf,
+} from '@cairn/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type build, type machine, step, team } from '../db/schema.js';
@@ -7,6 +13,7 @@ import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import {
   type MachineIneligibility,
   machineEligibility,
+  machineRunningCount,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
 import type { RouteProfile } from './routing-rules.js';
@@ -138,6 +145,24 @@ export function fallbackMachineId(
   const online = soleOnlineMachineId(machines.filter((row) => row.online).map((row) => row.id));
   if (online !== null) return online;
   return machines.length === 1 ? (machines[0]?.id ?? null) : null;
+}
+
+export function platformFallbackMachineId(
+  db: Db,
+  machines: readonly Pick<MachineRow, 'id' | 'online' | 'tokenHash' | 'capabilities'>[],
+  defaultMachineId: string | null,
+  os: RunnerOs | undefined,
+): string | null {
+  if (os === undefined) return fallbackMachineId(machines, defaultMachineId);
+  const matching = machines.filter(
+    (row) => row.tokenHash !== null && runnerOsOf(row.capabilities) === os,
+  );
+  if (matching.some((row) => row.id === defaultMachineId)) return defaultMachineId;
+  const online = matching
+    .filter((row) => row.online)
+    .map((row) => ({ id: row.id, running: machineRunningCount(db, row.id) }))
+    .sort((a, b) => a.running - b.running || (a.id < b.id ? -1 : 1));
+  return online[0]?.id ?? matching[0]?.id ?? null;
 }
 
 export type RouteVerdict = { claim: true } | { claim: false; waitingFor: string | null };

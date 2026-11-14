@@ -73,6 +73,7 @@ import {
 } from './machine-deps.js';
 import {
   fallbackMachineId,
+  platformFallbackMachineId,
   priorSessionOf,
   routeTargets,
   routeVerdict,
@@ -463,13 +464,20 @@ async function tryClaim(
     );
     const sessionOnOtherMachine =
       priorSessionId !== null && priorMachineId !== null && priorMachineId !== machineId;
-    const sole = fallbackMachineId(
+    const sole = platformFallbackMachineId(
+      db,
       db
-        .select({ id: machine.id, online: machine.online })
+        .select({
+          id: machine.id,
+          online: machine.online,
+          tokenHash: machine.tokenHash,
+          capabilities: machine.capabilities,
+        })
         .from(machine)
         .where(eq(machine.teamId, teamId))
         .all(),
       teamDefaultMachineId(db, teamId),
+      agentRow.requiredCapabilities?.os,
     );
     const allowed = routeVerdict({
       machineId,

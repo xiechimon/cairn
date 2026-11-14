@@ -335,7 +335,7 @@ Reach:
 - Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`, `/app/settings/team`, `/app/team`
 - Settings: `设置` (Settings) › `模型` (Model) › `用量与连接` (Usage & connections); `设置` (Settings) › `模型` (Model) › `规则与策略` (Rules & policies)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-save`, `routing-empty`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
+- Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-platform`, `route-override-save`, `routing-empty`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
 - Research: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](../../../docs/research/agent-machine-routing.md) (not on main)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md)

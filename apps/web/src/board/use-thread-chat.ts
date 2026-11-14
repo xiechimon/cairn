@@ -1,5 +1,6 @@
 import {
   isBuildStepKind,
+  type RunnerOs,
   resolvedBuildPrNumber,
   STOP_MESSAGE,
   type StepKind,
@@ -69,6 +70,7 @@ export interface ThreadChat {
   running: boolean;
   waitingOnChecks: boolean;
   machineName: string | null;
+  platformWait: { machine: string | null; platform: RunnerOs } | null;
   stopped: boolean;
   sendError: string | null;
   queuedMessages: QueuedCapsule[] | undefined;
@@ -181,6 +183,14 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       null;
     return machinesQ.data?.find((m) => m.id === pinned)?.name ?? null;
   }, [machinesQ.data, steps, listed?.routeOverride?.machineId, routingQ.data]);
+  const platformWait = useMemo(() => {
+    const queue = steps.find(
+      (step) => step.status === 'pending' && step.queue?.blocked?.platform !== undefined,
+    )?.queue;
+    const platform = queue?.blocked?.platform;
+    if (queue == null || platform === undefined) return null;
+    return { machine: queue.waitingFor?.name ?? null, platform };
+  }, [steps]);
   const todo = live ? (wire != null ? toDisplayTodo(wire) : (listed ?? null)) : (listed ?? null);
   const fixture = resolveScenario(searchParams);
   const fixtureDetail = fixture.details?.[todoId] ?? fixture.detail;
@@ -371,6 +381,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       buildQ.data != null &&
       resolvedBuildPrNumber(buildQ.data) != null,
     machineName,
+    platformWait,
     stopped: buildQ.data?.errorMessage === STOP_MESSAGE,
     sendError: mutations.messageThread.isError
       ? mutations.messageThread.error?.message || t('发送失败，请重试。')

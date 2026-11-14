@@ -52,6 +52,23 @@ export function osPlatformOf(nodePlatform: string): MachineOsPlatform {
   return nodePlatform === 'win32' ? 'windows' : 'other';
 }
 
+export const RUNNER_OS = ['linux', 'macos', 'windows'] as const;
+export const runnerOsSchema = z.enum(RUNNER_OS);
+export type RunnerOs = z.infer<typeof runnerOsSchema>;
+export const RUNNER_OS_LABELS: Record<RunnerOs, string> = {
+  linux: 'Linux',
+  macos: 'macOS',
+  windows: 'Windows',
+};
+
+export function runnerOsOf(
+  capabilities: { osPlatform?: MachineOsPlatform } | null | undefined,
+): RunnerOs | null {
+  const platform = capabilities?.osPlatform;
+  if (platform === 'darwin') return 'macos';
+  return platform === 'linux' || platform === 'windows' ? platform : null;
+}
+
 export const agentReachReportSchema = z.object({
   version: z.string().min(1).max(32),
   channels: z
@@ -126,6 +143,7 @@ export const requiredCapabilitiesSchema = z.object({
   mcpServers: z.array(z.string()).optional(),
   models: z.array(z.string()).optional(),
   executor: z.literal('orb').optional(),
+  os: runnerOsSchema.optional(),
 });
 export type RequiredCapabilities = z.infer<typeof requiredCapabilitiesSchema>;
 
@@ -133,8 +151,10 @@ export function capabilityMissingLabels(missing: {
   mcpServers?: string[];
   models?: string[];
   executor?: 'orb';
+  os?: RunnerOs;
 }): string[] {
   return [
+    ...(missing.os !== undefined ? [RUNNER_OS_LABELS[missing.os]] : []),
     ...(missing.mcpServers ?? []).map((slug) => `MCP server "${slug}"`),
     ...(missing.models ?? []).map((id) => `model "${id}"`),
     ...(missing.executor === 'orb' ? ['Orb sandbox executor'] : []),
@@ -144,5 +164,6 @@ export function capabilityMissingLabels(missing: {
 export const stepQueueBlockedSchema = z.object({
   kind: z.enum(['machine-offline', 'capability-missing']),
   missing: z.array(z.string()),
+  platform: runnerOsSchema.optional(),
 });
 export type StepQueueBlocked = z.infer<typeof stepQueueBlockedSchema>;

@@ -73,6 +73,7 @@ import type { OAuthClientConfig } from './oauth.js';
 import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
 import { getModelSources } from './providers.js';
 import type { VapidKeys } from './push.js';
+import { setTodoPlatform } from './routing-rules.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
 import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
@@ -604,6 +605,9 @@ export async function executeChiefTool(
         ownerId: ctx.userId,
       });
       db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, record.id)).run();
+      if (body.platform !== undefined) {
+        setTodoPlatform(db, requireTeamTodo(db, record.id, ctx.teamId), body.platform);
+      }
       const buildId = startThreadBuild(svc, requireTeamTodo(db, record.id, ctx.teamId), {
         origin: 'coordinator',
         actor: 'Coordinator',
@@ -611,8 +615,12 @@ export async function executeChiefTool(
       return json({ ...record, ...getTodo(svc, record.id), sourceBuildId: ctx.chiefId, buildId });
     }
     case 'update_todo': {
-      const body = parseWith(coordinatorUpdateTodoParamsSchema, params, 'params');
-      requireTeamTodo(db, body.todoId, ctx.teamId);
+      const { platform, ...body } = parseWith(coordinatorUpdateTodoParamsSchema, params, 'params');
+      const todoRow = requireTeamTodo(db, body.todoId, ctx.teamId);
+      if (platform !== undefined) {
+        setTodoPlatform(db, todoRow, platform === 'any' ? null : platform);
+        svc.machineHub?.wake(ctx.teamId);
+      }
       const record = updateRequestTodo(svc, ctx, body);
       if (!record) throw new HttpError(404, `todo ${body.todoId}`);
       return json(record);

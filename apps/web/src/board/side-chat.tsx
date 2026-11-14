@@ -1,7 +1,8 @@
+import { RUNNER_OS_LABELS } from '@cairn/shared';
 import { cn } from 'cn';
 import { ChevronLeft, FileDiff, ListChecks, X } from 'lucide-react';
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { contextPercentOf } from '../chief/context-meter-ring.js';
@@ -23,6 +24,7 @@ import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
+import { MACHINES_HREF } from '../resources/machines-page.js';
 import {
   type EngineRunView,
   engineCanTakeOver,
@@ -69,6 +71,7 @@ const OPEN_SURFACE = '.overlay, [role="dialog"], [role="menu"], [role="listbox"]
 function StatusLine({
   todo,
   machineName,
+  platformWait,
   now,
   waitingOnChecks,
   updates,
@@ -76,6 +79,7 @@ function StatusLine({
 }: {
   todo: TodoRecord;
   machineName: string | null;
+  platformWait: ThreadChat['platformWait'];
   now: number;
   waitingOnChecks: boolean;
   updates: ThreadUpdates | null;
@@ -85,12 +89,19 @@ function StatusLine({
   const needsYou = threadStatus(todo) === 'needs-you';
   const stated = threadPurpose(todo);
   const purpose = stated === originText?.trim() ? '' : stated;
+  const need = platformWait?.platform ?? todo.routeOverride?.requiredCapabilities?.os;
+  const needText =
+    need === undefined ? null : t('需要 {platform}', { platform: RUNNER_OS_LABELS[need] });
   const meta =
-    needsYou && updates !== null
-      ? t('{n} 条更新', { n: updates.lines.length })
-      : purpose !== ''
-        ? purpose
-        : joinMeta([machineName, relativeTime(todo.phaseAt, now, t)]);
+    platformWait !== null
+      ? platformWait.machine !== null
+        ? (needText ?? '')
+        : ''
+      : needsYou && updates !== null
+        ? t('{n} 条更新', { n: updates.lines.length })
+        : purpose !== ''
+          ? purpose
+          : joinMeta([machineName, needText, relativeTime(todo.phaseAt, now, t)]);
   return (
     <p
       data-testid="side-chat-status"
@@ -99,19 +110,35 @@ function StatusLine({
       <span
         className={cn(
           'flex-none',
-          todo.quotaWait == null ? taskStatusInk(todo.phase) : 'text-content-secondary',
+          platformWait !== null
+            ? 'text-tint-wait-ink'
+            : todo.quotaWait == null
+              ? taskStatusInk(todo.phase)
+              : 'text-content-secondary',
         )}
       >
-        {todo.quotaWait != null
-          ? t('等额度')
-          : waitingOnChecks
-            ? t(STATUS_WORDS.waitingChecks)
-            : t(threadCopy(todo).state)}
+        {platformWait !== null
+          ? platformWait.machine !== null
+            ? t('等 {machine} 上线', { machine: platformWait.machine })
+            : t('还没有 {platform} Runner', { platform: RUNNER_OS_LABELS[platformWait.platform] })
+          : todo.quotaWait != null
+            ? t('等额度')
+            : waitingOnChecks
+              ? t(STATUS_WORDS.waitingChecks)
+              : t(threadCopy(todo).state)}
       </span>
       {meta !== '' && (
         <>
           <span aria-hidden="true">·</span>
           <span className="min-w-0 truncate">{meta}</span>
+        </>
+      )}
+      {platformWait !== null && platformWait.machine === null && (
+        <>
+          <span aria-hidden="true">·</span>
+          <Link to={MACHINES_HREF} className="flex-none text-(--chat-link) hover:underline">
+            {t('添加 Runner')}
+          </Link>
         </>
       )}
     </p>
@@ -586,6 +613,7 @@ function ReadyThread({
         <StatusLine
           todo={todo}
           machineName={chat.machineName}
+          platformWait={chat.platformWait}
           now={now}
           waitingOnChecks={chat.waitingOnChecks}
           updates={updates}

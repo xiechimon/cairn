@@ -885,6 +885,18 @@ export const EN: Record<string, string> = {
     'Queued: waiting for {machine} to come online ({ahead} ahead)',
   '排队中：等机器上线（前面 {ahead} 个）':
     'Queued: waiting for a machine to come online ({ahead} ahead)',
+  '排队中：还没有 {platform} Runner · 需要 {platform}':
+    'Queued: no {platform} Runner yet · needs {platform}',
+  '排队中：等 {machine} 上线 · 需要 {platform}（前面 {ahead} 个）':
+    'Queued: waiting for {machine} to come online · needs {platform} ({ahead} ahead)',
+  运行平台: 'Platform',
+  '不限时用默认 Runner': 'Any uses the default Runner',
+  '需要 {platform}': 'needs {platform}',
+  '还没有 {platform} Runner': 'No {platform} Runner yet',
+  '添加 Runner': 'Add a Runner',
+  '不限（默认 Runner）': 'Any (default Runner)',
+  '运行中不能改，换平台请新开任务':
+    'Locked once the task has run. Start a new task to change the platform.',
   // #1251 machines page capability annotation (daemon-reported inventory).
   能力清单未上报: 'Capabilities not reported',
   'MCP {n} · 本机技能 {m}': 'MCP {n} · local skills {m}',

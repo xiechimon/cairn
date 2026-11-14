@@ -34,6 +34,7 @@ import { listNeedsYou } from './services/needs-you.js';
 import { orchestrateTodo } from './services/orchestrate.js';
 import { PhaseTransitionError } from './services/phase.js';
 import { assertProjectWritable } from './services/project-writable.js';
+import { assertPlatformUnlocked } from './services/routing-rules.js';
 import { runnerOverrideFor } from './services/runner-offline.js';
 import { snoozeTodo, unsnoozeTodo } from './services/snooze.js';
 import { listTasks } from './services/tasks.js';
@@ -118,6 +119,14 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     if (body.assignment != null) throw new HttpError(410, AGENTS_REMOVED_MESSAGE);
     const prior = getTodo(svc, id);
     if (prior !== null) assertProjectWritable(svc.db, prior.teamId, prior.projectId);
+    if (
+      prior !== null &&
+      body.routeOverride !== undefined &&
+      (body.routeOverride?.requiredCapabilities?.os ?? null) !==
+        (prior.routeOverride?.requiredCapabilities?.os ?? null)
+    ) {
+      assertPlatformUnlocked(svc.db, id);
+    }
     if (body.projectId !== undefined && body.projectId !== prior?.projectId) {
       assertProjectWritable(svc.db, ctx.team.id, body.projectId);
     }
