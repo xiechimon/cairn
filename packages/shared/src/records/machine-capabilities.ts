@@ -44,7 +44,13 @@ export function confinementDispatchReady(
   return capabilities?.osPlatform !== 'linux' || capabilities.confinement?.state === 'ready';
 }
 
-const machineOsPlatformSchema = z.enum(['linux', 'darwin', 'other']);
+const machineOsPlatformSchema = z.enum(['linux', 'darwin', 'windows', 'other']);
+export type MachineOsPlatform = z.infer<typeof machineOsPlatformSchema>;
+
+export function osPlatformOf(nodePlatform: string): MachineOsPlatform {
+  if (nodePlatform === 'linux' || nodePlatform === 'darwin') return nodePlatform;
+  return nodePlatform === 'win32' ? 'windows' : 'other';
+}
 
 export const agentReachReportSchema = z.object({
   version: z.string().min(1).max(32),

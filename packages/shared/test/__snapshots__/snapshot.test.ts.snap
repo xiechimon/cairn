@@ -10272,6 +10272,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               "enum": [
                 "linux",
                 "darwin",
+                "windows",
                 "other",
               ],
               "type": "string",

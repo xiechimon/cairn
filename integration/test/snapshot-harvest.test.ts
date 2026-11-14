@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import { otlpTraceIdOfTurn } from '@cairn/shared/otel';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { openDbWithHandle } from '../../apps/server/src/db/client.js';
 import { coordinatorTurnSnapshot } from '../../apps/server/src/db/schema.js';
 import { seed } from '../../apps/server/src/db/seed.js';
+import { COORDINATOR_SNAPSHOT_SCHEMA_VERSION } from '../../apps/server/src/services/coordinator-turn-capture.js';
 import { replayInput } from '../eval/coordinator-routing/contract.mts';
 import { buildDatasetItem, listHarvestCandidates } from '../eval/coordinator-routing/harvest.mts';
 import {
@@ -11,6 +12,7 @@ import {
   SNAPSHOT_SCHEMA_VERSION,
   snapshotToReplayInput,
 } from '../eval/coordinator-routing/snapshot.mts';
+import { prepareItems, uploadItems } from '../eval/coordinator-routing/upload.mts';
 
 const DAY = 86_400_000;
 
@@ -248,6 +250,88 @@ it('lists harvest candidates and builds dataset items from sealed snapshots', ()
     expect(item.input.request).toBe('please create a task');
     expect(() => buildDatasetItem(db.db, seeded.id, 'turn-2', null, 'routing')).toThrow(
       'incomplete: snapshot unusable',
+    );
+  } finally {
+    db.close();
+  }
+});
+
+it('harvests only the schema version the Coordinator writes', () => {
+  expect(COORDINATOR_SNAPSHOT_SCHEMA_VERSION).toBe(SNAPSHOT_SCHEMA_VERSION);
+});
+
+it('validates reviewed answers against the frozen snapshot before uploading anything', async () => {
+  const db = openDbWithHandle(':memory:');
+  try {
+    const { team: seeded } = seed(db.db);
+    db.db
+      .insert(coordinatorTurnSnapshot)
+      .values(sealedRow({ teamId: seeded.id }))
+      .run();
+    const route = {
+      decision: 'route',
+      parts: [{ project: 'docs' }],
+      askCandidates: [],
+      blockedBy: [],
+    };
+
+    expect(() =>
+      prepareItems(
+        db.db,
+        seeded.id,
+        [{ turnId: 'turn-1', expectedOutput: { ...route, parts: [{ project: 'nope' }] } }],
+        'routing',
+      ),
+    ).toThrow(/turn-1: incomplete: invalid expectedOutput project reference/);
+    expect(() =>
+      prepareItems(
+        db.db,
+        seeded.id,
+        [
+          { turnId: 'turn-1', expectedOutput: route },
+          { turnId: 'turn-1', expectedOutput: route },
+        ],
+        'routing',
+      ),
+    ).toThrow('incomplete: duplicate turn in reviewed file');
+    expect(() =>
+      prepareItems(db.db, seeded.id, [{ turnId: 'missing', expectedOutput: route }], 'routing'),
+    ).toThrow(/missing: incomplete: snapshot row missing/);
+    expect(() =>
+      prepareItems(
+        db.db,
+        seeded.id,
+        [{ turnId: 'turn-1', expectedOutput: { decision: 'x' } }],
+        'routing',
+      ),
+    ).toThrow(/turn-1/);
+
+    const items = prepareItems(
+      db.db,
+      seeded.id,
+      [{ turnId: 'turn-1', expectedOutput: route }],
+      'routing',
+    );
+    const send = vi.fn(async () => new Response('{}', { status: 200 }));
+    const target = { baseUrl: 'http://langfuse.test/', publicKey: 'pk', secretKey: 'sk' };
+    await expect(uploadItems(items, target, send as unknown as typeof fetch)).resolves.toBe(1);
+    const [url, init] = send.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('http://langfuse.test/api/public/dataset-items');
+    expect(new Headers(init.headers).get('authorization')).toBe(
+      `Basic ${Buffer.from('pk:sk').toString('base64')}`,
+    );
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      datasetName: 'routing',
+      id: 'cairn-routing-turn-1',
+      sourceTraceId: otlpTraceIdOfTurn('turn-1'),
+      status: 'ACTIVE',
+      expectedOutput: route,
+      input: { request: 'please create a task' },
+    });
+
+    const refuse = vi.fn(async () => new Response('no', { status: 403 }));
+    await expect(uploadItems(items, target, refuse as unknown as typeof fetch)).rejects.toThrow(
+      'cairn-routing-turn-1: Langfuse answered HTTP 403',
     );
   } finally {
     db.close();

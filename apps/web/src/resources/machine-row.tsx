@@ -1,4 +1,4 @@
-import { MACHINE_RUNTIMES, type MachineRuntime } from '@cairn/shared';
+import { MACHINE_RUNTIMES, type MachineOsPlatform, type MachineRuntime } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { ChevronRight, Ellipsis } from 'lucide-react';
@@ -30,6 +30,13 @@ import { type ChiefState, MachineDetailPane } from './machine-detail-pane.js';
 export type RowSection = 'runtime' | 'capabilities';
 
 type ItemStatus = { label: string; dot: string };
+
+const OS_NAMES: Record<MachineOsPlatform, string | undefined> = {
+  linux: 'Linux',
+  darwin: 'macOS',
+  windows: 'Windows',
+  other: undefined,
+};
 
 export function rowStatus(machine: MachineRow, notice: 'expired' | 'expiring' | null): ItemStatus {
   if (machine.online === false) return { label: '离线', dot: 'bg-content-dim' };
@@ -176,6 +183,8 @@ export function MachineRowView({
     machine.online === false && machine.lastSeenAt != null
       ? t('最后在线 {time}', { time: relativeTime(machine.lastSeenAt, now, t) })
       : null;
+  const osPlatform = machine.capabilities?.osPlatform;
+  const osName = osPlatform === undefined ? undefined : OS_NAMES[osPlatform];
   const canMutate = machine.id != null && online;
   const acceptFrozen = !canMutate || mutations.patchMachine.isPending;
   const acceptBlockedReason = online
@@ -226,6 +235,16 @@ export function MachineRowView({
             )}
           </Button>
           <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 pl-5 text-meta">
+            {osName !== undefined && (
+              <>
+                <span data-testid="machine-os" className="whitespace-nowrap text-content-secondary">
+                  {osName}
+                </span>
+                <span aria-hidden className="text-content-dim">
+                  ·
+                </span>
+              </>
+            )}
             <span aria-hidden className={cn('size-1.5 flex-none rounded-full', status.dot)} />
             <span
               data-testid="machine-item-status"

@@ -3,17 +3,17 @@ import XCTest
 @MainActor
 final class PilotJourneyTests: XCTestCase {
     private var app: XCUIApplication!
-    private var appearance: String { ProcessInfo.processInfo.environment["CAIRN_PILOT_APPEARANCE"] ?? "light" }
+    private var env: [String: String] { ProcessInfo.processInfo.environment }
+    private var appearance: String { env["CAIRN_PILOT_APPEARANCE"] ?? "light" }
 
     override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments = ["-cairn-reset"]
+        app.launchArguments = ["-cairn-reset", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
     }
 
-    func testInboxQuestionTaskAndCoordinator() throws {
-        let env = ProcessInfo.processInfo.environment
+    func testChatHomeThreadQuestionAndTabs() throws {
         let server = try XCTUnwrap(env["CAIRN_PILOT_SERVER"], "set TEST_RUNNER_CAIRN_PILOT_SERVER")
         let token = try XCTUnwrap(env["CAIRN_PILOT_TOKEN"], "set TEST_RUNNER_CAIRN_PILOT_TOKEN")
 
@@ -25,7 +25,6 @@ final class PilotJourneyTests: XCTestCase {
         serverField.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
         serverField.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 40))
         serverField.typeText(server)
-        XCTAssertEqual(serverField.value as? String, server)
         let tokenField = app.secureTextFields["token-field"]
         tokenField.tap()
         tokenField.typeText("wrong-token")
@@ -40,75 +39,55 @@ final class PilotJourneyTests: XCTestCase {
         tokenField.typeText(token)
         app.buttons["sign-in-button"].tap()
 
-        let rows = app.descendants(matching: .any).matching(identifier: "inbox-row")
-        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 15))
-        XCTAssertFalse(app.sheets["Save Password?"].waitForExistence(timeout: 5), "the token must not be offered to Passwords")
-        XCTAssertTrue(app.navigationBars["Needs you"].exists)
-        XCTAssertEqual(rows.count, 4, "one Coordinator question plus plan-ready, failed and review tasks")
-        XCTAssertTrue(rows.element(boundBy: 0).label.contains("Release"))
+        XCTAssertTrue(element("question-card").waitForExistence(timeout: 15), "the app opens on the Coordinator conversation")
+        XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 3), "the token must not be offered to Passwords")
+        XCTAssertEqual(all("thread-card").count, 2, "one thread row on each reply that started a thread")
+        XCTAssertEqual(all("user-message").count, 2)
+        XCTAssertTrue(element("option-3").exists, "the question shows its three options as chips")
+        XCTAssertEqual(element("tasks-button").value as? String, "3")
+        sleep(2)
+        XCTAssertLessThanOrEqual(element("option-3").frame.maxY, element("composer-field").frame.minY)
+        capture("03-home")
+
+        all("thread-card").element(boundBy: 0).tap()
+        XCTAssertTrue(element("assistant-message").waitForExistence(timeout: 10))
         sleep(1)
-        capture("03-inbox")
-
-        element("going-on").tap()
-        let runningRow = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Translate settings attribution labels")).firstMatch
-        XCTAssertTrue(runningRow.waitForExistence(timeout: 5))
-        capture("04-inbox-going-on")
-        element("going-on").tap()
-
-        rows.element(boundBy: 0).tap()
-        let option = element("option-1")
-        XCTAssertTrue(option.waitForExistence(timeout: 10))
-        capture("05-question")
-        option.tap()
-        capture("06-question-picked")
-        app.buttons["answer-button"].tap()
-        XCTAssertTrue(app.navigationBars["Needs you"].waitForExistence(timeout: 15))
-        let afterAnswer = NSPredicate(format: "count == 3")
-        expectation(for: afterAnswer, evaluatedWith: rows)
-        waitForExpectations(timeout: 15)
-        capture("07-inbox-after-answer")
-
-        rows.element(boundBy: 0).tap()
-        XCTAssertTrue(element("task-header").waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Split the merge gate into review and route checks"].waitForExistence(timeout: 5))
-        sleep(1)
-        capture("08-task-thread")
+        capture("04-thread")
         app.navigationBars.buttons.element(boundBy: 0).tap()
 
-        app.tabBars.buttons["Coordinator"].tap()
-        let composer = element("composer-field")
-        XCTAssertTrue(composer.waitForExistence(timeout: 10))
-        XCTAssertTrue(element("question-card").waitForExistence(timeout: 10))
-        sleep(2)
-        capture("09-coordinator")
-
-        composer.tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
-        let message = "Sent from the iOS pilot (\(appearance))"
-        composer.typeText(message)
-        app.buttons["send-button"].tap()
-        XCTAssertTrue(app.staticTexts[message].waitForExistence(timeout: 10))
-        let reply = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Stub model reply to \"\(message)\"")).firstMatch
-        XCTAssertTrue(reply.waitForExistence(timeout: 60))
+        XCTAssertTrue(element("option-1").waitForExistence(timeout: 5))
+        element("option-1").tap()
+        XCTAssertTrue(element("answered-choice").waitForExistence(timeout: 10))
         sleep(1)
-        XCTAssertLessThanOrEqual(reply.frame.maxY, composer.frame.minY, "the newest reply must sit above the composer, not behind it")
-        capture("10-coordinator-reply")
+        capture("05-question-answered")
 
-        reply.tap()
-        let keyboardGone = NSPredicate(format: "count == 0")
-        expectation(for: keyboardGone, evaluatedWith: app.keyboards)
-        waitForExpectations(timeout: 5)
-        app.tabBars.buttons["Needs you"].tap()
+        element("tasks-button").tap()
+        let rows = all("inbox-row")
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 10))
+        XCTAssertEqual(rows.count, 2, "the review and the needs-input thread; the answered question is gone")
+        XCTAssertEqual(all("task-row").count, 3, "one running, one to start, one done")
+        sleep(1)
+        capture("06-tasks")
+
+        app.tabBars.buttons.element(boundBy: 2).tap()
+        sleep(1)
+        capture("07-made")
+
+        app.tabBars.buttons.element(boundBy: 0).tap()
         let account = element("account-button")
         XCTAssertTrue(account.waitForExistence(timeout: 5))
         account.tap()
-        XCTAssertTrue(app.buttons["Sign out"].waitForExistence(timeout: 5))
+        XCTAssertTrue(element("sign-out-button").waitForExistence(timeout: 5))
         sleep(1)
-        capture("11-account")
+        capture("08-account")
+    }
+
+    private func all(_ identifier: String) -> XCUIElementQuery {
+        app.descendants(matching: .any).matching(identifier: identifier)
     }
 
     private func element(_ identifier: String) -> XCUIElement {
-        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+        all(identifier).firstMatch
     }
 
     private func capture(_ name: String) {

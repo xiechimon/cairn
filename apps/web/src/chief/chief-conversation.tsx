@@ -291,7 +291,6 @@ export function ChiefConversation({
   const [rewindConfirm, setRewindConfirm] = useState<{ index: number; id: string | null } | null>(
     null,
   );
-  const [toolsOpen, setToolsOpen] = useState<Set<number>>(() => new Set());
   const copyText = useCallback(
     (text: string) => {
       const clip = navigator.clipboard;
@@ -302,16 +301,6 @@ export function ChiefConversation({
       );
     },
     [t],
-  );
-  const toggleTools = useCallback(
-    (i: number) =>
-      setToolsOpen((cur) => {
-        const next = new Set(cur);
-        if (next.has(i)) next.delete(i);
-        else next.add(i);
-        return next;
-      }),
-    [],
   );
   const requestRewind = useCallback(
     (index: number, id: string | null) => setRewindConfirm({ index, id }),
@@ -539,8 +528,6 @@ export function ChiefConversation({
       item={item}
       index={i}
       onCopy={copyText}
-      toolsOpen={toolsOpen}
-      onToggleTools={toggleTools}
       onRewindRequest={requestRewind}
       entering={enteringKey !== null && chiefStreamRowKey(item, i) === enteringKey}
       onRetry={latestUser != null && i > latestUser.i ? retryLastUser : undefined}

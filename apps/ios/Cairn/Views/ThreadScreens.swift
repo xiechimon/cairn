@@ -18,23 +18,17 @@ struct TaskThreadView: View {
             error: error,
             placeholder: "Message this thread",
             onSend: send,
-            onAnswer: { _, _ in }
+            onAnswer: { question, answers in
+                conversationId = try await model.answer(question, answers: answers, inTask: task.id)
+                await reload()
+            },
+            upload: model.client.uploadAttachment
         ) {
-            VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(task.title)
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(Color.ink)
-                    StatusLine(task: task, projectName: model.projectName(task.projectId))
-                }
-                Text(task.spec)
-                    .font(.callout)
-                    .foregroundStyle(Color.ink)
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.card, in: .rect(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.hairline))
+            VStack(alignment: .leading, spacing: 12) {
                 if loaded && messages.isEmpty {
+                    if !task.spec.isEmpty && task.spec != task.title {
+                        ReplyBubble(text: task.spec)
+                    }
                     Text("No messages yet")
                         .font(.footnote)
                         .foregroundStyle(Color.inkMuted)
@@ -43,7 +37,8 @@ struct TaskThreadView: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("task-header")
         }
-        .navigationTitle("#\(task.seqNum)")
+        .navigationTitle(task.title)
+        .navigationSubtitle(Text([task.reason, model.projectName(task.projectId)].compactMap { $0 }.joined(separator: " · ")))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .task(id: conversationId) {
@@ -89,7 +84,7 @@ struct QuestionScreen: View {
 
     var body: some View {
         ScrollView {
-            QuestionCard(question: question) { question, answers in
+            QuestionChips(question: question) { question, answers in
                 try await model.answer(question, answers: answers)
                 dismiss()
             }
@@ -99,31 +94,5 @@ struct QuestionScreen: View {
         .navigationTitle("Question")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-    }
-}
-
-struct StatusLine: View {
-    let task: TaskRecord
-    let projectName: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 6) {
-                if task.status == .failed {
-                    Text("Failed")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.inkMuted)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .overlay(Capsule().strokeBorder(Color.hairline))
-                }
-                Text(task.status == .failed ? "Open it to retry." : task.reason)
-                    .font(.footnote)
-                    .foregroundStyle(task.status == .needsYou ? Color.waiting : Color.inkMuted)
-            }
-            Text(["#\(task.seqNum)", projectName].compactMap { $0 }.joined(separator: " · "))
-                .font(.caption)
-                .foregroundStyle(Color.inkMuted)
-        }
     }
 }

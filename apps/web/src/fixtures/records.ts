@@ -6,6 +6,7 @@ import {
   type GithubRepoSummary,
   type MachineExecutor,
   type MachineHardware,
+  type MachineOsPlatform,
   type MemoryRecord,
   type ModelSource,
   PHASE_VALUES,
@@ -294,6 +295,7 @@ export interface MachineRow {
     skills: string[];
     hardware?: MachineHardware;
     executor?: MachineExecutor;
+    osPlatform?: MachineOsPlatform;
     computer?: true;
     ownComputer?: true;
     browser?: true;

@@ -6,7 +6,6 @@ import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, TypingDots } from '../components/chat/live-row.js';
 import { STATUS_REF_CLS, StatusLine } from '../components/chat/status-line.js';
-import { TraceGroup, type TraceStepItem } from '../components/chat/trace-steps.js';
 import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
@@ -19,7 +18,7 @@ import {
   type TodoGlance,
   TodoGlanceContext,
 } from '../detail/segments.js';
-import type { ChiefSegment, ChiefStreamItem, ChiefToolRow } from '../fixtures/records.js';
+import type { ChiefSegment, ChiefStreamItem } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { dateTimeFormat } from '../lib/date-format.js';
@@ -202,18 +201,6 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
   );
 }
 
-function turnToolSteps(tools: ChiefToolRow[] | undefined): TraceStepItem[] {
-  return (tools ?? []).map((tool, k) => ({
-    id: k,
-    step: {
-      kind: 'tool',
-      name: tool.label,
-      status: tool.error === true ? 'failed' : 'done',
-      ...(tool.seconds !== undefined ? { secs: tool.seconds } : {}),
-    },
-  }));
-}
-
 function TaskStartedRow({
   todoId,
   seq,
@@ -294,8 +281,6 @@ interface ChiefStreamRowProps {
   item: ChiefStreamItem | ThreadActivity;
   index: number;
   onCopy: (text: string) => void;
-  toolsOpen: ReadonlySet<number>;
-  onToggleTools: (index: number) => void;
   onRewindRequest: (index: number, id: string | null) => void;
   onReply?: ((draft: ReplyQuoteDraft) => void) | undefined;
   entering?: boolean;
@@ -334,8 +319,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
   index: i,
   onCopy,
-  toolsOpen,
-  onToggleTools,
   onRewindRequest,
   onReply,
   entering = false,
@@ -547,7 +530,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         </Message>
       </MessageScrollerItem>
     );
-  const tools = turnToolSteps(item.tools);
   const settled = item.typing !== true;
   const whole = robotText(item);
   const fallbackNote =
@@ -574,7 +556,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             : undefined
         }
         onCopy={() => onCopy(quote)}
-        onSteps={tools.length > 0 ? () => onToggleTools(i) : undefined}
       />
     ) : null;
   const sourceHighlighted =
@@ -588,16 +569,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         data-run={runAttr(joinsPrev, joinsNext)}
       >
         <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-          {tools.length > 0 && toolsOpen.has(i) && (
-            <TraceGroup
-              density="compact"
-              steps={tools}
-              open
-              onOpenChange={() => onToggleTools(i)}
-              summaryTestId="chief-tools-toggle"
-              cardTestId="chief-turn-tools"
-            />
-          )}
           <div
             className={BUBBLE_WRAP_CLS}
             data-testid="chief-reply"
