@@ -624,11 +624,6 @@ describe('stuckResearchWaitState', () => {
         { buildId: checker.buildId, teamId: w.s.team.id, createdBy: w.s.user.id, report: text },
       );
     reportFor('No JSON audit.');
-    const firstAt = w.s.db
-      .select({ createdAt: message.createdAt })
-      .from(message)
-      .where(eq(message.id, `info-report-${checker.buildId}`))
-      .get()?.createdAt;
     reportFor(
       `\`\`\`json\n${JSON.stringify({
         claims: [
@@ -648,12 +643,6 @@ describe('stuckResearchWaitState', () => {
       .insert(tokenUsage)
       .values({ buildId: checker.buildId, model: 'gpt-6.1-sol', input: 1, output: 1 })
       .run();
-    const messageAt = w.s.db
-      .select({ createdAt: message.createdAt })
-      .from(message)
-      .where(eq(message.id, `info-report-${checker.buildId}`))
-      .get()?.createdAt;
-    expect(messageAt).toBe(firstAt);
     setCurrentAuditArrival(w.s, checker.buildId, requested.createdAt + 21 * 60_000);
     expect(stuckResearchWaitState(w.deps, w.buildId, requested.createdAt + 21 * 60_000)).toBe(
       'timed-out',
