@@ -5,9 +5,11 @@ const GITHUB_START = '(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{20}';
 const API_KEY_START = 'sk-[A-Za-z0-9_-]{20}';
 const ENVELOPE_START = `${SECRET_BOX_ENVELOPE_VERSION}:[A-Za-z0-9+/]{38}`;
 const NEXT_SECRET = `(?!${BEARER_START}|${GITHUB_START}|${API_KEY_START}|${ENVELOPE_START})`;
+const GENERATED_RECORD_ID = '[A-Za-z0-9][A-Za-z0-9_-]{20}';
 
 const REDACTION_PATTERN = new RegExp(
   [
+    `((?<![A-Za-z0-9_-])chief-${GENERATED_RECORD_ID}-${GENERATED_RECORD_ID}(?![A-Za-z0-9_-]))`,
     '#token=[^\\s"\'<>\\\\]*',
     '(?<=[?&])token=[^\\s&"\'<>\\\\]*',
     '(?<=Authorization:[\\t ]*)Basic[\\t ]+[A-Za-z0-9+/]+=*',
@@ -34,7 +36,8 @@ export function redactSecrets(
         return '[REDACTED]';
       });
     }
-    return text.replace(REDACTION_PATTERN, () => {
+    return text.replace(REDACTION_PATTERN, (match, chiefId: string | undefined) => {
+      if (chiefId !== undefined) return match;
       count++;
       return '[REDACTED]';
     });
