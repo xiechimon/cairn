@@ -14,30 +14,65 @@
   ],
   "groups": [
     {
+      "name": "Spiral",
       "layers": [
         {
-          "name": "mark",
-          "glass": false,
-          "image-name-specializations": [
+          "name": "spiral",
+          "image-name": "spiral.svg",
+          "glass": true,
+          "fill-specializations": [
             {
-              "value": "mark.svg"
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.12549,0.13333,0.12549,1.00000",
+                  "extended-srgb:0.45098,0.45882,0.43922,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.3,
+                    "y": 0.2
+                  },
+                  "stop": {
+                    "x": 0.8,
+                    "y": 0.9
+                  }
+                }
+              }
             },
             {
               "appearance": "dark",
-              "value": "mark-dark.svg"
-            },
-            {
-              "appearance": "tinted",
-              "value": "mark-tinted.svg"
+              "value": {
+                "linear-gradient": [
+                  "extended-srgb:0.94902,0.94902,0.92941,1.00000",
+                  "extended-srgb:0.54902,0.56078,0.54118,1.00000"
+                ],
+                "orientation": {
+                  "start": {
+                    "x": 0.3,
+                    "y": 0.2
+                  },
+                  "stop": {
+                    "x": 0.8,
+                    "y": 0.9
+                  }
+                }
+              }
             }
           ]
         }
-      ]
+      ],
+      "specular": true,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.4
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
     }
   ],
   "supported-platforms": {
-    "squares": [
-      "iOS"
-    ]
+    "squares": "shared"
   }
 }
