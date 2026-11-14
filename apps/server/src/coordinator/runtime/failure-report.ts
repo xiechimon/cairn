@@ -1,5 +1,6 @@
 import { otelErrorMessage } from '@cairn/shared';
-import { emitCompactionSpan } from '../../runtime-otel.js';
+import type { AssistantMessage } from '@earendil-works/pi-ai';
+import { emitCompactionSpan, emitSummaryCallSpan } from '../../runtime-otel.js';
 
 export type CompactionStage =
   | 'memory-flush'
@@ -55,6 +56,63 @@ export function recordCompactionSuccess(
   const stepId =
     scope.stepId ?? (scope.threadId === undefined ? null : sink.stepOf(scope.threadId));
   emitCompactionSpan({ ...scope, stepId: stepId ?? undefined, stage, startAt });
+}
+
+export function startSummaryCall(
+  scope: FailureScope,
+  stage: string,
+  model: { provider: string; id: string },
+) {
+  const startMs = Date.now();
+  const stepId =
+    scope.stepId ?? (scope.threadId === undefined ? null : sink.stepOf(scope.threadId));
+  return (reply: AssistantMessage | undefined, error: unknown, httpStatus: number | undefined) => {
+    try {
+      const scrub = (text: string) =>
+        otelErrorMessage(
+          (scope.threadId === undefined ? text : sink.scrub(scope.threadId, text)).replace(
+            /\b[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi,
+            '<url>',
+          ),
+        );
+      const diagnostics = reply?.diagnostics?.slice(-8).map((item) => ({
+        type: item.type,
+        name: item.error?.name,
+        message: item.error?.message,
+        code: item.error?.code,
+        configuredTransport: item.details?.configuredTransport,
+        fallbackTransport: item.details?.fallbackTransport,
+      }));
+      const message =
+        error === undefined
+          ? undefined
+          : scrub(error instanceof Error ? error.message : String(error));
+      emitSummaryCallSpan({
+        ...scope,
+        ...(stepId === null ? {} : { stepId }),
+        stage,
+        provider: model.provider,
+        model: model.id,
+        startMs,
+        endMs: Date.now(),
+        ...(reply === undefined
+          ? {}
+          : {
+              finishReason: reply.stopReason,
+              usage: reply.usage,
+              costUsd: reply.usage?.cost?.total,
+            }),
+        ...(message === undefined
+          ? {}
+          : {
+              errorMessage: message,
+              errorClass: scrub(error instanceof Error ? error.name : typeof error),
+            }),
+        ...(diagnostics === undefined ? {} : { diagnostics: scrub(JSON.stringify(diagnostics)) }),
+        ...(httpStatus === undefined ? {} : { httpStatus }),
+      });
+    } catch {}
+  };
 }
 
 export function reportCompactionFailure(
