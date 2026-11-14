@@ -55,6 +55,9 @@ const badge = (page: Page) => page.getByTestId('automation-badge');
 const popover = (page: Page) => page.getByRole('dialog', { name: 'Automations', exact: true });
 
 async function refreshSchedules(page: Page) {
+  await page.waitForFunction(() =>
+    window.__es.some((entry) => entry.url.includes('/api/teams/t1/stream')),
+  );
   await page.evaluate(() => {
     const stream = window.__es.find((entry) => entry.url.includes('/api/teams/t1/stream'));
     if (stream === undefined) throw new Error('team stream did not connect');
