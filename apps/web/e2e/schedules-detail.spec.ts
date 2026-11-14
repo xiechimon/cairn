@@ -371,11 +371,16 @@ test('a saved seven-minute anchor stays visible and survives Save unchanged', as
 test('an empty cached schedule list followed by network failure reports an error, not deletion', async ({ page }) => {
   const probe = await setup(page);
   await open(page);
-  const invalidate = (seq: number) => page.evaluate(({ todo, sequence }) => {
-    const stream = window.__es.find((entry) => entry.url.includes('/api/teams/t1/stream'));
-    if (stream === undefined) throw new Error('Team stream is not connected');
-    stream.emit({ type: 'todo', seq: sequence, v: 1, doc: todo });
-  }, { todo: { ...TASK, phase: 'done' }, sequence: seq });
+  const invalidate = async (seq: number) => {
+    await page.waitForFunction(() =>
+      window.__es.some((entry) => entry.url.includes('/api/teams/t1/stream')),
+    );
+    await page.evaluate(({ todo, sequence }) => {
+      const stream = window.__es.find((entry) => entry.url.includes('/api/teams/t1/stream'));
+      if (stream === undefined) throw new Error('Team stream is not connected');
+      stream.emit({ type: 'todo', seq: sequence, v: 1, doc: todo });
+    }, { todo: { ...TASK, phase: 'done' }, sequence: seq });
+  };
   probe.show(false);
   await invalidate(50);
   await expect(detail(page)).toContainText('This scheduled task is no longer available.');
