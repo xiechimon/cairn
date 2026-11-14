@@ -1,7 +1,7 @@
 import { canOrchestrate } from '@cairn/shared';
 import { cn } from 'cn';
 import { Ellipsis } from 'lucide-react';
-import { type ReactNode, useRef, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useApiMutations, useChiefThreads } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
@@ -9,6 +9,7 @@ import { REPLY_CHIP_CLS } from '../chief/quick-replies.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
+import { DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { toastError } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
@@ -82,7 +83,6 @@ export function useThreadActions({
   const [dialog, setDialog] = useState<
     'accept' | 'delete' | 'stop' | 'route-override' | 'rename' | null
   >(null);
-  const moreRef = useRef<HTMLButtonElement | null>(null);
   const { buildId, running } = chat;
   const phase = todo.phase;
   const archived = todo.archivedAt != null;
@@ -222,27 +222,28 @@ export function useThreadActions({
     phase === 'review' || phase === 'confirm' || (phase === 'failed' && chat.buildLegDone);
   const menu = (
     <>
-      <IconTooltip
-        label={t('更多操作…')}
-        side="bottom"
-        trigger={
-          <Button
-            ref={moreRef}
-            variant="ghost"
-            size="icon"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-5.5 max-[640px]:size-8"
-          />
-        }
-      >
-        <Ellipsis aria-hidden="true" />
-      </IconTooltip>
       <MoreMenu
         open={menuOpen}
-        anchor={moreRef}
-        onClose={() => setMenuOpen(false)}
+        onOpenChange={setMenuOpen}
+        trigger={
+          <IconTooltip
+            label={t('更多操作…')}
+            side="bottom"
+            trigger={
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-5.5 max-[640px]:size-8"
+                  />
+                }
+              />
+            }
+          >
+            <Ellipsis aria-hidden="true" />
+          </IconTooltip>
+        }
         onDelete={() => {
           setMenuOpen(false);
           setDialog('delete');
