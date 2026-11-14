@@ -55,6 +55,10 @@ export const EN: Record<string, string> = {
   '搜索 {n} 次': 'Searched {n#once|# times}',
   '跑了 {n} 条命令': 'Ran {n#1 command|# commands}',
   '改了 {n} 个文件': 'Edited {n#1 file|# files}',
+  测试通过: 'Tests pass',
+  改完测试通过: 'Edited, tests pass',
+  改完测试未通过: 'Edited, tests fail',
+  测试未通过: 'Tests fail',
   '推送 {n} 次': 'Pushed {n#once|# times}',
   '调用 {n} 个工具': 'Called {n#1 tool|# tools}',
   准备了工作区: 'Prepared the workspace',
@@ -274,6 +278,7 @@ export const EN: Record<string, string> = {
   回复: 'Reply',
   移除引用: 'Remove quote',
   方案: 'Plan',
+  计划: 'Plan',
   分支: 'Branch',
   变更: 'Changes',
   // 看板顶部通知引导条 (issue #114): components consume the shared
@@ -1885,7 +1890,6 @@ export const EN: Record<string, string> = {
   电脑没能加载: 'Computers did not load',
   '搜索没能完成，下面只是本地匹配的结果。': 'Search did not finish. These are local matches only.',
   正在加载对话: 'Loading the conversation',
-  '加载完成后才能发送。': 'You can send once loading finishes.',
   远程访问: 'Remote access',
 
   配对新设备: 'Pair a new device',

@@ -49,9 +49,9 @@ describe('runBrowserTool', () => {
       { timeoutMs: 5_000, signal: new AbortController().signal, session: 'chief:1' },
     );
     expect(text).toContain('ok');
-    expect(log[0]).toContain(
-      'agent-browser --session chief_1 --restore --headed open https://example.com',
-    );
+    expect(
+      log.filter((line) => !line.startsWith('xdotool ') && !/ get (title|url)$/.test(line))[0],
+    ).toContain('agent-browser --session chief_1 --restore --headed open https://example.com');
   });
 
   test('refuses non-http URLs before delivery', async () => {
@@ -85,7 +85,11 @@ describe('runBrowserTool', () => {
       { actions: [{ kind: 'fill', ref: '@e1', text: 'hello' }] },
       { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
     );
-    expect(log.at(-1)).toBe('agent-browser --session s --restore --headed fill @e1 hello');
+    expect(log.some((line) => line.includes(' -- '))).toBe(false);
+    const typed = log
+      .filter((line) => line.includes(' keyboard type '))
+      .map((line) => line.slice(line.indexOf(' keyboard type ') + ' keyboard type '.length));
+    expect(typed.join('')).toBe('hello');
   });
 
   test('refuses when the ref is missing from a fresh snapshot', async () => {
@@ -345,8 +349,11 @@ describe('login form detection', () => {
   test('navigate also runs detection after the page opens', async () => {
     const log: string[] = [];
     const result = await run(detectingProvider(log, evalResult(['challenge'])), 'browser_navigate');
-    expect(log[0]).toContain(' open https://example.com');
-    expect(log[1]).toContain(' --json eval ');
+    const browserLog = log.filter(
+      (line) => !line.startsWith('xdotool ') && !/ get (title|url)$/.test(line),
+    );
+    expect(browserLog[0]).toContain(' open https://example.com');
+    expect(browserLog[1]).toContain(' --json eval ');
     expect(result.loginForm).toEqual({ signals: ['challenge'] });
   });
 
@@ -449,7 +456,11 @@ describe('secret field guard', () => {
     await act(fieldProvider(log, { type: 'tel', autocomplete: 'tel' }), 'fill');
     expect(log).toContain('agent-browser --session s --restore --headed get attr @e2 type');
     expect(log).toContain('agent-browser --session s --restore --headed get attr @e2 autocomplete');
-    expect(log.at(-1)).toBe('agent-browser --session s --restore --headed fill @e2 value');
+    expect(log).toContain('agent-browser --session s --restore --headed focus @e2');
+    const typed = log
+      .filter((line) => line.includes(' keyboard type '))
+      .map((line) => line.slice(line.indexOf(' keyboard type ') + ' keyboard type '.length));
+    expect(typed.join('')).toBe('value');
   });
 });
 
@@ -616,14 +627,149 @@ describe('agent cursor on the live screen', () => {
     expect((at[act] ?? 0) - (at[box] ?? 0)).toBeLessThan(300);
   });
 
+  test('a new cursor starts from where the last one rested and glides to its target', () => {
+    const script = agentCursorScript(300, 400, 'click', { x: 120, y: 210 });
+    const start = script.indexOf("cursor.style.transform = 'translate(117px, 208px)'");
+    const reflow = script.indexOf('void cursor.offsetWidth');
+    const target = script.indexOf("cursor.style.transform = 'translate(297px, 398px)'");
+    expect(start).toBeGreaterThan(-1);
+    expect(reflow).toBeGreaterThan(start);
+    expect(target).toBeGreaterThan(reflow);
+    expect(agentCursorScript(300, 400, 'click')).toContain('innerWidth / 2');
+  });
+
+  test('the next click in the same browser session starts its cursor where the last click rested', async () => {
+    const log: string[] = [];
+    const boxes = [
+      { x: 100, y: 200, width: 40, height: 20 },
+      { x: 400, y: 500, width: 40, height: 20 },
+    ];
+    const provider: ComputerProvider = {
+      ...cursorProvider(log),
+      async execute(request) {
+        const line = request.argv.join(' ');
+        if (!line.includes(' get box ')) return cursorProvider(log).execute(request);
+        log.push(line);
+        const data = boxes.shift() ?? { x: 0, y: 0, width: 0, height: 0 };
+        return (async function* () {
+          yield { kind: 'stdout' as const, text: JSON.stringify({ success: true, data }) };
+          yield { kind: 'exit' as const, code: 0 };
+        })();
+      },
+    };
+    const clickIn = (session: string) =>
+      runBrowserTool(
+        provider,
+        'browser_act',
+        { actions: [{ kind: 'click', ref: 'e1' }] },
+        { timeoutMs: 5_000, signal: new AbortController().signal, session },
+      );
+    await clickIn('glide');
+    await clickIn('glide');
+    const draws = log.filter(
+      (line) => line.includes('__cairnAgentCursor') && line.includes(`"click" === 'click'`),
+    );
+    expect(draws[1]).toBe(
+      `agent-browser --session glide --restore --headed --json eval ${agentCursorScript(420, 510, 'click', { x: 120, y: 210 })}`,
+    );
+  });
+
+  test('the cursor stays on screen instead of fading out after a few seconds', () => {
+    expect(agentCursorScript(120, 210, 'click')).not.toContain("cursor.style.opacity = '0'");
+  });
+
+  test('after a click the cursor is drawn again where it clicked once the next page has loaded', async () => {
+    const log: string[] = [];
+    await runBrowserTool(
+      cursorProvider(log),
+      'browser_act',
+      { actions: [{ kind: 'click', ref: 'e1' }] },
+      { timeoutMs: 5_000, signal: new AbortController().signal, session: 'stay' },
+    );
+    const act = log.findIndex((line) => line.endsWith(' click @e1'));
+    const settle = log.findIndex(
+      (line, i) => i > act && line.endsWith(' wait --load domcontentloaded'),
+    );
+    const rest = log.findIndex((line, i) => i > settle && line.includes('__cairnAgentCursor'));
+    expect(settle).toBeGreaterThan(act);
+    expect(log[rest]).toBe(
+      `agent-browser --session stay --restore --headed --json eval ${agentCursorScript(120, 210, 'point', { x: 120, y: 210 })}`,
+    );
+  });
+
+  test('opening a page keeps the cursor where it last rested', async () => {
+    const log: string[] = [];
+    const provider = cursorProvider(log);
+    const options = { timeoutMs: 5_000, signal: new AbortController().signal, session: 'stay-nav' };
+    await runBrowserTool(
+      provider,
+      'browser_act',
+      { actions: [{ kind: 'click', ref: 'e1' }] },
+      options,
+    );
+    log.length = 0;
+    await runBrowserTool(provider, 'browser_navigate', { url: 'https://example.com' }, options);
+    const open = log.findIndex((line) => line.includes(' open https://example.com'));
+    const rest = log.findIndex((line, i) => i > open && line.includes('__cairnAgentCursor'));
+    expect(rest).toBeGreaterThan(open);
+  });
+
+  test('filling a field clears it, focuses it and types the text key by key like a person', async () => {
+    const log: string[] = [];
+    await runBrowserTool(
+      cursorProvider(log),
+      'browser_act',
+      { actions: [{ kind: 'fill', ref: 'e1', text: 'hello' }] },
+      { timeoutMs: 30_000, signal: new AbortController().signal, session: 'typing' },
+    );
+    const typed = log.filter((line) => line.includes(' keyboard type '));
+    expect(typed.map((line) => line.split(' keyboard type ')[1])).toEqual([
+      'h',
+      'e',
+      'l',
+      'l',
+      'o',
+    ]);
+    const clear = log.findIndex((line) => line.endsWith(' fill @e1 '));
+    const focus = log.findIndex((line) => line.endsWith(' focus @e1'));
+    const first = log.findIndex((line) => line.includes(' keyboard type '));
+    expect(clear).toBeGreaterThan(-1);
+    expect(focus).toBeGreaterThan(clear);
+    expect(first).toBeGreaterThan(focus);
+    expect(log.some((line) => line.endsWith(' fill @e1 hello'))).toBe(false);
+  });
+
+  test('long text is typed in at most 24 bursts that add up to the text', async () => {
+    const log: string[] = [];
+    const text = 'The deployment checks passed and the change is ready for review. '.repeat(2);
+    await runBrowserTool(
+      cursorProvider(log),
+      'browser_act',
+      { actions: [{ kind: 'type', ref: 'e1', text }] },
+      { timeoutMs: 60_000, signal: new AbortController().signal, session: 'typing-long' },
+    );
+    const bursts = log
+      .filter((line) => line.includes(' keyboard type '))
+      .map((line) => line.slice(line.indexOf(' keyboard type ') + ' keyboard type '.length));
+    expect(bursts.length).toBeLessThanOrEqual(24);
+    expect(bursts.join('')).toBe(text);
+  });
+
   test('the cursor never blocks the action when the box or the drawing fails', async () => {
+    const clickIn = (provider: ComputerProvider, session: string) =>
+      runBrowserTool(
+        provider,
+        'browser_act',
+        { actions: [{ kind: 'click', ref: 'e1' }] },
+        { timeoutMs: 5_000, signal: new AbortController().signal, session },
+      );
     const noBox: string[] = [];
-    await click(cursorProvider(noBox, { box: { text: 'not found', code: 1 } }));
+    await clickIn(cursorProvider(noBox, { box: { text: 'not found', code: 1 } }), 'nobox');
     expect(noBox.some((line) => line.includes('__cairnAgentCursor'))).toBe(false);
-    expect(noBox.at(-1)).toContain('click @e1');
+    expect(noBox.some((line) => line.endsWith(' click @e1'))).toBe(true);
     const noDraw: string[] = [];
-    await click(cursorProvider(noDraw, { evalCode: 1 }));
-    expect(noDraw.at(-1)).toContain('click @e1');
+    await clickIn(cursorProvider(noDraw, { evalCode: 1 }), 'nodraw');
+    expect(noDraw.some((line) => line.endsWith(' click @e1'))).toBe(true);
   });
 
   test('the cursor is hidden from the accessibility tree and never takes a click', () => {
@@ -634,5 +780,108 @@ describe('agent cursor on the live screen', () => {
     const styles = [...script.matchAll(/cssText = '([^']*)'/g)].map((match) => match[1] ?? '');
     expect(styles.length).toBeGreaterThanOrEqual(4);
     for (const style of styles) expect(style).toContain('pointer-events:none');
+  });
+});
+
+function addressBarProvider(
+  log: string[],
+  options: { window?: string; url?: string; title?: string } = {},
+): ComputerProvider {
+  return {
+    async execute(request) {
+      const line = request.argv.join(' ');
+      log.push(line);
+      const respond = (text: string, code = 0) =>
+        (async function* () {
+          if (text !== '') yield { kind: 'stdout' as const, text };
+          yield { kind: 'exit' as const, code };
+        })();
+      if (line.startsWith('xdotool search')) {
+        return options.window === undefined ? respond('', 1) : respond(`${options.window}\n`);
+      }
+      if (line.endsWith(' get url')) return respond(`${options.url ?? 'https://example.com/'}\n`);
+      if (line.endsWith(' get title'))
+        return respond(`[agent-browser] restore: loaded\n${options.title ?? 'Example Domain'}\n`);
+      if (line.includes(' eval ')) return respond('{"success":true,"data":{"result":[]}}');
+      return respond('ok\n');
+    },
+    async listFiles() {
+      return [];
+    },
+    async readFile() {
+      return '';
+    },
+    async writeFile() {},
+    async killAll() {},
+  };
+}
+
+describe('opening a page like a person', () => {
+  const navigate = (provider: ComputerProvider, url = 'https://example.com') =>
+    runBrowserTool(
+      provider,
+      'browser_navigate',
+      { url },
+      { timeoutMs: 60_000, signal: new AbortController().signal, session: 'omnibox' },
+    );
+
+  test('the URL is typed into the address bar and entered instead of jumping straight to it', async () => {
+    const log: string[] = [];
+    const result = await navigate(addressBarProvider(log, { window: '42' }));
+    const focus = log.findIndex((line) =>
+      line.includes('xdotool windowactivate --sync 42 key --clearmodifiers ctrl+l'),
+    );
+    const typed = log.findIndex((line) =>
+      /^xdotool type --delay \d+ https:\/\/example\.com$/.test(line),
+    );
+    const enter = log.findIndex((line) => line === 'xdotool key Return');
+    expect(focus).toBeGreaterThan(-1);
+    expect(typed).toBeGreaterThan(focus);
+    expect(enter).toBeGreaterThan(typed);
+    expect(log.some((line) => line.endsWith(' open https://example.com'))).toBe(false);
+    expect(result.text).toContain('Example Domain');
+    expect(result.text).toContain('https://example.com/');
+  });
+
+  test('the address bar of the session window is used when other browsers are open', async () => {
+    const log: string[] = [];
+    await navigate(addressBarProvider(log, { window: '42', title: 'Example Domain (v2)' }));
+    const search = log.find((line) => line.startsWith('xdotool search'));
+    expect(search).toBe('xdotool search --onlyvisible --name ^Example Domain \\(v2\\) - Chromium$');
+  });
+
+  test('two windows showing the same page are ambiguous, so it opens the URL directly', async () => {
+    const log: string[] = [];
+    await navigate(addressBarProvider(log, { window: '41\n42' }));
+    expect(log.some((line) => line.startsWith('xdotool type'))).toBe(false);
+    expect(log.some((line) => line.endsWith(' open https://example.com'))).toBe(true);
+  });
+
+  test('without a browser window it opens a blank page first and still types the URL', async () => {
+    const log: string[] = [];
+    let searches = 0;
+    const provider = addressBarProvider(log, { window: '7' });
+    const firstSearchMisses: ComputerProvider = {
+      ...provider,
+      async execute(request) {
+        if (request.argv[0] === 'xdotool' && request.argv[1] === 'search' && searches++ === 0) {
+          log.push(request.argv.join(' '));
+          return (async function* () {
+            yield { kind: 'exit' as const, code: 1 };
+          })();
+        }
+        return provider.execute(request);
+      },
+    };
+    await navigate(firstSearchMisses);
+    expect(log.some((line) => line.endsWith(' open about:blank'))).toBe(true);
+    expect(log.some((line) => line.startsWith('xdotool type --delay'))).toBe(true);
+  });
+
+  test('a page that fails to load in the address bar is reported as a failed navigation', async () => {
+    const log: string[] = [];
+    await expect(
+      navigate(addressBarProvider(log, { window: '42', url: 'chrome-error://chromewebdata/' })),
+    ).rejects.toMatchObject({ delivery: 'unknown' });
   });
 });

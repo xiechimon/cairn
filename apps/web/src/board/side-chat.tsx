@@ -46,6 +46,7 @@ import {
   threadUpdates,
 } from './thread-panel-model.js';
 import { ThreadPrPanel } from './thread-pr-panel.js';
+import { ThreadUpdatesBlock } from './thread-updates-block.js';
 import {
   ThreadUsageDetails,
   ThreadUsageRing,
@@ -257,7 +258,6 @@ function ThreadBody({
   view,
   onViewChanges,
   now,
-  updates,
   origin,
   onJumpToOrigin,
   onOpenPlan,
@@ -271,7 +271,6 @@ function ThreadBody({
   view: ThreadView;
   onViewChanges: () => void;
   now: number;
-  updates: ThreadUpdates | null;
   origin: ThreadOrigin | null;
   onJumpToOrigin: () => void;
   onOpenPlan: (() => void) | undefined;
@@ -309,7 +308,6 @@ function ThreadBody({
             <ThreadLead
               todo={todo}
               showSpec={!chat.hasEarlier}
-              updates={updates}
               origin={origin}
               onJumpToOrigin={onJumpToOrigin}
             />
@@ -528,7 +526,9 @@ function ReadyThread({
 }) {
   const { t } = useI18n();
   const [planOpen, setPlanOpen] = useState(false);
-  const openPlan = chat.planDoc !== undefined ? () => setPlanOpen(true) : undefined;
+  const updates = threadUpdates(todo, chat.transcript);
+  const openPlan =
+    chat.planDoc !== undefined || updates !== null ? () => setPlanOpen(true) : undefined;
   const usage = useThreadUsage(todo);
   const [takingOver, setTakingOver] = useState(false);
   const engineActions = engine?.actions;
@@ -554,7 +554,6 @@ function ReadyThread({
   const { live, teamId } = useLiveData();
   const prs = usePrs(teamId, todo.id, live);
   const prRows = prs.data ?? [];
-  const updates = threadUpdates(todo, chat.transcript);
   const origin = threadOrigin(todo.request, chatStream);
   const jumpToOrigin = () => {
     if (origin === null) return;
@@ -602,7 +601,6 @@ function ReadyThread({
         view={view}
         onViewChanges={() => onView('changes')}
         now={now}
-        updates={updates}
         origin={origin}
         onJumpToOrigin={jumpToOrigin}
         onOpenPlan={openPlan}
@@ -633,18 +631,25 @@ function ReadyThread({
         open={planOpen}
         onClose={() => setPlanOpen(false)}
         size="l"
-        title={t('方案')}
+        title={t('计划')}
         subtitle={todo.title}
       >
         <div data-testid="side-chat-plan" className="flex h-[min(70vh,720px)] min-h-0 flex-col">
-          <DocPane
-            mode="plan"
-            doc={chat.planDoc}
-            changes={undefined}
-            now={now}
-            onDocView={() => undefined}
-            planVersions={chat.planVersions}
-          />
+          {updates !== null && (
+            <div className="flex-none border-b border-border px-3.5 pt-1 pb-4">
+              <ThreadUpdatesBlock updates={updates} />
+            </div>
+          )}
+          {chat.planDoc !== undefined && (
+            <DocPane
+              mode="plan"
+              doc={chat.planDoc}
+              changes={undefined}
+              now={now}
+              onDocView={() => undefined}
+              planVersions={chat.planVersions}
+            />
+          )}
         </div>
       </DialogShell>
     </>

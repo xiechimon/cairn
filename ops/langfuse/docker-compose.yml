@@ -36,7 +36,8 @@ x-langfuse-env: &langfuse-env
   REDIS_PORT: "6379"
   REDIS_AUTH: ${REDIS_AUTH:?set REDIS_AUTH in .env}
   HTTPS_PROXY: ${LANGFUSE_LLM_HTTPS_PROXY:-}
-  NO_PROXY: localhost,127.0.0.1,postgres,clickhouse,minio,redis,langfuse-web,langfuse-worker
+  NO_PROXY: localhost,127.0.0.1,postgres,clickhouse,minio,redis,langfuse-web,langfuse-worker,code-eval-gateway
+  LANGFUSE_CODE_EVAL_DISPATCHER: aws-lambda
 
 x-egress-relay: &egress-relay
   image: docker.io/langfuse/langfuse-worker:4.68.0
@@ -50,7 +51,42 @@ x-egress-relay: &egress-relay
   security_opt: [no-new-privileges:true]
   logging: *default-logging
 
+x-code-eval-hardening: &code-eval-hardening
+  restart: always
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 64
+  logging: *default-logging
+
 services:
+  code-eval-runner:
+    <<: *code-eval-hardening
+    build: ./code-eval-runner
+    image: cairn-langfuse-code-eval-runner:4.68.0
+    user: "65534:65534"
+    mem_limit: 256m
+    cpus: 0.5
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid
+    environment:
+      AWS_LAMBDA_FUNCTION_TIMEOUT: "2"
+    networks: [code-eval-sandbox]
+
+  code-eval-gateway:
+    <<: *code-eval-hardening
+    image: docker.io/langfuse/langfuse-worker:4.68.0
+    entrypoint: ["node", "/gateway/code-eval-gateway.mjs"]
+    user: "0:0"
+    cap_add: [DAC_READ_SEARCH]
+    mem_limit: 64m
+    depends_on: [code-eval-runner]
+    environment:
+      GATEWAY_TARGET: code-eval-runner:8080
+    volumes:
+      - ./code-eval-gateway.mjs:/gateway/code-eval-gateway.mjs:ro
+    networks: [code-eval-ingress, code-eval-sandbox]
+
   egress-relay-host:
     <<: *egress-relay
     command: ["host"]
@@ -85,6 +121,13 @@ services:
         condition: service_healthy
     environment:
       <<: *langfuse-env
+      LANGFUSE_CODE_EVAL_AWS_LAMBDA_ENDPOINT: http://code-eval-gateway:8080
+      LANGFUSE_CODE_EVAL_AWS_LAMBDA_NODE_FUNCTION_NAME: function
+      LANGFUSE_CODE_EVAL_EXECUTION_WORKER_CONCURRENCY: "1"
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: code-eval-dispatcher-signing-only
+      AWS_SECRET_ACCESS_KEY: code-eval-dispatcher-signing-only
+    networks: [default, code-eval-ingress]
     logging: *default-logging
 
   langfuse-web:
@@ -184,6 +227,18 @@ services:
       timeout: 3s
       retries: 10
     logging: *default-logging
+
+networks:
+  code-eval-ingress:
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+      com.docker.network.bridge.gateway_mode_ipv6: isolated
+  code-eval-sandbox:
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+      com.docker.network.bridge.gateway_mode_ipv6: isolated
 
 volumes:
   postgres_data:

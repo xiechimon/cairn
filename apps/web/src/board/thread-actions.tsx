@@ -268,6 +268,14 @@ export function useThreadActions({
           setMenuOpen(false);
           setDialog('rename');
         }}
+        {...(onViewPlan !== undefined
+          ? {
+              onViewPlan: () => {
+                setMenuOpen(false);
+                onViewPlan();
+              },
+            }
+          : {})}
         {...(engine !== undefined
           ? {
               onViewRaw: () => {

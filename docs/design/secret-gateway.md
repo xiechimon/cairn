@@ -1,12 +1,18 @@
-# Team secret gateway: implementation design
+# Personal secret gateway: implementation design
 
-Status: proposed, 2026-11-12. Issue: #1775. Needs coordinator review before any product code (persisted state, wire protocol and a security surface all change). Research and the request rules this design relies on: [the decision brief](../research/1775-secret-gateway-design.md) and [the prior-art note](../research/1775-gateway-prior-art.md).
+Status: personal-scope revision, 2026-11-14. Issue: #1775. The coordinator reviewed the personal scope and independent offline prototype; the owner approved publishing this design and prototype on 2026-11-14. Steps 1 and 2 merged as #4101 and #4174; the gateway is not enabled. Needs coordinator review before further product code (persisted state, wire protocol and a security surface all change). Research and the request rules this design relies on: [the decision brief](../research/1775-secret-gateway-design.md) and [the prior-art note](../research/1775-gateway-prior-art.md).
+
+## Personal scope
+
+Cairn serves one person. The gateway protects that person's credentials from prompt injection in an agent's inputs; it is not a shared vault or a boundary between people. There are no member roles, invitations, sharing rules, delegated policy administrators or cross-person grants in this milestone. Only the person using settings binds a credential to an upstream. Agent assignment and project overrides restrict tasks belonging to that same person.
+
+Existing `teamId` columns and `/api/teams/:id/secrets` routes are compatibility names for the personal workspace, not a multi-person product contract. This design does not rename storage or routes or add another migration. Historical research retains its original terminology. Per-guest listeners and per-step grants remain necessary: two tasks of the same person must not borrow each other's credentials.
 
 ## Decisions this design rests on
 
 Ian answered the brief's four questions on 2026-11-12:
 
-1. **Scope.** The first milestone covers isolated execution only: a step that runs in a local Orb guest. A step on the host has no boundary the gateway could rely on, so it keeps plaintext delivery and the product shows that delivery as legacy.
+1. **Scope.** The first milestone covers isolated execution only: a step that runs in a local Orb guest. A step on the host has no boundary the gateway could rely on, so it receives only explicitly `plaintext` secrets, shown as legacy. An `http` secret is withheld there, never downgraded to plaintext.
 2. **Responses.** An upstream the owner explicitly binds to a secret may return anything. An upstream that echoes the credential cannot be stopped; the product says so next to the setting. No per-service response adapters in this milestone.
 3. **Existing secrets.** They stay as they are, shown as legacy plaintext, and the owner migrates each one. Nothing is converted or reauthorized automatically.
 4. **Gateway choice.** A prototype on a real Orb host compares Envoy with an extension of the existing egress relay before the production data plane is chosen.
@@ -81,9 +87,9 @@ Validation, run on every write, a rename included:
 
 **Who may write the policy.** Whoever can write `httpOrigin` can read the value out by pointing the secret at a host they control, so:
 
-- `delivery`, `httpOrigin`, `httpHeader` and `httpTemplate` are written only by the settings routes (`POST` and `PATCH /api/teams/:id/secrets`). These routes are owner-only already (`OWNER_ONLY_PATTERNS` in `lib/token-auth.ts`), so a paired device is refused there. The Coordinator's `set_secret` tool never creates or changes an `http` secret, neither value nor policy, and returns an error that points to settings. It also refuses when any row of that name which the new row would shadow, or be shadowed by, is `http` (the team row and that project's row): otherwise a project-scoped `plaintext` row would silently replace a gateway-delivered secret for steps in the project. A value that passed through `set_secret` has been in a model context and in chat history, so it cannot be an `http` secret in the promised sense. `delete_secrets` may delete one.
+- `delivery`, `httpOrigin`, `httpHeader` and `httpTemplate` are written only by the settings routes (`POST` and `PATCH /api/teams/:id/secrets`). These routes are owner-only already (`OWNER_ONLY_PATTERNS` in `lib/token-auth.ts`), so a paired device is refused there. This is a human-settings versus agent-tool boundary, not a member-role system. The Coordinator's `set_secret` tool never creates or changes an `http` secret, neither value nor policy, and returns an error that points to settings. It also refuses when any row of that name which the new row would shadow, or be shadowed by, is `http` (the personal-workspace row and that project's row): otherwise a project-scoped `plaintext` row would silently replace a gateway-delivered secret for steps in the project. A value that passed through `set_secret` has been in a model context and in chat history, so it cannot be an `http` secret in the promised sense. `delete_secrets` may delete one.
 - **The value is bound to its target.** A write that changes the origin, header or template of an `http` secret, or sets it back to `plaintext`, must carry a new value in the same request. The stored value is never carried over to a new target. `plaintext` to `http` may keep the value. The settings page asks for the value again on such an edit.
-- Project override: `openSecretValues` lets a project-scoped row replace a granted team row of the same name. The policy that applies is the effective row's, and `id` and `revision` in `httpSecrets` are that row's. A project row can be created only through the same settings routes when it is `http`.
+- Project override: `openSecretValues` lets a project-scoped row replace an assigned personal-workspace row of the same name. The policy that applies is the effective row's, and `id` and `revision` in `httpSecrets` are that row's. A project row can be created only through the same settings routes when it is `http`.
 
 ## Wire
 
@@ -96,7 +102,7 @@ httpSecrets?: Array<{
 }>
 ```
 
-The token route is a `GET`, so `surface` is a query parameter: `orb` or `host`, where an absent or unknown value is `host`. The host daemon says `orb` only for a local guest that has its own gateway listener. The server fills `httpSecrets` only when all five hold: the machine declared the `secretGateway` capability, the machine's reported `executor` is `orb`, the request says `orb`, the step's status is `claimed` (`ownedStep` checks only the machine today, so a finished step can still ask), and the step is one that gets team secrets today. In every other case an `http` secret is left out of the response entirely and its name is listed in `withheldSecrets: string[]`. It is never moved into `secrets`.
+The token route is a `GET`, so `surface` is a query parameter: `orb` or `host`, where an absent or unknown value is `host`. The host daemon says `orb` only for a local guest that has its own gateway listener. The server fills `httpSecrets` only when all five hold: the machine declared the `secretGateway` capability, the machine's reported `executor` is `orb`, the request says `orb`, the step's status is `claimed` (`ownedStep` checks only the machine today, so a finished step can still ask), and the step is eligible for the person's assigned secrets. In every other case an `http` secret is left out of the response entirely and its name is listed in `withheldSecrets: string[]`. It is never moved into `secrets`.
 
 The daemon declares `secretGateway` only while the gateway answers on the admin socket and reports per-guest listeners.
 
@@ -160,7 +166,7 @@ One test per row.
 | 1b | `DELETE /api/teams/:id/secrets/:sid` | deletes | unchanged; running steps are covered by reconcile and the bound |
 | 1c | Coordinator `set_secret` (`services/chief-tools.ts`) | creates or updates by name, value from the model | refuses when the existing row, or any same-name row it would shadow or be shadowed by, is `http` (one test for the project case); can only create `plaintext`; never writes policy columns |
 | 1d | Coordinator `delete_secrets` | deletes by name or id | unchanged |
-| 1e | Project override in `openSecretValues` | project row replaces the team row of the same name | the effective row's delivery, policy, id and revision apply |
+| 1e | Project override in `openSecretValues` | project row replaces the personal-workspace row of the same name | the effective row's delivery, policy, id and revision apply |
 | 1f | Mail-account link (`linkedMailSecretIds`) | links a secret to an account | refuses an `http` secret |
 | 2 | `openSecretValues` via `resolveStepCredentials` (`services/credentials.ts`) | name to value map | returns `plaintext` values and `http` entries separately |
 | 3 | `stepToken`, worker branch (`services/machine-step-token.ts`) | puts the map on the wire for a step in any status | applies the capability, executor, surface and `claimed` rule; fills `httpSecrets` or `withheldSecrets` |
@@ -175,7 +181,7 @@ One test per row.
 | 10 | Mail secrets (`isMailSecretName`) | separate channel | unchanged; refused as `http` on write for the same reason |
 | 11 | `clearCredentials`, step end, stop, timeout, disconnect | empties the vault | also closes the admin connection (revoke) |
 | 12 | Session continue or fallback to a new session | same vault | same grant while the step lives; a later step gets a new placeholder, and a placeholder left in an old transcript is inert |
-| 13 | Transcript and log redaction (`guardCredentialOutputs`, `credentialRedactor`) | redacts the subscription token and Git passwords only; a `plaintext` team secret taken with `get_secret` reaches the transcript, journal and logs unredacted | unchanged; there is no `http` value in the guest to redact, and stored content holds placeholders only, except an upstream echo |
+| 13 | Transcript and log redaction (`guardCredentialOutputs`, `credentialRedactor`) | redacts the subscription token and Git passwords only; a `plaintext` personal secret taken with `get_secret` reaches the transcript, journal and logs unredacted | unchanged; there is no `http` value in the guest to redact, and stored content holds placeholders only, except an upstream echo |
 | 14 | Agent secret assignment (`routing-rules.ts`, agent `secrets` list) | list of secret ids | unchanged; delivery is a property of the secret, not of the assignment |
 
 ## Failure behavior
@@ -200,6 +206,41 @@ One test per row.
 ## Prototype (decision 4)
 
 Before the gateway PR, on a real Orb host, two throwaway data planes behind the same admin contract: Envoy with a header-mutation filter, and the existing relay extended with `node:tls` termination, `node:http` parsing and a maintained X.509 library for leaf certificates (no hand-written TLS, HTTP or ASN.1). Each runs the brief's failure inventory rows for direct disclosure, wrong location, SNI and Host mismatch, redirect, cross-step access, revoke on disconnect and certificate failure, with real headers captured at a controlled upstream. The same run carries the identity tests from the precondition above for both data planes, and a client matrix inside the guest: curl, git, Node fetch, Python requests and the `claude` CLI must each trust the step certificate through the variables above. The result table and the choice are added to this document. Criteria, in order: inventory rows passed, privileged surface added to the host, install and upgrade footprint in `scripts/ops/orb`, added latency.
+
+### Offline acceptance and safety gate
+
+Use a fresh synthetic credential generated in trusted gateway memory, never a real account. Controlled TLS upstreams replace external services; gateway DNS and dial targets are fixture-owned, not a relaxation of production private-address checks. The fixture upstream verifies the exact header in memory and writes only a boolean, header name and request case. Never print the credential or put it in arguments, environment variables, fixture files or captured request bodies.
+
+| Case | Required observation |
+|---|---|
+| Authorized request | Agent-side tool response and sent request hold only the placeholder; upstream observes exactly one bound header with the synthetic value; URL, other headers and body contain no value |
+| Wrong host, port, SNI or Host | No injected credential reaches that upstream; intercepted authority mismatches are refused; ordinary unrelated egress remains an opaque tunnel |
+| Wrong location or duplicate bound header | Request is refused without substitution or a secret-bearing diagnostic |
+| Redirect | Gateway returns it without following; a different origin receives no injected value |
+| Other guest, stale placeholder or admin disconnect | No substitution; disconnect also closes existing credential-bearing connections |
+| Missing CA or invalid upstream certificate | TLS fails; no direct or plaintext retry |
+| Logs and transcripts | Scan gateway stdout/stderr, audit events, agent stdout/stderr and session/transcript artifacts for the synthetic value before discarding it; record a zero-match result, not the value |
+
+No live model account is needed for the deterministic client probes. Such probes establish the bytes a simulated tool consumer receives, not actual SDK session or model behavior. The CLI/client matrix and actual transcript/session scans remain separate acceptance rows; unavailable clients are reported as untested.
+
+On omarchy, #4543 reports that the daemon's bubblewrap home overlay fails on btrfs. A normal daemon-step acceptance run depends on that confinement gate and must stop if it is unavailable. A standalone prototype may use an independently working local Orb guest with its network disabled and only its own read-only listener directory mounted, but it cannot claim daemon-step acceptance. Never disable confinement, replace the guest with a host shell, or change live host units/firewall rules to obtain a passing result. An unconfined fallback requires explicit approval first. A missing offline runtime, image or Envoy binary is a blocked comparison, not a reason to select the other candidate without evidence.
+
+### Partial results, 2026-11-14
+
+The [standalone Node experiment](../../scripts/ops/orb/secret-gateway-prototype/README.md) passed 18 offline guest cases on omarchy. These are real podman guest processes and TLS requests against controlled local upstreams, not product integration. The simulated tool result contains a placeholder; no actual `get_secret`, SDK or model ran. Only three authorized requests reached the upstream (including a redirect response and a success control after refusals); each had exactly one header with the synthetic value. Saved guest stdout/stderr and gateway audit evidence contained zero exact matches for the value. No credential bytes were persisted as upstream evidence.
+
+| Observation | Node experiment | Envoy |
+|---|---|---|
+| Read-only listener bind usable; sibling/admin paths absent; only loopback interface | Passed in each guest | Not run |
+| Bound header substitution, including success after negative cases | 200; exact value checked in upstream memory | Not run |
+| Wrong host/port, Host/SNI mismatch, absent SNI | 403; no upstream request | Not run |
+| Wrong header/path, duplicate bound header, TRACE, absolute-form target | 403; no upstream request | Not run |
+| Redirect and new request to its unauthorized destination | 302 returned; destination refused with 403 | Not run |
+| Other guest and placeholder after admin disconnect | 403; no upstream request | Not run |
+| Missing guest CA / wrong upstream certificate hostname | Client TLS failure / gateway 502 | Not run |
+| SDK transcripts, client trust matrix, nspawn, restart and in-flight revoke | Not run | Not run |
+
+Envoy was absent locally; the coordinator agreed to defer that comparison. This experiment refuses unrelated destinations instead of implementing ordinary opaque egress, supports only one fixed policy and registration per guest, uses fixture-owned upstream trust and dialing, and does not extend the production relay. Production integration, the production trust store, DNS/address admission, full admin authentication/reconciliation and performance comparisons are unverified. There is no production data-plane selection. The normal daemon confinement gate remains unchanged and #4543 still blocks daemon-step acceptance.
 
 ## Change sequence
 

@@ -5,19 +5,16 @@ import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { SpecBlock } from '../detail/spec-block.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { ThreadOriginLine } from './thread-origin-line.js';
-import type { ThreadOrigin, ThreadUpdates } from './thread-panel-model.js';
-import { ThreadUpdatesBlock } from './thread-updates-block.js';
+import type { ThreadOrigin } from './thread-panel-model.js';
 
 export function ThreadLead({
   todo,
   showSpec,
-  updates,
   origin,
   onJumpToOrigin,
 }: {
   todo: TodoRecord;
   showSpec: boolean;
-  updates: ThreadUpdates | null;
   origin: ThreadOrigin | null;
   onJumpToOrigin: () => void;
 }) {
@@ -41,7 +38,6 @@ export function ThreadLead({
           <ChatMarkdown text={legacyReply?.body ?? spec} />
         </section>
       )}
-      {updates !== null && <ThreadUpdatesBlock updates={updates} />}
       {showSpec && inherited === true && <SpecBlock spec={spec} request={todo.request} />}
       {origin !== null && (
         <div className="mt-5 flex flex-col items-end first:mt-0">

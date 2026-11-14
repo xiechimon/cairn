@@ -218,6 +218,47 @@ test('a needs-you report shows the thread own line and answers the question thro
   expect(typeof sent[0]?.clientMessageId).toBe('string');
 });
 
+test('with several questions pending, a needs-you report reply moves the composer to that thread question and its chips', async ({
+  page,
+}) => {
+  const pending = (requestId: string, todoId: string, text: string, createdAt: number) => ({
+    id: `row-${requestId}`,
+    role: 'assistant',
+    createdAt,
+    content: JSON.stringify({
+      kind: 'ask_user_question',
+      requestId,
+      status: 'pending',
+      questions: [
+        {
+          header: text,
+          question: text,
+          options: [{ label: `${text} A`, recommended: true }, { label: `${text} B` }],
+        },
+      ],
+      answers: null,
+      provenance: `watch:${todoId}`,
+    }),
+  });
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      ...NEEDS_YOU_ROWS,
+      pending('ask-other', 'todo-other', 'Which search engine?', 21),
+      pending('ask-export', TASK.id, 'Which export format?', 22),
+    ],
+    todos: [{ ...TASK, phase: 'needs_input' }],
+  });
+  await page.goto('/app');
+  const block = page.getByTestId('chief-question');
+  await expect(block.getByTestId('chief-question-text')).toContainText('Which search engine?');
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
+  await stream.getByTestId('thread-report-reply').getByRole('button', { name: '回复' }).click();
+  await expect(block.getByTestId('chief-question-text')).toContainText('Which export format?');
+  await expect(block.getByRole('button', { name: 'Which export format? A' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '回复这个任务' })).toHaveCount(0);
+});
+
 test('a needs-you report offers no reply once the question is answered', async ({ page }) => {
   await mockLive(page, {
     threads: [THREAD],
