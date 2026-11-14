@@ -35,6 +35,7 @@ export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowM
       holdUntil: stepRow.holdUntil,
     });
     if (queue?.blocked === undefined) continue;
+    if (queue.blocked.kind === 'machine-offline' && queue.waitingFor !== null) continue;
     const existing = deps.db
       .select()
       .from(notification)

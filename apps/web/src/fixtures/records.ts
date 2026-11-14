@@ -17,6 +17,7 @@ import {
   type ProjectRepoKind,
   type ProviderRecord,
   type QuotaWait,
+  type RunnerOfflineContent,
   type SecretRecord,
   type SkillFact,
   type StepPromptOrigin,
@@ -643,6 +644,11 @@ export type ChiefStreamItem =
       kind: 'daily-report';
       id: string;
       report: ChiefReportContent;
+    }
+  | {
+      kind: 'runner-offline';
+      id: string;
+      notice: RunnerOfflineContent;
     }
   | {
       kind: 'streaming';

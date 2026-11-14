@@ -1297,7 +1297,8 @@
         ],
         "server": [
           "apps/server/src/services/machines.ts",
-          "apps/server/src/services/machine-revoke.ts"
+          "apps/server/src/services/machine-revoke.ts",
+          "apps/server/src/services/runner-offline.ts"
         ]
       },
       "routes": {
@@ -1310,7 +1311,8 @@
           "/api/teams/:id/machines",
           "/api/machines/:id",
           "/api/machines/:id/evacuate",
-          "/api/machines/:id/revoke"
+          "/api/machines/:id/revoke",
+          "/api/todos/:id/runner"
         ]
       },
       "reach": [

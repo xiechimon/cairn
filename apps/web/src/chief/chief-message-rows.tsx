@@ -1,7 +1,9 @@
-import { parseReplyQuote } from '@cairn/shared';
+import { parseReplyQuote, type RunnerOfflineContent } from '@cairn/shared';
 import { CircleAlert } from 'lucide-react';
-import { type CSSProperties, memo, type ReactNode, useContext } from 'react';
-import { isUsableTimestamp } from '../board/rel-time.js';
+import { type CSSProperties, memo, type ReactNode, useContext, useState } from 'react';
+import { useApiMutations } from '../api/hooks.js';
+import { useLiveData } from '../api/provider.js';
+import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, TypingDots } from '../components/chat/live-row.js';
@@ -11,6 +13,7 @@ import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import {
   TaskMentionAsLinkContext,
@@ -267,6 +270,7 @@ export function chiefStreamRowKey(
     case 'handoff':
     case 'task-card':
     case 'digest':
+    case 'runner-offline':
     case 'stopped':
     case 'thread-report':
     case 'thread-message':
@@ -310,6 +314,100 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
             </span>
           ))}
         </>
+      )}
+    </CoordinatorSaid>
+  );
+}
+
+const RUNNER_CHECKS_MD = [
+  '1. 电脑开着，没有休眠',
+  '2. 能打开 Cairn 网页（网络和到服务器的线路正常）',
+  '3. 运行 `cairn status`，没在运行就运行 `cairn start`',
+  '4. 还不行就运行 `cairn logs -f`，把最后几行发给我，我帮你看',
+];
+
+function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
+  const { t } = useI18n();
+  const now = useMinuteClock();
+  const { live, teamId } = useLiveData();
+  const mutations = useApiMutations(teamId);
+  const [moving, setMoving] = useState(false);
+  const count = (state: RunnerOfflineContent['todos'][number]['state']) =>
+    notice.todos.filter((todo) => todo.state === state).length;
+  const name = notice.machineName;
+  if (notice.backAt !== null) {
+    const queued = count('waiting');
+    const moved = count('moved');
+    return (
+      <CoordinatorSaid testId="chief-runner-offline">
+        {count('started') > 0
+          ? t('{name} 已恢复，{n} 个任务已开工。', { name, n: count('started') })
+          : t('{name} 已恢复。', { name })}
+        {queued > 0 && t('还有 {n} 个在排队。', { n: queued })}
+        {moved > 0 && t('{n} 个已改到其他 Runner。', { n: moved })}
+      </CoordinatorSaid>
+    );
+  }
+  const shown = notice.todos.filter((todo) => todo.state === 'waiting' || todo.state === 'moved');
+  const waiting = count('waiting');
+  const alternative = notice.alternative;
+  const move = async () => {
+    if (alternative === null) return;
+    if (!live) return;
+    setMoving(true);
+    let moved = 0;
+    try {
+      for (const todoId of alternative.todoIds) {
+        await mutations.runTodoOn.mutateAsync({ todoId, machineId: alternative.machineId });
+        moved += 1;
+      }
+      toastSuccess(t('已改在 {name} 上跑 {n} 个任务', { name: alternative.name, n: moved }));
+    } catch (error) {
+      toastError(t('改到 {name} 失败', { name: alternative.name }), error);
+    } finally {
+      setMoving(false);
+    }
+  };
+  return (
+    <CoordinatorSaid testId="chief-runner-offline">
+      <p className="m-0">
+        <span className="font-medium">
+          {notice.lastSeenAt > 0
+            ? t('{name} 离线了。', { name })
+            : t('{name} 还没连上过。', { name })}
+          {waiting > 0
+            ? t('{n} 个任务在等它。', { n: waiting })
+            : t('等它的任务都已改到其他 Runner。')}
+        </span>
+        {notice.lastSeenAt > 0 &&
+          t('最后在线 {ago}。', { ago: relativeTime(notice.lastSeenAt, now, t) })}
+      </p>
+      {shown.length > 0 && (
+        <ul className="my-2 flex list-none flex-col gap-0.5 p-0">
+          {shown.map((todo) => (
+            <li key={todo.id}>
+              <ThreadLink todoId={todo.id} className={STATUS_REF_CLS}>
+                {todo.title}
+              </ThreadLink>
+              {todo.state === 'moved' && (
+                <span className="text-content-tertiary"> · {t('已改到其他 Runner')}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="m-0">{t('请在 {name} 上按顺序检查：', { name })}</p>
+      <ChatMarkdown text={RUNNER_CHECKS_MD.map((line) => t(line)).join('\n')} />
+      {alternative !== null && waiting > 0 && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-3"
+          disabled={moving}
+          onClick={() => void move()}
+        >
+          {t('这次改在 {name} 上跑', { name: alternative.name })}
+        </Button>
       )}
     </CoordinatorSaid>
   );
@@ -362,6 +460,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'digest')
     return <ChiefDigestRow reason={item.reason} madeAt={item.madeAt} items={item.items} />;
   if (item.kind === 'daily-report') return <ChiefReportRow report={item.report} />;
+  if (item.kind === 'runner-offline') return <RunnerOfflineRow notice={item.notice} />;
   if (item.kind === 'note')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>

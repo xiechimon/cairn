@@ -9037,6 +9037,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
+    "note": "body {machineId}; runs a waiting task on that Runner this time; 409 once claimed, after a session, for a local-path project or when the Runner fails a hard gate",
+    "path": "/api/todos/{id}/runner",
+  },
+  {
+    "method": "POST",
     "note": "body {content, clientMessageId}; a repeated clientMessageId returns the first response and delivers nothing again; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)",
     "path": "/api/todos/{id}/messages",
   },

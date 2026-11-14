@@ -757,6 +757,11 @@ export function useApiMutations(teamId: string | undefined) {
       }) => api.patch<TodoRecord>(`/api/todos/${input.id}`, input.body),
       onSuccess: invalidateAll,
     }),
+    runTodoOn: useMutation({
+      mutationFn: (input: { todoId: string; machineId: string }) =>
+        api.post<TodoRecord>(`/api/todos/${input.todoId}/runner`, { machineId: input.machineId }),
+      onSuccess: invalidateAll,
+    }),
     stopAndDoneTodo: useMutation({
       mutationFn: (id: string) =>
         api.post<{ state: 'stopping' | 'done'; todo: TodoRecord }>(
