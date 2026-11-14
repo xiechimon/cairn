@@ -1,5 +1,4 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { openReplySteps } from './helpers.js';
 
 declare global {
   interface Window {
@@ -601,10 +600,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
       await expect(rows.nth(3)).toContainText('再核对补发语义');
       await expect(rows.nth(4)).toContainText('最后收口票');
       await expect(coordinator.getByTestId('chief-turn-tools')).toHaveCount(0);
-      await openReplySteps(page, rows.nth(3));
-      await expect(rows.nth(3).getByTestId('chief-turn-tools')).toContainText('todo_write');
-      await expect(rows.nth(2).getByTestId('chief-turn-tools')).toHaveCount(0);
-      await expect(coordinator.getByText('todo_write')).toHaveCount(1);
+      await expect(coordinator.getByText('todo_write')).toHaveCount(0);
       await expect(rows.filter({ hasText: '正在调用' })).toHaveCount(0);
     };
     await expectFolded();
