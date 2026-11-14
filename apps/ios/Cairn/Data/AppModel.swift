@@ -28,6 +28,7 @@ final class AppModel {
     private(set) var coordinator: CoordinatorThread?
     private(set) var tasks: [TaskRecord] = []
     private(set) var projects: [String: String] = [:]
+    private(set) var machines: [Machine] = []
     private(set) var coordinatorMessages: [ThreadMessage] = []
     private(set) var loaded = false
     var error: String?
@@ -57,15 +58,27 @@ final class AppModel {
         tasks.filter { $0.status == .running && $0.archivedAt == nil }.sorted { $0.phaseAt > $1.phaseAt }
     }
 
+    var upNext: [TaskRecord] {
+        tasks.filter { $0.status == .idle && $0.archivedAt == nil }.sorted { $0.phaseAt > $1.phaseAt }
+    }
+
+    var finished: [TaskRecord] {
+        tasks.filter { $0.status == .done && $0.archivedAt == nil }.sorted { $0.phaseAt > $1.phaseAt }
+    }
+
+    func task(_ id: String) -> TaskRecord? { tasks.first { $0.id == id } }
+
     func projectName(_ id: String) -> String? { projects[id] }
 
     func refresh() async throws {
         async let threadList = client.coordinatorThreads(teamId: team.id)
         async let taskList = client.tasks(teamId: team.id)
         async let projectList = client.projects(teamId: team.id)
+        async let machineList = client.machines(teamId: team.id)
         let threads = try await threadList
         tasks = try await taskList
         projects = Dictionary(uniqueKeysWithValues: ((try? await projectList) ?? []).map { ($0.id, $0.name) })
+        machines = (try? await machineList) ?? machines
         coordinator = threads.first
         if let coordinator {
             coordinatorMessages = try await client.messages(threadId: coordinator.id).messages

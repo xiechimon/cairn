@@ -35,7 +35,7 @@ final class ClientBehaviorTests: XCTestCase {
         }
         let result = try await client(session).messages(threadId: "chief_1")
         XCTAssertEqual(result.messages.map(\.id), ["m1", "m2", "m3"])
-        XCTAssertEqual(StubServer.requests.count, 2)
+        XCTAssertEqual(StubServer.requests.filter { $0.url?.path == "/api/conversations/chief_1/messages" }.count, 2)
     }
 
     func testTaskMessageReturnsTheConversationItLandedIn() async throws {
@@ -71,6 +71,79 @@ final class ClientBehaviorTests: XCTestCase {
         ])
         let body = String(decoding: try JSONEncoder().encode(answers[0]), as: UTF8.self)
         XCTAssertFalse(body.contains("choices"))
+    }
+
+    func testThreadRowsHangOnTheReplyThatStartedThem() throws {
+        let created = #"{\"id\":\"todo_9\",\"seqNum\":9,\"title\":\"Stream the export\"}"#
+        let json = """
+        [
+          {"id":"u1","role":"user","createdAt":1,"content":"Make the export fast"},
+          {"id":"c1","role":"assistant","createdAt":2,"content":{"kind":"toolcall","call":{"id":"x","name":"create_todo","arguments":{},"result":[{"type":"text","text":"\(created)"}]}}},
+          {"id":"c2","role":"assistant","createdAt":3,"content":{"kind":"toolcall","call":{"id":"y","name":"create_todo","arguments":{},"result":"{\\"id\\":\\"todo_10\\"}","isError":true}}},
+          {"id":"c3","role":"assistant","createdAt":4,"content":{"kind":"toolcall","call":{"id":"z","name":"read_todo","arguments":{},"result":"{\\"id\\":\\"todo_11\\"}"}}},
+          {"id":"a1","role":"assistant","createdAt":5,"content":"Opened a thread."},
+          {"id":"u2","role":"user","createdAt":6,"content":"Draft a reply"},
+          {"id":"c4","role":"assistant","createdAt":7,"content":{"kind":"toolcall","call":{"id":"w","name":"create_todo","arguments":{},"result":{"id":"todo_12"}}}}
+        ]
+        """
+        let messages = try JSONDecoder().decode([ThreadMessage].self, from: Data(json.utf8))
+        XCTAssertEqual(messages[1].content, .startedTask("todo_9"))
+        XCTAssertEqual(messages[2].content, .toolCall("create_todo"), "a failed create_todo starts no thread")
+        XCTAssertEqual(messages[3].content, .toolCall("read_todo"))
+        XCTAssertEqual(ConversationRow.rows(messages.reversed()), [
+            .message(messages[0]), .task(todoId: "todo_9", onReply: true), .message(messages[4]),
+            .message(messages[5]), .task(todoId: "todo_12", onReply: false),
+        ])
+    }
+
+    func testStatusMarkFollowsTheCoordinatorsTurn() throws {
+        let json = """
+        {"messages":[{"id":"e1","role":"system","createdAt":1,"content":"{\\"kind\\":\\"chief_turn_error\\",\\"message\\":\\"Model quota ran out\\"}"}],
+         "activeRun":{"phase":"chief","tool":{"toolName":"bash"}},"nextCursor":null}
+        """
+        let page = try JSONDecoder().decode(MessagePage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.messages[0].content, .turnError("Model quota ran out"))
+        XCTAssertEqual(page.activeRun?.tool?.toolName, "bash")
+
+        func mark(question: Bool = false, connected: Bool = true, running: Bool = true, tool: String? = nil, replying: Bool = false, failed: Bool = false) -> StatusMarkID {
+            .of(questionPending: question, connected: connected, running: running, tool: tool, replying: replying, lastTurnFailed: failed)
+        }
+        XCTAssertEqual(mark(tool: "bash"), .run)
+        XCTAssertEqual(mark(tool: "create_todo"), .task)
+        XCTAssertEqual(mark(tool: "needs_you"), .look)
+        XCTAssertEqual(mark(tool: "read_file"), .look)
+        XCTAssertEqual(mark(tool: "remember"), .think)
+        XCTAssertEqual(mark(replying: true), .write)
+        XCTAssertEqual(mark(), .think)
+        XCTAssertEqual(mark(running: false, failed: true), .error)
+        XCTAssertEqual(mark(running: false), .idle)
+        XCTAssertEqual(mark(connected: false, tool: "bash"), .offline)
+        XCTAssertEqual(mark(question: true, connected: false, tool: "bash"), .ask)
+    }
+
+    func testMarkSurvivesAFrameStampedBeforeTheStateChanged() {
+        let frame = MarkGeometry.frame(shown: .idle, next: .ask, sinceChange: -16, still: false)
+        XCTAssertEqual(frame.shown, .idle)
+        XCTAssertFalse(MarkGeometry.path(frame.shown, t: 0, pen: frame.pen, still: false).isEmpty)
+    }
+
+    func testUploadedAttachmentBecomesAMessageToken() async throws {
+        let session = StubServer.session { request in
+            request.url?.path == "/api/uploads/grant"
+                ? .init(status: 200, body: #"{"uploadUrl":"/api/uploads","grant":"g1","key":"team_1/att_9.jpg","attachmentId":"att_9"}"#)
+                : .init(status: 201, body: #"{"key":"team_1/att_9.jpg"}"#)
+        }
+        let token = try await client(session).uploadAttachment(Data([1, 2, 3]), fileName: "receipt.jpg", mimeType: "image/jpeg")
+        XCTAssertEqual(token, "![receipt.jpg](attachment:team_1/att_9.jpg)")
+        let upload = try XCTUnwrap(StubServer.requests.last)
+        XCTAssertEqual(upload.url?.path, "/api/uploads/upload")
+        XCTAssertTrue(upload.value(forHTTPHeaderField: "Content-Type")?.hasPrefix("multipart/form-data; boundary=") == true)
+    }
+
+    func testSentAttachmentsSplitFromTheText() {
+        let sent = SentText("![receipt 2.jpg](attachment:team/abc.jpg)\n\nWhy is this total wrong?")
+        XCTAssertEqual(sent.files, ["receipt 2.jpg"])
+        XCTAssertEqual(sent.text, "Why is this total wrong?")
     }
 
     func testPickingTogglesOnlyForMultiSelect() {
