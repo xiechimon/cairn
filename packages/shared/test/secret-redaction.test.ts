@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { redactSecrets } from '../src/index.js';
+import { chiefIdFormat, redactSecrets } from '../src/index.js';
 
 test('redacts credentials in nested values and keys without changing the source', () => {
   const token = `ghp_${'A'.repeat(36)}`;
@@ -31,6 +31,47 @@ test('preserves ordinary text and has no regex state between calls', () => {
   });
   const token = `ghp_${'A'.repeat(36)}`;
   expect(redactSecrets(token)).toEqual(redactSecrets(token));
+});
+
+test.each([
+  ['0123456789012345678sk', '012345678901234567890'],
+  ['0123456789012345678SK', '012345678901234567890'],
+  ['sk-012345678901234567', '0123456789012345678sk'],
+  ['012345678901234567890', '0123456789012345678sk'],
+])('preserves generated chief IDs for owner %s and team %s', (owner, team) => {
+  const id = chiefIdFormat(owner, team);
+  const source = { [id]: [`build=${id}`, id] };
+  expect(redactSecrets(source)).toEqual({ value: source, count: 0 });
+});
+
+test('chief IDs do not exempt neighboring, explicit or authorization credentials', () => {
+  const id = chiefIdFormat('0123456789012345678sk', '012345678901234567890');
+  const token = `sk-${'a'.repeat(32)}`;
+  expect(redactSecrets(`${token} ${id} ${token}`)).toEqual({
+    value: `[REDACTED] ${id} [REDACTED]`,
+    count: 2,
+  });
+  expect(redactSecrets(id, ['sk-012345678901234567890'])).toEqual({
+    value: 'chief-0123456789012345678[REDACTED]',
+    count: 1,
+  });
+  expect(redactSecrets({ authorization: id, token: id, authToken: id })).toEqual({
+    value: { authorization: '[REDACTED]', token: '[REDACTED]', authToken: '[REDACTED]' },
+    count: 3,
+  });
+  expect((redactSecrets(`Bearer ${id}`).value as string).replaceAll('[REDACTED]', '')).toBe('');
+});
+
+test.each([
+  'chief-012345678901234567sk-012345678901234567890',
+  'chief-01234567890123456789sk-012345678901234567890',
+  'chief-0123456789012345678sk-01234567890123456789',
+  'chief-0123456789012345678sk-0123456789012345678901',
+  'chief-0123456789012345678sk-012345678901234567890sk-012345678901234567890',
+  'sk-012345678901234567890chief-0123456789012345678sk-012345678901234567890',
+])('does not exempt credential-shaped text outside the generated ID format: %s', (text) => {
+  expect(redactSecrets(text).count).toBeGreaterThan(0);
+  expect(redactSecrets(text).value).not.toContain('sk-012345678901234567890');
 });
 
 test('rejects redacted key collisions instead of losing data', () => {

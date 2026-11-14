@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
+import { chiefIdFormat } from '@cairn/shared';
 import { otlpTraceIdOfTurn } from '@cairn/shared/otel';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { eq } from 'drizzle-orm';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import type { Db } from '../../src/db/client.js';
 import { coordinatorTurnSnapshot, project, step, todo } from '../../src/db/schema.js';
+import * as ids from '../../src/lib/ids.js';
 import {
   capturePreCallWorld,
   captureToolResult,
@@ -117,26 +119,38 @@ describe('coordinator turn snapshot writer', () => {
     expect(w.s.db.select().from(step).where(eq(step.id, w.stepId)).get()?.status).toBe('done');
   });
 
-  it('records tool-boundary views for create_todo with pre-call world and committed effects', async () => {
-    const w = await world('please create a task');
-    const { faux } = toolThenCreateTodo(w);
-    const coordinator = boot(w, faux);
-    coordinator.wake(w.threadId);
-    await coordinator.idle();
+  it.each(['0123456789012345678sk', '0123456789012345678SK', 'sk-012345678901234567'])(
+    'records tool-boundary views for create_todo with pre-call world and committed effects for owner %s',
+    async (ownerId) => {
+      const seedIds = vi
+        .spyOn(ids, 'newRecordId')
+        .mockReset()
+        .mockReturnValueOnce(ownerId)
+        .mockReturnValueOnce('012345678901234567890');
+      onTestFinished(() => seedIds.mockRestore());
+      const w = await world('please create a task');
+      const { faux } = toolThenCreateTodo(w);
+      const coordinator = boot(w, faux);
+      coordinator.wake(w.threadId);
+      await coordinator.idle();
 
-    const row = snapshotRow(w.s.db, w.stepId);
-    expect(row?.status).toBe('sealed');
-    const payload = JSON.parse(row?.payload ?? 'null');
-    const calls = payload?.toolViews ?? [];
-    const createCall = calls.find((c: { tool: string }) => c.tool === 'create_todo');
-    expect(createCall).toBeDefined();
-    expect(calls.length).toBeLessThanOrEqual(128);
-    expect(createCall.preCallTodos).toHaveLength(0);
-    const created = w.s.db.select().from(todo).all();
-    expect(created).toHaveLength(1);
-    const result = JSON.parse(String(createCall.result)) as { id: string };
-    expect(result.id).toBe(created[0]?.id);
-  });
+      const row = snapshotRow(w.s.db, w.stepId);
+      expect(row?.status).toBe('sealed');
+      expect(row?.redactionCount).toBe(0);
+      const payload = JSON.parse(row?.payload ?? 'null');
+      const calls = payload?.toolViews ?? [];
+      const createCall = calls.find((c: { tool: string }) => c.tool === 'create_todo');
+      expect(createCall).toBeDefined();
+      expect(calls.length).toBeLessThanOrEqual(128);
+      expect(createCall.preCallTodos).toHaveLength(0);
+      const created = w.s.db.select().from(todo).all();
+      expect(created).toHaveLength(1);
+      const result = JSON.parse(String(createCall.result)) as { id: string; sourceBuildId: string };
+      expect(result.id).toBe(created[0]?.id);
+      expect(result.sourceBuildId).toBe(chiefIdFormat(ownerId, w.teamId));
+      expect(result.sourceBuildId).toBe(created[0]?.sourceBuildId);
+    },
+  );
 
   it('never recreates a capture lost to a restart and seals no row for it', async () => {
     const w = await world('hello');
