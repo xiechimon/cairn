@@ -220,7 +220,7 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
 
     await expect(stream).toContainText('prose #12 与 [伪链](todos:t2) 保持字面');
     await expect(stream.locator('.mention-chip')).toHaveCount(0);
-    await expect(stream.getByTestId('chief-task-ref')).toHaveCount(1);
+    await expect(stream.getByTestId('chief-task-ref')).toHaveCount(0);
 
     await mention.click();
     await expect(page).toHaveURL(/[?&]thread=r3-legacy-1/);

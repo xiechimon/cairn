@@ -67,7 +67,8 @@ test('a task the Coordinator created is one reference row below the reply that a
   await expect(ref).toHaveAttribute('data-phase', 'building');
   await expect(ref.locator('svg[data-glyph="progress"]')).toHaveCount(1);
   await expect(ref).toHaveAccessibleName(new RegExp(`${TASK.title}.*Running`));
-  await expect(ref.locator('[data-slot="task-ref-elbow"]')).toHaveCount(1);
+  await expect(reply.locator('[data-slot="task-ref-elbow"]')).toHaveCount(1);
+  await expect(reply.locator('[data-slot="task-ref-trunk"]')).toHaveCount(0);
   await expect(stream.locator('[data-slot="task-card"]')).toHaveCount(0);
   await expect(stream.getByTestId('chief-task-card')).toHaveCount(0);
   await expect(stream.getByTestId('chief-task-started')).toHaveCount(0);
@@ -76,7 +77,7 @@ test('a task the Coordinator created is one reference row below the reply that a
   await expect(stream).not.toContainText('updates:');
   const tileBox = await ref.locator('span.grid').boundingBox();
   const bubbleBox = await reply.getByTestId('chief-reply-bubble').boundingBox();
-  expect(tileBox!.y - (bubbleBox!.y + bubbleBox!.height)).toBe(8);
+  expect(tileBox!.y - (bubbleBox!.y + bubbleBox!.height)).toBe(10);
   await ref.click();
   await expect(page).toHaveURL(new RegExp(`thread=${TASK.id}`));
 });
@@ -200,7 +201,7 @@ test.describe('at phone width', () => {
     await expect(stream.locator('[data-slot="task-card"]')).toHaveCount(0);
     await expect(ref).toHaveText(new RegExp(`^${TASK.title}`));
     const box = await ref.boundingBox();
-    expect(box!.height).toBe(24);
+    expect(box!.height).toBe(28);
     expect(box!.x + box!.width).toBeLessThanOrEqual(390 - 16);
     await ref.click();
     await expect(page).toHaveURL(new RegExp(`thread=${TASK.id}`));

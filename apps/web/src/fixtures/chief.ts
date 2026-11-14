@@ -123,6 +123,14 @@ export const chiefThread: FixtureSet = {
           { label: 'run_builds', seconds: 5 },
         ],
       },
+      {
+        kind: 'task-card',
+        id: 'r3-contributing-card',
+        todoId: contributingGuide.id,
+        projectId: contributingGuide.projectId,
+        seq: contributingGuide.seqNum,
+        title: contributingGuide.title,
+      },
     ],
   },
 };

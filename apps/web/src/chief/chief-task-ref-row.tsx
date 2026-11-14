@@ -11,10 +11,12 @@ export function TaskRefRow({
   taskRef,
   elbow = true,
   nested = false,
+  guide = true,
 }: {
   taskRef: TaskRef;
   elbow?: boolean;
   nested?: boolean;
+  guide?: boolean;
 }) {
   const { t } = useI18n();
   const unread = useThreadUnread(taskRef.todoId);
@@ -27,7 +29,7 @@ export function TaskRefRow({
             data-phase={taskRef.phase}
             data-testid="chief-task-ref"
             className={cn(
-              'relative -my-0.5 flex h-6 w-fit cursor-pointer items-center gap-1.5 text-ui font-normal text-(--foreground) no-underline hover:underline',
+              'relative flex h-7 w-fit cursor-pointer items-center gap-1.5 text-ui font-normal text-(--foreground) no-underline hover:underline',
               nested
                 ? 'ml-14 max-w-[calc(100%-3.5rem)]'
                 : elbow
@@ -37,12 +39,12 @@ export function TaskRefRow({
           />
         }
       >
-        {(elbow || nested) && (
+        {guide && (elbow || nested) && (
           <svg
             aria-hidden="true"
             data-slot="task-ref-elbow"
             viewBox="0 0 12 16"
-            className="pointer-events-none absolute -top-0.75 -left-3.75 h-4 w-3 overflow-visible text-(--task-ref-line)"
+            className="pointer-events-none absolute -top-px -left-3.75 h-4 w-3 overflow-visible text-(--task-ref-line)"
           >
             <path
               d="M1 1.75V9A6 6 0 0 0 7 15H10.75"
