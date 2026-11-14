@@ -5,7 +5,7 @@ export const QUICK_REPLIES_KIND = 'quick_replies';
 export const QUICK_REPLIES_ROW_ID_PREFIX = 'quick-replies-';
 export const SUGGEST_REPLIES_TOOL_NAME = 'suggest_replies';
 export const QUICK_REPLIES_MAX = 3;
-export const QUICK_REPLY_MAX_CHARS = 40;
+export const QUICK_REPLY_MAX_CHARS = 80;
 
 const quickReplySchema = z
   .string()
@@ -26,6 +26,9 @@ export function quickRepliesRowId(stepId: string): string {
 export type QuickRepliesSanitized =
   | { ok: true; replies: string[] }
   | { ok: false; problem: string };
+
+const IRREVERSIBLE =
+  /删除|删掉|删了|合并|关闭|归档|撤销|回滚|丢弃|覆盖|清空|重置|卸载|退订|取消订阅|\b(?:delete|remove|merge|close|archive|revert|discard|overwrite|reset|uninstall|unsubscribe)\b/i;
 
 export function sanitizeQuickReplies(raw: unknown): QuickRepliesSanitized {
   if (!Array.isArray(raw)) return { ok: false, problem: 'replies must be an array of strings' };
@@ -56,7 +59,7 @@ export function sanitizeQuickReplies(raw: unknown): QuickRepliesSanitized {
       };
     }
     const key = text.toLocaleLowerCase();
-    if (seen.has(key)) continue;
+    if (seen.has(key) || IRREVERSIBLE.test(text)) continue;
     seen.add(key);
     replies.push(text);
   }

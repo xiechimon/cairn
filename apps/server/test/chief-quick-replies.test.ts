@@ -11,6 +11,7 @@ import {
 import { and, eq, like } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { createCoordinatorServerApi } from '../src/coordinator/server-api.js';
 import { chiefMessage } from '../src/db/schema.js';
 import { buildChiefSystemPrompt, enqueueChiefStep } from '../src/services/chief.js';
 import { chiefRemoteTools } from '../src/services/routing-rules.js';
@@ -172,6 +173,58 @@ async function visible(w: World): Promise<string[]> {
 }
 
 describe('suggest_replies (Coordinator quick replies)', () => {
+  test('post-turn suggestions stream immediately and preserve explicit greeting chips', async () => {
+    const w = await setup();
+    w.userTurn('再解释一下');
+    const turn = await w.claim();
+    const api = createCoordinatorServerApi({
+      ...w.s.svc,
+      box: w.s.secretBox,
+      reposDir: w.s.reposDir,
+      attachmentsDir: w.s.attachmentsDir,
+    });
+    expect(await api.canSuggestReplies?.(turn.step.id)).toBe(true);
+    await api.suggestReplies?.(turn.step.id, ['给我举个例子']);
+    expect(JSON.stringify(w.streamed)).toContain(quickRepliesRowId(turn.step.id));
+    expect(await api.canSuggestReplies?.(turn.step.id)).toBe(false);
+    await api.suggestReplies?.(turn.step.id, ['替换掉']);
+    expect(JSON.parse(String(quickRows(w)[0]?.content)).replies).toEqual(['给我举个例子']);
+    await w.done(turn.step.id, '说明完毕。');
+    w.userTurn('打开项目频道');
+    const greeting = await w.claim();
+    expect((await w.tool(greeting.step.id, { replies: ['先做项目计划'] })).status).toBe(200);
+    expect(await api.canSuggestReplies?.(greeting.step.id)).toBe(false);
+    await api.suggestReplies?.(greeting.step.id, ['替换掉']);
+    const row = quickRows(w).find((row) => row.id === quickRepliesRowId(greeting.step.id));
+    expect(JSON.parse(String(row?.content)).replies).toEqual(['先做项目计划']);
+  });
+
+  test('post-turn suggestions do not publish after a newer owner message or pending question', async () => {
+    const w = await setup();
+    w.userTurn('再解释一下');
+    const turn = await w.claim();
+    const api = createCoordinatorServerApi({
+      ...w.s.svc,
+      box: w.s.secretBox,
+      reposDir: w.s.reposDir,
+      attachmentsDir: w.s.attachmentsDir,
+    });
+    expect(await api.canSuggestReplies?.(turn.step.id)).toBe(true);
+    await w.tool(
+      turn.step.id,
+      { questions: [{ header: '确认', question: '删除项目吗？', options: [{ label: '不删除' }] }] },
+      'ask_user',
+    );
+    expect(await api.canSuggestReplies?.(turn.step.id)).toBe(false);
+    await api.suggestReplies?.(turn.step.id, ['继续']);
+    expect(quickRows(w)).toEqual([]);
+    w.s.db.delete(chiefMessage).where(like(chiefMessage.content, '%ask_user_question%')).run();
+    seedOwnerMessage(w.s.db, w.threadId, '先等等');
+    expect(await api.canSuggestReplies?.(turn.step.id)).toBe(false);
+    await api.suggestReplies?.(turn.step.id, ['继续']);
+    expect(quickRows(w)).toEqual([]);
+  });
+
   test('is offered to the Coordinator and named in its working rules', async () => {
     const w = await setup();
     expect(chiefRemoteTools().map((t) => t.name)).toContain(SUGGEST_REPLIES_TOOL_NAME);
@@ -227,7 +280,7 @@ describe('suggest_replies (Coordinator quick replies)', () => {
     const turn = await w.claim();
     for (const replies of [
       ['a', 'b', 'c', 'd'],
-      ['字'.repeat(41)],
+      ['字'.repeat(81)],
       ['ok', 1],
       ['  ', '**'],
       'yes',

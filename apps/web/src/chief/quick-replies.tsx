@@ -40,7 +40,7 @@ export function QuickReplies({
             key={text}
             variant="ghost"
             data-testid="chief-quick-reply"
-            className={REPLY_CHIP_CLS}
+            className={`${REPLY_CHIP_CLS} min-w-0`}
             disabled={sending}
             onClick={() => send(text)}
             onPointerEnter={() => onPreview(text)}
@@ -48,7 +48,7 @@ export function QuickReplies({
             onFocus={() => onPreview(text)}
             onBlur={() => onPreview(null)}
           >
-            {text}
+            <span className="min-w-0 truncate">{text}</span>
           </Button>
         ))}
       </fieldset>

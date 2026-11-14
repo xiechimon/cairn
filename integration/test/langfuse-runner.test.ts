@@ -451,7 +451,9 @@ describe('Langfuse Coordinator runner', () => {
     expect(
       await runSandboxedTurn(world, modelProvider(model.url), 'test-key', 30_000),
     ).toMatchObject({ decision: 'answer', parts: [] });
-    const projectResult = model.requests.at(-1)?.messages.find((m) => m.role === 'tool')?.content;
+    const projectResult = model.requests
+      .flatMap((request) => request.messages)
+      .find((m) => m.role === 'tool')?.content;
     expect(JSON.parse(String(projectResult))).toEqual([
       { id: 'project-0', name: 'docs', repoKind: null, todoCount: 1 },
     ]);

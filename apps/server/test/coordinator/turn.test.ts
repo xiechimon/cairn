@@ -2,11 +2,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
-import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
+import { fauxAssistantMessage, fauxProvider, fauxText } from '@earendil-works/pi-ai';
 import { UserEntry } from '@earendil-works/pi-durable';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js';
 import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
+import { SUGGEST_REPLIES_ASK } from '../../src/coordinator/runtime/suggest-replies.js';
 import { runCoordinatorTurn } from '../../src/coordinator/runtime/turn.js';
 import { chiefStep, type FakeMachineApi, fakeMachineApi } from './fake-machine-api.js';
 
@@ -30,13 +31,19 @@ function setup(tokensPerSecond = 1e9) {
     tokensPerSecond,
   });
   faux.setResponses(
-    Array(5).fill((c: { systemPrompt?: string; messages: unknown[] }) => {
-      seen.push({
-        system: JSON.stringify([c.systemPrompt ?? '', c.messages[0]]),
-        messages: c.messages.length,
-      });
-      return fauxAssistantMessage(tokensPerSecond < 1e6 ? `answer ${'x '.repeat(60)}` : 'answer');
-    }),
+    Array(12).fill(
+      (c: { systemPrompt?: string; messages: { role: string; content: unknown }[] }) => {
+        const asked = c.messages[0]?.content === SUGGEST_REPLIES_ASK;
+        if (asked) {
+          return fauxAssistantMessage([fauxText('{"replies":["继续看"]}')]);
+        }
+        seen.push({
+          system: JSON.stringify([c.systemPrompt ?? '', c.messages[0]]),
+          messages: c.messages.length,
+        });
+        return fauxAssistantMessage(tokensPerSecond < 1e6 ? `answer ${'x '.repeat(60)}` : 'answer');
+      },
+    ),
   );
   return { coordinatorModels: createCoordinatorModels([faux.provider]), faux, seen };
 }
@@ -135,6 +142,158 @@ describe('runCoordinatorTurn', () => {
         (usage?.output ?? 0) +
         (usage?.cacheRead ?? 0) +
         (usage?.cacheWrite ?? 0),
+    );
+    expect(api.suggestions).toEqual([]);
+    expect(usage?.cacheRead).toBe(0);
+    await harness.close(ctx);
+  });
+
+  it('predicts after cold and warm ordinary replies but skips every event trigger', async () => {
+    const ordinary = setup();
+    const ordinaryHarness = await openCoordinatorHarness(
+      storagePath(),
+      ordinary.coordinatorModels.models,
+      ctx,
+    );
+    const ordinaryApi = fakeMachineApi();
+    ordinaryApi.canSuggestReplies = async () => true;
+    await runCoordinatorTurn(
+      {
+        harness: ordinaryHarness,
+        models: ordinary.coordinatorModels,
+        api: ordinaryApi,
+        context: ctx,
+        heartbeatMs: 1000,
+        now: () => 1,
+      },
+      chiefStep('step-cold', 'hello'),
+    );
+    await runCoordinatorTurn(
+      {
+        harness: ordinaryHarness,
+        models: ordinary.coordinatorModels,
+        api: ordinaryApi,
+        context: ctx,
+        heartbeatMs: 1000,
+        now: () => 1,
+      },
+      chiefStep('step-say', 'status?'),
+    );
+    expect(ordinary.faux.state.callCount).toBe(4);
+    expect(ordinaryApi.suggestions).toEqual([
+      { stepId: 'step-cold', replies: ['继续看'] },
+      { stepId: 'step-say', replies: ['继续看'] },
+    ]);
+    const usage = ordinaryApi.dones.at(-1)?.body.usage?.[0];
+    expect(usage?.contextTokens).toBeLessThan(
+      (usage?.input ?? 0) + (usage?.output ?? 0) + (usage?.cacheRead ?? 0),
+    );
+    for (const trigger of ['wake', 'settle', 'failed', 'gate'] as const) {
+      const step = chiefStep(`step-${trigger}`, `[wake:${trigger}] event`);
+      const calls = ordinary.faux.state.callCount;
+      await runCoordinatorTurn(
+        {
+          harness: ordinaryHarness,
+          models: ordinary.coordinatorModels,
+          api: ordinaryApi,
+          context: ctx,
+          heartbeatMs: 1000,
+          now: () => 2,
+        },
+        { ...step, chief: { ...step.chief!, trigger } },
+      );
+      expect(ordinary.faux.state.callCount).toBe(calls + 1);
+    }
+    expect(ordinaryApi.suggestions).toHaveLength(2);
+    const calls = ordinary.faux.state.callCount;
+    const expensive = await runCoordinatorTurn(
+      {
+        harness: ordinaryHarness,
+        models: ordinary.coordinatorModels,
+        api: ordinaryApi,
+        context: ctx,
+        heartbeatMs: 1000,
+        now: () => 3,
+      },
+      chiefStep('step-budget', 'x'.repeat(16_384)),
+    );
+    expect(expensive.status).toBe('success');
+    expect(expensive.usage?.[0]?.cacheRead).toBeGreaterThan(0);
+    expect(ordinary.faux.state.callCount).toBe(calls + 2);
+    expect(ordinaryApi.suggestions.at(-1)).toEqual({
+      stepId: 'step-budget',
+      replies: ['继续看'],
+    });
+    expect(ordinaryApi.rows.some((row) => row.stepId === 'step-budget')).toBe(true);
+    await ordinaryHarness.close(ctx);
+  });
+
+  it('aborts prediction on stop without publishing stale chips', async () => {
+    const { coordinatorModels } = setup();
+    const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx);
+    const api = fakeMachineApi();
+    api.canSuggestReplies = async () => true;
+    const deps = {
+      harness,
+      models: coordinatorModels,
+      api,
+      context: ctx,
+      heartbeatMs: 1000,
+      stopPollMs: 5,
+      now: () => 1,
+    };
+    await runCoordinatorTurn(deps, chiefStep('cold', 'hello'));
+    api.suggestions.splice(0);
+    coordinatorModels.models.completeSimple = async (_model, _context, options) => {
+      api.stopRequested.add('predict-stop');
+      await new Promise<void>((resolve) =>
+        options?.signal?.addEventListener('abort', () => resolve(), { once: true }),
+      );
+      return fauxAssistantMessage('{"replies":["stale"]}', { stopReason: 'aborted' });
+    };
+    const result = await runCoordinatorTurn(deps, chiefStep('predict-stop', 'status?'));
+    expect(result.status).toBe('stopped');
+    expect(api.suggestions).toEqual([]);
+    expect(api.rows.some((row) => row.stepId === 'predict-stop')).toBe(true);
+    await harness.close(ctx);
+  });
+
+  it('keeps the answer successful and counts usage when prediction is unusable', async () => {
+    const { coordinatorModels } = setup();
+    const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx);
+    const api = fakeMachineApi();
+    api.canSuggestReplies = async () => true;
+    const deps = {
+      harness,
+      models: coordinatorModels,
+      api,
+      context: ctx,
+      heartbeatMs: 1000,
+      now: () => 1,
+    };
+    await runCoordinatorTurn(deps, chiefStep('cold', 'hello'));
+    api.suggestions.splice(0);
+    coordinatorModels.models.completeSimple = async () => ({
+      ...fauxAssistantMessage('invalid JSON'),
+      usage: {
+        input: 17,
+        output: 11,
+        cacheRead: 900,
+        cacheWrite: 0,
+        totalTokens: 928,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+    });
+    const result = await runCoordinatorTurn(deps, chiefStep('invalid', 'status?'));
+    expect(result.status).toBe('success');
+    expect(result.usage?.[0]?.input).toBe(17);
+    expect(result.usage?.[0]?.cacheRead).toBeGreaterThanOrEqual(900);
+    expect(api.suggestions).toEqual([]);
+    coordinatorModels.models.completeSimple = async () => {
+      throw new Error('provider unavailable');
+    };
+    expect((await runCoordinatorTurn(deps, chiefStep('offline', 'status again?'))).status).toBe(
+      'success',
     );
     await harness.close(ctx);
   });

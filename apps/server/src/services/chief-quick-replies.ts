@@ -13,6 +13,28 @@ import { nowMs } from '../lib/ids.js';
 import { parseChiefTrigger, upsertChiefMessage } from './chief.js';
 import type { ConversationStreamHub } from './events.js';
 
+export function storeQuickReplies(
+  deps: { db: Db; convHub?: ConversationStreamHub },
+  threadId: string,
+  stepId: string,
+  replies: readonly string[],
+): void {
+  const sanitized = sanitizeQuickReplies([...replies]);
+  if (!sanitized.ok) return;
+  const row = {
+    id: quickRepliesRowId(stepId),
+    role: 'system' as const,
+    content: JSON.stringify({
+      kind: QUICK_REPLIES_KIND,
+      stepId,
+      replies: sanitized.replies,
+    } satisfies QuickRepliesContent),
+    createdAt: nowMs(),
+  };
+  const stored = upsertChiefMessage(deps.db, { ...row, threadId });
+  deps.convHub?.publishMessage(threadId, stored);
+}
+
 export function suggestQuickReplies(
   deps: { db: Db; convHub?: ConversationStreamHub },
   ctx: { threadId: string; turnPrompt?: string | null },
@@ -38,17 +60,6 @@ export function suggestQuickReplies(
   if (turn === undefined) {
     throw new HttpError(409, `${SUGGEST_REPLIES_TOOL_NAME} requires a running Coordinator turn`);
   }
-  const row = {
-    id: quickRepliesRowId(turn.id),
-    role: 'system' as const,
-    content: JSON.stringify({
-      kind: QUICK_REPLIES_KIND,
-      stepId: turn.id,
-      replies: sanitized.replies,
-    } satisfies QuickRepliesContent),
-    createdAt: nowMs(),
-  };
-  const stored = upsertChiefMessage(deps.db, { ...row, threadId: ctx.threadId });
-  deps.convHub?.publishMessage(ctx.threadId, stored);
+  storeQuickReplies(deps, ctx.threadId, turn.id, sanitized.replies);
   return JSON.stringify({ shown: sanitized.replies });
 }

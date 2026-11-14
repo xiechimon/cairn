@@ -31,6 +31,7 @@ import type { InputReceipts } from './input-receipts.js';
 import type { MachineApi } from './machine-api.js';
 import { createTurnMirror } from './mirror.js';
 import type { CoordinatorModels } from './models.js';
+import { suggestAfterTurn } from './suggest-replies.js';
 import type { ConversationGate, StepGate } from './tools.js';
 import { emitTurnSpans } from './turn-spans.js';
 import type { ColdSlimPlan, VolatileContext } from './volatile.js';
@@ -161,6 +162,7 @@ export async function runCoordinatorTurn(
     deps.volatile?.setStep(rootKey, stepId);
     deps.volatile?.setColdSlim(rootKey, deps.coldSlim ?? null);
     let stopping: Promise<void> | null = null;
+    const suggestionAbort = new AbortController();
     let polling = false;
     stopPoll = setInterval(() => {
       if (polling || stopping !== null) return;
@@ -168,7 +170,10 @@ export async function runCoordinatorTurn(
       void api
         .stop(stepId)
         .then((discard) => {
-          if (discard !== null && stopping === null) stopping = root.abort(context);
+          if (discard !== null && stopping === null) {
+            suggestionAbort.abort();
+            stopping = root.abort(context);
+          }
         })
         .catch(() => {})
         .finally(() => {
@@ -395,7 +400,6 @@ export async function runCoordinatorTurn(
       deps.now,
       mailTurn,
     );
-    clearInterval(stopPoll);
     if (stopping !== null) {
       await stopping;
       return done({ status: 'stopped' });
@@ -414,6 +418,32 @@ export async function runCoordinatorTurn(
       return done({ status: 'failed', errorMessage: 'Coordinator turn has no answer entry' });
     }
     const usage = turnUsage(answer, turnEntries);
+    const suggestion =
+      claimed.chief.trigger === 'user' &&
+      answer.stopReason === 'stop' &&
+      answer.content.some((block) => block.type === 'text' && block.text.trim() !== '') &&
+      (await api.canSuggestReplies?.(stepId).catch(() => false)) === true
+        ? await suggestAfterTurn(
+            deps.models.models,
+            root,
+            { provider, modelId },
+            context,
+            { threadId: claimed.chief.threadId, stepId },
+            suggestionAbort.signal,
+          ).catch(() => null)
+        : null;
+    if (suggestion !== null) {
+      usage.input += suggestion.usage.input;
+      usage.output += suggestion.usage.output;
+      usage.cacheRead += suggestion.usage.cacheRead;
+      usage.cacheWrite += suggestion.usage.cacheWrite;
+      if (suggestion.replies.length > 0 && !suggestionAbort.signal.aborted)
+        await api.suggestReplies?.(stepId, suggestion.replies).catch(() => {});
+    }
+    if (stopping !== null) {
+      await stopping;
+      return done({ status: 'stopped', usage: [usage] });
+    }
     const finished = await done({ status: 'success', usage: [usage] });
     const window = deps.models.models.getModel(provider, modelId)?.contextWindow;
     if (
