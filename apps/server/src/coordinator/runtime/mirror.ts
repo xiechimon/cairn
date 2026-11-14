@@ -29,6 +29,7 @@ export function entryRowSources(
   stepId: string,
   entries: readonly EntryRecord[],
   storeId?: string,
+  stoppedEntry?: EntryId,
 ): EntryRow[] {
   const results = new Map<string, ToolResultMessage>();
   for (const entry of entries) {
@@ -43,7 +44,7 @@ export function entryRowSources(
     if (
       !AssistantEntry.is(entry) ||
       message?.role !== 'assistant' ||
-      message.stopReason === 'aborted'
+      (message.stopReason === 'aborted' && entry.id !== stoppedEntry)
     ) {
       continue;
     }
@@ -59,6 +60,7 @@ export function entryRowSources(
         },
       });
     }
+    if (message.stopReason === 'aborted') continue;
     for (const block of message.content) {
       if (block.type !== 'toolCall') continue;
       const result = results.get(block.id);
@@ -95,7 +97,7 @@ function streamingText(view: ConversationView): string {
 
 export interface TurnMirror {
   onView(view: ConversationView): Promise<void>;
-  flush(entries: readonly EntryRecord[]): Promise<void>;
+  flush(entries: readonly EntryRecord[], stopped?: boolean): Promise<void>;
 }
 
 export function createTurnMirror(
@@ -106,8 +108,8 @@ export function createTurnMirror(
 ): TurnMirror {
   const posted = new Map<string, string>();
   let streamed = '';
-  const post = async (entries: readonly EntryRecord[]) => {
-    for (const { row, entryId } of entryRowSources(stepId, entries, storeId)) {
+  const post = async (entries: readonly EntryRecord[], stoppedEntry?: EntryId) => {
+    for (const { row, entryId } of entryRowSources(stepId, entries, storeId, stoppedEntry)) {
       const body = JSON.stringify(row.content);
       if (posted.get(row.id) === body) continue;
       await api.transcriptRow(stepId, row, entryId);
@@ -124,6 +126,10 @@ export function createTurnMirror(
       if (delta !== '') await api.transcriptDelta(stepId, delta);
       streamed = text;
     },
-    flush: post,
+    flush: (entries, stopped = false) =>
+      post(
+        entries,
+        stopped ? entries.findLast((entry) => AssistantEntry.is(entry))?.id : undefined,
+      ),
   };
 }
