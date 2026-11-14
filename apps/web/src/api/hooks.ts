@@ -52,6 +52,7 @@ import type {
   PrPanelRow,
   RemoteRoutesResponse,
   RetroProposal,
+  RouteOverride,
   ScheduleRecord,
   SearchResponse,
   SecretRecord,
@@ -745,14 +746,7 @@ export function useApiMutations(teamId: string | undefined) {
           phase?: string;
           orderIndex?: number;
           projectId?: string;
-          routeOverride?: {
-            machineId?: string;
-            requiredCapabilities?: {
-              mcpServers?: string[];
-              models?: string[];
-              executor?: 'orb';
-            };
-          } | null;
+          routeOverride?: RouteOverride | null;
         };
       }) => api.patch<TodoRecord>(`/api/todos/${input.id}`, input.body),
       onSuccess: invalidateAll,

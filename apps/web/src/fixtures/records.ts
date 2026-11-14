@@ -17,6 +17,7 @@ import {
   type ProjectRepoKind,
   type ProviderRecord,
   type QuotaWait,
+  type RouteOverride,
   type RunnerOfflineContent,
   type SecretRecord,
   type SkillFact,
@@ -93,14 +94,7 @@ export interface TodoRecord {
   madeKind?: MadeKind;
   previewUrl?: string;
   visibility?: 'private' | 'team';
-  routeOverride?: {
-    machineId?: string;
-    requiredCapabilities?: {
-      mcpServers?: string[];
-      models?: string[];
-      executor?: 'orb';
-    };
-  } | null;
+  routeOverride?: RouteOverride | null;
 }
 
 export interface TokenUsageContent {

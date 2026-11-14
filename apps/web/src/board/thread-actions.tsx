@@ -326,6 +326,7 @@ export function useThreadActions({
         onClose={() => setDialog(null)}
         todoId={todo.id}
         initial={todo.routeOverride}
+        platformLocked={todo.phase !== 'todo' && todo.phase !== 'queued'}
       />
     </>
   );

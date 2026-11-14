@@ -1,4 +1,10 @@
-import type { RequiredCapabilities, RouteOverride } from '@cairn/shared';
+import {
+  type RequiredCapabilities,
+  type RouteOverride,
+  RUNNER_OS,
+  RUNNER_OS_LABELS,
+  type RunnerOs,
+} from '@cairn/shared';
 import { cn } from 'cn';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -34,9 +40,13 @@ import { useI18n } from '../i18n/provider.js';
 function buildOverride(
   machineId: string | null,
   mcpServers: string[],
-  models: string[] | undefined,
+  kept: RequiredCapabilities | undefined,
+  os: RunnerOs | null,
 ): RouteOverride | null {
+  const { mcpServers: _replaced, os: _os, models, ...rest } = kept ?? {};
   const requiredCapabilities: RequiredCapabilities = {
+    ...rest,
+    ...(os !== null ? { os } : {}),
     ...(mcpServers.length > 0 ? { mcpServers } : {}),
     ...(models !== undefined && models.length > 0 ? { models } : {}),
   };
@@ -53,11 +63,13 @@ export function RouteOverrideDialog({
   onClose,
   todoId,
   initial,
+  platformLocked = false,
 }: {
   open?: boolean;
   onClose: () => void;
   todoId: string;
   initial: RouteOverride | null | undefined;
+  platformLocked?: boolean;
 }) {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
@@ -74,11 +86,15 @@ export function RouteOverrideDialog({
   const [mcpServers, setMcpServers] = useState<string[]>(
     initial?.requiredCapabilities?.mcpServers ?? [],
   );
+  const [platform, setPlatform] = useState<RunnerOs | null>(
+    initial?.requiredCapabilities?.os ?? null,
+  );
 
   useEffect(() => {
     if (!open) return;
     setMachineId(initial?.machineId ?? null);
     setMcpServers(initial?.requiredCapabilities?.mcpServers ?? []);
+    setPlatform(initial?.requiredCapabilities?.os ?? null);
   }, [open, initial]);
 
   const machines = live
@@ -105,7 +121,8 @@ export function RouteOverrideDialog({
     const routeOverride = buildOverride(
       machineId,
       mcpServers,
-      initial?.requiredCapabilities?.models,
+      initial?.requiredCapabilities,
+      platform,
     );
     mutations.patchTodo.mutate(
       { id: todoId, body: { routeOverride } },
@@ -144,6 +161,34 @@ export function RouteOverrideDialog({
     >
       <div className="flex flex-col gap-4" data-testid="route-override-dialog">
         <SettingsCard>
+          <SettingsRow
+            label={t('运行平台')}
+            hint={platformLocked ? t('运行中不能改，换平台请新开任务') : t('不限时用默认 Runner')}
+          >
+            <Select
+              value={platform}
+              disabled={platformLocked}
+              onValueChange={(next) => setPlatform(RUNNER_OS.find((os) => os === next) ?? null)}
+            >
+              <SelectTrigger
+                aria-label={t('运行平台')}
+                className={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-44')}
+                data-testid="route-override-platform"
+              >
+                <SelectValue>
+                  {platform === null ? t('不限（默认 Runner）') : RUNNER_OS_LABELS[platform]}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={null}>{t('不限（默认 Runner）')}</SelectItem>
+                {RUNNER_OS.map((os) => (
+                  <SelectItem key={os} value={os}>
+                    {RUNNER_OS_LABELS[os]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </SettingsRow>
           <SettingsRow label={t('首选机器')} hint={t('不填则沿用规则的机器')}>
             <Select value={machineId} onValueChange={(next) => setMachineId(next)}>
               <SelectTrigger
