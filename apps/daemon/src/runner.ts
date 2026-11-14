@@ -12,12 +12,9 @@ import type {
   WorktreeOps,
 } from '@cairn/shared';
 import { isBuildStepKind, PLAN_FILE_NAME } from '@cairn/shared';
-import { createActivityTracker } from './activity.js';
-import { AgentTodoReporter } from './agent-todo.js';
 import { AskChannel } from './ask-channel.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
-import { piWorktreeSkillDirs } from './backend/skills.js';
 import { composeSessionBrief } from './brief-file.js';
 import type { ClaudeCodeAuthProbe } from './claude-code-auth.js';
 import { credentialRedactor, guardCredentialOutputs } from './credential-output.js';
@@ -28,7 +25,7 @@ import { type MachineApi, MachineApiError } from './machine-client.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
 import { prepareStepEnv } from './step-env.js';
-import { reportStepProvenance } from './step-executor-record.js';
+import { reportStepProvenance, stepSkillsCatalog } from './step-executor-record.js';
 import { finishStepRun } from './step-finish.js';
 import { runLocalMergeStep } from './step-local-merge.js';
 import { createStepPassControls } from './step-pass-controls.js';
@@ -37,6 +34,7 @@ import { runStepPasses } from './step-pass-loop.js';
 import { agentStepRefusal, prepareStepPromptDelivery } from './step-preflight.js';
 import { composeWorkerSystemPrompt, planStepPrompt, taskMetaOpts } from './step-prompt.js';
 import { resolveStepProvider } from './step-provider.js';
+import { createStepReporters } from './step-reporters.js';
 import { StepSessionOpener } from './step-session-opener.js';
 import { composeStepSessionOpts } from './step-session-opts.js';
 import { stepMcpEndpoints } from './step-skill-tool.js';
@@ -172,31 +170,11 @@ async function runClaimedStep(
   const running = opts.running ?? 1;
   logger.raw(`step ${stepId} for conv ${convId} (${running} running)`);
 
-  let activityRelayWarned = false;
-  const activity = createActivityTracker({
-    send: (report) => {
-      client.activity?.(stepId, report)?.catch((err: unknown) => {
-        if (activityRelayWarned) return;
-        activityRelayWarned = true;
-        logger.step(
-          `activity relay failed (suppressed until next step): ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
-      });
-    },
+  const { activity, agentTodo } = createStepReporters({
+    stepId,
+    client: () => client,
+    log: (line) => logger.step(line),
     ...(deps.now !== undefined ? { now: deps.now } : {}),
-  });
-  activity.setPhase('preparing');
-
-  const agentTodo = new AgentTodoReporter({
-    send: (items) => client.agentTodo?.(stepId, { items }),
-    onFirstError: (err) =>
-      logger.step(
-        `agent todo relay failed (suppressed until next step): ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      ),
   });
 
   const {
@@ -504,19 +482,14 @@ async function runClaimedStep(
   if (!isChief) {
     await reportStepProvenance({
       record: () => ({
-        catalog:
-          deps.skillsDir === undefined
-            ? null
-            : {
-                skillsDir: deps.skillsDir,
-                cwd: deps.paths.home,
-                ...(sessionOpts.skillsAllowlist !== undefined
-                  ? { allowlist: sessionOpts.skillsAllowlist }
-                  : {}),
-                ...(injectedForSession !== undefined ? { injectedSkills: injectedForSession } : {}),
-                ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
-                ...(isPi ? { worktreeSkillsDirs: piWorktreeSkillDirs(cwd) } : {}),
-              },
+        catalog: stepSkillsCatalog({
+          skillsDir: deps.skillsDir,
+          home: deps.paths.home,
+          allowlist: sessionOpts.skillsAllowlist,
+          injectedSkills: injectedForSession,
+          teamSkillsDir,
+          piWorktree: isPi ? cwd : null,
+        }),
         injectedNames: skillInjection.facts?.injected,
         backend: backend.capabilities.name,
         model: modelKey,
