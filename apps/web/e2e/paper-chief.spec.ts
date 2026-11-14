@@ -106,7 +106,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(cards, 'S2').toHaveCSS('border-top-left-radius', await token(page, '--radius-card'));
     const routingRow = cards.getByTestId('chief-routing-row');
     await expect(routingRow, 'S2').toHaveCount(1);
-    await expect(routingRow, 'S2').toContainText('模型与机器');
+    await expect(routingRow, 'S2').toContainText('模型与 Runner');
     const heights = await cards
       .locator('> .settings-row')
       .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));

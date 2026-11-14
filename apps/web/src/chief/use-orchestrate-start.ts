@@ -42,8 +42,8 @@ export function useOrchestrateStart(): OrchestrateStart {
         (rule) => rule.use === 'session',
       )?.machineId;
       if (needsMachineName(machinesQ.data, sessionMachineId, todo.routeOverride?.machineId)) {
-        toast.warning(t('先选择机器'), {
-          description: t('多台机器在线时，开工前要在规则里点名一台。'),
+        toast.warning(t('先选择 Runner'), {
+          description: t('多台 Runner 在线时，开工前要在规则里点名一台。'),
           action: {
             label: t('去选择'),
             onClick: () => navigate(settingsHref('work-routing')),

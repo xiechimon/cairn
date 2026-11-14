@@ -49,7 +49,7 @@ const CONNECTION_LOST_LABEL = '连接断开，正在重连…';
 const OUTAGE_LABEL = '等待恢复';
 const MACHINE_OFFLINE_KEYS = new Set([
   '排队中：等 {machine} 上线（前面 {ahead} 个）',
-  '排队中：等机器上线（前面 {ahead} 个）',
+  '排队中：等 Runner 上线（前面 {ahead} 个）',
 ]);
 const RESPONDING_KEY = '模型输出中...';
 const QUOTA_WAIT_PREFIX = '等额度';

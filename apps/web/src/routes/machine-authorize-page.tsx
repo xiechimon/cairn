@@ -86,13 +86,13 @@ export function MachineAuthorizePage() {
     <div className="authorize-backdrop fixed inset-0 flex items-center justify-center bg-background">
       <Card
         role="region"
-        aria-label={t('授权机器')}
+        aria-label={t('授权 Runner')}
         className="w-[360px] max-w-[calc(100vw-48px)] gap-3 p-6"
       >
-        <h1 className="text-base font-semibold text-foreground">{t('授权机器')}</h1>
+        <h1 className="text-base font-semibold text-foreground">{t('授权 Runner')}</h1>
         {phase === 'idle' && (
           <>
-            <p className={DESC_CLASS}>{t('生成授权链接，在执行机上完成注册发起。')}</p>
+            <p className={DESC_CLASS}>{t('生成授权链接，在 Runner 上完成注册发起。')}</p>
             <Button className="w-full" onClick={() => void startEnrollment()}>
               {t('生成授权链接')}
             </Button>
@@ -101,7 +101,7 @@ export function MachineAuthorizePage() {
         {phase === 'pending' && (
           <>
             <p className={DESC_CLASS}>
-              {t('一台执行机请求加入你的团队。确认后它将以自己的凭据连接。')}
+              {t('一台 Runner 请求加入你的团队。确认后它将以自己的凭据连接。')}
             </p>
             <Button className="w-full" onClick={() => void confirm()}>
               {t('确认授权')}
@@ -111,14 +111,14 @@ export function MachineAuthorizePage() {
         {phase === 'authorizing' && <p className={DESC_CLASS}>{t('正在授权…')}</p>}
         {phase === 'authorized' && machine !== null && (
           <>
-            <p className={DESC_CLASS}>{t('授权完成，机器已注册。')}</p>
+            <p className={DESC_CLASS}>{t('授权完成，Runner 已注册。')}</p>
             <p className="text-xs break-all text-content-tertiary">
               machineId: {machine.machineId}
             </p>
           </>
         )}
         {phase === 'expired' && (
-          <p className={DESC_CLASS}>{t('授权链接已失效，请在执行机上重新发起。')}</p>
+          <p className={DESC_CLASS}>{t('授权链接已失效，请在 Runner 上重新发起。')}</p>
         )}
         {error !== null && phase !== 'authorized' && (
           <p className="text-xs text-destructive" role="alert">

@@ -139,7 +139,7 @@ export function RouteOverrideDialog({
   return (
     <DialogShell
       title={t('路由覆盖')}
-      subtitle={t('本任务的机器与执行要求；调度在规则开启后生效。')}
+      subtitle={t('本任务的 Runner 与执行要求；调度在规则开启后生效。')}
       open={open}
       onClose={onClose}
       size="m"
@@ -189,16 +189,16 @@ export function RouteOverrideDialog({
               </SelectContent>
             </Select>
           </SettingsRow>
-          <SettingsRow label={t('首选机器')} hint={t('不填则沿用规则的机器')}>
+          <SettingsRow label={t('首选 Runner')} hint={t('不填则沿用规则的 Runner')}>
             <Select value={machineId} onValueChange={(next) => setMachineId(next)}>
               <SelectTrigger
-                aria-label={t('首选机器')}
+                aria-label={t('首选 Runner')}
                 className={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-44')}
                 data-testid="route-override-machine"
               >
                 <SelectValue>
                   {machineId === null
-                    ? t(machines.length > 1 && !sessionHasMachine ? '选择机器' : '不固定')
+                    ? t(machines.length > 1 && !sessionHasMachine ? '选择 Runner' : '不固定')
                     : pickedMachine === undefined
                       ? machineId
                       : machineLabel(pickedMachine, machines)}
@@ -219,7 +219,7 @@ export function RouteOverrideDialog({
         </SettingsCard>
         <section className="flex flex-col gap-2">
           <h3 className="m-0 text-card-title font-medium text-foreground">{t('要求的 MCP')}</h3>
-          <p className={SETTINGS_HINT_CLS}>{t('派发时要求执行机已安装这些 MCP 服务器')}</p>
+          <p className={SETTINGS_HINT_CLS}>{t('派发时要求 Runner 已安装这些 MCP 服务器')}</p>
           {mcpOptions.length === 0 ? (
             <SettingsCard>
               <div className={cn(SETTINGS_ROW_CLS, 'gap-2')}>

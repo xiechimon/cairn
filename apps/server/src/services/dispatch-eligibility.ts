@@ -115,22 +115,22 @@ export function homeMachineRejectReason(
 ): string | null {
   const runtime = stepRuntimeFor(agentRow.provider);
   if (!machineRow.enabledRuntimes.includes(runtime)) {
-    return `机器 ${machineRow.name} 未启用 ${runtime} runtime（在机器页开启后再试）。`;
+    return `Runner ${machineRow.name} 未启用 ${runtime} runtime（在 Runner 页开启后再试）。`;
   }
   if (runtime === 'claude-code' && agentRow.modelId != null && agentRow.modelId !== '') {
     const report = machineRow.claudeCodeReport;
     const catalogEntry = catalog?.find((m) => m.id === agentRow.modelId);
     if (catalogEntry !== undefined && catalogEntry.liveness === 'dead') {
-      return `机器 ${machineRow.name} 的模型 ${agentRow.modelId} 已被上游下架（/v1/messages 404）。换一个活模型，或联系上游恢复上架。`;
+      return `Runner ${machineRow.name} 的模型 ${agentRow.modelId} 已被上游下架（/v1/messages 404）。换一个活模型，或联系上游恢复上架。`;
     }
     if (catalogEntry !== undefined) {
       return null;
     }
     if (report == null) {
-      return `机器 ${machineRow.name} 尚未上报模型清单（daemon 版本过旧或未上线），无法校验模型 ${agentRow.modelId}。`;
+      return `Runner ${machineRow.name} 尚未上报模型清单（daemon 版本过旧或未上线），无法校验模型 ${agentRow.modelId}。`;
     }
     if (!report.installed || !report.models.some((m) => m.id === agentRow.modelId)) {
-      return `机器 ${machineRow.name} 未配置模型 ${agentRow.modelId}（在该机 ~/.claude/settings.json 配上，或在路由规则里换模型）。`;
+      return `Runner ${machineRow.name} 未配置模型 ${agentRow.modelId}（在该 Runner 的 ~/.claude/settings.json 配上，或在路由规则里换模型）。`;
     }
   }
   return null;

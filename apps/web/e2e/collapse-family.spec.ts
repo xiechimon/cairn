@@ -42,7 +42,7 @@ test('resources live in settings, not the sidebar', async ({ page }) => {
   await expect(page.locator('.sidebar-group', { hasText: '资源' })).toHaveCount(0);
   await page.getByTestId('sidebar-settings').click();
   const settings = page.getByRole('dialog', { name: '设置' });
-  for (const name of ['技能', 'MCP', '密钥', '机器', '模型服务', '规则与策略', 'API 密钥', '账号']) {
+  for (const name of ['技能', 'MCP', '密钥', 'Runner', '模型服务', '规则与策略', 'API 密钥', '账号']) {
     await expect(settings.getByRole('link', { name, exact: true })).toBeVisible();
   }
 });

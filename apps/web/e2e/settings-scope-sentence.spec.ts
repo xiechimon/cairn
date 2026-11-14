@@ -9,7 +9,7 @@ const scope = (page: Page) => settings(page).getByRole('combobox', { name: '设�
 test('model services open with a scope sentence and keep the scope in the URL', async ({ page }) => {
   await page.goto('/app/settings/providers?scenario=providers-fleet');
   await expect(settings(page).getByTestId('settings-scope')).toContainText('设置作用于');
-  await expect(scope(page)).toContainText('所有机器');
+  await expect(scope(page)).toContainText('所有 Runner');
   await scope(page).click();
   await page.getByRole('option', { name: /build-box/ }).first().click();
   await expect(page).toHaveURL(/scope=/);
@@ -17,7 +17,7 @@ test('model services open with a scope sentence and keep the scope in the URL', 
   await expect(scope(page).locator('svg.lucide-monitor')).toBeVisible();
   await expect(settings(page).getByTestId('settings-checked')).toContainText('已检查');
   await scope(page).click();
-  await page.getByRole('option', { name: '所有机器', exact: true }).click();
+  await page.getByRole('option', { name: '所有 Runner', exact: true }).click();
   expect(new URL(page.url()).searchParams.has('scope')).toBe(false);
   await expect(scope(page).locator('svg.lucide-server')).toBeVisible();
 });
@@ -31,7 +31,7 @@ test('routing carries the same sentence and says routing applies to all machines
   await scope(page).click();
   await page.getByRole('option', { name: /build-box/ }).first().click();
   await expect(page).toHaveURL(/scope=/);
-  await expect(settings(page).getByTestId('settings-scope-note')).toContainText('对所有机器生效');
+  await expect(settings(page).getByTestId('settings-scope-note')).toContainText('对所有 Runner 生效');
 });
 
 test('English scope copy names all machines and keeps rules and policies in the nav', async ({
@@ -40,9 +40,9 @@ test('English scope copy names all machines and keeps rules and policies in the 
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
   await page.goto('/app/settings/providers?scenario=providers-fleet');
   const selector = page.getByRole('combobox', { name: 'Settings apply to' });
-  await expect(selector).toContainText('All machines');
+  await expect(selector).toContainText('All Runners');
   await selector.click();
-  await expect(page.getByRole('option', { name: 'All machines', exact: true })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'All Runners', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('link', { name: 'Rules & policies', exact: true })).toBeVisible();
 });
@@ -50,7 +50,7 @@ test('English scope copy names all machines and keeps rules and policies in the 
 test('gallery scope preserves duplicate suffixes and offline markers with icons', async ({ page }) => {
   await page.goto('/design.html?only=settings-scope&theme=light&w=390');
   const selector = page.getByRole('combobox', { name: 'Settings apply to' });
-  await expect(selector).toContainText('All machines');
+  await expect(selector).toContainText('All Runners');
   await selector.click();
   const twins = page.getByRole('option').filter({ hasText: 'build-box' });
   await expect(twins).toHaveCount(2);
@@ -145,9 +145,9 @@ test('the accept switch is derived: off clears runtimes, on opens runtimes with 
 
   await toggle.click();
   await expect(settings(page).getByTestId('machine-pick-runtimes')).toHaveText(
-    '选择这台机器接哪些运行时',
+    '选择这台 Runner 接哪些运行时',
   );
-  await expect(page.locator('[data-sonner-toast]')).toContainText('选择这台机器接哪些运行时');
+  await expect(page.locator('[data-sonner-toast]')).toContainText('选择这台 Runner 接哪些运行时');
   await expect(settings(page).getByTestId('machine-item')).toHaveAttribute(
     'data-expanded',
     'true',
@@ -241,7 +241,7 @@ test('scope menu wraps long machine names without clipping or overlapping adjace
   const selected = page.getByRole('option', { name: new RegExp(machineName), selected: true });
   const itemBox = await selected.boundingBox();
   const textBox = await selected.locator('> :first-child').boundingBox();
-  const previousBox = await page.getByRole('option', { name: '所有机器', exact: true }).boundingBox();
+  const previousBox = await page.getByRole('option', { name: '所有 Runner', exact: true }).boundingBox();
   const nextBox = await page.getByRole('option', { name: 'next-machine', exact: true }).boundingBox();
   expect(itemBox).not.toBeNull();
   expect(textBox).not.toBeNull();

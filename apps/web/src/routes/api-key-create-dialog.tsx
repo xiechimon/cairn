@@ -124,9 +124,9 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
             <Checkbox
               checked={machineAccess}
               onCheckedChange={setMachineAccess}
-              aria-label={t('机器注册（CLI 接入执行机）')}
+              aria-label={t('注册 Runner（命令行接入）')}
             />
-            <span>{t('机器注册（CLI 接入执行机）')}</span>
+            <span>{t('注册 Runner（命令行接入）')}</span>
           </div>
         </div>
         <div className="flex items-baseline justify-between">

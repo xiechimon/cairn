@@ -68,6 +68,7 @@ interface Section {
   id: SettingsSectionId;
   label: string;
   Icon: LucideIcon;
+  keywords?: string[];
   rows?: true;
   element: () => ReactNode;
 }
@@ -146,7 +147,13 @@ const GROUPS: Group[] = [
   {
     heading: '执行环境',
     sections: [
-      { id: 'machines', label: '机器', Icon: Server, element: () => <MachinesPage /> },
+      {
+        id: 'machines',
+        label: 'Runner',
+        Icon: Server,
+        keywords: ['机器', 'machine', 'computer'],
+        element: () => <MachinesPage />,
+      },
       { id: 'skills', label: '技能', Icon: Puzzle, element: () => <SkillsPage /> },
       { id: 'mcp', label: 'MCP', Icon: Plug, element: () => <McpServersPage /> },
     ],
@@ -289,7 +296,12 @@ export function SettingsDialog({
   const searchField = (
     <SettingsSearch
       inputRef={searchRef}
-      sections={SECTIONS.map((s) => ({ id: s.id, label: t(s.label), Icon: s.Icon }))}
+      sections={SECTIONS.map((s) => ({
+        id: s.id,
+        label: t(s.label),
+        Icon: s.Icon,
+        keywords: s.keywords ?? [],
+      }))}
       onPick={(pick) => {
         navigate(hrefFor(pick.section), { replace: true });
         setMatchLabel(pick.row);

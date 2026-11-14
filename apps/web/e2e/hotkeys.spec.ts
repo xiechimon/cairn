@@ -154,14 +154,14 @@ test.describe('⌘J leaves overlay routes for the Coordinator page', () => {
 
   test('back from the authorize page returns to the machines section', async ({ page }) => {
     await page.goto(MACHINES);
-    await page.getByRole('button', { name: '添加机器' }).click();
-    const dialog = page.getByRole('dialog', { name: '添加机器' });
+    await page.getByRole('button', { name: '添加 Runner' }).click();
+    const dialog = page.getByRole('dialog', { name: '添加 Runner' });
     await expect(dialog).toBeVisible();
     await dialog.getByRole('link', { name: '浏览器授权注册 →' }).click();
     await page.waitForURL((u) => u.pathname === '/app/machines/authorize');
     await expect(page.locator('.authorize-backdrop')).toBeVisible();
     await page.goBack();
     await page.waitForURL((u) => u.pathname === '/app/settings/machines');
-    await expect(page.getByRole('button', { name: '添加机器' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '添加 Runner' })).toBeVisible();
   });
 });

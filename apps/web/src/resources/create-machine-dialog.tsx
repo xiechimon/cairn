@@ -47,7 +47,7 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
   );
   return (
     <DialogShell
-      title={t('添加机器')}
+      title={t('添加 Runner')}
       open={open}
       onClose={onClose}
       size="l"
@@ -80,14 +80,14 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
           <li className={STEP_CLS}>
             <span className={STEP_NUM_CLS}>2</span>
             <div className={STEP_BODY_CLS}>
-              <span className="text-ui font-medium text-foreground">{t('在机器上执行')}</span>
+              <span className="text-ui font-medium text-foreground">{t('在 Runner 上执行')}</span>
               <div className={CMD_CLS}>
                 <code className={CMD_CODE_CLS}>{startCmd}</code>
                 {copyButton(startCmd)}
               </div>
               <p className="m-0 text-meta text-content-tertiary">
                 {t(
-                  '在待接入的机器上执行以下命令。浏览器将打开登录页，授权团队 {team} 后机器即可上线。此后它在后台常驻运行，无需保持终端开启。',
+                  '在待接入的 Runner 上执行以下命令。浏览器将打开登录页，授权团队 {team} 后 Runner 即可上线。此后它在后台常驻运行，无需保持终端开启。',
                   { team: teamName },
                 )}
               </p>

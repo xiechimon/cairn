@@ -17,11 +17,11 @@ test('scope menu: all machines first, one option per machine, offline and Orb ma
   page,
 }) => {
   await page.goto(FLEET);
-  await expect(scopeSelect(page)).toContainText('所有机器');
+  await expect(scopeSelect(page)).toContainText('所有 Runner');
   await expect(scopeSelect(page).locator('svg.lucide-server')).toBeVisible();
   await scopeSelect(page).click();
   await expect(page.getByRole('option')).toHaveText([
-    '所有机器',
+    '所有 Runner',
     'xmonsMac-3574.local',
     'build-box',
     'build-box-orb',
@@ -36,7 +36,7 @@ test('scope menu: all machines first, one option per machine, offline and Orb ma
     expect(await option.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   }
   await page.keyboard.press('Escape');
-  await expect(scopeSelect(page)).toContainText('所有机器');
+  await expect(scopeSelect(page)).toContainText('所有 Runner');
   await expect(page.getByText('DESKTOP-OLD')).toHaveCount(0);
 });
 
@@ -79,7 +79,7 @@ test('OAuth providers show no API key row; key providers show a write-only key r
 
 test('unknown scope and item fall back to the team tab and its first row', async ({ page }) => {
   await page.goto(`${FLEET}&scope=gone-machine&item=provider%3Agone`);
-  await expect(scopeSelect(page)).toContainText('所有机器');
+  await expect(scopeSelect(page)).toContainText('所有 Runner');
   await expect(page.getByTestId('provider-instance').first()).toHaveAttribute(
     'aria-current',
     'true',

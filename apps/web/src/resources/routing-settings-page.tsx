@@ -110,7 +110,7 @@ function RuleEditor({
       data-testid={rule === null ? `routing-rule-new-${use}` : `routing-rule-${use}`}
     >
       <SettingsCard>
-        <SettingsRow label={t(USE_LABELS[use])} hint={t('模型与首选机器')}>
+        <SettingsRow label={t(USE_LABELS[use])} hint={t('模型与首选 Runner')}>
           <span className="font-mono text-meta text-content-tertiary">{use}</span>
         </SettingsRow>
         <SettingsRow label={t('运行时')}>
@@ -156,16 +156,16 @@ function RuleEditor({
             </SelectContent>
           </Select>
         </SettingsRow>
-        <SettingsRow label={t('首选机器')}>
+        <SettingsRow label={t('首选 Runner')}>
           <Select value={machineId} onValueChange={(next) => setMachineId(next)}>
             <SelectTrigger
-              aria-label={t('首选机器')}
+              aria-label={t('首选 Runner')}
               className={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-44')}
             >
               <SelectValue>
                 {machineId === null
                   ? mustNameMachine
-                    ? t('选择机器')
+                    ? t('选择 Runner')
                     : unsetLabel
                   : pickedMachine === undefined
                     ? undefined

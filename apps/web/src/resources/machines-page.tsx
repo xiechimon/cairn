@@ -76,15 +76,15 @@ export function MachinesPage() {
       testId="resource-empty"
       className="mt-6"
       icon={Monitor}
-      title={t('尚无机器')}
-      description={t('在要执行任务的机器上运行注册命令，它就会出现在这里。')}
-      action={{ label: t('添加机器'), onClick: () => setAddOpen(true) }}
+      title={t('尚无 Runner')}
+      description={t('在要执行任务的 Runner 上运行注册命令，它就会出现在这里。')}
+      action={{ label: t('添加 Runner'), onClick: () => setAddOpen(true) }}
     />
   );
   return (
     <PageShell
       route={MACHINES_HREF}
-      title={t('机器')}
+      title={t('Runner')}
       selected={MACHINES_HREF}
       fixture={fixture}
       bleed
@@ -96,8 +96,8 @@ export function MachinesPage() {
         <QueryBoundary
           query={live ? machinesQ : undefined}
           isEmpty={machines.length === 0}
-          loadingLabel={t('正在加载机器')}
-          errorTitle={t('机器没能加载')}
+          loadingLabel={t('正在加载 Runner')}
+          errorTitle={t('Runner 没能加载')}
           className="mt-6"
           empty={noMachines}
         >
@@ -105,13 +105,13 @@ export function MachinesPage() {
             header={
               <div className="flex items-center gap-1">
                 <h2 className="m-0 text-card-title font-semibold text-foreground">
-                  {t('已接入的机器')}
+                  {t('已接入的 Runner')}
                 </h2>
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={t('添加机器')}
-                  title={t('添加机器')}
+                  aria-label={t('添加 Runner')}
+                  title={t('添加 Runner')}
                   onClick={() => setAddOpen(true)}
                 >
                   <Plus aria-hidden strokeWidth={1.75} />

@@ -313,13 +313,13 @@ test('fail row `查看原始错误` opens the raw-error dialog with the full tex
 }) => {
   await page.goto('/app/todo/r8-12?scenario=54');
 
-  await expect(page.locator('.chat-para--fail')).toHaveText('运行该任务的机器已离线');
+  await expect(page.locator('.chat-para--fail')).toHaveText('运行该任务的 Runner 已离线');
   await page.getByRole('button', { name: '查看原始错误' }).click();
   const dialog = page.getByRole('dialog', { name: '原始错误' });
   await expect(dialog).toBeVisible();
 
   await expect(dialog.locator('[data-testid="fail-raw-error"]')).toHaveText(
-    '运行该任务的机器已离线',
+    '运行该任务的 Runner 已离线',
   );
 
   await dialog.getByRole('button', { name: '关闭' }).click();

@@ -53,7 +53,7 @@ export function SettingsScopeSentence({
           >
             <SelectValue>
               {current === undefined ? <Server aria-hidden /> : <Monitor aria-hidden />}
-              {current === undefined ? t('所有机器') : machineLabel(current, machines)}
+              {current === undefined ? t('所有 Runner') : machineLabel(current, machines)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
@@ -62,7 +62,7 @@ export function SettingsScopeSentence({
           >
             <SelectItem value={TEAM_SCOPE}>
               <Server aria-hidden />
-              {t('所有机器')}
+              {t('所有 Runner')}
             </SelectItem>
             {machines.map((m) =>
               m.id === undefined ? null : (

@@ -16,7 +16,7 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `providers` | `设置` (Settings) › `模型` (Model) › `模型服务` (Providers) | [Model providers and subscriptions](#providers) |
 | `routing` | `设置` (Settings) › `模型` (Model) › `用量与连接` (Usage & connections) | [Model and work routing](#routing) |
 | `work-routing` | `设置` (Settings) › `模型` (Model) › `规则与策略` (Rules & policies) | [Model and work routing](#routing) |
-| `machines` | `设置` (Settings) › `执行环境` (Execution) › `机器` (Machines) | [Machines](#machines) |
+| `machines` | `设置` (Settings) › `执行环境` (Execution) › `Runner` (Runners) | [Machines](#machines) |
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
 | `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
 | `secrets` | `设置` (Settings) › `安全` (Security) › `密钥` (Secrets) | [Secrets](#secrets) |
@@ -525,7 +525,7 @@ Reach:
 2. `click testid:machine-item`
 
 - Web routes: `/app/resources/machines`, `/app/resources/machines/:id`
-- Settings: `设置` (Settings) › `执行环境` (Execution) › `机器` (Machines)
+- Settings: `设置` (Settings) › `执行环境` (Execution) › `Runner` (Runners)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `machine-list`, `machines-scroll`, `resource-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/machines-local-row.md](features/machines-local-row.md)

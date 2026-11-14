@@ -139,7 +139,7 @@ test(`usage opens from the ring in the composer tool row (${theme})`, async ({ p
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
   await expect(ring(page)).toHaveAttribute('aria-expanded', 'true');
   await expect(usage(page)).toContainText('90%');
-  await expect(usage(page).locator('dt')).toHaveText(['Cost', 'Tokens', 'Cache hit', 'Models', 'Machines']);
+  await expect(usage(page).locator('dt')).toHaveText(['Cost', 'Tokens', 'Cache hit', 'Models', 'Runners']);
   await expect(usage(page)).toContainText('provider/model-a');
   await expect(usage(page)).toContainText('provider/model-b');
   await expect(usage(page)).toContainText('omarchy');
@@ -182,7 +182,7 @@ for (const theme of ['light', 'dark'] as const) {
     await ring(page).hover();
     await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('Context 31% · $4.00 · Tokens: 2.5k');
     await openUsage(page);
-    await expect(usage(page).locator('dt')).toHaveText(['Context', 'Cost', 'Tokens', 'Cache hit', 'Models', 'Machines']);
+    await expect(usage(page).locator('dt')).toHaveText(['Context', 'Cost', 'Tokens', 'Cache hit', 'Models', 'Runners']);
     await expect(stat(page, 0)).toHaveText('31% · 62k / 200k');
     await expect(stat(page, 1)).toHaveText('$4.00');
     await expect(stat(page, 2)).toHaveText('2.5k');

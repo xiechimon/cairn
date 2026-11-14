@@ -22,7 +22,7 @@ for (const width of [1440, 390]) {
       const notifications = page.getByRole('switch', { name: '推送通知', exact: true });
       await expect(notifications).toBeVisible();
       await expect(page.getByRole('combobox', { name: '语言', exact: true })).toBeVisible();
-      await expect(page.getByRole('form', { name: '飞书机器人' })).toHaveCount(0);
+      await expect(page.getByRole('form', { name: '飞书 Runner 人' })).toHaveCount(0);
       await expect(page.getByText('正在加载飞书配置', { exact: true })).toHaveCount(0);
       expect(botRequests).toEqual([]);
       await notifications.click();

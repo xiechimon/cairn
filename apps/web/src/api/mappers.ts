@@ -135,7 +135,7 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
   if (queue.blocked?.kind === 'capability-missing') {
     return {
       label:
-        '排队中：没有机器满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）',
+        '排队中：没有 Runner 满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）',
       vars: { missing: queue.blocked.missing.join('、'), ahead },
     };
   }
@@ -145,7 +145,7 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
           label: '排队中：等 {machine} 上线（前面 {ahead} 个）',
           vars: { machine: queue.waitingFor.name, ahead },
         }
-      : { label: '排队中：等机器上线（前面 {ahead} 个）', vars: { ahead } };
+      : { label: '排队中：等 Runner 上线（前面 {ahead} 个）', vars: { ahead } };
   }
   return queue.waitingFor != null
     ? {
@@ -157,7 +157,7 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
           ahead,
         },
       }
-    : { label: '排队中：等空闲机器（前面 {ahead} 个）', vars: { ahead } };
+    : { label: '排队中：等空闲 Runner（前面 {ahead} 个）', vars: { ahead } };
 }
 
 function connectingLine(queue: NonNullable<StepRow['queue']>): {
@@ -969,7 +969,7 @@ const REWORK_REUSE_HEAD = '返工回到本分支继续';
 
 const CREDENTIAL_SOURCE_DETAIL = {
   integration: 'integration：每步下发的 token',
-  machine: 'machine：执行机本机的 git 凭据',
+  machine: 'machine：Runner 本机的 git 凭据',
 } as const;
 
 function systemRowItem(row: SystemRow, id: string, createdAt: number): TranscriptItem | ToolEntry {
@@ -1035,7 +1035,7 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
 function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string {
   switch (kind) {
     case 'network':
-      return '请将这台机器重新上线。这一步不会改派到其他机器。';
+      return '请将这台 Runner 重新上线。这一步不会改派到其他 Runner。';
     case 'quota':
       return '模型额度已用尽，请等待额度恢复后重试。';
     case 'capacity':

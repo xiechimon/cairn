@@ -103,7 +103,7 @@ export function ClaudeLoginBanner({ warnings }: { warnings: readonly ClaudeLogin
   const body =
     expired === 0
       ? t('到期前重新登录，任务才不会中断。')
-      : t('重新登录前，这些机器和订阅不会接新任务。');
+      : t('重新登录前，这些 Runner 和订阅不会接新任务。');
   return (
     <NoticeBanner
       data-testid="claude-login-banner"
@@ -120,7 +120,11 @@ export function ClaudeLoginBanner({ warnings }: { warnings: readonly ClaudeLogin
           className="px-3"
           render={<Link to={link.href} />}
         >
-          {links.length === 1 ? t('查看') : link.id === 'machines' ? t('查看机器') : t('查看订阅')}
+          {links.length === 1
+            ? t('查看')
+            : link.id === 'machines'
+              ? t('查看 Runner')
+              : t('查看订阅')}
         </Button>
       ))}
     />
