@@ -3,7 +3,11 @@ import { join } from 'node:path';
 import type { MachineHeartbeatBody } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { buildExecutorRecord } from '../src/executor-record.js';
-import { reportStepProvenance, stepExecutorRecord } from '../src/step-executor-record.js';
+import {
+  reportStepProvenance,
+  stepExecutorRecord,
+  stepSkillsCatalog,
+} from '../src/step-executor-record.js';
 import { testTempDir } from './test-temp-dir.js';
 
 function skillsFixture(): { skillsDir: string; cwd: string; content: (name: string) => string } {
@@ -133,5 +137,42 @@ describe('reportStepProvenance', () => {
     });
     expect(lines.slice(-1)).toEqual(['build provenance report failed: catalog unreadable']);
     expect(lines).toContain('build provenance report failed: server down');
+  });
+});
+
+describe('stepSkillsCatalog', () => {
+  const none = {
+    skillsDir: '/skills',
+    home: '/home/u',
+    allowlist: undefined,
+    injectedSkills: undefined,
+    teamSkillsDir: null,
+    piWorktree: null,
+  };
+
+  test('no skills directory means no catalog', () => {
+    expect(stepSkillsCatalog({ ...none, skillsDir: undefined, piWorktree: '/wt' })).toBeNull();
+  });
+
+  test('omits every unset field', () => {
+    expect(stepSkillsCatalog(none)).toEqual({ skillsDir: '/skills', cwd: '/home/u' });
+  });
+
+  test('carries allowlist, injected skills, team skills and pi worktree dirs', () => {
+    const catalog = stepSkillsCatalog({
+      ...none,
+      allowlist: ['alpha'],
+      injectedSkills: ['beta'],
+      teamSkillsDir: '/team',
+      piWorktree: '/wt',
+    });
+    expect(catalog).toMatchObject({
+      skillsDir: '/skills',
+      cwd: '/home/u',
+      allowlist: ['alpha'],
+      injectedSkills: ['beta'],
+      teamSkillsDir: '/team',
+    });
+    expect(Array.isArray(catalog?.worktreeSkillsDirs)).toBe(true);
   });
 });

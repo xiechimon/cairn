@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
 import type { MachineHeartbeatBody } from '@cairn/shared';
-import { collectVisibleSkillFileMap, type SkillsCatalogOpts } from './backend/skills.js';
+import {
+  collectVisibleSkillFileMap,
+  piWorktreeSkillDirs,
+  type SkillsCatalogOpts,
+} from './backend/skills.js';
 import { buildExecutorRecord, type ExecutorRecord } from './executor-record.js';
 
 export interface StepExecutorInput {
@@ -11,6 +15,29 @@ export interface StepExecutorInput {
   effort: string | null | undefined;
   systemPrompt: string | null | undefined;
   tools: readonly { name: string; description: string }[];
+}
+
+export interface StepSkillsCatalogInput {
+  skillsDir: string | undefined;
+  home: string;
+  allowlist: string[] | undefined;
+  injectedSkills: string[] | undefined;
+  teamSkillsDir: string | null;
+  piWorktree: string | null;
+}
+
+export function stepSkillsCatalog(input: StepSkillsCatalogInput): SkillsCatalogOpts | null {
+  if (input.skillsDir === undefined) return null;
+  return {
+    skillsDir: input.skillsDir,
+    cwd: input.home,
+    ...(input.allowlist !== undefined ? { allowlist: input.allowlist } : {}),
+    ...(input.injectedSkills !== undefined ? { injectedSkills: input.injectedSkills } : {}),
+    ...(input.teamSkillsDir !== null ? { teamSkillsDir: input.teamSkillsDir } : {}),
+    ...(input.piWorktree !== null
+      ? { worktreeSkillsDirs: piWorktreeSkillDirs(input.piWorktree) }
+      : {}),
+  };
 }
 
 export function stepExecutorRecord(input: StepExecutorInput): ExecutorRecord {
