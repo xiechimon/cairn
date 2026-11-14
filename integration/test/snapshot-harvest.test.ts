@@ -4,6 +4,7 @@ import { expect, it } from 'vitest';
 import { openDbWithHandle } from '../../apps/server/src/db/client.js';
 import { coordinatorTurnSnapshot } from '../../apps/server/src/db/schema.js';
 import { seed } from '../../apps/server/src/db/seed.js';
+import { COORDINATOR_SNAPSHOT_SCHEMA_VERSION } from '../../apps/server/src/services/coordinator-turn-capture.js';
 import { replayInput } from '../eval/coordinator-routing/contract.mts';
 import { buildDatasetItem, listHarvestCandidates } from '../eval/coordinator-routing/harvest.mts';
 import {
@@ -252,4 +253,8 @@ it('lists harvest candidates and builds dataset items from sealed snapshots', ()
   } finally {
     db.close();
   }
+});
+
+it('harvests only the schema version the Coordinator writes', () => {
+  expect(COORDINATOR_SNAPSHOT_SCHEMA_VERSION).toBe(SNAPSHOT_SCHEMA_VERSION);
 });
