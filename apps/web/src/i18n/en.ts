@@ -2056,4 +2056,7 @@ export const EN: Record<string, string> = {
   暂停播放: 'Pause',
   重来: 'Restart',
   '事件 {n} / {total}': 'Event {n} / {total}',
+  运行机器: 'Machine',
+  目录: 'Folder',
+  还没分配机器: 'No machine yet',
 };
