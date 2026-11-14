@@ -1,10 +1,6 @@
-import { reportStatusWord, type StatusWord } from '../board/status-words.js';
+import type { TodoGlance } from '../detail/segments.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
-
-export type ThreadEventItem = Extract<
-  ChiefStreamItem,
-  { kind: 'thread-report' | 'thread-message' }
->;
+import { taskRefsOf } from './chief-task-refs.js';
 
 export interface StreamRow {
   item: ChiefStreamItem;
@@ -16,7 +12,6 @@ export interface ThreadActivity {
   id: string;
   todoId: string;
   title: string;
-  events: ThreadEventItem[];
 }
 
 export interface GroupedRow {
@@ -24,64 +19,39 @@ export interface GroupedRow {
   i: number;
 }
 
-export interface ActivitySummary {
-  title: string;
-  messages: number;
-  status: StatusWord | null;
-}
-
-function isThreadEvent(item: ChiefStreamItem): item is ThreadEventItem {
-  return item.kind === 'thread-report' || item.kind === 'thread-message';
-}
-
-function reportKey(item: Extract<ThreadEventItem, { kind: 'thread-report' }>): string {
-  return `${reportStatusWord(item)}|${item.line ?? ''}`;
-}
-
-function appendEvent(events: ThreadEventItem[], item: ThreadEventItem): void {
-  if (item.kind === 'thread-report') {
-    const previous = events.findLast((event) => event.kind === 'thread-report');
-    if (previous?.kind === 'thread-report' && reportKey(previous) === reportKey(item)) return;
+export function subThreadRowIds(
+  stream: readonly ChiefStreamItem[],
+  glances: ReadonlyMap<string, TodoGlance>,
+): ReadonlySet<string> {
+  const shown = new Set(stream.flatMap((item) => (item.kind === 'task-card' ? [item.todoId] : [])));
+  const kept = new Set<string>();
+  for (const item of stream) {
+    if (item.kind === 'robot' && item.typing !== true) {
+      for (const ref of taskRefsOf(item, glances)) shown.add(ref.todoId);
+      continue;
+    }
+    if (item.kind !== 'thread-report' && item.kind !== 'thread-message') continue;
+    const parentId = glances.get(item.todoId)?.parentId;
+    if (shown.has(item.todoId) || (parentId !== undefined && shown.has(parentId))) continue;
+    shown.add(item.todoId);
+    kept.add(item.id);
   }
-  events.push(item);
+  return kept;
 }
 
 export function groupThreadEvents(
   rows: readonly StreamRow[],
-  standalone: (item: ChiefStreamItem) => boolean,
+  kept: ReadonlySet<string>,
 ): GroupedRow[] {
-  const entries: GroupedRow[] = [];
-  let open: { activity: ThreadActivity } | null = null;
-  for (const row of rows) {
+  return rows.flatMap((row): GroupedRow[] => {
     const { item } = row;
-    if (item.kind === 'thread-message' && item.by !== 'coordinator') continue;
-    if (!isThreadEvent(item) || standalone(item)) {
-      open = null;
-      entries.push(row);
-      continue;
-    }
-    if (open !== null && open.activity.todoId === item.todoId) {
-      appendEvent(open.activity.events, item);
-      continue;
-    }
-    const activity: ThreadActivity = {
-      kind: 'thread-activity',
-      id: item.id,
-      todoId: item.todoId,
-      title: item.title,
-      events: [item],
-    };
-    open = { activity };
-    entries.push({ item: activity, i: row.i });
-  }
-  return entries;
-}
-
-export function activitySummary(activity: ThreadActivity): ActivitySummary {
-  const latestReport = activity.events.findLast((event) => event.kind === 'thread-report');
-  return {
-    title: activity.title,
-    messages: activity.events.filter((event) => event.kind === 'thread-message').length,
-    status: latestReport?.kind === 'thread-report' ? reportStatusWord(latestReport) : null,
-  };
+    if (item.kind !== 'thread-report' && item.kind !== 'thread-message') return [row];
+    if (!kept.has(item.id)) return [];
+    return [
+      {
+        item: { kind: 'thread-activity', id: item.id, todoId: item.todoId, title: item.title },
+        i: row.i,
+      },
+    ];
+  });
 }
