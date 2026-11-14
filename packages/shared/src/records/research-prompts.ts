@@ -20,7 +20,7 @@ export interface IntakeHistoryItem {
 
 const TIER_METHOD: Record<ResearchTier, string> = {
   1: '单人研究：先想清楚要查什么，然后总共用 3 到 15 次工具调用完成，其中至少 3 次搜索或抓取外部页面，每一轮并行发出多个搜索，不要逐个串行搜。',
-  2: '多路研究：你是主研究员。先把问题拆成 3 到 5 个互相独立的子问题，用子代理（Task 工具）并行各查一个，合计至少 5 次子搜索，并抓取支持结论的原始页面，再由你合并结论、去重、核对冲突。',
+  2: '多路研究：你是主研究员。先把问题拆成 3 到 5 个互相独立的子问题，用子代理（Task 工具）并行各查一个，没有 Task 工具就自己逐个查完；合计至少 5 次子搜索，并抓取支持结论的原始页面，再由你合并结论、去重、核对冲突。',
 };
 
 const RESEARCH_RULES = [
@@ -81,7 +81,7 @@ export function researchIntakeQuestion(input: {
     ),
     '',
     '## 排重',
-    `收齐候选后，用一个 Haiku 子代理（Task 工具，model 指定 ${RESEARCH_DEDUPE_MODEL}）做语义排重：把候选和上面已交过的条目一起交给它，让它标出意思相同、只是 URL 不同的重复项，标出的全部删掉。`,
+    `收齐候选后，用一个 Haiku 子代理（Task 工具，model 指定 ${RESEARCH_DEDUPE_MODEL}）做语义排重：把候选和上面已交过的条目一起交给它，让它标出意思相同、只是 URL 不同的重复项，标出的全部删掉。没有 Task 工具时由你自己按同样标准排重。`,
     '',
     '## 输出',
     `报告正文用文字概述今天的发现，然后在 ${REPORT_FILE_NAME} 末尾恰好放一个 \`\`\`json 代码块，内容是最多 ${RESEARCH_INTAKE_ITEMS_MAX} 项的数组，每项形如：`,
