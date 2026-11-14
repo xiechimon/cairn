@@ -440,14 +440,16 @@ export function ComposerSurface({
           </Button>
         </div>
         {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          style={{ display: 'none' }}
-          onChange={onPickFiles}
-          accept={ATTACHMENT_ACCEPT}
-        />
+        {onAttachment != null && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            style={{ display: 'none' }}
+            onChange={onPickFiles}
+            accept={ATTACHMENT_ACCEPT}
+          />
+        )}
       </div>
       {!narrow && (
         <div className="mt-1.5 flex items-center gap-0 px-1.5">
