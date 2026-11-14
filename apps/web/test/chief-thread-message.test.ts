@@ -1,8 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { mapChiefStream, type MessageRow } from '../src/api/mappers.js';
-import { threadTargetsOf } from '../src/board/composer-thread-target.js';
 import { replyDeliveryOf } from '../src/board/reply-delivery.js';
-import type { TodoRecord } from '../src/fixtures/records.js';
 
 const MARKER = {
   kind: 'thread-message',
@@ -57,26 +55,5 @@ describe('how a home card reply reaches its thread', () => {
     ['closed', null],
   ] as const)('%s → %s', (phase, delivery) => {
     expect(replyDeliveryOf(phase)).toBe(delivery);
-  });
-});
-
-describe('which threads the home composer can talk to', () => {
-  const at = (id: string, phase: TodoRecord['phase'], extra: Partial<TodoRecord> = {}) =>
-    ({ id, phase, phaseAt: Number(id.slice(1)), latestBuildId: `b-${id}`, archivedAt: null, ...extra }) as TodoRecord;
-
-  test('only started, unarchived threads that a message can reach, newest first', () => {
-    const targets = threadTargetsOf([
-      at('t1', 'building'),
-      at('t2', 'queued'),
-      at('t3', 'confirm'),
-      at('t4', 'building', { latestBuildId: null }),
-      at('t5', 'failed', { archivedAt: 9 }),
-      at('t6', 'failed'),
-    ]);
-    expect(targets.map((target) => [target.todo.id, target.delivery])).toEqual([
-      ['t6', 'restart'],
-      ['t3', 'revision'],
-      ['t1', 'steer'],
-    ]);
   });
 });

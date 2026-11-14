@@ -38,11 +38,6 @@ import {
 } from './archived-project-bar.js';
 import { ComposerSetupHint, useComposerSetupStep } from './composer-setup-hint.js';
 import {
-  ComposerThreadTarget,
-  ComposerThreadTargetMenu,
-  useComposerThreadTarget,
-} from './composer-thread-target.js';
-import {
   FILE_NAME_PARAM,
   FILE_PARAM,
   type FileTarget,
@@ -354,7 +349,6 @@ export function HomeC({
   }, [questionTarget, stepKind, focusAt, loadEarlier]);
   const [section, setSection] = useState<HTMLElement | null>(null);
   useTouchMessageTools(section);
-  const thread = useComposerThreadTarget(scoped);
 
   const heading = <h1 className="sr-only">{projectName ?? t('Coordinator')}</h1>;
   const paneButtons = narrow ? (
@@ -593,17 +587,15 @@ export function HomeC({
                 onSend={
                   archived !== null
                     ? undefined
-                    : thread.picked !== null
-                      ? thread.send
-                      : surface.onSend != null
-                        ? (text: string) => surface.onSend?.(text, projectId)
-                        : live
-                          ? undefined
-                          : () => Promise.resolve()
+                    : surface.onSend != null
+                      ? (text: string) => surface.onSend?.(text, projectId)
+                      : live
+                        ? undefined
+                        : () => Promise.resolve()
                 }
                 onRewind={archived === null ? surface.onRewind : undefined}
                 onWithdraw={archived === null ? surface.onWithdraw : undefined}
-                unsent={archived === null && thread.picked === null ? surface.unsent : undefined}
+                unsent={archived === null ? surface.unsent : undefined}
                 onSteer={archived === null ? surface.onSteer : undefined}
                 onStop={archived === null ? surface.onStop : undefined}
                 composerReplacement={archivedBar}
@@ -617,26 +609,7 @@ export function HomeC({
                     ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
                     : t('给 Coordinator 发消息')
                 }
-                composerError={thread.error}
-                targetPlaceholder={thread.placeholder}
-                composerMenu={
-                  <ComposerThreadTargetMenu
-                    targets={thread.targets}
-                    picked={thread.picked}
-                    onPick={thread.pick}
-                  />
-                }
-                composerTools={
-                  <>
-                    <ComposerThreadTarget
-                      targets={thread.targets}
-                      picked={thread.picked}
-                      composerRef={composerRef}
-                      onPick={thread.pick}
-                    />
-                    {setupStep !== null && <ComposerSetupHint next={setupStep} />}
-                  </>
-                }
+                composerTools={setupStep !== null && <ComposerSetupHint next={setupStep} />}
                 composerRef={(node) => {
                   composerRef.current = node;
                 }}
