@@ -274,6 +274,7 @@ export const EN: Record<string, string> = {
   回复: 'Reply',
   移除引用: 'Remove quote',
   方案: 'Plan',
+  计划: 'Plan',
   分支: 'Branch',
   变更: 'Changes',
   // 看板顶部通知引导条 (issue #114): components consume the shared

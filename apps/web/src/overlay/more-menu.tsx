@@ -1,4 +1,13 @@
-import { Archive, CircleStop, Hand, Pencil, Route, ScrollText, Undo2 } from 'lucide-react';
+import {
+  Archive,
+  CircleStop,
+  ClipboardList,
+  Hand,
+  Pencil,
+  Route,
+  ScrollText,
+  Undo2,
+} from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { DropdownMenu, DropdownMenuSeparator } from '../components/ui/dropdown-menu.js';
@@ -19,6 +28,7 @@ interface MoreMenuProps {
   onDiscard?: () => void;
   onRouteOverride?: () => void;
   onRename?: () => void;
+  onViewPlan?: () => void;
   onViewRaw?: () => void;
   takeOver?: { label: string; onClick: () => void };
   moveSub?: ReactNode;
@@ -41,6 +51,7 @@ export function MoreMenu({
   onDiscard,
   onRouteOverride,
   onRename,
+  onViewPlan,
   onViewRaw,
   takeOver,
   moveSub,
@@ -70,6 +81,19 @@ export function MoreMenu({
             action: 'rename',
             disabled: false,
             onClick: onRename,
+          },
+        ]
+      : []),
+    ...(onViewPlan !== undefined
+      ? [
+          {
+            key: 'view-plan',
+            shortcut: 'P',
+            label: t('计划'),
+            Icon: ClipboardList,
+            action: 'view-plan',
+            disabled: false,
+            onClick: onViewPlan,
           },
         ]
       : []),

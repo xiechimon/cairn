@@ -3,20 +3,28 @@ import { expect, type Page, test } from '@playwright/test';
 const HOME = '/app?scenario=home-c';
 const panel = (page: Page) => page.getByTestId('side-chat');
 
-test('a review thread leads with the updates block and shows the update count in the head', async ({
+test('a review thread keeps its updates out of the conversation and in the plan dialog, and the head shows the update count', async ({
   page,
 }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
-  await expect(page.getByTestId('thread-updates')).toContainText('决定与更新');
-  await expect(page.getByTestId('thread-updates')).toContainText('r7 rebaseline probe');
-  await expect(page.getByTestId('thread-updates').locator('time')).toContainText('更新');
+  await expect(panel(page)).toBeVisible();
+  await expect(page.getByTestId('thread-updates')).toHaveCount(0);
   await expect(page.getByTestId('side-chat-status')).toContainText('待你决定·1 条更新');
+  await panel(page).getByRole('button', { name: '更多操作…' }).click();
+  await page.getByRole('menuitem', { name: '计划' }).click();
+  const plan = page.getByTestId('side-chat-plan');
+  await expect(plan.getByTestId('thread-updates')).toContainText('决定与更新');
+  await expect(plan.getByTestId('thread-updates')).toContainText('r7 rebaseline probe');
+  await expect(plan.getByTestId('thread-updates').locator('time')).toContainText('更新');
+  await expect(plan.getByTestId('doc-body')).toBeVisible();
 });
 
-test('a working thread has no updates block', async ({ page }) => {
+test('a working thread has no updates and no plan row in the more menu', async ({ page }) => {
   await page.goto(`${HOME}&thread=home-c-working-c`);
   await expect(panel(page)).toBeVisible();
   await expect(page.getByTestId('thread-updates')).toHaveCount(0);
+  await panel(page).getByRole('button', { name: '更多操作…' }).click();
+  await expect(page.getByRole('menuitem', { name: '计划' })).toHaveCount(0);
 });
 
 test('the origin line is one right-aligned link that scrolls the conversation to the request', async ({
@@ -313,10 +321,6 @@ test('the request shows once as an owner bubble with its origin under it, and re
   });
   expect(fills.length).toBeGreaterThan(0);
   expect(new Set(fills)).toEqual(new Set([replyFill]));
-  const updates = await page
-    .getByTestId('thread-updates')
-    .evaluate((el) => getComputedStyle(el).borderTopWidth);
-  expect(updates).toBe('0px');
 });
 
 test('the more menu offers rename and move beside the existing actions, and no usage item', async ({

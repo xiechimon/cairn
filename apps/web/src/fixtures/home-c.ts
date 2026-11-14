@@ -160,6 +160,8 @@ const conversation: ChiefContent = {
   streamAt: [r7(20, 0), r7(20, 1), r7(20, 1), r7(20, 1), r7(20, 5), r7(20, 6), r7(20, 6)],
 };
 
+const planDetail = detailConfirm(false).detail;
+
 export const homeC: FixtureSet = {
   ...boardDefault,
   resources: {
@@ -220,8 +222,12 @@ export const homeC: FixtureSet = {
   },
   details: {
     'home-c-confirm': detailConfirm(false).detail ?? { transcript: [] },
-    'home-c-review': detailReview({ userMenuOpen: false, changesExpanded: false }).detail ?? {
-      transcript: [],
+    'home-c-review': {
+      ...(detailReview({ userMenuOpen: false, changesExpanded: false }).detail ?? {
+        transcript: [],
+      }),
+      doc: planDetail?.doc,
+      planVersions: planDetail?.planVersions,
     },
     'home-c-working-a': {
       ...(detailBuilding(true).detail ?? { transcript: [] }),
