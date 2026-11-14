@@ -19,16 +19,13 @@ import {
   classifyStepFailure,
   isBuildStepKind,
   localCommitIdentity,
-  noVisionSignalOf,
   PLAN_FILE_NAME,
   stepTakesSecrets,
-  transcriptPromptRowId,
 } from '@cairn/shared';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { createActivityTracker } from './activity.js';
 import { AgentTodoReporter } from './agent-todo.js';
 import { AskChannel } from './ask-channel.js';
-import { SessionNotResumableError } from './backend/errors.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
 import { piWorktreeSkillDirs } from './backend/skills.js';
@@ -46,7 +43,7 @@ import type { DaemonLogger } from './log.js';
 import { type MachineApi, MachineApiError } from './machine-client.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
-import { resolveDeliveredPrompt, resolveStepImagesOrRaw } from './step-attachments.js';
+import { resolveDeliveredPrompt } from './step-attachments.js';
 import { deliverStepOutcome } from './step-deliver.js';
 import { assembleStepEnv } from './step-env.js';
 import { reportStepProvenance } from './step-executor-record.js';
@@ -61,15 +58,10 @@ import {
 } from './step-pass-events.js';
 import { resolveStepPassOutcome, rewindAfterStep } from './step-pass-outcome.js';
 import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
-import {
-  composeWorkerSystemPrompt,
-  freshSessionPrompt,
-  planStepPrompt,
-  resumeMissNote,
-  taskMetaOpts,
-} from './step-prompt.js';
+import { composeWorkerSystemPrompt, planStepPrompt, taskMetaOpts } from './step-prompt.js';
 import { resolveStepProvider } from './step-provider.js';
 import { stepRemoteToolExecutor } from './step-remote-tools.js';
+import { StepSessionOpener } from './step-session-opener.js';
 import { settleStepGit } from './step-settle-git.js';
 import { sessionInjectedSkills, stepMcpEndpoints } from './step-skill-tool.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
@@ -350,13 +342,12 @@ async function runClaimedStep(
   const modelKey = `${provider?.providerId ?? agent.provider}/${agent.modelId}`;
   logger.raw(`using model ${modelKey}`);
 
-  let imageSupport = isChief
+  const imageSupport = isChief
     ? null
     : await probeModelImageSupport(backend, provider, agent.modelId, (message) =>
         logger.step(message),
       );
   deps.stepImageSupport?.set(stepId, imageSupport);
-  let activePrompt = prompt;
   let deliveryPrompt = prompt;
   let promptImages: DeliveredImage[] | undefined;
   let skippedNoVisionCount = 0;
@@ -581,11 +572,6 @@ async function runClaimedStep(
     ...(Object.keys(stepEnv).length > 0 ? { env: stepEnv } : {}),
   };
 
-  let continueId =
-    claimed.session.action === 'continue'
-      ? (opts.resume?.sessionId ?? claimed.session.sessionId)
-      : null;
-
   const transcript = guardCredentialOutputs(
     new TranscriptBuffer(deps.paths.outboxDir, stepId),
     redact,
@@ -695,50 +681,36 @@ async function runClaimedStep(
     plansDir: deps.paths.plansDir,
     convId,
   };
-  let noVisionDegraded = false;
-  const retryWithoutImages = async (failureText: string): Promise<boolean> => {
-    if (
-      noVisionDegraded ||
+  const opener = new StepSessionOpener({
+    backend,
+    sessionOpts,
+    claimed,
+    stepId,
+    isChief,
+    resume: opts.resume,
+    prompt,
+    promptImages,
+    imageSupport,
+    freshPromptPaths,
+    modelKey,
+    client,
+    journal,
+    transcript,
+    logger,
+    stepAttachmentsDir: deps.paths.stepAttachmentsDir,
+    now,
+    forgetHandle: () => deps.sessionHandles?.delete(stepId),
+    rememberImageSupport: (support) => deps.stepImageSupport?.set(stepId, support),
+  });
+  const retryWithoutImages = (failureText: string): Promise<boolean> =>
+    opener.retryWithoutImages(
+      failureText,
       passState.sawProgress ||
-      priorPassMadeProgress ||
-      watchdog.trippedArm !== null ||
-      stop.request !== null ||
-      passState.quotaTrip !== null ||
-      promptImages === undefined ||
-      prompt === null ||
-      !noVisionSignalOf(failureText)
-    ) {
-      return false;
-    }
-    noVisionDegraded = true;
-    imageSupport = false;
-    backend.rememberNoVision?.(sessionOpts.provider, sessionOpts.modelId);
-    deps.stepImageSupport?.set(stepId, false);
-    const retryPrompt =
-      continueId === null ? activePrompt : freshSessionPrompt(claimed, freshPromptPaths);
-    const degraded = await resolveStepImagesOrRaw({
-      text: retryPrompt,
-      stepId,
-      client,
-      materializeDir: deps.paths.stepAttachmentsDir,
-      log: (line) => logger.step(line),
-      imageSupport: false,
-    });
-    sessionOpts.prompt = degraded.text;
-    continueId = null;
-    journal.update(stepId, { prompt: retryPrompt, sessionAction: 'new', sessionId: null });
-    delete sessionOpts.promptImages;
-    promptImages = undefined;
-    logger.step(`image degrade retry: ${modelKey} rejected image input — retrying without images`);
-    transcript.upsert({
-      id: `image-skip-${stepId}`,
-      role: 'system',
-      content: `图片未被模型读取：模型 ${modelKey} 拒绝了图片输入（${failureText.slice(0, 200)}），已去掉图片重试本步骤`,
-      createdAt: now(),
-    });
-    deps.sessionHandles?.delete(stepId);
-    return true;
-  };
+        priorPassMadeProgress ||
+        watchdog.trippedArm !== null ||
+        stop.request !== null ||
+        passState.quotaTrip !== null,
+    );
   const streamLimits = resolveStreamLimits({
     ...(opts.streamTimeouts !== undefined ? { timeouts: opts.streamTimeouts } : {}),
     ...(opts.streamDurationCapMs !== undefined ? { durationCapMs: opts.streamDurationCapMs } : {}),
@@ -774,71 +746,6 @@ async function runClaimedStep(
     passState.quotaTrip = trip;
     void handle?.stop();
   };
-  const openSession = (): Promise<AgentSessionHandle> => {
-    if (continueId === null) return backend.createSession(sessionOpts);
-    return backend.continueSession(continueId, sessionOpts).catch(async (err: unknown) => {
-      if (!(err instanceof SessionNotResumableError)) throw err;
-      if (opts.resume?.prompt === null) {
-        throw new Error(
-          `recover step ${stepId}: continue session ${continueId} unavailable and no journal prompt to resend`,
-        );
-      }
-      const missed = continueId ?? '';
-      const note = resumeMissNote(missed, claimed);
-      logger.step(
-        `continue session unavailable (${missed}) — falling back to new session — ${note}`,
-      );
-      transcript.upsert({
-        id: `resume-miss-${stepId}`,
-        role: 'system',
-        content: note,
-        createdAt: now(),
-      });
-      if (!opts.resume) {
-        const fresh = freshSessionPrompt(claimed, freshPromptPaths);
-        journal.update(stepId, {
-          prompt: fresh,
-          sessionAction: 'new',
-          sessionId: null,
-        });
-        activePrompt = fresh;
-        let delivery = fresh;
-        let images: DeliveredImage[] | undefined;
-        if (!isChief) {
-          const resolved = await resolveDeliveredPrompt({
-            text: fresh,
-            stepId,
-            client,
-            materializeDir: deps.paths.stepAttachmentsDir,
-            log: (line) => logger.step(line),
-            imageSupport,
-          });
-          delivery = resolved.text;
-          images = resolved.images;
-          if (resolved.skippedNoVision > 0) {
-            transcript.upsert({
-              id: `image-skip-${stepId}`,
-              role: 'system',
-              content: `图片未被模型读取：模型 ${modelKey} 不支持图片输入，${resolved.skippedNoVision} 张图片未下载（步骤继续执行，请以文字描述或改用支持图片的模型）`,
-              createdAt: now(),
-            });
-          }
-        }
-        sessionOpts.prompt = delivery;
-        promptImages = images;
-        if (images !== undefined) sessionOpts.promptImages = images;
-        else delete sessionOpts.promptImages;
-        transcript.upsert({
-          id: transcriptPromptRowId(stepId),
-          role: 'user',
-          content: fresh,
-          createdAt: now(),
-        });
-      }
-      continueId = null;
-      return backend.createSession(sessionOpts);
-    });
-  };
   for (let pass = 0; ; pass++) {
     if (pass > 0) {
       priorPassMadeProgress ||= passState.sawProgress;
@@ -849,7 +756,7 @@ async function runClaimedStep(
     if (stop.request !== null) break;
     activity.setPhase('starting', pass > 0 ? { resetLive: true } : undefined);
     try {
-      handle = await openSession();
+      handle = await opener.open();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (await retryWithoutImages(message)) continue;
@@ -858,12 +765,12 @@ async function runClaimedStep(
       await failStep(deps, heartbeat, stepId, message);
       return;
     }
-    logger.raw(continueId !== null ? `continue session ${convId}` : `new session ${convId}`);
-    if (!isChief && imageSupport === null) {
+    logger.raw(opener.continueId !== null ? `continue session ${convId}` : `new session ${convId}`);
+    if (!isChief && opener.imageSupport === null) {
       try {
-        imageSupport =
-          (await backend.modelSupportsImages?.(sessionOpts.provider, sessionOpts.modelId)) ?? null;
-        deps.stepImageSupport?.set(stepId, imageSupport);
+        opener.setImageSupport(
+          (await backend.modelSupportsImages?.(sessionOpts.provider, sessionOpts.modelId)) ?? null,
+        );
       } catch (err) {
         logger.step(
           `session image support probe failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -878,7 +785,7 @@ async function runClaimedStep(
       modelKey,
       provider,
       handle,
-      promptImages,
+      promptImages: opener.promptImages,
       retryStormMax,
       now,
       watchdog,
@@ -931,7 +838,7 @@ async function runClaimedStep(
           `provider network retry ${networkRetries}: waiting ${delay}ms before ${networkRetries === networkRetryDelays.length ? 'final' : 'next'} attempt`,
         );
         await new Promise((r) => setTimeout(r, delay));
-        continueId = handle.sessionId;
+        opener.continueId = handle.sessionId;
         deps.sessionHandles?.delete(stepId);
         continue;
       }
@@ -968,6 +875,7 @@ async function runClaimedStep(
     if (imageFailure !== null && (await retryWithoutImages(imageFailure))) continue;
     break;
   }
+  const continueId = opener.continueId;
   let { usage } = passState;
   const { sawChangeTool, sawDone } = passState;
   deps.sessionHandles?.delete(stepId);
