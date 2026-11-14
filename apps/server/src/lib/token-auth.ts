@@ -49,6 +49,7 @@ function isExempt(pathname: string): boolean {
   if (pathname === '/api/mcp') return true;
   if (pathname === '/api/oauth/callback') return true;
   if (pathname === '/api/auth/bootstrap') return true;
+  if (pathname === '/api/auth/access') return true;
   if (isOpenRemotePath(pathname)) return true;
   return false;
 }

@@ -21,6 +21,7 @@ import { migrateSidecarState } from './coordinator/boot-migration.js';
 import { coordinatorStoreDir, startCoordinator } from './coordinator/index.js';
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
+import { createAccessVerifier } from './lib/cloudflare-access.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environment-id.js';
 import { createServerLogger } from './lib/logger.js';
 import { loopbackOwnerFor } from './lib/loopback-owner.js';
@@ -161,6 +162,8 @@ const app = createApp(
     webDir: config.webDir,
     authToken: config.authToken,
     loopbackOwner: loopbackOwnerFor(config),
+    accessVerifier:
+      config.cloudflareAccess === null ? null : createAccessVerifier(config.cloudflareAccess),
     mcpConfigPath: config.mcpConfigPath,
     logger,
   },

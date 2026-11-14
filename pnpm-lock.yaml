@@ -332,6 +332,9 @@ importers:
       better-sqlite3:
         specifier: 13.0.3
         version: 13.0.3
+      jose:
+        specifier: 6.2.12
+        version: 6.2.12
       web-push:
         specifier: ^3.6.7
         version: 3.6.7(supports-color@10.2.2)

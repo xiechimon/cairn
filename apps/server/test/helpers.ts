@@ -79,6 +79,7 @@ export function bootServer(
     providerTestTimeoutMs?: number;
     authToken?: string | null;
     loopbackOwner?: AppContext['loopbackOwner'];
+    accessVerifier?: AppContext['accessVerifier'];
     vapidKeys?: VapidKeys | null;
     webOrigin?: string;
     pushEndpointHosts?: ReadonlySet<string>;
@@ -171,6 +172,7 @@ export function bootServer(
       ...(opts.webDir !== undefined ? { webDir: opts.webDir } : {}),
       authToken: opts.authToken ?? null,
       loopbackOwner: opts.loopbackOwner ?? null,
+      accessVerifier: opts.accessVerifier ?? null,
       mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
     };
     const app = createApp(appContext, opts.logger);
