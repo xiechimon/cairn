@@ -22,7 +22,6 @@ import { RETRY_STORM_MAX } from './backend/pi-retry.js';
 import { piWorktreeSkillDirs } from './backend/skills.js';
 import { composeSessionBrief } from './brief-file.js';
 import type { ClaudeCodeAuthProbe } from './claude-code-auth.js';
-import { claudeQuotaTrip, forwardClaudeRateLimit } from './claude-quota-trip.js';
 import { credentialRedactor, guardCredentialOutputs } from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
 import { type StepJournal, TranscriptBuffer } from './journal.js';
@@ -35,6 +34,7 @@ import { assembleStepEnv } from './step-env.js';
 import { reportStepProvenance } from './step-executor-record.js';
 import { finishStepRun } from './step-finish.js';
 import { runLocalMergeStep } from './step-local-merge.js';
+import { createStepPassControls } from './step-pass-controls.js';
 import { newStepPassState } from './step-pass-events.js';
 import { runStepPasses } from './step-pass-loop.js';
 import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
@@ -46,15 +46,12 @@ import { stepMcpEndpoints } from './step-skill-tool.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { prepareStepTooling } from './step-tooling.js';
 import { seedStepTranscript } from './step-transcript-seed.js';
-import { StepTranscriptStream } from './step-transcript-stream.js';
 import { resetReusedWorkspaceForFreshSession, setUpStepWorkspace } from './step-workspace.js';
 import {
-  resolveStreamLimits,
   STREAM_DURATION_CAP_DEFAULT_MS,
   STREAM_DURATION_CAP_ENV,
   STREAM_FIRST_EVENT_ENV,
   STREAM_IDLE_ENV,
-  StreamWatchdog,
 } from './stream-watchdog.js';
 
 export interface RunStepDeps {
@@ -590,24 +587,14 @@ async function runClaimedStep(
     forgetHandle: () => deps.sessionHandles?.delete(stepId),
     rememberImageSupport: (support) => deps.stepImageSupport?.set(stepId, support),
   });
-  const streamLimits = resolveStreamLimits({
-    ...(opts.streamTimeouts !== undefined ? { timeouts: opts.streamTimeouts } : {}),
-    ...(opts.streamDurationCapMs !== undefined ? { durationCapMs: opts.streamDurationCapMs } : {}),
-  });
-  const toolStartedAt = new Map<string, number>();
-  const watchdog = new StreamWatchdog({
-    timeouts: streamLimits.timeouts,
-    durationCapMs: streamLimits.durationCapMs,
-    durationCapIsAbsolute: streamLimits.durationCapIsAbsolute,
-    progressExtendsDuration:
-      isBuildStepKind(claimed.step.kind) && !streamLimits.durationCapIsAbsolute,
-    onTrip: () => {
-      askChannel.abort();
-      void session.current?.stop();
-    },
-  });
-  askChannel.keepAlive = () => watchdog.keepAlive();
-  const stream = new StepTranscriptStream({
+  const { watchdog, stream, session, toolStartedAt } = createStepPassControls({
+    stepKind: claimed.step.kind,
+    machineId: claimed.step.machineId,
+    streamTimeouts: opts.streamTimeouts,
+    streamDurationCapMs: opts.streamDurationCapMs,
+    askChannel,
+    sessionOpts,
+    passState,
     stepId,
     client,
     transcript,
@@ -615,15 +602,6 @@ async function runClaimedStep(
     now,
     log: (line) => logger.step(line),
   });
-  const session: { current: AgentSessionHandle | null } = { current: null };
-  sessionOpts.onClaudeRateLimit = (notice) => {
-    forwardClaudeRateLimit(client, claimed.step.machineId, notice, (line) => logger.step(line));
-    if (passState.quotaTrip !== null) return;
-    const trip = claudeQuotaTrip(notice, Date.now());
-    if (trip === null) return;
-    passState.quotaTrip = trip;
-    void session.current?.stop();
-  };
   const passes = await runStepPasses({
     stepId,
     client,
