@@ -350,6 +350,8 @@ export type CoordinatorTurnSpanRecord =
       input?: unknown;
       output?: unknown;
       at: number;
+      endAt: number;
+      firstTokenAt?: number;
       provider: string;
       model: string;
       responseModel?: string;
@@ -407,9 +409,12 @@ export function emitCoordinatorTurnSpans(
         name: `chat ${record.model}`.trim(),
         kind: 'client',
         startMs: record.at,
-        endMs: record.at,
+        endMs: record.endAt,
         attributes: {
           ...observationAttributes(observation),
+          ...(record.firstTokenAt === undefined
+            ? {}
+            : { [LANGFUSE_ATTR.completionStartTime]: new Date(record.firstTokenAt).toISOString() }),
           ...chatAttributes(
             {
               provider: record.provider,
@@ -458,12 +463,13 @@ export function emitCoordinatorTurnSpans(
   push(target, env, redactSecrets(spans).value as CairnSpan[]);
 }
 
-export function emitCompactionFailureSpan(
+export function emitCompactionSpan(
   failure: {
     stage: string;
-    errorClass: string;
-    message: string;
-    count: number;
+    startAt?: number | undefined;
+    errorClass?: string;
+    message?: string;
+    count?: number;
     threadId?: string | undefined;
     stepId?: string | undefined;
   },
@@ -492,7 +498,7 @@ export function emitCompactionFailureSpan(
       : { traceId }),
     name: `compaction ${failure.stage}`,
     kind: 'internal',
-    startMs: now,
+    startMs: failure.startAt ?? now,
     endMs: now,
     attributes: {
       'cairn.compaction.stage': failure.stage,
@@ -500,7 +506,7 @@ export function emitCompactionFailureSpan(
       'error.type': failure.errorClass,
       ...langfuseEnvironmentAttributes(environment),
     },
-    error: failure.message,
+    ...(failure.message === undefined ? {} : { error: failure.message }),
   };
   push(target, env, redactSecrets([span]).value as CairnSpan[]);
 }

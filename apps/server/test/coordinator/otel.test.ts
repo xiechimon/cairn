@@ -1,7 +1,19 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
+import { setTimeout as delay } from 'node:timers/promises';
+import {
+  createAssistantMessageEventStream,
+  fauxAssistantMessage,
+  fauxProvider,
+  fauxToolCall,
+} from '@earendil-works/pi-ai';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  createCoordinatorModels,
+  modelResponseTiming,
+} from '../../src/coordinator/runtime/models.js';
+import { SUGGEST_REPLIES_ASK } from '../../src/coordinator/runtime/suggest-replies.js';
+import { chiefMessage, chiefTurnUsage } from '../../src/db/schema.js';
 import {
   emitCoordinatorTurnSpans,
   flushRuntimeOtel,
@@ -11,7 +23,10 @@ import { boot, world } from './runner-world.js';
 
 interface Span {
   traceId: string;
+  spanId: string;
   parentSpanId?: string;
+  startTimeUnixNano: string;
+  endTimeUnixNano: string;
   name: string;
   status?: { code: number; message: string };
   attributes: { key: string; value: { stringValue?: string; intValue?: string } }[];
@@ -58,6 +73,201 @@ afterEach(() => {
 });
 
 describe('in-server Coordinator telemetry', () => {
+  it.each(['thinking_delta', 'toolcall_delta', 'error', 'aborted', 'done-only'] as const)(
+    'times %s responses without inventing a first token for non-streaming results',
+    async (mode) => {
+      const spans = captureSpans();
+      const faux = fauxProvider({ provider: 'stub', models: [{ id: 'm' }] });
+      const models = createCoordinatorModels([
+        {
+          ...faux.provider,
+          streamSimple(model) {
+            const stream = createAssistantMessageEventStream();
+            const message = {
+              ...fauxAssistantMessage('answer', {
+                stopReason: mode === 'error' || mode === 'aborted' ? mode : 'stop',
+              }),
+              api: model.api,
+              provider: model.provider,
+              model: model.id,
+              timestamp: Date.now(),
+            };
+            stream.push({ type: 'start', partial: message });
+            void (async () => {
+              await delay(30);
+              if (mode === 'thinking_delta' || mode === 'toolcall_delta') {
+                stream.push({ type: mode, contentIndex: 0, delta: 'first', partial: message });
+                await delay(20);
+                stream.push({ type: mode, contentIndex: 0, delta: 'later', partial: message });
+              }
+              if (mode === 'error' || mode === 'aborted')
+                stream.push({ type: 'error', reason: mode, error: message });
+              else stream.push({ type: 'done', reason: 'stop', message });
+              stream.end(message);
+            })();
+            return stream;
+          },
+        },
+      ]);
+      await models.setApiKey('stub', 'sk-test');
+      const reply = await models.models.completeSimple(models.models.getModel('stub', 'm')!, {
+        messages: [],
+      });
+      expect(reply.stopReason).toBe(mode === 'error' || mode === 'aborted' ? mode : 'stop');
+      expect(reply.content).toEqual([{ type: 'text', text: 'answer' }]);
+      emitCoordinatorTurnSpans(
+        { threadId: 't1', stepId: 's1', provider: 'stub', model: 'm' },
+        [
+          {
+            kind: 'chat',
+            ...modelResponseTiming(reply),
+            provider: reply.provider,
+            model: reply.model,
+            usage: reply.usage,
+            finishReason: reply.stopReason,
+          },
+        ],
+        { CAIRN_OTEL_ENDPOINT: endpoint },
+      );
+      await flushRuntimeOtel();
+      expect(spans).toHaveLength(1);
+      const span = spans[0]!;
+      const start = Number(BigInt(span.startTimeUnixNano) / 1_000_000n);
+      const end = Number(BigInt(span.endTimeUnixNano) / 1_000_000n);
+      expect(end - start).toBeGreaterThanOrEqual(25);
+      const first = attr(span, 'langfuse.observation.completion_start_time');
+      if (mode === 'thinking_delta' || mode === 'toolcall_delta') {
+        expect(Date.parse(first!) - start).toBeGreaterThanOrEqual(25);
+        expect(end - Date.parse(first!)).toBeGreaterThanOrEqual(15);
+      } else expect(first).toBeUndefined();
+      expect(span.status?.code === 2).toBe(mode === 'error');
+    },
+  );
+
+  it.each([false, true])(
+    'times cold summaries, streaming answers and suggestions (summary fails: %s)',
+    async (summaryFails) => {
+      vi.stubEnv('CAIRN_OTEL_ENDPOINT', endpoint);
+      const spans = captureSpans();
+      const w = await world('resume on a new model');
+      w.s.db
+        .insert(chiefMessage)
+        .values(
+          Array.from({ length: 130 }, (_, i) => ({
+            id: `old-${i}`,
+            threadId: w.threadId,
+            role: i % 2 === 0 ? ('user' as const) : ('assistant' as const),
+            content: `earlier message ${i}`,
+            createdAt: 1_000 + i,
+          })),
+        )
+        .run();
+      w.s.db
+        .insert(chiefTurnUsage)
+        .values({
+          stepId: 'prior',
+          threadId: w.threadId,
+          model: 'stub/previous',
+          input: 5_000,
+          output: 10,
+          cacheRead: 5_000,
+          cacheWrite: 0,
+          contextTokens: 5_000,
+          createdAt: Date.now() - 30_000,
+        })
+        .run();
+      const faux = fauxProvider({
+        provider: 'stub',
+        models: [{ id: 'm', contextWindow: 200_000 }],
+      });
+      const observations: { stage: string; start: number; first?: number; end?: number }[] = [];
+      const coordinator = boot(w, faux, {
+        fixedProviders: [
+          {
+            ...faux.provider,
+            streamSimple(model, context) {
+              const stage = JSON.stringify(context.messages).includes(
+                "You are Cairn's Coordinator summarization step.",
+              )
+                ? 'summary'
+                : context.messages[0]?.content === SUGGEST_REPLIES_ASK
+                  ? 'suggestion'
+                  : 'answer';
+              const observed: (typeof observations)[number] = { stage, start: Date.now() };
+              observations.push(observed);
+              const failed = stage === 'summary' && summaryFails;
+              const message = {
+                ...fauxAssistantMessage(
+                  stage === 'suggestion' ? '{"replies":["More"]}' : 'answer',
+                  {
+                    stopReason: failed ? 'error' : 'stop',
+                    ...(failed ? { errorMessage: 'summary websocket failed' } : {}),
+                  },
+                ),
+                api: model.api,
+                provider: model.provider,
+                model: model.id,
+                timestamp: Date.now(),
+              };
+              const stream = createAssistantMessageEventStream();
+              stream.push({ type: 'start', partial: message });
+              stream.push({ type: 'text_delta', contentIndex: 0, delta: '', partial: message });
+              void (async () => {
+                await delay(40);
+                if (!failed) {
+                  observed.first = Date.now();
+                  stream.push({
+                    type: 'text_delta',
+                    contentIndex: 0,
+                    delta: 'a',
+                    partial: message,
+                  });
+                }
+                await delay(25);
+                observed.end = Date.now();
+                if (failed) stream.push({ type: 'error', reason: 'error', error: message });
+                else stream.push({ type: 'done', reason: 'stop', message });
+                stream.end(message);
+              })();
+              return stream;
+            },
+          } satisfies typeof faux.provider,
+        ],
+      });
+      coordinator.wake(w.threadId);
+      await coordinator.idle();
+      await flushRuntimeOtel();
+      expect(observations.map((o) => o.stage)).toEqual(
+        summaryFails
+          ? ['summary', 'summary', 'answer', 'suggestion']
+          : ['summary', 'answer', 'suggestion'],
+      );
+      const turn = spans.find((s) => s.name === 'coordinator turn')!;
+      const summaries = spans.filter((s) => s.name === 'compaction seed-summary');
+      const chats = spans.filter((s) => s.name === 'chat m');
+      expect(summaries).toHaveLength(summaryFails ? 2 : 1);
+      expect(chats).toHaveLength(2);
+      for (const [i, span] of [...summaries, ...chats].entries()) {
+        const observed = observations[i]!;
+        const start = Number(BigInt(span.startTimeUnixNano) / 1_000_000n);
+        const end = Number(BigInt(span.endTimeUnixNano) / 1_000_000n);
+        expect(span.traceId).toBe(turn.traceId);
+        expect(span.parentSpanId).toBe(turn.spanId);
+        expect(start).toBeLessThanOrEqual(observed.start + 5);
+        expect(end).toBeGreaterThanOrEqual(observed.end! - 5);
+        expect(end - start).toBeGreaterThanOrEqual(60);
+        if (i >= summaries.length) {
+          const first = Date.parse(attr(span, 'langfuse.observation.completion_start_time') ?? '');
+          expect(first).toBeGreaterThanOrEqual(observed.first! - 5);
+          expect(first).toBeLessThanOrEqual(observed.end!);
+          expect(first - start).toBeGreaterThanOrEqual(35);
+          expect(first).toBeLessThan(end);
+        }
+      }
+      for (const summary of summaries) expect(summary.status?.code === 2).toBe(summaryFails);
+    },
+  );
+
   it('exports the turn, one chat span per model call and one span per tool call under the thread session', async () => {
     vi.stubEnv('CAIRN_OTEL_ENDPOINT', endpoint);
     const spans = captureSpans();
@@ -117,6 +327,7 @@ describe('in-server Coordinator telemetry', () => {
         {
           kind: 'chat',
           at: 1,
+          endAt: 914,
           provider: 'stub',
           model: 'm',
           finishReason: 'error',
@@ -128,6 +339,10 @@ describe('in-server Coordinator telemetry', () => {
     );
     await flushRuntimeOtel();
     expect(spans).toHaveLength(1);
+    expect(BigInt(spans[0]!.endTimeUnixNano) - BigInt(spans[0]!.startTimeUnixNano)).toBe(
+      913_000_000n,
+    );
+    expect(attr(spans[0]!, 'langfuse.observation.completion_start_time')).toBeUndefined();
     expect(spans[0]?.status?.code).toBe(2);
     expect(spans[0]?.status?.message).not.toContain('sk-abcdefghijklmnop');
   });

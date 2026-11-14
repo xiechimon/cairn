@@ -25,7 +25,7 @@ async function mockSlowSend(page: Page, total = 250): Promise<Row[]> {
             id: `s-${history.length}`,
             role: 'user',
             content,
-            createdAt: 1_000 + history.length,
+            createdAt: Date.now(),
           };
           history.push(message);
           running = true;
@@ -358,5 +358,100 @@ for (const reduced of [false, true]) {
     const shown = await animationOf('rise in');
     if (reduced) expect(shown.name).toBe('none');
     else expect(shown).toEqual({ name: 'message-enter', duration: '0.16s' });
+  });
+}
+
+for (const width of [1440, 390]) {
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`a cold send stays measured through confirmation at ${width}px in ${colorScheme}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.emulateMedia({ colorScheme });
+      await mockSlowSend(page);
+      await page.goto('/app');
+      await expect(row(page, 'answer 249')).toBeInViewport();
+      await page.reload();
+      await expect(row(page, 'answer 249')).toBeInViewport();
+      await home(page).getByTestId('chief-composer-input').fill('Send without jumping');
+      await viewport(page).evaluate((node) => {
+        const frames: { shown: boolean; copies: number; sending: boolean; gap: number; opacity: number }[] = [];
+        const started = performance.now();
+        const sample = () => {
+          const copies = [...node.querySelectorAll('[data-testid="chief-bubble"]')].filter(
+            (bubble) => bubble.textContent === 'Send without jumping',
+          );
+          const sent = copies[0];
+          const newest = node.querySelector('[data-testid="chief-virtual-rows"]')?.lastElementChild;
+          frames.push({
+            shown: sent !== undefined,
+            copies: copies.length,
+            sending: sent?.getAttribute('data-delivery') === 'sending',
+            gap:
+              newest === null || newest === undefined
+                ? 0
+                : node.getBoundingClientRect().bottom -
+                  parseFloat(getComputedStyle(node).paddingBottom) -
+                  newest.getBoundingClientRect().bottom,
+            opacity: Number(getComputedStyle(node).opacity),
+          });
+          if (performance.now() - started < 1200) requestAnimationFrame(sample);
+          else node.setAttribute('data-send-frames', JSON.stringify(frames));
+        };
+        requestAnimationFrame(sample);
+      });
+      await home(page).getByTestId('chief-composer-input').press('Enter');
+      await expect(viewport(page)).toHaveAttribute('data-send-frames');
+      const frames = JSON.parse((await viewport(page).getAttribute('data-send-frames')) ?? '[]') as {
+        shown: boolean;
+        copies: number;
+        sending: boolean;
+        gap: number;
+        opacity: number;
+      }[];
+      await evidenceJson(`send-motion-${width}-${colorScheme}.json`, frames);
+      const firstShown = frames.findIndex((frame) => frame.shown);
+      expect(firstShown).toBeGreaterThanOrEqual(0);
+      const visible = frames.slice(firstShown);
+      expect(visible.some((frame) => frame.sending)).toBe(true);
+      expect(visible.some((frame) => !frame.sending)).toBe(true);
+      expect(visible.every((frame) => frame.shown && frame.copies === 1 && frame.opacity === 1)).toBe(true);
+      expect(Math.max(...visible.map((frame) => Math.abs(frame.gap)))).toBeLessThanOrEqual(2);
+      await expect(row(page, 'Send without jumping')).toBeInViewport();
+      await expect(home(page).getByTestId('typing-dots')).toBeInViewport();
+      expect(await viewport(page).evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+      await evidenceShot(page, `send-motion-${width}-${colorScheme}.png`);
+    });
+  }
+}
+
+for (const width of [1440, 390]) {
+  test(`a settled reply retires typing after missed completion events at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.emulateMedia({ colorScheme: width === 390 ? 'light' : 'dark' });
+    await page.clock.install();
+    const history = [{ id: 'question', role: 'user', content: 'Test the reply', createdAt: Date.now() }];
+    const answer = { id: 'answer', role: 'assistant', content: 'The reply is working.', createdAt: Date.now() + 1 };
+    let running = true;
+    await mockLive(page, { threads: [THREAD], messages: history }, (path, route, json) => {
+      if (path === '/api/teams/t1/chief/threads')
+        return json([{ ...THREAD, activeRun: running ? { phase: 'chief' } : null }]);
+      if (path === `/api/conversations/${THREAD.id}/messages`)
+        return json({ messages: running ? history : [...history, answer], activeRun: running ? { phase: 'chief' } : null, nextCursor: null });
+      return undefined;
+    });
+    await page.goto('/app');
+    await expect(row(page, 'Test the reply')).toBeVisible();
+    await expect.poll(() => page.evaluate((u) => window.__es.some((es) => es.url.includes(u)), streamUrl)).toBe(true);
+    await emit(page, { type: 'text_delta', text: answer.content });
+    await expect(row(page, answer.content)).toBeVisible();
+    await expect(home(page).getByTestId('typing-dots')).toBeVisible();
+    running = false;
+    for (let i = 0; i < 4; i++) {
+      await emit(page, { type: 'ping' });
+      await page.clock.fastForward(5_000);
+    }
+    await expect(row(page, answer.content)).toHaveCount(1);
+    await expect(home(page).getByTestId('typing-dots')).toHaveCount(0);
+    expect(await viewport(page).evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+    await evidenceShot(page, `settled-reply-${width}.png`);
   });
 }

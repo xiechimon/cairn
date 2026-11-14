@@ -12,6 +12,17 @@ function clientWith(seed: (qc: QueryClient) => void): QueryClient {
 }
 
 describe('gate: the cache still has work in flight', () => {
+  it.each([
+    { activeRun: { phase: 'chief' }, pending: [], expected: true },
+    { activeRun: null, pending: [{ state: 'queued' }], expected: true },
+    { activeRun: null, pending: [{ state: 'held' }], expected: false },
+    { activeRun: null, pending: [], expected: false },
+  ])('reconciles Coordinator work without a todo: %j', ({ expected, ...thread }) => {
+    const qc = clientWith((c) => c.setQueryData(['chiefThreads', TEAM], [thread]));
+    expect(hasInFlightWork(qc)).toBe(expected);
+    qc.clear();
+  });
+
   it('board list query has planning → open', () => {
     const qc = clientWith((c) =>
       c.setQueryData(['todos', TEAM], [todo(1, 'todo'), todo(2, 'planning')]),

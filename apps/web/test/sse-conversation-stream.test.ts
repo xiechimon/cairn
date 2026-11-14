@@ -215,6 +215,124 @@ describe('seam: replayed snapshot + live increments (failure mode 3)', () => {
 });
 
 describe('existing faces unchanged (failure mode 4; #857 settle-handoff rewrote the clear semantics)', () => {
+  it.each(['done', 'failed', 'stopped'])(
+    'reads a missing Coordinator response after the step is %s',
+    async (status) => {
+      const qc = freshClient();
+      const key = ['messages', CONV, 'pages'];
+      const question = { id: 'question', role: 'user', content: 'Who are you?', createdAt: 1 };
+      const answer = { id: 'answer', role: 'assistant', content: 'Coordinator', createdAt: 2 };
+      let settled = false;
+      const options = {
+        queryKey: key,
+        staleTime: Infinity,
+        queryFn: async () => ({
+          pages: [{ messages: settled ? [question, answer] : [question] }],
+          pageParams: [null],
+        }),
+      };
+      await qc.fetchQuery(options);
+      const observer = new QueryObserver(qc, options);
+      const unsubscribe = observer.subscribe(() => {});
+      const stop = startConversationStream(CONV, qc, {});
+      const es = FakeEventSource.instances.at(-1)!;
+      es.fireOpen();
+      settled = true;
+      es.push({ type: 'step', step: { id: 's1', status } });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(qc.getQueryData(key)).toEqual({
+        pages: [{ messages: [question, answer] }],
+        pageParams: [null],
+      });
+      stop();
+      unsubscribe();
+      qc.clear();
+    },
+  );
+
+  it.each([true, false])('recovers a Coordinator response and retires typing when cached running is %s', async (cachedRunning) => {
+    const qc = freshClient();
+    const key = ['messages', CONV, 'pages'];
+    const question = { id: 'question', role: 'user', content: 'Who are you?', createdAt: 1 };
+    const answer = { id: 'answer', role: 'assistant', content: 'Coordinator', createdAt: 2 };
+    let settled = false;
+    qc.setQueryData(['chiefThreads', 'team-1'], [{ id: CONV, activeRun: cachedRunning ? { phase: 'chief' } : null }]);
+    const options = {
+      queryKey: key,
+      staleTime: Infinity,
+      queryFn: async () => ({
+        pages: [{
+          messages: settled ? [question, answer] : [question],
+          activeRun: settled || !cachedRunning ? null : { phase: 'chief' },
+        }],
+        pageParams: [null],
+      }),
+    };
+    await qc.fetchQuery(options);
+    const observer = new QueryObserver(qc, options);
+    const unsubscribe = observer.subscribe(() => {});
+    const stop = startConversationStream(CONV, qc, {});
+    const es = FakeEventSource.instances.at(-1)!;
+    es.fireOpen();
+    es.push({ type: 'text_delta', text: answer.content });
+    es.push({ type: 'thinking_delta', text: 'Finished thinking' });
+    settled = true;
+    for (let i = 0; i < 4; i++) {
+      if (i === 1)
+        qc.setQueryData(['chiefThreads', 'team-1'], [{ id: CONV, activeRun: null }]);
+      es.push({ type: 'ping' });
+      await vi.advanceTimersByTimeAsync(5_000);
+    }
+    expect(qc.getQueryData(key)).toEqual({
+      pages: [{ messages: [question, answer], activeRun: null }],
+      pageParams: [null],
+    });
+    expect(liveTextStore.get(CONV)).toBe('');
+    expect(liveThinkingStore.get(CONV)).toBe('');
+    expect(FakeEventSource.instances).toHaveLength(1);
+    stop();
+    unsubscribe();
+    qc.clear();
+  });
+
+  it.each(['running', 'new-event', 'unsubscribed', 'failed-read'] as const)(
+    'preserves streamed text when reconciliation is %s',
+    async (scenario) => {
+      const qc = freshClient();
+      const key = ['messages', CONV, 'pages'];
+      const initial = { pages: [{ messages: [], activeRun: { phase: 'chief' } as { phase: string } | null }], pageParams: [null] };
+      let finish: ((value: typeof initial) => void) | undefined;
+      let fail: ((reason: Error) => void) | undefined;
+      let reads = 0;
+      const options = {
+        queryKey: key,
+        staleTime: Infinity,
+        queryFn: () => ++reads === 1 ? Promise.resolve(initial) : new Promise<typeof initial>((resolve, reject) => { finish = resolve; fail = reject; }),
+      };
+      await qc.fetchQuery(options);
+      const observer = new QueryObserver(qc, options);
+      const unsubscribe = observer.subscribe(() => {});
+      const stop = startConversationStream(CONV, qc, {});
+      const es = FakeEventSource.instances.at(-1)!;
+      es.fireOpen();
+      es.push({ type: 'text_delta', text: 'Do not erase this' });
+      for (let i = 0; i < 4; i++) {
+        es.push({ type: 'ping' });
+        await vi.advanceTimersByTimeAsync(5_000);
+      }
+      expect(reads).toBe(2);
+      if (scenario === 'new-event') es.push({ type: 'text_delta', text: ' next turn' });
+      if (scenario === 'unsubscribed') stop();
+      if (scenario === 'failed-read') fail?.(new Error('Read unavailable'));
+      else finish?.({ pages: [{ messages: [], activeRun: scenario === 'running' ? { phase: 'chief' } : null }], pageParams: [null] });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(liveTextStore.get(CONV)).toBe(`Do not erase this${scenario === 'new-event' ? ' next turn' : ''}`);
+      stop();
+      unsubscribe();
+      qc.clear();
+    },
+  );
+
   it('message event (assistant text row): records handoff, does not clear the buffer + messages/plans invalidated and refetched', () => {
     const qc = freshClient();
     const invalidate = vi.spyOn(qc, 'invalidateQueries');

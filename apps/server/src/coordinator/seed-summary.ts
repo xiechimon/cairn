@@ -4,6 +4,7 @@ import type { Db } from '../db/client.js';
 import { chiefMessage, chiefSummary } from '../db/schema.js';
 import { chiefTranscriptLines } from '../services/chief-digest.js';
 import { foldSummary, type Summarize, summaryBatches } from './runtime/compaction.js';
+import { recordCompactionSuccess } from './runtime/failure-report.js';
 
 export const SEED_SUMMARY_MAX_BATCHES = 8;
 const SEED_SUMMARY_MAX_ROWS = 2_000;
@@ -43,7 +44,7 @@ export async function seedSummary(
   threadId: string,
   windowStart: RowPosition | null,
   summarize: Summarize | null,
-  onError: (error: unknown) => void,
+  onError: (error: unknown, startAt: number) => void,
   now: number,
 ): Promise<SeedSummaryResult> {
   const prior = db.select().from(chiefSummary).where(eq(chiefSummary.threadId, threadId)).get();
@@ -104,12 +105,14 @@ export async function seedSummary(
       .limit(1)
       .get() !== undefined;
   let folded: string;
+  const startAt = Date.now();
   try {
     folded = await foldSummary(prior?.summary ?? null, batches, summarize);
   } catch (error) {
-    onError(error);
+    onError(error, startAt);
     return { summary: previous, complete: false };
   }
+  recordCompactionSuccess({ threadId }, 'seed-summary', startAt);
   if (folded.trim() === '') return { summary: previous, complete: false };
   const values = {
     summary: folded,
