@@ -11,8 +11,18 @@ import {
   Search,
   Settings,
 } from 'lucide-react';
-import { type ReactElement, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
-import { Link, type To, useLocation, useNavigate } from 'react-router';
+import {
+  memo,
+  type ReactElement,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { Link, type NavigateFunction, type To, useLocation, useNavigate } from 'react-router';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import {
@@ -285,6 +295,81 @@ function RailTip({
   );
 }
 
+const ProjectRowItem = memo(function ProjectRowItem({
+  row,
+  place,
+  flat,
+  waiting,
+  status,
+  archived,
+  active,
+  groups,
+  plain,
+  navigate,
+  actionsRef,
+}: {
+  row: SidebarProject;
+  place: TreePlace;
+  flat: boolean;
+  waiting: string | null;
+  status: string | null;
+  archived: string | null;
+  active: boolean;
+  groups: readonly string[];
+  plain: string;
+  navigate: NavigateFunction;
+  actionsRef: RefObject<SidebarProjectActions | undefined> | null;
+}) {
+  const appSearch = (set: Record<string, string>) => {
+    const next = new URLSearchParams(plain);
+    for (const [key, value] of Object.entries(set)) next.set(key, value);
+    return `?${next}`;
+  };
+  const menu =
+    actionsRef === null ? undefined : isArchivedProject(row) ? (
+      <SidebarArchivedProjectMenu
+        name={row.name}
+        onUnarchive={() => actionsRef.current?.unarchive(row.id)}
+        onDelete={() => actionsRef.current?.remove(row.id)}
+      />
+    ) : (
+      <SidebarProjectMenu
+        name={row.name}
+        group={row.group ?? null}
+        groups={groups}
+        onMove={(group) => actionsRef.current?.move(row.id, group)}
+        onArchive={() => actionsRef.current?.archive(row.id)}
+        onRename={async (name) => actionsRef.current?.rename(row.id, name)}
+        onDelete={() => actionsRef.current?.remove(row.id)}
+        onHome={() => navigate({ pathname: '/app', search: appSearch({ project: row.id }) })}
+        onTasks={() => navigate({ pathname: `/app/project/${row.id}/tasks`, search: plain })}
+        onSettings={() => navigate({ pathname: `/app/project/${row.id}/settings`, search: plain })}
+        onInstructions={() =>
+          navigate({
+            pathname: `/app/project/${row.id}/settings`,
+            search: appSearch({ tab: 'memory' }),
+          })
+        }
+      />
+    );
+  return (
+    <SidebarProjectRow
+      name={row.name}
+      icon={row.icon}
+      place={place}
+      flat={flat}
+      waiting={waiting}
+      status={status}
+      archived={archived}
+      active={active}
+      onClick={() =>
+        navigate({ pathname: '/app', search: appSearch({ project: row.id, chat: '1' }) })
+      }
+      menu={menu}
+    />
+  );
+});
+
 export function BoardSidebar({
   collapsed = false,
   onToggle,
@@ -356,50 +441,25 @@ export function BoardSidebar({
       ? t('{n} 件进行中', { n: status.count })
       : `${t(status.word)} · ${t(status.what.key, status.what.params)}`;
   };
-  const projectMenu = (row: SidebarProject) =>
-    actions === undefined ? undefined : isArchivedProject(row) ? (
-      <SidebarArchivedProjectMenu
-        name={row.name}
-        onUnarchive={() => actions.unarchive(row.id)}
-        onDelete={() => actions.remove(row.id)}
-      />
-    ) : (
-      <SidebarProjectMenu
-        name={row.name}
-        group={row.group ?? null}
-        groups={groupNames}
-        onMove={(group) => actions.move(row.id, group)}
-        onArchive={() => actions.archive(row.id)}
-        onRename={(name) => actions.rename(row.id, name)}
-        onDelete={() => actions.remove(row.id)}
-        onHome={() => {
-          const next = new URLSearchParams(baseParams);
-          next.set('project', row.id);
-          navigate({ pathname: '/app', search: `?${next}` });
-        }}
-        onTasks={() => navigate({ pathname: `/app/project/${row.id}/tasks`, search: plain })}
-        onSettings={() => navigate({ pathname: `/app/project/${row.id}/settings`, search: plain })}
-        onInstructions={() => {
-          const next = new URLSearchParams(baseParams);
-          next.set('tab', 'memory');
-          navigate({ pathname: `/app/project/${row.id}/settings`, search: `?${next}` });
-        }}
-      />
-    );
+  const actionsRef = useRef(actions);
+  useLayoutEffect(() => {
+    actionsRef.current = actions;
+  });
   const projectRows = (rows: readonly SidebarProject[], flat = false) =>
     rows.map((row, index) => (
-      <SidebarProjectRow
+      <ProjectRowItem
         key={row.id}
-        name={row.name}
-        icon={row.icon}
+        row={row}
         place={treePlace(index, rows.length)}
         flat={flat}
         waiting={waiting.has(row.id) ? waitingLabel : null}
         status={isArchivedProject(row) ? null : statusText(row.id)}
         archived={isArchivedProject(row) ? archivedLabel : null}
         active={activeProject === row.id}
-        onClick={() => navigate(projectHref(row.id))}
-        menu={projectMenu(row)}
+        groups={groupNames}
+        plain={plain}
+        navigate={navigate}
+        actionsRef={actions === undefined ? null : actionsRef}
       />
     ));
   const [groupsCollapsed, setGroupsCollapsed] = useState(() =>

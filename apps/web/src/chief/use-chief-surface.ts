@@ -98,8 +98,8 @@ function placeOf(pathname: string, search: string): string {
 export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): ChiefSurface {
   const { live, teamId } = useLiveData();
   const navigate = useNavigate();
-  const machinesQ = useMachines(teamId, live);
-  const routingQ = useRoutingSettings(teamId, live);
+  const machines = useMachines(teamId, live).data;
+  const routingRules = useRoutingSettings(teamId, live).data?.rules;
   const { t } = useI18n();
   const chiefQ = useChief(teamId, live);
   const chiefThreadsQ = useChiefThreads(teamId, live);
@@ -178,14 +178,14 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   ]);
   const [shownChannel, setShownChannel] = useState(channel);
   const [newestPageOnly, setNewestPageOnly] = useState(false);
-  if (shownChannel !== channel) {
-    setShownChannel(channel);
-    setNewestPageOnly(channel === null);
-  }
   const { query: chiefMessagesQ, messages: loadedChiefMessages } = useConversationMessages(
     live ? (activeThread?.id ?? null) : null,
     live,
   );
+  if (shownChannel !== channel) {
+    setShownChannel(channel);
+    setNewestPageOnly(channel === null && (chiefMessagesQ.data?.pages.length ?? 0) > 1);
+  }
   const newestPage = chiefMessagesQ.data?.pages[0];
   const chiefMessages = useMemo(
     () => (newestPageOnly ? (newestPage?.messages ?? []) : loadedChiefMessages),
@@ -420,10 +420,8 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   );
   const onSend = live
     ? (text: string, projectId: string | null) => {
-        const sessionMachineId = routingQ.data?.rules?.find(
-          (rule) => rule.use === 'session',
-        )?.machineId;
-        if (activeThread == null && needsMachineName(machinesQ.data, sessionMachineId)) {
+        const sessionMachineId = routingRules?.find((rule) => rule.use === 'session')?.machineId;
+        if (activeThread == null && needsMachineName(machines, sessionMachineId)) {
           toast.warning(t('先选择机器'), {
             description: t('多台机器在线时，开工前要在规则里点名一台。'),
             action: {
