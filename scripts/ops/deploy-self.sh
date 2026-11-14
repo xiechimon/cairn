@@ -22,7 +22,9 @@ Deploys one green main commit to this host's cairn checkout and user units, with
   1. refuses a SHA not on origin/main, without every required check green, while autonomy
      is paused, or whose pnpm-workspace.yaml allows a new install script (exit 2)
   2. respects $CAIRN_DEPLOY_STATE/hold; daemon changes pause claims with a durable lease
-     and drain within CAIRN_DEPLOY_STEP_WAIT_SECONDS (exit 75 on timeout), always resuming
+     and drain within CAIRN_DEPLOY_STEP_WAIT_SECONDS (exit 75 on timeout), always resuming;
+     every deploy also waits that long for open Coordinator computer calls other than
+     request_takeover, which resumes across a restart
   3. rehearses the target's migrations on an online copy of the live DB in a scratch worktree
   4. checks out the target, installs with --frozen-lockfile, builds the daemon and web assets
   5. stops daemon and server, snapshots the DB, starts server then daemon, health-checks both
@@ -344,6 +346,18 @@ wait_for_steps() {
     [[ "$running" =~ ^[0-9]+$ ]] || refuse "invalid running step count"
     [ "$running" != 0 ] || return 0
     [ "$(date +%s)" -lt "$deadline" ] || busy "starved: steps never idle ($running still running after ${STEP_WAIT_SECONDS}s drain)"
+    sleep 1
+  done
+}
+
+wait_for_computer_calls() {
+  local deadline=$(( $(date +%s) + STEP_WAIT_SECONDS )) open
+  [ "$(sqlite3 -readonly "$DB" "select count(*) from sqlite_master where name='computer_call'")" = 1 ] || return 0
+  while :; do
+    open="$(sqlite3 -readonly "$DB" "select count(*) from computer_call where state in ('dispatched','running') and tool <> 'request_takeover'")" || refuse "cannot read open computer calls"
+    [[ "$open" =~ ^[0-9]+$ ]] || refuse "invalid open computer call count"
+    [ "$open" != 0 ] || return 0
+    [ "$(date +%s)" -lt "$deadline" ] || busy "starved: computer calls never idle ($open still open after ${STEP_WAIT_SECONDS}s drain)"
     sleep 1
   done
 }
@@ -825,6 +839,7 @@ fi
 
 assert_hold
 drain_steps
+wait_for_computer_calls
 
 mkdir -p "$BACKUPS" || restart_previous "creating $BACKUPS failed"
 SNAPSHOT="$BACKUPS/stopped-$(date -u +%Y%m%dT%H%M%SZ)-${PREVIOUS:0:12}.db"
