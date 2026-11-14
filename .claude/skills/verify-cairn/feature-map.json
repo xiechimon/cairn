@@ -455,7 +455,7 @@
     {
       "id": "push-notifications",
       "name": "Phone push",
-      "summary": "Web push to the user's devices when something needs them, suppressed while they are looking at the thread.",
+      "summary": "Web Push and APNs to the user's devices when something needs them, suppressed while they are looking at the thread.",
       "states": "Off, asking for permission, or on for this device; a notification opens the thread it names.",
       "centrality": 1,
       "status": "shipped",
@@ -469,7 +469,8 @@
           "apps/server/src/routes-push.ts",
           "apps/server/src/services/push.ts",
           "apps/server/src/services/push-alerts.ts",
-          "apps/server/src/services/owner.ts"
+          "apps/server/src/services/owner.ts",
+          "apps/server/src/services/apns.ts"
         ]
       },
       "routes": {
@@ -482,9 +483,9 @@
         "open /app",
         "click testid:tasks-toggle"
       ],
-      "research": {
-        "gap": "no prior-art note on agent notifications and push delivery"
-      },
+      "research": [
+        "docs/research/ios-apns-push-2026-11-14.md"
+      ],
       "frontendDesign": {
         "gap": "the notify banner, device switch and push copy have no design"
       },
@@ -494,7 +495,8 @@
       "evidence": [
         "apps/web/e2e/push-device-switch.spec.ts",
         "apps/web/e2e/notify-click.spec.ts",
-        "apps/server/test/push.test.ts"
+        "apps/server/test/push.test.ts",
+        "apps/server/test/apns.test.ts"
       ],
       "batch": "B2"
     },

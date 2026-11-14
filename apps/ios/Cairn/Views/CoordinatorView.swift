@@ -82,7 +82,7 @@ struct CoordinatorView: View {
                 }
             }
             .sheet(isPresented: $showAccount) {
-                AccountSheet(team: model.team.name, server: session.serverText) {
+                AccountSheet(model: model, server: session.serverText) {
                     showAccount = false
                     session.signOut()
                 }
@@ -183,21 +183,46 @@ struct CoordinatorView: View {
 }
 
 private struct AccountSheet: View {
-    let team: String
+    let model: AppModel
     let server: String
     let onSignOut: () -> Void
+    @Environment(PushRouter.self) private var push
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    LabeledContent("Team", value: team)
+                    LabeledContent("Team", value: model.team.name)
                     LabeledContent("Server", value: server)
                 }
                 .listRowBackground(Color.card)
                 Section {
-                    Button("Sign out", role: .destructive, action: onSignOut)
-                        .accessibilityIdentifier("sign-out-button")
+                    Toggle("Push on this device", isOn: Binding(
+                        get: { push.permission == .on },
+                        set: { on in Task { await toggle(on) } }
+                    ))
+                    .disabled(push.permission == .denied)
+                    .accessibilityIdentifier("push-toggle")
+                    if push.permission == .denied {
+                        Button("Allow notifications in Settings") {
+                            if let url = URL(string: UIApplication.openNotificationSettingsURLString) { openURL(url) }
+                        }
+                    }
+                } header: {
+                    Text("Push notifications")
+                } footer: {
+                    Text("Push immediately when a decision is needed; everything else lands in the twice-daily digest, even on the lock screen.")
+                }
+                .listRowBackground(Color.card)
+                Section {
+                    Button("Sign out", role: .destructive) {
+                        Task {
+                            await toggle(false)
+                            onSignOut()
+                        }
+                    }
+                    .accessibilityIdentifier("sign-out-button")
                 }
                 .listRowBackground(Color.card)
             }
@@ -206,6 +231,17 @@ private struct AccountSheet: View {
             .navigationTitle("Account")
             .navigationBarTitleDisplayMode(.inline)
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
+    }
+
+    private func toggle(_ on: Bool) async {
+        if on {
+            await push.enable()
+        } else if push.permission == .on {
+            if let token = push.deviceToken {
+                try? await model.client.unregisterPushDevice(teamId: model.team.id, token: token)
+            }
+            push.disable()
+        }
     }
 }

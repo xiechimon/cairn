@@ -24,6 +24,16 @@
         }
       }
     },
+    "Allow notifications in Settings" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到设置里允许通知"
+          }
+        }
+      }
+    },
     "Answered" : {
       "localizations" : {
         "zh-Hans" : {
@@ -320,6 +330,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "计划已就绪，批准后开工。"
+          }
+        }
+      }
+    },
+    "Push immediately when a decision is needed; everything else lands in the twice-daily digest, even on the lock screen." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要你决定时立即推送，其余进展并入每日两次简报，锁屏也能收到。"
+          }
+        }
+      }
+    },
+    "Push notifications" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推送通知"
+          }
+        }
+      }
+    },
+    "Push on this device" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在这台设备上接收推送"
           }
         }
       }

@@ -20,7 +20,7 @@
 | status partial | 8 |
 | status planned | 3 |
 | research, frontend design and backend design all present or not applicable | 24 |
-| Research gaps | 14 |
+| Research gaps | 13 |
 | Frontend design gaps | 19 |
 | Backend design gaps | 19 |
 | notes cited but not on main | 21 |
@@ -42,7 +42,7 @@
 | [Task references and needs-you](#needs-you) | 1 | shipped | yes | yes | gap | B2 |
 | [Per-task orb isolation](#orb-isolation) | 1 | partial | yes | gap | yes | B4 |
 | [Plans, approval and review](#plans-and-review) | 1 | shipped | yes | gap | yes | B3 |
-| [Phone push](#push-notifications) | 1 | shipped | gap | gap | gap | B2 |
+| [Phone push](#push-notifications) | 1 | shipped | yes | gap | gap | B2 |
 | [Question cards](#questions) | 1 | shipped | gap | yes (not on main) | gap | B2 |
 | [Model and work routing](#routing) | 1 | shipped | yes | yes | yes |  |
 | [Reply quote](#selection-reply) | 1 | shipped | yes | yes | yes |  |
@@ -97,7 +97,7 @@ The attention surfaces of the phase 1 graduation criteria: the needs-you tray, q
 |---|---|---|
 | [Daily report and retro](#daily-report) | 1 | Frontend design: the report row and retro proposal card have no design<br>Backend design: no design for report content, timing, quiet rules and retro proposal storage |
 | [Task references and needs-you](#needs-you) | 1 | Backend design: no design for which records enter the tray, their order and when they leave |
-| [Phone push](#push-notifications) | 1 | Research: no prior-art note on agent notifications and push delivery<br>Frontend design: the notify banner, device switch and push copy have no design<br>Backend design: no design for subscriptions, presence suppression, receipts and the three push states |
+| [Phone push](#push-notifications) | 1 | Frontend design: the notify banner, device switch and push copy have no design<br>Backend design: no design for subscriptions, presence suppression, receipts and the three push states |
 | [Question cards](#questions) | 1 | Research: the Codex CLI and t3code question patterns were never written up<br>Backend design: no design for the question lifecycle: parking, late answers, cancel and resume |
 
 ### B3 · Thread control and the merge decision
@@ -305,9 +305,9 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### push-notifications
 
-**Phone push** (shipped). Web push to the user's devices when something needs them, suppressed while they are looking at the thread.
+**Phone push** (shipped). Web Push and APNs to the user's devices when something needs them, suppressed while they are looking at the thread.
 
-- Research: **gap**: no prior-art note on agent notifications and push delivery
+- Research: [docs/research/ios-apns-push-2026-11-14.md](research/ios-apns-push-2026-11-14.md)
 - Frontend design: **gap**: the notify banner, device switch and push copy have no design
 - Backend design: **gap**: no design for subscriptions, presence suppression, receipts and the three push states
 

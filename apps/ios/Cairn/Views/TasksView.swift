@@ -2,9 +2,10 @@ import SwiftUI
 
 struct TasksView: View {
     let model: AppModel
+    @Binding var path: [InboxItem]
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
                 if let error = model.error {
                     Section {
