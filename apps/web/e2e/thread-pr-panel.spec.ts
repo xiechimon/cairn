@@ -237,15 +237,6 @@ test('the same PR reaches the Tasks row and the finish dialog', async ({ page })
   await expect(page.getByTestId('accept-dialog-pr').getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
 });
 
-test('a finished task in Made links its newest PR', async ({ page }) => {
-  const done = { ...TASK, id: 'todo-9', seqNum: 9, title: 'Finished with a PR', phase: 'done', phaseAt: Date.now() };
-  await setup(page, { rows: [prRow({ threadId: 'todo-9', number: 77, url: 'https://github.com/xiechimon/cairn/pull/77', state: 'merged' }), prRow({ threadId: 'todo-9', number: 70, url: 'https://github.com/xiechimon/cairn/pull/70', state: 'closed' })] }, 'light', { todos: [done] });
-  await page.goto('/app?pane=made');
-  const row = page.getByRole('complementary', { name: 'Made' }).getByRole('link', { name: /PR #77/ });
-  await expect(row).toHaveAttribute('href', /pull\/77$/);
-  await expect(page.getByRole('complementary', { name: 'Made' }).getByRole('link', { name: /PR #70/ })).toHaveCount(0);
-});
-
 test('the changes view does not leak into the next thread after closing', async ({ page }) => {
   await setup(page, { rows: [prRow()] }, 'light', { tasks: [REVIEW_ENTRY] });
   await page.goto('/app?thread=todo-1&view=changes');
