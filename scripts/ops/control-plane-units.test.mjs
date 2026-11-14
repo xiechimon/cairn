@@ -45,6 +45,10 @@ test('the deployed server fetch uses its configured HTTP proxy', { timeout: 1000
       socket.end('HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\nproxied');
     });
   });
+  proxy.on('request', (request, response) => {
+    assert.equal(request.url, 'http://cairn-egress-probe.invalid/check');
+    response.end('proxied');
+  });
   await new Promise((ready) => proxy.listen(0, '127.0.0.1', ready));
   t.after(() => proxy.close());
   const child = spawn(
