@@ -22,14 +22,19 @@ async function world() {
 const base = { title: 'Pick a queue library', question: 'Which queue library fits?' };
 
 describe('openResearchThread', () => {
-  test('refuses, creating nothing, when the session route sends builds to a runtime other than Claude Code', async () => {
+  test('opens on a session route that runs a runtime other than Claude Code', async () => {
     const w = await world();
     seedSessionRoute(w.s, { provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
-    const before = w.s.db.select().from(todo).all().length;
-    expect(() =>
-      openResearchThread(w.s.svc, { teamId: w.teamId, projectId: w.projectId, tier: 1, ...base }),
-    ).toThrow(/Claude Code/);
-    expect(w.s.db.select().from(todo).all()).toHaveLength(before);
+    const opened = openResearchThread(w.s.svc, {
+      teamId: w.teamId,
+      projectId: w.projectId,
+      tier: 2,
+      ...base,
+    });
+    const row = w.s.db.select().from(todo).where(eq(todo.id, opened.todoId)).get();
+    expect(row?.output).toBe('info');
+    expect(row?.spec).toContain('没有 Task 工具就自己逐个查完');
+    expect(w.s.db.select().from(build).where(eq(build.id, opened.buildId)).get()).toBeDefined();
   });
 
   test('refuses, creating nothing, when the team has no session route', async () => {

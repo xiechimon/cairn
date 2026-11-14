@@ -8,8 +8,6 @@ import { recordResearchTier } from './research-citations.js';
 import { routeForStep } from './routing-rules.js';
 import { createAutonomousTodo } from './todos.js';
 
-export const RESEARCH_AGENT_PROVIDER = 'claude-code';
-
 export interface OpenResearchThreadInput {
   teamId: string;
   projectId: string;
@@ -52,12 +50,6 @@ export function openResearchThread(
   const route = routeForStep(deps.db, { teamId: input.teamId }, 'build');
   if (route === null) {
     throw new HttpError(409, 'Research needs a session routing rule, but this team has none.');
-  }
-  if (route.provider !== RESEARCH_AGENT_PROVIDER) {
-    throw new HttpError(
-      409,
-      `Research needs a Claude Code route, but this team's session route runs ${route.provider}/${route.modelId}.`,
-    );
   }
   const todoId =
     existing?.id ??
