@@ -4,6 +4,10 @@ A native SwiftUI client: sign in with a server address and token, then a two-tab
 
 It is not part of the pnpm workspace and has no CI job; run its tests on a Mac.
 
+## Languages
+
+The UI ships in English and Simplified Chinese from `Cairn/Localizable.xcstrings`, with the wording of `apps/web/src/i18n/en.ts` (Chinese is the web's source string). It follows the system language; pass `-AppleLanguages "(zh-Hans)"` as a launch argument to force Chinese.
+
 ## Requirements
 
 - macOS with Xcode 27 (the iOS 27 SDK; required for App Store uploads from April 2027).
