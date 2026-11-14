@@ -10,7 +10,6 @@ import type {
   MachineHeartbeatBody,
   PreparedWorkspace,
   ProviderConfig,
-  SessionOpts,
   SkillInjectionFacts,
   WorkspaceHookNoteData,
   WorktreeOps,
@@ -60,8 +59,8 @@ import { resolveStepPassOutcome, rewindAfterStep } from './step-pass-outcome.js'
 import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
 import { composeWorkerSystemPrompt, planStepPrompt, taskMetaOpts } from './step-prompt.js';
 import { resolveStepProvider } from './step-provider.js';
-import { stepRemoteToolExecutor } from './step-remote-tools.js';
 import { StepSessionOpener } from './step-session-opener.js';
+import { composeStepSessionOpts } from './step-session-opts.js';
 import { settleStepGit } from './step-settle-git.js';
 import { sessionInjectedSkills, stepMcpEndpoints } from './step-skill-tool.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
@@ -533,44 +532,38 @@ async function runClaimedStep(
       runtimeId === 'claude-code' ? creds.claudeSubscriptionToken : undefined,
   });
   stepCleanups.push(dropGitCredentials);
-  const sessionOpts: SessionOpts = {
+  const sessionOpts = composeStepSessionOpts({
     provider,
     modelId: agent.modelId,
-    ...(agent.thinkingLevel ? { thinkingLevel: agent.thinkingLevel } : {}),
-    ...(systemPrompt ? { systemPrompt } : {}),
+    thinkingLevel: agent.thinkingLevel,
+    systemPrompt,
     cwd,
-    ...(deliveryPrompt !== null ? { prompt: deliveryPrompt } : {}),
-    ...(promptImages !== undefined ? { promptImages } : {}),
-    ...(localToolDefs.length > 0 ? { localTools: localToolDefs } : {}),
-    ...(remoteTools && remoteTools.length > 0
-      ? {
-          remoteTools,
-          executeRemoteTool: stepRemoteToolExecutor({
-            client,
-            stepId,
-            cwd,
-            remoteTools,
-            askChannel,
-            attachFiles: !isChief,
-            verifyEvidence: attachmentVerify
-              ? { directory: verifyEvidenceDirectory, uploaded: uploadedVerifyEvidence }
-              : null,
-          }),
-        }
-      : {}),
-    ...(claimedMcp !== undefined ? { mcpServers: mcpEndpoints } : {}),
-    ...(isChief || agent.skillsAllowlist == null ? {} : { skillsAllowlist: agent.skillsAllowlist }),
-    ...(isChief || injectedForSession === undefined ? {} : { injectedSkills: injectedForSession }),
+    prompt: deliveryPrompt,
+    promptImages,
+    localTools: localToolDefs,
+    remoteTools,
+    remoteExecutor: {
+      client,
+      stepId,
+      askChannel,
+      attachFiles: !isChief,
+      verifyEvidence: attachmentVerify
+        ? { directory: verifyEvidenceDirectory, uploaded: uploadedVerifyEvidence }
+        : null,
+    },
+    mcpServers: claimedMcp !== undefined ? mcpEndpoints : null,
+    skillsAllowlist: agent.skillsAllowlist,
+    injectedSkills: injectedForSession,
     onSkillsResolved: (names) => {
       skillInjection.facts = names;
     },
-    ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
-    ...(isReview ? { readOnly: true } : {}),
-    ...(isChief || isReview ? { lockedDown: true } : {}),
-    ...(claimed.remoteToolsOnly === true ? { remoteToolsOnly: true } : {}),
-    ...(telemetry !== undefined ? { telemetry } : {}),
-    ...(Object.keys(stepEnv).length > 0 ? { env: stepEnv } : {}),
-  };
+    teamSkillsDir,
+    isChief,
+    isReview,
+    remoteToolsOnly: claimed.remoteToolsOnly === true,
+    telemetry,
+    env: stepEnv,
+  });
 
   const transcript = guardCredentialOutputs(
     new TranscriptBuffer(deps.paths.outboxDir, stepId),
