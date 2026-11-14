@@ -116,6 +116,7 @@ import {
   sessionsRef,
   sessionsRefDetail,
 } from './home-c.js';
+import { readmeEn, readmeZh } from './readme.js';
 import type { FixtureSet } from './records.js';
 import { RESOURCES } from './resources.js';
 import { sidebarArchived } from './sidebar-archived.js';
@@ -172,6 +173,8 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'sessions-ref': sessionsRef,
       'sessions-ref-detail': sessionsRefDetail,
       'make-ref': makeRef,
+      'readme-en': readmeEn,
+      'readme-zh': readmeZh,
       'sidebar-thread-statuses': sidebarThreadStatuses,
       'board-inbox': boardInbox,
       'quota-wait': boardQuotaWait,
