@@ -98,6 +98,7 @@ export function EarlierLoader({
     if (!settled || anchor === null || viewport === null) return;
     anchorRef.current = null;
     restoreAnchor(anchor, viewport);
+    requestAnimationFrame(() => restoreAnchor(anchor, viewport));
   }, [loading, rowCount, viewportRef]);
   return null;
 }
