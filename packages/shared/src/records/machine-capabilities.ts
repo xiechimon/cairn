@@ -46,6 +46,14 @@ export function confinementDispatchReady(
 
 const machineOsPlatformSchema = z.enum(['linux', 'darwin', 'other']);
 
+export const agentReachReportSchema = z.object({
+  version: z.string().min(1).max(32),
+  channels: z
+    .array(z.object({ channel: z.string().min(1).max(32), status: z.string().min(1).max(32) }))
+    .max(64),
+});
+export type AgentReachReport = z.infer<typeof agentReachReportSchema>;
+
 export const machineCapabilitiesSchema = z.object({
   osPlatform: machineOsPlatformSchema.optional(),
   mcpServers: z.array(z.string()),
@@ -58,6 +66,7 @@ export const machineCapabilitiesSchema = z.object({
   secretGateway: z.literal(true).optional(),
   codexLogin: codexLoginSchema.optional(),
   confinement: confinementReportSchema.optional(),
+  agentReach: agentReachReportSchema.optional(),
 });
 export type MachineCapabilities = z.infer<typeof machineCapabilitiesSchema>;
 
@@ -76,11 +85,13 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   const hardware = machineHardwareSchema.safeParse(rec.hardware);
   const executor = machineExecutorSchema.safeParse(rec.executor);
   const codexLogin = codexLoginSchema.safeParse(rec.codexLogin);
+  const agentReach = agentReachReportSchema.safeParse(rec.agentReach);
   return {
     ...base.data,
     ...(osPlatform.success ? { osPlatform: osPlatform.data } : {}),
     ...(confinement.success ? { confinement: confinement.data } : {}),
     ...(codexLogin.success ? { codexLogin: codexLogin.data } : {}),
+    ...(agentReach.success ? { agentReach: agentReach.data } : {}),
     ...(hardware.success ? { hardware: hardware.data } : {}),
     ...(executor.success ? { executor: executor.data } : {}),
     ...(rec.computer === true ? { computer: true as const } : {}),

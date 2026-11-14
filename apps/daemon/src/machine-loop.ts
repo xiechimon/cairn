@@ -19,6 +19,7 @@ import {
   MACHINE_ORB_CONVERSATIONS_LIMIT,
   ORPHAN_WORKTREE_TTL_MS,
 } from '@cairn/shared';
+import { AgentReachProbe } from './agent-reach.js';
 import { configuredAcpBackends, createGeminiBackend } from './backend/acp.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
@@ -239,16 +240,21 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           onError: (message) => logger.machine(message),
         })
       : undefined);
-  const capabilitiesReport = (): MachineCapabilities => ({
-    ...capabilitiesProbe(),
-    osPlatform: platform === 'linux' || platform === 'darwin' ? platform : 'other',
-    confinement: availability?.observation(),
-    codexLogin: readCodexLogin(paths.agentRuntimeDir),
-    executor: orbProvider.kind,
-    ...(orbComputer ? { computer: true as const } : {}),
-    ...(orbComputer && computerImageOffersBrowser() ? { browser: true as const } : {}),
-    ...(hostComputer ? { ownComputer: true as const } : {}),
-  });
+  const agentReach = new AgentReachProbe();
+  const capabilitiesReport = (): MachineCapabilities => {
+    const reach = agentReach.current();
+    return {
+      ...capabilitiesProbe(),
+      osPlatform: platform === 'linux' || platform === 'darwin' ? platform : 'other',
+      confinement: availability?.observation(),
+      codexLogin: readCodexLogin(paths.agentRuntimeDir),
+      executor: orbProvider.kind,
+      ...(orbComputer ? { computer: true as const } : {}),
+      ...(orbComputer && computerImageOffersBrowser() ? { browser: true as const } : {}),
+      ...(hostComputer ? { ownComputer: true as const } : {}),
+      ...(reach !== undefined ? { agentReach: reach } : {}),
+    };
+  };
 
   let claudeBackend: AgentBackend | null = opts.claudeCodeBackend ?? null;
   let geminiBackend: AgentBackend | null = opts.geminiBackend ?? null;
