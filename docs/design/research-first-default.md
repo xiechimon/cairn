@@ -87,7 +87,7 @@ This matches the repository's own rule ("agents decide by their own recommendati
 ### 5. Triggers
 
 - **Phase 0 stopgap:** add Chinese keywords to `researchBeforePlanReason` (`性能`, `变慢`, `更快`, `延迟`, `新机制`, `依赖`, `选型`, `技术方案`, `架构`).
-- **Phase 2:** the Coordinator decides. `create_todo` gains an optional `research: { reason }` field, and `holdCodeThreadForPriorResearch` reads that field instead of the regex. The Coordinator is already a model that reads Chinese and already sets `difficulty`.
+- **Phase 2:** the Coordinator decides. `create_todo` gains an optional `research: { reason }` field, and `holdCodeThreadForPriorResearch` reads that field instead of the regex. The Coordinator is already a model that reads Chinese and already sets `difficulty`. The keyword regex and its Phase 0 keywords are removed; a todo without the field opens no research thread. The reason (1 to 200 characters) is stored in the todo request, survives `update_todo` message appends, and is quoted in the research thread's question. An `output=info` todo never opens one. `split_todo` maps to one `create_todo` per part, so each part carries its own decision.
 - **Every phase:** a session thread doing feature work runs its own prior-art step under the shared rule, even when no separate research thread was opened, and its report or PR has a `Prior art` section. This moves `PLAN_PRIOR_ART_RULE` from plan steps only to the shared rule.
 
 ## State, protocol and paths
@@ -96,7 +96,7 @@ This matches the repository's own rule ("agents decide by their own recommendati
 |---|---|---|
 | 0 | None: prompt text and one tool description | `buildChiefSystemPrompt`, `composeWorkerSystemPrompt`, `WORKER_ASK_USER_TOOL` and the Coordinator `ask_user`, `researchPrompt`, `researchBeforePlanReason` |
 | 1 | Built-in skill entries in the team skills manifest; a machine capability field for agent-reach | Manifest build and `materializeTeamSkills`; the machine capability report in `services/machine*.ts`, a security surface that merges under Merge routes with `/security-review` |
-| 2 | `create_todo` `research` field, stored with the todo request | `create_todo` handler, `holdCodeThreadForPriorResearch`, `split_todo`, Coordinator eval fixtures; its own one-page design before code |
+| 2 | `create_todo` `research` field, stored with the todo request | `createRequestTodo` writes it; `update_todo` message appends keep it; `holdCodeThreadForPriorResearch` reads it when the code thread opens; `split_todo` goes through `create_todo`. Old rows without the field open no research. Coordinator eval fixtures stay unchanged because `integration/eval/**` is protected |
 | 3 | Report sections "Decided myself" and "For you to decide" parsed into an `ask_user` card | Info report handoff (`blocker-handoff.ts`), `chief-questions.ts`, `worker-questions.ts` |
 
 ## Failure behavior

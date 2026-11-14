@@ -201,6 +201,10 @@ export const coordinatorCreateTodoParamsSchema = z
     priority: z.enum(TASK_REQUEST_PRIORITIES).optional(),
     difficulty: z.enum(TASK_REQUEST_DIFFICULTIES).optional(),
     output: todoOutputSchema.optional(),
+    research: z
+      .object({ reason: z.string().trim().min(1).max(200) })
+      .strict()
+      .optional(),
   })
   .strict()
   .refine((params) => params.messageIds === undefined || params.sourceTodoId === undefined, {
@@ -482,7 +486,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'create_todo',
     description:
-      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo, and starts with a placeholder title cut from them. After create, call update_todo with a short summary title for the Tasks panel. You add routing only. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is unclear, ask_user instead of filling the gap. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
+      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo, and starts with a placeholder title cut from them. After create, call update_todo with a short summary title for the Tasks panel. You add routing only. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is only vague, create the todo and let its thread research and propose; ask_user only when the need itself is ambiguous. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
     parameters: obj(
       {
         projectId: str('Project id.'),
@@ -506,6 +510,14 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         ),
         blockedBy: idArr(
           'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done (an info blocker counts once its report is in review); a failed or closed blocker wakes you to decide.',
+        ),
+        research: obj(
+          {
+            reason: str(
+              "One line, in the owner's language, saying what the research must answer before this task is planned. Set research for a code task that designs a new mechanism, adds a dependency, fixes a performance problem or chooses a technology: a read-only research thread studies open-source implementations first and this thread waits for its report. Leave it out for small fixes, wording or style changes and info tasks.",
+            ),
+          },
+          ['reason'],
         ),
       },
       ['projectId'],
