@@ -117,6 +117,16 @@ export async function bootstrapLoopback(): Promise<boolean> {
   }
 }
 
+export async function exchangeAccessIdentity(): Promise<boolean> {
+  if (isLoopbackPage()) return false;
+  try {
+    const res = await fetch('/api/auth/access', { method: 'POST', credentials: 'same-origin' });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 const DESCRIPTOR_PATH = '/api/remote/descriptor';
 const PAIR_PATH = '/api/remote/pair';
 const FALLBACK_DEVICE_NAME = 'Browser';

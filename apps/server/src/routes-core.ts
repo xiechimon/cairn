@@ -72,6 +72,24 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     return c.json({ ok: true });
   });
 
+  app.post('/api/auth/access', async (c) => {
+    if (ctx.accessVerifier == null) return c.json({ error: 'Not found' }, 404);
+    const site = c.req.header('sec-fetch-site');
+    if (site !== undefined && site !== 'same-origin' && site !== 'none') {
+      return c.json({ error: 'same-origin proof required' }, 403);
+    }
+    const verdict = await ctx.accessVerifier(c.req.header('cf-access-jwt-assertion'));
+    if (verdict.kind === 'unavailable') {
+      return c.json({ error: 'Cloudflare Access keys are unavailable' }, 503);
+    }
+    if (verdict.kind === 'invalid') return c.json({ error: 'Unauthorized' }, 401);
+    if (verdict.kind === 'not-allowed')
+      return c.json({ error: 'this account is not allowed' }, 403);
+    const session = issueBrowserSession(ctx.db, 'owner', null, undefined, verdict.expiresAt);
+    setAuthCookie(c, session.token, requestIsSecure(c), session.expiresAt);
+    return c.json({ ok: true });
+  });
+
   app.post('/api/auth/stream-ticket', (c) => {
     const deviceId = pairedDeviceIdOf(c);
     const owner = c.get('ownerIdentity');

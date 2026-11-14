@@ -6,6 +6,7 @@ import {
   clearLegacyBrowserToken,
   consumePairFragment,
   demandGate,
+  exchangeAccessIdentity,
   isLoopbackPage,
 } from './auth.js';
 
@@ -56,7 +57,8 @@ function establishSession(): Promise<boolean> {
       if (failed) return false;
     }
     if ((await fetch('/api/teams')).ok) return true;
-    return (await bootstrapLoopback()) && (await fetch('/api/teams')).ok;
+    if (await bootstrapLoopback()) return (await fetch('/api/teams')).ok;
+    return (await exchangeAccessIdentity()) && (await fetch('/api/teams')).ok;
   })().finally(() => {
     establishing = null;
   });

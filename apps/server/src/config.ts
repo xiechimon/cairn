@@ -72,6 +72,14 @@ export const serverConfigSchema = z.object({
   schedulerTickMs: z.number().int().positive(),
   webDir: z.string().nullable(),
   githubAppTokenSocket: z.string().min(1).nullable().default(null),
+  cloudflareAccess: z
+    .object({
+      teamDomain: z.string().regex(/^[a-z0-9-]+\.cloudflareaccess\.com$/),
+      aud: z.string().min(1),
+      ownerEmails: z.array(z.string().email()).min(1),
+    })
+    .nullable()
+    .default(null),
   githubAppIdentity: z.object({ name: z.string(), email: z.string() }).nullable().default(null),
   githubOauth: z.object({ clientId: z.string(), clientSecret: z.string() }).nullable(),
   authToken: z.string().nullable(),
@@ -106,6 +114,27 @@ function envPort(): number | undefined {
 function envStr(name: string): string | null {
   const raw = process.env[name];
   return raw !== undefined && raw !== '' ? raw : null;
+}
+
+const ACCESS_ENV = ['CAIRN_ACCESS_TEAM_DOMAIN', 'CAIRN_ACCESS_AUD', 'CAIRN_ACCESS_OWNER_EMAILS'];
+
+function envCloudflareAccess(): { teamDomain: string; aud: string; ownerEmails: string[] } | null {
+  const [teamDomain, aud, emails] = ACCESS_ENV.map(envStr);
+  if (teamDomain == null && aud == null && emails == null) return null;
+  const missing = ACCESS_ENV.filter((name) => envStr(name) === null);
+  if (missing.length > 0 || teamDomain == null || aud == null || emails == null) {
+    throw new Error(
+      `Cloudflare Access identity needs all of ${ACCESS_ENV.join(', ')}; missing ${missing.join(', ')}`,
+    );
+  }
+  return {
+    teamDomain: teamDomain.trim().toLowerCase(),
+    aud: aud.trim(),
+    ownerEmails: emails
+      .split(',')
+      .map((email) => email.trim())
+      .filter((email) => email !== ''),
+  };
 }
 
 function envFlagDefaultOn(name: string): boolean {
@@ -226,6 +255,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     schedulerTickMs: 15_000,
     webDir: webDirEnv !== undefined && webDirEnv !== '' ? resolve(webDirEnv) : defaultWebDir(),
     githubAppTokenSocket,
+    cloudflareAccess: envCloudflareAccess(),
     githubAppIdentity: envGithubAppIdentity(githubAppTokenSocket),
     githubOauth:
       oauthId !== undefined && oauthSecret !== undefined

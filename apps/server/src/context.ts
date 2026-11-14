@@ -2,6 +2,7 @@ import type { NetworkInterfaceInfo } from 'node:os';
 import type { GitIdentity, TeamRecord, UserRecord } from '@cairn/shared';
 import type { Logger } from 'pino';
 import type { Db } from './db/client.js';
+import type { AccessVerifier } from './lib/cloudflare-access.js';
 import type { FetchLike } from './lib/github.js';
 import type { LoopbackOwner } from './lib/loopback-owner.js';
 import type { KeySecretBox } from './lib/secret-box.js';
@@ -65,6 +66,7 @@ export interface AppContext {
   oauthClient: OAuthClientConfig | null;
   authToken: string | null;
   loopbackOwner?: LoopbackOwner | null;
+  accessVerifier?: AccessVerifier | null;
   mcpConfigPath: string;
   logger?: Logger;
 }

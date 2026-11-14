@@ -25,9 +25,10 @@ export function issueBrowserSession(
   kind: BrowserSessionKind,
   deviceId: string | null = null,
   now = nowMs(),
+  notAfter = Number.POSITIVE_INFINITY,
 ): { token: string; expiresAt: number } {
   const token = randomBytes(TOKEN_BYTES).toString('hex');
-  const expiresAt = now + SESSION_TTL_MS;
+  const expiresAt = Math.min(now + SESSION_TTL_MS, notAfter);
   db.delete(browserSession).where(lte(browserSession.expiresAt, now)).run();
   db.insert(browserSession)
     .values({
@@ -57,13 +58,18 @@ export function resolveBrowserSession(
   return { kind: row.kind, deviceId: row.deviceId };
 }
 
-export function setAuthCookie(c: Context, token: string, secure: boolean): void {
+export function setAuthCookie(
+  c: Context,
+  token: string,
+  secure: boolean,
+  expiresAt = nowMs() + SESSION_TTL_MS,
+): void {
   setCookie(c, AUTH_COOKIE, token, {
     httpOnly: true,
     path: '/',
     sameSite: 'Lax',
     secure,
-    maxAge: SESSION_TTL_MS / 1000,
+    maxAge: Math.max(0, Math.floor((expiresAt - nowMs()) / 1000)),
   });
 }
 
