@@ -1937,6 +1937,8 @@ export const EN: Record<string, string> = {
   等你审阅: 'Ready for review',
   '选择 {title}': 'Select {title}',
   '最后在线 {time}': 'Last seen {time}',
+  系统未知: 'Unknown OS',
+  '更新 Cairn 后才能接有平台要求的任务': 'Update Cairn to take tasks that need a platform',
   '选择这台 Runner 接哪些运行时': 'Choose which runtimes this Runner takes work for',
   '重新连接 {name} 后才能修改它的设置。': 'Reconnect {name} to change its settings.',
   '在这台 Runner 上确认它已联网、没有休眠，然后运行 `{command}` 重新启动。上线后这里会自动变回在线。':
