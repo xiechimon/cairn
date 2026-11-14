@@ -1,5 +1,8 @@
+import { createContext, runInContext } from 'node:vm';
 import { describe, expect, test } from 'vitest';
 import {
+  AGENT_CURSOR_INIT_PATH,
+  AGENT_CURSOR_INIT_SCRIPT,
   agentCursorScript,
   browserSessionName,
   LOGIN_DETECTION_SCRIPT,
@@ -51,7 +54,9 @@ describe('runBrowserTool', () => {
     expect(text).toContain('ok');
     expect(
       log.filter((line) => !line.startsWith('xdotool ') && !/ get (title|url)$/.test(line))[0],
-    ).toContain('agent-browser --session chief_1 --restore --headed open https://example.com');
+    ).toContain(
+      'agent-browser --session chief_1 --restore --headed --init-script .cairn/agent-cursor.js open https://example.com',
+    );
   });
 
   test('refuses non-http URLs before delivery', async () => {
@@ -340,7 +345,7 @@ describe('login form detection', () => {
       'browser_snapshot',
     );
     expect(log[1]).toBe(
-      `agent-browser --session s --restore --headed --json eval ${LOGIN_DETECTION_SCRIPT}`,
+      `agent-browser --session s --restore --headed --init-script .cairn/agent-cursor.js --json eval ${LOGIN_DETECTION_SCRIPT}`,
     );
     expect(result.loginForm).toEqual({ signals: ['password', 'one-time-code'] });
     expect(result.text.startsWith('[login form: password, one-time-code]\n')).toBe(true);
@@ -454,9 +459,15 @@ describe('secret field guard', () => {
   test('a phone or username field is filled after the check', async () => {
     const log: string[] = [];
     await act(fieldProvider(log, { type: 'tel', autocomplete: 'tel' }), 'fill');
-    expect(log).toContain('agent-browser --session s --restore --headed get attr @e2 type');
-    expect(log).toContain('agent-browser --session s --restore --headed get attr @e2 autocomplete');
-    expect(log).toContain('agent-browser --session s --restore --headed focus @e2');
+    expect(log).toContain(
+      'agent-browser --session s --restore --headed --init-script .cairn/agent-cursor.js get attr @e2 type',
+    );
+    expect(log).toContain(
+      'agent-browser --session s --restore --headed --init-script .cairn/agent-cursor.js get attr @e2 autocomplete',
+    );
+    expect(log).toContain(
+      'agent-browser --session s --restore --headed --init-script .cairn/agent-cursor.js focus @e2',
+    );
     const typed = log
       .filter((line) => line.includes(' keyboard type '))
       .map((line) => line.slice(line.indexOf(' keyboard type ') + ' keyboard type '.length));
@@ -565,6 +576,80 @@ function cursorProvider(
   };
 }
 
+interface FakeElement {
+  id: string;
+  style: Record<string, string>;
+  offsetWidth: number;
+  setAttribute(name: string, value: string): void;
+  appendChild(child: FakeElement): FakeElement;
+  append(...children: FakeElement[]): void;
+  animate(): void;
+  remove(): void;
+}
+
+function fakePage(options: { readyState: string; saved?: string; frame?: boolean }) {
+  const byId = new Map<string, FakeElement>();
+  const transforms: string[] = [];
+  const storage = new Map<string, string>(
+    options.saved === undefined ? [] : [['__cairnAgentCursor', options.saved]],
+  );
+  let parsed: (() => void) | undefined;
+  const element = (): FakeElement => {
+    const style: Record<string, string> = {};
+    const node: FakeElement = {
+      id: '',
+      style: new Proxy(style, {
+        set(target, key, value) {
+          if (key === 'transform') transforms.push(String(value));
+          target[String(key)] = String(value);
+          return true;
+        },
+      }),
+      offsetWidth: 0,
+      setAttribute() {},
+      appendChild(child) {
+        if (child.id !== '') byId.set(child.id, child);
+        return child;
+      },
+      append() {},
+      animate() {},
+      remove() {},
+    };
+    return node;
+  };
+  const body = element();
+  const sandbox: Record<string, unknown> = {
+    innerWidth: 1000,
+    innerHeight: 600,
+    setTimeout: () => 0,
+    sessionStorage: {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+    },
+    document: {
+      readyState: options.readyState,
+      body,
+      documentElement: body,
+      getElementById: (id: string) => byId.get(id) ?? null,
+      createElement: element,
+      createElementNS: element,
+      addEventListener: (type: string, listener: () => void) => {
+        if (type === 'DOMContentLoaded') parsed = listener;
+      },
+    },
+  };
+  sandbox.window = sandbox;
+  sandbox.top = options.frame ? {} : sandbox;
+  const context = createContext(sandbox);
+  return {
+    run: (script: string) => runInContext(script, context),
+    parsed: () => parsed?.(),
+    transforms: () => transforms,
+    cursors: () => (byId.has('__cairnAgentCursor') ? 1 : 0),
+    stored: () => storage.get('__cairnAgentCursor'),
+  };
+}
+
 describe('agent cursor on the live screen', () => {
   const click = (provider: ComputerProvider) =>
     runBrowserTool(
@@ -589,7 +674,7 @@ describe('agent cursor on the live screen', () => {
     expect(draw).toBeGreaterThan(box);
     expect(act).toBeGreaterThan(draw);
     expect(log[draw]).toBe(
-      `agent-browser --session s --restore --headed --json eval ${agentCursorScript(120, 210, 'click')}`,
+      `agent-browser --session s --restore --headed --init-script .cairn/agent-cursor.js --json eval ${agentCursorScript(120, 210, 'click')}`,
     );
   });
 
@@ -627,91 +712,101 @@ describe('agent cursor on the live screen', () => {
     expect((at[act] ?? 0) - (at[box] ?? 0)).toBeLessThan(300);
   });
 
-  test('a new cursor starts from where the last one rested and glides to its target', () => {
-    const script = agentCursorScript(300, 400, 'click', { x: 120, y: 210 });
-    const start = script.indexOf("cursor.style.transform = 'translate(117px, 208px)'");
-    const reflow = script.indexOf('void cursor.offsetWidth');
-    const target = script.indexOf("cursor.style.transform = 'translate(297px, 398px)'");
-    expect(start).toBeGreaterThan(-1);
-    expect(reflow).toBeGreaterThan(start);
-    expect(target).toBeGreaterThan(reflow);
-    expect(agentCursorScript(300, 400, 'click')).toContain('innerWidth / 2');
-  });
-
-  test('the next click in the same browser session starts its cursor where the last click rested', async () => {
-    const log: string[] = [];
-    const boxes = [
-      { x: 100, y: 200, width: 40, height: 20 },
-      { x: 400, y: 500, width: 40, height: 20 },
-    ];
-    const provider: ComputerProvider = {
-      ...cursorProvider(log),
-      async execute(request) {
-        const line = request.argv.join(' ');
-        if (!line.includes(' get box ')) return cursorProvider(log).execute(request);
-        log.push(line);
-        const data = boxes.shift() ?? { x: 0, y: 0, width: 0, height: 0 };
-        return (async function* () {
-          yield { kind: 'stdout' as const, text: JSON.stringify({ success: true, data }) };
-          yield { kind: 'exit' as const, code: 0 };
-        })();
-      },
-    };
-    const clickIn = (session: string) =>
-      runBrowserTool(
-        provider,
-        'browser_act',
-        { actions: [{ kind: 'click', ref: 'e1' }] },
-        { timeoutMs: 5_000, signal: new AbortController().signal, session },
-      );
-    await clickIn('glide');
-    await clickIn('glide');
-    const draws = log.filter(
-      (line) => line.includes('__cairnAgentCursor') && line.includes(`"click" === 'click'`),
-    );
-    expect(draws[1]).toBe(
-      `agent-browser --session glide --restore --headed --json eval ${agentCursorScript(420, 510, 'click', { x: 120, y: 210 })}`,
-    );
-  });
-
   test('the cursor stays on screen instead of fading out after a few seconds', () => {
     expect(agentCursorScript(120, 210, 'click')).not.toContain("cursor.style.opacity = '0'");
   });
 
-  test('after a click the cursor is drawn again where it clicked once the next page has loaded', async () => {
-    const log: string[] = [];
-    await runBrowserTool(
-      cursorProvider(log),
-      'browser_act',
-      { actions: [{ kind: 'click', ref: 'e1' }] },
-      { timeoutMs: 5_000, signal: new AbortController().signal, session: 'stay' },
-    );
-    const act = log.findIndex((line) => line.endsWith(' click @e1'));
-    const settle = log.findIndex(
-      (line, i) => i > act && line.endsWith(' wait --load domcontentloaded'),
-    );
-    const rest = log.findIndex((line, i) => i > settle && line.includes('__cairnAgentCursor'));
-    expect(settle).toBeGreaterThan(act);
-    expect(log[rest]).toBe(
-      `agent-browser --session stay --restore --headed --json eval ${agentCursorScript(120, 210, 'point', { x: 120, y: 210 })}`,
-    );
+  test('a first cursor on a page starts at the centre of the window and glides to its target', () => {
+    const page = fakePage({ readyState: 'complete' });
+    page.run(agentCursorScript(300, 400, 'click'));
+    expect(page.transforms()).toEqual(['translate(497px, 298px)', 'translate(297px, 398px)']);
   });
 
-  test('opening a page keeps the cursor where it last rested', async () => {
+  test('a cursor already on the page glides from where it rests to the next target', () => {
+    const page = fakePage({ readyState: 'complete' });
+    page.run(agentCursorScript(120, 210, 'click'));
+    page.run(agentCursorScript(300, 400, 'point'));
+    expect(page.transforms().at(-1)).toBe('translate(297px, 398px)');
+    expect(page.cursors()).toBe(1);
+  });
+
+  test('each pointed target is remembered for the next page of the same site', () => {
+    const page = fakePage({ readyState: 'complete' });
+    page.run(agentCursorScript(120, 210, 'click'));
+    expect(JSON.parse(page.stored() ?? 'null')).toEqual({ x: 120, y: 210 });
+  });
+
+  test('every new page draws the cursor where it last rested on that site as soon as the page is parsed', () => {
+    const page = fakePage({ readyState: 'loading', saved: JSON.stringify({ x: 120, y: 210 }) });
+    page.run(AGENT_CURSOR_INIT_SCRIPT);
+    expect(page.cursors()).toBe(0);
+    page.parsed();
+    expect(page.cursors()).toBe(1);
+    expect(page.transforms().at(-1)).toBe('translate(117px, 208px)');
+  });
+
+  test('a page on a site the cursor has not visited shows it at the centre of the window', () => {
+    const page = fakePage({ readyState: 'interactive' });
+    page.run(AGENT_CURSOR_INIT_SCRIPT);
+    expect(page.transforms().at(-1)).toBe('translate(497px, 298px)');
+  });
+
+  test('the page script leaves frames and an existing cursor alone', () => {
+    const frame = fakePage({ readyState: 'complete', frame: true });
+    frame.run(AGENT_CURSOR_INIT_SCRIPT);
+    expect(frame.cursors()).toBe(0);
+    const page = fakePage({ readyState: 'complete', saved: JSON.stringify({ x: 5, y: 5 }) });
+    page.run(agentCursorScript(300, 400, 'point'));
+    page.run(AGENT_CURSOR_INIT_SCRIPT);
+    expect(page.cursors()).toBe(1);
+    expect(page.transforms().at(-1)).toBe('translate(297px, 398px)');
+  });
+
+  test('a saved point that is not a pair of numbers falls back to the centre', () => {
+    const page = fakePage({ readyState: 'complete', saved: '{"x":"1e9px","y":null}' });
+    page.run(AGENT_CURSOR_INIT_SCRIPT);
+    expect(page.transforms().at(-1)).toBe('translate(497px, 298px)');
+  });
+
+  test('every browser call writes the cursor page script into the computer and registers it at browser launch', async () => {
     const log: string[] = [];
-    const provider = cursorProvider(log);
-    const options = { timeoutMs: 5_000, signal: new AbortController().signal, session: 'stay-nav' };
+    const written: Array<[string, string]> = [];
+    const provider: ComputerProvider = {
+      ...cursorProvider(log),
+      async writeFile(path, content) {
+        written.push([path, content]);
+      },
+    };
     await runBrowserTool(
       provider,
       'browser_act',
       { actions: [{ kind: 'click', ref: 'e1' }] },
-      options,
+      { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
     );
-    log.length = 0;
-    await runBrowserTool(provider, 'browser_navigate', { url: 'https://example.com' }, options);
-    const open = log.findIndex((line) => line.includes(' open https://example.com'));
-    const rest = log.findIndex((line, i) => i > open && line.includes('__cairnAgentCursor'));
-    expect(rest).toBeGreaterThan(open);
+    expect(written).toEqual([[AGENT_CURSOR_INIT_PATH, AGENT_CURSOR_INIT_SCRIPT]]);
+    const browserLines = log.filter((line) => line.startsWith('agent-browser '));
+    expect(browserLines.length).toBeGreaterThan(0);
+    for (const line of browserLines) {
+      expect(line).toContain(` --init-script ${AGENT_CURSOR_INIT_PATH} `);
+    }
+  });
+
+  test('a call whose page script cannot be written still runs, without registering it', async () => {
+    const log: string[] = [];
+    const provider: ComputerProvider = {
+      ...cursorProvider(log),
+      async writeFile() {
+        throw new Error('disk full');
+      },
+    };
+    await runBrowserTool(
+      provider,
+      'browser_act',
+      { actions: [{ kind: 'click', ref: 'e1' }] },
+      { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
+    );
+    expect(log.some((line) => line.endsWith(' click @e1'))).toBe(true);
+    expect(log.some((line) => line.includes('--init-script'))).toBe(false);
   });
 
   test('filling a field clears it, focuses it and types the text key by key like a person', async () => {
