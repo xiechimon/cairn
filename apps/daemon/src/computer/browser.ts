@@ -8,6 +8,7 @@ export const AGENT_BROWSER_BINARY = 'agent-browser';
 export const AGENT_BROWSER_SESSION = 'cairn';
 const AGENT_CURSOR_DWELL_MS = 650;
 const AGENT_CURSOR_DWELL_HEADROOM_MS = 2_000;
+const lastCursorPoints = new Map<string, AgentCursorPoint>();
 
 const navigateParams = z.object({
   url: z.string().min(1).max(8_192),
@@ -82,11 +83,27 @@ export const LOGIN_DETECTION_SCRIPT = `(() => {
 
 export type AgentCursorKind = 'click' | 'point';
 
-export function agentCursorScript(x: number, y: number, kind: AgentCursorKind): string {
+export interface AgentCursorPoint {
+  x: number;
+  y: number;
+}
+
+export function agentCursorScript(
+  x: number,
+  y: number,
+  kind: AgentCursorKind,
+  from?: AgentCursorPoint,
+): string {
   if (!Number.isFinite(x) || !Number.isFinite(y))
+    throw new Error('cursor needs finite coordinates');
+  if (from !== undefined && (!Number.isFinite(from.x) || !Number.isFinite(from.y)))
     throw new Error('cursor needs finite coordinates');
   const left = Math.round(x);
   const top = Math.round(y);
+  const start =
+    from === undefined
+      ? "'translate(' + (Math.round(window.innerWidth / 2) - 3) + 'px, ' + (Math.round(window.innerHeight / 2) - 2) + 'px)'"
+      : `'translate(${Math.round(from.x) - 3}px, ${Math.round(from.y) - 2}px)'`;
   return `(() => {
   const ns = 'http://www.w3.org/2000/svg';
   const host = document.body || document.documentElement;
@@ -112,8 +129,9 @@ export function agentCursorScript(x: number, y: number, kind: AgentCursorKind): 
     label.textContent = 'Coordinator';
     label.style.cssText = 'all:initial;pointer-events:none;margin-top:18px;padding:2px 7px;border-radius:999px;background:#d97757;color:#ffffff;font:500 11px/16px -apple-system,system-ui,sans-serif;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25);';
     cursor.append(svg, label);
-    cursor.style.transform = 'translate(${left - 3}px, ${top - 2}px)';
+    cursor.style.transform = ${start};
     host.appendChild(cursor);
+    void cursor.offsetWidth;
   }
   cursor.style.opacity = '1';
   cursor.style.transform = 'translate(${left - 3}px, ${top - 2}px)';
@@ -307,12 +325,14 @@ export async function runBrowserTool(
       return;
     }
     const { x, y, width, height } = parsed.data;
+    const target = { x: x + width / 2, y: y + height / 2 };
     const drawn = await read([
       ...prefix,
       '--json',
       'eval',
-      agentCursorScript(x + width / 2, y + height / 2, kind),
+      agentCursorScript(target.x, target.y, kind, lastCursorPoints.get(session)),
     ]);
+    if (drawn.code === 0) lastCursorPoints.set(session, target);
     const clock = options.now ?? Date.now;
     if (
       drawn.code !== 0 ||
