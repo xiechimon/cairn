@@ -142,6 +142,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'POST', path: '/api/todos/{id}/unsnooze', note: 'clears the snooze' },
   {
     method: 'POST',
+    path: '/api/todos/{id}/runner',
+    note: 'body {machineId}; runs a waiting task on that Runner this time; 409 once claimed, after a session, for a local-path project or when the Runner fails a hard gate',
+  },
+  {
+    method: 'POST',
     path: '/api/todos/{id}/messages',
     note: 'body {content, clientMessageId}; a repeated clientMessageId returns the first response and delivers nothing again; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)',
   },

@@ -297,7 +297,7 @@
       "reach": [
         "open /app",
         "type a task for the Coordinator and press Enter",
-        "click testid:thread-activity-toggle"
+        "click testid:chief-task-ref"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/chief-dispatch-judgment.md"
@@ -309,7 +309,7 @@
         "docs/research/r15-agent-responsibility-default.md"
       ],
       "frontendDesign": {
-        "na": "dispatch shows as threads and report rows inside the Coordinator chat"
+        "na": "dispatch shows as one sub-thread row under the reply that started it inside the Coordinator chat"
       },
       "backendDesign": [
         "docs/research/capability-routing-2026-11-06.md",
@@ -947,8 +947,7 @@
         ]
       },
       "reach": [
-        "settings machines",
-        "click testid:machine-running"
+        "settings machines"
       ],
       "research": [
         "docs/research/machine-execution-plane.md",
@@ -982,8 +981,7 @@
         ]
       },
       "reach": [
-        "open /app/todo/<id of a thread listed by the todos API>",
-        "click testid:route-override-orb"
+        "open /app/todo/<id of a thread listed by the todos API>"
       ],
       "research": [
         "docs/research/amp-native-sandbox-orb.md",
@@ -1290,8 +1288,8 @@
     {
       "id": "machines",
       "name": "Machines",
-      "summary": "The machines page and machine detail: online state, capabilities, concurrency, revoke and evacuate.",
-      "states": "An empty state, online and offline machines with last seen, a machine detail with runtimes, capabilities and concurrency.",
+      "summary": "The machines page and machine detail: online state, capabilities, revoke and evacuate.",
+      "states": "An empty state, online and offline machines with last seen, a machine detail with runtimes and capabilities.",
       "centrality": 2,
       "status": "shipped",
       "code": {
@@ -1301,7 +1299,8 @@
         ],
         "server": [
           "apps/server/src/services/machines.ts",
-          "apps/server/src/services/machine-revoke.ts"
+          "apps/server/src/services/machine-revoke.ts",
+          "apps/server/src/services/runner-offline.ts"
         ]
       },
       "routes": {
@@ -1314,17 +1313,16 @@
           "/api/teams/:id/machines",
           "/api/machines/:id",
           "/api/machines/:id/evacuate",
-          "/api/machines/:id/revoke"
+          "/api/machines/:id/revoke",
+          "/api/todos/:id/runner"
         ]
       },
       "reach": [
         "settings machines",
-        "click testid:machine-item",
-        "click testid:machine-concurrency-inc"
+        "click testid:machine-item"
       ],
       "verify": [
-        ".claude/skills/verify-cairn/features/machines-local-row.md",
-        ".claude/skills/verify-cairn/features/machine-concurrency.md"
+        ".claude/skills/verify-cairn/features/machines-local-row.md"
       ],
       "research": [
         "docs/research/machine-execution-plane.md",

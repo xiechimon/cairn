@@ -96,6 +96,7 @@ export function decodePng(buffer) {
   let width = 0;
   let height = 0;
   let channels = 0;
+  let bytes = 1;
   const idat = [];
   while (offset < buffer.length) {
     const length = buffer.readUInt32BE(offset);
@@ -106,29 +107,31 @@ export function decodePng(buffer) {
       height = data.readUInt32BE(4);
       const [depth, colorType, , , interlace] = data.subarray(8);
       channels = { 2: 3, 6: 4 }[colorType] ?? 0;
-      if (depth !== 8 || channels === 0 || interlace !== 0)
+      bytes = depth / 8;
+      if ((depth !== 8 && depth !== 16) || channels === 0 || interlace !== 0)
         throw new Error(`unsupported PNG: depth ${depth}, color type ${colorType}`);
     }
     if (type === 'IDAT') idat.push(data);
     offset += length + 12;
   }
   const raw = inflateSync(Buffer.concat(idat));
-  const stride = width * channels;
+  const pixelBytes = channels * bytes;
+  const stride = width * pixelBytes;
   const rows = Buffer.alloc(stride * height);
   for (let y = 0; y < height; y += 1) {
     const filter = raw[y * (stride + 1)];
     for (let x = 0; x < stride; x += 1) {
       const value = raw[y * (stride + 1) + 1 + x];
-      const left = x >= channels ? rows[y * stride + x - channels] : 0;
+      const left = x >= pixelBytes ? rows[y * stride + x - pixelBytes] : 0;
       const up = y > 0 ? rows[(y - 1) * stride + x] : 0;
-      const upLeft = x >= channels && y > 0 ? rows[(y - 1) * stride + x - channels] : 0;
+      const upLeft = x >= pixelBytes && y > 0 ? rows[(y - 1) * stride + x - pixelBytes] : 0;
       const predicted = [0, left, up, (left + up) >> 1, paeth(left, up, upLeft)][filter];
       rows[y * stride + x] = (value + predicted) & 255;
     }
   }
   const pixels = Buffer.alloc(width * height * 4, 255);
   for (let p = 0; p < width * height; p += 1)
-    rows.copy(pixels, p * 4, p * channels, (p + 1) * channels);
+    for (let c = 0; c < channels; c += 1) pixels[p * 4 + c] = rows[(p * channels + c) * bytes];
   return { width, height, pixels };
 }
 

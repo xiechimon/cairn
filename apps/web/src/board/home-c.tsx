@@ -18,6 +18,7 @@ import {
 } from '../chief/chief-conversation.js';
 import { QuestionScopeContext } from '../chief/chief-question.js';
 import { ChiefStatusMark } from '../chief/chief-status-mark.js';
+import { todoGlanceOf } from '../chief/chief-task-refs.js';
 import { questionDockState } from '../chief/question-dock-state.js';
 import { useTouchMessageTools } from '../chief/touch-message-tools.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
@@ -309,10 +310,7 @@ export function HomeC({
     <QuestionScopeContext.Provider value={questionScope}>{node}</QuestionScopeContext.Provider>
   );
   const todoGlances = useMemo(
-    () =>
-      new Map(
-        todos.map((todo) => [todo.id, { phase: todo.phase, seq: todo.seqNum, title: todo.title }]),
-      ),
+    () => new Map(todos.map((todo) => [todo.id, todoGlanceOf(todo)])),
     [todos],
   );
   const scopedTasks = useMemo(() => scopeTasks(tasks, projectId), [tasks, projectId]);

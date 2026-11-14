@@ -45,6 +45,7 @@ import type { ComputerProvider, ScopedComputerProviders } from './computer/provi
 import { OutboundComputerScreens } from './computer/screen-channel.js';
 import { createComputerScreenProvider } from './computer/screen-provider.js';
 import type { DaemonConfig } from './config.js';
+import { HostPermissionsProbe } from './host-permissions.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
@@ -83,6 +84,7 @@ export interface MachineLoopOpts {
   claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
   readClaudeOauthExpiresAt?: () => number | null;
   capabilitiesProbe?: () => MachineCapabilities;
+  hostPermissionsProbe?: HostPermissionsProbe;
   fetchImpl?: typeof fetch;
   client?: MachineApi;
   claimTimeoutMs?: number;
@@ -242,8 +244,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         })
       : undefined);
   const agentReach = new AgentReachProbe();
+  const hostPermissionsProbe = opts.hostPermissionsProbe ?? new HostPermissionsProbe();
   const capabilitiesReport = (): MachineCapabilities => {
     const reach = agentReach.current();
+    const hostPermissions = hostPermissionsProbe.current();
     return {
       ...capabilitiesProbe(),
       osPlatform: osPlatformOf(platform),
@@ -254,6 +258,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ...(orbComputer && computerImageOffersBrowser() ? { browser: true as const } : {}),
       ...(hostComputer ? { ownComputer: true as const } : {}),
       ...(reach !== undefined ? { agentReach: reach } : {}),
+      ...(hostPermissions !== undefined ? { hostPermissions } : {}),
     };
   };
 

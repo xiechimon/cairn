@@ -94,6 +94,7 @@ export const team = sqliteTable('team', {
   firstPrReportPromptFirstPrAt: epochMs('firstPrReportPromptFirstPrAt'),
   firstPrReportPromptFirstPrNumber: integer('firstPrReportPromptFirstPrNumber'),
   namedPrompts: json<NamedPromptOverrides | null>('namedPrompts'),
+  defaultMachineId: text('defaultMachineId'),
 });
 
 export const autonomyPause = sqliteTable(

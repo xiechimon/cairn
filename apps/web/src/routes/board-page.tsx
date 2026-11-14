@@ -32,6 +32,7 @@ import { useCloseThread } from '../board/thread-link.js';
 import { useTasksView } from '../board/use-tasks-view.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
+import { todoGlanceOf } from '../chief/chief-task-refs.js';
 import { toastError } from '../components/ui/toaster.js';
 import { TodoGlanceContext } from '../detail/segments.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
@@ -131,10 +132,7 @@ export function BoardPage() {
   const liveTodos = useMemo(() => (todosQ.data ?? []).map(toDisplayTodo), [todosQ.data]);
   const todos = live ? liveTodos : fixtureTodos;
   const todoGlances = useMemo(
-    () =>
-      new Map(
-        todos.map((todo) => [todo.id, { phase: todo.phase, seq: todo.seqNum, title: todo.title }]),
-      ),
+    () => new Map(todos.map((todo) => [todo.id, todoGlanceOf(todo)])),
     [todos],
   );
   const tasks = useTasksView(fixture);

@@ -17,8 +17,6 @@ test('thread more menu opens the per-todo route override dialog', async ({ page 
   await expect(page.getByRole('option').first()).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await dialog.getByRole('switch', { name: '要求 Orb' }).click();
-  await expect(dialog.getByRole('switch', { name: '要求 Orb' })).toBeChecked();
   await expect(dialog.getByTestId('route-override-mcp-r3-mcp')).toBeVisible();
   await dialog.getByRole('switch', { name: '要求安装 r3-mcp' }).click();
   await expect(dialog.getByRole('switch', { name: '要求安装 r3-mcp' })).toBeChecked();

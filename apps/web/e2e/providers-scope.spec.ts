@@ -24,7 +24,7 @@ test('scope menu: all machines first, one option per machine, offline and Orb ma
     '所有机器',
     'xmonsMac-3574.local',
     'build-box',
-    'build-box-orb · Orb',
+    'build-box-orb',
     'old-laptop · 离线',
     'new-box',
   ]);

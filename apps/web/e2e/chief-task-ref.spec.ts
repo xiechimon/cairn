@@ -181,11 +181,11 @@ test('the reference row sits like the reference: indented tile, a rounded elbow 
     return {
       tileLeft: tile.left - bubble.left,
       tileSize: [tile.width, tile.height],
-      tileToBubble: bubble.top - tile.bottom,
+      tileToBubble: tile.top - bubble.bottom,
       lineX: line.left - bubble.left,
-      lineTop: line.top - (tile.top + tile.height / 2),
+      lineEnd: line.bottom - (tile.top + tile.height / 2),
       gapToTile: tile.left - (line.right + 0.75),
-      gapToBubble: bubble.top - (line.bottom + 0.75),
+      gapToBubble: line.top - 0.75 - bubble.bottom,
       d: path.getAttribute('d'),
       stroke: cs.stroke,
       token,
@@ -200,7 +200,7 @@ test('the reference row sits like the reference: indented tile, a rounded elbow 
   expect(g.tileSize).toEqual([20, 20]);
   expect(g.tileToBubble).toBe(8);
   expect(g.lineX).toBeCloseTo(18, 0);
-  expect(Math.abs(g.lineTop)).toBeLessThanOrEqual(0.5);
+  expect(Math.abs(g.lineEnd)).toBeLessThanOrEqual(0.5);
   expect(g.gapToTile).toBeGreaterThanOrEqual(3);
   expect(g.gapToBubble).toBeGreaterThanOrEqual(3.5);
   expect(g.d).toContain('A6 6');

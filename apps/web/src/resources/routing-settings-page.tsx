@@ -12,7 +12,7 @@ import { cn } from 'cn';
 import { Route } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
-import { useMachines, useModelSources } from '../api/hooks.js';
+import { useMachines, useModelSources, useTeams } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
@@ -70,6 +70,7 @@ function RuleEditor({
   use,
   rule,
   machines,
+  hasDefault,
   options,
   live,
   onSave,
@@ -77,6 +78,7 @@ function RuleEditor({
   use: RouteUse;
   rule: RoutingRuleRecord | null;
   machines: { id: string; name: string }[];
+  hasDefault: boolean;
   options: ModelOption[];
   live: boolean;
   onSave?: (body: {
@@ -93,7 +95,8 @@ function RuleEditor({
     (rule?.thinkingLevel as ThinkingLevel | null | undefined) ?? 'off',
   );
   const [machineId, setMachineId] = useState(rule?.machineId ?? null);
-  const mustNameMachine = use === 'session' && machines.length > 1;
+  const mustNameMachine = use === 'session' && machines.length > 1 && !hasDefault;
+  const unsetLabel = hasDefault ? t('跟随默认 Runner') : t('不固定');
   const pickedMachine = machines.find((m) => m.id === machineId);
   const dirty =
     rule === null ||
@@ -161,14 +164,16 @@ function RuleEditor({
             >
               <SelectValue>
                 {machineId === null
-                  ? t(mustNameMachine ? '选择机器' : '不固定')
+                  ? mustNameMachine
+                    ? t('选择机器')
+                    : unsetLabel
                   : pickedMachine === undefined
                     ? undefined
                     : (machineLabel(pickedMachine, machines) ?? machineId)}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {mustNameMachine ? null : <SelectItem value={null}>{t('不固定')}</SelectItem>}
+              {mustNameMachine ? null : <SelectItem value={null}>{unsetLabel}</SelectItem>}
               {machines.map((machine) => (
                 <SelectItem key={machine.id} value={machine.id}>
                   <MachineName machine={machine} all={machines} />
@@ -284,6 +289,7 @@ export function RoutingSettingsPage() {
   const { live, teamId } = useLiveData();
   const settingsQ = useRoutingSettings(teamId, live);
   const machinesQ = useMachines(teamId, live);
+  const teamsQ = useTeams(live);
   const modelSourcesQ = useModelSources(teamId, live);
   const mutations = useRoutingSettingsMutations(teamId);
   const settings: TeamRoutingSettings = live
@@ -294,6 +300,8 @@ export function RoutingSettingsPage() {
     : (fixture.resources?.machines ?? [])
         .filter((machine): machine is typeof machine & { id: string } => machine.id != null)
         .map((machine) => ({ id: machine.id, name: machine.name }));
+  const defaultMachineId = live ? (teamsQ.data?.[0]?.defaultMachineId ?? null) : null;
+  const hasDefault = machines.some((machine) => machine.id === defaultMachineId);
   const modelOptions = live
     ? toModelOptions(modelSourcesQ.data?.sources ?? [])
     : toModelOptions(fixture.resources?.providerSources ?? []);
@@ -349,6 +357,7 @@ export function RoutingSettingsPage() {
                   use={rule.use}
                   rule={rule}
                   machines={machines}
+                  hasDefault={hasDefault}
                   options={modelOptions}
                   live={live}
                   onSave={live ? (body) => saveRule(rule.use, body) : undefined}
@@ -360,6 +369,7 @@ export function RoutingSettingsPage() {
                   use={use}
                   rule={null}
                   machines={machines}
+                  hasDefault={hasDefault}
                   options={modelOptions}
                   live={live}
                   onSave={live ? (body) => saveRule(use, body) : undefined}

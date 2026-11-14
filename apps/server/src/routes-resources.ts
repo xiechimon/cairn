@@ -23,7 +23,7 @@ import { and, eq, isNull, ne } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import type { Db } from './db/client.js';
-import { build, machine, provider, routingRule, step, todo } from './db/schema.js';
+import { build, machine, provider, routingRule, step, team, todo } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubUserRepos } from './lib/github.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
@@ -192,6 +192,10 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         throw new HttpError(409, 'machine does not report the requested capability');
       }
     }
+    if (body.isDefault === true) {
+      if (!c.get('ownerIdentity')) throw new HttpError(403, 'owner session required');
+      if (row.tokenHash === null) throw new HttpError(409, 'machine is not enrolled');
+    }
     if (body.enabledRuntimes?.includes('gemini') && !row.enabledRuntimes.includes('gemini')) {
       throw new HttpError(
         409,
@@ -207,6 +211,10 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     if (Object.keys(patch).length > 0) {
       ctx.db.update(machine).set(patch).where(eq(machine.id, id)).run();
     }
+    if (body.isDefault === true) {
+      ctx.db.update(team).set({ defaultMachineId: id }).where(eq(team.id, row.teamId)).run();
+      ctx.machineHub.wake(row.teamId);
+    }
     const updated = ctx.db.select().from(machine).where(eq(machine.id, id)).get();
     if (!updated) throw notFound(`machine ${id}`);
     return c.json(toMachineRecord(updated, machineRunningCount(ctx.db, id)));
@@ -218,6 +226,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     if (!row) throw notFound(`machine ${id}`);
     requireTeam(ctx, row.teamId);
     ctx.db.update(routingRule).set({ machineId: null }).where(eq(routingRule.machineId, id)).run();
+    ctx.db.update(team).set({ defaultMachineId: null }).where(eq(team.defaultMachineId, id)).run();
     const releasePendingOutput = pendingComputerOutputRelease(ctx.db, id);
     ctx.db.delete(machine).where(eq(machine.id, id)).run();
     releasePendingOutput();

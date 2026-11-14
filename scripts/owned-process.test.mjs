@@ -5,12 +5,23 @@ import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { ownedScopeAvailable, ownerChain, processInfo, spawnOwned } from './owned-process.mjs';
+import {
+  ownedScopeAvailable,
+  ownerChain,
+  parsePsInfo,
+  processInfo,
+  spawnOwned,
+} from './owned-process.mjs';
 import { makeTestTempDir } from './test-tmpdir.mjs';
 
 const CLI = join(import.meta.dirname, 'owned-process.mjs');
 const scopeAvailable = ownedScopeAvailable();
 const modes = scopeAvailable ? ['scope', 'group'] : ['group'];
+const needsSetsid = {
+  skip:
+    spawnSync('sh', ['-c', 'command -v setsid'], { stdio: 'ignore' }).status !== 0 &&
+    'setsid is not installed',
+};
 
 function token() {
   return `86${randomInt(100000, 999999)}.${randomInt(1, 9)}`;
@@ -47,7 +58,7 @@ function treeScript(marker) {
 }
 
 for (const mode of modes) {
-  test(`${mode}: the whole tree dies when the owner is SIGKILLed`, async (t) => {
+  test(`${mode}: the whole tree dies when the owner is SIGKILLed`, needsSetsid, async (t) => {
     const marker = token();
     const owner = started(
       t,
@@ -65,21 +76,25 @@ for (const mode of modes) {
     assert.ok(await waitFor(() => pidsRunning(marker).length === 0), 'tree reaped');
   });
 
-  test(`${mode}: the whole tree dies when the helper itself is SIGKILLed`, async (t) => {
-    const marker = token();
-    const helper = started(
-      t,
-      spawn('node', [CLI, '--', 'bash', '-c', treeScript(marker)], {
-        env: modeEnv(mode),
-        stdio: 'ignore',
-      }),
-    );
-    assert.ok(await waitFor(() => pidsRunning(marker).length === 2), 'tree started');
-    helper.kill('SIGKILL');
-    assert.ok(await waitFor(() => pidsRunning(marker).length === 0), 'tree reaped');
-  });
+  test(
+    `${mode}: the whole tree dies when the helper itself is SIGKILLed`,
+    needsSetsid,
+    async (t) => {
+      const marker = token();
+      const helper = started(
+        t,
+        spawn('node', [CLI, '--', 'bash', '-c', treeScript(marker)], {
+          env: modeEnv(mode),
+          stdio: 'ignore',
+        }),
+      );
+      assert.ok(await waitFor(() => pidsRunning(marker).length === 2), 'tree started');
+      helper.kill('SIGKILL');
+      assert.ok(await waitFor(() => pidsRunning(marker).length === 0), 'tree reaped');
+    },
+  );
 
-  test(`${mode}: a detached grandchild dies when the main child exits`, async () => {
+  test(`${mode}: a detached grandchild dies when the main child exits`, needsSetsid, async () => {
     const marker = token();
     const result = spawnSync(
       'node',
@@ -90,7 +105,7 @@ for (const mode of modes) {
     assert.ok(await waitFor(() => pidsRunning(marker).length === 0), 'grandchild reaped');
   });
 
-  test(`${mode}: SIGTERM to the helper stops the tree and exits 143`, async (t) => {
+  test(`${mode}: SIGTERM to the helper stops the tree and exits 143`, needsSetsid, async (t) => {
     const marker = token();
     const helper = started(
       t,
@@ -106,7 +121,7 @@ for (const mode of modes) {
     assert.equal(pidsRunning(marker).length, 0);
   });
 
-  test(`${mode}: --timeout-ms stops the tree and exits 124`, async () => {
+  test(`${mode}: --timeout-ms stops the tree and exits 124`, needsSetsid, async () => {
     const marker = token();
     const result = spawnSync(
       'node',
@@ -202,6 +217,23 @@ test('the parent owner chain is every ancestor up to the subreaper', () => {
   );
 });
 
+test('parsePsInfo reads the macOS ps line, trailing newline included', () => {
+  assert.deepEqual(
+    parsePsInfo(
+      25667,
+      '25381 Sat Nov 14 18:20:54 2026     /Users/me/.local/share/fnm/node-versions/v24.14.0/installation/bin/node\n',
+    ),
+    { pid: 25667, ppid: 25381, start: 'Sat Nov 14 18:20:54 2026', comm: 'node' },
+  );
+  assert.deepEqual(parsePsInfo(7, '    1 Mon Nov  3 09:05:01 2026     /sbin/launchd\n'), {
+    pid: 7,
+    ppid: 1,
+    start: 'Mon Nov  3 09:05:01 2026',
+    comm: 'launchd',
+  });
+  assert.equal(parsePsInfo(7, ''), null);
+});
+
 test('processInfo reads this process', () => {
   const me = processInfo(process.pid);
   assert.equal(me.ppid, process.ppid);
@@ -257,20 +289,27 @@ test('no cairn-owned scope outlives a run, even when its command exits at once',
 });
 
 for (const mode of modes) {
-  test(`${mode}: a nested owned tree whose grandchild ignores SIGTERM dies with the outer owner`, async (t) => {
-    const marker = token();
-    const stubborn = `trap '' TERM; setsid sleep ${marker} & sleep ${marker} & wait`;
-    const outer = started(
-      t,
-      spawn('node', [CLI, '--', 'node', CLI, '--', 'bash', '-c', stubborn], {
-        env: modeEnv(mode),
-        stdio: 'ignore',
-      }),
-    );
-    assert.ok(await waitFor(() => pidsRunning(marker).length === 2), 'nested tree started');
-    outer.kill('SIGTERM');
-    assert.ok(await waitFor(() => pidsRunning(marker).length === 0, 30_000), 'nested tree reaped');
-  });
+  test(
+    `${mode}: a nested owned tree whose grandchild ignores SIGTERM dies with the outer owner`,
+    needsSetsid,
+    async (t) => {
+      const marker = token();
+      const stubborn = `trap '' TERM; setsid sleep ${marker} & sleep ${marker} & wait`;
+      const outer = started(
+        t,
+        spawn('node', [CLI, '--', 'node', CLI, '--', 'bash', '-c', stubborn], {
+          env: modeEnv(mode),
+          stdio: 'ignore',
+        }),
+      );
+      assert.ok(await waitFor(() => pidsRunning(marker).length === 2), 'nested tree started');
+      outer.kill('SIGTERM');
+      assert.ok(
+        await waitFor(() => pidsRunning(marker).length === 0, 30_000),
+        'nested tree reaped',
+      );
+    },
+  );
 }
 
 test('a detached session job stays bound to the session when the helper starts slowly', {

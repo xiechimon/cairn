@@ -6,10 +6,8 @@ import {
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { TriangleAlert } from 'lucide-react';
-import { Fragment, type ReactNode, useRef, useState } from 'react';
-import { useApiMutations } from '../api/hooks.js';
+import { Fragment, type ReactNode } from 'react';
 import { RUNTIME_LABELS } from '../api/mappers.js';
-import { useLiveData } from '../api/provider.js';
 import { formatClaudeLoginWarning } from '../claude-login-warning.js';
 import {
   SETTINGS_ROW_CLS,
@@ -18,11 +16,9 @@ import {
   SettingsSection,
 } from '../components/settings-list.js';
 import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch.js';
-import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { MachineAgentAccess } from './machine-agent-access.js';
-import { CONCURRENCY_SOURCE_LABEL, MachineConcurrencySelect } from './machine-concurrency.js';
 import { offlineGuidance } from './machine-offline.js';
 
 export interface ChiefState {
@@ -45,8 +41,6 @@ const LOGIN_STATE = {
 
 const isMachineRuntime = (value: string): value is MachineRuntime =>
   (MACHINE_RUNTIMES as readonly string[]).includes(value);
-
-const FALLBACK_CAP = 1;
 
 export function InlineCode({ children }: { children: ReactNode }) {
   return (
@@ -161,42 +155,7 @@ export function MachineDetailPane({
   onToggleRuntime: (runtime: MachineRuntime, next: boolean) => void;
 }) {
   const { t } = useI18n();
-  const { live, teamId } = useLiveData();
-  const machineId = machine.id ?? '';
   const online = machine.online !== false;
-  const mutations = useApiMutations(teamId);
-
-  const [capDraft, setCapDraft] = useState<number | null>(null);
-  const capOn = capDraft ?? machine.maxConcurrent ?? FALLBACK_CAP;
-  const capChain = useRef<Promise<unknown>>(Promise.resolve());
-  const patchCap = (maxConcurrent: number | null): Promise<unknown> => {
-    const next = capChain.current.then(() =>
-      mutations.patchMachine
-        .mutateAsync({ id: machineId, body: { maxConcurrent } })
-        .catch(() => undefined),
-    );
-    capChain.current = next;
-    return next;
-  };
-  const pickCap = (n: number): Promise<unknown> | undefined => {
-    if (!live || machine.id == null) {
-      if (blockDemoWrite()) return;
-      setCapDraft(n);
-      return;
-    }
-    return patchCap(n);
-  };
-  const resetCap = (): Promise<unknown> | undefined => {
-    if (!live || machine.id == null) {
-      if (blockDemoWrite()) return;
-      setCapDraft(machine.recommendedConcurrent ?? machine.maxConcurrent ?? FALLBACK_CAP);
-      return;
-    }
-    return patchCap(null);
-  };
-  const capSaveFailed =
-    mutations.patchMachine.isError &&
-    mutations.patchMachine.variables?.body.maxConcurrent !== undefined;
 
   const offline = online
     ? null
@@ -331,45 +290,6 @@ export function MachineDetailPane({
               </span>
             </SettingsRow>
           </SettingsCard>
-        </SettingsSection>
-      )}
-
-      {machine.maxConcurrent !== undefined && (
-        <SettingsSection title={t('容量')}>
-          <SettingsCard>
-            <SettingsRow
-              label={t('并发上限')}
-              labelTestId="machine-capacity-label"
-              hint={
-                <span data-machine-col="concurrency">
-                  {machine.runningSteps !== undefined && (
-                    <span data-testid="machine-running" data-machine-running={machine.runningSteps}>
-                      {t('执行中 {n}/{cap}', { n: machine.runningSteps, cap: capOn })}
-                    </span>
-                  )}
-                  {machine.concurrencySource !== undefined && (
-                    <span data-concurrency-source={machine.concurrencySource}>
-                      {machine.runningSteps !== undefined ? ' · ' : ''}
-                      {t(CONCURRENCY_SOURCE_LABEL[machine.concurrencySource])}
-                    </span>
-                  )}
-                </span>
-              }
-            >
-              <MachineConcurrencySelect
-                machine={machine}
-                value={capOn}
-                onPick={pickCap}
-                onReset={resetCap}
-                disabled={!online}
-              />
-            </SettingsRow>
-          </SettingsCard>
-          {capSaveFailed && (
-            <p className="m-0 px-1 text-meta text-destructive" role="alert">
-              {t('保存失败，请重试。')}
-            </p>
-          )}
         </SettingsSection>
       )}
     </div>

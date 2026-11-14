@@ -71,6 +71,22 @@ test('owner patches nullable grants; absent capability rejects atomically and un
   expect((await call('/api/machines/foreign', { desktopOverride: false })).status).toBe(404);
 });
 
+test('only the owner moves the default Runner, and only to an enrolled machine', async () => {
+  boot();
+  s.db
+    .insert(machine)
+    .values({ id: 'enrolled', name: 'mac', teamId: s.team.id, tokenHash: 'synthetic' })
+    .run();
+  const defaultOf = () =>
+    s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.defaultMachineId ?? null;
+  expect((await call('/api/machines/enrolled', { isDefault: true }, 'device')).status).toBe(403);
+  expect(defaultOf()).toBeNull();
+  expect((await call('/api/machines/grant-machine', { isDefault: true })).status).toBe(409);
+  expect(defaultOf()).toBeNull();
+  expect((await call('/api/machines/enrolled', { isDefault: true })).status).toBe(200);
+  expect(defaultOf()).toBe('enrolled');
+});
+
 test.each(['device', 'agent'] as const)(
   '%s cannot change machine or mirrored computer grants',
   async (kind) => {
