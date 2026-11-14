@@ -13,7 +13,7 @@ const WARM_WINDOW = 600;
 
 const hoverCards = { open: 0, lastClosedAt: 0 };
 
-function useWarmHoverCard() {
+export function useWarmHoverCard() {
   const [open, setOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const shown = useRef(false);
@@ -55,7 +55,7 @@ const TONE_INK: Record<Tone, string> = {
 const UNDERLINE =
   'underline-offset-4 decoration-1 hover:underline focus-visible:underline data-popup-open:underline';
 
-const POPUP_STILL = 'duration-0 data-open:animate-none data-closed:animate-none';
+export const POPUP_STILL = 'duration-0 data-open:animate-none data-closed:animate-none';
 
 const STATE_TONE: Record<PrCardState, Tone> = {
   open: 'open',
