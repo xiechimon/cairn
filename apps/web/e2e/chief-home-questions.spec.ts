@@ -773,6 +773,7 @@ test('targeting a thread turns the composer back into a normal send and leaves t
   await page.goto('/app');
   const composer = page.getByTestId('chief-composer-input');
   await expect(page.getByTestId('chief-question-primary')).toBeVisible();
+  await expect(page.getByTestId('chief-composer-input')).toBeVisible();
   await page.locator('[data-testid="composer-plus"]:visible').click();
   await page.getByRole('menuitemradio').filter({ hasText: TASK.title }).click();
   await expect(page.getByTestId('chief-question-primary')).toHaveCount(0);
@@ -804,6 +805,7 @@ test('with a thread targeted, digits type, page switches and a chip answer leave
   });
   await page.goto('/app');
   const composer = page.getByTestId('chief-composer-input');
+  await expect(page.getByTestId('chief-composer-input')).toBeVisible();
   await page.locator('[data-testid="composer-plus"]:visible').click();
   await page.getByRole('menuitemradio').filter({ hasText: TASK.title }).click();
   await expect(page.getByRole('menu')).toHaveCount(0);
