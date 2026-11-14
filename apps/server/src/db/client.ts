@@ -94,21 +94,38 @@ export function openDbWithHandle(
   if (dbPath !== ':memory:') {
     mkdirSync(dirname(dbPath), { recursive: true });
   }
-  const sqlite = new Database(dbPath);
-  sqlite.pragma('busy_timeout = 10000');
-  sqlite.pragma('journal_mode = WAL');
-  sqlite.pragma('cache_size = -131072');
-  sqlite.pragma('foreign_keys = ON');
+  const sqlite = openConnection(dbPath);
   exportLegacyTables(sqlite, opts.legacyExportDir);
   const db = drizzle(sqlite, { schema });
   migrateDatabase(sqlite, db, opts.migrationLogger);
   return { db, close: () => sqlite.close() };
 }
 
+function openConnection(source: string | Buffer): Database.Database {
+  const sqlite = new Database(source);
+  sqlite.pragma('busy_timeout = 10000');
+  sqlite.pragma('journal_mode = WAL');
+  sqlite.pragma('cache_size = -131072');
+  sqlite.pragma('foreign_keys = ON');
+  return sqlite;
+}
+
 export function openDb(dbPath: string): Db {
   return openDbWithHandle(dbPath).db;
 }
 
+let migratedMemoryImage: Buffer | null = null;
+
+function migratedImage(): Buffer {
+  if (migratedMemoryImage === null) {
+    const sqlite = openConnection(':memory:');
+    migrateDatabase(sqlite, drizzle(sqlite, { schema }));
+    migratedMemoryImage = sqlite.serialize();
+    sqlite.close();
+  }
+  return migratedMemoryImage;
+}
+
 export function openMemoryDb(): Db {
-  return openDb(':memory:');
+  return drizzle(openConnection(migratedImage()), { schema });
 }
