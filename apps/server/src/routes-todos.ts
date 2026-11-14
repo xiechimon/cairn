@@ -5,6 +5,7 @@ import {
   isStartedTodo,
   needsYouQuerySchema,
   phaseSchema,
+  runTodoOnBodySchema,
   snoozeTodoBodySchema,
   type TodoRecord,
   tasksQuerySchema,
@@ -33,6 +34,7 @@ import { listNeedsYou } from './services/needs-you.js';
 import { orchestrateTodo } from './services/orchestrate.js';
 import { PhaseTransitionError } from './services/phase.js';
 import { assertProjectWritable } from './services/project-writable.js';
+import { runnerOverrideFor } from './services/runner-offline.js';
 import { snoozeTodo, unsnoozeTodo } from './services/snooze.js';
 import { listTasks } from './services/tasks.js';
 import { messageThreadAsUser } from './services/thread-message.js';
@@ -154,6 +156,19 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
         reason: `${closing ? 'closed' : 'marked done'} by ${svc.user.displayName}`,
       });
     }
+    return c.json(record);
+  });
+
+  app.post('/api/todos/:id/runner', async (c) => {
+    const id = c.req.param('id');
+    const body = parseWith(runTodoOnBodySchema, await jsonBody(c), 'body');
+    const prior = getTodo(svc, id);
+    if (prior === null || prior.teamId !== ctx.team.id) throw notFound(`todo ${id}`);
+    assertProjectWritable(svc.db, prior.teamId, prior.projectId);
+    const routeOverride = runnerOverrideFor(svc.db, prior, body.machineId);
+    const record = updateTodo(svc, id, { routeOverride });
+    if (!record) throw notFound(`todo ${id}`);
+    svc.machineHub?.wake(prior.teamId);
     return c.json(record);
   });
 
