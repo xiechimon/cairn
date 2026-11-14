@@ -110,7 +110,6 @@ test('L9: the sidebar keeps the measured reference geometry', async ({ page }) =
       rows: [...document.querySelectorAll('aside [data-slot="sidebar-project-row"]')].map(box),
       group: box(document.querySelector('aside [data-testid="project-group-header"]')),
       footer: box(document.querySelector('[data-testid="sidebar-footer"]')),
-      pill: box(document.querySelector('[data-testid="sidebar-attention"]')),
       settings: box(document.querySelector('[data-testid="sidebar-settings"]')),
       activity: box(document.querySelector('[data-testid="sidebar-activity"]')),
       label: aside?.textContent?.includes('项目') && !aside.textContent.includes('新建项目'),
@@ -127,7 +126,6 @@ test('L9: the sidebar keeps the measured reference geometry', async ({ page }) =
   ]);
   expect(m.group).toEqual([8, 176, 204, 26]);
   expect(m.footer[3]).toBe(56);
-  expect(m.pill.slice(0, 1).concat(m.pill.slice(3))).toEqual([4, 38]);
   expect(m.activity[0] + m.activity[2] / 2).toBe(168);
   expect(m.settings[0] + m.settings[2] / 2).toBe(198);
   await expect(page.getByRole('complementary').getByText('项目', { exact: true })).toHaveCount(0);
@@ -282,53 +280,13 @@ test('in English every row menu label stays on one line', async ({ page }) => {
   expect(overflow).toEqual(overflow.map(() => 0));
 });
 
-test('the footer machine status opens the computers panel', async ({ page }) => {
+test('the footer and the collapsed rail carry no computers link', async ({ page }) => {
   await page.goto(REF);
-  await page.getByTestId('sidebar-attention').click();
-  await expect(page).toHaveURL(/pane=machines/);
-  await expect(page.locator('.side-panel')).toBeVisible();
-});
-
-test('the footer leads with a 24px machines chip in the rows icon column and a quiet badge', async ({
-  page,
-}) => {
-  await page.goto(REF);
-  const m = await page.evaluate(() => {
-    const box = (el: Element | null) => {
-      if (el === null) throw new Error('missing');
-      const r = el.getBoundingClientRect();
-      return { x: r.x, y: r.y, w: r.width, h: r.height };
-    };
-    const link = document.querySelector('[data-testid="sidebar-attention"]');
-    const label = link?.querySelector(':scope > span:last-child') ?? null;
-    return {
-      chip: box(document.querySelector('[data-testid="sidebar-footer"] [data-slot="fleet-chip"]')),
-      badge: box(document.querySelector('[data-testid="sidebar-footer"] [data-slot="fleet-badge"]')),
-      label: box(label),
-      coordinatorIcon: box(document.querySelector('aside [data-slot="sidebar-nav-row"] svg')),
-      coordinatorLabel: box(
-        document.querySelector('aside [data-slot="sidebar-nav-row"] span:last-child'),
-      ),
-      footer: box(document.querySelector('[data-testid="sidebar-footer"]')),
-    };
-  });
-  expect([m.chip.w, m.chip.h]).toEqual([24, 24]);
-  expect(m.chip.x + m.chip.w / 2).toBe(m.coordinatorIcon.x + m.coordinatorIcon.w / 2);
-  expect(m.label.x).toBe(m.coordinatorLabel.x);
-  expect([m.badge.w, m.badge.h]).toEqual([8, 8]);
-  expect(Math.abs(m.chip.y + m.chip.h / 2 - (m.footer.y + m.footer.h / 2))).toBeLessThanOrEqual(1);
-});
-
-test('the collapsed rail shows the machines chip with its badge above activity and settings', async ({
-  page,
-}) => {
-  await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.goto(REF);
+  await expect(page.getByTestId('sidebar-attention')).toHaveCount(0);
+  await expect(page.locator('aside [data-slot="fleet-chip"]')).toHaveCount(0);
+  await page.evaluate(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
+  await page.reload();
   const rail = page.locator('aside.board-sidebar--collapsed');
-  await expect(rail.locator('[data-slot="fleet-chip"]')).toHaveCount(1);
-  await expect(rail.locator('[data-slot="fleet-badge"]')).toHaveCount(1);
-  const chip = (await rail.getByTestId('sidebar-attention').boundingBox())!;
-  const activity = (await rail.getByTestId('sidebar-activity').boundingBox())!;
-  expect(chip.y).toBeLessThan(activity.y);
-  expect(chip.x + chip.width / 2).toBeCloseTo(activity.x + activity.width / 2, 0);
+  await expect(rail.getByTestId('sidebar-activity')).toBeVisible();
+  await expect(rail.getByTestId('sidebar-attention')).toHaveCount(0);
 });
