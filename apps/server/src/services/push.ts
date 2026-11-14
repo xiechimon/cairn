@@ -13,8 +13,9 @@ import { dirname, resolve } from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import webpush from 'web-push';
 import type { Db } from '../db/client.js';
-import { pushDelivery, pushDigestItem, pushSubscription, todo } from '../db/schema.js';
+import { apnsDevice, pushDelivery, pushDigestItem, pushSubscription, todo } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { type ApnsConfig, sendApns } from './apns.js';
 import { isViewingThread } from './thread-presence.js';
 
 export interface VapidKeys {
@@ -22,6 +23,7 @@ export interface VapidKeys {
   privateKey: string;
   subject: string;
   webOrigin: string;
+  apns?: ApnsConfig | null;
 }
 
 export type PushOutcome =
@@ -149,9 +151,31 @@ export async function sendPushToUser(
     .from(pushSubscription)
     .where(and(eq(pushSubscription.userId, userId), eq(pushSubscription.teamId, teamId)))
     .all();
-  if (rows.length === 0) return { status: 'no-subscription', id };
-  const results = await Promise.allSettled(
-    rows.map(async (row) => {
+  const devices =
+    vapid.apns == null
+      ? []
+      : db
+          .select()
+          .from(apnsDevice)
+          .where(and(eq(apnsDevice.userId, userId), eq(apnsDevice.teamId, teamId)))
+          .all();
+  if (rows.length === 0 && devices.length === 0) return { status: 'no-subscription', id };
+  const apns = vapid.apns;
+  const apnsResults =
+    apns == null
+      ? []
+      : devices.map(async (device) => {
+          const outcome = await sendApns(apns, device, msg);
+          if (outcome === 'expired')
+            db.delete(apnsDevice)
+              .where(and(eq(apnsDevice.token, device.token), eq(apnsDevice.userId, userId)))
+              .run();
+          if (outcome === 'failed') process.stderr.write('apns delivery failed\n');
+          return outcome;
+        });
+  const results = await Promise.allSettled([
+    ...apnsResults,
+    ...rows.map(async (row) => {
       let providerDeadline: ReturnType<typeof setTimeout> | undefined;
       let timedOut = false;
       try {
@@ -198,7 +222,7 @@ export async function sendPushToUser(
         if (providerDeadline !== undefined) clearTimeout(providerDeadline);
       }
     }),
-  );
+  ]);
   const count = results.filter(
     (result) => result.status === 'fulfilled' && result.value === 'accepted',
   ).length;

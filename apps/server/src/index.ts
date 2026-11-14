@@ -27,6 +27,7 @@ import { loopbackOwnerFor } from './lib/loopback-owner.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { localWorkspaceRoot } from './lib/workspace-root.js';
 import { shutdownRuntimeOtel } from './runtime-otel.js';
+import { loadApnsConfig } from './services/apns.js';
 import { installBuiltinSkills } from './services/builtin-skills.js';
 import { sweepComputerHandoffs } from './services/computer-handoff.js';
 import { computerScreensOf } from './services/computer-screen.js';
@@ -94,11 +95,10 @@ const opened = (() => {
 })();
 const { db, close } = opened;
 const secretBox = createKeyfileSecretBox(config.keyfilePath);
-const vapidKeys = loadOrCreateVapidKeys(
-  config.vapidKeysPath,
-  config.vapidSubject,
-  config.webOrigin,
-);
+const vapidKeys = {
+  ...loadOrCreateVapidKeys(config.vapidKeysPath, config.vapidSubject, config.webOrigin),
+  apns: loadApnsConfig(config.apns),
+};
 const seeded = seed(db);
 seedLocalMachine(db, seeded.team.id);
 setCoordinatorServerContextEnabled(config.coordinatorServerContext || config.coordinatorInServer);

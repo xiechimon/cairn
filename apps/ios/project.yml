@@ -23,6 +23,10 @@ targets:
       - path: Cairn/AppIcon.icon
         type: file
         buildPhase: resources
+    entitlements:
+      path: Cairn/Cairn.entitlements
+      properties:
+        aps-environment: development
     info:
       path: Cairn/Info.plist
       properties:

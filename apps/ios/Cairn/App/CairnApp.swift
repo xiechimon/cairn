@@ -2,12 +2,14 @@ import SwiftUI
 
 @main
 struct CairnApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var session = Session()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(session)
+                .environment(PushRouter.shared)
                 .tint(Color.ink)
         }
     }
@@ -71,7 +73,9 @@ private struct RestoreView: View {
 
 struct MainTabs: View {
     let model: AppModel
+    @Environment(PushRouter.self) private var push
     @State private var tab = AppTab.chat
+    @State private var tasksPath: [InboxItem] = []
 
     var body: some View {
         TabView(selection: $tab) {
@@ -79,7 +83,7 @@ struct MainTabs: View {
                 CoordinatorView(model: model) { tab = .tasks }
             }
             Tab("Tasks", systemImage: "checklist", value: AppTab.tasks) {
-                TasksView(model: model)
+                TasksView(model: model, path: $tasksPath)
             }
             .badge(model.inbox.count)
             Tab("Made", systemImage: "shippingbox", value: AppTab.made) {
@@ -91,7 +95,29 @@ struct MainTabs: View {
         }
         .tabBarMinimizeBehavior(.onScrollDown)
         .task { await model.load() }
+        .task { await push.refreshPermission() }
+        .task(id: push.deviceToken) {
+            guard let token = push.deviceToken, push.permission == .on else { return }
+            try? await model.client.registerPushDevice(teamId: model.team.id, token: token, environment: PushRouter.environment)
+        }
         .onChange(of: tab) { Task { await model.load() } }
+        .onChange(of: push.route, initial: true) { _, route in
+            guard let route else { return }
+            push.route = nil
+            Task { await open(route) }
+        }
+    }
+
+    private func open(_ route: PushRoute) async {
+        switch route {
+        case .chat: tab = .chat
+        case .tasks: tab = .tasks
+        case .computers: tab = .computers
+        case .task(let id):
+            tab = .tasks
+            if model.task(id) == nil { await model.load() }
+            tasksPath = model.task(id).map { [.task($0)] } ?? []
+        }
     }
 }
 

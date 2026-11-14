@@ -282,4 +282,33 @@ final class ClientBehaviorTests: XCTestCase {
         XCTAssertNil(session.restoreError)
         XCTAssertEqual(session.model?.team.id, "team_1")
     }
+
+    func testNotificationHrefsOpenTheScreenTheServerNamed() {
+        XCTAssertEqual(PushRoute(href: "/app/todo/todo_42"), .task("todo_42"))
+        XCTAssertEqual(PushRoute(href: "/app?chief=chief_thread%201"), .chat)
+        XCTAssertEqual(PushRoute(href: "/app?pane=machines&machine=m1&screen=1"), .computers)
+        XCTAssertEqual(PushRoute(href: "/app"), .tasks)
+        XCTAssertEqual(PushRoute(href: "/app/todo/"), .tasks)
+    }
+
+    func testPushDeviceRegistersItsTokenAndEnvironment() async throws {
+        let session = StubServer.session { _ in .init(status: 201, body: #"{"ok":true,"delivers":true}"#) }
+        try await client(session).registerPushDevice(teamId: "team_1", token: "ab12", environment: "sandbox")
+        let request = try XCTUnwrap(StubServer.requests.first)
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/teams/team_1/push/apns-devices")
+        let stream = try XCTUnwrap(request.httpBodyStream)
+        stream.open()
+        var buffer = [UInt8](repeating: 0, count: 1024)
+        let count = stream.read(&buffer, maxLength: buffer.count)
+        stream.close()
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(buffer.prefix(count))) as? [String: String])
+        XCTAssertEqual(body, ["token": "ab12", "environment": "sandbox"])
+    }
+
+    func testUnregisteringAcceptsAnEmptyNoContentReply() async throws {
+        let session = StubServer.session { _ in .init(status: 204, body: "") }
+        try await client(session).unregisterPushDevice(teamId: "team_1", token: "ab12")
+        XCTAssertEqual(StubServer.requests.first?.httpMethod, "DELETE")
+    }
 }

@@ -284,7 +284,7 @@ Reach:
 
 ### push-notifications
 
-**Phone push** (shipped, centrality 1). Web push to the user's devices when something needs them, suppressed while they are looking at the thread.
+**Phone push** (shipped, centrality 1). Web Push and APNs to the user's devices when something needs them, suppressed while they are looking at the thread.
 
 States: Off, asking for permission, or on for this device; a notification opens the thread it names.
 
@@ -296,10 +296,10 @@ Reach:
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: none
-- Research: **gap**: no prior-art note on agent notifications and push delivery
+- Research: [docs/research/ios-apns-push-2026-11-14.md](../../../docs/research/ios-apns-push-2026-11-14.md)
 - Frontend design: **gap**: the notify banner, device switch and push copy have no design
 - Backend design: **gap**: no design for subscriptions, presence suppression, receipts and the three push states
-- Evidence: `apps/web/e2e/push-device-switch.spec.ts`, `apps/web/e2e/notify-click.spec.ts`, `apps/server/test/push.test.ts`
+- Evidence: `apps/web/e2e/push-device-switch.spec.ts`, `apps/web/e2e/notify-click.spec.ts`, `apps/server/test/push.test.ts`, `apps/server/test/apns.test.ts`
 
 ### questions
 
