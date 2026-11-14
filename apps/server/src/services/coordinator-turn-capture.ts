@@ -8,7 +8,7 @@ import { coordinatorTurnSnapshot, type step, todo } from '../db/schema.js';
 
 type StepRow = typeof step.$inferSelect;
 
-export const COORDINATOR_SNAPSHOT_SCHEMA_VERSION = 1;
+export const COORDINATOR_SNAPSHOT_SCHEMA_VERSION = 2;
 export const COORDINATOR_SNAPSHOT_PAYLOAD_MAX_BYTES = 2 * 1024 * 1024;
 export const COORDINATOR_SNAPSHOT_MAX_RECORDS = 10_000;
 export const COORDINATOR_SNAPSHOT_MAX_CALL_VIEWS = 128;
