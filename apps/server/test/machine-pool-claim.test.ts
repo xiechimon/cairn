@@ -7,12 +7,14 @@ import {
   project as projectTable,
   routingRule,
   step as stepTable,
+  team as teamTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { startBuilds } from '../src/services/builds.js';
 import { claimStep } from '../src/services/machines.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
+import { toTodoRecord } from '../src/services/todos.js';
 import { bootServer, issueApiKey, postProject, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
@@ -68,6 +70,39 @@ async function machineOf(
     .where(eq(machineTable.id, machineId))
     .run();
   return machineId;
+}
+
+function setDefault(w: World, machineId: string | null): void {
+  w.s.db
+    .update(teamTable)
+    .set({ defaultMachineId: machineId })
+    .where(eq(teamTable.id, w.s.team.id))
+    .run();
+}
+
+function defaultOf(w: World): string | null {
+  return (
+    w.s.db.select().from(teamTable).where(eq(teamTable.id, w.s.team.id)).get()?.defaultMachineId ??
+    null
+  );
+}
+
+function queuedTodo(w: World): string {
+  const todoId = `todo-start-${++seq}`;
+  w.s.db
+    .insert(todoTable)
+    .values({
+      id: todoId,
+      teamId: w.s.team.id,
+      projectId: w.projectId,
+      seqNum: seq,
+      title: 'start',
+      spec: 'probe',
+      phase: 'todo',
+      phaseAt: Date.now(),
+    })
+    .run();
+  return todoId;
 }
 
 function routeOf(
@@ -325,10 +360,11 @@ describe('a worker step runs only on its named machine', () => {
     expect(queue?.waitingFor).not.toHaveProperty('fallbackAt');
   });
 
-  test('two machines racing for an unnamed step: neither wins', async () => {
+  test('two machines racing for an unnamed step with no default Runner: neither wins', async () => {
     const w = await world();
     const a = await machineOf(w, 'a');
     const b = await machineOf(w, 'b');
+    setDefault(w, null);
     routeOf(w, null);
     const stepId = pendingStep(w);
     const [ra, rb] = await Promise.all([claimOn(w, a), claimOn(w, b)]);
@@ -412,25 +448,13 @@ describe('a worker step runs only on its named machine', () => {
     expect(statusOf(w, stepId)).toBe('pending');
   });
 
-  test('two online machines and no name: start is refused; one online machine is pinned', async () => {
+  test('two online machines, no name and no default Runner: start is refused; one online machine is pinned', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy');
     const mac = await machineOf(w, 'mac');
+    setDefault(w, null);
     routeOf(w, null);
-    const todoId = `todo-start-${++seq}`;
-    w.s.db
-      .insert(todoTable)
-      .values({
-        id: todoId,
-        teamId: w.s.team.id,
-        projectId: w.projectId,
-        seqNum: seq,
-        title: 'start',
-        spec: 'probe',
-        phase: 'todo',
-        phaseAt: Date.now(),
-      })
-      .run();
+    const todoId = queuedTodo(w);
     expect(() => startBuilds(w.s.svc, { projectId: w.projectId, todoIds: [todoId] })).toThrow(
       /Name a machine/,
     );
@@ -453,3 +477,95 @@ function setOverride(
   const todoId = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!.todoId;
   w.s.db.update(todoTable).set({ routeOverride }).where(eq(todoTable.id, todoId)).run();
 }
+
+describe('the default Runner', () => {
+  test('the first enrolled machine becomes the default; later ones do not', async () => {
+    const w = await world();
+    const linux = await machineOf(w, 'linux');
+    await machineOf(w, 'mac');
+    expect(defaultOf(w)).toBe(linux);
+  });
+
+  test('an unnamed step goes to the default Runner, not to another online machine', async () => {
+    const w = await world();
+    const linux = await machineOf(w, 'linux');
+    const mac = await machineOf(w, 'mac');
+    routeOf(w, null);
+    const stepId = pendingStep(w);
+    expect(await claimOn(w, mac)).toBeNull();
+    expect((await claimOn(w, linux))?.step.id).toBe(stepId);
+  });
+
+  test('an offline default Runner keeps the step waiting; no other machine takes it', async () => {
+    const w = await world();
+    const linux = await machineOf(w, 'linux', { online: false });
+    const mac = await machineOf(w, 'mac');
+    routeOf(w, null);
+    const stepId = pendingStep(w, { ageMs: 60 * 60_000 });
+    expect(await claimOn(w, mac)).toBeNull();
+    expect(statusOf(w, stepId)).toBe('pending');
+    const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+    const queue = stepQueueProjector(w.s.db, w.s.team.id).project({
+      id: stepId,
+      createdAt: row.createdAt,
+      homeMachineId: null,
+    });
+    expect(queue?.waitingFor?.machineId).toBe(linux);
+    expect(queue?.blocked).toEqual({ kind: 'machine-offline', missing: [] });
+    const todoId = w.s.db
+      .select()
+      .from(buildTable)
+      .where(eq(buildTable.id, row.buildId))
+      .get()!.todoId;
+    w.s.db
+      .update(todoTable)
+      .set({ latestBuildId: row.buildId })
+      .where(eq(todoTable.id, todoId))
+      .run();
+    const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()!;
+    expect(toTodoRecord(w.s.svc, todoRow).waitingOn).toEqual({ on: 'machine', retryAt: null });
+  });
+
+  test('a rule machine and a task pick both outrank the default Runner', async () => {
+    const w = await world();
+    const linux = await machineOf(w, 'linux');
+    const mac = await machineOf(w, 'mac');
+    const win = await machineOf(w, 'win');
+    routeOf(w, mac);
+    const ruled = pendingStep(w);
+    expect(await claimOn(w, linux)).toBeNull();
+    expect((await claimOn(w, mac))?.step.id).toBe(ruled);
+    const picked = pendingStep(w);
+    setOverride(w, picked, { machineId: win });
+    expect(await claimOn(w, linux)).toBeNull();
+    expect((await claimOn(w, win))?.step.id).toBe(picked);
+  });
+
+  test('with a default Runner, start succeeds and does not pin the task', async () => {
+    const w = await world();
+    const linux = await machineOf(w, 'linux');
+    await machineOf(w, 'mac');
+    routeOf(w, null);
+    expect(defaultOf(w)).toBe(linux);
+    const todoId = queuedTodo(w);
+    startBuilds(w.s.svc, { projectId: w.projectId, todoIds: [todoId] });
+    expect(
+      w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()?.routeOverride ?? null,
+    ).toBeNull();
+  });
+
+  test('revoking or deleting the default Runner clears it, and a later enroll does not take it over', async () => {
+    const w = await world();
+    const linux = await machineOf(w, 'linux');
+    const mac = await machineOf(w, 'mac');
+    expect(
+      (await w.s.app.request(`/api/machines/${linux}/revoke`, { method: 'POST' })).status,
+    ).toBe(204);
+    expect(defaultOf(w)).toBeNull();
+    await machineOf(w, 'late');
+    expect(defaultOf(w)).toBeNull();
+    setDefault(w, mac);
+    expect((await w.s.app.request(`/api/machines/${mac}`, { method: 'DELETE' })).status).toBe(204);
+    expect(defaultOf(w)).toBeNull();
+  });
+});

@@ -10,8 +10,6 @@ const OUT_DIR = resolve(fileURLToPath(new URL('../docs/assets/readme', import.me
 const SCALE = 2;
 
 const SHOTS = [
-  { name: 'hero', query: '&thread=readme-export', width: 1440, height: 800, radius: 12 },
-  { name: 'home', query: '', width: 390, height: 760, radius: 28 },
   {
     name: 'work',
     query: '&thread=readme-export',

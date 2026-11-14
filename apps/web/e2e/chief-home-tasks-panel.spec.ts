@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { mockLive, TASK, THREAD } from './chief-home-mock';
 
 const HOME = '/app?scenario=home-c';
 
@@ -750,4 +751,25 @@ test('one mark holds the left edge: the checkbox when the row has one, its ring 
   const title = review.locator('[data-slot="task-row-title"]');
   expect(await title.evaluate((el) => el.getBoundingClientRect().height)).toBe(20);
   await expect(review.locator('[data-slot="task-row-what"]')).toHaveText('改动写好了');
+});
+
+test('a research report waiting on the owner is already in Made, marked as waiting', async ({
+  page,
+}) => {
+  const research = {
+    ...TASK,
+    id: 'todo-research',
+    seqNum: 10,
+    title: 'Research export formats',
+    phase: 'needs_input',
+    output: 'info',
+  };
+  const coding = { ...TASK, id: 'todo-code', seqNum: 11, title: 'Wire the export', phase: 'needs_input' };
+  await mockLive(page, { threads: [THREAD], messages: [], todos: [research, coding] });
+  await page.goto('/app');
+  await madeButton(page).click();
+  const cards = madePanel(page).getByTestId('made-card');
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText('Research export formats');
+  await expect(cards.first().getByTestId('made-card-meta')).toHaveText(/^待你决定 · /);
 });

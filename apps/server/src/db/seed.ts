@@ -56,5 +56,6 @@ export function toTeamRecord(
     coAuthorTrailer: row.coAuthorTrailer,
     requestInstructorReview: row.requestInstructorReview,
     maxAutonomousMergesPerDay: row.maxAutonomousMergesPerDay,
+    defaultMachineId: row.defaultMachineId,
   };
 }

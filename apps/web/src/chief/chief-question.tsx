@@ -37,15 +37,6 @@ export function useQuestionPending(): boolean {
   return useShownQuestions().length > 0;
 }
 
-export function useFocusQuestionOfTodo(todoId: string): (() => void) | null {
-  const at = useShownQuestions().findIndex((request) => request.item.todoId === todoId);
-  if (at < 0) return null;
-  return () => {
-    questionDockState.setFocus(at);
-    questionDockState.reveal();
-  };
-}
-
 export function useAnswerKey(): string | null {
   const pending = useShownQuestions();
   const shown = pending[clampQuestionIndex(questionDockState.focus(), pending.length)];

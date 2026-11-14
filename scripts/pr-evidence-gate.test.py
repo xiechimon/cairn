@@ -83,7 +83,8 @@ class EvidenceGateTests(unittest.TestCase):
         self.assertEqual(result, 0, output)
         probe.assert_not_called()
         for url in ['https://example.org/proof.png?theme=dark#proof', 'https://user-images.githubusercontent.com/123/asset', 'https://github.com/user-attachments/assets/asset']:
-            for body in [url, f'[proof]({url})']:
+            inline = url.startswith('https://github.com/user-attachments/')
+            for body in [f'see {url} here' if inline else url, f'[proof]({url})']:
                 result, output, _ = self.verdict(body)
                 self.assertEqual(result, 1, output)
                 self.assertIn('FAIL not-embedded:', output)
@@ -91,6 +92,36 @@ class EvidenceGateTests(unittest.TestCase):
             self.assertEqual(result, 1, output)
             self.assertIn('FAIL unreachable (HTTP 404):', output)
             probe.assert_called_once_with(url)
+
+    def test_an_attachment_alone_on_its_line_is_embedded_media(self):
+        url = 'https://github.com/user-attachments/assets/abe9e1f4-e0e1-4774-a315-68e1c073152f'
+        for body in [url, f'Recording:\n\n{url}\n\nFrames below.', f'  {url}  ']:
+            with self.subTest(body=body):
+                links = gate.find_links(body)
+                self.assertEqual([(link['form'], link['embedded'], link['url']) for link in links], [('media', True, url)])
+                result, output, probe = self.verdict(body)
+                self.assertEqual(result, 0, output)
+                probe.assert_called_once_with(url)
+
+    def test_an_unpublished_attachment_alone_on_its_line_is_unreachable(self):
+        url = 'https://github.com/user-attachments/assets/abe9e1f4-e0e1-4774-a315-68e1c073152f'
+        result, output, _ = self.verdict(url, '404')
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL unreachable (HTTP 404):', output)
+        self.assertNotIn('FAIL not-embedded:', output)
+
+    def test_other_bare_media_alone_on_a_line_still_fails(self):
+        for url in ['https://example.org/proof.png', 'https://user-images.githubusercontent.com/123/asset']:
+            with self.subTest(url=url):
+                result, output, _ = self.verdict(url)
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL not-embedded:', output)
+
+    def test_reachability_follows_redirects_to_the_final_answer(self):
+        completed = subprocess.CompletedProcess([], 0, stdout='200', stderr='')
+        with patch.object(gate.subprocess, 'run', return_value=completed) as run:
+            self.assertEqual(gate.http_code('https://github.com/user-attachments/assets/a'), '200')
+        self.assertIn('-L', run.call_args.args[0])
 
 
 class SectionContractTests(unittest.TestCase):

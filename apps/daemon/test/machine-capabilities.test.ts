@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { cpus, totalmem } from 'node:os';
 import { join } from 'node:path';
-import { machineHardwareSchema } from '@cairn/shared';
+import { machineHardwareSchema, osPlatformOf } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   createMachineCapabilitiesProbe,
@@ -196,7 +196,7 @@ describe('probeMachineHardware (#1241 capability fingerprint)', () => {
 
 test('both machine capability probes report the current OS platform', () => {
   const sources = { mcpConfigPath: join(tmpRoot(), 'absent.json'), skillsDir: tmpRoot() };
-  const osPlatform = ['linux', 'darwin'].includes(process.platform) ? process.platform : 'other';
+  const osPlatform = osPlatformOf(process.platform);
   expect(probeMachineCapabilities(sources)).toMatchObject({ osPlatform });
   expect(createMachineCapabilitiesProbe(sources)()).toMatchObject({ osPlatform });
 });

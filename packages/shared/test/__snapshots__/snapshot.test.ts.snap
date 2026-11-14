@@ -10272,6 +10272,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               "enum": [
                 "linux",
                 "darwin",
+                "windows",
                 "other",
               ],
               "type": "string",
@@ -11380,6 +11381,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
       "type": "integer",
+    },
+    "defaultMachineId": {
+      "type": [
+        "string",
+        "null",
+      ],
     },
     "firstPrReportPrompt": {
       "additionalProperties": false,

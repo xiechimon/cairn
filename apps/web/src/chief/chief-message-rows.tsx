@@ -6,7 +6,6 @@ import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, TypingDots } from '../components/chat/live-row.js';
 import { STATUS_REF_CLS, StatusLine } from '../components/chat/status-line.js';
-import { TraceGroup, type TraceStepItem } from '../components/chat/trace-steps.js';
 import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
@@ -19,7 +18,7 @@ import {
   type TodoGlance,
   TodoGlanceContext,
 } from '../detail/segments.js';
-import type { ChiefSegment, ChiefStreamItem, ChiefToolRow } from '../fixtures/records.js';
+import type { ChiefSegment, ChiefStreamItem } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { dateTimeFormat } from '../lib/date-format.js';
@@ -27,7 +26,7 @@ import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.j
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefReportRow } from './chief-report-row.js';
 import { TaskRefRow } from './chief-task-ref-row.js';
-import { taskRefsOf } from './chief-task-refs.js';
+import { childRefsOf, type TaskRef } from './chief-task-refs.js';
 import { isLiveNotice } from './live-notice.js';
 import { MessageToolbar } from './message-toolbar.js';
 import { QuestionAnsweredLine, QuestionAsked } from './question-answered-line.js';
@@ -42,8 +41,6 @@ import {
 } from './reply-source-highlight.js';
 import { SentAttachments } from './sent-attachments.js';
 import type { ThreadActivity } from './thread-activity.js';
-import { ThreadActivityRow, ThreadEventLine } from './thread-activity-row.js';
-import { ThreadReportReply } from './thread-report-reply.js';
 import { messageStampLabel } from './time-dividers.js';
 
 const STAMP_CLS = 'text-caption whitespace-nowrap tabular-nums';
@@ -138,22 +135,49 @@ function TodoSegmentLink({ seq }: { seq: number }) {
   );
 }
 
-function TaskRefRows({
-  source,
-  started,
-}: {
-  source: Parameters<typeof taskRefsOf>[0];
-  started: readonly string[];
-}) {
-  const glances = useContext(TodoGlanceContext);
-  const refs = taskRefsOf(source, glances ?? NO_GLANCES, started);
+function TaskRefRows({ refs }: { refs: readonly TaskRef[] }) {
   if (refs.length === 0) return null;
   return (
-    <div className="mb-2 flex flex-col gap-0.5" data-testid="chief-task-refs">
+    <div className="mt-2 flex flex-col gap-0.5" data-testid="chief-task-refs">
       {refs.map((ref) => (
-        <TaskRefRow key={ref.todoId} taskRef={ref} />
+        <TaskRefWithChildren key={ref.todoId} taskRef={ref} />
       ))}
     </div>
+  );
+}
+
+function TaskRefWithChildren({ taskRef, elbow = true }: { taskRef: TaskRef; elbow?: boolean }) {
+  const glances = useContext(TodoGlanceContext);
+  return (
+    <>
+      <TaskRefRow taskRef={taskRef} elbow={elbow} />
+      {childRefsOf(taskRef.todoId, glances ?? NO_GLANCES).map((child) => (
+        <TaskRefRow key={child.todoId} taskRef={child} nested />
+      ))}
+    </>
+  );
+}
+
+function SubThreadRow({ activity }: { activity: ThreadActivity }) {
+  const glance = useContext(TodoGlanceContext)?.get(activity.todoId);
+  if (glance === undefined) return null;
+  return (
+    <MessageScrollerItem
+      messageId={activity.id}
+      style={SCROLLER_ITEM_STYLE}
+      className={EVENT_ROW_CLS}
+      data-testid="chief-sub-thread"
+    >
+      <TaskRefWithChildren
+        elbow={false}
+        taskRef={{
+          todoId: activity.todoId,
+          seq: glance.seq ?? null,
+          title: glance.title ?? activity.title,
+          phase: glance.phase,
+        }}
+      />
+    </MessageScrollerItem>
   );
 }
 
@@ -177,18 +201,6 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
   );
 }
 
-function turnToolSteps(tools: ChiefToolRow[] | undefined): TraceStepItem[] {
-  return (tools ?? []).map((tool, k) => ({
-    id: k,
-    step: {
-      kind: 'tool',
-      name: tool.label,
-      status: tool.error === true ? 'failed' : 'done',
-      ...(tool.seconds !== undefined ? { secs: tool.seconds } : {}),
-    },
-  }));
-}
-
 function TaskStartedRow({
   todoId,
   seq,
@@ -207,7 +219,7 @@ function TaskStartedRow({
         data-testid="chief-task-started"
         className={EVENT_ROW_CLS}
       >
-        <TaskRefRow
+        <TaskRefWithChildren
           elbow={false}
           taskRef={{
             todoId,
@@ -268,21 +280,17 @@ export function chiefStreamRowKey(
 interface ChiefStreamRowProps {
   item: ChiefStreamItem | ThreadActivity;
   index: number;
-  replyable?: boolean;
   onCopy: (text: string) => void;
-  toolsOpen: ReadonlySet<number>;
-  onToggleTools: (index: number) => void;
   onRewindRequest: (index: number, id: string | null) => void;
   onReply?: ((draft: ReplyQuoteDraft) => void) | undefined;
   entering?: boolean;
   onRetry?: (() => void) | undefined;
   joinsPrev?: boolean;
   joinsNext?: boolean;
-  startedTasks?: readonly string[];
+  taskRefs?: readonly TaskRef[];
 }
 
-const NO_STARTED_TASKS: readonly string[] = [];
-const NO_TEXT = {};
+const NO_TASK_REFS: readonly TaskRef[] = [];
 
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
   const { t } = useI18n();
@@ -310,17 +318,14 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
 export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
   index: i,
-  replyable = false,
   onCopy,
-  toolsOpen,
-  onToggleTools,
   onRewindRequest,
   onReply,
   entering = false,
   onRetry,
   joinsPrev = false,
   joinsNext = false,
-  startedTasks = NO_STARTED_TASKS,
+  taskRefs = NO_TASK_REFS,
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
   const highlightedSource = useContext(ReplySourceHighlightContext);
@@ -329,29 +334,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       ? { [REPLY_HIGHLIGHT_ATTR]: '' }
       : {};
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
-  if (item.kind === 'thread-report' || item.kind === 'thread-message')
-    return (
-      <MessageScrollerItem
-        messageId={item.id}
-        style={SCROLLER_ITEM_STYLE}
-        className={EVENT_ROW_CLS}
-      >
-        <ThreadEventLine item={item} />
-        {item.kind === 'thread-report' && item.phase === 'needs-you' && replyable && (
-          <ThreadReportReply todoId={item.todoId} />
-        )}
-      </MessageScrollerItem>
-    );
-  if (item.kind === 'thread-activity')
-    return (
-      <MessageScrollerItem
-        messageId={item.id}
-        style={SCROLLER_ITEM_STYLE}
-        className={EVENT_ROW_CLS}
-      >
-        <ThreadActivityRow activity={item} />
-      </MessageScrollerItem>
-    );
+  if (item.kind === 'thread-activity') return <SubThreadRow activity={item} />;
+  if (item.kind === 'thread-report' || item.kind === 'thread-message') return null;
   if (item.kind === 'error')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
@@ -546,7 +530,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         </Message>
       </MessageScrollerItem>
     );
-  const tools = turnToolSteps(item.tools);
   const settled = item.typing !== true;
   const whole = robotText(item);
   const fallbackNote =
@@ -573,7 +556,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             : undefined
         }
         onCopy={() => onCopy(quote)}
-        onSteps={tools.length > 0 ? () => onToggleTools(i) : undefined}
       />
     ) : null;
   const sourceHighlighted =
@@ -587,17 +569,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         data-run={runAttr(joinsPrev, joinsNext)}
       >
         <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-          {tools.length > 0 && toolsOpen.has(i) && (
-            <TraceGroup
-              density="compact"
-              steps={tools}
-              open
-              onOpenChange={() => onToggleTools(i)}
-              summaryTestId="chief-tools-toggle"
-              cardTestId="chief-turn-tools"
-            />
-          )}
-          <TaskRefRows source={settled ? item : NO_TEXT} started={startedTasks} />
           <div
             className={BUBBLE_WRAP_CLS}
             data-testid="chief-reply"
@@ -650,6 +621,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             )}
           </div>
           {item.typing === true && <TypingDots className="mt-1" />}
+          <TaskRefRows refs={taskRefs} />
           {robotTools('below-start', whole, 'chief-msg-tools-touch', false)}
         </MessageContent>
       </Message>

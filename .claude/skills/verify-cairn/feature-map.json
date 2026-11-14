@@ -297,7 +297,7 @@
       "reach": [
         "open /app",
         "type a task for the Coordinator and press Enter",
-        "click testid:thread-activity-toggle"
+        "click testid:chief-task-ref"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/chief-dispatch-judgment.md"
@@ -309,7 +309,7 @@
         "docs/research/r15-agent-responsibility-default.md"
       ],
       "frontendDesign": {
-        "na": "dispatch shows as threads and report rows inside the Coordinator chat"
+        "na": "dispatch shows as one sub-thread row under the reply that started it inside the Coordinator chat"
       },
       "backendDesign": [
         "docs/research/capability-routing-2026-11-06.md",

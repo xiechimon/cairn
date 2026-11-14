@@ -1,0 +1,2 @@
+ALTER TABLE `team` ADD `defaultMachineId` text;--> statement-breakpoint
+UPDATE `team` SET `defaultMachineId` = COALESCE((SELECT `r`.`machineId` FROM `routing_rule` `r` WHERE `r`.`teamId` = `team`.`id` AND `r`.`use` = 'session' AND `r`.`machineId` IS NOT NULL), (SELECT `m`.`id` FROM `machine` `m` WHERE `m`.`teamId` = `team`.`id` AND (SELECT COUNT(*) FROM `machine` `c` WHERE `c`.`teamId` = `team`.`id`) = 1));

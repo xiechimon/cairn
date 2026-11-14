@@ -8,7 +8,7 @@ import { coordinatorTurnSnapshot, type step, todo } from '../db/schema.js';
 
 type StepRow = typeof step.$inferSelect;
 
-export const COORDINATOR_SNAPSHOT_SCHEMA_VERSION = 1;
+export const COORDINATOR_SNAPSHOT_SCHEMA_VERSION = 2;
 export const COORDINATOR_SNAPSHOT_PAYLOAD_MAX_BYTES = 2 * 1024 * 1024;
 export const COORDINATOR_SNAPSHOT_MAX_RECORDS = 10_000;
 export const COORDINATOR_SNAPSHOT_MAX_CALL_VIEWS = 128;
@@ -235,7 +235,11 @@ export function sealCoordinatorTurnSnapshot(
   try {
     if (capture.overLimit) throw new Error('capture view or record limit crossed');
     const parsed = snapshotPayload.parse({ claim: capture.claim, toolViews: capture.views });
-    const redacted = redactSecrets(parsed);
+    const viewsRedacted = redactSecrets(parsed.toolViews);
+    const redacted = {
+      value: { claim: parsed.claim, toolViews: viewsRedacted.value },
+      count: viewsRedacted.count,
+    };
     const payloadText = JSON.stringify(redacted.value);
     if (Buffer.byteLength(payloadText, 'utf8') > COORDINATOR_SNAPSHOT_PAYLOAD_MAX_BYTES)
       throw new Error('payload limit exceeded');

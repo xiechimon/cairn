@@ -126,12 +126,15 @@ test('scrolling to the top loads the older page and keeps the reading position',
   const requested = await mockPagedHistory(page, 250, 100, false, olderGate);
   await page.goto('/app');
   await expect(row(page, 'answer 249')).toBeInViewport();
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
   await scrollUntilShown(page, 'question 150');
   await expect.poll(() => requested).toEqual([null, 'h-0150']);
   const before = await offsetOf(page, 'question 150');
   releaseOlder();
   await expect(row(page, 'question 148')).toHaveCount(1);
   await expect.poll(() => offsetOf(page, 'question 150')).toBeCloseTo(before, 0);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
 
   await scrollUntilShown(page, 'question 50');
   await scrollUntilShown(page, 'question 0');

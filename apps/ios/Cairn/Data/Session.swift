@@ -80,7 +80,7 @@ final class Session {
             session: urlSession
         )
         guard let team = try await candidate.teams().first else {
-            throw CairnError.server(status: 404, message: "This token has no team.")
+            throw CairnError.server(status: 404, message: String(localized: "This token has no team."))
         }
         KeychainToken.write(candidate.credentials.token, account: trimmed)
         UserDefaults.standard.set(trimmed, forKey: Self.serverKey)
@@ -93,7 +93,7 @@ final class Session {
         guard model == nil, let client else { return }
         do {
             guard let team = try await client.teams().first else {
-                throw CairnError.server(status: 404, message: "This token has no team.")
+                throw CairnError.server(status: 404, message: String(localized: "This token has no team."))
             }
             restoreError = nil
             model = AppModel(client: client, team: team)

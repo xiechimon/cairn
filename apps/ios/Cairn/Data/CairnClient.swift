@@ -8,10 +8,10 @@ enum CairnError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .badServerURL: "Enter a server address such as http://localhost:8787."
-        case .unauthorized: "The server rejected this token."
-        case .server(let status, let message): "Server error \(status): \(message)"
-        case .offline(let reason): "Could not reach the server. \(reason)"
+        case .badServerURL: String(localized: "Enter a server address such as http://localhost:8787.")
+        case .unauthorized: String(localized: "The server rejected this token.")
+        case .server(let status, let message): String(localized: "Server error \(status): \(message)")
+        case .offline(let reason): String(localized: "Could not reach the server. \(reason)")
         }
     }
 }
@@ -44,6 +44,10 @@ struct CairnClient: Sendable {
 
     func projects(teamId: String) async throws -> [Project] {
         try await get("/api/projects", query: [URLQueryItem(name: "teamId", value: teamId)])
+    }
+
+    func machines(teamId: String) async throws -> [Machine] {
+        try await get("/api/teams/\(teamId)/machines")
     }
 
     func messageTask(taskId: String, content: String) async throws -> TaskMessageResult {
@@ -81,6 +85,24 @@ struct CairnClient: Sendable {
         try await post("/api/teams/\(teamId)/chief/threads", body: SendBody(content: content))
     }
 
+    func uploadAttachment(_ data: Data, fileName: String, mimeType: String) async throws -> String {
+        let grant: UploadGrant = try await post("/api/uploads/grant", body: GrantBody(
+            fileName: fileName, mimeType: mimeType, size: data.count
+        ))
+        let boundary = UUID().uuidString
+        var body = Data()
+        body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"grant\"\r\n\r\n\(grant.grant)\r\n".utf8))
+        body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"\(fileName.replacingOccurrences(of: "\"", with: "'"))\"\r\nContent-Type: \(mimeType)\r\n\r\n".utf8))
+        body.append(data)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
+        var request = authorized(url("\(grant.uploadUrl)/upload"))
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        let _: Accepted = try await perform(request)
+        return "![\(fileName)](attachment:\(grant.key))"
+    }
+
     func stream(threadId: String) -> AsyncThrowingStream<StreamEvent, Error> {
         let request = authorized(url("/api/conversations/\(threadId)/stream"), accept: "text/event-stream")
         let session = self.session
@@ -103,6 +125,20 @@ struct CairnClient: Sendable {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    private struct GrantBody: Encodable {
+        let kind = "attachment"
+        let fileName: String
+        let mimeType: String
+        let size: Int
+        let scope = "message"
+    }
+
+    private struct UploadGrant: Decodable {
+        let uploadUrl: String
+        let grant: String
+        let key: String
     }
 
     private struct AnswerBody: Encodable {

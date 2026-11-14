@@ -46,7 +46,7 @@ const MENTIONING = MESSAGES.map((message) =>
     : message,
 );
 
-test('a task the Coordinator created is one reference row above the reply that announced it, with no card', async ({
+test('a task the Coordinator created is one reference row below the reply that announced it, with no card', async ({
   page,
 }) => {
   await mockLive(page, {
@@ -76,7 +76,7 @@ test('a task the Coordinator created is one reference row above the reply that a
   await expect(stream).not.toContainText('updates:');
   const tileBox = await ref.locator('span.grid').boundingBox();
   const bubbleBox = await reply.getByTestId('chief-reply-bubble').boundingBox();
-  expect(bubbleBox!.y - (tileBox!.y + tileBox!.height)).toBe(8);
+  expect(tileBox!.y - (bubbleBox!.y + bubbleBox!.height)).toBe(8);
   await ref.click();
   await expect(page).toHaveURL(new RegExp(`thread=${TASK.id}`));
 });

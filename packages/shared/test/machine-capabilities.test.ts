@@ -7,6 +7,7 @@ import {
   machineHardwareSchema,
   machinePresenceBodySchema,
   machineRecordSchema,
+  osPlatformOf,
   parseReportedCapabilities,
   requiredCapabilitiesSchema,
   stepJournalRowSchema,
@@ -372,4 +373,22 @@ it('keeps a valid agent-reach report and drops a malformed one without losing th
       agentReach: { version: '1.6.1', channels: [{ channel: 'x'.repeat(33), status: 'ok' }] },
     }),
   ).toEqual(report);
+});
+
+describe('Runner OS platform', () => {
+  it('maps Node platform names, with Windows as its own value', () => {
+    expect(osPlatformOf('linux')).toBe('linux');
+    expect(osPlatformOf('darwin')).toBe('darwin');
+    expect(osPlatformOf('win32')).toBe('windows');
+    expect(osPlatformOf('freebsd')).toBe('other');
+  });
+
+  it('a reported windows platform survives parsing; an unknown one is dropped', () => {
+    expect(
+      parseReportedCapabilities({ mcpServers: [], skills: [], osPlatform: 'windows' })?.osPlatform,
+    ).toBe('windows');
+    expect(
+      parseReportedCapabilities({ mcpServers: [], skills: [], osPlatform: 'win32' })?.osPlatform,
+    ).toBeUndefined();
+  });
 });

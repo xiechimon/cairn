@@ -1,20 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { mockLive, TASK, THREAD } from './chief-home-mock';
 
-const STATUS = {
-  done: '已完成',
-  verified: '已完成',
-  failed: '失败',
-  review: '审阅中',
-} as const;
-
 for (const [label, phase, verified] of [
   ['done', 'done', false],
   ['verified', 'done', true],
   ['failed', 'failed', undefined],
   ['review', 'review', undefined],
 ] as const) {
-  test(`${label}: the task report names its status and the event turn stays silent`, async ({
+  test(`${label}: the task report is one title-only sub-thread row and the event turn stays silent`, async ({
     page,
   }) => {
     await mockLive(page, {
@@ -48,13 +41,15 @@ for (const [label, phase, verified] of [
           createdAt: 31,
         },
       ],
-      todos: [],
+      todos: [{ ...TASK, title: 'Repair board counts', phase: phase === 'done' ? 'done' : phase }],
     });
     await page.goto('/app');
     const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-    const marker = stream.getByTestId('thread-report-marker');
-    await expect(marker).toHaveText(`Repair board counts：${STATUS[label]}`);
-    await expect(marker.getByRole('link')).toHaveAttribute('href', `/app?thread=${TASK.id}`);
+    const row = stream.getByTestId('chief-sub-thread').getByTestId('chief-task-ref');
+    await expect(row).toHaveCount(1);
+    await expect(row).toHaveText(/^Repair board counts/);
+    await expect(row).toHaveAttribute('href', `/app?thread=${TASK.id}`);
+    await expect(row.locator('[data-slot="task-ref-elbow"]')).toHaveCount(0);
     await expect(stream.getByTestId('chief-bubble')).toHaveCount(1);
     await expect(stream).not.toContainText('[wake:');
     await expect(stream).not.toContainText('Internal worker reporting instructions');
@@ -171,261 +166,128 @@ test('a notify_user notice from an event turn shows in the conversation', async 
   await expect(stream).not.toContainText('Internal failure instructions');
 });
 
-const NEEDS_YOU_ROWS = [
-  { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
-  {
-    id: 'report',
-    role: 'system',
-    content: JSON.stringify({
-      kind: 'thread-report',
-      todoId: TASK.id,
-      phase: 'needs-you',
-      seqNum: TASK.seqNum,
-      title: 'Add an export',
-      line: 'Which export format?',
-    }),
-    createdAt: 20,
-  },
-];
+const report = (id: string, phase: string, createdAt: number, line?: string) => ({
+  id,
+  role: 'system',
+  content: JSON.stringify({
+    kind: 'thread-report',
+    todoId: TASK.id,
+    phase,
+    seqNum: TASK.seqNum,
+    title: TASK.title,
+    ...(line !== undefined ? { line } : {}),
+  }),
+  createdAt,
+});
 
-test('a needs-you report shows the thread own line and answers the question through the thread message path', async ({
+const relay = (id: string, by: 'user' | 'coordinator', excerpt: string, createdAt: number) => ({
+  id,
+  role: 'system',
+  content: JSON.stringify({
+    kind: 'thread-message',
+    todoId: TASK.id,
+    seqNum: TASK.seqNum,
+    title: TASK.title,
+    excerpt,
+    delivered: 'steer',
+    conversationId: 'build-1',
+    by,
+  }),
+  createdAt,
+});
+
+test('reports and relayed messages of one thread show one sub-thread row with no text, no reply and no report icon', async ({
   page,
 }) => {
-  const sent: Record<string, unknown>[] = [];
-  await mockLive(
-    page,
-    {
-      threads: [THREAD],
-      messages: NEEDS_YOU_ROWS,
-      todos: [{ ...TASK, phase: 'needs_input' }],
-    },
-    (path, route, json) => {
-      if (path !== `/api/todos/${TASK.id}/messages` || route.request().method() !== 'POST') return;
-      sent.push(route.request().postDataJSON() as Record<string, unknown>);
-      return json({ todoId: TASK.id, conversationId: 'build-1', delivered: 'steer' }, 201);
-    },
-  );
-  await page.goto('/app');
-  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-  const marker = stream.getByTestId('thread-report-marker');
-  await expect(marker).toHaveAttribute('data-phase', 'needs-you');
-  await expect(marker).toHaveText('Add an export：待你决定Which export format?');
-  await stream.getByTestId('thread-report-reply').getByRole('button', { name: '回复' }).click();
-  await page.getByRole('textbox', { name: '回复这个任务' }).fill('JSON please');
-  await page.keyboard.press('Enter');
-  await expect.poll(() => sent).toHaveLength(1);
-  expect(sent[0]).toMatchObject({ content: 'JSON please' });
-  expect(typeof sent[0]?.clientMessageId).toBe('string');
-});
-
-test('with several questions pending, a needs-you report reply moves the composer to that thread question and its chips', async ({
-  page,
-}) => {
-  const pending = (requestId: string, todoId: string, text: string, createdAt: number) => ({
-    id: `row-${requestId}`,
-    role: 'assistant',
-    createdAt,
-    content: JSON.stringify({
-      kind: 'ask_user_question',
-      requestId,
-      status: 'pending',
-      questions: [
-        {
-          header: text,
-          question: text,
-          options: [{ label: `${text} A`, recommended: true }, { label: `${text} B` }],
-        },
-      ],
-      answers: null,
-      provenance: `watch:${todoId}`,
-    }),
-  });
-  await mockLive(page, {
-    threads: [THREAD],
-    messages: [
-      ...NEEDS_YOU_ROWS,
-      pending('ask-other', 'todo-other', 'Which search engine?', 21),
-      pending('ask-export', TASK.id, 'Which export format?', 22),
-    ],
-    todos: [{ ...TASK, phase: 'needs_input' }],
-  });
-  await page.goto('/app');
-  const block = page.getByTestId('chief-question');
-  await expect(block.getByTestId('chief-question-text')).toContainText('Which search engine?');
-  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-  await stream.getByTestId('thread-report-reply').getByRole('button', { name: '回复' }).click();
-  await expect(block.getByTestId('chief-question-text')).toContainText('Which export format?');
-  await expect(block.getByRole('button', { name: 'Which export format? A' })).toBeVisible();
-  await expect(page.getByRole('textbox', { name: '回复这个任务' })).toHaveCount(0);
-});
-
-test('a needs-you report offers no reply once the question is answered', async ({ page }) => {
-  await mockLive(page, {
-    threads: [THREAD],
-    messages: NEEDS_YOU_ROWS,
-    todos: [{ ...TASK, phase: 'building' }],
-  });
-  await page.goto('/app');
-  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-  await expect(stream.getByTestId('thread-report-marker')).toBeVisible();
-  await expect(stream.getByTestId('thread-report-reply')).toHaveCount(0);
-});
-
-test('only the newest needs-you report of a thread offers a reply', async ({ page }) => {
-  const asked = (id: string, line: string, createdAt: number) => ({
-    id,
-    role: 'system',
-    content: JSON.stringify({
-      kind: 'thread-report',
-      todoId: TASK.id,
-      phase: 'needs-you',
-      seqNum: TASK.seqNum,
-      title: 'Add an export',
-      line,
-    }),
-    createdAt,
-  });
   await mockLive(page, {
     threads: [THREAD],
     messages: [
       { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
-      asked('first-question', 'Which export format?', 20),
-      asked('second-question', 'Which delimiter?', 30),
+      relay('m1', 'coordinator', 'Use CSV instead', 20),
+      report('q1', 'needs-you', 30, 'Which export format?'),
+      relay('m2', 'user', 'JSON please', 40),
+      report('q2', 'review', 50),
     ],
     todos: [{ ...TASK, phase: 'needs_input' }],
   });
   await page.goto('/app');
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-  await expect(stream.getByTestId('thread-report-marker')).toHaveCount(2);
-  await expect(stream.getByTestId('thread-report-reply')).toHaveCount(1);
-  const replyAfter = (text: string) =>
-    stream
-      .getByTestId('thread-report-marker')
-      .filter({ hasText: text })
-      .locator('xpath=following-sibling::*[@data-testid="thread-report-reply"]');
-  await expect(replyAfter('Which delimiter?')).toHaveCount(1);
-  await expect(replyAfter('Which export format?')).toHaveCount(0);
-});
-
-test('user relay markers stay hidden while Coordinator messages remain visible', async ({ page }) => {
-  const marker = (by: 'user' | 'coordinator', excerpt: string, createdAt: number) => ({
-    id: `msg-${by}`,
-    role: 'system',
-    content: JSON.stringify({
-      kind: 'thread-message',
-      todoId: TASK.id,
-      seqNum: TASK.seqNum,
-      title: TASK.title,
-      excerpt,
-      delivered: 'steer',
-      conversationId: 'build-1',
-      by,
-    }),
-    createdAt,
-  });
-  await mockLive(page, {
-    threads: [THREAD],
-    messages: [
-      { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
-      marker('user', 'JSON please', 20),
-      marker('coordinator', 'Use CSV instead', 30),
-    ],
-    todos: [],
-  });
-  await page.goto('/app');
-  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-  await expect(stream.getByTestId('thread-activity')).toHaveCount(0);
-  await expect(stream.getByTestId('thread-message-marker')).toHaveText(`Coordinator 直接对 ${TASK.title} 说：Use CSV instead`);
+  const row = stream.getByTestId('chief-sub-thread');
+  await expect(row).toHaveCount(1);
+  await expect(row.getByTestId('chief-task-ref')).toHaveAttribute('data-phase', 'needs_input');
+  await expect(stream).not.toContainText('Which export format?');
+  await expect(stream).not.toContainText('Use CSV instead');
   await expect(stream).not.toContainText('JSON please');
+  await expect(stream.getByTestId('thread-report-reply')).toHaveCount(0);
+  await expect(stream.getByTestId('thread-report-marker')).toHaveCount(0);
   await expect(stream.getByTestId('chief-bubble')).toHaveText('Add an export');
 });
 
-test('events about one thread coalesce, repeated statuses dedupe, another thread breaks the group', async ({
+test('a thread already shown under the reply that started it adds no row for its later reports', async ({
   page,
 }) => {
-  const event = (
-    id: string,
-    content: Record<string, unknown>,
-    createdAt: number,
-    thread = { todoId: TASK.id, seqNum: TASK.seqNum, title: TASK.title },
-  ) => ({
-    id,
-    role: 'system',
-    content: JSON.stringify({ ...thread, ...content }),
-    createdAt,
-  });
-  const message = (
-    id: string,
-    createdAt: number,
-    thread?: { todoId: string; seqNum: number; title: string },
-  ) =>
-    event(
-      id,
-      { kind: 'thread-message', excerpt: id, delivered: 'steer', conversationId: 'build-1', by: 'coordinator' },
-      createdAt,
-      thread,
-    );
-  const review = (id: string, createdAt: number) =>
-    event(id, { kind: 'thread-report', phase: 'review' }, createdAt);
   await mockLive(page, {
     threads: [THREAD],
     messages: [
       { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
-      message('one', 20),
-      message('two', 21),
-      review('r1', 22),
-      review('r2', 23),
-      message('elsewhere', 24, { todoId: 'other-todo', seqNum: 3, title: 'Trim the log' }),
-    ],
-    todos: [],
-  });
-  await page.goto('/app');
-  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-  const group = stream.getByTestId('thread-activity');
-  await expect(group).toHaveCount(1);
-  await expect(group.getByTestId('thread-activity-summary')).toHaveText(`${TASK.title} · 2 次追问 · 审阅中`);
-  await group.getByTestId('thread-activity-toggle').click();
-  await expect(group.getByTestId('thread-activity-event')).toHaveCount(3);
-  await expect(stream.getByTestId('thread-message-marker')).toHaveText('Coordinator 直接对 Trim the log 说：elsewhere');
-  const box = await group.boundingBox();
-  const chat = await stream.boundingBox();
-  if (box === null || chat === null) throw new Error('no box');
-  expect(box.x - chat.x).toBeLessThan(20);
-  const decoration = await group.getByTestId('thread-activity-summary').evaluate((node) => getComputedStyle(node).textDecorationLine);
-  expect(decoration).toBe('none');
-});
-
-test('a parked question keeps its reply after a later review report', async ({ page }) => {
-  const report = (id: string, phase: string, createdAt: number) => ({
-    id,
-    role: 'system',
-    content: JSON.stringify({
-      kind: 'thread-report',
-      todoId: TASK.id,
-      phase,
-      seqNum: TASK.seqNum,
-      title: 'Add an export',
-      ...(phase === 'needs-you' ? { line: 'Which export format?' } : {}),
-    }),
-    createdAt,
-  });
-  await mockLive(page, {
-    threads: [THREAD],
-    messages: [
-      { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
-      report('question', 'needs-you', 20),
-      report('parked', 'review', 30),
+      {
+        id: 'started',
+        role: 'assistant',
+        content: `Started [#${TASK.seqNum}](todo:${TASK.id}).`,
+        createdAt: 20,
+      },
+      report('q1', 'needs-you', 30, 'Which export format?'),
+      {
+        id: 'later',
+        role: 'assistant',
+        content: `[#${TASK.seqNum}](todo:${TASK.id}) is waiting on you.`,
+        createdAt: 40,
+      },
     ],
     todos: [{ ...TASK, phase: 'needs_input' }],
   });
   await page.goto('/app');
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-  await expect(stream.getByTestId('thread-report-marker')).toHaveCount(2);
-  await expect(stream.getByTestId('thread-report-reply')).toHaveCount(1);
-  await expect(
-    stream
-      .getByTestId('thread-report-marker')
-      .filter({ hasText: 'Which export format?' })
-      .locator('xpath=following-sibling::*[@data-testid="thread-report-reply"]'),
-  ).toHaveCount(1);
+  await expect(stream.getByTestId('chief-task-ref')).toHaveCount(1);
+  await expect(stream.getByTestId('chief-sub-thread')).toHaveCount(0);
+  const first = stream.getByTestId('chief-msg').filter({ hasText: 'Started' });
+  await expect(first.getByTestId('chief-task-ref')).toHaveCount(1);
+});
+
+test('research opened before planning hangs under its code task as a nested row', async ({
+  page,
+}) => {
+  const research = {
+    ...TASK,
+    id: 'todo-research',
+    seqNum: 10,
+    title: 'Research export formats',
+    phase: 'building',
+    output: 'info',
+    sourceKind: 'research-before-plan',
+    sourceRef: `before-plan:${TASK.id}`,
+  };
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
+      {
+        id: 'started',
+        role: 'assistant',
+        content: `Started [#${TASK.seqNum}](todo:${TASK.id}); it researches first.`,
+        createdAt: 20,
+      },
+    ],
+    todos: [{ ...TASK, phase: 'queued' }, research],
+  });
+  await page.goto('/app');
+  const refs = page.getByTestId('home-c').getByTestId('chief-task-refs');
+  await expect(refs.getByTestId('chief-task-ref')).toHaveText([
+    new RegExp(`^${TASK.title}`),
+    /^Research export formats/,
+  ]);
+  const [parent, child] = await refs
+    .getByTestId('chief-task-ref')
+    .evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().left));
+  expect(child! - parent!).toBe(24);
 });

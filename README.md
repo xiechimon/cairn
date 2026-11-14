@@ -20,7 +20,7 @@
 
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/hero-en-dark.webp">
-    <img alt="Cairn on desktop: the Coordinator conversation with a decision waiting on you, and a thread report open beside it" src="docs/assets/readme/hero-en-light.webp" width="100%">
+    <img alt="Cairn on a MacBook, installed as a web app with a thread report open, next to the Cairn iOS app on an iPhone" src="docs/assets/readme/hero-en-light.webp" width="100%">
   </picture>
 </div>
 
@@ -38,8 +38,8 @@ Tell one Coordinator what you want, from code to your own affairs. It opens a th
 <table>
   <tr>
     <td width="33%"><picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/home-en-dark.webp">
-    <img alt="Cairn on a phone: a request, two thread cards and a decision with three options" src="docs/assets/readme/home-en-light.webp" width="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/ios-home-en-dark.webp">
+    <img alt="The Cairn iOS app: two requests, the threads they started and a decision with three options" src="docs/assets/readme/ios-home-en-light.webp" width="100%">
   </picture></td>
     <td width="33%"><picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/work-en-dark.webp">
