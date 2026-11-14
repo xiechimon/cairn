@@ -1401,6 +1401,7 @@ export const EN: Record<string, string> = {
   回答选项: 'Answer options',
   提交: 'Submit',
   下一步: 'Next',
+  看调研报告: 'Open research report',
   '提交回答失败，请重试。': 'Could not submit your answers. Try again.',
   '取消提问失败，请重试。': 'Could not dismiss the question. Try again.',
   备用模型: 'Fallback models',

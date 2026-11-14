@@ -21,6 +21,7 @@ interface GlanceSource {
   title: string;
   sourceKind?: string | null;
   sourceRef?: string | null;
+  output?: string;
 }
 
 export function todoGlanceOf(todo: GlanceSource): TodoGlance {
@@ -34,6 +35,7 @@ export function todoGlanceOf(todo: GlanceSource): TodoGlance {
     ...(todo.seqNum !== undefined ? { seq: todo.seqNum } : {}),
     title: todo.title,
     ...(parentId !== undefined ? { parentId } : {}),
+    ...(todo.output === 'info' ? { report: true } : {}),
   };
 }
 
