@@ -4,7 +4,7 @@ Status: implemented with the PR that adds this document. Baseline `origin/main` 
 
 ## Problem
 
-The owner's ask (2026-11-14): "把引导做好，就是引导，帮我给用户配置一些什么权限什么的" — a second person must go from install to first result without help. Today the machine page shows `Agent 的权限` with a browser switch whose hint says `这台机器还不支持浏览器。` and nothing else. When the host screen tools fail on macOS because Accessibility is not granted, or on Linux because AT-SPI is not reachable, the only error is a late refusal inside a step transcript. Nothing on the settings page tells the person what to grant.
+The owner's ask (2026-11-14) was to make the onboarding guidance good: guide the user to grant the permissions the assistant needs, so a second person goes from install to first result without help. Today the machine page shows `Agent 的权限` with a browser switch whose hint says `这台机器还不支持浏览器。` and nothing else. When the host screen tools fail on macOS because Accessibility is not granted, or on Linux because AT-SPI is not reachable, the only error is a late refusal inside a step transcript. Nothing on the settings page tells the person what to grant.
 
 ## What exists today
 
