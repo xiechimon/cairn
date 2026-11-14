@@ -19,6 +19,20 @@ private func page(_ ids: [String], next: String?) -> String {
     return #"{"messages":[\#(rows.joined(separator: ","))],"activeRun":null,"nextCursor":\#(cursor)}"#
 }
 
+private func sentContent(_ request: URLRequest) -> String? {
+    guard let stream = request.httpBodyStream else { return nil }
+    stream.open()
+    defer { stream.close() }
+    var data = Data()
+    var buffer = [UInt8](repeating: 0, count: 4096)
+    while stream.hasBytesAvailable {
+        let count = stream.read(&buffer, maxLength: buffer.count)
+        guard count > 0 else { break }
+        data.append(buffer, count: count)
+    }
+    return (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["content"] as? String
+}
+
 @MainActor
 final class ClientBehaviorTests: XCTestCase {
     private let server = URL(string: "http://stub.test")!
@@ -198,6 +212,49 @@ final class ClientBehaviorTests: XCTestCase {
         XCTAssertEqual(conversation, "build_2")
         XCTAssertEqual(StubServer.requests.filter { $0.httpMethod == "POST" }.count, 1)
         XCTAssertEqual(model.error, "Server error 503: refresh down")
+    }
+
+    func testThreadQuestionIsAnsweredByATaskMessage() async throws {
+        let session = StubServer.session { request in
+            request.httpMethod == "POST"
+                ? .init(status: 201, body: #"{"todoId":"t1","conversationId":"build_2","delivered":"steered"}"#)
+                : .init(status: 200, body: "[]")
+        }
+        let model = AppModel(client: client(session), team: Team(id: "team_1", name: "Team"))
+        let json = #"{"id":"q1","role":"assistant","createdAt":1,"content":{"kind":"ask_user_question","requestId":"req_1","status":"pending","questions":[{"header":"Export limit","question":"Drop the cap?","multiSelect":false,"options":[{"label":"Drop the cap"},{"label":"Keep 50,000 rows"}]}],"answers":null}}"#
+        let message = try JSONDecoder().decode(ThreadMessage.self, from: Data(json.utf8))
+        let question = PendingQuestion(message: message, ask: try XCTUnwrap(message.question))
+
+        let tapped = try await model.answer(question, answers: [QuestionAnswer(header: "Export limit", choices: ["Drop the cap"], text: nil)], inTask: "t1")
+        let typed = try await model.answer(question, answers: [QuestionAnswer(header: "Export limit", choices: ["Keep it until Friday"], text: nil)], inTask: "t1")
+
+        XCTAssertEqual(tapped, "build_2")
+        XCTAssertEqual(typed, "build_2")
+        let sent = StubServer.requests.filter { $0.httpMethod == "POST" }
+        XCTAssertEqual(sent.map { $0.url?.path }, ["/api/todos/t1/messages", "/api/todos/t1/messages"])
+        XCTAssertEqual(sent.map(sentContent), ["Drop the cap", "Keep it until Friday"])
+    }
+
+    func testMultiQuestionReplyNamesEachHeader() {
+        let ask = AskQuestion(
+            requestId: "req_2",
+            status: "pending",
+            questions: [
+                QuestionItem(header: "Limit", question: "Drop it?", options: [QuestionOption(label: "Drop", description: nil, recommended: true)], multiSelect: nil),
+                QuestionItem(header: "Formats", question: "Which?", options: [
+                    QuestionOption(label: "CSV", description: nil, recommended: nil),
+                    QuestionOption(label: "JSON", description: nil, recommended: nil),
+                ], multiSelect: true),
+            ],
+            answers: nil
+        )
+        XCTAssertEqual(
+            ask.replyText([
+                QuestionAnswer(header: "Limit", choices: ["Drop"], text: nil),
+                QuestionAnswer(header: "Formats", choices: ["CSV", "JSON"], text: nil),
+            ]),
+            "Limit: Drop\nFormats: CSV, JSON"
+        )
     }
 
     func testRestoreFailureIsRecoverable() async {

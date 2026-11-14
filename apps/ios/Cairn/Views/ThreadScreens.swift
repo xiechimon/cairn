@@ -18,7 +18,10 @@ struct TaskThreadView: View {
             error: error,
             placeholder: "Message this thread",
             onSend: send,
-            onAnswer: { _, _ in },
+            onAnswer: { question, answers in
+                conversationId = try await model.answer(question, answers: answers, inTask: task.id)
+                await reload()
+            },
             upload: model.client.uploadAttachment
         ) {
             VStack(alignment: .leading, spacing: 12) {

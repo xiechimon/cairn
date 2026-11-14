@@ -104,6 +104,10 @@ final class AppModel {
         await load()
     }
 
+    func answer(_ question: PendingQuestion, answers: [QuestionAnswer], inTask taskId: String) async throws -> String {
+        try await message(taskId: taskId, content: question.ask.replyText(answers))
+    }
+
     func message(taskId: String, content: String) async throws -> String {
         let conversation = try await client.messageTask(taskId: taskId, content: content).conversationId
         await load()

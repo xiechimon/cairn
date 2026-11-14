@@ -114,6 +114,12 @@ struct AskQuestion: Decodable, Hashable, Sendable {
 
     var isPending: Bool { status == "pending" }
 
+    func replyText(_ answers: [QuestionAnswer]) -> String {
+        let values = answers.map { $0.text ?? ($0.choices ?? []).joined(separator: ", ") }
+        if values.count == 1 { return values[0] }
+        return zip(answers, values).map { "\($0.header): \($1)" }.joined(separator: "\n")
+    }
+
     func reply(_ replies: [Int: [String]]) -> [QuestionAnswer]? {
         var answers: [QuestionAnswer] = []
         for (index, item) in questions.enumerated() {
