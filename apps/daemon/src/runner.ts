@@ -27,7 +27,7 @@ import { AskChannel } from './ask-channel.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
 import { piWorktreeSkillDirs } from './backend/skills.js';
-import { assertNoLegacyBrief, composeBrief } from './brief-file.js';
+import { composeSessionBrief } from './brief-file.js';
 import type { ClaudeCodeAuthProbe } from './claude-code-auth.js';
 import { claudeQuotaTrip, forwardClaudeRateLimit } from './claude-quota-trip.js';
 import {
@@ -66,7 +66,7 @@ import { sessionInjectedSkills, stepMcpEndpoints } from './step-skill-tool.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { seedStepTranscript } from './step-transcript-seed.js';
 import { StepTranscriptStream } from './step-transcript-stream.js';
-import { resetFreshSessionWorkspace, setUpStepWorkspace } from './step-workspace.js';
+import { resetReusedWorkspaceForFreshSession, setUpStepWorkspace } from './step-workspace.js';
 import {
   resolveStreamLimits,
   STREAM_DURATION_CAP_DEFAULT_MS,
@@ -548,47 +548,28 @@ async function runClaimedStep(
     redact,
   });
 
-  if (
-    ws !== null &&
-    deps.workspace &&
-    claimed.session.action === 'new' &&
-    !isReview &&
-    !attachmentVerify &&
-    ws.reused &&
-    headAtStart !== null
-  ) {
-    const reason = await resetFreshSessionWorkspace({
-      workspace: deps.workspace,
-      cwd: ws.cwd,
-      headAtStart,
-      planFile: join(deps.paths.plansDir, convId, PLAN_FILE_NAME),
-    });
-    if (reason === null) {
-      logger.workspace('返工新会话：工作区回退到分支头');
-    } else {
-      logger.step(`fresh-session worktree reset failed: ${reason}`);
-      transcript.upsert({
-        id: `fresh-reset-${stepId}`,
-        role: 'system',
-        content: `新会话轮未能回退工作区到分支头（${reason}）——上一轮未提交的改动可能带入本轮`,
-        createdAt: now(),
-      });
-    }
-  }
+  await resetReusedWorkspaceForFreshSession({
+    workspace: deps.workspace,
+    ws,
+    claimed,
+    headAtStart,
+    skip: isReview || attachmentVerify,
+    planFile: join(deps.paths.plansDir, convId, PLAN_FILE_NAME),
+    stepId,
+    transcript,
+    now,
+    log: { workspace: (line) => logger.workspace(line), step: (line) => logger.step(line) },
+  });
 
-  try {
-    assertNoLegacyBrief(cwd);
-    if (backend.brief !== undefined) {
-      sessionOpts.systemPrompt = composeBrief({
-        cwd,
-        backendId: backend.brief.backendId,
-        content: backend.brief.composeBody(sessionOpts, systemPrompt),
-      });
-    }
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
+  const briefError = composeSessionBrief({
+    cwd,
+    brief: backend.brief,
+    sessionOpts,
+    systemPrompt,
+  });
+  if (briefError !== null) {
     clearCredentials(creds);
-    await failStep(deps, heartbeat, stepId, `Runtime guidance could not be composed: ${reason}`);
+    await failStep(deps, heartbeat, stepId, briefError);
     return;
   }
 
