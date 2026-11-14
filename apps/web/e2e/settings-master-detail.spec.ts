@@ -203,13 +203,13 @@ test('machines are single-column rows: name, then status, runtime and capability
   await expect(detail(page)).toHaveCount(0);
 });
 
-test('expansion sections: runtimes, capacity, each row a label and description with the control on the right', async ({
+test('expansion sections: runtimes, each row a label and description with the control on the right', async ({
   page,
 }) => {
   await page.goto(MACHINES);
   await items(page).filter({ hasText: 'omarchy' }).getByTestId('machine-toggle').click();
   const pane = detail(page);
-  for (const name of ['运行时', '容量']) {
+  for (const name of ['运行时']) {
     await expect(pane.getByRole('heading', { name, exact: true })).toBeVisible();
   }
 
@@ -217,15 +217,6 @@ test('expansion sections: runtimes, capacity, each row a label and description w
   await expect(row).toContainText('Claude Code');
   await expect(row).toContainText('2.1.316');
   await expect(row.locator('svg[fill^="#"]')).toHaveCount(0);
-
-  const cap = pane.getByTestId('machine-concurrency');
-  await expect(cap).toBeVisible();
-  await expect(pane.getByTestId('machine-running')).toContainText('1/3');
-  const label = await pane.getByTestId('machine-capacity-label').boundingBox();
-  const control = await cap.boundingBox();
-  expect(label).not.toBeNull();
-  expect(control).not.toBeNull();
-  expect((control?.x ?? 0) > (label?.x ?? 0) + (label?.width ?? 0)).toBe(true);
 });
 
 test('the runtime link opens the row and an offline row says when it was last online and freezes its settings', async ({

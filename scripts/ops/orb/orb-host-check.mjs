@@ -14,7 +14,7 @@ export function parseHostCheck(input, { blockedPorts = [22, 5231] } = {}) {
   const statuses = [...input.headers.matchAll(/^HTTP\/\S+\s+(\d{3})([^\r\n]*)/gm)].filter(
     (match) => !/connection established/i.test(match[2]),
   );
-  const memory = /^MemoryMax=(\d+)\s*$/m.exec(input.memory);
+  const memoryUnlimited = /^MemoryMax=infinity$/m.test((input.memory ?? '').trim());
   let section = '';
   let manageForeignRules = 'yes';
   for (const line of (input.networkdConfig ?? '').split('\n')) {
@@ -68,7 +68,7 @@ export function parseHostCheck(input, { blockedPorts = [22, 5231] } = {}) {
       })
         ? 'ok'
         : 'failed',
-    memoryMax: memory ? Number(memory[1]) : null,
+    memoryUnlimited,
     homeVisible: input.homeExit === 0 ? false : input.homeExit === 1 ? true : null,
     negativeControl:
       input.negativeExit !== null &&
@@ -88,7 +88,7 @@ export function parseHostCheck(input, { blockedPorts = [22, 5231] } = {}) {
       record.firewall === 'ok' &&
       ['ok', 'inactive'].includes(record.ufw) &&
       record.networkReady === true &&
-      record.memoryMax === 4294967296 &&
+      record.memoryUnlimited === true &&
       record.homeVisible === false &&
       record.negativeControl === 'denied',
   };

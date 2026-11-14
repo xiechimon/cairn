@@ -401,7 +401,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### machines
 
-**Machines** (shipped). The machines page and machine detail: online state, capabilities, concurrency, revoke and evacuate.
+**Machines** (shipped). The machines page and machine detail: online state, capabilities, revoke and evacuate.
 
 - Research: [docs/research/machine-execution-plane.md](research/machine-execution-plane.md), [docs/research/t3code-devices-and-scope-2026-11-06.md](research/t3code-devices-and-scope-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/settings](design/references/settings), [docs/spec/11-model-service-and-machine-localization.md](spec/11-model-service-and-machine-localization.md)

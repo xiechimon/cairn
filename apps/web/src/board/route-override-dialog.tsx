@@ -33,12 +33,10 @@ import { useI18n } from '../i18n/provider.js';
 
 function buildOverride(
   machineId: string | null,
-  requireOrb: boolean,
   mcpServers: string[],
   models: string[] | undefined,
 ): RouteOverride | null {
   const requiredCapabilities: RequiredCapabilities = {
-    ...(requireOrb ? { executor: 'orb' as const } : {}),
     ...(mcpServers.length > 0 ? { mcpServers } : {}),
     ...(models !== undefined && models.length > 0 ? { models } : {}),
   };
@@ -73,7 +71,6 @@ export function RouteOverrideDialog({
   const sessionHasMachine =
     routingQ.data?.rules?.some((rule) => rule.use === 'session' && rule.machineId != null) === true;
   const [machineId, setMachineId] = useState<string | null>(initial?.machineId ?? null);
-  const [requireOrb, setRequireOrb] = useState(initial?.requiredCapabilities?.executor === 'orb');
   const [mcpServers, setMcpServers] = useState<string[]>(
     initial?.requiredCapabilities?.mcpServers ?? [],
   );
@@ -81,7 +78,6 @@ export function RouteOverrideDialog({
   useEffect(() => {
     if (!open) return;
     setMachineId(initial?.machineId ?? null);
-    setRequireOrb(initial?.requiredCapabilities?.executor === 'orb');
     setMcpServers(initial?.requiredCapabilities?.mcpServers ?? []);
   }, [open, initial]);
 
@@ -108,7 +104,6 @@ export function RouteOverrideDialog({
     }
     const routeOverride = buildOverride(
       machineId,
-      requireOrb,
       mcpServers,
       initial?.requiredCapabilities?.models,
     );
@@ -175,14 +170,6 @@ export function RouteOverrideDialog({
                 ))}
               </SelectContent>
             </Select>
-          </SettingsRow>
-          <SettingsRow label={t('要求 Orb')} hint={t('执行机须上报 Orb 沙箱执行器')}>
-            <ToggleSwitch
-              aria-label={t('要求 Orb')}
-              data-testid="route-override-orb"
-              checked={requireOrb}
-              onCheckedChange={setRequireOrb}
-            />
           </SettingsRow>
         </SettingsCard>
         <section className="flex flex-col gap-2">

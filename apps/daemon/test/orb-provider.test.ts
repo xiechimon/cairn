@@ -1,7 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { cpus } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
-import { OrbLifecycle, resolveOrbCap } from '../src/orb/lifecycle.js';
+import { OrbLifecycle, orbConcurrencyFromCpuCount, resolveOrbCap } from '../src/orb/lifecycle.js';
 import { HostOrbProvider, NspawnOrbProvider, type OrbCommandRunner } from '../src/orb/provider.js';
 import { rejectGuestExec } from './orb-fake.js';
 import { testTempDir } from './test-temp-dir.js';
@@ -163,7 +164,12 @@ test('lifecycle caps, serializes Threads, evicts idle machines and protects pend
   await lifecycle.sweep({ activeConversationIds: ['A'], now: Date.now() + 73 * 60 * 60_000 });
   expect((await provider.list()).map((handle) => handle.conversationId)).toEqual(['A']);
   expect(resolveOrbCap({ CAIRN_ORB_MAX: '4' }, 1)).toBe(1);
-  expect(resolveOrbCap({}, 4)).toBe(2);
+  expect(resolveOrbCap({}, 4)).toBe(orbConcurrencyFromCpuCount(cpus().length));
+  expect(resolveOrbCap({}, 1)).toBe(1);
+  expect(orbConcurrencyFromCpuCount(16)).toBe(4);
+  expect(orbConcurrencyFromCpuCount(4)).toBe(1);
+  expect(orbConcurrencyFromCpuCount(2)).toBe(1);
+  expect(orbConcurrencyFromCpuCount(64)).toBe(8);
 });
 
 test('same-Thread lifecycle runs serialize and active steps cannot be swept', async () => {

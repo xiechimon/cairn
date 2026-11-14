@@ -74,17 +74,10 @@ if ! cmp -s "$source_file" "$target_file"; then
   changes=$((changes + 1))
 fi
 unit=systemd-nspawn@$name.service
-current=$(systemctl show "$unit" -p MemoryMax -p CPUQuotaPerSecUSec -p TasksMax)
-if ! { grep -qx 'MemoryMax=4294967296' <<< "$current" &&
-       grep -qx 'CPUQuotaPerSecUSec=4s' <<< "$current" &&
-       grep -qx 'TasksMax=4096' <<< "$current"; }; then
-  properties=()
-  while IFS='=' read -r key value; do
-    case "$key" in MemoryMax|CPUQuota|TasksMax) properties+=("$key=$value");; esac
-  done < "$host_root/etc/systemd/system/systemd-nspawn@cairn-orb-.service.d/limits.conf"
-  [[ ${#properties[@]} == 3 ]] || { printf 'Invalid limits configuration\n' >&2; exit 1; }
-  printf 'systemctl set-property --runtime %s %s\n' "$unit" "${properties[*]}"
-  if ! $dry_run; then systemctl set-property --runtime "$unit" "${properties[@]}"; fi
-  changes=$((changes + 1))
+if ! $dry_run; then
+  if ! systemctl set-property --runtime "$unit" MemoryAccounting=true; then
+    printf 'set-property failed for %s\n' "$unit" >&2
+    exit 1
+  fi
 fi
 printf '%s changes\n' "$changes"

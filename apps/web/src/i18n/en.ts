@@ -122,7 +122,6 @@ export const EN: Record<string, string> = {
   已建任务: 'Created task',
   审阅中: 'In review',
   定时: 'Schedules',
-  '执行中 {n}': '{n} running',
   项目: 'Project', // sidebar group / search group / schedule-form field — one fit
   Coordinator: 'Coordinator',
   成果: 'Made',
@@ -859,28 +858,11 @@ export const EN: Record<string, string> = {
     'Queued: waiting for {machine} to come online ({ahead} ahead)',
   '排队中：等机器上线（前面 {ahead} 个）':
     'Queued: waiting for a machine to come online ({ahead} ahead)',
-  '执行中 {n}/{cap}': 'Running {n}/{cap}',
   // #1251 machines page capability annotation (daemon-reported inventory).
   能力清单未上报: 'Capabilities not reported',
   'MCP {n} · 本机技能 {m}': 'MCP {n} · local skills {m}',
   手动: 'Manual',
   推荐: 'Recommended',
-  估算: 'Estimate',
-  核数: 'Cores',
-  总内存: 'Total memory',
-  负载: 'Load',
-  '未收到能力指纹，按保守默认 {n} 估算':
-    'No capability fingerprint received; estimated at the conservative default of {n}',
-  恢复推荐: 'Reset to recommended',
-  并发上限: 'Concurrency limit',
-  '可选 {min}–{max}（按内存）': 'Range {min}–{max} (by memory)',
-  '可选 {min}–{max}（默认档位）': 'Range {min}–{max} (default)',
-  '推荐 {n}': 'Recommended {n}',
-  '当前值 {n} 超出可选范围': 'Current value {n} is outside the range',
-  减少并发上限: 'Decrease concurrency limit',
-  增加并发上限: 'Increase concurrency limit',
-  '并发上限 {n}': 'Concurrency limit {n}',
-  '并发上限 {n}，{source}': 'Concurrency limit {n}, {source}',
   // #905 activity phases (live row labels) + the freshness disclosure line.
   '正在连接模型...': 'Connecting to the model...',
   '模型思考中...': 'Model is thinking...',
@@ -1634,8 +1616,6 @@ export const EN: Record<string, string> = {
   路由覆盖: 'Route override',
   '本任务的机器与执行要求；调度在规则开启后生效。':
     'Per-task machine and capability requirements; applied when routing rules are on.',
-  '要求 Orb': 'Require Orb',
-  '执行机须上报 Orb 沙箱执行器': 'Executor must report the Orb sandbox',
   '要求的 MCP': 'Required MCP',
   '派发时要求执行机已安装这些 MCP 服务器': 'Dispatch requires these MCP servers on the executor',
   路由覆盖已保存: 'Route override saved',
@@ -1834,7 +1814,6 @@ export const EN: Record<string, string> = {
     'The runtimes that can take tasks on this machine, and their sign-in state.',
   能力: 'Capabilities',
   '这台机器上报的 MCP 与技能清单': 'The MCP servers and skills this machine reports',
-  容量: 'Capacity',
   管理: 'Manage',
   登录已过期: 'Sign-in expired',
   登录将过期: 'Sign-in expiring',

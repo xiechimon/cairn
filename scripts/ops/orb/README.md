@@ -55,7 +55,7 @@ not implement or substitute for it. A missing release does not fail the network
 host check, but guests need a published release to run a Thread.
 
 A passing result exits zero and contains `image: "cairn-orb-base"`,
-`cloneStartStop: "ok"`, `egress: "ok"`, `memoryMax: 4294967296`,
+`cloneStartStop: "ok"`, `egress: "ok"`, `memoryUnlimited: true`,
 `homeVisible: false`, `negativeControl: "denied"`, `privateEgress: "denied"`,
 `firewall: "ok"`, `ufw: "ok"` (or `"inactive"`), `foreignRules: "ok"` (or `"no-tun"`),
 and `networkReady: true`,
@@ -380,7 +380,7 @@ The `--json` result has `image` (base-image name or null), `cloneStartStop`
 `failed`), `firewall` (`ok` or `failed`), `ufw` (`ok`, `inactive` or
 `missing-rules`), `foreignRules` (`ok`, `managed`, `lost` or `no-tun`),
 `networkReady` (boolean), `networkWaitMs` (milliseconds or null),
-`ipv4` (address only or null), `memoryMax` (bytes or null),
+`ipv4` (address only or null), `memoryUnlimited` (boolean),
 `homeVisible` (boolean or null), `negativeControl` (`denied` or `failed`),
 `daemonRelease` (`{key, version, sha}` from `/var/lib/cairn-orb/dist/current.json`,
 or null when absent or unreadable), `ok` (boolean), and `errors` (string array).

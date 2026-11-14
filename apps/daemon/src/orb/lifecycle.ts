@@ -1,11 +1,29 @@
+import { cpus } from 'node:os';
+
 import type { OrbHandle, OrbProvider } from './provider.js';
 
 export const ORB_IDLE_STOP_MS = 20 * 60_000;
 export const ORB_IDLE_REMOVE_MS = 72 * 60 * 60_000;
 
+export const ORB_CONCURRENCY_PER_CPUS = 4;
+export const ORB_CONCURRENCY_FLOOR = 1;
+export const ORB_CONCURRENCY_CEILING = 8;
+
+export function orbConcurrencyFromCpuCount(cpuCount: number): number {
+  const adaptive = Math.floor(cpuCount / ORB_CONCURRENCY_PER_CPUS);
+  return Math.min(
+    ORB_CONCURRENCY_CEILING,
+    Math.max(ORB_CONCURRENCY_FLOOR, Number.isInteger(adaptive) ? adaptive : ORB_CONCURRENCY_FLOOR),
+  );
+}
+
 export function resolveOrbCap(env: NodeJS.ProcessEnv, localCap: number): number {
-  const max = Number(env.CAIRN_ORB_MAX ?? 2);
-  return Math.min(localCap, Number.isInteger(max) && max > 0 ? max : 2);
+  const override = Number(env.CAIRN_ORB_MAX);
+  const max =
+    Number.isInteger(override) && override > 0
+      ? override
+      : orbConcurrencyFromCpuCount(cpus().length);
+  return Math.min(localCap, max);
 }
 
 export class OrbLifecycle {
