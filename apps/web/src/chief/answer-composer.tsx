@@ -24,6 +24,7 @@ export interface AnswerComposerProps {
   tools: ReactNode;
   menu?: ReactNode;
   context?: ChiefContextUsage | undefined;
+  running?: boolean | undefined;
   threadId?: string | null;
   onFocusEnter: () => void;
   onFocusLeave: () => void;
@@ -41,6 +42,7 @@ export function AnswerComposer({
   tools,
   menu,
   context,
+  running,
   threadId = null,
   onFocusEnter,
   onFocusLeave,
@@ -98,6 +100,7 @@ export function AnswerComposer({
       tools={tools}
       menu={menu}
       context={context}
+      running={running}
       threadId={threadId}
       dropActive={dropActive}
     />

@@ -738,6 +738,7 @@ export function ChiefConversation({
               tools={answerActive ? null : composerTools}
               menu={answerActive ? null : composerMenu}
               context={chief.context}
+              running={chief.running}
               threadId={chief.threadId ?? null}
               dropActive={drop.active}
               seededFiles={live ? undefined : chief.composerFiles}
@@ -759,6 +760,7 @@ export function ChiefConversation({
                 tools={answerActive ? composerTools : null}
                 menu={answerActive ? composerMenu : null}
                 context={chief.context}
+                running={chief.running}
                 threadId={chief.threadId ?? null}
                 dropActive={drop.active}
               />
