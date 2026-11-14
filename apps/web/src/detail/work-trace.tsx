@@ -44,17 +44,57 @@ export function formatWorkDuration(seconds: number | null): string {
   return `${Math.floor(rounded / 60)}m ${rounded % 60}s`;
 }
 
+const THINK_HEADING = /^\*\*(.+?)\*\*$/gm;
+const TEST_COMMAND =
+  /\b(?:vitest|jest|pytest|mocha|playwright test|cargo test|go test)\b|\b(?:pnpm|npm|yarn|bun)(?: run)? (?:test|e2e)/;
+const NAMED_PURPOSES = 2;
+
 export function workPurposes(steps: readonly WorkStep[], running: boolean, t: TFunc): string[] {
-  const purposes = steps.flatMap((step) => {
-    if (step.kind !== 'call' || step.command === undefined || step.description === undefined)
-      return [];
+  const purposes = steps.flatMap((step, index) => {
+    if (step.kind === 'think') {
+      if (running && index !== steps.length - 1) return [];
+      const headings = [...step.text.matchAll(THINK_HEADING)].map((match) =>
+        (match[1] ?? '').trim(),
+      );
+      return running ? headings.slice(-1) : headings;
+    }
+    if (step.command === undefined || step.description === undefined) return [];
     if (running && !step.running) return [];
     const purpose = (step.localized === true ? t(step.description) : step.description).trim();
     return purpose === '' || purpose === (step.command.split('\n')[0] ?? '').trim()
       ? []
       : [purpose];
   });
-  return [...new Set(purposes)];
+  return [...new Set(purposes.filter((purpose) => purpose !== ''))].slice(0, NAMED_PURPOSES);
+}
+
+export function workOutcome(steps: readonly WorkStep[], t: TFunc): string[] {
+  const edited = new Set(
+    steps.flatMap((step) =>
+      step.kind === 'call' && step.action === 'edit' ? [step.target ?? ''] : [],
+    ),
+  );
+  const test = steps.findLast(
+    (step) =>
+      step.kind === 'call' &&
+      step.action === 'run' &&
+      !step.running &&
+      !step.unfinished &&
+      TEST_COMMAND.test(step.command ?? ''),
+  );
+  if (test?.kind === 'call')
+    return [
+      t(
+        edited.size > 0
+          ? test.error
+            ? '改完测试未通过'
+            : '改完测试通过'
+          : test.error
+            ? '测试未通过'
+            : '测试通过',
+      ),
+    ];
+  return edited.size > 0 ? [t('改了 {n} 个文件', { n: edited.size })] : [];
 }
 
 function stepTarget(step: Extract<WorkStep, { kind: 'call' }>): string {
@@ -234,14 +274,19 @@ export function WorkTrace({
   counts.edit = editPaths.size;
   const { text, failed } = traceSummary(t, counts, running);
   const purposes = workPurposes(item.steps, running, t);
+  const outcome = running || purposes.length === 0 ? [] : workOutcome(item.steps, t);
   return (
     <div className="my-2 min-w-0" data-testid="work-block">
       <div className="flex items-center gap-1">
         <TraceGroupSummary
           data-testid="work-summary"
           summary={purposes.length > 0 ? purposes.join(t('，')) : text}
+          outcome={outcome.length > 0 ? `${t('，')}${outcome.join(t('，'))}` : null}
           more={
-            !running && purposes.length > 0 && item.steps.length > purposes.length
+            !running &&
+            purposes.length > 0 &&
+            outcome.length === 0 &&
+            item.steps.length > purposes.length
               ? t('· {n} 步', { n: item.steps.length })
               : null
           }
