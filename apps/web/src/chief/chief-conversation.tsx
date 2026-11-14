@@ -148,8 +148,37 @@ export function ChiefScrollProvider({ children }: { children: React.ReactNode })
   );
 }
 
+export function useMentionGroups(): MentionGroups {
+  const { live, teamId } = useLiveData();
+  const todosQ = useTodos(teamId, live);
+  const projectsQ = useProjects(teamId, live);
+  const skillsQ = useSkills(teamId, live);
+  const machinesQ = useMachines(teamId, live);
+  return {
+    todo: (todosQ.data ?? []).map((td) => ({
+      id: td.id,
+      label: `#${td.seqNum} ${td.title}`,
+      seq: td.seqNum,
+      subtitle: td.phase,
+    })),
+    agent: [],
+    project: (projectsQ.data ?? []).map((p) => ({ id: p.id, label: p.name })),
+    skill: (skillsQ.data ?? []).map((s) => ({
+      id: s.id,
+      label: s.name,
+      subtitle: s.description ?? undefined,
+    })),
+    machine: (machinesQ.data ?? []).map((m) => ({
+      id: m.id,
+      label: m.name,
+      subtitle: machineSecondary(m, machinesQ.data ?? []) ?? undefined,
+    })),
+  };
+}
+
 export interface ChiefConversationProps {
   chief: ChiefContent;
+  mentionGroups: MentionGroups;
   onSettings?: () => void;
   onSend?: (text: string) => void | Promise<void>;
   onRewind?: (messageId: string) => void;
@@ -179,6 +208,7 @@ export interface ChiefConversationProps {
 
 export function ChiefConversation({
   chief,
+  mentionGroups,
   onSettings,
   onSend,
   onRewind,
@@ -237,29 +267,6 @@ export function ChiefConversation({
   const answerActive = mode === 'answer';
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
-  const projectsQ = useProjects(teamId, live);
-  const skillsQ = useSkills(teamId, live);
-  const machinesQ = useMachines(teamId, live);
-  const mentionGroups: MentionGroups = {
-    todo: (todosQ.data ?? []).map((td) => ({
-      id: td.id,
-      label: `#${td.seqNum} ${td.title}`,
-      seq: td.seqNum,
-      subtitle: td.phase,
-    })),
-    agent: [],
-    project: (projectsQ.data ?? []).map((p) => ({ id: p.id, label: p.name })),
-    skill: (skillsQ.data ?? []).map((s) => ({
-      id: s.id,
-      label: s.name,
-      subtitle: s.description ?? undefined,
-    })),
-    machine: (machinesQ.data ?? []).map((m) => ({
-      id: m.id,
-      label: m.name,
-      subtitle: machineSecondary(m, machinesQ.data ?? []) ?? undefined,
-    })),
-  };
   const onAttachment =
     onSend != null ? (files: File[]) => uploadMessageAttachments(files, t) : undefined;
   const { scrollToEnd } = useMessageScroller();
@@ -623,7 +630,7 @@ export function ChiefConversation({
               reserveEnd
               ref={viewportRef}
               data-testid="chief-body"
-              className="scrollbar-gutter-both [--scroll-fade-size:32px] in-data-[chat-top=under-header]:[--scroll-fade-size-top:80px] [html[data-narrow-chrome]_&]:[--scroll-fade-size-top:80px]"
+              className="scrollbar-gutter-both data-pending-scroll:visible data-pending-scroll:opacity-0 [--scroll-fade-size:32px] in-data-[chat-top=under-header]:[--scroll-fade-size-top:80px] [html[data-narrow-chrome]_&]:[--scroll-fade-size-top:80px]"
             >
               <MessageScrollerContent className={SCROLLER_CONTENT_CLS} data-testid="chief-stream">
                 <TodoGlanceContext.Provider value={glances}>
@@ -633,6 +640,7 @@ export function ChiefConversation({
                     {lead}
                     {day == null ? (
                       <VirtualStream
+                        cacheKey={chief.threadId ?? ''}
                         keys={streamLayout.keys}
                         renderRow={(n) => streamEntry(streamLayout, n)}
                         viewportRef={viewportRef}
