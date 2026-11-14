@@ -264,25 +264,30 @@ const conversationMessagesQuery = (conversationId: string | null | undefined) =>
   });
 
 export function useWarmConversationMessages(
-  conversationId: string | null,
-  prefetch: boolean,
+  retainedIds: readonly string[],
+  prefetchId: string | null,
 ): void {
   const queryClient = useQueryClient();
+  const retained = retainedIds.join('\n');
   useEffect(() => {
-    if (conversationId === null) return;
-    const retainer = new InfiniteQueryObserver(queryClient, {
-      ...conversationMessagesQuery(conversationId),
-      enabled: false,
-    });
-    return retainer.subscribe(() => {});
-  }, [conversationId, queryClient]);
+    if (retained === '') return;
+    const releases = retained.split('\n').map((conversationId) =>
+      new InfiniteQueryObserver(queryClient, {
+        ...conversationMessagesQuery(conversationId),
+        enabled: false,
+      }).subscribe(() => {}),
+    );
+    return () => {
+      for (const release of releases) release();
+    };
+  }, [retained, queryClient]);
   useEffect(() => {
-    if (!prefetch || conversationId === null) return;
+    if (prefetchId === null) return;
     void queryClient.prefetchInfiniteQuery({
-      ...conversationMessagesQuery(conversationId),
+      ...conversationMessagesQuery(prefetchId),
       staleTime: PREFETCH_FRESH_MS,
     });
-  }, [conversationId, prefetch, queryClient]);
+  }, [prefetchId, queryClient]);
 }
 
 export function prefetchThread(qc: QueryClient, teamId: string, todoId: string): void {

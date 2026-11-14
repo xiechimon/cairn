@@ -195,8 +195,8 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   const queryClient = useQueryClient();
   const activeThreadId = live ? (activeThread?.id ?? null) : null;
   useWarmConversationMessages(
-    live ? (globalCoordinatorThread(liveThreads)?.id ?? null) : null,
-    channel !== null,
+    live ? liveThreads.map((thread) => thread.id) : [],
+    live && channel !== null ? (globalCoordinatorThread(liveThreads)?.id ?? null) : null,
   );
   useEffect(() => {
     if (!newestPageOnly) return;
