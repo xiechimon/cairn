@@ -124,6 +124,7 @@ function OpenPr({ pr, now }: { pr: PrPanelRow; now: number }) {
         delay={0}
         onPointerLeave={card.onPointerLeave}
         nativeButton={false}
+        role="link"
         render={<a href={pr.url} target="_blank" rel="noreferrer" />}
         data-slot="task-pr"
         data-state={pr.state}
