@@ -11,6 +11,7 @@ import { MachineName, machineLabel } from '../components/machine-label.js';
 import { SETTINGS_SELECT_TRIGGER_CLS, SettingsSelectTrigger } from '../components/settings-list.js';
 import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch.js';
 import { AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
+import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
 import {
@@ -51,6 +52,7 @@ const isMachineRuntime = (value: string): value is MachineRuntime =>
 export function MachineRowView({
   machine,
   machines,
+  isDefault,
   chief,
   status,
   expanded,
@@ -61,6 +63,7 @@ export function MachineRowView({
 }: {
   machine: MachineRow;
   machines: MachineRow[];
+  isDefault: boolean;
   chief: ChiefState;
   status: ItemStatus;
   expanded: boolean;
@@ -160,6 +163,17 @@ export function MachineRowView({
     }
   };
 
+  const makeDefault = () => {
+    if (!live) {
+      blockDemoWrite();
+      return;
+    }
+    mutations.patchMachine.mutate(
+      { id: machineId, body: { isDefault: true } },
+      { onError: (error) => toastError(t('设为默认 Runner 失败，请重试。'), error) },
+    );
+  };
+
   const remove = async () => {
     setConfirmOpen(false);
     setDeleting(true);
@@ -225,6 +239,15 @@ export function MachineRowView({
             <span data-testid="machine-item-name" className="truncate">
               <MachineName machine={machine} all={machines} />
             </span>
+            {isDefault && (
+              <Badge
+                variant="outline"
+                data-testid="machine-default"
+                className="flex-none font-normal"
+              >
+                {t('默认')}
+              </Badge>
+            )}
             {chief.host && (
               <span
                 data-orchestration="host"
@@ -324,6 +347,13 @@ export function MachineRowView({
             <Ellipsis aria-hidden strokeWidth={1.75} />
           </DropdownMenuTrigger>
           <DropdownMenuContent side="bottom" align="end" sideOffset={4} className="w-auto min-w-40">
+            <DropdownMenuItem
+              data-testid="machine-menu-default"
+              disabled={isDefault || machine.id == null || mutations.patchMachine.isPending}
+              onClick={makeDefault}
+            >
+              {isDefault ? t('已是默认 Runner') : t('设为默认 Runner')}
+            </DropdownMenuItem>
             <DropdownMenuItem
               data-testid="machine-menu-evacuate"
               disabled={others.length === 0}

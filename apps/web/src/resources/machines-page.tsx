@@ -45,6 +45,9 @@ export function MachinesPage() {
         };
   const teamsQ = useTeams(live);
   const teamName = live ? (teamsQ.data?.[0]?.name ?? t('团队')) : TEAM_NAME;
+  const defaultMachineId = live
+    ? (teamsQ.data?.[0]?.defaultMachineId ?? null)
+    : (machines.find((machine) => machine.isDefault === true)?.id ?? null);
   const [addOpen, setAddOpen] = useState(false);
   const [section, setSection] = useState<RowSection | null>(null);
 
@@ -122,6 +125,7 @@ export function MachinesPage() {
                   key={rowKey(machine)}
                   machine={machine}
                   machines={machines}
+                  isDefault={machine.id != null && machine.id === defaultMachineId}
                   chief={chiefState(machine)}
                   status={statusOf(machine)}
                   expanded={expandedKey === rowKey(machine)}

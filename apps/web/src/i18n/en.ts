@@ -1634,6 +1634,10 @@ export const EN: Record<string, string> = {
   模型与首选机器: 'Model and preferred machine',
   首选机器: 'Preferred machine',
   不固定: 'Any machine',
+  '跟随默认 Runner': 'Follow the default Runner',
+  '设为默认 Runner': 'Make default Runner',
+  '已是默认 Runner': 'Default Runner',
+  '设为默认 Runner 失败，请重试。': 'Could not change the default Runner. Try again.',
   路由覆盖: 'Route override',
   '本任务的机器与执行要求；调度在规则开启后生效。':
     'Per-task machine and capability requirements; applied when routing rules are on.',

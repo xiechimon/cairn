@@ -286,6 +286,7 @@ export interface MachineRow {
   pill?: string;
   enabledRuntimes?: string[];
   chiefHost?: boolean;
+  isDefault?: boolean;
   chiefRunning?: boolean;
   chiefWaiting?: boolean;
   maxConcurrent?: number;
