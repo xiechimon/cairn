@@ -4976,6 +4976,14 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                       },
                       "type": "array",
                     },
+                    "platform": {
+                      "enum": [
+                        "linux",
+                        "macos",
+                        "windows",
+                      ],
+                      "type": "string",
+                    },
                   },
                   "required": [
                     "kind",
@@ -6153,6 +6161,14 @@ exports[`body/envelope schema snapshots > startBuildsBody > startBuildsBody.json
               },
               "type": "array",
             },
+            "os": {
+              "enum": [
+                "linux",
+                "macos",
+                "windows",
+              ],
+              "type": "string",
+            },
           },
           "type": "object",
         },
@@ -6461,6 +6477,14 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
                 "type": "string",
               },
               "type": "array",
+            },
+            "platform": {
+              "enum": [
+                "linux",
+                "macos",
+                "windows",
+              ],
+              "type": "string",
             },
           },
           "required": [
@@ -7283,6 +7307,14 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                             "type": "string",
                           },
                           "type": "array",
+                        },
+                        "os": {
+                          "enum": [
+                            "linux",
+                            "macos",
+                            "windows",
+                          ],
+                          "type": "string",
                         },
                       },
                       "type": "object",
@@ -9929,6 +9961,14 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
                   },
                   "type": "array",
                 },
+                "platform": {
+                  "enum": [
+                    "linux",
+                    "macos",
+                    "windows",
+                  ],
+                  "type": "string",
+                },
               },
               "required": [
                 "kind",
@@ -12062,6 +12102,14 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
                     "type": "string",
                   },
                   "type": "array",
+                },
+                "os": {
+                  "enum": [
+                    "linux",
+                    "macos",
+                    "windows",
+                  ],
+                  "type": "string",
                 },
               },
               "type": "object",

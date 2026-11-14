@@ -1,6 +1,7 @@
 import {
   type ChiefThread,
   parseLocalMergeInstruction,
+  RUNNER_OS_LABELS,
   type StepQueueBlocked,
   type StepQueueInfo,
 } from '@cairn/shared';
@@ -11,7 +12,7 @@ import { nowMs } from '../lib/ids.js';
 import { missingCapabilities, runtimeGatePasses } from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
 import {
-  fallbackMachineId,
+  platformFallbackMachineId,
   priorSessionOf,
   type RouteVerdict,
   routeTargets,
@@ -137,7 +138,8 @@ export function stepQueueProjector(db: Db, teamId: string) {
     const unavailable = (id: string) =>
       targetUnavailable(db, machineRowOf(id), teamId, facts, catalog, now);
     const prior = priorSessionOf(db, row, row.buildRow);
-    const sole = fallbackMachineId(teamMachines, defaultMachineId);
+    const need = agentRow.requiredCapabilities?.os;
+    const sole = platformFallbackMachineId(db, teamMachines, defaultMachineId, need);
     const verdict = routeVerdict({
       machineId: null,
       targets: routeTargets(
@@ -148,13 +150,20 @@ export function stepQueueProjector(db: Db, teamId: string) {
     });
     if (verdict.claim) return { verdict, blocked: undefined };
     const named = verdict.waitingFor;
+    const platform = need === undefined ? {} : { platform: need };
     if (named === null) {
-      return { verdict, blocked: { kind: 'machine-offline', missing: [] } };
+      return {
+        verdict,
+        blocked:
+          need === undefined
+            ? { kind: 'machine-offline', missing: [] }
+            : { kind: 'capability-missing', missing: [RUNNER_OS_LABELS[need]], ...platform },
+      };
     }
     if (!unavailable(named)) return { verdict, blocked: undefined };
     const home = machineRowOf(named);
     if (home === undefined || !home.online) {
-      return { verdict, blocked: { kind: 'machine-offline', missing: [] } };
+      return { verdict, blocked: { kind: 'machine-offline', missing: [], ...platform } };
     }
     const gap = workerIneligibility(db, home, facts, catalog, now);
     return {

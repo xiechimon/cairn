@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { thinkingLevelSchema } from '../agent-backend.js';
 import { FALLBACK_MODELS_MAX } from './agent.js';
 import { epochMs, recordId } from './common.js';
-import { requiredCapabilitiesSchema } from './machine-capabilities.js';
+import { type RunnerOs, requiredCapabilitiesSchema } from './machine-capabilities.js';
 import { modelRefSchema } from './model-source.js';
 import type { StepKind } from './step.js';
 import { workPolicyRecordSchema } from './work-policy.js';
@@ -25,6 +25,18 @@ export const routeOverrideSchema = z.object({
   requiredCapabilities: requiredCapabilitiesSchema.optional(),
 });
 export type RouteOverride = z.infer<typeof routeOverrideSchema>;
+
+export function withPlatform(
+  override: RouteOverride | null | undefined,
+  os: RunnerOs | null,
+): RouteOverride | null {
+  const { requiredCapabilities, ...rest } = override ?? {};
+  const { os: _previous, ...needs } = requiredCapabilities ?? {};
+  const required = os === null ? needs : { ...needs, os };
+  const next =
+    Object.keys(required).length > 0 ? { ...rest, requiredCapabilities: required } : rest;
+  return Object.keys(next).length > 0 ? next : null;
+}
 
 export function isSessionStepKind(kind: StepKind): boolean {
   return SESSION_STEP_KINDS.has(kind);

@@ -6,6 +6,8 @@ import {
   type MachineCapabilities,
   type MachineHardware,
   type RequiredCapabilities,
+  type RunnerOs,
+  runnerOsOf,
   type StepKind,
 } from '@cairn/shared';
 import { and, eq, ne } from 'drizzle-orm';
@@ -34,14 +36,17 @@ export interface MachineCapabilityFacts {
 export function missingCapabilityItems(
   machineRow: MachineCapabilityFacts,
   required: RequiredCapabilities | null | undefined,
-): { mcpServers: string[]; models: string[]; executor?: 'orb' } {
+): { mcpServers: string[]; models: string[]; executor?: 'orb'; os?: RunnerOs } {
   if (required == null) return { mcpServers: [], models: [] };
   const reportedMcp = machineRow.capabilities?.mcpServers;
   const reportedModels = machineRow.claudeCodeReport?.models;
   const executorMissing =
     required.executor === 'orb' && machineRow.capabilities?.executor !== 'orb';
+  const osMissing =
+    required.os !== undefined && runnerOsOf(machineRow.capabilities) !== required.os;
   return {
     ...(executorMissing ? { executor: 'orb' as const } : {}),
+    ...(osMissing ? { os: required.os } : {}),
     mcpServers: (required.mcpServers ?? [])
       .map((slug) => slug.toLowerCase())
       .filter((slug) => !(reportedMcp ?? []).includes(slug)),

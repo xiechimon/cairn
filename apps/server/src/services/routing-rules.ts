@@ -13,14 +13,17 @@ import {
   type RouteOverride,
   type RouteUse,
   type RoutingRuleRecord,
+  type RunnerOs,
+  runnerOsOf,
   type StepKind,
   type TeamRoutingSettings,
   type TodoSourceKind,
   type WorkPolicyRecord,
+  withPlatform,
 } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { machine, routingRule, workPolicy } from '../db/schema.js';
+import { build, machine, routingRule, step, todo, workPolicy } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { decideStepRoute } from './step-route.js';
@@ -123,12 +126,39 @@ export function withOverride(
   const mcpServers = union(rule?.mcpServers, override.mcpServers);
   const models = union(rule?.models, override.models);
   const executor = rule?.executor ?? override.executor;
+  const os = override.os ?? rule?.os;
   const merged: RequiredCapabilities = {
     ...(mcpServers !== undefined ? { mcpServers } : {}),
     ...(models !== undefined ? { models } : {}),
     ...(executor !== undefined ? { executor } : {}),
+    ...(os !== undefined ? { os } : {}),
   };
   return Object.keys(merged).length > 0 ? merged : rule;
+}
+
+export const PLATFORM_LOCKED_MESSAGE = '运行中不能改，换平台请新开任务';
+
+export function assertPlatformUnlocked(db: Pick<Db, 'select'>, todoId: string): void {
+  const started = db
+    .select({ id: step.id })
+    .from(step)
+    .innerJoin(build, eq(step.buildId, build.id))
+    .where(and(eq(build.todoId, todoId), isNotNull(step.sessionId)))
+    .get();
+  if (started !== undefined) throw new HttpError(409, PLATFORM_LOCKED_MESSAGE);
+}
+
+export function setTodoPlatform(
+  db: Db,
+  todoRow: Pick<typeof todo.$inferSelect, 'id' | 'routeOverride' | 'v'>,
+  os: RunnerOs | null,
+): void {
+  if ((todoRow.routeOverride?.requiredCapabilities?.os ?? null) === os) return;
+  assertPlatformUnlocked(db, todoRow.id);
+  db.update(todo)
+    .set({ routeOverride: withPlatform(todoRow.routeOverride, os), v: todoRow.v + 1 })
+    .where(eq(todo.id, todoRow.id))
+    .run();
 }
 
 export function routeProfile(
@@ -166,7 +196,21 @@ export function ruleProfileForStep(
 ): RouteProfile | null {
   const route = routeForStep(db, todoRow, kind);
   if (route === null) return null;
-  return routeProfile(route, policyForStep(db, todoRow, kind), todoRow.routeOverride ?? null);
+  const profile = routeProfile(
+    route,
+    policyForStep(db, todoRow, kind),
+    todoRow.routeOverride ?? null,
+  );
+  const os = profile.requiredCapabilities?.os;
+  if (os === undefined || profile.machineId === null) return profile;
+  const named = db
+    .select({ capabilities: machine.capabilities })
+    .from(machine)
+    .where(eq(machine.id, profile.machineId))
+    .get();
+  return named !== undefined && runnerOsOf(named.capabilities) === os
+    ? profile
+    : { ...profile, machineId: null };
 }
 
 const ROUTED_PROVIDERS = ['claude-code', CODEX_MODEL.provider];

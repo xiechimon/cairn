@@ -43,6 +43,7 @@ async function machineOf(
     executor?: 'orb' | 'host';
     runtimes?: string[];
     maxConcurrent?: number;
+    osPlatform?: 'linux' | 'darwin' | 'windows';
   } = {},
 ): Promise<string> {
   const apiKey = await issueApiKey(w.s);
@@ -60,9 +61,13 @@ async function machineOf(
   });
   expect(res.status).toBe(200);
   const { machineId } = (await res.json()) as { machineId: string };
+  const enrolled = w.s.db.select().from(machineTable).where(eq(machineTable.id, machineId)).get();
   w.s.db
     .update(machineTable)
     .set({
+      ...(opts.osPlatform !== undefined && enrolled?.capabilities
+        ? { capabilities: { ...enrolled.capabilities, osPlatform: opts.osPlatform } }
+        : {}),
       online: opts.online ?? true,
       enabledRuntimes: opts.runtimes ?? ['pi'],
       maxConcurrent: opts.maxConcurrent ?? 3,
@@ -471,7 +476,10 @@ describe('a worker step runs only on its named machine', () => {
 function setOverride(
   w: World,
   stepId: string,
-  routeOverride: { machineId?: string; requiredCapabilities?: { executor?: 'orb' } },
+  routeOverride: {
+    machineId?: string;
+    requiredCapabilities?: { executor?: 'orb'; os?: 'linux' | 'macos' | 'windows' };
+  },
 ): void {
   const buildId = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!.buildId;
   const todoId = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!.todoId;
@@ -569,3 +577,157 @@ describe('the default Runner', () => {
     expect(defaultOf(w)).toBeNull();
   });
 });
+
+function queueOf(w: World, stepId: string) {
+  const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+  return stepQueueProjector(w.s.db, w.s.team.id).project({
+    id: stepId,
+    createdAt: row.createdAt,
+    homeMachineId: null,
+  });
+}
+
+function macTask(w: World, os: 'macos' | 'windows' = 'macos'): string {
+  const stepId = pendingStep(w);
+  setOverride(w, stepId, { requiredCapabilities: { os } });
+  return stepId;
+}
+
+describe('a task that needs a platform', () => {
+  test('a macOS task skips the Linux default and runs on the Mac', async () => {
+    const w = await world();
+    const linux = await machineOf(w, 'linux', { osPlatform: 'linux' });
+    const mac = await machineOf(w, 'mac', { osPlatform: 'darwin' });
+    routeOf(w, null);
+    expect(defaultOf(w)).toBe(linux);
+    const stepId = macTask(w);
+    expect(await claimOn(w, linux)).toBeNull();
+    expect((await claimOn(w, mac))?.step.id).toBe(stepId);
+  });
+
+  test('a rule machine on Linux does not hold a macOS task', async () => {
+    const w = await world();
+    const linux = await machineOf(w, 'linux', { osPlatform: 'linux' });
+    const mac = await machineOf(w, 'mac', { osPlatform: 'darwin' });
+    routeOf(w, linux);
+    const stepId = macTask(w);
+    expect(queueOf(w, stepId)?.waitingFor?.machineId).not.toBe(linux);
+    expect((await claimOn(w, mac))?.step.id).toBe(stepId);
+  });
+
+  test('a default Runner that matches the platform keeps the task', async () => {
+    const w = await world();
+    const first = await machineOf(w, 'mac-a', { osPlatform: 'darwin' });
+    const second = await machineOf(w, 'mac-b', { osPlatform: 'darwin' });
+    setDefault(w, second);
+    occupy(w, second, 2);
+    routeOf(w, null);
+    const stepId = macTask(w);
+    expect(await claimOn(w, first)).toBeNull();
+    expect((await claimOn(w, second))?.step.id).toBe(stepId);
+  });
+
+  test('without a matching default, the Mac running the fewest tasks takes it', async () => {
+    const w = await world();
+    await machineOf(w, 'linux', { osPlatform: 'linux' });
+    const busy = await machineOf(w, 'mac-busy', { osPlatform: 'darwin' });
+    const idle = await machineOf(w, 'mac-idle', { osPlatform: 'darwin' });
+    occupy(w, busy, 2);
+    routeOf(w, null);
+    const stepId = macTask(w);
+    expect(await claimOn(w, busy)).toBeNull();
+    expect((await claimOn(w, idle))?.step.id).toBe(stepId);
+  });
+
+  test('an offline Mac keeps the macOS task waiting for it; Linux does not take it', async () => {
+    const w = await world();
+    const linux = await machineOf(w, 'linux', { osPlatform: 'linux' });
+    const mac = await machineOf(w, 'mac', { osPlatform: 'darwin', online: false });
+    routeOf(w, null);
+    const stepId = macTask(w);
+    expect(await claimOn(w, linux)).toBeNull();
+    expect(statusOf(w, stepId)).toBe('pending');
+    const queue = queueOf(w, stepId);
+    expect(queue?.waitingFor?.machineId).toBe(mac);
+    expect(queue?.blocked).toEqual({ kind: 'machine-offline', missing: [], platform: 'macos' });
+  });
+
+  test('with no Windows Runner the task says Windows is missing and nobody claims it', async () => {
+    const w = await world();
+    const linux = await machineOf(w, 'linux', { osPlatform: 'linux' });
+    const mac = await machineOf(w, 'mac', { osPlatform: 'darwin' });
+    routeOf(w, null);
+    const stepId = macTask(w, 'windows');
+    expect(await claimOn(w, linux)).toBeNull();
+    expect(await claimOn(w, mac)).toBeNull();
+    const queue = queueOf(w, stepId);
+    expect(queue?.waitingFor ?? null).toBeNull();
+    expect(queue?.blocked).toEqual({
+      kind: 'capability-missing',
+      missing: ['Windows'],
+      platform: 'windows',
+    });
+  });
+
+  test('a daemon that does not report its OS cannot take a macOS task', async () => {
+    const w = await world();
+    const unknown = await machineOf(w, 'old-nas');
+    routeOf(w, null);
+    const stepId = macTask(w);
+    expect(await claimOn(w, unknown)).toBeNull();
+    expect(queueOf(w, stepId)?.blocked).toEqual({
+      kind: 'capability-missing',
+      missing: ['macOS'],
+      platform: 'macos',
+    });
+  });
+
+  test('moving a macOS task onto a Linux Runner is refused', async () => {
+    const w = await world();
+    const linux = await machineOf(w, 'linux', { osPlatform: 'linux' });
+    await machineOf(w, 'mac', { osPlatform: 'darwin', online: false });
+    routeOf(w, null);
+    const todoId = todoOfStep(w, macTask(w));
+    const res = await w.s.app.request(`/api/todos/${todoId}/runner`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ machineId: linux }),
+    });
+    expect(res.status).toBe(409);
+    expect(routeOverrideOf(w, todoId)).toEqual({ requiredCapabilities: { os: 'macos' } });
+  });
+
+  test('the platform can change before the task starts and is locked once a session exists', async () => {
+    const w = await world();
+    const linux = await machineOf(w, 'linux', { osPlatform: 'linux' });
+    routeOf(w, null);
+    const patch = (todoId: string, os: 'macos' | 'windows') =>
+      w.s.app.request(`/api/todos/${todoId}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ routeOverride: { requiredCapabilities: { os } } }),
+      });
+    const fresh = todoOfStep(w, pendingStep(w));
+    expect((await patch(fresh, 'macos')).status).toBe(200);
+    expect(routeOverrideOf(w, fresh)).toEqual({ requiredCapabilities: { os: 'macos' } });
+    const started = todoOfStep(
+      w,
+      pendingStep(w, { priorSession: { machineId: linux, sessionId: 'sess-1' } }),
+    );
+    const locked = await patch(started, 'windows');
+    expect(locked.status).toBe(409);
+    expect(await locked.text()).toContain('运行中不能改');
+    expect(routeOverrideOf(w, started)).toBeNull();
+  });
+});
+
+function todoOfStep(w: World, stepId: string): string {
+  const buildId = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!.buildId;
+  return w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!.todoId;
+}
+
+function routeOverrideOf(w: World, todoId: string) {
+  return (
+    w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()?.routeOverride ?? null
+  );
+}

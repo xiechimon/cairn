@@ -20,7 +20,7 @@ import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { capabilityGatePasses, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
 import { isChiefConversation, type MachineDeps, stepTeamId } from './machine-deps.js';
 import {
-  fallbackMachineId,
+  platformFallbackMachineId,
   priorSessionOf,
   routeTargets,
   teamDefaultMachineId,
@@ -129,7 +129,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
   const subscriptionOnly =
     deps.db.select().from(team).where(eq(team.id, teamId)).get()?.claudeUsage !== 'allow-paid';
   let changed = false;
-  const sole = fallbackMachineId(machines, teamDefaultMachineId(deps.db, teamId));
+  const defaultMachineId = teamDefaultMachineId(deps.db, teamId);
   const consider = (
     stepRow: StepRow,
     agentRow: AgentRow,
@@ -146,7 +146,14 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     const sessionId =
       !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineId : null;
     const namedId = routeTargets(sessionId, agentRow.machineId)[0]?.machineId ?? null;
-    const homeId = namedId ?? sole;
+    const homeId =
+      namedId ??
+      platformFallbackMachineId(
+        deps.db,
+        machines,
+        defaultMachineId,
+        agentRow.requiredCapabilities?.os,
+      );
     const policyOwner = namedId ? byId.get(namedId) : undefined;
     const owner = homeId ? byId.get(homeId) : undefined;
     const ownerBlock = owner ? claudeRateBlock(owner.claudeRateLimits ?? [], now) : null;
