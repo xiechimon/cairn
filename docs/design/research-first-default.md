@@ -97,7 +97,7 @@ This matches the repository's own rule ("agents decide by their own recommendati
 | 0 | None: prompt text and one tool description | `buildChiefSystemPrompt`, `composeWorkerSystemPrompt`, `WORKER_ASK_USER_TOOL` and the Coordinator `ask_user`, `researchPrompt`, `researchBeforePlanReason` |
 | 1 | Built-in skill entries in the team skills manifest; a machine capability field for agent-reach | Manifest build and `materializeTeamSkills`; the machine capability report in `services/machine*.ts`, a security surface that merges under Merge routes with `/security-review` |
 | 2 | `create_todo` `research` field, stored with the todo request | `createRequestTodo` writes it; `update_todo` message appends keep it; `holdCodeThreadForPriorResearch` reads it when the code thread opens; `split_todo` goes through `create_todo`. Old rows without the field open no research. Coordinator eval fixtures stay unchanged because `integration/eval/**` is protected |
-| 3 | Report sections "Decided myself" and "For you to decide" parsed into an `ask_user` card | Info report handoff (`blocker-handoff.ts`), `chief-questions.ts`, `worker-questions.ts` |
+| 3 | None: P3a is prompt text that reuses the worker `ask_user` question and `todo.decisions`; P3b is read-only settings text | Research rules in `researchPrompt`, the built-in research skill, `COORDINATOR_DECISION_RULES`; the worker question path (`worker-questions.ts`, `answer_question`); the `章程` tab in `chief-settings.tsx` |
 
 ## Failure behavior
 

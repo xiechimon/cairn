@@ -102,6 +102,16 @@ export function ChiefSettings({ chief, onBack }: { chief: ChiefContent; onBack: 
           {tab === 'charter' && (
             <>
               <SettingsCard className="mt-4">
+                <div data-testid="chief-default-rule" className={ENTRY_ROW_CLS}>
+                  <span className="text-ui text-foreground">{t('Cairn 默认规则')}</span>
+                  <span className={SETTINGS_HINT_CLS}>
+                    {t(
+                      '你提需求、做架构决策。调研和其余决定由 Cairn 自己完成：先找同类开源实现、读源码，再带着方案回来，只把真正要你定的事交给你。所有团队都生效，章程不能关掉它。',
+                    )}
+                  </span>
+                </div>
+              </SettingsCard>
+              <SettingsCard className="mt-4">
                 {charter !== '' ? (
                   <div className="px-4 py-3 text-ui whitespace-pre-wrap text-foreground">
                     {charter}
