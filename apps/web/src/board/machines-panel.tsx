@@ -20,7 +20,7 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { settingsHref } from '../settings/settings-href.js';
 import { CoordinatorComputer } from './computer-feed.js';
-import { MachineScreenSurface, ScreenPlaceholder } from './computer-screen.js';
+import { MachineScreenSurface } from './computer-screen.js';
 import { ComputerControlBar, ComputerScreenDialog } from './computer-screen-dialog.js';
 import { machineStateLabel } from './fleet-status.js';
 import { desktopControlOnline } from './machine-capabilities.js';
@@ -214,17 +214,13 @@ function MachineCard({
       </div>
       {screenLive ? (
         <>
-          {fullscreen ? (
-            <ScreenPlaceholder online label={t('屏幕已全屏')} />
-          ) : (
-            <MachineScreenSurface
-              teamId={teamId}
-              computer={computer}
-              leaseId={control.leaseId}
-              interactive={false}
-              onExpand={() => setFullscreen(true)}
-            />
-          )}
+          <MachineScreenSurface
+            teamId={teamId}
+            computer={computer}
+            leaseId={control.leaseId}
+            interactive={false}
+            onExpand={() => setFullscreen(true)}
+          />
           <ComputerControlBar
             held={control.controlHeld}
             busy={control.busy}
