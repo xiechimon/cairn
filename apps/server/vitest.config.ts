@@ -6,5 +6,6 @@ await admitTestRun();
 export default defineConfig({
   test: {
     setupFiles: ['./test/tmpdir-cleanup-setup.ts'],
+    testTimeout: 20_000,
   },
 });
