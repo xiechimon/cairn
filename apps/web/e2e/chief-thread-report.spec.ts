@@ -356,6 +356,7 @@ test('a research report is one card under its research row; hover shows a summar
   await card.click();
   const doc = page.getByTestId('research-report-doc');
   await expect(doc.getByText('Parquet keeps types')).toBeVisible();
+  await expect(doc.getByRole('link', { name: 'report.md' })).toHaveCount(0);
   await expect(page.getByRole('dialog', { name: 'Research export formats' })).toBeVisible();
 });
 
@@ -406,6 +407,7 @@ test('a research card in Made opens its report as a document; one with no report
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText('定稿');
   await expect(page.getByTestId('research-report-doc').getByText('Parquet keeps types')).toBeVisible();
+  await expect(dialog.getByRole('link', { name: 'report.md' })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
 
