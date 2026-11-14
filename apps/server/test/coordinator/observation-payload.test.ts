@@ -58,7 +58,7 @@ test('SDK observations contain owner input, reply, and each actual generation re
         : fauxAssistantMessage([fauxToolCall('todos', {})], { stopReason: 'toolUse' });
     }),
   );
-  const coordinator = boot(w, faux);
+  const coordinator = boot(w, faux, { fixedProviders: [faux.provider] });
   try {
     coordinator.wake(w.threadId);
     await coordinator.idle();

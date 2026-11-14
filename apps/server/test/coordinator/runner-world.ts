@@ -1,4 +1,8 @@
-import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
+import {
+  createAssistantMessageEventStream,
+  fauxAssistantMessage,
+  fauxProvider,
+} from '@earendil-works/pi-ai';
 import { afterEach, beforeEach, expect } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
 import { type Coordinator, startCoordinator } from '../../src/coordinator/index.js';
@@ -101,7 +105,25 @@ export function boot(
     heartbeatMs: 1_000,
     tickMs: 3_600_000,
     stopPollMs: 50,
-    fixedProviders: [faux.provider],
+    fixedProviders: [
+      {
+        ...faux.provider,
+        streamSimple(model, context, options) {
+          if (context.messages[0]?.content !== SUGGEST_REPLIES_ASK)
+            return faux.provider.streamSimple(model, context, options);
+          const stream = createAssistantMessageEventStream();
+          const message = {
+            ...fauxAssistantMessage('{"replies":[]}'),
+            api: model.api,
+            provider: model.provider,
+            model: model.id,
+          };
+          stream.push({ type: 'done', reason: 'stop', message });
+          stream.end(message);
+          return stream;
+        },
+      },
+    ],
     ...extra,
   });
   closers.push(() => coordinator.close());
@@ -117,8 +139,6 @@ export function stub(answer: string) {
   const seen: { system: string; messages: unknown[] }[] = [];
   faux.setResponses(
     Array(16).fill((c: { systemPrompt?: string; messages: { content: unknown }[] }) => {
-      if (c.messages[0]?.content === SUGGEST_REPLIES_ASK)
-        return fauxAssistantMessage('{"replies":[]}');
       seen.push({ system: c.systemPrompt ?? '', messages: c.messages });
       return fauxAssistantMessage(answer);
     }),
