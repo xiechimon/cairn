@@ -369,8 +369,15 @@ pnpm exec tsx eval/coordinator-routing/harvest.mts /tmp/cand.db "$TEAM_ID"
 Each line says whether a sealed snapshot is eligible and, when it is not, why. Keep the answers in a file outside the repository, one entry per chosen turn, with project names exactly as the snapshot shows them:
 
 ```json
-[{"turnId": "<turn id>", "expectedOutput": {"decision": "route", "parts": [{"project": "<name>"}], "askCandidates": [], "blockedBy": []}}]
+[
+  {"turnId": "<turn id>", "expectedOutput": {"decision": "route", "parts": [{"project": "<name>"}], "askCandidates": [], "blockedBy": []}},
+  {"turnId": "<turn id>", "expectedOutput": {"decision": "route", "parts": [{"project": "<a>"}, {"project": "<b>"}], "askCandidates": [], "blockedBy": [[1, 0]]}},
+  {"turnId": "<turn id>", "expectedOutput": {"decision": "ask", "parts": [], "askCandidates": ["<option>", "<option>"], "blockedBy": []}},
+  {"turnId": "<turn id>", "expectedOutput": {"decision": "answer", "parts": [], "askCandidates": [], "blockedBy": []}}
+]
 ```
+
+The four entries are the four shapes: one project, two projects where part 1 waits for part 0 (`[from, to]` are positions in `parts`, counted from 0), a question to the user whose `askCandidates` are the options it should offer in any order, and a reply that dispatches nothing. `decision` is `route`, `ask` or `answer`; `parts` holds only `project`; an optional `notes` string is not scored. Keep the three decisions roughly balanced and include a few dependency cases, since `routing.blocked_by_ok` is scored only when `blockedBy` is not empty.
 
 `upload.mts` checks every entry against its frozen snapshot and the expected-output schema, and prints a dry run by default. Nothing is sent unless `--apply` is given, and one invalid entry stops the whole file. At most 60 items fit one file, the same limit the runner enforces.
 
