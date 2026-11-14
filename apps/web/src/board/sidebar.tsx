@@ -30,11 +30,11 @@ import {
   SIDEBAR_ROW_ACTION,
   SidebarProjectGroupHeader,
   SidebarProjectRow,
+  SidebarProjectRowSkeleton,
   type TreePlace,
 } from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
-import { Skeleton } from '../components/ui/skeleton.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { isDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
@@ -686,11 +686,11 @@ export function BoardSidebar({
           <div
             data-testid="sidebar-projects-loading"
             aria-busy="true"
-            className="ml-5.5 flex flex-col gap-1.5 py-1 pr-2 pl-2.5"
+            className="flex flex-col gap-0.5"
           >
             <span className="sr-only">{t('正在加载项目')}</span>
-            {[0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-6 w-full" />
+            {(['first', 'middle', 'last'] as const).map((place) => (
+              <SidebarProjectRowSkeleton key={place} place={place} />
             ))}
           </div>
         )}

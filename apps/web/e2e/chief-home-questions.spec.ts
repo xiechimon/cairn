@@ -644,6 +644,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
     await mockLive(page, structuredClone(ONE));
     await page.goto('/app');
+    await expect(page.getByTestId('chief-composer-input')).toBeVisible();
     const composer = page.getByTestId('home-c').locator('.chief-composer');
     await expect(composer).toBeVisible();
     const read = () =>

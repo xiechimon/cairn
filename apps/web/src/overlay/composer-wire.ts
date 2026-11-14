@@ -336,8 +336,8 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       callback?.(text);
       return;
     }
-    if (text === '') return;
-    const result = callback?.(text);
+    if (text === '' || callback === undefined) return;
+    const result = callback(text);
     if (result instanceof Promise) {
       sending.current = true;
       void result

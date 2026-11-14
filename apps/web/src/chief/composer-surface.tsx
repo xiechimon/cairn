@@ -97,6 +97,7 @@ export interface ComposerSurfaceProps {
   handleRef?: Ref<ComposerSurfaceHandle>;
   dropActive?: boolean;
   seededFiles?: ComposerFileSeed[] | undefined;
+  inputTestId?: string;
 }
 
 export function ComposerSurface({
@@ -124,6 +125,7 @@ export function ComposerSurface({
   handleRef,
   dropActive = false,
   seededFiles,
+  inputTestId,
 }: ComposerSurfaceProps) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
@@ -307,7 +309,7 @@ export function ComposerSurface({
           <div className="relative min-w-0 flex-1">
             <Textarea
               ref={attachComposer}
-              data-testid={active ? 'chief-composer-input' : undefined}
+              data-testid={active ? (inputTestId ?? 'chief-composer-input') : undefined}
               data-compose-target=""
               data-question-answer={active && onAdvance !== undefined ? '' : undefined}
               aria-invalid={invalid ? true : undefined}
@@ -438,14 +440,16 @@ export function ComposerSurface({
           </Button>
         </div>
         {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          style={{ display: 'none' }}
-          onChange={onPickFiles}
-          accept={ATTACHMENT_ACCEPT}
-        />
+        {onAttachment != null && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            style={{ display: 'none' }}
+            onChange={onPickFiles}
+            accept={ATTACHMENT_ACCEPT}
+          />
+        )}
       </div>
       {!narrow && (
         <div className="mt-1.5 flex items-center gap-0 px-1.5">
