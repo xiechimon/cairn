@@ -6,7 +6,6 @@ import {
   parseReplyQuote,
   replyQuoteText,
 } from '@cairn/shared';
-import { TriangleAlert } from 'lucide-react';
 import {
   type CSSProperties,
   Fragment,
@@ -215,11 +214,8 @@ export interface ChiefConversationProps {
   initialDraft?: string;
   prefill?: { text: string; key: number } | null;
   placeholder?: string;
-  composerError?: string | null;
   composerReplacement?: ReactNode;
   composerTools?: ReactNode;
-  composerMenu?: ReactNode;
-  targetPlaceholder?: string | null;
   showBindGate?: boolean;
 }
 
@@ -245,11 +241,8 @@ export function ChiefConversation({
   initialDraft = '',
   prefill = null,
   placeholder,
-  composerError = null,
   composerReplacement,
   composerTools,
-  composerMenu,
-  targetPlaceholder = null,
   showBindGate = true,
 }: ChiefConversationProps) {
   const questionPending = useQuestionPending();
@@ -261,7 +254,6 @@ export function ChiefConversation({
   const previewReply = preview !== null && preview.key === quickKey ? preview.text : null;
   const composerPlaceholder =
     previewReply ??
-    targetPlaceholder ??
     (replyQuote !== null
       ? t('回复这条消息')
       : chief.outage != null
@@ -272,11 +264,9 @@ export function ChiefConversation({
             ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
             : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
-  const answerHere = targetPlaceholder === null;
   const answerKey = useAnswerKey();
   const [threadOverride, setThreadOverride] = useState(false);
   const mode = composerMode({
-    answerHere,
     questionPending: answerKey !== null,
     threadClaimed: threadOverride,
     quoteStaged: replyQuote !== null,
@@ -401,7 +391,7 @@ export function ChiefConversation({
   const empty = (chief.stream?.length ?? 0) === 0;
   const heroLayout = empty && !heroCollapsed && !questionPending;
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const canStop = targetPlaceholder === null && chief.running === true && onStop != null;
+  const canStop = chief.running === true && onStop != null;
   const connected = useConnected();
   const restoreSent = (text: string) => {
     followSentRef.current = false;
@@ -566,7 +556,7 @@ export function ChiefConversation({
   const quickReplies = (
     <QuickReplies
       replies={chief.quickReplies}
-      hidden={questionPending || answerActive || !answerHere}
+      hidden={questionPending || answerActive}
       onPreview={(text) => setPreview(text === null ? null : { key: quickKey, text })}
       onSend={
         onSend == null
@@ -665,7 +655,7 @@ export function ChiefConversation({
                         {renderRows(streamLayout)}
                       </>
                     )}
-                    <ChiefQuestion bound={answerHere} />
+                    <ChiefQuestion />
                   </ReplySourceHighlightContext.Provider>
                 </TodoGlanceContext.Provider>
               </MessageScrollerContent>
@@ -702,16 +692,6 @@ export function ChiefConversation({
       >
         {composerReplacement ?? (
           <>
-            {composerError != null && (
-              <p
-                role="alert"
-                data-testid="chief-composer-error"
-                className={`mx-auto my-2 flex w-[calc(100%-2rem)] max-w-chat max-h-12 items-start gap-1.5 overflow-y-auto text-meta text-destructive`}
-              >
-                <TriangleAlert aria-hidden="true" className="size-4 flex-none" />
-                {composerError}
-              </p>
-            )}
             <ComposerSurface
               key="thread"
               handleRef={surfaceRef}
@@ -732,11 +712,9 @@ export function ChiefConversation({
               onFocusLeave={leaveComposer}
               onCancelReply={replyQuote === null ? undefined : () => setReplyQuote(null)}
               placeholder={composerPlaceholder}
-              invalid={composerError != null}
               composerRef={answerActive ? undefined : composerRef}
               above={answerActive ? null : capsules}
               tools={answerActive ? null : composerTools}
-              menu={answerActive ? null : composerMenu}
               context={chief.context}
               threadId={chief.threadId ?? null}
               dropActive={drop.active}
@@ -752,12 +730,10 @@ export function ChiefConversation({
                   focusedComposerRef.current = answerKey;
                 }}
                 onFocusLeave={leaveComposer}
-                invalid={composerError != null}
                 onAttachment={onAttachment}
                 composerRef={answerActive ? composerRef : undefined}
                 above={answerActive ? capsules : null}
                 tools={answerActive ? composerTools : null}
-                menu={answerActive ? composerMenu : null}
                 context={chief.context}
                 threadId={chief.threadId ?? null}
                 dropActive={drop.active}
