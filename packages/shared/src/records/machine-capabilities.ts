@@ -60,6 +60,18 @@ export const agentReachReportSchema = z.object({
 });
 export type AgentReachReport = z.infer<typeof agentReachReportSchema>;
 
+const permissionStateSchema = z.enum(['granted', 'not_required', 'denied', 'unknown']);
+export type PermissionState = z.infer<typeof permissionStateSchema>;
+
+export const hostPermissionsSchema = z
+  .object({
+    accessibility: permissionStateSchema,
+    automation: permissionStateSchema,
+    screenRecording: permissionStateSchema,
+  })
+  .strict();
+export type HostPermissions = z.infer<typeof hostPermissionsSchema>;
+
 export const machineCapabilitiesSchema = z.object({
   osPlatform: machineOsPlatformSchema.optional(),
   mcpServers: z.array(z.string()),
@@ -73,6 +85,7 @@ export const machineCapabilitiesSchema = z.object({
   codexLogin: codexLoginSchema.optional(),
   confinement: confinementReportSchema.optional(),
   agentReach: agentReachReportSchema.optional(),
+  hostPermissions: hostPermissionsSchema.optional(),
 });
 export type MachineCapabilities = z.infer<typeof machineCapabilitiesSchema>;
 
@@ -92,12 +105,14 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   const executor = machineExecutorSchema.safeParse(rec.executor);
   const codexLogin = codexLoginSchema.safeParse(rec.codexLogin);
   const agentReach = agentReachReportSchema.safeParse(rec.agentReach);
+  const hostPermissions = hostPermissionsSchema.safeParse(rec.hostPermissions);
   return {
     ...base.data,
     ...(osPlatform.success ? { osPlatform: osPlatform.data } : {}),
     ...(confinement.success ? { confinement: confinement.data } : {}),
     ...(codexLogin.success ? { codexLogin: codexLogin.data } : {}),
     ...(agentReach.success ? { agentReach: agentReach.data } : {}),
+    ...(hostPermissions.success ? { hostPermissions: hostPermissions.data } : {}),
     ...(hardware.success ? { hardware: hardware.data } : {}),
     ...(executor.success ? { executor: executor.data } : {}),
     ...(rec.computer === true ? { computer: true as const } : {}),
