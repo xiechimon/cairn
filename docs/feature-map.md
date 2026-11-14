@@ -228,7 +228,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 **Coordinator dispatch** (shipped). The Coordinator opens threads, picks the project, machine and model for each, and orchestrates splits; fixed role agents are retired.
 
 - Research: [docs/research/cairn-dogfood-feasibility-2026-11-06.md](research/cairn-dogfood-feasibility-2026-11-06.md), [docs/research/capability-routing-2026-11-06.md](research/capability-routing-2026-11-06.md), [docs/research/r14-orchestration-parent-card.md](research/r14-orchestration-parent-card.md), [docs/research/r15-agent-responsibility-default.md](research/r15-agent-responsibility-default.md)
-- Frontend design: n/a: dispatch shows as threads and report rows inside the Coordinator chat
+- Frontend design: n/a: dispatch shows as one sub-thread row under the reply that started it inside the Coordinator chat
 - Backend design: [docs/research/capability-routing-2026-11-06.md](research/capability-routing-2026-11-06.md), [docs/research/r14-orchestration-parent-card.md](research/r14-orchestration-parent-card.md)
 
 ### daily-report

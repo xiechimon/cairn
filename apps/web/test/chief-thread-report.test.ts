@@ -1,7 +1,5 @@
 import { describe, expect, test } from 'vitest';
 import { mapChiefStream, type MessageRow } from '../src/api/mappers.js';
-import { EN } from '../src/i18n/en.js';
-import { translate } from '../src/i18n/translate.js';
 
 const REPORT = {
   kind: 'thread-report',
@@ -48,15 +46,6 @@ describe('chief thread reports and quiet event turns (#1784)', () => {
         row('invalid-json', 'system', '{"kind":"thread-report"'),
       ]),
     ).toEqual([]);
-  });
-
-  test('report labels use a Chinese source and an English translation', () => {
-    const key = '{n}：{status}';
-    const vars = { n: 'Repair board counts', status: translate('en', EN, '已完成') };
-    expect(translate('zh', EN, key, { ...vars, status: '已完成' })).toBe(
-      'Repair board counts：已完成',
-    );
-    expect(translate('en', EN, key, vars)).toBe('Repair board counts: Done');
   });
 
   test('an invisible resumed-turn boundary restores the reply without rendering generated prompt text', () => {

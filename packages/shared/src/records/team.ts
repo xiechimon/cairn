@@ -43,6 +43,7 @@ export const teamRecordSchema = z.object({
   requestInstructorReview: z.boolean().default(false),
   maxAutonomousMergesPerDay: z.number().int().nonnegative().optional(),
   firstPrReportPrompt: firstPrReportPromptSchema.optional(),
+  defaultMachineId: recordId.nullable().optional(),
 });
 export type TeamRecord = z.infer<typeof teamRecordSchema>;
 

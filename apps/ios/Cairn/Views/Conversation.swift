@@ -140,8 +140,8 @@ struct ConversationView<Header: View>: View {
     }
 
     private var composer: some View {
-        GlassEffectContainer(spacing: 8) {
-            HStack(alignment: .bottom, spacing: 0) {
+        VStack(spacing: 0) {
+            HStack(alignment: .bottom, spacing: 8) {
                 plusMenu
                 VStack(alignment: .leading, spacing: 8) {
                     if !attachments.isEmpty {
@@ -160,32 +160,30 @@ struct ConversationView<Header: View>: View {
                     TextField(answersInComposer == nil || !attachments.isEmpty ? placeholder : "Type your own answer…", text: $draft, axis: .vertical)
                         .lineLimit(1...6)
                         .focused($composerFocused)
-                        .padding(.vertical, 13)
+                        .padding(.vertical, 6)
                         .contentShape(.rect)
                         .onTapGesture { composerFocused = true }
                         .accessibilityIdentifier("composer-field")
                 }
-                .padding(.leading, 2)
-                .padding(.trailing, 8)
                 Button {
                     Task { await send() }
                 } label: {
                     Image(systemName: sending ? "ellipsis" : "arrow.up")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(canSend ? Color.onAccent : Color.inkMuted)
-                        .frame(width: 34, height: 34)
-                        .background(canSend ? Color.ink : Color.menuHover, in: .circle)
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(canSend ? Color.ink : Color.inkTertiary)
+                        .frame(width: 32, height: 32)
+                        .background(Color.composerButton, in: .circle)
                 }
                 .buttonStyle(.plain)
                 .disabled(!canSend)
-                .padding(5)
                 .accessibilityLabel(Text("Send"))
                 .accessibilityIdentifier("send-button")
             }
-            .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 24))
+            .padding(8)
+            .background(ComposerSurface())
         }
-        .padding(.horizontal, 12)
-        .padding(.bottom, 6)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
         .fileImporter(isPresented: $importing, allowedContentTypes: [.item]) { result in
             guard case .success(let url) = result else { return }
             let scoped = url.startAccessingSecurityScopedResource()
@@ -217,12 +215,11 @@ struct ConversationView<Header: View>: View {
             }
         } label: {
             Image(systemName: "plus")
-                .font(.system(size: 19, weight: .regular))
+                .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(Color.ink)
-                .frame(width: 34, height: 34)
+                .frame(width: 32, height: 32)
                 .contentShape(.circle)
         }
-        .padding(5)
         .accessibilityLabel(Text("More"))
     }
 
@@ -494,5 +491,19 @@ struct AttachmentChip: View {
 
     private var icon: String {
         UTType(filenameExtension: (name as NSString).pathExtension)?.conforms(to: .image) == true ? "photo" : "paperclip"
+    }
+}
+
+struct ComposerSurface: View {
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let dark = scheme == .dark
+        shape
+            .fill(Color.composerFill)
+            .shadow(color: .black.opacity(dark ? 0.3 : 0.04), radius: 1, y: 1)
+            .shadow(color: .black.opacity(dark ? 0.24 : 0.05), radius: dark ? 6 : 5, y: dark ? 4 : 3)
+            .overlay(shape.strokeBorder(Color.composerRing, lineWidth: 1))
     }
 }

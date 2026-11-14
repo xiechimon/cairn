@@ -60,7 +60,7 @@ import {
   correctionFromGithubLabels,
   todoGithubLabelIds,
 } from './github-labels.js';
-import { priorSessionOf, soleOnlineMachineId } from './machine-routing.js';
+import { priorSessionOf, soleOnlineMachineId, teamDefaultMachineId } from './machine-routing.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodo } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -231,7 +231,8 @@ function waitingOnOf(
     .where(and(eq(machine.teamId, row.teamId), eq(machine.online, true)))
     .all();
   const buildRow = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
-  const sole = soleOnlineMachineId(online.map((m) => m.id));
+  const sole =
+    teamDefaultMachineId(deps.db, row.teamId) ?? soleOnlineMachineId(online.map((m) => m.id));
   for (const s of pendingSteps) {
     const agentRow = profileForStep(deps.db, row, s.kind, s.id);
     if (agentRow === null) continue;

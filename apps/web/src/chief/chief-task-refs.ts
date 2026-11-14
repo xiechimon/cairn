@@ -1,3 +1,4 @@
+import { RESEARCH_BEFORE_PLAN_SOURCE_KIND } from '@cairn/shared';
 import type { TodoGlance } from '../detail/segments.js';
 import type { ChiefSegment } from '../fixtures/records.js';
 import { parseMentionSegments } from '../overlay/mention-token.js';
@@ -11,6 +12,43 @@ export interface TaskRef {
 }
 
 export const MAX_TASK_REFS = 3;
+
+const BEFORE_PLAN_REF = 'before-plan:';
+
+interface GlanceSource {
+  phase: string;
+  seqNum?: number;
+  title: string;
+  sourceKind?: string | null;
+  sourceRef?: string | null;
+  output?: string;
+}
+
+export function todoGlanceOf(todo: GlanceSource): TodoGlance {
+  const parentId =
+    todo.sourceKind === RESEARCH_BEFORE_PLAN_SOURCE_KIND &&
+    todo.sourceRef?.startsWith(BEFORE_PLAN_REF) === true
+      ? todo.sourceRef.slice(BEFORE_PLAN_REF.length)
+      : undefined;
+  return {
+    phase: todo.phase as TodoGlance['phase'],
+    ...(todo.seqNum !== undefined ? { seq: todo.seqNum } : {}),
+    title: todo.title,
+    ...(parentId !== undefined ? { parentId } : {}),
+    ...(todo.output === 'info' ? { report: true } : {}),
+  };
+}
+
+export function childRefsOf(todoId: string, glances: ReadonlyMap<string, TodoGlance>): TaskRef[] {
+  return [...glances]
+    .filter(([, glance]) => glance.parentId === todoId)
+    .map(([id, glance]) => ({
+      todoId: id,
+      seq: glance.seq ?? null,
+      title: glance.title ?? null,
+      phase: glance.phase,
+    }));
+}
 
 interface RefSource {
   markdown?: string | undefined;
@@ -91,4 +129,40 @@ export function foldTaskCards(
     rows: kept,
     startedBy: new Map([...started].map(([reply, ids]) => [reply, stableList(reply, ids)])),
   };
+}
+
+const placedLists = new WeakMap<object, { key: string; refs: readonly TaskRef[] }>();
+
+function stableRefs(owner: object, refs: TaskRef[]): readonly TaskRef[] {
+  const key = refs.map((ref) => `${ref.todoId}|${ref.phase}|${ref.title ?? ''}`).join('\n');
+  const previous = placedLists.get(owner);
+  if (previous !== undefined && previous.key === key) return previous.refs;
+  placedLists.set(owner, { key, refs });
+  return refs;
+}
+
+export function placeTaskRefs(
+  rows: readonly GroupedRow[],
+  startedBy: ReadonlyMap<GroupedRow['item'], readonly string[]>,
+  glances: ReadonlyMap<string, TodoGlance>,
+  seen: Set<string>,
+): ReadonlyMap<GroupedRow['item'], readonly TaskRef[]> {
+  const show = (todoId: string) => {
+    seen.add(todoId);
+    for (const child of childRefsOf(todoId, glances)) seen.add(child.todoId);
+  };
+  const placed = new Map<GroupedRow['item'], readonly TaskRef[]>();
+  for (const { item } of rows) {
+    if (item.kind === 'task-card' || item.kind === 'thread-activity') show(item.todoId);
+    if (item.kind !== 'robot' || item.typing === true) continue;
+    const all = taskRefsOf(item, glances, startedBy.get(item) ?? []);
+    const listed = new Set(all.map((ref) => ref.todoId));
+    const refs = all.filter((ref) => {
+      const parentId = glances.get(ref.todoId)?.parentId;
+      return !seen.has(ref.todoId) && (parentId === undefined || !listed.has(parentId));
+    });
+    for (const ref of refs) show(ref.todoId);
+    if (refs.length > 0) placed.set(item, stableRefs(item, refs));
+  }
+  return placed;
 }
