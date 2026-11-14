@@ -775,6 +775,9 @@ export const EN: Record<string, string> = {
   技能已更新: 'Skill updated',
   关注与提醒: 'Watches & reminders',
   未设置: 'Not set',
+  'Cairn 默认规则': 'Cairn default rule',
+  '你提需求、做架构决策。调研和其余决定由 Cairn 自己完成：先找同类开源实现、读源码，再带着方案回来，只把真正要你定的事交给你。所有团队都生效，章程不能关掉它。':
+    'You state needs and make architecture decisions. Cairn does the research and makes the other calls itself: it finds similar open-source implementations, reads their source, and comes back with a proposal, bringing you only the decisions that are really yours. It applies to every team, and a charter cannot turn it off.',
   '尚无章程。点击编辑，为 Coordinator 添加常设指示。':
     'No charter yet. Click edit to give the Coordinator standing instructions.',
   编辑: 'Edit',
