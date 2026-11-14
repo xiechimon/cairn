@@ -77,6 +77,7 @@ import {
 } from '@cairn/shared';
 import {
   type InfiniteData,
+  InfiniteQueryObserver,
   infiniteQueryOptions,
   keepPreviousData,
   type QueryClient,
@@ -260,6 +261,28 @@ const conversationMessagesQuery = (conversationId: string | null | undefined) =>
     initialPageParam: null as string | null,
     getNextPageParam: (last) => (typeof last.nextCursor === 'string' ? last.nextCursor : null),
   });
+
+export function useWarmConversationMessages(
+  conversationId: string | null,
+  prefetch: boolean,
+): void {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (conversationId === null) return;
+    const retainer = new InfiniteQueryObserver(queryClient, {
+      ...conversationMessagesQuery(conversationId),
+      enabled: false,
+    });
+    return retainer.subscribe(() => {});
+  }, [conversationId, queryClient]);
+  useEffect(() => {
+    if (!prefetch || conversationId === null) return;
+    void queryClient.prefetchInfiniteQuery({
+      ...conversationMessagesQuery(conversationId),
+      staleTime: PREFETCH_FRESH_MS,
+    });
+  }, [conversationId, prefetch, queryClient]);
+}
 
 export function prefetchThread(qc: QueryClient, teamId: string, todoId: string): void {
   void qc.prefetchQuery({ ...todoQuery(todoId), staleTime: PREFETCH_FRESH_MS });
