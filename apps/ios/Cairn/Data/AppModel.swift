@@ -30,6 +30,7 @@ final class AppModel {
     private(set) var projects: [String: String] = [:]
     private(set) var machines: [Machine] = []
     private(set) var coordinatorMessages: [ThreadMessage] = []
+    private(set) var orchestrating: Set<String> = []
     private(set) var loaded = false
     var error: String?
 
@@ -80,6 +81,9 @@ final class AppModel {
         projects = Dictionary(uniqueKeysWithValues: ((try? await projectList) ?? []).map { ($0.id, $0.name) })
         machines = (try? await machineList) ?? machines
         coordinator = threads.first
+        orchestrating = Set(threads.compactMap { thread in
+            thread.orchestration.flatMap { $0.state == "failed" ? nil : $0.todoId }
+        })
         if let coordinator {
             coordinatorMessages = try await client.messages(threadId: coordinator.id).messages
         } else {
@@ -112,6 +116,28 @@ final class AppModel {
         let conversation = try await client.messageTask(taskId: taskId, content: content).conversationId
         await load()
         return conversation
+    }
+
+    func decide(_ decision: TaskDecision, on task: TaskRecord) async throws {
+        switch decision {
+        case .approve:
+            guard let build = task.latestBuildId else { return }
+            try await client.approvePlan(buildId: build)
+        case .start, .retry:
+            _ = try await client.orchestrate(taskId: task.id)
+            orchestrating.insert(task.id)
+        }
+        await load()
+    }
+
+    func complete(_ task: TaskRecord, merge: Bool) async throws {
+        if merge {
+            guard let build = task.latestBuildId else { return }
+            try await client.merge(buildId: build)
+        } else {
+            try await client.completeTask(taskId: task.id)
+        }
+        await load()
     }
 
     func adoptCoordinator(_ thread: CoordinatorThread) {

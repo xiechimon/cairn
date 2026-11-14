@@ -18,14 +18,40 @@ struct Machine: Decodable, Identifiable, Hashable, Sendable {
 }
 
 struct CoordinatorThread: Decodable, Identifiable, Hashable, Sendable {
+    struct Orchestration: Decodable, Hashable, Sendable {
+        let todoId: String
+        let state: String
+    }
+
     let id: String
     let title: String
     let updatedAt: Double
     let lastTurnAt: Double?
+    var orchestration: Orchestration? = nil
 }
 
 enum ThreadStatus: Sendable {
     case needsYou, running, failed, done, idle
+}
+
+enum TaskDecision: Sendable {
+    case start, approve, retry
+
+    var label: LocalizedStringResource {
+        switch self {
+        case .start: "Start"
+        case .approve: "Approve plan"
+        case .retry: "Retry"
+        }
+    }
+
+    var reason: LocalizedStringResource {
+        switch self {
+        case .start: "Not started."
+        case .approve: "The plan is ready. To change it, reply below."
+        case .retry: "It failed. Retry, or reply below with what to change."
+        }
+    }
 }
 
 struct TaskRecord: Decodable, Identifiable, Hashable, Sendable {
@@ -50,6 +76,18 @@ struct TaskRecord: Decodable, Identifiable, Hashable, Sendable {
         default: return .idle
         }
     }
+
+    var decision: TaskDecision? {
+        guard archivedAt == nil else { return nil }
+        switch phase {
+        case "todo": return .start
+        case "confirm": return latestBuildId == nil ? nil : .approve
+        case "failed": return .retry
+        default: return nil
+        }
+    }
+
+    var canComplete: Bool { phase == "review" && archivedAt == nil && latestBuildId != nil }
 
     var actRank: Int {
         if phase == "needs_input" || phase == "confirm" { return 0 }

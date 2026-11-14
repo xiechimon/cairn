@@ -46,7 +46,7 @@ enum ConversationRow: Identifiable, Hashable {
     }
 }
 
-struct ConversationView<Header: View>: View {
+struct ConversationView<Header: View, Actions: View>: View {
     let messages: [ThreadMessage]
     let liveText: String
     let running: Bool
@@ -58,6 +58,7 @@ struct ConversationView<Header: View>: View {
     let upload: (Data, String, String) async throws -> String
     var task: (String) -> TaskRecord? = { _ in nil }
     @ViewBuilder var header: Header
+    @ViewBuilder var actions: Actions
 
     @State private var draft = ""
     @State private var attachments: [ComposerAttachment] = []
@@ -141,6 +142,7 @@ struct ConversationView<Header: View>: View {
 
     private var composer: some View {
         VStack(spacing: 0) {
+            actions
             HStack(alignment: .bottom, spacing: 8) {
                 plusMenu
                 VStack(alignment: .leading, spacing: 8) {
