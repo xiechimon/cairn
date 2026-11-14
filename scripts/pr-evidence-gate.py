@@ -25,7 +25,7 @@ Other URLs are image links under two parallel rules (#940):
    whose last path segment carries no file extension -- the shape
    drag-and-drop uploads produce.
 
-A URL counts as embedded under any of three forms (#1335):
+A URL counts as embedded under any of four forms (#1335):
 
 1. Markdown image: the target of `![label](url)`.
 2. HTML image: the value of an `<img src="...">` attribute (the
@@ -34,6 +34,14 @@ A URL counts as embedded under any of three forms (#1335):
    attribute (the variants a `<picture>` picks between). Whitespace
    around each comma is allowed and a width/height descriptor after
    each URL (`2x`, `100w`) is stripped -- neither is part of the URL.
+4. Attachment: a github.com/user-attachments URL standing alone on its
+   line. GitHub renders it as the uploaded image or as a video player,
+   and a video has no other form that plays (`![label](url)` shows a
+   broken image). The same URL inside a sentence still fails.
+
+Reachability follows redirects: a published attachment answers 302 to
+signed storage, then 200; an attachment not yet saved in any body or
+comment answers 404.
 
 URLs inside an HTML comment (`<!-- ... -->`) are not embedded and are
 not scanned at all: GitHub does not render them, so the comment text
@@ -48,7 +56,7 @@ link. Without them the gate red-flags every badge URL as a bare
 external image link, even though GitHub renders the badge. Stripping
 the footer at the lane that opens the PR is out of bounds (#1335),
 so the gate has to recognize the form. Bare URLs that are not wrapped
-in any of the three forms still fail.
+in any of the four forms still fail.
 
 Outside explicit image embeds, raw.githubusercontent.com is judged by rule 1 alone: it serves every
 committed file type, so an extensionless raw path (LICENSE, a directory
@@ -121,10 +129,14 @@ HTML_EMBED = re.compile(
     re.IGNORECASE | re.DOTALL)
 
 
+def is_attachment(url):
+    parsed = urlsplit(url)
+    return parsed.hostname == 'github.com' and parsed.path.startswith('/user-attachments/')
+
+
 def is_media_host_image(url):
     parsed = urlsplit(url)
-    media_host = parsed.hostname == 'user-images.githubusercontent.com' or (
-        parsed.hostname == 'github.com' and parsed.path.startswith('/user-attachments/'))
+    media_host = parsed.hostname == 'user-images.githubusercontent.com' or is_attachment(url)
     last = parsed.path.rsplit('/', 1)[-1]
     return media_host and bool(last) and not TAIL_EXT.search(last)
 
@@ -242,7 +254,7 @@ def prose_length(body):
 
 def http_code(url):
     r = subprocess.run(
-        ['curl', '-s', '-o', '/dev/null', '-w', '%{http_code}', '-m', '25', url],
+        ['curl', '-s', '-L', '-o', '/dev/null', '-w', '%{http_code}', '-m', '25', url],
         capture_output=True, text=True)
     return r.stdout.strip()
 
@@ -298,8 +310,12 @@ def find_links(body):
                       r'\1', parsed.path, flags=re.IGNORECASE)
         url = parsed._replace(path=path).geturl()
         if IMG_EXT.search(urlsplit(url).path) or is_media_host_image(url):
-            links.append({'form': 'bare', 'embedded': False, 'label': None, 'url': url,
-                          'line': clean.count('\n', 0, m.start()) + 1})
+            line_start = clean.rfind('\n', 0, m.start()) + 1
+            line_end = clean.find('\n', m.end())
+            alone = clean[line_start:len(clean) if line_end == -1 else line_end].strip() == m.group(0)
+            media = alone and is_attachment(url)
+            links.append({'form': 'media' if media else 'bare', 'embedded': media, 'label': None,
+                          'url': url, 'line': clean.count('\n', 0, m.start()) + 1})
     return links
 
 
