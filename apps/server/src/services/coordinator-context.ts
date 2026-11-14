@@ -6,7 +6,8 @@ import {
   resumeExpiresAtOf,
   retentionMsFor,
 } from '../coordinator/runtime/cold-slim.js';
-import { DEFAULT_CONTEXT_WINDOW } from '../coordinator/runtime/provider.js';
+import { compactionWindow } from '../coordinator/runtime/compaction.js';
+import { catalogContextWindow, DEFAULT_CONTEXT_WINDOW } from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
 import { chiefThread, chiefTurnUsage, coordinatorConversation, provider } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
@@ -56,7 +57,10 @@ function contextWindowOf(db: Db, teamId: string, usageModel: string): number {
     .from(provider)
     .where(and(eq(provider.teamId, teamId), eq(provider.providerId, providerId)))
     .get();
-  return providerRow?.models.find((m) => m.id === modelId)?.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
+  return (
+    providerRow?.models.find((m) => m.id === modelId)?.contextWindow ??
+    catalogContextWindow(providerId, modelId)
+  );
 }
 
 function activeRouterModel(db: Db, teamId: string): string | null {
@@ -176,6 +180,7 @@ export function lastTurnContext(
 ): {
   tokens: number;
   contextWindow: number;
+  compactAt: number;
   resume: ContextResume;
   resumeExpiresAt?: number;
   resumeExpiresInMs?: number;
@@ -233,9 +238,11 @@ export function lastTurnContext(
     lastUsageCreatedAt: last.createdAt,
     lastColdSlimAt,
   });
+  const contextWindow = contextWindowOf(db, chiefRow.teamId, last.model);
   return {
     tokens: last.contextTokens,
-    contextWindow: contextWindowOf(db, chiefRow.teamId, last.model),
+    contextWindow,
+    compactAt: compactionWindow(contextWindow).backgroundAt,
     resume,
     ...(resumeExpiresAt !== null
       ? {

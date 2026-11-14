@@ -8,6 +8,7 @@ import {
   retentionMsFor,
   SHORT_RETENTION_MS,
 } from '../src/coordinator/runtime/cold-slim.js';
+import { compactionWindow } from '../src/coordinator/runtime/compaction.js';
 import {
   build,
   chiefThread,
@@ -329,6 +330,20 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     expect(getChiefEnvelope(H.s.svc, H.teamId, otherThread).context).toMatchObject({
       tokens: 9_000,
       contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+  });
+
+  test('a subscription model with no window on its provider row reads its window from the catalog', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-codex');
+    await finishStep(deps(), machineId, 'turn-codex', {
+      status: 'success',
+      usage: [usage('openai-codex/gpt-6.1-sol', 37_321, 23, { contextTokens: 49_376 })],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
+      tokens: 49_376,
+      contextWindow: 500_000,
+      compactAt: compactionWindow(500_000).backgroundAt,
     });
   });
 

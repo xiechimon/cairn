@@ -32,13 +32,7 @@ import { MentionInline } from '../overlay/mention-inline.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import type { ComposerBinding } from './composer-binding.js';
-import {
-  ContextMeterLine,
-  ContextMeterRing,
-  contextPercentOf,
-  contextResumeOf,
-  MOCK_CONTEXT_PERCENT,
-} from './context-meter-ring.js';
+import { ContextMeterLine, ContextMeterRing, contextPercentOf } from './context-meter-ring.js';
 
 export const TOOL_BTN_CLS =
   "size-7 cursor-pointer rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground [&_svg:not([class*='size-'])]:size-auto";
@@ -132,7 +126,7 @@ export function ComposerSurface({
   const chiefQ = useChief(teamId, live, threadId);
   const shownContext = live ? chiefQ.data?.context : context;
   const contextPercent = contextPercentOf(shownContext);
-  const contextResume = contextResumeOf(shownContext);
+  const meterContext = contextPercent == null ? null : (shownContext ?? null);
   const wire = useComposerWire({
     editable,
     draft: binding.draft,
@@ -258,11 +252,7 @@ export function ComposerSurface({
         {narrow && showMeter && (
           <>
             <DropdownMenuSeparator />
-            <ContextMeterLine
-              percent={contextPercent ?? MOCK_CONTEXT_PERCENT}
-              mock={contextPercent == null}
-              resume={contextResume}
-            />
+            <ContextMeterLine context={meterContext} />
           </>
         )}
       </DropdownMenuContent>
@@ -457,11 +447,7 @@ export function ComposerSurface({
           {tools}
           {showMeter && (
             <span className="ml-auto flex">
-              <ContextMeterRing
-                percent={contextPercent ?? MOCK_CONTEXT_PERCENT}
-                mock={contextPercent == null}
-                resume={contextResume}
-              />
+              <ContextMeterRing context={meterContext} />
             </span>
           )}
         </div>

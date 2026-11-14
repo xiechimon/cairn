@@ -1,19 +1,10 @@
-import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
+import type { Locale } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 
 export const MOCK_CONTEXT_PERCENT = 5;
-
-export const CONTEXT_RESUME_STATES = ['warm', 'cold', 'compacted', 'idle'] as const;
-export type ContextResumeState = (typeof CONTEXT_RESUME_STATES)[number];
-
-const CONTEXT_RESUME_SHORT: Record<ContextResumeState, string> = {
-  warm: '暖',
-  cold: '冷·将精简',
-  compacted: '已压实',
-  idle: '空闲',
-};
 
 export const METER_BTN_CLS =
   'h-7 w-auto gap-1.5 px-1.5 pointer-coarse:h-11 cursor-default rounded-(--radius-control) text-caption font-normal tabular-nums text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-secondary) dark:hover:bg-(--menu-hover) dark:hover:text-(--text-secondary)';
@@ -43,19 +34,6 @@ export function contextPercentOf(
   return clampContextPercent((100 * context.tokens) / context.contextWindow);
 }
 
-export function contextResumeOf(context: unknown): ContextResumeState | null {
-  if (context == null || typeof context !== 'object') return null;
-  const resume = (context as { resume?: unknown }).resume;
-  if (typeof resume !== 'string') return null;
-  return (CONTEXT_RESUME_STATES as readonly string[]).includes(resume)
-    ? (resume as ContextResumeState)
-    : null;
-}
-
-export function contextResumeShortLabel(resume: ContextResumeState): string {
-  return CONTEXT_RESUME_SHORT[resume];
-}
-
 export function contextMeterArcPath(percent: number, cx = CX, cy = CY, radius = RADIUS): string {
   const filled = clampContextPercent(percent);
   if (filled <= 0) return '';
@@ -71,21 +49,27 @@ export function contextMeterArcPath(percent: number, cx = CX, cy = CY, radius = 
   return `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY}`;
 }
 
-function contextMeterLabel(
+export type ContextMeterReading = { tokens: number; contextWindow: number; compactAt?: number };
+
+function compactTokens(locale: Locale, n: number): string {
+  return new Intl.NumberFormat(locale === 'zh' ? 'zh-CN' : 'en', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(n);
+}
+
+export function contextMeterLines(
   t: TFunc,
-  filled: number,
-  mock: boolean,
-  resume: ContextResumeState | null,
-): string {
-  const short = resume != null ? t(CONTEXT_RESUME_SHORT[resume]) : null;
-  if (short != null) {
-    return mock
-      ? t('{state} · {percent}%（示意）', { state: short, percent: filled })
-      : t('{state} · {percent}%', { state: short, percent: filled });
-  }
-  return mock
-    ? t('上下文 {percent}%（示意）', { percent: filled })
-    : t('上下文 {percent}%', { percent: filled });
+  locale: Locale,
+  context: ContextMeterReading | null,
+): string[] {
+  if (context == null) return [t('上下文（示意）')];
+  const used = t('已用 {used} / {window}', {
+    used: compactTokens(locale, context.tokens),
+    window: compactTokens(locale, context.contextWindow),
+  });
+  if (context.compactAt === undefined) return [used];
+  return [used, t('{at}时自动压缩', { at: compactTokens(locale, context.compactAt) })];
 }
 
 export function ContextMeterGlyph({ filled }: { filled: number }) {
@@ -114,58 +98,58 @@ export function ContextMeterGlyph({ filled }: { filled: number }) {
   );
 }
 
-export type ContextMeterRingProps = {
-  percent?: number;
-  mock?: boolean;
-  resume?: ContextResumeState | null;
-};
+export type ContextMeterRingProps = { context?: ContextMeterReading | null };
 
-export function ContextMeterRing({
-  percent = MOCK_CONTEXT_PERCENT,
-  mock = true,
-  resume = null,
-}: ContextMeterRingProps) {
-  const { t } = useI18n();
-  const filled = clampContextPercent(percent);
+function useContextMeter(context: ContextMeterReading | null) {
+  const { t, locale } = useI18n();
+  return {
+    filled: contextPercentOf(context) ?? MOCK_CONTEXT_PERCENT,
+    lines: contextMeterLines(t, locale, context),
+  };
+}
+
+export function ContextMeterRing({ context = null }: ContextMeterRingProps) {
+  const { filled, lines } = useContextMeter(context);
   return (
-    <IconTooltip
-      label={contextMeterLabel(t, filled, mock, resume)}
-      trigger={
-        <Button
-          variant="ghost"
-          size="icon"
-          type="button"
-          data-testid="composer-context-meter"
-          data-mock={mock ? '' : undefined}
-          data-percent={filled}
-          data-resume={resume ?? undefined}
-          className={METER_BTN_CLS}
-        />
-      }
-    >
-      <ContextMeterGlyph filled={filled} />
-      <span aria-hidden="true">{`${filled}%`}</span>
-    </IconTooltip>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon"
+            type="button"
+            aria-label={lines.join(', ')}
+            data-testid="composer-context-meter"
+            data-mock={context == null ? '' : undefined}
+            data-percent={filled}
+            className={METER_BTN_CLS}
+          />
+        }
+      >
+        <ContextMeterGlyph filled={filled} />
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={8} className="flex-col items-start gap-0.5">
+        {lines.map((line, index) => (
+          <span key={line} className={index === 0 ? undefined : 'opacity-80'}>
+            {line}
+          </span>
+        ))}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
-export function ContextMeterLine({
-  percent = MOCK_CONTEXT_PERCENT,
-  mock = true,
-  resume = null,
-}: ContextMeterRingProps) {
-  const { t } = useI18n();
-  const filled = clampContextPercent(percent);
+export function ContextMeterLine({ context = null }: ContextMeterRingProps) {
+  const { filled, lines } = useContextMeter(context);
   return (
     <div
       data-testid="composer-context-meter"
-      data-mock={mock ? '' : undefined}
+      data-mock={context == null ? '' : undefined}
       data-percent={filled}
-      data-resume={resume ?? undefined}
       className="flex h-8 items-center gap-2.5 px-2.5 text-meta tabular-nums text-content-tertiary"
     >
       <ContextMeterGlyph filled={filled} />
-      {contextMeterLabel(t, filled, mock, resume)}
+      {lines.join(' · ')}
     </div>
   );
 }

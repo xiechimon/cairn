@@ -7,8 +7,6 @@ import {
   type ContextMeterRingProps,
   contextMeterArcPath,
   contextPercentOf,
-  contextResumeOf,
-  contextResumeShortLabel,
   MOCK_CONTEXT_PERCENT,
 } from '../src/chief/context-meter-ring.js';
 import { I18nProvider } from '../src/i18n/provider.js';
@@ -46,27 +44,6 @@ describe('contextPercentOf', () => {
   });
 });
 
-describe('contextResumeOf', () => {
-  test('reads optional context.resume when the value is a known short state', () => {
-    expect(contextResumeOf(null)).toBeNull();
-    expect(contextResumeOf({ tokens: 1, contextWindow: 2 })).toBeNull();
-    expect(contextResumeOf({ resume: 'hot' })).toBeNull();
-    expect(contextResumeOf({ resume: 'warm' })).toBe('warm');
-    expect(contextResumeOf({ resume: 'cold' })).toBe('cold');
-    expect(contextResumeOf({ resume: 'compacted' })).toBe('compacted');
-    expect(contextResumeOf({ resume: 'idle' })).toBe('idle');
-  });
-});
-
-describe('contextResumeShortLabel', () => {
-  test('maps draft §0 short states', () => {
-    expect(contextResumeShortLabel('warm')).toBe('暖');
-    expect(contextResumeShortLabel('cold')).toBe('冷·将精简');
-    expect(contextResumeShortLabel('compacted')).toBe('已压实');
-    expect(contextResumeShortLabel('idle')).toBe('空闲');
-  });
-});
-
 describe('contextMeterArcPath', () => {
   test('returns an arc path without stroke-dasharray semantics', () => {
     expect(contextMeterArcPath(0)).toBe('');
@@ -77,42 +54,31 @@ describe('contextMeterArcPath', () => {
 });
 
 describe('ContextMeterRing', () => {
-  test('falls back to the mock fill when percent is omitted', () => {
+  test('falls back to the mock fill when there is no reading', () => {
     const html = renderRing();
     expect(html).toContain('data-testid="composer-context-meter"');
     expect(html).toContain('pointer-coarse:h-11');
     expect(html).toContain('class="size-3.5"');
-    expect(html).toContain(`>${MOCK_CONTEXT_PERCENT}%</span>`);
     expect(html).not.toContain('size-5.5');
     expect(html).toContain('data-mock=""');
     expect(html).toContain(`data-percent="${MOCK_CONTEXT_PERCENT}"`);
-    expect(html).not.toContain('data-resume');
     expect(html).not.toContain('stroke-dasharray');
-    expect(html).toContain('示意');
+    expect(html).toContain('aria-label="上下文（示意）"');
     expect(html).toContain('<path ');
   });
 
-  test('renders a prop-driven percent without the mock label', () => {
-    const html = renderRing({ percent: 18, mock: false });
-    expect(html).toContain('data-percent="18"');
+  test('fills the ring against the model window and names used, window and the compaction point', () => {
+    const html = renderRing({
+      context: { tokens: 49_376, contextWindow: 500_000, compactAt: 150_000 },
+    });
+    expect(html).toContain('data-percent="10"');
     expect(html).not.toContain('data-mock');
-    expect(html).not.toContain('data-resume');
-    expect(html).toContain('aria-label="上下文 18%"');
-    expect(html).not.toContain('示意');
-    expect(html).not.toContain('stroke-dasharray');
+    expect(html).toContain('aria-label="已用 4.9万 / 50万, 15万时自动压缩"');
+    expect(html).not.toContain('%');
   });
 
-  test('shows the draft §0 short state with percent when resume is present', () => {
-    const html = renderRing({ percent: 18, mock: false, resume: 'cold' });
-    expect(html).toContain('data-resume="cold"');
-    expect(html).toContain('aria-label="冷·将精简 · 18%"');
-    expect(html).not.toContain('示意');
-    expect(html).not.toContain('stroke-dasharray');
-  });
-
-  test('keeps the percent-only tooltip when resume is absent', () => {
-    const html = renderRing({ percent: 12, mock: false, resume: null });
-    expect(html).not.toContain('data-resume');
-    expect(html).toContain('aria-label="上下文 12%"');
+  test('omits the compaction line when the server sends no compaction point', () => {
+    const html = renderRing({ context: { tokens: 18_885, contextWindow: 1_000_000 } });
+    expect(html).toContain('aria-label="已用 1.9万 / 100万"');
   });
 });
