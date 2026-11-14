@@ -264,3 +264,31 @@ it('does not count the repeated pre-call todo projection against the record cap'
   expect(payload?.claim?.initialTodos).toHaveLength(200);
   expect((payload?.toolViews ?? []).length).toBeGreaterThan(0);
 });
+
+it('seals a closure whose text mentions bearer auth descriptively', async () => {
+  const w = await world('hello');
+  w.s.db.insert(project).values({ id: 'p-bearer', teamId: w.teamId, name: 'bearer' }).run();
+  w.s.db
+    .insert(todo)
+    .values({
+      id: 'todo-bearer',
+      teamId: w.teamId,
+      projectId: 'p-bearer',
+      title: 'auth comparison',
+      spec: 'compare Bearer vs api-key auth in the provider seam',
+      phase: 'todo',
+      phaseAt: 1,
+      seqNum: 1,
+    })
+    .run();
+  const { faux } = stub('all quiet');
+  const coordinator = boot(w, faux, {});
+  coordinator.wake(w.threadId);
+  await coordinator.idle();
+
+  const row = snapshotRow(w.s.db, w.stepId);
+  expect(row?.status).toBe('sealed');
+  expect(row?.redactionCount).toBe(0);
+  const payload = JSON.parse(row?.payload ?? 'null');
+  expect(payload?.claim?.initialTodos?.[0]?.spec).toContain('Bearer vs api-key');
+});

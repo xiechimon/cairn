@@ -81,13 +81,21 @@ async function openChiefComposer(page: Page, server?: { seed?: string }) {
 
 const storedDraft = (page: Page) => page.evaluate((key) => localStorage.getItem(key), DRAFT_KEY);
 
+async function reloadHoldingStorage(page: Page) {
+  const holder = await page.context().newPage();
+  await holder.goto('/icon-192.png');
+  await holder.evaluate(() => localStorage.length);
+  await page.reload();
+  await holder.close();
+}
+
 test('live face: the draft survives a full-page reload', async ({ page }) => {
   const { input } = await openChiefComposer(page);
   await input.fill(DRAFT);
   await expect.poll(() => storedDraft(page)).toBe(DRAFT);
   await evidenceShot(page, 'draft-typed-before-reload.png');
 
-  await page.reload();
+  await reloadHoldingStorage(page);
 
   await expect(input).toBeVisible();
   await expect(input).toHaveValue(DRAFT);
@@ -123,7 +131,7 @@ test('live face: an accepted send clears the persisted draft (no resurrection)',
   await expect.poll(() => storedDraft(page)).toBeNull();
   await evidenceShot(page, 'send-accepted-storage-cleared.png');
 
-  await page.reload();
+  await reloadHoldingStorage(page);
   await expect(input).toBeVisible();
   await expect(input).toHaveValue('');
 });
@@ -146,7 +154,7 @@ test('live face: a rejected send keeps the draft in the box and in storage (#631
   await expect.poll(() => storedDraft(page)).toBe(DRAFT);
   await evidenceShot(page, 'send-rejected-draft-persisted.png');
 
-  await page.reload();
+  await reloadHoldingStorage(page);
   await expect(input).toBeVisible();
   await expect(input).toHaveValue(DRAFT);
 });
@@ -197,7 +205,7 @@ test('live face: the draft is saved to the server and a fresh device restores it
     .toContain('"dirty":false');
 
   await page.evaluate(() => localStorage.clear());
-  await page.reload();
+  await reloadHoldingStorage(page);
   await expect(input).toHaveValue(DRAFT);
   await evidenceShot(page, 'server-draft-restored-on-fresh-device.png');
 });

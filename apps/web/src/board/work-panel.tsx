@@ -51,7 +51,8 @@ export function useProjectNames(): ReadonlyMap<string, string> {
   }, [live, projectsQ.data, search]);
 }
 
-const isMade = (todo: TodoRecord) => threadStatus(todo) === 'done';
+const isMade = (todo: TodoRecord) =>
+  threadStatus(todo) === 'done' || (todo.output === 'info' && todo.phase === 'needs_input');
 
 export function WorkPanel({
   todos,
@@ -146,7 +147,11 @@ export function WorkPanel({
               <MadeCard
                 key={todo.id}
                 todo={todo}
-                meta={joinMeta([relativeTime(todo.phaseAt, now, t), projectOf(todo)])}
+                meta={joinMeta([
+                  todo.phase === 'needs_input' ? t('待你决定') : undefined,
+                  relativeTime(todo.phaseAt, now, t),
+                  projectOf(todo),
+                ])}
                 pr={prOf.get(todo.id)}
                 onOpen={() => onOpenThread(todo.id)}
               />

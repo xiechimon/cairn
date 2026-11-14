@@ -166,6 +166,16 @@ Use the side-branch commit SHA, never the implementation head or a branch
 name. Push before linking and never merge the asset branch. Keep the branch
 so the images remain reachable. Images belong outside code fences.
 
+## Recordings
+
+Motion and timing are proven with a real-speed MP4 that plays in the PR body itself, under Proof; a frame sheet alone or a recording in a later comment is not enough.
+
+1. Push the MP4 (60 s or less, under 10 MiB) to `pr-assets/<pr-number>` as above.
+2. Upload it through GitHub's web editor: open the PR in the browser, edit the body, and drop the file into the Proof section. GitHub has no API for attachments. When the editor shows no file input, fetch the pushed raw file in page JavaScript and dispatch `dragenter`, `dragover` and `drop` with a `DataTransfer` holding it on the textarea.
+3. Leave the `https://github.com/user-attachments/assets/<id>` URL alone on its own line and save in the web editor. GitHub renders that line as a video player; `![label](url)` shows a broken image instead. `pr-evidence` accepts the URL in this form only.
+
+An attachment answers 404 until a saved body or comment contains it, so a local `gh pr edit` with a fresh attachment fails the pre-tool body hook. Saving through the web editor publishes it, and CI's `pr-evidence` then follows the redirect to a 200.
+
 ## Snapshot baselines
 
 When the diff adds or modifies any `*-snapshots/*.png` baseline, the workflow passes the list to the gate as `--changed-baselines`, and `baseline-evidence` reds the PR until the body shows every one of them. Per baseline, give either a table row naming the file with two embedded images, old baseline then new render, or a `<file>: <verdict>` line saying what changed and whether it is intended (a ```` ```text ```` fence keeps long lists out of the cap). Name the file exactly, with or without `.png`. Do not accept a baseline you have not looked at; if no one read it, the verdict says so.
