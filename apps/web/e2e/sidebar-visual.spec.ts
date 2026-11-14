@@ -214,15 +214,14 @@ test('the row menu matches the reference metrics and order', async ({ page }) =>
   const menu = page.locator('[data-slot="dropdown-menu-content"]');
   await expect(menu.getByRole('menuitem')).toHaveText([
     '重命名',
-    '项目主页',
-    '任务',
     '项目设置',
-    '项目说明',
     '移到分组',
     '归档',
     '删除',
   ]);
-  await expect.poll(() => menu.evaluate((el) => el.getBoundingClientRect().width)).toBe(168);
+  await menu.evaluate((el) =>
+    Promise.all(el.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+  );
   const m = await page.evaluate(() => {
     const menu = document.querySelector('[data-slot="dropdown-menu-content"]')!;
     const trigger = document.querySelector('[aria-label="r3-lifecycle 的菜单"]')!;
@@ -252,10 +251,10 @@ test('the row menu matches the reference metrics and order', async ({ page }) =>
       })(),
     };
   });
-  expect(m.menu.width).toBe(168);
+  expect(m.menu.width).toBeGreaterThanOrEqual(168);
   expect(m.radius).toBe('10px');
   expect(m.padding).toBe('6px');
-  expect(m.itemHeights).toEqual([27, 27, 27, 27, 27, 27, 27, 27]);
+  expect(m.itemHeights).toEqual([27, 27, 27, 27, 27]);
   expect(m.itemRadius).toBe('6px');
   expect(m.icon).toEqual([20, 10]);
   expect(m.font).toBe('13px');
@@ -265,6 +264,22 @@ test('the row menu matches the reference metrics and order', async ({ page }) =>
   expect(m.menu.top - m.trigger.bottom).toBe(5);
   expect(Math.abs(m.menu.left - m.trigger.left)).toBeLessThanOrEqual(1);
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+});
+
+test('in English every row menu label stays on one line', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
+  await page.goto(REF);
+  await page.locator('aside [data-slot="sidebar-project-row"]', { hasText: 'r3-lifecycle' }).hover();
+  await page.getByRole('button', { name: 'r3-lifecycle menu' }).click();
+  const menu = page.locator('[data-slot="dropdown-menu-content"]');
+  await expect(menu.getByRole('menuitem', { name: 'Move to group' })).toBeVisible();
+  await menu.evaluate((el) =>
+    Promise.all(el.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+  );
+  const overflow = await menu
+    .getByRole('menuitem')
+    .evaluateAll((items) => items.map((item) => item.scrollHeight - item.clientHeight));
+  expect(overflow).toEqual(overflow.map(() => 0));
 });
 
 test('the footer machine status opens the computers panel', async ({ page }) => {

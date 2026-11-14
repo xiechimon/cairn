@@ -226,7 +226,6 @@ export const EN: Record<string, string> = {
   项目记忆: 'Project memory',
   定时任务: 'Schedules',
   没有定时任务: 'No schedules',
-  项目主页: 'Project home',
   '问 Coordinator 关于 {name} 的事…': 'Ask the Coordinator about {name}…',
   '这个项目还没有 thread': 'No threads in this project yet',
   '在上面问 Coordinator，它会开 thread 来做。':
@@ -1528,7 +1527,6 @@ export const EN: Record<string, string> = {
   '这台 Runner 还不能单独开关 {name}': '{name} cannot be switched on this Runner yet',
   '这台 Runner 还没有上报 provider 状态': 'This Runner has not reported its providers yet',
   重命名: 'Rename',
-  重命名项目: 'Rename project',
   重命名分组: 'Rename group',
   解散分组: 'Ungroup',
   '分组 {name} 的菜单': 'Menu for group {name}',
