@@ -52,14 +52,14 @@ export function ResetConfirmDialog({
         )}
         <p className="m-0 mb-1.5 text-ui text-foreground">{t('以下内容将被清空，无法恢复：')}</p>
         <ul className="m-0 mb-2 list-disc pl-5 text-ui text-foreground">
-          <li>{t('中断运行中的构建（在线的执行机即时中断；离线机器的残留进程够不着）')}</li>
+          <li>{t('中断运行中的构建（在线的 Runner 即时中断；离线 Runner 的残留进程够不着）')}</li>
           <li>{t('清空对话记录')}</li>
           <li>{t('清空方案版本')}</li>
           <li>{t('清空改动记录')}</li>
         </ul>
         <p className="m-0 text-meta text-content-tertiary">
           {t(
-            '保留：标题、需求说明、标签与人员指派。运行历史保留，可供审计。执行机工作区文件不受影响。',
+            '保留：标题、需求说明、标签与人员指派。运行历史保留，可供审计。Runner 工作区文件不受影响。',
           )}
         </p>
       </div>

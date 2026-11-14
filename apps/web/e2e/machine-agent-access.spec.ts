@@ -82,7 +82,7 @@ test('without a computer row the browser switch still enables the first computer
 test('a machine that reports no browser keeps the browser switch disabled', async ({ page }) => {
   const access = await open(page, [], [{ ...MACHINE, capabilities: { mcpServers: [], skills: [] } }]);
   await expect(access.getByRole('switch', { name: '浏览器' })).toBeDisabled();
-  const reason = '这台机器还不支持浏览器。';
+  const reason = '这台 Runner 还不支持浏览器。';
   await access.getByRole('button', { name: reason }).focus();
   await page.keyboard.press(' ');
   await expect(page.locator('[data-sonner-toast]', { hasText: reason })).toBeVisible();

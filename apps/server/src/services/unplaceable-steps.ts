@@ -49,10 +49,10 @@ export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowM
         : (deps.db.select().from(machine).where(eq(machine.id, homeMachineId)).get()?.name ?? null);
     const snippet =
       queue.blocked.kind === 'capability-missing'
-        ? `没有在线机器满足要求（缺 ${queue.blocked.missing.join('、')}），步骤已等 ${minutes} 分钟`
+        ? `没有在线 Runner 满足要求（缺 ${queue.blocked.missing.join('、')}），步骤已等 ${minutes} 分钟`
         : preferredName !== null
-          ? `${preferredName} 不能跑这一步，不会改派到其他机器，步骤已等 ${minutes} 分钟`
-          : `没有在线机器能跑这一步，步骤已等 ${minutes} 分钟`;
+          ? `${preferredName} 不能跑这一步，不会改派到其他 Runner，步骤已等 ${minutes} 分钟`
+          : `没有在线 Runner 能跑这一步，步骤已等 ${minutes} 分钟`;
     notifyNoMachine(deps, todoRow, snippet);
     raised += 1;
   }

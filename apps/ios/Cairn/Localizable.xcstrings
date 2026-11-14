@@ -44,6 +44,16 @@
         }
       }
     },
+    "Approve plan" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "批准计划"
+          }
+        }
+      }
+    },
     "Ask the Coordinator anything about your projects." : {
       "localizations" : {
         "zh-Hans" : {
@@ -64,12 +74,62 @@
         }
       }
     },
+    "Cancel" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消"
+          }
+        }
+      }
+    },
     "Chat" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "对话"
+          }
+        }
+      }
+    },
+    "Complete task" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成任务"
+          }
+        }
+      }
+    },
+    "Complete task…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成任务…"
+          }
+        }
+      }
+    },
+    "Complete without merging" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成，不合并"
+          }
+        }
+      }
+    },
+    "Completing without merging keeps the changes on the conversation branch." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不合并直接完成，改动会留在会话分支。"
           }
         }
       }
@@ -104,12 +164,32 @@
         }
       }
     },
+    "Could not approve. Try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "批准失败，请重试。"
+          }
+        }
+      }
+    },
     "Could not reach the server. %@" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "连不上服务器。%@"
+          }
+        }
+      }
+    },
+    "Could not start orchestration" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能开始编排"
           }
         }
       }
@@ -164,12 +244,32 @@
         }
       }
     },
+    "Handed to the Coordinator" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已交给 Coordinator 编排"
+          }
+        }
+      }
+    },
     "In progress" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "进行中"
+          }
+        }
+      }
+    },
+    "It failed. Retry, or reply below with what to change." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "失败了。可以重试，或在下面回复说明怎么改。"
           }
         }
       }
@@ -204,6 +304,26 @@
         }
       }
     },
+    "Merge started. The task moves to Done once the merge completes." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已发起合并，合并完成后任务进入已完成。"
+          }
+        }
+      }
+    },
+    "Merge the changes into the default branch" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将改动合并到默认分支"
+          }
+        }
+      }
+    },
     "Message the Coordinator" : {
       "localizations" : {
         "zh-Hans" : {
@@ -230,6 +350,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更多"
+          }
+        }
+      }
+    },
+    "More actions…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更多操作…"
           }
         }
       }
@@ -310,6 +440,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在线 · %lld 在跑"
+          }
+        }
+      }
+    },
+    "Orchestrating" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编排中"
           }
         }
       }
@@ -514,12 +654,32 @@
         }
       }
     },
+    "Start" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始"
+          }
+        }
+      }
+    },
     "Submit" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "提交"
+          }
+        }
+      }
+    },
+    "Task completed. The changes stay on the conversation branch." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务已完成，改动保留在会话分支。"
           }
         }
       }
@@ -550,6 +710,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "团队"
+          }
+        }
+      }
+    },
+    "The completion request was not sent. Try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成请求未送出，请重试。"
+          }
+        }
+      }
+    },
+    "The merge request was not sent. Try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合并请求未送出，请重试。"
+          }
+        }
+      }
+    },
+    "The plan is ready. To change it, reply below." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "计划已就绪。要改计划，直接在下面回复。"
           }
         }
       }

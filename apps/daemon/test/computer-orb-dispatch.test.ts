@@ -309,6 +309,23 @@ describe('orb routing', () => {
     ]);
   });
 
+  test('a computer that runs on the host keeps the cairn host rules', async () => {
+    const log: string[] = [];
+    const fake = fakeClient();
+    const dispatcher = createComputerDispatcher({
+      client: fake.client,
+      orb: { ...fakeOrb(log), onHost: true },
+      ...FAST,
+    });
+    const scoped = { scopeKey: 'chief:c1' };
+    await dispatcher.dispatch(call('shell', { command: 'shutdown now' }, scoped));
+    await dispatcher.dispatch(call('shell', { command: 'echo ok' }, scoped));
+    const errors = fake.frames.filter((frame) => frame.kind === 'error');
+    expect(errors).toHaveLength(1);
+    expect((errors[0] as { message: string }).message).toContain('desktop-protection guard');
+    expect(log).toEqual(['orb[chief:c1]:execute:echo ok']);
+  });
+
   test('the two guard entry points differ only by the cairn host rules', () => {
     for (const command of [
       'machinectl poweroff cairn-orb-x',

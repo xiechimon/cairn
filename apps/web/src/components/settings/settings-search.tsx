@@ -10,6 +10,7 @@ export interface SettingsSearchSection {
   id: string;
   label: string;
   Icon: ComponentType<SVGProps<SVGSVGElement>>;
+  keywords?: string[];
 }
 
 interface Pick {
@@ -51,7 +52,9 @@ export function SettingsSearch({
   const lines: Line[] = [];
   if (needle !== '') {
     for (const section of sections) {
-      const sectionHit = includes(section.label, needle);
+      const sectionHit =
+        includes(section.label, needle) ||
+        (section.keywords ?? []).some((word) => includes(t(word), needle));
       const rows = SETTINGS_ROW_INDEX.filter(
         (entry) =>
           entry.section === section.id &&

@@ -65,6 +65,7 @@ const INFERRED_ROUTES = [
   'GET /api/remote/descriptor',
   'GET /api/remote/routes',
   'POST /api/auth/bootstrap',
+  'POST /api/auth/access',
   'POST /api/auth/stream-ticket',
   'GET /api/remote/pairing',
   'POST /api/remote/pairing',

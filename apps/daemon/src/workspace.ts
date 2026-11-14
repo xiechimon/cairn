@@ -616,9 +616,9 @@ export function localRepoUnreachableMessage(
   err: LocalRepoUnreachableError,
 ): string {
   return [
-    `local 形态项目无法在机器「${machineName}」上执行步骤：仓库路径 ${err.repoPath} 在本机不可达（${LOCAL_ERROR_REASON_COPY[err.reason]}）。`,
-    'local 形态的仓库真值在登记机的文件系统上（ADR 0016），其它执行机看不到该路径——本项目只能在仓库所在机器上运行。',
-    '补法（任选其一）：① 把任务的钉选机器改回仓库所在机器（或取消钉选，由该机器认领）；',
+    `local 形态项目无法在 Runner「${machineName}」上执行步骤：仓库路径 ${err.repoPath} 在本机不可达（${LOCAL_ERROR_REASON_COPY[err.reason]}）。`,
+    'local 形态的仓库真值在登记机的文件系统上（ADR 0016），其它 Runner 看不到该路径——本项目只能在仓库所在 Runner 上运行。',
+    '补法（任选其一）：① 把任务的钉选 Runner 改回仓库所在 Runner（或取消钉选，由该 Runner 认领）；',
     '② 跨机开发请用 GitHub 形态建项目（githubRepo 为真值，同机可加挂 localPath 加速位，ADR 0017）。',
   ].join('');
 }

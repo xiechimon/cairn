@@ -387,15 +387,15 @@ export function AccountsSection() {
               key={phase}
               query={query}
               isEmpty
-              loadingLabel={t('正在加载机器')}
-              errorTitle={t('机器没能加载')}
+              loadingLabel={t('正在加载 Runner')}
+              errorTitle={t('Runner 没能加载')}
               skeletonRows={2}
               empty={
                 <EmptyState
                   testId="resource-empty"
                   icon={Monitor}
-                  title={t('尚无机器')}
-                  description={t('在要执行任务的机器上运行注册命令，它就会出现在这里。')}
+                  title={t('尚无 Runner')}
+                  description={t('在要执行任务的 Runner 上运行注册命令，它就会出现在这里。')}
                 />
               }
             >

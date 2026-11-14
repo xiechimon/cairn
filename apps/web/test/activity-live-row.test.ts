@@ -322,7 +322,7 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
     });
     expect(tail(items)).toMatchObject({
       kind: 'streaming',
-      label: '排队中：等空闲机器（前面 {ahead} 个）',
+      label: '排队中：等空闲 Runner（前面 {ahead} 个）',
       labelVars: { ahead: 0 },
     });
   });
@@ -344,7 +344,7 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
     });
     expect(tail(items)).toMatchObject({
       kind: 'streaming',
-      label: '排队中：等空闲机器（前面 {ahead} 个）',
+      label: '排队中：等空闲 Runner（前面 {ahead} 个）',
     });
     expect(tail(items)?.signalAt).toBeUndefined();
   });
@@ -429,7 +429,7 @@ describe('mapChief queue projection (#1108 Q6)', () => {
     ).toMatchObject({
       kind: 'streaming',
       label: '处理中...',
-      labelDetail: { label: '排队中：等空闲机器（前面 {ahead} 个）', vars: { ahead: 0 } },
+      labelDetail: { label: '排队中：等空闲 Runner（前面 {ahead} 个）', vars: { ahead: 0 } },
     });
 
     expect(chiefOfThread({ ...THREAD_Q }).stream?.at(-1)).toMatchObject({

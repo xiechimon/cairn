@@ -59,7 +59,7 @@ export function ThreadUsageDetails({
     { label: t('Token 数'), value: summary.tokens },
     { label: t('缓存命中'), value: summary.cached },
     { label: t('模型列表'), value: summary.models.join(' · ') },
-    { label: t('机器'), value: summary.machines.join(' · ') },
+    { label: t('Runner'), value: summary.machines.join(' · ') },
   ].filter((row) => row.value !== '');
   return (
     <section

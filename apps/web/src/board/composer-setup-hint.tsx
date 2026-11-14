@@ -45,15 +45,15 @@ export function ComposerSetupHint({ next }: { next: FirstRunStepId }) {
     'model-source': {
       icon: <Key width={16} height={16} />,
       label: t('接入模型来源'),
-      hint: t('添加模型服务商，或在机器上登录 Claude Code'),
+      hint: t('添加模型服务商，或在 Runner 上登录 Claude Code'),
     },
     machine: {
       icon: <Monitor width={16} height={16} />,
-      label: t('连接一台机器'),
+      label: t('连接一台 Runner'),
       hint: (
         <>
           {t('运行')} <code className={CODE_CLS}>{`${PUBLISHED_PACKAGES.cli.command} start`}</code>{' '}
-          {t('连接这台机器')}
+          {t('连接这台 Runner')}
         </>
       ),
     },

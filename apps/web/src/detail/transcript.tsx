@@ -388,7 +388,7 @@ function Row({
                 </span>
                 {liveStep.machine != null && (
                   <span className="[overflow-wrap:anywhere]">
-                    {t('执行机器：{n}', { n: liveStep.machine })}
+                    {t('Runner：{n}', { n: liveStep.machine })}
                   </span>
                 )}
                 {(item.skills ?? []).map((s) => (

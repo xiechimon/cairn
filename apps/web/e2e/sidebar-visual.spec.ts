@@ -234,6 +234,7 @@ test('the row menu matches the reference metrics and order', async ({ page }) =>
       menu: box(menu),
       trigger: box(trigger),
       triggerSize: [box(trigger).width, box(trigger).height],
+      triggerGlyph: box(trigger.querySelector('svg')!).width,
       radius: cs.borderRadius,
       padding: cs.paddingTop,
       itemHeights: items.map((item) => box(item).height),
@@ -260,6 +261,7 @@ test('the row menu matches the reference metrics and order', async ({ page }) =>
   expect(m.font).toBe('13px');
   expect(m.danger).toBe(m.destructive);
   expect(m.triggerSize).toEqual([22, 22]);
+  expect(m.triggerGlyph).toBe(16);
   expect(m.menu.top - m.trigger.bottom).toBe(5);
   expect(Math.abs(m.menu.left - m.trigger.left)).toBeLessThanOrEqual(1);
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');

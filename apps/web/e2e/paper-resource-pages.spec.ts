@@ -45,9 +45,9 @@ for (const [name, url, rows] of [
   });
 }
 
-test('machines: `添加机器` is the plus beside the list heading, no dashed full-width bar', async ({ page }) => {
+test('machines: `添加 Runner` is the plus beside the list heading, no dashed full-width bar', async ({ page }) => {
   await light(page, '/app/resources/machines?scenario=06&machine=TlZ2sSD4EJCxjNJqVhdo_');
-  const add = page.getByTestId('settings-content').getByRole('button', { name: '添加机器' });
+  const add = page.getByTestId('settings-content').getByRole('button', { name: '添加 Runner' });
   await expect(add).toBeVisible();
   await expect(page.locator('button.border-dashed')).toHaveCount(0);
   const local = page.getByTestId('machine-item').first();

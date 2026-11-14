@@ -157,6 +157,12 @@ describe('createComputerOrbProvider', () => {
     },
   );
 
+  test('the host desktop switch starts no computer Orb, even on an nspawn executor', () => {
+    expect(
+      createComputerOrbProvider({ [COMPUTER_ENV]: 'host' }, new NspawnOrbProvider()),
+    ).toBeUndefined();
+  });
+
   test('an unknown computer value fails instead of silently running without one', () => {
     expect(() =>
       createComputerOrbProvider({ [COMPUTER_ENV]: 'podman' }, new HostOrbProvider()),

@@ -94,7 +94,7 @@ function RuntimeRow({
   const login = provider === undefined ? null : LOGIN_STATE[provider.login];
   const switchDisabled = !toggleable || frozen;
   const reason = !toggleable
-    ? t('这台机器还不能单独开关 {name}', { name })
+    ? t('这台 Runner 还不能单独开关 {name}', { name })
     : frozen
       ? blockedReason
       : undefined;
@@ -118,7 +118,7 @@ function RuntimeRow({
           )}
           {provider?.login === 'logged-out' && provider.loginCommand !== null && (
             <span>
-              {t('在这台机器上运行')}{' '}
+              {t('在这台 Runner 上运行')}{' '}
               <span data-testid="provider-login-command">
                 <InlineCode>{provider.loginCommand}</InlineCode>
               </span>
@@ -218,7 +218,7 @@ export function MachineDetailPane({
               </div>
             )}
             {(chief.running || chief.waiting) && (
-              <SettingsRow label={t('Coordinator')} hint={t('这台机器在 Coordinator 里的角色')}>
+              <SettingsRow label={t('Coordinator')} hint={t('这台 Runner 在 Coordinator 里的角色')}>
                 <span className="flex flex-wrap items-center justify-end gap-x-3 text-meta">
                   {chief.running && (
                     <span
@@ -233,7 +233,7 @@ export function MachineDetailPane({
                       className="inline-flex items-center gap-1.5 text-content-tertiary before:block before:size-1.5 before:rounded-full before:bg-content-dim before:content-['']"
                       data-orchestration="waiting"
                     >
-                      {t('Coordinator 等待机器')}
+                      {t('Coordinator 等待 Runner')}
                     </span>
                   )}
                 </span>
@@ -246,11 +246,11 @@ export function MachineDetailPane({
       <SettingsSection
         testId="machine-runtimes"
         title={t('运行时')}
-        description={t('这台机器上能接任务的执行器，以及它们的登录状态。')}
+        description={t('这台 Runner 上能接任务的执行器，以及它们的登录状态。')}
       >
         {online && !(machine.enabledRuntimes ?? []).some(isMachineRuntime) && (
           <p data-testid="machine-pick-runtimes" className="m-0 text-meta text-content-secondary">
-            {t('选择这台机器接哪些运行时')}
+            {t('选择这台 Runner 接哪些运行时')}
           </p>
         )}
         <SettingsCard>
@@ -276,7 +276,7 @@ export function MachineDetailPane({
       {capabilities !== undefined && (
         <SettingsSection testId="machine-capabilities" title={t('能力')}>
           <SettingsCard>
-            <SettingsRow label={t('能力')} hint={t('这台机器上报的 MCP 与技能清单')}>
+            <SettingsRow label={t('能力')} hint={t('这台 Runner 上报的 MCP 与技能清单')}>
               <span
                 className="text-meta text-content-secondary"
                 data-machine-capabilities={capabilities === null ? 'unreported' : 'reported'}

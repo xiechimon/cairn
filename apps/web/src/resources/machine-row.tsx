@@ -119,7 +119,7 @@ export function MachineRowView({
   const setAccepting = (next: boolean) => {
     if (next) {
       onOpenSection('runtime');
-      toast(t('选择这台机器接哪些运行时'));
+      toast(t('选择这台 Runner 接哪些运行时'));
       return;
     }
     writeRuntimes([]);
@@ -187,7 +187,7 @@ export function MachineRowView({
       void queryClient.invalidateQueries({ queryKey: ['members', teamId] });
       onClosed();
     } catch (error) {
-      toastError(t('删除机器失败，请重试。'), error);
+      toastError(t('删除 Runner 失败，请重试。'), error);
     } finally {
       setDeleting(false);
     }
@@ -327,7 +327,11 @@ export function MachineRowView({
             checked={enabled}
             disabled={acceptFrozen}
             title={
-              online ? (enabled ? undefined : t('选择这台机器接哪些运行时')) : acceptBlockedReason
+              online
+                ? enabled
+                  ? undefined
+                  : t('选择这台 Runner 接哪些运行时')
+                : acceptBlockedReason
             }
             onCheckedChange={setAccepting}
           />
@@ -364,10 +368,10 @@ export function MachineRowView({
             <DropdownMenuItem
               data-testid="machine-menu-delete"
               disabled={deleting}
-              title={t('删除后，这台机器要重新注册才能再接任务')}
+              title={t('删除后，这台 Runner 要重新注册才能再接任务')}
               onClick={() => setConfirmOpen(true)}
             >
-              {t('删除机器')}
+              {t('删除 Runner')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -384,7 +388,7 @@ export function MachineRowView({
       )}
       <AlertDialogShell
         title={t('整机迁移')}
-        subtitle={t('把固定在这台机器上的路由规则一起迁到另一台机器。')}
+        subtitle={t('把固定在这台 Runner 上的路由规则一起迁到另一台 Runner。')}
         ariaLabel={t('整机迁移')}
         open={evacuateOpen}
         onClose={() => setEvacuateOpen(false)}
@@ -430,9 +434,9 @@ export function MachineRowView({
       </AlertDialogShell>
       <DeleteConfirm
         open={confirmOpen}
-        title={t('确定删除这台机器？此操作不可撤销。')}
+        title={t('确定删除这台 Runner？此操作不可撤销。')}
         summary={machine.name}
-        ariaLabel={t('删除机器')}
+        ariaLabel={t('删除 Runner')}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => void remove()}
       />

@@ -119,12 +119,12 @@ export function MachineAgentAccess({ machine }: { machine: MachineRow }) {
     !browserPinnedElsewhere &&
     (browserInstalled || browserEnabled);
   const browserHint = browserPinnedElsewhere
-    ? t('浏览器偏好已绑定到另一台机器。')
+    ? t('浏览器偏好已绑定到另一台 Runner。')
     : browserInstalled
       ? t('让 agent 打开网页、点击和填表。')
       : browserEnabled
-        ? t('这台机器已不再报告浏览器能力；可关闭已保存的偏好。')
-        : t('这台机器还不支持浏览器。');
+        ? t('这台 Runner 已不再报告浏览器能力；可关闭已保存的偏好。')
+        : t('这台 Runner 还不支持浏览器。');
   const onBrowserToggle = (checked: boolean) => {
     const machineId = machine.id;
     if (teamId === undefined || machineId === undefined || browserBusy) return;

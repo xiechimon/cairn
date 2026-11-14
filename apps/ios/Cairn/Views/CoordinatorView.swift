@@ -42,7 +42,7 @@ struct CoordinatorView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 80)
                 }
-            }
+            } actions: {}
             .navigationTitle("Coordinator")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: TaskRecord.self) { task in

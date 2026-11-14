@@ -332,7 +332,7 @@ export function ProjectHome({
                     <ListRow
                       icon={<Gauge className="size-5" />}
                       title={t('并发与优先级')}
-                      subtitle={t('目前跟随机器上限')}
+                      subtitle={t('目前跟随 Runner 上限')}
                     />
                   </Link>
                 </ListCard>

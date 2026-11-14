@@ -49,6 +49,7 @@ export function openReadOnlyView(): ReadOnlyView {
 export interface ComputerScreenProviderOptions {
   runtimeRoot?: string | (() => string);
   ensureComputer?: (scopeKey: string) => Promise<string>;
+  socketPath?: (scopeKey: string, kind: 'view' | 'control') => string;
   socketWaitMs?: number;
   connect?: (path: string) => Socket;
   now?: () => number;
@@ -157,7 +158,9 @@ export function createComputerScreenProvider(
           ? options.runtimeRoot()
           : (options.runtimeRoot ?? DEFAULT_RUNTIME_ROOT);
       return openUnixScreen(
-        computerScreenSocketPath(runtimeRoot, request.scopeKey, request.kind),
+        options.socketPath
+          ? options.socketPath(request.scopeKey, request.kind)
+          : computerScreenSocketPath(runtimeRoot, request.scopeKey, request.kind),
         request.signal,
         {
           socketWaitMs,

@@ -26,7 +26,7 @@ export const SIDEBAR_ROW =
   'h-8.5 w-full justify-start gap-3 rounded-(--cds-radius-md) border-none text-ui font-normal pointer-coarse:h-11';
 
 export const SIDEBAR_ROW_ACTION =
-  'size-5.5 rounded-(--cds-radius-md) p-0 text-foreground hover:bg-(--sidebar-press) aria-expanded:bg-(--sidebar-press) dark:hover:bg-(--sidebar-press) pointer-coarse:size-11 [&_svg:not([class*=size-])]:size-5';
+  'size-5.5 rounded-(--cds-radius-md) p-0 text-foreground hover:bg-(--sidebar-press) aria-expanded:bg-(--sidebar-press) dark:hover:bg-(--sidebar-press) pointer-coarse:size-11 [&_svg:not([class*=size-])]:size-4 pointer-coarse:[&_svg:not([class*=size-])]:size-5';
 
 const ACTION_SLOT =
   'absolute top-1/2 right-1 -translate-y-1/2 items-center gap-0.5 group-focus-within/row:inline-flex group-hover/row:inline-flex has-aria-expanded:inline-flex [@media(hover:none)]:inline-flex';

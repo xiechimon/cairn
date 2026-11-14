@@ -16,7 +16,7 @@ import { EditCharterDialog } from './edit-charter-dialog.js';
 import { MemoryPanel } from './memory-panel.js';
 
 const TABS: { id: ChiefSettingsTab; label: string }[] = [
-  { id: 'routing', label: '模型与机器' },
+  { id: 'routing', label: '模型与 Runner' },
   { id: 'charter', label: '章程' },
   { id: 'memory', label: '记忆' },
   { id: 'watches', label: '关注与提醒' },
@@ -89,7 +89,7 @@ export function ChiefSettings({ chief, onBack }: { chief: ChiefContent; onBack: 
                 onClick={() => navigate(COORDINATOR_ROUTING_HREF)}
               >
                 <span className="flex min-w-0 flex-col">
-                  <span className="text-ui text-foreground">{t('模型与机器')}</span>
+                  <span className="text-ui text-foreground">{t('模型与 Runner')}</span>
                   <span className={SETTINGS_HINT_CLS}>
                     {t('跟随 coordinator 路由规则，在路由设置里调整。')}
                   </span>

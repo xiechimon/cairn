@@ -32,9 +32,13 @@ The account sheet (menu button on the Chat tab) has a `Push on this device` swit
 
 Without an Apple key, try the tap path on a simulator with `xcrun simctl push <device> dev.cairn.ios payload.apns`, where the payload carries `aps.alert` and `href`.
 
+## Decisions
+
+A task thread shows the web thread's decision as a chip above the composer: `Start`, `Approve plan` or `Retry`, and `Orchestrating` while the Coordinator works on a start or retry. A task waiting for review has `Complete task…` in the trailing `…` menu, which merges the changes or completes without merging. The routes and copy are the web app's; [`docs/design/mobile-information-architecture.md`](../../docs/design/mobile-information-architecture.md) lists them.
+
 ## Unit tests
 
-`CairnTests` runs against a `URLProtocol` stub, so it needs no server: message history follows `nextCursor` to the oldest page, a task message returns the conversation it landed in, free-text questions answer with `text` and multi-select questions keep every pick, a conversation stream event reloads the open thread, a failed session restore stays recoverable, every notification `href` the server sends opens the right screen, and push registration sends the token and environment.
+`CairnTests` runs against a `URLProtocol` stub, so it needs no server: message history follows `nextCursor` to the oldest page, a task message returns the conversation it landed in, free-text questions answer with `text` and multi-select questions keep every pick, a conversation stream event reloads the open thread, a failed session restore stays recoverable, every notification `href` the server sends opens the right screen, push registration sends the token and environment, each decision calls the web app's route, each phase offers the web app's decision, an orchestration that failed unlocks its task, and a decision failure shows the server's reason only for a 4xx.
 
 ```sh
 xcodebuild -project Cairn.xcodeproj -scheme Cairn \

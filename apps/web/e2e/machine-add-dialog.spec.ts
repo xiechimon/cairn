@@ -4,19 +4,19 @@ const MACHINES = '/app/resources/machines?scenario=06';
 
 async function openDialog(page: Page) {
   await page.goto(MACHINES);
-  await page.getByRole('button', { name: '添加机器' }).click();
-  const dialog = page.getByRole('dialog', { name: '添加机器' });
+  await page.getByRole('button', { name: '添加 Runner' }).click();
+  const dialog = page.getByRole('dialog', { name: '添加 Runner' });
   await expect(dialog).toBeVisible();
   return dialog;
 }
 
-test('`添加机器` button opens the dialog with the two-step command blocks', async ({ page }) => {
+test('`添加 Runner` button opens the dialog with the two-step command blocks', async ({ page }) => {
   const dialog = await openDialog(page);
-  await expect(dialog).toHaveAccessibleName('添加机器');
+  await expect(dialog).toHaveAccessibleName('添加 Runner');
   await expect(dialog.getByText('有条件时优先使用云主机')).toContainText('有条件时优先使用云主机');
 
-  await expect(dialog.getByText("授权团队 Xmon Dai's team 后机器即可上线")).toContainText(
-    "授权团队 Xmon Dai's team 后机器即可上线",
+  await expect(dialog.getByText("授权团队 Xmon Dai's team 后 Runner 即可上线")).toContainText(
+    "授权团队 Xmon Dai's team 后 Runner 即可上线",
   );
   const commands = dialog.locator('code');
   await expect(commands).toHaveCount(2);
@@ -32,17 +32,17 @@ test('`添加机器` button opens the dialog with the two-step command blocks', 
 test('family law: X, Escape and backdrop dismiss; panel clicks do not', async ({ page }) => {
   let dialog = await openDialog(page);
   await dialog.getByRole('button', { name: '关闭' }).click();
-  await expect(page.getByRole('dialog', { name: '添加机器' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: '添加 Runner' })).toBeHidden();
 
   dialog = await openDialog(page);
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: '添加机器' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: '添加 Runner' })).toBeHidden();
 
   dialog = await openDialog(page);
   await dialog.getByTestId('dialog-head').click();
-  await expect(page.getByRole('dialog', { name: '添加机器' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '添加 Runner' })).toBeVisible();
   await page.mouse.click(20, 20);
-  await expect(page.getByRole('dialog', { name: '添加机器' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: '添加 Runner' })).toBeHidden();
 });
 
 test('API key disclosure expands the key command and the api-keys link', async ({ page }) => {
