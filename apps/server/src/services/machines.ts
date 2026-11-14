@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import { hostname } from 'node:os';
-import { join } from 'node:path';
 import type {
   AgentTodoReport,
   ClaudeCodeReport,
@@ -682,7 +681,7 @@ function skillsSelection(
   return {
     isChief: false,
     unrestricted: false,
-    wanted: scanned.filter((s) => whitelist.has(s.id)),
+    wanted: scanned.filter((s) => s.builtin || whitelist.has(s.id)),
   };
 }
 
@@ -695,7 +694,7 @@ export function machineSkillsManifest(
   const { isChief, unrestricted, wanted } = skillsSelection(deps, row);
   const skills: MachineSkillsManifestResponse['skills'] = [];
   for (const skill of wanted) {
-    const dir = join(deps.skillsDir, skill.dirName);
+    const dir = skill.dir;
     const files: MachineSkillsManifestResponse['skills'][number]['files'] = [];
     for (const path of listSkillFiles(dir)) {
       const bytes = readSkillFileBytes(dir, path);
@@ -728,7 +727,7 @@ export function machineSkillFile(
   const { wanted } = skillsSelection(deps, row);
   const skill = wanted.find((s) => s.dirName === dirName);
   if (!skill) throw new NotFoundError(`skill ${dirName}`);
-  const dir = join(deps.skillsDir, skill.dirName);
+  const dir = skill.dir;
   if (!listSkillFiles(dir).includes(filePath)) throw new NotFoundError(`file ${filePath}`);
   const bytes = readSkillFileBytes(dir, filePath);
   if (bytes === null) throw new NotFoundError(`file ${filePath}`);

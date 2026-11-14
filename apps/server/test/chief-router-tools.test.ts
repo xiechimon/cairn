@@ -38,6 +38,24 @@ const QUESTIONS = [
   },
 ];
 
+const RESEARCHED = {
+  request: {
+    segments: [
+      {
+        source: { kind: 'chat' as const, threadId: 't', messageId: 'm', span: 'whole' as const },
+        author: 'owner' as const,
+        sourceRef: null,
+        text: 'make the export faster',
+      },
+    ],
+    siblings: [],
+    difficulty: null,
+    titleSource: 'owner' as const,
+    titleSourceRef: null,
+    research: { reason: 'how do other boards stream large exports?' },
+  },
+};
+
 function seedTodo(over: Partial<typeof todo.$inferInsert> = {}) {
   const id = over.id ?? `todo-${Math.random().toString(36).slice(2, 8)}`;
   H.s.db
@@ -172,7 +190,11 @@ describe('router tools', () => {
 
     test('a faster task opens research and holds the session until that research finishes', async () => {
       seedSessionRoute(H.s);
-      const id = seedTodo({ title: 'make the export faster', spec: 'The board export is slow.' });
+      const id = seedTodo({
+        ...RESEARCHED,
+        title: 'make the export faster',
+        spec: 'The board export is slow.',
+      });
       const out = (await relay('open_thread', { todoId: id })) as { buildId: string };
       const research = H.s.db
         .select()
@@ -208,9 +230,38 @@ describe('router tools', () => {
       expect(released?.prompt ?? '').toContain('Use a streaming export.');
     });
 
+    test('a faster title without the Coordinator research flag opens no research', async () => {
+      seedSessionRoute(H.s);
+      const id = seedTodo({ title: 'make the export faster', spec: 'The board export is slow.' });
+      await relay('open_thread', { todoId: id });
+      expect(
+        H.s.db.select().from(todo).where(eq(todo.sourceKind, 'research-before-plan')).all(),
+      ).toHaveLength(0);
+      expect(H.s.db.select().from(todo).where(eq(todo.id, id)).get()?.blockedBy ?? []).toEqual([]);
+    });
+
+    test('create_todo with research stores the flag and opens one research thread carrying the reason', async () => {
+      seedSessionRoute(H.s);
+      const created = (await relay('create_todo', {
+        ...ownerTodo('队列选型'),
+        research: { reason: '比较几种消息队列的投递语义' },
+      })) as { id: string };
+      const row = H.s.db.select().from(todo).where(eq(todo.id, created.id)).get();
+      expect(row?.request?.research).toEqual({ reason: '比较几种消息队列的投递语义' });
+      const research = H.s.db
+        .select()
+        .from(todo)
+        .where(eq(todo.sourceKind, 'research-before-plan'))
+        .all();
+      expect(research).toHaveLength(1);
+      expect(research[0]?.spec).toContain('比较几种消息队列的投递语义');
+      expect(row?.blockedBy).toEqual([research[0]?.id]);
+    });
+
     test('a delivered tier-2 report in review releases the hold', async () => {
       seedSessionRoute(H.s);
       const id = seedTodo({
+        ...RESEARCHED,
         title: 'make the export faster',
         spec: `The board export is slow. ${'detail '.repeat(800)}`,
       });
@@ -245,7 +296,11 @@ describe('router tools', () => {
 
     test('resuming a stopped faster thread holds the replacement session', async () => {
       seedSessionRoute(H.s);
-      const id = seedTodo({ title: 'make the export faster', spec: 'The board export is slow.' });
+      const id = seedTodo({
+        ...RESEARCHED,
+        title: 'make the export faster',
+        spec: 'The board export is slow.',
+      });
       const opened = (await relay('open_thread', { todoId: id })) as { buildId: string };
       await relay('stop_thread', { todoId: id, reason: 'test stop' });
       await relay('message_thread', { todoId: id, content: 'Try a smaller export.' });

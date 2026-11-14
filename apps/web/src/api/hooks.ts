@@ -94,6 +94,7 @@ import { api } from './client.js';
 import { computerQueryKeys } from './computer-query-scope.js';
 import { cacheUserMessage } from './message-cache.js';
 import { resumeRefreshDelayMs } from './resume-refresh-delay.js';
+import { keepNewerTasks, keepNewerTodo, keepNewerTodos } from './todo-freshness.js';
 
 const CHIEF_THREADS_INFLIGHT_POLL_MS = 3000;
 const BACKUP_HEALTH_POLL_MS = 5 * 60 * 1000;
@@ -157,10 +158,15 @@ function useDebouncedValue(value: string, delayMs: number): string {
   return debounced;
 }
 
+export const todosQuery = (teamId: string | undefined) => ({
+  queryKey: ['todos', teamId],
+  queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}`),
+  structuralSharing: keepNewerTodos,
+});
+
 export const useTodos = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
-    queryKey: ['todos', teamId],
-    queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}`),
+    ...todosQuery(teamId),
     enabled: enabled && teamId !== undefined,
     staleTime: STREAM_KEPT_FRESH_MS,
   });
@@ -172,18 +178,24 @@ export const useArchivedTodos = (teamId: string | undefined, enabled: boolean) =
     enabled: enabled && teamId !== undefined,
   });
 
+export const tasksQuery = (teamId: string | undefined) => ({
+  queryKey: ['tasks', teamId],
+  queryFn: async () =>
+    tasksQuerySchema.parse(await api.get(`/api/tasks?teamId=${teamId}&sectioned=1`)),
+  structuralSharing: keepNewerTasks,
+});
+
 export const useTasks = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
-    queryKey: ['tasks', teamId],
-    queryFn: async () =>
-      tasksQuerySchema.parse(await api.get(`/api/tasks?teamId=${teamId}&sectioned=1`)),
+    ...tasksQuery(teamId),
     enabled: enabled && teamId !== undefined,
     staleTime: STREAM_KEPT_FRESH_MS,
   });
 
-const todoQuery = (id: string | undefined) => ({
+export const todoQuery = (id: string | undefined) => ({
   queryKey: ['todo', id],
   queryFn: () => api.get<TodoRecord>(`/api/todos/${id}`),
+  structuralSharing: keepNewerTodo,
 });
 
 export const useTodo = (id: string | undefined, enabled: boolean) =>

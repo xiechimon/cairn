@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<rect x="2" y="2" width="1596" height="896" rx="24" fill="#8b949e" fill-opacity="0.12" stroke="#8b949e" stroke-opacity="0.6" stroke-width="3" stroke-dasharray="16 12"/>
+<g fill="#8b949e" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">
+<text x="800" y="420" font-size="56" font-weight="600">Full demo video, coming soon</text>
+<text x="800" y="490" font-size="44">完整演示视频，待补</text>
+<text x="800" y="560" font-size="32">About 90 seconds, from a request on the phone to a merged pull request</text>
+</g>
+</svg>

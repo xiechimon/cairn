@@ -60,6 +60,14 @@ describe('sanitizeQuickReplies', () => {
     });
   });
 
+  it('drops a reply that confirms an irreversible action and keeps the rest', () => {
+    expect(sanitizeQuickReplies(['继续看 README', '删除这个项目', 'Merge it'])).toEqual({
+      ok: true,
+      replies: ['继续看 README'],
+    });
+    expect(sanitizeQuickReplies(['删掉吧']).ok).toBe(false);
+  });
+
   it('drops empties and case-insensitive duplicates', () => {
     expect(sanitizeQuickReplies(['Yes', 'yes', 'No'])).toEqual({
       ok: true,
@@ -73,11 +81,11 @@ describe('sanitizeQuickReplies', () => {
     expect(result.ok).toBe(false);
   });
 
-  it('rejects a reply longer than 40 characters after cleaning and accepts exactly 40', () => {
-    expect(sanitizeQuickReplies(['字'.repeat(41)]).ok).toBe(false);
-    expect(sanitizeQuickReplies(['字'.repeat(40)])).toEqual({
+  it('rejects a reply longer than 80 characters after cleaning and accepts exactly 80', () => {
+    expect(sanitizeQuickReplies(['字'.repeat(81)]).ok).toBe(false);
+    expect(sanitizeQuickReplies(['字'.repeat(80)])).toEqual({
       ok: true,
-      replies: ['字'.repeat(40)],
+      replies: ['字'.repeat(80)],
     });
     expect(sanitizeQuickReplies([`**${'a'.repeat(40)}**`]).ok).toBe(true);
   });
@@ -99,7 +107,7 @@ describe('quickRepliesContentSchema', () => {
       quickRepliesContentSchema.safeParse({ ...base, replies: ['a', 'b', 'c', 'd'] }).success,
     ).toBe(false);
     expect(
-      quickRepliesContentSchema.safeParse({ ...base, replies: ['x'.repeat(41)] }).success,
+      quickRepliesContentSchema.safeParse({ ...base, replies: ['x'.repeat(81)] }).success,
     ).toBe(false);
     expect(quickRepliesContentSchema.safeParse({ ...base, replies: ['a\nb'] }).success).toBe(false);
   });

@@ -27,6 +27,7 @@ import { loopbackOwnerFor } from './lib/loopback-owner.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { localWorkspaceRoot } from './lib/workspace-root.js';
 import { shutdownRuntimeOtel } from './runtime-otel.js';
+import { installBuiltinSkills } from './services/builtin-skills.js';
 import { sweepComputerHandoffs } from './services/computer-handoff.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import {
@@ -71,6 +72,11 @@ if (refusal !== null) {
 }
 const config = ensureAccessToken(loadedConfig);
 logSecrets.push(config.authToken ?? '');
+try {
+  installBuiltinSkills(join(config.dataDir, 'builtin-skills'));
+} catch (error) {
+  logger.warn({ err: error }, 'built-in skills were not installed; running without them');
+}
 
 const opened = (() => {
   try {

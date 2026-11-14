@@ -21,6 +21,7 @@ import {
   parseVerifyPromptMeta,
   REPORT_FILE_NAME,
   type ReviewGate,
+  WORKER_DECISION_BOUNDARY,
 } from '@cairn/shared';
 
 export function buildTaskPrompt(claimed: ClaimedStep): string {
@@ -140,6 +141,7 @@ export function composeWorkerSystemPrompt(
   opts?: {
     taskMeta?: { currentTitle: string; meta?: TaskMetaForm };
     attachments?: boolean;
+    decisionBoundary?: boolean;
     project?: { name: string; instructions?: string | undefined };
   },
 ): string | undefined {
@@ -150,6 +152,7 @@ export function composeWorkerSystemPrompt(
     );
   }
   if (description) parts.push(description);
+  if (opts?.decisionBoundary) parts.push(WORKER_DECISION_BOUNDARY);
   if (opts?.project?.instructions) {
     parts.push(`## 项目说明（${opts.project.name}）\n${opts.project.instructions}`);
   }

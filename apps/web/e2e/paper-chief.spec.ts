@@ -128,6 +128,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto(SETTINGS('102'));
     const charterCard = page.locator('.settings-card');
     await expect(charterCard.getByText(/尚无章程/), 'S3').toBeVisible();
+    await expect(page.getByTestId('chief-default-rule'), 'S3').toContainText('你提需求、做架构决策');
     const edit = page.getByRole('button', { name: '编辑' });
     expect((await edit.boundingBox())?.height, 'S3').toBe(32);
     await expect(edit, 'S3').toHaveCSS(

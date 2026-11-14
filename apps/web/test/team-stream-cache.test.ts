@@ -6,6 +6,7 @@ import {
 } from '@cairn/shared';
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
+import { tasksQuery, todoQuery, todosQuery } from '../src/api/hooks.js';
 import {
   applyTeamStreamEvent,
   listRefetchDue,
@@ -192,5 +193,53 @@ describe('team stream patches the board lists instead of refetching them', () =>
     vi.setSystemTime(15_000);
     expect(listRefetchDue(qc, TEAM)).toBe(true);
     vi.useRealTimers();
+  });
+});
+
+describe('a fetch that started before a pushed todo cannot roll it back', () => {
+  function held<T>() {
+    let release: (value: T) => void = () => {};
+    const pending = new Promise<T>((resolve) => {
+      release = resolve;
+    });
+    return { pending, release };
+  }
+
+  it('keeps the pushed building phase when an older single-todo fetch lands after it', async () => {
+    const qc = client();
+    const fetch = held<WireTodo>();
+    const fetching = qc.fetchQuery({ ...todoQuery('todo-1'), queryFn: () => fetch.pending });
+    applyTeamStreamEvent(qc, TEAM, event(row(1, 'building', { v: 6 })));
+    fetch.release(row(1, 'queued', { v: 5 }));
+    await fetching;
+    expect(qc.getQueryData<WireTodo>(['todo', 'todo-1'])?.phase).toBe('building');
+  });
+
+  it('keeps the pushed row in the todo and task lists when an older list fetch lands after it', async () => {
+    const qc = client();
+    qc.setQueryData(['todos', TEAM], [row(1, 'queued', { v: 5 }), row(2, 'todo')]);
+    qc.setQueryData(['tasks', TEAM], {
+      entries: [taskRow(row(1, 'queued', { v: 5, section: 'up_next' }))],
+    });
+    const todos = held<WireTodo[]>();
+    const tasks = held<TasksQuery>();
+    const fetchingTodos = qc.fetchQuery({ ...todosQuery(TEAM), queryFn: () => todos.pending });
+    const fetchingTasks = qc.fetchQuery({ ...tasksQuery(TEAM), queryFn: () => tasks.pending });
+    applyTeamStreamEvent(qc, TEAM, event(row(1, 'building', { v: 6, section: 'up_next' })));
+    todos.release([row(1, 'queued', { v: 5 }), row(2, 'todo', { v: 3 })]);
+    tasks.release({ entries: [taskRow(row(1, 'queued', { v: 5, section: 'up_next' }))] });
+    await Promise.all([fetchingTodos, fetchingTasks]);
+    const list = qc.getQueryData<WireTodo[]>(['todos', TEAM]) ?? [];
+    expect(list.find((todo) => todo.id === 'todo-1')?.phase).toBe('building');
+    expect(list.find((todo) => todo.id === 'todo-2')?.v).toBe(3);
+    const entry = qc.getQueryData<TasksQuery>(['tasks', TEAM])?.entries[0];
+    expect(entry?.kind === 'todo' ? entry.phase : null).toBe('building');
+  });
+
+  it('takes a newer fetch over an older cached row', async () => {
+    const qc = client();
+    applyTeamStreamEvent(qc, TEAM, event(row(1, 'queued', { v: 5 })));
+    await qc.fetchQuery({ ...todoQuery('todo-1'), queryFn: async () => row(1, 'building', { v: 6 }) });
+    expect(qc.getQueryData<WireTodo>(['todo', 'todo-1'])?.phase).toBe('building');
   });
 });

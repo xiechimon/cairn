@@ -106,7 +106,12 @@ function workerSkillInjection(
   const granted =
     agentRow.skillsAllowlist === null
       ? [...scanned.keys()]
-      : [...new Set(agentRow.skillsAllowlist)];
+      : [
+          ...new Set([
+            ...agentRow.skillsAllowlist,
+            ...[...scanned.values()].filter((s) => s.builtin).map((s) => s.id),
+          ]),
+        ];
   const candidates = granted.map((id) => {
     const s = scanned.get(id);
     return s === undefined

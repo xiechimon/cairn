@@ -110,6 +110,7 @@ export function TraceChevron({ open }: { open: boolean }) {
 
 export function TraceGroupSummary({
   summary,
+  outcome,
   more,
   failed,
   open,
@@ -119,6 +120,7 @@ export function TraceGroupSummary({
   ...props
 }: Omit<ComponentProps<typeof Button>, 'children'> & {
   summary: ReactNode;
+  outcome?: string | null;
   more?: string | null;
   failed?: string | null;
   summaryTitle?: string;
@@ -141,6 +143,11 @@ export function TraceGroupSummary({
       <span className="min-w-0 truncate" data-trace-summary="" title={summaryTitle}>
         <span className={cn(running && 'shimmer motion-reduce:shimmer-none')}>{summary}</span>
       </span>
+      {outcome != null && (
+        <span className="-ml-2 flex-none" data-trace-outcome="">
+          {outcome}
+        </span>
+      )}
       {more != null && (
         <span className="-ml-1 flex-none text-(--text-tertiary)" data-trace-more="">
           {more}

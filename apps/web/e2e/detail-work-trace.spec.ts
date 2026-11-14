@@ -176,7 +176,8 @@ test('work groups consecutive thinking and calls, with only the last block expan
   await expect(summaries).toHaveCount(2);
   const words = summaries.first().locator('[data-trace-summary]');
   await expect(words).toHaveText('Find readiness checks，Verify changes');
-  await expect(summaries.first().locator('[data-trace-more]')).toHaveText('· 7 步');
+  await expect(summaries.first().locator('[data-trace-outcome]')).toHaveText('，改完测试通过');
+  await expect(summaries.first().locator('[data-trace-more]')).toHaveCount(0);
   await expect(summaries.first().locator('[data-trace-failed]')).toHaveText('（1 个失败）');
   await expect(summaries.first()).toHaveAttribute('data-trace-state', 'failed');
   for (const count of ['思考 1 次', '读了 1 个文件', '搜索 1 次', '跑了 1 条命令', '改了 2 个文件', '调用 1 个工具'])

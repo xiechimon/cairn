@@ -348,6 +348,9 @@ test('finishing a step refreshes whole-thread cost and current-run tokens withou
       status: 'done', createdAt: NOW - 100_000, checkpointCommit: null, skillInjection: null,
     },
   };
+  await page.waitForFunction(() =>
+    window.__es.some((entry) => entry.url.includes('/api/conversations/build-1/stream')),
+  );
   await page.evaluate((ev) => {
     const stream = window.__es.find((entry) => entry.url.includes('/api/conversations/build-1/stream'));
     if (stream === undefined) throw new Error('build stream did not connect');
@@ -381,6 +384,9 @@ test('fresh usage determines cost while the todo aggregate refresh is held', asy
       status: 'done', createdAt: NOW - 100_000, checkpointCommit: null, skillInjection: null,
     },
   };
+  await page.waitForFunction(() =>
+    window.__es.some((entry) => entry.url.includes('/api/conversations/build-1/stream')),
+  );
   await page.evaluate((ev) => {
     const stream = window.__es.find((entry) => entry.url.includes('/api/conversations/build-1/stream'));
     if (stream === undefined) throw new Error('build stream did not connect');

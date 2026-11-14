@@ -1223,7 +1223,7 @@
       ],
       "evidence": [
         "apps/server/test/research-trigger.test.ts",
-        "apps/server/test/research-before-plan.test.ts",
+        "apps/server/test/chief-router-tools.test.ts",
         "apps/daemon/test/web-search.test.ts"
       ]
     },

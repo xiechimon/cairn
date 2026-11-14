@@ -201,6 +201,10 @@ export const coordinatorCreateTodoParamsSchema = z
     priority: z.enum(TASK_REQUEST_PRIORITIES).optional(),
     difficulty: z.enum(TASK_REQUEST_DIFFICULTIES).optional(),
     output: todoOutputSchema.optional(),
+    research: z
+      .object({ reason: z.string().trim().min(1).max(200) })
+      .strict()
+      .optional(),
   })
   .strict()
   .refine((params) => params.messageIds === undefined || params.sourceTodoId === undefined, {
@@ -482,7 +486,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'create_todo',
     description:
-      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo, and starts with a placeholder title cut from them. After create, call update_todo with a short summary title for the Tasks panel. You add routing only. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is unclear, ask_user instead of filling the gap. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
+      "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo, and starts with a placeholder title cut from them. After create, call update_todo with a short summary title for the Tasks panel. You add routing only. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is only vague, create the todo and let its thread research and propose; ask_user only when the need itself is ambiguous. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
     parameters: obj(
       {
         projectId: str('Project id.'),
@@ -506,6 +510,14 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         ),
         blockedBy: idArr(
           'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done (an info blocker counts once its report is in review); a failed or closed blocker wakes you to decide.',
+        ),
+        research: obj(
+          {
+            reason: str(
+              "One line, in the owner's language, saying what the research must answer before this task is planned. Set research for a code task that designs a new mechanism, adds a dependency, fixes a performance problem or chooses a technology: a read-only research thread studies open-source implementations first and this thread waits for its report. Leave it out for small fixes, wording or style changes and info tasks.",
+            ),
+          },
+          ['reason'],
         ),
       },
       ['projectId'],
@@ -705,7 +717,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'ask_user',
     description:
-      'Ask the user structured questions and block this turn until they answer a question card (same turn continues with their choices as the tool result). Use it whenever the answer would change what you do next; batch up to 4 questions per call instead of asking one at a time. Every card already offers a free-text answer, so list only real choices.',
+      'Ask the user structured questions and block this turn until they answer a question card (same turn continues with their choices as the tool result). The user states needs and makes architecture decisions; research and decide everything else yourself. Do not ask for facts you can find in the code, the docs or by research, or for implementation details. Ask only for real decisions: an ambiguous need, architecture or product direction, reversing a recorded decision, payments, credentials, irreversible or external actions, or what a team, project or repository rule routes to a person. Batch them into one call instead of asking one at a time; give each the evidence in its description and mark the option you recommend. Every card already offers a free-text answer, so list only real choices.',
     parameters: obj(
       {
         questions: arr(
@@ -875,7 +887,7 @@ export const CHIEF_ROUTER_TOOLS: readonly RemoteToolDef[] = [
 export const CHIEF_REPLY_TOOLS: readonly RemoteToolDef[] = [
   {
     name: SUGGEST_REPLIES_TOOL_NAME,
-    description: `Offer the user up to ${QUICK_REPLIES_MAX} short replies to your reply in this turn; they show as buttons above the input and a click sends that text as the user's message. Use it only after a simple open question or a proposed next step with obvious short answers, written in the user's language. Never for destructive or irreversible confirmations: use ask_user for those. Each reply is plain text of at most ${QUICK_REPLY_MAX_CHARS} characters; calling it again in the same turn replaces the earlier set. Not available in event turns.`,
+    description: `Offer the user up to ${QUICK_REPLIES_MAX} short replies to your reply in this turn; they show as buttons above the input and a click sends that text as the user's message. Written in the user's language, each one something they would send as is. Never for destructive or irreversible confirmations: use ask_user for those. Each reply is plain text of at most ${QUICK_REPLY_MAX_CHARS} characters; calling it again in the same turn replaces the earlier set. Skip it when this turn will not reach the user, such as an event turn.`,
     parameters: obj(
       {
         replies: arr(

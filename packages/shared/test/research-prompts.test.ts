@@ -12,6 +12,15 @@ describe('research search requirements', () => {
     },
   );
 
+  test('a report reads source and separates its own choices from the owner decisions', () => {
+    const prompt = researchPrompt({ tier: 1, title: 'Queue', question: 'Which queue fits?' });
+    expect(prompt).toContain('读相关源码');
+    expect(prompt).toContain('「我已自行决定」');
+    expect(prompt).toContain('「需要你定的」');
+    expect(prompt).toContain('用 ask_user 把这几项一次问完');
+    expect(prompt).toContain('「已由你决定」');
+  });
+
   test('an empty intake still requires checking dependency releases', () => {
     const question = researchIntakeQuestion({ openThreadTitles: [], previousItems: [] });
     expect(question).toContain('至少检查 5 个直接依赖');

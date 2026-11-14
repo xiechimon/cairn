@@ -88,7 +88,13 @@ function commit(work, message, { allowBuilds = 'esbuild: true', date, files = {}
   return git(work, 'rev-parse', 'HEAD');
 }
 
-function fixture({ claimed = 0, digestClaimed = 0, heartbeatAgeMs = null, seedFiles = {} } = {}) {
+function fixture({
+  claimed = 0,
+  digestClaimed = 0,
+  heartbeatAgeMs = null,
+  seedFiles = {},
+  openComputerCalls = [],
+} = {}) {
   const dir = makeTestTempDir('deploy-self-');
   const origin = join(dir, 'origin.git');
   const work = join(dir, 'work');
@@ -116,6 +122,7 @@ function fixture({ claimed = 0, digestClaimed = 0, heartbeatAgeMs = null, seedFi
     `create table step(id text primary key, buildId text, status text, lastHeartbeatAt integer, machineId text default 'm1');
      create table machine(id text primary key, name text, lastSeenAt integer, maxConcurrent integer default 1);
      create table deploy_lease(id text primary key, owner text not null, status text not null, expiresAt integer not null);
+     create table computer_call(id text primary key, tool text not null, state text not null);
      create table __drizzle_migrations(id integer primary key, hash text);
      insert into machine values ('m1', 'omarchy', 0, 1);
      insert into __drizzle_migrations(hash) values ('m0');`,
@@ -126,6 +133,8 @@ function fixture({ claimed = 0, digestClaimed = 0, heartbeatAgeMs = null, seedFi
       db,
       `insert into step(id, buildId, status, lastHeartbeatAt) values ('s${i}', 'build-${i}', 'claimed', ${heartbeat})`,
     );
+  for (const [i, tool] of openComputerCalls.entries())
+    sqlite(db, `insert into computer_call values ('c${i}', '${tool}', 'running')`);
   for (let i = 0; i < digestClaimed; i++)
     sqlite(
       db,
@@ -1017,6 +1026,23 @@ test('server-only deploys under continuous active work without stopping either d
   assert.ok(Date.now() - started < 10_000);
   assert.doesNotMatch(f.log('systemctl.log'), /(?:stop|start) cairn-daemon/);
   assert.equal(sqlite(f.db, "select status from step where id='s0'"), 'claimed');
+});
+
+test('a Coordinator computer call in flight holds the deploy instead of being cut', () => {
+  const f = fixture({ openComputerCalls: ['browser_act'] });
+  const target = pushTarget(f, 'server', { files: { 'apps/server/src/probe.ts': 'export {};\n' } });
+  const result = f.run(DEPLOY, [target], { CAIRN_DEPLOY_STEP_WAIT_SECONDS: '0' });
+  assert.equal(result.status, 75, result.stderr);
+  assert.match(result.stderr, /starved: computer calls never idle/);
+  assert.equal(f.log('systemctl.log'), '');
+});
+
+test('a held login handoff does not hold the deploy, because it resumes across a restart', () => {
+  const f = fixture({ openComputerCalls: ['request_takeover'] });
+  const target = pushTarget(f, 'server', { files: { 'apps/server/src/probe.ts': 'export {};\n' } });
+  const result = f.run(DEPLOY, [target], { CAIRN_DEPLOY_STEP_WAIT_SECONDS: '0' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(f.log('systemctl.log'), /stop cairn-server/);
 });
 
 test('bootstrap stages the target runner before the deployed idle gate can starve the first rollout', () => {

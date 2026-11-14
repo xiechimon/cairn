@@ -1,4 +1,5 @@
 import type { BoundGitCredentials } from '@cairn/shared';
+import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { gitCredentialEnv } from './git.js';
 
 const READONLY_GIT_ENV: Record<string, string> = {
@@ -59,4 +60,22 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
       }
     },
   };
+}
+
+export function prepareStepEnv(
+  input: Omit<StepEnvInput, 'temporary'>,
+  cleanups: (() => void | Promise<void>)[],
+): { env: Record<string, string> } | { error: string } {
+  let temporary: ReturnType<typeof createTempEnvironment>;
+  try {
+    temporary = createTempEnvironment({ ...process.env, ...input.inherited });
+  } catch (error) {
+    return {
+      error: `Temporary directory setup failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  cleanups.push(temporary.cleanup);
+  const { env, dropGitCredentials } = assembleStepEnv({ ...input, temporary: temporary.env });
+  cleanups.push(dropGitCredentials);
+  return { env };
 }

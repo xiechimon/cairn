@@ -1334,6 +1334,8 @@ export function chiefTurnErrorOfContent(content: unknown): string | null {
   return row.success ? row.data.message : null;
 }
 
+const WATCH_PROVENANCE_PREFIX = 'watch:';
+
 export function askQuestionOfContent(content: unknown): {
   requestId: string;
   status: 'pending' | 'answered' | 'cancelled';
@@ -1344,6 +1346,7 @@ export function askQuestionOfContent(content: unknown): {
     multiSelect?: boolean;
   }[];
   answers: { header: string; choices?: string[]; text?: string }[] | null;
+  todoId?: string;
 } | null {
   let parsed: unknown = content;
   if (typeof content === 'string') {
@@ -1367,6 +1370,9 @@ export function askQuestionOfContent(content: unknown): {
     status: row.data.status,
     questions: row.data.questions,
     answers: row.data.answers,
+    ...(row.data.provenance?.startsWith(WATCH_PROVENANCE_PREFIX)
+      ? { todoId: row.data.provenance.slice(WATCH_PROVENANCE_PREFIX.length) }
+      : {}),
   };
 }
 
@@ -1580,6 +1586,7 @@ function collectChiefStream(
         status: ask.status,
         questions: ask.questions,
         answers: ask.answers,
+        ...(ask.todoId !== undefined ? { todoId: ask.todoId } : {}),
       });
       continue;
     }

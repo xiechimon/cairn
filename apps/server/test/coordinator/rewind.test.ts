@@ -1,6 +1,7 @@
 import { fauxAssistantMessage } from '@earendil-works/pi-ai';
 import { asc } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
+import { SUGGEST_REPLIES_ASK } from '../../src/coordinator/runtime/suggest-replies.js';
 import { chiefMessage, coordinatorConversation, coordinatorEntry } from '../../src/db/schema.js';
 import { req } from '../helpers.js';
 import { boot, stub, type World, world } from './runner-world.js';
@@ -8,10 +9,13 @@ import { boot, stub, type World, world } from './runner-world.js';
 type Seen = { messages: unknown[] }[];
 
 function answers(faux: ReturnType<typeof stub>['faux'], texts: string[], seen: Seen) {
+  let next = 0;
   faux.setResponses(
-    texts.map((text) => (context: { messages: unknown[] }) => {
+    Array(texts.length * 2).fill((context: { messages: { content: unknown }[] }) => {
+      if (context.messages[0]?.content === SUGGEST_REPLIES_ASK)
+        return fauxAssistantMessage('{"replies":[]}');
       seen.push({ messages: context.messages });
-      return fauxAssistantMessage(text);
+      return fauxAssistantMessage(texts[next++] ?? '');
     }),
   );
 }

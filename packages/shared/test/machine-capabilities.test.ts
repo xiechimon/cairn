@@ -358,3 +358,18 @@ it('keeps only Codex login state and expiry in reported capabilities', () => {
     skills: [],
   });
 });
+
+it('keeps a valid agent-reach report and drops a malformed one without losing the rest', () => {
+  const report = { mcpServers: ['figma'], skills: [] };
+  const agentReach = { version: '1.6.1', channels: [{ channel: 'github', status: 'unverified' }] };
+  expect(parseReportedCapabilities({ ...report, agentReach })).toEqual({ ...report, agentReach });
+  expect(
+    parseReportedCapabilities({ ...report, agentReach: { version: '', channels: [] } }),
+  ).toEqual(report);
+  expect(
+    parseReportedCapabilities({
+      ...report,
+      agentReach: { version: '1.6.1', channels: [{ channel: 'x'.repeat(33), status: 'ok' }] },
+    }),
+  ).toEqual(report);
+});

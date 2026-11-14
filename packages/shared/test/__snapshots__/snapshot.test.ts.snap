@@ -634,6 +634,20 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 },
               ],
             },
+            "research": {
+              "additionalProperties": false,
+              "properties": {
+                "reason": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "reason",
+              ],
+              "type": "object",
+            },
             "segments": {
               "items": {
                 "additionalProperties": false,
@@ -1622,6 +1636,20 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                           "type": "null",
                         },
                       ],
+                    },
+                    "research": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "reason": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "reason",
+                      ],
+                      "type": "object",
                     },
                     "segments": {
                       "items": {
@@ -6966,6 +6994,20 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                         },
                       ],
                     },
+                    "research": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "reason": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "reason",
+                      ],
+                      "type": "object",
+                    },
                     "segments": {
                       "items": {
                         "additionalProperties": false,
@@ -10028,6 +10070,45 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         {
           "additionalProperties": false,
           "properties": {
+            "agentReach": {
+              "additionalProperties": false,
+              "properties": {
+                "channels": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "channel": {
+                        "maxLength": 32,
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "status": {
+                        "maxLength": 32,
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "channel",
+                      "status",
+                    ],
+                    "type": "object",
+                  },
+                  "maxItems": 64,
+                  "type": "array",
+                },
+                "version": {
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "version",
+                "channels",
+              ],
+              "type": "object",
+            },
             "browser": {
               "const": true,
               "type": "boolean",
@@ -11641,6 +11722,20 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
                   "type": "null",
                 },
               ],
+            },
+            "research": {
+              "additionalProperties": false,
+              "properties": {
+                "reason": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "reason",
+              ],
+              "type": "object",
             },
             "segments": {
               "items": {

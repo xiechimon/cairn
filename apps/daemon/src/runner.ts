@@ -6,23 +6,17 @@ import type {
   AgentSessionHandle,
   ClaimedStep,
   CommitIdentity,
-  DeliveredImage,
   MachineHeartbeatBody,
   SkillInjectionFacts,
   WorkspaceHookNoteData,
   WorktreeOps,
 } from '@cairn/shared';
 import { isBuildStepKind, PLAN_FILE_NAME } from '@cairn/shared';
-import { createTempEnvironment } from '@cairn/shared/temp-environment';
-import { createActivityTracker } from './activity.js';
-import { AgentTodoReporter } from './agent-todo.js';
 import { AskChannel } from './ask-channel.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
-import { piWorktreeSkillDirs } from './backend/skills.js';
 import { composeSessionBrief } from './brief-file.js';
 import type { ClaudeCodeAuthProbe } from './claude-code-auth.js';
-import { claudeQuotaTrip, forwardClaudeRateLimit } from './claude-quota-trip.js';
 import { credentialRedactor, guardCredentialOutputs } from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
 import { type StepJournal, TranscriptBuffer } from './journal.js';
@@ -30,33 +24,29 @@ import type { DaemonLogger } from './log.js';
 import { type MachineApi, MachineApiError } from './machine-client.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
-import { resolveDeliveredPrompt } from './step-attachments.js';
-import { deliverStepOutcome } from './step-deliver.js';
-import { assembleStepEnv } from './step-env.js';
-import { reportStepProvenance } from './step-executor-record.js';
+import { prepareStepEnv } from './step-env.js';
+import { reportStepProvenance, stepSkillsCatalog } from './step-executor-record.js';
+import { finishStepRun } from './step-finish.js';
 import { runLocalMergeStep } from './step-local-merge.js';
+import { createStepPassControls } from './step-pass-controls.js';
 import { newStepPassState } from './step-pass-events.js';
 import { runStepPasses } from './step-pass-loop.js';
-import { resolveStepPassOutcome, rewindAfterStep } from './step-pass-outcome.js';
-import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
+import { agentStepRefusal, prepareStepPromptDelivery } from './step-preflight.js';
 import { composeWorkerSystemPrompt, planStepPrompt, taskMetaOpts } from './step-prompt.js';
 import { resolveStepProvider } from './step-provider.js';
+import { createStepReporters } from './step-reporters.js';
 import { StepSessionOpener } from './step-session-opener.js';
 import { composeStepSessionOpts } from './step-session-opts.js';
-import { settleStepGit } from './step-settle-git.js';
 import { stepMcpEndpoints } from './step-skill-tool.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { prepareStepTooling } from './step-tooling.js';
 import { seedStepTranscript } from './step-transcript-seed.js';
-import { StepTranscriptStream } from './step-transcript-stream.js';
 import { resetReusedWorkspaceForFreshSession, setUpStepWorkspace } from './step-workspace.js';
 import {
-  resolveStreamLimits,
   STREAM_DURATION_CAP_DEFAULT_MS,
   STREAM_DURATION_CAP_ENV,
   STREAM_FIRST_EVENT_ENV,
   STREAM_IDLE_ENV,
-  StreamWatchdog,
 } from './stream-watchdog.js';
 
 export interface RunStepDeps {
@@ -180,31 +170,11 @@ async function runClaimedStep(
   const running = opts.running ?? 1;
   logger.raw(`step ${stepId} for conv ${convId} (${running} running)`);
 
-  let activityRelayWarned = false;
-  const activity = createActivityTracker({
-    send: (report) => {
-      client.activity?.(stepId, report)?.catch((err: unknown) => {
-        if (activityRelayWarned) return;
-        activityRelayWarned = true;
-        logger.step(
-          `activity relay failed (suppressed until next step): ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
-      });
-    },
+  const { activity, agentTodo } = createStepReporters({
+    stepId,
+    client: () => client,
+    log: (line) => logger.step(line),
     ...(deps.now !== undefined ? { now: deps.now } : {}),
-  });
-  activity.setPhase('preparing');
-
-  const agentTodo = new AgentTodoReporter({
-    send: (items) => client.agentTodo?.(stepId, { items }),
-    onFirstError: (err) =>
-      logger.step(
-        `agent todo relay failed (suppressed until next step): ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      ),
   });
 
   const {
@@ -319,33 +289,21 @@ async function runClaimedStep(
   const modelKey = `${provider?.providerId ?? agent.provider}/${agent.modelId}`;
   logger.raw(`using model ${modelKey}`);
 
-  const imageSupport = isChief
-    ? null
-    : await probeModelImageSupport(backend, provider, agent.modelId, (message) =>
-        logger.step(message),
-      );
-  deps.stepImageSupport?.set(stepId, imageSupport);
-  let deliveryPrompt = prompt;
-  let promptImages: DeliveredImage[] | undefined;
-  let skippedNoVisionCount = 0;
-  if (!isChief && prompt !== null) {
-    const resolved = await resolveDeliveredPrompt({
-      text: prompt,
-      stepId,
-      client,
-      materializeDir: deps.paths.stepAttachmentsDir,
-      log: (line) => logger.step(line),
-      imageSupport,
-    });
-    deliveryPrompt = resolved.text;
-    promptImages = resolved.images;
-    skippedNoVisionCount = resolved.skippedNoVision;
-  }
-  if (skippedNoVisionCount > 0) {
-    logger.step(
-      `image attachment skipped: model ${modelKey} does not support images (${skippedNoVisionCount} image(s) not delivered)`,
-    );
-  }
+  const delivery = await prepareStepPromptDelivery({
+    backend,
+    provider,
+    modelId: agent.modelId,
+    modelKey,
+    isChief,
+    prompt,
+    stepId,
+    client,
+    materializeDir: deps.paths.stepAttachmentsDir,
+    rememberImageSupport: (support) => deps.stepImageSupport?.set(stepId, support),
+    log: (line) => logger.step(line),
+  });
+  const { imageSupport, promptImages, skippedNoVisionCount } = delivery;
+  let { deliveryPrompt } = delivery;
 
   logger.workspace('准备工作区...');
   const checkout = isReview && reviewGate === 'review';
@@ -378,6 +336,7 @@ async function runClaimedStep(
       : composeWorkerSystemPrompt(agent.description, agent.memories, {
           ...taskMetaOpts(claimed),
           attachments: true,
+          decisionBoundary: claimed.step.kind === 'plan' || isBuildStepKind(claimed.step.kind),
           ...(claimed.project !== undefined ? { project: claimed.project } : {}),
         });
   const remoteTools = claimed.remoteTools;
@@ -426,29 +385,21 @@ async function runClaimedStep(
       ? deps.otel.contextFor(claimed.step.buildId, stepId, claimed.step.kind)
       : undefined;
   const skillInjection: { facts: SkillInjectionFacts | null } = { facts: null };
-  let temporary: ReturnType<typeof createTempEnvironment>;
-  try {
-    temporary = createTempEnvironment({ ...process.env, ...opts.env });
-  } catch (error) {
-    await failStep(
-      deps,
-      heartbeat,
-      stepId,
-      `Temporary directory setup failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+  const stepEnv = prepareStepEnv(
+    {
+      inherited: opts.env,
+      git: repo?.kind === 'github' ? creds.git : null,
+      appCredential,
+      readonlyGit: readonlyWorkspace || attachmentVerify,
+      claudeSubscriptionToken:
+        runtimeId === 'claude-code' ? creds.claudeSubscriptionToken : undefined,
+    },
+    stepCleanups,
+  );
+  if ('error' in stepEnv) {
+    await failStep(deps, heartbeat, stepId, stepEnv.error);
     return;
   }
-  stepCleanups.push(temporary.cleanup);
-  const { env: stepEnv, dropGitCredentials } = assembleStepEnv({
-    inherited: opts.env,
-    temporary: temporary.env,
-    git: repo?.kind === 'github' ? creds.git : null,
-    appCredential,
-    readonlyGit: readonlyWorkspace || attachmentVerify,
-    claudeSubscriptionToken:
-      runtimeId === 'claude-code' ? creds.claudeSubscriptionToken : undefined,
-  });
-  stepCleanups.push(dropGitCredentials);
   const sessionOpts = composeStepSessionOpts({
     provider,
     modelId: agent.modelId,
@@ -479,7 +430,7 @@ async function runClaimedStep(
     isReview,
     remoteToolsOnly: claimed.remoteToolsOnly === true,
     telemetry,
-    env: stepEnv,
+    env: stepEnv.env,
   });
 
   const transcript = guardCredentialOutputs(
@@ -531,19 +482,14 @@ async function runClaimedStep(
   if (!isChief) {
     await reportStepProvenance({
       record: () => ({
-        catalog:
-          deps.skillsDir === undefined
-            ? null
-            : {
-                skillsDir: deps.skillsDir,
-                cwd: deps.paths.home,
-                ...(sessionOpts.skillsAllowlist !== undefined
-                  ? { allowlist: sessionOpts.skillsAllowlist }
-                  : {}),
-                ...(injectedForSession !== undefined ? { injectedSkills: injectedForSession } : {}),
-                ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
-                ...(isPi ? { worktreeSkillsDirs: piWorktreeSkillDirs(cwd) } : {}),
-              },
+        catalog: stepSkillsCatalog({
+          skillsDir: deps.skillsDir,
+          home: deps.paths.home,
+          allowlist: sessionOpts.skillsAllowlist,
+          injectedSkills: injectedForSession,
+          teamSkillsDir,
+          piWorktree: isPi ? cwd : null,
+        }),
         injectedNames: skillInjection.facts?.injected,
         backend: backend.capabilities.name,
         model: modelKey,
@@ -591,24 +537,14 @@ async function runClaimedStep(
     forgetHandle: () => deps.sessionHandles?.delete(stepId),
     rememberImageSupport: (support) => deps.stepImageSupport?.set(stepId, support),
   });
-  const streamLimits = resolveStreamLimits({
-    ...(opts.streamTimeouts !== undefined ? { timeouts: opts.streamTimeouts } : {}),
-    ...(opts.streamDurationCapMs !== undefined ? { durationCapMs: opts.streamDurationCapMs } : {}),
-  });
-  const toolStartedAt = new Map<string, number>();
-  const watchdog = new StreamWatchdog({
-    timeouts: streamLimits.timeouts,
-    durationCapMs: streamLimits.durationCapMs,
-    durationCapIsAbsolute: streamLimits.durationCapIsAbsolute,
-    progressExtendsDuration:
-      isBuildStepKind(claimed.step.kind) && !streamLimits.durationCapIsAbsolute,
-    onTrip: () => {
-      askChannel.abort();
-      void session.current?.stop();
-    },
-  });
-  askChannel.keepAlive = () => watchdog.keepAlive();
-  const stream = new StepTranscriptStream({
+  const { watchdog, stream, session, toolStartedAt } = createStepPassControls({
+    stepKind: claimed.step.kind,
+    machineId: claimed.step.machineId,
+    streamTimeouts: opts.streamTimeouts,
+    streamDurationCapMs: opts.streamDurationCapMs,
+    askChannel,
+    sessionOpts,
+    passState,
     stepId,
     client,
     transcript,
@@ -616,16 +552,6 @@ async function runClaimedStep(
     now,
     log: (line) => logger.step(line),
   });
-  const segments = stream.segments;
-  const session: { current: AgentSessionHandle | null } = { current: null };
-  sessionOpts.onClaudeRateLimit = (notice) => {
-    forwardClaudeRateLimit(client, claimed.step.machineId, notice, (line) => logger.step(line));
-    if (passState.quotaTrip !== null) return;
-    const trip = claudeQuotaTrip(notice, Date.now());
-    if (trip === null) return;
-    passState.quotaTrip = trip;
-    void session.current?.stop();
-  };
   const passes = await runStepPasses({
     stepId,
     client,
@@ -661,75 +587,7 @@ async function runClaimedStep(
     await failStep(deps, heartbeat, stepId, passes.openError);
     return;
   }
-  const handle = session.current;
-  const continueId = opener.continueId;
-  let { usage } = passState;
-  const { sawChangeTool, sawDone } = passState;
-  deps.sessionHandles?.delete(stepId);
-  await segments.seal();
-  stream.flushDeltas();
-  if (opts.env?.CAIRN_ORB !== '1') clearInterval(heartbeat);
-  watchdog.stop();
-  askChannel.abort();
-  const stopReq = stop.settle();
-  const outcome = resolveStepPassOutcome({
-    pass: passState,
-    timeoutText: watchdog.message(),
-    watchdogTripped: watchdog.trippedArm !== null,
-    stopRequest: stopReq,
-    provider,
-    log: (message) => logger.step(message),
-  });
-  let { lastError } = outcome;
-  const { stopped, quotaBlock } = outcome;
-  if (!sawDone && handle !== null) usage = handle.usage();
-
-  await rewindAfterStep({
-    workspace: deps.workspace,
-    ws,
-    headAtStart,
-    attachmentVerify,
-    stopped,
-    stopRequest: stopReq,
-    reviewCheckout: checkout,
-    stepId,
-    transcript,
-    now,
-    log: (message) => logger.step(message),
-  });
-
-  const settledGit = await settleStepGit({
-    git: deps.workspace,
-    ws,
-    claimed,
-    stepId,
-    coAuthor: tokenRes.coAuthor ?? null,
-    appIdentity,
-    identity: stepIdentity,
-    mergeCredential: creds.git,
-    headAtStart,
-    stepStartMs,
-    runGit: withStepGit,
-    headCommit: attachmentVerify ? headAtStart : null,
-    hasChanges: isReview || attachmentVerify || readonlyWorkspace ? false : sawChangeTool,
-    lastError,
-    stopped,
-    closes: lastError === null && !stopped && !isReview && !attachmentVerify,
-    note: (id, content) => transcript.upsert({ id, role: 'system', content, createdAt: now() }),
-    log: (message) => logger.step(message),
-    logRaw: (message) => logger.raw(message),
-  });
-  lastError = settledGit.lastError;
-  const {
-    headCommit,
-    branchDrift,
-    artifactBranches,
-    hasChanges,
-    pushHookOutput,
-    preservedCommits,
-  } = settledGit;
-
-  await deliverStepOutcome({
+  await finishStepRun({
     client,
     journal,
     logger,
@@ -746,25 +604,33 @@ async function runClaimedStep(
     credentialValues,
     refreshGitToken: appCredential !== null ? async () => (await refreshGit()).password : null,
     transcript,
-    session: { sessionId: handle?.sessionId ?? continueId, sessionFile: handle?.sessionFile },
-    usage,
-    lastError,
-    stopped,
     isReview,
     attachmentVerify,
     infoReportFile: isInfoBuild ? reportFile : null,
-    quotaBlock,
     skillInjectionFacts: skillInjection.facts,
     uploadedEvidence: uploadedVerifyEvidence,
-    git: {
-      headCommit,
-      branchDrift,
-      artifactBranches,
-      hasChanges,
-      pushHookOutput,
-      preservedCommits,
-    },
     running,
+    passState,
+    handle: session.current,
+    continueId: opener.continueId,
+    provider,
+    stream,
+    watchdog,
+    askChannel,
+    stop,
+    forgetHandle: () => deps.sessionHandles?.delete(stepId),
+    stopHeartbeat: () => {
+      if (opts.env?.CAIRN_ORB !== '1') clearInterval(heartbeat);
+    },
+    headAtStart,
+    stepStartMs,
+    reviewCheckout: checkout,
+    readonlyWorkspace,
+    coAuthor: tokenRes.coAuthor ?? null,
+    appIdentity,
+    identity: stepIdentity,
+    runGit: withStepGit,
+    now,
   });
 }
 

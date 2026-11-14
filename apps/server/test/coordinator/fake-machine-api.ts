@@ -20,6 +20,7 @@ export interface FakeMachineApi extends MachineApi {
   stopRequested: Set<string>;
   stopPolls: string[];
   asks: { stepId: string; body: MachineAskBody }[];
+  suggestions: { stepId: string; replies: readonly string[] }[];
 }
 
 export function fakeMachineApi(apiKey = 'sk-test'): FakeMachineApi {
@@ -35,6 +36,7 @@ export function fakeMachineApi(apiKey = 'sk-test'): FakeMachineApi {
     stopRequested: new Set(),
     stopPolls: [],
     asks: [],
+    suggestions: [],
     claim: async () => {
       const next = api.queue.shift() ?? null;
       if (next) api.claimedByMe.push(next.step);
@@ -69,6 +71,9 @@ export function fakeMachineApi(apiKey = 'sk-test'): FakeMachineApi {
     },
     transcriptDelta: async (stepId, text) => {
       api.deltas.push({ stepId, text });
+    },
+    suggestReplies: async (stepId, replies) => {
+      api.suggestions.push({ stepId, replies });
     },
     done: async (stepId, body) => {
       api.dones.push({ stepId, body });

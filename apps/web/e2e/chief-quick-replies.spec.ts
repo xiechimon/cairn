@@ -40,6 +40,27 @@ function state(over: Partial<MockState> = {}): MockState {
   return { threads: [THREAD], messages: [...TURN], todos: [], ...over };
 }
 
+for (const count of [1, 2, 3]) {
+  test(`keeps ${count} short suggestions inside the phone conversation`, async ({ page }) => {
+    const replies = ['举个具体例子', '缓存多久过期', '怎么验证命中'].slice(0, count);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockLive(page, state({
+      messages: TURN.map((row) => row.id === 'quick-replies-s1'
+        ? { ...row, content: JSON.stringify({ kind: 'quick_replies', stepId: 's1', replies }) }
+        : row),
+    }));
+    await page.goto('/app');
+    await expect(chips(page)).toHaveText(replies);
+    const bounds = await chips(page).evaluateAll((els) => els.map((el) => ({
+      height: el.getBoundingClientRect().height,
+      left: el.getBoundingClientRect().left,
+      right: el.getBoundingClientRect().right,
+    })));
+    expect(bounds.every((item) => item.height === 28 && item.left >= 0 && item.right <= 390)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  });
+}
+
 test('shows the latest reply suggestions under the reply as outlined, keyboard-reachable pills', async ({
   page,
 }) => {
@@ -92,6 +113,39 @@ test('hovering or focusing a chip previews its text in the empty composer and le
   await expect(placeholder).toHaveText('好，等你汇报');
   await page.getByTestId('home-c').getByTestId('chief-composer-input').focus();
   await expect(placeholder).toHaveText(before ?? '');
+});
+
+test('long legacy suggestions stay on one line and preview and send their full text on a phone', async ({ page }) => {
+  const text =
+    '先给我一份具体的执行计划，列清楚每个步骤要改动的文件、对应的验证方法和可能的风险，暂时不要修改代码，等我确认范围之后再继续。';
+  await page.setViewportSize({ width: 390, height: 844 });
+  const sent = await mockLive(
+    page,
+    state({
+      messages: TURN.map((row) =>
+        row.id === 'quick-replies-s1'
+          ? { ...row, content: JSON.stringify({ kind: 'quick_replies', stepId: 's1', replies: [text] }) }
+          : row,
+      ),
+    }),
+  );
+  await page.goto('/app');
+  await expect(chips(page)).toHaveText([text]);
+  const size = await chips(page).first().evaluate((el) => ({
+    height: el.clientHeight,
+    contentHeight: el.scrollHeight,
+    right: el.getBoundingClientRect().right,
+  }));
+  expect(size.height).toBe(26);
+  expect(size.contentHeight).toBeLessThanOrEqual(size.height);
+  expect(size.right).toBeLessThanOrEqual(390);
+  const label = chips(page).first().locator('span');
+  expect(await label.evaluate((el) => getComputedStyle(el).whiteSpace)).toBe('nowrap');
+  expect(await label.evaluate((el) => getComputedStyle(el).textOverflow)).toBe('ellipsis');
+  await chips(page).first().focus();
+  await expect(page.getByTestId('chief-composer-placeholder')).toHaveText(text);
+  await chips(page).first().click();
+  await expect.poll(() => sent).toEqual([text]);
 });
 
 test('clicking a chip sends exactly its text as an owner message and the chips go away', async ({
