@@ -277,6 +277,7 @@ export const EN: Record<string, string> = {
   技能: 'Skills',
   密钥: 'Secrets',
   Runner: 'Runners',
+  机器: 'Machine',
   模型服务: 'Providers',
   用量: 'Usage',
   收起侧边栏: 'Collapse sidebar',

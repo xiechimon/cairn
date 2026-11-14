@@ -54,7 +54,7 @@ export function SettingsSearch({
     for (const section of sections) {
       const sectionHit =
         includes(section.label, needle) ||
-        (section.keywords ?? []).some((word) => includes(word, needle));
+        (section.keywords ?? []).some((word) => includes(t(word), needle));
       const rows = SETTINGS_ROW_INDEX.filter(
         (entry) =>
           entry.section === section.id &&
