@@ -6,7 +6,7 @@ const MIDDAY_IN_BEIJING = Date.UTC(2026, 10, 12, 4);
 const chip = (page: Page) => page.getByTestId('machines-button');
 const panel = (page: Page) => page.getByRole('complementary', { name: '电脑' });
 
-test('the computer chip names only the Coordinator machine and its running count', async ({
+test('the computer chip names the Coordinator machine, its running count and any offline machine', async ({
   page,
 }) => {
   await page.goto(HOME);
@@ -14,7 +14,8 @@ test('the computer chip names only the Coordinator machine and its running count
   await expect(chip(page)).toHaveAccessibleName(/2\/8 在跑/);
   await expect(chip(page)).not.toHaveAccessibleName(/\+1/);
   await expect(chip(page)).toHaveText('');
-  await expect(chip(page).locator('span')).toHaveCount(0);
+  await expect(chip(page).locator('span:not([data-slot="fleet-badge"])')).toHaveCount(0);
+  await expect(chip(page).locator('[data-slot="fleet-badge"]')).toHaveAttribute('data-fleet', 'offline');
   await expect(chip(page)).toHaveAttribute('aria-pressed', 'false');
 });
 
@@ -60,6 +61,21 @@ test('each computer is one card in the list with no detail page, tabs or back co
   await expect(offline.getByTestId('machine-screen-hint')).toHaveCount(0);
 });
 
+test('the chip badge is green when every computer is online and the sidebar has no computers link', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=10');
+  const badge = chip(page).locator('[data-slot="fleet-badge"]');
+  await expect(badge).toHaveAttribute('data-fleet', 'online');
+  const [r, g, b] = (await badge.evaluate((el) => getComputedStyle(el).backgroundColor))
+    .match(/\d+/g)
+    ?.map(Number) ?? [0, 0, 0];
+  expect(g).toBeGreaterThan(r ?? 0);
+  expect(g).toBeGreaterThan(b ?? 0);
+  await expect(chip(page)).not.toHaveAccessibleName(/离线/);
+  await expect(page.getByTestId('sidebar-footer').getByRole('link', { name: /在线/ })).toHaveCount(0);
+});
+
 test('re-checking refreshes the checked time without leaving the list', async ({ page }) => {
   await page.goto(`${HOME}&pane=machines`);
   await panel(page).getByRole('button', { name: '再检查一次' }).click();
@@ -69,7 +85,7 @@ test('re-checking refreshes the checked time without leaving the list', async ({
 
 test('the chip name carries the Coordinator machine and its state', async ({ page }) => {
   await page.goto(HOME);
-  await expect(chip(page)).toHaveAccessibleName('电脑 · xmonsMac · 在线 · 2/8 在跑');
+  await expect(chip(page)).toHaveAccessibleName('电脑 · xmonsMac · 在线 · 2/8 在跑 · 1 台在线 · 1 台离线（omarchy）');
 });
 
 test('with one computer the panel says work runs on the Coordinator machine', async ({ page }) => {
@@ -94,7 +110,7 @@ test('the icon-only header buttons show a tooltip with their name on hover', asy
   for (const [name, tip] of [
     ['任务', '任务，3 件等你'],
     ['成果', '成果'],
-    ['电脑', '电脑 · xmonsMac · 在线 · 2/8 在跑'],
+    ['电脑', '电脑 · xmonsMac · 在线 · 2/8 在跑 · 1 台在线 · 1 台离线（omarchy）'],
   ] as const) {
     const button = page.getByTestId('home-c-pane-buttons').getByRole('button', { name });
     await button.hover();

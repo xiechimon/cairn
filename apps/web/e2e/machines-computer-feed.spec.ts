@@ -573,7 +573,8 @@ test('an offline Coordinator machine reads offline in the chip and the card, wit
   await expect(chip).toHaveAccessibleName(/omarchy/);
   await expect(chip).toHaveAccessibleName(/离线/);
   await expect(chip).not.toHaveAccessibleName(/在跑/);
-  await expect(chip.locator('span')).toHaveCount(0);
+  await expect(chip.locator('span:not([data-slot="fleet-badge"])')).toHaveCount(0);
+  await expect(chip.locator('[data-slot="fleet-badge"]')).toHaveAttribute('data-fleet', 'offline');
   const row = panel.locator('[data-slot="list-card"]').first();
   await expect(row).toContainText('离线');
   await expect(row).not.toContainText('在跑');
