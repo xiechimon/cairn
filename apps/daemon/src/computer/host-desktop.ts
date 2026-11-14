@@ -103,7 +103,7 @@ interface Desktop {
 }
 
 export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSource {
-  readonly onHost = true;
+  readonly hostRoot: string;
   private readonly env: NodeJS.ProcessEnv;
   private readonly run: CommandRunner;
   private readonly desktops = new Map<string, Desktop>();
@@ -113,6 +113,7 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
   private readonly listeners = new Set<() => void>();
 
   constructor(private readonly options: HostDesktopsOptions) {
+    this.hostRoot = options.root;
     this.env = options.env ?? process.env;
     this.run = options.run ?? runCommand;
   }

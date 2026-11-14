@@ -1,3 +1,4 @@
+import { homedir } from 'node:os';
 import { cairnHostRefusal } from './guard-cairn.js';
 import { executablePatternRefusal, shellExecutablePatternRefusal } from './guard-executable.js';
 import {
@@ -579,6 +580,20 @@ export function protectedComputerLifecycleRefusal(command: string): string | und
 
 export function orbComputerProtectionRefusal(command: string): string | undefined {
   return lifecycleRefusal(command, false);
+}
+
+export function hostComputerRootRefusal(
+  command: string,
+  root: string | undefined,
+): string | undefined {
+  if (!root) return undefined;
+  const home = homedir();
+  const name = root.startsWith(`${home}/`) ? root.slice(home.length + 1) : root;
+  const folded = command
+    .replace(/['"\\]/g, '')
+    .replace(/\/(?:\.\/)+/g, '/')
+    .replace(/\/{2,}/g, '/');
+  return folded.includes(name) ? 'agent computer path' : undefined;
 }
 
 export function isProtectedComputerLifecycleCommand(command: string): boolean {
