@@ -47,6 +47,7 @@ import {
   type StepPassEventContext,
 } from './step-pass-events.js';
 import { resolveStepPassOutcome, rewindAfterStep } from './step-pass-outcome.js';
+import { planStepPassRetry } from './step-pass-retry.js';
 import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
 import { composeWorkerSystemPrompt, planStepPrompt, taskMetaOpts } from './step-prompt.js';
 import { resolveStepProvider } from './step-provider.js';
@@ -741,57 +742,41 @@ async function runClaimedStep(
     stop.detach();
     if (classifyStepFailure(passState.lastModelError ?? '') === 'model_unavailable')
       passState.lastError = passState.lastModelError;
-    {
-      const failureText = passState.lastModelError ?? passState.lastError;
-      const stopPending = stop.request !== null;
-      if (
-        failureText !== null &&
-        passState.lastError !== null &&
-        !stopPending &&
-        classifyStepFailure(failureText) === 'network' &&
-        networkRetries < networkRetryDelays.length
-      ) {
-        const delay = networkRetryDelays[networkRetries] ?? 0;
-        networkRetries += 1;
+    const retry = planStepPassRetry({
+      pass,
+      state: passState,
+      watchdogTripped: watchdog.trippedArm !== null,
+      stopPending: stop.request !== null,
+      networkRetries,
+      networkRetryDelays,
+    });
+    if (retry.kind === 'finish') break;
+    if (retry.kind === 'network') {
+      networkRetries += 1;
+      logger.step(
+        `provider network retry ${networkRetries}: waiting ${retry.delayMs}ms before ${networkRetries === networkRetryDelays.length ? 'final' : 'next'} attempt`,
+      );
+      await new Promise((r) => setTimeout(r, retry.delayMs));
+      opener.continueId = handle.sessionId;
+      deps.sessionHandles?.delete(stepId);
+      continue;
+    }
+    if (retry.kind === 'compat') {
+      const amended: ProviderConfig | null =
+        backend.adaptProviderCompat?.(provider, retry.failureText) ?? null;
+      if (amended !== null) {
+        provider = amended;
+        sessionOpts.provider = amended;
         logger.step(
-          `provider network retry ${networkRetries}: waiting ${delay}ms before ${networkRetries === networkRetryDelays.length ? 'final' : 'next'} attempt`,
+          `protocol fallback: provider ${amended.providerId} compat adapted (${JSON.stringify(
+            amended.compat,
+          )}), retrying session once`,
         );
-        await new Promise((r) => setTimeout(r, delay));
-        opener.continueId = handle.sessionId;
         deps.sessionHandles?.delete(stepId);
         continue;
       }
     }
-    if (
-      classifyStepFailure(passState.lastModelError ?? passState.lastError ?? '') ===
-      'model_unavailable'
-    )
-      break;
-    if (pass === 0 && !passState.sawProgress && passState.quotaTrip === null) {
-      const failureText = passState.lastModelError ?? passState.lastError;
-      if (
-        failureText !== null &&
-        (passState.lastError !== null ||
-          (watchdog.trippedArm !== null && passState.lastModelError !== null) ||
-          (passState.retryStorm && passState.lastModelError !== null))
-      ) {
-        const amended: ProviderConfig | null =
-          backend.adaptProviderCompat?.(provider, failureText) ?? null;
-        if (amended !== null) {
-          provider = amended;
-          sessionOpts.provider = amended;
-          logger.step(
-            `protocol fallback: provider ${amended.providerId} compat adapted (${JSON.stringify(
-              amended.compat,
-            )}), retrying session once`,
-          );
-          deps.sessionHandles?.delete(stepId);
-          continue;
-        }
-      }
-    }
-    const imageFailure = passState.lastModelError ?? passState.lastError;
-    if (imageFailure !== null && (await retryWithoutImages(imageFailure))) continue;
+    if (await retryWithoutImages(retry.failureText)) continue;
     break;
   }
   const continueId = opener.continueId;
