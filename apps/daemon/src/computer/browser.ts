@@ -9,6 +9,21 @@ export const AGENT_BROWSER_SESSION = 'cairn';
 const AGENT_CURSOR_DWELL_MS = 650;
 const AGENT_CURSOR_DWELL_HEADROOM_MS = 2_000;
 const lastCursorPoints = new Map<string, AgentCursorPoint>();
+const TYPING_PAUSE_MS = 90;
+const TYPING_MAX_BURSTS = 24;
+const TYPING_STEP_COST_MS = 400;
+const ADDRESS_BAR_TYPING_MS = 2_500;
+const ADDRESS_BAR_SETTLE_MS = 300;
+
+function typingBursts(text: string): string[] {
+  const characters = Array.from(text);
+  const size = Math.max(1, Math.ceil(characters.length / TYPING_MAX_BURSTS));
+  const bursts: string[] = [];
+  for (let start = 0; start < characters.length; start += size) {
+    bursts.push(characters.slice(start, start + size).join(''));
+  }
+  return bursts;
+}
 
 const navigateParams = z.object({
   url: z.string().min(1).max(8_192),
@@ -143,8 +158,6 @@ export function agentCursorScript(
     ring.animate([{ transform: 'scale(.4)', opacity: 1 }, { transform: 'scale(1.7)', opacity: 0 }], { duration: 650, delay: 380, easing: 'ease-out' });
     setTimeout(() => ring.remove(), 1200);
   }
-  clearTimeout(window.__cairnAgentCursorTimer);
-  window.__cairnAgentCursorTimer = setTimeout(() => { cursor.style.opacity = '0'; }, 6000);
   return true;
 })()`;
 }
@@ -314,6 +327,108 @@ export async function runBrowserTool(
   };
   const read = (argv: readonly string[]) => collectExecute(provider, argv, timed, started);
 
+  const humanType = async (
+    kind: 'fill' | 'type',
+    ref: string,
+    text: string,
+    argv: string[],
+  ): Promise<{ code: number | null; text: string }> => {
+    const bursts = typingBursts(text);
+    const clock = options.now ?? Date.now;
+    if (
+      remainingTimeoutMs(deadlineAt, clock) <
+      bursts.length * TYPING_STEP_COST_MS + AGENT_CURSOR_DWELL_HEADROOM_MS
+    )
+      return execute([...prefix, ...argv]);
+    const steps = [
+      ...(kind === 'fill' ? [[...prefix, 'fill', ref, '']] : []),
+      [...prefix, 'focus', ref],
+    ];
+    for (const step of steps) {
+      const prepared = await execute(step);
+      if (prepared.code !== 0 && prepared.code !== null) return prepared;
+    }
+    for (const burst of bursts) {
+      const typed = await execute([...prefix, 'keyboard', 'type', burst]);
+      if (typed.code !== 0 && typed.code !== null) return typed;
+      await sleep(TYPING_PAUSE_MS, undefined, { signal: options.signal }).catch(() => {});
+    }
+    return { code: 0, text: `${kind} ok` };
+  };
+
+  const pageValue = async (what: 'title' | 'url'): Promise<string | null> => {
+    const answer = await read([...prefix, 'get', what]);
+    if (answer.code !== 0) return null;
+    return (
+      answer.text
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(
+          (line) => line !== '' && !line.startsWith('[agent-browser]') && !line.startsWith('⚠'),
+        )
+        .at(-1) ?? ''
+    );
+  };
+
+  const browserWindow = async (): Promise<string | 'none' | null> => {
+    const title = await pageValue('title');
+    const url = await pageValue('url');
+    const name =
+      title !== null && title !== ''
+        ? title
+        : url === null || url === '' || url === 'about:blank'
+          ? 'about:blank'
+          : null;
+    if (name === null) return null;
+    const found = await read([
+      'xdotool',
+      'search',
+      '--onlyvisible',
+      '--name',
+      `^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} - Chromium$`,
+    ]);
+    if (found.code === 1) return 'none';
+    if (found.code !== 0) return null;
+    const windows = found.text.split(/\s+/).filter((word) => /^\d+$/.test(word));
+    return windows.length === 1 ? (windows[0] ?? null) : null;
+  };
+
+  const navigateByAddressBar = async (
+    url: string,
+  ): Promise<{ code: number | null; text: string } | null> => {
+    let window = await browserWindow();
+    if (window === 'none') {
+      const blank = await execute([...prefix, 'open', 'about:blank']);
+      if (blank.code !== 0 && blank.code !== null) return null;
+      window = await browserWindow();
+    }
+    if (window === null || window === 'none') return null;
+    const delay = Math.min(80, Math.max(15, Math.round(ADDRESS_BAR_TYPING_MS / url.length)));
+    for (const step of [
+      ['xdotool', 'windowactivate', '--sync', window, 'key', '--clearmodifiers', 'ctrl+l'],
+      ['xdotool', 'type', '--delay', String(delay), url],
+      ['xdotool', 'key', 'Return'],
+    ]) {
+      const done = await execute(step);
+      if (done.code !== 0 && done.code !== null) return null;
+    }
+    await sleep(ADDRESS_BAR_SETTLE_MS, undefined, { signal: options.signal }).catch(() => {});
+    await read([...prefix, 'wait', '--load', 'load']);
+    const href = (await pageValue('url')) ?? '';
+    if (href.startsWith('chrome-error://')) {
+      refuse(`✗ Navigation failed: ${url} did not load`, started);
+    }
+    const title = (await pageValue('title')) ?? '';
+    return { code: 0, text: `✓ ${title}\n  ${href}` };
+  };
+
+  const restAgentCursor = async (): Promise<void> => {
+    const point = lastCursorPoints.get(session);
+    if (point === undefined) return;
+    await read([...prefix, 'wait', '--load', 'domcontentloaded']);
+    await read([...prefix, '--json', 'eval', agentCursorScript(point.x, point.y, 'point', point)]);
+  };
+
   const showAgentCursor = async (ref: string, kind: AgentCursorKind): Promise<void> => {
     await read([...prefix, 'scrollintoview', ref]);
     const box = await read([...prefix, '--json', 'get', 'box', ref]);
@@ -364,10 +479,11 @@ export async function runBrowserTool(
     if (!/^https?:\/\//i.test(url)) {
       refuse('browser_navigate only accepts http(s) URLs', started);
     }
-    const result = await execute([...prefix, 'open', url]);
+    const result = (await navigateByAddressBar(url)) ?? (await execute([...prefix, 'open', url]));
     if (result.code !== 0 && result.code !== null) {
       refuse(result.text || `agent-browser open failed with exit code ${result.code}`, started);
     }
+    await restAgentCursor();
     return withDetection(result.text || `opened ${url}`);
   }
 
@@ -418,7 +534,12 @@ export async function runBrowserTool(
       if (error instanceof ComputerRefusal) refuse(error.message, started);
       throw error;
     }
-    const result = await execute([...prefix, ...argv]);
+    const result =
+      (action.kind === 'fill' || action.kind === 'type') &&
+      action.ref !== undefined &&
+      action.text !== undefined
+        ? await humanType(action.kind, normalizeRef(action.ref), action.text, argv)
+        : await execute([...prefix, ...argv]);
     if (result.code !== 0 && result.code !== null) {
       refuse(
         result.text || `agent-browser ${action.kind} failed with exit code ${result.code}`,
@@ -426,6 +547,7 @@ export async function runBrowserTool(
       );
     }
     lines.push(result.text || `${action.kind} ok`);
+    await restAgentCursor();
   }
   return { text: lines.join('\n') };
 }
