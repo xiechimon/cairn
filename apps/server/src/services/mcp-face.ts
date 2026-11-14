@@ -5,6 +5,8 @@ import {
   githubReadToolParamsSchemas,
   MCP_TOOL_REGISTRY,
   MERGE_HUMAN_ONLY_COPY,
+  RUNNER_OS,
+  runnerOsSchema,
   type UserRecord,
 } from '@cairn/shared';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -27,9 +29,10 @@ import {
   THREAD_TOOL_DESCRIPTIONS,
   THREAD_TOOL_SCHEMAS,
 } from './mcp-threads.js';
+import { setTodoPlatform } from './routing-rules.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { scanLocalSkills } from './skills.js';
-import { createAutonomousTodo, listTodos, updateAutonomousTodo } from './todos.js';
+import { createAutonomousTodo, getTodo, listTodos, updateAutonomousTodo } from './todos.js';
 
 export interface McpCallerCtx {
   teamId: string;
@@ -39,6 +42,7 @@ export interface McpCallerCtx {
 
 const s = z.string();
 const sArr = z.array(z.string());
+const updatePlatform = z.enum([...RUNNER_OS, 'any']);
 
 const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
   ...THREAD_TOOL_SCHEMAS,
@@ -52,8 +56,13 @@ const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
   issues: githubReadToolParamsSchemas.issues.shape,
   pull_requests: githubReadToolParamsSchemas.pull_requests.shape,
   workflow_runs: githubReadToolParamsSchemas.workflow_runs.shape,
-  create_todo: { projectId: s, title: s, spec: s },
-  update_todo: { todoId: s, title: s.optional(), spec: s.optional() },
+  create_todo: { projectId: s, title: s, spec: s, platform: runnerOsSchema.optional() },
+  update_todo: {
+    todoId: s,
+    title: s.optional(),
+    spec: s.optional(),
+    platform: updatePlatform.optional(),
+  },
   message_todo: { todoId: s, content: s },
   confirm_builds: { buildIds: sArr },
   merge_builds: { buildIds: sArr },
@@ -227,22 +236,29 @@ export async function executeMcpTool(
     case 'create_todo': {
       parseWith(categoryFreeTaskInputSchema, args, 'arguments');
       const projectId = str(args, 'projectId');
+      const platform = parseWith(runnerOsSchema.optional(), args.platform, 'platform');
       requireProjectRow(db, projectId, ctx.teamId);
-      return json(
-        createAutonomousTodo(svc, {
-          teamId: ctx.teamId,
-          projectId,
-          title: str(args, 'title'),
-          spec: str(args, 'spec'),
-          createdBy: null,
-          ownerId: ctx.user.id,
-        }),
-      );
+      const record = createAutonomousTodo(svc, {
+        teamId: ctx.teamId,
+        projectId,
+        title: str(args, 'title'),
+        spec: str(args, 'spec'),
+        createdBy: null,
+        ownerId: ctx.user.id,
+      });
+      if (platform === undefined) return json(record);
+      setTodoPlatform(db, requireTeamTodo(db, record.id, ctx.teamId), platform);
+      return json(getTodo(svc, record.id));
     }
     case 'update_todo': {
       parseWith(categoryFreeTaskInputSchema, args, 'arguments');
       const todoId = str(args, 'todoId');
-      requireTeamTodo(db, todoId, ctx.teamId);
+      const platform = parseWith(updatePlatform.optional(), args.platform, 'platform');
+      const row = requireTeamTodo(db, todoId, ctx.teamId);
+      if (platform !== undefined) {
+        setTodoPlatform(db, row, platform === 'any' ? null : platform);
+        deps.machineHub?.wake(ctx.teamId);
+      }
       const record = updateAutonomousTodo(svc, todoId, {
         ...(optStr(args, 'title') !== undefined ? { title: optStr(args, 'title') } : {}),
         ...(optStr(args, 'spec') !== undefined ? { spec: optStr(args, 'spec') } : {}),
