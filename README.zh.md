@@ -17,7 +17,7 @@
     <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-SQLite-173a2f?style=flat-square">
   </p>
 
-  <p><b>Cairn 是自托管的通用助理：你跟一个 Coordinator 说要做什么，agent 在你自己的机器上分 thread 隔离干活。</b></p>
+  <p><b>Cairn 是给写代码的人用的自托管个人助理：从写代码到你自己的事，你跟一个 Coordinator 说要做什么，agent 在你自己的机器上分 thread 隔离干活。</b></p>
 
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="site/img/hero-dark.webp">
@@ -36,6 +36,25 @@
 - **跑在你自己的机器上。** 在任意主机上跑 daemon 就能登记成执行机。thread 会派到满足运行时、模型和工具要求的任意机器上，在独立的 git worktree 里干活；主机支持时也可以每个任务一个用完即弃的 Orb 容器（`CAIRN_EXECUTOR=orb`，目前需手动开启）。计划、diff、工具调用实时推回来。
 - **项目。** 项目主页含项目说明、项目记忆、项目密钥和并发上限；人的消息永远插队。仓库可以由服务器自己托管，也可以接 GitHub。
 - **自举闭环。** Cairn 自己领票、实现、审核、开 PR，正在用它自己开发它自己。
+- **你自己的事（计划中）。** 邮件、日程、求职作为一个不挂仓库的项目来跑：agent 负责读、分类、起草；发邮件、投简历这类撤不回的动作，都等你点头。
+
+## 适合谁
+
+Cairn 是给一个人用的，不是给团队用的：你装一份自己用，别人想用就各自装一份。
+
+适合你，如果你：
+
+- 写代码，或者工作离不开代码，想让 agent 在后台干活，自己只拍板；
+- 有一台能一直开着的机器（台式机、家里的服务器或 VPS），最好还有笔记本或手机随时跟进；
+- 已经在付 Claude Code、Codex 或 Gemini 的订阅，或者有 API key，想接着用，不想再买一份算力；
+- 希望代码、邮件和凭据都留在自己的机器上。
+
+不太适合你，如果你想要：
+
+- 团队一起用的工具，有共享频道、角色和计费（看 [Amp Spaces](https://ampcode.com/docs/spaces) 或 [Multica](https://github.com/multica-ai/multica)）；
+- 只是一个更好用的界面，自己来操作 Claude Code 或 Codex（看 [T3 Code](https://github.com/pingdotgg/t3code)）；
+- 住在聊天软件里的助理，比如 Telegram、WhatsApp（看 [OpenClaw](https://github.com/openclaw/openclaw) 或 [Hermes Agent](https://github.com/NousResearch/hermes-agent)）；
+- 不用安装、不用维护任何东西的托管服务。
 
 ## 作品
 

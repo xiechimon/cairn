@@ -17,7 +17,7 @@
     <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-SQLite-173a2f?style=flat-square">
   </p>
 
-  <p><b>Cairn is a self-hosted general assistant. Tell one Coordinator what you want, and agents do the work in isolated threads on your own machines.</b></p>
+  <p><b>Cairn is a self-hosted personal assistant for people who write code. Tell one Coordinator what you want, from code to your own affairs, and agents do the work in isolated threads on your own machines.</b></p>
 
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="site/img/hero-dark.webp">
@@ -35,6 +35,25 @@
 - **Your machines.** Register any host by running the daemon on it. A thread runs on any machine that meets its runtime, model and tool constraints, in its own git worktree, or in a throwaway per-task Orb container where the host supports it (`CAIRN_EXECUTOR=orb`, opt-in for now). Planned: E2B and Daytona sandboxes using your own key; the project never resells compute. Plans, diffs and tool calls stream back live. Cairn runs on your own machine with no hosted control plane, and credentials stay there.
 - **Projects.** A project home with its instructions, memory, secrets and a concurrency limit; a person's message always jumps the queue. Repos are hosted by the server itself or connected from GitHub.
 - **Bootstrap loop.** Cairn takes its own tickets, implements them, reviews them and opens the PRs: it is being used to build itself.
+- **Your own affairs (planned).** Mail, calendar and job search run as a project with no repository: agents read, sort and draft, and anything that cannot be undone, such as sending a mail or submitting an application, waits for your yes.
+
+## Who it's for
+
+Cairn is for one person, not a team: you run your own copy, and someone else who wants it runs theirs.
+
+It fits you if you:
+
+- write code, or work alongside code, and want agents to do the work in the background while you only make the calls;
+- have a machine that can stay on (a desktop, a home server or a VPS), and ideally a laptop or a phone to follow along from;
+- already pay for Claude Code, Codex or Gemini, or have an API key, and want to keep using them rather than buy compute again;
+- want your code, mail and credentials to stay on your own machines.
+
+It is not the right fit if you want:
+
+- a tool for a team to share, with shared channels, roles and billing ([Amp Spaces](https://ampcode.com/docs/spaces) or [Multica](https://github.com/multica-ai/multica));
+- only a better interface for driving Claude Code or Codex yourself ([T3 Code](https://github.com/pingdotgg/t3code));
+- an assistant that lives in your chat apps, such as Telegram or WhatsApp ([OpenClaw](https://github.com/openclaw/openclaw) or [Hermes Agent](https://github.com/NousResearch/hermes-agent));
+- a hosted service with nothing to install or keep running.
 
 ## Showcase
 
