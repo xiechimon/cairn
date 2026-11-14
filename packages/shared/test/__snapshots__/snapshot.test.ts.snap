@@ -10262,6 +10262,44 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               ],
               "type": "object",
             },
+            "hostPermissions": {
+              "additionalProperties": false,
+              "properties": {
+                "accessibility": {
+                  "enum": [
+                    "granted",
+                    "not_required",
+                    "denied",
+                    "unknown",
+                  ],
+                  "type": "string",
+                },
+                "automation": {
+                  "enum": [
+                    "granted",
+                    "not_required",
+                    "denied",
+                    "unknown",
+                  ],
+                  "type": "string",
+                },
+                "screenRecording": {
+                  "enum": [
+                    "granted",
+                    "not_required",
+                    "denied",
+                    "unknown",
+                  ],
+                  "type": "string",
+                },
+              },
+              "required": [
+                "accessibility",
+                "automation",
+                "screenRecording",
+              ],
+              "type": "object",
+            },
             "mcpServers": {
               "items": {
                 "type": "string",

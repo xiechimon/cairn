@@ -169,6 +169,18 @@ export const EN: Record<string, string> = {
   '你在操作，Coordinator 已暂停': 'You are in control; the Coordinator is paused',
   浏览器: 'Browser',
   '让 agent 打开网页、点击和填表。': 'Lets agents open pages, click and fill forms.',
+  辅助功能未授予: 'Accessibility not granted',
+  '在 系统设置 → 隐私与安全性 → 辅助功能 中允许 Cairn，否则 agent 无法读取和操作桌面。':
+    'Allow Cairn under System Settings → Privacy & Security → Accessibility, or agents cannot read and drive the desktop.',
+  桌面辅助通道不可用: 'Desktop accessibility bus unavailable',
+  'AT-SPI 辅助总线不可用，agent 将无法读取和操作桌面。请安装并启用 at-spi（如 orca）后重试。':
+    'The AT-SPI accessibility bus is unavailable, so agents cannot read and drive the desktop. Install and enable at-spi (for example orca) and retry.',
+  屏幕录制未授予: 'Screen recording not granted',
+  '在 系统设置 → 隐私与安全性 → 屏幕录制 中允许 Cairn，否则 agent 无法截取屏幕。':
+    'Allow Cairn under System Settings → Privacy & Security → Screen Recording, or agents cannot capture the screen.',
+  屏幕截取不可用: 'Screen capture unavailable',
+  '当前环境无法截取屏幕，agent 的屏幕读取将被拒绝。':
+    'This environment cannot capture the screen; agents will be refused screen reads.',
   '这台机器还不支持浏览器。': 'This machine does not support the browser yet.',
   '这台机器已不再报告浏览器能力；可关闭已保存的偏好。':
     'This machine no longer reports browser capability; you can turn off the saved preference.',

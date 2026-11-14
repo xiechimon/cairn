@@ -87,3 +87,86 @@ test('a machine that reports no browser keeps the browser switch disabled', asyn
   await page.keyboard.press(' ');
   await expect(page.locator('[data-sonner-toast]', { hasText: reason })).toBeVisible();
 });
+
+test('a mac that denies accessibility and screen recording shows one guidance row per permission', async ({
+  page,
+}) => {
+  const access = await open(page, [computer()], [
+    {
+      ...MACHINE,
+      capabilities: {
+        browser: true,
+        mcpServers: [],
+        skills: [],
+        osPlatform: 'darwin',
+        hostPermissions: {
+          accessibility: 'denied',
+          automation: 'granted',
+          screenRecording: 'denied',
+        },
+      },
+    },
+  ]);
+  await expect(access.getByTestId('machine-permission-accessibility')).toHaveText('辅助功能未授予');
+  await expect(access.getByTestId('machine-permission-screen-recording')).toHaveText(
+    '屏幕录制未授予',
+  );
+  await expect(access.locator('[data-settings-label="辅助功能未授予"]')).toContainText(
+    '隐私与安全性',
+  );
+  await expect(access.locator('[data-settings-label="屏幕录制未授予"]')).toContainText(
+    '隐私与安全性',
+  );
+  await expect(access.getByTestId('machine-permission-accessibility')).toHaveCount(1);
+  await expect(access.getByRole('switch')).toHaveCount(1);
+});
+
+test('a linux machine without an accessibility bus shows the AT-SPI hint', async ({ page }) => {
+  const access = await open(page, [computer()], [
+    {
+      ...MACHINE,
+      capabilities: {
+        browser: true,
+        mcpServers: [],
+        skills: [],
+        osPlatform: 'linux',
+        hostPermissions: {
+          accessibility: 'unknown',
+          automation: 'granted',
+          screenRecording: 'not_required',
+        },
+      },
+    },
+  ]);
+  await expect(access.getByTestId('machine-permission-accessibility')).toHaveText(
+    '桌面辅助通道不可用',
+  );
+  await expect(access.locator('[data-settings-label="桌面辅助通道不可用"]')).toContainText(
+    'AT-SPI',
+  );
+  await expect(access.getByTestId('machine-permission-screen-recording')).toHaveCount(0);
+});
+
+test('a machine with all permissions granted or not required renders no guidance rows', async ({
+  page,
+}) => {
+  const access = await open(page, [computer()], [
+    {
+      ...MACHINE,
+      capabilities: {
+        browser: true,
+        mcpServers: [],
+        skills: [],
+        osPlatform: 'darwin',
+        hostPermissions: {
+          accessibility: 'granted',
+          automation: 'granted',
+          screenRecording: 'not_required',
+        },
+      },
+    },
+  ]);
+  await expect(access.getByTestId('machine-permission-accessibility')).toHaveCount(0);
+  await expect(access.getByTestId('machine-permission-screen-recording')).toHaveCount(0);
+});
+

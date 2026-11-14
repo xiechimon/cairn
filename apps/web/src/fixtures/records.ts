@@ -9,6 +9,7 @@ import {
   type MachineOsPlatform,
   type MemoryRecord,
   type ModelSource,
+  type PermissionState,
   PHASE_VALUES,
   type Phase,
   type ProjectColor,
@@ -300,6 +301,11 @@ export interface MachineRow {
     computer?: true;
     ownComputer?: true;
     browser?: true;
+    hostPermissions?: {
+      accessibility: PermissionState;
+      automation: PermissionState;
+      screenRecording: PermissionState;
+    };
   } | null;
   maxConcurrentOverridden?: boolean;
   recommendedConcurrent?: number;
