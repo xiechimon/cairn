@@ -221,7 +221,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           threadId,
           oldest === undefined ? null : { at: oldest.message.createdAt, rowid: oldest.rowid },
           summarize,
-          (error) => {
+          (error, startAt) => {
             const ids = [providers?.router.provider, providers?.summary.provider].filter(
               (id): id is string => id !== undefined,
             );
@@ -233,7 +233,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
             );
             const scrubbed = new Error(message);
             scrubbed.name = error instanceof Error ? error.name : 'Error';
-            reportCompactionFailure({ threadId }, 'seed-summary', scrubbed);
+            reportCompactionFailure({ threadId }, 'seed-summary', scrubbed, startAt);
           },
           nowMs(),
         );
@@ -608,7 +608,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       threadId,
       windowStart,
       summarize,
-      (error) => {
+      (error, startAt) => {
         const message = scrubProviderError(
           { db, box: machine.box },
           teamId,
@@ -617,7 +617,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         );
         const scrubbed = new Error(message);
         scrubbed.name = error instanceof Error ? error.name : 'Error';
-        reportCompactionFailure({ threadId }, 'seed-summary', scrubbed);
+        reportCompactionFailure({ threadId }, 'seed-summary', scrubbed, startAt);
       },
       nowMs(),
     );

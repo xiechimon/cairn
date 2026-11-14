@@ -31,6 +31,7 @@ import {
   SidebarProjectGroupHeader,
   SidebarProjectRow,
   SidebarProjectRowSkeleton,
+  type SidebarRename,
   type TreePlace,
 } from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
@@ -295,6 +296,64 @@ function RailTip({
   );
 }
 
+function useRowRename(label: string, save: (name: string) => Promise<void> | undefined) {
+  const [editing, setEditing] = useState(false);
+  const [pending, setPending] = useState<string | null>(null);
+  const rename: SidebarRename | null = editing
+    ? {
+        label,
+        onCancel: () => setEditing(false),
+        onCommit: (next) => {
+          setEditing(false);
+          setPending(next);
+          Promise.resolve(save(next))
+            .catch(() => undefined)
+            .finally(() => setPending(null));
+        },
+      }
+    : null;
+  return { rename, pending, start: () => setEditing(true) };
+}
+
+function GroupHeaderItem({
+  name,
+  expanded,
+  count,
+  waiting,
+  spaced,
+  onToggle,
+  actions,
+}: {
+  name: string;
+  expanded: boolean;
+  count: number;
+  waiting: string | null;
+  spaced: boolean;
+  onToggle: () => void;
+  actions: SidebarProjectActions | undefined;
+}) {
+  const { t } = useI18n();
+  const { rename, pending, start } = useRowRename(t('分组名称'), (next) =>
+    actions?.renameGroup(name, next),
+  );
+  return (
+    <SidebarProjectGroupHeader
+      name={pending ?? name}
+      expanded={expanded}
+      count={count}
+      waiting={waiting}
+      spaced={spaced}
+      onToggle={onToggle}
+      rename={rename}
+      menu={
+        actions === undefined ? undefined : (
+          <SidebarGroupMenu name={name} onRename={start} onUngroup={() => actions.ungroup(name)} />
+        )
+      }
+    />
+  );
+}
+
 const ProjectRowItem = memo(function ProjectRowItem({
   row,
   place,
@@ -320,6 +379,10 @@ const ProjectRowItem = memo(function ProjectRowItem({
   navigate: NavigateFunction;
   actionsRef: RefObject<SidebarProjectActions | undefined> | null;
 }) {
+  const { t } = useI18n();
+  const { rename, pending, start } = useRowRename(t('项目名称'), (next) =>
+    actionsRef?.current?.rename(row.id, next),
+  );
   const appSearch = (set: Record<string, string>) => {
     const next = new URLSearchParams(plain);
     for (const [key, value] of Object.entries(set)) next.set(key, value);
@@ -339,22 +402,15 @@ const ProjectRowItem = memo(function ProjectRowItem({
         groups={groups}
         onMove={(group) => actionsRef.current?.move(row.id, group)}
         onArchive={() => actionsRef.current?.archive(row.id)}
-        onRename={async (name) => actionsRef.current?.rename(row.id, name)}
+        onRename={start}
         onDelete={() => actionsRef.current?.remove(row.id)}
-        onHome={() => navigate({ pathname: '/app', search: appSearch({ project: row.id }) })}
-        onTasks={() => navigate({ pathname: `/app/project/${row.id}/tasks`, search: plain })}
         onSettings={() => navigate({ pathname: `/app/project/${row.id}/settings`, search: plain })}
-        onInstructions={() =>
-          navigate({
-            pathname: `/app/project/${row.id}/settings`,
-            search: appSearch({ tab: 'memory' }),
-          })
-        }
       />
     );
   return (
     <SidebarProjectRow
-      name={row.name}
+      name={pending ?? row.name}
+      rename={rename}
       icon={row.icon}
       place={place}
       flat={flat}
@@ -722,22 +778,14 @@ export function BoardSidebar({
             const groupWaiting = group.projects.some((row) => waiting.has(row.id));
             return (
               <div key={group.name} className="flex flex-col gap-0.5">
-                <SidebarProjectGroupHeader
+                <GroupHeaderItem
                   name={group.name}
                   expanded={expanded}
                   count={group.projects.length}
                   waiting={groupWaiting ? waitingLabel : null}
                   spaced={spaced}
                   onToggle={() => toggleGroup(group.name)}
-                  menu={
-                    actions === undefined ? undefined : (
-                      <SidebarGroupMenu
-                        name={group.name}
-                        onRename={(next) => actions.renameGroup(group.name, next)}
-                        onUngroup={() => actions.ungroup(group.name)}
-                      />
-                    )
-                  }
+                  actions={actions}
                 />
                 {expanded && projectRows(group.projects)}
               </div>

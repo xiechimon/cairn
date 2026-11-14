@@ -199,6 +199,7 @@ export function MachineRowView({
       : null;
   const osPlatform = machine.capabilities?.osPlatform;
   const osName = osPlatform === undefined ? undefined : OS_NAMES[osPlatform];
+  const osUnreported = machine.capabilities !== undefined && osPlatform === undefined;
   const canMutate = machine.id != null && online;
   const acceptFrozen = !canMutate || mutations.patchMachine.isPending;
   const acceptBlockedReason = online
@@ -268,6 +269,19 @@ export function MachineRowView({
                 </span>
               </>
             )}
+            {osUnreported && (
+              <>
+                <span
+                  data-testid="machine-os-unknown"
+                  className="whitespace-nowrap text-content-secondary"
+                >
+                  {t('系统未知')}
+                </span>
+                <span aria-hidden className="text-content-dim">
+                  ·
+                </span>
+              </>
+            )}
             <span aria-hidden className={cn('size-1.5 flex-none rounded-full', status.dot)} />
             <span
               data-testid="machine-item-status"
@@ -315,6 +329,14 @@ export function MachineRowView({
               </>
             )}
           </div>
+          {osUnreported && (
+            <p
+              data-testid="machine-os-update-hint"
+              className="pl-5 text-meta text-content-tertiary"
+            >
+              {t('更新 Cairn 后才能接有平台要求的任务')}
+            </p>
+          )}
         </div>
         <ExplainDisabledToggle
           className="relative z-10"

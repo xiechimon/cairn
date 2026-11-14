@@ -179,9 +179,18 @@ test('machines are single-column rows: name, then status, runtime and capability
   await expect(host.getByTestId('machine-open-runtime')).toContainText('运行时');
   await expect(host.getByTestId('machine-accept-toggle')).toBeVisible();
   await expect(host.getByTestId('machine-menu')).toBeVisible();
+  await expect(host.getByTestId('machine-os')).toHaveText('Linux');
+  await expect(host.getByTestId('machine-os-unknown')).toHaveCount(0);
   await expect(
     items(page).filter({ hasText: 'old-laptop' }).getByTestId('machine-item-status'),
   ).toHaveText('离线');
+  const oldDaemon = items(page).filter({ hasText: 'old-laptop' });
+  await expect(oldDaemon.getByTestId('machine-os')).toHaveCount(0);
+  await expect(oldDaemon.getByTestId('machine-os-unknown')).toHaveText('系统未知');
+  await expect(oldDaemon.getByTestId('machine-os-update-hint')).toHaveText(
+    '更新 Cairn 后才能接有平台要求的任务',
+  );
+  await expect(host.getByTestId('machine-os-update-hint')).toHaveCount(0);
   await expect(
     items(page).filter({ hasText: 'build-box' }).getByTestId('machine-item-status'),
   ).toHaveText('登录已过期');

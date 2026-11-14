@@ -1,6 +1,7 @@
 import { parsePairFragment } from '@cairn/shared';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import {
+  authSnapshot,
   awaitGate,
   bootstrapLoopback,
   clearLegacyBrowserToken,
@@ -8,6 +9,7 @@ import {
   demandGate,
   exchangeAccessIdentity,
   isLoopbackPage,
+  passGate,
 } from './auth.js';
 
 export class ApiError extends Error {
@@ -65,6 +67,11 @@ function establishSession(): Promise<boolean> {
   return establishing;
 }
 
+function signedIn(res: Response): Response {
+  if (authSnapshot().gateOpen) passGate();
+  return res;
+}
+
 async function settle<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as {
@@ -83,10 +90,10 @@ async function request<T>(path: string, init?: { method?: string; body?: unknown
   }
   await ensureLoopbackSession();
   const first = await send(path, init);
-  if (first.status !== 401) return settle<T>(first);
+  if (first.status !== 401) return settle<T>(signedIn(first));
   if (await establishSession()) {
     const retried = await send(path, init);
-    if (retried.status !== 401) return settle<T>(retried);
+    if (retried.status !== 401) return settle<T>(signedIn(retried));
   }
   demandGate();
   await awaitGate();

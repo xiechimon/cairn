@@ -1,11 +1,12 @@
 import type { ComputerRecord } from '@cairn/shared';
 import { cn } from 'cn';
-import type { ReactNode } from 'react';
+import { Minimize2 } from 'lucide-react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import type { useComputerControl } from '../api/use-computer-control.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
-import { X } from '../icons/index.js';
 import { MachineScreenSurface } from './computer-screen.js';
 
 export type ComputerControl = ReturnType<typeof useComputerControl>;
@@ -64,6 +65,46 @@ export function ComputerControlBar({
   );
 }
 
+const CHROME_IDLE_MS = 2_500;
+
+function useBrowserFullscreen(open: boolean, onExit: () => void) {
+  const exitRef = useRef(onExit);
+  exitRef.current = onExit;
+  useEffect(() => {
+    if (!open || document.fullscreenElement != null || !document.fullscreenEnabled) return;
+    let entered = false;
+    const onChange = () => {
+      if (document.fullscreenElement != null) {
+        entered = true;
+        return;
+      }
+      if (entered) exitRef.current();
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    void document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange);
+      if (entered && document.fullscreenElement != null)
+        void document.exitFullscreen().catch(() => {});
+    };
+  }, [open]);
+}
+
+function useIdleChrome(): [boolean, () => void] {
+  const [idle, setIdle] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+  const wake = useCallback(() => {
+    setIdle(false);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setIdle(true), CHROME_IDLE_MS);
+  }, []);
+  useEffect(() => {
+    wake();
+    return () => window.clearTimeout(timer.current);
+  }, [wake]);
+  return [idle, wake];
+}
+
 export function ComputerScreenDialog({
   open,
   onClose,
@@ -83,65 +124,70 @@ export function ComputerScreenDialog({
 }) {
   const { t } = useI18n();
   const { leaseId } = control;
+  const [idle, wake] = useIdleChrome();
+  useBrowserFullscreen(open, onClose);
   return (
     <DialogShell
-      bare
       open={open}
       onClose={onClose}
-      title={title}
-      width="min(100vw - 1.5rem, 1280px)"
-      height="min(100dvh - 1.5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom), 900px)"
-      className="flex max-h-[calc(100dvh-1.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col"
+      viewportRoot
+      backdropClassName="bg-(--screen-letterbox)"
+      zIndex="var(--z-modal)"
     >
-      <div className="relative flex shrink-0 items-start gap-3 px-4 pt-4 pr-12 pb-2 sm:px-5 sm:pt-4.5 sm:pr-13 pointer-coarse:pr-15">
-        <div className="min-w-0 flex-1">
-          <div className="font-heading text-heading leading-[1.4] font-title text-foreground">
-            {title}
-          </div>
-          <p className="mt-0.5 text-meta text-content-tertiary">
-            {status ?? (leaseId !== null ? t('在大屏里点击和键入') : t('接管后才能点击和键入'))}
-          </p>
-        </div>
-        <ComputerControlBar
-          compact
-          held={control.controlHeld}
-          busy={control.busy}
-          handoff={computer.handoffReason}
-          onTakeOver={() => control.setHeld(true)}
-          onGiveBack={() => control.setHeld(false)}
-        />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="absolute top-3 right-3 text-content-tertiary hover:text-foreground sm:top-4 sm:right-4 pointer-coarse:top-2 pointer-coarse:right-1.5 pointer-coarse:size-11"
-          aria-label={t('关闭')}
-          onClick={onClose}
-        >
-          <X width={20} height={20} />
-        </Button>
-      </div>
       <div
+        role="dialog"
+        aria-label={title}
         data-testid="machine-screen-enlarged"
-        className="grid min-h-0 flex-1 place-items-center px-2 pb-2 sm:px-3 sm:pb-3"
-        style={{ containerType: 'size' }}
+        className="fixed inset-0 z-(--z-modal) bg-(--screen-letterbox) pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+        onPointerMoveCapture={wake}
+        onPointerDownCapture={wake}
+        onKeyDownCapture={wake}
       >
+        <MachineScreenSurface
+          teamId={teamId}
+          computer={computer}
+          leaseId={leaseId}
+          interactive={leaseId !== null}
+          fill
+          autoFocus
+        />
         <div
-          className="max-h-full max-w-full"
-          style={{
-            aspectRatio: '16 / 10',
-            width: 'min(100cqw, calc(100cqh * 16 / 10))',
-            height: 'min(100cqh, calc(100cqw * 10 / 16))',
-          }}
+          data-testid="machine-screen-chrome"
+          data-idle={idle ? 'true' : 'false'}
+          className="absolute top-[calc(env(safe-area-inset-top)+0.75rem)] left-1/2 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-3 rounded-(--radius-popover) bg-popover py-1.5 pr-1.5 pl-4 text-popover-foreground shadow-(--e2) transition-opacity duration-(--dur-overlay) focus-within:opacity-100 hover:opacity-100 pointer-fine:data-[idle=true]:opacity-0 motion-reduce:transition-none"
         >
-          <MachineScreenSurface
-            teamId={teamId}
-            computer={computer}
-            leaseId={leaseId}
-            interactive={leaseId !== null}
-            fill
-            autoFocus
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate text-ui text-foreground">{title}</span>
+            <span className="hidden truncate text-meta text-content-tertiary sm:block">
+              {status ??
+                (leaseId !== null ? t('你在操作，Coordinator 已暂停') : t('接管后才能点击和键入'))}
+            </span>
+          </div>
+          <ComputerControlBar
+            compact
+            held={control.controlHeld}
+            busy={control.busy}
+            handoff={computer.handoffReason}
+            onTakeOver={() => control.setHeld(true)}
+            onGiveBack={() => control.setHeld(false)}
           />
+          <IconTooltip
+            label={t('退出全屏')}
+            side="bottom"
+            trigger={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                data-testid="machine-screen-exit"
+                className="flex-none text-content-tertiary hover:text-foreground pointer-coarse:size-11"
+                aria-label={t('退出全屏')}
+                onClick={onClose}
+              />
+            }
+          >
+            <Minimize2 aria-hidden="true" className="size-5" />
+          </IconTooltip>
         </div>
       </div>
     </DialogShell>

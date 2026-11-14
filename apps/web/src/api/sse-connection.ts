@@ -6,7 +6,7 @@ export const SSE_BIZ_SILENCE_MAX_MS = 300_000;
 
 export interface StreamGuards {
   inFlight: () => boolean;
-  reconcile: () => void;
+  reconcile: () => void | Promise<void>;
 }
 
 export function connect(

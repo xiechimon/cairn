@@ -1,6 +1,7 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -33,6 +34,8 @@ const dirs: string[] = [];
 
 interface Span {
   name: string;
+  startTimeUnixNano: string;
+  endTimeUnixNano: string;
   status?: { code: number; message: string };
   attributes: { key: string; value: { stringValue?: string; intValue?: string } }[];
 }
@@ -106,8 +109,16 @@ describe('compaction failures are never silent', () => {
     });
     faux.setResponses(
       Array(400).fill(
-        (c: { messages: { role: string }[] }, _o: unknown, _s: unknown, model: { id: string }) => {
-          if (model.id === 'sum') return fauxAssistantMessage('folded summary');
+        async (
+          c: { messages: { role: string }[] },
+          _o: unknown,
+          _s: unknown,
+          model: { id: string },
+        ) => {
+          if (model.id === 'sum') {
+            await delay(20);
+            return fauxAssistantMessage('folded summary');
+          }
           const last = c.messages.at(-1);
           if (last?.role === 'toolResult')
             return fauxAssistantMessage(`answer ${'word '.repeat(1500)}`);
@@ -134,6 +145,7 @@ describe('compaction failures are never silent', () => {
             () => ({
               run: async () => {
                 flushRuns += 1;
+                await delay(20);
                 throw new Error(`'none' is not supported with the model ${SECRET}`);
               },
             }),
@@ -176,6 +188,13 @@ describe('compaction failures are never silent', () => {
     await flushSpans();
     const span = spans.find((s) => s.name === 'compaction memory-flush');
     expect(span?.status?.code).toBe(2);
+    const folded = spans.find((s) => s.name === 'compaction summary-fold');
+    expect(folded?.status?.code).not.toBe(2);
+    for (const phase of [span, folded]) {
+      expect(
+        BigInt(phase!.endTimeUnixNano) - BigInt(phase!.startTimeUnixNano),
+      ).toBeGreaterThanOrEqual(15_000_000n);
+    }
     expect(JSON.stringify(spans)).not.toContain(SECRET);
     expect(attr(span as Span, 'error.type')).toBe('Error');
   }, 60_000);
@@ -191,12 +210,19 @@ describe('compaction failures are never silent', () => {
     });
     faux.setResponses(
       Array(400).fill(
-        (c: { messages: { role: string }[] }, _o: unknown, _s: unknown, model: { id: string }) => {
-          if (model.id === 'sum')
+        async (
+          c: { messages: { role: string }[] },
+          _o: unknown,
+          _s: unknown,
+          model: { id: string },
+        ) => {
+          if (model.id === 'sum') {
+            await delay(20);
             return fauxAssistantMessage('', {
               stopReason: 'error',
               errorMessage: `'none' is not supported ${SECRET}`,
             });
+          }
           const last = c.messages.at(-1);
           if (last?.role === 'toolResult')
             return fauxAssistantMessage(`answer ${'word '.repeat(1500)}`);
@@ -249,6 +275,13 @@ describe('compaction failures are never silent', () => {
     expect(reported.length).toBeGreaterThan(0);
     expect(JSON.stringify(logs)).not.toContain(SECRET);
     expect(compactionFailureCounts()['background-compaction']).toBe(reported.length);
+    await flushSpans();
+    const failedFold = spans.find(
+      (s) => s.name === 'compaction summary-fold' && s.status?.code === 2,
+    )!;
+    expect(
+      BigInt(failedFold.endTimeUnixNano) - BigInt(failedFold.startTimeUnixNano),
+    ).toBeGreaterThanOrEqual(15_000_000n);
   }, 60_000);
 
   it('a failing fold before a model switch is reported and the turn still completes', async () => {

@@ -45,7 +45,6 @@ async function open(
   page: Page,
   feed: Feed,
   machines: unknown[] = [FEED_MACHINE],
-  detail = true,
   url = '/app?pane=machines',
 ) {
   await mockLive(page, { threads: [], messages: HISTORY, machines }, (path, route, json) => {
@@ -76,12 +75,7 @@ async function open(
     return undefined;
   });
   await page.goto(url);
-  const panel = page.getByRole('complementary', { name: '电脑' });
-  if (detail && machines.length > 0) {
-    await panel.locator('[data-slot="list-card"]').first().getByRole('button').click();
-    await panel.getByRole('tab', { name: '在这台工作' }).click();
-  }
-  return panel;
+  return page.getByRole('complementary', { name: '电脑' });
 }
 
 async function emit(page: Page, event: unknown) {
@@ -441,8 +435,6 @@ test('private REST history disappears at the auth gate and a late old response c
   try {
     await page.goto('/app?pane=machines');
     const panel = page.getByRole('complementary', { name: '电脑' });
-    await panel.locator('[data-slot="list-card"]').first().getByRole('button').click();
-    await panel.getByRole('tab', { name: '在这台工作' }).click();
     await expect(entries(panel)).toContainText(['first-owner-only']);
     holdFirstHistory = true;
     await emit(page, { type: 'ping', seq: 1 });
@@ -553,7 +545,7 @@ test('with a machine listed the panel still shows its card and the screen placeh
   );
   const card = panel;
   await expect(card.getByTestId('machine-screen')).toBeVisible();
-  await card.getByRole('tab', { name: 'Agent 的权限' }).click();
+  await expect(card.getByRole('tab')).toHaveCount(0);
   await expect(card.getByText('已安装')).toHaveCount(0);
   await expect(card.getByText('未安装')).toHaveCount(0);
   await expect(card.getByRole('switch')).toHaveCount(0);
@@ -561,7 +553,7 @@ test('with a machine listed the panel still shows its card and the screen placeh
 });
 
 test('with no machines the list is only the add row and the hint', async ({ page }) => {
-  const panel = await open(page, { computers: [], commands: [] }, [], false);
+  const panel = await open(page, { computers: [], commands: [] }, []);
   await expect(panel.getByRole('heading', { name: '你的电脑' })).toBeVisible();
   await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(1);
   await expect(panel.getByTestId('machine-list-row')).toHaveCount(0);
@@ -576,7 +568,6 @@ test('an offline Coordinator machine reads offline in the chip and the card, wit
     page,
     { computers: [], commands: [] },
     [{ id: 'm1', name: 'omarchy', online: false, runningSteps: 3 }],
-    false,
   );
   const chip = page.getByTestId('machines-button');
   await expect(chip).toHaveAccessibleName(/omarchy/);
@@ -586,12 +577,11 @@ test('an offline Coordinator machine reads offline in the chip and the card, wit
   const row = panel.locator('[data-slot="list-card"]').first();
   await expect(row).toContainText('离线');
   await expect(row).not.toContainText('在跑');
-  await row.getByRole('button').click();
   await expect(panel.getByTestId('machine-screen')).toHaveCount(0);
   await expect(panel.getByTestId('machine-screen-hint')).toHaveCount(0);
 });
 
-test('enlarging the live screen only watches; Take control and Return control drive the lease', async ({
+test('full screen only watches; Take control and Return control drive the lease', async ({
   page,
 }) => {
   const feed: Feed = { computers: [computer()], commands: [command(1)], controlCalls: [] };
@@ -616,7 +606,7 @@ test('enlarging the live screen only watches; Take control and Return control dr
     'true',
     { timeout: 15_000 },
   );
-  await expect(page.getByText('在大屏里点击和键入')).toBeVisible();
+  await expect(dialog.getByText('你在操作，Coordinator 已暂停')).toBeVisible();
   expect(feed.controlCalls).toEqual(['POST']);
   await dialog.getByRole('button', { name: '交还' }).click();
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
@@ -624,7 +614,7 @@ test('enlarging the live screen only watches; Take control and Return control dr
     'false',
   );
   expect(feed.controlCalls).toEqual(['POST', 'DELETE']);
-  await dialog.getByRole('button', { name: '关闭' }).click();
+  await dialog.getByRole('button', { name: '退出全屏' }).click();
   await expect(enlarged).toHaveCount(0);
 });
 
@@ -648,7 +638,7 @@ test('opening the machine while a user lease exists elsewhere does not take cont
   await expect.poll(() => feed.controlCalls).toEqual(['POST', 'DELETE']);
 });
 
-test('without a computer row the machine keeps the waiting placeholder and an empty access tab', async ({
+test('without a computer row the machine card shows the turn-on hint instead of a screen', async ({
   page,
 }) => {
   const panel = await open(
@@ -659,18 +649,15 @@ test('without a computer row the machine keeps the waiting placeholder and an em
   const card = panel;
   await expect(card.getByTestId('machine-screen')).toHaveCount(0);
   await expect(card.getByTestId('machine-screen-hint')).toBeVisible();
-  await card.getByRole('tab', { name: 'Agent 的权限' }).click();
   await expect(card.getByRole('switch')).toHaveCount(0);
-  await expect(card.getByTestId('machine-folders-empty')).toBeVisible();
 });
 
 const LONG_OUTPUT = `${'x'.repeat(4000)}\n${'line of output\n'.repeat(300)}`.slice(-4096);
 
 const MACHINE = { id: 'm1', name: 'omarchy', online: true, kind: 'remote', maxConcurrent: 4, runningSteps: 1 };
 
-const SHOT_SCENES: Record<string, { feed: Feed; expand: number | null; machines?: unknown[]; detail?: boolean }> = {
+const SHOT_SCENES: Record<string, { feed: Feed; expand: number | null; machines?: unknown[] }> = {
   machines: { feed: HISTORY_FEED, expand: null, machines: [MACHINE] },
-  list: { feed: HISTORY_FEED, expand: null, machines: [MACHINE], detail: false },
   empty: { feed: { computers: [], commands: [] }, expand: null },
   history: { feed: HISTORY_FEED, expand: 1 },
   offline: {
@@ -691,12 +678,12 @@ const SHOT_SCENES: Record<string, { feed: Feed; expand: number | null; machines?
 
 for (const theme of ['light', 'dark'] as const) {
   for (const width of [1280, 390]) {
-    for (const [scene, { feed, expand, machines, detail }] of Object.entries(SHOT_SCENES)) {
+    for (const [scene, { feed, expand, machines }] of Object.entries(SHOT_SCENES)) {
       test(`screenshots ${scene} ${theme} ${width}`, async ({ page }) => {
         test.skip(!SHOTS, 'screenshots only on request');
         await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
         await page.setViewportSize({ width, height: 900 });
-        const panel = await open(page, feed, machines, detail);
+        const panel = await open(page, feed, machines);
         if (expand !== null) {
           await entries(panel).nth(expand).getByRole('button', { name: '输出' }).click();
         }
@@ -736,7 +723,6 @@ test('the push link opens the machine with its screen enlarged and view-only', a
     page,
     feed,
     [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
-    false,
     '/app?pane=machines&machine=m1&screen=1',
   );
   const enlarged = page.getByTestId('machine-screen-enlarged');
@@ -751,7 +737,9 @@ test('the push link opens the machine with its screen enlarged and view-only', a
 test.describe('on a touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  test('the enlarged screen stays inside the top and bottom safe areas', async ({ page }) => {
+  test('the full-screen desktop and its bar stay inside the top and bottom safe areas', async ({
+    page,
+  }) => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setSafeAreaInsetsOverride', {
       insets: { top: 59, topMax: 59, bottom: 34, bottomMax: 34, left: 0, leftMax: 0, right: 0, rightMax: 0 },
@@ -765,22 +753,22 @@ test.describe('on a touch phone', () => {
       page,
       feed,
       [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
-      false,
       '/app?pane=machines&machine=m1&screen=1',
     );
-    const dialog = page.getByRole('dialog', { name: 'omarchy' });
-    await expect(dialog).toBeVisible();
-    await dialog.evaluate((node) =>
-      Promise.all(node.getAnimations({ subtree: true }).map((animation) => animation.finished)),
-    );
-    const box = await dialog.boundingBox();
-    expect(box).not.toBeNull();
-    if (!box) return;
-    expect(box.y).toBeGreaterThanOrEqual(59);
-    expect(box.y + box.height).toBeLessThanOrEqual(844 - 34);
+    const enlarged = page.getByTestId('machine-screen-enlarged');
+    await expect(enlarged).toBeVisible();
+    const screen = await enlarged.getByTestId('machine-screen').boundingBox();
+    const bar = await page.getByTestId('machine-screen-chrome').boundingBox();
+    expect(screen).not.toBeNull();
+    expect(bar).not.toBeNull();
+    if (!screen || !bar) return;
+    expect(screen.y).toBeGreaterThanOrEqual(59);
+    expect(screen.y + screen.height).toBeLessThanOrEqual(844 - 34);
+    expect(screen.width).toBe(390);
+    expect(bar.y).toBeGreaterThanOrEqual(59);
   });
 
-  test('the enlarged header keeps Give back and close as separate 44px touch targets', async ({
+  test('the full-screen bar keeps Give back and exit as separate 44px touch targets', async ({
     page,
   }) => {
     const feed: Feed = {
@@ -792,7 +780,6 @@ test.describe('on a touch phone', () => {
       page,
       feed,
       [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
-      false,
       '/app?pane=machines&machine=m1&screen=1',
     );
     const dialog = page.getByRole('dialog', { name: 'omarchy' });
@@ -801,7 +788,7 @@ test.describe('on a touch phone', () => {
       Promise.all(node.getAnimations({ subtree: true }).map((animation) => animation.finished)),
     );
     const giveBack = await dialog.getByRole('button', { name: '交还' }).boundingBox();
-    const close = await dialog.getByRole('button', { name: '关闭' }).boundingBox();
+    const close = await dialog.getByRole('button', { name: '退出全屏' }).boundingBox();
     expect(giveBack).not.toBeNull();
     expect(close).not.toBeNull();
     if (!giveBack || !close) return;
@@ -832,7 +819,7 @@ test.describe('on a touch phone', () => {
     expect(box.y + box.height).toBeLessThanOrEqual(tabs.y);
   });
 
-  test('Give back in the enlarged screen header releases control and keeps the screen open', async ({
+  test('Give back in the full-screen bar releases control and keeps the screen open', async ({
     page,
   }) => {
     const feed: Feed = {
@@ -844,7 +831,6 @@ test.describe('on a touch phone', () => {
       page,
       feed,
       [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
-      false,
       '/app?pane=machines&machine=m1&screen=1',
     );
     const enlarged = page.getByTestId('machine-screen-enlarged');
