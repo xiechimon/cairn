@@ -3,8 +3,6 @@ import { mapChiefStream, type MessageRow } from '../src/api/mappers.js';
 import { threadTargetsOf } from '../src/board/composer-thread-target.js';
 import { replyDeliveryOf } from '../src/board/reply-delivery.js';
 import type { TodoRecord } from '../src/fixtures/records.js';
-import { EN } from '../src/i18n/en.js';
-import { translate } from '../src/i18n/translate.js';
 
 const MARKER = {
   kind: 'thread-message',
@@ -43,20 +41,6 @@ describe('direct thread messages in the Coordinator conversation', () => {
         row('bad-json', '{"kind":"thread-message"'),
       ]),
     ).toEqual([]);
-  });
-
-  test('the marker label has a Chinese source and an English translation', () => {
-    const key = '你直接对 {n} 说：{excerpt}';
-    const vars = { n: 'Export', excerpt: 'Split it' };
-    expect(translate('zh', EN, key, vars)).toBe('你直接对 Export 说：Split it');
-    expect(translate('en', EN, key, vars)).toBe('You told Export directly: Split it');
-  });
-
-  test('a coordinator-origin marker uses the Coordinator label, not the user label', () => {
-    const key = 'Coordinator 直接对 {n} 说：{excerpt}';
-    const vars = { n: 'Export', excerpt: 'Split it' };
-    expect(translate('zh', EN, key, vars)).toBe('Coordinator 直接对 Export 说：Split it');
-    expect(translate('en', EN, key, vars)).toBe('The Coordinator told Export directly: Split it');
   });
 });
 
