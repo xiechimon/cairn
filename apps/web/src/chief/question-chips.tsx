@@ -4,7 +4,6 @@ import { Check } from 'lucide-react';
 import {
   Fragment,
   type ReactNode,
-  useContext,
   useEffect,
   useId,
   useMemo,
@@ -12,14 +11,12 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { ThreadLink } from '../board/thread-link.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { toastSuccess } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
-import { TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { MessageToolbar } from './message-toolbar.js';
@@ -112,9 +109,6 @@ export function QuestionChips({
     () => false,
   );
   const pending = item.status === 'pending' && onAnswer !== undefined && !submitting;
-  const glances = useContext(TodoGlanceContext);
-  const reportTodo =
-    item.todoId !== undefined && glances?.get(item.todoId)?.report === true ? item.todoId : null;
   const total = questions.length;
   const lastStep = total - 1;
   const last = step === lastStep;
@@ -369,15 +363,6 @@ export function QuestionChips({
           >
             {last ? t('提交') : t('下一步')}
           </Button>
-        )}
-        {reportTodo !== null && (
-          <ThreadLink
-            todoId={reportTodo}
-            data-testid="chief-question-report"
-            className="cursor-pointer text-ui text-(--text-tertiary) hover:text-(--foreground) hover:underline"
-          >
-            {t('看调研报告')}
-          </ThreadLink>
         )}
       </fieldset>
     </div>

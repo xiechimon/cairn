@@ -6,6 +6,7 @@ import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { contextPercentOf } from '../chief/context-meter-ring.js';
 import { REPLY_SOURCE_ATTR } from '../chief/reply-source-highlight.js';
+import { isFinalReportPhase, ReportThreadContext } from '../chief/research-report.js';
 import { TraceCard } from '../components/chat/trace-parts.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
@@ -288,6 +289,7 @@ function ThreadBody({
     localKey: `cairn.draft.todo:${todo.id}`,
     enabled: live,
   });
+  const reportThread = { title: todo.title, final: isFinalReportPhase(todo.phase) };
   return (
     <>
       {chat.wire?.sourceKind != null && <SourceLine wire={chat.wire} onLeave={onClose} />}
@@ -296,47 +298,49 @@ function ThreadBody({
       ) : view === 'changes' ? (
         <ChangesView chat={chat} now={now} />
       ) : (
-        <TranscriptColumn
-          transcript={[
-            ...chat.transcript.filter((item) => item.kind !== 'plan'),
-            ...(engine === undefined ? [] : engineTranscript(engine.run)),
-          ]}
-          liveStep={null}
-          agent={null}
-          onOpenPlan={onOpenPlan}
-          lead={
-            <ThreadLead
-              todo={todo}
-              showSpec={!chat.hasEarlier}
-              origin={origin}
-              onJumpToOrigin={onJumpToOrigin}
-            />
-          }
-          result={
-            engine !== undefined ||
-            chat.changes.status === 'ready' ||
-            chat.changes.status === 'error' ? (
-              <>
-                {engine?.controls}
-                {engine !== undefined && (
-                  <div data-testid="engine-run" data-state={engine.run.state}>
-                    <EngineQuestion run={engine.run} actions={engine.actions} />
-                  </div>
-                )}
-                {(chat.changes.status === 'ready' || chat.changes.status === 'error') && (
-                  <ChangesCard changes={chat.changes} onOpen={onViewChanges} />
-                )}
-              </>
-            ) : undefined
-          }
-          hasEarlier={chat.hasEarlier}
-          {...(chat.earlier !== undefined ? { earlier: chat.earlier } : {})}
-          autoScroll={chat.transcript.length > 0}
-          running={threadStatus(todo) === 'running'}
-          settled={chat.transcriptSettled}
-          threadKey={todo.id}
-          shortEnd={engine !== undefined}
-        />
+        <ReportThreadContext.Provider value={reportThread}>
+          <TranscriptColumn
+            transcript={[
+              ...chat.transcript.filter((item) => item.kind !== 'plan'),
+              ...(engine === undefined ? [] : engineTranscript(engine.run)),
+            ]}
+            liveStep={null}
+            agent={null}
+            onOpenPlan={onOpenPlan}
+            lead={
+              <ThreadLead
+                todo={todo}
+                showSpec={!chat.hasEarlier}
+                origin={origin}
+                onJumpToOrigin={onJumpToOrigin}
+              />
+            }
+            result={
+              engine !== undefined ||
+              chat.changes.status === 'ready' ||
+              chat.changes.status === 'error' ? (
+                <>
+                  {engine?.controls}
+                  {engine !== undefined && (
+                    <div data-testid="engine-run" data-state={engine.run.state}>
+                      <EngineQuestion run={engine.run} actions={engine.actions} />
+                    </div>
+                  )}
+                  {(chat.changes.status === 'ready' || chat.changes.status === 'error') && (
+                    <ChangesCard changes={chat.changes} onOpen={onViewChanges} />
+                  )}
+                </>
+              ) : undefined
+            }
+            hasEarlier={chat.hasEarlier}
+            {...(chat.earlier !== undefined ? { earlier: chat.earlier } : {})}
+            autoScroll={chat.transcript.length > 0}
+            running={threadStatus(todo) === 'running'}
+            settled={chat.transcriptSettled}
+            threadKey={todo.id}
+            shortEnd={engine !== undefined}
+          />
+        </ReportThreadContext.Provider>
       )}
       {chat.sendError != null && (
         <p

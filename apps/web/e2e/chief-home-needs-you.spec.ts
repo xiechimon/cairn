@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockLive, TASK, THREAD } from './chief-home-mock';
+import { mockLive, THREAD } from './chief-home-mock';
 
 function question(requestId: string, header: string, text: string, options: unknown[]) {
   return {
@@ -134,32 +134,4 @@ test('pending questions show one at a time and the tasks panel rows move between
   await expect(dock.getByTestId('chief-question-text')).toContainText('Who merges it?');
   await rows.filter({ hasText: 'Model · #74' }).click();
   await expect(dock.getByTestId('chief-question-text')).toContainText('Which model?');
-});
-
-test('a decision from a research task links to its report; one from a code task does not', async ({
-  page,
-}) => {
-  const state = {
-    threads: [THREAD],
-    messages: [
-      question('ask-0000000a', 'Format · #9', 'CSV or Parquet?', [
-        { label: 'Parquet', recommended: true },
-        { label: 'CSV' },
-      ]),
-    ],
-    todos: [{ ...TASK, phase: 'needs_input', output: 'info' }],
-  };
-  await mockLive(page, state);
-  await page.goto('/app');
-  const dock = page.getByTestId('chief-question');
-  await expect(dock.getByTestId('chief-question-text')).toContainText('CSV or Parquet?');
-  const link = dock.getByTestId('chief-question-report');
-  await expect(link).toHaveText('看调研报告');
-  await link.click();
-  await expect(page).toHaveURL(/[?&]thread=todo-1(&|$)/);
-
-  state.todos = [{ ...TASK, phase: 'needs_input', output: 'code' }];
-  await page.goto('/app');
-  await expect(dock.getByTestId('chief-question-text')).toContainText('CSV or Parquet?');
-  await expect(dock.getByTestId('chief-question-report')).toHaveCount(0);
 });

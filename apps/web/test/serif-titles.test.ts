@@ -79,7 +79,7 @@ describe('the serif voice follows claude.ai (DESIGN.md Typography)', () => {
     expect(rows).not.toContain('voice-response');
     const transcript = read('detail/transcript.tsx');
     expect(transcript).toMatch(/font-sans[^"]*"\s*data-testid="agent-text"/);
-    expect(transcript).toMatch(/font-sans[^"]*"\s*data-testid="info-report"/);
+    expect(read('chief/research-report.tsx')).toMatch(/data-testid="research-report-doc"\s*className="[^"]*font-sans/);
     expect(transcript).not.toContain('voice-response');
   });
 });

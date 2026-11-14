@@ -1,6 +1,7 @@
 import type { StepPromptOrigin } from '@cairn/shared';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { MessageToolbar } from '../chief/message-toolbar.js';
+import { TranscriptReportCard } from '../chief/research-report.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal, TypingDots } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
@@ -343,13 +344,8 @@ function Row({
     }
     case 'report':
       return (
-        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
-          <div
-            className="chat-text min-w-0 max-w-full font-sans text-ui leading-5 break-words text-(--foreground)"
-            data-testid="info-report"
-          >
-            <ChatMarkdown text={item.markdown} bubbles />
-          </div>
+        <div className={`${AGENT_ROW} ${margin}`} data-row="agent" data-testid="info-report">
+          <TranscriptReportCard content={item.markdown} createdAt={item.createdAt} />
         </div>
       );
     case 'thinking':
