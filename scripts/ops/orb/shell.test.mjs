@@ -1180,7 +1180,7 @@ test('computer image builds from the base with the host mirrorlist read-only and
     assert.match(waitOnline, /^ExecStart=$/m);
     assert.match(
       waitOnline,
-      /^ExecStart=\/usr\/lib\/systemd\/systemd-networkd-wait-online --ipv4 --timeout=60$/m,
+      /^ExecStart=\/usr\/lib\/systemd\/systemd-networkd-wait-online --ipv4 --operational-state=routable --timeout=60$/m,
     );
     assert.match(agent, /^Environment=DISPLAY=:1$/m);
     assert.match(agent, /^Environment=AGENT_BROWSER_EXECUTABLE_PATH=\/usr\/bin\/chromium$/m);

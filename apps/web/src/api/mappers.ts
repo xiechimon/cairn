@@ -834,6 +834,11 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   const running = steps.find(
     (s) => s.status === 'claimed' || s.status === 'pending' || s.status === 'waiting_quota',
   );
+  const liveReply: TranscriptItem | null =
+    liveText.trim() === ''
+      ? null
+      : { kind: 'robot', paragraphs: [{ segments: [{ text: liveText }] }] };
+  if (!running && liveReply !== null) items.push(liveReply);
   if (running && build) {
     if (liveThinking.trim() !== '') {
       const step: WorkStep = {
@@ -846,12 +851,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       if (previous?.kind === 'work') previous.steps.push(step);
       else items.push({ kind: 'work', id: step.id, steps: [step] });
     }
-    if (liveText.trim() !== '') {
-      items.push({
-        kind: 'robot',
-        paragraphs: [{ segments: [{ text: liveText }] }],
-      });
-    }
+    if (liveReply !== null) items.push(liveReply);
     const liveTodo = agentTodo != null && agentTodo.stepId === running.id ? agentTodo : null;
     if (liveTodo !== null && liveTodo.items.length > 0) {
       items.push({ kind: 'agent-todo', items: liveTodo.items });

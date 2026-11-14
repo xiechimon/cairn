@@ -347,7 +347,10 @@ export const message = sqliteTable(
     createdAt: epochMs('createdAt').notNull(),
     actor: text('actor'),
   },
-  (t) => [index('message_createdAt_idx').on(t.createdAt)],
+  (t) => [
+    index('message_createdAt_idx').on(t.createdAt),
+    index('message_conversationId_idx').on(t.conversationId),
+  ],
 );
 
 export const autonomousMergeAdmission = sqliteTable(

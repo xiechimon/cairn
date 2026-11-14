@@ -119,6 +119,13 @@ class GuestLink {
     );
   }
 
+  servesCurrentDirectory(): boolean {
+    if (this.directoryDescriptor === undefined) return true;
+    const current = lstatSync(this.directory, { throwIfNoEntry: false });
+    const opened = fstatSync(this.directoryDescriptor);
+    return current !== undefined && current.dev === opened.dev && current.ino === opened.ino;
+  }
+
   listen(): Promise<void> {
     this.listening ??= this.startListening().catch((error: unknown) => {
       this.listening = undefined;
@@ -679,7 +686,7 @@ export class OrbComputerProvider implements ScopedComputerProviders {
       name,
     );
     let link = this.links.get(scopeKey);
-    if (link && link.directory !== directory) {
+    if (link && (link.directory !== directory || !link.servesCurrentDirectory())) {
       await link.close();
       this.links.delete(scopeKey);
       this.releaseInput(scopeKey);

@@ -365,7 +365,7 @@ export async function runCoordinatorTurn(
         cursor = page.next;
       } while (cursor !== undefined);
     }
-    await mirror.flush(turnEntries);
+    await mirror.flush(turnEntries, stopping !== null);
     if (!mailTurn) await deps.afterMirror?.();
     const ordered = [...turnEntries].sort((a, b) => Number(a.id) - Number(b.id));
     observation = {

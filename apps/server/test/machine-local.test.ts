@@ -183,6 +183,41 @@ describe('PATCH /api/machines/{id} (spec 11 A8/A9: enabledRuntimes write-back)',
     }
   });
 
+  test('Gemini cannot be turned on until its permission requests go through the command gate (#1612)', async () => {
+    const s = bootServer();
+    try {
+      seedLocalMachine(s.db, s.team.id);
+      const id = localRows(s.db, s.team.id)[0]?.id;
+      const on = await req(s.app, 'PATCH', `/api/machines/${id}`, {
+        enabledRuntimes: ['pi', 'gemini'],
+      });
+      expect(on.status).toBe(409);
+      expect(((await on.json()) as { error: string }).error).toMatch(/command gate/);
+      expect(localRows(s.db, s.team.id)[0]?.enabledRuntimes).toEqual(['pi']);
+
+      s.db
+        .update(machineTable)
+        .set({ enabledRuntimes: ['pi', 'gemini'] })
+        .where(eq(machineTable.id, id ?? ''))
+        .run();
+      const keep = await req(s.app, 'PATCH', `/api/machines/${id}`, {
+        enabledRuntimes: ['pi', 'claude-code', 'gemini'],
+      });
+      expect(keep.status).toBe(200);
+      const off = await req(s.app, 'PATCH', `/api/machines/${id}`, {
+        enabledRuntimes: ['pi', 'claude-code'],
+      });
+      expect(off.status).toBe(200);
+      expect(localRows(s.db, s.team.id)[0]?.enabledRuntimes).toEqual(['pi', 'claude-code']);
+      const again = await req(s.app, 'PATCH', `/api/machines/${id}`, {
+        enabledRuntimes: ['pi', 'claude-code', 'gemini'],
+      });
+      expect(again.status).toBe(409);
+    } finally {
+      s.dispose();
+    }
+  });
+
   test('unknown id -> 404 {error}', async () => {
     const s = bootServer();
     try {

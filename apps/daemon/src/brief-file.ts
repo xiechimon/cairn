@@ -5,6 +5,8 @@ import {
   BRIEF_MARKER_END,
   BRIEF_RECONCILE_FILENAMES,
   type BriefBackendId,
+  type BriefChannel,
+  type SessionOpts,
 } from '@cairn/shared';
 
 const CONTEXT_FILENAMES = new Set(BRIEF_RECONCILE_FILENAMES.map((file) => file.toLowerCase()));
@@ -35,4 +37,25 @@ export function composeBrief(opts: {
     }
   }
   return `${BRIEF_MARKER_BEGIN}\n${content.trimEnd()}\n${BRIEF_MARKER_END}\n`;
+}
+
+export function composeSessionBrief(input: {
+  cwd: string;
+  brief: BriefChannel | undefined;
+  sessionOpts: SessionOpts;
+  systemPrompt: string | undefined;
+}): string | null {
+  try {
+    assertNoLegacyBrief(input.cwd);
+    if (input.brief !== undefined) {
+      input.sessionOpts.systemPrompt = composeBrief({
+        cwd: input.cwd,
+        backendId: input.brief.backendId,
+        content: input.brief.composeBody(input.sessionOpts, input.systemPrompt),
+      });
+    }
+    return null;
+  } catch (err) {
+    return `Runtime guidance could not be composed: ${err instanceof Error ? err.message : String(err)}`;
+  }
 }

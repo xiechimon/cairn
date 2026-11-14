@@ -1,4 +1,5 @@
-import { rmSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import type {
   BoundGitCredentials,
   ClaimedStep,
@@ -8,6 +9,7 @@ import type {
 import { LocalRepoUnreachableError } from '@cairn/shared';
 import { createVerificationClone } from './backend/verification-clone.js';
 import { type GitCredentialFallbackOpts, withGitCredentialFallback } from './git.js';
+import type { TranscriptBuffer } from './journal.js';
 import { localRepoUnreachableMessage } from './workspace.js';
 
 export type StepRepo = NonNullable<NonNullable<ClaimedStep['project']>['repo']>;
@@ -105,6 +107,80 @@ export async function prepareVerifyClone(input: VerifyCloneInput): Promise<Verif
   }
 }
 
+export interface StepWorkspaceSetupInput {
+  workspace: WorktreeOps | undefined;
+  claimed: ClaimedStep;
+  repo: StepRepo | null;
+  workspacesRoot: string;
+  credentials: BoundGitCredentials | null;
+  readonly: boolean;
+  refresh: GitCredentialFallbackOpts['refresh'];
+  machineName: string;
+  attachmentVerify: boolean;
+  evidenceDirectory: string | undefined;
+  expectedHeadSha: string | undefined;
+  cleanups: (() => void | Promise<void>)[];
+}
+
+export type StepWorkspaceSetup =
+  | {
+      ws: PreparedWorkspace | null;
+      cwd: string;
+      headAtStart: string | null;
+      stepStartMs: number;
+    }
+  | { error: string };
+
+export async function setUpStepWorkspace(
+  input: StepWorkspaceSetupInput,
+): Promise<StepWorkspaceSetup> {
+  const { workspace, repo } = input;
+  let ws: PreparedWorkspace | null = null;
+  if (repo !== null) {
+    if (!workspace) return { error: 'workspace ops unavailable for repo-bound step' };
+    const prepared = await prepareStepWorkspace({
+      workspace,
+      claimed: input.claimed,
+      repo,
+      workspacesRoot: input.workspacesRoot,
+      credentials: input.credentials,
+      readonly: input.readonly,
+      refresh: input.refresh,
+      machineName: input.machineName,
+    });
+    if ('error' in prepared) return prepared;
+    ws = prepared.ws;
+  }
+  let cwd = ws?.cwd ?? join(input.workspacesRoot, input.claimed.conversationId);
+  if (!ws) mkdirSync(cwd, { recursive: true });
+
+  const stepStartMs = Date.now();
+  let headAtStart: string | null = null;
+  if (ws !== null && ws.readonly !== true && workspace) {
+    try {
+      headAtStart = await workspace.headCommit(ws.cwd);
+    } catch {
+      headAtStart = null;
+    }
+  }
+
+  if (input.attachmentVerify) {
+    const verifyClone = await prepareVerifyClone({
+      workspace,
+      ws,
+      headAtStart,
+      evidenceDirectory: input.evidenceDirectory,
+      expectedHeadSha: input.expectedHeadSha,
+      cleanups: input.cleanups,
+    });
+    if ('error' in verifyClone) return verifyClone;
+    ws = verifyClone.ws;
+    cwd = verifyClone.cwd;
+    headAtStart = verifyClone.headAtStart;
+  }
+  return { ws, cwd, headAtStart, stepStartMs };
+}
+
 export async function resetFreshSessionWorkspace(input: {
   workspace: Pick<WorktreeOps, 'restoreCheckpoint'>;
   cwd: string;
@@ -118,4 +194,38 @@ export async function resetFreshSessionWorkspace(input: {
   } catch (err) {
     return err instanceof Error ? err.message : String(err);
   }
+}
+
+export async function resetReusedWorkspaceForFreshSession(input: {
+  workspace: Pick<WorktreeOps, 'restoreCheckpoint'> | undefined;
+  ws: PreparedWorkspace | null;
+  claimed: ClaimedStep;
+  headAtStart: string | null;
+  skip: boolean;
+  planFile: string;
+  stepId: string;
+  transcript: Pick<TranscriptBuffer, 'upsert'>;
+  now: () => number;
+  log: { workspace: (line: string) => void; step: (line: string) => void };
+}): Promise<void> {
+  const { ws, workspace, headAtStart } = input;
+  if (ws === null || !workspace || headAtStart === null) return;
+  if (input.skip || input.claimed.session.action !== 'new' || !ws.reused) return;
+  const reason = await resetFreshSessionWorkspace({
+    workspace,
+    cwd: ws.cwd,
+    headAtStart,
+    planFile: input.planFile,
+  });
+  if (reason === null) {
+    input.log.workspace('返工新会话：工作区回退到分支头');
+    return;
+  }
+  input.log.step(`fresh-session worktree reset failed: ${reason}`);
+  input.transcript.upsert({
+    id: `fresh-reset-${input.stepId}`,
+    role: 'system',
+    content: `新会话轮未能回退工作区到分支头（${reason}）——上一轮未提交的改动可能带入本轮`,
+    createdAt: input.now(),
+  });
 }

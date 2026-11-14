@@ -8,31 +8,20 @@ import type {
   CommitIdentity,
   DeliveredImage,
   MachineHeartbeatBody,
-  PreparedWorkspace,
   ProviderConfig,
-  SessionOpts,
   SkillInjectionFacts,
   WorkspaceHookNoteData,
   WorktreeOps,
 } from '@cairn/shared';
-import {
-  classifyStepFailure,
-  isBuildStepKind,
-  localCommitIdentity,
-  noVisionSignalOf,
-  PLAN_FILE_NAME,
-  stepTakesSecrets,
-  transcriptPromptRowId,
-} from '@cairn/shared';
+import { classifyStepFailure, isBuildStepKind, PLAN_FILE_NAME } from '@cairn/shared';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { createActivityTracker } from './activity.js';
 import { AgentTodoReporter } from './agent-todo.js';
 import { AskChannel } from './ask-channel.js';
-import { SessionNotResumableError } from './backend/errors.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
 import { piWorktreeSkillDirs } from './backend/skills.js';
-import { assertNoLegacyBrief, composeBrief } from './brief-file.js';
+import { composeSessionBrief } from './brief-file.js';
 import type { ClaudeCodeAuthProbe } from './claude-code-auth.js';
 import { claudeQuotaTrip, forwardClaudeRateLimit } from './claude-quota-trip.js';
 import {
@@ -46,13 +35,11 @@ import type { DaemonLogger } from './log.js';
 import { type MachineApi, MachineApiError } from './machine-client.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
-import { resolveDeliveredPrompt, resolveStepImagesOrRaw } from './step-attachments.js';
+import { resolveDeliveredPrompt } from './step-attachments.js';
 import { deliverStepOutcome } from './step-deliver.js';
 import { assembleStepEnv } from './step-env.js';
 import { reportStepProvenance } from './step-executor-record.js';
-import { stepGitRunner } from './step-git-tools.js';
 import { runLocalMergeStep } from './step-local-merge.js';
-import { assembleStepLocalTools } from './step-local-tools.js';
 import {
   consumeStepPassEvent,
   newStepPassState,
@@ -60,26 +47,19 @@ import {
   type StepPassEventContext,
 } from './step-pass-events.js';
 import { resolveStepPassOutcome, rewindAfterStep } from './step-pass-outcome.js';
+import { planStepPassRetry } from './step-pass-retry.js';
 import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
-import {
-  composeWorkerSystemPrompt,
-  freshSessionPrompt,
-  planStepPrompt,
-  resumeMissNote,
-  taskMetaOpts,
-} from './step-prompt.js';
+import { composeWorkerSystemPrompt, planStepPrompt, taskMetaOpts } from './step-prompt.js';
 import { resolveStepProvider } from './step-provider.js';
-import { stepRemoteToolExecutor } from './step-remote-tools.js';
+import { StepSessionOpener } from './step-session-opener.js';
+import { composeStepSessionOpts } from './step-session-opts.js';
 import { settleStepGit } from './step-settle-git.js';
-import { sessionInjectedSkills, stepMcpEndpoints } from './step-skill-tool.js';
+import { stepMcpEndpoints } from './step-skill-tool.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
+import { prepareStepTooling } from './step-tooling.js';
 import { seedStepTranscript } from './step-transcript-seed.js';
 import { StepTranscriptStream } from './step-transcript-stream.js';
-import {
-  prepareStepWorkspace,
-  prepareVerifyClone,
-  resetFreshSessionWorkspace,
-} from './step-workspace.js';
+import { resetReusedWorkspaceForFreshSession, setUpStepWorkspace } from './step-workspace.js';
 import {
   resolveStreamLimits,
   STREAM_DURATION_CAP_DEFAULT_MS,
@@ -88,7 +68,6 @@ import {
   STREAM_IDLE_ENV,
   StreamWatchdog,
 } from './stream-watchdog.js';
-import { materializeTeamSkills } from './team-skills.js';
 
 export interface RunStepDeps {
   client: MachineApi;
@@ -350,13 +329,12 @@ async function runClaimedStep(
   const modelKey = `${provider?.providerId ?? agent.provider}/${agent.modelId}`;
   logger.raw(`using model ${modelKey}`);
 
-  let imageSupport = isChief
+  const imageSupport = isChief
     ? null
     : await probeModelImageSupport(backend, provider, agent.modelId, (message) =>
         logger.step(message),
       );
   deps.stepImageSupport?.set(stepId, imageSupport);
-  let activePrompt = prompt;
   let deliveryPrompt = prompt;
   let promptImages: DeliveredImage[] | undefined;
   let skippedNoVisionCount = 0;
@@ -380,63 +358,29 @@ async function runClaimedStep(
   }
 
   logger.workspace('准备工作区...');
-  let ws: PreparedWorkspace | null = null;
   const checkout = isReview && reviewGate === 'review';
   const repo = isChief || (isReview && !checkout) ? null : (claimed.project?.repo ?? null);
-  if (repo !== null) {
-    if (!deps.workspace) {
-      clearCredentials(creds);
-      await failStep(deps, heartbeat, stepId, 'workspace ops unavailable for repo-bound step');
-      return;
-    }
-    const prepared = await prepareStepWorkspace({
-      workspace: deps.workspace,
-      claimed,
-      repo,
-      workspacesRoot: deps.workspacesDir,
-      credentials: creds.git,
-      readonly: readonlyWorkspace,
-      refresh: refreshGit,
-      machineName: deps.machineName ?? hostname(),
-    });
-    if ('error' in prepared) {
-      clearCredentials(creds);
-      await failStep(deps, heartbeat, stepId, prepared.error);
-      return;
-    }
-    ws = prepared.ws;
+  const setup = await setUpStepWorkspace({
+    workspace: deps.workspace,
+    claimed,
+    repo,
+    workspacesRoot: deps.workspacesDir,
+    credentials: creds.git,
+    readonly: readonlyWorkspace,
+    refresh: refreshGit,
+    machineName: deps.machineName ?? hostname(),
+    attachmentVerify,
+    evidenceDirectory: verifyEvidenceDirectory,
+    expectedHeadSha: verifyMeta?.expectedHeadSha,
+    cleanups: stepCleanups,
+  });
+  if ('error' in setup) {
+    clearCredentials(creds);
+    await failStep(deps, heartbeat, stepId, setup.error);
+    return;
   }
-  let cwd = ws?.cwd ?? join(deps.workspacesDir, convId);
-  if (!ws) mkdirSync(cwd, { recursive: true });
-
-  const stepStartMs = Date.now();
-  let headAtStart: string | null = null;
-  if (ws !== null && ws.readonly !== true && deps.workspace) {
-    try {
-      headAtStart = await deps.workspace.headCommit(ws.cwd);
-    } catch {
-      headAtStart = null;
-    }
-  }
-
+  const { ws, cwd, headAtStart, stepStartMs } = setup;
   const uploadedVerifyEvidence = new Set<string>();
-  if (attachmentVerify) {
-    const verifyClone = await prepareVerifyClone({
-      workspace: deps.workspace,
-      ws,
-      headAtStart,
-      evidenceDirectory: verifyEvidenceDirectory,
-      expectedHeadSha: verifyMeta?.expectedHeadSha,
-      cleanups: stepCleanups,
-    });
-    if ('error' in verifyClone) {
-      await failStep(deps, heartbeat, stepId, verifyClone.error);
-      return;
-    }
-    ws = verifyClone.ws;
-    cwd = verifyClone.cwd;
-    headAtStart = verifyClone.headAtStart;
-  }
 
   const systemPrompt =
     isChief && claimed.chief
@@ -449,68 +393,41 @@ async function runClaimedStep(
   const remoteTools = claimed.remoteTools;
   const claimedMcp = claimed.mcpServers;
   const mcpEndpoints = stepMcpEndpoints(deps.mcpConfigPath, claimedMcp, (line) => logger.mcp(line));
-  let teamSkillsDir: string | null = null;
-  try {
-    const manifest = await client.skillsManifest(stepId);
-    teamSkillsDir = await materializeTeamSkills({
-      cacheRoot: deps.paths.teamSkillsCacheDir,
-      manifest,
-      fetchFile: (dirName, path) => client.skillFile(stepId, dirName, path),
-      log: (msg) => logger.skills(msg),
-    });
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    logger.skills(`team-skills-failed: ${reason}`);
-    await failStep(deps, heartbeat, stepId, `team skills distribution failed: ${reason}`);
-    return;
-  }
   const isPi = backend.brief?.backendId === 'pi';
   const appIdentity: CommitIdentity | null = tokenRes.commitIdentity ?? null;
-  const stepIdentity: CommitIdentity =
-    appIdentity ?? localCommitIdentity(claimed.agent?.displayName ?? 'cairn-agent');
-  const withStepGit = stepGitRunner({
-    credential: creds.git,
+  const tooling = await prepareStepTooling({
+    client,
+    claimed,
+    agent,
+    stepId,
+    teamSkillsCacheDir: deps.paths.teamSkillsCacheDir,
+    skillsDir: deps.skillsDir,
+    home: deps.paths.home,
+    isPi,
+    isChief,
+    isReview,
+    metered: opts.env?.CAIRN_ORB !== '1',
+    creds,
     appCredential,
-    refresh: refreshGit,
-    allowMachineFallback: repo?.kind === 'github',
-    log: (line) => logger.step(line),
+    refreshGit,
+    commitIdentity: appIdentity,
+    repo,
+    ws,
+    cwd,
+    redact,
+    logger,
   });
-  const injectedForSession = sessionInjectedSkills(agent);
-  const skillsRootDir = deps.skillsDir;
-  const localTools = assembleStepLocalTools({
-    web: {
-      enabled: isPi && !isChief && !isReview && claimed.remoteToolsOnly !== true,
-      metered: opts.env?.CAIRN_ORB !== '1',
-      creds,
-      stepId,
-      home: deps.paths.home,
-      log: (line) => logger.step(line),
-    },
-    secrets: stepTakesSecrets(claimed.step.kind)
-      ? { stepId, agentId: agent?.id ?? null, onAudit: (line) => logger.step(line) }
-      : null,
-    createTag: {
-      localTools: claimed.localTools,
-      repoDir: ws?.cwd ?? null,
-      credential: creds.git,
-      identity: stepIdentity,
-      runGit: withStepGit,
-      redact,
-    },
-    skillLoad:
-      isPi && skillsRootDir !== undefined
-        ? {
-            skillsDir: skillsRootDir,
-            home: deps.paths.home,
-            cwd,
-            isChief,
-            skillsAllowlist: agent.skillsAllowlist,
-            injectedSkills: injectedForSession,
-            teamSkillsDir,
-            log: (msg) => logger.skills(msg),
-          }
-        : null,
-  });
+  if ('error' in tooling) {
+    await failStep(deps, heartbeat, stepId, tooling.error);
+    return;
+  }
+  const {
+    teamSkillsDir,
+    stepIdentity,
+    withStepGit,
+    injectedSkills: injectedForSession,
+    localTools,
+  } = tooling;
   const localToolDefs = localTools.tools;
   if (deliveryPrompt !== null) deliveryPrompt = localTools.dispatch(deliveryPrompt);
   const askChannel = new AskChannel({ client, stepId, log: (message) => logger.step(message) });
@@ -542,49 +459,38 @@ async function runClaimedStep(
       runtimeId === 'claude-code' ? creds.claudeSubscriptionToken : undefined,
   });
   stepCleanups.push(dropGitCredentials);
-  const sessionOpts: SessionOpts = {
+  const sessionOpts = composeStepSessionOpts({
     provider,
     modelId: agent.modelId,
-    ...(agent.thinkingLevel ? { thinkingLevel: agent.thinkingLevel } : {}),
-    ...(systemPrompt ? { systemPrompt } : {}),
+    thinkingLevel: agent.thinkingLevel,
+    systemPrompt,
     cwd,
-    ...(deliveryPrompt !== null ? { prompt: deliveryPrompt } : {}),
-    ...(promptImages !== undefined ? { promptImages } : {}),
-    ...(localToolDefs.length > 0 ? { localTools: localToolDefs } : {}),
-    ...(remoteTools && remoteTools.length > 0
-      ? {
-          remoteTools,
-          executeRemoteTool: stepRemoteToolExecutor({
-            client,
-            stepId,
-            cwd,
-            remoteTools,
-            askChannel,
-            attachFiles: !isChief,
-            verifyEvidence: attachmentVerify
-              ? { directory: verifyEvidenceDirectory, uploaded: uploadedVerifyEvidence }
-              : null,
-          }),
-        }
-      : {}),
-    ...(claimedMcp !== undefined ? { mcpServers: mcpEndpoints } : {}),
-    ...(isChief || agent.skillsAllowlist == null ? {} : { skillsAllowlist: agent.skillsAllowlist }),
-    ...(isChief || injectedForSession === undefined ? {} : { injectedSkills: injectedForSession }),
+    prompt: deliveryPrompt,
+    promptImages,
+    localTools: localToolDefs,
+    remoteTools,
+    remoteExecutor: {
+      client,
+      stepId,
+      askChannel,
+      attachFiles: !isChief,
+      verifyEvidence: attachmentVerify
+        ? { directory: verifyEvidenceDirectory, uploaded: uploadedVerifyEvidence }
+        : null,
+    },
+    mcpServers: claimedMcp !== undefined ? mcpEndpoints : null,
+    skillsAllowlist: agent.skillsAllowlist,
+    injectedSkills: injectedForSession,
     onSkillsResolved: (names) => {
       skillInjection.facts = names;
     },
-    ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
-    ...(isReview ? { readOnly: true } : {}),
-    ...(isChief || isReview ? { lockedDown: true } : {}),
-    ...(claimed.remoteToolsOnly === true ? { remoteToolsOnly: true } : {}),
-    ...(telemetry !== undefined ? { telemetry } : {}),
-    ...(Object.keys(stepEnv).length > 0 ? { env: stepEnv } : {}),
-  };
-
-  let continueId =
-    claimed.session.action === 'continue'
-      ? (opts.resume?.sessionId ?? claimed.session.sessionId)
-      : null;
+    teamSkillsDir,
+    isChief,
+    isReview,
+    remoteToolsOnly: claimed.remoteToolsOnly === true,
+    telemetry,
+    env: stepEnv,
+  });
 
   const transcript = guardCredentialOutputs(
     new TranscriptBuffer(deps.paths.outboxDir, stepId),
@@ -607,47 +513,28 @@ async function runClaimedStep(
     redact,
   });
 
-  if (
-    ws !== null &&
-    deps.workspace &&
-    claimed.session.action === 'new' &&
-    !isReview &&
-    !attachmentVerify &&
-    ws.reused &&
-    headAtStart !== null
-  ) {
-    const reason = await resetFreshSessionWorkspace({
-      workspace: deps.workspace,
-      cwd: ws.cwd,
-      headAtStart,
-      planFile: join(deps.paths.plansDir, convId, PLAN_FILE_NAME),
-    });
-    if (reason === null) {
-      logger.workspace('返工新会话：工作区回退到分支头');
-    } else {
-      logger.step(`fresh-session worktree reset failed: ${reason}`);
-      transcript.upsert({
-        id: `fresh-reset-${stepId}`,
-        role: 'system',
-        content: `新会话轮未能回退工作区到分支头（${reason}）——上一轮未提交的改动可能带入本轮`,
-        createdAt: now(),
-      });
-    }
-  }
+  await resetReusedWorkspaceForFreshSession({
+    workspace: deps.workspace,
+    ws,
+    claimed,
+    headAtStart,
+    skip: isReview || attachmentVerify,
+    planFile: join(deps.paths.plansDir, convId, PLAN_FILE_NAME),
+    stepId,
+    transcript,
+    now,
+    log: { workspace: (line) => logger.workspace(line), step: (line) => logger.step(line) },
+  });
 
-  try {
-    assertNoLegacyBrief(cwd);
-    if (backend.brief !== undefined) {
-      sessionOpts.systemPrompt = composeBrief({
-        cwd,
-        backendId: backend.brief.backendId,
-        content: backend.brief.composeBody(sessionOpts, systemPrompt),
-      });
-    }
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
+  const briefError = composeSessionBrief({
+    cwd,
+    brief: backend.brief,
+    sessionOpts,
+    systemPrompt,
+  });
+  if (briefError !== null) {
     clearCredentials(creds);
-    await failStep(deps, heartbeat, stepId, `Runtime guidance could not be composed: ${reason}`);
+    await failStep(deps, heartbeat, stepId, briefError);
     return;
   }
 
@@ -695,50 +582,36 @@ async function runClaimedStep(
     plansDir: deps.paths.plansDir,
     convId,
   };
-  let noVisionDegraded = false;
-  const retryWithoutImages = async (failureText: string): Promise<boolean> => {
-    if (
-      noVisionDegraded ||
+  const opener = new StepSessionOpener({
+    backend,
+    sessionOpts,
+    claimed,
+    stepId,
+    isChief,
+    resume: opts.resume,
+    prompt,
+    promptImages,
+    imageSupport,
+    freshPromptPaths,
+    modelKey,
+    client,
+    journal,
+    transcript,
+    logger,
+    stepAttachmentsDir: deps.paths.stepAttachmentsDir,
+    now,
+    forgetHandle: () => deps.sessionHandles?.delete(stepId),
+    rememberImageSupport: (support) => deps.stepImageSupport?.set(stepId, support),
+  });
+  const retryWithoutImages = (failureText: string): Promise<boolean> =>
+    opener.retryWithoutImages(
+      failureText,
       passState.sawProgress ||
-      priorPassMadeProgress ||
-      watchdog.trippedArm !== null ||
-      stop.request !== null ||
-      passState.quotaTrip !== null ||
-      promptImages === undefined ||
-      prompt === null ||
-      !noVisionSignalOf(failureText)
-    ) {
-      return false;
-    }
-    noVisionDegraded = true;
-    imageSupport = false;
-    backend.rememberNoVision?.(sessionOpts.provider, sessionOpts.modelId);
-    deps.stepImageSupport?.set(stepId, false);
-    const retryPrompt =
-      continueId === null ? activePrompt : freshSessionPrompt(claimed, freshPromptPaths);
-    const degraded = await resolveStepImagesOrRaw({
-      text: retryPrompt,
-      stepId,
-      client,
-      materializeDir: deps.paths.stepAttachmentsDir,
-      log: (line) => logger.step(line),
-      imageSupport: false,
-    });
-    sessionOpts.prompt = degraded.text;
-    continueId = null;
-    journal.update(stepId, { prompt: retryPrompt, sessionAction: 'new', sessionId: null });
-    delete sessionOpts.promptImages;
-    promptImages = undefined;
-    logger.step(`image degrade retry: ${modelKey} rejected image input — retrying without images`);
-    transcript.upsert({
-      id: `image-skip-${stepId}`,
-      role: 'system',
-      content: `图片未被模型读取：模型 ${modelKey} 拒绝了图片输入（${failureText.slice(0, 200)}），已去掉图片重试本步骤`,
-      createdAt: now(),
-    });
-    deps.sessionHandles?.delete(stepId);
-    return true;
-  };
+        priorPassMadeProgress ||
+        watchdog.trippedArm !== null ||
+        stop.request !== null ||
+        passState.quotaTrip !== null,
+    );
   const streamLimits = resolveStreamLimits({
     ...(opts.streamTimeouts !== undefined ? { timeouts: opts.streamTimeouts } : {}),
     ...(opts.streamDurationCapMs !== undefined ? { durationCapMs: opts.streamDurationCapMs } : {}),
@@ -774,71 +647,6 @@ async function runClaimedStep(
     passState.quotaTrip = trip;
     void handle?.stop();
   };
-  const openSession = (): Promise<AgentSessionHandle> => {
-    if (continueId === null) return backend.createSession(sessionOpts);
-    return backend.continueSession(continueId, sessionOpts).catch(async (err: unknown) => {
-      if (!(err instanceof SessionNotResumableError)) throw err;
-      if (opts.resume?.prompt === null) {
-        throw new Error(
-          `recover step ${stepId}: continue session ${continueId} unavailable and no journal prompt to resend`,
-        );
-      }
-      const missed = continueId ?? '';
-      const note = resumeMissNote(missed, claimed);
-      logger.step(
-        `continue session unavailable (${missed}) — falling back to new session — ${note}`,
-      );
-      transcript.upsert({
-        id: `resume-miss-${stepId}`,
-        role: 'system',
-        content: note,
-        createdAt: now(),
-      });
-      if (!opts.resume) {
-        const fresh = freshSessionPrompt(claimed, freshPromptPaths);
-        journal.update(stepId, {
-          prompt: fresh,
-          sessionAction: 'new',
-          sessionId: null,
-        });
-        activePrompt = fresh;
-        let delivery = fresh;
-        let images: DeliveredImage[] | undefined;
-        if (!isChief) {
-          const resolved = await resolveDeliveredPrompt({
-            text: fresh,
-            stepId,
-            client,
-            materializeDir: deps.paths.stepAttachmentsDir,
-            log: (line) => logger.step(line),
-            imageSupport,
-          });
-          delivery = resolved.text;
-          images = resolved.images;
-          if (resolved.skippedNoVision > 0) {
-            transcript.upsert({
-              id: `image-skip-${stepId}`,
-              role: 'system',
-              content: `图片未被模型读取：模型 ${modelKey} 不支持图片输入，${resolved.skippedNoVision} 张图片未下载（步骤继续执行，请以文字描述或改用支持图片的模型）`,
-              createdAt: now(),
-            });
-          }
-        }
-        sessionOpts.prompt = delivery;
-        promptImages = images;
-        if (images !== undefined) sessionOpts.promptImages = images;
-        else delete sessionOpts.promptImages;
-        transcript.upsert({
-          id: transcriptPromptRowId(stepId),
-          role: 'user',
-          content: fresh,
-          createdAt: now(),
-        });
-      }
-      continueId = null;
-      return backend.createSession(sessionOpts);
-    });
-  };
   for (let pass = 0; ; pass++) {
     if (pass > 0) {
       priorPassMadeProgress ||= passState.sawProgress;
@@ -849,7 +657,7 @@ async function runClaimedStep(
     if (stop.request !== null) break;
     activity.setPhase('starting', pass > 0 ? { resetLive: true } : undefined);
     try {
-      handle = await openSession();
+      handle = await opener.open();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (await retryWithoutImages(message)) continue;
@@ -858,12 +666,12 @@ async function runClaimedStep(
       await failStep(deps, heartbeat, stepId, message);
       return;
     }
-    logger.raw(continueId !== null ? `continue session ${convId}` : `new session ${convId}`);
-    if (!isChief && imageSupport === null) {
+    logger.raw(opener.continueId !== null ? `continue session ${convId}` : `new session ${convId}`);
+    if (!isChief && opener.imageSupport === null) {
       try {
-        imageSupport =
-          (await backend.modelSupportsImages?.(sessionOpts.provider, sessionOpts.modelId)) ?? null;
-        deps.stepImageSupport?.set(stepId, imageSupport);
+        opener.setImageSupport(
+          (await backend.modelSupportsImages?.(sessionOpts.provider, sessionOpts.modelId)) ?? null,
+        );
       } catch (err) {
         logger.step(
           `session image support probe failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -878,7 +686,7 @@ async function runClaimedStep(
       modelKey,
       provider,
       handle,
-      promptImages,
+      promptImages: opener.promptImages,
       retryStormMax,
       now,
       watchdog,
@@ -915,59 +723,44 @@ async function runClaimedStep(
     stop.detach();
     if (classifyStepFailure(passState.lastModelError ?? '') === 'model_unavailable')
       passState.lastError = passState.lastModelError;
-    {
-      const failureText = passState.lastModelError ?? passState.lastError;
-      const stopPending = stop.request !== null;
-      if (
-        failureText !== null &&
-        passState.lastError !== null &&
-        !stopPending &&
-        classifyStepFailure(failureText) === 'network' &&
-        networkRetries < networkRetryDelays.length
-      ) {
-        const delay = networkRetryDelays[networkRetries] ?? 0;
-        networkRetries += 1;
+    const retry = planStepPassRetry({
+      pass,
+      state: passState,
+      watchdogTripped: watchdog.trippedArm !== null,
+      stopPending: stop.request !== null,
+      networkRetries,
+      networkRetryDelays,
+    });
+    if (retry.kind === 'finish') break;
+    if (retry.kind === 'network') {
+      networkRetries += 1;
+      logger.step(
+        `provider network retry ${networkRetries}: waiting ${retry.delayMs}ms before ${networkRetries === networkRetryDelays.length ? 'final' : 'next'} attempt`,
+      );
+      await new Promise((r) => setTimeout(r, retry.delayMs));
+      opener.continueId = handle.sessionId;
+      deps.sessionHandles?.delete(stepId);
+      continue;
+    }
+    if (retry.kind === 'compat') {
+      const amended: ProviderConfig | null =
+        backend.adaptProviderCompat?.(provider, retry.failureText) ?? null;
+      if (amended !== null) {
+        provider = amended;
+        sessionOpts.provider = amended;
         logger.step(
-          `provider network retry ${networkRetries}: waiting ${delay}ms before ${networkRetries === networkRetryDelays.length ? 'final' : 'next'} attempt`,
+          `protocol fallback: provider ${amended.providerId} compat adapted (${JSON.stringify(
+            amended.compat,
+          )}), retrying session once`,
         );
-        await new Promise((r) => setTimeout(r, delay));
-        continueId = handle.sessionId;
         deps.sessionHandles?.delete(stepId);
         continue;
       }
     }
-    if (
-      classifyStepFailure(passState.lastModelError ?? passState.lastError ?? '') ===
-      'model_unavailable'
-    )
-      break;
-    if (pass === 0 && !passState.sawProgress && passState.quotaTrip === null) {
-      const failureText = passState.lastModelError ?? passState.lastError;
-      if (
-        failureText !== null &&
-        (passState.lastError !== null ||
-          (watchdog.trippedArm !== null && passState.lastModelError !== null) ||
-          (passState.retryStorm && passState.lastModelError !== null))
-      ) {
-        const amended: ProviderConfig | null =
-          backend.adaptProviderCompat?.(provider, failureText) ?? null;
-        if (amended !== null) {
-          provider = amended;
-          sessionOpts.provider = amended;
-          logger.step(
-            `protocol fallback: provider ${amended.providerId} compat adapted (${JSON.stringify(
-              amended.compat,
-            )}), retrying session once`,
-          );
-          deps.sessionHandles?.delete(stepId);
-          continue;
-        }
-      }
-    }
-    const imageFailure = passState.lastModelError ?? passState.lastError;
-    if (imageFailure !== null && (await retryWithoutImages(imageFailure))) continue;
+    if (await retryWithoutImages(retry.failureText)) continue;
     break;
   }
+  const continueId = opener.continueId;
   let { usage } = passState;
   const { sawChangeTool, sawDone } = passState;
   deps.sessionHandles?.delete(stepId);

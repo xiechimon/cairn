@@ -107,6 +107,25 @@ describe('mapTranscript quiescent live tail (#471)', () => {
     expect(rows[0]?.seconds).toBeUndefined();
   });
 
+  test.each(['done', 'stopped', 'failed'] as const)(
+    'F9b: a %s step keeps the streamed reply until the stored row loads',
+    (status) => {
+      const items = mapTranscript({
+        messages: [],
+        steps: [step(status)],
+        plans: [],
+        build: BUILD,
+        todo: todo(9, 'review'),
+        machineName: null,
+        userName: 'Xmon Dai',
+        liveText: '最终结论',
+      });
+      const robots = items.filter((i) => i.kind === 'robot');
+      expect(robots).toEqual([{ kind: 'robot', paragraphs: [{ segments: [{ text: '最终结论' }] }] }]);
+      expect(streamingRows(items)).toHaveLength(0);
+    },
+  );
+
   test('F10: phases past building hang no live tail', () => {
     for (const phase of ['todo', 'queued', 'planning', 'confirm', 'review', 'done', 'failed'] as const) {
       const items = render({ todo: todo(9, phase), steps: [step('done')] });
