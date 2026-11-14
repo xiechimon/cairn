@@ -596,10 +596,11 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     models.useProvider(summaryBind.config, summaryBind.resolveKey);
     let summarize = null as ReturnType<typeof summarizerFor> | null;
     try {
-      summarize = summarizerFor(models.models, {
-        provider: providers.summary.provider,
-        modelId: providers.summary.modelId,
-      });
+      summarize = summarizerFor(
+        models.models,
+        { provider: providers.summary.provider, modelId: providers.summary.modelId },
+        { threadId, stage: 'seed-summary' },
+      );
     } catch (error) {
       reportCompactionFailure({ threadId }, 'summary-model', error);
     }
