@@ -1,7 +1,6 @@
 import type { Message, ToolResultMessage } from '@earendil-works/pi-ai';
 import { describe, expect, it } from 'vitest';
 import {
-  COLD_CACHE_MISS_MIN_TOKENS,
   COLD_RECENT_EXCHANGES,
   coldWindowStartFromRows,
   contextResumeOf,
@@ -74,93 +73,26 @@ const pureToolCall = (
 });
 
 describe('isColdResume', () => {
-  it('is warm when last turn is fresh with cache hits', () => {
-    expect(
-      isColdResume({
-        now: 10_000,
-        retentionMs: SHORT_RETENTION_MS,
-        lastUsage: {
-          createdAt: 9_000,
-          cacheRead: 12_000,
-          input: 100,
-          contextTokens: 12_100,
-          model: 'openai/gpt',
-        },
-      }),
-    ).toBe(false);
-  });
+  const lastUsage = {
+    createdAt: 0,
+    cacheRead: 0,
+    input: 20_000,
+    contextTokens: 20_100,
+    model: 'openai/gpt',
+  };
 
-  it('is cold after the retention TTL', () => {
-    expect(
-      isColdResume({
-        now: SHORT_RETENTION_MS + 5_000,
-        retentionMs: SHORT_RETENTION_MS,
-        lastUsage: {
-          createdAt: 0,
-          cacheRead: 20_000,
-          input: 100,
-          contextTokens: 20_100,
-          model: 'openai/gpt',
-        },
-      }),
-    ).toBe(true);
-  });
-
-  it('is cold on a large cache miss inside the TTL', () => {
-    expect(
-      isColdResume({
-        now: 1_000,
-        retentionMs: SHORT_RETENTION_MS,
-        lastUsage: {
-          createdAt: 0,
-          cacheRead: 0,
-          input: COLD_CACHE_MISS_MIN_TOKENS,
-          contextTokens: COLD_CACHE_MISS_MIN_TOKENS,
-          model: 'anthropic/claude',
-        },
-      }),
-    ).toBe(true);
+  it('stays warm after the cache retention window so idle time never drops the conversation', () => {
+    expect(isColdResume({ lastUsage, activeModel: 'openai/gpt' })).toBe(false);
   });
 
   it('ignores empty first turns', () => {
-    expect(
-      isColdResume({
-        now: 1_000,
-        retentionMs: SHORT_RETENTION_MS,
-        lastUsage: null,
-      }),
-    ).toBe(false);
+    expect(isColdResume({ lastUsage: null, activeModel: 'anthropic/claude' })).toBe(false);
   });
 
-  it('is cold when the active router model differs from the last usage model', () => {
-    expect(
-      isColdResume({
-        now: 1_000,
-        retentionMs: SHORT_RETENTION_MS,
-        activeModel: 'anthropic/claude',
-        lastUsage: {
-          createdAt: 900,
-          cacheRead: 20_000,
-          input: 100,
-          contextTokens: 20_100,
-          model: 'openai/gpt',
-        },
-      }),
-    ).toBe(true);
-    expect(
-      isColdResume({
-        now: 1_000,
-        retentionMs: SHORT_RETENTION_MS,
-        activeModel: 'openai/gpt',
-        lastUsage: {
-          createdAt: 900,
-          cacheRead: 20_000,
-          input: 100,
-          contextTokens: 20_100,
-          model: 'openai/gpt',
-        },
-      }),
-    ).toBe(false);
+  it('is cold only when the active router model differs from the last usage model', () => {
+    expect(isColdResume({ lastUsage, activeModel: 'anthropic/claude' })).toBe(true);
+    expect(isColdResume({ lastUsage, activeModel: 'openai/gpt' })).toBe(false);
+    expect(isColdResume({ lastUsage, activeModel: '' })).toBe(false);
   });
 });
 
@@ -435,7 +367,22 @@ describe('contextResumeOf', () => {
         lastUsage: {
           createdAt: 0,
           cacheRead: 0,
-          input: COLD_CACHE_MISS_MIN_TOKENS,
+          input: 4_000,
+          contextTokens: 20_000,
+          model: 'anthropic/claude',
+        },
+        lastColdSlimAt: null,
+      }),
+    ).toBe('warm');
+    expect(
+      contextResumeOf({
+        now: 1_000,
+        retentionMs: SHORT_RETENTION_MS,
+        activeModel: 'openai/gpt',
+        lastUsage: {
+          createdAt: 0,
+          cacheRead: 0,
+          input: 4_000,
           contextTokens: 20_000,
           model: 'anthropic/claude',
         },
@@ -449,7 +396,7 @@ describe('contextResumeOf', () => {
         lastUsage: {
           createdAt: 0,
           cacheRead: 0,
-          input: COLD_CACHE_MISS_MIN_TOKENS,
+          input: 4_000,
           contextTokens: 20_000,
           model: 'anthropic/claude',
         },
@@ -501,7 +448,7 @@ describe('contextResumeOf', () => {
         lastUsage: {
           createdAt: slimAt - 1,
           cacheRead: 0,
-          input: COLD_CACHE_MISS_MIN_TOKENS,
+          input: 4_000,
           contextTokens: 20_000,
           model: 'anthropic/claude',
         },
@@ -540,7 +487,7 @@ describe('contextResumeOf', () => {
         lastUsage: {
           createdAt: slimAt - 1,
           cacheRead: 0,
-          input: COLD_CACHE_MISS_MIN_TOKENS,
+          input: 4_000,
           contextTokens: 20_000,
           model: 'stub-gw/model-b',
         },
@@ -643,19 +590,6 @@ describe('idle → miss → slim', () => {
     fat.push(user('[wake:timer] stale wake noise'));
     fat.push(user('what did we leave open?'));
     const before = JSON.stringify(fat).length;
-    expect(
-      isColdResume({
-        now: SHORT_RETENTION_MS + 1,
-        retentionMs: SHORT_RETENTION_MS,
-        lastUsage: {
-          createdAt: 0,
-          cacheRead: 0,
-          input: COLD_CACHE_MISS_MIN_TOKENS,
-          contextTokens: before,
-          model: 'anthropic/claude',
-        },
-      }),
-    ).toBe(true);
     const slim = projectColdMessages(fat, { summaryHint: 'queued billing fix; tour done' });
     const after = JSON.stringify(slim).length;
     const users = slim.filter((message) => message.role === 'user').map(userText);
