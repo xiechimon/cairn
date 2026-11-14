@@ -8,7 +8,7 @@ export const AGENT_BROWSER_BINARY = 'agent-browser';
 export const AGENT_BROWSER_SESSION = 'cairn';
 const AGENT_CURSOR_DWELL_MS = 650;
 const AGENT_CURSOR_DWELL_HEADROOM_MS = 2_000;
-const lastCursorPoints = new Map<string, AgentCursorPoint>();
+export const AGENT_CURSOR_INIT_PATH = '.cairn/agent-cursor.js';
 const TYPING_PAUSE_MS = 90;
 const TYPING_MAX_BURSTS = 24;
 const TYPING_STEP_COST_MS = 400;
@@ -98,36 +98,16 @@ export const LOGIN_DETECTION_SCRIPT = `(() => {
 
 export type AgentCursorKind = 'click' | 'point';
 
-export interface AgentCursorPoint {
-  x: number;
-  y: number;
-}
-
-export function agentCursorScript(
-  x: number,
-  y: number,
-  kind: AgentCursorKind,
-  from?: AgentCursorPoint,
-): string {
-  if (!Number.isFinite(x) || !Number.isFinite(y))
-    throw new Error('cursor needs finite coordinates');
-  if (from !== undefined && (!Number.isFinite(from.x) || !Number.isFinite(from.y)))
-    throw new Error('cursor needs finite coordinates');
-  const left = Math.round(x);
-  const top = Math.round(y);
-  const start =
-    from === undefined
-      ? "'translate(' + (Math.round(window.innerWidth / 2) - 3) + 'px, ' + (Math.round(window.innerHeight / 2) - 2) + 'px)'"
-      : `'translate(${Math.round(from.x) - 3}px, ${Math.round(from.y) - 2}px)'`;
-  return `(() => {
+const DRAW_AGENT_CURSOR = `function (x, y, kind) {
   const ns = 'http://www.w3.org/2000/svg';
   const host = document.body || document.documentElement;
   let cursor = document.getElementById('__cairnAgentCursor');
+  if (cursor && kind === 'rest') return true;
   if (!cursor) {
     cursor = document.createElement('div');
     cursor.id = '__cairnAgentCursor';
     cursor.setAttribute('aria-hidden', 'true');
-    cursor.style.cssText = 'all:initial;position:fixed;left:0;top:0;z-index:2147483647;pointer-events:none;display:flex;align-items:flex-start;gap:2px;transition:transform 420ms cubic-bezier(.2,.8,.2,1),opacity 240ms ease;will-change:transform;';
+    cursor.style.cssText = 'all:initial;position:fixed;left:0;top:0;z-index:2147483647;pointer-events:none;display:flex;align-items:flex-start;gap:2px;transition:transform 420ms cubic-bezier(.2,.8,.2,1);will-change:transform;';
     const svg = document.createElementNS(ns, 'svg');
     svg.setAttribute('width', '26');
     svg.setAttribute('height', '26');
@@ -144,22 +124,51 @@ export function agentCursorScript(
     label.textContent = 'Coordinator';
     label.style.cssText = 'all:initial;pointer-events:none;margin-top:18px;padding:2px 7px;border-radius:999px;background:#d97757;color:#ffffff;font:500 11px/16px -apple-system,system-ui,sans-serif;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25);';
     cursor.append(svg, label);
-    cursor.style.transform = ${start};
+    const startX = kind === 'rest' ? x : Math.round(window.innerWidth / 2);
+    const startY = kind === 'rest' ? y : Math.round(window.innerHeight / 2);
+    cursor.style.transform = 'translate(' + (startX - 3) + 'px, ' + (startY - 2) + 'px)';
     host.appendChild(cursor);
     void cursor.offsetWidth;
   }
-  cursor.style.opacity = '1';
-  cursor.style.transform = 'translate(${left - 3}px, ${top - 2}px)';
-  if (${JSON.stringify(kind)} === 'click') {
+  if (kind === 'rest') return true;
+  cursor.style.transform = 'translate(' + (x - 3) + 'px, ' + (y - 2) + 'px)';
+  try {
+    sessionStorage.setItem('__cairnAgentCursor', JSON.stringify({ x: x, y: y }));
+  } catch {}
+  if (kind === 'click') {
     const ring = document.createElement('div');
     ring.setAttribute('aria-hidden', 'true');
-    ring.style.cssText = 'all:initial;position:fixed;left:${left - 14}px;top:${top - 14}px;width:28px;height:28px;border-radius:50%;border:2px solid #d97757;z-index:2147483646;pointer-events:none;opacity:0;';
+    ring.style.cssText = 'all:initial;pointer-events:none;opacity:0;position:fixed;width:28px;height:28px;border-radius:50%;border:2px solid #d97757;z-index:2147483646;left:' + (x - 14) + 'px;top:' + (y - 14) + 'px;';
     host.appendChild(ring);
     ring.animate([{ transform: 'scale(.4)', opacity: 1 }, { transform: 'scale(1.7)', opacity: 0 }], { duration: 650, delay: 380, easing: 'ease-out' });
     setTimeout(() => ring.remove(), 1200);
   }
   return true;
-})()`;
+}`;
+
+export const AGENT_CURSOR_INIT_SCRIPT = `(() => {
+  if (window.top !== window) return;
+  const draw = ${DRAW_AGENT_CURSOR};
+  const show = () => {
+    let saved = null;
+    try {
+      saved = JSON.parse(sessionStorage.getItem('__cairnAgentCursor') || 'null');
+    } catch {}
+    const known = saved !== null && typeof saved === 'object' && Number.isFinite(saved.x) && Number.isFinite(saved.y);
+    draw(
+      known ? saved.x : Math.round(window.innerWidth / 2),
+      known ? saved.y : Math.round(window.innerHeight / 2),
+      'rest',
+    );
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', show, { once: true });
+  else show();
+})();`;
+
+export function agentCursorScript(x: number, y: number, kind: AgentCursorKind): string {
+  if (!Number.isFinite(x) || !Number.isFinite(y))
+    throw new Error('cursor needs finite coordinates');
+  return `(${DRAW_AGENT_CURSOR})(${Math.round(x)}, ${Math.round(y)}, ${JSON.stringify(kind)})`;
 }
 
 const cursorBoxSchema = z.object({
@@ -315,9 +324,23 @@ export async function runBrowserTool(
 ): Promise<BrowserToolResult> {
   const binary = options.binary ?? AGENT_BROWSER_BINARY;
   const session = browserSessionName(options.session);
-  const prefix = [binary, ...sessionFlag(session), ...headedFlags()];
   const deadlineAt = browserDeadlineAt(options);
   const timed = { ...options, deadlineAt };
+  const cursorScriptWritten = await provider
+    .writeFile(AGENT_CURSOR_INIT_PATH, AGENT_CURSOR_INIT_SCRIPT, {
+      timeoutMs: remainingTimeoutMs(deadlineAt, options.now ?? Date.now),
+      signal: options.signal,
+    })
+    .then(
+      () => true,
+      () => false,
+    );
+  const prefix = [
+    binary,
+    ...sessionFlag(session),
+    ...headedFlags(),
+    ...(cursorScriptWritten ? ['--init-script', AGENT_CURSOR_INIT_PATH] : []),
+  ];
   let started = false;
 
   const execute = async (argv: readonly string[]) => {
@@ -422,13 +445,6 @@ export async function runBrowserTool(
     return { code: 0, text: `✓ ${title}\n  ${href}` };
   };
 
-  const restAgentCursor = async (): Promise<void> => {
-    const point = lastCursorPoints.get(session);
-    if (point === undefined) return;
-    await read([...prefix, 'wait', '--load', 'domcontentloaded']);
-    await read([...prefix, '--json', 'eval', agentCursorScript(point.x, point.y, 'point', point)]);
-  };
-
   const showAgentCursor = async (ref: string, kind: AgentCursorKind): Promise<void> => {
     await read([...prefix, 'scrollintoview', ref]);
     const box = await read([...prefix, '--json', 'get', 'box', ref]);
@@ -445,9 +461,8 @@ export async function runBrowserTool(
       ...prefix,
       '--json',
       'eval',
-      agentCursorScript(target.x, target.y, kind, lastCursorPoints.get(session)),
+      agentCursorScript(target.x, target.y, kind),
     ]);
-    if (drawn.code === 0) lastCursorPoints.set(session, target);
     const clock = options.now ?? Date.now;
     if (
       drawn.code !== 0 ||
@@ -483,7 +498,6 @@ export async function runBrowserTool(
     if (result.code !== 0 && result.code !== null) {
       refuse(result.text || `agent-browser open failed with exit code ${result.code}`, started);
     }
-    await restAgentCursor();
     return withDetection(result.text || `opened ${url}`);
   }
 
@@ -547,7 +561,6 @@ export async function runBrowserTool(
       );
     }
     lines.push(result.text || `${action.kind} ok`);
-    await restAgentCursor();
   }
   return { text: lines.join('\n') };
 }
