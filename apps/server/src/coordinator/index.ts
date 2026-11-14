@@ -416,7 +416,6 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       lastUsage?.model ?? routerModel,
     );
     const cold = isColdResume({
-      now: nowMs(),
       lastUsage:
         lastUsage === null
           ? null
@@ -427,7 +426,6 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
               contextTokens: lastUsage.contextTokens,
               model: lastUsage.model,
             },
-      retentionMs,
       activeModel: routerModel,
     });
     const summaryHint =

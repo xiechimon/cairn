@@ -27,15 +27,57 @@ function olderRows(w: Awaited<ReturnType<typeof world>>, count: number): void {
 }
 
 describe('cold catchUpColdSummary on lag', () => {
+  it('keeps the whole conversation when the same model resumes after idle', async () => {
+    const w = await world('resume after idle on the same model');
+    olderRows(w, 40);
+    w.s.db
+      .insert(chiefTurnUsage)
+      .values({
+        stepId: 'prior-step-idle',
+        threadId: w.threadId,
+        model: 'stub/m',
+        input: 5_000,
+        output: 10,
+        cacheRead: 0,
+        cacheWrite: 0,
+        contextTokens: 5_000,
+        createdAt: Date.now() - SHORT_RETENTION_MS - 60_000,
+      })
+      .run();
+
+    const { faux } = stub('unused');
+    faux.setResponses([fauxAssistantMessage('answered with the full conversation')]);
+    const coordinator = boot(w, faux);
+    coordinator.wake(w.threadId);
+    await coordinator.idle();
+
+    expect(
+      w.s.db.select().from(chiefSummary).where(eq(chiefSummary.threadId, w.threadId)).get(),
+    ).toBeUndefined();
+    const conversation = w.s.db
+      .select()
+      .from(coordinatorConversation)
+      .where(eq(coordinatorConversation.threadId, w.threadId))
+      .get();
+    expect(conversation?.lastColdSlimStepId ?? null).toBeNull();
+    expect(
+      w.s.db
+        .select()
+        .from(step)
+        .all()
+        .map((r) => r.status),
+    ).toEqual(['done']);
+  });
+
   it('stays warm when catch-up fails and the summary still lags the cold window', async () => {
-    const w = await world('resume after idle without summary');
+    const w = await world('resume on a new model without summary');
     olderRows(w, 40);
     w.s.db
       .insert(chiefTurnUsage)
       .values({
         stepId: 'prior-step-fail',
         threadId: w.threadId,
-        model: 'stub/m',
+        model: 'stub/previous',
         input: 5_000,
         output: 10,
         cacheRead: 0,
@@ -73,7 +115,7 @@ describe('cold catchUpColdSummary on lag', () => {
   });
 
   it('runs seedSummary→foldSummary and records lastColdSlim markers', async () => {
-    const w = await world('resume after idle');
+    const w = await world('resume on a new model');
     olderRows(w, 130);
     const priorCovered = w.s.db
       .select({
@@ -103,7 +145,7 @@ describe('cold catchUpColdSummary on lag', () => {
       .values({
         stepId: 'prior-step',
         threadId: w.threadId,
-        model: 'stub/m',
+        model: 'stub/previous',
         input: 5_000,
         output: 10,
         cacheRead: 0,

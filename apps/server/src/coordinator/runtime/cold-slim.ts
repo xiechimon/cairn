@@ -13,7 +13,6 @@ export const TOOL_RESULT_MAX_CHARS = 1024;
 export const SHORT_RETENTION_MS = 5 * 60_000;
 export const LONG_RETENTION_ANTHROPIC_MS = 60 * 60_000;
 export const LONG_RETENTION_OPENAI_MS = 24 * 60 * 60_000;
-export const COLD_CACHE_MISS_MIN_TOKENS = 4_000;
 
 const TOOL_RESULT_EXEMPT = new Set(['read_history', 'search_history']);
 
@@ -77,9 +76,7 @@ export function contextResumeOf(args: {
   if (slimRecent && slimOwnsLatest && modelMatches) return 'compacted';
   if (
     isColdResume({
-      now: args.now,
       lastUsage: args.lastUsage,
-      retentionMs: args.retentionMs,
       activeModel: args.activeModel,
     })
   ) {
@@ -102,18 +99,12 @@ export function resumeExpiresAtOf(args: {
 }
 
 export function isColdResume(args: {
-  now: number;
   lastUsage: TurnUsageSnapshot | null;
-  retentionMs: number;
   activeModel?: string | null;
 }): boolean {
-  const { lastUsage, now, retentionMs } = args;
-  if (lastUsage === null) return false;
+  if (args.lastUsage === null) return false;
   const active = args.activeModel?.trim() ?? '';
-  if (active !== '' && lastUsage.model !== active) return true;
-  if (now - lastUsage.createdAt >= retentionMs) return true;
-  const size = lastUsage.contextTokens ?? lastUsage.input;
-  return lastUsage.cacheRead === 0 && size >= COLD_CACHE_MISS_MIN_TOKENS;
+  return active !== '' && args.lastUsage.model !== active;
 }
 
 function toolResultText(message: ToolResultMessage): string {

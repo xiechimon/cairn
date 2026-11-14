@@ -10,7 +10,7 @@ There is one runtime compaction path: pi-durable threshold compaction through `c
 
 ## Budget
 
-`coordinatorCompactionSettings` reserves 16,384 tokens and keeps 8,000 recent tokens. For model window W, blocking pressure is W minus 16,384 and background start is min(70,000, floor((W minus 16,384) / 2)). The pi setting named `backgroundTokens` is the distance below the blocking threshold, not the absolute start. Model overrides must preserve that distinction.
+`coordinatorCompactionSettings` reserves 16,384 tokens and keeps 8,000 recent tokens. For model window W, blocking pressure is W minus 16,384 and background start is min(150,000, floor((W minus 16,384) / 2)). The pi setting named `backgroundTokens` is the distance below the blocking threshold, not the absolute start. Model overrides must preserve that distinction.
 
 The resolved model catalog supplies W. Reject an unusable model window before starting a turn; do not use the context-meter default of 128,000 as permission to submit a larger request. The 3,000-token memory selection budget is inside the total request, not extra space outside W. Tool schemas, system instructions, recent messages and output reservation all consume the same window.
 
