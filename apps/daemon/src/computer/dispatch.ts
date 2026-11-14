@@ -11,6 +11,7 @@ import { type BrowserToolName, type BrowserToolResult, runBrowserTool } from './
 import { FramePoster } from './frame-poster.js';
 import {
   desktopProtectionGuardMessage,
+  hostComputerRootRefusal,
   orbComputerProtectionRefusal,
   protectedComputerLifecycleRefusal,
 } from './guard.js';
@@ -170,14 +171,21 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
   function routeFor(call: ComputerCall): Route | string {
     if (call.tool === 'user_computer_shell') {
       return options.host
-        ? { provider: options.host, guard: protectedComputerLifecycleRefusal }
+        ? {
+            provider: options.host,
+            guard: (command) =>
+              protectedComputerLifecycleRefusal(command) ??
+              hostComputerRootRefusal(command, options.orb?.hostRoot),
+          }
         : NO_COMPUTER_PROVIDER_MESSAGE;
     }
     if (!ORB_TOOLS.has(call.tool) || !options.orb) return NO_COMPUTER_PROVIDER_MESSAGE;
     if (!call.scopeKey) return NO_COMPUTER_SCOPE_MESSAGE;
     return {
       provider: options.orb.forScope(call.scopeKey),
-      guard: options.orb.onHost ? protectedComputerLifecycleRefusal : orbComputerProtectionRefusal,
+      guard: options.orb.hostRoot
+        ? protectedComputerLifecycleRefusal
+        : orbComputerProtectionRefusal,
     };
   }
 
