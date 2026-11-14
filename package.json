@@ -47,6 +47,7 @@
     "husky": "^9.1.7",
     "lucide-static": "^1.48.0",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "yaml": "2.9.0"
   }
 }
