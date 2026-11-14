@@ -13,13 +13,7 @@ import type {
   WorkspaceHookNoteData,
   WorktreeOps,
 } from '@cairn/shared';
-import {
-  classifyStepFailure,
-  isBuildStepKind,
-  localCommitIdentity,
-  PLAN_FILE_NAME,
-  stepTakesSecrets,
-} from '@cairn/shared';
+import { classifyStepFailure, isBuildStepKind, PLAN_FILE_NAME } from '@cairn/shared';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { createActivityTracker } from './activity.js';
 import { AgentTodoReporter } from './agent-todo.js';
@@ -45,9 +39,7 @@ import { resolveDeliveredPrompt } from './step-attachments.js';
 import { deliverStepOutcome } from './step-deliver.js';
 import { assembleStepEnv } from './step-env.js';
 import { reportStepProvenance } from './step-executor-record.js';
-import { stepGitRunner } from './step-git-tools.js';
 import { runLocalMergeStep } from './step-local-merge.js';
-import { assembleStepLocalTools } from './step-local-tools.js';
 import {
   consumeStepPassEvent,
   newStepPassState,
@@ -62,8 +54,9 @@ import { resolveStepProvider } from './step-provider.js';
 import { StepSessionOpener } from './step-session-opener.js';
 import { composeStepSessionOpts } from './step-session-opts.js';
 import { settleStepGit } from './step-settle-git.js';
-import { sessionInjectedSkills, stepMcpEndpoints } from './step-skill-tool.js';
+import { stepMcpEndpoints } from './step-skill-tool.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
+import { prepareStepTooling } from './step-tooling.js';
 import { seedStepTranscript } from './step-transcript-seed.js';
 import { StepTranscriptStream } from './step-transcript-stream.js';
 import { resetFreshSessionWorkspace, setUpStepWorkspace } from './step-workspace.js';
@@ -75,7 +68,6 @@ import {
   STREAM_IDLE_ENV,
   StreamWatchdog,
 } from './stream-watchdog.js';
-import { materializeTeamSkills } from './team-skills.js';
 
 export interface RunStepDeps {
   client: MachineApi;
@@ -401,68 +393,41 @@ async function runClaimedStep(
   const remoteTools = claimed.remoteTools;
   const claimedMcp = claimed.mcpServers;
   const mcpEndpoints = stepMcpEndpoints(deps.mcpConfigPath, claimedMcp, (line) => logger.mcp(line));
-  let teamSkillsDir: string | null = null;
-  try {
-    const manifest = await client.skillsManifest(stepId);
-    teamSkillsDir = await materializeTeamSkills({
-      cacheRoot: deps.paths.teamSkillsCacheDir,
-      manifest,
-      fetchFile: (dirName, path) => client.skillFile(stepId, dirName, path),
-      log: (msg) => logger.skills(msg),
-    });
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    logger.skills(`team-skills-failed: ${reason}`);
-    await failStep(deps, heartbeat, stepId, `team skills distribution failed: ${reason}`);
-    return;
-  }
   const isPi = backend.brief?.backendId === 'pi';
   const appIdentity: CommitIdentity | null = tokenRes.commitIdentity ?? null;
-  const stepIdentity: CommitIdentity =
-    appIdentity ?? localCommitIdentity(claimed.agent?.displayName ?? 'cairn-agent');
-  const withStepGit = stepGitRunner({
-    credential: creds.git,
+  const tooling = await prepareStepTooling({
+    client,
+    claimed,
+    agent,
+    stepId,
+    teamSkillsCacheDir: deps.paths.teamSkillsCacheDir,
+    skillsDir: deps.skillsDir,
+    home: deps.paths.home,
+    isPi,
+    isChief,
+    isReview,
+    metered: opts.env?.CAIRN_ORB !== '1',
+    creds,
     appCredential,
-    refresh: refreshGit,
-    allowMachineFallback: repo?.kind === 'github',
-    log: (line) => logger.step(line),
+    refreshGit,
+    commitIdentity: appIdentity,
+    repo,
+    ws,
+    cwd,
+    redact,
+    logger,
   });
-  const injectedForSession = sessionInjectedSkills(agent);
-  const skillsRootDir = deps.skillsDir;
-  const localTools = assembleStepLocalTools({
-    web: {
-      enabled: isPi && !isChief && !isReview && claimed.remoteToolsOnly !== true,
-      metered: opts.env?.CAIRN_ORB !== '1',
-      creds,
-      stepId,
-      home: deps.paths.home,
-      log: (line) => logger.step(line),
-    },
-    secrets: stepTakesSecrets(claimed.step.kind)
-      ? { stepId, agentId: agent?.id ?? null, onAudit: (line) => logger.step(line) }
-      : null,
-    createTag: {
-      localTools: claimed.localTools,
-      repoDir: ws?.cwd ?? null,
-      credential: creds.git,
-      identity: stepIdentity,
-      runGit: withStepGit,
-      redact,
-    },
-    skillLoad:
-      isPi && skillsRootDir !== undefined
-        ? {
-            skillsDir: skillsRootDir,
-            home: deps.paths.home,
-            cwd,
-            isChief,
-            skillsAllowlist: agent.skillsAllowlist,
-            injectedSkills: injectedForSession,
-            teamSkillsDir,
-            log: (msg) => logger.skills(msg),
-          }
-        : null,
-  });
+  if ('error' in tooling) {
+    await failStep(deps, heartbeat, stepId, tooling.error);
+    return;
+  }
+  const {
+    teamSkillsDir,
+    stepIdentity,
+    withStepGit,
+    injectedSkills: injectedForSession,
+    localTools,
+  } = tooling;
   const localToolDefs = localTools.tools;
   if (deliveryPrompt !== null) deliveryPrompt = localTools.dispatch(deliveryPrompt);
   const askChannel = new AskChannel({ client, stepId, log: (message) => logger.step(message) });
