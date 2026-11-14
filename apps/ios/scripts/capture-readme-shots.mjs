@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -61,15 +61,33 @@ const xcode = [
   'CODE_SIGNING_REQUIRED=NO',
 ];
 
-spawnSync('xcrun', ['simctl', 'boot', udid]);
-run('xcrun', ['simctl', 'bootstatus', udid, '-b']);
+function boot() {
+  spawnSync('xcrun', ['simctl', 'boot', udid]);
+  run('xcrun', ['simctl', 'bootstatus', udid, '-b']);
+}
+
+function globalDefault(key) {
+  return spawnSync('xcrun', ['simctl', 'spawn', udid, 'defaults', 'read', '-g', key], {
+    encoding: 'utf8',
+  }).stdout.trim();
+}
+
 async function warmAccessibilityCaches() {
   run('xcrun', ['simctl', 'launch', udid, 'com.apple.Preferences']);
   await new Promise((done) => setTimeout(done, 30_000));
   spawnSync('xcrun', ['simctl', 'terminate', udid, 'com.apple.Preferences']);
 }
 
-if (state !== 'Booted') await warmAccessibilityCaches();
+boot();
+let cold = state !== 'Booted';
+if (globalDefault('AppleICUForce12HourTime') !== '1') {
+  run('xcrun', ['simctl', 'spawn', udid, 'defaults', 'write', '-g', 'AppleICUForce12HourTime', '-bool', 'YES']);
+  spawnSync('xcrun', ['simctl', 'spawn', udid, 'defaults', 'delete', '-g', 'AppleICUForce24HourTime']);
+  run('xcrun', ['simctl', 'shutdown', udid]);
+  boot();
+  cold = true;
+}
+if (cold) await warmAccessibilityCaches();
 run('xcrun', [
   'simctl',
   'status_bar',
@@ -88,7 +106,7 @@ run('xcrun', [
   '--cellularBars',
   '4',
   '--batteryState',
-  'charged',
+  'discharging',
   '--batteryLevel',
   '100',
 ]);
@@ -143,10 +161,12 @@ for (const language of ['en', 'zh-Hans']) {
         attachment.suggestedHumanReadableName.startsWith(`${name}-`),
       );
       if (step === undefined) continue;
+      const raw = join(attachments, attachment.exportedFileName);
+      if (step === '01-home') copyFileSync(raw, join(outDir, `${shots[step]}-raw-${tag}.png`));
       const png = join(work, `${shots[step]}-${tag}.png`);
       run('python3', [
         join(iosDir, 'scripts/round-shot.py'),
-        join(attachments, attachment.exportedFileName),
+        raw,
         png,
         hairline[appearance],
       ]);
