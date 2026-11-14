@@ -2,12 +2,7 @@ import type { MachineDoneBody } from '@cairn/shared';
 import { chiefDigestThreadId, machineDoneBodySchema } from '@cairn/shared';
 import { and, desc, eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import {
-  isColdResume,
-  resolveCacheRetentionTier,
-  retentionMsFor,
-  SHORT_RETENTION_MS,
-} from '../src/coordinator/runtime/cold-slim.js';
+import { isColdResume, SHORT_RETENTION_MS } from '../src/coordinator/runtime/cold-slim.js';
 import { compactionWindow } from '../src/coordinator/runtime/compaction.js';
 import {
   build,
@@ -430,8 +425,6 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     });
     expect(
       isColdResume({
-        now: Date.now(),
-        retentionMs: SHORT_RETENTION_MS,
         activeModel: 'stub-gw/stub-model',
         lastUsage:
           raw === null
@@ -514,9 +507,7 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
       contextWindow: DEFAULT_CONTEXT_WINDOW,
       resume: 'warm',
     });
-    const retentionMs = retentionMsFor(resolveCacheRetentionTier(), shared?.model ?? modelA);
     const sendCold = isColdResume({
-      now: Date.now(),
       lastUsage:
         shared === null
           ? null
@@ -527,14 +518,12 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
               contextTokens: shared.contextTokens,
               model: shared.model,
             },
-      retentionMs,
       activeModel: modelA,
     });
     expect(sendCold).toBe(false);
     expect(meter?.resume === 'warm').toBe(!sendCold);
     expect(
       isColdResume({
-        now: Date.now(),
         lastUsage:
           newestByCreatedAt === undefined
             ? null
@@ -545,10 +534,6 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
                 contextTokens: newestByCreatedAt.contextTokens,
                 model: newestByCreatedAt.model,
               },
-        retentionMs: retentionMsFor(
-          resolveCacheRetentionTier(),
-          newestByCreatedAt?.model ?? modelA,
-        ),
         activeModel: modelA,
       }),
     ).toBe(true);

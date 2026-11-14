@@ -34,14 +34,15 @@ afterEach(() => {
 const user = (text: string): Message => ({ role: 'user', content: text, timestamp: 1 });
 
 describe('compaction policy', () => {
-  it('starts background folds near 70k and leaves blocking at the edge of the window', () => {
-    expect(compactionWindow(1_000_000)).toEqual({ blockingAt: 983_616, backgroundAt: 70_000 });
+  it('starts background folds at 150k and leaves blocking at the edge of the window', () => {
+    expect(compactionWindow(1_000_000)).toEqual({ blockingAt: 983_616, backgroundAt: 150_000 });
+    expect(compactionWindow(200_000)).toEqual({ blockingAt: 183_616, backgroundAt: 91_808 });
     expect(compactionWindow(32_000)).toEqual({ blockingAt: 15_616, backgroundAt: 7_808 });
     const settings = coordinatorCompactionSettings([
       { provider: 'anthropic', id: 'claude-haiku-5-5', contextWindow: 1_000_000 },
     ]);
     expect(settings.modelOverrides?.['anthropic/claude-haiku-5-5']).toEqual({
-      backgroundTokens: 983_616 - 70_000,
+      backgroundTokens: 983_616 - 150_000,
     });
   });
 });

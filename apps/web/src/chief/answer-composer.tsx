@@ -16,13 +16,11 @@ const NO_MENTIONS = { todo: [], agent: [], project: [], skill: [], machine: [] }
 export interface AnswerComposerProps {
   answerKey: string;
   active: boolean;
-  invalid: boolean;
   onAttachment?: ((files: File[]) => string[] | Promise<string[]>) | undefined;
   composerRef?: ((node: HTMLTextAreaElement | null) => void) | undefined;
   handleRef?: Ref<ComposerSurfaceHandle>;
   above: ReactNode;
   tools: ReactNode;
-  menu?: ReactNode;
   context?: ChiefContextUsage | undefined;
   threadId?: string | null;
   onFocusEnter: () => void;
@@ -33,13 +31,11 @@ export interface AnswerComposerProps {
 export function AnswerComposer({
   answerKey,
   active,
-  invalid,
   onAttachment,
   composerRef,
   handleRef,
   above,
   tools,
-  menu,
   context,
   threadId = null,
   onFocusEnter,
@@ -92,11 +88,9 @@ export function AnswerComposer({
       onFocusEnter={onFocusEnter}
       onFocusLeave={onFocusLeave}
       placeholder={t('输入你自己的回答…')}
-      invalid={invalid}
       composerRef={composerRef}
       above={above}
       tools={tools}
-      menu={menu}
       context={context}
       threadId={threadId}
       dropActive={dropActive}

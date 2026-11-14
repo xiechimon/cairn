@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockLive, TASK, THREAD } from './chief-home-mock';
+import { createTodoRow, mockLive, TASK, THREAD } from './chief-home-mock';
 
 for (const [label, phase, verified] of [
   ['done', 'done', false],
@@ -230,6 +230,7 @@ test('a thread already shown under the reply that started it adds no row for its
     threads: [THREAD],
     messages: [
       { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
+      createTodoRow('create', TASK, 15),
       {
         id: 'started',
         role: 'assistant',
@@ -271,6 +272,7 @@ test('research opened before planning hangs under its code task as a nested row'
     threads: [THREAD],
     messages: [
       { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
+      createTodoRow('create', TASK, 15),
       {
         id: 'started',
         role: 'assistant',
@@ -321,6 +323,7 @@ test('a research report is one card under its research row; hover shows a summar
     threads: [THREAD],
     messages: [
       { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
+      createTodoRow('create', TASK, 15),
       {
         id: 'started',
         role: 'assistant',
@@ -336,8 +339,9 @@ test('a research report is one card under its research row; hover shows a summar
       : undefined,
   );
   await page.goto('/app');
-  const refs = page.getByTestId('home-c').getByTestId('chief-task-refs');
-  const card = refs.getByTestId('research-report-card');
+  const reply = page.getByTestId('home-c').getByTestId('chief-msg').filter({ hasText: 'Started' });
+  const card = reply.getByTestId('chief-reply-bubble').getByTestId('research-report-card');
+  await expect(reply.getByTestId('chief-task-refs').getByTestId('research-report-card')).toHaveCount(0);
   await expect(card).toHaveCount(1);
   await expect(card).toContainText('调研报告已生成');
   await expect(card).toContainText('Research export formats');
@@ -352,6 +356,7 @@ test('a research report is one card under its research row; hover shows a summar
   await card.click();
   const doc = page.getByTestId('research-report-doc');
   await expect(doc.getByText('Parquet keeps types')).toBeVisible();
+  await expect(doc.getByRole('link', { name: 'report.md' })).toHaveCount(0);
   await expect(page.getByRole('dialog', { name: 'Research export formats' })).toBeVisible();
 });
 
@@ -402,6 +407,7 @@ test('a research card in Made opens its report as a document; one with no report
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText('定稿');
   await expect(page.getByTestId('research-report-doc').getByText('Parquet keeps types')).toBeVisible();
+  await expect(dialog.getByRole('link', { name: 'report.md' })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
 

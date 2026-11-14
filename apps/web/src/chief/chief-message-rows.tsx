@@ -42,7 +42,7 @@ import {
   type ReplyQuoteDraft,
   ReplySourceHighlightContext,
 } from './reply-source-highlight.js';
-import { ResearchReportRow } from './research-report.js';
+import { ResearchReportLine, ResearchReportRow } from './research-report.js';
 import { SentAttachments } from './sent-attachments.js';
 import { TakeoverCard } from './takeover-card.js';
 import type { ThreadActivity } from './thread-activity.js';
@@ -143,26 +143,119 @@ function TodoSegmentLink({ seq }: { seq: number }) {
 function TaskRefRows({ refs }: { refs: readonly TaskRef[] }) {
   if (refs.length === 0) return null;
   return (
-    <div className="mt-2 flex flex-col gap-0.5" data-testid="chief-task-refs">
-      {refs.map((ref) => (
-        <TaskRefWithChildren key={ref.todoId} taskRef={ref} />
+    <div className="mt-1.5 flex flex-col" data-testid="chief-task-refs">
+      {refs.map((ref, index) => (
+        <TaskRefWithChildren key={ref.todoId} taskRef={ref} last={index === refs.length - 1} />
       ))}
     </div>
   );
 }
 
-function TaskRefWithChildren({ taskRef, elbow = true }: { taskRef: TaskRef; elbow?: boolean }) {
+function BubbleReports({ todoIds }: { todoIds: readonly string[] }) {
+  if (todoIds.length === 0) return null;
+  return (
+    <div data-slot="bubble-reports" className="mt-1 flex flex-col">
+      {todoIds.map((todoId) => (
+        <ResearchReportLine key={todoId} todoId={todoId} />
+      ))}
+    </div>
+  );
+}
+
+const TOP_X = 18.75;
+const NESTED_X = 42.75;
+const ROW_MID = 14;
+const BEND = 6;
+
+function TreeGuideSvg({
+  rails,
+  branch,
+}: {
+  rails: readonly number[];
+  branch?: { x: number; last: boolean; to: number };
+}) {
+  const through = branch !== undefined && !branch.last ? [...rails, branch.x] : rails;
+  return (
+    <svg
+      aria-hidden="true"
+      data-slot="task-ref-guide"
+      className="pointer-events-none absolute inset-y-0 left-0 h-full w-16 overflow-visible text-(--task-ref-line)"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      {through.map((x) => (
+        <line key={x} data-slot="task-ref-trunk" x1={x} x2={x} y1="0" y2="100%" />
+      ))}
+      {branch !== undefined && (
+        <path
+          data-slot="task-ref-elbow"
+          strokeLinecap="round"
+          d={`${branch.last ? `M${branch.x} 0V${ROW_MID - BEND}` : `M${branch.x} ${ROW_MID - BEND}`}A${BEND} ${BEND} 0 0 0 ${branch.x + BEND} ${ROW_MID}H${branch.to}`}
+        />
+      )}
+    </svg>
+  );
+}
+
+function GuidedRow({
+  rails,
+  branch,
+  children,
+}: {
+  rails: readonly number[];
+  branch?: { x: number; last: boolean; to: number };
+  children: ReactNode;
+}) {
+  return (
+    <div className="relative flex flex-col">
+      {(rails.length > 0 || branch !== undefined) && (
+        <TreeGuideSvg rails={rails} {...(branch !== undefined ? { branch } : {})} />
+      )}
+      {children}
+    </div>
+  );
+}
+
+function TaskRefWithChildren({
+  taskRef,
+  elbow = true,
+  last = true,
+  reportsBelow = false,
+}: {
+  taskRef: TaskRef;
+  elbow?: boolean;
+  last?: boolean;
+  reportsBelow?: boolean;
+}) {
   const glances = useContext(TodoGlanceContext);
+  const children = childRefsOf(taskRef.todoId, glances ?? NO_GLANCES);
+  const rails = elbow && !last ? [TOP_X] : [];
   return (
     <>
-      <TaskRefRow taskRef={taskRef} elbow={elbow} />
-      <ResearchReportRow todoId={taskRef.todoId} indent={elbow ? 'ml-8' : 'ml-0'} />
-      {childRefsOf(taskRef.todoId, glances ?? NO_GLANCES).map((child) => (
-        <Fragment key={child.todoId}>
-          <TaskRefRow taskRef={child} nested />
-          <ResearchReportRow todoId={child.todoId} indent="ml-14" />
-        </Fragment>
-      ))}
+      <GuidedRow rails={[]} {...(elbow ? { branch: { x: TOP_X, last, to: 28 } } : {})}>
+        <TaskRefRow taskRef={taskRef} elbow={elbow} guide={false} />
+      </GuidedRow>
+      {reportsBelow && (
+        <GuidedRow rails={rails}>
+          <ResearchReportRow todoId={taskRef.todoId} indent={elbow ? 'ml-8' : 'ml-0'} />
+        </GuidedRow>
+      )}
+      {children.map((child, index) => {
+        const lastChild = index === children.length - 1;
+        return (
+          <Fragment key={child.todoId}>
+            <GuidedRow rails={rails} branch={{ x: NESTED_X, last: lastChild, to: 52 }}>
+              <TaskRefRow taskRef={child} nested guide={false} />
+            </GuidedRow>
+            {reportsBelow && (
+              <GuidedRow rails={lastChild ? rails : [...rails, NESTED_X]}>
+                <ResearchReportRow todoId={child.todoId} indent="ml-14" />
+              </GuidedRow>
+            )}
+          </Fragment>
+        );
+      })}
     </>
   );
 }
@@ -179,6 +272,7 @@ function SubThreadRow({ activity }: { activity: ThreadActivity }) {
     >
       <TaskRefWithChildren
         elbow={false}
+        reportsBelow
         taskRef={{
           todoId: activity.todoId,
           seq: glance.seq ?? null,
@@ -230,6 +324,7 @@ function TaskStartedRow({
       >
         <TaskRefWithChildren
           elbow={false}
+          reportsBelow
           taskRef={{
             todoId,
             seq: glance.seq ?? seq,
@@ -299,9 +394,11 @@ interface ChiefStreamRowProps {
   joinsPrev?: boolean;
   joinsNext?: boolean;
   taskRefs?: readonly TaskRef[];
+  reports?: readonly string[];
 }
 
 const NO_TASK_REFS: readonly TaskRef[] = [];
+const NO_REPORTS: readonly string[] = [];
 
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
   const { t } = useI18n();
@@ -431,6 +528,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   joinsPrev = false,
   joinsNext = false,
   taskRefs = NO_TASK_REFS,
+  reports = NO_REPORTS,
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
   const highlightedSource = useContext(ReplySourceHighlightContext);
@@ -687,6 +785,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                 <ChatMarkdown
                   text={item.markdown}
                   bubbles
+                  bubbleFooter={<BubbleReports todoIds={reports} />}
                   bubbleTools={(group, n) =>
                     robotTools(
                       'right',
@@ -722,6 +821,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                       ))}
                     </ul>
                   )}
+                  <BubbleReports todoIds={reports} />
                 </div>
                 {robotTools('right', whole, 'chief-msg-foot')}
               </div>

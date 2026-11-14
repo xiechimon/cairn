@@ -15,7 +15,7 @@ import {
 } from '@earendil-works/pi-durable';
 import { reportCompactionFailure } from './failure-report.js';
 
-export const BACKGROUND_COMPACTION_AT = 70_000;
+export const BACKGROUND_COMPACTION_AT = 150_000;
 export const COMPACTION_RESERVE_TOKENS = 16_384;
 export const KEEP_RECENT_TOKENS = 8_000;
 const TOOL_ARGS_CHARS = 200;

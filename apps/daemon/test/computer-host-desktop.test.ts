@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:net';
 import { join } from 'node:path';
@@ -103,7 +104,7 @@ describe('HostDesktops', () => {
     expect(await again.presence()).toEqual([
       {
         scopeKey: 'chief:a',
-        providerRef: expect.stringMatching(/^cairn-desktop-[a-f0-9]{16}\.service$/),
+        providerRef: `cairn-orb-computer-${createHash('sha256').update('chief:a').digest('hex').slice(0, 40)}`,
         state: 'running',
       },
     ]);

@@ -495,10 +495,12 @@ function ReplyGroup({
   group,
   tools,
   highlighted,
+  footer,
 }: {
   group: ChatBubbleGroup;
   tools: ReactNode;
   highlighted: boolean;
+  footer: ReactNode;
 }) {
   return (
     <div
@@ -514,9 +516,13 @@ function ReplyGroup({
           {...(highlighted ? { 'data-reply-highlight': '' } : {})}
         >
           <MarkdownBlocks blocks={group.blocks} depth={0} flow="bubble" />
+          {footer}
         </div>
       ) : (
-        <MarkdownBlocks blocks={group.blocks} depth={0} flow="bubble" />
+        <>
+          <MarkdownBlocks blocks={group.blocks} depth={0} flow="bubble" />
+          {footer}
+        </>
       )}
       {tools}
     </div>
@@ -527,11 +533,13 @@ export function ChatMarkdown({
   text,
   bubbles = false,
   bubbleTools,
+  bubbleFooter,
   highlight,
 }: {
   text: string;
   bubbles?: boolean;
   bubbleTools?: (group: ChatBubbleGroup, index: number) => ReactNode;
+  bubbleFooter?: ReactNode;
   highlight?: (group: ChatBubbleGroup) => boolean;
 }) {
   const groups = useMemo(() => (bubbles ? chatBubbleGroups(text) : null), [bubbles, text]);
@@ -547,6 +555,7 @@ export function ChatMarkdown({
               group={group}
               tools={bubbleTools?.(group, i)}
               highlighted={highlight?.(group) === true}
+              footer={i === groups.length - 1 ? bubbleFooter : null}
             />
           ))}
         </div>

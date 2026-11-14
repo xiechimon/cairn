@@ -21,6 +21,14 @@ const REPORT_TEXT = [
   '- 31 条在第二步重复读取同一文件',
   '- 7 条在测试失败后直接放弃',
   '- 4 条正常收口',
+  '',
+  ...Array.from(
+    { length: 12 },
+    (_, index) =>
+      `### 第 ${index + 1} 组复核记录\n\n复核文件读取、测试失败与退出时的轨迹，区分观察到的事实和需要继续验证的推测。`,
+  ),
+  '',
+  '[数据表](attachment:team-1/evidence.csv)',
 ].join('\n');
 
 const CARD_BASE = {
@@ -209,11 +217,14 @@ for (const theme of ['light', 'dark'] as const) {
     await card.click();
     const doc = page.getByTestId('research-report-doc');
     await expect(doc.getByText('登录页轨迹调研')).toBeVisible();
+    await expect(doc.getByText('登录页轨迹调研')).toBeInViewport();
     await expect(doc.getByText('4 条正常收口')).toBeVisible();
     await expect(doc).not.toContainText('info-report');
-    await expect(doc.getByRole('link', { name: 'report.md' })).toHaveAttribute(
+    await evidenceShot(page, `report-document-${theme}.png`);
+    await expect(doc.getByRole('link', { name: 'report.md' })).toHaveCount(0);
+    await expect(doc.getByRole('link', { name: '数据表' })).toHaveAttribute(
       'href',
-      '/api/attachments/att-report',
+      '/api/attachments/evidence',
     );
     await page.keyboard.press('Escape');
     await expect(doc).toHaveCount(0);

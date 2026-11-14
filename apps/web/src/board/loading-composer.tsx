@@ -21,7 +21,6 @@ export function LoadingComposer({ draft, onDraftChange, placeholder }: LoadingCo
           onClick: () => {},
         }}
         placeholder={placeholder}
-        invalid={false}
         above={null}
         tools={null}
         inputTestId="loading-composer-input"

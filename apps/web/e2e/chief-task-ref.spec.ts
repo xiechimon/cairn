@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockLive, TASK as BASE_TASK, THREAD } from './chief-home-mock';
+import { createTodoRow, mockLive, TASK as BASE_TASK, THREAD } from './chief-home-mock';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
@@ -7,13 +7,14 @@ test.beforeEach(async ({ page }) => {
 
 const TASK = { ...BASE_TASK, title: 'Read the cairn repo', phase: 'building' };
 
-test('a reply that mentions a task gets one reference row with the state, and the mention is the title as a plain link', async ({
+test('a reply that created a task gets one reference row with the state, and the mention is the title as a plain link', async ({
   page,
 }) => {
   await mockLive(page, {
     threads: [THREAD],
     messages: [
       { id: 'm1', role: 'user', content: 'Look at the repo', createdAt: 10 },
+      createTodoRow('m1b', TASK, 12),
       {
         id: 'm2',
         role: 'assistant',
@@ -61,6 +62,7 @@ test('no status word trails the title: the glyph and the accessible name carry t
   await mockLive(page, {
     threads: [THREAD],
     messages: [
+      createTodoRow('m1b', done, 12),
       {
         id: 'm2',
         role: 'assistant',
@@ -106,6 +108,7 @@ for (const theme of ['light', 'dark'] as const) {
     await mockLive(page, {
       threads: [THREAD],
       messages: [
+        createTodoRow('m1b', waiting, 12),
         {
           id: 'm2',
           role: 'assistant',
@@ -145,16 +148,14 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('the reference row sits like the reference: indented tile, a rounded elbow clear of the bubble and the tile, regular title', async ({
-  page,
-}) => {
+test('a reply that only mentions a task it did not create gets no reference row', async ({ page }) => {
   await mockLive(page, {
     threads: [THREAD],
     messages: [
       {
         id: 'm2',
         role: 'assistant',
-        content: `Started [#${TASK.seqNum}](todo:${TASK.id}) and it is reading the repo.`,
+        content: `Nothing started. [#${TASK.seqNum}](todo:${TASK.id}) is still queued.`,
         createdAt: 13,
       },
     ],
@@ -163,51 +164,69 @@ test('the reference row sits like the reference: indented tile, a rounded elbow 
   });
   await page.goto('/app');
   const stream = page.getByTestId('chief-stream');
-  const ref = stream.getByTestId('chief-task-ref');
-  const g = await ref.evaluate((row) => {
+  await expect(stream.locator('a[data-slot="task-mention"]')).toHaveText('Read the cairn repo');
+  await expect(stream.getByTestId('chief-task-ref')).toHaveCount(0);
+});
+
+test('sibling tasks hang off one unbroken trunk: one stroke width, one x, an elbow into each tile centre', async ({
+  page,
+}) => {
+  const second = { ...TASK, id: 'todo-2', seqNum: 10, title: 'Rotate the relay token', phase: 'review' };
+  const third = { ...TASK, id: 'todo-3', seqNum: 11, title: 'Pin the CI image', phase: 'queued' };
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      createTodoRow('m1a', TASK, 11),
+      createTodoRow('m1b', second, 12),
+      createTodoRow('m1c', third, 12),
+      { id: 'm2', role: 'assistant', content: 'Started three tasks.', createdAt: 13 },
+    ],
+    todos: [TASK, second, third],
+    tasks: [],
+  });
+  await page.goto('/app');
+  const refs = page.getByTestId('chief-stream').getByTestId('chief-task-ref');
+  await expect(refs).toHaveCount(3);
+  const g = await page.getByTestId('chief-task-refs').evaluate((root) => {
     const box = (el: Element) => el.getBoundingClientRect();
-    const msg = row.closest('[data-testid="chief-msg"]')!;
-    const bubble = box(msg.querySelector('[data-testid="chief-reply-bubble"]')!);
-    const tile = box(row.querySelector('span.grid')!);
-    const path = row.querySelector('[data-slot="task-ref-elbow"] path')!;
-    const line = box(path);
-    const cs = getComputedStyle(path);
-    const probe = document.createElement('span');
-    probe.style.color = 'var(--task-ref-line)';
-    document.body.append(probe);
-    const token = getComputedStyle(probe).color;
-    probe.remove();
-    const title = row.querySelector('span.truncate')!;
+    const bubble = box(root.closest('[data-testid="chief-msg"]')!.querySelector('[data-testid="chief-reply-bubble"]')!);
+    const rows = [...root.querySelectorAll('[data-testid="chief-task-ref"]')];
+    const strokes = [...root.querySelectorAll('[data-slot="task-ref-guide"] line, [data-slot="task-ref-guide"] path')];
+    const trunk = [...root.querySelectorAll('[data-slot="task-ref-trunk"]')].map(box);
+    const elbows = [...root.querySelectorAll('[data-slot="task-ref-elbow"]')].map(box);
     return {
-      tileLeft: tile.left - bubble.left,
-      tileSize: [tile.width, tile.height],
-      tileToBubble: tile.top - bubble.bottom,
-      lineX: line.left - bubble.left,
-      lineEnd: line.bottom - (tile.top + tile.height / 2),
-      gapToTile: tile.left - (line.right + 0.75),
-      gapToBubble: line.top - 0.75 - bubble.bottom,
-      d: path.getAttribute('d'),
-      stroke: cs.stroke,
-      token,
-      width: cs.strokeWidth,
-      cap: cs.strokeLinecap,
-      titleGap: box(title).left - tile.right,
-      weight: getComputedStyle(title).fontWeight,
-      size: getComputedStyle(title).fontSize,
+      widths: [...new Set(strokes.map((s) => getComputedStyle(s).strokeWidth))],
+      colors: [...new Set(strokes.map((s) => getComputedStyle(s).stroke))],
+      rowElbowSvgs: root.querySelectorAll('[data-testid="chief-task-ref"] svg[data-slot]').length,
+      trunkX: [...new Set(trunk.map((t) => Math.round((t.left + t.width / 2 - bubble.left) * 100) / 100))],
+      trunkGaps: trunk.slice(1).map((t, i) => t.top - trunk[i]!.bottom),
+      trunkTop: trunk[0]!.top,
+      trunkBottom: trunk.at(-1)!.bottom,
+      rows: rows.map((row, i) => {
+        const tile = box(row.querySelector('span.grid')!);
+        const elbow = elbows[i]!;
+        return {
+          tileLeft: tile.left - bubble.left,
+          tileMid: tile.top + tile.height / 2,
+          elbowBottom: elbow.bottom,
+          elbowRight: elbow.right,
+          tileTopGap: i === 0 ? tile.top : tile.top - box(rows[i - 1]!.querySelector('span.grid')!).bottom,
+        };
+      }),
     };
   });
-  expect(g.tileLeft).toBe(32);
-  expect(g.tileSize).toEqual([20, 20]);
-  expect(g.tileToBubble).toBe(8);
-  expect(g.lineX).toBeCloseTo(18, 0);
-  expect(Math.abs(g.lineEnd)).toBeLessThanOrEqual(0.5);
-  expect(g.gapToTile).toBeGreaterThanOrEqual(3);
-  expect(g.gapToBubble).toBeGreaterThanOrEqual(3.5);
-  expect(g.d).toContain('A6 6');
-  expect(g.stroke).toBe(g.token);
-  expect(g.width).toBe('1.5px');
-  expect(g.cap).toBe('round');
-  expect(g.titleGap).toBe(6);
-  expect(g.weight).toBe('400');
-  expect(g.size).toBe('14px');
+  expect(g.widths).toEqual(['1.5px']);
+  expect(g.colors).toHaveLength(1);
+  expect(g.rowElbowSvgs).toBe(0);
+  expect(g.trunkX).toEqual([18.75]);
+  for (const gap of g.trunkGaps) expect(Math.abs(gap)).toBeLessThanOrEqual(0.01);
+  const [a, b, c] = g.rows;
+  expect(g.trunkTop).toBeLessThanOrEqual(a!.tileMid);
+  expect(c!.tileMid - g.trunkBottom).toBeCloseTo(14, 1);
+  for (const row of g.rows) {
+    expect(row.tileLeft).toBe(32);
+    expect(Math.abs(row.elbowBottom - row.tileMid)).toBeLessThanOrEqual(0.5);
+  }
+  expect(b!.tileTopGap).toBe(8);
+  expect(c!.tileTopGap).toBe(8);
 });

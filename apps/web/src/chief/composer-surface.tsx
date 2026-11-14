@@ -81,11 +81,9 @@ export interface ComposerSurfaceProps {
   onFocusLeave?: (() => void) | undefined;
   onCancelReply?: (() => void) | undefined;
   placeholder: string;
-  invalid: boolean;
   composerRef?: ((node: HTMLTextAreaElement | null) => void) | undefined;
   above: ReactNode;
   tools: ReactNode;
-  menu?: ReactNode;
   context?: ChiefContextUsage | null | undefined;
   threadId?: string | null;
   handleRef?: Ref<ComposerSurfaceHandle>;
@@ -109,11 +107,9 @@ export function ComposerSurface({
   onFocusLeave,
   onCancelReply,
   placeholder,
-  invalid,
   composerRef,
   above,
   tools,
-  menu,
   context = null,
   threadId = null,
   handleRef,
@@ -243,12 +239,6 @@ export function ComposerSurface({
           <Paperclip width={20} height={20} />
           {t('添加附件')}
         </DropdownMenuItem>
-        {menu != null && (
-          <>
-            <DropdownMenuSeparator />
-            {menu}
-          </>
-        )}
         {narrow && showMeter && (
           <>
             <DropdownMenuSeparator />
@@ -268,12 +258,11 @@ export function ComposerSurface({
       style={active ? { viewTransitionName: 'chief-composer' } : undefined}
     >
       <div
-        data-invalid={invalid ? '' : undefined}
         data-drop-target={dropActive && active ? '' : undefined}
         className={cn(
           active && 'chief-composer',
           COMPOSER_FIELD_CLS,
-          'data-invalid:ring-1 data-invalid:ring-destructive data-drop-target:ring-2 data-drop-target:ring-(--focus-ring) rounded-(--radius-composer) border-0 bg-(--composer-fill)',
+          'data-drop-target:ring-2 data-drop-target:ring-(--focus-ring) rounded-(--radius-composer) border-0 bg-(--composer-fill)',
           narrow ? 'px-2 py-2' : 'px-3.5 py-2.25',
         )}
       >
@@ -302,7 +291,6 @@ export function ComposerSurface({
               data-testid={active ? (inputTestId ?? 'chief-composer-input') : undefined}
               data-compose-target=""
               data-question-answer={active && onAdvance !== undefined ? '' : undefined}
-              aria-invalid={invalid ? true : undefined}
               className={`h-7 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 py-1 font-sans text-ui leading-5 md:text-ui tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary) [&::placeholder]:whitespace-nowrap [&::placeholder]:opacity-0`}
               readOnly={!editable}
               value={wire.draft}
