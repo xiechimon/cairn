@@ -114,31 +114,47 @@ export function ResearchReportCard({
           )}
         </PopoverContent>
       </Popover>
-      <DialogShell
-        title={report.title}
-        subtitle={stage}
-        open={open}
-        onClose={() => setOpen(false)}
-        width="var(--settings-w)"
-        className="h-(--settings-h)"
-      >
-        <div
-          data-testid="research-report-doc"
-          className="chat-text mx-auto max-w-180 font-sans text-ui leading-6 break-words text-foreground"
-        >
-          <ChatMarkdown text={report.content} />
-        </div>
-      </DialogShell>
+      <ResearchReportDialog report={report} open={open} onClose={() => setOpen(false)} />
     </>
   );
 }
 
-export function useResearchReport(todoId: string): ResearchReport | null {
-  const glance = useContext(TodoGlanceContext)?.get(todoId);
-  const buildId = glance?.buildId ?? null;
-  const { messages } = useConversationMessages(buildId, glance?.report === true);
-  return useMemo(() => {
-    if (glance === undefined || buildId === null) return null;
+export function ResearchReportDialog({
+  report,
+  open,
+  onClose,
+}: {
+  report: ResearchReport;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <DialogShell
+      title={report.title}
+      subtitle={report.final ? t('定稿') : t('初稿')}
+      open={open}
+      onClose={onClose}
+      width="var(--settings-w)"
+      className="h-(--settings-h)"
+    >
+      <div
+        data-testid="research-report-doc"
+        className="chat-text mx-auto max-w-180 font-sans text-ui leading-6 break-words text-foreground"
+      >
+        <ChatMarkdown text={report.content} />
+      </div>
+    </DialogShell>
+  );
+}
+
+export function useBuildReport(
+  thread: { buildId: string | null; title: string; phase: string } | null,
+): { report: ResearchReport | null; settled: boolean } {
+  const buildId = thread?.buildId ?? null;
+  const { query, messages } = useConversationMessages(buildId, thread !== null);
+  const report = useMemo(() => {
+    if (thread === null || buildId === null) return null;
     const row = messages.find((m) => m.id === `info-report-${buildId}`);
     if (row === undefined || typeof row.content !== 'string') return null;
     let parsed: unknown;
@@ -147,15 +163,28 @@ export function useResearchReport(todoId: string): ResearchReport | null {
     } catch {
       return null;
     }
-    const report = infoReportMessageSchema.safeParse(parsed);
-    if (!report.success) return null;
+    const message = infoReportMessageSchema.safeParse(parsed);
+    if (!message.success) return null;
     return {
-      title: glance.title ?? '',
-      content: `${report.data.attachmentToken}\n\n${report.data.content}`,
+      title: thread.title,
+      content: `${message.data.attachmentToken}\n\n${message.data.content}`,
       createdAt: row.createdAt,
-      final: isFinalReportPhase(glance.phase),
+      final: isFinalReportPhase(thread.phase),
     };
-  }, [glance, buildId, messages]);
+  }, [thread, buildId, messages]);
+  return { report, settled: buildId === null || query.isSuccess || query.isError };
+}
+
+export function useResearchReport(todoId: string): ResearchReport | null {
+  const glance = useContext(TodoGlanceContext)?.get(todoId);
+  const thread = useMemo(
+    () =>
+      glance?.report === true
+        ? { buildId: glance.buildId ?? null, title: glance.title ?? '', phase: glance.phase }
+        : null,
+    [glance],
+  );
+  return useBuildReport(thread).report;
 }
 
 export function ResearchReportRow({ todoId, indent }: { todoId: string; indent: string }) {

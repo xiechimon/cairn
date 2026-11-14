@@ -1,9 +1,10 @@
 import { PackageCheck, Search, SearchX } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router';
 import { useArchivedTodos, useProjects, usePrs } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { ResearchReportDialog, useBuildReport } from '../chief/research-report.js';
 import { EmptyState } from '../components/empty-state.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
@@ -51,6 +52,30 @@ export function useProjectNames(): ReadonlyMap<string, string> {
   }, [live, projectsQ.data, search]);
 }
 
+function MadeReport({
+  todo,
+  onClose,
+  onOpenThread,
+}: {
+  todo: TodoRecord;
+  onClose: () => void;
+  onOpenThread: (id: string) => void;
+}) {
+  const thread = useMemo(
+    () => ({ buildId: todo.latestBuildId, title: todo.title, phase: todo.phase }),
+    [todo.latestBuildId, todo.title, todo.phase],
+  );
+  const { report, settled } = useBuildReport(thread);
+  useEffect(() => {
+    if (settled && report === null) {
+      onClose();
+      onOpenThread(todo.id);
+    }
+  }, [settled, report, onClose, onOpenThread, todo.id]);
+  if (report === null) return null;
+  return <ResearchReportDialog report={report} open onClose={onClose} />;
+}
+
 const isMade = (todo: TodoRecord) =>
   threadStatus(todo) === 'done' || (todo.output === 'info' && todo.phase === 'needs_input');
 
@@ -70,6 +95,7 @@ export function WorkPanel({
   const [tab, setTab] = useState<MadeTab>('all');
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
+  const [reportTodo, setReportTodo] = useState<TodoRecord | null>(null);
   const archivedQ = useArchivedTodos(teamId, connected && tab === 'archived');
   const archivedLive = useMemo(
     () =>
@@ -153,7 +179,11 @@ export function WorkPanel({
                   projectOf(todo),
                 ])}
                 pr={prOf.get(todo.id)}
-                onOpen={() => onOpenThread(todo.id)}
+                onOpen={() =>
+                  todo.output === 'info' && todo.latestBuildId !== null
+                    ? setReportTodo(todo)
+                    : onOpenThread(todo.id)
+                }
               />
             ))}
           </MadeCarousel>
@@ -164,6 +194,13 @@ export function WorkPanel({
   const body = made.length === 0 ? emptyView : listView;
   return (
     <SidePanel label={title} onDismiss={onClose} phoneTab>
+      {reportTodo !== null && (
+        <MadeReport
+          todo={reportTodo}
+          onClose={() => setReportTodo(null)}
+          onOpenThread={onOpenThread}
+        />
+      )}
       <SidePanelHead closeLabel={t('关闭')} onClose={onClose}>
         <SidePanelTitle>{title}</SidePanelTitle>
         <IconTooltip

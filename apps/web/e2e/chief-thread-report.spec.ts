@@ -354,3 +354,58 @@ test('a research report is one card under its research row; hover shows a summar
   await expect(doc.getByText('Parquet keeps types')).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Research export formats' })).toBeVisible();
 });
+
+test('a research card in Made opens its report as a document; one with no report opens its thread', async ({
+  page,
+}) => {
+  const research = {
+    ...TASK,
+    id: 'todo-research',
+    seqNum: 10,
+    title: 'Research export formats',
+    phase: 'done',
+    output: 'info',
+    latestBuildId: 'build-research',
+  };
+  const bare = {
+    ...TASK,
+    id: 'todo-bare',
+    seqNum: 11,
+    title: 'Research cache layers',
+    phase: 'done',
+    output: 'info',
+    latestBuildId: 'build-bare',
+  };
+  const report = {
+    id: 'info-report-build-research',
+    role: 'system',
+    createdAt: 30,
+    content: JSON.stringify({
+      kind: 'info-report',
+      attachmentId: 'att-r',
+      attachmentToken: '![report.md](attachment:t1/att-r.md)',
+      content: '## Export formats\n\nParquet halves the file size of CSV.\n\n- Parquet keeps types',
+    }),
+  };
+  const page0 = { chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null };
+  await mockLive(page, { threads: [THREAD], messages: [], todos: [research, bare] }, (path, _route, json) =>
+    path === '/api/conversations/build-research/messages'
+      ? json({ messages: [report], ...page0 })
+      : path === '/api/conversations/build-bare/messages'
+        ? json({ messages: [], ...page0 })
+        : undefined,
+  );
+  await page.goto('/app?pane=made');
+  const made = page.getByRole('complementary', { name: '成果' });
+  await made.getByRole('button', { name: 'Research export formats' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Research export formats' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('定稿');
+  await expect(page.getByTestId('research-report-doc').getByText('Parquet keeps types')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+
+  await made.getByRole('button', { name: 'Research cache layers' }).click();
+  await expect(page).toHaveURL(/todo-bare/);
+  await expect(page.getByTestId('research-report-doc')).toHaveCount(0);
+});
