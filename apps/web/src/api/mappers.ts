@@ -1258,7 +1258,6 @@ export function mapMachines(
     enabledRuntimes: m.enabledRuntimes,
     ...(m.maxConcurrent !== undefined ? { maxConcurrent: m.maxConcurrent } : {}),
     ...(m.runningSteps !== undefined ? { runningSteps: m.runningSteps } : {}),
-    ...(m.running !== undefined ? { runningHere: m.running } : {}),
     ...(m.capabilities !== undefined ? { capabilities: m.capabilities } : {}),
     ...(m.maxConcurrentOverridden !== undefined
       ? { maxConcurrentOverridden: m.maxConcurrentOverridden }

@@ -250,7 +250,6 @@ export interface FixtureSet {
   chiefChannels?: Record<string, ChiefContent>;
   github?: GithubFixture;
   tags?: Array<Pick<TagRecord, 'id' | 'name' | 'color'>>;
-  machinesOpen?: string;
   attachments?: Record<string, { text?: string; src?: string }>;
 }
 
@@ -308,21 +307,6 @@ export interface MachineRow {
   concurrencySource?: 'measured' | 'estimate' | 'manual';
   claudeLogin?: ClaudeLogin;
   providers?: MachineProvider[];
-  hostname?: string;
-  folders?: MachineFolder[];
-  runningHere?: MachineRunningThread[];
-}
-
-export interface MachineFolder {
-  path: string;
-  enabled: boolean;
-}
-
-export interface MachineRunningThread {
-  threadId: string;
-  title: string;
-  projectId: string;
-  startedAt: number;
 }
 
 export interface ResourcesContent {
