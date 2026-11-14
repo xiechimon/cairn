@@ -11,10 +11,15 @@ import {
   skillRecordSchema,
 } from '@cairn/shared';
 import type { Hono } from 'hono';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { skillAudit } from '../src/db/schema.js';
+import {
+  BUILTIN_RESEARCH_SKILL_ID,
+  installBuiltinSkills,
+  uninstallBuiltinSkills,
+} from '../src/services/builtin-skills.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import {
   bootServer,
@@ -924,5 +929,83 @@ describe('machine-wire skill listing and on-demand fetch (GET /api/machine/skill
     } finally {
       s.dispose();
     }
+  });
+
+  describe('the built-in research skill', () => {
+    afterEach(() => uninstallBuiltinSkills());
+
+    test('B1: nothing is built in until the server installs it', async () => {
+      const { s, token, step } = await claimWorld({ skillsAllowlist: null });
+      try {
+        const body = machineSkillsManifestResponseSchema.parse(
+          await (await pkg(s.app, token, step.step.id)).json(),
+        );
+        expect(body.skills.map((sk) => sk.id)).toEqual(['alpha', 'beta']);
+      } finally {
+        s.dispose();
+      }
+    });
+
+    test('B2: an installed built-in reaches a worker whose allowlist leaves it out, with its file', async () => {
+      installBuiltinSkills(join(makeRoot(), 'builtin-skills'));
+      const { s, token, step } = await claimWorld({ skillsAllowlist: ['alpha'] });
+      try {
+        const body = machineSkillsManifestResponseSchema.parse(
+          await (await pkg(s.app, token, step.step.id)).json(),
+        );
+        expect(body.skills.map((sk) => sk.id).sort()).toEqual(['alpha', BUILTIN_RESEARCH_SKILL_ID]);
+        const res = await fileGet(
+          s.app,
+          token,
+          step.step.id,
+          BUILTIN_RESEARCH_SKILL_ID,
+          'SKILL.md',
+        );
+        expect(res.status).toBe(200);
+        expect(Buffer.from(await res.arrayBuffer()).toString('utf8')).toContain(
+          `name: ${BUILTIN_RESEARCH_SKILL_ID}`,
+        );
+      } finally {
+        s.dispose();
+      }
+    });
+
+    test('B3: the built-in is listed, cannot be edited, created again, or shadowed by a team skill', async () => {
+      installBuiltinSkills(join(makeRoot(), 'builtin-skills'));
+      const skillsDir = makeRoot();
+      const s = bootServer({ skillsDir });
+      try {
+        const create = await req(
+          s.app,
+          'POST',
+          '/api/skills',
+          createBody(BUILTIN_RESEARCH_SKILL_ID, 'again'),
+        );
+        expect(create.status).toBe(409);
+        expect(existsSync(join(skillsDir, BUILTIN_RESEARCH_SKILL_ID))).toBe(false);
+        const edit = await req(
+          s.app,
+          'PUT',
+          `/api/teams/${s.team.id}/skills/${BUILTIN_RESEARCH_SKILL_ID}`,
+          createBody(BUILTIN_RESEARCH_SKILL_ID, 'rewritten'),
+        );
+        expect(edit.status).toBe(409);
+        mkdirSync(join(skillsDir, BUILTIN_RESEARCH_SKILL_ID));
+        writeFileSync(
+          join(skillsDir, BUILTIN_RESEARCH_SKILL_ID, 'SKILL.md'),
+          skillMd(BUILTIN_RESEARCH_SKILL_ID, 'a team copy'),
+        );
+        const list = (await (
+          await req(s.app, 'GET', `/api/skills?teamId=${s.team.id}`)
+        ).json()) as {
+          id: string;
+          description: string;
+        }[];
+        expect(list).toHaveLength(1);
+        expect(list[0]?.description).not.toBe('a team copy');
+      } finally {
+        s.dispose();
+      }
+    });
   });
 });

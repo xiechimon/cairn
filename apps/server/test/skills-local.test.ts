@@ -74,7 +74,7 @@ describe('the scanLocalSkills directory scan', () => {
     addSkill(root, 'deploy', { name: 'deployer', description: '部署流程手册' });
     addSkill(root, 'plain', null);
     const scanned = scanLocalSkills(root);
-    expect(scanned).toEqual([
+    expect(scanned).toMatchObject([
       { id: 'deployer', name: 'deployer', description: '部署流程手册', dirName: 'deploy' },
       { id: 'plain', name: 'plain', description: null, dirName: 'plain' },
     ]);
@@ -89,7 +89,7 @@ describe('the scanLocalSkills directory scan', () => {
     );
     addSkill(root, 'folded-name', '---\nname: |-\n  block\n---\n');
     const scanned = scanLocalSkills(root);
-    expect(scanned).toEqual([
+    expect(scanned).toMatchObject([
       {
         id: 'academy-guide',
         name: 'academy-guide',
@@ -119,7 +119,7 @@ describe('the scanLocalSkills directory scan', () => {
     const root = makeRoot();
     const real = addSkill(root, 'real', { name: 'linked-skill' });
     symlinkSync(real, join(root, 'alias'));
-    expect(scanLocalSkills(root)).toEqual([
+    expect(scanLocalSkills(root)).toMatchObject([
       { id: 'linked-skill', name: 'linked-skill', description: null, dirName: 'alias' },
     ]);
     const outside = makeRoot();

@@ -236,6 +236,7 @@ export function curateCandidates(
         }
         const skill = candidate.skill as string;
         const resolved = resolveLocalSkill(options.skillsDir, skill);
+        if (resolved?.skill.builtin) continue;
         const entryPath = resolved ? join(resolved.dir, SKILL_ENTRY_FILE) : null;
         const current = entryPath ? readFileSync(entryPath, 'utf8') : '';
         const section = `## ${candidate.title}\n\n${candidate.content}\n`;
