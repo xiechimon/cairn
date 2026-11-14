@@ -1,0 +1,26 @@
+{
+  "steps": [
+    {
+      "status": "done",
+      "n": 4
+    }
+  ],
+  "replies": [
+    {
+      "role": "assistant",
+      "content": "[{\"type\":\"text\",\"text\":\"The reply is working.\"}]"
+    },
+    {
+      "role": "assistant",
+      "content": "[{\"type\":\"text\",\"text\":\"The reply is working.\"}]"
+    },
+    {
+      "role": "assistant",
+      "content": "[{\"type\":\"text\",\"text\":\"The reply is working.\"}]"
+    },
+    {
+      "role": "assistant",
+      "content": "[{\"type\":\"text\",\"text\":\"The reply is working.\"}]"
+    }
+  ]
+}

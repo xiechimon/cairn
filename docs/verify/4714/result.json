@@ -1,0 +1,92 @@
+{
+  "head": "9aa8d32c7067137f73e1002852274fc3772b13f1",
+  "provider": "local OpenAI-compatible HTTP fake",
+  "results": [
+    {
+      "width": 1440,
+      "colorScheme": "dark",
+      "activeRun": null,
+      "messages": 2,
+      "overflow": false,
+      "dropped": [
+        "message",
+        "message",
+        "step"
+      ]
+    },
+    {
+      "width": 1440,
+      "colorScheme": "light",
+      "activeRun": null,
+      "messages": 4,
+      "overflow": false,
+      "dropped": []
+    },
+    {
+      "width": 390,
+      "colorScheme": "dark",
+      "activeRun": null,
+      "messages": 6,
+      "overflow": false,
+      "dropped": []
+    },
+    {
+      "width": 390,
+      "colorScheme": "light",
+      "activeRun": null,
+      "messages": 8,
+      "overflow": false,
+      "dropped": []
+    }
+  ],
+  "calls": [
+    {
+      "at": 1794674537592,
+      "model": "verify-model",
+      "stream": true,
+      "suggestion": false
+    },
+    {
+      "at": 1794674538414,
+      "model": "verify-model",
+      "stream": true,
+      "suggestion": true
+    },
+    {
+      "at": 1794674576151,
+      "model": "verify-model",
+      "stream": true,
+      "suggestion": false
+    },
+    {
+      "at": 1794674576922,
+      "model": "verify-model",
+      "stream": true,
+      "suggestion": true
+    },
+    {
+      "at": 1794674581811,
+      "model": "verify-model",
+      "stream": true,
+      "suggestion": false
+    },
+    {
+      "at": 1794674582598,
+      "model": "verify-model",
+      "stream": true,
+      "suggestion": true
+    },
+    {
+      "at": 1794674599777,
+      "model": "verify-model",
+      "stream": true,
+      "suggestion": false
+    },
+    {
+      "at": 1794674600551,
+      "model": "verify-model",
+      "stream": true,
+      "suggestion": true
+    }
+  ]
+}
