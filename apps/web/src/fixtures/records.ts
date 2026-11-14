@@ -569,6 +569,14 @@ export type ChiefStreamItem =
   | { kind: 'error'; text: string; createdAt?: number }
   | { kind: 'handoff'; todoId: string; id?: string }
   | {
+      kind: 'takeover';
+      id: string;
+      reason: string;
+      startedAt: number | null;
+      endedAt: number | null;
+      outcome: 'waiting' | 'handed-back' | 'not-done';
+    }
+  | {
       kind: 'task-card';
       todoId: string;
       id: string;

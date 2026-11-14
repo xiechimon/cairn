@@ -1,17 +1,14 @@
-import type { ComputerTool } from '@cairn/shared';
+import { COMPUTER_HANDOFF_TIMEOUT_MS, type ComputerTool } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, lte } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { computer, computerCall } from '../db/schema.js';
 
-export const COMPUTER_HANDOFF_TIMEOUT_MS = 15 * 60_000;
 export const COMPUTER_HANDOFF_POLL_MS = 500;
 
 export const HANDOFF_NAVIGATE_REFUSED =
   'A login or human check is waiting on this computer. browser_navigate is refused. Call request_takeover so the owner can handle it.';
 export const HANDOFF_OWNER_CONTROL_REFUSED =
   'The owner has control of this computer, so browser_snapshot and computer_observe are refused. Wait for request_takeover to return.';
-export const TAKEOVER_HANDED_BACK =
-  'The owner handed the computer back. Take a fresh browser_snapshot before acting.';
 export const TAKEOVER_NOT_DONE =
   'The owner did not finish. This step is not done. Stop and tell the owner.';
 export const TAKEOVER_NO_COMPUTER = 'There is no Coordinator computer to hand over.';

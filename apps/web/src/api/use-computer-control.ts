@@ -20,6 +20,7 @@ export function useComputerControl({
   const qc = useQueryClient();
   const [leaseId, setLeaseId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
   const controlHeld = leaseId !== null || computer?.controlHolder === 'user';
 
   useEffect(() => {
@@ -40,6 +41,7 @@ export function useComputerControl({
   const setHeld = (checked: boolean) => {
     if (teamId === undefined || computer === null || busy) return;
     setBusy(true);
+    setFailed(false);
     const releaseWithFreshLease = () =>
       acquireComputerControl(teamId, computer.id).then((lease) =>
         releaseComputerControl(teamId, computer.id, lease.leaseId),
@@ -56,8 +58,9 @@ export function useComputerControl({
         });
     void run
       .then(() => invalidateConverged(qc, { queryKey: ['computers', teamId] }))
+      .catch(() => setFailed(true))
       .finally(() => setBusy(false));
   };
 
-  return { leaseId, busy, controlHeld, setHeld };
+  return { leaseId, busy, failed, controlHeld, setHeld };
 }

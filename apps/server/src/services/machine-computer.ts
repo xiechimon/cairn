@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   COMPUTER_FEED_TOOLS,
+  COMPUTER_HANDOFF_TIMEOUT_MS,
   COMPUTER_REPLAY_SAFE_TOOLS,
   type ComputerCall,
   type ComputerCallState,
@@ -12,6 +13,7 @@ import {
   type MachineComputerFramesResponse,
   type MachineComputerRelayBody,
   redactSecrets,
+  TAKEOVER_HANDED_BACK,
 } from '@cairn/shared';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -22,21 +24,19 @@ import { NotFoundError } from './builds.js';
 import { computerCallOwnerUserId } from './computer-access.js';
 import {
   COMPUTER_HANDOFF_POLL_MS,
-  COMPUTER_HANDOFF_TIMEOUT_MS,
   clearHandoff,
   HANDOFF_CLEARED,
   handoffRefusal,
   markHandoffIfNone,
   ownerHoldsControl,
   pause,
-  TAKEOVER_HANDED_BACK,
   TAKEOVER_NO_COMPUTER,
   TAKEOVER_NOT_DONE,
 } from './computer-handoff.js';
 import type { TeamStreamHub } from './events.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { pushToUserSafely } from './push.js';
+import { sendMustReachAlert } from './push-alerts.js';
 
 export const COMPUTER_OUTPUT_HEAD_CHARS = 16 * 1024;
 export const COMPUTER_OUTPUT_TAIL_CHARS = 48 * 1024;
@@ -697,11 +697,13 @@ async function holdTakeover(
   const reason =
     typeof asked === 'string' && asked.trim() !== '' ? redact(asked).slice(0, 200) : '';
   if (!resumed) {
-    pushToUserSafely(db, deps.vapidKeys ?? null, thread.userId, thread.teamId, {
-      title: 'Login needed',
-      body: reason || 'The Coordinator needs you to take over its computer.',
-      href: `/app?pane=machines&machine=${encodeURIComponent(target.machineId)}&screen=1`,
+    void sendMustReachAlert(db, deps.vapidKeys ?? null, thread.userId, thread.teamId, {
+      title: '需要你登录',
+      body: reason || 'Coordinator 需要你接管它的电脑。',
+      href: `/app?chief=${encodeURIComponent(thread.id)}`,
       tag: `${thread.userId}:${callId}`,
+    }).catch(() => {
+      process.stderr.write('takeover push failed\n');
     });
   }
   const atStart = db.select().from(computer).where(eq(computer.id, target.id)).get();
