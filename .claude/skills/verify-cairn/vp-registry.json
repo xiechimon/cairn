@@ -844,7 +844,7 @@
       }
     },
     "machine-concurrency": {
-      "recipe": "features/machine-concurrency.md",
+      "recipe": null,
       "cases": {
         "agent-concurrency-cap": {
           "script": ".claude/skills/verify-cairn/archive/1138/drive-1138-agent-concurrency.mjs",
