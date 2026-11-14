@@ -2,8 +2,9 @@ import { MCP_TOOL_REGISTRY, MERGE_HUMAN_ONLY_COPY } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
-import { todo as todoTable } from '../src/db/schema.js';
-import { bootServer, postProject, type TestServer } from './helpers.js';
+import { step, todo as todoTable } from '../src/db/schema.js';
+import { PLATFORM_LOCKED_MESSAGE } from '../src/services/routing-rules.js';
+import { bootServer, postProject, startLegacyBuild, type TestServer } from './helpers.js';
 
 interface JsonRpcResponse {
   jsonrpc: '2.0';
@@ -293,6 +294,69 @@ describe('/api/mcp tool execution = key owner identity (02 section 7.2)', () => 
       expect(res.result?.content?.[0]?.text ?? '', name).toContain('projectId');
     }
     expect(outbound).toEqual([]);
+    s.dispose();
+  });
+});
+
+describe('/api/mcp create_todo and update_todo carry the platform a task needs (#4596)', () => {
+  test('tools/list advertises it, create sets it, any clears it, an unknown system and a started task are refused', async () => {
+    const s = bootServer();
+    const projectId = await postProject(s.app);
+    const key = await issueMcpKey(s, { read: [], write: ['Create Todo', 'Update Todo'] });
+    const call = async (name: string, args: Record<string, unknown>) =>
+      ((await rpc(s.app, key, 'tools/call', { name, arguments: args })).body as JsonRpcResponse)
+        .result;
+    const osOf = (id: string) =>
+      s.db.select().from(todoTable).where(eq(todoTable.id, id)).get()?.routeOverride
+        ?.requiredCapabilities?.os ?? null;
+
+    const listed = (await rpc(s.app, key, 'tools/list')).body as {
+      result: { tools: { name: string; inputSchema: { properties: Record<string, unknown> } }[] };
+    };
+    for (const name of ['create_todo', 'update_todo']) {
+      const tool = listed.result.tools.find((t) => t.name === name);
+      expect(tool?.inputSchema.properties).toHaveProperty('platform');
+    }
+
+    const created = await call('create_todo', {
+      projectId,
+      title: '打包 iOS 测试版',
+      spec: 's',
+      platform: 'macos',
+    });
+    expect(created?.isError ?? false).toBe(false);
+    const record = JSON.parse(created?.content?.[0]?.text ?? '{}') as {
+      id: string;
+      routeOverride: { requiredCapabilities?: { os?: string } } | null;
+    };
+    expect(record.routeOverride?.requiredCapabilities?.os).toBe('macos');
+    expect(osOf(record.id)).toBe('macos');
+
+    const plain = JSON.parse(
+      (await call('create_todo', { projectId, title: 'plain', spec: 's' }))?.content?.[0]?.text ??
+        '{}',
+    ) as { id: string };
+    expect(osOf(plain.id)).toBeNull();
+
+    const bad = await call('update_todo', { todoId: record.id, platform: 'beos' });
+    expect(bad?.isError).toBe(true);
+    expect(osOf(record.id)).toBe('macos');
+
+    expect(
+      (await call('update_todo', { todoId: record.id, platform: 'windows' }))?.isError ?? false,
+    ).toBe(false);
+    expect(osOf(record.id)).toBe('windows');
+    expect(
+      (await call('update_todo', { todoId: record.id, platform: 'any' }))?.isError ?? false,
+    ).toBe(false);
+    expect(osOf(record.id)).toBeNull();
+
+    const buildId = startLegacyBuild(s, plain.id, { withPlan: false });
+    s.db.update(step).set({ sessionId: 'sess-mcp' }).where(eq(step.buildId, buildId)).run();
+    const locked = await call('update_todo', { todoId: plain.id, platform: 'macos' });
+    expect(locked?.isError).toBe(true);
+    expect(locked?.content?.[0]?.text).toContain(PLATFORM_LOCKED_MESSAGE);
+    expect(osOf(plain.id)).toBeNull();
     s.dispose();
   });
 });
