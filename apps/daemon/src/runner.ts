@@ -8,12 +8,11 @@ import type {
   CommitIdentity,
   DeliveredImage,
   MachineHeartbeatBody,
-  ProviderConfig,
   SkillInjectionFacts,
   WorkspaceHookNoteData,
   WorktreeOps,
 } from '@cairn/shared';
-import { classifyStepFailure, isBuildStepKind, PLAN_FILE_NAME } from '@cairn/shared';
+import { isBuildStepKind, PLAN_FILE_NAME } from '@cairn/shared';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { createActivityTracker } from './activity.js';
 import { AgentTodoReporter } from './agent-todo.js';
@@ -24,11 +23,7 @@ import { piWorktreeSkillDirs } from './backend/skills.js';
 import { composeSessionBrief } from './brief-file.js';
 import type { ClaudeCodeAuthProbe } from './claude-code-auth.js';
 import { claudeQuotaTrip, forwardClaudeRateLimit } from './claude-quota-trip.js';
-import {
-  credentialRedactor,
-  credentialSafeEvents,
-  guardCredentialOutputs,
-} from './credential-output.js';
+import { credentialRedactor, guardCredentialOutputs } from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
 import { type StepJournal, TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
@@ -40,14 +35,9 @@ import { deliverStepOutcome } from './step-deliver.js';
 import { assembleStepEnv } from './step-env.js';
 import { reportStepProvenance } from './step-executor-record.js';
 import { runLocalMergeStep } from './step-local-merge.js';
-import {
-  consumeStepPassEvent,
-  newStepPassState,
-  resetStepPassForRetry,
-  type StepPassEventContext,
-} from './step-pass-events.js';
+import { newStepPassState } from './step-pass-events.js';
+import { runStepPasses } from './step-pass-loop.js';
 import { resolveStepPassOutcome, rewindAfterStep } from './step-pass-outcome.js';
-import { planStepPassRetry } from './step-pass-retry.js';
 import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
 import { composeWorkerSystemPrompt, planStepPrompt, taskMetaOpts } from './step-prompt.js';
 import { resolveStepProvider } from './step-provider.js';
@@ -569,9 +559,7 @@ async function runClaimedStep(
   }
 
   const passState = newStepPassState();
-  let priorPassMadeProgress = false;
   const retryStormMax = opts.retryStormMax ?? RETRY_STORM_MAX;
-  let networkRetries = 0;
   const networkRetryDelays =
     claimed.step.kind === 'plan' || isBuildStepKind(claimed.step.kind)
       ? PROVIDER_NETWORK_RETRY_DELAYS_MS
@@ -603,15 +591,6 @@ async function runClaimedStep(
     forgetHandle: () => deps.sessionHandles?.delete(stepId),
     rememberImageSupport: (support) => deps.stepImageSupport?.set(stepId, support),
   });
-  const retryWithoutImages = (failureText: string): Promise<boolean> =>
-    opener.retryWithoutImages(
-      failureText,
-      passState.sawProgress ||
-        priorPassMadeProgress ||
-        watchdog.trippedArm !== null ||
-        stop.request !== null ||
-        passState.quotaTrip !== null,
-    );
   const streamLimits = resolveStreamLimits({
     ...(opts.streamTimeouts !== undefined ? { timeouts: opts.streamTimeouts } : {}),
     ...(opts.streamDurationCapMs !== undefined ? { durationCapMs: opts.streamDurationCapMs } : {}),
@@ -625,7 +604,7 @@ async function runClaimedStep(
       isBuildStepKind(claimed.step.kind) && !streamLimits.durationCapIsAbsolute,
     onTrip: () => {
       askChannel.abort();
-      void handle?.stop();
+      void session.current?.stop();
     },
   });
   askChannel.keepAlive = () => watchdog.keepAlive();
@@ -638,128 +617,51 @@ async function runClaimedStep(
     log: (line) => logger.step(line),
   });
   const segments = stream.segments;
-  let handle: AgentSessionHandle | null = null;
+  const session: { current: AgentSessionHandle | null } = { current: null };
   sessionOpts.onClaudeRateLimit = (notice) => {
     forwardClaudeRateLimit(client, claimed.step.machineId, notice, (line) => logger.step(line));
     if (passState.quotaTrip !== null) return;
     const trip = claudeQuotaTrip(notice, Date.now());
     if (trip === null) return;
     passState.quotaTrip = trip;
-    void handle?.stop();
+    void session.current?.stop();
   };
-  for (let pass = 0; ; pass++) {
-    if (pass > 0) {
-      priorPassMadeProgress ||= passState.sawProgress;
-      resetStepPassForRetry(passState);
-      watchdog.clearTrip();
-      stream.discardDeltas();
-    }
-    if (stop.request !== null) break;
-    activity.setPhase('starting', pass > 0 ? { resetLive: true } : undefined);
-    try {
-      handle = await opener.open();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (await retryWithoutImages(message)) continue;
-      stream.flushDeltas();
-      clearCredentials(creds);
-      await failStep(deps, heartbeat, stepId, message);
-      return;
-    }
-    logger.raw(opener.continueId !== null ? `continue session ${convId}` : `new session ${convId}`);
-    if (!isChief && opener.imageSupport === null) {
-      try {
-        opener.setImageSupport(
-          (await backend.modelSupportsImages?.(sessionOpts.provider, sessionOpts.modelId)) ?? null,
-        );
-      } catch (err) {
-        logger.step(
-          `session image support probe failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-    }
-    journal.update(stepId, { state: 'running', sessionId: handle.sessionId });
-    const passEvents: StepPassEventContext = {
-      stepId,
-      client,
-      logger,
-      modelKey,
-      provider,
-      handle,
-      promptImages: opener.promptImages,
-      retryStormMax,
-      now,
-      watchdog,
-      activity,
-      stream,
-      transcript,
-      agentTodo,
-      toolStartedAt,
-    };
-    deps.sessionHandles?.set(stepId, handle);
-    let promptDelivered = false;
-    stop.attach(handle).catch((err: unknown) => {
-      logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
-    });
-    watchdog.startPass(pass === 0);
-    try {
-      for await (const ev of credentialSafeEvents(handle.events, () => credentialValues)) {
-        if (!promptDelivered) {
-          promptDelivered = true;
-          await askChannel.ackAnswers(claimed.answerIds ?? [], 'session-start');
-        }
-        if (ev.type === 'toolcall_end') {
-          watchdog.noteToolCall(ev.call.id, ev.call.result === undefined);
-          if (ev.call.result !== undefined) await askChannel.ackPollsReachedBy(ev.call.result);
-        }
-        watchdog.noteEvent();
-        activity.noteEvent();
-        await consumeStepPassEvent(ev, passEvents, passState);
-        if (classifyStepFailure(passState.lastModelError ?? '') === 'model_unavailable') break;
-      }
-    } catch (err) {
-      passState.lastError = err instanceof Error ? err.message : String(err);
-    }
-    stop.detach();
-    if (classifyStepFailure(passState.lastModelError ?? '') === 'model_unavailable')
-      passState.lastError = passState.lastModelError;
-    const retry = planStepPassRetry({
-      pass,
-      state: passState,
-      watchdogTripped: watchdog.trippedArm !== null,
-      stopPending: stop.request !== null,
-      networkRetries,
-      networkRetryDelays,
-    });
-    if (retry.kind === 'finish') break;
-    if (retry.kind === 'network') {
-      networkRetries += 1;
-      logger.step(
-        `provider network retry ${networkRetries}: waiting ${retry.delayMs}ms before ${networkRetries === networkRetryDelays.length ? 'final' : 'next'} attempt`,
-      );
-      await new Promise((r) => setTimeout(r, retry.delayMs));
-      opener.continueId = handle.sessionId;
-      deps.sessionHandles?.delete(stepId);
-      continue;
-    }
-    if (retry.kind === 'compat') {
-      const amended: ProviderConfig | null =
-        backend.adaptProviderCompat?.(provider, retry.failureText) ?? null;
-      if (amended !== null) {
-        provider = amended;
-        sessionOpts.provider = amended;
-        logger.step(
-          `protocol fallback: provider ${amended.providerId} compat adapted (${JSON.stringify(
-            amended.compat,
-          )}), retrying session once`,
-        );
-        deps.sessionHandles?.delete(stepId);
-        continue;
-      }
-    }
-    if (await retryWithoutImages(retry.failureText)) continue;
-    break;
+  const passes = await runStepPasses({
+    stepId,
+    client,
+    logger,
+    modelKey,
+    retryStormMax,
+    now,
+    watchdog,
+    activity,
+    stream,
+    transcript,
+    agentTodo,
+    toolStartedAt,
+    claimed,
+    convId,
+    isChief,
+    backend,
+    sessionOpts,
+    provider,
+    opener,
+    passState,
+    session,
+    stop,
+    askChannel,
+    journal,
+    credentialValues: () => credentialValues,
+    sessionHandles: deps.sessionHandles,
+    networkRetryDelays,
+  });
+  provider = passes.provider;
+  if (passes.openError !== null) {
+    clearCredentials(creds);
+    await failStep(deps, heartbeat, stepId, passes.openError);
+    return;
   }
+  const handle = session.current;
   const continueId = opener.continueId;
   let { usage } = passState;
   const { sawChangeTool, sawDone } = passState;
