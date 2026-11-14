@@ -875,7 +875,7 @@ export const CHIEF_ROUTER_TOOLS: readonly RemoteToolDef[] = [
 export const CHIEF_REPLY_TOOLS: readonly RemoteToolDef[] = [
   {
     name: SUGGEST_REPLIES_TOOL_NAME,
-    description: `Offer the user up to ${QUICK_REPLIES_MAX} short replies to your reply in this turn; they show as buttons above the input and a click sends that text as the user's message. Use it only after a simple open question or a proposed next step with obvious short answers, written in the user's language. Never for destructive or irreversible confirmations: use ask_user for those. Each reply is plain text of at most ${QUICK_REPLY_MAX_CHARS} characters; calling it again in the same turn replaces the earlier set. Not available in event turns.`,
+    description: `Offer the user up to ${QUICK_REPLIES_MAX} short replies to your reply in this turn; they show as buttons above the input and a click sends that text as the user's message. Written in the user's language, each one something they would send as is. Never for destructive or irreversible confirmations: use ask_user for those. Each reply is plain text of at most ${QUICK_REPLY_MAX_CHARS} characters; calling it again in the same turn replaces the earlier set. Skip it when this turn will not reach the user, such as an event turn.`,
     parameters: obj(
       {
         replies: arr(

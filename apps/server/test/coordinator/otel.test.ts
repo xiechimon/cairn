@@ -83,7 +83,7 @@ describe('in-server Coordinator telemetry', () => {
     const chats = spans.filter((s) => s.name === 'chat m');
     const tools = spans.filter((s) => s.name === 'execute_tool todos');
     expect(attr(turn as Span, 'session.id')).toBe(w.threadId);
-    expect(chats).toHaveLength(2);
+    expect(chats).toHaveLength(3);
     expect(tools).toHaveLength(1);
     for (const child of [...chats, ...tools]) {
       expect(child.traceId).toBe(turn?.traceId);

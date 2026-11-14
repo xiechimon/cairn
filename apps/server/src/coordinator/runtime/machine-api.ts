@@ -35,4 +35,6 @@ export interface MachineApi {
   mapUserEntry?(stepId: string, entryId: string): Promise<void>;
   transcriptDelta(stepId: string, text: string): Promise<void>;
   done(stepId: string, body: MachineDoneBody, observation?: OtelObservation): Promise<void>;
+  canSuggestReplies?(stepId: string): Promise<boolean>;
+  suggestReplies?(stepId: string, replies: readonly string[]): Promise<void>;
 }

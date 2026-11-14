@@ -2,6 +2,7 @@ import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
 import { afterEach, beforeEach, expect } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
 import { type Coordinator, startCoordinator } from '../../src/coordinator/index.js';
+import { SUGGEST_REPLIES_ASK } from '../../src/coordinator/runtime/suggest-replies.js';
 import { routingRule, step } from '../../src/db/schema.js';
 import {
   setCoordinatorInServer,
@@ -115,7 +116,9 @@ export function stub(answer: string) {
   });
   const seen: { system: string; messages: unknown[] }[] = [];
   faux.setResponses(
-    Array(8).fill((c: { systemPrompt?: string; messages: unknown[] }) => {
+    Array(16).fill((c: { systemPrompt?: string; messages: { content: unknown }[] }) => {
+      if (c.messages[0]?.content === SUGGEST_REPLIES_ASK)
+        return fauxAssistantMessage('{"replies":[]}');
       seen.push({ system: c.systemPrompt ?? '', messages: c.messages });
       return fauxAssistantMessage(answer);
     }),

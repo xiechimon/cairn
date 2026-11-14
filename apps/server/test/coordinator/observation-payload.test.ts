@@ -71,7 +71,7 @@ test('SDK observations contain owner input, reply, and each actual generation re
     expect.soft(attr(root, 'langfuse.observation.input')).toContain('show my tasks');
     expect.soft(attr(root, 'langfuse.observation.output')).toContain('Here are your tasks.');
     const chats = spans.filter((span) => span.name === 'chat m');
-    expect(chats).toHaveLength(2);
+    expect(chats).toHaveLength(3);
     for (let index = 0; index < chats.length; index++) {
       expect
         .soft(JSON.parse(attr(chats[index], 'langfuse.observation.input') ?? 'null'))

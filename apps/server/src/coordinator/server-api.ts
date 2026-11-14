@@ -1,8 +1,16 @@
-import { coordinatorConversationKey } from '@cairn/shared';
-import { and, eq, isNull } from 'drizzle-orm';
-import { coordinatorConversation, coordinatorEntry, step, stopPending } from '../db/schema.js';
+import { coordinatorConversationKey, quickRepliesRowId } from '@cairn/shared';
+import { and, eq, gt, isNull } from 'drizzle-orm';
+import {
+  chiefMessage,
+  coordinatorConversation,
+  coordinatorEntry,
+  step,
+  stopPending,
+} from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { NotFoundError } from '../services/builds.js';
+import { askQuestionContentOf } from '../services/chief-questions.js';
+import { storeQuickReplies } from '../services/chief-quick-replies.js';
 import { releaseUnconsumedSteer } from '../services/chief-turns.js';
 import {
   consumeCoordinatorInput,
@@ -44,6 +52,36 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
     const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
     if (!row) throw new NotFoundError(`step ${stepId}`);
     return row;
+  };
+  const canSuggestReplies = (stepId: string): boolean => {
+    const owned = stepRow(stepId);
+    if (owned.status !== 'claimed') return false;
+    if (deps.db.select().from(stopPending).where(eq(stopPending.stepId, stepId)).get())
+      return false;
+    const rows = deps.db
+      .select()
+      .from(chiefMessage)
+      .where(eq(chiefMessage.threadId, owned.buildId))
+      .all();
+    if (
+      rows.some(
+        (row) =>
+          row.id === quickRepliesRowId(stepId) ||
+          askQuestionContentOf(row.content)?.status === 'pending',
+      )
+    )
+      return false;
+    return !deps.db
+      .select({ id: chiefMessage.id })
+      .from(chiefMessage)
+      .where(
+        and(
+          eq(chiefMessage.threadId, owned.buildId),
+          eq(chiefMessage.role, 'user'),
+          gt(chiefMessage.createdAt, owned.claimedAt ?? owned.createdAt),
+        ),
+      )
+      .get();
   };
   const mapEntry = (chiefMessageId: string, threadId: string, entryId: string) => {
     const conversation = deps.db
@@ -201,6 +239,11 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
     },
     transcriptDelta: async (stepId, text) => {
       reportTranscriptDelta(deps, null, stepId, text);
+    },
+    canSuggestReplies: async (stepId) => canSuggestReplies(stepId),
+    suggestReplies: async (stepId, replies) => {
+      if (!canSuggestReplies(stepId)) return;
+      storeQuickReplies(deps, stepRow(stepId).buildId, stepId, replies);
     },
     done: async (stepId, body, observation) => {
       const owned = stepRow(stepId);
