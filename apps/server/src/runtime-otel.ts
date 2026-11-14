@@ -463,6 +463,64 @@ export function emitCoordinatorTurnSpans(
   push(target, env, redactSecrets(spans).value as CairnSpan[]);
 }
 
+export function emitSummaryCallSpan(
+  call: {
+    threadId?: string;
+    stepId?: string;
+    stage: string;
+    provider: string;
+    model: string;
+    startMs: number;
+    endMs: number;
+    finishReason?: string;
+    usage?: TokenCounts;
+    costUsd?: number;
+    errorMessage?: string;
+    errorClass?: string;
+    diagnostics?: string;
+    httpStatus?: number;
+  },
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  const target = runtimeTarget(env);
+  if (target === null) return;
+  const inTurn = call.threadId !== undefined && call.stepId !== undefined;
+  const traceId = inTurn
+    ? otlpTraceIdOfStep({ kind: 'chief', buildId: call.threadId ?? '', stepId: call.stepId ?? '' })
+    : otlpTraceIdOfBuild(call.threadId ?? 'coordinator');
+  push(target, env, [
+    {
+      ...(inTurn
+        ? {
+            parent: {
+              traceId,
+              spanId: otlpStepSpanIdOfBuild(call.threadId ?? '', call.stepId ?? ''),
+            },
+          }
+        : { traceId }),
+      name: `summary ${call.stage}`,
+      kind: 'client',
+      startMs: call.startMs,
+      endMs: call.endMs,
+      attributes: {
+        ...chatAttributes(call, call),
+        ...(call.threadId === undefined
+          ? {}
+          : { 'cairn.thread_id': call.threadId, [LANGFUSE_ATTR.sessionId]: call.threadId }),
+        ...(call.stepId === undefined ? {} : { 'cairn.step_id': call.stepId }),
+        'cairn.compaction.stage': call.stage,
+        ...(call.errorClass === undefined ? {} : { 'error.type': call.errorClass }),
+        ...(call.diagnostics === undefined
+          ? {}
+          : { 'cairn.provider.diagnostics': call.diagnostics }),
+        ...(call.httpStatus === undefined ? {} : { 'http.response.status_code': call.httpStatus }),
+        ...langfuseEnvironmentAttributes(otelEnvironment(env)),
+      },
+      ...(call.errorMessage === undefined ? {} : { error: call.errorMessage }),
+    },
+  ]);
+}
+
 export function emitCompactionSpan(
   failure: {
     stage: string;

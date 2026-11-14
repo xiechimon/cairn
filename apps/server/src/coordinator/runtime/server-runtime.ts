@@ -142,7 +142,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     ];
     const summarize = (): Summarize | null => {
       try {
-        return summarizerFor(models.models, summary.ref);
+        return summarizerFor(models.models, summary.ref, { threadId, stage: 'reconcile-summary' });
       } catch (error) {
         reportCompactionFailure({ threadId }, 'summary-model', error);
         return null;
