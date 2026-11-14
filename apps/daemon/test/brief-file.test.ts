@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BRIEF_MARKER_BEGIN, BRIEF_MARKER_END } from '@cairn/shared';
+import { BRIEF_MARKER_BEGIN, BRIEF_MARKER_END, type SessionOpts } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { composeBrief } from '../src/brief-file.js';
+import { composeBrief, composeSessionBrief } from '../src/brief-file.js';
 import { testTempDir } from './test-temp-dir.js';
 
 describe('in-memory runtime guidance', () => {
@@ -38,5 +38,36 @@ describe('in-memory runtime guidance', () => {
     );
     expect(readFileSync(join(cwd, 'AGENTS.md'), 'utf8')).toBe('agents guidance\n');
     expect(readFileSync(join(cwd, 'CLAUDE.md'), 'utf8')).toBe('claude guidance\n');
+  });
+});
+
+describe('composeSessionBrief', () => {
+  const sessionOpts = (): SessionOpts => ({ modelId: 'm', cwd: '/ws' }) as unknown as SessionOpts;
+
+  test('writes the composed brief into the session system prompt', () => {
+    const cwd = testTempDir('cairn-brief-');
+    const opts = sessionOpts();
+    const error = composeSessionBrief({
+      cwd,
+      brief: { backendId: 'pi', composeBody: (_opts, base) => `body:${base}` },
+      sessionOpts: opts,
+      systemPrompt: 'base',
+    });
+    expect(error).toBeNull();
+    expect(opts.systemPrompt).toBe(`${BRIEF_MARKER_BEGIN}\nbody:base\n${BRIEF_MARKER_END}\n`);
+  });
+
+  test('a legacy brief file fails with the runtime guidance error', () => {
+    const cwd = testTempDir('cairn-brief-');
+    writeFileSync(join(cwd, 'AGENTS.md'), `${BRIEF_MARKER_BEGIN}\nold\n${BRIEF_MARKER_END}\n`);
+    const error = composeSessionBrief({
+      cwd,
+      brief: undefined,
+      sessionOpts: sessionOpts(),
+      systemPrompt: undefined,
+    });
+    expect(error).toMatch(
+      /^Runtime guidance could not be composed: Legacy runtime guidance remains in AGENTS\.md/,
+    );
   });
 });

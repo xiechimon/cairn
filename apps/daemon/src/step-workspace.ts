@@ -9,6 +9,7 @@ import type {
 import { LocalRepoUnreachableError } from '@cairn/shared';
 import { createVerificationClone } from './backend/verification-clone.js';
 import { type GitCredentialFallbackOpts, withGitCredentialFallback } from './git.js';
+import type { TranscriptBuffer } from './journal.js';
 import { localRepoUnreachableMessage } from './workspace.js';
 
 export type StepRepo = NonNullable<NonNullable<ClaimedStep['project']>['repo']>;
@@ -193,4 +194,38 @@ export async function resetFreshSessionWorkspace(input: {
   } catch (err) {
     return err instanceof Error ? err.message : String(err);
   }
+}
+
+export async function resetReusedWorkspaceForFreshSession(input: {
+  workspace: Pick<WorktreeOps, 'restoreCheckpoint'> | undefined;
+  ws: PreparedWorkspace | null;
+  claimed: ClaimedStep;
+  headAtStart: string | null;
+  skip: boolean;
+  planFile: string;
+  stepId: string;
+  transcript: Pick<TranscriptBuffer, 'upsert'>;
+  now: () => number;
+  log: { workspace: (line: string) => void; step: (line: string) => void };
+}): Promise<void> {
+  const { ws, workspace, headAtStart } = input;
+  if (ws === null || !workspace || headAtStart === null) return;
+  if (input.skip || input.claimed.session.action !== 'new' || !ws.reused) return;
+  const reason = await resetFreshSessionWorkspace({
+    workspace,
+    cwd: ws.cwd,
+    headAtStart,
+    planFile: input.planFile,
+  });
+  if (reason === null) {
+    input.log.workspace('返工新会话：工作区回退到分支头');
+    return;
+  }
+  input.log.step(`fresh-session worktree reset failed: ${reason}`);
+  input.transcript.upsert({
+    id: `fresh-reset-${input.stepId}`,
+    role: 'system',
+    content: `新会话轮未能回退工作区到分支头（${reason}）——上一轮未提交的改动可能带入本轮`,
+    createdAt: input.now(),
+  });
 }
