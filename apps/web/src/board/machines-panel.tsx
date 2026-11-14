@@ -295,8 +295,8 @@ function MachineDetail({
       onClose={() => setExpanded(false)}
       title={machine.name}
       width="min(100vw - 1.5rem, 1280px)"
-      height="min(100dvh - 1.5rem, 900px)"
-      className="flex max-h-[calc(100dvh-1.5rem)] flex-col"
+      height="min(100dvh - 1.5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom), 900px)"
+      className="flex max-h-[calc(100dvh-1.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col"
     >
       <div className="relative flex shrink-0 items-start gap-3 px-4 pt-4 pr-12 pb-2 sm:px-5 sm:pt-4.5 sm:pr-13 pointer-coarse:pr-15">
         <div className="min-w-0 flex-1">
