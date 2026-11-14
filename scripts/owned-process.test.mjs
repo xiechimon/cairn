@@ -5,7 +5,13 @@ import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { ownedScopeAvailable, ownerChain, processInfo, spawnOwned } from './owned-process.mjs';
+import {
+  ownedScopeAvailable,
+  ownerChain,
+  parsePsInfo,
+  processInfo,
+  spawnOwned,
+} from './owned-process.mjs';
 import { makeTestTempDir } from './test-tmpdir.mjs';
 
 const CLI = join(import.meta.dirname, 'owned-process.mjs');
@@ -200,6 +206,23 @@ test('the parent owner chain is every ancestor up to the subreaper', () => {
     ownerChain(30, 'session', (pid) => (pid === 20 ? { ...table[20], comm: 'zsh' } : info(pid))),
     [],
   );
+});
+
+test('parsePsInfo reads the macOS ps line, trailing newline included', () => {
+  assert.deepEqual(
+    parsePsInfo(
+      25667,
+      '25381 Sat Nov 14 18:20:54 2026     /Users/me/.local/share/fnm/node-versions/v24.14.0/installation/bin/node\n',
+    ),
+    { pid: 25667, ppid: 25381, start: 'Sat Nov 14 18:20:54 2026', comm: 'node' },
+  );
+  assert.deepEqual(parsePsInfo(7, '    1 Mon Nov  3 09:05:01 2026     /sbin/launchd\n'), {
+    pid: 7,
+    ppid: 1,
+    start: 'Mon Nov  3 09:05:01 2026',
+    comm: 'launchd',
+  });
+  assert.equal(parsePsInfo(7, ''), null);
 });
 
 test('processInfo reads this process', () => {
