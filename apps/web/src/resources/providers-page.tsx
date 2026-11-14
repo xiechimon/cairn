@@ -221,9 +221,11 @@ function machineEntries(
         id: 'gemini',
         name: 'Gemini CLI',
         Mark: GeminiMark,
-        status: t('还没上报'),
+        status: enabled.has('gemini') ? t('还没上报') : t('接入命令闸前不能开启'),
         tone: 'off',
-        toggle: switchFor('gemini'),
+        toggle: enabled.has('gemini')
+          ? switchFor('gemini')
+          : { ...switchFor('gemini'), disabled: true },
       },
       editor: <GeminiEditor machineName={machine.name} />,
     },
