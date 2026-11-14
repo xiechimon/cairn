@@ -48,7 +48,7 @@ jobs:
           ops_selftests=true
           web_ui=false
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            if ! git diff --name-only "$PREPUSH_BASE_SHA" HEAD | grep -qE '^(scripts/|\.github/|packages/shared/|\.mergify\.yml$|package\.json$|pnpm-lock\.yaml$)'; then
+            if ! git diff --name-only "$PREPUSH_BASE_SHA" HEAD | grep -qE '^(scripts/|\.github/|ops/langfuse/|packages/shared/|\.mergify\.yml$|package\.json$|pnpm-lock\.yaml$)'; then
               ops_selftests=false
             fi
             if git diff --name-only "$PREPUSH_BASE_SHA" HEAD | grep -q '^apps/web/src/'; then
@@ -612,6 +612,10 @@ jobs:
       - name: Scoped root runner for ops scripts (#2362)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/ops/cairn-ops/run.test.mjs scripts/ops/cairn-ops/install.test.mjs
+
+      - name: Langfuse code evaluator isolation
+        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
+        run: node --test scripts/ops/langfuse-code-eval.test.mjs
 
   ops-backup-test:
     needs: changes

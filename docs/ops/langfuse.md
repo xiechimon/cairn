@@ -64,7 +64,7 @@ docker compose ps
 curl -sf "http://127.0.0.1:3000/api/public/health"
 ```
 
-On first start `langfuse-web` runs the Postgres / ClickHouse migrations; measured about 8 minutes on omarchy, during which health connections being reset is normal. Continue only after health returns JSON and all six containers in `docker compose ps` are healthy / running. UI: `http://127.0.0.1:3000`.
+On first start `langfuse-web` runs the Postgres / ClickHouse migrations; measured about 8 minutes on omarchy, during which health connections being reset is normal. Continue only after health returns JSON and all eight containers in `docker compose ps` are healthy / running. UI: `http://127.0.0.1:3000`.
 
 ## Creating the project and getting the key pair
 
@@ -264,6 +264,62 @@ secrets are not guaranteed to match. Abrupt daemon termination can lose pending
 spans. Gemini ACP still inherits its process environment and does not receive
 Cairn's per-step OTel configuration; this change is limited to Claude Code.
 
+## Code evaluators (hardened dispatcher)
+
+Langfuse code evaluators run owner-written TypeScript against an observation and return scores. v4.68.0 ships two dispatchers: `insecure-local` runs the source inside the worker process with `node:vm`, which can reach the worker's database, ClickHouse and LLM credentials, and `aws-lambda`. This stack uses `aws-lambda` against a local AWS Lambda Runtime Interface Emulator so evaluator code never runs inside the worker.
+
+```
+langfuse-worker ──(code-eval-ingress)──> code-eval-gateway ──(code-eval-sandbox)──> code-eval-runner
+```
+
+| Service | Role |
+|---|---|
+| `code-eval-runner` | Official `public.ecr.aws/lambda/nodejs:24` image (pinned by digest) with Langfuse's own `code-based-eval-handler.mjs` from v4.68.0, copied unchanged into `ops/langfuse/code-eval-runner/`. It runs as `65534`, with a read-only root filesystem, a 16 MiB `noexec` tmpfs, all capabilities dropped, 256 MiB of memory, half a CPU, 64 processes, no secrets and no published ports. `AWS_LAMBDA_FUNCTION_TIMEOUT=2` makes the emulator kill an invocation after 2 seconds and restart the runtime for the next one. |
+| `code-eval-gateway` | A TCP forwarder (`code-eval-gateway.mjs`) on the two code-eval networks. It listens only on its `code-eval-ingress` address and always forwards to `code-eval-runner:8080`, so the evaluator has no way to reach the worker, the web container, a database or the host, and the worker is never on the evaluator's network. |
+| `langfuse-worker` | `LANGFUSE_CODE_EVAL_DISPATCHER=aws-lambda`, the endpoint `http://code-eval-gateway:8080`, function name `function` (the emulator's only route), `LANGFUSE_CODE_EVAL_EXECUTION_WORKER_CONCURRENCY=1`, and dummy AWS signing values that exist only in this service. |
+| `langfuse-web` | `LANGFUSE_CODE_EVAL_DISPATCHER=aws-lambda`, so the UI offers code evaluators. It has no AWS values and is not on a code-eval network. |
+
+Both code-eval networks are `internal` and use `gateway_mode_ipv4: isolated`, so Docker assigns the bridge no address on the host. An `internal` network alone still leaves the host reachable on the bridge address. TypeScript is the only supported language: the Python function name keeps its default and fails with a configuration error.
+
+### Applying it to the live stack
+
+From `ops/langfuse/` after this change is on `main`:
+
+```sh
+docker compose up -d --build
+docker compose ps
+```
+
+This recreates `langfuse-web` and `langfuse-worker` and starts the two new containers. Then check the isolation and one invocation:
+
+```sh
+for n in code-eval-ingress code-eval-sandbox; do
+  docker network inspect "cairn-langfuse_$n" --format '{{.Internal}}'
+  ip -4 addr show "br-$(docker network inspect "cairn-langfuse_$n" --format '{{.Id}}' | cut -c1-12)" | grep -c inet
+done
+docker compose exec -T langfuse-worker node -e "fetch('http://code-eval-gateway:8080/2015-03-31/functions/function/invocations',{method:'POST',body:JSON.stringify({code:{source:'function evaluate(){return {scores:[{name:\"smoke\",value:1,dataType:\"NUMERIC\"}]}}'},payload:{}})}).then(r=>r.text()).then(console.log)"
+```
+
+The loop prints `true` then `0` for each network. The invocation prints `{"scores":[{"name":"smoke","value":1,"dataType":"NUMERIC"}]}`. A non-zero count means the Docker Engine ignored `gateway_mode_ipv4: isolated`; the change was verified on Docker Engine 29.9.2, so upgrade before relying on it.
+
+To roll back, remove `LANGFUSE_CODE_EVAL_DISPATCHER` from `x-langfuse-env`, delete the `code-eval-*` services and run `docker compose up -d --remove-orphans`.
+
+### Writing an evaluator
+
+An evaluator is `function evaluate(ctx)` returning `{ scores: [...] }`. `ctx.observation` carries `input`, `output`, `metadata` and `toolCalls`; `ctx.experiment` carries `itemExpectedOutput` and `itemMetadata` for experiment items. A rule with the filters `isExperimentItemRootSpan = true` and `datasetId` scopes an evaluator to one dataset's experiment runs. Create them in the UI, or with `POST /api/public/v2/evaluators` (`type: "code"`, `sourceCodeLanguage: "TYPESCRIPT"`) and `POST /api/public/v2/evaluation-rules`, using a project key held in your shell; do not put it in a file or a command line that is logged.
+
+Every failure leaves a `job_executions` row in `ERROR` and no score, which is how an unscored item shows up:
+
+| Evaluator does | Result |
+|---|---|
+| Throws | `ERROR` with the exception message |
+| Returns anything but `{ scores: [...] }` | `ERROR`, "invalid result" |
+| Returns more than 256 KB | `ERROR`, "result is too large" |
+| Runs longer than 2 seconds, or exhausts memory | `ERROR`, "invalid result"; the runner log shows `Task timed out after 2.00 seconds`. The next invocation runs normally |
+| Calls `fetch`, opens a socket, or resolves a name | Fails inside the runner; there is no DNS and no route out |
+
+The evaluator can write only to its 16 MiB `/tmp`. The environment it can read holds the emulator's own values and nothing from this stack.
+
 ## Binding to this machine or the LAN
 
 By default `BIND_ADDRESS=127.0.0.1`, so only processes on omarchy itself can reach the UI and OTLP.
@@ -343,6 +399,8 @@ Leave 15 GiB before starting; at 80% disk, enable retention first, then check th
 | Postgres | `docker.io/library/postgres:17.11` |
 | ClickHouse | `docker.io/clickhouse/clickhouse-server:25.12.11` (do not drift to 26.x, the query analyzer is incompatible) |
 | Redis | `docker.io/library/redis:7.4.11` |
+| code-eval-runner | `public.ecr.aws/lambda/nodejs:24@sha256:eb0de3ee81b4638149f0b1bcab2c657603a23a0c221a4b5678be29b48265bd31`, built locally with Langfuse's v4.68.0 `code-based-eval-handler.mjs` |
+| code-eval-gateway | the `langfuse-worker` image running `code-eval-gateway.mjs` |
 | MinIO | `cgr.dev/chainguard/minio@sha256:73297936408b731668ca0e835ac9add1a35cb6026a125c2f0cd476d9ef48222c` (MinIO no longer publishes container images, and the official Langfuse compose also switched to the Chainguard build; the Chainguard free tier only has `latest`, so it is pinned by digest) |
 
 Upgrade: change this table and the same set of tags in `ops/langfuse/docker-compose.yml`, stop the stack, `docker compose pull`, `up -d`. Langfuse runs migrations by itself within the same major version; for a major version, read the official upgrade guide first.
