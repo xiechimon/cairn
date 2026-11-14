@@ -25,7 +25,7 @@ import { settingsHref } from '../settings/settings-href.js';
 import { CoordinatorComputer } from './computer-feed.js';
 import { MachineScreenSurface, ScreenPlaceholder } from './computer-screen.js';
 import { ComputerControlBar, ComputerScreenDialog } from './computer-screen-dialog.js';
-import { machineStateLabel } from './fleet-status.js';
+import { fleetStatus, fleetStatusLine, machineStateLabel } from './fleet-status.js';
 import { desktopControlOnline } from './machine-capabilities.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { useOpenThread } from './thread-link.js';
@@ -135,10 +135,13 @@ export function MachineChip({
   const { t } = useI18n();
   const connected = useConnected();
   const host = coordinatorMachine(machines);
-  const label =
-    host === null
-      ? t('电脑')
-      : `${t('电脑')} · ${host.name} · ${connected ? machineStateLabel(host, t) : t('连接断开，正在重连…')}`;
+  const fleet = fleetStatus(machines);
+  const label = joinMeta([
+    t('电脑'),
+    host?.name,
+    host === null ? null : connected ? machineStateLabel(host, t) : t('连接断开，正在重连…'),
+    fleetStatusLine(fleet, t),
+  ]);
   return (
     <IconTooltip
       label={label}
@@ -160,6 +163,25 @@ export function MachineChip({
       }
     >
       <Laptop aria-hidden="true" className={round ? 'size-5.5' : undefined} />
+      {fleet.online + fleet.offline > 0 && (
+        <span
+          aria-hidden="true"
+          data-slot="fleet-badge"
+          data-fleet={fleet.offline > 0 ? 'offline' : 'online'}
+          className={cn(
+            'absolute size-2 rounded-full ring-2',
+            round ? 'right-2.5 bottom-3 ring-popover' : 'right-1 bottom-1.5 ring-background',
+            fleet.online === 0
+              ? cn(
+                  'rounded-full border bg-background',
+                  fleet.offline > 0 ? 'border-destructive' : 'border-content-tertiary',
+                )
+              : fleet.offline > 0
+                ? 'bg-destructive'
+                : 'bg-running',
+          )}
+        />
+      )}
     </IconTooltip>
   );
 }

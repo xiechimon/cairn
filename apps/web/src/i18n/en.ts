@@ -1633,8 +1633,6 @@ export const EN: Record<string, string> = {
   模型列表: 'Models',
   '已安装，登录状态未知': 'Installed, sign-in unknown',
   '{online}/{total} 台电脑在线': '{online} of {total#1 computer|# computers} online',
-  '{online} 台在线': '{online} online',
-  '{online} 在线 · {offline} 离线': '{online} online · {offline} offline',
   '{online} 台在线 · {offline} 台离线（{names}）': '{online} online · {offline} offline ({names})',
   设置分区: 'Settings sections',
   搜索设置: 'Search settings',
