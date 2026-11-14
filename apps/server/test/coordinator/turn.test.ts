@@ -207,12 +207,21 @@ describe('runCoordinatorTurn', () => {
       now: () => 1,
     };
     const started = Date.now();
-    setTimeout(() => api.stopRequested.add('step-stop'), 200);
+    const stopOnText = setInterval(() => {
+      if (api.deltas.length > 0) api.stopRequested.add('step-stop');
+    }, 10);
     const result = await runCoordinatorTurn(deps, chiefStep('step-stop', 'long one'));
+    clearInterval(stopOnText);
     expect(result.status).toBe('stopped');
     expect(Date.now() - started).toBeLessThan(3_000);
     expect(api.dones).toEqual([{ stepId: 'step-stop', body: { status: 'stopped' } }]);
     expect(new Set(api.stopPolls)).toEqual(new Set(['step-stop']));
+    const kept = api.rows.filter((r) => r.stepId === 'step-stop');
+    expect(kept).toHaveLength(1);
+    expect(kept[0]?.row.content).toEqual([{ type: 'text', text: expect.any(String) }]);
+    const text = ((kept[0]?.row.content ?? []) as { text: string }[])[0]?.text ?? '';
+    expect(text.startsWith('answer')).toBe(true);
+    expect(text.length).toBeLessThan(`answer ${'x '.repeat(60)}`.trim().length);
 
     const polls = api.stopPolls.length;
     await new Promise((r) => setTimeout(r, 100));
