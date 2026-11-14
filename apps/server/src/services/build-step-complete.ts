@@ -253,11 +253,26 @@ export function completeStep(
     confirmDeliveredPlan(deps, stepRow.buildId);
     return;
   }
+  const keepInfoReport = () => {
+    if (outcome.report === undefined || deps.attachmentsDir === undefined) return;
+    storeInfoReport(
+      { db: deps.db, attachmentsDir: deps.attachmentsDir },
+      {
+        buildId: stepRow.buildId,
+        teamId: todoRow.teamId,
+        createdBy: deps.user.id,
+        report: outcome.report,
+      },
+    );
+    const stored = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+    if (stored) publishBuild(deps, stored);
+  };
   if (
     isBuildStepKind(stepRow.kind) &&
     canTransitionPhase(todoRow.phase, 'needs_input') &&
     pendingWorkerQuestions(deps.db, stepRow.buildId).length > 0
   ) {
+    if (todoRow.output === 'info') keepInfoReport();
     setTodoPhase(
       deps,
       todoRow.id,
@@ -267,19 +282,7 @@ export function completeStep(
     return;
   }
   if (isBuildStepKind(stepRow.kind) && todoRow.output === 'info') {
-    if (outcome.report !== undefined && deps.attachmentsDir !== undefined) {
-      storeInfoReport(
-        { db: deps.db, attachmentsDir: deps.attachmentsDir },
-        {
-          buildId: stepRow.buildId,
-          teamId: todoRow.teamId,
-          createdBy: deps.user.id,
-          report: outcome.report,
-        },
-      );
-      const stored = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
-      if (stored) publishBuild(deps, stored);
-    }
+    keepInfoReport();
     setTodoPhase(deps, todoRow.id, 'review', { hasChanges: false });
     return;
   }

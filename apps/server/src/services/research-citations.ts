@@ -5,7 +5,7 @@ import {
   quoteIssueLines,
   RESEARCH_DATA_NOTE,
 } from '@cairn/shared';
-import { and, asc, eq, isNotNull, isNull, notExists, notInArray, or, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, ne, notExists, notInArray, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
@@ -431,6 +431,7 @@ export function planResearchCitationChecks(deps: BuildDeps): void {
     .where(
       and(
         eq(todo.output, 'info'),
+        ne(todo.phase, 'needs_input'),
         isNull(todo.archivedAt),
         isNotNull(build.reportAttachmentId),
         or(sql`${todo.sourceKind} IN ('research-intake', 'research-stuck')`, eq(tier, 2)),
