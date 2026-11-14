@@ -607,6 +607,9 @@ async function tryClaim(
           .map((answer) => answer.requestId)
           .filter((requestId) => decided.has(requestId))
       : [];
+    const charter =
+      db.select({ charter: chief.charter }).from(chief).where(eq(chief.teamId, teamId)).get()
+        ?.charter ?? '';
     return {
       step: {
         id: cand.stepRow.id,
@@ -644,6 +647,7 @@ async function tryClaim(
         ...(projectRow?.instructions != null ? { instructions: projectRow.instructions } : {}),
         repo,
       },
+      ...(charter.trim() !== '' ? { team: { charter } } : {}),
       agent: {
         id: agentRow.id,
         displayName: agentRow.displayName,

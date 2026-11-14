@@ -140,6 +140,7 @@ export function composeWorkerSystemPrompt(
   opts?: {
     taskMeta?: { currentTitle: string; meta?: TaskMetaForm };
     attachments?: boolean;
+    teamCharter?: string;
     project?: { name: string; instructions?: string | undefined };
   },
 ): string | undefined {
@@ -150,6 +151,7 @@ export function composeWorkerSystemPrompt(
     );
   }
   if (description) parts.push(description);
+  if (opts?.teamCharter) parts.push(`## 团队章程\n${opts.teamCharter}`);
   if (opts?.project?.instructions) {
     parts.push(`## 项目说明（${opts.project.name}）\n${opts.project.instructions}`);
   }
