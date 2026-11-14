@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readFileSync,
   realpathSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
@@ -570,6 +571,29 @@ describe('orb computer link failures', () => {
     await running;
     expect(lastFrame(fake.frames)).toMatchObject({ kind: 'error', delivery: 'unknown' });
     expect(fake.frames.filter((frame) => frame.kind === 'done')).toHaveLength(0);
+  });
+
+  test('a computer restarted outside the daemon gets a fresh socket in its new runtime directory', async () => {
+    const orb = makeProvider({ connectTimeoutMs: 3_000 });
+    const first = fakeClient();
+    const dispatcher = createComputerDispatcher({ client: first.client, orb, ...FAST });
+    const running = dispatcher.dispatch(call({ command: 'sleep 30' }));
+    const guest = await fakeGuest('good');
+    await until(() =>
+      guest.frames.some((frame) => (frame as { method?: string })?.method === 'execute'),
+    );
+    guest.socket.destroy();
+    await running;
+    const directory = path.join(runtime, NAME);
+    rmSync(directory, { recursive: true });
+    mkdirSync(directory, { mode: 0o700 });
+    startGuest();
+    const second = fakeClient();
+    await createComputerDispatcher({ client: second.client, orb, ...FAST }).dispatch(
+      call({ command: 'echo after-restart' }),
+    );
+    expect(stdoutOf(second.frames)).toContain('after-restart');
+    expect(lastFrame(second.frames)).toMatchObject({ kind: 'done', exitCode: 0 });
   });
 
   test('a guest that disconnects mid-file-write gives an unknown-delivery error', async () => {
