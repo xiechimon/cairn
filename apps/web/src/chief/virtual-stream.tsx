@@ -1,4 +1,10 @@
-import { defaultRangeExtractor, type Range, useVirtualizer } from '@tanstack/react-virtual';
+import {
+  defaultRangeExtractor,
+  type Range,
+  type Rect,
+  useVirtualizer,
+  type VirtualItem,
+} from '@tanstack/react-virtual';
 import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react';
 import { FOLLOW_THRESHOLD } from '../components/chat/jump-to-latest.js';
 
@@ -12,17 +18,28 @@ function keepNewestRowMounted(range: Range): number[] {
   return indexes;
 }
 
+interface StreamSnapshot {
+  items: VirtualItem[];
+  rect: Rect | null;
+  scrollMargin: number;
+}
+
+const snapshots = new Map<string, StreamSnapshot>();
+
 export function VirtualStream({
+  cacheKey,
   keys,
   renderRow,
   viewportRef,
 }: {
+  cacheKey: string;
   keys: readonly (string | number)[];
   renderRow: (index: number) => ReactNode;
   viewportRef: RefObject<HTMLDivElement | null>;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
-  const [scrollMargin, setScrollMargin] = useState(0);
+  const [restored] = useState(() => snapshots.get(cacheKey));
+  const [scrollMargin, setScrollMargin] = useState(restored?.scrollMargin ?? 0);
   const virtualizer = useVirtualizer({
     count: keys.length,
     getScrollElement: () => viewportRef.current,
@@ -32,6 +49,8 @@ export function VirtualStream({
     rangeExtractor: keepNewestRowMounted,
     anchorTo: 'end',
     initialOffset: Number.MAX_SAFE_INTEGER,
+    initialMeasurementsCache: restored?.items ?? [],
+    ...(restored?.rect != null ? { initialRect: restored.rect } : {}),
     scrollEndThreshold: FOLLOW_THRESHOLD,
     scrollMargin,
   });
@@ -44,6 +63,22 @@ export function VirtualStream({
     );
     if (top !== scrollMargin) setScrollMargin(top);
   });
+  useLayoutEffect(() => {
+    const viewport = listRef.current?.closest<HTMLElement>(
+      '[data-slot="message-scroller-viewport"]',
+    );
+    if (viewport != null) viewport.scrollTop = viewport.scrollHeight;
+  }, []);
+  useLayoutEffect(
+    () => () => {
+      snapshots.set(cacheKey, {
+        items: virtualizer.takeSnapshot(),
+        rect: virtualizer.scrollRect,
+        scrollMargin: virtualizer.options.scrollMargin,
+      });
+    },
+    [cacheKey, virtualizer],
+  );
   return (
     <div
       ref={listRef}

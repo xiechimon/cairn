@@ -1183,6 +1183,7 @@ test('computer image builds from the base with the host mirrorlist read-only and
       /^ExecStart=\/usr\/lib\/systemd\/systemd-networkd-wait-online --ipv4 --operational-state=routable --timeout=60$/m,
     );
     assert.match(agent, /^Environment=DISPLAY=:1$/m);
+    assert.match(agent, /^Environment=AGENT_BROWSER_NO_VERSION_CHECK=1$/m);
     assert.match(agent, /^Environment=AGENT_BROWSER_EXECUTABLE_PATH=\/usr\/bin\/chromium$/m);
     assert.match(agent, /^Restart=always$/m);
     assert.match(agent, /^ExecStartPre=.*-S \/run\/cairn\/computer\.sock/m);

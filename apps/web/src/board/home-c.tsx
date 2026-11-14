@@ -11,7 +11,11 @@ import {
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useApiMutations, useProjects, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
+import {
+  ChiefConversation,
+  ChiefScrollProvider,
+  useMentionGroups,
+} from '../chief/chief-conversation.js';
 import { QuestionScopeContext } from '../chief/chief-question.js';
 import { ChiefStatusMark } from '../chief/chief-status-mark.js';
 import { questionDockState } from '../chief/question-dock-state.js';
@@ -31,7 +35,7 @@ import {
   ArchivedProjectBar,
   type ArchivedProjectState,
 } from './archived-project-bar.js';
-import { ComposerSetupHint } from './composer-setup-hint.js';
+import { ComposerSetupHint, useComposerSetupStep } from './composer-setup-hint.js';
 import {
   ComposerThreadTarget,
   ComposerThreadTargetMenu,
@@ -198,6 +202,8 @@ export function HomeC({
   const narrow = useNarrow();
   const { createTodo } = useApiMutations(teamId);
   const projectsQuery = useProjects(teamId, live);
+  const mentionGroups = useMentionGroups();
+  const setupStep = useComposerSetupStep();
   usePrs(teamId, undefined, live);
   const activeProjects = splitProjectsByArchive(projectsQuery.data ?? []).active;
   const saveProjectId =
@@ -580,6 +586,7 @@ export function HomeC({
           <OpenFileContext.Provider value={openFile}>
             <ConversationBoundary key={channelKey} resetKey={conversationResetKey}>
               <ChiefConversation
+                mentionGroups={mentionGroups}
                 chief={{
                   ...chiefData,
                   stream: conversation,
@@ -629,7 +636,7 @@ export function HomeC({
                       composerRef={composerRef}
                       onPick={thread.pick}
                     />
-                    <ComposerSetupHint />
+                    {setupStep !== null && <ComposerSetupHint next={setupStep} />}
                   </>
                 }
                 composerRef={(node) => {

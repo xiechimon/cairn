@@ -28,19 +28,17 @@ import type { DaemonLogger } from './log.js';
 import { type MachineApi, MachineApiError } from './machine-client.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
-import { deliverStepOutcome } from './step-deliver.js';
 import { prepareStepEnv } from './step-env.js';
 import { reportStepProvenance } from './step-executor-record.js';
+import { finishStepRun } from './step-finish.js';
 import { runLocalMergeStep } from './step-local-merge.js';
 import { newStepPassState } from './step-pass-events.js';
 import { runStepPasses } from './step-pass-loop.js';
-import { resolveStepPassOutcome, rewindAfterStep } from './step-pass-outcome.js';
 import { agentStepRefusal, prepareStepPromptDelivery } from './step-preflight.js';
 import { composeWorkerSystemPrompt, planStepPrompt, taskMetaOpts } from './step-prompt.js';
 import { resolveStepProvider } from './step-provider.js';
 import { StepSessionOpener } from './step-session-opener.js';
 import { composeStepSessionOpts } from './step-session-opts.js';
-import { settleStepGit } from './step-settle-git.js';
 import { stepMcpEndpoints } from './step-skill-tool.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { prepareStepTooling } from './step-tooling.js';
@@ -593,7 +591,6 @@ async function runClaimedStep(
     now,
     log: (line) => logger.step(line),
   });
-  const segments = stream.segments;
   const session: { current: AgentSessionHandle | null } = { current: null };
   sessionOpts.onClaudeRateLimit = (notice) => {
     forwardClaudeRateLimit(client, claimed.step.machineId, notice, (line) => logger.step(line));
@@ -638,75 +635,7 @@ async function runClaimedStep(
     await failStep(deps, heartbeat, stepId, passes.openError);
     return;
   }
-  const handle = session.current;
-  const continueId = opener.continueId;
-  let { usage } = passState;
-  const { sawChangeTool, sawDone } = passState;
-  deps.sessionHandles?.delete(stepId);
-  await segments.seal();
-  stream.flushDeltas();
-  if (opts.env?.CAIRN_ORB !== '1') clearInterval(heartbeat);
-  watchdog.stop();
-  askChannel.abort();
-  const stopReq = stop.settle();
-  const outcome = resolveStepPassOutcome({
-    pass: passState,
-    timeoutText: watchdog.message(),
-    watchdogTripped: watchdog.trippedArm !== null,
-    stopRequest: stopReq,
-    provider,
-    log: (message) => logger.step(message),
-  });
-  let { lastError } = outcome;
-  const { stopped, quotaBlock } = outcome;
-  if (!sawDone && handle !== null) usage = handle.usage();
-
-  await rewindAfterStep({
-    workspace: deps.workspace,
-    ws,
-    headAtStart,
-    attachmentVerify,
-    stopped,
-    stopRequest: stopReq,
-    reviewCheckout: checkout,
-    stepId,
-    transcript,
-    now,
-    log: (message) => logger.step(message),
-  });
-
-  const settledGit = await settleStepGit({
-    git: deps.workspace,
-    ws,
-    claimed,
-    stepId,
-    coAuthor: tokenRes.coAuthor ?? null,
-    appIdentity,
-    identity: stepIdentity,
-    mergeCredential: creds.git,
-    headAtStart,
-    stepStartMs,
-    runGit: withStepGit,
-    headCommit: attachmentVerify ? headAtStart : null,
-    hasChanges: isReview || attachmentVerify || readonlyWorkspace ? false : sawChangeTool,
-    lastError,
-    stopped,
-    closes: lastError === null && !stopped && !isReview && !attachmentVerify,
-    note: (id, content) => transcript.upsert({ id, role: 'system', content, createdAt: now() }),
-    log: (message) => logger.step(message),
-    logRaw: (message) => logger.raw(message),
-  });
-  lastError = settledGit.lastError;
-  const {
-    headCommit,
-    branchDrift,
-    artifactBranches,
-    hasChanges,
-    pushHookOutput,
-    preservedCommits,
-  } = settledGit;
-
-  await deliverStepOutcome({
+  await finishStepRun({
     client,
     journal,
     logger,
@@ -723,25 +652,33 @@ async function runClaimedStep(
     credentialValues,
     refreshGitToken: appCredential !== null ? async () => (await refreshGit()).password : null,
     transcript,
-    session: { sessionId: handle?.sessionId ?? continueId, sessionFile: handle?.sessionFile },
-    usage,
-    lastError,
-    stopped,
     isReview,
     attachmentVerify,
     infoReportFile: isInfoBuild ? reportFile : null,
-    quotaBlock,
     skillInjectionFacts: skillInjection.facts,
     uploadedEvidence: uploadedVerifyEvidence,
-    git: {
-      headCommit,
-      branchDrift,
-      artifactBranches,
-      hasChanges,
-      pushHookOutput,
-      preservedCommits,
-    },
     running,
+    passState,
+    handle: session.current,
+    continueId: opener.continueId,
+    provider,
+    stream,
+    watchdog,
+    askChannel,
+    stop,
+    forgetHandle: () => deps.sessionHandles?.delete(stepId),
+    stopHeartbeat: () => {
+      if (opts.env?.CAIRN_ORB !== '1') clearInterval(heartbeat);
+    },
+    headAtStart,
+    stepStartMs,
+    reviewCheckout: checkout,
+    readonlyWorkspace,
+    coAuthor: tokenRes.coAuthor ?? null,
+    appIdentity,
+    identity: stepIdentity,
+    runGit: withStepGit,
+    now,
   });
 }
 
