@@ -72,10 +72,14 @@ export function contextMeterLines(
   return [used, t('{at}时自动压缩', { at: compactTokens(locale, context.compactAt) })];
 }
 
-export function ContextMeterGlyph({ filled }: { filled: number }) {
-  const arc = contextMeterArcPath(filled);
+export function ContextMeterGlyph({ filled, busy = false }: { filled: number; busy?: boolean }) {
+  const arc = contextMeterArcPath(busy ? 25 : filled);
   return (
-    <svg viewBox={`0 0 ${VIEW} ${VIEW}`} aria-hidden="true" className="size-3.5">
+    <svg
+      viewBox={`0 0 ${VIEW} ${VIEW}`}
+      aria-hidden="true"
+      className={busy ? 'size-3.5 motion-safe:animate-spin' : 'size-3.5'}
+    >
       <circle
         cx={CX}
         cy={CY}
@@ -98,18 +102,26 @@ export function ContextMeterGlyph({ filled }: { filled: number }) {
   );
 }
 
-export type ContextMeterRingProps = { context?: ContextMeterReading | null };
+export type ContextMeterRingProps = {
+  context?: ContextMeterReading | null;
+  busy?: boolean;
+  loading?: boolean;
+};
 
-function useContextMeter(context: ContextMeterReading | null) {
+function useContextMeter(context: ContextMeterReading | null, loading: boolean) {
   const { t, locale } = useI18n();
   return {
     filled: contextPercentOf(context) ?? MOCK_CONTEXT_PERCENT,
-    lines: contextMeterLines(t, locale, context),
+    lines: loading ? [t('正在加载用量…')] : contextMeterLines(t, locale, context),
   };
 }
 
-export function ContextMeterRing({ context = null }: ContextMeterRingProps) {
-  const { filled, lines } = useContextMeter(context);
+export function ContextMeterRing({
+  context = null,
+  busy = false,
+  loading = false,
+}: ContextMeterRingProps) {
+  const { filled, lines } = useContextMeter(context, loading);
   return (
     <Tooltip>
       <TooltipTrigger
@@ -119,6 +131,7 @@ export function ContextMeterRing({ context = null }: ContextMeterRingProps) {
             size="icon"
             type="button"
             aria-label={lines.join(', ')}
+            aria-busy={busy || loading}
             data-testid="composer-context-meter"
             data-mock={context == null ? '' : undefined}
             data-percent={filled}
@@ -126,7 +139,7 @@ export function ContextMeterRing({ context = null }: ContextMeterRingProps) {
           />
         }
       >
-        <ContextMeterGlyph filled={filled} />
+        <ContextMeterGlyph filled={filled} busy={busy || loading} />
       </TooltipTrigger>
       <TooltipContent side="top" sideOffset={8} className="flex-col items-start gap-0.5">
         {lines.map((line, index) => (
@@ -139,16 +152,21 @@ export function ContextMeterRing({ context = null }: ContextMeterRingProps) {
   );
 }
 
-export function ContextMeterLine({ context = null }: ContextMeterRingProps) {
-  const { filled, lines } = useContextMeter(context);
+export function ContextMeterLine({
+  context = null,
+  busy = false,
+  loading = false,
+}: ContextMeterRingProps) {
+  const { filled, lines } = useContextMeter(context, loading);
   return (
     <div
       data-testid="composer-context-meter"
+      aria-busy={busy || loading}
       data-mock={context == null ? '' : undefined}
       data-percent={filled}
       className="flex h-8 items-center gap-2.5 px-2.5 text-meta tabular-nums text-content-tertiary"
     >
-      <ContextMeterGlyph filled={filled} />
+      <ContextMeterGlyph filled={filled} busy={busy || loading} />
       {lines.join(' · ')}
     </div>
   );
