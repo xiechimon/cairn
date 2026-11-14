@@ -18,6 +18,7 @@ import {
   isBackendRuntimeId,
   MACHINE_ORB_CONVERSATIONS_LIMIT,
   ORPHAN_WORKTREE_TTL_MS,
+  osPlatformOf,
 } from '@cairn/shared';
 import { AgentReachProbe } from './agent-reach.js';
 import { configuredAcpBackends, createGeminiBackend } from './backend/acp.js';
@@ -245,7 +246,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     const reach = agentReach.current();
     return {
       ...capabilitiesProbe(),
-      osPlatform: platform === 'linux' || platform === 'darwin' ? platform : 'other',
+      osPlatform: osPlatformOf(platform),
       confinement: availability?.observation(),
       codexLogin: readCodexLogin(paths.agentRuntimeDir),
       executor: orbProvider.kind,

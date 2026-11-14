@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   type MachineCapabilities,
   type MachineHardware,
+  osPlatformOf,
   parseClaudeMcpEntries,
 } from '@cairn/shared';
 
@@ -74,8 +75,7 @@ export function probeMachineHardware(diskPath: string): MachineHardware | undefi
 export function probeMachineCapabilities(sources: MachineCapabilitySources): MachineCapabilities {
   const hardware = probeMachineHardware(sources.skillsDir);
   return {
-    osPlatform:
-      process.platform === 'linux' || process.platform === 'darwin' ? process.platform : 'other',
+    osPlatform: osPlatformOf(process.platform),
     mcpServers: scanMcpSlugs(sources.mcpConfigPath),
     skills: scanSkillNames(sources.skillsDir),
     ...(hardware !== undefined ? { hardware } : {}),
@@ -113,8 +113,7 @@ export function createMachineCapabilitiesProbe(
     }
     const hardware = probeMachineHardware(sources.skillsDir);
     return {
-      osPlatform:
-        process.platform === 'linux' || process.platform === 'darwin' ? process.platform : 'other',
+      osPlatform: osPlatformOf(process.platform),
       mcpServers: mcpCache.value,
       skills: skillsCache.value,
       ...(hardware !== undefined ? { hardware } : {}),
