@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { HISTORY, mockLive, type Row, THREAD } from './chief-home-mock';
 import { evidenceShot } from './evidence';
-import { openReplySteps, pressOpenCoordinator } from './helpers.js';
+import { expectNoReplySteps, pressOpenCoordinator } from './helpers.js';
 
 test.describe('home is one continuous Coordinator chat (T1)', () => {
   test('a fresh home shows a greeting bubble with starter replies, the composer, and no floating Coordinator', async ({
@@ -97,7 +97,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(input).toHaveValue('看板拖完卡片计数不对');
   });
 
-  test('a reply carries a live task reference, a hand-off row and an expandable trace; reload keeps it', async ({
+  test('a reply carries a live task reference, a hand-off row and no steps view; reload keeps it', async ({
     page,
   }) => {
     await mockLive(page, { threads: [THREAD], messages: HISTORY });
@@ -129,8 +129,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     expect(handoffLine).toEqual({ ...replyLook, rule: 'none', chips: 0 });
     await expect(handoff.getByRole('link', { name: '修复看板拖拽后计数不刷新' })).toHaveAttribute('data-phase', 'building');
     await expect(stream.getByTestId('chief-turn-tools')).toHaveCount(0);
-    await openReplySteps(page, stream.getByTestId('chief-msg').filter({ hasText: '已经补给它了' }));
-    await expect(stream.getByTestId('chief-turn-tools').first()).toBeVisible();
+    await expectNoReplySteps(page, stream.getByTestId('chief-msg').filter({ hasText: '已经补给它了' }));
     await evidenceShot(page, 'home-chat.png');
     await page.reload();
     await expect(page.getByTestId('home-c').getByTestId('chief-stream')).toContainText(
