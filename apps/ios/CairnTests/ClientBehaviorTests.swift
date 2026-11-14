@@ -20,6 +20,10 @@ private func page(_ ids: [String], next: String?) -> String {
 }
 
 private func sentContent(_ request: URLRequest) -> String? {
+    (sentJSON(request) as? [String: Any])?["content"] as? String
+}
+
+private func sentJSON(_ request: URLRequest) -> Any? {
     guard let stream = request.httpBodyStream else { return nil }
     stream.open()
     defer { stream.close() }
@@ -30,7 +34,7 @@ private func sentContent(_ request: URLRequest) -> String? {
         guard count > 0 else { break }
         data.append(buffer, count: count)
     }
-    return (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["content"] as? String
+    return try? JSONSerialization.jsonObject(with: data)
 }
 
 @MainActor
@@ -304,6 +308,70 @@ final class ClientBehaviorTests: XCTestCase {
         stream.close()
         let body = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(buffer.prefix(count))) as? [String: String])
         XCTAssertEqual(body, ["token": "ab12", "environment": "sandbox"])
+    }
+
+    func testDecisionsHitTheRoutesTheWebAppUses() async throws {
+        let session = StubServer.session { request in
+            request.url?.path == "/api/todos/t1/orchestrate"
+                ? .init(status: 201, body: ##"{"thread":{"id":"chief_9","title":"#7","updatedAt":1,"lastTurnAt":null},"message":{"id":"m1"}}"##)
+                : .init(status: request.httpMethod == "PATCH" ? 200 : 202, body: #"{"delegated":true}"#)
+        }
+        let cairn = client(session)
+        try await cairn.approvePlan(buildId: "b1")
+        try await cairn.merge(buildId: "b1")
+        try await cairn.completeTask(taskId: "t1")
+        let thread = try await cairn.orchestrate(taskId: "t1")
+        XCTAssertEqual(thread.id, "chief_9")
+        XCTAssertEqual(StubServer.requests.map { "\($0.httpMethod ?? "") \($0.url?.path ?? "")" }, [
+            "POST /api/builds/b1/steps",
+            "POST /api/builds/b1/merge",
+            "PATCH /api/todos/t1",
+            "POST /api/todos/t1/orchestrate",
+        ])
+        XCTAssertEqual(sentJSON(StubServer.requests[0]) as? [String: String], ["action": "confirm"])
+        XCTAssertEqual(sentJSON(StubServer.requests[2]) as? [String: String], ["phase": "done"])
+    }
+
+    func testEachPhaseOffersTheWebAppsDecision() throws {
+        func task(_ phase: String, archived: Bool = false, build: Bool = true) throws -> TaskRecord {
+            let archivedAt = archived ? "1" : "null"
+            let buildId = build ? #""b1""# : "null"
+            let json = #"{"id":"t1","seqNum":7,"title":"x","spec":"","phase":"\#(phase)","phaseAt":1,"projectId":"p1","latestBuildId":\#(buildId),"archivedAt":\#(archivedAt)}"#
+            return try JSONDecoder().decode(TaskRecord.self, from: Data(json.utf8))
+        }
+        XCTAssertEqual(try task("todo").decision, .start)
+        XCTAssertEqual(try task("confirm").decision, .approve)
+        XCTAssertEqual(try task("failed").decision, .retry)
+        for phase in ["needs_input", "review", "building", "queued", "planning", "done"] {
+            XCTAssertNil(try task(phase).decision, phase)
+        }
+        XCTAssertNil(try task("failed", archived: true).decision)
+        XCTAssertNil(try task("confirm", build: false).decision)
+        XCTAssertTrue(try task("review").canComplete)
+        XCTAssertFalse(try task("review", archived: true).canComplete)
+        XCTAssertFalse(try task("confirm").canComplete)
+    }
+
+    func testOrchestratingLocksOnlyTasksWhoseTurnHasNotFailed() async throws {
+        let threads = ##"[{"id":"c1","title":"Coordinator","updatedAt":3,"lastTurnAt":null,"orchestration":null},{"id":"c2","title":"#7","updatedAt":2,"lastTurnAt":null,"orchestration":{"todoId":"t7","state":"running","error":null}},{"id":"c3","title":"#8","updatedAt":1,"lastTurnAt":null,"orchestration":{"todoId":"t8","state":"failed","error":"boom"}}]"##
+        let session = StubServer.session { request in
+            switch request.url?.path {
+            case "/api/teams/team_1/chief/threads": .init(status: 200, body: threads)
+            case "/api/conversations/c1/messages": .init(status: 200, body: page([], next: nil))
+            default: .init(status: 200, body: "[]")
+            }
+        }
+        let model = AppModel(client: client(session), team: Team(id: "team_1", name: "Team"))
+        try await model.refresh()
+        XCTAssertEqual(model.coordinator?.id, "c1")
+        XCTAssertEqual(model.orchestrating, ["t7"])
+    }
+
+    func testDecisionFailuresShowTheServerReasonOnlyForClientErrors() {
+        XCTAssertEqual(CairnError.server(status: 409, message: "Plan already approved").message(fallback: "Try again."), "Plan already approved")
+        XCTAssertEqual(CairnError.server(status: 500, message: "stack trace").message(fallback: "Try again."), "Try again.")
+        XCTAssertEqual(CairnError.server(status: 409, message: "").message(fallback: "Try again."), "Try again.")
+        XCTAssertEqual(CairnError.offline("timed out").message(fallback: "Try again."), CairnError.offline("timed out").errorDescription)
     }
 
     func testUnregisteringAcceptsAnEmptyNoContentReply() async throws {

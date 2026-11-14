@@ -16,6 +16,15 @@ enum CairnError: LocalizedError, Equatable {
     }
 }
 
+extension Error {
+    func message(fallback: String) -> String {
+        if case .server(let status, let message) = self as? CairnError {
+            return status < 500 && !message.isEmpty ? message : fallback
+        }
+        return localizedDescription
+    }
+}
+
 struct Credentials: Hashable, Sendable {
     let serverURL: URL
     let token: String
@@ -75,6 +84,23 @@ struct CairnClient: Sendable {
             cursor = older.nextCursor
         }
         return MessagePage(messages: messages, activeRun: latest.activeRun, nextCursor: nil)
+    }
+
+    func approvePlan(buildId: String) async throws {
+        let _: Accepted = try await post("/api/builds/\(buildId)/steps", body: ["action": "confirm"])
+    }
+
+    func merge(buildId: String) async throws {
+        let _: Accepted = try await post("/api/builds/\(buildId)/merge", body: [String: String]())
+    }
+
+    func orchestrate(taskId: String) async throws -> CoordinatorThread {
+        let result: SendResult = try await post("/api/todos/\(taskId)/orchestrate", body: [String: String]())
+        return result.thread
+    }
+
+    func completeTask(taskId: String) async throws {
+        let _: Accepted = try await post("/api/todos/\(taskId)", body: ["phase": "done"], method: "PATCH")
     }
 
     func registerPushDevice(teamId: String, token: String, environment: String) async throws {
@@ -200,9 +226,9 @@ struct CairnClient: Sendable {
         try await perform(authorized(url(path, query: query)))
     }
 
-    private func post<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
+    private func post<T: Decodable, B: Encodable>(_ path: String, body: B, method: String = "POST") async throws -> T {
         var request = authorized(url(path))
-        request.httpMethod = "POST"
+        request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(body)
         return try await perform(request)
