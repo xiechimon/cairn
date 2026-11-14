@@ -6,6 +6,7 @@ import {
   type JWTVerifyGetKey,
   SignJWT,
 } from 'jose';
+import pino from 'pino';
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 import { loadConfig } from '../src/config.js';
 import { createAccessVerifier } from '../src/lib/cloudflare-access.js';
@@ -184,6 +185,34 @@ describe('POST /api/auth/access', () => {
     });
     expect(res.status).toBe(403);
     expect(cookieOf(res)).toBe('');
+  });
+
+  test('every exchange logs its outcome without the email or the token', async () => {
+    const lines: string[] = [];
+    const logger = pino({ level: 'info' }, { write: (line: string) => lines.push(line) });
+    server = bootServer({
+      authToken: 'owner-token',
+      accessVerifier: createAccessVerifier(CONFIG, keys),
+      logger,
+    });
+    const outsider = await token({ email: 'other@example.com' });
+    const owner = await token();
+    await exchange(server, { 'cf-access-jwt-assertion': outsider });
+    await exchange(server, {});
+    await exchange(server, { 'cf-access-jwt-assertion': owner });
+    const outcomes = lines
+      .map((line) => JSON.parse(line) as { msg?: string; outcome?: string; status?: number })
+      .filter((entry) => entry.msg === 'access exchange')
+      .map((entry) => [entry.outcome, entry.status]);
+    expect(outcomes).toEqual([
+      ['not-allowed', 403],
+      ['invalid', 401],
+      ['owner', 200],
+    ]);
+    const text = lines.join('\n');
+    for (const secret of ['other@example.com', OWNER, outsider, owner]) {
+      expect(text).not.toContain(secret);
+    }
   });
 
   test('with Access identity not configured the exchange does not exist', async () => {
