@@ -1,6 +1,7 @@
 name: Cairn
 options:
   bundleIdPrefix: dev.cairn
+  developmentLanguage: en
   deploymentTarget:
     iOS: "26.0"
   createIntermediateGroups: true
@@ -26,6 +27,10 @@ targets:
       path: Cairn/Info.plist
       properties:
         CFBundleDisplayName: Cairn
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations:
+          - en
+          - zh-Hans
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

@@ -585,6 +585,7 @@ export type ChiefStreamItem =
         multiSelect?: boolean;
       }[];
       answers: { header: string; choices?: string[]; text?: string }[] | null;
+      todoId?: string;
     }
   | {
       kind: 'user';

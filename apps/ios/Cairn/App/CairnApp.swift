@@ -8,7 +8,7 @@ struct CairnApp: App {
         WindowGroup {
             RootView()
                 .environment(session)
-                .tint(Color("AccentColor"))
+                .tint(Color.ink)
         }
     }
 }
@@ -71,16 +71,22 @@ private struct RestoreView: View {
 
 struct MainTabs: View {
     let model: AppModel
-    @State private var tab = 0
+    @State private var tab = AppTab.chat
 
     var body: some View {
         TabView(selection: $tab) {
-            Tab("Needs you", systemImage: "tray", value: 0) {
-                InboxView(model: model)
+            Tab("Chat", systemImage: "bubble.left", value: AppTab.chat) {
+                CoordinatorView(model: model) { tab = .tasks }
+            }
+            Tab("Tasks", systemImage: "checklist", value: AppTab.tasks) {
+                TasksView(model: model)
             }
             .badge(model.inbox.count)
-            Tab("Coordinator", image: "CoordinatorGlyph", value: 1) {
-                CoordinatorView(model: model)
+            Tab("Made", systemImage: "shippingbox", value: AppTab.made) {
+                MadeView(model: model)
+            }
+            Tab("Computers", systemImage: "laptopcomputer", value: AppTab.computers, role: AppTab.computersRole) {
+                MachinesView(model: model)
             }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
@@ -89,15 +95,10 @@ struct MainTabs: View {
     }
 }
 
-extension Color {
-    static let canvas = Color("Canvas")
-    static let card = Color("Card")
-    static let ink = Color("Ink")
-    static let inkMuted = Color("InkMuted")
-    static let hairline = Color("Hairline")
-    static let userBubble = Color("UserBubble")
-    static let running = Color("Running")
-    static let failure = Color("Failure")
-    static let onAccent = Color("OnAccent")
-    static let waiting = Color("Waiting")
+enum AppTab: Hashable {
+    case chat, tasks, made, computers
+
+    static var computersRole: TabRole? {
+        if #available(iOS 27, *) { .prominent } else { nil }
+    }
 }

@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
-import { openReplySteps, verticalGap } from './helpers.js';
+import { verticalGap } from './helpers.js';
 
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: 'ian', avatarUrl: null };
@@ -411,7 +411,7 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     await expect(home.getByTestId('queued-message')).toHaveCount(0);
   });
 
-  test('a running turn leaves the answered turn above it alone: its tools show once, under the reply header', async ({
+  test('a running turn leaves the answered turn above it alone: no tool names show anywhere', async ({
     page,
   }) => {
     const call = (id: string, name: string, at: number) => ({
@@ -442,12 +442,11 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     const reply = home.getByTestId('chief-msg').filter({ hasText: '已派发 #9。' });
     await expect(reply).toHaveCount(1);
     await expect(reply.getByTestId('chief-turn-tools')).toHaveCount(0);
-    await openReplySteps(page, reply);
     await evidenceShot(page, 'tools-once.png');
     const question = home.getByTestId('chief-msg').filter({ hasText: '？' }).first();
     expect(await verticalGap(page, question, reply)).toBeLessThan(48);
     for (const name of ['pull_requests', 'issues', 'run_builds']) {
-      await expect(home.getByText(name, { exact: true })).toHaveCount(1);
+      await expect(home.getByText(name, { exact: true })).toHaveCount(0);
     }
   });
 
