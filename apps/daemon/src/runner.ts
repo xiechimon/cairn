@@ -59,6 +59,7 @@ import {
   resetStepPassForRetry,
   type StepPassEventContext,
 } from './step-pass-events.js';
+import { resolveStepPassOutcome, rewindAfterStep } from './step-pass-outcome.js';
 import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
 import {
   composeWorkerSystemPrompt,
@@ -68,7 +69,6 @@ import {
   taskMetaOpts,
 } from './step-prompt.js';
 import { resolveStepProvider } from './step-provider.js';
-import { stepQuotaBlock } from './step-quota-block.js';
 import { stepRemoteToolExecutor } from './step-remote-tools.js';
 import { settleStepGit } from './step-settle-git.js';
 import { sessionInjectedSkills, stepMcpEndpoints } from './step-skill-tool.js';
@@ -126,13 +126,8 @@ export interface RunStepOptions {
 
 export const PROVIDER_NETWORK_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 16_000] as const;
 
-export { RETRY_STORM_MAX };
-
-export function combineTimeoutWithRootCause(timeoutText: string, rootCause: string | null): string {
-  return rootCause !== null ? `${timeoutText}；根因: ${rootCause}` : timeoutText;
-}
-
 export {
+  RETRY_STORM_MAX,
   STREAM_DURATION_CAP_DEFAULT_MS,
   STREAM_DURATION_CAP_ENV,
   STREAM_FIRST_EVENT_ENV,
@@ -973,80 +968,40 @@ async function runClaimedStep(
     if (imageFailure !== null && (await retryWithoutImages(imageFailure))) continue;
     break;
   }
-  let { usage, lastError } = passState;
-  const {
-    lastModelError,
-    lastErrorWasProcessCrash,
-    sawChangeTool,
-    sawDone,
-    sawProgress,
-    retryStorm,
-    quotaTrip,
-  } = passState;
+  let { usage } = passState;
+  const { sawChangeTool, sawDone } = passState;
   deps.sessionHandles?.delete(stepId);
   await segments.seal();
   stream.flushDeltas();
   if (opts.env?.CAIRN_ORB !== '1') clearInterval(heartbeat);
   watchdog.stop();
   askChannel.abort();
-  const timeoutText = watchdog.message();
-  if (timeoutText !== null) {
-    lastError = combineTimeoutWithRootCause(timeoutText, lastError ?? lastModelError);
-  } else if (retryStorm && lastError === null && lastModelError !== null) {
-    lastError = lastModelError;
-  }
   const stopReq = stop.settle();
-  const stopped = stopReq !== null && !sawDone;
-  if (stopReq !== null && sawDone) logger.step('stop arrived after completion — ignored');
-  const quotaBlock = stepQuotaBlock({
+  const outcome = resolveStepPassOutcome({
+    pass: passState,
+    timeoutText: watchdog.message(),
+    watchdogTripped: watchdog.trippedArm !== null,
+    stopRequest: stopReq,
     provider,
-    quotaTrip,
-    stopped,
-    processCrash: lastErrorWasProcessCrash,
-    failureText: lastModelError ?? lastError,
+    log: (message) => logger.step(message),
   });
-  if (quotaBlock !== null && lastError === null) {
-    lastError = quotaBlock.reason;
-  }
-  if (watchdog.trippedArm === null && !stopped && !sawProgress && !sawDone && lastError === null) {
-    lastError =
-      'agent session ended with zero progress and no terminal outcome (silent no-op round)';
-    logger.step('zero-event round: session stream exhausted without progress, done, or error');
-  }
+  let { lastError } = outcome;
+  const { stopped, quotaBlock } = outcome;
   if (!sawDone && handle !== null) usage = handle.usage();
 
-  const rewindToStepStart = async (): Promise<string | null> => {
-    if (attachmentVerify) return null;
-    if (ws?.readonly === true) return null;
-    if (ws === null || !deps.workspace || headAtStart === null) return '步起点 commit 不可得';
-    try {
-      await deps.workspace.restoreCheckpoint(ws.cwd, headAtStart);
-      return null;
-    } catch (err) {
-      return err instanceof Error ? err.message : String(err);
-    }
-  };
-
-  if (stopped) {
-    logger.step(`step stopped by user (discard=${stopReq?.discard === true})`);
-    if (stopReq?.discard === true) {
-      const failed = await rewindToStepStart();
-      if (failed !== null) logger.step(`discard rewind failed: ${failed}`);
-    }
-  }
-
-  if (checkout) {
-    const failed = await rewindToStepStart();
-    if (failed !== null) {
-      logger.step(`review rewind failed: ${failed}`);
-      transcript.upsert({
-        id: `review-rewind-${stepId}`,
-        role: 'system',
-        content: `审核检出未能回退到本轮起点（${failed}）——本轮审核对工作区的写入可能残留，合并前请确认工作区状态`,
-        createdAt: now(),
-      });
-    }
-  }
+  await rewindAfterStep({
+    workspace: deps.workspace,
+    ws,
+    headAtStart,
+    attachmentVerify,
+    stopped,
+    stopRequest: stopReq,
+    reviewCheckout: checkout,
+    stepId,
+    transcript,
+    now,
+    log: (message) => logger.step(message),
+  });
 
   const settledGit = await settleStepGit({
     git: deps.workspace,
