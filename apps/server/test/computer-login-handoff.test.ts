@@ -8,6 +8,7 @@ import {
   computerCall as computerCallTable,
   computer as computerTable,
   machine as machineTable,
+  pushDelivery,
   pushSubscription,
   step as stepTable,
 } from '../src/db/schema.js';
@@ -359,7 +360,25 @@ describe('request_takeover', () => {
     expect(await result).toBe(NOT_DONE);
   });
 
-  test('sends exactly one push that opens the live screen', async () => {
+  test('a takeover with no subscribed device still leaves a push record', async () => {
+    const { s, deps } = boot();
+    const abort = new AbortController();
+    const result = forwardComputerCall(deps, 'sidecar', 'step-a', takeover(), {
+      ...FAST,
+      signal: abort.signal,
+    });
+    await waitForPending(s);
+    await vi.waitFor(() => {
+      const rows = s.db.select().from(pushDelivery).all();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.pushStatus).toBe('no-subscription');
+      expect(rows[0]?.message?.href).toBe(`/app?chief=${THREAD}`);
+    });
+    abort.abort();
+    await result;
+  });
+
+  test('sends exactly one push that opens the conversation', async () => {
     const { s, deps } = boot();
     s.db
       .insert(pushSubscription)
@@ -387,9 +406,10 @@ describe('request_takeover', () => {
     await result;
     expect(send).toHaveBeenCalledTimes(1);
     const payload = JSON.parse(String(send.mock.calls[0]![1])).notification;
-    expect(payload.title).toBe('Login needed');
+    expect(payload.title).toBe('需要你登录');
     expect(payload.body).toContain('log in to the job board');
-    expect(payload.navigate).toContain('/app?pane=machines&machine=omarchy&screen=1');
+    expect(payload.navigate).toContain(`/app?chief=${THREAD}`);
+    expect(s.db.select().from(pushDelivery).all()).toHaveLength(1);
   });
 });
 

@@ -1004,7 +1004,7 @@
       "id": "agent-computer",
       "name": "The agent's computer",
       "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed, desktop control, and a browser preference toggle in the web app.",
-      "states": "No computer; command feed empty, streaming, or settled; live screen enlarged with control; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere.",
+      "states": "No computer; command feed empty, streaming, or settled; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere.",
       "centrality": 1,
       "status": "partial",
       "code": {
@@ -1012,6 +1012,8 @@
           "apps/web/src/board/computer-feed.tsx",
           "apps/web/src/board/computer-screen.tsx",
           "apps/web/src/board/machines-panel.tsx",
+          "apps/web/src/board/computer-screen-dialog.tsx",
+          "apps/web/src/chief/takeover-card.tsx",
           "apps/web/src/board/machine-capabilities.ts"
         ],
         "server": [

@@ -55,3 +55,7 @@ export const COMPUTER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     }),
   },
 ];
+
+export const COMPUTER_HANDOFF_TIMEOUT_MS = 15 * 60_000;
+export const TAKEOVER_HANDED_BACK =
+  'The owner handed the computer back. Take a fresh browser_snapshot before acting.';
