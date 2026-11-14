@@ -1,27 +1,31 @@
 # 18 · Positioning and Differentiation (2026-10-02 #520 ruling finalized)
 
-> **Remaining-volumes reconciliation seal (2026-10-08, #1013 / #991 Q13)**: the #908 migration leftover "which remaining volumes to mark superseded" reconciliation closes here — this volume has **no surface voided by the UI shape chain (ADR 0009 motion-value surface → ADR 0010 site-wide overhaul → ADR 0012 official-form alignment)**: the positioning source of truth is independent of the shape chain (ADR 0012 D6 explicitly preserves ADR 0008's positioning two axes and the self-use-first criterion); §4's "todos.dev baseline re-photography and pixel parity" not-doing caliber is consistent with volume 06 D1's parity-obligation release. The original text remains wholly canon.
+> **Remaining-volumes reconciliation seal (2026-10-08, #1013 / #991 Q13)**: the #908 migration leftover "which remaining volumes to mark superseded" reconciliation closes here — this volume has **no surface voided by the UI shape chain (ADR 0009 motion-value surface → ADR 0010 site-wide overhaul → ADR 0012 official-form alignment)**: the positioning source of truth is independent of the shape chain (ADR 0012 D6 explicitly preserves ADR 0008's positioning two axes and the self-use-first criterion, which the second-person criterion replaced on 2026-11-14, §2); §4's "todos.dev baseline re-photography and pixel parity" not-doing caliber is consistent with volume 06 D1's parity-obligation release. The original text remains wholly canon.
 
 > Canonical status: this volume = the pacman positioning source of truth (thesis / criterion / two axes / what not to do / honesty list),
 > revising volume 06 D1's positioning narrative (**revision does not replace** — D1's other components stay valid).
-> Ruling chain: #515 criterion and two axes → #516 adversarial ruling (thesis final draft) → #520 carrier six items (user 2026-10-02 agree). → D55 three-pillar thesis (#2489, PR #2490; owner accepted 2026-11-01). → general-assistant thesis (owner decision, 2026-11-11; §1).
+> Ruling chain: #515 criterion and two axes → #516 adversarial ruling (thesis final draft) → #520 carrier six items (user 2026-10-02 agree). → D55 three-pillar thesis (#2489, PR #2490; owner accepted 2026-11-01). → general-assistant thesis (owner decision, 2026-11-11). → personal-assistant thesis and second-person criterion (owner decision, 2026-11-14; §1, §2).
 > Argument and trade-offs were in ADR 0008 (removed; see the git history at 608eabac0): **the ADR recorded why, this volume records what**.
 
 ## 0. Overview
 
 | # | Item | Ruling |
 |---|---|---|
-| P1 | Thesis | a self-hosted general assistant, not only a coding workspace (owner decision, 2026-11-11; full text §1). The evidence-bound merge gate, eval-gated harness changes and per-task orb isolation are capabilities, not the pitch |
-| P2 | Criterion | self-use first |
+| P1 | Thesis | a self-hosted personal assistant for one person who writes code: code work and personal affairs (mail, calendar, job search) in one loop; not a team product (owner decision, 2026-11-14; full text §1). The evidence-bound merge gate, eval-gated harness changes and per-task orb isolation are capabilities, not the pitch |
+| P2 | Criterion | a second person can run it (owner decision, 2026-11-14; replaces "self-use first"; §2) |
 | P3 | Semantic axis | machine-verified merge gate (ADR 0026 / 0028) plus eval-gated harness changes; human gates remain where the merge route sends work to the owner (§3.1) |
 | P4 | Runtime axis | aligned with the Multica runtime model: runtime = one computer × one CLI tool |
 | P5 | Not aligned | Multica's three philosophical tenets: no hard gates / status-first / daemon not a sandbox boundary; plus workers as the operator's OS user (DSH super-agent, sig) and merge rules as prompt text (DSH) (§3.3) |
 | P6 | Chief | the gates' established consumer (withdrawn from the differentiation pillar), survival ruled by real closed-loop measurement, including the slow-path share once #2487 lands |
 | P7 | Shape | one chief; the entry chosen by the user; output that is code passes the gates; whether to open a PR is only how the code lands (§3.5) |
 
-## 1. Thesis (owner decision, 2026-11-11)
+## 1. Thesis (owner decision, 2026-11-14)
 
-> **cairn is a self-hosted general assistant, not only a coding workspace.** You tell one Coordinator what you want; it opens a thread for each piece of work, and agents do that work on your own machines.
+> **cairn is a self-hosted personal assistant for people who write code.** You tell one Coordinator what you want, from code to your own affairs; it opens a thread for each piece of work, and agents do that work on your own machines and subscriptions. Anything that cannot be undone, such as merging, sending a mail or submitting an application, waits for your yes or passes a gate.
+
+One product, two kinds of project, one loop. A code project has a repository and lands through the merge gate. A personal project has no repository and holds the owner's own affairs, such as mail, calendar and job search; agents read, sort and draft there, and outward actions go through the one approval mechanism (the confirm-once class in `docs/design/ai-native-actions.md`). Both use the same channels, threads and decision cards; there is no second inbox or second approval system.
+
+Who it is for: one person who writes code or works alongside code, has a machine that can stay on, already pays for Claude Code, Codex or Gemini or holds an API key, and wants code, mail and credentials to stay on their own machines. It is for one person, not a team: someone else who wants it runs their own copy. Not for: teams that share channels, roles and billing (Amp Spaces, Multica); people who only want a better interface for driving one coding agent themselves (T3 Code); an assistant that lives in chat apps (OpenClaw, Hermes Agent); people who want a hosted service with nothing to install. README's "Who it's for" section carries the same lists.
 
 The review and merge machinery is one capability among others and is not the product's pitch. Evaluation and harness self-improvement stay in scope: they apply to a personal assistant as much as to coding work (owner, 2026-11-12). What is specific to coding is the bench content, not the ruler, the adoption judge or the trajectory capture. The work this direction adds is listed under "Direction: a general assistant" in `docs/design/home-redesign-backend-todo.md`.
 
@@ -37,7 +41,7 @@ The 2026-11-01 thesis read "cairn is a self-hosted agent team whose output is tr
 >
 > The router (chief / coordinator), the daemon and machine pairing are necessary plumbing: cairn matches the best existing designs there (thread-subscription fast path #2487, watchdog #2488, quiet by default #1784) rather than claiming them as differentiators.
 
-Why the thesis changed on 2026-11-11: the owner decided cairn is a general assistant whose planned work reaches past code (mail, job applications, a daily brief), so a pitch built on the merge gate describes one capability and not the product. Why it changed on 2026-11-01: the earlier thesis (#516, 2026-10-01: "two hard gates + AI review with teeth + versioned plan documents", scarcity against Multica and todos) predates ADR 0026 / 0028, which replaced the human merge gate with machine trust, and the 2026-11-01 walk showed two shipped products (DSH super-agent, sig) with cairn's routing shape: a resident router over isolated workers on the user's own machines is table stakes. The earlier text is in git history and in `docs/adr/0008`.
+Why the thesis changed on 2026-11-14: the owner wants cairn to write code and run his personal affairs in one product, and to be used by other people; he ruled out team features for now and set no order among mail, calendar and job search. "General assistant" did not say who the product is for, so it is replaced by a named audience. Why the thesis changed on 2026-11-11: the owner decided cairn is a general assistant whose planned work reaches past code (mail, job applications, a daily brief), so a pitch built on the merge gate describes one capability and not the product. Why it changed on 2026-11-01: the earlier thesis (#516, 2026-10-01: "two hard gates + AI review with teeth + versioned plan documents", scarcity against Multica and todos) predates ADR 0026 / 0028, which replaced the human merge gate with machine trust, and the 2026-11-01 walk showed two shipped products (DSH super-agent, sig) with cairn's routing shape: a resident router over isolated workers on the user's own machines is table stakes. The earlier text is in git history and in `docs/adr/0008`.
 
 In-volume terms (do not enter `CONTEXT.md` — that only manages product-domain entities):
 
@@ -46,13 +50,15 @@ In-volume terms (do not enter `CONTEXT.md` — that only manages product-domain 
 - **Versioned plan documents**: Plan / Changes class documents, comparable version by version, the object "looked at" on the gate.
 - **Evidence-bound**: a verdict counts only for the patch digest it judged (ADR 0021 D3); the independent review is additionally bound to the current head (ADR 0026).
 - **Semantic axis / runtime axis**: the semantic axis = how a task flows (gates, review, evidence, eval, state machine); the runtime axis = where a task runs (runtime, daemon, orb, self-hosted deployment).
-- **Self-use first**: sees §2.
+- **Second-person criterion**: see §2.
 
 **Maintenance trigger**: this thesis's scarcity has a clock. Any of these expires it the same day: the source-available camp (Multica etc.) adds hard gates; todos goes open-source or self-hosted; DSH or sig ships a merge gate bound to judged patches, a protected eval ruler, or per-task containers. On trigger, rewrite this section and README's lead sentence, leaving no hung thesis.
 
-## 2. Criterion: Self-Use First
+## 2. Criterion: A Second Person Can Run It (owner decision, 2026-11-14)
 
-Every trade-off first asks "do I really use it myself", then "is it differentiating" (#515, 2026-09-30 ruled). In a single-person self-use scenario market validation weighs little — 51k stars proves "no-gate has a market", not evidence that "gates have no value".
+Every trade-off first asks "can a second person run it": someone other than the owner, without the owner's help, installs cairn (`npx @xiechimon/cairn`), connects their own machine and their own subscription or API key, and gets a first result, such as a thread that merges a pull request or drafts a reply to a mail. Then it asks "is it differentiating".
+
+This replaces "self-use first" (#515, 2026-09-30), which asked "do I really use it myself" first. That question ranked last everything only a newcomer hits and the owner never does: unclear first-run guidance, errors only the owner can read, documents that assume the history, and settings that exist only on the owner's machine. The second person is still one person with their own copy; the criterion does not bring in team features (§4).
 
 Supporting discipline (#515 hard constraint): **reference implementation first, do not fabricate out of nothing** — any new mechanism first researches down to a running real implementation (Multica's open-source repo, todos official docs, Craft Agents, pi SDK), and if none found, mark `[inferred]` and degrade. Landing on the two axes: the semantic axis's mechanisms do not take Multica as reference (it has none); the runtime axis's mechanisms are not self-invented (it has an open-source implementation to read).
 
@@ -102,10 +108,11 @@ Construction tickets (2026-10-24; #1625 has since landed through #2050): #1623 (
 
 ## 4. What Not to Do (#515 Out of scope fixed)
 
-- Selling anything or gating features (owner plan D96–D105, 2026-11-06): all code is Apache-2.0 open source with DCO sign-off and no CLA, the current audience is individual developers, and only the private rotating eval holdout stays unpublished. No project-run hosted control plane and no resold compute (built-in models gateway / subscription billing stay out); credentials stay on the user's machine. Threads run on the app's machine, registered runners, or planned E2B/Daytona sandboxes with the user's own key.
+- Selling anything or gating features (owner plan D96–D105, 2026-11-06): all code is Apache-2.0 open source with DCO sign-off and no CLA, the audience is one person who writes code (§1), and only the private rotating eval holdout stays unpublished. No project-run hosted control plane and no resold compute (built-in models gateway / subscription billing stay out); credentials stay on the user's machine. Threads run on the app's machine, registered runners, or planned E2B/Daytona sandboxes with the user's own key.
 - The Squad object — Chief's subset, and explicitly "does not raise concurrency, does not merge agents"; only copy its wake-rule table, do not introduce the object.
 - Chief autonomous dispatch — first want "shutdown without breaking the chain", not "still deciding on its own when shut down".
-- Gantt view / multiple workspaces / third-party Git (Forgejo / Gitea / GitLab) — meaningless for self-use, killed outright.
+- Team features (owner decision, 2026-11-14): channels shared by several people, team roles and permissions, team billing. Another person uses cairn by running their own copy.
+- Gantt view / multiple workspaces / third-party Git (Forgejo / Gitea / GitLab) — meaningless for one person, killed outright.
 - Directly chasing Multica's integration-surface breadth (IM five, desktop app) — recorded as "possible future C class". Phone access today is Tailscale; embedded tsnet with automatic LAN / tailnet / optional Funnel routing is planned, and a hosted relay may come later.
 - todos.dev baseline re-photography and pixel parity — volume 06 D1 released the parity obligation.
 
@@ -118,7 +125,7 @@ Construction tickets (2026-10-24; #1625 has since landed through #2050): #1623 (
 1. **"Better" depends on unattended being real** — the gates' value proposition (queue up and leave, come back to check only two points) and the runtime axis (an always-on machine running at night) are each other's premise; when the real closed-loop measurement fails and a human stays present watching the run, the gates are just verbosity.
 2. **withPlan already measured — bypass dominates (2026-10-05 #892 measured)** — direct-execute skipping confirm is a built-in ability (`withPlan=false`), board drag can also bypass the funnel; measured (local 28 builds / 17 done cards): direct-execute 39% (chief dispatch 8/8 all direct), the confirm gate entered 13 times only 3 confirmed, the review main door passed only 1, 15/17 done cards landed through manual board phase changes (both gates skipped), versioned plan documents 0 rows. The "rubber stamp" did not appear (the only 4 human gate dwells were all substantive), but "bypass" holds — the degraded shape is really "two gates + a side door everyone walks", not "one gate + a ritual". Data and improvement-ticket suggestions: `docs/research/892-gate-usage-measurement.md`.
 3. **The runtime surface is currently in debt** — #518 inventoried 25 gaps (no runtime object / no capability advertisement / no liveness judgment / no task-level identity), of which 6 block #519. The differentiation thesis currently holds only on the semantic surface. (Historical, 2026-10-02; the D55 thesis adds per-task orb isolation on the runtime axis.)
-4. **single-person repo vs a live project** — Multica v0.6.0 (2026-09-28) is live; the security-fix and protocol-follow long-run risk cannot be refuted, only absorbed through self-use first.
+4. **single-person repo vs a live project** — Multica v0.6.0 (2026-09-28) is live; the security-fix and protocol-follow long-run risk cannot be refuted, only absorbed through daily use of cairn on real work.
 5. **Chief** — in a single-person self-use scenario the user is the orchestrator themselves; per the 2026-10-01 ruling it withdraws from the pillar, demoted to "the gates' established consumer", survival awaits real closed-loop measurement.
 
 #519 real closed-loop measurement debt (measured 2026-10-02, all three cleared after the fix tickets merged 2026-10-03; update this section as each fix ticket clears):
@@ -129,6 +136,7 @@ Construction tickets (2026-10-24; #1625 has since landed through #2050): #1623 (
 
 ## 6. Sources
 
+- Owner decisions of 2026-11-14 (Amp thread T-01a1d814-51d8-754a-b827-249c6ec75676): code and personal affairs in one product, one person and no team features, no fixed order among mail, calendar and job search, and the second-person criterion — §1, §2, §4.
 - #2489 / PR #2490 (hands-on walk of DeepSeek Harness's super-agent and sig, 2026-11-01) and plan decision D55 (owner accepted the three-pillar thesis, 2026-11-01) — §1 thesis, P3, P5, P6, maintenance trigger.
 - #515 (Map: pacman self-positioning) — criterion / two axes / Out of scope ruling.
 - #516 (Decision: why pacman exists — adversarial argument) — thesis final draft + three evidence items + honesty list five items.
