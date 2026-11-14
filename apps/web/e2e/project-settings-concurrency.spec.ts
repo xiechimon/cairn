@@ -36,7 +36,7 @@ test('project concurrency saves serial, a limit and back to no limit', async ({ 
 
   await page.goto('/app/project/cc-project/settings');
   const control = page.getByTestId('project-concurrency');
-  await expect(control.locator('[data-slot="select-value"]')).toHaveText('不限（跟随机器上限）');
+  await expect(control.locator('[data-slot="select-value"]')).toHaveText('不限（跟随 Runner 上限）');
   await control.click();
   await page.getByRole('option', { name: '串行，一次一个' }).click();
   await expect.poll(() => patches).toEqual([{ maxConcurrent: 1 }]);
@@ -45,6 +45,6 @@ test('project concurrency saves serial, a limit and back to no limit', async ({ 
   await control.click();
   await page.getByRole('option', { name: '最多 3 个' }).click();
   await control.click();
-  await page.getByRole('option', { name: '不限（跟随机器上限）' }).click();
+  await page.getByRole('option', { name: '不限（跟随 Runner 上限）' }).click();
   await expect.poll(() => patches).toEqual([{ maxConcurrent: 1 }, { maxConcurrent: 3 }, { maxConcurrent: null }]);
 });

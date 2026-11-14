@@ -51,7 +51,7 @@ export function useThreadUsage(todo: TodoRecord) {
       ]
     : [];
   const machineNames = machineIds.map(
-    (id) => machinesQuery.data?.find((machine) => machine.id === id)?.name ?? t('未知机器'),
+    (id) => machinesQuery.data?.find((machine) => machine.id === id)?.name ?? t('未知 Runner'),
   );
   const stepsComplete = live && stepQueries.every((query) => query.isSuccess);
   const summary = threadUsageSummary(

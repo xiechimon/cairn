@@ -51,7 +51,7 @@ export function carriedAnswers(claimed: ClaimedStep): { requestId: string; text:
 export function resumeMissNote(sessionId: string, claimed: ClaimedStep): string {
   const prior = claimed.session.priorMachineId;
   if (prior !== undefined && prior !== claimed.step.machineId) {
-    return `会话 ${sessionId} 在另一台机器上，本机无法续接。已改开新会话，按原任务继续。`;
+    return `会话 ${sessionId} 在另一台 Runner 上，本机无法续接。已改开新会话，按原任务继续。`;
   }
   return `本机找不到会话 ${sessionId}，无法续接。已改开新会话，按原任务继续。`;
 }

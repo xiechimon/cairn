@@ -62,7 +62,7 @@ test('secret: static-form face submit stays in the viewport', async ({ page }) =
 
 test('machine: disclosure expanded (tallest content state) bottom link stays in the viewport', async ({ page }) => {
   await page.goto('/app/resources/machines?scenario=06');
-  await page.getByRole('button', { name: '添加机器' }).click();
+  await page.getByRole('button', { name: '添加 Runner' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: '在云服务器上运行？改用 API key 注册' }).click();

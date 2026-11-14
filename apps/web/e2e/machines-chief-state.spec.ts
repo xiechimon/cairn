@@ -25,7 +25,7 @@ test('chief waiting for a machine: waiting status in the detail of the offline r
   await page.goto(CHIEF_STATE);
   await page.locator(ITEM).filter({ hasText: 'vps-relay' }).getByTestId('machine-toggle').click();
   await expect(page.locator(`${PANE} [data-orchestration="waiting"]`)).toHaveText(
-    'Coordinator 等待机器',
+    'Coordinator 等待 Runner',
   );
   await expect(page.locator(ITEM).filter({ hasText: 'vps-relay' }).getByTestId('machine-item-status')).toHaveText('离线');
 });

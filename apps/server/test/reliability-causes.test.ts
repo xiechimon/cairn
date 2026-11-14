@@ -15,7 +15,7 @@ const liveMessages: Array<{ message: string; cause: BuildCause; why: string }> =
   },
   {
     message:
-      '本轮无人认领：钉选的机器「mea」在线且有空闲并发位，但 10 分钟未认领本步（其 daemon 可能未在领取或为旧版串行循环）。请检查该机器的 daemon（重启或升级后重跑），或把任务的机器改为其它在线机器（重跑沿用任务的钉选）。',
+      '本轮无人认领：钉选的 Runner「mea」在线且有空闲并发位，但 10 分钟未认领本步（其 daemon 可能未在领取或为旧版串行循环）。请检查该 Runner 的 daemon（重启或升级后重跑），或把任务的 Runner 改为其它在线 Runner（重跑沿用任务的钉选）。',
     cause: 'unclaimed',
     why: 'the pinned machine held an idle slot and still never claimed the step',
   },
@@ -75,7 +75,7 @@ test('every cause has at least one message that reaches it, and no pattern steal
     timeout: 'stream timeout (arm=idle, 300000ms)',
     git: "git push failed (128): fatal: Authentication failed for 'https://x/y'",
     unstaffed: 'plan 步无指派 Agent：assignment 的 plan 槽为空，无人可领。',
-    unclaimed: '本轮无人认领：钉选的机器「mea」在线且有空闲并发位',
+    unclaimed: '本轮无人认领：钉选的 Runner「mea」在线且有空闲并发位',
     'session-lost': 'session abc not found on this machine (continue session impossible)',
     'agent-gave-up': 'agent session ended with zero progress and no terminal outcome',
     'gate-or-phase-bug': '方案结构不合格：plan must cite prior art',

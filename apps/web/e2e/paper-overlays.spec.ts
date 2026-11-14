@@ -110,8 +110,8 @@ test('dialog face: sheet surface, 12px corners, 15px sans title, 28px close', as
 test('split footer: hint left, actions right, no band fill', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto(MACHINES);
-  await page.getByRole('button', { name: '添加机器' }).first().click();
-  const dialog = page.getByRole('dialog', { name: '添加机器' });
+  await page.getByRole('button', { name: '添加 Runner' }).first().click();
+  const dialog = page.getByRole('dialog', { name: '添加 Runner' });
   await expect(dialog).toBeVisible();
   await settle(dialog);
   expect((await dialog.boundingBox())?.width).toBe(640);
@@ -139,8 +139,8 @@ test('split footer: hint left, actions right, no band fill', async ({ page }) =>
 test('footer stays on screen on a short viewport; only the body scrolls', async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 500 });
   await page.goto(MACHINES);
-  await page.getByRole('button', { name: '添加机器' }).first().click();
-  const dialog = page.getByRole('dialog', { name: '添加机器' });
+  await page.getByRole('button', { name: '添加 Runner' }).first().click();
+  const dialog = page.getByRole('dialog', { name: '添加 Runner' });
   await expect(dialog).toBeVisible();
   await settle(dialog);
   await dialog.getByRole('button', { name: '在云服务器上运行？改用 API key 注册' }).click();

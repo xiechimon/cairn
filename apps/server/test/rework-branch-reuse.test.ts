@@ -125,7 +125,7 @@ function makeWorld(opts: WorldOpts = {}): World {
       prevPhase: 'review',
       triggerSource: 'user',
       planDocId: null,
-      errorMessage: '本轮无人认领：团队当前没有在线机器',
+      errorMessage: '本轮无人认领：团队当前没有在线 Runner',
       prUrl: opts.prFields === false ? null : PR_URL,
       prNumber: opts.prFields === false ? null : PR_NUMBER,
       changes: null,
@@ -205,7 +205,7 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
       (m) => m.role === 'system' && systemRowOf(m.content)?.kind === BUILD_FAILURE_ROW_KIND,
     );
     expect(failures.map((m) => systemRowOf(m.content))).toEqual([
-      expect.objectContaining({ reason: '本轮无人认领：团队当前没有在线机器' }),
+      expect.objectContaining({ reason: '本轮无人认领：团队当前没有在线 Runner' }),
     ]);
     expect(rows.filter((m) => JSON.stringify(m.content).includes('本轮无人认领'))).toHaveLength(1);
 

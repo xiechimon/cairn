@@ -381,7 +381,7 @@ describe('#1286 recover-surface session degradation', () => {
     const note = client.uploads
       .flatMap((upload) => upload.messages)
       .find((message) => message.role === 'system');
-    expect(String(note?.content)).toContain('另一台机器');
+    expect(String(note?.content)).toContain('另一台 Runner');
     expect(String(note?.content)).not.toContain('本机找不到会话');
   });
 

@@ -148,7 +148,7 @@ describe('chief unread badge (#1303)', () => {
       .where(eq(stepTable.buildId, w.threadId))
       .run();
     const claimed = await w.claim();
-    await w.done(claimed.step.id, '机器回头：任务仍在跑，无需处理。');
+    await w.done(claimed.step.id, 'Runner 回头：任务仍在跑，无需处理。');
     expect(chiefNotif(w.s, w.threadId)).toBeUndefined();
     expect(await unreadChief(w.s, w.teamId)).not.toContain(w.threadId);
   });
@@ -183,7 +183,7 @@ describe('chief unread badge (#1303)', () => {
       .where(eq(stepTable.buildId, w.threadId))
       .run();
     const claimed = await w.claim();
-    await w.done(claimed.step.id, '机器回头：任务仍在跑，无需处理。', wakePrompt);
+    await w.done(claimed.step.id, 'Runner 回头：任务仍在跑，无需处理。', wakePrompt);
     expect(chiefNotif(w.s, w.threadId)).toBeUndefined();
     expect(await unreadChief(w.s, w.teamId)).not.toContain(w.threadId);
   });

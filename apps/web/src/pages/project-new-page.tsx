@@ -632,7 +632,7 @@ export function ProjectNewPage() {
           {repoSel === 'local' && (
             <div className={`${FIELD_NOTE_CLS} text-content-tertiary`}>
               {t(
-                '单机器形态：这台机器损坏时进度随机器走。需要在任意机器上续跑，请用 GitHub 接入。',
+                '单 Runner 形态：这台 Runner 损坏时进度随之丢失。需要在任意 Runner 上续跑，请用 GitHub 接入。',
               )}
             </div>
           )}

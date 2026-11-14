@@ -145,7 +145,7 @@ export function ProviderRow({
         {meta.length > 0 && <span className="truncate font-mono">{meta.join(' · ')}</span>}
         {provider.login === 'logged-out' && provider.loginCommand !== null && (
           <span className="truncate">
-            {t('在这台机器上运行')}{' '}
+            {t('在这台 Runner 上运行')}{' '}
             <code
               data-testid="provider-login-command"
               className="rounded-sm bg-secondary px-1.5 py-0.5 font-mono text-code text-foreground"
@@ -161,7 +161,7 @@ export function ProviderRow({
         aria-label={t('{name} 接任务', { name })}
         checked={provider.enabled}
         disabled={!toggleable || pending}
-        title={toggleable ? undefined : t('这台机器还不能单独开关 {name}', { name })}
+        title={toggleable ? undefined : t('这台 Runner 还不能单独开关 {name}', { name })}
         onCheckedChange={(next) => onToggle(next)}
       />
     </div>
@@ -196,7 +196,7 @@ export function MachineProvidersCard({
       <SettingsCard>
         {providers.length === 0 ? (
           <div className={cn(SETTINGS_ROW_CLS, 'text-meta text-content-tertiary')}>
-            {t('这台机器还没有上报 provider 状态')}
+            {t('这台 Runner 还没有上报 provider 状态')}
           </div>
         ) : (
           providers.map((provider) => (

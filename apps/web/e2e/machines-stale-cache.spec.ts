@@ -61,7 +61,7 @@ test('deleting the open machine drops it from the mounted list and collapses the
 
   await items.first().getByTestId('machine-menu').click();
   await page.getByTestId('machine-menu-delete').click();
-  await page.getByRole('alertdialog', { name: '删除机器' }).getByRole('button', { name: '删除' }).click();
+  await page.getByRole('alertdialog', { name: '删除 Runner' }).getByRole('button', { name: '删除' }).click();
 
   await expect(items).toHaveCount(1);
   await expect(items.first()).toContainText('beta');

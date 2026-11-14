@@ -146,7 +146,7 @@ const GROUPS: Group[] = [
   {
     heading: '执行环境',
     sections: [
-      { id: 'machines', label: '机器', Icon: Server, element: () => <MachinesPage /> },
+      { id: 'machines', label: 'Runner', Icon: Server, element: () => <MachinesPage /> },
       { id: 'skills', label: '技能', Icon: Puzzle, element: () => <SkillsPage /> },
       { id: 'mcp', label: 'MCP', Icon: Plug, element: () => <McpServersPage /> },
     ],

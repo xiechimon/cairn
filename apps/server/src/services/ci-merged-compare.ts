@@ -73,6 +73,6 @@ export function mergedCheckpointHint(
   if (status === 'missing')
     return `PR #${prNumber} 已在 GitHub 合并（合并时 head ${head}），但 GitHub 上找不到分支提交 ${cp}（可能从没推送过），无法确认它在这次合并里。任务留在审核关口。`;
   if (status === 'invalid')
-    return `PR #${prNumber} 已在 GitHub 合并，但机器回报的分支提交不是有效的提交 SHA，无法核对它是否在这次合并里。任务留在审核关口。`;
+    return `PR #${prNumber} 已在 GitHub 合并，但 Runner 回报的分支提交不是有效的提交 SHA，无法核对它是否在这次合并里。任务留在审核关口。`;
   return `PR #${prNumber} 已在 GitHub 合并（合并时 head ${head}），但分支提交 ${cp} 不是那个 head 的祖先：合并之后又推了提交，或分支被改写过。这部分改动可能还没进默认分支；任务留在审核关口，由人把这个提交另行合入默认分支。`;
 }

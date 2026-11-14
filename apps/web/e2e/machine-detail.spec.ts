@@ -35,7 +35,7 @@ test('menu delete opens a confirm layer first, cancel does not delete', async ({
   });
   await row(page).getByTestId('machine-menu').click();
   await page.getByTestId('machine-menu-delete').click();
-  const confirm = page.getByRole('alertdialog', { name: '删除机器' });
+  const confirm = page.getByRole('alertdialog', { name: '删除 Runner' });
   await expect(confirm).toBeVisible();
   await expect(confirm).toContainText('mea-wsl');
   await confirm.getByRole('button', { name: '取消' }).click();

@@ -133,12 +133,12 @@ export function readDefaultClaudeOauthExpiresAt(): number | null {
 export function claudeCodeAuthFailureMessage(machineName: string, cliMessage?: string): string {
   return [
     `${CLAUDE_CODE_AUTH_FAILURE_MARKER} `,
-    `claude-code 步骤无法在机器「${machineName}」上执行：该机器没有可用的 Claude Code 凭据`,
+    `claude-code 步骤无法在 Runner「${machineName}」上执行：该 Runner 没有可用的 Claude Code 凭据`,
     '（预检 `claude auth status` = 未登录）。',
-    '补法（在该机器上做，任选其一）：① 运行 `claude` 完成 /login；',
+    '补法（在该 Runner 上做，任选其一）：① 运行 `claude` 完成 /login；',
     '② 在 ~/.claude/settings.json 的 env 里配 ANTHROPIC_API_KEY 或 ANTHROPIC_AUTH_TOKEN；',
     '③ 配 apiKeyHelper 输出密钥。',
-    '凭据不跨机——每台要跑 claude-code 的机器各自配（cairn 不传登录态）。',
+    '凭据不跨机——每台要跑 claude-code 的 Runner 各自配（cairn 不传登录态）。',
     ...(cliMessage ? [`CLI 原因：${cliMessage}`] : []),
   ].join('');
 }

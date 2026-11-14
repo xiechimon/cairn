@@ -180,7 +180,7 @@ describe('recover reconciliation (02 §5.4 step journal recovery)', () => {
     });
     await waitFor(() => api.uploads.length === 1);
     const note = api.uploads[0]?.body.messages.find((message) => message.role === 'system');
-    expect(String(note?.content)).toContain('另一台机器');
+    expect(String(note?.content)).toContain('另一台 Runner');
     expect(String(note?.content)).not.toContain('本机找不到会话');
     await handle.stop();
     await handle.done;
@@ -238,7 +238,7 @@ describe('recover reconciliation (02 §5.4 step journal recovery)', () => {
     await waitFor(() => api.uploads.length === 1);
     const note = api.uploads[0]?.body.messages.find((message) => message.role === 'system');
     expect(String(note?.content)).toContain('本机找不到会话 local-1');
-    expect(String(note?.content)).not.toContain('另一台机器');
+    expect(String(note?.content)).not.toContain('另一台 Runner');
     await handle.stop();
     await handle.done;
   });

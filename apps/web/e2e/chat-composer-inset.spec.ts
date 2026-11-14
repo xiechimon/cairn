@@ -3,7 +3,7 @@ import { type MockState, mockLive, type Row, THREAD } from './chief-home-mock';
 import { evidenceShot } from './evidence';
 
 const STREAM = `/api/conversations/${THREAD.id}/stream`;
-const REPLY = '你想测试什么？可以试着问我一个问题，或让我查机器、技能、任务状态。';
+const REPLY = '你想测试什么？可以试着问我一个问题，或让我查 Runner、技能、任务状态。';
 const LONG_REPLY = Array.from({ length: 24 }, (_, n) => `第 ${n} 段 ${'流式文字 '.repeat(18)}`).join(
   '\n\n',
 );

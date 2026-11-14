@@ -130,9 +130,9 @@ test('pick result overrides a manually edited path during the dialog (last actio
 test('local pick state stays in the single-machine form annotation and does not occupy the status live area', async ({ page }) => {
   await stubBoot(page);
   await page.goto(NEW_PROJECT_LIVE);
-  await expect(page.getByText(/单机器形态/)).toHaveCount(0);
+  await expect(page.getByText(/单 Runner 形态/)).toHaveCount(0);
   await openLocalFace(page);
-  await expect(page.getByText(/单机器形态：这台机器损坏时进度随机器走/)).toBeVisible();
+  await expect(page.getByText(/单 Runner 形态：这台 Runner 损坏时进度随之丢失/)).toBeVisible();
 
   await expect(page.getByRole('status')).toHaveCount(0);
 });

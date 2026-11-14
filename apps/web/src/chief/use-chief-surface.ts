@@ -407,7 +407,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
           if (isCoordinatorNotReady(error))
             toastCoordinatorNotReady(
               t('Coordinator 还不能回答'),
-              t('点输入框下方的按钮，把模型来源、机器和 Coordinator 接上，再发一次。'),
+              t('点输入框下方的按钮，把模型来源、Runner 和 Coordinator 接上，再发一次。'),
             );
           else toastError(t('发送失败，请重试。'), error);
           throw error;
@@ -427,8 +427,8 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     ? (text: string, projectId: string | null) => {
         const sessionMachineId = routingRules?.find((rule) => rule.use === 'session')?.machineId;
         if (activeThread == null && needsMachineName(machines, sessionMachineId)) {
-          toast.warning(t('先选择机器'), {
-            description: t('多台机器在线时，开工前要在规则里点名一台。'),
+          toast.warning(t('先选择 Runner'), {
+            description: t('多台 Runner 在线时，开工前要在规则里点名一台。'),
             action: {
               label: t('去选择'),
               onClick: () => navigate(settingsHref('work-routing')),

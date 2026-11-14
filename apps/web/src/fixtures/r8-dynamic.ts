@@ -165,8 +165,8 @@ function transcript12(stamp: string): TranscriptItem[] {
     { kind: 'note', text: 'Xmon Dai 发起了合并' },
     {
       kind: 'fail',
-      title: '运行该任务的机器已离线',
-      body: '请将这台机器重新上线。这一步不会改派到其他机器。',
+      title: '运行该任务的 Runner 已离线',
+      body: '请将这台 Runner 重新上线。这一步不会改派到其他 Runner。',
     },
   ];
 }
@@ -483,8 +483,8 @@ const RUN1_FAILED: TranscriptItem[] = [
   { kind: 'note', text: 'Xmon Dai 发起了合并' },
   {
     kind: 'fail',
-    title: '运行该任务的机器已离线',
-    body: '请将这台机器重新上线。这一步不会改派到其他机器。',
+    title: '运行该任务的 Runner 已离线',
+    body: '请将这台 Runner 重新上线。这一步不会改派到其他 Runner。',
   },
 ];
 
@@ -503,7 +503,7 @@ const REUSED_TRANSCRIPT: TranscriptItem[] = [
   { kind: 'plan', title: '方案 · v1', preview: R8_PLAN_PREVIEW },
   { kind: 'run', machine: MACHINE_NAME },
   { kind: 'user', text: '确认' },
-  { kind: 'streaming', seconds: 1, label: '连接机器...' },
+  { kind: 'streaming', seconds: 1, label: '连接 Runner...' },
 ];
 
 const REUSED_REVIEW_TRANSCRIPT: TranscriptItem[] = [

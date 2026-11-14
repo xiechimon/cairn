@@ -17,7 +17,7 @@ export function ProjectConcurrencySelect({ project }: { project: ProjectRecord }
   const { t } = useI18n();
   const mutations = useApiMutations(project.teamId);
   const items = [
-    { value: '', label: t('不限（跟随机器上限）') },
+    { value: '', label: t('不限（跟随 Runner 上限）') },
     { value: '1', label: t('串行，一次一个') },
     ...LIMITS.map((limit) => ({ value: String(limit), label: t('最多 {n} 个', { n: limit }) })),
   ];

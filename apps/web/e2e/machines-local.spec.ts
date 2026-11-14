@@ -21,7 +21,7 @@ test('local machine pinned first: data-kind=local + id handle + hostname canon',
 test('managed facade row removed (spec 11 A8 negative)', async ({ page }) => {
   await page.goto(MACHINES);
   await expect(page.locator(`${ITEM}[data-kind="local"]`)).toBeVisible();
-  await expect(page.getByTestId('settings-content')).not.toContainText('Cairn 托管机器');
+  await expect(page.getByTestId('settings-content')).not.toContainText('Cairn 托管 Runner');
 });
 
 test('runtimes are labelled rows with a switch each, monochrome, enabled state from enabledRuntimes', async ({ page }) => {

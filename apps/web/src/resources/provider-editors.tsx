@@ -357,7 +357,7 @@ export function ClaudeCodeEditor({
             {bin?.path ?? t('未找到')}
           </code>
         </SettingsRow>
-        <SettingsRow label={t('配置')} hint={t('模型槽来自这台机器的这个文件')}>
+        <SettingsRow label={t('配置')} hint={t('模型槽来自这台 Runner 的这个文件')}>
           <code className="text-meta text-content-secondary">~/.claude/settings.json</code>
         </SettingsRow>
       </SettingsCard>
@@ -365,9 +365,9 @@ export function ClaudeCodeEditor({
         {source === undefined || source.models.length === 0 ? (
           <p className={cn(SETTINGS_HINT_CLS, 'm-0 px-1')}>
             {source === undefined
-              ? t('这台机器还没上报 Claude Code 信息。')
+              ? t('这台 Runner 还没上报 Claude Code 信息。')
               : t(
-                  '在该机器上写 ~/.claude/settings.json 的 env.ANTHROPIC_*_MODEL 槽后，此处自动展示其模型槽。',
+                  '在该 Runner 上写 ~/.claude/settings.json 的 env.ANTHROPIC_*_MODEL 槽后，此处自动展示其模型槽。',
                 )}
           </p>
         ) : (
@@ -406,11 +406,11 @@ export function PiEditor({
       <SettingsCard>
         <SettingsRow
           label={t('服务商')}
-          hint={t('pi 步骤用所有机器的服务商，不读这台机器的配置')}
+          hint={t('pi 步骤用所有 Runner 的服务商，不读这台 Runner 的配置')}
           className="flex-wrap gap-y-2 py-2.5"
         >
           <Button variant="outline" size="sm" onClick={onShowTeam}>
-            {t('所有机器的 {n} 个服务商', { n: providerCount })}
+            {t('所有 Runner 的 {n} 个服务商', { n: providerCount })}
           </Button>
         </SettingsRow>
       </SettingsCard>
@@ -428,7 +428,7 @@ export function GeminiEditor({ machineName }: { machineName: string }) {
         kind={t('{machine} 上的 CLI', { machine: machineName })}
       />
       <p className={cn(SETTINGS_HINT_CLS, 'm-0 px-1')}>
-        {t('Gemini CLI 还不上报版本和模型；打开后，这台机器会接 Gemini 步骤。')}
+        {t('Gemini CLI 还不上报版本和模型；打开后，这台 Runner 会接 Gemini 步骤。')}
       </p>
     </>
   );

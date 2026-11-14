@@ -39,7 +39,7 @@ Boundary rulings:
 
 | Chinese UI word | English word | Internal name | Definition / boundary |
 |---|---|---|---|
-| `机器` | Machine | `machine` | A registered execution host (`cairn` daemon + embedded pi runtime) that claims and runs build steps. One machine can carry steps of multiple Agents; it is not a property of an Agent. |
+| `Runner` | Runner | `machine` | A registered execution host (`cairn` daemon + embedded pi runtime) that claims and runs build steps. One Runner can carry steps of multiple Agents; it is not a property of an Agent. The UI says `Runner` in both languages; code, tables and the wire keep `machine`. One Runner is the default Runner (`team.defaultMachineId`). |
 | `Agent` | Agent | `agent` | An execution role configured with model, responsibilities, skills, tools, keys, MCP, and memory; runs on some machine. |
 | `Coordinator` | Coordinator | `chief` | The dispatch-and-conversation agent, one per "user × team", responsible for assigning tasks; domain-wise distinct from worker Agents that do the work. |
 | `主力机` | Primary machine | `chief.machineId` | The Coordinator's default execution machine (#895): the second level of the Coordinator new-thread pinning default chain (`todo.machineId` → this slot → null); pinning semantics are the same as `todo.machineId` — deterministic, no automatic fallback, unpinning belongs to the user; null = automatic (any online machine claims it + conversation affinity). It governs only the Coordinator thread's pinning, not worker dispatch. The setting surface is the "machine" slot in the Agent tab of Coordinator settings (PATCH /chief); the machines page shows a read-only three-state marker (Coordinator host / round in progress / waiting for machine). |
