@@ -1417,6 +1417,7 @@
         "server": [
           "/api/remote/**",
           "/api/auth/bootstrap",
+          "/api/auth/access",
           "/api/auth/stream-ticket"
         ]
       },
