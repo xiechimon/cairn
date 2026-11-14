@@ -186,7 +186,7 @@ async function openCompleteDialogFromDetail(page: Page, cardId: string, theme: s
 }
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`info card transcript shows the report text and its attachment reference (${theme})`, async ({
+  test(`info card transcript shows a report card that opens the report document (${theme})`, async ({
     page,
   }) => {
     await useTheme(page, theme);
@@ -195,26 +195,32 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
 
     const report = page.getByTestId('info-report');
-    await expect(report).toBeVisible();
-    await expect(report.getByText('登录页轨迹调研')).toBeVisible();
-    await expect(report.getByText('31 条在第二步重复读取同一文件')).toBeVisible();
-    await expect(report.getByText('4 条正常收口')).toBeVisible();
-    await expect(report).not.toContainText('info-report');
-    const attachment = report.getByRole('link', { name: 'report.md' });
-    await expect(attachment).toHaveAttribute('href', '/api/attachments/att-report');
-    const reportBox = await report.boundingBox();
-    const attachmentBox = await attachment.boundingBox();
-    expect(reportBox).not.toBeNull();
-    expect(attachmentBox).not.toBeNull();
-    expect(attachmentBox?.x).toBeGreaterThanOrEqual(reportBox?.x ?? 0);
-    expect((attachmentBox?.x ?? 0) + (attachmentBox?.width ?? 0)).toBeLessThanOrEqual(
-      (reportBox?.x ?? 0) + (reportBox?.width ?? 0) + 1,
+    const card = report.getByTestId('research-report-card');
+    await expect(card).toContainText('调研报告已生成');
+    await expect(card).toContainText('调研登录页 agent 轨迹');
+    await expect(card).toHaveAttribute('data-stage', 'final');
+    await expect(report.getByText('31 条在第二步重复读取同一文件')).toHaveCount(0);
+
+    await card.hover();
+    const hover = page.getByTestId('research-report-hover');
+    await expect(hover).toContainText('共抽查 42 条轨迹，结论如下：');
+    await expect(hover).not.toContainText('31 条');
+
+    await card.click();
+    const doc = page.getByTestId('research-report-doc');
+    await expect(doc.getByText('登录页轨迹调研')).toBeVisible();
+    await expect(doc.getByText('4 条正常收口')).toBeVisible();
+    await expect(doc).not.toContainText('info-report');
+    await expect(doc.getByRole('link', { name: 'report.md' })).toHaveAttribute(
+      'href',
+      '/api/attachments/att-report',
     );
+    await page.keyboard.press('Escape');
+    await expect(doc).toHaveCount(0);
 
     await evidenceShot(page, `transcript-report-${theme}.png`);
     if (theme === 'light') {
-      const reportRow = page.locator('[data-row="agent"]').filter({ has: report });
-      await evidencePanelShot(page, 'transcript-report-closeup.png', reportRow, 48);
+      await evidencePanelShot(page, 'transcript-report-closeup.png', report, 48);
     }
   });
 

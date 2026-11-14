@@ -291,3 +291,66 @@ test('research opened before planning hangs under its code task as a nested row'
     .evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().left));
   expect(child! - parent!).toBe(24);
 });
+
+test('a research report is one card under its research row; hover shows a summary and a click opens the document', async ({
+  page,
+}) => {
+  const research = {
+    ...TASK,
+    id: 'todo-research',
+    seqNum: 10,
+    title: 'Research export formats',
+    phase: 'needs_input',
+    output: 'info',
+    latestBuildId: 'build-research',
+    sourceKind: 'research-before-plan',
+    sourceRef: `before-plan:${TASK.id}`,
+  };
+  const report = {
+    id: 'info-report-build-research',
+    role: 'system',
+    createdAt: 30,
+    content: JSON.stringify({
+      kind: 'info-report',
+      attachmentId: 'att-r',
+      attachmentToken: '![report.md](attachment:t1/att-r.md)',
+      content: '## Export formats\n\nParquet halves the file size of CSV.\n\n- Parquet keeps types\n- CSV opens anywhere',
+    }),
+  };
+  const state = {
+    threads: [THREAD],
+    messages: [
+      { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
+      {
+        id: 'started',
+        role: 'assistant',
+        content: `Started [#${TASK.seqNum}](todo:${TASK.id}); it researches first.`,
+        createdAt: 20,
+      },
+    ],
+    todos: [{ ...TASK, phase: 'queued' }, research],
+  };
+  await mockLive(page, state, (path, _route, json) =>
+    path === '/api/conversations/build-research/messages'
+      ? json({ messages: [report], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null })
+      : undefined,
+  );
+  await page.goto('/app');
+  const refs = page.getByTestId('home-c').getByTestId('chief-task-refs');
+  const card = refs.getByTestId('research-report-card');
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText('调研报告已生成');
+  await expect(card).toContainText('Research export formats');
+  await expect(card).toHaveAttribute('data-stage', 'draft');
+  await expect(card.getByText('初稿')).toBeVisible();
+  await expect(page.getByTestId('chief-question-report')).toHaveCount(0);
+
+  await card.hover();
+  await expect(page.getByTestId('research-report-hover')).toContainText(
+    'Parquet halves the file size of CSV.',
+  );
+  await card.click();
+  const doc = page.getByTestId('research-report-doc');
+  await expect(doc.getByText('Parquet keeps types')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Research export formats' })).toBeVisible();
+});

@@ -1,6 +1,6 @@
 import { parseReplyQuote, type RunnerOfflineContent } from '@cairn/shared';
 import { CircleAlert } from 'lucide-react';
-import { type CSSProperties, memo, type ReactNode, useContext, useState } from 'react';
+import { type CSSProperties, Fragment, memo, type ReactNode, useContext, useState } from 'react';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
@@ -42,6 +42,7 @@ import {
   type ReplyQuoteDraft,
   ReplySourceHighlightContext,
 } from './reply-source-highlight.js';
+import { ResearchReportRow } from './research-report.js';
 import { SentAttachments } from './sent-attachments.js';
 import type { ThreadActivity } from './thread-activity.js';
 import { messageStampLabel } from './time-dividers.js';
@@ -154,8 +155,12 @@ function TaskRefWithChildren({ taskRef, elbow = true }: { taskRef: TaskRef; elbo
   return (
     <>
       <TaskRefRow taskRef={taskRef} elbow={elbow} />
+      <ResearchReportRow todoId={taskRef.todoId} indent={elbow ? 'ml-8' : 'ml-0'} />
       {childRefsOf(taskRef.todoId, glances ?? NO_GLANCES).map((child) => (
-        <TaskRefRow key={child.todoId} taskRef={child} nested />
+        <Fragment key={child.todoId}>
+          <TaskRefRow taskRef={child} nested />
+          <ResearchReportRow todoId={child.todoId} indent="ml-14" />
+        </Fragment>
       ))}
     </>
   );
