@@ -690,6 +690,7 @@ export interface ModelOption {
 export interface ChiefContextUsage {
   tokens: number;
   contextWindow: number;
+  compactAt?: number;
   resume?: 'warm' | 'cold' | 'compacted' | 'idle';
 }
 

@@ -5,6 +5,11 @@ import { openAICodexResponsesApi } from '@earendil-works/pi-ai/api/openai-codex-
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy';
 import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.lazy';
 import { createProvider } from '@earendil-works/pi-ai/models';
+import {
+  type BuiltinProvider,
+  getBuiltinModels,
+  getBuiltinProviders,
+} from '@earendil-works/pi-ai/providers/all';
 import { CODEX_API, CODEX_BASE_URL, CODEX_PROVIDER_ID } from '../codex-login.js';
 
 const STREAMS: Record<string, () => ProviderStreams> = {
@@ -17,6 +22,19 @@ const STREAMS: Record<string, () => ProviderStreams> = {
 export const DEFAULT_CONTEXT_WINDOW = 200_000;
 const DEFAULT_MAX_TOKENS = 8_192;
 const KEYLESS_PLACEHOLDER = 'cairn-keyless';
+
+function isBuiltinProvider(providerId: string): providerId is BuiltinProvider {
+  const builtin: readonly string[] = getBuiltinProviders();
+  return builtin.includes(providerId);
+}
+
+export function catalogContextWindow(providerId: string, modelId: string): number {
+  if (!isBuiltinProvider(providerId)) return DEFAULT_CONTEXT_WINDOW;
+  return (
+    getBuiltinModels(providerId).find((model) => model.id === modelId)?.contextWindow ??
+    DEFAULT_CONTEXT_WINDOW
+  );
+}
 
 export type KeyResolver = () => string | null | Promise<string | null>;
 
@@ -35,7 +53,7 @@ export function stepProvider(config: ProviderConfig, resolveKey?: KeyResolver): 
     input: m.input ?? ['text', 'image'],
     cost: m.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     reasoning: subscription,
-    contextWindow: m.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
+    contextWindow: m.contextWindow ?? catalogContextWindow(config.providerId, m.id),
     maxTokens: m.maxTokens ?? DEFAULT_MAX_TOKENS,
     ...(config.compat === undefined ? {} : { compat: config.compat }),
   }));

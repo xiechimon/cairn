@@ -67,7 +67,7 @@ export const chiefDraft: FixtureSet = {
       { kind: 'streaming', seconds: 42, label: '处理中...' },
     ],
     quickReplies: ['好，等你汇报', '先只看 README'],
-    context: { tokens: 24_000, contextWindow: 200_000 },
+    context: { tokens: 24_000, contextWindow: 200_000, compactAt: 70_000 },
   },
 };
 
