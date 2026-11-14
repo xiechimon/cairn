@@ -51,9 +51,6 @@ test('machines rows carry only live controls, no dead inline buttons (#222 shipp
   await expect(page.getByTestId('machine-accept-toggle').first()).toBeVisible();
 
   await expect(page.locator('[data-testid="machine-item"] > div:first-child button:not([data-testid])')).toHaveCount(0);
-  await expect(
-    page.getByTestId('machine-detail').locator('button[aria-label^="并发上限"]'),
-  ).toHaveCount(1);
 });
 
 test('composer toolbar drops the `语音输入` button, keeps attachment', async ({ page }) => {

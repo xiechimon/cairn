@@ -1637,8 +1637,6 @@ export const EN: Record<string, string> = {
   路由覆盖: 'Route override',
   '本任务的机器与执行要求；调度在规则开启后生效。':
     'Per-task machine and capability requirements; applied when routing rules are on.',
-  '要求 Orb': 'Require Orb',
-  '执行机须上报 Orb 沙箱执行器': 'Executor must report the Orb sandbox',
   '要求的 MCP': 'Required MCP',
   '派发时要求执行机已安装这些 MCP 服务器': 'Dispatch requires these MCP servers on the executor',
   路由覆盖已保存: 'Route override saved',

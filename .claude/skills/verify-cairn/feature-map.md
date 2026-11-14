@@ -252,7 +252,6 @@ States: Off by default; when on, a thread runs in its own orb and the route over
 Reach:
 
 1. `open /app/todo/<id of a thread listed by the todos API>`
-2. `click testid:route-override-orb`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
@@ -336,7 +335,7 @@ Reach:
 - Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`, `/app/settings/team`, `/app/team`
 - Settings: `设置` (Settings) › `模型` (Model) › `用量与连接` (Usage & connections); `设置` (Settings) › `模型` (Model) › `规则与策略` (Rules & policies)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-orb`, `route-override-save`, `routing-empty`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
+- Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-save`, `routing-empty`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
 - Research: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](../../../docs/research/agent-machine-routing.md) (not on main)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md)
@@ -393,7 +392,6 @@ States: No user page; machines show what they are running and threads move from 
 Reach:
 
 1. `settings machines`
-2. `click testid:machine-running`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
@@ -517,21 +515,20 @@ Reach:
 
 ### machines
 
-**Machines** (shipped, centrality 2). The machines page and machine detail: online state, capabilities, concurrency, revoke and evacuate.
+**Machines** (shipped, centrality 2). The machines page and machine detail: online state, capabilities, revoke and evacuate.
 
-States: An empty state, online and offline machines with last seen, a machine detail with runtimes, capabilities and concurrency.
+States: An empty state, online and offline machines with last seen, a machine detail with runtimes and capabilities.
 
 Reach:
 
 1. `settings machines`
 2. `click testid:machine-item`
-3. `click testid:machine-concurrency-inc`
 
 - Web routes: `/app/resources/machines`, `/app/resources/machines/:id`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `机器` (Machines)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `machine-list`, `machines-scroll`, `resource-empty`
-- Verify recipes: [.claude/skills/verify-cairn/features/machines-local-row.md](features/machines-local-row.md), [.claude/skills/verify-cairn/features/machine-concurrency.md](features/machine-concurrency.md)
+- Verify recipes: [.claude/skills/verify-cairn/features/machines-local-row.md](features/machines-local-row.md)
 - Research: [docs/research/machine-execution-plane.md](../../../docs/research/machine-execution-plane.md), [docs/research/t3code-devices-and-scope-2026-11-06.md](../../../docs/research/t3code-devices-and-scope-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings), [docs/spec/11-model-service-and-machine-localization.md](../../../docs/spec/11-model-service-and-machine-localization.md)
 - Backend design: [docs/spec/11-model-service-and-machine-localization.md](../../../docs/spec/11-model-service-and-machine-localization.md)

@@ -39,12 +39,12 @@ test('runtimes are labelled rows with a switch each, monochrome, enabled state f
   await expect(page.locator(`${PANE} svg[fill^="#"], ${PANE} [data-runtime] svg path[fill^="#"]`)).toHaveCount(0);
 });
 
-test('concurrency is a labelled control in the capacity section; no remote-shell switch (#1796)', async ({ page }) => {
+test('no remote-shell switch (#1796)', async ({ page }) => {
   await page.goto(`${MACHINES}&machine=${LOCAL_ID}`);
   await expect(page.locator(PANE)).not.toContainText('远程 shell');
   await expect(page.locator(PANE)).not.toContainText('Remote shell');
   await expect(page.locator(`${PANE} [data-machine-col="shell"]`)).toHaveCount(0);
-  await expect(page.locator(`${PANE} button[aria-label^="并发上限"]`)).toHaveCount(1);
+  await expect(page.locator(`${PANE} button[aria-label^="并发上限"]`)).toHaveCount(0);
 });
 
 test('local machine can be migrated or deleted only through its menu, and the row has one switch', async ({ page }) => {

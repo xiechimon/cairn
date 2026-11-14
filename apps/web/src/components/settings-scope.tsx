@@ -76,9 +76,6 @@ export function SettingsScopeSentence({
                   {m.online === false && (
                     <span className="text-content-tertiary">{` · ${t('离线')}`}</span>
                   )}
-                  {m.capabilities?.executor === 'orb' && (
-                    <span className="text-content-tertiary">{' · Orb'}</span>
-                  )}
                 </SelectItem>
               ),
             )}
