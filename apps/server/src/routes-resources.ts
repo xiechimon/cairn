@@ -192,6 +192,12 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         throw new HttpError(409, 'machine does not report the requested capability');
       }
     }
+    if (body.enabledRuntimes?.includes('gemini') && !row.enabledRuntimes.includes('gemini')) {
+      throw new HttpError(
+        409,
+        'Gemini cannot be turned on until its permission requests go through the command gate (#1612)',
+      );
+    }
     const patch = {
       ...(body.browserOverride !== undefined ? { browserOverride: body.browserOverride } : {}),
       ...(body.desktopOverride !== undefined ? { desktopOverride: body.desktopOverride } : {}),

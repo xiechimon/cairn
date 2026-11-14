@@ -1595,6 +1595,7 @@ export const EN: Record<string, string> = {
   '添加 API key、订阅或自定义端点后，它们的模型会出现在这里。':
     'Add an API key, subscription or custom endpoint and its models show up here.',
   还没上报: 'Not reported yet',
+  接入命令闸前不能开启: 'Locked until it uses the command gate',
   模型列表: 'Models',
   '已安装，登录状态未知': 'Installed, sign-in unknown',
   '{online}/{total} 台电脑在线': '{online} of {total#1 computer|# computers} online',
