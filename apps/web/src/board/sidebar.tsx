@@ -656,7 +656,7 @@ export function BoardSidebar({
                 <ProjectFilterMenu
                   filter={filter}
                   onFilter={chooseFilter}
-                  className="size-7 bg-transparent"
+                  className="size-7 bg-transparent [&_svg:not([class*=size-])]:size-5"
                 />
               </div>
             </div>
