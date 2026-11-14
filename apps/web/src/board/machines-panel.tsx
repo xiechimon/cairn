@@ -208,6 +208,7 @@ function ComputerControlBar({
         type="button"
         variant="outline"
         size="sm"
+        className="pointer-coarse:h-11 pointer-coarse:px-4"
         disabled={busy}
         onClick={held ? onGiveBack : onTakeOver}
       >
@@ -297,7 +298,7 @@ function MachineDetail({
       height="min(100dvh - 1.5rem, 900px)"
       className="flex max-h-[calc(100dvh-1.5rem)] flex-col"
     >
-      <div className="relative flex shrink-0 items-start gap-3 px-4 pt-4 pr-12 pb-2 sm:px-5 sm:pt-4.5 sm:pr-13">
+      <div className="relative flex shrink-0 items-start gap-3 px-4 pt-4 pr-12 pb-2 sm:px-5 sm:pt-4.5 sm:pr-13 pointer-coarse:pr-15">
         <div className="min-w-0 flex-1">
           <div className="font-heading text-heading leading-[1.4] font-title text-foreground">
             {machine.name}
@@ -320,7 +321,7 @@ function MachineDetail({
           type="button"
           variant="ghost"
           size="icon-sm"
-          className="absolute top-3 right-3 text-content-tertiary hover:text-foreground sm:top-4 sm:right-4"
+          className="absolute top-3 right-3 text-content-tertiary hover:text-foreground sm:top-4 sm:right-4 pointer-coarse:top-2 pointer-coarse:right-1.5 pointer-coarse:size-11"
           aria-label={t('关闭')}
           onClick={() => setExpanded(false)}
         >
