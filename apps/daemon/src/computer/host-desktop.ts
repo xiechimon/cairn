@@ -11,7 +11,7 @@ import {
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { COMPUTER_PRESENCE_LIMIT, type ComputerPresence } from '@cairn/shared';
-import { PINNED_AGENT_BROWSER_VERSION } from '../orb/computer.js';
+import { computerMachineName, PINNED_AGENT_BROWSER_VERSION } from '../orb/computer.js';
 import { executableOnPath } from './contained-spawn.js';
 import { HostComputerProvider } from './host.js';
 import type { ComputerInputFence, ComputerInputLease } from './input-fence.js';
@@ -318,9 +318,9 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     const states = (
       await this.run(['systemctl', '--user', 'is-active', ...known.map((entry) => entry.unit)])
     ).stdout.split('\n');
-    return known.map(({ scopeKey, unit }, index) => ({
+    return known.map(({ scopeKey }, index) => ({
       scopeKey,
-      providerRef: unit,
+      providerRef: computerMachineName(scopeKey),
       state: this.pending.has(scopeKey)
         ? 'starting'
         : this.failed.has(scopeKey)

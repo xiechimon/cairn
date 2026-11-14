@@ -2,6 +2,7 @@ import { Play } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 import { ResetConfirmDialog } from '../board/reset-confirm-dialog.js';
 import { Button } from '../components/ui/button.js';
+import { DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { useI18n } from '../i18n/provider.js';
 import { EllipsisVertical, Search, Settings } from '../icons/index.js';
@@ -253,7 +254,6 @@ function MenusSpecimen() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [view, setView] = useState<DocView>('plan');
   const [last, setLast] = useState<string | null>(null);
-  const moreRef = useRef<HTMLButtonElement>(null);
   return (
     <Specimen
       id="menus-and-popovers"
@@ -262,19 +262,16 @@ function MenusSpecimen() {
       stage="canvas"
     >
       <Cell label="MoreMenu">
-        <Button
-          ref={moreRef}
-          variant="outline"
-          size="icon"
-          aria-label="More"
-          onClick={() => setMoreOpen(true)}
-        >
-          <EllipsisVertical />
-        </Button>
         <MoreMenu
           open={moreOpen}
-          anchor={moreRef}
-          onClose={() => setMoreOpen(false)}
+          onOpenChange={setMoreOpen}
+          trigger={
+            <DropdownMenuTrigger
+              render={<Button variant="outline" size="icon" aria-label="More" />}
+            >
+              <EllipsisVertical />
+            </DropdownMenuTrigger>
+          }
           onDelete={() => setLast('Delete')}
           onComplete={() => setLast('Complete')}
           canComplete

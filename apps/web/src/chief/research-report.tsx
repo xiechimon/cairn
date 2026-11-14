@@ -1,6 +1,6 @@
 import { infoReportMessageSchema } from '@cairn/shared';
 import { cn } from 'cn';
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useMemo, useRef, useState } from 'react';
 import { useConversationMessages } from '../api/hooks.js';
 import { TraceCard } from '../components/chat/trace-parts.js';
 import { Button } from '../components/ui/button.js';
@@ -155,18 +155,22 @@ export function ResearchReportDialog({
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  const contentRef = useRef<HTMLDivElement>(null);
   return (
     <DialogShell
       title={report.title}
       subtitle={report.final ? t('定稿') : t('初稿')}
       open={open}
       onClose={onClose}
+      initialFocus={contentRef}
       width="var(--settings-w)"
       className="h-(--settings-h)"
     >
       <div
+        ref={contentRef}
+        tabIndex={-1}
         data-testid="research-report-doc"
-        className="chat-text mx-auto max-w-180 font-sans text-ui leading-6 break-words text-foreground"
+        className="chat-text mx-auto max-w-180 font-sans text-ui leading-6 break-words text-foreground outline-none"
       >
         <ChatMarkdown text={report.content} />
       </div>
@@ -193,7 +197,7 @@ export function useBuildReport(
     if (!message.success) return null;
     return {
       title: thread.title,
-      content: `${message.data.attachmentToken}\n\n${message.data.content}`,
+      content: message.data.content,
       createdAt: row.createdAt,
       final: isFinalReportPhase(thread.phase),
     };

@@ -340,7 +340,10 @@ test('the more menu offers rename and move beside the existing actions, and no u
   await expect(panel(page)).toBeVisible();
   await page.goto(`${HOME}&thread=home-c-idle`);
   await panel(page).getByRole('button', { name: '更多操作…' }).click();
-  await expect(page.getByRole('menuitem', { name: /移到项目/ })).toBeVisible();
+  await page.getByRole('menuitem', { name: /移到项目/ }).click();
+  const projects = page.getByTestId('task-move-projects');
+  await expect(projects.getByRole('menuitemradio').first()).toBeVisible();
+  await expect(page.getByRole('menu', { name: '更多' })).toBeVisible();
 });
 
 test('a running thread ends in a reply bubble of three typing dots', async ({ page }) => {

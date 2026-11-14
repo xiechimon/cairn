@@ -732,7 +732,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
             at: m.createdAt,
             item: {
               kind: 'report',
-              markdown: `${report.data.attachmentToken}\n\n${report.data.content}`,
+              markdown: report.data.content,
               id: m.id,
               createdAt: m.createdAt,
             },

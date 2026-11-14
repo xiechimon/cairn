@@ -8,7 +8,7 @@ import {
   ScrollText,
   Undo2,
 } from 'lucide-react';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { DropdownMenu, DropdownMenuSeparator } from '../components/ui/dropdown-menu.js';
 import { useI18n } from '../i18n/provider.js';
@@ -16,7 +16,8 @@ import { Ban, Check, Copy, MessageSquare, Trash2 } from '../icons/index.js';
 
 interface MoreMenuProps {
   open: boolean;
-  onClose: () => void;
+  onOpenChange: (open: boolean) => void;
+  trigger: ReactElement;
   onDelete: () => void;
   onComplete: () => void;
   canComplete: boolean;
@@ -32,14 +33,14 @@ interface MoreMenuProps {
   onViewRaw?: () => void;
   takeOver?: { label: string; onClick: () => void };
   moveSub?: ReactNode;
-  anchor?: ComponentProps<typeof KeyedMenuContent>['anchor'];
 }
 
 const PANEL_CLS = 'more-menu w-[220px]';
 
 export function MoreMenu({
   open,
-  onClose,
+  onOpenChange,
+  trigger,
   onDelete,
   onComplete,
   canComplete,
@@ -55,12 +56,11 @@ export function MoreMenu({
   onViewRaw,
   takeOver,
   moveSub,
-  anchor,
 }: MoreMenuProps) {
   const { t } = useI18n();
   const copyLink = () => {
     void navigator.clipboard?.writeText(window.location.href);
-    onClose();
+    onOpenChange(false);
   };
   const rows = [
     {
@@ -218,14 +218,9 @@ export function MoreMenu({
     },
   ];
   return (
-    <DropdownMenu
-      open={open}
-      onOpenChange={(next: boolean) => {
-        if (!next) onClose();
-      }}
-    >
+    <DropdownMenu open={open} onOpenChange={onOpenChange}>
+      {trigger}
       <KeyedMenuContent
-        anchor={anchor}
         align="end"
         side="bottom"
         sideOffset={4}
