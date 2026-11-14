@@ -359,6 +359,49 @@ describe('/api/mcp create_todo and update_todo carry the platform a task needs (
     expect(osOf(plain.id)).toBeNull();
     s.dispose();
   });
+
+  test('update_todo whose title is refused leaves the platform unchanged', async () => {
+    const s = bootServer();
+    const projectId = await postProject(s.app);
+    const key = await issueMcpKey(s, { read: [], write: ['Create Todo', 'Update Todo'] });
+    const call = async (name: string, args: Record<string, unknown>) =>
+      ((await rpc(s.app, key, 'tools/call', { name, arguments: args })).body as JsonRpcResponse)
+        .result;
+    const created = JSON.parse(
+      (await call('create_todo', { projectId, title: 'cited', spec: 's', platform: 'macos' }))
+        ?.content?.[0]?.text ?? '{}',
+    ) as { id: string };
+    s.db
+      .update(todoTable)
+      .set({
+        request: {
+          segments: [
+            {
+              source: { kind: 'edit', userId: s.user.id, at: 1, span: 'whole' },
+              author: 'owner',
+              sourceRef: null,
+              text: 's',
+            },
+          ],
+          siblings: [],
+          difficulty: null,
+          titleSource: 'owner',
+          titleSourceRef: null,
+        },
+      })
+      .where(eq(todoTable.id, created.id))
+      .run();
+    const refused = await call('update_todo', {
+      todoId: created.id,
+      title: 'renamed',
+      platform: 'windows',
+    });
+    expect(refused?.isError).toBe(true);
+    const row = s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get();
+    expect(row?.routeOverride?.requiredCapabilities?.os).toBe('macos');
+    expect(row?.title).toBe('cited');
+    s.dispose();
+  });
 });
 
 describe('/api/mcp unschedule_todo ends a snooze (#2242, #2354)', () => {
