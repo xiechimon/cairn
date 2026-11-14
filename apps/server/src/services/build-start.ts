@@ -5,6 +5,7 @@ import { build, machine, project } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newUuidv7, nowMs } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep, NotFoundError, publishBuild } from './builds.js';
+import { teamDefaultMachineId } from './machine-routing.js';
 import { assertPhaseTransition } from './phase.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import { assertAutomaticRetryAllowed } from './retry-parking.js';
@@ -25,6 +26,7 @@ function namedMachineForStart(
   const named =
     routeOverride?.machineId ?? todoRecord.routeOverride?.machineId ?? profile?.machineId ?? null;
   if (named !== null) return { machineId: named, pin: false };
+  if (teamDefaultMachineId(deps.db, todoRecord.teamId) !== null) return null;
   const registered = deps.db
     .select({ id: machine.id, online: machine.online })
     .from(machine)

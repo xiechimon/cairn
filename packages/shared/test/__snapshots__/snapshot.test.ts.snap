@@ -11382,6 +11382,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
       "minimum": -9007199254740991,
       "type": "integer",
     },
+    "defaultMachineId": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
     "firstPrReportPrompt": {
       "additionalProperties": false,
       "properties": {

@@ -72,10 +72,11 @@ import {
   upsertMessage,
 } from './machine-deps.js';
 import {
+  fallbackMachineId,
   priorSessionOf,
   routeTargets,
   routeVerdict,
-  soleClaimMachineId,
+  teamDefaultMachineId,
   type WorkerStepFacts,
   workerIneligibility,
 } from './machine-routing.js';
@@ -346,12 +347,13 @@ function claimChiefTurn(
     }
     const chiefRuntime = stepRuntimeFor(cand.agentRow.provider);
     if (chiefRuntime === 'claude-code' && claudeBlocked(machineId)) continue;
-    const sole = soleClaimMachineId(
+    const sole = fallbackMachineId(
       db
         .select({ id: machine.id, online: machine.online })
         .from(machine)
         .where(eq(machine.teamId, teamId))
         .all(),
+      teamDefaultMachineId(db, teamId),
     );
     const chiefMachine = cand.agentRow.machineId ?? sole;
     if (chiefMachine !== machineId) continue;
@@ -461,12 +463,13 @@ async function tryClaim(
     );
     const sessionOnOtherMachine =
       priorSessionId !== null && priorMachineId !== null && priorMachineId !== machineId;
-    const sole = soleClaimMachineId(
+    const sole = fallbackMachineId(
       db
         .select({ id: machine.id, online: machine.online })
         .from(machine)
         .where(eq(machine.teamId, teamId))
         .all(),
+      teamDefaultMachineId(db, teamId),
     );
     const allowed = routeVerdict({
       machineId,

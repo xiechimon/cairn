@@ -11,12 +11,13 @@ import { nowMs } from '../lib/ids.js';
 import { missingCapabilities, runtimeGatePasses } from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
 import {
+  fallbackMachineId,
   priorSessionOf,
   type RouteVerdict,
   routeTargets,
   routeVerdict,
-  soleClaimMachineId,
   targetUnavailable,
+  teamDefaultMachineId,
   type WorkerStepFacts,
   workerIneligibility,
 } from './machine-routing.js';
@@ -107,6 +108,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
   };
 
   const teamMachines = db.select().from(machine).where(eq(machine.teamId, teamId)).all();
+  const defaultMachineId = teamDefaultMachineId(db, teamId);
   function agentForRow(row: (typeof queue)[number]): RouteProfile | null {
     if ('todoRow' in row) return profileForStep(db, row.todoRow, row.kind, row.id);
     return coordinatorProfile(db, teamId);
@@ -135,7 +137,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
     const unavailable = (id: string) =>
       targetUnavailable(db, machineRowOf(id), teamId, facts, catalog, now);
     const prior = priorSessionOf(db, row, row.buildRow);
-    const sole = soleClaimMachineId(teamMachines);
+    const sole = fallbackMachineId(teamMachines, defaultMachineId);
     const verdict = routeVerdict({
       machineId: null,
       targets: routeTargets(

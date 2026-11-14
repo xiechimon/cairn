@@ -42,6 +42,7 @@ export const patchMachineBodySchema = z.object({
   desktopOverride: z.boolean().nullable().optional(),
   enabledRuntimes: z.array(z.enum(MACHINE_RUNTIMES)).optional(),
   maxConcurrent: z.number().int().min(1).max(16).nullable().optional(),
+  isDefault: z.literal(true).optional(),
 });
 export type PatchMachineBody = z.infer<typeof patchMachineBodySchema>;
 

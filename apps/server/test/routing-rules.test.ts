@@ -138,11 +138,12 @@ describe('profileForStep: the session rule supplies the model and machine', () =
     expect(profileForStep(w.s.db, todoRow, 'merge')?.id).toBe(ruleId);
   });
 
-  test('a rule without a machine still names the only registered machine', async () => {
+  test('a rule without a machine leaves the step to the default Runner', async () => {
     const w = await setupWorld();
     const ruleId = sessionRule(w.s);
     const todoRow = await buildTodo(w);
-    expect(profileForStep(w.s.db, todoRow, 'build')?.machineId).toBe(w.machineId);
+    expect(profileForStep(w.s.db, todoRow, 'build')?.machineId).toBe(null);
+    expect((await claim(w))?.step.kind).toBe('session');
     expect(
       w.s.db.select().from(routingRule).where(eq(routingRule.id, ruleId)).get()?.machineId,
     ).toBe(null);

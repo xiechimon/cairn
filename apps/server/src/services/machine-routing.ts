@@ -1,7 +1,7 @@
 import { claudeLoginBlocksClaim, claudeRateBlock, isBuildStepKind } from '@cairn/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { type build, type machine, step } from '../db/schema.js';
+import { type build, type machine, step, team } from '../db/schema.js';
 import { claudeUsageGatePasses } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import {
@@ -122,9 +122,19 @@ export function soleOnlineMachineId(onlineIds: readonly string[]): string | null
   return onlineIds.length === 1 ? (onlineIds[0] ?? null) : null;
 }
 
-export function soleClaimMachineId(
+export function teamDefaultMachineId(db: Pick<Db, 'select'>, teamId: string): string | null {
+  return (
+    db.select({ id: team.defaultMachineId }).from(team).where(eq(team.id, teamId)).get()?.id ?? null
+  );
+}
+
+export function fallbackMachineId(
   machines: readonly { id: string; online: boolean }[],
+  defaultMachineId: string | null,
 ): string | null {
+  if (defaultMachineId !== null && machines.some((row) => row.id === defaultMachineId)) {
+    return defaultMachineId;
+  }
   const online = soleOnlineMachineId(machines.filter((row) => row.online).map((row) => row.id));
   if (online !== null) return online;
   return machines.length === 1 ? (machines[0]?.id ?? null) : null;

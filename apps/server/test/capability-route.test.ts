@@ -392,7 +392,7 @@ describe('the router leaves the execution constraints of the rule alone', () => 
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: true });
     const todoRow = await buildTodo(w, 'rename one label');
-    expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ machineId: w.machineId });
+    expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ machineId: null });
     expect(
       w.s.db
         .select()

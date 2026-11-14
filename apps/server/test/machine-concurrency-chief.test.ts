@@ -523,3 +523,31 @@ describe('the late chief claim sees routing changes made while the worker loop a
     );
   });
 });
+
+test('a Coordinator turn with no machine on its rule runs on the default Runner', async () => {
+  const w = await setupWorld();
+  w.s.db
+    .update(routingRuleTable)
+    .set({ machineId: null })
+    .where(eq(routingRuleTable.use, 'coordinator'))
+    .run();
+  const key = await issueApiKey(w.s);
+  await w.s.app.request('/api/machine/enroll', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+    body: JSON.stringify(
+      readyMachine({ teamId: w.s.team.id, name: 'second-box', cliVersion: '0.1.0' }),
+    ),
+  });
+  const secondId = w.s.db
+    .select()
+    .from(machineTable)
+    .where(eq(machineTable.name, 'second-box'))
+    .get()!.id;
+  w.s.db.update(machineTable).set({ online: true }).run();
+  const chiefStepId = insertPendingChiefStep(w.s);
+  expect(
+    await claimStep(machineDepsOf(w), secondId, w.s.team.id, 10, 'http://localhost'),
+  ).toBeNull();
+  expect((await claimAs(w))?.step.id).toBe(chiefStepId);
+});

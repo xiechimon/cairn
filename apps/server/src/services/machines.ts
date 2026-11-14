@@ -20,9 +20,18 @@ import {
   machineRecordSchema,
   parseReportedCapabilities,
 } from '@cairn/shared';
-import { and, asc, eq, isNotNull, lt } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, lt, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { apiKey, build, machine, steerPending, step, stopPending, todo } from '../db/schema.js';
+import {
+  apiKey,
+  build,
+  machine,
+  steerPending,
+  step,
+  stopPending,
+  team,
+  todo,
+} from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -318,6 +327,19 @@ export function seedLocalMachine(db: Db, teamId: string): void {
     .run();
 }
 
+function adoptAsDefaultIfUnset(db: Db, teamId: string, machineId: string): void {
+  const otherEnrolled = db
+    .select({ id: machine.id })
+    .from(machine)
+    .where(and(eq(machine.teamId, teamId), ne(machine.id, machineId), isNotNull(machine.tokenHash)))
+    .get();
+  if (otherEnrolled !== undefined) return;
+  db.update(team)
+    .set({ defaultMachineId: machineId })
+    .where(and(eq(team.id, teamId), isNull(team.defaultMachineId)))
+    .run();
+}
+
 export function enrollMachine(
   deps: MachineDeps,
   input: {
@@ -361,6 +383,7 @@ export function enrollMachine(
       .run();
     markOffline(deps, byKey.id);
     deps.machineHub.revokeMachine(byKey.id);
+    adoptAsDefaultIfUnset(db, input.teamId, byKey.id);
     return {
       machineId: byKey.id,
       token: token.plain,
@@ -400,6 +423,7 @@ export function enrollMachine(
         : {}),
     })
     .run();
+  adoptAsDefaultIfUnset(db, input.teamId, machineId);
   return { machineId, token: token.plain, teamId: input.teamId, serverUrl: input.serverUrl };
 }
 
@@ -428,6 +452,7 @@ export function authorizeEnrollmentMachine(
       .run();
     markOffline(deps, existing.id);
     deps.machineHub.revokeMachine(existing.id);
+    adoptAsDefaultIfUnset(db, input.teamId, existing.id);
     return {
       machineId: existing.id,
       token: token.plain,
@@ -449,6 +474,7 @@ export function authorizeEnrollmentMachine(
       enabledRuntimes: ['pi'],
     })
     .run();
+  adoptAsDefaultIfUnset(db, input.teamId, machineId);
   return { machineId, token: token.plain, teamId: input.teamId, serverUrl: input.serverUrl };
 }
 
