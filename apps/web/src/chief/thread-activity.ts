@@ -1,6 +1,5 @@
 import type { TodoGlance } from '../detail/segments.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
-import { taskRefsOf } from './chief-task-refs.js';
 
 export interface StreamRow {
   item: ChiefStreamItem;
@@ -26,10 +25,6 @@ export function subThreadRowIds(
   const shown = new Set(stream.flatMap((item) => (item.kind === 'task-card' ? [item.todoId] : [])));
   const kept = new Set<string>();
   for (const item of stream) {
-    if (item.kind === 'robot' && item.typing !== true) {
-      for (const ref of taskRefsOf(item, glances)) shown.add(ref.todoId);
-      continue;
-    }
     if (item.kind !== 'thread-report' && item.kind !== 'thread-message') continue;
     const parentId = glances.get(item.todoId)?.parentId;
     if (shown.has(item.todoId) || (parentId !== undefined && shown.has(parentId))) continue;

@@ -57,9 +57,11 @@ export function reportSummaryOf(content: string): string {
 export function ResearchReportCard({
   report,
   className,
+  inline = false,
 }: {
   report: ResearchReport;
   className?: string;
+  inline?: boolean;
 }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
@@ -73,30 +75,54 @@ export function ResearchReportCard({
   return (
     <>
       <Popover open={hover && !open} onOpenChange={setHover}>
-        <PopoverTrigger
-          openOnHover
-          delay={350}
-          nativeButton={false}
-          render={<TraceCard className={cn('w-fit max-w-full', className)} />}
-        >
-          <Button
-            variant="ghost"
+        {inline ? (
+          <PopoverTrigger
+            openOnHover
+            delay={350}
             data-testid="research-report-card"
+            data-variant="inline"
             data-stage={report.final ? 'final' : 'draft'}
             onClick={() => setOpen(true)}
-            className="h-10 max-w-full justify-start gap-2 border-0 px-3 text-ui font-normal text-foreground hover:bg-(--menu-hover) pointer-coarse:h-11 dark:hover:bg-(--menu-hover)"
+            className={cn(
+              'flex max-w-full cursor-pointer items-center gap-1.5 bg-transparent p-0 text-left text-ui leading-5 text-foreground outline-none',
+              className,
+            )}
           >
-            <FileText aria-hidden="true" className="size-5 flex-none text-content-secondary" />
+            <FileText aria-hidden="true" className="size-4 flex-none text-content-secondary" />
             <span className="flex-none">{t('调研报告已生成')}</span>
-            <span className="min-w-0 truncate text-content-secondary">{report.title}</span>
-            <span
-              data-slot="research-report-stage"
-              className="flex-none rounded-sm bg-secondary px-1.5 text-meta text-content-secondary"
-            >
+            <span className="min-w-0 truncate text-(--chat-link) underline decoration-(--chat-link)/40 underline-offset-3 hover:decoration-(--chat-link)">
+              {report.title}
+            </span>
+            <span data-slot="research-report-stage" className="flex-none text-content-secondary">
               {stage}
             </span>
-          </Button>
-        </PopoverTrigger>
+          </PopoverTrigger>
+        ) : (
+          <PopoverTrigger
+            openOnHover
+            delay={350}
+            nativeButton={false}
+            render={<TraceCard className={cn('w-fit max-w-full', className)} />}
+          >
+            <Button
+              variant="ghost"
+              data-testid="research-report-card"
+              data-stage={report.final ? 'final' : 'draft'}
+              onClick={() => setOpen(true)}
+              className="h-10 max-w-full justify-start gap-2 border-0 px-3 text-ui font-normal text-foreground hover:bg-(--menu-hover) pointer-coarse:h-11 dark:hover:bg-(--menu-hover)"
+            >
+              <FileText aria-hidden="true" className="size-5 flex-none text-content-secondary" />
+              <span className="flex-none">{t('调研报告已生成')}</span>
+              <span className="min-w-0 truncate text-content-secondary">{report.title}</span>
+              <span
+                data-slot="research-report-stage"
+                className="flex-none rounded-sm bg-secondary px-1.5 text-meta text-content-secondary"
+              >
+                {stage}
+              </span>
+            </Button>
+          </PopoverTrigger>
+        )}
         <PopoverContent
           side="top"
           align="start"
@@ -191,4 +217,10 @@ export function ResearchReportRow({ todoId, indent }: { todoId: string; indent: 
   const report = useResearchReport(todoId);
   if (report === null) return null;
   return <ResearchReportCard report={report} className={cn('my-1', indent)} />;
+}
+
+export function ResearchReportLine({ todoId }: { todoId: string }) {
+  const report = useResearchReport(todoId);
+  if (report === null) return null;
+  return <ResearchReportCard report={report} inline className="mt-1" />;
 }

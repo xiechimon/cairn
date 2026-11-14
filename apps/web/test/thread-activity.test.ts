@@ -64,13 +64,14 @@ describe('subThreadRowIds', () => {
     expect(subThreadRowIds([card('code'), report('research', 'needs-you')], glances).size).toBe(0);
   });
 
-  test('a thread an earlier reply already mentioned gets no row from its reports', () => {
+  test('a reply that only mentions a thread does not stand in for its row', () => {
     const reply: ChiefStreamItem = {
       kind: 'robot',
       seconds: '1',
-      markdown: 'Started [#1](todo:other).',
+      markdown: '[#1](todo:other) is still queued.',
     };
-    expect(subThreadRowIds([reply, report('other')], glances).size).toBe(0);
+    const first = report('other');
+    expect([...subThreadRowIds([reply, first], glances)]).toEqual([first.id]);
   });
 
   test('a thread with no task card shows exactly one row, at its first event', () => {

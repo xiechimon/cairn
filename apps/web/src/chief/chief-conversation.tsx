@@ -60,7 +60,13 @@ import {
   ChiefOutageBanner,
 } from './chief-outage-banner.js';
 import { ChiefQuestion, useAnswerKey, useQuestionPending } from './chief-question.js';
-import { foldTaskCards, placeTaskRefs, type TaskRef, todoGlanceOf } from './chief-task-refs.js';
+import {
+  foldTaskCards,
+  placeReportCards,
+  placeTaskRefs,
+  type TaskRef,
+  todoGlanceOf,
+} from './chief-task-refs.js';
 import { serverDraftBinding } from './composer-binding.js';
 import { composerMode } from './composer-mode.js';
 import { ComposerSurface, type ComposerSurfaceHandle } from './composer-surface.js';
@@ -91,6 +97,7 @@ interface StreamLayout {
   keys: (string | number)[];
   runs: BubbleRun[];
   taskRefs: ReadonlyMap<GroupedRow['item'], readonly TaskRef[]>;
+  reports: ReadonlyMap<GroupedRow['item'], readonly string[]>;
   dividers: (number | null)[];
   lastAt: number | null;
 }
@@ -101,6 +108,7 @@ function layoutStream(
   glances: ReadonlyMap<string, TodoGlance>,
   previousAt: number | null,
   seen: Set<string>,
+  reportSeen: Set<string>,
 ): StreamLayout {
   const { rows: grouped, startedBy } = foldTaskCards(
     groupThreadEvents(list, subThreadRows),
@@ -118,6 +126,7 @@ function layoutStream(
     keys: grouped.map(({ item, i }) => chiefStreamRowKey(item, i)),
     runs: bubbleRuns(grouped, previousAt),
     taskRefs: placeTaskRefs(grouped, startedBy, glances, seen),
+    reports: placeReportCards(grouped, startedBy, glances, reportSeen),
     dividers,
     lastAt,
   };
@@ -512,10 +521,18 @@ export function ChiefConversation({
       glances,
     );
     const seen = new Set<string>();
-    const before = layoutStream(rows.slice(0, dayEarlier), subThreadRows, glances, null, seen);
+    const reportSeen = new Set<string>();
+    const before = layoutStream(
+      rows.slice(0, dayEarlier),
+      subThreadRows,
+      glances,
+      null,
+      seen,
+      reportSeen,
+    );
     return [
       before,
-      layoutStream(rows.slice(dayEarlier), subThreadRows, glances, before.lastAt, seen),
+      layoutStream(rows.slice(dayEarlier), subThreadRows, glances, before.lastAt, seen, reportSeen),
     ] as const;
   }, [rows, glances, dayEarlier]);
   const row = (
@@ -523,6 +540,7 @@ export function ChiefConversation({
     i: number,
     run: BubbleRun | undefined,
     taskRefs: readonly TaskRef[] | undefined,
+    reports: readonly string[] | undefined,
   ) => (
     <ChiefStreamRow
       item={item}
@@ -535,6 +553,7 @@ export function ChiefConversation({
       joinsPrev={run?.joinsPrev === true}
       joinsNext={run?.joinsNext === true}
       {...(taskRefs !== undefined ? { taskRefs } : {})}
+      {...(reports !== undefined ? { reports } : {})}
     />
   );
   const lastRobotIndex = rows.findLastIndex(
@@ -578,7 +597,13 @@ export function ChiefConversation({
             </div>
           </MessageScrollerItem>
         )}
-        {row(entry.item, entry.i, layout.runs[n], layout.taskRefs.get(entry.item))}
+        {row(
+          entry.item,
+          entry.i,
+          layout.runs[n],
+          layout.taskRefs.get(entry.item),
+          layout.reports.get(entry.item),
+        )}
         {quickAfter !== undefined && entry.item === quickAfter && quickReplies}
       </>
     );
