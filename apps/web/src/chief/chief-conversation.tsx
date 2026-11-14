@@ -43,7 +43,7 @@ import {
 } from '../components/ui/message-scroller.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
-import type { ChiefContent, ChiefStreamItem, Phase } from '../fixtures/records.js';
+import type { ChiefContent, ChiefStreamItem } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { ArrowDown } from '../icons/index.js';
@@ -60,18 +60,22 @@ import {
   ChiefOutageBanner,
 } from './chief-outage-banner.js';
 import { ChiefQuestion, useAnswerKey, useQuestionPending } from './chief-question.js';
-import { foldTaskCards } from './chief-task-refs.js';
+import { foldTaskCards, placeTaskRefs, type TaskRef, todoGlanceOf } from './chief-task-refs.js';
 import { serverDraftBinding } from './composer-binding.js';
 import { composerMode } from './composer-mode.js';
 import { ComposerSurface, type ComposerSurfaceHandle } from './composer-surface.js';
 import type { UnsentSends } from './outbox.js';
-import { outstandingReportIds } from './outstanding-reports.js';
 import { questionDockState } from './question-dock-state.js';
 import { awaitingStream } from './question-lifecycle.js';
 import { QuickReplies } from './quick-replies.js';
 import { ReplyingToBar } from './reply-quote-block.js';
 import { type ReplyQuoteDraft, ReplySourceHighlightContext } from './reply-source-highlight.js';
-import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
+import {
+  type GroupedRow,
+  groupThreadEvents,
+  type StreamRow,
+  subThreadRowIds,
+} from './thread-activity.js';
 import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
 import { VirtualStream } from './virtual-stream.js';
 
@@ -86,18 +90,22 @@ interface StreamLayout {
   grouped: GroupedRow[];
   keys: (string | number)[];
   runs: BubbleRun[];
-  startedBy: ReadonlyMap<GroupedRow['item'], readonly string[]>;
+  taskRefs: ReadonlyMap<GroupedRow['item'], readonly TaskRef[]>;
   dividers: (number | null)[];
   lastAt: number | null;
 }
 
 function layoutStream(
   list: readonly StreamRow[],
-  keepsOwnRow: (item: ChiefStreamItem) => boolean,
+  subThreadRows: ReadonlySet<string>,
   glances: ReadonlyMap<string, TodoGlance>,
   previousAt: number | null,
+  seen: Set<string>,
 ): StreamLayout {
-  const { rows: grouped, startedBy } = foldTaskCards(groupThreadEvents(list, keepsOwnRow), glances);
+  const { rows: grouped, startedBy } = foldTaskCards(
+    groupThreadEvents(list, subThreadRows),
+    glances,
+  );
   let lastAt = previousAt;
   const dividers = grouped.map(({ item }) => {
     const at = 'createdAt' in item && typeof item.createdAt === 'number' ? item.createdAt : null;
@@ -109,7 +117,7 @@ function layoutStream(
     grouped,
     keys: grouped.map(({ item, i }) => chiefStreamRowKey(item, i)),
     runs: bubbleRuns(grouped, previousAt),
-    startedBy,
+    taskRefs: placeTaskRefs(grouped, startedBy, glances, seen),
     dividers,
     lastAt,
   };
@@ -378,14 +386,7 @@ export function ChiefConversation({
     restoreToThread(() => prefillText);
   }, [prefillKey, prefillText]);
   const glances = useMemo(
-    () =>
-      todoGlances ??
-      new Map(
-        (todosQ.data ?? []).map((td) => [
-          td.id,
-          { phase: td.phase as Phase, seq: td.seqNum, title: td.title },
-        ]),
-      ),
+    () => todoGlances ?? new Map((todosQ.data ?? []).map((td) => [td.id, todoGlanceOf(td)])),
     [todoGlances, todosQ.data],
   );
   const empty = (chief.stream?.length ?? 0) === 0;
@@ -470,10 +471,6 @@ export function ChiefConversation({
         ]
       : [],
   );
-  const outstandingReports = useMemo(
-    () => outstandingReportIds(chief.stream ?? []),
-    [chief.stream],
-  );
   const capsules = (
     <>
       {replyQuote !== null && (
@@ -510,24 +507,26 @@ export function ChiefConversation({
   const clock = useMinuteClock();
   const dayEarlier = day?.earlier ?? 0;
   const [earlierLayout, streamLayout] = useMemo(() => {
-    const keepsOwnRow = (item: ChiefStreamItem) =>
-      item.kind === 'thread-report' && outstandingReports.has(item.id);
-    const before = layoutStream(rows.slice(0, dayEarlier), keepsOwnRow, glances, null);
+    const subThreadRows = subThreadRowIds(
+      rows.map(({ item }) => item),
+      glances,
+    );
+    const seen = new Set<string>();
+    const before = layoutStream(rows.slice(0, dayEarlier), subThreadRows, glances, null, seen);
     return [
       before,
-      layoutStream(rows.slice(dayEarlier), keepsOwnRow, glances, before.lastAt),
+      layoutStream(rows.slice(dayEarlier), subThreadRows, glances, before.lastAt, seen),
     ] as const;
-  }, [rows, outstandingReports, glances, dayEarlier]);
+  }, [rows, glances, dayEarlier]);
   const row = (
     item: GroupedRow['item'],
     i: number,
     run: BubbleRun | undefined,
-    startedTasks: readonly string[] | undefined,
+    taskRefs: readonly TaskRef[] | undefined,
   ) => (
     <ChiefStreamRow
       item={item}
       index={i}
-      replyable={item.kind === 'thread-report' && outstandingReports.has(item.id)}
       onCopy={copyText}
       onRewindRequest={requestRewind}
       entering={enteringKey !== null && chiefStreamRowKey(item, i) === enteringKey}
@@ -535,7 +534,7 @@ export function ChiefConversation({
       onReply={onSend != null && composerReplacement == null ? stageReply : undefined}
       joinsPrev={run?.joinsPrev === true}
       joinsNext={run?.joinsNext === true}
-      {...(startedTasks !== undefined ? { startedTasks } : {})}
+      {...(taskRefs !== undefined ? { taskRefs } : {})}
     />
   );
   const lastRobotIndex = rows.findLastIndex(
@@ -579,7 +578,7 @@ export function ChiefConversation({
             </div>
           </MessageScrollerItem>
         )}
-        {row(entry.item, entry.i, layout.runs[n], layout.startedBy.get(entry.item))}
+        {row(entry.item, entry.i, layout.runs[n], layout.taskRefs.get(entry.item))}
         {quickAfter !== undefined && entry.item === quickAfter && quickReplies}
       </>
     );

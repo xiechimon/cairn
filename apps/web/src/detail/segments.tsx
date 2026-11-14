@@ -36,6 +36,7 @@ export interface TodoGlance {
   phase: Phase;
   seq?: number;
   title?: string;
+  parentId?: string;
 }
 
 export const TodoGlanceContext = createContext<ReadonlyMap<string, TodoGlance> | null>(null);
