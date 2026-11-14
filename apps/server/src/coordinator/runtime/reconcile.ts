@@ -12,7 +12,6 @@ import {
   UserEntry,
 } from '@earendil-works/pi-durable';
 import { parseWatermark } from '../watermark.js';
-import type { Summarize } from './compaction.js';
 import { activeConversation, type Conversation, newestEntryId } from './conversations.js';
 import { openCoordinatorHarness } from './harness.js';
 import { type SeedRow, seedCoordinator } from './seed.js';
@@ -35,7 +34,7 @@ export interface ReconcileFacts {
   hasClaimedStep: boolean;
   forceReseed?: boolean;
   isLive(requestId: string): boolean;
-  seed(summarize: Summarize | null): Promise<ReconcileSeed>;
+  seed(): Promise<ReconcileSeed>;
   record(state: {
     storeId?: string;
     conversationId: string;
@@ -57,7 +56,6 @@ export type ReconcileOutcome =
 export interface ReconcileOptions {
   extensions?: readonly Extension[];
   settings?: () => HarnessSettings;
-  summarize?: () => Summarize | null;
   beforeReconcile?: (harness: Harness, storeId?: string) => Promise<void>;
   storeIdentity?: (harness: Harness) => Promise<string>;
   refreshFacts?: () => ReconcileFacts;
@@ -157,7 +155,7 @@ export async function openReconciledHarness(
       storeId = await options.storeIdentity?.(harness);
       await options.beforeReconcile?.(harness, storeId);
     }
-    const seed = await facts.seed(options.summarize?.() ?? null);
+    const seed = await facts.seed();
     await seedCoordinator(harness, seed.summary, seed.rows, seed.model, context);
     outcome = reseed;
   }

@@ -12,11 +12,8 @@ import {
   coordinatorCompactionSettings,
   type MemoryFlush,
   type ModelRef,
-  type Summarize,
-  summarizerFor,
 } from './compaction.js';
 import { withRegisteredMailConversation } from './conversations.js';
-import { reportCompactionFailure } from './failure-report.js';
 import { generationTelemetryExtension } from './generation-telemetry.js';
 import { createInputReceipts, type InputReceipts } from './input-receipts.js';
 import { replayCoordinatorInputs } from './input-replay.js';
@@ -67,8 +64,6 @@ export interface ProviderBinding {
 export interface ServerTurn {
   claimed: ClaimedStep;
   volatileText: string | null;
-  coldSlim?: { cold: boolean; summaryHint?: string | null } | null;
-  beforeDone?: () => void;
   router: ProviderBinding;
   summary: ProviderBinding;
 }
@@ -140,14 +135,6 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         stepId: await gate.stepFor(conversationId),
       })),
     ];
-    const summarize = (): Summarize | null => {
-      try {
-        return summarizerFor(models.models, summary.ref);
-      } catch (error) {
-        reportCompactionFailure({ threadId }, 'summary-model', error);
-        return null;
-      }
-    };
     const harness = openReconciledHarness(
       threadStorePath(config.storageDir, threadId),
       models.models,
@@ -155,7 +142,6 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       {
         extensions,
         settings: settings(models),
-        summarize,
         storeIdentity: (harness) => coordinatorStoreId(harness, context),
         refreshFacts: () => config.factsFor(threadId),
         beforeReconcile: async (harness, storeId) => {
@@ -285,8 +271,6 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
               conversationGate: current.gate,
               volatile: current.volatile,
               volatileText: turn.volatileText,
-              coldSlim: turn.coldSlim ?? null,
-              ...(turn.beforeDone === undefined ? {} : { beforeDone: turn.beforeDone }),
             },
             turn.claimed,
           );

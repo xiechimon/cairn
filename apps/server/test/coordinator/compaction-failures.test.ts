@@ -359,10 +359,13 @@ describe('compaction failures are never silent', () => {
       )
       .run();
     const { faux } = stub('unused');
-    faux.setResponses([
-      fauxAssistantMessage([], { stopReason: 'error', errorMessage: `401 key ${SECRET}` }),
-      fauxAssistantMessage('answered'),
-    ]);
+    faux.setResponses(
+      Array(4).fill((c: { messages: unknown[] }) =>
+        JSON.stringify(c.messages).includes("You are Cairn's Coordinator summarization step.")
+          ? fauxAssistantMessage([], { stopReason: 'error', errorMessage: `401 key ${SECRET}` })
+          : fauxAssistantMessage('answered'),
+      ),
+    );
     const coordinator = boot(w, faux, {
       logger: {
         info: () => {},
@@ -397,7 +400,6 @@ describe('compaction failures are never silent', () => {
 
   it.each([
     'memory-flush',
-    'model-switch-fold',
     'summary-fold',
     'summary-model',
     'seed-summary',
