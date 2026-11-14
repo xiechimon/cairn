@@ -6,7 +6,7 @@ const DELAY_MS = 5000;
 const CONCLUSIONS = [
   '请先在工作路由里配置 Coordinator',
   '没有在进行的任务',
-  '还没有完成的工作',
+  '还没有完成的文档',
   '尚无 Runner',
   '尚未添加服务商',
   '尚无技能',

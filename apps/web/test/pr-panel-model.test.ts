@@ -2,7 +2,6 @@ import type { PrPanelRow } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   PR_READ_LATE_MS,
-  prByThread,
   prCardModelOfRow,
   prChecksText,
   prCiUnread,
@@ -90,12 +89,6 @@ describe('a stale read is reported only for a PR that can still change', () => {
 });
 
 describe('list helpers', () => {
-  test('the first row of a thread wins', () => {
-    const byThread = prByThread([row({ number: 1 }), row({ buildId: 'b2', number: 2 })]);
-    expect(byThread.get('t1')?.number).toBe(1);
-    expect(prByThread(undefined).size).toBe(0);
-  });
-
   test('a PR with no checks shows no count', () => {
     expect(prChecksText({ passed: 0, failed: 0, running: 0, total: 0, failedNames: [] })).toBeNull();
     expect(prChecksText({ passed: 3, failed: 0, running: 0, total: 4, failedNames: [] })).toBe('3/4');

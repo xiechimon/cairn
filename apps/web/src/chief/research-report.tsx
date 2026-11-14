@@ -4,6 +4,7 @@ import { createContext, useContext, useMemo, useRef, useState } from 'react';
 import { useConversationMessages } from '../api/hooks.js';
 import { TraceCard } from '../components/chat/trace-parts.js';
 import { Button } from '../components/ui/button.js';
+import { DialogTitle } from '../components/ui/dialog.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { ChatMarkdown } from '../detail/chat-markdown.js';
@@ -51,7 +52,10 @@ export function reportSummaryOf(content: string): string {
     .split(/\n\s*\n/)
     .map((block) => block.trim())
     .find((block) => block !== '' && !/^(#|!\[|[-*]\s|\d+\.\s|```|\||>)/.test(block));
-  return (para ?? '').replace(/[*_`]/g, '').replace(/\s+/g, ' ');
+  return (para ?? '')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[*_`]/g, '')
+    .replace(/\s+/g, ' ');
 }
 
 export function ResearchReportCard({
@@ -154,26 +158,52 @@ export function ResearchReportDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const { t } = useI18n();
-  const contentRef = useRef<HTMLDivElement>(null);
+  const { t, locale } = useI18n();
+  const contentRef = useRef<HTMLElement>(null);
+  const when =
+    report.createdAt === undefined
+      ? null
+      : messageStampLabel(report.createdAt, Date.now(), locale, t);
   return (
     <DialogShell
-      title={report.title}
-      subtitle={report.final ? t('定稿') : t('初稿')}
       open={open}
       onClose={onClose}
       initialFocus={contentRef}
       width="var(--settings-w)"
       className="h-(--settings-h)"
     >
-      <div
+      <article
         ref={contentRef}
         tabIndex={-1}
-        data-testid="research-report-doc"
-        className="chat-text mx-auto max-w-180 font-sans text-ui leading-6 break-words text-foreground outline-none"
+        className="mx-auto max-w-180 px-2 pt-5 pb-16 outline-none sm:px-8"
       >
-        <ChatMarkdown text={report.content} />
-      </div>
+        <header className="border-b border-border pb-6">
+          <p
+            data-testid="research-report-meta"
+            className="m-0 flex items-center gap-1.5 text-meta text-content-tertiary"
+          >
+            <FileText aria-hidden="true" className="size-4 flex-none" />
+            <span>{t('调研报告')}</span>
+            <span aria-hidden="true">·</span>
+            <span>{report.final ? t('定稿') : t('初稿')}</span>
+            {when !== null && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="tabular-nums">{when}</span>
+              </>
+            )}
+          </p>
+          <DialogTitle className="mt-3 voice-title text-page text-foreground">
+            {report.title}
+          </DialogTitle>
+        </header>
+        <div
+          data-testid="research-report-doc"
+          className="report-doc mt-7 font-sans break-words text-foreground"
+        >
+          <ChatMarkdown text={report.content} />
+        </div>
+      </article>
     </DialogShell>
   );
 }
