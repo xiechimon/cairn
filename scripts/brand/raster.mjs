@@ -1,59 +1,5 @@
 import { crc32, deflateSync, inflateSync } from 'node:zlib';
 
-const TAU = Math.PI * 2;
-const clamp01 = (v) => Math.min(1, Math.max(0, v));
-
-function arcDistance(arc, x, y) {
-  const dx = x - arc.cx;
-  const dy = y - arc.cy;
-  const along = (((Math.atan2(dy, dx) - arc.from) % TAU) + TAU) % TAU;
-  if (along <= arc.sweep) return Math.abs(Math.hypot(dx, dy) - arc.r);
-  const end = arc.from + arc.sweep;
-  return Math.min(
-    Math.hypot(x - arc.cx - arc.r * Math.cos(arc.from), y - arc.cy - arc.r * Math.sin(arc.from)),
-    Math.hypot(x - arc.cx - arc.r * Math.cos(end), y - arc.cy - arc.r * Math.sin(end)),
-  );
-}
-
-function roundedRectDistance(x, y, origin, size, rx) {
-  const half = size / 2;
-  const qx = Math.abs(x - origin - half) - (half - rx);
-  const qy = Math.abs(y - origin - half) - (half - rx);
-  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - rx;
-}
-
-const rgb = (hex) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16) / 255);
-
-export function rasterize(scene, px) {
-  const { size, plate, mark, at, ink } = scene;
-  const unit = size / px;
-  const plateRgb = rgb(plate.fill);
-  const inkRgb = rgb(ink);
-  const pixels = Buffer.alloc(px * px * 4);
-  for (let j = 0; j < px; j += 1) {
-    for (let i = 0; i < px; i += 1) {
-      const ux = (i + 0.5) * unit;
-      const uy = (j + 0.5) * unit;
-      const plateAlpha = clamp01(
-        0.5 - roundedRectDistance(ux, uy, plate.inset, size - 2 * plate.inset, plate.rx) / unit,
-      );
-      const mx = (ux - at.cx) / at.k + at.mx;
-      const my = (uy - at.cy) / at.k + at.my;
-      let centre = Number.POSITIVE_INFINITY;
-      for (const arc of mark.arcs) centre = Math.min(centre, arcDistance(arc, mx, my));
-      const inkAlpha = clamp01(0.5 - ((centre - mark.band / 2) * at.k) / unit);
-      const alpha = inkAlpha + plateAlpha * (1 - inkAlpha);
-      const o = (j * px + i) * 4;
-      for (let c = 0; c < 3; c += 1) {
-        const premultiplied = inkRgb[c] * inkAlpha + plateRgb[c] * plateAlpha * (1 - inkAlpha);
-        pixels[o + c] = alpha === 0 ? 0 : Math.round((premultiplied / alpha) * 255);
-      }
-      pixels[o + 3] = Math.round(alpha * 255);
-    }
-  }
-  return { width: px, height: px, pixels };
-}
-
 function chunk(type, data) {
   const head = Buffer.alloc(8);
   head.writeUInt32BE(data.length, 0);
