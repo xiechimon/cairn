@@ -175,6 +175,7 @@ User=agent
 Environment=CAIRN_ORB=1
 Environment=DISPLAY=:1
 Environment=AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
+Environment=AGENT_BROWSER_NO_VERSION_CHECK=1
 Restart=always
 RestartSec=1
 ExecStartPre=/bin/sh -c 'while [ ! -S /run/cairn/computer.sock ]; do sleep 1; done'
