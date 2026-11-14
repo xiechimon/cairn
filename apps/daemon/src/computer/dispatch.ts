@@ -177,7 +177,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     if (!call.scopeKey) return NO_COMPUTER_SCOPE_MESSAGE;
     return {
       provider: options.orb.forScope(call.scopeKey),
-      guard: orbComputerProtectionRefusal,
+      guard: options.orb.onHost ? protectedComputerLifecycleRefusal : orbComputerProtectionRefusal,
     };
   }
 
