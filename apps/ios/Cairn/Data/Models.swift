@@ -10,6 +10,13 @@ struct Project: Decodable, Identifiable, Hashable, Sendable {
     let name: String
 }
 
+struct Machine: Decodable, Identifiable, Hashable, Sendable {
+    let id: String
+    let name: String
+    let online: Bool
+    let runningSteps: Int?
+}
+
 struct CoordinatorThread: Decodable, Identifiable, Hashable, Sendable {
     let id: String
     let title: String
@@ -62,15 +69,15 @@ struct TaskRecord: Decodable, Identifiable, Hashable, Sendable {
 
     var reason: String {
         switch phase {
-        case "needs_input": return "Asked you a question."
-        case "confirm": return "Plan ready. Approve to start."
-        case "review": return "Ready for your review."
-        case "failed": return "Failed. Open it to retry."
-        case "queued": return "Waiting for a machine."
-        case "planning": return "Writing the plan."
-        case "building": return "Working on it."
-        case "todo": return "Not started."
-        default: return "Done."
+        case "needs_input": return String(localized: "Asked you a question.")
+        case "confirm": return String(localized: "Plan ready. Approve to start.")
+        case "review": return String(localized: "Ready for your review.")
+        case "failed": return String(localized: "Failed. Open it to retry.")
+        case "queued": return String(localized: "Waiting for a machine.")
+        case "planning": return String(localized: "Writing the plan.")
+        case "building": return String(localized: "Working on it.")
+        case "todo": return String(localized: "Not started.")
+        default: return String(localized: "Done.")
         }
     }
 }
@@ -107,6 +114,12 @@ struct AskQuestion: Decodable, Hashable, Sendable {
 
     var isPending: Bool { status == "pending" }
 
+    func replyText(_ answers: [QuestionAnswer]) -> String {
+        let values = answers.map { $0.text ?? ($0.choices ?? []).joined(separator: ", ") }
+        if values.count == 1 { return values[0] }
+        return zip(answers, values).map { "\($0.header): \($1)" }.joined(separator: "\n")
+    }
+
     func reply(_ replies: [Int: [String]]) -> [QuestionAnswer]? {
         var answers: [QuestionAnswer] = []
         for (index, item) in questions.enumerated() {
@@ -135,12 +148,37 @@ enum MessageContent: Decodable, Hashable, Sendable {
     case text(String)
     case parts([MessagePart])
     case toolCall(String)
+    case startedTask(String)
     case question(AskQuestion)
+    case turnError(String)
 
     private struct Tagged: Decodable {
-        struct Call: Decodable { let name: String }
+        struct Call: Decodable {
+            let name: String
+            let result: ToolResult?
+            let isError: Bool?
+        }
         let kind: String
         let call: Call?
+        let message: String?
+    }
+
+    private struct ToolResult: Decodable {
+        let createdId: String?
+
+        private struct Part: Decodable { let text: String? }
+        private struct Created: Decodable { let id: String }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            if let created = try? container.decode(Created.self) {
+                createdId = created.id
+                return
+            }
+            let text = (try? container.decode(String.self))
+                ?? (try? container.decode([Part].self))?.compactMap(\.text).joined(separator: "\n")
+            createdId = text.flatMap { try? JSONDecoder().decode(Created.self, from: Data($0.utf8)) }?.id
+        }
     }
 
     init(from decoder: Decoder) throws {
@@ -152,8 +190,10 @@ enum MessageContent: Decodable, Hashable, Sendable {
         } else if let tagged = try? container.decode(Tagged.self) {
             if tagged.kind == "ask_user_question", let question = try? container.decode(AskQuestion.self) {
                 self = .question(question)
+            } else if tagged.kind == "chief_turn_error" {
+                self = .turnError(tagged.message ?? "")
             } else {
-                self = .toolCall(tagged.call?.name ?? tagged.kind)
+                self = Self.call(tagged)
             }
         } else {
             self = .text("")
@@ -165,8 +205,17 @@ enum MessageContent: Decodable, Hashable, Sendable {
         if tag.kind == "ask_user_question", let question = try? JSONDecoder().decode(AskQuestion.self, from: data) {
             return .question(question)
         }
-        if tag.kind == "toolcall" { return .toolCall(tag.call?.name ?? "tool") }
+        if tag.kind == "toolcall" { return call(tag) }
+        if tag.kind == "chief_turn_error" { return .turnError(tag.message ?? "") }
         return nil
+    }
+
+    private static func call(_ tagged: Tagged) -> MessageContent {
+        guard let call = tagged.call else { return .toolCall(tagged.kind) }
+        if call.name == "create_todo", call.isError != true, let id = call.result?.createdId {
+            return .startedTask(id)
+        }
+        return .toolCall(call.name)
     }
 
     var plainText: String {
@@ -175,7 +224,7 @@ enum MessageContent: Decodable, Hashable, Sendable {
             string
         case .parts(let parts):
             parts.compactMap { $0.type == nil || $0.type == "text" ? $0.text : nil }.joined(separator: "\n\n")
-        case .toolCall, .question:
+        case .toolCall, .startedTask, .question, .turnError:
             ""
         }
     }
@@ -197,7 +246,12 @@ struct ThreadMessage: Decodable, Identifiable, Hashable, Sendable {
 }
 
 struct ActiveRun: Decodable, Hashable, Sendable {
+    struct Tool: Decodable, Hashable, Sendable {
+        let toolName: String
+    }
+
     let phase: String?
+    let tool: Tool?
 }
 
 struct MessagePage: Decodable, Sendable {
