@@ -396,6 +396,7 @@ async function runClaimedStep(
       : composeWorkerSystemPrompt(agent.description, agent.memories, {
           ...taskMetaOpts(claimed),
           attachments: true,
+          decisionBoundary: claimed.step.kind === 'plan' || isBuildStepKind(claimed.step.kind),
           ...(claimed.project !== undefined ? { project: claimed.project } : {}),
         });
   const remoteTools = claimed.remoteTools;
