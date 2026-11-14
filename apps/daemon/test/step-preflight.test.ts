@@ -1,6 +1,11 @@
-import { AGENT_TOOL_MERGE, AGENT_TOOL_PUSH } from '@cairn/shared';
+import {
+  AGENT_TOOL_MERGE,
+  AGENT_TOOL_PUSH,
+  type AgentBackend,
+  type ProviderConfig,
+} from '@cairn/shared';
 import { describe, expect, it } from 'vitest';
-import { agentStepRefusal } from '../src/step-preflight.js';
+import { agentStepRefusal, prepareStepPromptDelivery } from '../src/step-preflight.js';
 
 const base = {
   stepKind: 'build',
@@ -62,5 +67,59 @@ describe('agentStepRefusal', () => {
     });
     expect(refusal).toBeNull();
     expect(lines).toEqual(['claude-code auth probe inconclusive: timeout (continuing)']);
+  });
+});
+
+describe('prepareStepPromptDelivery', () => {
+  const delivery = (patch: { isChief?: boolean; prompt?: string | null; supports?: boolean }) => {
+    const remembered: (boolean | null)[] = [];
+    const backend = {
+      modelSupportsImages: async () => patch.supports ?? true,
+    } as unknown as AgentBackend;
+    return {
+      remembered,
+      run: prepareStepPromptDelivery({
+        backend,
+        provider: {} as ProviderConfig,
+        modelId: 'm',
+        modelKey: 'p/m',
+        isChief: patch.isChief ?? false,
+        prompt: patch.prompt === undefined ? 'do it' : patch.prompt,
+        stepId: 's1',
+        client: {
+          attachment: async () => {
+            throw new Error('unused');
+          },
+        } as never,
+        materializeDir: '/nonexistent',
+        rememberImageSupport: (support) => remembered.push(support),
+        log: () => {},
+      }),
+    };
+  };
+
+  it('skips the probe for a chief step and keeps its prompt as is', async () => {
+    const { run, remembered } = delivery({ isChief: true });
+    expect(await run).toEqual({
+      imageSupport: null,
+      deliveryPrompt: 'do it',
+      promptImages: undefined,
+      skippedNoVisionCount: 0,
+    });
+    expect(remembered).toEqual([null]);
+  });
+
+  it('records the probed support and passes a plain prompt through', async () => {
+    const { run, remembered } = delivery({ supports: false });
+    const result = await run;
+    expect(result.imageSupport).toBe(false);
+    expect(result.deliveryPrompt).toBe('do it');
+    expect(result.promptImages).toBeUndefined();
+    expect(remembered).toEqual([false]);
+  });
+
+  it('keeps a null prompt null', async () => {
+    const { run } = delivery({ prompt: null });
+    expect((await run).deliveryPrompt).toBeNull();
   });
 });

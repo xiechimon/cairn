@@ -6,14 +6,12 @@ import type {
   AgentSessionHandle,
   ClaimedStep,
   CommitIdentity,
-  DeliveredImage,
   MachineHeartbeatBody,
   SkillInjectionFacts,
   WorkspaceHookNoteData,
   WorktreeOps,
 } from '@cairn/shared';
 import { isBuildStepKind, PLAN_FILE_NAME } from '@cairn/shared';
-import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { createActivityTracker } from './activity.js';
 import { AgentTodoReporter } from './agent-todo.js';
 import { AskChannel } from './ask-channel.js';
@@ -30,15 +28,14 @@ import type { DaemonLogger } from './log.js';
 import { type MachineApi, MachineApiError } from './machine-client.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
-import { resolveDeliveredPrompt } from './step-attachments.js';
 import { deliverStepOutcome } from './step-deliver.js';
-import { assembleStepEnv } from './step-env.js';
+import { prepareStepEnv } from './step-env.js';
 import { reportStepProvenance } from './step-executor-record.js';
 import { runLocalMergeStep } from './step-local-merge.js';
 import { newStepPassState } from './step-pass-events.js';
 import { runStepPasses } from './step-pass-loop.js';
 import { resolveStepPassOutcome, rewindAfterStep } from './step-pass-outcome.js';
-import { agentStepRefusal, probeModelImageSupport } from './step-preflight.js';
+import { agentStepRefusal, prepareStepPromptDelivery } from './step-preflight.js';
 import { composeWorkerSystemPrompt, planStepPrompt, taskMetaOpts } from './step-prompt.js';
 import { resolveStepProvider } from './step-provider.js';
 import { StepSessionOpener } from './step-session-opener.js';
@@ -319,33 +316,21 @@ async function runClaimedStep(
   const modelKey = `${provider?.providerId ?? agent.provider}/${agent.modelId}`;
   logger.raw(`using model ${modelKey}`);
 
-  const imageSupport = isChief
-    ? null
-    : await probeModelImageSupport(backend, provider, agent.modelId, (message) =>
-        logger.step(message),
-      );
-  deps.stepImageSupport?.set(stepId, imageSupport);
-  let deliveryPrompt = prompt;
-  let promptImages: DeliveredImage[] | undefined;
-  let skippedNoVisionCount = 0;
-  if (!isChief && prompt !== null) {
-    const resolved = await resolveDeliveredPrompt({
-      text: prompt,
-      stepId,
-      client,
-      materializeDir: deps.paths.stepAttachmentsDir,
-      log: (line) => logger.step(line),
-      imageSupport,
-    });
-    deliveryPrompt = resolved.text;
-    promptImages = resolved.images;
-    skippedNoVisionCount = resolved.skippedNoVision;
-  }
-  if (skippedNoVisionCount > 0) {
-    logger.step(
-      `image attachment skipped: model ${modelKey} does not support images (${skippedNoVisionCount} image(s) not delivered)`,
-    );
-  }
+  const delivery = await prepareStepPromptDelivery({
+    backend,
+    provider,
+    modelId: agent.modelId,
+    modelKey,
+    isChief,
+    prompt,
+    stepId,
+    client,
+    materializeDir: deps.paths.stepAttachmentsDir,
+    rememberImageSupport: (support) => deps.stepImageSupport?.set(stepId, support),
+    log: (line) => logger.step(line),
+  });
+  const { imageSupport, promptImages, skippedNoVisionCount } = delivery;
+  let { deliveryPrompt } = delivery;
 
   logger.workspace('准备工作区...');
   const checkout = isReview && reviewGate === 'review';
@@ -426,29 +411,21 @@ async function runClaimedStep(
       ? deps.otel.contextFor(claimed.step.buildId, stepId, claimed.step.kind)
       : undefined;
   const skillInjection: { facts: SkillInjectionFacts | null } = { facts: null };
-  let temporary: ReturnType<typeof createTempEnvironment>;
-  try {
-    temporary = createTempEnvironment({ ...process.env, ...opts.env });
-  } catch (error) {
-    await failStep(
-      deps,
-      heartbeat,
-      stepId,
-      `Temporary directory setup failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+  const stepEnv = prepareStepEnv(
+    {
+      inherited: opts.env,
+      git: repo?.kind === 'github' ? creds.git : null,
+      appCredential,
+      readonlyGit: readonlyWorkspace || attachmentVerify,
+      claudeSubscriptionToken:
+        runtimeId === 'claude-code' ? creds.claudeSubscriptionToken : undefined,
+    },
+    stepCleanups,
+  );
+  if ('error' in stepEnv) {
+    await failStep(deps, heartbeat, stepId, stepEnv.error);
     return;
   }
-  stepCleanups.push(temporary.cleanup);
-  const { env: stepEnv, dropGitCredentials } = assembleStepEnv({
-    inherited: opts.env,
-    temporary: temporary.env,
-    git: repo?.kind === 'github' ? creds.git : null,
-    appCredential,
-    readonlyGit: readonlyWorkspace || attachmentVerify,
-    claudeSubscriptionToken:
-      runtimeId === 'claude-code' ? creds.claudeSubscriptionToken : undefined,
-  });
-  stepCleanups.push(dropGitCredentials);
   const sessionOpts = composeStepSessionOpts({
     provider,
     modelId: agent.modelId,
@@ -479,7 +456,7 @@ async function runClaimedStep(
     isReview,
     remoteToolsOnly: claimed.remoteToolsOnly === true,
     telemetry,
-    env: stepEnv,
+    env: stepEnv.env,
   });
 
   const transcript = guardCredentialOutputs(
