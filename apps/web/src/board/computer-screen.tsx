@@ -50,6 +50,7 @@ export function MachineScreenSurface({
   const rfbRef = useRef<NovncRfb | null>(null);
   const [status, setStatus] = useState<ScreenStatus>('connecting');
   const online = computer.machine.online && computer.state !== 'failed';
+  const controlLease = interactive ? leaseId : null;
 
   useEffect(() => {
     if (!online || host.current === null) {
@@ -65,7 +66,7 @@ export function MachineScreenSurface({
         const opened = await openComputerScreen(
           teamId,
           computer.id,
-          interactive && leaseId !== null ? { kind: 'control', leaseId } : { kind: 'view' },
+          controlLease !== null ? { kind: 'control', leaseId: controlLease } : { kind: 'view' },
         );
         if (cancelled) return;
         const { default: RFB } = await import('@novnc/novnc');
@@ -118,7 +119,7 @@ export function MachineScreenSurface({
     computer.machine.online,
     computer.state,
     interactive,
-    leaseId,
+    controlLease,
     online,
     autoFocus,
   ]);

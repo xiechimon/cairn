@@ -589,11 +589,19 @@ test('full screen only watches; Take control and Return control drive the lease'
   const panel = await open(page, feed, [
     { id: 'm1', name: 'omarchy', online: true, runningSteps: 0 },
   ]);
-  await expect(panel.getByTestId('machine-screen-expand')).toBeVisible();
+  const screenOpens: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().endsWith('/computers/comp-1/screen'))
+      screenOpens.push(request.url());
+  });
+  const cardScreen = page.getByTestId('machine-card').getByTestId('machine-screen');
+  await expect(cardScreen).toHaveAttribute('data-status', 'placeholder');
+  const cardOpens = screenOpens.length;
   await panel.getByTestId('machine-screen-expand').click();
   const enlarged = page.getByTestId('machine-screen-enlarged');
   await expect(enlarged).toBeVisible();
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-fill', 'true');
+  await expect(cardScreen).toHaveAttribute('data-interactive', 'false');
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
     'data-interactive',
     'false',
@@ -615,8 +623,12 @@ test('full screen only watches; Take control and Return control drive the lease'
     'false',
   );
   expect(feed.controlCalls).toEqual(['POST', 'DELETE']);
+  const openedWhileFull = screenOpens.length;
   await dialog.getByRole('button', { name: '退出全屏' }).click();
   await expect(enlarged).toHaveCount(0);
+  await expect(cardScreen).toHaveAttribute('data-status', 'placeholder');
+  expect(openedWhileFull).toBeGreaterThan(cardOpens);
+  expect(screenOpens.length).toBe(openedWhileFull);
 });
 
 test('opening the machine while a user lease exists elsewhere does not take control, and Return control releases it', async ({

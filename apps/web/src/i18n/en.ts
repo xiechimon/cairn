@@ -158,7 +158,6 @@ export const EN: Record<string, string> = {
   电脑离线: 'Computer offline',
   'Coordinator 在这台': 'Coordinator runs here',
   全屏查看: 'View full screen',
-  屏幕已全屏: 'Showing full screen',
   退出全屏: 'Exit full screen',
   接管后才能点击和键入: 'Take control to click and type',
   接管: 'Take control',
