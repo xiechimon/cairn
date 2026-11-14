@@ -3,14 +3,14 @@ import { and, asc, eq, gte, isNull, or } from 'drizzle-orm';
 import { chiefMessage, chiefThread, todo } from '../db/schema.js';
 import { askQuestionContentOf } from './chief-questions.js';
 import { ownershipOf, sectionOf, TASKS_RECENT_MS } from './owner.js';
-import { type TodoDeps, toTodoRecord } from './todos.js';
+import { type TodoDeps, toTodoRecords } from './todos.js';
 
 export function listTasks(
   deps: Pick<TodoDeps, 'db'>,
   teamId: string,
   { sectionedOnly = false, now = Date.now() }: { sectionedOnly?: boolean; now?: number } = {},
 ): TasksQuery {
-  const todos = deps.db
+  const rows = deps.db
     .select()
     .from(todo)
     .where(
@@ -21,8 +21,13 @@ export function listTasks(
     )
     .orderBy(asc(todo.seqNum), asc(todo.id))
     .all()
-    .filter((row) => !sectionedOnly || sectionOf(row, ownershipOf(deps.db, row, now), now) !== null)
-    .map((row) => ({ kind: 'todo' as const, ...toTodoRecord(deps, row, now) }));
+    .filter(
+      (row) => !sectionedOnly || sectionOf(row, ownershipOf(deps.db, row, now), now) !== null,
+    );
+  const todos = toTodoRecords(deps, rows, now).map((record) => ({
+    kind: 'todo' as const,
+    ...record,
+  }));
   const questions: TasksQuery['entries'] = deps.db
     .select({ message: chiefMessage })
     .from(chiefMessage)

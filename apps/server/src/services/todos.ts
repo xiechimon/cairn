@@ -105,59 +105,142 @@ function notifyPhaseEntry(deps: TodoDeps, record: TodoRecord, from: Phase, to: P
   triggerChiefWakes(deps, record, to);
 }
 
+type QuotaWait = TodoRecord['quotaWait'];
+
+interface TodoUsage {
+  rows: number;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  total: number;
+  priced: number;
+}
+
+function groupBy<T, K>(items: readonly T[], keyOf: (item: T) => K): Map<K, T[]> {
+  const groups = new Map<K, T[]>();
+  for (const item of items) {
+    const group = groups.get(keyOf(item));
+    if (group === undefined) groups.set(keyOf(item), [item]);
+    else group.push(item);
+  }
+  return groups;
+}
+
+function todoRelations(db: Db, rows: readonly TodoRow[]) {
+  const ids = rows.map((row) => row.id);
+  const latestBuildIds = rows.flatMap((row) =>
+    row.latestBuildId === null ? [] : [row.latestBuildId],
+  );
+  const tags = groupBy(
+    db
+      .select({ todoId: todoTag.todoId, tagId: todoTag.tagId })
+      .from(todoTag)
+      .where(inArray(todoTag.todoId, ids))
+      .all(),
+    (r) => r.todoId,
+  );
+  const labels = groupBy(
+    db
+      .select({ todoId: todoGithubLabel.todoId, labelId: todoGithubLabel.labelId })
+      .from(todoGithubLabel)
+      .where(inArray(todoGithubLabel.todoId, ids))
+      .all(),
+    (r) => r.todoId,
+  );
+  const history = groupBy(
+    db
+      .select({ todoId: build.todoId, buildId: build.id, createdAt: build.createdAt })
+      .from(build)
+      .where(inArray(build.todoId, ids))
+      .orderBy(asc(build.createdAt))
+      .all(),
+    (r) => r.todoId,
+  );
+  const quotaWaits = new Map<string, QuotaWait>();
+  const waitingSteps =
+    latestBuildIds.length === 0
+      ? []
+      : db
+          .select({ buildId: step.buildId, block: step.quotaBlock })
+          .from(step)
+          .where(and(inArray(step.buildId, latestBuildIds), eq(step.status, 'waiting_quota')))
+          .all();
+  for (const waiting of waitingSteps) {
+    const block = waiting.block;
+    quotaWaits.set(
+      waiting.buildId,
+      block === null
+        ? null
+        : {
+            kind: block.kind,
+            providerId: block.providerId,
+            label: block.label,
+            retryAfterMs: block.retryAfterMs,
+            probeAt: block.probeAt,
+          },
+    );
+  }
+  const usage = new Map<string, TodoUsage>(
+    db
+      .select({
+        todoId: build.todoId,
+        rows: sql<number>`count(*)`,
+        input: sql<number>`coalesce(sum(${tokenUsage.costInput}), 0)`,
+        output: sql<number>`coalesce(sum(${tokenUsage.costOutput}), 0)`,
+        cacheRead: sql<number>`coalesce(sum(${tokenUsage.costCacheRead}), 0)`,
+        cacheWrite: sql<number>`coalesce(sum(${tokenUsage.costCacheWrite}), 0)`,
+        total: sql<number>`coalesce(sum(${tokenUsage.costTotal}), 0)`,
+        priced: sql<number>`count(${tokenUsage.costTotal})`,
+      })
+      .from(tokenUsage)
+      .innerJoin(build, eq(build.id, tokenUsage.buildId))
+      .where(inArray(build.todoId, ids))
+      .groupBy(build.todoId)
+      .all()
+      .map(({ todoId, ...sums }) => [todoId, sums]),
+  );
+  return (row: TodoRow) => ({
+    tagIds: (tags.get(row.id) ?? []).map((r) => r.tagId),
+    githubLabelIds: (labels.get(row.id) ?? []).map((r) => r.labelId),
+    history: (history.get(row.id) ?? []).map(({ buildId, createdAt }) => ({ buildId, createdAt })),
+    quotaWait: row.latestBuildId === null ? null : (quotaWaits.get(row.latestBuildId) ?? null),
+    usage: usage.get(row.id),
+  });
+}
+
+export function toTodoRecords(
+  deps: Pick<TodoDeps, 'db'>,
+  rows: readonly TodoRow[],
+  now = nowMs(),
+): (TodoRecord & { section: TodoSection | null })[] {
+  if (rows.length === 0) return [];
+  const relationsOf = todoRelations(deps.db, rows);
+  return rows.map((row) => todoRecordOf(deps, row, relationsOf(row), now));
+}
+
 export function toTodoRecord(
   deps: Pick<TodoDeps, 'db'>,
   row: TodoRow,
   now = nowMs(),
 ): TodoRecord & { section: TodoSection | null } {
-  const { db } = deps;
-  const tagIds = db
-    .select({ tagId: todoTag.tagId })
-    .from(todoTag)
-    .where(eq(todoTag.todoId, row.id))
-    .all()
-    .map((r) => r.tagId);
-  const history = db
-    .select({ buildId: build.id, createdAt: build.createdAt })
-    .from(build)
-    .where(eq(build.todoId, row.id))
-    .orderBy(asc(build.createdAt))
-    .all();
-  let quotaWait: TodoRecord['quotaWait'] = null;
-  if (row.latestBuildId !== null) {
-    const waiting = db
-      .select()
-      .from(step)
-      .where(and(eq(step.buildId, row.latestBuildId), eq(step.status, 'waiting_quota')))
-      .all()
-      .at(-1);
-    const block = waiting?.quotaBlock ?? null;
-    if (block !== null) {
-      quotaWait = {
-        kind: block.kind,
-        providerId: block.providerId,
-        label: block.label,
-        retryAfterMs: block.retryAfterMs,
-        probeAt: block.probeAt,
-      };
-    }
-  }
+  return todoRecordOf(deps, row, todoRelations(deps.db, [row])(row), now);
+}
+
+function todoRecordOf(
+  deps: Pick<TodoDeps, 'db'>,
+  row: TodoRow,
+  {
+    tagIds,
+    githubLabelIds,
+    history,
+    quotaWait,
+    usage,
+  }: ReturnType<ReturnType<typeof todoRelations>>,
+  now: number,
+): TodoRecord & { section: TodoSection | null } {
   const waitingOn = waitingOnOf(deps, row);
-  const ownership = ownershipOf(db, row);
-  const usage = db
-    .select({
-      rows: sql<number>`count(*)`,
-      input: sql<number>`coalesce(sum(${tokenUsage.costInput}), 0)`,
-      output: sql<number>`coalesce(sum(${tokenUsage.costOutput}), 0)`,
-      cacheRead: sql<number>`coalesce(sum(${tokenUsage.costCacheRead}), 0)`,
-      cacheWrite: sql<number>`coalesce(sum(${tokenUsage.costCacheWrite}), 0)`,
-      total: sql<number>`coalesce(sum(${tokenUsage.costTotal}), 0)`,
-      priced: sql<number>`count(${tokenUsage.costTotal})`,
-    })
-    .from(tokenUsage)
-    .innerJoin(build, eq(build.id, tokenUsage.buildId))
-    .where(eq(build.todoId, row.id))
-    .get();
+  const ownership = ownershipOf(deps.db, row);
   return {
     id: row.id,
     teamId: row.teamId,
@@ -173,7 +256,7 @@ export function toTodoRecord(
     seqNum: row.seqNum,
     orderIndex: row.orderIndex,
     tagIds,
-    githubLabelIds: todoGithubLabelIds(db, row.id),
+    githubLabelIds,
     latestBuildId: row.latestBuildId,
     lastRunAt: row.lastRunAt,
     hasChanges: row.hasChanges,
@@ -294,7 +377,7 @@ export function listTodos(
     .where(conds.length > 0 ? and(...conds) : sql`1=1`)
     .orderBy(asc(todo.seqNum))
     .all();
-  return rows.map((row) => toTodoRecord(deps, row));
+  return toTodoRecords(deps, rows);
 }
 
 export function getTodo<D extends Pick<TodoDeps, 'db'>>(deps: D, id: string): TodoRecord | null {
