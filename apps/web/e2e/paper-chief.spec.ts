@@ -1,5 +1,4 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { openReplySteps } from './helpers.js';
 
 const GATED = '/app?scenario=100';
 const READY = '/app?scenario=111';
@@ -73,15 +72,7 @@ for (const theme of ['light', 'dark'] as const) {
       .first()
       .locator('[data-slot="message-toolbar-meta"]');
     await expect(meta, 'W5').toHaveCSS('font-size', '12px');
-    const toolsToggle = win.getByTestId('chief-tools-toggle');
-    await expect(toolsToggle, 'W5: steps stay out of the stream until asked for').toHaveCount(0);
-    await openReplySteps(page, win.getByTestId('chief-msg').last());
-    await expect(toolsToggle.locator('[data-trace-summary]'), 'W5').toHaveCSS('font-size', '14px');
-    await expect(toolsToggle.locator('svg[data-glyph="done"]'), 'W5').toHaveCount(1);
-    await expect(toolsToggle.locator('svg[data-trace-triangle="open"]'), 'W5').toHaveCSS('rotate', '90deg');
-    expect((await toolsToggle.boundingBox())?.height, 'W5').toBe(28);
-    const toolRow = win.getByTestId('chief-turn-tools').locator('[data-trace-verb]').first();
-    await expect(toolRow, 'W5').toHaveCSS('font-size', '13px');
+    await expect(win.getByTestId('chief-tools-toggle'), 'W5: the stream carries no steps').toHaveCount(0);
   });
 
   test(`settings: Paper top bar, routing card and tab-specific empty states (${theme})`, async ({
