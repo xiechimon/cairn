@@ -38,8 +38,8 @@
 <table>
   <tr>
     <td width="33%"><picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/home-zh-dark.webp">
-    <img alt="手机上的 Cairn：一句需求、两张 thread 卡片和一个带三个选项的决定" src="docs/assets/readme/home-zh-light.webp" width="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/ios-home-zh-dark.webp">
+    <img alt="Cairn iOS app：两句需求、各自开出的 thread 和一个带三个选项的决定" src="docs/assets/readme/ios-home-zh-light.webp" width="100%">
   </picture></td>
     <td width="33%"><picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/work-zh-dark.webp">
