@@ -914,7 +914,7 @@ Reach:
 - Research: [docs/research/research-loop-plan.md](../../../docs/research/research-loop-plan.md)
 - Frontend design: n/a: research runs inside threads and shows as ordinary transcript rows
 - Backend design: [docs/research/research-loop-plan.md](../../../docs/research/research-loop-plan.md)
-- Evidence: `apps/server/test/research-trigger.test.ts`, `apps/server/test/research-before-plan.test.ts`, `apps/daemon/test/web-search.test.ts`
+- Evidence: `apps/server/test/research-trigger.test.ts`, `apps/server/test/chief-router-tools.test.ts`, `apps/daemon/test/web-search.test.ts`
 
 ### schedules
 
