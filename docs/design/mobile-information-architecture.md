@@ -50,7 +50,7 @@ The one Coordinator conversation, newest at the bottom and pinned there while th
 - User messages in a right-aligned `--bubble-fill` bubble with a tail; Coordinator replies in a left-aligned `--reply-bubble-fill` bubble (V3).
 - A thread started in a turn shows once as a reference row on the reply that started it: a small elbow, the status tile in the task's tone and the title (C10). It opens the task thread. Other tool calls are not shown.
 - A pending question shows as a reply bubble with the question, then one chip per option, the recommended one first and filled, no numbers (C11). A tap on a chip answers a single-choice question; multi-select and free-text questions add `Submit`. While a question is open the composer reads `Type your own answer…` and sends its text as the answer.
-- Composer: one glass capsule with a leading `+` and a round send button that fills in ink when there is a draft. `+` opens `Photo library` and `Add attachment`; each pick uploads at once and shows as a chip above the field, and the message carries it as an attachment token, as on the web. Sent attachments show as chips above the user bubble.
+- Composer: the web's narrow composer (`apps/web/src/chief/composer-surface.tsx`): a 14pt rounded rectangle in the composer fill with a 1px ring and a soft drop shadow, a leading `+` in the foreground colour, and a send arrow in a grey circle that turns from tertiary to foreground when there is a draft. `+` opens `Photo library` and `Add attachment`; each pick uploads at once and shows as a chip above the field, and the message carries it as an attachment token, as on the web. Sent attachments show as chips above the user bubble.
 - Empty: brand mark and the composer, which starts the thread.
 
 ### Tab 2: Tasks
@@ -89,7 +89,7 @@ Opened from the Tasks tab. The same question bubble and chips as Tab 1. Earlier 
 | Tab bar | System `TabView` with the floating glass tab bar (`Chat`, `Tasks`, `Made`) and the computers tab as the separate trailing circle (`Tab(role: .prominent)` on iOS 27); minimizes on scroll | `NavigationBar` with three destinations and a separate computers button, expressive active indicator |
 | Top bar | Tab 1: three glass toolbar controls (menu, status mark, Tasks with count); other tabs: large title; pushed screens: inline title and subtitle; iOS 27 `toolbarMinimizationBehavior(.onScrollDown)` | `TopAppBar` with the same three controls on Tab 1, `LargeTopAppBar` elsewhere, collapse on scroll |
 | Lists | Inset grouped list on the neutral canvas; rows on card color | `LazyColumn` with list items on surface containers, no dividers |
-| Composer | One glass capsule (`glassEffect`) holding `+` (a `Menu` with `PhotosPicker` and `fileImporter`), the field and a round send button that fills in ink with a draft | Filled text field in a bottom app bar, `FilledIconButton` send |
+| Composer | A rounded rectangle with the web composer's fill, ring and shadow (not glass), holding `+` (a `Menu` with `PhotosPicker` and `fileImporter`), the field and a grey round send button | Filled text field in a bottom app bar, `FilledIconButton` send |
 | Primary button | Filled ink capsule (the web `primary` is the foreground color) | `Button` (filled) in the primary color |
 | Sheets | System sheet with detents | `ModalBottomSheet` |
 | Color | cairn tokens from `apps/web/src/styles/shadcn.css` in `Cairn/Brand/Palette.swift` (canvas, card, ink ladder, bubble fills, task tone tiles, the blue count badge); system materials stay neutral | Same tokens mapped into a custom `ColorScheme`; dynamic color off |
