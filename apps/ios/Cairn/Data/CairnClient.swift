@@ -77,6 +77,28 @@ struct CairnClient: Sendable {
         return MessagePage(messages: messages, activeRun: latest.activeRun, nextCursor: nil)
     }
 
+    func registerPushDevice(teamId: String, token: String, environment: String) async throws {
+        let _: PushDeviceResult = try await post(
+            "/api/teams/\(teamId)/push/apns-devices",
+            body: PushDeviceBody(token: token, environment: environment)
+        )
+    }
+
+    func unregisterPushDevice(teamId: String, token: String) async throws {
+        var request = authorized(url("/api/teams/\(teamId)/push/apns-devices"))
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["token": token])
+        do {
+            let (data, response) = try await session.data(for: request)
+            try Self.check(response, data: data)
+        } catch let error as CairnError {
+            throw error
+        } catch {
+            throw CairnError.offline(error.localizedDescription)
+        }
+    }
+
     func send(threadId: String, content: String) async throws -> SendResult {
         try await post("/api/conversations/\(threadId)/messages", body: SendBody(content: content))
     }
@@ -139,6 +161,15 @@ struct CairnClient: Sendable {
         let uploadUrl: String
         let grant: String
         let key: String
+    }
+
+    private struct PushDeviceBody: Encodable {
+        let token: String
+        let environment: String
+    }
+
+    private struct PushDeviceResult: Decodable {
+        let ok: Bool
     }
 
     private struct AnswerBody: Encodable {

@@ -61,6 +61,12 @@ export const serverConfigSchema = z.object({
       );
     })
     .transform((value) => new URL(value).origin),
+  apns: z.object({
+    keyPath: z.string().nullable(),
+    keyId: z.string().nullable(),
+    teamId: z.string().nullable(),
+    bundleId: z.string().min(1),
+  }),
   pingIntervalMs: z.number().int().positive(),
   claimHoldMs: z.number().int().positive(),
   schedulerTickMs: z.number().int().positive(),
@@ -209,6 +215,12 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     vapidKeysPath: join(dataDir, 'vapid.json'),
     vapidSubject: envStr('CAIRN_VAPID_SUBJECT') ?? 'mailto:push@cairn.dev',
     webOrigin: envStr('CAIRN_WEB_ORIGIN') ?? 'https://cairn.local',
+    apns: {
+      keyPath: envStr('CAIRN_APNS_KEY_PATH'),
+      keyId: envStr('CAIRN_APNS_KEY_ID'),
+      teamId: envStr('CAIRN_APNS_TEAM_ID'),
+      bundleId: envStr('CAIRN_APNS_BUNDLE_ID') ?? 'dev.cairn.ios',
+    },
     pingIntervalMs: TEAM_STREAM_PING_INTERVAL_MS,
     claimHoldMs: CLAIM_POLL_INTERVAL_MS,
     schedulerTickMs: 15_000,

@@ -8763,6 +8763,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "push_subscription",
   "push_digest_item",
   "push_delivery",
+  "apns_device",
   "harness_eval_attempts",
   "autonomous_merge_admission",
   "chief_report",
@@ -9162,6 +9163,15 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   {
     "method": "DELETE",
     "path": "/api/teams/{id}/push/subscriptions",
+  },
+  {
+    "method": "POST",
+    "note": "#4632: iOS app registers its APNs device token for the needs-you pushes",
+    "path": "/api/teams/{id}/push/apns-devices",
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/teams/{id}/push/apns-devices",
   },
   {
     "method": "POST",

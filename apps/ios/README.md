@@ -26,9 +26,15 @@ Pick an iOS 27 simulator and run. On first launch enter the server address and t
 
 The simulator shares the Mac's network, so `http://127.0.0.1:<port>` reaches a server on the Mac or one forwarded to it (`ssh -N -R 127.0.0.1:<port>:127.0.0.1:<port> <mac>`). Use `127.0.0.1` rather than `localhost` for an IPv4-only forward: in the pilot run `localhost` failed to connect while `127.0.0.1` worked. Plain HTTP is allowed only for local addresses (`NSAllowsLocalNetworking`); any other server needs HTTPS.
 
+## Push notifications
+
+The account sheet (menu button on the Chat tab) has a `Push on this device` switch. Turning it on asks for notification permission and registers the device's APNs token with the server (`POST /api/teams/:id/push/apns-devices`); turning it off or signing out removes it. A Debug build registers as `sandbox`, a Release build as `production`. The server sends only when `CAIRN_APNS_*` is set ([`docs/configuration.md`](../../docs/configuration.md)). Tapping a notification opens what its `href` names: a task thread, the Chat tab for a Coordinator question, or Computers. Design notes: [`docs/research/ios-apns-push-2026-11-14.md`](../../docs/research/ios-apns-push-2026-11-14.md).
+
+Without an Apple key, try the tap path on a simulator with `xcrun simctl push <device> dev.cairn.ios payload.apns`, where the payload carries `aps.alert` and `href`.
+
 ## Unit tests
 
-`CairnTests` runs against a `URLProtocol` stub, so it needs no server: message history follows `nextCursor` to the oldest page, a task message returns the conversation it landed in, free-text questions answer with `text` and multi-select questions keep every pick, a conversation stream event reloads the open thread, and a failed session restore stays recoverable.
+`CairnTests` runs against a `URLProtocol` stub, so it needs no server: message history follows `nextCursor` to the oldest page, a task message returns the conversation it landed in, free-text questions answer with `text` and multi-select questions keep every pick, a conversation stream event reloads the open thread, a failed session restore stays recoverable, every notification `href` the server sends opens the right screen, and push registration sends the token and environment.
 
 ```sh
 xcodebuild -project Cairn.xcodeproj -scheme Cairn \

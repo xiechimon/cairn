@@ -213,6 +213,12 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     method: 'DELETE',
     path: '/api/teams/{id}/push/subscriptions',
   },
+  {
+    method: 'POST',
+    path: '/api/teams/{id}/push/apns-devices',
+    note: '#4632: iOS app registers its APNs device token for the needs-you pushes',
+  },
+  { method: 'DELETE', path: '/api/teams/{id}/push/apns-devices' },
   { method: 'POST', path: '/api/teams/{id}/push/receipts' },
   { method: 'POST', path: '/api/teams/{id}/push/test' },
   { method: 'GET', path: '/api/teams/{id}/push/test/{deliveryId}' },

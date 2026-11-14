@@ -9,7 +9,7 @@ import {
 } from '@cairn/shared';
 import { and, asc, count, eq, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { pairedDevice, pairingGrant, pushSubscription } from '../db/schema.js';
+import { apnsDevice, pairedDevice, pairingGrant, pushSubscription } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -249,6 +249,7 @@ export function revokePairedDevice(db: Db, teamId: string, id: string): boolean 
   if (row === undefined || row.teamId !== teamId) return false;
   db.transaction((tx) => {
     tx.delete(pushSubscription).where(eq(pushSubscription.pairedDeviceId, id)).run();
+    tx.delete(apnsDevice).where(eq(apnsDevice.pairedDeviceId, id)).run();
     tx.delete(pairedDevice).where(eq(pairedDevice.id, id)).run();
   });
   deviceStreams.closeAll(id);

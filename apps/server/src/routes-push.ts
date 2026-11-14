@@ -6,17 +6,29 @@ import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
-import { pushDelivery, pushSubscription, todo } from './db/schema.js';
+import { apnsDevice, pushDelivery, pushSubscription, todo } from './db/schema.js';
 import { parseWith } from './lib/errors.js';
 import { newRecordId, nowMs } from './lib/ids.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody, requireTeam } from './routes-helpers.js';
+import { APNS_TOKEN_PATTERN } from './services/apns.js';
 import { assertDeviceActive } from './services/paired-devices.js';
 import { sendMustReachAlert } from './services/push-alerts.js';
 import { clearThreadPresence, recordThreadPresence } from './services/thread-presence.js';
 
 const threadPresenceBodySchema = z
   .object({ todoId: z.string().min(1).max(128), tabId: z.string().min(1).max(128) })
+  .strict();
+
+const apnsDeviceBodySchema = z
+  .object({
+    token: z.string().regex(APNS_TOKEN_PATTERN),
+    environment: z.enum(['sandbox', 'production']),
+  })
+  .strict();
+
+const apnsDeviceDeleteBodySchema = z
+  .object({ token: z.string().regex(APNS_TOKEN_PATTERN) })
   .strict();
 
 const requestWindows = new WeakMap<AppContext, Map<string, number[]>>();
@@ -212,6 +224,73 @@ export function registerPushRoutes(app: Hono, ctx: AppContext): void {
           eq(pushSubscription.endpoint, body.endpoint),
           eq(pushSubscription.userId, ctx.user.id),
           eq(pushSubscription.teamId, ctx.team.id),
+        ),
+      )
+      .run();
+    return c.body(null, 204);
+  });
+
+  app.post('/api/teams/:id/push/apns-devices', async (c) => {
+    requireTeam(ctx, c.req.param('id'));
+    if (!allowRequest(ctx, `${ctx.user.id}:subscribe`)) {
+      return c.json({ error: 'too many push subscription requests' }, 429);
+    }
+    const body = parseWith(apnsDeviceBodySchema, await jsonBody(c), 'body');
+    const existing = ctx.db
+      .select({ userId: apnsDevice.userId, teamId: apnsDevice.teamId })
+      .from(apnsDevice)
+      .where(eq(apnsDevice.token, body.token))
+      .get();
+    if (
+      existing !== undefined &&
+      (existing.userId !== ctx.user.id || existing.teamId !== ctx.team.id)
+    ) {
+      return c.json({ error: 'push endpoint already belongs to another account' }, 409);
+    }
+    assertDeviceActive(pairedDeviceIdOf(c));
+    const createdAt = nowMs();
+    ctx.db
+      .insert(apnsDevice)
+      .values({
+        id: newRecordId(),
+        userId: ctx.user.id,
+        teamId: ctx.team.id,
+        token: body.token,
+        environment: body.environment,
+        pairedDeviceId: pairedDeviceIdOf(c),
+        createdAt,
+      })
+      .onConflictDoUpdate({
+        target: apnsDevice.token,
+        set: { environment: body.environment, pairedDeviceId: pairedDeviceIdOf(c), createdAt },
+      })
+      .run();
+    const oldest = ctx.db
+      .select({ id: apnsDevice.id })
+      .from(apnsDevice)
+      .where(and(eq(apnsDevice.userId, ctx.user.id), eq(apnsDevice.teamId, ctx.team.id)))
+      .orderBy(apnsDevice.createdAt)
+      .all()
+      .slice(0, -20);
+    for (const row of oldest) {
+      ctx.db.delete(apnsDevice).where(eq(apnsDevice.id, row.id)).run();
+    }
+    return c.json({ ok: true, delivers: ctx.vapidKeys?.apns != null }, 201);
+  });
+
+  app.delete('/api/teams/:id/push/apns-devices', async (c) => {
+    requireTeam(ctx, c.req.param('id'));
+    if (!allowRequest(ctx, `${ctx.user.id}:unsubscribe`)) {
+      return c.json({ error: 'too many push subscription requests' }, 429);
+    }
+    const body = parseWith(apnsDeviceDeleteBodySchema, await jsonBody(c), 'body');
+    ctx.db
+      .delete(apnsDevice)
+      .where(
+        and(
+          eq(apnsDevice.token, body.token),
+          eq(apnsDevice.userId, ctx.user.id),
+          eq(apnsDevice.teamId, ctx.team.id),
         ),
       )
       .run();

@@ -702,6 +702,20 @@ export const pushSubscription = sqliteTable(
   (t) => [uniqueIndex('push_subscription_endpoint_unique').on(t.endpoint)],
 );
 
+export const apnsDevice = sqliteTable(
+  'apns_device',
+  {
+    id: text('id').primaryKey(),
+    userId: text('userId').notNull(),
+    teamId: text('teamId').notNull(),
+    token: text('token').notNull(),
+    environment: text('environment').$type<'sandbox' | 'production'>().notNull(),
+    pairedDeviceId: text('pairedDeviceId'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [uniqueIndex('apns_device_token_unique').on(t.token)],
+);
+
 export const pushDelivery = sqliteTable('push_delivery', {
   message: json<{ title: string; body: string; href: string; tag: string }>('message'),
   pushStatus: text('pushStatus').notNull().default('unknown'),
