@@ -17,6 +17,8 @@ describe('research search requirements', () => {
     expect(prompt).toContain('读相关源码');
     expect(prompt).toContain('「我已自行决定」');
     expect(prompt).toContain('「需要你定的」');
+    expect(prompt).toContain('用 ask_user 把这几项一次问完');
+    expect(prompt).toContain('「已由你决定」');
   });
 
   test('an empty intake still requires checking dependency releases', () => {
