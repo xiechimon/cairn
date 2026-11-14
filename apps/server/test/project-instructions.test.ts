@@ -108,6 +108,32 @@ describe('threads in the project receive the instructions (D74 P1)', () => {
     expect(started.status).toBe(201);
     expect((await claim(token)).project?.instructions).toBe(RULES);
   });
+
+  test.each([
+    ['Ask before adding a dependency.', { charter: 'Ask before adding a dependency.' }],
+    ['', undefined],
+  ])('a claimed build carries the team charter %j only when it is set', async (charter, team) => {
+    s.db
+      .insert(chiefTable)
+      .values({
+        id: `chief-${s.user.id}-${s.team.id}`,
+        userId: s.user.id,
+        teamId: s.team.id,
+        charter,
+        watches: [],
+        wakes: [],
+        createdAt: nowMs(),
+      })
+      .run();
+    const token = await enroll('charter-builder');
+    seedSessionRoute(s, { provider: 'pi', modelId: 'stub-model' });
+    const id = await createProject('charter', { kind: 'github', githubRepo: 'octo/demo' });
+    const task = (await (
+      await req(s.app, 'POST', `/api/projects/${id}/todos`, { title: 'Build', spec: 'Build it' })
+    ).json()) as { id: string };
+    await req(s.app, 'POST', `/api/projects/${id}/builds`, { todoIds: [task.id], withPlan: false });
+    expect((await claim(token)).team).toEqual(team);
+  });
 });
 
 describe('Coordinator turns scoped to a project receive its instructions (D74 P1)', () => {
