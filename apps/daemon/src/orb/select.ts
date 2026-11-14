@@ -116,14 +116,19 @@ export function createOrbProvider(env: NodeJS.ProcessEnv, home: string): OrbProv
   );
 }
 
+export function hostDesktopRequested(env: NodeJS.ProcessEnv): boolean {
+  return env[COMPUTER_ENV] === 'host';
+}
+
 export function createComputerOrbProvider(
   env: NodeJS.ProcessEnv,
   executor: OrbProvider,
 ): NspawnOrbProvider | undefined {
+  if (hostDesktopRequested(env)) return undefined;
   if (executor instanceof NspawnOrbProvider) return executor;
   const value = env[COMPUTER_ENV];
   if (value === undefined || value === '') return undefined;
   if (value !== 'orb')
-    throw new Error(`${COMPUTER_ENV} must be orb (got ${JSON.stringify(value)})`);
+    throw new Error(`${COMPUTER_ENV} must be orb or host (got ${JSON.stringify(value)})`);
   return new NspawnOrbProvider();
 }

@@ -37,6 +37,7 @@ import { type ClaudeBinInfo, probeClaudeBin } from './claude-code-bin.js';
 import { readClaudeCodeReport } from './claude-code-models.js';
 import { createComputerDispatcher } from './computer/dispatch.js';
 import { HostComputerProvider } from './computer/host.js';
+import { HostDesktops } from './computer/host-desktop.js';
 import { createHostScreenFromEnv, type HostScreen } from './computer/host-screen.js';
 import { ComputerInputFence } from './computer/input-fence.js';
 import { OrbComputerProvider } from './computer/orb.js';
@@ -54,7 +55,11 @@ import { enrollThroughBrowser } from './machine-enroll.js';
 import { ComputerOrbs, computerImageOffersBrowser } from './orb/computer.js';
 import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
 import type { OrbProvider } from './orb/provider.js';
-import { createComputerOrbProvider, createOrbProvider } from './orb/select.js';
+import {
+  createComputerOrbProvider,
+  createOrbProvider,
+  hostDesktopRequested,
+} from './orb/select.js';
 import { relayOrbStopped, runOrbStep } from './orb/step.js';
 import { ensurePrivateDir } from './private-fs.js';
 import { setupProxy } from './proxy.js';
@@ -227,7 +232,16 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         })
       : undefined;
   const computerInputLocks = join(paths.home, 'computer-input');
-  if (computerOrbs) ensurePrivateDir(computerInputLocks);
+  const hostDesktops =
+    opts.orbComputer === undefined && hostDesktopRequested(capEnv)
+      ? new HostDesktops({
+          root: join(paths.home, 'desktops'),
+          toolsRoot: join(paths.home, 'tools'),
+          env: capEnv,
+          inputFence: new ComputerInputFence(computerInputLocks, () => enrolledIdentity.machineId),
+        })
+      : undefined;
+  if (computerOrbs || hostDesktops) ensurePrivateDir(computerInputLocks);
   const orbComputer =
     opts.orbComputer ??
     (computerOrbs && computerHost
@@ -242,7 +256,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           },
           onError: (message) => logger.machine(message),
         })
-      : undefined);
+      : hostDesktops);
   const agentReach = new AgentReachProbe();
   const hostPermissionsProbe = opts.hostPermissionsProbe ?? new HostPermissionsProbe();
   const capabilitiesReport = (): MachineCapabilities => {
@@ -255,7 +269,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       codexLogin: readCodexLogin(paths.agentRuntimeDir),
       executor: orbProvider.kind,
       ...(orbComputer ? { computer: true as const } : {}),
-      ...(orbComputer && computerImageOffersBrowser() ? { browser: true as const } : {}),
+      ...((orbComputer && computerImageOffersBrowser()) || hostDesktops?.offersBrowser()
+        ? { browser: true as const }
+        : {}),
       ...(hostComputer ? { ownComputer: true as const } : {}),
       ...(reach !== undefined ? { agentReach: reach } : {}),
       ...(hostPermissions !== undefined ? { hostPermissions } : {}),
@@ -380,12 +396,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     provider: createComputerScreenProvider({
       runtimeRoot: computerHost ? () => computerHost.runtimeRoot : '/run/cairn-orb',
       ...(computerOrbs ? { ensureComputer: (scopeKey) => computerOrbs.ensure(scopeKey) } : {}),
+      ...(hostDesktops
+        ? {
+            ensureComputer: (scopeKey) => hostDesktops.ensure(scopeKey),
+            socketPath: (scopeKey, kind) => hostDesktops.socketPath(scopeKey, kind),
+          }
+        : {}),
     }),
   });
 
   let networkFailures = 0;
   const presenceReporter = new ComputerPresenceReporter({
-    source: opts.computerPresence ?? computerOrbs,
+    source: opts.computerPresence ?? computerOrbs ?? hostDesktops,
     body: () => ({
       cliVersion: DAEMON_VERSION,
       claudeCode: claudeReport(),
@@ -909,6 +931,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     await presenceReporter.close();
     await computerDispatcher.close();
     if (orbComputer instanceof OrbComputerProvider) await orbComputer.close();
+    hostDesktops?.close();
   }
 
   return {

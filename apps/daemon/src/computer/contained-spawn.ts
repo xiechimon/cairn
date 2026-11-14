@@ -12,10 +12,14 @@ const SUBREAPER_LAUNCH = [
 ].join('\n');
 
 export function python3Executable(pathValue: string | undefined): string | undefined {
+  return executableOnPath('python3', pathValue);
+}
+
+export function executableOnPath(name: string, pathValue: string | undefined): string | undefined {
   if (!pathValue) return undefined;
   for (const directory of pathValue.split(':')) {
     if (!directory) continue;
-    const candidate = `${directory}/python3`;
+    const candidate = `${directory}/${name}`;
     try {
       accessSync(candidate, constants.X_OK);
       return candidate;
