@@ -16,8 +16,9 @@ import { adaptProviderCompat, PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
-import { combineTimeoutWithRootCause, RETRY_STORM_MAX, runStep } from '../src/runner.js';
+import { RETRY_STORM_MAX, runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { combineTimeoutWithRootCause } from '../src/step-pass-outcome.js';
 import { testTempDir } from './test-temp-dir.js';
 
 const RELAY_400 = '400: {"message":"Model does not support this protocol.","type":"server_error"}';

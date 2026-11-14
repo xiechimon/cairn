@@ -751,6 +751,36 @@ test('the push link opens the machine with its screen enlarged and view-only', a
 test.describe('on a touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
+  test('the enlarged header keeps Give back and close as separate 44px touch targets', async ({
+    page,
+  }) => {
+    const feed: Feed = {
+      computers: [computer({ handoffReason: 'login', controlHolder: 'user' })],
+      commands: [command(1)],
+      controlCalls: [],
+    };
+    await open(
+      page,
+      feed,
+      [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
+      false,
+      '/app?pane=machines&machine=m1&screen=1',
+    );
+    const dialog = page.getByRole('dialog', { name: 'omarchy' });
+    await expect(dialog.getByRole('button', { name: '交还' })).toBeVisible();
+    await dialog.evaluate((node) =>
+      Promise.all(node.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+    );
+    const giveBack = await dialog.getByRole('button', { name: '交还' }).boundingBox();
+    const close = await dialog.getByRole('button', { name: '关闭' }).boundingBox();
+    expect(giveBack).not.toBeNull();
+    expect(close).not.toBeNull();
+    if (!giveBack || !close) return;
+    expect(giveBack.height).toBeGreaterThanOrEqual(44);
+    expect(Math.min(close.width, close.height)).toBeGreaterThanOrEqual(44);
+    expect(close.x - (giveBack.x + giveBack.width)).toBeGreaterThanOrEqual(8);
+  });
+
   test('the control bar under the screen sits above the bottom navigation without scrolling', async ({
     page,
   }) => {
