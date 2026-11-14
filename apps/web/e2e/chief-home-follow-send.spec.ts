@@ -319,12 +319,15 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
     const landed = measurement.frames.findIndex((frame) => frame.gap <= 2);
     const hidden = measurement.frames.findIndex((frame) => frame.opacity === 0);
     expect(landed).toBeGreaterThanOrEqual(0);
-    expect(measurement.frames[landed]?.t).toBeLessThanOrEqual(150);
     expect(measurement.frames.slice(landed).every((frame) => frame.gap <= 2)).toBe(true);
     expect(hidden).toBeGreaterThanOrEqual(0);
-    expect(measurement.frames[hidden]?.t).toBeLessThanOrEqual(
-      activation === 'phone-light' ? 300 : 150,
-    );
+    if (activation === 'phone-light') {
+      expect(landed).toBeLessThanOrEqual(1);
+      expect(hidden).toBeLessThanOrEqual(1);
+    } else {
+      expect(measurement.frames[landed]?.t).toBeLessThanOrEqual(150);
+      expect(measurement.frames[hidden]?.t).toBeLessThanOrEqual(150);
+    }
     expect(measurement.latestVisible).toBe(true);
     expect(resting.property === 'none' || resting.duration.split(',').every((v) => parseFloat(v) === 0)).toBe(true);
     await page.waitForTimeout(250);
