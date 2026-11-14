@@ -36,8 +36,12 @@ export function processInfo(pid) {
   const ps = spawnSync('ps', ['-o', 'ppid=,lstart=,comm=', '-p', String(pid)], {
     encoding: 'utf8',
   });
-  const match = /^\s*(\d+)\s+(\S+\s+\S+\s+\d+\s+[\d:]+\s+\d+)\s+(.+)$/.exec(ps.stdout ?? '');
-  if (ps.status !== 0 || !match) return null;
+  return ps.status === 0 ? parsePsInfo(pid, ps.stdout ?? '') : null;
+}
+
+export function parsePsInfo(pid, stdout) {
+  const match = /^\s*(\d+)\s+(\S+\s+\S+\s+\d+\s+[\d:]+\s+\d+)\s+(.+)$/.exec(stdout.trimEnd());
+  if (!match) return null;
   return { pid, ppid: Number(match[1]), start: match[2], comm: basename(match[3].trim()) };
 }
 

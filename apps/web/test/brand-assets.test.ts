@@ -1,80 +1,68 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { brandFiles, PLATE } from '../../../scripts/brand/logo.mjs';
-import { type Bitmap, decodeIcns, decodePng } from '../../../scripts/brand/raster.mjs';
+import { APP_ICON, brandFiles, ICNS_SLOTS, WEB_ICONS } from '../../../scripts/brand/logo.mjs';
+import { decodeIcns, decodePng } from '../../../scripts/brand/raster.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../../..');
 const GENERATED = brandFiles();
-const rgb = (hex: string) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
-
-function largestChannelGap(a: Bitmap, b: Bitmap): number {
-  expect([b.width, b.height]).toEqual([a.width, a.height]);
-  let gap = 0;
-  for (let i = 0; i < a.pixels.length; i += 1)
-    gap = Math.max(gap, Math.abs((a.pixels[i] ?? 0) - (b.pixels[i] ?? 0)));
-  return gap;
-}
 
 describe('brand assets match scripts/brand/generate-logo.mjs', () => {
-  it.each(GENERATED.filter(([, content]) => typeof content === 'string'))(
+  it.each(GENERATED)(
     '%s is the generated text',
     (path, content) => {
       expect(readFileSync(resolve(ROOT, path), 'utf8')).toBe(content);
     },
   );
 
-  it.each(GENERATED.filter(([path]) => path.endsWith('.png')))(
-    '%s has the generated pixels',
-    (path, content) => {
-      const committed = decodePng(readFileSync(resolve(ROOT, path)));
-      expect(largestChannelGap(decodePng(content as Buffer), committed)).toBeLessThanOrEqual(1);
-    },
-  );
+  it('the iOS app icon is one filled spiral layer with a gradient fill per appearance', () => {
+    const files = new Map(GENERATED);
+    const json = files.get(`${APP_ICON}/icon.json`);
+    const layer = files.get(`${APP_ICON}/Assets/spiral.svg`);
+    expect(typeof json).toBe('string');
+    expect(layer).toMatch(/<path d="M[^"]+Z" fill="#[0-9a-f]{6}"\/>/);
+    expect(layer).not.toMatch(/stroke/);
+    const icon = JSON.parse(json as string);
+    const layers = icon.groups.flatMap((g: { layers: { 'image-name': string }[] }) => g.layers);
+    expect(layers.map((l: { 'image-name': string }) => l['image-name'])).toEqual(['spiral.svg']);
+    const fills = layers[0]['fill-specializations'];
+    expect(fills.map((f: { appearance?: string }) => f.appearance ?? 'light')).toEqual(['light', 'dark']);
+    for (const fill of fills) expect(fill.value['linear-gradient']).toHaveLength(2);
+    const committedAssets = readdirSync(resolve(ROOT, APP_ICON, 'Assets')).sort();
+    expect(committedAssets).toEqual(['spiral.svg']);
+  });
 
-  it.each(GENERATED.filter(([path]) => path.endsWith('.icns')))(
-    '%s has the generated slots and pixels',
-    (path, content) => {
-      const generated = decodeIcns(content as Buffer);
-      const committed = decodeIcns(readFileSync(resolve(ROOT, path)));
-      expect(committed.map(([type]) => type)).toEqual(generated.map(([type]) => type));
-      generated.forEach(([, png], i) => {
-        const [, committedPng] = committed[i] ?? [];
-        expect(committedPng).toBeDefined();
-        expect(
-          largestChannelGap(decodePng(png), decodePng(committedPng as Buffer)),
-        ).toBeLessThanOrEqual(1);
-      });
-    },
-  );
+  it('the macOS icns holds every slot exported from the app icon', () => {
+    const slots = decodeIcns(readFileSync(resolve(ROOT, 'assets/AppIcon.icns')));
+    expect(slots.map(([type]) => type)).toEqual(ICNS_SLOTS.map(([type]) => type));
+    slots.forEach(([, png], i) => {
+      const { width, height } = decodePng(png);
+      expect([width, height]).toEqual([ICNS_SLOTS[i]?.[1], ICNS_SLOTS[i]?.[1]]);
+    });
+    const { width } = decodePng(readFileSync(resolve(ROOT, 'assets/AppIcon-1024.png')));
+    expect(width).toBe(1024);
+  });
 
-  it.each(GENERATED.filter(([, content]) => typeof content === 'string'))(
+  it.each(GENERATED.filter(([path]) => path.endsWith('.svg')))(
     '%s is flat: no filter, gradient, shadow, mask or embedded image',
     (_path, content) => {
       expect(content).not.toMatch(/filter|gradient|shadow|<mask|<image|opacity/i);
     },
   );
 
-  it.each(GENERATED.filter(([path]) => path.endsWith('.png')))(
-    '%s holds only its plate, its ink and the blend between them',
-    (path, content) => {
-      const { fill, ink } = PLATE[path.includes('-light') ? 'light' : 'dark'];
-      const plate = rgb(fill);
-      const mark = rgb(ink);
-      const { pixels } = decodePng(content as Buffer);
-      let stray = 0;
-      for (let i = 0; i < pixels.length; i += 4) {
-        const alpha = pixels[i + 3] ?? 0;
-        if (alpha === 0) continue;
-        const t = alpha < 255 ? 0 : ((pixels[i] ?? 0) - plate[0]) / (mark[0] - plate[0]);
-        const off = [0, 1, 2].some(
-          (c) => Math.abs((pixels[i + c] ?? 0) - (plate[c] ?? 0) - t * ((mark[c] ?? 0) - (plate[c] ?? 0))) > 2,
-        );
-        if (off) stray += 1;
-      }
-      expect(stray).toBe(0);
-    },
-  );
+  it.each(WEB_ICONS)('$path is the app icon rendered by Icon Composer ($rendition, $shape)', ({ path, px, shape }) => {
+    const { width, height, pixels } = decodePng(readFileSync(resolve(ROOT, path)));
+    expect([width, height]).toEqual([px, px]);
+    const alphaAt = (x: number, y: number) => pixels[(y * width + x) * 4 + 3];
+    const corners = [alphaAt(0, 0), alphaAt(px - 1, 0), alphaAt(0, px - 1), alphaAt(px - 1, px - 1)];
+    expect(corners).toEqual(shape === 'bleed' ? [255, 255, 255, 255] : [0, 0, 0, 0]);
+    expect(alphaAt(px >> 1, px >> 1)).toBe(255);
+    const colours = new Set<number>();
+    for (let i = 0; i < pixels.length; i += 4)
+      if (pixels[i + 3] === 255)
+        colours.add(((pixels[i] ?? 0) << 16) | ((pixels[i + 1] ?? 0) << 8) | (pixels[i + 2] ?? 0));
+    expect(colours.size).toBeGreaterThan(px * 2);
+  });
 
   it('every icon the manifest and index.html link exists', () => {
     const manifest = JSON.parse(

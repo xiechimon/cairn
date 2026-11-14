@@ -375,6 +375,46 @@ it('keeps a valid agent-reach report and drops a malformed one without losing th
   ).toEqual(report);
 });
 
+it('keeps a valid host-permissions report and drops a malformed one without losing the rest', () => {
+  const report = { mcpServers: ['figma'], skills: [] };
+  const hostPermissions = {
+    accessibility: 'granted',
+    automation: 'not_required',
+    screenRecording: 'denied',
+  };
+  expect(parseReportedCapabilities({ ...report, hostPermissions })).toEqual({
+    ...report,
+    hostPermissions,
+  });
+  expect(
+    parseReportedCapabilities({
+      ...report,
+      hostPermissions: { accessibility: 'granted', automation: 'not_required' },
+    }),
+  ).toEqual(report);
+  expect(
+    parseReportedCapabilities({
+      ...report,
+      hostPermissions: {
+        accessibility: 'maybe',
+        automation: 'granted',
+        screenRecording: 'granted',
+      },
+    }),
+  ).toEqual(report);
+  expect(
+    parseReportedCapabilities({
+      ...report,
+      hostPermissions: {
+        accessibility: 'granted',
+        automation: 'granted',
+        screenRecording: 'granted',
+        extra: true,
+      },
+    }),
+  ).toEqual(report);
+});
+
 describe('Runner OS platform', () => {
   it('maps Node platform names, with Windows as its own value', () => {
     expect(osPlatformOf('linux')).toBe('linux');

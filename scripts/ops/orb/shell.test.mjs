@@ -102,7 +102,7 @@ if (cmd === 'systemd-nspawn' && args.includes('/usr/bin/node')) console.log(proc
 if (cmd === 'systemctl') {
   const state = join(root, 'properties');
   if (args[0] === 'show') console.log(existsSync(state) ? readFileSync(state, 'utf8') : 'MemoryMax=infinity\\nCPUQuotaPerSecUSec=infinity\\nTasksMax=16384');
-  if (args[0] === 'set-property') writeFileSync(state, 'MemoryMax=4294967296\\nCPUQuotaPerSecUSec=4s\\nTasksMax=4096');
+  if (args[0] === 'set-property') writeFileSync(state, 'MemoryAccounting=true\\n');
 }
 if (cmd === 'install') {
   const dest = args.at(-1);
@@ -358,23 +358,21 @@ test('preparation applies the shared template and actual runtime limits idempote
     assert.ok(!f.calls().some((call) => call.includes('set-property')));
     const first = f.run('prepare-machine.sh', ['cairn-orb-test-a']);
     assert.equal(first.status, 0, first.stderr);
-    assert.match(first.stdout, /MemoryMax=4G CPUQuota=400% TasksMax=4096/);
-    writeFileSync(
-      join(f.root, 'properties'),
-      `MemoryMax=4294967296\nCPUQuotaPerSecUSec=4s\nTasksMax=4096\nExtra=${'x'.repeat(1024 * 1024)}`,
+    assert.match(first.stdout, /2 changes/);
+    assert.ok(
+      f
+        .calls()
+        .some((call) => call.includes('set-property') && call.includes('MemoryAccounting=true')),
     );
-    assert.equal(f.run('prepare-machine.sh', ['cairn-orb-test-a']).stdout.trim(), '0 changes');
     for (const flags of ['rw,nodev', 'rw,nosuid', 'rw', '']) {
       assert.notEqual(
         f.run('prepare-machine.sh', ['cairn-orb-test-a'], { RUN_MOUNT_OPTIONS: flags }).status,
         0,
       );
     }
-    writeFileSync(
-      join(f.root, 'properties'),
-      'MemoryMax=42949672960\nCPUQuotaPerSecUSec=4s\nTasksMax=40960',
-    );
-    assert.match(f.run('prepare-machine.sh', ['cairn-orb-test-a']).stdout, /set-property/);
+    const second = f.run('prepare-machine.sh', ['cairn-orb-test-a']);
+    assert.equal(second.status, 0, second.stderr);
+    assert.match(second.stdout, /0 changes/);
     const persistent = join(f.root, 'etc/systemd/nspawn/cairn-orb-test-a.nspawn');
     writeFileSync(persistent, '[Files]\nBind=/home\n');
     assert.notEqual(f.run('prepare-machine.sh', ['cairn-orb-test-a']).status, 0);

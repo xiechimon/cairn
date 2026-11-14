@@ -9,6 +9,7 @@ import {
   type MachineOsPlatform,
   type MemoryRecord,
   type ModelSource,
+  type PermissionState,
   PHASE_VALUES,
   type Phase,
   type ProjectColor,
@@ -16,6 +17,7 @@ import {
   type ProjectRepoKind,
   type ProviderRecord,
   type QuotaWait,
+  type RunnerOfflineContent,
   type SecretRecord,
   type SkillFact,
   type StepPromptOrigin,
@@ -300,6 +302,11 @@ export interface MachineRow {
     computer?: true;
     ownComputer?: true;
     browser?: true;
+    hostPermissions?: {
+      accessibility: PermissionState;
+      automation: PermissionState;
+      screenRecording: PermissionState;
+    };
   } | null;
   maxConcurrentOverridden?: boolean;
   recommendedConcurrent?: number;
@@ -645,6 +652,11 @@ export type ChiefStreamItem =
       kind: 'daily-report';
       id: string;
       report: ChiefReportContent;
+    }
+  | {
+      kind: 'runner-offline';
+      id: string;
+      notice: RunnerOfflineContent;
     }
   | {
       kind: 'streaming';

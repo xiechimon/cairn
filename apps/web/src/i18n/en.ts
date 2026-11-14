@@ -122,7 +122,6 @@ export const EN: Record<string, string> = {
   已建任务: 'Created task',
   审阅中: 'In review',
   定时: 'Schedules',
-  '执行中 {n}': '{n} running',
   项目: 'Project', // sidebar group / search group / schedule-form field — one fit
   Coordinator: 'Coordinator',
   成果: 'Made',
@@ -184,6 +183,18 @@ export const EN: Record<string, string> = {
   '你在控制 · 还剩 {n} 分钟': 'You are in control · {n} min left',
   浏览器: 'Browser',
   '让 agent 打开网页、点击和填表。': 'Lets agents open pages, click and fill forms.',
+  辅助功能未授予: 'Accessibility not granted',
+  '在 系统设置 → 隐私与安全性 → 辅助功能 中允许 Cairn，否则 agent 无法读取和操作桌面。':
+    'Allow Cairn under System Settings → Privacy & Security → Accessibility, or agents cannot read and drive the desktop.',
+  桌面辅助通道不可用: 'Desktop accessibility bus unavailable',
+  'AT-SPI 辅助总线不可用，agent 将无法读取和操作桌面。请安装并启用 at-spi（如 orca）后重试。':
+    'The AT-SPI accessibility bus is unavailable, so agents cannot read and drive the desktop. Install and enable at-spi (for example orca) and retry.',
+  屏幕录制未授予: 'Screen recording not granted',
+  '在 系统设置 → 隐私与安全性 → 屏幕录制 中允许 Cairn，否则 agent 无法截取屏幕。':
+    'Allow Cairn under System Settings → Privacy & Security → Screen Recording, or agents cannot capture the screen.',
+  屏幕截取不可用: 'Screen capture unavailable',
+  '当前环境无法截取屏幕，agent 的屏幕读取将被拒绝。':
+    'This environment cannot capture the screen; agents will be refused screen reads.',
   '这台机器还不支持浏览器。': 'This machine does not support the browser yet.',
   '这台机器已不再报告浏览器能力；可关闭已保存的偏好。':
     'This machine no longer reports browser capability; you can turn off the saved preference.',
@@ -874,28 +885,11 @@ export const EN: Record<string, string> = {
     'Queued: waiting for {machine} to come online ({ahead} ahead)',
   '排队中：等机器上线（前面 {ahead} 个）':
     'Queued: waiting for a machine to come online ({ahead} ahead)',
-  '执行中 {n}/{cap}': 'Running {n}/{cap}',
   // #1251 machines page capability annotation (daemon-reported inventory).
   能力清单未上报: 'Capabilities not reported',
   'MCP {n} · 本机技能 {m}': 'MCP {n} · local skills {m}',
   手动: 'Manual',
   推荐: 'Recommended',
-  估算: 'Estimate',
-  核数: 'Cores',
-  总内存: 'Total memory',
-  负载: 'Load',
-  '未收到能力指纹，按保守默认 {n} 估算':
-    'No capability fingerprint received; estimated at the conservative default of {n}',
-  恢复推荐: 'Reset to recommended',
-  并发上限: 'Concurrency limit',
-  '可选 {min}–{max}（按内存）': 'Range {min}–{max} (by memory)',
-  '可选 {min}–{max}（默认档位）': 'Range {min}–{max} (default)',
-  '推荐 {n}': 'Recommended {n}',
-  '当前值 {n} 超出可选范围': 'Current value {n} is outside the range',
-  减少并发上限: 'Decrease concurrency limit',
-  增加并发上限: 'Increase concurrency limit',
-  '并发上限 {n}': 'Concurrency limit {n}',
-  '并发上限 {n}，{source}': 'Concurrency limit {n}, {source}',
   // #905 activity phases (live row labels) + the freshness disclosure line.
   '正在连接模型...': 'Connecting to the model...',
   '模型思考中...': 'Model is thinking...',
@@ -1268,6 +1262,27 @@ export const EN: Record<string, string> = {
   '停止失败，请重试。': 'Could not stop. Try again.',
   '已停止，没有建任务。': 'Stopped. No task was created.',
   '已停止。停之前已经建了任务': 'Stopped. A task was already created before the stop:',
+  '{name} 已恢复，{n} 个任务已开工。': '{name} is back. {n#1 task|# tasks} started.',
+  '还有 {n} 个在排队。': ' {n#1 task is|# tasks are} still queued.',
+  '{n} 个已改到其他 Runner。': ' {n#1 task|# tasks} moved to another Runner.',
+  '已改在 {name} 上跑 {n} 个任务': 'Moved {n#1 task|# tasks} to {name}',
+  '改到 {name} 失败': 'Could not move to {name}',
+  '{name} 离线了。': '{name} is offline.',
+  '{name} 还没连上过。': '{name} has never connected.',
+  '{n} 个任务在等它。': ' {n#1 task is|# tasks are} waiting for it.',
+  '等它的任务都已改到其他 Runner。': ' Its waiting tasks moved to another Runner.',
+  '{name} 已恢复。': '{name} is back.',
+  '最后在线 {ago}。': ' Last seen {ago}.',
+  '已改到其他 Runner': 'Moved to another Runner',
+  '请在 {name} 上按顺序检查：': 'On {name}, check in order:',
+  '1. 电脑开着，没有休眠': '1. The computer is on and not asleep',
+  '2. 能打开 Cairn 网页（网络和到服务器的线路正常）':
+    '2. It can open the Cairn page (the network and the route to the server work)',
+  '3. 运行 `cairn status`，没在运行就运行 `cairn start`':
+    '3. Run `cairn status`; if it is not running, run `cairn start`',
+  '4. 还不行就运行 `cairn logs -f`，把最后几行发给我，我帮你看':
+    '4. Still failing? Run `cairn logs -f` and send me the last lines; I will read them',
+  '这次改在 {name} 上跑': 'Run it on {name} instead',
   '已存下，Coordinator 恢复后会处理': 'Saved. The Coordinator will handle it once it is back',
   现在插话: 'Steer now',
   移除: 'Remove',
@@ -1395,6 +1410,7 @@ export const EN: Record<string, string> = {
   回答选项: 'Answer options',
   提交: 'Submit',
   下一步: 'Next',
+  看调研报告: 'Open research report',
   '提交回答失败，请重试。': 'Could not submit your answers. Try again.',
   '取消提问失败，请重试。': 'Could not dismiss the question. Try again.',
   备用模型: 'Fallback models',
@@ -1648,8 +1664,6 @@ export const EN: Record<string, string> = {
   路由覆盖: 'Route override',
   '本任务的机器与执行要求；调度在规则开启后生效。':
     'Per-task machine and capability requirements; applied when routing rules are on.',
-  '要求 Orb': 'Require Orb',
-  '执行机须上报 Orb 沙箱执行器': 'Executor must report the Orb sandbox',
   '要求的 MCP': 'Required MCP',
   '派发时要求执行机已安装这些 MCP 服务器': 'Dispatch requires these MCP servers on the executor',
   路由覆盖已保存: 'Route override saved',
@@ -1848,7 +1862,6 @@ export const EN: Record<string, string> = {
     'The runtimes that can take tasks on this machine, and their sign-in state.',
   能力: 'Capabilities',
   '这台机器上报的 MCP 与技能清单': 'The MCP servers and skills this machine reports',
-  容量: 'Capacity',
   管理: 'Manage',
   登录已过期: 'Sign-in expired',
   登录将过期: 'Sign-in expiring',

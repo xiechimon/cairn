@@ -37,6 +37,7 @@ export interface TodoGlance {
   seq?: number;
   title?: string;
   parentId?: string;
+  report?: boolean;
 }
 
 export const TodoGlanceContext = createContext<ReadonlyMap<string, TodoGlance> | null>(null);

@@ -16,6 +16,10 @@ extension Color {
     static let failure = Color(light: 0xA33A2A, dark: 0xF09A88)
     static let waiting = Color(light: 0x6E4900, dark: 0xF2CF86)
     static let onAccent = Color(light: 0xFFFFFF, dark: 0x0A0A0A)
+    static let inkTertiary = Color(light: 0x545454, dark: 0xA3A3A3)
+    static let composerFill = Color(light: 0xFFFFFF, dark: 0x292929)
+    static let composerRing = Color(light: 0xDEDEDE, dark: 0x383838)
+    static let composerButton = Color(light: 0xF0F0F0, dark: 0x393939)
 
     init(light: UInt32, dark: UInt32) {
         self.init(uiColor: UIColor { traits in

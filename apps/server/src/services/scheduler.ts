@@ -65,6 +65,7 @@ import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
 import { sweepPendingPushAlerts } from './push-alerts.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
 import { planResearchIntake } from './research-intake.js';
+import { sweepOfflineRunners } from './runner-offline.js';
 import {
   ARCHIVED_SCHEDULE_PAUSE_REASON,
   assertWorkerScheduleInterval,
@@ -526,6 +527,7 @@ export function createScheduler(
     sweepZombieQueuedTodos(deps, now);
     sweepPlanAutoConfirm(deps);
     sweepQuotaWaitSteps(deps, now);
+    sweepOfflineRunners(deps, now);
     sweepUnplaceableSteps(deps, now);
     void sweepFailedRetries(deps).catch(() => {});
     const digestTimes = opts.pushDigestTimes ?? [];

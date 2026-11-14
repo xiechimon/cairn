@@ -274,6 +274,31 @@ export const chiefNoticeContentSchema = z.object({
 });
 export type ChiefNoticeContent = z.infer<typeof chiefNoticeContentSchema>;
 
+export const RUNNER_OFFLINE_KIND = 'runner_offline';
+export const runnerOfflineContentSchema = z.object({
+  kind: z.literal(RUNNER_OFFLINE_KIND),
+  machineId: recordId,
+  machineName: z.string(),
+  lastSeenAt: z.number(),
+  todos: z.array(
+    z.object({
+      id: recordId,
+      seqNum: z.number().int(),
+      title: z.string(),
+      state: z.enum(['waiting', 'started', 'moved', 'gone']),
+    }),
+  ),
+  alternative: z
+    .object({ machineId: recordId, name: z.string(), todoIds: z.array(recordId) })
+    .nullable(),
+  backAt: z.number().nullable(),
+  recoveredAt: z.number().nullable(),
+});
+export type RunnerOfflineContent = z.infer<typeof runnerOfflineContentSchema>;
+
+export const runTodoOnBodySchema = z.object({ machineId: recordId });
+export type RunTodoOnBody = z.infer<typeof runTodoOnBodySchema>;
+
 export const ASK_USER_QUESTION_KIND = 'ask_user_question';
 
 export const askUserQuestionSchema = z.object({

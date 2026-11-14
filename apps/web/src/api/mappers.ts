@@ -49,6 +49,7 @@ import {
   resolvedBuildPrNumber,
   reviewVerdictSchema,
   reworkNoteWithoutReason,
+  runnerOfflineContentSchema,
   SUGGEST_REPLIES_TOOL_NAME,
   type SystemRow,
   stripAnsiEscapes,
@@ -1551,6 +1552,12 @@ function collectChiefStream(
       if (notice.success) {
         pendingTools = [];
         items.push({ kind: 'robot', markdown: notice.data.message, seconds: '', id: m.id });
+        continue;
+      }
+      const runnerOffline = runnerOfflineContentSchema.safeParse(parsed);
+      if (runnerOffline.success) {
+        pendingTools = [];
+        items.push({ kind: 'runner-offline', id: m.id, notice: runnerOffline.data });
         continue;
       }
       const dailyReport = chiefReportContentSchema.safeParse(parsed);

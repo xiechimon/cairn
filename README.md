@@ -20,7 +20,7 @@
 
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/hero-en-dark.webp">
-    <img alt="Cairn on desktop: the Coordinator conversation with a decision waiting on you, and a thread report open beside it" src="docs/assets/readme/hero-en-light.webp" width="100%">
+    <img alt="Cairn on a MacBook, installed as a web app with a thread report open, next to the Cairn iOS app on an iPhone" src="docs/assets/readme/hero-en-light.webp" width="100%">
   </picture>
 </div>
 
