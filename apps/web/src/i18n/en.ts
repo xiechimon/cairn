@@ -243,8 +243,9 @@ export const EN: Record<string, string> = {
   '项目说明保存失败，请重试。': 'Could not save the instructions. Try again.',
   没有在进行的任务: 'Nothing in progress',
   没有空闲的任务: 'Nothing idle',
-  还没有完成的工作: 'Nothing finished yet',
-  '任务合并完成后会出现在这里。': 'Tasks show up here once they merge.',
+  还没有完成的文档: 'No finished documents yet',
+  '调研报告等文档完成后会出现在这里。':
+    'Research reports and other documents show up here once they finish.',
   新建项目: 'New project',
   接入模型来源: 'Connect a model source',
   '添加模型服务商，或在 Runner 上登录 Claude Code':
@@ -2054,7 +2055,6 @@ export const EN: Record<string, string> = {
   文档: 'Documents',
   设计: 'Designs',
   网页: 'Web pages',
-  代码改动: 'Code changes',
   '之前的 {n} 步': '{n} earlier steps',
   '收起之前的 {n} 步': 'Hide {n} earlier steps',
   已允许这一次: 'Allowed once',
