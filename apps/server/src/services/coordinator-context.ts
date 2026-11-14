@@ -9,7 +9,7 @@ import {
 import { compactionWindow } from '../coordinator/runtime/compaction.js';
 import { catalogContextWindow, DEFAULT_CONTEXT_WINDOW } from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
-import { chiefThread, chiefTurnUsage, coordinatorConversation, provider } from '../db/schema.js';
+import { chiefThread, chiefTurnUsage, provider } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { coordinatorProfile } from './routing-rules.js';
 
@@ -206,20 +206,8 @@ export function lastTurnContext(
   const last = lastContextBearingTurnUsageWhere(db, scope);
   if (last == null) return null;
   const retentionMs = retentionMsFor(resolveCacheRetentionTier(), last.model);
-  const coldSlim =
-    db
-      .select({
-        at: coordinatorConversation.lastColdSlimAt,
-        stepId: coordinatorConversation.lastColdSlimStepId,
-      })
-      .from(coordinatorConversation)
-      .where(eq(coordinatorConversation.threadId, last.threadId))
-      .get() ?? null;
-  const lastColdSlimAt = coldSlim?.at ?? null;
   const now = nowMs();
   const resume = contextResumeOf({
-    now,
-    retentionMs,
     lastUsage: {
       createdAt: last.createdAt,
       cacheRead: last.cacheRead,
@@ -227,16 +215,12 @@ export function lastTurnContext(
       contextTokens: last.contextTokens,
       model: last.model,
     },
-    lastColdSlimAt,
-    lastColdSlimStepId: coldSlim?.stepId ?? null,
-    lastUsageStepId: last.stepId,
     activeModel: activeRouterModel(db, chiefRow.teamId),
   });
   const resumeExpiresAt = resumeExpiresAtOf({
     resume,
     retentionMs,
     lastUsageCreatedAt: last.createdAt,
-    lastColdSlimAt,
   });
   const contextWindow = contextWindowOf(db, chiefRow.teamId, last.model);
   return {

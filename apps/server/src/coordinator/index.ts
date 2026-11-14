@@ -9,7 +9,7 @@ import {
   transcriptPromptRowId,
   withHistoryMarker,
 } from '@cairn/shared';
-import { and, asc, desc, eq, inArray, like, ne, not, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import {
   build,
   chief,
@@ -46,13 +46,7 @@ import {
 import { acquireLease, type Lease, LeaseHeldError } from './lease.js';
 import { settleInterruptedMailConversation } from './mail-owner.js';
 import { createMemoryFlush } from './memory-flush.js';
-import {
-  COLD_RECENT_EXCHANGES,
-  coldWindowStartFromRows,
-  isColdResume,
-  resolveCacheRetentionTier,
-  retentionMsFor,
-} from './runtime/cold-slim.js';
+import { isColdResume, resolveCacheRetentionTier, retentionMsFor } from './runtime/cold-slim.js';
 import { summarizerFor } from './runtime/compaction.js';
 import { reportCompactionFailure, setFailureSink } from './runtime/failure-report.js';
 import type { MachineApi } from './runtime/machine-api.js';
@@ -64,7 +58,7 @@ import {
   type ProviderBinding,
   type ServerRuntimeConfig,
 } from './runtime/server-runtime.js';
-import { seedSummary } from './seed-summary.js';
+import { laggingSeedWindowStart, SUMMARY_LAG_ROWS, seedSummary } from './seed-summary.js';
 import { createCoordinatorServerApi } from './server-api.js';
 import { parseWatermark } from './watermark.js';
 
@@ -190,7 +184,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       isLive: (requestId) =>
         coordinatorInputIsLive(db, requestId) ??
         liveSteps(threadId).some((r) => r.id === requestId),
-      seed: async (summarize) => {
+      seed: async () => {
         const teamId = threadTeam(threadId);
         const providers =
           teamId === null ? null : coordinatorProviders({ db, box: machine.box }, teamId);
@@ -199,12 +193,21 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           live.flatMap((r) => [r.id, transcriptPromptRowId(r.id), ...(r.ownerMessageIds ?? [])]),
         );
         if (watermark?.kind === 'rewind') pendingUsers.add(watermark.anchorMessageId);
+        const prior = db
+          .select()
+          .from(chiefSummary)
+          .where(eq(chiefSummary.threadId, threadId))
+          .get();
+        const unsummarized = (m: { createdAt: number }, rowid: number) =>
+          prior === undefined ||
+          m.createdAt > prior.coveredAt ||
+          (m.createdAt === prior.coveredAt && rowid > prior.coveredRowid);
         const window = db
           .select({ message: chiefMessage, rowid: sql<number>`rowid` })
           .from(chiefMessage)
           .where(eq(chiefMessage.threadId, threadId))
           .orderBy(sql`${chiefMessage.createdAt} desc`, sql`rowid desc`)
-          .limit(SEED_MAX_ROWS + pendingUsers.size + 20)
+          .limit(SEED_MAX_ROWS + SUMMARY_LAG_ROWS + pendingUsers.size + 20)
           .all()
           .filter(
             ({ message: m }) =>
@@ -213,31 +216,9 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
               !m.id.startsWith('chief-digest-') &&
               !m.id.startsWith('chief-report-'),
           )
-          .slice(0, SEED_MAX_ROWS)
+          .slice(0, SEED_MAX_ROWS + SUMMARY_LAG_ROWS)
+          .filter(({ message: m, rowid }, index) => index < SEED_MAX_ROWS || unsummarized(m, rowid))
           .reverse();
-        const oldest = window[0];
-        const seeded = await seedSummary(
-          db,
-          threadId,
-          oldest === undefined ? null : { at: oldest.message.createdAt, rowid: oldest.rowid },
-          summarize,
-          (error, startAt) => {
-            const ids = [providers?.router.provider, providers?.summary.provider].filter(
-              (id): id is string => id !== undefined,
-            );
-            const message = scrubProviderError(
-              { db, box: machine.box },
-              teamId ?? '',
-              ids,
-              String(error),
-            );
-            const scrubbed = new Error(message);
-            scrubbed.name = error instanceof Error ? error.name : 'Error';
-            reportCompactionFailure({ threadId }, 'seed-summary', scrubbed, startAt);
-          },
-          nowMs(),
-        );
-        const summary = seeded.summary;
         const rows = window.map(
           ({ message: m }): SeedRow => ({
             id: m.id,
@@ -247,7 +228,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           }),
         );
         return {
-          summary,
+          summary: prior?.summary ?? '',
           rows,
           model: {
             provider: providers?.router.provider ?? 'unknown',
@@ -391,7 +372,6 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
   ): {
     claimed: ClaimedStep;
     volatileText: string | null;
-    coldSlim: { cold: boolean; summaryHint: string | null };
   } | null => {
     const threadRow = db.select().from(chiefThread).where(eq(chiefThread.id, row.buildId)).get();
     if (threadRow === undefined) return null;
@@ -428,9 +408,6 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
             },
       activeModel: routerModel,
     });
-    const summaryHint =
-      db.select().from(chiefSummary).where(eq(chiefSummary.threadId, row.buildId)).get()?.summary ??
-      null;
     logger.info(
       {
         threadId: row.buildId,
@@ -563,38 +540,23 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         remoteTools: [...chiefRemoteTools()],
       },
       volatileText: volatileParts.length === 0 ? null : volatileParts.join('\n\n'),
-      coldSlim: { cold, summaryHint },
     };
   };
 
-  const catchUpColdSummary = async (
+  const preparing = new Map<string, Promise<void>>();
+
+  const prepareSummary = (
     threadId: string,
     teamId: string,
     providers: CoordinatorProviders,
-  ): Promise<{ summary: string | null; complete: boolean }> => {
-    const newestFirst = db
-      .select({
-        at: chiefMessage.createdAt,
-        rowid: sql<number>`rowid`,
-        role: chiefMessage.role,
-      })
-      .from(chiefMessage)
-      .where(
-        and(
-          eq(chiefMessage.threadId, threadId),
-          ne(chiefMessage.role, 'system'),
-          not(like(chiefMessage.id, 'chief-digest-%')),
-          not(like(chiefMessage.id, 'chief-report-%')),
-        ),
-      )
-      .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
-      .limit(COLD_RECENT_EXCHANGES * 4)
-      .all();
-    const windowStart = coldWindowStartFromRows(newestFirst);
+  ): void => {
+    if (closing || preparing.has(threadId)) return;
+    const windowStart = laggingSeedWindowStart(db, threadId, SEED_MAX_ROWS, SUMMARY_LAG_ROWS);
+    if (windowStart === null) return;
     const models = createCoordinatorModels(options.fixedProviders ?? []);
     const summaryBind = binding(teamId, providers.summary);
     models.useProvider(summaryBind.config, summaryBind.resolveKey);
-    let summarize = null as ReturnType<typeof summarizerFor> | null;
+    let summarize: ReturnType<typeof summarizerFor>;
     try {
       summarize = summarizerFor(models.models, {
         provider: providers.summary.provider,
@@ -602,26 +564,26 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       });
     } catch (error) {
       reportCompactionFailure({ threadId }, 'summary-model', error);
+      return;
     }
-    const seeded = await seedSummary(
-      db,
-      threadId,
-      windowStart,
-      summarize,
-      (error, startAt) => {
-        const message = scrubProviderError(
-          { db, box: machine.box },
-          teamId,
-          [providers.router.provider, providers.summary.provider],
-          String(error),
-        );
-        const scrubbed = new Error(message);
-        scrubbed.name = error instanceof Error ? error.name : 'Error';
-        reportCompactionFailure({ threadId }, 'seed-summary', scrubbed, startAt);
-      },
-      nowMs(),
-    );
-    return { summary: seeded.summary === '' ? null : seeded.summary, complete: seeded.complete };
+    const reportScrubbed = (error: unknown, startAt?: number) => {
+      const message = scrubProviderError(
+        { db, box: machine.box },
+        teamId,
+        [providers.router.provider, providers.summary.provider],
+        String(error),
+      );
+      const scrubbed = new Error(message);
+      scrubbed.name = error instanceof Error ? error.name : 'Error';
+      reportCompactionFailure({ threadId }, 'seed-summary', scrubbed, startAt);
+    };
+    const running = seedSummary(db, threadId, windowStart, summarize, reportScrubbed, nowMs())
+      .then(
+        () => {},
+        (error: unknown) => reportScrubbed(error),
+      )
+      .finally(() => preparing.delete(threadId));
+    preparing.set(threadId, running);
   };
 
   const runStep = async (row: StepRow): Promise<void> => {
@@ -639,71 +601,13 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       if (providers === null) throw new Error('Coordinator route resolves to no keyed provider');
       const payload = claimedPayload(row, providers);
       if (payload === null) throw new Error('Coordinator step has no chief thread');
-      let coldSlim = payload.coldSlim;
-      if (coldSlim.cold) {
-        const prior = db
-          .select()
-          .from(chiefSummary)
-          .where(eq(chiefSummary.threadId, row.buildId))
-          .get();
-        const newestFirst = db
-          .select({
-            at: chiefMessage.createdAt,
-            rowid: sql<number>`rowid`,
-            role: chiefMessage.role,
-          })
-          .from(chiefMessage)
-          .where(
-            and(
-              eq(chiefMessage.threadId, row.buildId),
-              ne(chiefMessage.role, 'system'),
-              not(like(chiefMessage.id, 'chief-digest-%')),
-              not(like(chiefMessage.id, 'chief-report-%')),
-            ),
-          )
-          .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
-          .limit(COLD_RECENT_EXCHANGES * 4)
-          .all();
-        const windowStart = coldWindowStartFromRows(newestFirst);
-        const lagging =
-          windowStart !== null &&
-          (prior === undefined ||
-            prior.coveredAt < windowStart.at ||
-            (prior.coveredAt === windowStart.at && prior.coveredRowid < windowStart.rowid));
-        const beforeGeneration = prior?.generation ?? 0;
-        const caughtUp = await catchUpColdSummary(row.buildId, teamId, providers);
-        const afterGeneration =
-          db.select().from(chiefSummary).where(eq(chiefSummary.threadId, row.buildId)).get()
-            ?.generation ?? 0;
-        const catchUpAdvanced = afterGeneration > beforeGeneration;
-        if (lagging && (!catchUpAdvanced || !caughtUp.complete)) {
-          coldSlim = { cold: false, summaryHint: null };
-        } else {
-          coldSlim = { cold: true, summaryHint: caughtUp.summary };
-        }
-      }
       await runtime.runTurn({
         claimed: payload.claimed,
         volatileText: payload.volatileText,
-        coldSlim,
-        ...(coldSlim.cold
-          ? {
-              beforeDone: () => {
-                const at = nowMs();
-                db.update(coordinatorConversation)
-                  .set({
-                    lastColdSlimAt: at,
-                    lastColdSlimStepId: row.id,
-                    updatedAt: at,
-                  })
-                  .where(eq(coordinatorConversation.threadId, row.buildId))
-                  .run();
-              },
-            }
-          : {}),
         router: binding(teamId, providers.router),
         summary: binding(teamId, providers.summary),
       });
+      prepareSummary(row.buildId, teamId, providers);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const scrubbed = scrubProviderError({ db, box: machine.box }, teamId, keyed, message);
@@ -833,7 +737,8 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     tick,
     idle: async () => {
       await Promise.resolve();
-      while (draining.size > 0) await Promise.allSettled([...draining.values()]);
+      while (draining.size > 0 || preparing.size > 0)
+        await Promise.allSettled([...draining.values(), ...preparing.values()]);
     },
     close: async () => {
       closing = true;

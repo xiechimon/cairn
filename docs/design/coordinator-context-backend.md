@@ -6,7 +6,9 @@ Status: B1 design draft, documentation only. Baseline: `f004cd719`, 2026-11-08. 
 
 The Coordinator has one continuing conversation. `chief_message` is canonical history; compaction changes model context, never the user's transcript. History tools remain the way to recover omitted detail. No frontend compaction controls or new routes are introduced.
 
-There is one runtime compaction path: pi-durable threshold compaction through `coordinatorCompactionExtension`. There is one recovery path: on-demand `seedSummary` when reconstructing the derived runtime store. The recovery cache is not a second scheduler-driven summary stream.
+There is one runtime compaction path: pi-durable threshold compaction through `coordinatorCompactionExtension`. It runs in the background from the background start; it blocks a request only above the blocking threshold, where the request would not fit.
+
+A send never waits on a summary (mon X, 2026-11-14). A model switch sends the whole conversation, the same view the next warm turn would send, so it needs no summary. Reconstructing the derived runtime store seeds from the stored `chief_summary` and every row it does not cover, up to `SEED_MAX_ROWS + SUMMARY_LAG_ROWS` rows, without calling a model. After each turn, when at least `SUMMARY_LAG_ROWS` rows lie between the summary cursor and the newest `SEED_MAX_ROWS` rows, `seedSummary` folds that gap in the background so the next reconstruction finds the summary ready.
 
 ## Budget
 
@@ -24,11 +26,11 @@ Summary input is divided by `COORDINATOR_SUMMARY_TRANSCRIPT_MAX_CHARS`; output i
 | pi durable store | Runtime entries and compaction checkpoints | Derived; keep valid turn/tool boundaries |
 | `chief_summary` | Recovery cache keyed by `threadId` | Write only after nonempty successful folding |
 | Recovery coverage | `coveredThroughId`, `coveredAt`, `coveredRowid` | Commit atomically with summary and generation |
-| Turn usage | Actual request context usage | Diagnostic, not a summary trigger based on row count |
+| Turn usage | Actual request context usage | Diagnostic; the background summary is triggered by row lag, not usage |
 
 Recovery orders equal timestamps by SQLite rowid. Snapshot `windowStart` before reading the older gap, and include only rows strictly before it and strictly after the prior coverage cursor. Messages appended during folding are not covered by that checkpoint. A restart reads the last committed generation; partial model output is not a checkpoint.
 
-The current recovery implementation reads up to 2,000 newest gap rows and folds at most eight newest batches. This is bounded recovery, not evidence of complete older-history coverage. The design requires explicit coverage semantics: retain a searchable-history pointer for any skipped prefix and do not describe the summary as a complete account. Tests must distinguish the retained summarized range from omitted older history. Do not add a rolling job to hide this limitation.
+The current recovery implementation reads up to 2,000 newest gap rows and folds at most eight newest batches. This is bounded recovery, not evidence of complete older-history coverage. The design requires explicit coverage semantics: retain a searchable-history pointer for any skipped prefix and do not describe the summary as a complete account. Tests must distinguish the retained summarized range from omitted older history. The after-turn fold keeps the gap short; it does not make the summary a complete account.
 
 ## Compaction flow
 
