@@ -38,6 +38,8 @@ If \`agent-reach\` is on PATH, run \`agent-reach doctor\` once (it makes no netw
 - The approach that fits this project, and why.
 - **Decided myself**: the implementation choices you made from the evidence, each with its reason.
 - **For you to decide**: at most three real decisions (architecture or product direction, reversing a recorded decision, payments, credentials, irreversible or external actions). Give each its options, evidence links and the option you recommend. Write "none" when there are none.
+
+When that list is not "none" and the \`ask_user\` tool is available, ask all of them in one call before you finish: one question per decision, the evidence and links in each option's description, and \`recommended\` on the option you recommend. Then add a **Decided by you** section to the report with each question and its answer.
 `;
 
 const BUILTIN_SKILLS: readonly { dirName: string; files: Record<string, string> }[] = [

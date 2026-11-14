@@ -106,6 +106,7 @@ This matches the repository's own rule ("agents decide by their own recommendati
 - **Cloned code or pages contain instructions:** they are data. The research thread is read-only, and its report enters other sessions only inside the quoted-data fence, as today.
 - **Over-triggering on small tasks:** a one-line fix (`Kind: fix`) skips research, as the plan rule already allows. The Phase 2 trigger belongs to the Coordinator and is measured.
 - **Under-asking (an agent decides a real architecture question itself):** the report's "Decided myself" list makes this visible, and the person can reverse it with one message.
+- **Nobody answers the decision card:** the research thread stays parked and the code thread stays blocked; the question sits in the person's needs-you list with the existing push notification. Nothing proceeds on the recommendation without an answer.
 
 ## Measurement
 
@@ -118,6 +119,8 @@ This matches the repository's own rule ("agents decide by their own recommendati
 - **P1, toolkit:** the bundled research skill in the team manifest, and agent-reach detection as an optional capability.
 - **P2, the Coordinator decides research:** the `create_todo` field replaces the regex.
 - **P3, the proposal card and settings:** the report's decision section becomes an `ask_user` card, and the settings show the product rule.
+  - **P3a, the card (no new state):** nothing parses the report. `ask_user` already carries options, a `recommended` flag, a pending, parked and resumed lifecycle, and answers stored as `todo.decisions`; research runs as a `session` step, which has the tool. The research rules and the built-in skill tell the thread to ask its "For you to decide" items with one `ask_user` call before it finishes, and to record the answers in a "Decided by you" section. The question reaches the Coordinator first, and the Coordinator rule now says to relay a real decision to the person with its options and recommendation instead of answering it, then hand the answer back with `answer_question`. If the Coordinator's turn ends without acting, the question goes to the person's needs-you list as today. The code thread stays blocked on the research thread, so no code starts before the person decides. A research thread without the tool keeps the decisions in its report.
+  - **P3b, settings:** the Coordinator settings show the product rule as read-only text above the editable team charter.
 
 ## Decisions for the owner
 
