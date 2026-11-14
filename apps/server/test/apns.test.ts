@@ -3,11 +3,11 @@ import { generateKeyPairSync, verify } from 'node:crypto';
 import { readFileSync, rmSync } from 'node:fs';
 import { createSecureServer, type ServerHttp2Session, type ServerHttp2Stream } from 'node:http2';
 import { join } from 'node:path';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import webpush from 'web-push';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { apnsDevice } from '../src/db/schema.js';
-import type { ApnsConfig } from '../src/services/apns.js';
+import { type ApnsConfig, loadApnsConfig } from '../src/services/apns.js';
 import { bootServer, postProject, req } from './helpers.js';
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -203,6 +203,34 @@ describe('APNs delivery', () => {
       expect(removed.status).toBe(204);
       expect(s.db.select().from(apnsDevice).all()).toHaveLength(0);
     } finally {
+      s.dispose();
+    }
+  });
+
+  test('without CAIRN_APNS_* a registered phone is kept, nothing is sent and nothing is logged', async () => {
+    expect(
+      loadApnsConfig({ keyPath: null, keyId: null, teamId: null, bundleId: 'dev.cairn.ios' }),
+    ).toBeNull();
+    expect(() =>
+      loadApnsConfig({
+        keyPath: null,
+        keyId: 'KEY1234567',
+        teamId: null,
+        bundleId: 'dev.cairn.ios',
+      }),
+    ).toThrow(/together/);
+    const s = bootServer();
+    const stderr = vi.spyOn(process.stderr, 'write');
+    try {
+      await register(s, TOKEN_A);
+      await needsYou(s);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(stderr.mock.calls.filter(([line]) => String(line).includes('apns'))).toHaveLength(0);
+      expect(s.db.select({ token: apnsDevice.token }).from(apnsDevice).all()).toEqual([
+        { token: TOKEN_A },
+      ]);
+    } finally {
+      stderr.mockRestore();
       s.dispose();
     }
   });
