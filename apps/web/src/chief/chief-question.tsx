@@ -67,7 +67,7 @@ function QuestionError({ draftKey }: { draftKey: string }) {
   );
 }
 
-export function ChiefQuestion({ bound }: { bound: boolean }) {
+export function ChiefQuestion() {
   const { t } = useI18n();
   const root = useOptionalChiefRoot();
   const pending = useShownQuestions();
@@ -110,7 +110,7 @@ export function ChiefQuestion({ bound }: { bound: boolean }) {
           key={shown.item.requestId}
           item={shown.item}
           draftKey={key}
-          bound={bound}
+          bound
           onAnswer={(input) =>
             root?.surface.onAnswerQuestion?.({ ...input, threadId: shown.conversationId })
           }

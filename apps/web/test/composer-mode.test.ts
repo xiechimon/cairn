@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { composerMode } from '../src/chief/composer-mode.js';
 
-const base = { answerHere: true, questionPending: true, threadClaimed: false, quoteStaged: false };
+const base = { questionPending: true, threadClaimed: false, quoteStaged: false };
 
 describe('composerMode', () => {
   test('a pending question owns the composer by default', () => {
@@ -16,6 +16,5 @@ describe('composerMode', () => {
 
   test('without a question here the thread always owns it', () => {
     expect(composerMode({ ...base, questionPending: false })).toBe('thread');
-    expect(composerMode({ ...base, answerHere: false })).toBe('thread');
   });
 });

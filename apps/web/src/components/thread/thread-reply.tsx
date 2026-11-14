@@ -11,7 +11,7 @@ import {
 
 export type ThreadReplyDelivery = 'steer' | 'revision' | 'restart';
 
-export const THREAD_REPLY_HINT: Record<ThreadReplyDelivery, string> = {
+const THREAD_REPLY_HINT: Record<ThreadReplyDelivery, string> = {
   steer: '直接发给这个任务，插进它这一轮。',
   revision: '作为改计划的意见发给这个任务，不算批准。',
   restart: '这个任务会带着这句话重跑。',

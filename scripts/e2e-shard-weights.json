@@ -24,7 +24,6 @@
   "chief-draft-persist.spec.ts": 6714,
   "chief-home-backup.spec.ts": 1636,
   "chief-home-busy.spec.ts": 9818,
-  "chief-home-c-thread-reply.spec.ts": 2305,
   "chief-home-c.spec.ts": 9328,
   "chief-home-chat.spec.ts": 6585,
   "chief-home-claude-login.spec.ts": 493,
