@@ -751,6 +751,35 @@ test('the push link opens the machine with its screen enlarged and view-only', a
 test.describe('on a touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
+  test('the enlarged screen stays inside the top and bottom safe areas', async ({ page }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setSafeAreaInsetsOverride', {
+      insets: { top: 59, topMax: 59, bottom: 34, bottomMax: 34, left: 0, leftMax: 0, right: 0, rightMax: 0 },
+    });
+    const feed: Feed = {
+      computers: [computer({ handoffReason: 'login' })],
+      commands: [command(1)],
+      controlCalls: [],
+    };
+    await open(
+      page,
+      feed,
+      [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
+      false,
+      '/app?pane=machines&machine=m1&screen=1',
+    );
+    const dialog = page.getByRole('dialog', { name: 'omarchy' });
+    await expect(dialog).toBeVisible();
+    await dialog.evaluate((node) =>
+      Promise.all(node.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+    );
+    const box = await dialog.boundingBox();
+    expect(box).not.toBeNull();
+    if (!box) return;
+    expect(box.y).toBeGreaterThanOrEqual(59);
+    expect(box.y + box.height).toBeLessThanOrEqual(844 - 34);
+  });
+
   test('the enlarged header keeps Give back and close as separate 44px touch targets', async ({
     page,
   }) => {
