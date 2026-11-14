@@ -10028,6 +10028,45 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         {
           "additionalProperties": false,
           "properties": {
+            "agentReach": {
+              "additionalProperties": false,
+              "properties": {
+                "channels": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "channel": {
+                        "maxLength": 32,
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "status": {
+                        "maxLength": 32,
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "channel",
+                      "status",
+                    ],
+                    "type": "object",
+                  },
+                  "maxItems": 64,
+                  "type": "array",
+                },
+                "version": {
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "version",
+                "channels",
+              ],
+              "type": "object",
+            },
             "browser": {
               "const": true,
               "type": "boolean",
