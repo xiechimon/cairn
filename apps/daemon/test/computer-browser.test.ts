@@ -616,6 +616,51 @@ describe('agent cursor on the live screen', () => {
     expect((at[act] ?? 0) - (at[box] ?? 0)).toBeLessThan(300);
   });
 
+  test('a new cursor starts from where the last one rested and glides to its target', () => {
+    const script = agentCursorScript(300, 400, 'click', { x: 120, y: 210 });
+    const start = script.indexOf("cursor.style.transform = 'translate(117px, 208px)'");
+    const reflow = script.indexOf('void cursor.offsetWidth');
+    const target = script.indexOf("cursor.style.transform = 'translate(297px, 398px)'");
+    expect(start).toBeGreaterThan(-1);
+    expect(reflow).toBeGreaterThan(start);
+    expect(target).toBeGreaterThan(reflow);
+    expect(agentCursorScript(300, 400, 'click')).toContain('innerWidth / 2');
+  });
+
+  test('the next click in the same browser session starts its cursor where the last click rested', async () => {
+    const log: string[] = [];
+    const boxes = [
+      { x: 100, y: 200, width: 40, height: 20 },
+      { x: 400, y: 500, width: 40, height: 20 },
+    ];
+    const provider: ComputerProvider = {
+      ...cursorProvider(log),
+      async execute(request) {
+        const line = request.argv.join(' ');
+        if (!line.includes(' get box ')) return cursorProvider(log).execute(request);
+        log.push(line);
+        const data = boxes.shift() ?? { x: 0, y: 0, width: 0, height: 0 };
+        return (async function* () {
+          yield { kind: 'stdout' as const, text: JSON.stringify({ success: true, data }) };
+          yield { kind: 'exit' as const, code: 0 };
+        })();
+      },
+    };
+    const clickIn = (session: string) =>
+      runBrowserTool(
+        provider,
+        'browser_act',
+        { actions: [{ kind: 'click', ref: 'e1' }] },
+        { timeoutMs: 5_000, signal: new AbortController().signal, session },
+      );
+    await clickIn('glide');
+    await clickIn('glide');
+    const draws = log.filter((line) => line.includes('__cairnAgentCursor'));
+    expect(draws[1]).toBe(
+      `agent-browser --session glide --restore --headed --json eval ${agentCursorScript(420, 510, 'click', { x: 120, y: 210 })}`,
+    );
+  });
+
   test('the cursor never blocks the action when the box or the drawing fails', async () => {
     const noBox: string[] = [];
     await click(cursorProvider(noBox, { box: { text: 'not found', code: 1 } }));
