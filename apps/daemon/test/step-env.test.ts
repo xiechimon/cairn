@@ -1,6 +1,6 @@
 import type { BoundGitCredentials } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { assembleStepEnv, type StepEnvInput } from '../src/step-env.js';
+import { assembleStepEnv, prepareStepEnv, type StepEnvInput } from '../src/step-env.js';
 
 const git: BoundGitCredentials = {
   username: 'x-access-token',
@@ -84,5 +84,20 @@ describe('assembleStepEnv', () => {
       input({ inherited: { CAIRN_ORB: '1' }, claudeSubscriptionToken: 'step' }),
     );
     expect(env).toEqual({ CAIRN_ORB: '1', CLAUDE_CODE_OAUTH_TOKEN: 'step' });
+  });
+});
+
+describe('prepareStepEnv', () => {
+  test('creates a step temp directory, passes git through and registers both cleanups', async () => {
+    const cleanups: (() => void | Promise<void>)[] = [];
+    const { temporary: _, ...rest } = input({ inherited: { KEEP: '1' }, git });
+    const prepared = prepareStepEnv(rest, cleanups);
+    if ('error' in prepared) throw new Error(prepared.error);
+    expect(prepared.env.KEEP).toBe('1');
+    expect(prepared.env.GH_TOKEN).toBe('step-password');
+    expect(prepared.env.TMPDIR).toBeTruthy();
+    expect(cleanups).toHaveLength(2);
+    for (const cleanup of [...cleanups].reverse()) await cleanup();
+    expect(prepared.env.GH_TOKEN).toBeUndefined();
   });
 });
