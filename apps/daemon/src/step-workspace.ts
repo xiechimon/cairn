@@ -1,4 +1,5 @@
-import { rmSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import type {
   BoundGitCredentials,
   ClaimedStep,
@@ -103,6 +104,80 @@ export async function prepareVerifyClone(input: VerifyCloneInput): Promise<Verif
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+export interface StepWorkspaceSetupInput {
+  workspace: WorktreeOps | undefined;
+  claimed: ClaimedStep;
+  repo: StepRepo | null;
+  workspacesRoot: string;
+  credentials: BoundGitCredentials | null;
+  readonly: boolean;
+  refresh: GitCredentialFallbackOpts['refresh'];
+  machineName: string;
+  attachmentVerify: boolean;
+  evidenceDirectory: string | undefined;
+  expectedHeadSha: string | undefined;
+  cleanups: (() => void | Promise<void>)[];
+}
+
+export type StepWorkspaceSetup =
+  | {
+      ws: PreparedWorkspace | null;
+      cwd: string;
+      headAtStart: string | null;
+      stepStartMs: number;
+    }
+  | { error: string };
+
+export async function setUpStepWorkspace(
+  input: StepWorkspaceSetupInput,
+): Promise<StepWorkspaceSetup> {
+  const { workspace, repo } = input;
+  let ws: PreparedWorkspace | null = null;
+  if (repo !== null) {
+    if (!workspace) return { error: 'workspace ops unavailable for repo-bound step' };
+    const prepared = await prepareStepWorkspace({
+      workspace,
+      claimed: input.claimed,
+      repo,
+      workspacesRoot: input.workspacesRoot,
+      credentials: input.credentials,
+      readonly: input.readonly,
+      refresh: input.refresh,
+      machineName: input.machineName,
+    });
+    if ('error' in prepared) return prepared;
+    ws = prepared.ws;
+  }
+  let cwd = ws?.cwd ?? join(input.workspacesRoot, input.claimed.conversationId);
+  if (!ws) mkdirSync(cwd, { recursive: true });
+
+  const stepStartMs = Date.now();
+  let headAtStart: string | null = null;
+  if (ws !== null && ws.readonly !== true && workspace) {
+    try {
+      headAtStart = await workspace.headCommit(ws.cwd);
+    } catch {
+      headAtStart = null;
+    }
+  }
+
+  if (input.attachmentVerify) {
+    const verifyClone = await prepareVerifyClone({
+      workspace,
+      ws,
+      headAtStart,
+      evidenceDirectory: input.evidenceDirectory,
+      expectedHeadSha: input.expectedHeadSha,
+      cleanups: input.cleanups,
+    });
+    if ('error' in verifyClone) return verifyClone;
+    ws = verifyClone.ws;
+    cwd = verifyClone.cwd;
+    headAtStart = verifyClone.headAtStart;
+  }
+  return { ws, cwd, headAtStart, stepStartMs };
 }
 
 export async function resetFreshSessionWorkspace(input: {
