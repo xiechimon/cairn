@@ -311,6 +311,36 @@ describe('session steps share the build-step paths', () => {
     return H.s.db.select().from(step).where(eq(step.id, stepId)).get()!;
   }
 
+  test('a research turn that parks on a question keeps its report for the person deciding', async () => {
+    const { todoId, buildId, stepRow } = startSession();
+    H.s.db.update(todo).set({ phase: 'building', output: 'info' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    const report =
+      'Joplin merges three ways. https://example.com/joplin\n\n## Your decisions\n- Format';
+    completeStep({ ...deps(), attachmentsDir: H.s.attachmentsDir }, stepRow.id, {
+      hasChanges: false,
+      report,
+    });
+    expect(getTodo(deps(), todoId)!.phase).toBe('needs_input');
+    const stored = H.s.db.select().from(build).where(eq(build.id, buildId)).get()!;
+    expect(stored.reportAttachmentId).not.toBeNull();
+    const row = H.s.db
+      .select()
+      .from(message)
+      .where(eq(message.id, `info-report-${buildId}`))
+      .get()!;
+    expect(JSON.parse(String(row.content))).toMatchObject({
+      attachmentId: stored.reportAttachmentId,
+      content: report,
+    });
+  });
+
   test('a session turn that parked on an unanswered ask with no changes parks instead of failing', async () => {
     const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
