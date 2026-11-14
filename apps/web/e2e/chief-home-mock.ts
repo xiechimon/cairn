@@ -93,9 +93,30 @@ export const toolRow = (id: string, name: string, args: unknown, at: number) => 
   createdAt: at,
 });
 
+export const createTodoRow = (
+  id: string,
+  todo: { id: string; seqNum: number; title: string; projectId?: string },
+  at: number,
+) => ({
+  id,
+  role: 'assistant',
+  content: {
+    kind: 'toolcall',
+    call: {
+      id: `c-${id}`,
+      name: 'create_todo',
+      arguments: { title: todo.title, projectId: todo.projectId ?? 'proj-1' },
+      result: { id: todo.id, seqNum: todo.seqNum, title: todo.title },
+      startedAt: at,
+      endedAt: at + 1,
+    },
+  },
+  createdAt: at,
+});
+
 export const HISTORY = [
   { id: 'm1', role: 'user', content: '看板拖完卡片计数不对，修一下', createdAt: 10 },
-  toolRow('m2', 'create_todo', { title: TASK.title, projectId: 'proj-1' }, 11),
+  createTodoRow('m2', TASK, 11),
   {
     id: 'm3',
     role: 'assistant',

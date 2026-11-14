@@ -157,7 +157,7 @@ export function placeTaskRefs(
   for (const { item } of rows) {
     if (item.kind === 'task-card' || item.kind === 'thread-activity') show(item.todoId);
     if (item.kind !== 'robot' || item.typing === true) continue;
-    const all = taskRefsOf(item, glances, startedBy.get(item) ?? []);
+    const all = taskRefsOf({}, glances, startedBy.get(item) ?? []);
     const listed = new Set(all.map((ref) => ref.todoId));
     const refs = all.filter((ref) => {
       const parentId = glances.get(ref.todoId)?.parentId;
@@ -165,6 +165,39 @@ export function placeTaskRefs(
     });
     for (const ref of refs) show(ref.todoId);
     if (refs.length > 0) placed.set(item, stableRefs(item, refs));
+  }
+  return placed;
+}
+
+const placedReports = new WeakMap<object, readonly string[]>();
+
+export function placeReportCards(
+  rows: readonly GroupedRow[],
+  startedBy: ReadonlyMap<GroupedRow['item'], readonly string[]>,
+  glances: ReadonlyMap<string, TodoGlance>,
+  seen: Set<string>,
+): ReadonlyMap<GroupedRow['item'], readonly string[]> {
+  const withChildren = (todoId: string) => [
+    todoId,
+    ...childRefsOf(todoId, glances).map((child) => child.todoId),
+  ];
+  const placed = new Map<GroupedRow['item'], readonly string[]>();
+  for (const { item } of rows) {
+    if (item.kind === 'thread-activity') {
+      for (const id of withChildren(item.todoId)) seen.add(id);
+      continue;
+    }
+    if (item.kind !== 'robot' || item.typing === true) continue;
+    const ids = [...new Set((startedBy.get(item) ?? []).flatMap(withChildren))].filter(
+      (id) => glances.get(id)?.report === true && !seen.has(id),
+    );
+    for (const id of ids) seen.add(id);
+    if (ids.length === 0) continue;
+    const previous = placedReports.get(item);
+    const stable =
+      previous !== undefined && previous.join('\n') === ids.join('\n') ? previous : ids;
+    placedReports.set(item, stable);
+    placed.set(item, stable);
   }
   return placed;
 }
