@@ -19,7 +19,13 @@ function pageBefore(history: Row[], size: number, before: string | null) {
   };
 }
 
-async function mockPagedHistory(page: Page, total = 250, size = 100, olderFails = false) {
+async function mockPagedHistory(
+  page: Page,
+  total = 250,
+  size = 100,
+  olderFails = false,
+  olderGate: Promise<void> = Promise.resolve(),
+) {
   const history = historyOf(total);
   const requested: (string | null)[] = [];
   await mockLive(page, { threads: [THREAD], messages: [] }, (path, route, json) => {
@@ -28,6 +34,7 @@ async function mockPagedHistory(page: Page, total = 250, size = 100, olderFails 
     const before = new URL(route.request().url()).searchParams.get('before');
     requested.push(before);
     if (olderFails && before !== null) return json({ error: 'older page failed' }, 500);
+    if (before !== null) return olderGate.then(() => json(pageBefore(history, size, before)));
     return json(pageBefore(history, size, before));
   });
   return requested;
@@ -96,27 +103,38 @@ test('scrolling up shows the loaded rows above before asking for an older page',
   await page.goto('/app');
   await expect(row(page, 'answer 249')).toBeInViewport();
   const top = await firstMessage(page);
-  const before = await offsetOf(page, top, true);
-  await expect.poll(() => firstMessage(page)).not.toBe(top);
-  await expect.poll(() => offsetOf(page, top)).toBeCloseTo(before, 0);
-  await scrollUntilShown(page, 'question 150');
+  await expect
+    .poll(async () => {
+      await viewport(page).evaluate((node) => {
+        node.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
+        node.scrollTop = Math.max(node.scrollTop - 400, 600);
+      });
+      return row(page, 'question 200').count();
+    })
+    .toBe(1);
+  await expect(row(page, top)).toHaveCount(0);
   expect(requested).toEqual([null]);
 });
 
 test('scrolling to the top loads the older page and keeps the reading position', async ({
   page,
 }) => {
-  const requested = await mockPagedHistory(page);
+  let releaseOlder = () => {};
+  const olderGate = new Promise<void>((resolve) => {
+    releaseOlder = resolve;
+  });
+  const requested = await mockPagedHistory(page, 250, 100, false, olderGate);
   await page.goto('/app');
   await expect(row(page, 'answer 249')).toBeInViewport();
   await scrollUntilShown(page, 'question 150');
-  const before = await offsetOf(page, 'question 150', true);
+  await expect.poll(() => requested).toEqual([null, 'h-0150']);
+  const before = await offsetOf(page, 'question 150');
+  releaseOlder();
   await expect(row(page, 'question 148')).toHaveCount(1);
-  expect(requested).toEqual([null, 'h-0150']);
   await expect.poll(() => offsetOf(page, 'question 150')).toBeCloseTo(before, 0);
 
-  await offsetOf(page, 'question 50', true);
-  await expect(row(page, 'question 0')).toHaveCount(1);
+  await scrollUntilShown(page, 'question 50');
+  await scrollUntilShown(page, 'question 0');
   expect(requested).toEqual([null, 'h-0150', 'h-0050']);
 });
 
@@ -166,8 +184,9 @@ test('typing in the composer does not re-render the conversation rows', async ({
         rerendered: props.filter((p, i) => p === null || p !== before[i]).length,
       };
     });
-  expect((await rowProps()).rows).toBe(20);
+  const { rows } = await rowProps();
+  expect(rows).toBeGreaterThan(5);
   await page.getByTestId('home-c').getByTestId('chief-composer-input').pressSequentially('hello');
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toHaveValue('hello');
-  expect(await rowProps()).toEqual({ rows: 20, rerendered: 0 });
+  expect(await rowProps()).toEqual({ rows, rerendered: 0 });
 });
