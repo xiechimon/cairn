@@ -146,7 +146,9 @@ test('the selling points browse end to end with no backend traffic', async ({ pa
   await expect(page.getByTestId('machine-item').filter({ hasText: 'build-box' })).toBeVisible();
 
   await page.goto(`${demo.base}/app/schedules`);
-  await expect(page.getByRole('heading', { name: /定时/ }).first()).toBeVisible();
+  const tasks = page.getByRole('complementary', { name: '任务' });
+  await expect(tasks.getByRole('tab', { name: '定时' })).toHaveAttribute('aria-selected', 'true');
+  await expect(tasks.locator('[data-slot="schedule-row"]', { hasText: '重建搜索索引' })).toBeVisible();
 
   expectQuiet(traffic);
 });
@@ -195,7 +197,7 @@ test('write: the primary action and the delete confirm are blocked', async ({ pa
 
 test('write: sending to the Coordinator is blocked', async ({ page }) => {
   const traffic = watchTraffic(page);
-  await page.goto(`${demo.base}/app/schedules`);
+  await page.goto(`${demo.base}/app?pane=tasks&tab=scheduled`);
   await pressOpenCoordinator(page);
   const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
   await input.fill('把购物车那张票提到最前面');

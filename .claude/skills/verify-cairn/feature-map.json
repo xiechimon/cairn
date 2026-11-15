@@ -1699,12 +1699,13 @@
       "id": "schedules",
       "name": "Scheduled tasks",
       "summary": "Recurring work that starts or continues threads on a schedule, with run-now and a project schedule.",
-      "states": "Loading, empty, a list of schedules with cadence, a detail dialog with run now, and an error state.",
+      "states": "Loading, empty, a list of schedules with cadence in the Tasks panel Schedules tab, a small popover editor with run now, a collapsed ended group, and an error state.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/pages/schedules-page.tsx",
+          "apps/web/src/board/tasks-schedule-list.tsx",
+          "apps/web/src/board/tasks-schedule-menu.tsx",
           "apps/web/src/schedules"
         ],
         "server": [
@@ -1723,14 +1724,15 @@
         ]
       },
       "reach": [
-        "open /app/schedules",
-        "click testid:schedule-detail-body"
+        "open /app",
+        "click testid:sidebar-schedules",
+        "click testid:schedule-new"
       ],
       "research": {
         "gap": "no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model "
       },
       "frontendDesign": {
-        "gap": "the schedules page and detail dialog have no design"
+        "gap": "the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md"
       },
       "backendDesign": {
         "gap": "no design for due events, missed runs and continue-thread schedules"

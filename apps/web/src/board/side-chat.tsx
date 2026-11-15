@@ -59,7 +59,7 @@ import {
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
 import { useThreadMentions } from './use-thread-mentions.js';
 import { useThreadUsage } from './use-thread-usage.js';
-import { PANE_PARAM } from './work-panel.js';
+import { PANE_PARAM, TASKS_TAB_PARAM } from './work-panel.js';
 
 const OVERLAY_QUERY = '(max-width: 1100px)';
 
@@ -453,6 +453,7 @@ export function SideChat({
         params.delete(THREAD_PARAM);
         params.delete(VIEW_PARAM);
         params.delete(PANE_PARAM);
+        params.delete(TASKS_TAB_PARAM);
         return params;
       },
       { replace: true },

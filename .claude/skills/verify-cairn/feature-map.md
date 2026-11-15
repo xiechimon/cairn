@@ -914,18 +914,19 @@ Reach:
 
 **Scheduled tasks** (shipped, centrality 3). Recurring work that starts or continues threads on a schedule, with run-now and a project schedule.
 
-States: Loading, empty, a list of schedules with cadence, a detail dialog with run now, and an error state.
+States: Loading, empty, a list of schedules with cadence in the Tasks panel Schedules tab, a small popover editor with run now, a collapsed ended group, and an error state.
 
 Reach:
 
-1. `open /app/schedules`
-2. `click testid:schedule-detail-body`
+1. `open /app`
+2. `click testid:sidebar-schedules`
+3. `click testid:schedule-new`
 
 - Web routes: `/app/schedules`
-- Keyboard shortcuts in its code: `D`
-- Test ids in its code: `schedule-detail-body`, `schedule-popover`, `schedule-popover-runs`, `schedules-ended`, `schedules-error`, `schedules-loading`
+- Keyboard shortcuts in its code: `D`, `E`, `N`, `P`
+- Test ids in its code: `schedule-new`, `schedule-popover`, `schedule-popover-runs`, `schedule-row-menu-button`, `schedules-ended`, `tasks-schedules-empty`, `tasks-section`
 - Research: **gap**: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model
-- Frontend design: **gap**: the schedules page and detail dialog have no design
+- Frontend design: **gap**: the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md
 - Backend design: **gap**: no design for due events, missed runs and continue-thread schedules
 - Evidence: `apps/web/e2e/schedules-live.spec.ts`, `apps/server/test/schedules.test.ts`, `apps/server/test/due-events.test.ts`
 

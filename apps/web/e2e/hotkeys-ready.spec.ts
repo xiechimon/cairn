@@ -27,7 +27,7 @@ test('R2: C at load focuses the home composer', async ({ page }) => {
 
 test('R3: ⌘J at load navigates to the Coordinator page', async ({ page }) => {
   await pressAtLoad(page, { key: 'j', metaKey: true });
-  await page.goto('/app/schedules?scenario=01');
+  await page.goto('/app?scenario=01&pane=tasks&tab=scheduled');
   await expect(page).toHaveURL(/\/app\?scenario=01$/);
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeFocused();
 });

@@ -756,9 +756,34 @@ test('Schedules is a labelled row pinned above 新建项目, not a tree row or a
   expect(rowTop).toBeLessThan(newTop);
   await expect(schedules).not.toHaveAttribute('aria-current');
   await schedules.click();
-  await expect(page).toHaveURL(/\/app\/schedules/);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('定时');
+  await expect(page).toHaveURL('/app?scenario=home-c&pane=tasks&tab=scheduled');
+  await expect(panel(page).getByRole('tab', { name: '定时' })).toHaveAttribute('aria-selected', 'true');
+  await page.getByTestId('sidebar-reopen').click();
   await expect(schedules).toHaveAttribute('aria-current', 'page');
+  await expect(
+    aside.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }),
+  ).not.toHaveAttribute('aria-current');
+});
+
+test('the old schedules URL opens the Tasks panel on 定时, and picking another tab drops the link and the sidebar highlight', async ({
+  page,
+}) => {
+  await page.goto('/app/schedules?scenario=home-c');
+  await expect(page).toHaveURL('/app?scenario=home-c&pane=tasks&tab=scheduled');
+  const scheduledTab = panel(page).getByRole('tab', { name: '定时' });
+  await expect(scheduledTab).toHaveAttribute('aria-selected', 'true');
+  await expect(panel(page).locator('[data-slot="schedule-row"]')).toHaveCount(3);
+  await page.getByTestId('sidebar-reopen').click();
+  const row = page.getByTestId('sidebar-schedules');
+  await expect(row).toHaveAttribute('aria-current', 'page');
+
+  await panel(page).getByRole('tab', { name: '接下来' }).click();
+  await expect(panel(page).getByRole('tab', { name: '接下来' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page).toHaveURL('/app?scenario=home-c&pane=tasks');
+  await expect(row).not.toHaveAttribute('aria-current');
+  await expect(
+    page.locator('.board-sidebar [data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }),
+  ).toHaveAttribute('aria-current', 'page');
 });
 
 test('at phone width the panel overlays without horizontal overflow', async ({ page }) => {

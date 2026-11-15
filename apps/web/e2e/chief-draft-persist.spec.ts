@@ -170,7 +170,10 @@ test('live face: route switches keep the draft (D6 zero regression)', async ({ p
   await page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '关闭设置' }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(input).toHaveValue(DRAFT);
-  await page.goto('/app/schedules');
+  await page.goto('/app?pane=tasks&tab=scheduled');
+  await expect(page.getByRole('complementary', { name: '任务' })).toBeVisible();
+  await page.getByTestId('sidebar-reopen').click();
+  await page.mouse.move(700, 400);
   await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toHaveValue(DRAFT);

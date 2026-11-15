@@ -5,12 +5,16 @@ const FLEET = 'scenario=providers-fleet';
 const settings = (page: Page) => page.getByRole('dialog', { name: '设置' });
 
 test('settings open over the page they were opened from, which stays mounted', async ({ page }) => {
-  await page.goto(`/app/schedules?${FLEET}`);
-  const rowsBefore = await page.locator('[data-route="/app/schedules"]').count();
+  await page.goto(`/app?${FLEET}&pane=tasks&tab=scheduled`);
+  await page.getByTestId('sidebar-reopen').click();
+  await page.mouse.move(700, 400);
+  await expect(page.getByRole('complementary', { name: '任务' })).toBeVisible();
+  const newSchedule = page.locator('[data-route="board"] [data-testid="schedule-new"]');
+  await expect(newSchedule).toHaveCount(1);
   await page.getByTestId('sidebar-settings').click();
   await expect(settings(page)).toBeVisible();
-  await expect(page.locator('[data-route="/app/schedules"]')).toHaveCount(rowsBefore);
-  await expect(page.locator('[inert] [data-route="/app/schedules"]')).toHaveCount(rowsBefore);
+  await expect(newSchedule).toHaveCount(1);
+  await expect(page.locator('[inert] [data-route="board"] [data-testid="schedule-new"]')).toHaveCount(1);
   const box = await settings(page).boundingBox();
   const view = page.viewportSize();
   expect(box && view && box.width < view.width - 40 && box.height < view.height - 20).toBe(true);
@@ -38,13 +42,15 @@ test('a legacy settings URL opens the modal over the home and closes to it', asy
 });
 
 test('browser back closes the modal even after switching sections', async ({ page }) => {
-  await page.goto(`/app/schedules?${FLEET}`);
+  await page.goto(`/app?${FLEET}&pane=tasks&tab=scheduled`);
+  await page.getByTestId('sidebar-reopen').click();
+  await page.mouse.move(700, 400);
   await page.getByTestId('sidebar-settings').click();
   await settings(page).locator('[data-settings-section="providers"]').click();
   await settings(page).locator('[data-settings-section="machines"]').click();
   await page.goBack();
   await expect(settings(page)).toHaveCount(0);
-  await expect(page).toHaveURL(new RegExp(`/app/schedules\\?${FLEET}$`));
+  await expect(page).toHaveURL(new RegExp(`/app\\?${FLEET}&pane=tasks&tab=scheduled$`));
 });
 
 test('the backdrop closes the modal and focus returns to the gear', async ({ page }) => {
