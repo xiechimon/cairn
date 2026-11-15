@@ -236,7 +236,7 @@ Owner-reviewed sidebar prototype (2026-11-11), measured against the Claude Duet 
 
 ### Selector and ⌘K
 - The selected row in pickers that are not menus: white card (`card`) + `line` hairline ring + at most one extremely light shadow (0 1px 2px). No hover tint, no accent.
-- ⌘K is a menu-style palette (Linear): 640px, rows 32px with the `menu-hover` fill and 8px corners. On a task page the task rides along as a chip above the input and its commands come first under "This task"; typing filters commands and results together; Backspace on an empty input drops the chip. A footer row shows the keys (move, open, drop context, close).
+- ⌘K is a menu-style palette (Linear): 640px, rows 32px with the `menu-hover` fill and 8px corners. On a task page the task rides along as a chip above the input and its commands come first under "This task"; typing filters commands and results together; Backspace on an empty input drops the chip. A footer row shows the keys (move, drop context, close, and open only while the arrow keys pick a row, since no row is lit at rest and Enter at rest opens nothing); on touch it shows only `语法`.
 - Folder picker (`DirBrowser`, Amp's project picker): a search / paste-a-path input, then Recent (picked folders and project folders) and the git repositories in the last browsed folder; each row is name, grey path on the right and a `git` tag. "Browse folders…" at the bottom opens the old breadcrumb tree.
 
 ### Slash and @ lists (Claude Code)
