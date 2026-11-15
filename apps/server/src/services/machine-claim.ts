@@ -44,6 +44,7 @@ import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { holdBlockedBuild } from './blockers.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
 import { turnProvenance } from './chief.js';
+import { chiefHistoryFor } from './chief-claim-history.js';
 import {
   CHIEF_DIGEST_MIN_CLI_VERSION,
   CHIEF_DIGEST_REMOTE_TOOLS,
@@ -271,6 +272,7 @@ function chiefClaimPayload(
   );
   const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
   const locked = digest || mailTurn;
+  const history = locked ? null : chiefHistoryFor(deps.db, threadRow, stepRow);
   const chiefMcp = locked
     ? []
     : claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
@@ -305,6 +307,7 @@ function chiefClaimPayload(
       threadId: threadRow.id,
       systemPrompt,
       trigger,
+      ...(history !== null ? { history } : {}),
     },
     remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : mailTurn ? [] : chiefRemoteTools())],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),

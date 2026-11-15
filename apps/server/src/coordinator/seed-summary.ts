@@ -20,7 +20,7 @@ export interface SeedSummaryResult {
   complete: boolean;
 }
 
-const conversational = (threadId: string) =>
+export const conversational = (threadId: string) =>
   and(
     eq(chiefMessage.threadId, threadId),
     not(like(chiefMessage.id, `${CHIEF_DIGEST_ROW_ID_PREFIX}%`)),
@@ -28,7 +28,7 @@ const conversational = (threadId: string) =>
     ne(chiefMessage.role, 'system'),
   );
 
-const strictlyAfter = (cursor: RowPosition) =>
+export const strictlyAfter = (cursor: RowPosition) =>
   or(
     gt(chiefMessage.createdAt, cursor.at),
     and(eq(chiefMessage.createdAt, cursor.at), gt(sql`rowid`, cursor.rowid)),
