@@ -82,17 +82,3 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('collapsed rail draws no seam either (Paper PR 7)', async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem('cairn-theme', 'dark');
-    localStorage.setItem('cairn.sidebar-collapsed', '1');
-  });
-  await page.goto('/app/schedules?scenario=01');
-
-  const rail = await page.locator('.board-sidebar--collapsed').evaluate((el) => {
-    const cs = getComputedStyle(el);
-    return { borderRight: cs.borderRightWidth, shadow: cs.boxShadow };
-  });
-  expect(rail.borderRight).toBe('0px');
-  expect(rail.shadow).toBe('none');
-});

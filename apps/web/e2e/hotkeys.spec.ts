@@ -105,17 +105,20 @@ test('Space on a focused button activates it natively; ⌘J fires past button fo
   await expect(page.getByTestId('chief-composer-input')).toBeFocused();
 });
 
-test('the collapsed rail search icon hovers the ⌘K hint', async ({ page }) => {
+test('the collapsed sidebar peek search icon hovers the ⌘K hint', async ({ page }) => {
   await page.goto(SCHEDULES);
   await page.locator('button[aria-label="收起侧边栏"]').click();
-  const railSearch = page.getByRole('button', { name: '搜索' });
-  await expect(railSearch).toBeVisible();
+  await expect(page.getByRole('button', { name: '搜索' })).toBeHidden();
 
   const hint = page.locator('[data-slot="tooltip-content"]');
   await page.mouse.move(700, 400);
   await expect(hint).toHaveCount(0);
-  await railSearch.hover();
-  await expect(hint).toBeVisible();
+  await page.getByTestId('sidebar-reopen').hover();
+  const peek = page.getByTestId('sidebar-peek');
+  await expect(peek).toHaveAttribute('data-open', '');
+  const peekSearch = peek.getByRole('button', { name: '搜索' });
+  await peekSearch.hover();
+  await expect(hint.filter({ has: page.locator('[data-slot="kbd"]') })).toBeVisible();
   await expect(hint.locator('[data-slot="kbd"]')).toHaveText('⌘K');
 });
 

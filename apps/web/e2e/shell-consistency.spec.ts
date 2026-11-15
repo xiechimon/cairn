@@ -108,34 +108,40 @@ test.describe('sidebar form is route-invariant', () => {
     await expect.poll(() => headContentX(page)).toEqual(board);
   });
 
-  test('collapsed rail survives route hops (storage-backed on every shell)', async ({ page }) => {
+  test('a collapsed sidebar stays collapsed across route hops (storage-backed on every shell)', async ({
+    page,
+  }) => {
     await page.addInitScript((k) => {
       localStorage.setItem(k, '1');
     }, SIDEBAR_KEY);
-    await page.goto('/app?scenario=03');
-    const rail = page.getByRole('complementary');
-    const railBox = await captureSidebarBox(page, rail, '/app');
-
-    await page.goto('/app/schedules?scenario=03');
-    await expectSidebarBox(page, rail, '/app/schedules', railBox);
+    for (const route of ['/app?scenario=03', '/app/schedules?scenario=03']) {
+      await page.goto(route);
+      await expect(page.getByTestId('sidebar-reopen')).toBeVisible();
+      await expect(page.getByRole('complementary')).toHaveCount(0);
+    }
   });
 
   test('the collapse toggle works off-board and the state rides back', async ({ page }) => {
     await page.goto('/app/schedules?scenario=12');
     await expect(page.locator('[data-route="schedules"]')).toBeVisible();
     await page.getByRole('button', { name: '收起侧边栏' }).click();
-    await expect(page.getByRole('complementary')).toBeVisible();
+    await expect(page.getByTestId('sidebar-reopen')).toBeVisible();
     // the toggle writes storage synchronously before its state flip; poll
     // keeps the read conditional regardless of commit ordering
     await expect
       .poll(() => page.evaluate((k) => localStorage.getItem(k), SIDEBAR_KEY))
       .toBe('1');
 
-    await page.getByRole('link', { name: /^Coordinator/ }).click();
+    await page.mouse.move(700, 400);
+    await page.getByTestId('sidebar-reopen').hover();
+    await page
+      .getByTestId('sidebar-peek')
+      .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' })
+      .click();
     await expect(page).toHaveURL('/app?scenario=12');
     await expect(page.locator('[data-route="board"]')).toBeVisible();
 
-    await expect(page.getByRole('complementary')).toBeVisible();
+    await expect(page.getByTestId('sidebar-reopen')).toBeVisible();
   });
 });
 
