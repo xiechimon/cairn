@@ -684,7 +684,12 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         if (text === CONFIRM_ANNOUNCEMENT && m.actor === SERVER_ACTOR) continue;
         entries.push({
           at: m.createdAt,
-          item: { kind: 'note', text: `${m.actor ?? userName} ${text}`, id: m.id },
+          item: {
+            kind: 'note',
+            text: `{name} ${text}`,
+            vars: { name: m.actor ?? userName },
+            id: m.id,
+          },
         });
         continue;
       }

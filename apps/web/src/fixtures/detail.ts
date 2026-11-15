@@ -169,7 +169,7 @@ function probeTools(expanded: boolean): TranscriptItem {
 }
 
 const PROBE_MERGE_ROUND: TranscriptItem[] = [
-  { kind: 'note', text: 'Xmon Dai 发起了合并' },
+  { kind: 'note', text: '{name} 发起了合并', vars: { name: 'Xmon Dai' } },
   {
     kind: 'robot',
     paragraphs: [
