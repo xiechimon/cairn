@@ -21,8 +21,6 @@ import type {
   FsPickResult,
   GithubConnectionStatus,
   GithubIssueEcho,
-  GithubIssueState,
-  GithubIssuesResponse,
   GithubReposResponse,
   ImportSkillBody,
   MachineRecord,
@@ -530,22 +528,6 @@ export const useFsList = (dir: string | null, enabled: boolean) =>
     staleTime: 0,
   });
 
-export function useGithubIssues(
-  projectId: string | undefined,
-  state: GithubIssueState,
-  page: number,
-  enabled: boolean,
-) {
-  return useQuery({
-    queryKey: ['github-issues', projectId, state, page],
-    queryFn: () =>
-      api.get<GithubIssuesResponse>(
-        `/api/projects/${projectId}/github/issues?state=${state}&page=${page}`,
-      ),
-    enabled: enabled && projectId !== undefined,
-  });
-}
-
 export function useGithubIssueEcho(todoId: string | undefined, enabled: boolean) {
   return useQuery({
     queryKey: ['github-issue-echo', todoId],
@@ -734,13 +716,6 @@ export function useApiMutations(teamId: string | undefined) {
           title: '',
           spec: input.spec,
           ...(input.machineId != null ? { machineId: input.machineId } : {}),
-        }),
-      onSuccess: invalidateAll,
-    }),
-    importGithubIssue: useMutation({
-      mutationFn: (input: { projectId: string; number: number }) =>
-        api.post<TodoRecord>(`/api/projects/${input.projectId}/github/issues/import`, {
-          number: input.number,
         }),
       onSuccess: invalidateAll,
     }),

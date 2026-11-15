@@ -335,7 +335,7 @@ Reach:
 - Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`, `/app/settings/team`, `/app/team`
 - Settings: `设置` (Settings) › `模型` (Model) › `用量与连接` (Usage & connections); `设置` (Settings) › `模型` (Model) › `规则与策略` (Rules & policies)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-platform`, `route-override-save`, `routing-empty`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-session-default`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
+- Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-platform`, `route-override-save`, `routing-coordinator-default`, `routing-empty`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-session-default`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
 - Research: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](../../../docs/research/agent-machine-routing.md) (not on main)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md)
@@ -792,15 +792,14 @@ Reach:
 
 ### github
 
-**GitHub connection and issues** (shipped, centrality 3). Connecting GitHub, choosing repositories, importing issues as threads and writing results back to the issue.
+**GitHub connection and issues** (shipped, centrality 3). Connecting GitHub, choosing repositories, importing labeled issues as threads and writing results back to the issue.
 
 States: Not connected, connected with a repository picker, an issue imported as a thread, and the write-back pending, done, drifted or failed with retry.
 
 Reach:
 
-1. `open /app/project/<id of a project listed by the projects API>/tasks`
-2. `open /app/todo/<id of a thread listed by the todos API>`
-3. `click testid:source-issue-retry`
+1. `open /app/todo/<id of a thread listed by the todos API>`
+2. `click testid:source-issue-retry`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
@@ -809,7 +808,7 @@ Reach:
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](../../../docs/research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
 - Backend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
-- Evidence: `apps/web/e2e/project-github-issues.spec.ts`, `apps/web/e2e/github-issue-writeback.spec.ts`, `apps/server/test/github-connection.test.ts`
+- Evidence: `apps/web/e2e/github-issue-writeback.spec.ts`, `apps/server/test/github-issues.test.ts`, `apps/server/test/github-connection.test.ts`
 
 ### harness-profile
 
@@ -845,9 +844,9 @@ Reach:
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `resource-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/mcp-servers.md](features/mcp-servers.md)
-- Research: **gap**: no note on MCP configuration surfaces in t3code and Amp
-- Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md)
-- Backend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md)
+- Research: [docs/research/mcp-connectors-2026-11-15.md](../../../docs/research/mcp-connectors-2026-11-15.md)
+- Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](../../../docs/design/mcp-connectors.md)
+- Backend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](../../../docs/design/mcp-connectors.md)
 - Evidence: `apps/server/test/mcp-servers.test.ts`, `apps/daemon/test/mcp-config.test.ts`
 
 ### projects
@@ -860,15 +859,14 @@ Reach:
 
 1. `open /app/project/new`
 2. `click testid:github-picker`
-3. `open /app/project/<id of a project listed by the projects API>/tasks`
-4. `open /app/project/<id of a project listed by the projects API>/settings`
-5. `click testid:project-instructions-input`
-6. `settings projects`
+3. `open /app/project/<id of a project listed by the projects API>/settings`
+4. `click testid:project-instructions-input`
+5. `settings projects`
 
 - Web routes: `/app/project/:id`, `/app/project/:id/settings`, `/app/project/:id/tasks`, `/app/project/new`
 - Settings: `设置` (Settings) › `项目`
-- Keyboard shortcuts in its code: `A`, `D`, `G`, `L`, `P`, `R`, `T`
-- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`, `task-card`, `task-meta`, `task-row`, `task-status`
+- Keyboard shortcuts in its code: `G`, `L`
+- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`
 - Verify recipes: [.claude/skills/verify-cairn/features/project-new-form.md](features/project-new-form.md), [.claude/skills/verify-cairn/features/github-oauth-picker.md](features/github-oauth-picker.md), [.claude/skills/verify-cairn/features/local-repo-api.md](features/local-repo-api.md)
 - Research: [docs/research/project-coordinators.md](../../../docs/research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
@@ -997,7 +995,7 @@ Reach:
 
 **Sidebar** (shipped, centrality 3). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive, delete) and the machine-status footer.
 
-States: Projects under the Coordinator with no group, ungrouped projects then groups in name order, a folded group with its count, an ochre dot on a project with a task waiting on the owner, the open row menu, loading or error rows, the filter on archived (note, archived rows with their groups, back row) or empty archived, the filter on all with archived rows marked, an archived project opened read-only with the unarchive bar, and the 48px rail.
+States: Projects under the Coordinator with no group, ungrouped projects then groups in name order, a folded group with its count, an ochre dot on a project with a task waiting on the owner, the open row menu, loading or error rows, the filter on archived (note, archived rows with their groups, back row) or empty archived, the filter on all with archived rows marked, an archived project opened read-only with the unarchive bar, and collapsed with only the toggle, whose hover, edge or keyboard focus floats the whole sidebar as a peek.
 
 Reach:
 
@@ -1009,7 +1007,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: `A`, `D`, `M`, `N`, `R`, `S`, `U`
-- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-activity`, `sidebar-archived-delete-all`, `sidebar-archived-empty`, `sidebar-archived-note`, `sidebar-archived-page`, `sidebar-footer`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-reopen`, `sidebar-settings`, `team-row`
+- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-activity`, `sidebar-archived-delete-all`, `sidebar-archived-empty`, `sidebar-archived-note`, `sidebar-archived-page`, `sidebar-footer`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `team-row`
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
 - Backend design: **gap**: no design for unread and read marks across devices

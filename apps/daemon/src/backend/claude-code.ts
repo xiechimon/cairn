@@ -49,6 +49,7 @@ import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { SessionNotResumableError } from './errors.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 import { claudeCliEnv, claudeTelemetryEnv, PiStepSpanSink } from './otel.js';
+import { withoutPinnedEnv } from './pinned-env.js';
 import {
   appendSkillsCatalog,
   collectDeniedSkillDirs,
@@ -956,7 +957,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
   const locked = !parts.inOrb && parts.lockedDown;
   const stepToken = parts.env?.CLAUDE_CODE_OAUTH_TOKEN;
   const inheritedEnv = claudeCliEnv({
-    ...process.env,
+    ...withoutPinnedEnv(process.env),
     ...parts.env,
     ...(stepToken !== undefined ? METERED_CLAUDE_AUTH_BLANK : {}),
   });

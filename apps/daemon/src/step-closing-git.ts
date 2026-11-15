@@ -85,7 +85,7 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
       log(`push skipped: agent lacks ${AGENT_TOOL_PUSH} permission`);
     } else if (pushWarranted) {
       const pushSource = await input.push();
-      if (pushSource === 'machine') {
+      if (pushSource === 'machine' && claimed.project?.repo?.kind === 'github') {
         note(`git-credential-${stepId}`, gitCredentialRowContent('machine'));
       }
       input.logRaw(`pushed ${ws.branch}`);

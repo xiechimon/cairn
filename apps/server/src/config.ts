@@ -12,7 +12,6 @@ import {
   ENV_VARS,
   formatAccessTokenFile,
   parseAccessTokenFile,
-  SKILLS_DIR_DEFAULT,
   TEAM_STREAM_PING_INTERVAL_MS,
 } from '@cairn/shared';
 import { z } from 'zod';
@@ -111,7 +110,7 @@ function envPort(): number | undefined {
   return Number.isInteger(n) ? n : undefined;
 }
 
-function envStr(name: string): string | null {
+export function envStr(name: string): string | null {
   const raw = process.env[name];
   return raw !== undefined && raw !== '' ? raw : null;
 }
@@ -209,7 +208,8 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
   const joinedDataDir = join(home, 'server');
   const dataDir = existsSync(joinedDataDir) ? realpathSync(joinedDataDir) : joinedDataDir;
   const skillsDirEnv = envStr(ENV_VARS.skillsDir);
-  const skillsDir = resolve(expandHome(skillsDirEnv ?? SKILLS_DIR_DEFAULT));
+  const skillsDir =
+    skillsDirEnv === null ? resolve(home, 'skills') : resolve(expandHome(skillsDirEnv));
   const webDirEnv = process.env[ENV_VARS.webDir];
   const oauthId = process.env[ENV_VARS.githubOauthClientId] || undefined;
   const oauthSecret = process.env[ENV_VARS.githubOauthClientSecret] || undefined;

@@ -536,6 +536,21 @@ export function appendReportLocationNote(prompt: string, reportFile: string): st
   return prompt === '' ? note : `${prompt}\n${note}`;
 }
 
+const DELIVERABLES_NOTE_HEAD = '成果文件交接位置：';
+const DELIVERABLES_NOTE_TAIL = `。可选：本步如果做出了网页或 PPT，把网页（.html）放进其中的 pages/，把 PPT（.pptx 或 .pdf）放进 slides/；文件直接放在这两个文件夹里，不要再分子文件夹，最多 5 个文件，网页每个不超过 2 MiB，PPT 每个不超过 20 MiB。报告仍写在 ${REPORT_FILE_NAME}。`;
+
+export function appendDeliverablesLocationNote(prompt: string, deliverablesDir: string): string {
+  if (prompt.includes(DELIVERABLES_NOTE_HEAD)) return prompt;
+  const note = `${DELIVERABLES_NOTE_HEAD}${deliverablesDir}${DELIVERABLES_NOTE_TAIL}`;
+  return prompt === '' ? note : `${prompt}\n${note}`;
+}
+
+function stripTrailingNote(text: string, head: string, tail: string): string {
+  const idx = text.lastIndexOf(`\n${head}`);
+  if (idx === -1) return text;
+  return wrappedBy(text.slice(idx + 1), head, tail) ? text.slice(0, idx) : text;
+}
+
 export function stripConfirmedPlanNote(text: string): string {
   const idx = text.lastIndexOf(`\n${CONFIRMED_PLAN_NOTE_HEAD}`);
   if (idx === -1) return text;
@@ -577,13 +592,11 @@ export function stripBlockerHandoff(text: string): string {
 function stripTaskDeliveryNotes(text: string): string {
   let cur = text;
   for (;;) {
-    const reportIdx = cur.lastIndexOf(`\n${REPORT_NOTE_HEAD}`);
-    const withoutReport =
-      reportIdx === -1
-        ? cur
-        : wrappedBy(cur.slice(reportIdx + 1), REPORT_NOTE_HEAD, REPORT_NOTE_TAIL)
-          ? cur.slice(0, reportIdx)
-          : cur;
+    const withoutReport = stripTrailingNote(
+      stripTrailingNote(cur, DELIVERABLES_NOTE_HEAD, DELIVERABLES_NOTE_TAIL),
+      REPORT_NOTE_HEAD,
+      REPORT_NOTE_TAIL,
+    );
     const next = stripConfirmedPlanNote(stripWorkBranchNote(withoutReport));
     if (next === cur) return cur;
     cur = next;

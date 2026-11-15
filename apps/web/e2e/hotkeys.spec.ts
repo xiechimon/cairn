@@ -3,7 +3,6 @@ import { pressAndExpect } from './helpers.js';
 
 const SCHEDULES = '/app/schedules?scenario=01';
 
-const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=r2-24b';
 
 const MACHINE_DETAIL = '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06';
 const AUTHORIZE = '/app/machines/authorize';
@@ -106,25 +105,20 @@ test('Space on a focused button activates it natively; ⌘J fires past button fo
   await expect(page.getByTestId('chief-composer-input')).toBeFocused();
 });
 
-test('⌘J on a project page lands on that project chat', async ({ page }) => {
-  await page.goto(PROJECT);
-  await expect(page.getByRole('complementary')).toBeVisible();
-  await pressAndExpect(page, 'Meta+j', home(page));
-  await expect(page).toHaveURL(/\/app\?scenario=r2-24b&project=ZAQczKCu0MOAzC1ZqcFlX&chat=1$/);
-  await expect(page.getByTestId('chief-composer-input')).toBeFocused();
-});
-
-test('the collapsed rail search icon hovers the ⌘K hint', async ({ page }) => {
+test('the collapsed sidebar peek search icon hovers the ⌘K hint', async ({ page }) => {
   await page.goto(SCHEDULES);
   await page.locator('button[aria-label="收起侧边栏"]').click();
-  const railSearch = page.getByRole('button', { name: '搜索' });
-  await expect(railSearch).toBeVisible();
+  await expect(page.getByRole('button', { name: '搜索' })).toBeHidden();
 
   const hint = page.locator('[data-slot="tooltip-content"]');
   await page.mouse.move(700, 400);
   await expect(hint).toHaveCount(0);
-  await railSearch.hover();
-  await expect(hint).toBeVisible();
+  await page.getByTestId('sidebar-reopen').hover();
+  const peek = page.getByTestId('sidebar-peek');
+  await expect(peek).toHaveAttribute('data-open', '');
+  const peekSearch = peek.getByRole('button', { name: '搜索' });
+  await peekSearch.hover();
+  await expect(hint.filter({ has: page.locator('[data-slot="kbd"]') })).toBeVisible();
   await expect(hint.locator('[data-slot="kbd"]')).toHaveText('⌘K');
 });
 

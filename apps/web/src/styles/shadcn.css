@@ -138,7 +138,6 @@
   --voice-response-weight: 400;
   --rem-scale: calc(16 / 17);
   --sidebar-w: 220px;
-  --sidebar-rail-w: 48px;
   --sidebar-surface: var(--background);
   --chat-max-w: 768px;
   --composer-max-h: 384px;

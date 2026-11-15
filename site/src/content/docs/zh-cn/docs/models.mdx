@@ -1,0 +1,80 @@
+---
+title: 接入模型
+description: 用你已经在付费的订阅或 API key。
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+Cairn 自己不带模型，也不转售算力。thread 和 Coordinator 都跑在你已有的模型来源上。手上有哪个就用哪个，有一个就能开始。
+
+| 你手上有 | 放在哪 |
+|---|---|
+| 已登录的 Claude Code | 装在 Runner 上，Cairn 自己会识别 |
+| 已登录的 Codex CLI | 装在 Runner 上，Cairn 自己会识别 |
+| Claude 订阅令牌 | `设置` → `模型服务` → `添加服务商` → `Claude` |
+| 某个服务商的 API key | `设置` → `模型服务` → `添加服务商` → 对应服务商 |
+| 任何兼容 OpenAI 或 Anthropic 的端点 | `设置` → `模型服务` → `添加服务商` → `自定义端点` |
+
+<Tabs syncKey="model-source">
+<TabItem label="Claude Code">
+
+在 Runner 那台机器上装好 [Claude Code](https://claude.com/product/claude-code)，用跑 `cairn` 的同一个用户执行 `claude` 登录。Runner 会把它上报给服务端；在 `模型服务` 里它显示为那台 Runner 上的 `Claude Code`，状态比如 `已登录`。
+
+它的模型来自那台机器 `~/.claude/settings.json` 里的模型槽（`env.ANTHROPIC_*_MODEL`）。只要有一台装了 Claude Code 的 Runner 在线，新的活默认就用 Claude Code。
+
+</TabItem>
+<TabItem label="Codex">
+
+在 Runner 那台机器上装好 [Codex CLI](https://github.com/openai/codex)，用跑 `cairn` 的同一个用户执行 `codex login`。Runner 会上报这个登录（读的是 `~/.codex/auth.json`，或 `$CODEX_HOME/auth.json`）。没有 Runner 装 Claude Code 时，默认就用 Codex。
+
+</TabItem>
+<TabItem label="Claude 令牌">
+
+在任意一台已登录 Claude Code 的机器上执行：
+
+```sh
+claude setup-token
+```
+
+然后在 Cairn 里打开 `设置` → `模型服务` → `添加服务商`，在 `订阅登录` 下选 `Claude`，粘贴令牌。也可以顺手填上它的过期日期。
+
+</TabItem>
+<TabItem label="API key">
+
+打开 `设置` → `模型服务` → `添加服务商`。列表分组：模型厂商（Anthropic、OpenAI、Google、xAI、DeepSeek、Mistral、Moonshot、Kimi For Coding、MiniMax、Qwen、Z.ai 等）、云平台（Amazon Bedrock、Google Vertex AI、Cloudflare Workers AI）、推理平台（Groq、Cerebras、Fireworks、Together 等）、网关与聚合（OpenRouter、Vercel AI Gateway、Cloudflare AI Gateway、OpenCode）。选一个，粘贴 key。xAI 还可以用 `Sign in with SuperGrok or X Premium` 按钮登录。
+
+key 加密存在你的服务端，保存后不能再查看。`测试连接` 会发一个最小请求，不会显示密钥。
+
+</TabItem>
+<TabItem label="自定义端点">
+
+中转、自建模型或者列表里没有的，在 `其他` 下选 `自定义端点`，填：
+
+- **名称**；
+- **API 密钥**：无密钥网关可留空；
+- `连接设置` 里：**服务商 ID**（比如 `my-relay`）、**Base URL**（比如 `https://api.example.com/v1`）、**API 协议**（`OpenAI Completions`、`OpenAI Responses` 或 `Anthropic Messages`），以及是否以 `Authorization: Bearer` 请求头发送密钥（默认勾选）；
+- **模型（可选）**：点 `添加模型`，输入模型 ID。
+
+保存后打开这个服务商，在 `测试连接` 旁点 `测试` 确认能连上。
+
+</TabItem>
+</Tabs>
+
+<Aside type="note" title="还不能用的">
+列表里也有 OpenAI Codex 的订阅登录，标着 `暂未开通`；现在请改用 Runner 上的 Codex CLI。GitHub Copilot 登录只有在服务端配了你自己的 GitHub OAuth App（`CAIRN_GITHUB_OAUTH_CLIENT_ID` 和 `CAIRN_GITHUB_OAUTH_CLIENT_SECRET`）时才能用。Gemini CLI 会出现在 Runner 上，但在接入命令闸之前不能开启。
+</Aside>
+
+## 告诉 Coordinator 用哪个模型
+
+光有模型来源，Coordinator 还不会回话：没有规则时它拒绝对话。首页最后一步设置 `打开工作路由` 会打开 `设置` → `规则与策略`。在 `Coordinator` 这张卡片上：
+
+1. `运行时`：选 `内置 (pi)`，用你添加的服务商的模型；
+2. `模型`：选一个你添加过的模型；
+3. 点 `创建`。
+
+规则保存后，首页的设置提示就消失了。同一页的 `会话` 卡片会显示新的活默认用什么、为什么，比如 `当前默认：Claude Code（因为有 Runner 装了 Claude Code）`。
+
+## 凭证放在哪
+
+- 你在网页里添加的服务商 key 和令牌，加密存在服务端的 `~/.cairn/server/` 下。备份整个 `~/.cairn` 目录；少了 `secretbox.key`，数据库解不开。
+- Claude Code 和 Codex 的登录留在你登录的那台机器上，在它们自己的文件里。

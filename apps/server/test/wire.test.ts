@@ -123,7 +123,6 @@ const INFERRED_ROUTES = [
   'DELETE /api/teams/{id}/github/connection',
   'POST /api/fs/pick',
   'GET /api/fs/list',
-  'GET /api/projects/{id}/github/issues',
   'POST /api/projects/{id}/github/issues/import',
   'GET /api/todos/{id}/github-issue',
   'POST /api/todos/{id}/github-issue/retry',

@@ -275,28 +275,6 @@ test('todo-phase `开始` fires orchestration directly — no start dialog (#640
   await expect(page.locator('.overlay-title')).toHaveCount(0);
 });
 
-test('project task rows and cards are real links that open the todo detail (#318, #2531)', async ({ page }) => {
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks');
-  const row = page.locator('.prj-task-row').first();
-  await expect(row).toBeVisible();
-
-  await expect(row.locator('a.prj-task-link')).toHaveCount(1);
-  await expect(row.locator('a.prj-task-link')).toHaveAttribute(
-    'href',
-    /^\/app\?scenario=prj-tasks&thread=[^&]+$/,
-  );
-  await row.click();
-  await expect(page).toHaveURL(/\/app\?scenario=prj-tasks&thread=/);
-
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks');
-  await page.locator('.prj-tasks-view-btn').nth(1).click();
-  const card = page.locator('.prj-task-card').first();
-  await expect(card).toBeVisible();
-  await expect(card.locator('a.prj-task-link')).toHaveCount(1);
-  await card.click();
-  await expect(page).toHaveURL(/\/app\?scenario=prj-tasks&thread=/);
-});
-
 test('detail transcript message tools carry no restore action (#884)', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
   await expect(page.locator('.chat-col path[d^="M3 12a9"]')).toHaveCount(0);

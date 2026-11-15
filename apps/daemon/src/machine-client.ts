@@ -3,6 +3,9 @@ import {
   type ClaimedStep,
   type ClaudeCodeReport,
   type ClaudeRateLimitReport,
+  DELIVERABLE_UPLOAD_DEADLINE_MS,
+  type DeliverableKind,
+  type DeliverableReceiptState,
   type MachineAskBody,
   type MachineAskResponse,
   type MachineAttachmentResponse,
@@ -26,11 +29,13 @@ import {
   type MachineStreamEvent,
   type MachineSyncResultBody,
   type MachineTokenResponse,
+  type MachineUploadUrlsResponse,
   machineAskResponseSchema,
   machineAttachmentResponseSchema,
   machineClaimResponseSchema,
   machineClosedOrbsResponseSchema,
   machineComputerFramesResponseSchema,
+  machineDeliverableReceiptResponseSchema,
   machineEnrollPollResponseSchema,
   machineEnrollResponseSchema,
   machineEnrollStartResponseSchema,
@@ -85,6 +90,11 @@ export interface MachineClientOpts {
   fetchImpl?: typeof fetch;
 }
 
+export interface DeliverableGrantRequest {
+  generation: number;
+  entries: { kind: DeliverableKind; name: string; size: number; sha256: string }[];
+}
+
 export interface MachineApi {
   enroll(body: {
     teamId: string;
@@ -131,9 +141,13 @@ export interface MachineApi {
   uploadUrls(
     stepId: string,
     files: { name: string; size?: number }[],
+    deliverables?: DeliverableGrantRequest,
   ): Promise<{
     uploads: { name: string; url: string; method: 'PUT'; headers: Record<string, string> }[];
+    deliverables?: MachineUploadUrlsResponse['deliverables'];
   }>;
+  putDeliverable?(url: string, headers: Record<string, string>, body: Buffer): Promise<void>;
+  deliverableReceipt?(stepId: string, generation: number): Promise<DeliverableReceiptState>;
   putUpload(
     url: string,
     headers: Record<string, string>,
@@ -495,13 +509,46 @@ export class MachineClient implements MachineApi {
   async uploadUrls(
     stepId: string,
     files: { name: string; size?: number }[],
-  ): Promise<{
-    uploads: { name: string; url: string; method: 'PUT'; headers: Record<string, string> }[];
-  }> {
+    deliverables?: DeliverableGrantRequest,
+  ): Promise<MachineUploadUrlsResponse> {
     return this.request('POST', `/api/machine/upload-urls/${stepId}`, {
-      body: { files },
-      parse: (raw) => machineUploadUrlsResponseSchema.parse(raw) as never,
+      body:
+        deliverables !== undefined
+          ? { files, generation: deliverables.generation, deliverables: deliverables.entries }
+          : { files },
+      parse: (raw) => machineUploadUrlsResponseSchema.parse(raw),
     });
+  }
+
+  async putDeliverable(url: string, headers: Record<string, string>, body: Buffer): Promise<void> {
+    const { pathname } = new URL(url, this.opts.serverUrl);
+    if (!pathname.startsWith('/api/machine/deliverable/')) {
+      throw new Error(`unexpected deliverable upload path: ${pathname}`);
+    }
+    const token = this.opts.getToken?.();
+    const res = await this.fetchImpl(this.url(pathname), {
+      method: 'PUT',
+      headers: {
+        'content-type': 'application/octet-stream',
+        ...headers,
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+      body: new Uint8Array(body),
+      signal: AbortSignal.timeout(DELIVERABLE_UPLOAD_DEADLINE_MS),
+    });
+    if (!res.ok) throw new MachineApiError(res.status, await res.text());
+    machineOkResponseSchema.parse(await res.json());
+  }
+
+  async deliverableReceipt(stepId: string, generation: number): Promise<DeliverableReceiptState> {
+    const res = await this.request(
+      'GET',
+      `/api/machine/steps/${stepId}/receipt?generation=${generation}`,
+      {
+        parse: (raw) => machineDeliverableReceiptResponseSchema.parse(raw),
+      },
+    );
+    return res.state;
   }
 
   async putUpload(

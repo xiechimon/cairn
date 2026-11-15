@@ -2,10 +2,11 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs
 import { join } from 'node:path';
 import type { ClaimedStep, MachineDoneBody, StepKind, TranscriptUpload } from '@cairn/shared';
 import { ensurePrivateDir, writePrivateFile } from './private-fs.js';
+import { type DeliverableSnapshot, deliverablesOutboxOf } from './step-deliverables.js';
 import type { StopRequest } from './step-stops.js';
 
 const STEP_OUTBOX_SUFFIXES = ['.transcript.json', '.session.jsonl'];
-const STEP_OUTBOX_FILE = /^step-(.+)\.(?:transcript\.json|session\.jsonl)$/;
+const STEP_OUTBOX_FILE = /^step-(.+)\.(?:transcript\.json|session\.jsonl|deliverables)$/;
 
 export type JournalState = 'claimed' | 'running' | 'awaiting-upload' | 'done' | 'failed';
 
@@ -20,6 +21,7 @@ export interface StepJournalEntry {
   prompt: string | null;
   claimed: ClaimedStep | null;
   doneBody?: MachineDoneBody | null;
+  deliverables?: DeliverableSnapshot | null;
   planContent?: string | null;
   sessionFile?: string | null;
   stopRequest?: StopRequest | null;
@@ -95,10 +97,20 @@ export class StepJournal {
       .sort((a, b) => a.claimedAt - b.claimedAt);
   }
 
+  deliverablesDir(stepId: string): string {
+    return deliverablesOutboxOf(this.dir, stepId);
+  }
+
+  dropDeliverables(stepId: string): void {
+    rmSync(this.deliverablesDir(stepId), { recursive: true, force: true });
+    this.update(stepId, { deliverables: null });
+  }
+
   remove(stepId: string): void {
     if (existsSync(this.file(stepId))) rmSync(this.file(stepId));
     for (const suffix of STEP_OUTBOX_SUFFIXES)
       rmSync(join(this.dir, `step-${stepId}${suffix}`), { force: true });
+    rmSync(this.deliverablesDir(stepId), { recursive: true, force: true });
   }
 
   sweepOrphanFiles(input: { now: number; ttlMs: number }): string[] {
@@ -111,7 +123,7 @@ export class StepJournal {
       const path = join(this.dir, name);
       try {
         if (input.now - statSync(path).mtimeMs <= input.ttlMs) continue;
-        rmSync(path, { force: true });
+        rmSync(path, { recursive: true, force: true });
         removed.push(name);
       } catch {}
     }

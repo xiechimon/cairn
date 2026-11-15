@@ -165,9 +165,11 @@ test('the footer keeps Activity and Settings and no computers link', async ({ pa
   await expect(page.getByTestId('sidebar-attention')).toHaveCount(0);
 });
 
-test('the collapsed rail keeps Activity and Settings as direct links', async ({ page }) => {
+test('the collapsed sidebar peek keeps Activity and Settings as direct links', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=activity');
+  await page.getByTestId('sidebar-reopen').hover();
+  await expect(page.getByTestId('sidebar-peek')).toHaveAttribute('data-open', '');
   const activity = page.getByTestId('sidebar-activity');
   await activity.focus();
   await activity.press('Enter');
@@ -176,6 +178,8 @@ test('the collapsed rail keeps Activity and Settings as direct links', async ({ 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Activity' })).toHaveCount(0);
   await expect(page).toHaveURL(/\/app\?scenario=activity$/);
+  await page.mouse.move(700, 400);
+  await page.getByTestId('sidebar-reopen').hover();
   await page.getByTestId('sidebar-settings').click();
   await expect(page).toHaveURL(/\/app\/settings/);
 });

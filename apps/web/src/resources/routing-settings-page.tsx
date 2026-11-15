@@ -1,5 +1,6 @@
 import {
   AGENT_TOOL_SWITCHES,
+  type CoordinatorDefault,
   type PolicyUse,
   type RouteUse,
   type RoutingRuleRecord,
@@ -99,10 +100,38 @@ function SessionDefaultHint({
   return <span data-testid="routing-session-default">{text}</span>;
 }
 
+function CoordinatorDefaultHint({
+  coordinatorDefault,
+  options,
+}: {
+  coordinatorDefault: CoordinatorDefault;
+  options: ModelOption[];
+}) {
+  const { t } = useI18n();
+  const row = options.find(
+    (o) => o.provider === coordinatorDefault.provider && o.modelId === coordinatorDefault.modelId,
+  );
+  const vars = {
+    model: row?.modelName ?? coordinatorDefault.modelId ?? '',
+    provider: row?.providerLabel ?? coordinatorDefault.provider ?? '',
+  };
+  const text =
+    coordinatorDefault.reason === 'anthropic-key'
+      ? t('当前默认：{model} · {provider}（因为团队有 Anthropic API key）', vars)
+      : coordinatorDefault.reason === 'provider'
+        ? t(
+            '当前默认：{model} · {provider}（因为这是最早添加、Coordinator 能直接用的服务商）',
+            vars,
+          )
+        : t('当前没有可用的默认：添加一个有 API key 的服务商，或在这里创建规则');
+  return <span data-testid="routing-coordinator-default">{text}</span>;
+}
+
 function RuleEditor({
   use,
   rule,
   sessionDefault,
+  coordinatorDefault,
   machines,
   hasDefault,
   options,
@@ -112,6 +141,7 @@ function RuleEditor({
   use: RouteUse;
   rule: RoutingRuleRecord | null;
   sessionDefault?: SessionDefault | undefined;
+  coordinatorDefault?: CoordinatorDefault | undefined;
   machines: { id: string; name: string }[];
   hasDefault: boolean;
   options: ModelOption[];
@@ -153,6 +183,8 @@ function RuleEditor({
           hint={
             rule === null && sessionDefault !== undefined ? (
               <SessionDefaultHint sessionDefault={sessionDefault} options={options} />
+            ) : rule === null && coordinatorDefault !== undefined ? (
+              <CoordinatorDefaultHint coordinatorDefault={coordinatorDefault} options={options} />
             ) : (
               t('模型与首选 Runner')
             )
@@ -426,6 +458,9 @@ export function RoutingSettingsPage() {
                   use={use}
                   rule={null}
                   sessionDefault={use === 'session' ? settings.sessionDefault : undefined}
+                  coordinatorDefault={
+                    use === 'coordinator' ? settings.coordinatorDefault : undefined
+                  }
                   machines={machines}
                   hasDefault={hasDefault}
                   options={modelOptions}

@@ -36,7 +36,7 @@ Not captured: toasts and a failed send (no reliable trigger without breaking the
 | Thread side panel (`board/side-chat.tsx`, `board/work-panel.tsx`, `chief/chief-drawer.tsx`) | Chat side panel (files and tools) and the artifact panel | `chat-long`, `artifact` |
 | Tool and thinking rows in a thread | Web-search tool block (`Searching the web`, then `Searched the web`, expandable) | `tool-search` |
 | Settings pages (`settings/`, `routes/account-page.tsx`, `routes/api-keys-page.tsx`, `routes/team-page.tsx`, `routes/remote-access-page.tsx`, `pages/project-settings-page.tsx`) | Settings dialog: left nav, rows with label left and control right; an inset sheet at 375 | `settings` |
-| Project list and project home (`pages/project-page.tsx`, `board/project-home.tsx`) | Projects page: serif title, New project, two-column cards | `projects` |
+| New project (`pages/project-new-page.tsx`) | Projects page: serif title, New project, two-column cards | `projects` |
 | Search (`search/`) | Search palette, Ctrl+K | `search-palette` |
 | Menus (`board/sidebar-project-menu.tsx`, `board/thread-actions.tsx`, `chief/project-menu.tsx`, model pickers) | Composer `+` menu, model menu; a bottom sheet at 375 | `shell` |
 | Dialogs (`DialogShell`, `chief/edit-charter-dialog.tsx`, `board/reset-confirm-dialog.tsx`) | Settings dialog chrome | `shell`, `settings` |

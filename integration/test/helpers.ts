@@ -7,6 +7,7 @@ import type { MergePolicy, ProjectRepoKind, Scheduler } from '@cairn/shared';
 import { serve } from '@hono/node-server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { type Page, expect as pexpect } from '@playwright/test';
 import { and, eq, isNull } from 'drizzle-orm';
 import { afterAll, onTestFinished } from 'vitest';
 import { z } from 'zod';
@@ -449,6 +450,22 @@ export async function waitFor(
     if (Date.now() > deadline) throw new Error('waitFor timeout');
     await new Promise((r) => setTimeout(r, intervalMs));
   }
+}
+
+export function projectTasksUrl(serverUrl: string, projectId: string): string {
+  return `${serverUrl}/app?project=${projectId}&chat=1&pane=tasks`;
+}
+
+export async function openPanelTask(page: Page, title: string): Promise<void> {
+  const row = page.locator('[data-slot="task-row"]').filter({ hasText: title });
+  await pexpect(async () => {
+    for (const tab of ['进行中', '接下来', '已完成']) {
+      await page.getByRole('tab', { name: tab, exact: true }).click();
+      if (await row.isVisible()) return;
+    }
+    throw new Error(`no Tasks panel row for ${title}`);
+  }).toPass({ timeout: 30_000 });
+  await row.click();
 }
 
 export function updateSessionPolicy(

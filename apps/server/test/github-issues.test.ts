@@ -1,7 +1,6 @@
 import {
   buildTaskPromptText,
   type ClaimedStep,
-  githubIssuesResponseSchema,
   issueFenceQuotedLines,
   parseAttachmentTokenLines,
   todoRecordSchema,
@@ -169,135 +168,6 @@ function defaultRoutes(overrides: Record<string, GhResponse | ((url: URL) => GhR
 function projectLabels(s: TestServer, projectId: string) {
   return s.db.select().from(githubLabel).where(eq(githubLabel.projectId, projectId)).all();
 }
-
-describe('GET /api/projects/{id}/github/issues (B4-B11)', () => {
-  test('B4 shape mismatch: local(plain)/hosted project -> 404, no outbound', async () => {
-    const mock = ghMock(defaultRoutes());
-    const s = bootServer({ githubFetch: mock.impl });
-    seedConnection(s);
-    const projectId = await postProject(s.app);
-    const res = await call(s.app, 'GET', `/api/projects/${projectId}/github/issues`);
-    expect(res.status).toBe(404);
-    expect(mock.calls).toHaveLength(0);
-    s.dispose();
-  });
-
-  test('B5 not connected: github project with no connection -> 404, no outbound', async () => {
-    const mock = ghMock(defaultRoutes());
-    const s = bootServer({ githubFetch: mock.impl });
-    const projectId = await postGithubProject(s.app);
-    const res = await call(s.app, 'GET', `/api/projects/${projectId}/github/issues`);
-    expect(res.status).toBe(404);
-    expect(mock.calls).toHaveLength(0);
-    s.dispose();
-  });
-
-  test('B3/B6/B10 proxy surface: state/page passed through upstream, token only into the Authorization header', async () => {
-    const mock = ghMock(defaultRoutes());
-    const s = bootServer({ githubFetch: mock.impl });
-    seedConnection(s);
-    const projectId = await postGithubProject(s.app);
-    const res = await call(
-      s.app,
-      'GET',
-      `/api/projects/${projectId}/github/issues?state=closed&page=2`,
-    );
-    expect(res.status).toBe(200);
-    expect(mock.calls).toHaveLength(1);
-    const url = new URL(mock.calls[0]!.url);
-    expect(url.origin + url.pathname).toBe(`https://api.github.com${ISSUES_PATH}`);
-    expect(url.searchParams.get('state')).toBe('closed');
-    expect(url.searchParams.get('page')).toBe('2');
-    expect(url.searchParams.get('per_page')).toMatch(/^\d+$/);
-    expect(mock.calls[0]!.headers.authorization).toBe(`Bearer ${TOKEN}`);
-    expect(mock.calls[0]!.url).not.toContain(TOKEN);
-    const raw = await res.text();
-    expect(raw).not.toContain(TOKEN);
-    s.dispose();
-  });
-
-  test('B7/B8 envelope: PR entries filtered out, malformed entries skipped, shape passes the schema', async () => {
-    const mock = ghMock(defaultRoutes());
-    const s = bootServer({ githubFetch: mock.impl });
-    seedConnection(s);
-    const projectId = await postGithubProject(s.app);
-    const res = await call(s.app, 'GET', `/api/projects/${projectId}/github/issues`);
-    const envelope = githubIssuesResponseSchema.parse(await res.json());
-    expect(envelope.issues.map((i) => i.number)).toEqual([7, 9]);
-    expect(envelope.issues[0]!.labels).toEqual([
-      { name: 'bug', color: '#d73a4a' },
-      { name: 'area:auth', color: '#0075ca' },
-    ]);
-    s.dispose();
-  });
-
-  test('B10 hasMore: Link header rel=next -> true; missing Link -> false', async () => {
-    const withLink = ghMock(
-      defaultRoutes({
-        [ISSUES_PATH]: {
-          headers: { link: '<https://api.github.com/x?page=2>; rel="next"' },
-          body: ISSUES_LIST,
-        },
-      }),
-    );
-    const s1 = bootServer({ githubFetch: withLink.impl });
-    seedConnection(s1);
-    const p1 = await postGithubProject(s1.app);
-    const r1 = githubIssuesResponseSchema.parse(
-      await (await call(s1.app, 'GET', `/api/projects/${p1}/github/issues`)).json(),
-    );
-    expect(r1.hasMore).toBe(true);
-    s1.dispose();
-
-    const noLink = ghMock(defaultRoutes());
-    const s2 = bootServer({ githubFetch: noLink.impl });
-    seedConnection(s2);
-    const p2 = await postGithubProject(s2.app);
-    const r2 = githubIssuesResponseSchema.parse(
-      await (await call(s2.app, 'GET', `/api/projects/${p2}/github/issues`)).json(),
-    );
-    expect(r2.hasMore).toBe(false);
-    s2.dispose();
-  });
-
-  test('B10 param gate: invalid state / invalid page -> 400, no outbound', async () => {
-    const mock = ghMock(defaultRoutes());
-    const s = bootServer({ githubFetch: mock.impl });
-    seedConnection(s);
-    const projectId = await postGithubProject(s.app);
-    expect(
-      (await call(s.app, 'GET', `/api/projects/${projectId}/github/issues?state=bogus`)).status,
-    ).toBe(400);
-    expect(
-      (await call(s.app, 'GET', `/api/projects/${projectId}/github/issues?page=0`)).status,
-    ).toBe(400);
-    expect(
-      (await call(s.app, 'GET', `/api/projects/${projectId}/github/issues?page=abc`)).status,
-    ).toBe(400);
-    expect(mock.calls).toHaveLength(0);
-    s.dispose();
-  });
-
-  test('B9 upstream mapping: 404 -> 404; rate-limited 403+remaining=0 -> 429', async () => {
-    const notFound = ghMock(defaultRoutes({ [ISSUES_PATH]: { status: 404, body: {} } }));
-    const s1 = bootServer({ githubFetch: notFound.impl });
-    seedConnection(s1);
-    const p1 = await postGithubProject(s1.app);
-    expect((await call(s1.app, 'GET', `/api/projects/${p1}/github/issues`)).status).toBe(404);
-    s1.dispose();
-
-    const limited = ghMock(
-      defaultRoutes({
-        [ISSUES_PATH]: { status: 403, headers: { 'x-ratelimit-remaining': '0' }, body: {} },
-      }),
-    );
-    const s2 = bootServer({ githubFetch: limited.impl });
-    seedConnection(s2);
-    const p2 = await postGithubProject(s2.app);
-    expect((await call(s2.app, 'GET', `/api/projects/${p2}/github/issues`)).status).toBe(429);
-    s2.dispose();
-  });
-});
 
 describe('github project label vocabulary = repo label mirror (C12-C16)', () => {
   test('GitHub and ordinary project creation do not seed category vocabulary', async () => {
@@ -811,7 +681,9 @@ describe('outbound discipline', () => {
     const s = bootServer({ githubFetch: mock.impl });
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
-    const res = await req(s.app, 'GET', `/api/projects/${projectId}/github/issues`);
+    const res = await req(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
+      number: 7,
+    });
     expect(res.status).toBe(404);
     expect(mock.calls).toHaveLength(1);
     s.dispose();
@@ -881,7 +753,7 @@ describe('#1406 concurrent import placeholder', () => {
     s.dispose();
   });
 
-  test('a reference differing only in case is the same issue: a card github:Octo/Alpha#7 exists -> list filters out 7, direct import 409', async () => {
+  test('a reference differing only in case is the same issue: a card github:Octo/Alpha#7 exists -> direct import 409', async () => {
     const mock = ghMock(defaultRoutes());
     const { s, row, deps } = await importWorld(mock.impl);
     s.db
@@ -899,10 +771,6 @@ describe('#1406 concurrent import placeholder', () => {
         sourceRef: 'github:Octo/Alpha#7',
       })
       .run();
-    const list = await call(s.app, 'GET', `/api/projects/${row.id}/github/issues`);
-    expect(list.status).toBe(200);
-    const face = (await list.json()) as { issues: Array<{ number: number }> };
-    expect(face.issues.map((i) => i.number)).toEqual([9]);
     await expect(importGithubIssue(deps, row, 7)).rejects.toMatchObject({ status: 409 });
     expect(
       s.db.select().from(todoTable).where(eq(todoTable.sourceKind, 'github-issue')).all(),

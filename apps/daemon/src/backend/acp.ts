@@ -33,6 +33,7 @@ import { DAEMON_VERSION } from '../version.js';
 import { openAcpTools } from './acp-tools.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 import { runtimeChildEnv } from './otel.js';
+import { withoutPinnedEnv } from './pinned-env.js';
 
 const adapterProcessGroups = new Set<number>();
 
@@ -395,7 +396,7 @@ class AcpBackend implements AgentBackend {
           cwd: opts.cwd,
           stdio: ['pipe', 'pipe', 'pipe'],
           ...(adapter && process.platform !== 'win32' ? { detached: true } : {}),
-          env: runtimeChildEnv({ ...process.env, ...opts.env }),
+          env: runtimeChildEnv({ ...withoutPinnedEnv(process.env), ...opts.env }),
         },
       );
     } catch (error) {

@@ -34,6 +34,19 @@ cairn start        # also: stop / restart / logs -f / status
 
 Both packages install a `cairn` bin: installing both globally on the same machine means whichever came last wins the name. The clean split is running the server where you browse and `cairn-cli` where agents build.
 
+## Use your Claude subscription on your machines
+
+Set the subscription up once on the server; every machine you enroll then runs Claude Code tasks with it, without a `claude` login on each machine. Cairn stores the token encrypted on your own server and hands it only to your own machines (and their orbs) for the official Claude Code to use.
+
+1. **Install the Claude Code CLI on every machine that runs tasks, and on the server host.** The daemon looks for `claude` on `PATH` (or `CAIRN_CLAUDE_BIN`) and logs `claude binary: not found` when it is missing. The server host needs it too: the Verify button runs `claude -p` there, and reports "unavailable" without it (`CLAUDE_BIN` overrides the path).
+2. **Enroll the machine** as in the section above. Wait until its log shows `claude binary: <path>`. If the machine's runtime list shows Claude Code as not installed, check that `claude` is on the daemon's `PATH`. A daemon older than the detection fix in #4795 also needs a `~/.claude/settings.json` that lists a model; without it an unpinned task never goes to that machine, so update the daemon or pin the task.
+3. **Turn on the Claude Code runtime for the machine.** A new machine only has `pi` enabled. Open the machine, and in its Runtimes section switch Claude Code on. Without this the machine never claims a Claude Code task; the task's queue line then reads "this Runner has the claude-code runtime turned off", and after ten minutes the owner gets a notification with the same reason.
+4. **Create the token.** On any computer where you are signed in to your Claude subscription, run `claude setup-token` and copy the `sk-ant-oat01-…` value it prints.
+5. **Paste it in the Model services page.** Add a connection, pick Claude (tagged Subscription), give it a name, paste the token, optionally set the expiry date, and save. The token cannot be viewed afterwards. Then press Verify: a good token shows ok, a revoked one shows an authentication failure.
+6. **Start a task.** The default route sends a task to Claude Code (`claude-sonnet-5-5`). The plan step and the build run on a machine from step 3 and appear in the task conversation.
+
+Places a newcomer gets stuck: the runtime switch in step 3; the server host missing `claude` in step 1; and a token that is not in the `sk-ant-oat01-` format, which is rejected as an invalid credential.
+
 ## Run the server in Docker
 
 Only the server (with the web UI) is containerized; agents run through a daemon on your own machines. The image binds `0.0.0.0` and keeps all state under `/data`:

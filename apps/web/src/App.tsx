@@ -17,7 +17,6 @@ import { TooltipProvider } from './components/ui/tooltip.js';
 import { I18nProvider } from './i18n/provider.js';
 import { TokenGate } from './overlay/token-gate.js';
 import { ProjectNewPage } from './pages/project-new-page.js';
-import { ProjectTasksPage } from './pages/project-page.js';
 import { ProjectHomeRedirect } from './pages/project-redirect.js';
 import { ProjectSettingsPage } from './pages/project-settings-page.js';
 import { SchedulesPage } from './pages/schedules-page.js';
@@ -60,7 +59,7 @@ const PAGE_ROUTES = withBoundary([
   { path: '/app/todo/:id', element: <TodoRedirect /> },
   { path: '/app/schedules', element: <SchedulesPage /> },
   { path: '/app/project/:id', element: <ProjectHomeRedirect /> },
-  { path: '/app/project/:id/tasks', element: <ProjectTasksPage /> },
+  { path: '/app/project/:id/tasks', element: <ProjectHomeRedirect pane="tasks" /> },
   { path: '/app/team', element: <SettingsRedirect section="work-routing" /> },
   { path: `${SETTINGS_HREF}/team`, element: <SettingsRedirect section="work-routing" /> },
   { path: '/app/account', element: <SettingsRedirect section="account" /> },

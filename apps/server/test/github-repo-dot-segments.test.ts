@@ -255,22 +255,17 @@ describe('#1466 write surface: . / .. segment refusal (W1-W4)', () => {
 });
 
 describe('#1466 read path: legacy rows treated as "not a valid GitHub repo", zero outbound (R1-R8)', () => {
-  test.each(STORED_BAD_REFS)(
-    'R1/R2 issue list and import -> 404, zero outbound (%s)',
-    async (bad) => {
-      const rec = recorder();
-      const s = boot(rec);
-      const projectId = insertGithubProject(s, bad);
-      const list = await req(s.app, 'GET', `/api/projects/${projectId}/github/issues`);
-      expect(list.status).toBe(404);
-      const imported = await req(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
-        number: 7,
-      });
-      expect(imported.status).toBe(404);
-      expect(rec.calls).toEqual([]);
-      expect(s.db.select().from(todoTable).all()).toHaveLength(0);
-    },
-  );
+  test.each(STORED_BAD_REFS)('R1/R2 issue import -> 404, zero outbound (%s)', async (bad) => {
+    const rec = recorder();
+    const s = boot(rec);
+    const projectId = insertGithubProject(s, bad);
+    const imported = await req(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
+      number: 7,
+    });
+    expect(imported.status).toBe(404);
+    expect(rec.calls).toEqual([]);
+    expect(s.db.select().from(todoTable).all()).toHaveLength(0);
+  });
 
   test.each(STORED_BAD_REFS)(
     'R3 建任务：不进 #452 自建 issue 面（来源两列 null），零出站（%s）',

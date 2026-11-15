@@ -675,8 +675,13 @@
   }
 }
 
-.board-shell:not(:has(> .board-sidebar)) > .board-sheet {
+.board-shell:not(:has(> .board-sidebar)) > .board-sheet,
+.page-shell:not(:has(> .board-sidebar)) > .page-main {
   border-left-width: 0;
+}
+
+.page-shell:not(:has(> .board-sidebar)) [data-testid="page-topbar"] {
+  padding-left: 52px;
 }
 
 @media (width < 48rem) {

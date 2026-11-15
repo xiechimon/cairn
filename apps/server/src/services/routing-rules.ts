@@ -3,6 +3,7 @@ import {
   CHIEF_REPLY_TOOLS,
   CHIEF_ROUTER_TOOLS,
   CODEX_MODEL,
+  type CoordinatorDefault,
   filterAgentTools,
   isSessionStepKind,
   type PatchRoutingRuleBody,
@@ -24,7 +25,7 @@ import {
   withPlatform,
 } from '@cairn/shared';
 import { and, asc, eq, isNotNull, sql } from 'drizzle-orm';
-import { usesHostCodexLogin } from '../coordinator/codex-login.js';
+import { codexLoginAvailable, usesHostCodexLogin } from '../coordinator/codex-login.js';
 import { builtinModelIds, isBuiltinProvider } from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
 import { build, machine, provider, routingRule, step, todo, workPolicy } from '../db/schema.js';
@@ -77,6 +78,9 @@ export function chiefRemoteTools(): readonly RemoteToolDef[] {
 
 const LEGACY_RUNTIME_PROVIDER = 'pi';
 const DEFAULT_SESSION_RULE_ID = 'default-session';
+const DEFAULT_COORDINATOR_RULE_ID = 'default-coordinator';
+const COORDINATOR_MODEL_PREFERENCE = [/haiku/i, /sonnet/i];
+const ANTHROPIC_API_HOST = 'api.anthropic.com';
 const CODEX_LOGIN_PRESENT = new Set(['ok', 'expired']);
 
 export function keylessEndpoint(providerId: string): boolean {
@@ -210,13 +214,94 @@ function defaultSessionChoice(
   return choice === null ? null : { reason: 'provider', ...choice };
 }
 
+function isAnthropicApi(baseUrl: string): boolean {
+  try {
+    return new URL(baseUrl).hostname === ANTHROPIC_API_HOST;
+  } catch {
+    return false;
+  }
+}
+
+export function anthropicCoordinatorChoice(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+): { provider: string; modelId: string } | null {
+  const source = db
+    .select({ providerId: provider.providerId, models: provider.models, baseUrl: provider.baseUrl })
+    .from(provider)
+    .where(
+      and(
+        eq(provider.teamId, teamId),
+        eq(provider.api, 'anthropic-messages'),
+        isNotNull(provider.apiKeyCipher),
+      ),
+    )
+    .all()
+    .find((row) => isAnthropicApi(row.baseUrl) && row.models.length > 0);
+  if (source === undefined) return null;
+  const ids = source.models.map((m) => m.id);
+  const modelId =
+    COORDINATOR_MODEL_PREFERENCE.map((re) => ids.find((id) => re.test(id))).find(
+      (id) => id !== undefined,
+    ) ?? ids[0];
+  return modelId === undefined ? null : { provider: source.providerId, modelId };
+}
+
+export function defaultCoordinatorChoice(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+): (CoordinatorDefault & { provider: string; modelId: string }) | null {
+  const anthropic = anthropicCoordinatorChoice(db, teamId);
+  if (anthropic !== null) return { reason: 'anthropic-key', ...anthropic };
+  const rows = db
+    .select({
+      providerId: provider.providerId,
+      baseUrl: provider.baseUrl,
+      models: provider.models,
+      keyed: sql<number>`${provider.apiKeyCipher} is not null`,
+    })
+    .from(provider)
+    .where(eq(provider.teamId, teamId))
+    .orderBy(asc(provider.createdAt), asc(provider.id))
+    .all();
+  for (const row of rows) {
+    const runnable =
+      row.keyed === 1 ||
+      keylessEndpoint(row.providerId) ||
+      (usesHostCodexLogin(row.providerId, row.baseUrl) && codexLoginAvailable());
+    if (!runnable) continue;
+    const model = row.models.find(
+      (m) => m.id !== '' && paidClaudeAllowed(db, teamId, row.providerId, m.id),
+    );
+    if (model !== undefined) {
+      return { reason: 'provider', provider: row.providerId, modelId: model.id };
+    }
+  }
+  return null;
+}
+
+export function defaultCoordinatorRule(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+): RoutingRuleRow | null {
+  const choice = defaultCoordinatorChoice(db, teamId);
+  return choice === null ? null : syntheticRule(teamId, 'coordinator', choice);
+}
+
 function defaultSessionRule(db: Pick<Db, 'select'>, teamId: string): RoutingRuleRow | null {
   const choice = defaultSessionChoice(db, teamId);
-  if (choice === null) return null;
+  return choice === null ? null : syntheticRule(teamId, 'session', choice);
+}
+
+function syntheticRule(
+  teamId: string,
+  use: 'session' | 'coordinator',
+  choice: { provider: string; modelId: string },
+): RoutingRuleRow {
   return {
-    id: DEFAULT_SESSION_RULE_ID,
+    id: use === 'session' ? DEFAULT_SESSION_RULE_ID : DEFAULT_COORDINATOR_RULE_ID,
     teamId,
-    use: 'session',
+    use,
     provider: choice.provider,
     modelId: choice.modelId,
     thinkingLevel: null,
@@ -423,8 +508,13 @@ export function profileForStep(
   };
 }
 
-export function coordinatorProfile(db: Pick<Db, 'select'>, teamId: string): RouteProfile | null {
-  const route = ruleRow(db, teamId, 'coordinator');
+export function coordinatorProfile(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+  withDefault = false,
+): RouteProfile | null {
+  const route =
+    ruleRow(db, teamId, 'coordinator') ?? (withDefault ? defaultCoordinatorRule(db, teamId) : null);
   return route === null ? null : routeProfile(route);
 }
 
@@ -485,7 +575,11 @@ function requireWorkPolicy(db: Db, id: string): WorkPolicyRecord {
   return toWorkPolicyRecord(row);
 }
 
-export function listRoutingSettings(db: Db, teamId: string): TeamRoutingSettings {
+export function listRoutingSettings(
+  db: Db,
+  teamId: string,
+  coordinatorInServer = false,
+): TeamRoutingSettings {
   const rules = db
     .select()
     .from(routingRule)
@@ -500,12 +594,16 @@ export function listRoutingSettings(db: Db, teamId: string): TeamRoutingSettings
     .all()
     .map(toWorkPolicyRecord)
     .sort((a, b) => a.use.localeCompare(b.use));
-  if (rules.some((rule) => rule.use === 'session')) return { rules, policies };
-  const choice = defaultSessionChoice(db, teamId);
+  const none = { reason: 'none' as const, provider: null, modelId: null };
   return {
     rules,
     policies,
-    sessionDefault: choice ?? { reason: 'none', provider: null, modelId: null },
+    ...(rules.some((rule) => rule.use === 'session')
+      ? {}
+      : { sessionDefault: defaultSessionChoice(db, teamId) ?? none }),
+    ...(!coordinatorInServer || rules.some((rule) => rule.use === 'coordinator')
+      ? {}
+      : { coordinatorDefault: defaultCoordinatorChoice(db, teamId) ?? none }),
   };
 }
 

@@ -1,6 +1,6 @@
 import { Navigate, useParams, useSearchParams } from 'react-router';
 
-export function ProjectHomeRedirect() {
+export function ProjectHomeRedirect({ pane }: { pane?: 'tasks' }) {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const next = new URLSearchParams(searchParams);
@@ -8,5 +8,6 @@ export function ProjectHomeRedirect() {
     next.set('project', id);
     next.set('chat', '1');
   }
+  if (pane !== undefined) next.set('pane', pane);
   return <Navigate to={{ pathname: '/app', search: `?${next.toString()}` }} replace />;
 }

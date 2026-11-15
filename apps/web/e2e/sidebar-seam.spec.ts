@@ -42,28 +42,6 @@ test.describe('sidebar seam (Paper Grouped)', () => {
       expect(await teamRowBox(page)).toEqual({ x: 8, y: 0, w: 204, h: 48 });
     });
 
-    test(`rail: no seam either (${theme})`, async ({ page }) => {
-      await page.addInitScript((t) => {
-        localStorage.setItem('cairn-theme', t);
-        localStorage.setItem('cairn.sidebar-collapsed', '1');
-      }, theme);
-      await page.goto('/app?scenario=01');
-
-      const m = await page.evaluate(() => {
-        const rail = document.querySelector('aside')!;
-        const ss = getComputedStyle(rail);
-        return {
-          borderRightW: ss.borderRightWidth,
-          shadow: ss.boxShadow,
-          railW: rail.getBoundingClientRect().width,
-        };
-      });
-
-      expect(m.borderRightW).toBe('0px');
-      expect(m.shadow).toBe('none');
-      expect(m.railW).toBe(48);
-    });
-
     for (const [name, url] of [
       ['pages', '/app/schedules?scenario=11'],
     ] as const) {

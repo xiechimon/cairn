@@ -36,11 +36,6 @@
     "apps/web/src/pages/schedules-page.tsx",
     "apps/web/src/pages/schedule-summary.ts"
   ],
-  "project-tasks": [
-    "apps/web/src/pages/project-page.tsx",
-    "apps/web/src/pages/dir-browser.tsx",
-    "apps/web/src/board/"
-  ],
   "project-settings": [
     "apps/web/src/pages/project-settings-page.tsx",
     "apps/web/src/pages/project-autonomy-card.tsx",

@@ -1,0 +1,873 @@
+---
+import '../styles/fonts.css';
+import '../styles/tokens.css';
+import Mark from './Mark.astro';
+import { copy, type Lang, links } from './copy';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = copy[lang];
+const site = 'https://cairn.xmon.me';
+const shot = (name: string, theme: 'light' | 'dark') => `/img/${name}-${lang}-${theme}.webp`;
+const stepSize: Record<string, [number, number]> = {
+  'ios-home': [880, 1912],
+  work: [780, 1520],
+  report: [780, 1520],
+};
+---
+
+<!doctype html>
+<html lang={t.htmlLang} data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{t.title}</title>
+    <meta name="description" content={t.description} />
+    <link rel="canonical" href={`${site}${t.home}`} />
+    <link rel="alternate" hreflang="en" href={`${site}/`} />
+    <link rel="alternate" hreflang="zh-CN" href={`${site}/zh-cn/`} />
+    <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+    <meta name="color-scheme" content="light dark" />
+    <meta property="og:title" content="Cairn" />
+    <meta property="og:description" content={t.description} />
+    <meta property="og:url" content={`${site}${t.home}`} />
+    <meta property="og:image" content={`${site}/img/share-card-en.png`} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content={`${site}/img/share-card-en.png`} />
+    <link rel="preload" href="/fonts/source-serif-4-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/instrument-sans-latin-var.woff2" as="font" type="font/woff2" crossorigin />
+    <script is:inline define:vars={{ lang }}>
+      (() => {
+        let stored = null;
+        let langPref = null;
+        try {
+          stored = localStorage.getItem('starlight-theme');
+          langPref = localStorage.getItem('cairn-lang');
+        } catch {}
+        const theme =
+          stored === 'light' || stored === 'dark'
+            ? stored
+            : matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light';
+        document.documentElement.dataset.theme = theme;
+        const browserZh = (navigator.language || '').toLowerCase().startsWith('zh');
+        if (lang === 'en' && langPref !== 'en' && (langPref === 'zh' || browserZh)) {
+          location.replace('/zh-cn/');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <header class="nav wrap">
+      <a class="brand" href={t.home}>
+        <Mark size={24} />
+        <span>Cairn</span>
+      </a>
+      <nav class="nav-links" aria-label="Cairn">
+        <a href={t.docs}>{t.nav.docs}</a>
+        <a href={links.repo} class="gh">{t.nav.github}</a>
+        <a href={t.other.href} class="lang" data-lang={lang === 'zh' ? 'en' : 'zh'} hreflang={lang === 'zh' ? 'en' : 'zh-CN'} title={t.other.name}>{t.other.label}</a>
+        <button type="button" class="icon-btn" id="theme-toggle" aria-label={t.nav.theme} title={t.nav.theme}>
+          <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+          <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"></path></svg>
+        </button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero wrap">
+        <p class="eyebrow">
+          {t.eyebrow.map((item) => <span>{item}</span>)}
+        </p>
+        <h1>{t.h1.map((line) => <span>{line}</span>)}</h1>
+        <p class="lede">{t.lede}</p>
+        <div class="actions">
+          <a class="btn primary" href={t.install}>
+            {t.start}
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+          </a>
+          <div class="cmd" data-copy="npx @xiechimon/cairn">
+            <code><span class="prompt" aria-hidden="true">$</span>npx @xiechimon/cairn</code>
+            <button type="button" class="copy" aria-label={t.copy} data-label={t.copy} data-done={t.copied}>
+              <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
+              <svg class="i-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <figure class="hero-shot wrap" id="hero-shot">
+        <img class="for-light" src={shot('hero', 'light')} width="2400" height="1116" alt={t.heroAlt} fetchpriority="high" />
+        <img class="for-dark" src={shot('hero', 'dark')} width="2400" height="1116" alt={t.heroAlt} loading="lazy" />
+        <figcaption>{t.caption}</figcaption>
+      </figure>
+
+      <section class="section wrap" aria-labelledby="how">
+        <div class="section-head">
+          <h2 id="how">{t.how.title}</h2>
+          <p>{t.how.lede}</p>
+        </div>
+        <ol class="steps">
+          {
+            t.how.steps.map((step, index) => {
+              const [w, h] = stepSize[step.img] ?? [780, 1520];
+              return (
+                <li>
+                  <div class="phone">
+                    <img class="for-light" src={shot(step.img, 'light')} width={w} height={h} alt={step.alt} loading="lazy" />
+                    <img class="for-dark" src={shot(step.img, 'dark')} width={w} height={h} alt={step.alt} loading="lazy" />
+                  </div>
+                  <span class="num">{String(index + 1).padStart(2, '0')}</span>
+                  <h3>{step.title}</h3>
+                  <p>{step.body}</p>
+                </li>
+              );
+            })
+          }
+        </ol>
+      </section>
+
+      <section class="section wrap" aria-labelledby="why">
+        <div class="section-head">
+          <h2 id="why">{t.points.title}</h2>
+        </div>
+        <ul class="points">
+          {
+            t.points.items.map((item) => (
+              <li>
+                <h3>
+                  {item.title}
+                  {'tag' in item && <span class="tag">{item.tag}</span>}
+                </h3>
+                <p>{item.body}</p>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
+
+      <section class="section wrap" aria-labelledby="fit">
+        <div class="section-head">
+          <h2 id="fit">{t.fit.title}</h2>
+        </div>
+        <div class="fit">
+          <div>
+            <h3>{t.fit.yesTitle}</h3>
+            <ul class="marks yes">
+              {t.fit.yes.map((line) => <li>{line}</li>)}
+            </ul>
+          </div>
+          <div>
+            <h3>{t.fit.noTitle}</h3>
+            <ul class="marks no">
+              {
+                t.fit.no.map((row) => (
+                  <li>
+                    {row.text}
+                    {row.href && (
+                      <span class="alt">
+                        {t.fit.altPrefix} <a href={row.href}>{row.alt}</a>
+                      </span>
+                    )}
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="section wrap">
+        <div class="selling">
+          <h2>{t.selling.title}</h2>
+          <p>{t.selling.body}</p>
+        </div>
+      </section>
+
+      <section class="section wrap" aria-labelledby="install" id="start">
+        <div class="section-head">
+          <h2 id="install">{t.install.title}</h2>
+          <p>{t.install.lede}</p>
+        </div>
+        <ol class="install">
+          {
+            t.install.steps.map((step, index) => (
+              <li>
+                <span class="num">{String(index + 1).padStart(2, '0')}</span>
+                <h3>{step.title}</h3>
+                <p>{step.body}</p>
+                {step.code && (
+                  <div class="block" data-copy={step.code}>
+                    <pre><code>{step.code}</code></pre>
+                    <button type="button" class="copy" aria-label={t.copy} data-label={t.copy} data-done={t.copied}>
+                      <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
+                      <svg class="i-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+                    </button>
+                  </div>
+                )}
+              </li>
+            ))
+          }
+        </ol>
+        <div class="actions">
+          <a class="btn primary" href={t.install}>
+            {t.install.more}
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+          </a>
+          <a class="btn ghost" href={t.firstTask}>{t.install.first}</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer wrap">
+      <div class="foot-brand">
+        <a class="brand" href={t.home}>
+          <Mark size={20} />
+          <span>Cairn</span>
+        </a>
+        <p>{t.footer.tagline}</p>
+      </div>
+      <nav class="foot-links" aria-label="Footer">
+        <a href={t.docs}>{t.footer.docs}</a>
+        <a href={links.repo}>GitHub</a>
+        <a href={links.discussions}>{t.footer.discussions}</a>
+        <a href={links.issues}>{t.footer.issues}</a>
+        <a href={links.security}>{t.footer.security}</a>
+        <a href={links.license}>{t.footer.license}</a>
+      </nav>
+    </footer>
+
+    <script>
+      const root = document.documentElement;
+      document.getElementById('theme-toggle')?.addEventListener('click', () => {
+        const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        root.dataset.theme = next;
+        try {
+          localStorage.setItem('starlight-theme', next);
+        } catch {}
+      });
+      document.querySelectorAll<HTMLAnchorElement>('a.lang').forEach((link) => {
+        link.addEventListener('click', () => {
+          try {
+            localStorage.setItem('cairn-lang', link.dataset.lang ?? '');
+          } catch {}
+        });
+      });
+      document.querySelectorAll<HTMLElement>('[data-copy]').forEach((box) => {
+        const button = box.querySelector<HTMLButtonElement>('button.copy');
+        button?.addEventListener('click', async () => {
+          await navigator.clipboard.writeText(box.dataset.copy ?? '');
+          button.classList.add('done');
+          button.setAttribute('aria-label', button.dataset.done ?? '');
+          setTimeout(() => {
+            button.classList.remove('done');
+            button.setAttribute('aria-label', button.dataset.label ?? '');
+          }, 1600);
+        });
+      });
+      const figure = document.getElementById('hero-shot');
+      fetch('/media/promo.mp4', { method: 'HEAD' })
+        .then((response) => {
+          if (!figure || !response.ok || !(response.headers.get('content-type') ?? '').startsWith('video')) return;
+          const poster = figure.querySelector<HTMLImageElement>(`img.for-${root.dataset.theme}`);
+          const video = document.createElement('video');
+          video.src = '/media/promo.mp4';
+          video.controls = true;
+          video.playsInline = true;
+          video.preload = 'metadata';
+          if (poster) video.poster = poster.currentSrc || poster.src;
+          figure.prepend(video);
+          figure.classList.add('has-video');
+        })
+        .catch(() => {});
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+  html {
+    background: var(--sheet);
+    color-scheme: light;
+  }
+  html[data-theme="dark"] {
+    color-scheme: dark;
+  }
+  body {
+    margin: 0;
+    background: var(--sheet);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.6;
+  }
+  a {
+    color: inherit;
+  }
+  img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+  html[data-theme="dark"] .for-light,
+  html:not([data-theme="dark"]) .for-dark {
+    display: none;
+  }
+  :focus-visible {
+    outline: 2.4px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+</style>
+
+<style>
+  .wrap {
+    width: 100%;
+    max-width: 1152px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    color: var(--ink);
+    font-family: var(--font-serif);
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .nav-links a {
+    padding: 8px 12px;
+    border-radius: var(--radius-control);
+    color: var(--ink-2);
+    font-size: 14px;
+    text-decoration: none;
+  }
+  .nav-links a:hover,
+  .icon-btn:hover {
+    background: var(--hover);
+    color: var(--ink);
+  }
+  .icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    color: var(--ink-2);
+    cursor: pointer;
+  }
+  svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .cairn-mark {
+    stroke: none;
+  }
+  html[data-theme="dark"] .icon-btn .moon,
+  html:not([data-theme="dark"]) .icon-btn .sun {
+    display: none;
+  }
+
+  .hero {
+    padding-top: 88px;
+    text-align: center;
+  }
+  .eyebrow {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 0;
+    margin: 0 0 28px;
+    color: var(--ink-3);
+    font-size: 13px;
+  }
+  .eyebrow span + span::before {
+    content: "";
+    display: inline-block;
+    width: 3px;
+    height: 3px;
+    margin: 0 10px;
+    border-radius: 50%;
+    background: var(--ink-4);
+    vertical-align: middle;
+  }
+  h1 {
+    max-width: 900px;
+    margin: 0 auto;
+    font-family: var(--font-serif);
+    font-size: clamp(2.25rem, 4.8vw, 3.5rem);
+    font-weight: 400;
+    line-height: 1.1;
+    text-wrap: balance;
+  }
+  h1 span {
+    display: inline;
+  }
+  :lang(zh-CN) h1 span {
+    display: inline-block;
+  }
+  :lang(zh-CN) h1 {
+    max-width: 820px;
+    font-size: clamp(2.25rem, 5.2vw, 3.75rem);
+    font-weight: 500;
+    line-height: 1.2;
+  }
+  .lede {
+    max-width: 680px;
+    margin: 24px auto 0;
+    color: var(--ink-2);
+    font-size: 18px;
+    line-height: 1.65;
+    text-wrap: pretty;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 36px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 18px;
+    border-radius: var(--radius-control);
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  .btn.primary {
+    background: var(--primary);
+    color: var(--on-primary);
+  }
+  .btn.primary:hover {
+    opacity: 0.88;
+  }
+  .btn.ghost {
+    box-shadow: inset 0 0 0 1px var(--line);
+    color: var(--ink);
+  }
+  .btn.ghost:hover {
+    background: var(--hover);
+  }
+  .cmd {
+    display: inline-flex;
+    align-items: center;
+    height: 44px;
+    padding: 0 6px 0 16px;
+    border-radius: var(--radius-control);
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .cmd code {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .prompt {
+    margin-right: 10px;
+    color: var(--ink-4);
+    user-select: none;
+  }
+  .copy {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    margin-left: 8px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--ink-3);
+    cursor: pointer;
+  }
+  .copy svg {
+    width: 16px;
+    height: 16px;
+  }
+  .copy:hover {
+    background: var(--hover);
+    color: var(--ink);
+  }
+  .copy .i-check,
+  .copy.done .i-copy {
+    display: none;
+  }
+  .copy.done .i-check {
+    display: block;
+    color: var(--running);
+  }
+
+  .hero-shot {
+    margin-top: 64px;
+    margin-bottom: 0;
+  }
+  .hero-shot img,
+  .hero-shot video {
+    width: 100%;
+  }
+  .hero-shot.has-video img {
+    display: none;
+  }
+  .hero-shot video {
+    aspect-ratio: 16 / 9;
+    border-radius: var(--radius-panel);
+    background: #000;
+  }
+  figcaption {
+    margin-top: 12px;
+    color: var(--ink-3);
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .section {
+    padding-top: 128px;
+  }
+  .section-head {
+    max-width: 680px;
+    margin-bottom: 48px;
+  }
+  h2 {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(1.875rem, 3.4vw, 2.5rem);
+    font-weight: 400;
+    line-height: 1.15;
+  }
+  :lang(zh-CN) h2 {
+    font-weight: 500;
+  }
+  .section-head p {
+    margin: 14px 0 0;
+    color: var(--ink-2);
+    font-size: 17px;
+  }
+  h3 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .num {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--ink-3);
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .phone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 4 / 5;
+    margin-bottom: 24px;
+    padding: 28px;
+    border-radius: var(--radius-panel);
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .phone img {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+  }
+  .steps p,
+  .points p,
+  .install p {
+    margin: 8px 0 0;
+    color: var(--ink-2);
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  .points {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0 40px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .points li {
+    padding: 24px 0 36px;
+    border-top: 1px solid var(--line);
+  }
+  .tag {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--secondary);
+    color: var(--ink-2);
+    font-size: 12px;
+    font-weight: 500;
+    vertical-align: 2px;
+  }
+
+  .fit {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+  }
+  .fit h3 {
+    margin-bottom: 16px;
+  }
+  .marks {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .marks li {
+    position: relative;
+    padding: 14px 0 14px 32px;
+    border-top: 1px solid var(--line);
+    color: var(--ink-2);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .marks li::before {
+    content: "";
+    position: absolute;
+    top: 18px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: currentColor;
+    -webkit-mask: var(--glyph) center / contain no-repeat;
+    mask: var(--glyph) center / contain no-repeat;
+  }
+  .marks.yes li::before {
+    color: var(--running);
+    --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  }
+  .marks.no li::before {
+    color: var(--ink-4);
+    --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E");
+  }
+  .alt {
+    display: block;
+    margin-top: 2px;
+    color: var(--ink-3);
+    font-size: 14px;
+  }
+  .alt a {
+    color: var(--accent);
+    text-underline-offset: 0.2em;
+  }
+
+  .selling {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 56px 48px;
+    border-radius: var(--radius-panel);
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--line);
+    text-align: center;
+  }
+  .selling p {
+    max-width: 620px;
+    margin: 18px auto 0;
+    color: var(--ink-2);
+    font-size: 17px;
+    line-height: 1.7;
+  }
+
+  .install {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .install li {
+    display: flex;
+    flex-direction: column;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+  }
+  .block {
+    position: relative;
+    margin-top: 16px;
+    border-radius: var(--radius-card);
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .block pre {
+    margin: 0;
+    padding: 14px 48px 14px 16px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    line-height: 1.7;
+    color: var(--ink);
+  }
+  .block .copy {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    margin: 0;
+  }
+  .section > .actions {
+    justify-content: flex-start;
+    margin-top: 48px;
+  }
+
+  .footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-top: 128px;
+    padding-top: 32px;
+    padding-bottom: 48px;
+    border-top: 1px solid var(--line);
+  }
+  .foot-brand p {
+    max-width: 420px;
+    margin: 12px 0 0;
+    color: var(--ink-3);
+    font-size: 14px;
+  }
+  .foot-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+    font-size: 14px;
+  }
+  .foot-links a {
+    color: var(--ink-2);
+    text-decoration: none;
+  }
+  .foot-links a:hover {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  @media (max-width: 900px) {
+    .steps,
+    .install {
+      grid-template-columns: 1fr;
+      gap: 48px;
+    }
+    .phone {
+      aspect-ratio: auto;
+      max-width: 440px;
+      height: 420px;
+    }
+    .points {
+      grid-template-columns: 1fr 1fr;
+    }
+    .fit {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .wrap {
+      padding: 0 16px;
+    }
+    .nav-links .gh {
+      display: none;
+    }
+    .nav-links a {
+      padding: 8px 10px;
+    }
+    .hero {
+      padding-top: 48px;
+    }
+    .lede {
+      font-size: 16px;
+    }
+    :lang(zh-CN) h1 {
+      font-size: 1.875rem;
+    }
+    h2,
+    :lang(zh-CN) h2 {
+      font-size: 1.625rem;
+    }
+    .actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .btn,
+    .cmd {
+      justify-content: center;
+    }
+    .hero-shot {
+      margin-top: 40px;
+    }
+    .section {
+      padding-top: 88px;
+    }
+    .section-head {
+      margin-bottom: 32px;
+    }
+    .phone {
+      height: 380px;
+    }
+    .points {
+      grid-template-columns: 1fr;
+    }
+    .selling {
+      padding: 40px 24px;
+    }
+    .footer {
+      margin-top: 88px;
+    }
+  }
+</style>
