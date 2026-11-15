@@ -59,7 +59,7 @@ Reach:
 3. `type a request and press Enter`
 
 - Web routes: `/app`
-- Keyboard shortcuts in its code: none
+- Keyboard shortcuts in its code: `A`, `C`, `D`, `R`
 - Test ids in its code: `chief-body`, `chief-bubble`, `chief-composer-block`, `chief-composer-input`, `chief-composer-placeholder`, `chief-default-rule`, `chief-digest`, `chief-digest-card`, `chief-digest-group`, `chief-digest-item`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-home-scroll`, `chief-msg`, `chief-msg-block-tools`, `chief-msg-col`, `chief-msg-copy`, `chief-msg-foot`, `chief-msg-more`, `chief-msg-reply`, `chief-msg-sending`, `chief-msg-stamp`, `chief-msg-tools-touch`, `chief-note`, `chief-outage`, `chief-question`, `chief-question-asked`, `chief-question-chips`, `chief-question-dismiss`, `chief-question-error`, `chief-question-input-*`, `chief-question-line`, `chief-question-option-*`, `chief-question-submit`, `chief-question-text`, `chief-question-tools`, `chief-question-tools-touch`, `chief-quick-replies`, `chief-quick-reply`, `chief-reply`, `chief-reply-bubble`, `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`, `chief-routing-row`, `chief-runner-offline`, `chief-sent-attachment`, `chief-sent-attachments`, `chief-settings-col`, `chief-settings-topbar`, `chief-status-live`, `chief-status-mark`, `chief-status-pill`, `chief-stopped`, `chief-stream`, `chief-sub-thread`, `chief-takeover`, `chief-takeover-failed`, `chief-takeover-give-back`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-take`, `chief-takeover-time-left`, `chief-task-created`, `chief-task-ref`, `chief-task-ref-hover`, `chief-task-refs`, `chief-task-started`, `chief-time-divider`, `chief-turn-error`, `chief-turn-retry`, `chief-virtual-rows`, `composer-context-meter`, `composer-plus`, `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `home-c`, `home-c-error`, `home-c-pane-buttons`, `memory-list`, `panel-error`, `project-instructions-input`, `reply-quote`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`, `tasks-badge`, `tasks-toggle`
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-segments.md](features/chief-segments.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md)
 - Research: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/research/dsh-sig-walk-2026-11.md](../../../docs/research/dsh-sig-walk-2026-11.md), [docs/research/pi-durable-spike.md](../../../docs/research/pi-durable-spike.md) (not on main), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
@@ -375,7 +375,7 @@ Reach:
 4. `click label:停止`
 
 - Web routes: none
-- Keyboard shortcuts in its code: none
+- Keyboard shortcuts in its code: `A`, `R`
 - Test ids in its code: `composer-card`, `composer-placeholder`, `composer-plus`, `composer-toolbar`
 - Verify recipes: [.claude/skills/verify-cairn/features/stop-button.md](features/stop-button.md)
 - Research: **gap**: no note on how Amp, Claude Code and Codex steer, queue and interrupt
@@ -455,7 +455,7 @@ Reach:
 4. `click testid:side-chat-action`
 
 - Web routes: `/app/todo/:id`
-- Keyboard shortcuts in its code: `B`, `C`, `P`
+- Keyboard shortcuts in its code: `A`, `B`, `C`, `P`, `R`
 - Test ids in its code: `accept-dialog-pr`, `agent-text`, `agent-todo`, `automation-completed`, `chief-reply-bubble`, `composer-card`, `composer-placeholder`, `composer-plus`, `composer-toolbar`, `diff-fold`, `diff-full`, `doc-body`, `doc-pane`, `edit-error`, `fail-raw-error`, `info-report`, `left`, `live-row`, `md-checkbox`, `md-code`, `md-code-block`, `md-code-copy`, `md-code-dialog-body`, `md-code-dialog-copy`, `md-code-done`, `md-code-expand`, `md-code-lang`, `md-item-bullet`, `md-item-ordered`, `md-item-task`, `md-list-bullet`, `md-list-ordered`, `md-list-task`, `md-quote`, `md-table`, `md-task`, `md-task-children`, `md-tasks`, `msg-actions`, `msg-stamp`, `msg-tools`, `msg-tools-touch`, `right`, `schedule-wake-marker`, `scheduled-turn`, `side-chat-action`, `skill-line`, `skills-summary`, `source-issue-drift`, `source-issue-echo`, `source-issue-pending`, `source-issue-retry`, `source-orchestration`, `source-orchestration-link`, `step-prompt-raw`, `thinking-body`, `tool-output`, `transcript-col`, `transcript-note`, `transcript-question`, `transcript-step-prompt`, `transcript-time-divider`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-earlier`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`
 - Verify recipes: [.claude/skills/verify-cairn/features/board-new-task.md](features/board-new-task.md), [.claude/skills/verify-cairn/features/agent-detail.md](features/agent-detail.md)
 - Research: [docs/research/r12-save-and-start-behavior.md](../../../docs/research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/research/duet-proactive-coordinator.md](../../../docs/research/duet-proactive-coordinator.md)
@@ -746,7 +746,7 @@ Reach:
 3. `type / to open slash commands or @ to mention`
 
 - Web routes: none
-- Keyboard shortcuts in its code: none
+- Keyboard shortcuts in its code: `A`
 - Test ids in its code: `chief-composer-input`, `chief-composer-placeholder`, `composer-plus`
 - Verify recipes: [.claude/skills/verify-cairn/features/mentions.md](features/mentions.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md), [.claude/skills/verify-cairn/features/hotkeys.md](features/hotkeys.md)
 - Research: **gap**: no note comparing composers in claude.ai, Amp and t3code
@@ -1009,7 +1009,7 @@ Reach:
 5. `click testid:archived-project-bar-unarchive`
 
 - Web routes: none
-- Keyboard shortcuts in its code: none
+- Keyboard shortcuts in its code: `A`, `D`, `M`, `N`, `R`, `S`, `U`
 - Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-activity`, `sidebar-archived-delete-all`, `sidebar-archived-empty`, `sidebar-archived-note`, `sidebar-archived-page`, `sidebar-footer`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-reopen`, `sidebar-settings`, `team-row`
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
