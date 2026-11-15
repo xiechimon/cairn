@@ -1,6 +1,6 @@
 # Self-deploy on omarchy
 
-`cairn-self-deploy.timer` runs `scripts/ops/deploy-watch.sh` every minute. The watcher finds the newest first-parent main commit after the deployed one whose required checks (`check`, `pack-smoke`, `e2e-gate`) are all green and runs `scripts/ops/deploy-self.sh <sha>` for it. Both scripts copy themselves into the state directory before running, because the deploy switches the checkout they live in.
+`cairn-self-deploy.timer` runs `scripts/ops/deploy-watch.sh` every 5 minutes. The watcher finds the newest first-parent main commit after the deployed one whose required checks (`check`, `pack-smoke`, `e2e-gate`) are all green and runs `scripts/ops/deploy-self.sh <sha>` for it. Both scripts copy themselves into the state directory before running, because the deploy switches the checkout they live in.
 
 For the first upgrade from the idle-gated runner, stage the reviewed bootstrap launcher before running a deploy. The old timer cannot load this fix by itself because it waits for idle before checkout. Set `TARGET_SHA` to a full green main SHA whose diff from the deployed revision is server-only, then run:
 
