@@ -100,7 +100,7 @@ export function PageThumb({ html, title }: { html: string; title: string }) {
       ref={ref}
       aria-hidden="true"
       data-testid="made-card-thumb"
-      className="relative size-full overflow-hidden rounded-(--radius-tile) border border-border bg-white"
+      className="relative size-full overflow-hidden rounded-(--radius-tile) border border-border bg-(--page-preview)"
     >
       <div
         className="absolute top-0 left-0 origin-top-left"
@@ -171,7 +171,7 @@ export function MadeFiles({ deliverables }: { deliverables: TodoDeliverables | u
                 <PageFrame
                   html={html.data}
                   title={item.name}
-                  className="block h-95 w-full border-0 border-t border-border bg-white max-sm:h-75"
+                  className="block h-95 w-full border-t border-border bg-(--page-preview) max-sm:h-75"
                 />
               )}
             </div>
