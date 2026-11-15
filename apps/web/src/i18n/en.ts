@@ -56,8 +56,6 @@ export const EN: Record<string, string> = {
   '跑了 {n} 条命令': 'Ran {n#1 command|# commands}',
   '改了 {n} 个文件': 'Edited {n#1 file|# files}',
   测试通过: 'Tests pass',
-  改完测试通过: 'Edited, tests pass',
-  改完测试未通过: 'Edited, tests fail',
   测试未通过: 'Tests fail',
   '改了 {files}': 'Edited {files}',
   '改了 {files}，测试通过': 'Edited {files}, tests pass',
@@ -1625,7 +1623,6 @@ export const EN: Record<string, string> = {
   'Gemini CLI 还不上报版本和模型；打开后，这台 Runner 会接 Gemini 步骤。':
     'Gemini CLI does not report its version or models yet; when on, this Runner takes Gemini steps.',
   '{n} 个模型': '{n#1 model|# models}',
-  '· {n} 步': '· {n#1 step|# steps}',
   '{n} 个已下架': '{n} retired',
   '使用所有 Runner 的服务商': 'Uses providers for all Runners',
   范围: 'Scope',
