@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
+import { isLoopbackOrigin } from '../lib/pairing-origin.js';
 
 const CMD_CLS =
   'flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2 dark:bg-input/30';
@@ -33,8 +34,9 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
     if (apiKeyOpen) apiKeyRef.current?.scrollIntoView({ block: 'nearest' });
   }, [apiKeyOpen]);
   const installCmd = `npm install -g ${PUBLISHED_PACKAGES.cli.name}@latest`;
-  const startCmd = `${PUBLISHED_PACKAGES.cli.command} start`;
-  const apiKeyCmd = `${PUBLISHED_PACKAGES.cli.command} start --api-key <key> --team ${teamId ?? '<teamId>'}`;
+  const serverOrigin = window.location.origin;
+  const startCmd = `${PUBLISHED_PACKAGES.cli.command} start --server ${serverOrigin}`;
+  const apiKeyCmd = `${startCmd} --api-key <key> --team ${teamId ?? '<teamId>'}`;
   const copyButton = (cmd: string) => (
     <Button
       variant="outline"
@@ -66,6 +68,14 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
         <p className="m-0 text-ui text-content-secondary">
           {t('有条件时优先使用云主机：笔记本会休眠或断网，云主机常在线，构建更稳定。')}
         </p>
+        {isLoopbackOrigin(serverOrigin) && (
+          <p className="m-0 text-meta text-content-secondary">
+            {t(
+              '当前地址只适用于这台电脑。添加另一台电脑前，请用 Tailscale 地址打开 Cairn，再复制命令。',
+            )}{' '}
+            <Link to={{ pathname: '/app/settings/remote', search }}>{t('远程访问')}</Link>
+          </p>
+        )}
         <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
           <li className={STEP_CLS}>
             <span className={STEP_NUM_CLS}>1</span>
