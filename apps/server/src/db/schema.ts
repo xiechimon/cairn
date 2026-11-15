@@ -24,6 +24,8 @@ import type {
   MailAccountStatus,
   MailEventStatus,
   MailRank,
+  McpConnectorAuthKind,
+  McpConnectorOAuthMeta,
   McpConnectorStatus,
   MemoryCandidateStatus,
   MemoryLayer,
@@ -1450,6 +1452,11 @@ export const mcpConnector = sqliteTable(
     url: text('url').notNull(),
     headerNames: json<string[]>('headerNames').notNull(),
     valuesCipher: text('valuesCipher'),
+    authKind: text('authKind').$type<McpConnectorAuthKind>().notNull().default('none'),
+    oauthMeta: json<McpConnectorOAuthMeta>('oauthMeta'),
+    oauthCipher: text('oauthCipher'),
+    authRevision: integer('authRevision').notNull().default(0),
+    tokenGeneration: integer('tokenGeneration').notNull().default(0),
     status: text('status').$type<McpConnectorStatus>().notNull(),
     statusReason: text('statusReason'),
     toolCount: integer('toolCount'),
@@ -1463,6 +1470,7 @@ export const mcpConnector = sqliteTable(
       'mcp_connector_status',
       sql`${t.status} in ('unchecked', 'connected', 'needs_auth', 'error')`,
     ),
+    check('mcp_connector_auth_kind', sql`${t.authKind} in ('none', 'static', 'oauth')`),
   ],
 );
 
