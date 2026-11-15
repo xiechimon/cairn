@@ -4,6 +4,7 @@ import { BrandGlyph } from '../components/brand-glyph.js';
 import { ListCard, ListRow } from '../components/list-card.js';
 import { NoticeBanner } from '../components/notice-banner.js';
 import { SegmentedRadio } from '../components/segmented.js';
+import { QuotaRow } from '../components/settings/quota-row.js';
 import {
   RoutingGraph,
   type RoutingSourceGroup,
@@ -305,6 +306,10 @@ export function RoutingSection() {
             ]}
           />
           <RoutingGraph groups={ROUTING_GROUPS} targets={ROUTING_TARGETS} />
+          <div className="flex w-56 flex-col gap-0.5">
+            <QuotaRow name="Claude subscription" label="5h" left={68} />
+            <QuotaRow name="Claude subscription" label="Week" left={12} />
+          </div>
         </div>
       </Specimen>
     </Section>

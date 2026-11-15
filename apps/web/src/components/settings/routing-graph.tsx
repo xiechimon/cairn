@@ -100,7 +100,7 @@ export function RoutingGraph({
             data-broken={wire.broken ? '' : undefined}
             d={wire.d}
             fill="none"
-            strokeWidth={lit(wire) ? 2 : 1.5}
+            strokeWidth={1.75}
             strokeDasharray={wire.broken ? '4 4' : undefined}
             className="transition-opacity duration-(--dur-fast)"
             style={{
