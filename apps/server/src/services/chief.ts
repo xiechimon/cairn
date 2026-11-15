@@ -245,7 +245,7 @@ export function getChiefEnvelope(
   threadId?: string,
 ): ChiefGetResponse {
   const row = ensureChief(deps, teamId);
-  const agentRow = coordinatorProfile(deps.db, teamId);
+  const agentRow = coordinatorProfile(deps.db, teamId, coordinatorRunsOnPi());
   return {
     chief: toChiefRecord(row, agentRow),
     agentActor: agentRow ? coordinatorRecordOf(agentRow) : null,
@@ -389,7 +389,7 @@ export function openProjectChannel(
     existing !== undefined
       ? { row: existing, created: false }
       : insertCoordinatorThread(deps, chiefRow, picked);
-  if (created && coordinatorProfile(deps.db, teamId)?.modelId) {
+  if (created && coordinatorProfile(deps.db, teamId, coordinatorRunsOnPi())?.modelId) {
     enqueueChiefStep(deps, row.id, {
       prompt: promptWithPickedProject(
         picked,
@@ -508,7 +508,7 @@ export function getChiefThread(deps: { db: Db }, threadId: string): ThreadRow | 
 }
 
 function requireCoordinatorRule(deps: ChiefDeps, teamId: string): RouteProfile {
-  const profile = coordinatorProfile(deps.db, teamId);
+  const profile = coordinatorProfile(deps.db, teamId, coordinatorRunsOnPi());
   if (profile === null) {
     throw new HttpError(
       409,

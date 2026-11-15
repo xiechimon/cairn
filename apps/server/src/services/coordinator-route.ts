@@ -1,11 +1,16 @@
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { codexLoginAvailable, usesHostCodexLogin } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
 import { provider, routingRule } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { paidClaudeAllowed } from './model-routing.js';
-import { keylessEndpoint, resolveRuleProvider } from './routing-rules.js';
+import {
+  anthropicCoordinatorChoice,
+  defaultCoordinatorRule,
+  keylessEndpoint,
+  resolveRuleProvider,
+} from './routing-rules.js';
 
 export type CoordinatorRouteRefusal =
   | 'no-api-key-provider'
@@ -13,49 +18,17 @@ export type CoordinatorRouteRefusal =
   | 'rule-provider-has-no-key'
   | 'paid-claude-not-allowed';
 
-const MODEL_PREFERENCE = [/haiku/i, /sonnet/i];
-
-const ANTHROPIC_API_HOST = 'api.anthropic.com';
-
-function isAnthropicApi(baseUrl: string): boolean {
-  try {
-    return new URL(baseUrl).hostname === ANTHROPIC_API_HOST;
-  } catch {
-    return false;
-  }
-}
-
-function keyedAnthropicProvider(db: Db, teamId: string) {
-  return db
-    .select({ providerId: provider.providerId, models: provider.models, baseUrl: provider.baseUrl })
-    .from(provider)
-    .where(
-      and(
-        eq(provider.teamId, teamId),
-        eq(provider.api, 'anthropic-messages'),
-        isNotNull(provider.apiKeyCipher),
-      ),
-    )
-    .all()
-    .find((row) => isAnthropicApi(row.baseUrl) && row.models.length > 0);
-}
-
 function seedCoordinatorRule(db: Db, teamId: string) {
-  const source = keyedAnthropicProvider(db, teamId);
-  if (source === undefined) return undefined;
-  const ids = source.models.map((m) => m.id);
-  const modelId =
-    MODEL_PREFERENCE.map((re) => ids.find((id) => re.test(id))).find((id) => id !== undefined) ??
-    ids[0];
-  if (modelId === undefined) return undefined;
+  const choice = anthropicCoordinatorChoice(db, teamId);
+  if (choice === null) return undefined;
   const now = nowMs();
   db.insert(routingRule)
     .values({
       id: newRecordId(),
       teamId,
       use: 'coordinator',
-      provider: source.providerId,
-      modelId,
+      provider: choice.provider,
+      modelId: choice.modelId,
       createdAt: now,
       updatedAt: now,
     })
@@ -80,7 +53,11 @@ export function coordinatorRouteVerdict(
   teamId: string,
 ): { rule: CoordinatorRule } | { refusal: CoordinatorRouteRefusal; rule?: CoordinatorRule } | null {
   if (!coordinatorRunsOnPi()) return null;
-  const rule = coordinatorRule(db, teamId) ?? seedCoordinatorRule(db, teamId);
+  const rule =
+    coordinatorRule(db, teamId) ??
+    seedCoordinatorRule(db, teamId) ??
+    defaultCoordinatorRule(db, teamId) ??
+    undefined;
   if (rule === undefined) return { refusal: 'no-api-key-provider' };
   const row = db
     .select({ baseUrl: provider.baseUrl, keyed: sql<number>`${provider.apiKeyCipher} is not null` })

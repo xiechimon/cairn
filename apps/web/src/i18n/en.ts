@@ -1684,6 +1684,12 @@ export const EN: Record<string, string> = {
     'Current default: {model} · {provider} (no Runner has Claude Code, so the first provider you added is used)',
   '当前没有可用的默认：添加服务商，或在 Runner 上装 Claude Code':
     'No default yet: add a provider, or install Claude Code on a Runner',
+  '当前默认：{model} · {provider}（因为团队有 Anthropic API key）':
+    'Current default: {model} · {provider} (the team has an Anthropic API key)',
+  '当前默认：{model} · {provider}（因为这是最早添加、Coordinator 能直接用的服务商）':
+    'Current default: {model} · {provider} (the first provider you added that the Coordinator can use)',
+  '当前没有可用的默认：添加一个有 API key 的服务商，或在这里创建规则':
+    'No default yet: add a provider with an API key, or create the rule here',
   '设为默认 Runner': 'Make default Runner',
   '已是默认 Runner': 'Default Runner',
   '设为默认 Runner 失败，请重试。': 'Could not change the default Runner. Try again.',
