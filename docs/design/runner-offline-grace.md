@@ -1,6 +1,6 @@
 # Runner offline grace period
 
-Tracking: #4596. Status: revision 3, awaiting a narrow design re-check. Baseline `origin/main` at `50827425b`. Revision 2 (`1614c51e9`) answered review items M1 to M5 on revision 1 (`99f5ea2bd`); revision 3 answers the re-check: presence admission (M1, M2) and recovery after fresh presence (M3).
+Tracking: #4596. Status: revision 3, accepted by design review on 2026-11-15. Baseline `origin/main` at `50827425b`. Revision 2 (`1614c51e9`) answered review items M1 to M5 on revision 1 (`99f5ea2bd`); revision 3 answers the re-check: presence admission (M1, M2) and recovery after fresh presence (M3).
 
 ## Problem
 
@@ -30,10 +30,10 @@ A daemon from this change sends `connectionId` in every presence body: `null` be
 | Presence with the pending grace id | Always | `lastSeenAt` and reports; sets `presenceSinceDrop`; does not cancel the grace, so the Runner still turns offline 45 s after the drop unless a stream returns |
 | Presence with any other id: superseded, expired, ended by goodbye, or from before a server restart | Always | Writes nothing; `200` |
 | Presence with `connectionId: null` | Always | `lastSeenAt` and reports; `online` unchanged |
-| Presence with no `connectionId` field (daemon that predates this) | Always | As today: `online`, `lastSeenAt`, reports |
+| Presence with no `connectionId` field (daemon that predates this) | Always | As today: `online`, `lastSeenAt`, reports; during a grace it also sets `presenceSinceDrop` |
 | `sweepStaleMachines` (15 s tick) | `lastSeenAt` older than 150 s | Unchanged: `markOffline`; also cancels any pending grace. Offline wins over a running grace |
 
-So for a daemon from this change, `online` becomes true only through a stream open or a presence on the current connection, and a Runner that is offline stays offline until a new stream opens. `markOffline` publishes only on the online-to-offline transition, so a timer, a goodbye and the sweep together produce one offline event.
+So for a daemon from this change, `online` becomes true only through a stream open or a presence on the current connection. A Runner whose connection expired or said goodbye stays offline until a new stream opens; one the stale sweep marked offline while its connection is still current comes back on its next presence. `markOffline` publishes only on the online-to-offline transition, so a timer, a goodbye and the sweep together produce one offline event.
 
 Orderings this closes:
 
@@ -91,7 +91,7 @@ Server, Vitest with fake timers, through the HTTP routes. Each is a new behavior
 8. Revoke during grace: offline at once, and the old timer firing later changes nothing.
 9. Two machines' graces are independent.
 10. A stale `lastSeenAt` makes the sweep mark offline during grace with one event, and the timer then does nothing.
-11. Build and Coordinator steps with a 119 s old heartbeat when the stream drops: with no presence after the drop they are released at the same sweep as on the baseline; with presence 1 s after the drop they are kept, as on the baseline; after expiry with no new stream and a heartbeat older than 120 s they are released.
+11. Build and Coordinator steps with a 119 s old heartbeat when the stream drops: with no presence after the drop they are released at the same sweep as on the baseline; with presence 1 s after the drop, on the grace id or with no `connectionId` field, they are kept, as on the baseline; after expiry with no new stream and a heartbeat older than 120 s they are released.
 12. Restart: a new server with the machine online in the database. Presence with a pre-restart id writes nothing; a new stream marks it online; with no stream it turns offline only after 150 s without presence.
 13. Presence without a `connectionId` field keeps today's behavior, including marking an offline Runner online.
 14. During grace, branch sync returns 409 and computer calls fail.
