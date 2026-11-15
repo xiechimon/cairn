@@ -20,6 +20,7 @@ import {
   loadDaemonConfig,
   WorkspacesDirError,
 } from './config.js';
+import { realDoctorEnv, runDoctorCommand } from './doctor.js';
 import { createDaemonLogger } from './log.js';
 import { pendingEnrollmentUrl } from './machine-enroll.js';
 import { runMachine } from './machine-loop.js';
@@ -242,6 +243,18 @@ export function buildProgram(): Command {
         { rotate: opts.rotate === true },
         { env: process.env, writeOut: (text) => process.stdout.write(text) },
       );
+      if (code !== 0) process.exitCode = code;
+    });
+
+  program
+    .command('doctor')
+    .description('Check whether this machine can host the Coordinator computer')
+    .option('--json', 'print the result as JSON')
+    .action((opts: { json?: boolean }) => {
+      const code = runDoctorCommand(opts, {
+        env: realDoctorEnv(),
+        writeOut: (text) => process.stdout.write(text),
+      });
       if (code !== 0) process.exitCode = code;
     });
 
