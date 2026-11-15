@@ -348,29 +348,30 @@ export function McpServersPage() {
                 </CardGrid>
               </SettingsSection>
             )}
-            {local.length > 0 && (
-              <SettingsSection
-                title={t('本机配置')}
-                description={t('来自服务器所在电脑的本机配置文件，在那里修改。')}
-                testId="mcp-local"
-              >
-                <ResourceList className="mt-0">
-                  {local.map((server) => (
-                    <ResourceRow mcp key={server.name}>
-                      <RowText>
-                        <RowLine>
-                          <RowTitle>{server.name}</RowTitle>
-                          <RowMeta>{t(server.kind)}</RowMeta>
-                        </RowLine>
-                        <RowDesc>{server.url}</RowDesc>
-                      </RowText>
-                      <RowMeta>{t(server.ago)}</RowMeta>
-                    </ResourceRow>
-                  ))}
-                </ResourceList>
-              </SettingsSection>
-            )}
           </SettingsFlat>
+          {local.length > 0 && (
+            <SettingsSection
+              className="[&>div:first-child]:px-0"
+              title={t('本机配置')}
+              description={t('来自服务器所在电脑的本机配置文件，在那里修改。')}
+              testId="mcp-local"
+            >
+              <ResourceList className="mt-0">
+                {local.map((server) => (
+                  <ResourceRow mcp key={server.name}>
+                    <RowText>
+                      <RowLine>
+                        <RowTitle>{server.name}</RowTitle>
+                        <RowMeta>{t(server.kind)}</RowMeta>
+                      </RowLine>
+                      <RowDesc>{server.url}</RowDesc>
+                    </RowText>
+                    <RowMeta>{t(server.ago)}</RowMeta>
+                  </ResourceRow>
+                ))}
+              </ResourceList>
+            </SettingsSection>
+          )}
         </div>
       </QueryBoundary>
       <McpConnectorDialog
