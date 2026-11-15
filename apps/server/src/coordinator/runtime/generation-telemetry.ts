@@ -11,13 +11,20 @@ import { modelResponseTiming } from './models.js';
 
 export function generationTelemetryExtension(
   turnFor: (conversationId: string) => Promise<{ threadId: string; stepId: string }>,
+  setup: { mark(name: string): void; end(): void },
 ) {
   const requests = new Map<string, Attributes>();
   return defineExtension({
     name: 'cairn-generation-telemetry',
     hooks: [
       hook(GenerationTask, {
+        beforeProviderRequest: () => {
+          setup.mark('provider request');
+          setup.end();
+          return undefined;
+        },
         beforeRequest: (request, api) => {
+          setup.mark('request hooks');
           try {
             if (requests.size >= 64) requests.delete(requests.keys().next().value ?? '');
             requests.set(

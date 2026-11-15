@@ -107,8 +107,8 @@ export function capabilityCandidates(
         modelId: 'claude-sonnet-5-5',
       }) &&
       claudeRateBlock(row.claudeRateLimits ?? [], now) === null &&
-      report?.auth?.state !== 'not-logged-in' &&
-      (hasActiveClaudeSubscription({ db }, teamId) || !claudeLoginBlocksClaim(report?.login, now));
+      (hasActiveClaudeSubscription({ db }, teamId) ||
+        (report?.auth?.state !== 'not-logged-in' && !claudeLoginBlocksClaim(report?.login, now)));
     for (const modelId of CLAUDE_MODELS) {
       candidates.push({
         harness: 'claude-code',

@@ -16,6 +16,7 @@ import {
   useApiMutations,
   useBuild,
   useBuildChanges,
+  useChiefThreads,
   useConversationMessages,
   useMachines,
   usePlans,
@@ -25,11 +26,19 @@ import {
 import { invalidateConverged } from '../api/invalidate.js';
 import { liveTextStore } from '../api/live-text.js';
 import { liveThinkingStore } from '../api/live-thinking.js';
-import { mapPlanDoc, mapPlanVersions, mapTranscript, toDisplayTodo } from '../api/mappers.js';
+import {
+  mapOrchestrationFeedback,
+  mapPlanDoc,
+  mapPlanVersions,
+  mapTranscript,
+  toDisplayTodo,
+} from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
 import { useConversationStream } from '../api/sse.js';
 import { useSendKey } from '../api/use-send-key.js';
+import { globalCoordinatorThread } from '../chief/coordinator-load.js';
+import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import type { EarlierPages } from '../components/chat/earlier-loader.js';
 import type { QueuedCapsule } from '../components/queued-capsules.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -235,6 +244,27 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     agentTodo,
   ]);
 
+  const awaitingStart = wire?.phase === 'todo' || wire?.phase === 'failed';
+  const chiefThreadsQ = useChiefThreads(teamId, live && awaitingStart);
+  const coordinator =
+    live && awaitingStart ? globalCoordinatorThread(chiefThreadsQ.data ?? []) : null;
+  const coordinatorId = coordinator?.id ?? null;
+  const { messages: coordinatorMessages } = useConversationMessages(coordinatorId, live);
+  const coordinatorTurn =
+    coordinator === null ? null : `${coordinator.lastTurnAt}:${threadTurnInFlight(coordinator)}`;
+  useEffect(() => {
+    if (coordinatorId === null || coordinatorTurn === null) return;
+    void invalidateConverged(qc, { queryKey: ['messages', coordinatorId, 'pages'] });
+  }, [qc, coordinatorId, coordinatorTurn]);
+  const orchestration = useMemo(
+    () => (wire == null ? [] : mapOrchestrationFeedback(wire, coordinator, coordinatorMessages)),
+    [wire, coordinator, coordinatorMessages],
+  );
+  const shownTranscript = useMemo(
+    () => (orchestration.length === 0 ? transcript : [...transcript, ...orchestration]),
+    [transcript, orchestration],
+  );
+
   const load: ThreadChatLoad = !live
     ? listed != null
       ? 'ready'
@@ -334,7 +364,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   return {
     load,
     todo,
-    transcript,
+    transcript: shownTranscript,
     hasEarlier: live && messagesQ.hasNextPage,
     ...(live
       ? {

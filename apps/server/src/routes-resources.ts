@@ -20,7 +20,7 @@ import {
   testProviderBodySchema,
 } from '@cairn/shared';
 import { and, eq, isNull, ne } from 'drizzle-orm';
-import type { Hono } from 'hono';
+import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
 import type { Db } from './db/client.js';
 import { build, machine, provider, routingRule, step, team, todo } from './db/schema.js';
@@ -99,6 +99,16 @@ import { pollXaiDeviceLogin, startXaiDeviceLogin } from './services/xai-device-l
 
 export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
+
+  const requireOwnerSession = (c: Context): void => {
+    const owned =
+      pairedDeviceIdOf(c) === null &&
+      (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
+      isOwner(ctx.db, ctx.user.id);
+    if (!owned) {
+      throw new HttpError(403, 'Only the instance owner can manage Claude subscription tokens');
+    }
+  };
 
   const importOpts = (teamId: string): SkillImportOpts => ({
     db: ctx.db,
@@ -400,6 +410,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/claude-subscriptions', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
+    requireOwnerSession(c);
     const body = parseWith(createClaudeSubscriptionSchema, await jsonBody(c), 'body');
     return c.json(createClaudeSubscription(keysvc, teamId, body), 201);
   });
@@ -407,6 +418,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.delete('/api/teams/:id/claude-subscriptions/:cid', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
+    requireOwnerSession(c);
     if (!deleteClaudeSubscription(keysvc, teamId, c.req.param('cid'))) {
       throw notFound('Claude subscription connection');
     }
@@ -416,6 +428,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/claude-subscriptions/:cid/verify', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
+    requireOwnerSession(c);
     return c.json(await verifySubscriptionConnection(keysvc, teamId, c.req.param('cid')));
   });
 

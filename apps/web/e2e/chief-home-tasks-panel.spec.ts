@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { mockLive, TASK, THREAD } from './chief-home-mock';
+import { mockLive, TASK, taskEntry, THREAD } from './chief-home-mock';
 
 const HOME = '/app?scenario=home-c';
 
@@ -507,6 +507,44 @@ test('once tasks exist, an empty tab is one left-aligned quiet line under the ta
   await expect(quiet).toHaveText('接下来没有安排');
   await panel(page).getByRole('tab', { name: '已完成' }).click();
   await expect(panel(page).locator('[data-section="resolved"]')).toContainText('Unread dot on threads');
+});
+
+const queued = taskEntry({
+  id: 'todo-next',
+  seqNum: 12,
+  title: 'Draft the release notes',
+  phase: 'todo',
+  latestBuildId: null,
+  section: 'up_next',
+});
+
+async function mockSlowTasks(page: Page, tasks: unknown[]) {
+  await mockLive(page, { threads: [THREAD], messages: [], tasks }, (path, _route, json) =>
+    path === '/api/tasks'
+      ? new Promise<void>((resolve) => setTimeout(resolve, 800)).then(() => json({ entries: tasks }))
+      : undefined,
+  );
+}
+
+test('with nothing in progress the panel opens on Up next once the tasks load, and the picked tab stays', async ({
+  page,
+}) => {
+  await mockSlowTasks(page, [queued]);
+  await page.goto('/app?pane=tasks');
+  const next = panel(page).getByRole('tab', { name: '接下来' });
+  await expect(next).toHaveAttribute('aria-selected', 'true');
+  await expect(panel(page).locator('[data-section="up_next"]')).toContainText('Draft the release notes');
+  await panel(page).getByRole('tab', { name: '进行中' }).click();
+  await expect(panel(page).getByTestId('tasks-quiet')).toHaveText('现在没有进行中的任务');
+  await page.waitForTimeout(1000);
+  await expect(panel(page).getByRole('tab', { name: '进行中' })).toHaveAttribute('aria-selected', 'true');
+});
+
+test('with a task in progress the panel still opens on In progress', async ({ page }) => {
+  await mockSlowTasks(page, [taskEntry({ section: 'working', title: TASK.title }), queued]);
+  await page.goto('/app?pane=tasks');
+  await expect(panel(page).locator('[data-section="working"]')).toContainText(TASK.title);
+  await expect(panel(page).getByRole('tab', { name: '进行中' })).toHaveAttribute('aria-selected', 'true');
 });
 
 test('the Made button swaps the panel to finished work', async ({ page }) => {

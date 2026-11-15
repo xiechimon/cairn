@@ -513,7 +513,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### github
 
-**GitHub connection and issues** (shipped). Connecting GitHub, choosing repositories, importing issues as threads and writing results back to the issue.
+**GitHub connection and issues** (shipped). Connecting GitHub, choosing repositories, importing labeled issues as threads and writing results back to the issue.
 
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
