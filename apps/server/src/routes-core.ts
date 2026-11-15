@@ -27,6 +27,7 @@ import {
   resolveBrowserSession,
   setAuthCookie,
 } from './services/browser-session.js';
+import { coordinatorRunsOnPi } from './services/coordinator-context.js';
 import { readDeployStatus } from './services/deploy-status.js';
 import { createSerialConnection } from './services/events.js';
 import { readFirstPrReportPrompt, setFirstPrReportPrompt } from './services/first-pr-report.js';
@@ -149,7 +150,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/routing-settings', (c) => {
     const id = c.req.param('id');
     requireTeam(ctx, id);
-    return c.json(listRoutingSettings(ctx.db, id));
+    return c.json(listRoutingSettings(ctx.db, id, coordinatorRunsOnPi()));
   });
 
   app.patch('/api/teams/:id/routing-rules/:use', async (c) => {

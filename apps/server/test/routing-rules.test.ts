@@ -651,6 +651,62 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     expect(((await res.json()) as { sessionDefault?: unknown }).sessionDefault).toBeUndefined();
   });
 
+  test('with no stored Coordinator rule, the in-server Coordinator routes to the earliest provider it can run and stores nothing', () => {
+    const s = bare();
+    addProvider(s, 'deepseek', { key: false, models: ['m0'], createdAt: 1 });
+    addProvider(s, 'vani', { models: ['m1', 'm2'], createdAt: 2 });
+    setCoordinatorServerContextEnabled(true);
+    try {
+      expect(coordinatorRoute(s.db, s.team.id)).toMatchObject({ provider: 'vani', modelId: 'm1' });
+      expect(coordinatorProfile(s.db, s.team.id, true)).toMatchObject({ provider: 'vani' });
+      expect(coordinatorProfile(s.db, s.team.id)).toBeNull();
+      expect(listRoutingSettings(s.db, s.team.id, true).coordinatorDefault).toEqual({
+        reason: 'provider',
+        provider: 'vani',
+        modelId: 'm1',
+      });
+      expect(listRoutingSettings(s.db, s.team.id, true).rules).toEqual([]);
+    } finally {
+      setCoordinatorServerContextEnabled(false);
+    }
+    expect(coordinatorRoute(s.db, s.team.id)).toBeNull();
+    expect(listRoutingSettings(s.db, s.team.id).coordinatorDefault).toBeUndefined();
+  });
+
+  test('the Coordinator default prefers an Anthropic key, says when nothing can run it, and yields to a stored rule', () => {
+    const s = bare();
+    const coordinatorDefault = () => listRoutingSettings(s.db, s.team.id, true).coordinatorDefault;
+    expect(coordinatorDefault()).toEqual({ reason: 'none', provider: null, modelId: null });
+    addProvider(s, 'deepseek', { key: false, models: ['m0'] });
+    expect(coordinatorDefault()).toEqual({ reason: 'none', provider: null, modelId: null });
+    addProvider(s, 'vani', { models: ['m1'] });
+    createProvider(
+      { db: s.db, box: s.secretBox },
+      {
+        teamId: s.team.id,
+        body: {
+          providerId: 'anthropic',
+          label: 'Anthropic',
+          baseUrl: 'https://api.anthropic.com',
+          api: 'anthropic-messages',
+          apiKey: 'sk-ant-test',
+          models: [
+            { id: 'claude-sonnet-5-5', name: 'Sonnet' },
+            { id: 'claude-haiku-5-5', name: 'Haiku' },
+          ],
+        },
+        createdBy: s.user.id,
+      },
+    );
+    expect(coordinatorDefault()).toEqual({
+      reason: 'anthropic-key',
+      provider: 'anthropic',
+      modelId: 'claude-haiku-5-5',
+    });
+    seedRoute(s, 'coordinator', { provider: 'vani', modelId: 'm1' });
+    expect(coordinatorDefault()).toBeUndefined();
+  });
+
   test('memory ownership stays on the stored rule, not the read-time default', () => {
     const s = bare();
     claudeRunner(s);

@@ -508,8 +508,13 @@ export function profileForStep(
   };
 }
 
-export function coordinatorProfile(db: Pick<Db, 'select'>, teamId: string): RouteProfile | null {
-  const route = ruleRow(db, teamId, 'coordinator') ?? defaultCoordinatorRule(db, teamId);
+export function coordinatorProfile(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+  withDefault = false,
+): RouteProfile | null {
+  const route =
+    ruleRow(db, teamId, 'coordinator') ?? (withDefault ? defaultCoordinatorRule(db, teamId) : null);
   return route === null ? null : routeProfile(route);
 }
 
@@ -570,7 +575,11 @@ function requireWorkPolicy(db: Db, id: string): WorkPolicyRecord {
   return toWorkPolicyRecord(row);
 }
 
-export function listRoutingSettings(db: Db, teamId: string): TeamRoutingSettings {
+export function listRoutingSettings(
+  db: Db,
+  teamId: string,
+  coordinatorInServer = false,
+): TeamRoutingSettings {
   const rules = db
     .select()
     .from(routingRule)
@@ -592,7 +601,7 @@ export function listRoutingSettings(db: Db, teamId: string): TeamRoutingSettings
     ...(rules.some((rule) => rule.use === 'session')
       ? {}
       : { sessionDefault: defaultSessionChoice(db, teamId) ?? none }),
-    ...(rules.some((rule) => rule.use === 'coordinator')
+    ...(!coordinatorInServer || rules.some((rule) => rule.use === 'coordinator')
       ? {}
       : { coordinatorDefault: defaultCoordinatorChoice(db, teamId) ?? none }),
   };

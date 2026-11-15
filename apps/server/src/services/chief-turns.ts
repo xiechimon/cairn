@@ -21,6 +21,7 @@ import {
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
+import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { queueCoordinatorInput } from './coordinator-inputs.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -146,7 +147,7 @@ export function chiefOutage(db: Db, chiefId: string): ChiefOutage | null {
   const latest = rows[0];
   if (latest === undefined) return null;
   const chiefRow = db.select().from(chief).where(eq(chief.id, chiefId)).get();
-  const agentRow = chiefRow ? coordinatorProfile(db, chiefRow.teamId) : null;
+  const agentRow = chiefRow ? coordinatorProfile(db, chiefRow.teamId, coordinatorRunsOnPi()) : null;
   const ran = latest.fallback?.model ?? {
     provider: agentRow?.provider ?? null,
     modelId: agentRow?.modelId ?? null,
