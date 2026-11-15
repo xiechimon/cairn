@@ -23,6 +23,7 @@ import {
   type SecretRecord,
   type SkillFact,
   type StepPromptOrigin,
+  type StepQueueBlocked,
   type TagRecord,
   type TaskRequest,
   type ThreadMessageContent,
@@ -650,6 +651,7 @@ export type ChiefStreamItem =
       labelDetail?: { label: string; vars: Record<string, string | number> };
       signalAt?: number;
       blocked?: true;
+      blockedKind?: StepQueueBlocked['kind'];
     };
 
 export interface ChiefToolRow {

@@ -906,8 +906,15 @@ export const EN: Record<string, string> = {
     'Queued: Claude Code is not logged in on {machine}. Run claude on that machine to log in ({ahead} ahead)',
   '排队中：团队只用 Claude 订阅，{machine} 上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）':
     'Queued: this team uses Claude subscriptions only and Claude Code on {machine} is not logged in with one. Log in with a subscription there, or allow pay as you go in Usage & connections ({ahead} ahead)',
-  'Coordinator 用不了它的模型：规则里的连接没有 API key，或要走付费 Claude——到工作路由改 Coordinator 规则':
-    'The Coordinator cannot use its model: the connection in its rule has no API key, or it needs paid Claude. Change the Coordinator rule in work routing',
+  'Coordinator 规则用的服务商「{name}」还没添加':
+    'The Coordinator rule uses the provider "{name}", which has not been added',
+  'Coordinator 规则用的服务商「{name}」没有 API key':
+    'The Coordinator rule uses the provider "{name}", which has no API key',
+  'Coordinator 规则用的是付费 Claude（{name}），但团队只允许用订阅':
+    'The Coordinator rule uses paid Claude ({name}), but this team allows subscriptions only',
+  '改 Coordinator 规则': 'Change the Coordinator rule',
+  '填写 API key': 'Add the API key',
+  '换 Coordinator 模型': 'Pick another Coordinator model',
   运行平台: 'Platform',
   '不限时用默认 Runner': 'Any uses the default Runner',
   '需要 {platform}': 'needs {platform}',
