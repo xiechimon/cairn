@@ -47,6 +47,7 @@ export function reloadOnNewDeploy({
   storage,
   now,
   every,
+  offerReload,
 }: {
   target: EventTarget;
   currentEntry: string;
@@ -57,18 +58,17 @@ export function reloadOnNewDeploy({
   storage: Storage | null;
   now: () => number;
   every: (run: () => void) => void;
+  offerReload: () => void;
 }): void {
-  let outdated = false;
-  const reloadWhenIdle = () => {
-    if (outdated && !busy()) guardedReload(storage, reload, now);
-  };
-  const check = async () => {
-    if (!visible()) return;
+  const check = async (shown: boolean) => {
     const latest = await latestEntry().catch(() => null);
-    if (latest !== null && latest !== currentEntry) outdated = true;
-    reloadWhenIdle();
+    if (latest === null || latest === currentEntry) return;
+    const unseen = shown || !visible();
+    if (unseen && !busy() && guardedReload(storage, reload, now)) return;
+    offerReload();
   };
-  target.addEventListener('visibilitychange', () => void check());
-  target.addEventListener('focusout', reloadWhenIdle);
-  every(() => void check());
+  target.addEventListener('visibilitychange', () => {
+    if (visible()) void check(true);
+  });
+  every(() => void check(false));
 }

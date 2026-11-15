@@ -1,8 +1,11 @@
 import { StrictMode } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
+import { toast } from 'sonner';
 import { App } from './App.js';
+import { EN } from './i18n/en.js';
 import { applyLocaleLang, readStoredLocale } from './i18n/locale.js';
+import { translate } from './i18n/translate.js';
 import { trackPointerFocus } from './pointer-focus.js';
 import { safeLocalStorage, safeSessionStorage } from './safe-storage.js';
 import { entryScriptOf, reloadOnNewDeploy, reloadOnStaleBuild } from './stale-build-reload.js';
@@ -45,6 +48,17 @@ if (currentEntry !== null) {
     storage: safeSessionStorage(),
     now: Date.now,
     every: (run) => window.setInterval(run, 60_000),
+    offerReload: () => {
+      const locale = readStoredLocale(bootStorage);
+      toast(translate(locale, EN, '有新版本'), {
+        id: 'new-deploy',
+        duration: Number.POSITIVE_INFINITY,
+        action: {
+          label: translate(locale, EN, '点此刷新'),
+          onClick: () => window.location.reload(),
+        },
+      });
+    },
   });
 }
 
