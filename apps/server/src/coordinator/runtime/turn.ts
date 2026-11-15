@@ -258,6 +258,7 @@ export async function runCoordinatorTurn(
         input.kind === 'initial' &&
         input.conversationId === conversationKey,
     );
+    deps.setupPhase?.('input list');
     const prior =
       api.inputs === undefined
         ? undefined
@@ -269,12 +270,14 @@ export async function runCoordinatorTurn(
               ),
             context,
           );
+    deps.setupPhase?.('prior lookup');
     const initial = await api.inputs?.prepare(
       stepId,
       conversationKey,
       storedInstruction ?? '',
       prior?.entry === undefined ? undefined : String(prior.entry),
     );
+    deps.setupPhase?.('input prepare');
     const submission = await root.submit(
       {
         type: 'input',

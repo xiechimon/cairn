@@ -300,7 +300,7 @@ describe('in-server Coordinator telemetry', () => {
     expect(chats[0]?.attributes.some((a) => a.key === 'gen_ai.usage.input_tokens')).toBe(true);
   });
 
-  it('times each step before the first model request as contiguous content-free setup spans', async () => {
+  it('times each step before the first model request as contiguous content-free setup spans with event-loop delay', async () => {
     vi.stubEnv('CAIRN_OTEL_ENDPOINT', endpoint);
     const spans = captureSpans();
     const w = await world('what is open?');
@@ -326,7 +326,11 @@ describe('in-server Coordinator telemetry', () => {
             const stream = createAssistantMessageEventStream();
             void (async () => {
               await delay(60);
-              if (!suggestion) await options?.onPayload?.({}, model);
+              if (!suggestion) {
+                const blockedUntil = Date.now() + 80;
+                while (Date.now() < blockedUntil) {}
+                await options?.onPayload?.({}, model);
+              }
               stream.push({ type: 'start', partial: message });
               stream.push({
                 type: 'done',
@@ -354,6 +358,9 @@ describe('in-server Coordinator telemetry', () => {
       'setup token',
       'setup conversation',
       'setup configure',
+      'setup input list',
+      'setup prior lookup',
+      'setup input prepare',
       'setup submit',
       'setup generation prepare',
       'setup input barrier',
@@ -371,7 +378,14 @@ describe('in-server Coordinator telemetry', () => {
     }
     const ms = (span: Span) =>
       Number((BigInt(span.endTimeUnixNano) - BigInt(span.startTimeUnixNano)) / 1_000_000n);
-    expect(ms(setup.at(-1)!)).toBeGreaterThanOrEqual(55);
+    expect(ms(setup.at(-1)!)).toBeGreaterThanOrEqual(135);
+    const loopDelay = (span: Span) =>
+      Number(
+        span.attributes.find((a) => a.key === 'cairn.event_loop.max_delay_ms')?.value.intValue,
+      );
+    for (const span of setup) expect(Number.isFinite(loopDelay(span))).toBe(true);
+    expect(loopDelay(setup.at(-1)!)).toBeGreaterThanOrEqual(50);
+    expect(loopDelay(setup.at(-1)!)).toBeLessThanOrEqual(ms(setup.at(-1)!));
     const firstChat = spans.find((s) => s.name === 'chat m')!;
     expect(BigInt(setup.at(-1)!.startTimeUnixNano)).toBeLessThanOrEqual(
       BigInt(firstChat.startTimeUnixNano),
