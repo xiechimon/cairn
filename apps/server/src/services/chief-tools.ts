@@ -36,6 +36,7 @@ import {
 import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { proposalCardId } from './action-proposals.js';
 import { executeAction } from './action-registry.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta, resolveToolAttachmentId } from './attachments.js';
@@ -55,7 +56,12 @@ import {
   upsertChiefMessage,
 } from './chief.js';
 import { channelMessages, readHistory, searchHistory } from './chief-history.js';
-import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
+import {
+  APPROVAL_CARD_ID_PREFIX,
+  announceQuestion,
+  askUserQuestionsOfParams,
+  createOrGetQuestion,
+} from './chief-questions.js';
 import { suggestQuickReplies } from './chief-quick-replies.js';
 import { assertToolNotRemoved, executeRouterTool, isRouterTool } from './chief-router-tools.js';
 import { readConversationPage } from './conversation-page.js';
@@ -80,7 +86,7 @@ import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js
 import { snoozeTodo } from './snooze.js';
 import { listBuildStepRoutes } from './step-route.js';
 import { startThreadBuild } from './thread-message.js';
-import { deleteTodo, getTodo, listTodos, setTodoPhase } from './todos.js';
+import { getTodo, listTodos, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement } from './transcript.js';
 
 export interface ChiefToolDeps {
@@ -308,20 +314,24 @@ export async function executeChiefTool(
   if (name === SUGGEST_REPLIES_TOOL_NAME) return suggestQuickReplies(deps, ctx, params);
   const action = actionByToolName(name);
   if (action?.surfaces.includes('coordinator') === true) {
-    return json(
-      executeAction(
-        { db, reposDir: deps.reposDir },
-        {
-          id: action.id,
-          input: params,
-          actor: 'coordinator',
-          surface: 'coordinator',
-          teamId: ctx.teamId,
-          threadId: ctx.threadId,
-          scopeProjectId: ctx.turnScopeProjectId ?? null,
-        },
-      ),
+    const result = executeAction(
+      { db, reposDir: deps.reposDir },
+      {
+        id: action.id,
+        input: params,
+        actor: 'coordinator',
+        surface: 'coordinator',
+        teamId: ctx.teamId,
+        threadId: ctx.threadId,
+        scopeProjectId: ctx.turnScopeProjectId ?? null,
+      },
     );
+    if (result.status !== 'pending') return json(result);
+    if (result.created) announceQuestion(deps, ctx.threadId, proposalCardId(result.proposalId));
+    return json({
+      ...result,
+      note: '没有执行任何改动。审批卡已发给用户；只有用户在卡片上批准后服务端才会执行。告诉用户在等批准，然后结束本轮。',
+    });
   }
   switch (name) {
     case 'projects': {
@@ -627,12 +637,6 @@ export async function executeChiefTool(
       svc.machineHub?.wake(ctx.teamId);
       return json({ ...record, ...getTodo(svc, body.todoId) });
     }
-    case 'delete_todos': {
-      const ids = strArr(params, 'todoIds');
-      for (const id of ids) requireTeamTodo(db, id, ctx.teamId);
-      const deleted = ids.filter((id) => deleteTodo(svc, id));
-      return json({ deleted });
-    }
     case 'close_todos': {
       const supersededBy = optStr(params, 'supersededBy');
       return json(
@@ -869,6 +873,12 @@ export async function executeChiefTool(
       );
       const questions = askUserQuestionsOfParams(params);
       const requestId = optStr(params, 'requestId') ?? `ask-${newRecordId()}`;
+      if (requestId.startsWith(APPROVAL_CARD_ID_PREFIX)) {
+        throw new HttpError(
+          400,
+          'invalid params.requestId: approval cards are written by the server',
+        );
+      }
       const { content } = createOrGetQuestion(
         {
           db,

@@ -1,19 +1,40 @@
 import { createHash } from 'node:crypto';
-import { ACTION_PROPOSAL_TTL_MS } from '@cairn/shared';
-import { and, eq, lte } from 'drizzle-orm';
+import {
+  ACTION_PROPOSAL_TTL_MS,
+  ASK_USER_QUESTION_KIND,
+  type AskUserQuestion,
+  type AskUserQuestionContent,
+  type UserRecord,
+} from '@cairn/shared';
+import { and, eq, inArray, lte } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   actionJournal,
   actionProposal,
   actionSubscriber,
   actionWakeOutbox,
+  build,
+  chiefMessage,
+  project,
   step,
+  todo,
 } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { type ChiefDeps, enqueueChiefStep } from './chief.js';
+import {
+  ACTION_PROPOSAL_CARD_MARKER,
+  APPROVAL_CARD_ID_PREFIX,
+  askQuestionContentOf,
+  proposalIdOfCard,
+} from './chief-questions.js';
+import type { TeamStreamHub } from './events.js';
 import { dispatchHostedCleanup } from './hosted-cleanup.js';
 import { deleteProject, type ProjectTx } from './projects.js';
+import { deleteTodo } from './todos.js';
+
+export const APPROVE_CHOICE = '批准执行';
+export const REFUSE_CHOICE = '不执行';
 
 type ProposalStatus = 'pending' | 'refused' | 'executed' | 'failed' | 'expired' | 'superseded';
 type Decision = 'refuse' | 'allow-once' | 'always';
@@ -26,6 +47,7 @@ export interface ProposeInput {
   input: unknown;
   threadId: string;
   scopeProjectId: string | null;
+  card?: readonly AskUserQuestion[];
   now?: number;
 }
 
@@ -34,8 +56,47 @@ export interface AnswerInput {
   teamId: string;
   decision: Decision;
   decidedBy: string;
+  viaCard?: boolean;
   now?: number;
 }
+
+export interface AnswerDeps {
+  db: Db;
+  reposDir: string;
+  hub: TeamStreamHub;
+  user: UserRecord;
+}
+
+export const proposalCardId = (proposalId: string) => `${APPROVAL_CARD_ID_PREFIX}${proposalId}`;
+
+const cardDigest = (questions: readonly AskUserQuestion[]) => hashInput(questions);
+
+function storedCardDigest(row: ProposalRow): string | null {
+  const stored = JSON.parse(row.inputJson) as { cardDigest?: unknown };
+  return typeof stored.cardDigest === 'string' ? stored.cardDigest : null;
+}
+
+function requireIntactCard(tx: ProjectTx, row: ProposalRow, digest: string) {
+  const card = cardRow(tx, row.id);
+  const content = card === undefined ? null : askQuestionContentOf(card.content);
+  if (
+    content === null ||
+    content.status !== 'pending' ||
+    proposalIdOfCard(content) !== row.id ||
+    cardDigest(content.questions) !== digest
+  ) {
+    throw new HttpError(409, `approval card for proposal ${row.id} does not match it`);
+  }
+}
+
+const CARD_ENDINGS: Record<ProposalStatus, string> = {
+  pending: '',
+  refused: '你选择了不执行，没有执行。',
+  executed: '已按你的批准执行。',
+  failed: '批准后执行失败，没有改动任何数据。',
+  expired: '审批已过期，没有执行。',
+  superseded: '这张审批已被新的审批替换，没有执行。',
+};
 
 const hashInput = (input: unknown) =>
   createHash('sha256').update(JSON.stringify(input)).digest('hex');
@@ -116,6 +177,73 @@ function writeWakes(tx: ProjectTx, proposalId: string, outcome: ProposalStatus) 
   }
 }
 
+function cardRow(tx: ProjectTx, proposalId: string) {
+  return tx
+    .select()
+    .from(chiefMessage)
+    .where(eq(chiefMessage.id, proposalCardId(proposalId)))
+    .get();
+}
+
+function settleCard(
+  tx: ProjectTx,
+  proposalId: string,
+  status: ProposalStatus,
+  decision: Decision | null,
+  now: number,
+) {
+  const row = cardRow(tx, proposalId);
+  const content = row === undefined ? null : askQuestionContentOf(row.content);
+  if (row === undefined || content === null || content.status !== 'pending') return;
+  const next: AskUserQuestionContent =
+    decision === null
+      ? { ...content, status: 'cancelled', cancelReason: CARD_ENDINGS[status] }
+      : {
+          ...content,
+          status: 'answered',
+          answers: content.questions.map((question) => ({
+            header: question.header,
+            choices: [decision === 'allow-once' ? APPROVE_CHOICE : REFUSE_CHOICE],
+          })),
+          answeredAt: now,
+          answeredBy: 'person',
+          cancelReason: CARD_ENDINGS[status],
+        };
+  tx.update(chiefMessage)
+    .set({ content: JSON.stringify(next) })
+    .where(eq(chiefMessage.id, row.id))
+    .run();
+}
+
+function insertCard(
+  tx: ProjectTx,
+  proposalId: string,
+  threadId: string,
+  scopeProjectId: string | null,
+  questions: readonly AskUserQuestion[],
+  now: number,
+) {
+  const content: AskUserQuestionContent = {
+    kind: ASK_USER_QUESTION_KIND,
+    requestId: proposalCardId(proposalId),
+    status: 'pending',
+    questions: [...questions],
+    answers: null,
+    parkedAt: now,
+    askedFor: [`${ACTION_PROPOSAL_CARD_MARKER}${proposalId}`],
+  };
+  tx.insert(chiefMessage)
+    .values({
+      id: content.requestId,
+      threadId,
+      role: 'assistant',
+      content: JSON.stringify(content),
+      projectId: scopeProjectId,
+      createdAt: now,
+    })
+    .run();
+}
+
 function journal(tx: ProjectTx, row: ProposalRow, kind: 'run' | 'error', now: number) {
   tx.insert(actionJournal)
     .values({
@@ -144,6 +272,7 @@ function closeProposal(
     .set({ status, decision, decidedBy, decidedAt: now })
     .where(eq(actionProposal.id, row.id))
     .run();
+  settleCard(tx, row.id, status, decision, now);
   writeWakes(tx, row.id, status);
 }
 
@@ -157,15 +286,24 @@ export function settlePendingProposal(
   if (pending) closeProposal(tx, pending, 'executed', 'allow-once', null, nowMs());
 }
 
-export function proposeAction(db: Db, input: ProposeInput): { proposalId: string } {
+export function proposeAction(
+  db: Db,
+  input: ProposeInput,
+): { proposalId: string; created: boolean } {
   const now = input.now ?? nowMs();
-  const inputHash = hashInput(input.input);
+  const stored =
+    input.card === undefined
+      ? input.input
+      : { ...(input.input as Record<string, unknown>), cardDigest: cardDigest(input.card) };
+  const inputHash = hashInput(stored);
   return db.transaction(
     (tx) => {
       const pending = pendingFor(tx, input.teamId, input.actionId, input.targetId);
-      if (pending && pending.inputHash === inputHash) {
+      const cardLost =
+        pending !== undefined && input.card !== undefined && cardRow(tx, pending.id) === undefined;
+      if (pending && pending.inputHash === inputHash && !cardLost) {
         addSubscriber(tx, pending.id, input.threadId, input.scopeProjectId);
-        return { proposalId: pending.id };
+        return { proposalId: pending.id, created: false };
       }
       if (pending) closeProposal(tx, pending, 'superseded', null, null, now);
       const proposalId = newRecordId();
@@ -175,7 +313,7 @@ export function proposeAction(db: Db, input: ProposeInput): { proposalId: string
           teamId: input.teamId,
           actionId: input.actionId,
           targetId: input.targetId,
-          inputJson: JSON.stringify(input.input),
+          inputJson: JSON.stringify(stored),
           inputHash,
           status: 'pending',
           decision: null,
@@ -186,20 +324,76 @@ export function proposeAction(db: Db, input: ProposeInput): { proposalId: string
         })
         .run();
       addSubscriber(tx, proposalId, input.threadId, input.scopeProjectId);
-      return { proposalId };
+      if (input.card !== undefined) {
+        insertCard(tx, proposalId, input.threadId, input.scopeProjectId, input.card, now);
+      }
+      return { proposalId, created: true };
     },
     { behavior: 'immediate' },
   );
 }
 
-export function answerProposal(
-  deps: { db: Db; reposDir: string },
-  input: AnswerInput,
-): { status: ProposalStatus } {
+function runTodoDelete(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: number) {
+  const bound = JSON.parse(row.inputJson) as {
+    todoIds: string[];
+    versions: Record<string, number>;
+  };
+  const present = tx
+    .select({ id: todo.id, v: todo.v, archivedAt: project.archivedAt })
+    .from(todo)
+    .innerJoin(project, eq(project.id, todo.projectId))
+    .where(and(inArray(todo.id, bound.todoIds), eq(todo.teamId, row.teamId)))
+    .all();
+  for (const current of present) {
+    if (bound.versions[current.id] !== current.v) {
+      throw new HttpError(409, `todo ${current.id} changed after the approval was asked`);
+    }
+    if (current.archivedAt !== null) {
+      throw new HttpError(409, `todo ${current.id} is in an archived project`);
+    }
+  }
+  const running = tx
+    .select({ id: step.id })
+    .from(step)
+    .innerJoin(build, eq(build.id, step.buildId))
+    .where(
+      and(
+        inArray(
+          build.todoId,
+          present.map((current) => current.id),
+        ),
+        eq(step.status, 'claimed'),
+      ),
+    )
+    .get();
+  if (running !== undefined) throw new HttpError(409, 'cannot delete a todo while work is running');
+  for (const current of present) deleteTodo(deps, current.id);
+  journal(tx, row, 'run', now);
+}
+
+function runHandler(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: number) {
+  if (row.actionId === 'todo.delete') {
+    runTodoDelete(deps, tx, row, now);
+    return;
+  }
+  if (row.actionId !== 'project.delete') throw new HttpError(400, `no handler for ${row.actionId}`);
+  const removed = deleteProject(
+    deps,
+    row.targetId,
+    (inner) => {
+      journal(inner, row, 'run', now);
+    },
+    tx,
+  );
+  if (!removed) throw notFound(`project ${row.targetId}`);
+}
+
+export function answerProposal(deps: AnswerDeps, input: AnswerInput): { status: ProposalStatus } {
   const now = input.now ?? nowMs();
-  const outcome: { status: ProposalStatus; expired: boolean } = {
+  const outcome: { status: ProposalStatus; expired: boolean; actionId: string | null } = {
     status: 'pending',
     expired: false,
+    actionId: null,
   };
   deps.db.transaction(
     (tx) => {
@@ -213,6 +407,12 @@ export function answerProposal(
       if (row?.status !== 'pending') {
         throw new HttpError(409, `proposal ${input.proposalId} is not pending`);
       }
+      const digest = storedCardDigest(row);
+      if (digest !== null && input.viaCard !== true) {
+        throw new HttpError(409, `proposal ${input.proposalId} is answered on its card`);
+      }
+      if (digest !== null) requireIntactCard(tx, row, digest);
+      outcome.actionId = row.actionId;
       if (row.expiresAt <= now) {
         closeProposal(tx, row, 'expired', null, null, now);
         outcome.expired = true;
@@ -227,15 +427,7 @@ export function answerProposal(
       let handlerFailed = false;
       try {
         tx.transaction((savepoint) => {
-          const removed = deleteProject(
-            deps,
-            row.targetId,
-            (inner) => {
-              journal(inner, row, 'run', now);
-            },
-            savepoint,
-          );
-          if (!removed) throw notFound(`project ${row.targetId}`);
+          runHandler(deps, savepoint, row, now);
         });
       } catch {
         handlerFailed = true;
@@ -252,7 +444,9 @@ export function answerProposal(
     { behavior: 'immediate' },
   );
   if (outcome.expired) throw new HttpError(409, `proposal ${input.proposalId} expired`);
-  if (outcome.status === 'executed') dispatchHostedCleanup(deps.db, deps.reposDir);
+  if (outcome.status === 'executed' && outcome.actionId === 'project.delete') {
+    dispatchHostedCleanup(deps.db, deps.reposDir);
+  }
   return { status: outcome.status };
 }
 
@@ -298,7 +492,10 @@ export function dispatchActionWakes(deps: ChiefDeps): { delivered: number; undel
     try {
       enqueueChiefStep(deps, subscriber.threadId, {
         id: subscriber.wakeStepId,
-        prompt: `Action proposal ${row.proposalId} is ${row.outcome}.`,
+        prompt:
+          row.outcome === 'executed'
+            ? `审批 ${row.proposalId} 已由用户批准，服务端已执行。`
+            : `审批 ${row.proposalId} 的结果是 ${row.outcome}：没有执行。除非用户重新要求，不要再次发起同一动作。`,
         scopeProjectId: subscriber.scopeProjectId,
         ownerMessageIds: [],
         trigger: 'wake',

@@ -11,7 +11,14 @@ import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { chiefMessage } from './db/schema.js';
 import { notFound, parseWith } from './lib/errors.js';
+import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody, requireTeam, svcOf } from './routes-helpers.js';
+import {
+  APPROVE_CHOICE,
+  answerProposal,
+  dispatchActionWakes,
+  proposalCardId,
+} from './services/action-proposals.js';
 import { sendBuildSteer } from './services/builds.js';
 import {
   answerChiefQuestion,
@@ -23,7 +30,13 @@ import {
   rewindChiefThread,
   sendChiefMessageFromComposer,
 } from './services/chief.js';
-import { cancelQuestion, parseAnswerBody } from './services/chief-questions.js';
+import {
+  askQuestionContentOf,
+  cancelQuestion,
+  parseAnswerBody,
+  proposalIdOfCard,
+  publishQuestion,
+} from './services/chief-questions.js';
 import { decideRetroProposal } from './services/chief-report.js';
 import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
 import { readCoordinatorPage } from './services/coordinator.js';
@@ -38,6 +51,30 @@ import {
 
 export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
+
+  const answerCard = (
+    teamId: string,
+    threadId: string,
+    requestId: string,
+    proposalId: string,
+    decision: 'allow-once' | 'refuse',
+    c: Parameters<typeof pairedDeviceIdOf>[0],
+  ) => {
+    if (requestId !== proposalCardId(proposalId)) throw notFound(`question ${requestId}`);
+    const deviceId = pairedDeviceIdOf(c);
+    try {
+      return answerProposal(svc, {
+        proposalId,
+        teamId,
+        decision,
+        decidedBy: deviceId === null ? ctx.user.id : `device:${deviceId}`,
+        viaCard: true,
+      });
+    } finally {
+      publishQuestion(svc, threadId, requestId);
+      dispatchActionWakes(svc);
+    }
+  };
 
   app.get('/api/teams/:id/coordinator', (c) => {
     const teamId = c.req.param('id');
@@ -158,6 +195,19 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       .from(chiefMessage)
       .where(and(eq(chiefMessage.id, requestId), eq(chiefMessage.threadId, threadId)))
       .get();
+    const card = askQuestionContentOf(waiting?.content);
+    const proposalId = card === null ? null : proposalIdOfCard(card);
+    if (card !== null && proposalId !== null) {
+      const choices = answers.length === 1 ? answers[0]?.choices : undefined;
+      const approved = choices?.length === 1 && choices[0] === APPROVE_CHOICE;
+      answerCard(teamId, threadId, requestId, proposalId, approved ? 'allow-once' : 'refuse', c);
+      const settled = ctx.db
+        .select()
+        .from(chiefMessage)
+        .where(eq(chiefMessage.id, requestId))
+        .get();
+      return c.json(askQuestionContentOf(settled?.content));
+    }
     const answeredBy = jobSubmitAnswerActor(
       waiting?.content,
       isJobOwnerCaller(c.get('pairedDeviceId'), c.get('ownerIdentity'), ctx.authToken),
@@ -178,11 +228,19 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     const threadId = c.req.param('tid');
     const thread = getChiefThread(svc, threadId);
     if (!thread || thread.teamId !== teamId) throw notFound(`chief thread ${threadId}`);
-    cancelQuestion(svc, {
-      threadId,
-      requestId: c.req.param('requestId'),
-      reason: '用户取消了本次提问',
-    });
+    const requestId = c.req.param('requestId');
+    const waiting = ctx.db
+      .select()
+      .from(chiefMessage)
+      .where(and(eq(chiefMessage.id, requestId), eq(chiefMessage.threadId, threadId)))
+      .get();
+    const card = askQuestionContentOf(waiting?.content);
+    const proposalId = card === null ? null : proposalIdOfCard(card);
+    if (card !== null && proposalId !== null) {
+      answerCard(teamId, threadId, requestId, proposalId, 'refuse', c);
+      return c.json({ ok: true as const });
+    }
+    cancelQuestion(svc, { threadId, requestId, reason: '用户取消了本次提问' });
     return c.json({ ok: true as const });
   });
 
