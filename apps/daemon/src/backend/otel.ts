@@ -19,7 +19,6 @@ import {
   stepOtelContext,
   traceparentFor,
 } from '@cairn/shared/otel';
-import { withoutPinnedEnv } from './pinned-env.js';
 
 const SCOPE = 'cairn.daemon';
 
@@ -79,7 +78,7 @@ const CLI_EXPORT_KEY = /^(OTEL_|CAIRN_OTEL_|ANT_OTEL_|BETA_TRACING_|ENABLE_BETA_
 
 export function runtimeChildEnv(env: NodeJS.ProcessEnv): Record<string, string> {
   const filtered: Record<string, string> = {};
-  for (const [key, value] of Object.entries(withoutPinnedEnv(env))) {
+  for (const [key, value] of Object.entries(env)) {
     if (value === undefined || CLI_EXPORT_KEY.test(key)) continue;
     if (
       env.CAIRN_GIT_CRED_FILE &&

@@ -52,7 +52,7 @@ import { probeModelImageSupport, rememberNoVision } from './image-support.js';
 import { connectFailedLine } from './mcp-config.js';
 import { PiStepSpanSink, runtimeChildEnv } from './otel.js';
 import { PI_RETRY_SETTINGS } from './pi-retry.js';
-import { pinProcessEnv } from './pinned-env.js';
+import { pinProcessEnv, withoutPinnedEnv } from './pinned-env.js';
 import {
   enrichProviderError,
   type ProviderResponseSink,
@@ -1120,7 +1120,11 @@ export class PiBackend implements AgentBackend {
       createBashToolDefinition(opts.cwd, {
         spawnHook: (ctx) => ({
           ...ctx,
-          env: runtimeChildEnv({ ...ctx.env, ...shellPathFor(this.opts.agentDir), ...opts.env }),
+          env: runtimeChildEnv({
+            ...withoutPinnedEnv(ctx.env),
+            ...shellPathFor(this.opts.agentDir),
+            ...opts.env,
+          }),
         }),
       }),
     );

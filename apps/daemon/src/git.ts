@@ -309,7 +309,10 @@ export async function landGitSquash(input: {
 }): Promise<'landed' | 'stale' | 'dirty'> {
   const { dir, branch, currentBranch, base, commit, receipt } = input;
   return new Promise((resolve, reject) => {
-    const child = spawn('git', ['update-ref', '--no-deref', '--stdin'], { cwd: dir });
+    const child = spawn('git', ['update-ref', '--no-deref', '--stdin'], {
+      cwd: dir,
+      env: withoutPinnedEnv(process.env),
+    });
     let output = '';
     let preparing = false;
     let dirty = false;

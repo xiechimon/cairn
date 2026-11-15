@@ -104,12 +104,15 @@ test('the embedded pi keeps its agent dir and pins out of task commands', async 
   expect(process.env.PI_CODING_AGENT_DIR).toBeUndefined();
   expect(process.env.PI_SKIP_VERSION_CHECK).toBe('1');
   vi.stubEnv('PI_TELEMETRY', 'operator-choice');
-  const handle = await backend.createSession(syntheticSession(directory));
+  const handle = await backend.createSession({
+    ...syntheticSession(directory),
+    env: { PI_SKIP_VERSION_CHECK: '1' },
+  });
   try {
     const child = await bashChildEnv();
     expect(child).not.toHaveProperty('PI_CODING_AGENT_DIR');
-    expect(child).not.toHaveProperty('PI_SKIP_VERSION_CHECK');
     expect(child).not.toHaveProperty('PI_OFFLINE');
+    expect(child.PI_SKIP_VERSION_CHECK).toBe('1');
     expect(child.PI_TELEMETRY).toBe('operator-choice');
   } finally {
     await handle.stop();
