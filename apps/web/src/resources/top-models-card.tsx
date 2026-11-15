@@ -26,12 +26,11 @@ import { cn } from 'cn';
 import { Box, GripVertical, Plus, Server, X } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 import { ClaudeMark, GeminiMark, GrokMark, OpenAIMark } from '../components/brand-marks.js';
-import { KeyedMenuContent } from '../components/menu-keys.js';
+import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
   DropdownMenuGroup,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
@@ -271,7 +270,7 @@ export function TopModelsCard({
                 {unique
                   .filter((o) => o.runtime === runtime)
                   .map((o) => (
-                    <DropdownMenuItem
+                    <KeyedMenuItem
                       key={topModelKey(o)}
                       className="top-models-add-row"
                       onClick={() =>
@@ -285,7 +284,7 @@ export function TopModelsCard({
                       {o.provider !== o.runtime && (
                         <span className="text-meta text-content-tertiary">{o.providerLabel}</span>
                       )}
-                    </DropdownMenuItem>
+                    </KeyedMenuItem>
                   ))}
               </DropdownMenuGroup>
             ))}
