@@ -76,6 +76,7 @@ export * from './thread-pr.js';
 export * from './ticket-dedupe.js';
 export * from './todo.js';
 export * from './token-usage.js';
+export * from './top-models.js';
 export * from './user.js';
 export * from './verify.js';
 export * from './work-policy.js';

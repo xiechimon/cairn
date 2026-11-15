@@ -85,6 +85,7 @@ export const DB_TABLES = [
   'mail_event',
   'mail_rule',
   'mcp_connector',
+  'team_top_models',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -92,6 +93,7 @@ export type DbTable = (typeof DB_TABLES)[number];
 export const JOIN_ONLY_TABLES = ['todo_tag', 'todo_github_label'] as const;
 
 export const INTERNAL_ONLY_TABLES = [
+  'team_top_models',
   'action_journal',
   'action_proposal',
   'action_subscriber',
