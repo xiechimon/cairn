@@ -1,6 +1,16 @@
+import { readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
-import { app, BrowserWindow, dialog, shell, type UtilityProcess, utilityProcess } from 'electron';
+import { ACCESS_TOKEN_FILE_NAME, ENV_VARS, parseAccessTokenFile } from '@cairn/shared';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  session,
+  shell,
+  type UtilityProcess,
+  utilityProcess,
+} from 'electron';
 
 const LOOPBACK = '127.0.0.1';
 const READY_TIMEOUT_MS = 60_000;
@@ -20,6 +30,10 @@ function serverRoot(): string {
   return app.isPackaged ? join(process.resourcesPath, 'server') : join(app.getAppPath(), 'server');
 }
 
+function cairnHome(): string {
+  return join(app.getPath('userData'), 'home');
+}
+
 function freeLoopbackPort(): Promise<number> {
   return new Promise((resolvePort, reject) => {
     const probe = createServer();
@@ -33,15 +47,18 @@ function freeLoopbackPort(): Promise<number> {
 }
 
 function startServer(port: number): RunningServer {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    HOST: LOOPBACK,
+    PORT: String(port),
+    [ENV_VARS.home]: cairnHome(),
+  };
+  delete env[ENV_VARS.token];
+  delete env[ENV_VARS.auth];
   const child = utilityProcess.fork(join(serverRoot(), 'dist', 'index.mjs'), [], {
     serviceName: 'Cairn server',
     stdio: 'inherit',
-    env: {
-      ...process.env,
-      HOST: LOOPBACK,
-      PORT: String(port),
-      CAIRN_HOME: join(app.getPath('userData'), 'home'),
-    },
+    env,
   });
   const running: RunningServer = {
     process: child,
@@ -73,6 +90,27 @@ async function waitUntilServing(running: RunningServer): Promise<void> {
     await new Promise((wake) => setTimeout(wake, READY_POLL_MS));
   }
   throw new Error(`The Cairn server did not answer on ${running.origin} within 60 seconds.`);
+}
+
+function readOwnerToken(): string {
+  const path = join(cairnHome(), ACCESS_TOKEN_FILE_NAME);
+  const token = parseAccessTokenFile(readFileSync(path, 'utf8'));
+  if (token === null) throw new Error(`The Cairn owner token file ${path} has no usable token.`);
+  return token;
+}
+
+function signOwnPagesIn(origin: string, token: string): void {
+  const { host } = new URL(origin);
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: [`http://${host}/*`, `ws://${host}/*`] },
+    (details, callback) => {
+      if (details.initiatorOrigin !== origin) {
+        callback({});
+        return;
+      }
+      callback({ requestHeaders: { ...details.requestHeaders, Authorization: `Bearer ${token}` } });
+    },
+  );
 }
 
 function isWebUrl(url: string): boolean {
@@ -115,6 +153,7 @@ async function boot(): Promise<void> {
   try {
     server = startServer(await freeLoopbackPort());
     await waitUntilServing(server);
+    signOwnPagesIn(server.origin, readOwnerToken());
     openWindow(server.origin);
   } catch (error) {
     quitting = true;
