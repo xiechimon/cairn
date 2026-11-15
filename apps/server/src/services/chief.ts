@@ -1875,7 +1875,8 @@ export function sweepAbandonedChiefSteps(
       : undefined;
     const stale =
       row.lastHeartbeatAt !== null && now - row.lastHeartbeatAt > CHIEF_ABANDONED_STEP_MS;
-    if (machineRow === undefined || !machineRow.online) {
+    const live = machineRow?.online === true && !deps.machineHub?.silentSinceDrop(machineRow.id);
+    if (!live) {
       if (!stale) continue;
       deps.db
         .update(step)

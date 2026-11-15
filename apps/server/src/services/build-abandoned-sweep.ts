@@ -62,7 +62,8 @@ function abandonedEnding(
     : undefined;
   const progressed =
     row.lastHeartbeatAt !== null && row.lastHeartbeatAt > (row.claimedAt ?? row.createdAt);
-  if (machineRow?.online && progressed) return null;
+  const live = machineRow?.online === true && !deps.machineHub?.silentSinceDrop(machineRow.id);
+  if (live && progressed) return null;
   return row.archiveStop !== null ||
     todoRow.archivedAt !== null ||
     todoRow.phase === 'closed' ||
