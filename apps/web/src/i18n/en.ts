@@ -248,8 +248,11 @@ export const EN: Record<string, string> = {
   '添加模型服务商，或在 Runner 上登录 Claude Code':
     'Add a provider, or sign in to Claude Code on a Runner',
   '连接一台 Runner': 'Connect a Runner',
-  运行: 'Run',
-  '连接这台 Runner': 'to connect this Runner',
+  '在要干活的电脑上运行 `{command}`': 'Run `{command}` on the computer that should do the work',
+  '{name} 离线': '{name} is offline',
+  '在 {name} 上运行 `{command}` 让它重新上线': 'Run `{command}` on {name} to bring it back',
+  '{n} 台 Runner 都离线': '{n} Runners are offline',
+  '在其中一台上运行 `{command}` 让它重新上线': 'Run `{command}` on one of them to bring it back',
   'Coordinator 还不能回答': 'The Coordinator cannot answer yet',
   '点输入框下方的按钮，把模型来源、Runner 和 Coordinator 接上，再发一次。':
     'Use the button below the box to connect a model source, a Runner and the Coordinator, then send again.',
