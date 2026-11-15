@@ -1,8 +1,8 @@
 # Personal relay offline components
 
-This is not an installable connector. These are the SQLite allowance ledger and bounded digest registry from the reviewed [relay protocol](../../../docs/design/connect-device-protocol.md), with [primary-source research](../../../docs/research/connect-do-enrollment-2026-11-15.md). There is no deployable Worker, route, credentials or cloud configuration. The synthetic transport experiment remains separate.
+This is not an installable connector. These are the SQLite allowance ledger, bounded digest registry and stateless HTTP ingress policy from the reviewed [relay protocol](../../../docs/design/connect-device-protocol.md), with [primary-source research](../../../docs/research/connect-do-enrollment-2026-11-15.md). There is no deployable Worker, route, credentials or cloud configuration. The synthetic transport experiment remains separate.
 
-Use Node 24.22 or later within Node 24. Install with scripts disabled, then run:
+Use Node 24.22 or later within Node 24. First install the repository workspace with `pnpm install --frozen-lockfile --ignore-scripts`; shared schemas and the existing web Vite bundler are used by the ingress tests. In this directory, install with scripts disabled, then run:
 
 ```sh
 npm ci --ignore-scripts --no-audit --no-fund
@@ -18,4 +18,10 @@ The ledger initializes all four tables atomically on empty storage; existing led
 
 `findSession` returns metadata or a genuine cache miss, never authenticated authority. SQL failures and corruption throw rather than return a miss. Only call `rememberSession` after correlated host authorization: both cache hits and misses still need the full host validation/commit exchange. FIFO eviction and `forgetSession` do not revoke a host session or close an already authenticated socket. No raw code, bearer, cookie or message is accepted by these storage APIs.
 
+`readRelayIngress` returns distinct descriptor, host-transport, presented-client-token and parsed-pairing decisions, or a bounded failure. It enforces canonical HTTPS configuration, exact origin/routes/methods, role-separated headers, browser Origin/Fetch Metadata, duplicate-cookie rejection and the actual 1KiB streamed UTF-8 JSON limit. Host transport uses constant-time capability comparison. Client success is only syntax validation, not authentication; the host must still validate the real scoped session through the complete admission/commit exchange. Pairing cookies never replace grant redemption. Returned tokens/codes are transient and must not enter diagnostics, attachments or SQL. The function creates no Response, socket, cookie, counter or dispatch. Tests bundle the actual shared schemas with the workspace's existing Vite and run the policy on native local workerd Request/Headers/streams/crypto, using only a generated inspection wrapper.
+
+Pairing accepts only `application/json`, optionally followed by one UTF-8 charset parameter (case-insensitive, optionally quoted). Combined media types, other parameters and other charsets reject; the entire header is validated rather than ignoring the suffix after a semicolon.
+
 The future transport still owns calling reservations on every required path, per-socket lifetime/rate limits, admission, correlation, authentication and closure after failure. This ledger does not meter provider ingress or guarantee Free account availability or a dollar ceiling. It is not wired to Cairn, deployment or the private service.
+
+The future routed layer must repeat ingress checks at the Worker and DO boundaries, bound slow-body/admission time, reserve dynamic/pair/upgrade/output costs, and issue no-store/no-referrer/no-CORS responses. This parser does not supply those guarantees or complete the connector's offline pairing-to-result acceptance.
