@@ -11,8 +11,8 @@ import { isOwnerOnlyRoute } from '../src/lib/token-auth.js';
 import {
   checkMcpConnector,
   createMcpConnector,
+  createPublicOAuthFetch,
   type McpConnectorDeps,
-  publicOAuthFetch,
   refreshMcpConnectorToken,
   updateMcpConnector,
 } from '../src/services/mcp-servers.js';
@@ -724,7 +724,9 @@ describe('MCP connector OAuth', () => {
   });
 
   test('the production OAuth fetch refuses a host that resolves to a private address', async () => {
-    const failure = await publicOAuthFetch('https://localhost/x').catch((err: unknown) => err);
+    const failure = await createPublicOAuthFetch({})('https://localhost/x').catch(
+      (err: unknown) => err,
+    );
     expect(String((failure as Error & { cause?: unknown }).cause)).toContain('non-public address');
   });
 });
