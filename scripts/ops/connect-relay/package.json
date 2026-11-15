@@ -1,0 +1,17 @@
+{
+  "name": "cairn-personal-relay",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.22 <25"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1 ledger.test.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261113.1",
+    "miniflare": "5.20261113.0-beta",
+    "typescript": "7.0.2"
+  }
+}
