@@ -1654,7 +1654,7 @@ export const EN: Record<string, string> = {
   '冷却至 {time}': 'Cooling until {time}',
   已检测到: 'Detected',
   '没有检测到，装好后重启执行机': 'Not detected. Install it, then restart the Runner',
-  接入命令闸前不能用: 'Unavailable until it uses the command gate',
+  暂不支持: 'Not supported yet',
   '这台执行机上检测到的执行器。检测到就能接任务，不用开关。':
     'Runtimes detected on this Runner. Anything detected takes tasks; there is nothing to switch on.',
   可用: 'Available',

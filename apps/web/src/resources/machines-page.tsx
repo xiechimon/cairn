@@ -6,6 +6,7 @@ import { useChief, useMachines, useModelSources, useTeams } from '../api/hooks.j
 import { mapMachines } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { SettingsPanel } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
@@ -124,7 +125,7 @@ export function MachinesPage() {
     >
       <div
         data-testid="machines-scroll"
-        className="flex w-full min-w-0 flex-col gap-3 px-4 py-4 md:px-6"
+        className="flex w-full min-w-0 flex-col gap-3 px-4 pt-1 pb-6"
       >
         <QueryBoundary
           query={live ? machinesQ : undefined}
@@ -140,15 +141,19 @@ export function MachinesPage() {
                 <h2 className="m-0 text-card-title font-semibold text-foreground">
                   {t('已接入的执行机')}
                 </h2>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('添加执行机')}
-                  title={t('添加执行机')}
-                  onClick={() => setAddOpen(true)}
+                <IconTooltip
+                  label={t('添加执行机')}
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="pointer-coarse:-ml-2 pointer-coarse:size-11"
+                      onClick={() => setAddOpen(true)}
+                    />
+                  }
                 >
                   <Plus aria-hidden strokeWidth={1.75} />
-                </Button>
+                </IconTooltip>
               </div>
             }
           >

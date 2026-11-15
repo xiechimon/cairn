@@ -33,7 +33,7 @@ const RUNTIME_NAMES: Record<string, string> = {
 };
 
 const LOGIN_STATE = {
-  'logged-in': { label: '已登录', dot: 'bg-running', text: 'text-running-text' },
+  'logged-in': { label: '已登录', dot: 'bg-running', text: 'text-content-secondary' },
   'logged-out': { label: '未登录', dot: 'bg-(--card-button)', text: 'text-content-secondary' },
   unknown: { label: '状态未知', dot: 'bg-content-dim', text: 'text-content-tertiary' },
 } as const;
@@ -99,7 +99,7 @@ export function TextWithCode({ text }: { text: string }) {
 }
 
 function runtimeAvailability(machine: MachineRow, runtime: string): string {
-  if (runtime === 'gemini') return '接入命令闸前不能用';
+  if (runtime === 'gemini') return '暂不支持';
   if (!isMachineRuntime(runtime)) return '已检测到';
   return (machine.enabledRuntimes ?? []).includes(runtime)
     ? '可用'
@@ -149,7 +149,7 @@ function RuntimeRow({ machine, runtime }: { machine: MachineRow; runtime: string
         data-testid="provider-availability"
         className={cn(
           'inline-flex items-center gap-1.5 text-meta',
-          available ? 'text-running-text' : 'text-content-tertiary',
+          available ? 'text-content-secondary' : 'text-content-tertiary',
         )}
       >
         <span
@@ -263,7 +263,7 @@ export function MachineDetailPane({ machine, chief }: { machine: MachineRow; chi
                 <span className="flex flex-wrap items-center justify-end gap-x-3 text-meta">
                   {chief.running && (
                     <span
-                      className="inline-flex items-center gap-1.5 text-running-text before:block before:size-1.5 before:rounded-full before:bg-running before:content-['']"
+                      className="inline-flex items-center gap-1.5 text-content-secondary before:block before:size-1.5 before:rounded-full before:bg-running before:content-['']"
                       data-orchestration="running"
                     >
                       {t('Coordinator 回合进行中')}

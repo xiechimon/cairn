@@ -37,7 +37,7 @@ test('runtimes are labelled rows without switches, monochrome, showing what the 
   await expect(cc).toHaveAttribute('data-available', 'false');
   await expect(pi.getByTestId('provider-availability')).toHaveText('可用');
   await expect(cc.getByTestId('provider-availability')).toHaveText('没有检测到，装好后重启执行机');
-  await expect(gemini.getByTestId('provider-availability')).toHaveText('接入命令闸前不能用');
+  await expect(gemini.getByTestId('provider-availability')).toHaveText('暂不支持');
   await expect(page.locator(`${PANE} [data-testid="machine-runtimes"] [role="switch"]`)).toHaveCount(0);
   await expect(page.locator(`${PANE} svg[fill^="#"], ${PANE} [data-runtime] svg path[fill^="#"]`)).toHaveCount(0);
 });
