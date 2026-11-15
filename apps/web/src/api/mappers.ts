@@ -105,17 +105,30 @@ import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
 
 const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
   'sandbox-unavailable':
-    '排队中：{machine} 的任务沙箱没就绪，接不了任务——原因和修法见 Runner 页（前面 {ahead} 个）',
+    '排队中：{machine} 的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）',
   'runtime-disabled':
-    '排队中：{machine} 上没有检测到 {runtime}，装好后重启 Runner（前面 {ahead} 个）',
+    '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）',
   'model-unavailable':
     '排队中：{machine} 用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）',
-  'local-path': '排队中：本地项目只在它所在的 Runner 上跑，{machine} 跑不了（前面 {ahead} 个）',
+  'local-path': '排队中：本地项目只在它所在的执行机上跑，{machine} 跑不了（前面 {ahead} 个）',
   'claude-rate-limited': '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
   'claude-logged-out':
     '排队中：{machine} 上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
   'coordinator-provider-missing': 'Coordinator 规则用的服务商「{name}」还没添加',
   'coordinator-provider-no-key': 'Coordinator 规则用的服务商「{name}」没有 API key',
+};
+
+const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
+  'sandbox-unavailable':
+    '排队中：执行机的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）',
+  'runtime-disabled': '排队中：执行机上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）',
+  'model-unavailable': '排队中：执行机用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）',
+  'local-path': '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了（前面 {ahead} 个）',
+  'claude-rate-limited': '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
+  'claude-logged-out':
+    '排队中：执行机上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
+  'claude-usage-refused':
+    '排队中：团队只用 Claude 订阅，执行机上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）',
 };
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
@@ -136,7 +149,7 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
     queue.waitingFor == null
   ) {
     return {
-      label: '排队中：还没有 {platform} Runner · 需要 {platform}',
+      label: '排队中：还没有 {platform} 执行机 · 需要 {platform}',
       vars: { platform: RUNNER_OS_LABELS[platform] },
     };
   }
@@ -153,17 +166,21 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
   if (queue.blocked?.kind === 'capability-missing') {
     return {
       label:
-        '排队中：没有 Runner 满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）',
+        '排队中：没有执行机满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）',
       vars: { missing: queue.blocked.missing.join('、'), ahead },
     };
   }
+  const refusalLabels =
+    queue.waitingFor == null ? UNNAMED_RUNNER_REFUSAL_LABELS : RUNNER_REFUSAL_LABELS;
   const refusal =
-    queue.blocked === undefined ? undefined : RUNNER_REFUSAL_LABELS[queue.blocked.kind];
+    queue.blocked === undefined
+      ? undefined
+      : (refusalLabels[queue.blocked.kind] ?? RUNNER_REFUSAL_LABELS[queue.blocked.kind]);
   if (refusal !== undefined) {
     return {
       label: refusal,
       vars: {
-        machine: queue.waitingFor?.name ?? 'Runner',
+        machine: queue.waitingFor?.name ?? '',
         runtime: queue.blocked?.missing.join('、') ?? '',
         name: queue.blocked?.missing.join('、') ?? '',
         ahead,
@@ -176,7 +193,7 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
           label: '排队中：等 {machine} 上线（前面 {ahead} 个）',
           vars: { machine: queue.waitingFor.name, ahead },
         }
-      : { label: '排队中：等 Runner 上线（前面 {ahead} 个）', vars: { ahead } };
+      : { label: '排队中：等执行机上线（前面 {ahead} 个）', vars: { ahead } };
   }
   return queue.waitingFor != null
     ? {
@@ -188,7 +205,7 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
           ahead,
         },
       }
-    : { label: '排队中：等空闲 Runner（前面 {ahead} 个）', vars: { ahead } };
+    : { label: '排队中：等空闲执行机（前面 {ahead} 个）', vars: { ahead } };
 }
 
 function connectingLine(queue: NonNullable<StepRow['queue']>): {
@@ -1014,7 +1031,7 @@ const REWORK_REUSE_HEAD = '返工回到本分支继续';
 
 const CREDENTIAL_SOURCE_DETAIL = {
   integration: 'integration：每步下发的 token',
-  machine: 'machine：Runner 本机的 git 凭据',
+  machine: 'machine：执行机本机的 git 凭据',
 } as const;
 
 function systemRowItem(row: SystemRow, id: string, createdAt: number): TranscriptItem | ToolEntry {
@@ -1080,7 +1097,7 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
 function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string {
   switch (kind) {
     case 'network':
-      return '请将这台 Runner 重新上线。这一步不会改派到其他 Runner。';
+      return '请将这台执行机重新上线。这一步不会改派到其他执行机。';
     case 'quota':
       return '模型额度已用尽，请等待额度恢复后重试。';
     case 'capacity':

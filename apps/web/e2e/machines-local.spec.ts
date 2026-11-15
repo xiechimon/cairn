@@ -21,7 +21,7 @@ test('local machine pinned first: data-kind=local + id handle + hostname canon',
 test('managed facade row removed (spec 11 A8 negative)', async ({ page }) => {
   await page.goto(MACHINES);
   await expect(page.locator(`${ITEM}[data-kind="local"]`)).toBeVisible();
-  await expect(page.getByTestId('settings-content')).not.toContainText('Cairn 托管 Runner');
+  await expect(page.getByTestId('settings-content')).not.toContainText('Cairn 托管执行机');
 });
 
 test('runtimes are labelled rows without switches, monochrome, showing what the Runner detected', async ({ page }) => {
@@ -36,7 +36,7 @@ test('runtimes are labelled rows without switches, monochrome, showing what the 
   await expect(pi).toHaveAttribute('data-available', 'true');
   await expect(cc).toHaveAttribute('data-available', 'false');
   await expect(pi.getByTestId('provider-availability')).toHaveText('可用');
-  await expect(cc.getByTestId('provider-availability')).toHaveText('没有检测到，装好后重启 Runner');
+  await expect(cc.getByTestId('provider-availability')).toHaveText('没有检测到，装好后重启执行机');
   await expect(gemini.getByTestId('provider-availability')).toHaveText('接入命令闸前不能用');
   await expect(page.locator(`${PANE} [data-testid="machine-runtimes"] [role="switch"]`)).toHaveCount(0);
   await expect(page.locator(`${PANE} svg[fill^="#"], ${PANE} [data-runtime] svg path[fill^="#"]`)).toHaveCount(0);

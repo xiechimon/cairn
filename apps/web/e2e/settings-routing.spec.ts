@@ -20,7 +20,7 @@ test('model selector with no rules offers a picker per use and no Runner or poli
   await expect(settings.getByTestId('routing-rule-new-coordinator')).toContainText(
     '先给 Coordinator 选模型',
   );
-  await expect(settings.getByText('首选 Runner')).toHaveCount(0);
+  await expect(settings.getByText('首选执行机')).toHaveCount(0);
   await expect(settings.getByText('工作策略')).toHaveCount(0);
   await expect(settings.getByRole('button', { name: '创建' })).toHaveCount(0);
 });
@@ -57,7 +57,7 @@ test('the model menu groups by runtime and greys a runtime no Runner has turned 
     .locator('#route-session .routing-rule-model-select')
     .click();
   const piOnly = page.locator('.routing-rule-model-menu');
-  await expect(piOnly.getByText('Claude Code（没有 Runner 启用）')).toBeVisible();
+  await expect(piOnly.getByText('Claude Code（没有执行机启用）')).toBeVisible();
   await expect(
     piOnly.locator('.routing-rule-model-row', { hasText: 'claude-haiku-4-5' }),
   ).toHaveAttribute('data-disabled', '');

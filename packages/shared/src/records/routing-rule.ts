@@ -67,6 +67,7 @@ export const patchRoutingRuleBodySchema = z
     machineId: recordId.nullable().optional(),
     requiredCapabilities: requiredCapabilitiesSchema.nullable().optional(),
     mcpServers: z.array(z.string()).nullable().optional(),
+    expectedUpdatedAt: epochMs.optional(),
   })
   .refine((body) => Object.keys(body).length > 0, { message: 'empty patch' });
 export type PatchRoutingRuleBody = z.infer<typeof patchRoutingRuleBodySchema>;
@@ -89,10 +90,41 @@ export const coordinatorDefaultSchema = z.object({
 });
 export type CoordinatorDefault = z.infer<typeof coordinatorDefaultSchema>;
 
+export const RULE_ISSUE_REASONS = [
+  'runtime-disabled',
+  'machine-unusable',
+  'provider-missing',
+  'provider-no-key',
+  'paid-claude',
+] as const;
+export type RuleIssueReason = (typeof RULE_ISSUE_REASONS)[number];
+
+export const ruleFixSchema = z.object({
+  provider: z.string(),
+  modelId: z.string(),
+  machineId: z.null().optional(),
+  requiredCapabilities: z.null().optional(),
+  fallbackModels: z.null().optional(),
+  thinkingLevel: z.null().optional(),
+  expectedUpdatedAt: epochMs,
+});
+export type RuleFix = z.infer<typeof ruleFixSchema>;
+
+export const ruleIssueSchema = z.object({
+  use: routeUseSchema,
+  reason: z.enum(RULE_ISSUE_REASONS),
+  runtime: z.enum(['pi', 'claude-code', 'gemini']).optional(),
+  provider: z.string().optional(),
+  machineId: recordId.optional(),
+  suggested: ruleFixSchema.nullable(),
+});
+export type RuleIssue = z.infer<typeof ruleIssueSchema>;
+
 export const teamRoutingSettingsSchema = z.object({
   rules: z.array(routingRuleRecordSchema),
   policies: z.array(workPolicyRecordSchema),
   sessionDefault: sessionDefaultSchema.optional(),
   coordinatorDefault: coordinatorDefaultSchema.optional(),
+  ruleIssues: z.array(ruleIssueSchema).optional(),
 });
 export type TeamRoutingSettings = z.infer<typeof teamRoutingSettingsSchema>;

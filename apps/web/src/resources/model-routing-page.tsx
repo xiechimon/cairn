@@ -39,7 +39,7 @@ function TargetRow({ target }: { target: RoutingTargetRow }) {
       ? t(providerKind(target.record))
       : target.id.startsWith('subscription:')
         ? [t('Claude 订阅'), target.plan].filter(Boolean).join(' · ')
-        : t('Runner 上的登录');
+        : t('执行机上的登录');
   return (
     <Link
       to={{ pathname: settingsHref('providers'), search: `?item=${encodeURIComponent(target.id)}` }}

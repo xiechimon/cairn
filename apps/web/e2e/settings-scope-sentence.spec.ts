@@ -9,7 +9,7 @@ const scope = (page: Page) => settings(page).getByRole('combobox', { name: '设�
 test('model services open with a scope sentence and keep the scope in the URL', async ({ page }) => {
   await page.goto('/app/settings/providers?scenario=providers-fleet');
   await expect(settings(page).getByTestId('settings-scope')).toContainText('设置作用于');
-  await expect(scope(page)).toContainText('所有 Runner');
+  await expect(scope(page)).toContainText('所有执行机');
   await scope(page).click();
   await page.getByRole('option', { name: /build-box/ }).first().click();
   await expect(page).toHaveURL(/scope=/);
@@ -17,7 +17,7 @@ test('model services open with a scope sentence and keep the scope in the URL', 
   await expect(scope(page).locator('svg.lucide-monitor')).toBeVisible();
   await expect(settings(page).getByTestId('settings-checked')).toContainText('已检查');
   await scope(page).click();
-  await page.getByRole('option', { name: '所有 Runner', exact: true }).click();
+  await page.getByRole('option', { name: '所有执行机', exact: true }).click();
   expect(new URL(page.url()).searchParams.has('scope')).toBe(false);
   await expect(scope(page).locator('svg.lucide-server')).toBeVisible();
 });
@@ -116,7 +116,7 @@ test('scope menu wraps long machine names without clipping or overlapping adjace
   const selected = page.getByRole('option', { name: new RegExp(machineName), selected: true });
   const itemBox = await selected.boundingBox();
   const textBox = await selected.locator('> :first-child').boundingBox();
-  const previousBox = await page.getByRole('option', { name: '所有 Runner', exact: true }).boundingBox();
+  const previousBox = await page.getByRole('option', { name: '所有执行机', exact: true }).boundingBox();
   const nextBox = await page.getByRole('option', { name: 'next-machine', exact: true }).boundingBox();
   expect(itemBox).not.toBeNull();
   expect(textBox).not.toBeNull();

@@ -112,7 +112,7 @@ test('chief tabs: indicator pill slides between chips — 150ms ease on left/top
 }) => {
   await themed(page, 'light', '/app?scenario=101');
   const pill = page.locator('[data-segmented="indicator"]');
-  const routing = page.getByRole('tab', { name: '模型与 Runner' });
+  const routing = page.getByRole('tab', { name: '模型与执行机' });
   const charter = page.getByRole('tab', { name: '章程' });
 
   const box = (loc: Locator) =>

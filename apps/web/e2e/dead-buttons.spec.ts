@@ -40,7 +40,7 @@ test('schedules fixture face: topbar `新建` opens the dialog, freq tabs respon
   await expect(dialog).toBeHidden();
   await expect(page.locator('.sched-card')).toHaveCount(1);
 
-  await expect(page.locator('.sched-card')).toContainText('每周运行');
+  await expect(page.locator('.sched-card')).toContainText(/每周[一二三四五六日] \d{2}:\d{2}/);
 });
 
 test('machines rows carry only live controls, no dead inline buttons (#222 shipped + #1108 narrowed)', async ({
@@ -291,13 +291,13 @@ test('fail row `查看原始错误` opens the raw-error dialog with the full tex
 }) => {
   await page.goto('/app/todo/r8-12?scenario=54');
 
-  await expect(page.locator('.chat-para--fail')).toHaveText('运行该任务的 Runner 已离线');
+  await expect(page.locator('.chat-para--fail')).toHaveText('运行该任务的执行机已离线');
   await page.getByRole('button', { name: '查看原始错误' }).click();
   const dialog = page.getByRole('dialog', { name: '原始错误' });
   await expect(dialog).toBeVisible();
 
   await expect(dialog.locator('[data-testid="fail-raw-error"]')).toHaveText(
-    '运行该任务的 Runner 已离线',
+    '运行该任务的执行机已离线',
   );
 
   await dialog.getByRole('button', { name: '关闭' }).click();

@@ -218,7 +218,7 @@ for (const surface of ['global', 'project'] as const) {
     await setup(page, { at, nextRunAt: at, tz: 'America/New_York' });
     await page.clock.setFixedTime(Date.UTC(2026, 10, 5, 4, 30));
     await visit(page);
-    await expect(summary(page)).toContainText('Nov 5 01:15 Runs daily · Next Nov 5 01:15');
+    await expect(summary(page)).toContainText('Daily at 01:15 · Next Nov 5 01:15');
     await expect(summary(page)).not.toContainText('Next today');
   });
   test(`${surface} summary preserves missing-next data through its actual consumer`, async ({ page }) => {

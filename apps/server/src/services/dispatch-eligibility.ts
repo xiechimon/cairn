@@ -63,8 +63,8 @@ export function claudeCodeLoginBlocked(
 
 function runtimeMissingReason(name: string, runtime: 'pi' | 'claude-code' | 'gemini'): string {
   return runtime === 'gemini'
-    ? `Runner ${name} 不能运行 Gemini：它的权限请求还没接入命令闸。`
-    : `Runner ${name} 上没有检测到 ${MODEL_SOURCE_RUNTIME_LABELS[runtime]}：装好后重启 Runner。`;
+    ? `执行机 ${name} 不能运行 Gemini：它的权限请求还没接入命令闸。`
+    : `执行机 ${name} 上没有检测到 ${MODEL_SOURCE_RUNTIME_LABELS[runtime]}：装好后重启执行机。`;
 }
 
 export interface MachineCapabilityFacts {
@@ -167,16 +167,16 @@ export function homeMachineRejectReason(
     const report = machineRow.claudeCodeReport;
     const catalogEntry = catalog?.find((m) => m.id === agentRow.modelId);
     if (catalogEntry !== undefined && catalogEntry.liveness === 'dead') {
-      return `Runner ${machineRow.name} 的模型 ${agentRow.modelId} 已被上游下架（/v1/messages 404）。换一个活模型，或联系上游恢复上架。`;
+      return `执行机 ${machineRow.name} 的模型 ${agentRow.modelId} 已被上游下架（/v1/messages 404）。换一个活模型，或联系上游恢复上架。`;
     }
     if (catalogEntry !== undefined) {
       return null;
     }
     if (report == null) {
-      return `Runner ${machineRow.name} 尚未上报模型清单（daemon 版本过旧或未上线），无法校验模型 ${agentRow.modelId}。`;
+      return `执行机 ${machineRow.name} 尚未上报模型清单（后台服务版本过旧或未上线），无法校验模型 ${agentRow.modelId}。`;
     }
     if (!report.installed || !report.models.some((m) => m.id === agentRow.modelId)) {
-      return `Runner ${machineRow.name} 未配置模型 ${agentRow.modelId}（在该 Runner 的 ~/.claude/settings.json 配上，或在路由规则里换模型）。`;
+      return `执行机 ${machineRow.name} 未配置模型 ${agentRow.modelId}（在该执行机的 ~/.claude/settings.json 配上，或在路由规则里换模型）。`;
     }
   }
   return null;
