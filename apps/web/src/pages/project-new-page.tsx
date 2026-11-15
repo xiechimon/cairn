@@ -709,6 +709,6 @@ export function ProjectNewPage() {
 function NewProjectIcon({ icon }: { icon: ProjectIcon | null }) {
   const Icon = PROJECT_ICON_COMPONENTS[icon ?? 'box'];
   return (
-    <Icon className={cn('size-6', icon === null ? 'text-content-tertiary' : 'text-foreground')} />
+    <Icon className={cn('size-5', icon === null ? 'text-content-tertiary' : 'text-foreground')} />
   );
 }
