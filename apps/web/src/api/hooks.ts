@@ -49,7 +49,6 @@ import type {
   ProviderTestResult,
   PrPanelRow,
   RemoteRoutesResponse,
-  RetroProposal,
   RouteOverride,
   ScheduleRecord,
   SearchResponse,
@@ -1105,14 +1104,6 @@ export function useApiMutations(teamId: string | undefined) {
     importSkill: useMutation({
       mutationFn: (body: ImportSkillBody) =>
         api.post<SkillRecord>(`/api/teams/${teamId}/skills/import`, body),
-      onSuccess: invalidateAll,
-    }),
-    decideRetroProposal: useMutation({
-      mutationFn: (input: { proposalId: string; decision: 'accept' | 'dismiss' }) =>
-        api.post<RetroProposal>(
-          `/api/teams/${teamId}/chief/retro-proposals/${input.proposalId}/${input.decision}`,
-          {},
-        ),
       onSuccess: invalidateAll,
     }),
     deleteMemory: useMutation({

@@ -413,17 +413,19 @@
     {
       "id": "daily-report",
       "name": "Daily report and retro",
-      "summary": "The Coordinator posts an 08:00 report in the conversation and proposes retro changes the user accepts or rejects.",
-      "states": "A report row in the conversation with yesterday, needs-you and intake sections, and retro proposals that can be accepted or rejected.",
+      "summary": "The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro and intake suggestions by telling the Coordinator.",
+      "states": "A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro and intake suggestions and each one's state.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/chief/chief-report-row.tsx"
+          "apps/web/src/chief/chief-report-row.tsx",
+          "apps/web/src/chief/research-report.tsx"
         ],
         "server": [
           "apps/server/src/services/chief-report.ts",
-          "apps/server/src/services/chief-digest.ts"
+          "apps/server/src/services/chief-digest.ts",
+          "apps/server/src/services/chief-router-tools.ts"
         ]
       },
       "routes": {
@@ -433,7 +435,7 @@
       },
       "reach": [
         "open /app",
-        "click testid:chief-report"
+        "click testid:research-report-card"
       ],
       "research": [
         "docs/research/duet-proactive-coordinator.md"
@@ -447,7 +449,8 @@
       "evidence": [
         "apps/web/e2e/chief-daily-report.spec.ts",
         "apps/server/test/chief-report.test.ts",
-        "apps/server/test/chief-digest.test.ts"
+        "apps/server/test/chief-digest.test.ts",
+        "apps/server/test/chief-router-tools.test.ts"
       ],
       "batch": "B2"
     },
