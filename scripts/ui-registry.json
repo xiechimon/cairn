@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "97d0bba71e7d83252dd0b30c879ee719a7050eff",
+    "sha": "401e615b05c93c06b20aa96b1ce6eea99262f1ed",
     "date": "2026-11-15"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -130,7 +130,7 @@
     "menu.ts": {
       "kind": "adapter",
       "reason": "Shared Paper menu classes (surface, item, indicator, separator) consumed by dropdown-menu.tsx and the hand-built menus outside components/ui, so every menu uses one padding token and the concentric --radius-menu-item.",
-      "hash": "46bf678e0254c78594a66f51b30670dd6f1e645b67f257a9b0b2c1d105379a79"
+      "hash": "47ba97af684cd377dafef5c38a032c8ed0c5ad77662eafee55b5dfffb602a006"
     },
     "message-scroller.tsx": {
       "kind": "registry",

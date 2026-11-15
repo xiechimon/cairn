@@ -82,7 +82,7 @@ const PROVIDERS: ProviderRecord[] = [
 ];
 
 export const RESOURCES: ResourcesContent = {
-  skills: [{ name: 'r3-probe-skill', description: 'R3 盘点测试技能' }],
+  skills: [{ name: 'code-review', description: '按团队规范审查改动并给出修改建议' }],
   mcpServers: [
     {
       name: 'r3-mcp',
@@ -126,7 +126,7 @@ export const resourcesSkillsList: FixtureSet = {
   resources: {
     ...RESOURCES,
     skills: [
-      { name: 'r3-probe-skill', description: 'R3 盘点测试技能' },
+      { name: 'code-review', description: '按团队规范审查改动并给出修改建议' },
       { name: 'release-notes', description: '按提交历史起草发布说明' },
       { name: 'repo-audit', description: '盘点仓库依赖与许可证' },
     ],
