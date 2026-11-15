@@ -403,7 +403,7 @@ export function ProjectNewPage() {
             />
           </span>
           <span className="text-meta text-content-tertiary">
-            {t('项目图标，可选。不选时显示文件夹图标。')}
+            {t('项目图标，可选。不选时显示方盒图标。')}
           </span>
         </div>
         <FormField label={t('项目名称')} htmlFor="prj-new-name">
@@ -707,7 +707,7 @@ export function ProjectNewPage() {
 }
 
 function NewProjectIcon({ icon }: { icon: ProjectIcon | null }) {
-  const Icon = PROJECT_ICON_COMPONENTS[icon ?? 'folder'];
+  const Icon = PROJECT_ICON_COMPONENTS[icon ?? 'box'];
   return (
     <Icon className={cn('size-6', icon === null ? 'text-content-tertiary' : 'text-foreground')} />
   );

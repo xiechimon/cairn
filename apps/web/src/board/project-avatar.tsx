@@ -1,6 +1,6 @@
 import type { ProjectColor, ProjectIcon } from '@cairn/shared';
 import { cn } from 'cn';
-import { Folder } from 'lucide-react';
+import { Box } from 'lucide-react';
 import { PROJECT_ICON_COMPONENTS } from './project-icon-map.js';
 
 export function ProjectAvatar({
@@ -15,13 +15,13 @@ export function ProjectAvatar({
   bare?: boolean;
   className?: string;
 }) {
-  const Icon = icon != null ? PROJECT_ICON_COMPONENTS[icon] : Folder;
+  const Icon = icon != null ? PROJECT_ICON_COMPONENTS[icon] : Box;
   const tiled = icon != null && !bare;
   return (
     <span
       aria-hidden="true"
       data-project-icon={icon ?? undefined}
-      data-project-type={icon == null ? 'folder' : undefined}
+      data-project-type={icon == null ? 'box' : undefined}
       className={cn(
         'project-avatar grid flex-none place-items-center text-content-tertiary',
         tiled
