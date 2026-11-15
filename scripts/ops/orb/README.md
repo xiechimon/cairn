@@ -491,13 +491,6 @@ name comes from `--name omarchy-orb`. The server remains
 Do not inherit a production `CAIRN_API_KEY` or `CAIRN_TEAM` in this user unit;
 use the authorize URL for the separate enrollment.
 
-`CAIRN_COMPUTER=orb` gives a host-executor daemon the Coordinator computer
-without moving builds into Orbs. The daemon then reports the `computer`
-capability, and `browser` when `/var/lib/cairn-orb/computer-image` pins the
-expected agent-browser version. Any other non-empty value stops the daemon at
-startup. A daemon with `CAIRN_EXECUTOR=orb` and the nspawn runtime already has
-the computer and ignores this switch.
-
 Record live acceptance using [the trial evidence template](../../../docs/verify/b2-trial-one/README.md).
 Local fake tests do not establish Linux enrollment or Orb execution.
 
@@ -698,45 +691,3 @@ proves the detector and delivery plumbing, not Linux isolation. Only the
 coordinator's live `docs/verify/2277/canary.json` can establish nspawn, filesystem
 and egress behavior on omarchy. The macOS backend-user canary remains outside
 this item's scope.
-
-## Coordinator computer image
-
-`build-computer-image.sh` copies the image's completion marker to
-`/var/lib/cairn-orb/computer-image` (mode 0644), also on a run that reports
-`0 changes`. `/var/lib/machines` is root-only, so this copy is the only marker
-the daemon user can read; a host built before the copy existed reports no
-`browser` capability until the script runs again.
-
-`install-host.sh` also runs `build-computer-image.sh` after the base image. It
-snapshots `cairn-orb-base` into `cairn-orb-computer` and installs
-`xorg-server-xvfb`, `x11vnc`, `fluxbox`, `xdotool`, `chromium` and
-`imagemagick` with `systemd-nspawn --directory` and the host mirrorlist bound
-read-only. `arch-chroot` cannot install into an image that is not a mount
-point. The build refuses a guest Node major other than the base's. It installs
-a Chromium managed policy (no password manager, autofill or sync) and the
-`cairn-computer-desktop.service` unit, which runs Xvfb `:1`, fluxbox and two
-x11vnc servers on Unix sockets only: `/run/cairn-computer/vnc.sock` and the
-view-only `/run/cairn-computer/view.sock`. That guest path is a bind of the
-host `$RUN/cairn-orb/<machine>/computer` directory (created 0700 for the owner),
-so the daemon can connect without inbound ports and bridge raw RFB over its
-outbound websocket to the sealed noVNC gateway. Chromium keeps its own sandbox
-inside the Orb (measured in spike S1), so it runs without `--no-sandbox`.
-The image also installs `cairn-computer-agent.service` (user `agent`,
-`Restart=always`), which waits for `/run/cairn/computer.sock` and runs
-`/usr/bin/node /opt/cairn/daemon/cli.mjs orb-computer --socket /run/cairn/computer.sock`.
-The daemon listens on that socket (mode 0600) and writes `computer.sock.token`
-next to it; the agent authenticates with the token and its release key. The
-inherited `cairn-orb-worker.service` is disabled, because a computer never
-runs worker steps.
-
-Polkit treats `cairn-orb-computer` as a template, like `cairn-orb-base`: the owner
-cannot remove, rename or start it. Only the template may be cloned to a
-`cairn-orb-computer-*` name, and the template may only be cloned to such a
-name. For `cairn-orb-computer-*` machines, `prepare-machine.sh` runs
-`computer-home.mjs` as root. It creates `/var/lib/cairn-computer/<machine>`
-(`<owner>:<owner> 0700`, refusing links and foreign owners) and binds it to
-`/home/agent` with an idmap. The image is disposable and the home persists.
-The idmap maps guest root to host root on that bind, so the installer mounts
-`/var/lib/cairn-computer` on itself with `nosuid,nodev`
-(`var-lib-cairn\x2dcomputer.mount`), and `prepare-machine.sh` refuses to start
-a computer when that mount lacks either option, as it does for `/run/cairn-orb`.
