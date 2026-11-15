@@ -8,6 +8,7 @@ import {
   readFileSync,
   renameSync,
   statSync,
+  symlinkSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -448,6 +449,93 @@ test('refuses the same postinstall added to two manifests', () => {
   const result = f.run(DEPLOY, [target]);
   assert.equal(result.status, 2, result.stderr);
   assert.match(result.stderr, /install hooks/);
+});
+
+function fixtureWithManifest(manifest) {
+  const f = fixture();
+  const base = pushTarget(f, 'base', { files: { 'package.json': manifest } });
+  git(f.checkout, 'fetch', '-q', 'origin', 'main');
+  git(f.checkout, 'checkout', '-q', base);
+  return f;
+}
+
+const manifest = (scripts, extra = {}) => `${JSON.stringify({ scripts, ...extra }, null, 2)}\n`;
+
+test('refuses a package.json change that may add or change an install hook', () => {
+  const scripts = { prepare: 'husky', build: 'tsc' };
+  for (const [next, reason] of [
+    [manifest({ ...scripts, 'pnpm:devPreinstall': 'node x.cjs' }), /pnpm:devPreinstall/],
+    [
+      manifest({ ...scripts, postinstall: 'node x.cjs' }).replace(
+        '"postinstall"',
+        '"post\\u0069nstall"',
+      ),
+      /postinstall/,
+    ],
+    [manifest({ ...scripts, prepare: 'husky && node x.cjs' }), /prepare/],
+    [manifest({ ...scripts, preinstall: 'node x.cjs' }), /preinstall/],
+    [manifest({ ...scripts, prepublish: 'node x.cjs' }), /prepublish/],
+    [manifest(scripts, { pnpm: { onlyBuiltDependencies: ['evil'] } }), /pnpm settings changed/],
+    [manifest(scripts).replace('"tsc"', '"tsc",'), /does not parse/],
+    [manifest('node x.cjs'), /scripts changed and is not an object/],
+  ]) {
+    const f = fixtureWithManifest(manifest(scripts));
+    const before = git(f.checkout, 'rev-parse', 'HEAD');
+    const target = pushTarget(f, 'target', { files: { 'package.json': next } });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 2, `${next}\n${result.stderr}`);
+    assert.match(result.stderr, /install hooks in package.json may be added or changed/);
+    assert.match(result.stderr, reason, next);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), before);
+    assert.equal(f.log('pnpm.log'), '');
+  }
+});
+
+test('refuses a hook in a manifest pnpm reads that the JSON guard cannot see', () => {
+  for (const [files, reason] of [
+    [{ 'apps/evil\n/package.json': manifest({ postinstall: 'node x.cjs' }) }, /apps\/evil/],
+    [{ 'apps/evil/package.yaml': 'scripts:\n  postinstall: node x.cjs\n' }, /package.yaml/],
+    [{ 'apps/evil/binding.gyp': '{}\n' }, /binding.gyp/],
+  ]) {
+    const f = fixture();
+    const before = git(f.checkout, 'rev-parse', 'HEAD');
+    const target = pushTarget(f, 'target', { files });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 2, `${Object.keys(files)}\n${result.stderr}`);
+    assert.match(result.stderr, reason);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), before);
+    assert.equal(f.log('pnpm.log'), '');
+  }
+});
+
+test('refuses a package.json that is a symlink', () => {
+  const f = fixture();
+  const before = git(f.checkout, 'rev-parse', 'HEAD');
+  writeFileSync(join(f.work, 'real.json'), manifest({ postinstall: 'node x.cjs' }));
+  mkdirSync(join(f.work, 'apps/evil'), { recursive: true });
+  symlinkSync('../../real.json', join(f.work, 'apps/evil/package.json'));
+  git(f.work, 'add', 'real.json', 'apps/evil/package.json');
+  const target = pushTarget(f);
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(result.stderr, /apps\/evil\/package.json is not a regular file/);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), before);
+});
+
+test('deploys a package.json change that adds or changes no install hook', () => {
+  const base =
+    '{\n  "scripts": {\n    "prepare": "husky",\n    "postinstall": "node x.cjs"\n  }\n}\n';
+  for (const next of [
+    '{"scripts":{"postinstall":"node x.cjs","prepare":"husky","build":"tsc"},"version":"2.0.0"}\n',
+    '{"scripts":{"prepare":"husky"}}\n',
+    '{"scripts":{}}\n',
+  ]) {
+    const f = fixtureWithManifest(base);
+    const target = pushTarget(f, 'target', { files: { 'package.json': next } });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 0, `${next}\n${result.stderr}`);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), target);
+  }
 });
 
 test('ignores a trailing comma added after an unchanged prepare hook', () => {
