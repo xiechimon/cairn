@@ -1,18 +1,21 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import type { ClaudeAuthStateWire, ClaudeCodeReport } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
+  claudeSubscription as claudeSubscriptionTable,
   machine as machineTable,
   step as stepTable,
   team as teamTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import { hasActiveClaudeSubscription } from '../src/services/claude-subscriptions.js';
+import { claimPendingChiefStep } from '../src/services/coordinator-steps.js';
 import { claimStep, markPresence } from '../src/services/machines.js';
 import {
   bootServer,
@@ -599,4 +602,199 @@ test('team-scoped revocation removes future credentials and restores the machine
   const nextCredentials = await s.app.request(`/api/machine/token/${nextStep}`, { headers });
   expect(nextCredentials.status).toBe(200);
   expect(await nextCredentials.text()).not.toContain(token);
+});
+
+describe('several stored subscriptions, one enabled', () => {
+  const tokenOf = (letter: string) => `sk-ant-oat01-${letter.repeat(64)}`;
+
+  async function save(s: TestServer, label: string, letter: string, expiresAt?: number) {
+    const response = await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions`, {
+      label,
+      token: tokenOf(letter),
+      ...(expiresAt !== undefined ? { expiresAt } : {}),
+    });
+    expect(response.status).toBe(201);
+    return ((await response.json()) as { id: string }).id;
+  }
+
+  function rows(s: TestServer) {
+    return s.db.select().from(claudeSubscriptionTable).all();
+  }
+
+  function stepRow(s: TestServer, id: string) {
+    return s.db.select().from(stepTable).where(eq(stepTable.id, id)).get();
+  }
+
+  function credentialsOf(s: TestServer, machineId: string, stepId: string) {
+    const machineToken = `machine-${stepId}`;
+    s.db
+      .update(machineTable)
+      .set({ tokenHash: createHash('sha256').update(machineToken).digest('hex') })
+      .where(eq(machineTable.id, machineId))
+      .run();
+    return s.app.request(`/api/machine/token/${stepId}`, {
+      headers: { authorization: `Bearer ${machineToken}` },
+    });
+  }
+
+  test('the first token is enabled, a token saved beside a live one is not', async () => {
+    const { s } = await world();
+    const first = await save(s, 'First', 'a');
+    const second = await save(s, 'Second', 'b');
+    expect(rows(s).find((row) => row.id === first)?.enabledAt).not.toBeNull();
+    expect(rows(s).find((row) => row.id === second)?.enabledAt).toBeNull();
+  });
+
+  test('an expired enabled token is replaced by the next one saved, which is enabled', async () => {
+    const { s } = await world();
+    const old = await save(s, 'Old', 'a', Date.now() + 60_000);
+    s.db
+      .update(claudeSubscriptionTable)
+      .set({ expiresAt: Date.now() - 1000 })
+      .where(eq(claudeSubscriptionTable.id, old))
+      .run();
+    expect(hasActiveClaudeSubscription({ db: s.db }, s.team.id)).toBe(false);
+    const fresh = await save(s, 'Fresh', 'b');
+    expect(rows(s).find((row) => row.id === old)?.enabledAt).toBeNull();
+    expect(rows(s).find((row) => row.id === fresh)?.enabledAt).not.toBeNull();
+    expect(hasActiveClaudeSubscription({ db: s.db }, s.team.id)).toBe(true);
+  });
+
+  test('the database refuses a second enabled row in a team but allows one per team', async () => {
+    const { s } = await world();
+    const first = await save(s, 'First', 'a');
+    const second = await save(s, 'Second', 'b');
+    expect(() =>
+      s.db
+        .update(claudeSubscriptionTable)
+        .set({ enabledAt: 5 })
+        .where(eq(claudeSubscriptionTable.id, second))
+        .run(),
+    ).toThrow(/UNIQUE/i);
+    s.db
+      .update(claudeSubscriptionTable)
+      .set({ enabledAt: null })
+      .where(eq(claudeSubscriptionTable.id, first))
+      .run();
+    expect(hasActiveClaudeSubscription({ db: s.db }, s.team.id)).toBe(false);
+  });
+
+  test.each(['build', 'chief'] as const)(
+    'a %s claim is bound to the enabled account and keeps its token after the enabled row changes',
+    async (kind) => {
+      const { s, projectId } = await world();
+      const machineId = insertMachine(s, {
+        name: `bound-${kind}`,
+        claudeCodeReport: report({ state: 'expired', expiresAt: 1 }),
+      });
+      const first = await save(s, 'First', 'a');
+      const second = await save(s, 'Second', 'b');
+      const stepId =
+        kind === 'chief'
+          ? insertChief(s, machineId, 'claude-code')
+          : (() => {
+              routeSession(s, { machineId, provider: 'claude-code' });
+              return insertBuildStep(s, projectId);
+            })();
+      expect((await claimAs(s, machineId))?.step.id).toBe(stepId);
+      expect(stepRow(s, stepId)?.claudeSubscriptionId).toBe(first);
+      s.db
+        .update(claudeSubscriptionTable)
+        .set({ enabledAt: null })
+        .where(eq(claudeSubscriptionTable.id, first))
+        .run();
+      s.db
+        .update(claudeSubscriptionTable)
+        .set({ enabledAt: Date.now() })
+        .where(eq(claudeSubscriptionTable.id, second))
+        .run();
+      const response = await credentialsOf(s, machineId, stepId);
+      expect(await response.json()).toMatchObject({ claudeSubscriptionToken: tokenOf('a') });
+    },
+  );
+
+  test('a step with no recorded account receives no stored token even when one is enabled', async () => {
+    const { s, projectId } = await world();
+    const machineId = insertMachine(s, { name: 'unbound', claudeCodeReport: report() });
+    routeSession(s, { machineId, provider: 'claude-code' });
+    const stepId = insertBuildStep(s, projectId);
+    expect((await claimAs(s, machineId))?.step.id).toBe(stepId);
+    expect(stepRow(s, stepId)?.claudeSubscriptionId).toBeNull();
+    await save(s, 'Late', 'a');
+    const response = await credentialsOf(s, machineId, stepId);
+    expect(await response.text()).not.toContain(tokenOf('a'));
+  });
+
+  test('a step whose bound account is gone receives nothing and never another account', async () => {
+    const { s, projectId } = await world();
+    const machineId = insertMachine(s, { name: 'gone', claudeCodeReport: report() });
+    const first = await save(s, 'First', 'a');
+    await save(s, 'Second', 'b');
+    routeSession(s, { machineId, provider: 'claude-code' });
+    const stepId = insertBuildStep(s, projectId);
+    expect((await claimAs(s, machineId))?.step.id).toBe(stepId);
+    expect(stepRow(s, stepId)?.claudeSubscriptionId).toBe(first);
+    s.db.delete(claudeSubscriptionTable).where(eq(claudeSubscriptionTable.id, first)).run();
+    const body = await (await credentialsOf(s, machineId, stepId)).text();
+    expect(body).not.toContain(tokenOf('a'));
+    expect(body).not.toContain(tokenOf('b'));
+  });
+
+  test('the in-server Coordinator claim never records an account', async () => {
+    const { s } = await world();
+    await save(s, 'First', 'a');
+    const machineId = insertMachine(s, { name: 'unused', claudeCodeReport: report() });
+    const stepId = insertChief(s, machineId, 'claude-code');
+    const pending = stepRow(s, stepId);
+    expect(pending).toBeDefined();
+    expect(claimPendingChiefStep(s.db, pending as NonNullable<typeof pending>, null)).toBe(true);
+    expect(stepRow(s, stepId)).toMatchObject({ status: 'claimed', claudeSubscriptionId: null });
+  });
+
+  test('a step on a runtime other than Claude Code records no account', async () => {
+    const { s, projectId } = await world();
+    const machineId = insertMachine(s, { name: 'pi-runtime', claudeCodeReport: report() });
+    await save(s, 'First', 'a');
+    routeSession(s, { machineId, provider: 'stub-gw' });
+    const stepId = insertBuildStep(s, projectId);
+    const claimed = await claimAs(s, machineId);
+    expect(claimed?.step.id).toBe(stepId);
+    expect(stepRow(s, stepId)?.claudeSubscriptionId).toBeNull();
+  });
+
+  test('the migration backfill enables the newest unexpired row per team and binds claimed steps', async () => {
+    const { s } = await world();
+    const machineId = insertMachine(s, { name: 'backfill', claudeCodeReport: report() });
+    const base = { teamId: s.team.id, tokenCipher: 'cipher', expiresAt: null, enabledAt: null };
+    s.db
+      .insert(claudeSubscriptionTable)
+      .values([
+        { ...base, id: 'old', label: 'old', createdAt: 1 },
+        { ...base, id: 'new', label: 'new', createdAt: 2 },
+        { ...base, id: 'dead', label: 'dead', createdAt: 3, expiresAt: 1 },
+      ])
+      .run();
+    s.db
+      .insert(stepTable)
+      .values([
+        { id: 'running', buildId: 'b1', kind: 'build', status: 'claimed', machineId, createdAt: 1 },
+        { id: 'queued', buildId: 'b2', kind: 'build', status: 'pending', createdAt: 2 },
+      ])
+      .run();
+    const statements = readFileSync(
+      new URL('../drizzle/0170_claude_subscription_enabled.sql', import.meta.url),
+      'utf8',
+    )
+      .split('--> statement-breakpoint')
+      .filter((statement) => /^\s*UPDATE/i.test(statement));
+    expect(statements).toHaveLength(2);
+    for (const statement of statements) s.db.run(sql.raw(statement));
+    expect(
+      rows(s)
+        .filter((row) => row.enabledAt !== null)
+        .map((row) => row.id),
+    ).toEqual(['new']);
+    expect(stepRow(s, 'running')?.claudeSubscriptionId).toBe('new');
+    expect(stepRow(s, 'queued')?.claudeSubscriptionId).toBeNull();
+  });
 });

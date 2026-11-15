@@ -4,7 +4,7 @@ import type {
   CreateClaudeSubscription,
   SecretBox,
 } from '@cairn/shared';
-import { and, desc, eq, gt, isNull, or } from 'drizzle-orm';
+import { and, desc, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { claudeSubscription } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
@@ -43,15 +43,31 @@ export function createClaudeSubscription(
 ): ClaudeSubscription {
   if (body.label.includes(body.token))
     throw new HttpError(400, 'Connection label must not contain the token');
+  const now = nowMs();
   const row = {
     id: newRecordId(),
     teamId,
     label: body.label,
     tokenCipher: deps.box.seal(body.token),
     expiresAt: body.expiresAt ?? null,
-    createdAt: nowMs(),
+    enabledAt: null as number | null,
+    createdAt: now,
   };
-  deps.db.insert(claudeSubscription).values(row).run();
+  deps.db.transaction((tx) => {
+    tx.update(claudeSubscription)
+      .set({ enabledAt: null })
+      .where(
+        and(
+          eq(claudeSubscription.teamId, teamId),
+          isNotNull(claudeSubscription.enabledAt),
+          isNotNull(claudeSubscription.expiresAt),
+          lte(claudeSubscription.expiresAt, now),
+        ),
+      )
+      .run();
+    row.enabledAt = activeSubscriptionRow({ db: tx }, teamId) === undefined ? now : null;
+    tx.insert(claudeSubscription).values(row).run();
+  });
   return toRecord(row);
 }
 
@@ -91,10 +107,28 @@ export function openClaudeSubscription(
   deps: Deps,
   teamId: string,
   provider: string | null | undefined,
+  boundSubscriptionId: string | null | undefined,
 ): string | undefined {
-  if (provider !== 'claude-code') return undefined;
-  const row = activeSubscriptionRow(deps, teamId);
+  if (provider !== 'claude-code' || !boundSubscriptionId) return undefined;
+  const row = deps.db
+    .select()
+    .from(claudeSubscription)
+    .where(
+      and(
+        eq(claudeSubscription.teamId, teamId),
+        eq(claudeSubscription.id, boundSubscriptionId),
+        or(isNull(claudeSubscription.expiresAt), gt(claudeSubscription.expiresAt, nowMs())),
+      ),
+    )
+    .get();
   return row ? deps.box.open(row.tokenCipher) : undefined;
+}
+
+export function enabledSubscriptionId(
+  deps: { db: Pick<Db, 'select'> },
+  teamId: string,
+): string | null {
+  return activeSubscriptionRow(deps, teamId)?.id ?? null;
 }
 
 export function hasActiveClaudeSubscription(
@@ -111,10 +145,10 @@ function activeSubscriptionRow(deps: { db: Pick<Db, 'select'> }, teamId: string)
     .where(
       and(
         eq(claudeSubscription.teamId, teamId),
+        isNotNull(claudeSubscription.enabledAt),
         or(isNull(claudeSubscription.expiresAt), gt(claudeSubscription.expiresAt, nowMs())),
       ),
     )
-    .orderBy(desc(claudeSubscription.createdAt), desc(claudeSubscription.id))
     .get();
 }
 
