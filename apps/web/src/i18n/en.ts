@@ -1370,6 +1370,13 @@ export const EN: Record<string, string> = {
   '等 Runner 上线': 'waiting for a Runner to come online',
   '缺 {missing}': 'missing {missing}',
   排队中: 'queued',
+  '已交给 Coordinator 安排': 'Handed to the Coordinator',
+  'Coordinator 正在安排这个任务...': 'The Coordinator is arranging this task...',
+  'Coordinator 没能安排这个任务：{reason}': 'The Coordinator could not arrange this task: {reason}',
+  'Coordinator 没有派发这个任务，原因见上面的回复。点「开始」再试一次。':
+    'The Coordinator did not dispatch this task; its reply above says why. Press Start to try again.',
+  'Coordinator 没有派发这个任务，也没有说明原因。点「开始」再试一次。':
+    'The Coordinator did not dispatch this task and gave no reason. Press Start to try again.',
   'Coordinator 正在编排这张任务，等这一轮结束再发起。':
     'The Coordinator is already orchestrating this task — wait for this round to finish.',
   '重复发起只会多排一轮编排，不会更快开始。':
