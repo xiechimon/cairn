@@ -43,7 +43,7 @@ describe('enroll confirm owner auth (#2053)', () => {
     expect(confirm.status).toBe(401);
 
     const poll = await reqWith(s, 'POST', '/api/machine/enroll/poll', {}, { enrollId });
-    expect(await poll.json()).toEqual({ status: 'pending' });
+    expect(await poll.json()).toEqual({ status: 'pending', name: 'audit-machine' });
   });
 
   test('wrong bearer and api-key bearer cannot confirm', async () => {
@@ -82,7 +82,7 @@ describe('enroll confirm owner auth (#2053)', () => {
     expect(withKey.status).toBe(401);
 
     const poll = await reqWith(s, 'POST', '/api/machine/enroll/poll', {}, { enrollId });
-    expect(await poll.json()).toEqual({ status: 'pending' });
+    expect(await poll.json()).toEqual({ status: 'pending', name: 'wrong-bearer' });
   });
 
   test('owner confirmation authorizes; CLI poll stays anonymous; confirm is single-use', async () => {
@@ -98,7 +98,7 @@ describe('enroll confirm owner auth (#2053)', () => {
     const { enrollId } = (await start.json()) as { enrollId: string };
 
     const pending = await reqWith(s, 'POST', '/api/machine/enroll/poll', {}, { enrollId });
-    expect(await pending.json()).toEqual({ status: 'pending' });
+    expect(await pending.json()).toEqual({ status: 'pending', name: 'owner-approved' });
 
     const confirmed = await reqWith(
       s,
@@ -161,7 +161,7 @@ describe('enroll confirm owner auth (#2053)', () => {
     expect(confirm.status).toBe(403);
 
     const poll = await reqWith(s, 'POST', '/api/machine/enroll/poll', {}, { enrollId });
-    expect(await poll.json()).toEqual({ status: 'pending' });
+    expect(await poll.json()).toEqual({ status: 'pending', name: 'foreign-team' });
   });
 
   test('auth off still allows confirm without bearer (local/dev)', async () => {

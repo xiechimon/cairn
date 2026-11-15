@@ -3,6 +3,7 @@ import {
   claudeRateLimitReportSchema,
   computerCallIdSchema,
   DELIVERABLE_GRANT_MAX_BODY_BYTES,
+  enrollDisplayName,
   machineActivityBodySchema,
   machineAgentTodoBodySchema,
   machineAskBodySchema,
@@ -288,7 +289,8 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       return c.json({ status: 'expired' });
     }
     if (pending.machine) return c.json({ status: 'authorized', machine: pending.machine });
-    return c.json({ status: 'pending' });
+    const name = enrollDisplayName(pending.name);
+    return c.json({ status: 'pending', ...(name !== undefined ? { name } : {}) });
   });
 
   app.post('/api/machine/enroll/confirm', async (c) => {

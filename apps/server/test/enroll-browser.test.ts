@@ -33,7 +33,27 @@ describe('browser authorization flow (W4 #285)', () => {
     const pending = await req(s.app, 'POST', '/api/machine/enroll/poll', {
       enrollId: startBody.enrollId,
     });
-    expect(await pending.json()).toEqual({ status: 'pending' });
+    expect(await pending.json()).toEqual({ status: 'pending', name: 'mbp-14' });
+    for (const [name, shown] of [
+      [undefined, false],
+      ['', false],
+      ['   ', false],
+      ['evil\u202emachine', false],
+      ['a'.repeat(254), false],
+      ['a'.repeat(253), true],
+    ] as const) {
+      const other = await req(
+        s.app,
+        'POST',
+        '/api/machine/enroll/start',
+        name === undefined ? {} : { name },
+      );
+      const { enrollId } = (await other.json()) as { enrollId: string };
+      const polled = await req(s.app, 'POST', '/api/machine/enroll/poll', { enrollId });
+      expect(await polled.json()).toEqual(
+        shown ? { status: 'pending', name } : { status: 'pending' },
+      );
+    }
     const unknown = await req(s.app, 'POST', '/api/machine/enroll/poll', {
       enrollId: 'nope',
     });
