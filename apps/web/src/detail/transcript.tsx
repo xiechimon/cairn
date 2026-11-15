@@ -1,5 +1,6 @@
 import type { StepPromptOrigin } from '@cairn/shared';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { CoordinatorFixLinks } from '../chief/chief-message-rows.js';
 import { MessageToolbar } from '../chief/message-toolbar.js';
 import { TranscriptReportCard } from '../chief/research-report.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
@@ -375,7 +376,10 @@ function Row({
         <div className={`${AGENT_ROW} ${margin} [&>*]:max-w-full`} data-row="agent">
           {liveStep == null ? (
             item.blocked === true ? (
-              <BlockedTyping text={t(item.label, item.labelVars)} />
+              <BlockedTyping
+                text={t(item.label, item.labelVars)}
+                actions={<CoordinatorFixLinks kind={item.blockedKind} />}
+              />
             ) : (
               <TypingDots testId="live-row" label={t(item.label, item.labelVars)} />
             )

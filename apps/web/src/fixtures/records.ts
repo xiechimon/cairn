@@ -1,6 +1,5 @@
 import {
   type AgentTodoItem,
-  type ChiefDigestItem,
   type ChiefReportContent,
   type ClaudeLogin,
   type ConfinementReport,
@@ -397,6 +396,7 @@ export type TranscriptItem =
       signalAt?: number;
       skills?: SkillFact[];
       blocked?: true;
+      blockedKind?: StepQueueBlocked['kind'];
     }
   | { kind: 'skills'; read: string[]; denied: string[] }
   | { kind: 'plan'; title: string; preview: string; seconds?: number; createdAt?: number }
@@ -623,13 +623,6 @@ export type ChiefStreamItem =
       kind: 'thinking';
       text: string;
       id?: string;
-    }
-  | {
-      kind: 'digest';
-      id: string;
-      reason: 'daily' | 'threshold';
-      madeAt: number;
-      items: ChiefDigestItem[];
     }
   | {
       kind: 'daily-report';

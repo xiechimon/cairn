@@ -29,7 +29,6 @@ import { dateTimeFormat } from '../lib/date-format.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/routing-settings-page.js';
 import { settingsHref } from '../settings/settings-href.js';
-import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefReportRow } from './chief-report-row.js';
 import { TaskRefRow } from './chief-task-ref-row.js';
 import { childRefsOf, type TaskRef } from './chief-task-refs.js';
@@ -374,7 +373,6 @@ export function chiefStreamRowKey(
     case 'handoff':
     case 'takeover':
     case 'task-card':
-    case 'digest':
     case 'runner-offline':
     case 'stopped':
     case 'thread-report':
@@ -443,7 +441,7 @@ const COORDINATOR_FIXES: Partial<
   ],
 };
 
-function CoordinatorFixLinks({ kind }: { kind: StepQueueBlocked['kind'] | undefined }) {
+export function CoordinatorFixLinks({ kind }: { kind: StepQueueBlocked['kind'] | undefined }) {
   const { t } = useI18n();
   const fixes = kind === undefined ? undefined : COORDINATOR_FIXES[kind];
   if (fixes === undefined) return null;
@@ -604,8 +602,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'takeover') return <TakeoverCard item={item} />;
   if (item.kind === 'task-card')
     return <TaskStartedRow todoId={item.todoId} seq={item.seq} title={item.title} />;
-  if (item.kind === 'digest')
-    return <ChiefDigestRow reason={item.reason} madeAt={item.madeAt} items={item.items} />;
   if (item.kind === 'daily-report') return <ChiefReportRow report={item.report} />;
   if (item.kind === 'runner-offline') return <RunnerOfflineRow notice={item.notice} />;
   if (item.kind === 'note')

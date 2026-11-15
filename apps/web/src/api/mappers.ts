@@ -42,6 +42,7 @@ import {
   infoReportMessageSchema,
   liveQuickReplies,
   MODEL_SOURCE_RUNTIME_LABELS,
+  orchestratedTodoIdOf,
   orchestratePromptHeadOf,
   PLACEHOLDER_TITLE_FALLBACK,
   PLAN_SECTIONS,
@@ -70,6 +71,7 @@ import {
 } from '@cairn/shared';
 import { relativeTime } from '../board/rel-time.js';
 import { STATUS_WORDS } from '../board/status-words.js';
+import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import type {
   BranchInfoContent,
   ChiefContent,
@@ -1623,19 +1625,7 @@ function collectChiefStream(
         items.push({ kind: 'daily-report', id: m.id, report: dailyReport.data });
         continue;
       }
-      const digest = chiefDigestContentSchema.safeParse(parsed);
-      if (digest.success) {
-        if (digest.data.items.length === 0) continue;
-        pendingTools = [];
-        items.push({
-          kind: 'digest',
-          id: m.id,
-          reason: digest.data.reason,
-          madeAt: digest.data.madeAt,
-          items: digest.data.items,
-        });
-        continue;
-      }
+      if (chiefDigestContentSchema.safeParse(parsed).success) continue;
     }
     const call = toolCallOfContent(m.content);
     if (call?.name === SUGGEST_REPLIES_TOOL_NAME) continue;
@@ -1880,6 +1870,70 @@ export function mapChief(
     ...(active?.fallbackModel != null ? { fallbackModel: active.fallbackModel } : {}),
     ...(quickReplies.length > 0 ? { quickReplies } : {}),
   };
+}
+
+export function mapOrchestrationFeedback(
+  todo: Pick<WireTodo, 'id' | 'phase' | 'phaseAt'>,
+  thread: ChiefThread | null,
+  messages: readonly MessageRow[],
+): TranscriptItem[] {
+  if (thread === null || (todo.phase !== 'todo' && todo.phase !== 'failed')) return [];
+  const start = messages.findLastIndex(
+    (m) =>
+      m.role === 'user' &&
+      m.createdAt >= todo.phaseAt &&
+      orchestratedTodoIdOf(textOfContent(m.content)) === todo.id,
+  );
+  const request = messages[start];
+  if (request === undefined) return [];
+  const pending = new Set((thread.pending ?? []).map((p) => p.messageId));
+  const rest = messages.slice(start + 1);
+  const next = rest.findIndex((m) => m.role === 'user' && !pending.has(m.id));
+  const turn = next === -1 ? rest : rest.slice(0, next);
+  const items: TranscriptItem[] = [{ kind: 'note', text: '已交给 Coordinator 安排' }];
+  for (const m of turn) {
+    const error = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
+    if (error !== null) {
+      items.push({
+        kind: 'note',
+        text: 'Coordinator 没能安排这个任务：{reason}',
+        vars: { reason: error },
+        id: m.id,
+      });
+      return items;
+    }
+    const text = m.role === 'assistant' ? textOfContent(m.content).trim() : '';
+    if (text !== '')
+      items.push({ kind: 'robot', markdown: text, id: m.id, createdAt: m.createdAt });
+  }
+  const replied = items.length > 1;
+  if (next === -1 && threadTurnInFlight(thread)) {
+    if (thread.turnQueue != null) {
+      const queued = connectingLine(thread.turnQueue);
+      items.push({
+        kind: 'streaming',
+        ...(thread.turnQueue.blocked != null
+          ? { blocked: true as const, blockedKind: thread.turnQueue.blocked.kind }
+          : {}),
+        label: queued.label,
+        ...(queued.vars !== undefined ? { labelVars: queued.vars } : {}),
+      });
+    } else {
+      items.push({
+        kind: 'streaming',
+        label: 'Coordinator 正在安排这个任务...',
+        startedAt: request.createdAt,
+      });
+    }
+    return items;
+  }
+  items.push({
+    kind: 'note',
+    text: replied
+      ? 'Coordinator 没有派发这个任务，原因见上面的回复。点「开始」再试一次。'
+      : 'Coordinator 没有派发这个任务，也没有说明原因。点「开始」再试一次。',
+  });
+  return items;
 }
 
 export function mapPlanVersions(plans: PlanRow[]): PlanVersion[] {

@@ -1,6 +1,5 @@
 import {
   type AutonomyRecord,
-  type ChiefDigestItem,
   FIXED_TAGS,
   type FsListResult,
   type GithubIssueEcho,
@@ -413,26 +412,6 @@ export const QUESTION_CANCELLED: ChiefQuestionItem = {
   requestId: 'req-3',
   status: 'cancelled',
 };
-
-export const DIGEST_ITEMS: ChiefDigestItem[] = [
-  {
-    group: 'decided',
-    text: 'Exports skip archived tasks.',
-    reason: 'You picked it in the export thread.',
-  },
-  { group: 'done', text: 'Merged **#1190**, the branch badge fix.', reason: '' },
-  {
-    group: 'open',
-    text: 'The schedules migration still fails on the remote machine.',
-    reason: 'Two retries left.',
-  },
-  {
-    group: 'remembered',
-    text: 'Prefer small PRs that touch one page.',
-    reason: 'Saved to the Coordinator memory.',
-    memory: { id: 'mem-1', agentId: 'chief' },
-  },
-];
 
 export const AUTONOMY: AutonomyRecord = {
   settings: { enabled: true, quietMinutes: 10, cooldownMinutes: 15, dailyBudgetUsd: 10 },

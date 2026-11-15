@@ -104,7 +104,13 @@ export async function finishStepRun(input: StepFinishInput): Promise<void> {
     lastError: outcome.lastError,
     stopped,
     closes: outcome.lastError === null && !stopped && !isReview && !attachmentVerify,
-    note: (id, content) => transcript.upsert({ id, role: 'system', content, createdAt: now() }),
+    note: (id, content) =>
+      transcript.upsert({
+        id,
+        role: 'system',
+        content,
+        createdAt: transcript.messages().find((m) => m.id === id)?.createdAt ?? now(),
+      }),
     log: (message) => logger.step(message),
     logRaw: (message) => logger.raw(message),
   });
