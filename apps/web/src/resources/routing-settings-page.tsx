@@ -372,7 +372,7 @@ export function RoutingSettingsPage() {
         <div className="flex flex-col gap-8 pt-1 pb-16">
           <p className="m-0 text-meta text-pretty break-keep text-content-tertiary">
             {t(
-              '选新任务默认用哪个模型，以及 Coordinator 和其他 Agent 各用什么模型、思考多深。改动马上生效。',
+              '在这里改常用模型，以及新任务和 Coordinator 用哪个模型、思考多深，改动马上生效。其他后台用途（评审、引文检查等）用哪个模型，在模型路由的图里能看到。',
             )}
           </p>
           <RuleIssueNotices

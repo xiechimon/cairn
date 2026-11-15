@@ -161,7 +161,7 @@ function TopModelRow({
       <span className="flex flex-none items-center gap-1 max-sm:basis-full max-sm:pl-7">
         <span
           data-testid="top-model-provider"
-          className="inline-flex h-6 max-sm:h-5 max-w-36 flex-none items-center gap-1 rounded-full bg-secondary px-2 text-caption text-content-secondary max-sm:mr-auto max-sm:max-w-40 max-sm:min-w-0 max-sm:shrink"
+          className="inline-flex h-6 max-sm:h-5 max-w-56 flex-none items-center gap-1 rounded-full bg-secondary px-2 text-caption text-content-secondary max-sm:mr-auto max-sm:max-w-40 max-sm:min-w-0 max-sm:shrink"
         >
           {option === undefined ? (
             t('不可用')
