@@ -52,6 +52,7 @@ function demoFixtureOf(): FixtureSet {
       hasChanges: input.hasChanges ?? false,
       hasPlan: input.hasPlan ?? false,
       buildHistory: input.buildHistory ?? [],
+      output: 'code',
       sourceTodo: null,
       v: 3,
       ...SERVER_SECTION[input.phase],

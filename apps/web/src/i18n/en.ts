@@ -144,8 +144,8 @@ export const EN: Record<string, string> = {
   '在线 · 空闲': 'Online · idle',
   '{n} 在跑': '{n} running',
   已安装: 'Installed',
-  '未开启桌面控制，开启后这里显示屏幕':
-    'Desktop control is off; the screen shows here once it is on',
+  '未开启桌面控制，开启后屏幕显示在电脑下方':
+    'Desktop control is off; each screen shows under its computer once it is on',
   '桌面控制已上线，屏幕显示在这里': 'Desktop control is online; the screen shows here',
   正在连接屏幕: 'Connecting to the screen',
   屏幕暂时连不上: 'The screen could not connect',
@@ -1622,7 +1622,6 @@ export const EN: Record<string, string> = {
   等待检查: 'Waiting on checks',
   未配置: 'Not configured',
   空闲: 'Idle',
-  '{n} 个在跑': '{n} running',
   项目设置: 'Project settings',
   回答: 'Answer',
   看计划: 'Review plan',
