@@ -59,7 +59,7 @@ test('settings: github project can retarget its repo; save writes githubRepo and
   page,
 }) => {
   const stub = await stubWorld(page, [githubProject('octo/pacman')]);
-  await page.goto(`/app/project/${PROJECT_ID}/settings`);
+  await page.goto(`/app/project/${PROJECT_ID}/settings?tab=repo`);
 
   const input = page.getByRole('textbox', { name: FIELD });
   await expect(input).toBeVisible();
@@ -79,7 +79,7 @@ test('settings: github project can retarget its repo; save writes githubRepo and
 
 test('settings: a malformed repo shows an inline error and sends no PATCH', async ({ page }) => {
   const stub = await stubWorld(page, [githubProject('octo/pacman')]);
-  await page.goto(`/app/project/${PROJECT_ID}/settings`);
+  await page.goto(`/app/project/${PROJECT_ID}/settings?tab=repo`);
 
   const input = page.getByRole('textbox', { name: FIELD });
   await input.fill('no-slash');
@@ -99,8 +99,8 @@ test('settings: hosted project keeps the read-only repo row (github-only edit)',
       githubRepo: null,
     },
   ]);
-  await page.goto(`/app/project/${HOSTED_PROJECT_ID}/settings`);
-  await expect(page.getByText('名称', { exact: true })).toBeVisible();
+  await page.goto(`/app/project/${HOSTED_PROJECT_ID}/settings?tab=repo`);
+  await expect(page.getByText('目标分支', { exact: true })).toBeVisible();
   await expect(page.getByRole('textbox', { name: FIELD })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '保存仓库' })).toHaveCount(0);
 });

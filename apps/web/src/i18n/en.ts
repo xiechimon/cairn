@@ -826,7 +826,6 @@ export const EN: Record<string, string> = {
   本机加速路径: 'Local acceleration path',
   '绝对路径，留空即清除': 'Absolute path; empty to clear',
   // #1242 项目身份可变面：设置页名称/描述编辑 + local→github 转换卡。
-  保存名称: 'Save name',
   更换项目图标: 'Change project icon',
   搜索图标: 'Search icons',
   没有匹配的图标: 'No matching icons',
@@ -1894,6 +1893,7 @@ export const EN: Record<string, string> = {
   加词或筛选: 'Add words or a filter',
   快速筛选: 'Quick filters',
   '{n} 条 · {cost}': '{n#1 thread|# threads} · {cost}',
+  '{n} 条': '{n#1 thread|# threads}',
   '显示 {shown} / {total}': 'Showing {shown} of {total}',
   加载更多: 'Load more',
   正在加载活动: 'Loading activity',
