@@ -68,12 +68,7 @@ export function workPurposes(steps: readonly WorkStep[], running: boolean, t: TF
   return [...new Set(purposes.filter((purpose) => purpose !== ''))].slice(0, NAMED_PURPOSES);
 }
 
-export function workOutcome(steps: readonly WorkStep[], t: TFunc): string[] {
-  const edited = new Set(
-    steps.flatMap((step) =>
-      step.kind === 'call' && step.action === 'edit' ? [step.target ?? ''] : [],
-    ),
-  );
+function lastTest(steps: readonly WorkStep[]): Extract<WorkStep, { kind: 'call' }> | undefined {
   const test = steps.findLast(
     (step) =>
       step.kind === 'call' &&
@@ -82,7 +77,52 @@ export function workOutcome(steps: readonly WorkStep[], t: TFunc): string[] {
       !step.unfinished &&
       TEST_COMMAND.test(step.command ?? ''),
   );
-  if (test?.kind === 'call')
+  return test?.kind === 'call' ? test : undefined;
+}
+
+function touchedFiles(steps: readonly WorkStep[], action: 'read' | 'edit'): string[] {
+  const paths = steps.flatMap((step) =>
+    step.kind === 'call' && step.action === action && !step.running
+      ? [(step.target ?? '').replace(/ L\d.*$/, '').trim()]
+      : [],
+  );
+  return [...new Set(paths.filter((path) => path !== ''))];
+}
+
+function fileNames(paths: readonly string[], t: TFunc): string {
+  const [first = '', second = ''] = paths.map((path) => path.split('/').pop() ?? path);
+  if (paths.length === 1) return first;
+  return paths.length === 2
+    ? t('{first}、{second}', { first, second })
+    : t('{first}、{second} 等 {n} 个文件', {
+        first,
+        second,
+        n: paths.length,
+        more: paths.length - 2,
+      });
+}
+
+export function workFallback(steps: readonly WorkStep[], t: TFunc): string | null {
+  const edited = touchedFiles(steps, 'edit');
+  const test = lastTest(steps);
+  if (edited.length > 0) {
+    const files = fileNames(edited, t);
+    if (test === undefined) return t('改了 {files}', { files });
+    return t(test.error ? '改了 {files}，测试未通过' : '改了 {files}，测试通过', { files });
+  }
+  if (test !== undefined) return t(test.error ? '测试未通过' : '测试通过');
+  const read = touchedFiles(steps, 'read');
+  return read.length > 0 ? t('读了 {files}', { files: fileNames(read, t) }) : null;
+}
+
+export function workOutcome(steps: readonly WorkStep[], t: TFunc): string[] {
+  const edited = new Set(
+    steps.flatMap((step) =>
+      step.kind === 'call' && step.action === 'edit' ? [step.target ?? ''] : [],
+    ),
+  );
+  const test = lastTest(steps);
+  if (test !== undefined)
     return [
       t(
         edited.size > 0
@@ -275,12 +315,13 @@ export function WorkTrace({
   const { text, failed } = traceSummary(t, counts, running);
   const purposes = workPurposes(item.steps, running, t);
   const outcome = running || purposes.length === 0 ? [] : workOutcome(item.steps, t);
+  const fallback = running || purposes.length > 0 ? null : workFallback(item.steps, t);
   return (
     <div className="my-2 min-w-0" data-testid="work-block">
       <div className="flex items-center gap-1">
         <TraceGroupSummary
           data-testid="work-summary"
-          summary={purposes.length > 0 ? purposes.join(t('，')) : text}
+          summary={purposes.length > 0 ? purposes.join(t('，')) : (fallback ?? text)}
           outcome={outcome.length > 0 ? `${t('，')}${outcome.join(t('，'))}` : null}
           more={
             !running &&
