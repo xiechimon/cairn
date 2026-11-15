@@ -54,7 +54,13 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       threadId: null,
       ...body,
     });
-    if (!replayed) ctx.convHub?.publishMessage(result.thread.id, { ...result.message });
+    if (!replayed)
+      ctx.convHub?.publishMessage(
+        result.thread.id,
+        { ...result.message },
+        undefined,
+        body.clientMessageId,
+      );
     return c.json(result, 201);
   });
 
@@ -97,7 +103,13 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       'body',
     );
     const { result, replayed } = sendChiefMessageFromComposer(svc, teamId, body);
-    if (!replayed) ctx.convHub?.publishMessage(result.thread.id, { ...result.message });
+    if (!replayed)
+      ctx.convHub?.publishMessage(
+        result.thread.id,
+        { ...result.message },
+        undefined,
+        body.clientMessageId,
+      );
     return c.json(result, 201);
   });
 
@@ -223,7 +235,13 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       'body',
     );
     const { result, replayed } = sendChiefMessageFromComposer(svc, thread.teamId, body);
-    if (!replayed) ctx.convHub?.publishMessage(conversationId, { ...result.message });
+    if (!replayed)
+      ctx.convHub?.publishMessage(
+        conversationId,
+        { ...result.message },
+        undefined,
+        body.clientMessageId,
+      );
     return c.json(result, 201);
   });
 }

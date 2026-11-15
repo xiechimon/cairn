@@ -135,6 +135,7 @@ export class ConversationStreamHub {
     conversationId: string,
     message: TranscriptRow,
     deliveredQueue?: ConversationMessageEvent['deliveredQueue'],
+    clientMessageId?: string,
   ): void {
     if (endsLiveTextBuffer(message)) {
       this.textBuffers.delete(conversationId);
@@ -147,6 +148,7 @@ export class ConversationStreamHub {
       type: 'message',
       message,
       ...(deliveredQueue === undefined ? {} : { deliveredQueue }),
+      ...(clientMessageId === undefined ? {} : { clientMessageId }),
     };
     this.publish(conversationId, event);
     if (

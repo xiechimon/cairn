@@ -965,13 +965,14 @@ export function useApiMutations(teamId: string | undefined) {
             );
       },
       onSuccess: (result) => {
-        void qc.cancelQueries({ queryKey: ['chiefThreads', teamId] });
-        qc.setQueryData<ChiefThread[]>(['chiefThreads', teamId], (threads) => {
-          const current = threads ?? [];
-          return current.some((thread) => thread.id === result.thread.id)
-            ? current.map((thread) => (thread.id === result.thread.id ? result.thread : thread))
-            : [...current, result.thread];
-        });
+        const threadsKey = ['chiefThreads', teamId];
+        if (!qc.getQueryData<ChiefThread[]>(threadsKey)?.some((t) => t.id === result.thread.id)) {
+          void qc.cancelQueries({ queryKey: threadsKey });
+          qc.setQueryData<ChiefThread[]>(threadsKey, (threads) => [
+            ...(threads ?? []),
+            result.thread,
+          ]);
+        }
         cacheUserMessage(qc, result.thread.id, result.message);
         invalidateAll();
       },
