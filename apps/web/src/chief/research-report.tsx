@@ -1,6 +1,6 @@
 import { infoReportMessageSchema } from '@cairn/shared';
 import { cn } from 'cn';
-import { createContext, useContext, useMemo, useRef, useState } from 'react';
+import { createContext, type ReactNode, useContext, useMemo, useRef, useState } from 'react';
 import { useConversationMessages } from '../api/hooks.js';
 import { TraceCard } from '../components/chat/trace-parts.js';
 import { Button } from '../components/ui/button.js';
@@ -160,10 +160,12 @@ export function ResearchReportDialog({
   report,
   open,
   onClose,
+  children,
 }: {
   report: ResearchReport;
   open: boolean;
   onClose: () => void;
+  children?: ReactNode;
 }) {
   const { t, locale } = useI18n();
   const contentRef = useRef<HTMLElement>(null);
@@ -207,6 +209,7 @@ export function ResearchReportDialog({
           <DialogTitle className="mt-3 voice-title text-page text-foreground">
             {report.title}
           </DialogTitle>
+          {children}
         </header>
         <div
           data-testid="research-report-doc"

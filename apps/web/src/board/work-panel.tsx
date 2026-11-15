@@ -15,6 +15,7 @@ import type { TodoRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { MadeCard, MadeCarousel, MadeSkeleton } from './made-carousel.js';
+import { MadeFiles, sizeLabel } from './made-files.js';
 import { groupMade, MADE_GROUP_LABEL, madeGroupOf, matchesMadeQuery } from './made-groups.js';
 import { MadeSearch } from './made-search.js';
 import { joinMeta, relativeTime } from './rel-time.js';
@@ -72,7 +73,11 @@ function MadeReport({
     }
   }, [settled, report, onClose, onOpenThread, todo.id]);
   if (report === null) return null;
-  return <ResearchReportDialog report={report} open onClose={onClose} />;
+  return (
+    <ResearchReportDialog report={report} open onClose={onClose}>
+      <MadeFiles deliverables={todo.deliverables} />
+    </ResearchReportDialog>
+  );
 }
 
 const isMade = (todo: TodoRecord) =>
@@ -178,6 +183,12 @@ export function WorkPanel({
                 todo={todo}
                 meta={joinMeta([
                   todo.phase === 'needs_input' ? t('待你决定') : undefined,
+                  todo.madeKind === 'slides'
+                    ? sizeLabel(
+                        todo.deliverables?.items.find((item) => item.kind === 'slides')
+                          ?.sizeBytes ?? 0,
+                      )
+                    : undefined,
                   relativeTime(todo.phaseAt, now, t),
                   projectOf(todo),
                 ])}
