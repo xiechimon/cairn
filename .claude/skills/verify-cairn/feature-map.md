@@ -798,10 +798,9 @@ States: Not connected, connected with a repository picker, an issue imported as 
 
 Reach:
 
-1. `open /app/project/<id of a project listed by the projects API>`
-2. `click testid:project-home-links`
-3. `open /app/todo/<id of a thread listed by the todos API>`
-4. `click testid:source-issue-retry`
+1. `open /app/project/<id of a project listed by the projects API>/tasks`
+2. `open /app/todo/<id of a thread listed by the todos API>`
+3. `click testid:source-issue-retry`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
@@ -853,9 +852,9 @@ Reach:
 
 ### projects
 
-**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings or the sidebar's archived filter, an archived project opened read-only, and delete.
+**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings or the sidebar's archived filter, an archived project opened read-only, and delete.
 
-States: A new-project form for a local folder or a GitHub repository, a project home, settings for base branch, concurrency, autonomy and instructions, archived or deleted.
+States: A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived or deleted.
 
 Reach:
 
@@ -869,7 +868,7 @@ Reach:
 - Web routes: `/app/project/:id`, `/app/project/:id/settings`, `/app/project/:id/tasks`, `/app/project/new`
 - Settings: `设置` (Settings) › `项目`
 - Keyboard shortcuts in its code: `A`, `D`, `G`, `L`, `P`, `R`, `T`
-- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`, `project-home`, `project-home-ask`, `project-home-edit-blocked`, `project-home-empty`, `project-home-instructions`, `project-home-links`, `task-card`, `task-meta`, `task-row`, `task-status`
+- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`, `task-card`, `task-meta`, `task-row`, `task-status`
 - Verify recipes: [.claude/skills/verify-cairn/features/project-new-form.md](features/project-new-form.md), [.claude/skills/verify-cairn/features/github-oauth-picker.md](features/github-oauth-picker.md), [.claude/skills/verify-cairn/features/local-repo-api.md](features/local-repo-api.md)
 - Research: [docs/research/project-coordinators.md](../../../docs/research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
