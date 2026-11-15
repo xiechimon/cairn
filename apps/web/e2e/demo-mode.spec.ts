@@ -125,7 +125,7 @@ test('banner follows the locale', async ({ page }) => {
   );
 });
 
-test('a waiting task with one request opens at its start, with nothing to jump to', async ({
+test('a waiting task with one request opens at its start and cannot scroll into blank space', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -134,6 +134,16 @@ test('a waiting task with one request opens at its start, with nothing to jump t
   await expect(column.getByTestId('user-bubble')).toHaveCount(1);
   await page.waitForTimeout(1000);
   expect(await column.evaluate((el) => el.scrollTop)).toBe(0);
+  const blankBelow = await column.evaluate((el) => el.scrollHeight - el.clientHeight);
+  expect(blankBelow).toBeLessThanOrEqual(24);
+  await page.setViewportSize({ width: 1440, height: 560 });
+  const gapUnderLastRow = await column.evaluate((el) => {
+    el.scrollTo({ top: el.scrollHeight });
+    const rows = [...(el.querySelector('[data-slot="message-scroller-content"]')?.children ?? [])];
+    const last = rows.filter((row) => row.getBoundingClientRect().height > 0).at(-1);
+    return el.getBoundingClientRect().bottom - (last?.getBoundingClientRect().bottom ?? 0);
+  });
+  expect(gapUnderLastRow).toBeLessThanOrEqual(32);
   await expect(
     page.getByTestId('side-chat-panel').getByTestId('jump-to-latest'),
   ).toHaveAttribute('data-active', 'false');
