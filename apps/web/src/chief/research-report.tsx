@@ -96,15 +96,10 @@ export function ResearchReportCard({
             )}
           >
             <FileText aria-hidden="true" className="size-4 flex-none text-content-secondary" />
-            <span className="flex-none">{cardLabel}</span>
+            {report.label !== undefined && <span className="flex-none">{report.label.card}</span>}
             <span className="min-w-0 truncate text-(--chat-link) underline decoration-(--chat-link)/40 underline-offset-3 hover:decoration-(--chat-link)">
               {report.title}
             </span>
-            {stage !== null && (
-              <span data-slot="research-report-stage" className="flex-none text-content-secondary">
-                {stage}
-              </span>
-            )}
           </PopoverTrigger>
         ) : (
           <PopoverTrigger
