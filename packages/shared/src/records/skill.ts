@@ -4,8 +4,6 @@ import { recordId } from './common.js';
 
 export const SKILL_ENTRY_FILE = 'SKILL.md';
 
-export const SKILLS_DIR_DEFAULT = '~/.agents/skills';
-
 export const MAX_SKILL_FILE_BYTES = 512_000;
 
 export const MAX_SKILL_TOTAL_BYTES = 2_000_000;
@@ -96,5 +94,5 @@ export function buildSkillEntry(name: string, description: string, body: string)
 
 export const SKILL_PAGE_COPY = {
   empty: '尚无技能',
-  directoryHint: '把包含 SKILL.md 的技能目录放进 {dir}，或新建一个技能，即会出现在这里。',
+  hint: '用「导入」或「新建」添加技能。',
 } as const;

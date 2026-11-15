@@ -10,6 +10,7 @@ import {
   backupStatusPathOf,
   deployRecordPathOf,
   ensureAccessToken,
+  envStr,
   loadConfig,
   logTokenAuthStartup,
   reposDirOf,
@@ -53,6 +54,8 @@ import {
   trajectoryOutcomeRunOf,
   trajectoryReflectCurateRunOf,
 } from './services/scheduler.js';
+import { sharedAgentSkillRoots } from './services/skills.js';
+import { prepareSkillsHome } from './services/skills-home.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 import { startTsnetRemote, type TsnetRemote } from './services/tsnet-remote.js';
 import { createHttpDrain } from './shutdown-http.js';
@@ -95,6 +98,27 @@ const opened = (() => {
   }
 })();
 const { db, close } = opened;
+const skillsHome = await prepareSkillsHome({
+  db,
+  skillsDir: config.skillsDir,
+  pinned: envStr(ENV_VARS.skillsDir) !== null,
+  legacyDir: sharedAgentSkillRoots()[0],
+  skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
+}).catch((error: unknown) => {
+  logger.fatal(
+    { err: error, skillsDir: config.skillsDir },
+    'could not prepare the Cairn skills directory',
+  );
+  process.exit(1);
+});
+if (skillsHome.kind === 'shared') {
+  logger.warn(
+    { skillsDir: config.skillsDir },
+    'the skills directory overlaps one other agent tools share; Cairn reads it and refuses every write there',
+  );
+} else {
+  logger.info({ skillsDir: config.skillsDir, ...skillsHome }, 'skills directory ready');
+}
 const secretBox = createKeyfileSecretBox(config.keyfilePath);
 const vapidKeys = {
   ...loadOrCreateVapidKeys(config.vapidKeysPath, config.vapidSubject, config.webOrigin),
