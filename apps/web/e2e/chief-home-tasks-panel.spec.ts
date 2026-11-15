@@ -528,13 +528,14 @@ test('Made shows an empty state when nothing has finished', async ({ page }) => 
 
 const MADE = '/app?scenario=home-c-made&pane=made';
 
-test('Made groups finished work by kind with counts, as horizontal rows of preview cards', async ({
+test('Made groups the last seven days by kind and everything older under Earlier, as horizontal rows of preview cards', async ({
   page,
 }) => {
   await page.goto('/app?scenario=make-ref&pane=made');
   const groups = madePanel(page).getByTestId('made-group');
-  await expect(groups).toHaveCount(3);
-  await expect(groups.locator('h3')).toHaveText(['文档6', '设计3', '其他1']);
+  await expect(groups).toHaveCount(4);
+  await expect(groups.locator('h3')).toHaveText(['文档6', '设计3', '其他1', '更早1']);
+  await expect(groups.nth(3).getByTestId('made-card')).toContainText('0.8 版本发布落地页');
   await expect(groups.nth(0).getByTestId('made-card')).toHaveCount(6);
   const first = groups.nth(0).getByTestId('made-card').first();
   await expect(first).toContainText('发布会演讲稿');
@@ -632,6 +633,8 @@ test('Made search also matches the kind and keeps the matching group', async ({ 
   await madePanel(page).getByRole('button', { name: '搜索成果' }).click();
   await madePanel(page).getByTestId('made-search').fill('设计');
   await expect(madePanel(page).getByTestId('made-group').locator('h3')).toHaveText(['设计3']);
+  await madePanel(page).getByTestId('made-search').fill('网页');
+  await expect(madePanel(page).getByTestId('made-group').locator('h3')).toHaveText(['更早1']);
 });
 
 test('Made with many finished items scrolls the groups under fixed tabs', async ({ page }) => {
