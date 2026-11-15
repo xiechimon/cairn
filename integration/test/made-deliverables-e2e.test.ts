@@ -135,6 +135,14 @@ describe('#4837 Made pages and slide decks through a real daemon', () => {
       ['page', 'summary.html'],
     ]);
     expect(content.skipped).toEqual([{ name: 'notes.txt', reason: 'unsupported-kind' }]);
+    const record = (await api(server.url, 'GET', `/api/todos/${todoId}`)).body as {
+      deliverables?: { items: { kind: string; name: string }[]; skipped: unknown[] };
+    };
+    expect(record.deliverables?.items.map((i) => [i.kind, i.name])).toEqual([
+      ['slides', 'deck.pptx'],
+      ['page', 'summary.html'],
+    ]);
+    expect(record.deliverables?.skipped).toEqual(content.skipped);
 
     const page = rows.find((r) => r.fileName === 'summary.html')!;
     const pageRes = await fetch(`${server.url}/api/attachments/${page.id}?download=1`);
