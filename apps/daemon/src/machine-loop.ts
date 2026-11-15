@@ -456,7 +456,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     if (claudeAuth === null) await probeAuthAndRemember();
   };
   try {
-    await availability.recheck();
+    for (let backoff = opts.claimBackoffBaseMs ?? 1_000; ; backoff = nextBackoffMs(backoff)) {
+      try {
+        await availability.recheck();
+        break;
+      } catch (error) {
+        if (error instanceof MachineApiError && error.status < 500) throw error;
+        logger.machine(
+          `server not reachable at startup, retrying: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        await sleep(backoff);
+      }
+    }
     await probeHarnesses();
   } catch (error) {
     await presenceReporter.close();
