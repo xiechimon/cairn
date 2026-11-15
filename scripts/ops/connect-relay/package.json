@@ -6,7 +6,7 @@
     "node": ">=24.22 <25"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=1 ledger.test.mjs",
+    "test": "node --test --test-concurrency=1 ledger.test.mjs ingress.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
