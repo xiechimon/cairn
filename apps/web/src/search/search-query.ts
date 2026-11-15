@@ -96,7 +96,7 @@ export const SYNTAX_ROWS = [
   },
   { key: 'project:', meaning: '项目名', example: 'project:cairn' },
   { key: 'pr:', meaning: 'PR 编号，或 any', example: 'pr:2271' },
-  { key: 'by:', meaning: '发起它的 agent 或成员', example: 'by:builder' },
+  { key: 'by:', meaning: '发起它的 Agent 或成员', example: 'by:builder' },
   { key: 'after:', meaning: '日期，或距今的时间段', example: 'after:7d' },
   { key: 'cost:', meaning: '花费，用 > 或 <', example: 'cost:>5' },
 ] as const;
@@ -108,5 +108,5 @@ export const CHIP_PROBLEM_COPY: Record<ChipProblem, string> = {
   bad_date: '请写日期如 2026-11-01，或时间段如 7d',
   bad_cost: '请写 > 或 < 加数字，如 >5',
   unknown_project: '没有这个名字的项目',
-  unknown_person: '没有这个名字的 agent 或成员',
+  unknown_person: '没有这个名字的 Agent 或成员',
 };

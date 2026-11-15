@@ -29,14 +29,14 @@ function permissionGuidanceRows(
             testId: 'machine-permission-accessibility',
             label: t('辅助功能未授予'),
             hint: t(
-              '在 系统设置 → 隐私与安全性 → 辅助功能 中允许 Cairn，否则 agent 无法读取和操作桌面。',
+              '在 系统设置 → 隐私与安全性 → 辅助功能 中允许 Cairn，否则 Agent 无法读取和操作桌面。',
             ),
           }
         : {
             testId: 'machine-permission-accessibility',
             label: t('桌面辅助通道不可用'),
             hint: t(
-              'AT-SPI 辅助总线不可用，agent 将无法读取和操作桌面。请安装并启用 at-spi（如 orca）后重试。',
+              'AT-SPI 辅助总线不可用，Agent 将无法读取和操作桌面。请安装并启用 at-spi（如 orca）后重试。',
             ),
           },
     );
@@ -48,13 +48,13 @@ function permissionGuidanceRows(
             testId: 'machine-permission-screen-recording',
             label: t('屏幕录制未授予'),
             hint: t(
-              '在 系统设置 → 隐私与安全性 → 屏幕录制 中允许 Cairn，否则 agent 无法截取屏幕。',
+              '在 系统设置 → 隐私与安全性 → 屏幕录制 中允许 Cairn，否则 Agent 无法截取屏幕。',
             ),
           }
         : {
             testId: 'machine-permission-screen-recording',
             label: t('屏幕截取不可用'),
-            hint: t('当前环境无法截取屏幕，agent 的屏幕读取将被拒绝。'),
+            hint: t('当前环境无法截取屏幕，Agent 的屏幕读取将被拒绝。'),
           },
     );
   }
@@ -119,12 +119,12 @@ export function MachineAgentAccess({ machine }: { machine: MachineRow }) {
     !browserPinnedElsewhere &&
     (browserInstalled || browserEnabled);
   const browserHint = browserPinnedElsewhere
-    ? t('浏览器偏好已绑定到另一台 Runner。')
+    ? t('浏览器偏好已绑定到另一台执行机。')
     : browserInstalled
-      ? t('让 agent 打开网页、点击和填表。')
+      ? t('让 Agent 打开网页、点击和填表。')
       : browserEnabled
-        ? t('这台 Runner 已不再报告浏览器能力；可关闭已保存的偏好。')
-        : t('这台 Runner 还不支持浏览器。');
+        ? t('这台执行机已不再报告浏览器能力；可关闭已保存的偏好。')
+        : t('这台执行机还不支持浏览器。');
   const onBrowserToggle = (checked: boolean) => {
     const machineId = machine.id;
     if (teamId === undefined || machineId === undefined || browserBusy) return;

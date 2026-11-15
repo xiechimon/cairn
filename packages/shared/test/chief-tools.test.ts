@@ -341,7 +341,7 @@ describe('settings-gear canon + id seam (r5 §2/§3.6, AC3 backend half)', () =>
 
   it('rebind second-confirmation notice = r5 §2 verbatim (memory does not migrate)', () => {
     expect(CHIEF_REBIND_CONFIRM_COPY).toBe(
-      '更换 Coordinator 的 agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。',
+      '更换 Coordinator 的 Agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。',
     );
     expect(CHIEF_REBIND_CONFIRM_COPY).toContain('当前记忆不会迁移');
   });

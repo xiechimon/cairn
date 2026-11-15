@@ -326,7 +326,7 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
               <FormField
                 label={t('本地路径')}
                 htmlFor="dlg-skill-import-path"
-                help={t('server 本机上的技能目录路径，目录里要有 SKILL.md。')}
+                help={t('服务器本机上的技能目录路径，目录里要有 SKILL.md。')}
               >
                 <Input
                   id="dlg-skill-import-path"
@@ -341,7 +341,7 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
               <FormField
                 label={t('GitHub 地址')}
                 htmlFor="dlg-skill-import-url"
-                help={t('GitHub 公共仓库或其中子目录的地址；导入后可用 refresh 重新拉取。')}
+                help={t('GitHub 公共仓库或其中子目录的地址；导入后可刷新，重新拉取。')}
               >
                 <Input
                   id="dlg-skill-import-url"
