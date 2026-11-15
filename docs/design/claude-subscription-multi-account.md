@@ -1,6 +1,6 @@
 # Several Claude subscriptions, one enabled at a time
 
-Status: revision 2, proposed on 2026-11-15 (answers an independent review of revision 1, FAIL). Owner decisions (mon X, 2026-11-15): save several named Claude subscription tokens; at most one is enabled and all may be off; switching is done on the server atomically and fails safe; a switch is refused while the old account has running or accepted tasks; queued or quota-paused tasks never move to the new account on their own; hitting a quota never switches accounts; after a stop and a manual switch the UI has one "continue" and the backend decides between resuming the old session and starting a new run, with no routine confirmation; every run records its account and session identity; no promise of cache reuse across accounts. Source: the coordination artifact "Cairn dual-engine plan", section 10, revision 5. The page belongs to T-01a1deb7-aa24-75c8-9a0a-a82608edcb36; this document owns the server contract.
+Status: revision 3, proposed on 2026-11-15 (answers two independent reviews, both FAIL). Owner decisions (mon X, 2026-11-15): save several named Claude subscription tokens; at most one is enabled and all may be off; switching is done on the server atomically and fails safe; a switch is refused while the old account has running or accepted tasks; queued or quota-paused tasks never move to the new account on their own; hitting a quota never switches accounts; after a stop and a manual switch the UI has one "continue" and the backend decides between resuming the old session and starting a new run, with no routine confirmation; every run records its account and session identity; no promise of cache reuse across accounts. Source: the coordination artifact "Cairn dual-engine plan", section 10, revision 5. The page belongs to T-01a1deb7-aa24-75c8-9a0a-a82608edcb36; this document owns the server contract.
 
 "Instance" and "team" coincide in the personal edition (one team), so the uniqueness is per team.
 
@@ -26,11 +26,11 @@ Status: revision 2, proposed on 2026-11-15 (answers an independent review of rev
 
 ## Semantics of "enabled" (PR A)
 
-`hasActiveClaudeSubscription` and `activeSubscriptionRow` mean: the team has an enabled, unexpired row. Consequences, all intended: with rows present but all disabled there is no stored account (gates such as `claudeUsageGatePasses`, `claudeCodeLoginBlocked`, `step-route` and `machine-routing` then treat the team as having none, exactly as a team with no rows does today); an expired enabled row means none, the next account is never picked automatically. With exactly one enabled row every caller behaves as today. Rows created: enabled if and only if the team has no rows (so the create, delete, create sequence of the existing end-to-end test stays enabled), else disabled.
+`hasActiveClaudeSubscription` and `activeSubscriptionRow` mean: the team has an enabled, unexpired row. Consequences, all intended: with rows present but all disabled there is no stored account (gates such as `claudeUsageGatePasses`, `claudeCodeLoginBlocked`, `step-route` and `machine-routing` then treat the team as having none, exactly as a team with no rows does today); an expired enabled row means none, the next account is never picked automatically. With exactly one enabled row every caller behaves as today. Rows created: enabled if and only if the team has no unexpired enabled row, and the same transaction clears the `enabledAt` of an expired enabled row. So the first token is enabled, a new token replaces an expired enabled one (rotating an expired token works from PR A alone), and the existing end-to-end sequence create, delete, create stays enabled; a token saved next to a live enabled one is disabled. Test fixtures that insert rows directly (`chief-demotion.test.ts`, `capability-route.test.ts`) set `enabledAt`.
 
 ## Binding and token delivery (PR A)
 
-- Worker claim: inside the existing claim transaction (`machine-claim.ts`) bind `claudeSubscriptionId` to the enabled unexpired account when the step's effective provider is `claude-code`.
+- Worker claim: inside the existing claim transaction (`machine-claim.ts`) bind `claudeSubscriptionId` to the enabled unexpired account when the step's effective provider is `claude-code`; the claim `UPDATE` always writes the id or null, so a re-claim on another runtime never keeps a stale binding. Release paths (quota park, abandoned sweep, finish, hand-back) update only the columns they name, so the binding of the run a step lost survives, which the hold needs.
 - Chief claim: `claimPendingChiefStep` gains an explicit `bindTeamId` argument passed only by `buildChiefClaim` when the model provider is `claude-code`; the in-server Coordinator call (`machineId` null, no Claude Code) never binds. The binding is a subquery in the same `UPDATE`, filtered on `enabledAt` and expiry.
 - Token: `resolveStepCredentials`, `resolveChiefStepCredentials` and `openClaudeSubscription` take the step's bound id and deliver that row's token only, using the same provider rule as the claim (`fallback.model.provider ?? agent.provider`). Null binding, a deleted row or an expired row delivers nothing and never falls back to another account. Delivery stays after the claim, owner-only storage unchanged.
 
@@ -41,7 +41,7 @@ All under `/api/teams/:id/claude-subscriptions`.
 | Request | Behavior |
 |---|---|
 | `GET` | Existing fields plus `enabled: boolean` and `enabledAt: number \| null`. |
-| `POST` | Creates a row (enabled iff the team has none). |
+| `POST` | Creates a row (the create rule above). |
 | `PATCH /:cid` `{label}` | Rename; opens the sealed token and applies the existing rule that a label must not contain the token. |
 | `POST /:cid/enable` | Switch to this account. Idempotent when already enabled. |
 | `POST /:cid/disable` | Disable; refused with the running-task rule when the account has running steps. |
@@ -61,12 +61,12 @@ Claims are synchronous and single process: a step is bound to exactly one accoun
 
 ## The account hold (PR C)
 
-A pending worker step is held, not claimable, when its runtime is `claude-code`, it was not created by a person (`step.byPerson` false), and either of these differs from the enabled account and is non-null: the step's own stale binding (a released or quota-parked step keeps the id of the run it lost), or, when the step would continue a session, the latest prior step's binding. A null binding means the step ran on the machine's own login or before this feature and stays resumable. Only `claude-code` steps are compared, so pi or Codex priors are ignored, and review, verify and merge steps (fresh sessions, no continuation) are held only by their own stale binding.
+A pending worker step is held, not claimable, when its runtime is `claude-code`, it was not created by a person (`step.byPerson` false), and either of these is non-null and differs from the enabled account (no enabled account counts as differing, so a stale binding never runs on the machine's own login): the step's own stale binding (a released or quota-parked step keeps the id of the run it lost), or, when the step would continue a session, the latest prior step's binding. A null binding means the step ran on the machine's own login or before this feature and stays resumable. Only `claude-code` steps are compared, so pi or Codex priors are ignored, and review, verify and merge steps (fresh sessions, no continuation) are held only by their own stale binding.
 
 - Where: one function `accountHold(db, stepRow)` used by `claimCandidates`, `refreshClaudeRateParks.consider` (a quota-parked step is not released while held) and `step-queue.ts` (new `StepQueueBlocked` kind `account-switched` in shared and web).
 - It is evaluated again inside the claim transaction against the enabled account read in that same transaction; if the step became held, or the account the earlier gates used changed, the transaction returns false and the claim retries next tick. The `session` field uses the same fresh-or-continue decision.
 - A person-created step (the "continue", a retry, a message after a stop, and `build-confirm`, which gains `byPerson`) is never held. If the prior account differs it starts a new run: `priorSessionOf` returns no prior session and `freshSession`, so the claim says `new`, and the existing blocker handoff text carries the goal; files stay in the workspace.
-- Release path: a person step enqueued on a build supersedes (stops) the held pending steps of that same build, so a held step can neither stay stuck after the person acted nor later continue the new account's session.
+- Release path: a held step is released by the existing stop followed by the person's continue (a stopped pending step is finished by `applyStoppedStep`, and continue creates a `byPerson` step); the queue reason offers stop. No new supersede logic touches the build or todo phase.
 - Chief turns are not held. A thread whose last chief step ran on another account claims with `action: 'new'`; the history carry (#5011) supplies the earlier conversation.
 
 ## Every path that reads or writes the changed state
@@ -85,6 +85,7 @@ A pending worker step is held, not claimable, when its runtime is `claude-code`,
 | Rows exist, all disabled | no stored account |
 | Pending automatic step, differing non-null binding | held `account-switched` |
 | Pending person step, differing prior | new run, fresh session |
+| Held step | released by stop then continue |
 | Pending step, null binding or null prior | resumable as before |
 | Quota-parked step with a stale binding | stays parked while held |
 | Quota rejection recorded for the old account | cleared at every enable |
@@ -97,7 +98,7 @@ PR A: unique index (two enabled rows in a team refused, two teams fine); create 
 
 PR B: enable swaps atomically; precheck failure keeps the old (fake verifier), including `unavailable`; running bound step gives `running-tasks` with the count; target deleted or expired during the precheck; idempotent enable; concurrent enables yield one winner; disable and delete rules; rename token check; rate-limit reset lets a parked machine claim; `/steps` shape and outcomes; no response contains a token.
 
-PR C: automatic pending step held after a switch, shown as `account-switched`; person step after a switch starts a new session; null prior and null binding stay resumable; pi prior ignored; review, verify and merge not blocked by a session-less prior; parked step not released while held; person step supersedes held steps of its build; `build-confirm` sets `byPerson`; hold re-check inside the claim transaction when a switch lands between the gates and the claim; chief turn after a switch starts a new session.
+PR C: automatic pending step held after a switch, shown as `account-switched`; person step after a switch starts a new session; null prior and null binding stay resumable; pi prior ignored; review, verify and merge not blocked by a session-less prior; parked step not released while held; a held step is released by stop then continue; `build-confirm` sets `byPerson`; hold re-check inside the claim transaction when a switch lands between the gates and the claim; chief turn after a switch starts a new session.
 
 ## Security
 
