@@ -8,6 +8,7 @@ import { expectedTargets, isContainerConfig, networkTargets } from './canary-att
 import { runCommand, withCleanup } from './canary-process.mjs';
 import { plantSentinels, recoverSentinels, remainingSentinels } from './canary-sentinels.mjs';
 import { startStack } from './canary-stack.mjs';
+import { readOrbOwner } from './owner.mjs';
 
 export { withCleanup } from './canary-process.mjs';
 
@@ -163,8 +164,10 @@ export async function runCanary({
   signal,
   runtime = process.env.CAIRN_ORB_RUNTIME || 'nspawn',
   preflight = async () => {
-    if (process.platform !== 'linux' || userInfo().username !== 'ian' || process.getuid() === 0)
-      throw new Error('Run on the provisioned Linux host as ian without sudo');
+    if (process.platform !== 'linux') throw new Error('Run on the provisioned Linux host');
+    const owner = readOrbOwner();
+    if (userInfo().username !== owner || process.getuid() === 0)
+      throw new Error(`Run on the provisioned Linux host as ${owner} without sudo`);
     const result = JSON.parse(
       await runCommand(
         process.execPath,

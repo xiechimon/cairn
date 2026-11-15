@@ -14,7 +14,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 
@@ -26,6 +26,9 @@ function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'cairn-orb-shell-'));
   const bin = join(root, 'bin');
   mkdirSync(bin);
+  const ownerFile = join(root, 'etc/cairn-orb/owner');
+  mkdirSync(dirname(ownerFile), { recursive: true });
+  writeFileSync(ownerFile, 'ian\n');
   const fake = join(bin, 'fake.mjs');
   writeFileSync(
     fake,
@@ -40,7 +43,13 @@ appendFileSync(join(root, 'calls'), JSON.stringify([cmd, ...args]) + '\\n');
 if (process.env.FAIL_COMMAND === cmd) process.exit(1);
 if (cmd === 'node') console.log(args[0].endsWith('/runtime-directory.mjs') || args[0].endsWith('/computer-home.mjs') ? (process.env.HOME_CHANGES ?? '0') + ' changes' : JSON.stringify({ http: process.env.http_proxy, https: process.env.https_proxy }));
 if (cmd === 'sysctl') console.log(process.env.PROTECTED_HARDLINKS ?? '1');
-if (cmd === 'id') console.log(args[0] === '-un' ? (process.env.FAKE_USER || 'root') : args.includes('ian') ? (process.env.AGENT_UID || '1000') : '0');
+if (cmd === 'id') {
+  const named = args.find((arg) => !arg.startsWith('-'));
+  if (args[0] === '-un') console.log(process.env.FAKE_USER || 'root');
+  else if (!named) console.log('0');
+  else if (['ian', 'alice'].includes(named)) console.log(process.env.AGENT_UID || '1000');
+  else process.exit(1);
+}
 if (cmd === 'runuser' || cmd === 'bash') console.log(args.some((arg) => arg.includes('daemon-package.mjs')) ? (process.env.CAIRN_ORB_NODE_MAJOR || process.env.HOST_NODE_MAJOR || '26') : args.at(-1).includes('claude') ? (process.env.BAD_VERSION || '2.1.302 (Claude Code)') : 'codex-cli 0.163.0');
 if (cmd !== 'systemd-nspawn' && cmd !== 'pacstrap' && args.some((arg) => arg === '-M' || arg.startsWith('--machine'))) process.exit(91);
 if (cmd === 'machinectl' && args.some((arg) => ['bind', 'shell', 'login', 'copy-to', 'copy-from'].includes(arg))) process.exit(92);
@@ -155,7 +164,7 @@ if (cmd === 'ip') console.log('7: vz-cairn inet ' + (process.env.BRIDGE_IP || '1
     existsSync(join(root, 'calls'))
       ? readFileSync(join(root, 'calls'), 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse)
       : [];
-  return { root, run, calls, env };
+  return { root, run, calls, env, ownerFile };
 }
 
 for (const file of [
@@ -614,7 +623,7 @@ test('a busy build lock prevents provisioning another image', () => {
 test('installer supplies the loopback proxy to provisioning commands', () => {
   const f = fixture();
   try {
-    const result = f.run('install-host.sh', ['--dry-run'], {
+    const result = f.run('install-host.sh', ['--dry-run', '--owner', 'ian'], {
       HTTP_PROXY: '',
       HTTPS_PROXY: '',
       http_proxy: '',
@@ -1294,6 +1303,129 @@ test('computer image refuses a missing base, Node drift and an unrecognized imag
         .slice(calls)
         .some(([cmd]) => cmd === 'systemd-nspawn'),
     );
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('build-image uses the owner from the owner file, not a fixed account', () => {
+  const f = fixture();
+  try {
+    writeFileSync(f.ownerFile, 'alice\n');
+    const dry = f.run('build-image.sh', ['--dry-run'], {
+      FAKE_USER: 'alice',
+      FAIL_COMMAND: 'runuser',
+    });
+    assert.equal(dry.status, 0, dry.stderr);
+    assert.ok(f.calls().some((call) => call[0] === 'id' && call.at(-1) === 'alice'));
+    assert.ok(!f.calls().some((call) => call.includes('ian')));
+    const other = f.run('build-image.sh', ['--dry-run'], { FAKE_USER: 'bob' });
+    assert.equal(other.status, 0, other.stderr);
+    const runuser = f.calls().find(([cmd]) => cmd === 'runuser');
+    assert.deepEqual(runuser.slice(0, 3), ['runuser', '-u', 'alice']);
+    const refused = f.run('build-image.sh', ['--dry-run'], { AGENT_UID: '0' });
+    assert.notEqual(refused.status, 0);
+    assert.match(refused.stderr, /Cannot map alice to guest agent UID/);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('build-image fails closed when the owner file is missing, invalid or names no account', () => {
+  const f = fixture();
+  try {
+    rmSync(f.ownerFile);
+    const missing = f.run('build-image.sh', ['--dry-run']);
+    assert.notEqual(missing.status, 0);
+    assert.match(missing.stderr, /Cannot read the orb owner file/);
+    for (const content of ['', 'Ian\n', 'a b\n', 'ian\nroot\n', '-ian\n', `${'a'.repeat(33)}\n`]) {
+      writeFileSync(f.ownerFile, content);
+      const result = f.run('build-image.sh', ['--dry-run']);
+      assert.notEqual(result.status, 0, JSON.stringify(content));
+      assert.match(result.stderr, /Invalid orb owner/);
+    }
+    writeFileSync(f.ownerFile, 'ghost\n');
+    const ghost = f.run('build-image.sh', ['--dry-run']);
+    assert.notEqual(ghost.status, 0);
+    assert.match(ghost.stderr, /Cannot map ghost to guest agent UID/);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('build-image takes --owner only in a dry run and only while the owner file is absent', () => {
+  const f = fixture();
+  try {
+    rmSync(f.ownerFile);
+    const planned = f.run('build-image.sh', ['--dry-run', '--owner', 'alice'], {
+      FAKE_USER: 'alice',
+    });
+    assert.equal(planned.status, 0, planned.stderr);
+    assert.notEqual(f.run('build-image.sh', ['--owner', 'alice']).status, 0);
+    assert.notEqual(f.run('build-image.sh', ['--dry-run', '--owner', 'Alice!']).status, 0);
+    writeFileSync(f.ownerFile, 'ian\n');
+    rmSync(join(f.root, 'calls'));
+    f.run('build-image.sh', ['--dry-run', '--owner', 'alice'], { FAKE_USER: 'ian' });
+    assert.ok(!f.calls().some((call) => call[0] === 'id' && call.at(-1) === 'alice'));
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('prepare-machine creates the computer runtime directory for the file owner and fails closed', () => {
+  const f = fixture();
+  try {
+    for (const [from, to] of [
+      ['cairn-orb.nspawn', 'etc/systemd/nspawn/cairn-orb.nspawn'],
+      [
+        'systemd-nspawn@cairn-orb-.service.d/limits.conf',
+        'etc/systemd/system/systemd-nspawn@cairn-orb-.service.d/limits.conf',
+      ],
+    ]) {
+      mkdirSync(join(f.root, to, '..'), { recursive: true });
+      writeFileSync(join(f.root, to), readFileSync(join(source, from)));
+    }
+    const name = 'cairn-orb-computer-own';
+    writeFileSync(f.ownerFile, 'alice\n');
+    assert.equal(f.run('prepare-machine.sh', [name]).status, 0);
+    assert.ok(f.calls().some((call) => call[0] === 'id' && call.at(-1) === 'alice'));
+    assert.ok(!f.calls().some((call) => call.includes('ian')));
+    for (const content of [null, '', 'Alice\n', 'a b\n', 'alice\nian\n']) {
+      if (content === null) rmSync(f.ownerFile);
+      else writeFileSync(f.ownerFile, content);
+      rmSync(join(f.root, 'run/cairn-orb', name, 'computer'), { recursive: true, force: true });
+      const result = f.run('prepare-machine.sh', [name]);
+      assert.notEqual(result.status, 0, JSON.stringify(content));
+      assert.match(result.stderr, /orb owner/);
+    }
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('install-host.sh refuses a missing, root, invalid or nonexistent owner and accepts --owner or SUDO_USER', () => {
+  const f = fixture();
+  try {
+    const env = { HTTP_PROXY: '', HTTPS_PROXY: '', http_proxy: '', https_proxy: '' };
+    const refuse = (args, extra = {}) => {
+      const result = f.run('install-host.sh', args, { ...env, SUDO_USER: '', ...extra });
+      assert.notEqual(result.status, 0, JSON.stringify([args, extra]));
+      assert.match(result.stderr, /Cannot choose the orb owner/);
+    };
+    if (!existsSync('/etc/cairn-orb/owner')) refuse(['--dry-run']);
+    refuse(['--dry-run'], { SUDO_USER: 'root' });
+    refuse(['--dry-run', '--owner', 'root']);
+    refuse(['--dry-run', '--owner', 'Alice']);
+    refuse(['--dry-run', '--owner', 'ghost']);
+    refuse(['--dry-run', '--owner']);
+    refuse(['--dry-run'], { SUDO_USER: 'ghost' });
+    assert.equal(f.run('install-host.sh', ['--dry-run', '--owner', 'alice'], env).status, 0);
+    assert.equal(f.run('install-host.sh', ['--dry-run'], { ...env, SUDO_USER: 'alice' }).status, 0);
+    const flagWins = f.run('install-host.sh', ['--dry-run', '--owner', 'alice'], {
+      ...env,
+      SUDO_USER: 'root',
+    });
+    assert.equal(flagWins.status, 0, flagWins.stderr);
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }

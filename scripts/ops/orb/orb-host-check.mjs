@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path';
 import { checkContainerHost } from './container-host-check.mjs';
 import { readMetadata, validatePorts } from './guest-check.mjs';
 import { cleanupMachine } from './machine-cleanup.mjs';
+import { ORB_OWNER_FILE, readOrbOwner } from './owner.mjs';
 import { missingUfwRules } from './ufw-rules.mjs';
 
 export function parseHostCheck(input, { blockedPorts = [22, 5231] } = {}) {
@@ -103,6 +104,8 @@ export function checkHost({
     }),
   wait = () => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000),
   user = userInfo().username,
+  ownerFile = ORB_OWNER_FILE,
+  owner = readOrbOwner({ path: ownerFile }),
   name = `cairn-orb-check-${randomUUID().slice(0, 8)}`,
   runtimeRoot = '/run/cairn-orb',
   releaseFile = '/var/lib/cairn-orb/dist/current.json',
@@ -110,7 +113,7 @@ export function checkHost({
   networkdDirectory = '/etc/systemd',
   blockedPorts = (process.env.CAIRN_ORB_CHECK_BLOCKED_PORTS ?? '22,5231').split(',').map(Number),
 } = {}) {
-  if (user !== 'ian') throw new Error('Run the host check as ian without sudo');
+  if (user !== owner) throw new Error(`Run the host check as ${owner} without sudo`);
   if (!/^cairn-orb-check-[a-zA-Z0-9-]+$/.test(name)) throw new Error('Invalid check machine name');
   validatePorts(blockedPorts);
   const errors = [];
@@ -257,7 +260,7 @@ export function checkHost({
       throw new Error('Timed out waiting for root-prepared runtime directory');
     writeFileSync(
       join(directory, 'check-request'),
-      JSON.stringify({ version: 1, requestId, blockedPorts }),
+      JSON.stringify({ version: 1, requestId, blockedPorts, owner }),
       { mode: 0o600, flag: 'wx' },
     );
     let result;
