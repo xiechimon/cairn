@@ -1,6 +1,14 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, linkSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  linkSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import type { ClaimedStep, MachineDoneBody } from '@cairn/shared';
 import { classifyUserText, DELIVERABLE_LIMITS } from '@cairn/shared';
@@ -385,6 +393,55 @@ describe('deliverable recovery', () => {
     );
     expect(f.puts).toEqual([]);
     expect(f.doneBodies[0]?.deliverables).toEqual([]);
+  });
+
+  test('a rejected set whose done is lost keeps the generation, so a later reclaim is protected', async () => {
+    const w = recoveryWorld();
+    const deps = (client: MachineApi) => ({
+      client,
+      journal: w.journal,
+      logger: silent,
+      paths: w.paths,
+    });
+    const first = fakeClient({
+      grant: async () => {
+        throw new MachineApiError(413, 'team attachment quota exceeded');
+      },
+    });
+    const lostDone = first.client as unknown as { done: () => Promise<void> };
+    lostDone.done = async () => {
+      throw new TypeError('fetch failed');
+    };
+    await resumePendingUpload(deps(first.client), w.entry);
+    const kept = w.journal.get('s1')!;
+    expect(kept.deliverables).toBeNull();
+    expect(kept.doneBody).toMatchObject({
+      generation: capability.generation,
+      deliverables: [],
+      deliverablesSkipped: expect.arrayContaining([
+        { name: 'deck.pptx', reason: 'upload-rejected' },
+      ]),
+    });
+
+    const superseded = fakeClient({ receipt: async () => 'superseded' });
+    await resumePendingUpload(deps(superseded.client), kept);
+    expect(superseded.calls).toEqual(['receipt']);
+    expect(w.journal.get('s1')).toBeNull();
+  });
+
+  test('a copy changed after the snapshot is not uploaded', async () => {
+    const w = recoveryWorld();
+    rmSync(join(w.copyDir, '0.pptx'));
+    writeFileSync(join(w.paths.home, 'secret.bin'), DECK);
+    symlinkSync(join(w.paths.home, 'secret.bin'), join(w.copyDir, '0.pptx'));
+    const f = fakeClient({});
+    await resumePendingUpload(
+      { client: f.client, journal: w.journal, logger: silent, paths: w.paths },
+      w.entry,
+    );
+    expect(f.puts).toEqual([]);
+    expect(f.doneBodies[0]?.deliverables).toEqual([]);
+    expect(f.doneBodies[0]?.generation).toBe(capability.generation);
   });
 
   test('a 409 grant re-asks the receipt and drops a finished claim', async () => {

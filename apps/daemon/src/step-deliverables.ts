@@ -4,9 +4,8 @@ import {
   constants,
   fstatSync,
   lstatSync,
+  opendirSync,
   openSync,
-  readdirSync,
-  readFileSync,
   readSync,
   rmSync,
   writeSync,
@@ -38,10 +37,6 @@ export class DeliverableRejectedError extends Error {}
 
 const COPY_NAME = /^\d+\.(?:html|pptx|pdf)$/;
 const UPLOAD_PATH_PREFIX = '/api/machine/deliverable/';
-
-export function ownsCopyDir(copyDir: string, stepId: string): boolean {
-  return basename(copyDir) === `step-${stepId}.deliverables`;
-}
 
 export interface DeliverableFile {
   kind: DeliverableKind;
@@ -240,7 +235,7 @@ export function snapshotDeliverables(input: {
   const levels = [{ path: input.sourceDir, id: root }];
   const skipped: DeliverableSkip[] = [];
   const known = new Set(KIND_FOLDERS.map((k) => k.folder));
-  for (const name of readdirSync(input.sourceDir).sort()) {
+  for (const name of boundedNames(input.sourceDir, MAX_FOLDER_ENTRIES).names) {
     if (!known.has(name)) skipped.push({ name, reason: 'outside-kind-folder' });
   }
   const candidates: {
@@ -255,10 +250,9 @@ export function snapshotDeliverables(input: {
     if (id === 'missing') continue;
     if (id === 'unsafe') return rejected();
     levels.push({ path: dir, id });
-    const names = readdirSync(dir).sort();
-    if (names.length > MAX_FOLDER_ENTRIES)
-      skipped.push({ name: folder, reason: 'too-many-entries' });
-    for (const name of names.slice(0, MAX_FOLDER_ENTRIES)) {
+    const { names, truncated } = boundedNames(dir, MAX_FOLDER_ENTRIES);
+    if (truncated) skipped.push({ name: folder, reason: 'too-many-entries' });
+    for (const name of names) {
       candidates.push({ kind, exts, name, path: join(dir, name) });
     }
   }
@@ -295,6 +289,48 @@ export function snapshotDeliverables(input: {
   return { generation, copyDir: target, files, skipped: boundedSkips(skipped) };
 }
 
+function readVerifiedCopy(file: DeliverableFile): Buffer {
+  let fd: number;
+  try {
+    fd = openSync(file.path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  } catch {
+    throw new DeliverableRejectedError(`deliverable copy is unreadable: ${file.name}`);
+  }
+  try {
+    const st = fstatSync(fd);
+    if (!st.isFile() || st.nlink !== 1 || st.size !== file.size) {
+      throw new DeliverableRejectedError(`deliverable copy changed: ${file.name}`);
+    }
+    const bytes = Buffer.alloc(file.size);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const read = readSync(fd, bytes, offset, bytes.length - offset, offset);
+      if (read === 0) break;
+      offset += read;
+    }
+    if (offset !== file.size || createHash('sha256').update(bytes).digest('hex') !== file.sha256) {
+      throw new DeliverableRejectedError(`deliverable copy changed: ${file.name}`);
+    }
+    return bytes;
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function boundedNames(dir: string, limit: number): { names: string[]; truncated: boolean } {
+  const handle = opendirSync(dir);
+  const names: string[] = [];
+  try {
+    for (let entry = handle.readSync(); entry !== null; entry = handle.readSync()) {
+      if (names.length === limit) return { names: names.sort(), truncated: true };
+      names.push(entry.name);
+    }
+  } finally {
+    handle.closeSync();
+  }
+  return { names: names.sort(), truncated: false };
+}
+
 function retryable(err: unknown): boolean {
   return (
     err instanceof MachineApiError &&
@@ -314,9 +350,6 @@ export async function deliverableDoneFields(
     deliverablesSkipped: snapshot.skipped,
   };
   if (snapshot.files.length === 0) return fields;
-  if (!ownsCopyDir(snapshot.copyDir, stepId)) {
-    throw new DeliverableRejectedError('deliverable copies are outside the outbox');
-  }
   const put = client.putDeliverable?.bind(client);
   if (put === undefined) return null;
   let granted: Awaited<ReturnType<MachineApi['uploadUrls']>>['deliverables'];
@@ -349,7 +382,7 @@ export async function deliverableDoneFields(
     if (dirname(file.path) !== snapshot.copyDir || !COPY_NAME.test(basename(file.path))) {
       throw new DeliverableRejectedError(`deliverable copy outside the outbox: ${file.name}`);
     }
-    const bytes = readFileSync(file.path);
+    const bytes = readVerifiedCopy(file);
     for (let attempt = 1; ; attempt++) {
       try {
         await put(slot.url, slot.headers, bytes);

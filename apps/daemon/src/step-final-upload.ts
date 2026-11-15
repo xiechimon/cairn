@@ -94,14 +94,16 @@ export async function completeWithDeliverables(
   if (snapshot === null) return client.done(stepId, doneBody);
   let fields: DeliverableDoneFields | null;
   try {
+    if (snapshot.copyDir !== journal.deliverablesDir(stepId)) {
+      throw new DeliverableRejectedError('deliverable copies are outside the outbox');
+    }
     fields = await deliverableDoneFields(client, logger, stepId, snapshot);
   } catch (err) {
     if (!rejectsDeliverables(err)) throw err;
     logger.step(
       `deliverables rejected (${err instanceof Error ? err.message : String(err)}); reporting without them`,
     );
-    journal.dropDeliverables(stepId);
-    return client.done(stepId, {
+    const rejectedBody: MachineDoneBody = {
       ...doneBody,
       generation: snapshot.generation,
       deliverables: [],
@@ -109,7 +111,10 @@ export async function completeWithDeliverables(
         ...snapshot.skipped,
         ...snapshot.files.map((f) => ({ name: f.name, reason: 'upload-rejected' })),
       ].slice(0, DELIVERABLE_LIMITS.maxSkipped),
-    });
+    };
+    journal.update(stepId, { doneBody: rejectedBody });
+    journal.dropDeliverables(stepId);
+    return client.done(stepId, rejectedBody);
   }
   if (fields === null) {
     const names = [...snapshot.files, ...snapshot.skipped].map((f) => f.name).join(', ');
@@ -162,6 +167,7 @@ export async function resumePendingUpload(
   const running = opts.running ?? 1;
   logger.recover(`step ${stepId} awaiting upload — replaying final report (no agent round)`);
   let snapshot = entry.deliverables ?? null;
+  const generation = snapshot?.generation ?? doneBody.generation;
   const dropFinished = (state: ReceiptOutcome): boolean => {
     if (state !== 'finished' && state !== 'superseded') return false;
     logger.recover(`step ${stepId} is ${state} on the server — dropping its journal`);
@@ -169,10 +175,10 @@ export async function resumePendingUpload(
     deps.sessionHandles?.delete(stepId);
     return true;
   };
-  if (snapshot !== null) {
-    const state = await receiptOutcome(client, logger, stepId, snapshot.generation);
+  if (generation !== undefined) {
+    const state = await receiptOutcome(client, logger, stepId, generation);
     if (state === 'retry' || dropFinished(state)) return;
-    if (state === 'unsupported') {
+    if (state === 'unsupported' && snapshot !== null) {
       snapshot = null;
       journal.dropDeliverables(stepId);
     }
@@ -197,8 +203,8 @@ export async function resumePendingUpload(
     await completeWithDeliverables(client, logger, journal, stepId, doneBody, snapshot);
   } catch (err) {
     logger.step(`done report failed: ${err instanceof Error ? err.message : String(err)}`);
-    if (snapshot !== null && err instanceof MachineApiError && err.status === 409) {
-      dropFinished(await receiptOutcome(client, logger, stepId, snapshot.generation));
+    if (generation !== undefined && err instanceof MachineApiError && err.status === 409) {
+      dropFinished(await receiptOutcome(client, logger, stepId, generation));
       return;
     }
     if (

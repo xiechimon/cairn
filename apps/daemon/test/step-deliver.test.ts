@@ -51,7 +51,7 @@ function silentLogger(lines: string[]): DaemonLogger {
 
 function harness(options: { uploadFails?: boolean; stopped?: boolean; lastError?: string }) {
   const root = testTempDir('step-deliver');
-  const journal = new StepJournal(join(root, 'journal'));
+  const journal = new StepJournal(join(root, 'outbox'));
   const claimed = claimedBuildStep();
   journal.claim({
     stepId: STEP_ID,
