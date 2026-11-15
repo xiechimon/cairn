@@ -1498,8 +1498,6 @@ export const EN: Record<string, string> = {
   '防护：{safeguard}': 'Safeguard: {safeguard}',
   '出处：': 'Source: ',
   协调者对话: 'Coordinator chat',
-  建成线程: 'Make it a thread',
-  不用了: 'Dismiss',
   已建成线程: 'Made into a thread',
   已忽略: 'Dismissed',
   '{n} 件等你': '{n## item|# items} waiting on you',
@@ -1521,6 +1519,9 @@ export const EN: Record<string, string> = {
   日报: 'Daily report',
   '昨天（{day}）的进展': 'Yesterday ({day})',
   '今天的日报写好了：昨天没有新进展': "Today's report is ready: nothing new yesterday",
+  '{day} 的日报写好了：{covers} 没有新进展': 'The {day} report is ready: nothing new on {covers}',
+  '{day} 的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}':
+    'The {day} report is ready: done {done} · merged {merged} · failed {failed}',
   '今天的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}':
     "Today's report is ready: done {done} · merged {merged} · failed {failed}",
   '，有 {k} 条建议等你决定': ', {k## suggestion needs|# suggestions need} your decision',
