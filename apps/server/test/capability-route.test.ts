@@ -248,6 +248,7 @@ describe('the router agrees with what dispatch can execute', () => {
         label: 'team',
         tokenCipher: 'cipher',
         expiresAt: null,
+        enabledAt: nowMs(),
         createdAt: nowMs(),
       })
       .run();

@@ -86,11 +86,15 @@ export function ProductPagesSection({ theme }: { theme: GalleryTheme }) {
       <Specimen
         id="schedule-rows"
         title="Schedule rows"
-        note="Iframe of scenario r3-93; ScheduleCard is private to the schedules page"
+        note="Iframe of scenario r3-93 in the Tasks panel Schedules tab"
         stage="canvas"
         className="block"
       >
-        <ScenarioFrame title="Schedule rows" url="/app/schedules?scenario=r3-93" theme={theme} />
+        <ScenarioFrame
+          title="Schedule rows"
+          url="/app?scenario=r3-93&pane=tasks&tab=scheduled"
+          theme={theme}
+        />
       </Specimen>
     </Section>
   );

@@ -126,10 +126,5 @@ export {
   resourcesDefault,
   resourcesSkillsList,
 } from './resources.js';
-export {
-  schedulesEmpty,
-  schedulesFormDaily,
-  schedulesFormOnce,
-  schedulesList,
-} from './schedules.js';
+export { schedulesEmpty, schedulesList } from './schedules.js';
 export { TEAM_R7, teamGrid } from './team.js';

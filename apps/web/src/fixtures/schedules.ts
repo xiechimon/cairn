@@ -43,16 +43,3 @@ export const schedulesList: FixtureSet = {
   schedules: [scheduleOnce],
   project: projectContent,
 };
-
-export const schedulesFormDaily: FixtureSet = {
-  todos: [legacyReview, legacyDone],
-  now: at(R3_DAY, 13, 50),
-  schedules: [],
-  scheduleForm: 'daily',
-  project: projectContent,
-};
-
-export const schedulesFormOnce: FixtureSet = {
-  ...schedulesFormDaily,
-  scheduleForm: 'once',
-};

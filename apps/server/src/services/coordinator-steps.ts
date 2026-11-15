@@ -8,6 +8,7 @@ import { and, eq, notInArray, sql } from 'drizzle-orm';
 import {
   type chiefThread,
   chiefTurnUsage,
+  claudeSubscription,
   coordinatorInput,
   step,
   tokenUsage,
@@ -47,6 +48,7 @@ export function claimPendingChiefStep(
   db: MachineDeps['db'],
   stepRow: StepRow,
   machineId: string | null,
+  bindTeamId: string | null = null,
 ): boolean {
   const claimedAt = nowMs();
   const res = db
@@ -54,6 +56,12 @@ export function claimPendingChiefStep(
     .set({
       status: 'claimed',
       machineId,
+      claudeSubscriptionId:
+        bindTeamId === null
+          ? null
+          : sql<
+              string | null
+            >`(select ${claudeSubscription.id} from ${claudeSubscription} where ${claudeSubscription.teamId} = ${bindTeamId} and ${claudeSubscription.enabledAt} is not null and (${claudeSubscription.expiresAt} is null or ${claudeSubscription.expiresAt} > ${claimedAt}))`,
       claimedAt,
       lastHeartbeatAt: claimedAt,
       holdReason: null,

@@ -27,13 +27,13 @@
     "apps/web/src/detail/"
   ],
   "schedules-list": [
+    "apps/web/src/board/tasks-schedule-list.tsx",
     "apps/web/src/schedules/",
-    "apps/web/src/pages/schedules-page.tsx",
     "apps/web/src/pages/schedule-summary.ts"
   ],
   "schedules-form": [
+    "apps/web/src/board/tasks-schedule-list.tsx",
     "apps/web/src/schedules/",
-    "apps/web/src/pages/schedules-page.tsx",
     "apps/web/src/pages/schedule-summary.ts"
   ],
   "project-settings": [

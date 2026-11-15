@@ -7,7 +7,7 @@ const light = async (page: Page, url: string) => {
 };
 
 for (const [name, url] of [
-  ['schedules', '/app/schedules?scenario=11'],
+  ['secrets', '/app/resources/secrets?scenario=01'],
   ['api-keys', '/app/api-keys'],
 ] as const) {
   test(`${name} empty state: bare ink-3 icon, no tile`, async ({ page }) => {
@@ -28,10 +28,7 @@ for (const [name, url] of [
   });
 }
 
-for (const [name, url] of [
-  ['schedules', '/app/schedules?scenario=r3-93'],
-  ['api-keys', '/app/api-keys?scenario=api-keys-created'],
-] as const) {
+for (const [name, url] of [['api-keys', '/app/api-keys?scenario=api-keys-created']] as const) {
   test(`${name} list: one settings card of 52px rows, 14px corner`, async ({ page }) => {
     await light(page, url);
     const cards = page.locator('[data-testid="page-col"] .settings-card');
@@ -44,77 +41,45 @@ for (const [name, url] of [
   });
 }
 
-test('`新建定时` footer: a grey `取消` pill left of a 32px primary `保存`, no outline or bare-text button', async ({
-  page,
-}) => {
-  await light(page, '/app/schedules?scenario=r3-92');
-  const foot = page.getByRole('dialog', { name: '新建定时' }).getByTestId('dialog-foot');
-  const cancel = foot.getByRole('button', { name: '取消' });
-  const save = foot.getByRole('button', { name: '保存' });
-  await expect(save).toHaveCSS('height', '32px');
-  await expect(cancel).toHaveCSS('height', '32px');
-  const pill = await cancel.evaluate((el) => {
-    const token = (name: string) => {
-      const probe = document.createElement('span');
-      probe.style.color = `var(${name})`;
-      document.body.append(probe);
-      const value = getComputedStyle(probe).color;
-      probe.remove();
-      return value;
-    };
-    const cs = getComputedStyle(el);
-    return {
-      fill: cs.backgroundColor,
-      ink: cs.color,
-      border: cs.borderTopColor,
-      radius: cs.borderTopLeftRadius,
-      weight: cs.fontWeight,
-      secondary: token('--secondary'),
-      foreground: token('--foreground'),
-    };
-  });
-  expect(pill.fill).toBe(pill.secondary);
-  expect(pill.ink).toBe(pill.foreground);
-  expect(pill.border).toMatch(/^rgba\(0, 0, 0, 0\)$|transparent/);
-  expect(pill.weight).toBe('500');
-  await expect(save).toHaveCSS('border-top-left-radius', pill.radius);
-  const [c, s] = await Promise.all([cancel.boundingBox(), save.boundingBox()]);
-  expect(c!.x + c!.width).toBeLessThanOrEqual(s!.x);
-});
+const NEW_SCHEDULE = '/app?scenario=home-c&pane=tasks&tab=scheduled';
 
 test('`新建定时` hour and minute selects sit side by side', async ({ page }) => {
-  await light(page, '/app/schedules?scenario=r3-92');
-  const dialog = page.getByRole('dialog', { name: '新建定时' });
-  await dialog.evaluate((el) =>
+  await light(page, NEW_SCHEDULE);
+  await page.getByTestId('schedule-new').click();
+  const popover = page.getByTestId('schedule-popover');
+  await expect(popover).toContainText('新建定时');
+  await popover.evaluate((el) =>
     Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)),
   );
   const [hour, minute] = await Promise.all([
-    dialog.getByRole('combobox', { name: '时' }).boundingBox(),
-    dialog.getByRole('combobox', { name: '分' }).boundingBox(),
+    popover.getByRole('combobox', { name: '时' }).boundingBox(),
+    popover.getByRole('combobox', { name: '分' }).boundingBox(),
   ]);
   expect(minute!.x - (hour!.x + hour!.width)).toBeLessThanOrEqual(12);
   expect(minute!.y).toBe(hour!.y);
 });
 
-test('new schedule form: a pointer open shows no focus ring, a keyboard open lands on the frequency radio', async ({
+test('new schedule editor: a pointer open shows no focus ring, a keyboard open moves a ringed focus inside', async ({
   page,
 }) => {
-  await light(page, '/app/schedules?scenario=01');
-  const open = page.locator('.sched-empty').getByRole('button', { name: '新建定时' });
-  const dialog = page.getByRole('dialog', { name: '新建定时' });
+  await light(page, NEW_SCHEDULE);
+  const open = page.getByTestId('schedule-new');
+  const popover = page.getByTestId('schedule-popover');
   const ringed = () =>
     page.evaluate(() => document.activeElement?.matches(':focus-visible') ?? false);
 
   await open.click();
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByText('频率', { exact: true })).toBeVisible();
+  await expect(popover).toBeVisible();
+  await expect(popover.getByText('频率', { exact: true })).toBeVisible();
   await expect.poll(ringed).toBe(false);
 
   await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
+  await expect(popover).toBeHidden();
   await open.focus();
   await page.keyboard.press('Enter');
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('radio', { checked: true })).toBeFocused();
+  await expect(popover).toBeVisible();
+  await expect
+    .poll(() => popover.evaluate((el) => el.contains(document.activeElement)))
+    .toBe(true);
   await expect.poll(ringed).toBe(true);
 });

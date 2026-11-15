@@ -196,6 +196,7 @@ async function chiefStepToken(
     { db: deps.db, box: deps.box },
     threadId,
     stepRow?.fallback?.model?.provider,
+    stepRow?.claudeSubscriptionId,
   );
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   const agentRow = threadRow ? coordinatorProfile(deps.db, threadRow.teamId) : null;

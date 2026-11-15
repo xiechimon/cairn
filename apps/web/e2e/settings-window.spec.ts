@@ -23,14 +23,16 @@ test('sidebar footer: settings and activity icons, no user chip and no computers
 test('the settings icon opens the window on Account; Escape returns to the page it came from', async ({
   page,
 }) => {
-  await page.goto(`/app/schedules?${FLEET}`);
+  await page.goto(`/app?${FLEET}&pane=tasks&tab=scheduled`);
+  await page.getByTestId('sidebar-reopen').click();
+  await page.mouse.move(700, 400);
   await page.getByTestId('sidebar-settings').click();
   await expect(page).toHaveURL(/\/app\/settings\?/);
   await expect(settings(page)).toBeVisible();
   await expect(navItem(page, 'account')).toHaveAttribute('aria-current', 'page');
   await page.keyboard.press('Escape');
   await expect(settings(page)).toHaveCount(0);
-  await expect(page).toHaveURL(/\/app\/schedules\?scenario=providers-fleet/);
+  await expect(page).toHaveURL(/\/app\?scenario=providers-fleet&pane=tasks&tab=scheduled$/);
 });
 
 test('Escape inside a text field is the field\'s; the window stays open', async ({ page }) => {
@@ -47,20 +49,24 @@ test('Escape inside a text field is the field\'s; the window stays open', async 
 test('section and scope changes keep the page settings will return to', async ({
   page,
 }) => {
-  await page.goto('/app/schedules?scenario=model-routing');
+  await page.goto('/app?scenario=model-routing&pane=tasks&tab=scheduled');
+  await page.getByTestId('sidebar-reopen').click();
+  await page.mouse.move(700, 400);
   await page.getByTestId('sidebar-settings').click();
   await navItem(page, 'routing').click();
   await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=model-routing/);
   await settings(page).getByRole('button', { name: '关闭设置' }).click();
-  await expect(page).toHaveURL(/\/app\/schedules\?scenario=model-routing$/);
+  await expect(page).toHaveURL(/\/app\?scenario=model-routing&pane=tasks&tab=scheduled$/);
 
-  await page.goto(`/app/schedules?${FLEET}`);
+  await page.goto(`/app?${FLEET}&pane=tasks&tab=scheduled`);
+  await page.getByTestId('sidebar-reopen').click();
+  await page.mouse.move(700, 400);
   await page.getByTestId('sidebar-settings').click();
   await navItem(page, 'providers').click();
   await settings(page).getByRole('combobox', { name: '设置作用于' }).click();
   await page.getByRole('option', { name: /build-box-orb/ }).click();
   await page.keyboard.press('Escape');
-  await expect(page).toHaveURL(/\/app\/schedules\?scenario=providers-fleet$/);
+  await expect(page).toHaveURL(/\/app\?scenario=providers-fleet&pane=tasks&tab=scheduled$/);
 });
 
 test('sections switch in place, keep their own params, and close goes back to where it started', async ({

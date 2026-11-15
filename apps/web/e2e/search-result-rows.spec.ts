@@ -52,8 +52,11 @@ test('clicking a go-to row → panel closes + jumps to the matching route', asyn
   await openPanel(page);
 
   await panel(page).getByRole('button', { name: '定时' }).click();
-  await expect(page).toHaveURL('/app/schedules?scenario=01');
+  await expect(page).toHaveURL('/app?scenario=01&pane=tasks&tab=scheduled');
   await expect(panel(page)).toBeHidden();
+  await expect(
+    page.getByRole('complementary', { name: '任务' }).getByRole('tab', { name: '定时' }),
+  ).toHaveAttribute('aria-selected', 'true');
 });
 
 test('idle: no always-on; hovering a row lights exactly that one row', async ({ page }) => {

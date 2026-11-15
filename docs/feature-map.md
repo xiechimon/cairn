@@ -146,7 +146,7 @@ Scheduled tasks, the search syntax with the activity view, and the sidebar with 
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Scheduled tasks](#schedules) | 3 | Research: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model<br>Frontend design: the schedules page and detail dialog have no design<br>Backend design: no design for due events, missed runs and continue-thread schedules |
+| [Scheduled tasks](#schedules) | 3 | Research: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model<br>Frontend design: the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md<br>Backend design: no design for due events, missed runs and continue-thread schedules |
 | [Search and activity](#search-and-activity) | 3 | Research: no note on Amp's search syntax and activity filters<br>Backend design: no design for the search syntax, index and ranking |
 | [Sidebar](#sidebar) | 3 | Backend design: no design for unread and read marks across devices |
 
@@ -563,7 +563,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 **Scheduled tasks** (shipped). Recurring work that starts or continues threads on a schedule, with run-now and a project schedule.
 
 - Research: **gap**: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model
-- Frontend design: **gap**: the schedules page and detail dialog have no design
+- Frontend design: **gap**: the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md
 - Backend design: **gap**: no design for due events, missed runs and continue-thread schedules
 
 ### search-and-activity
