@@ -22,7 +22,6 @@ const OWNER_ONLY_PATTERNS = [
 
 export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
   if (
-    pathname === '/api/machine/enroll/confirm' ||
     pathname === '/api/remote/pairing' ||
     pathname.startsWith('/api/remote/pairing/') ||
     (pathname.startsWith('/api/remote/devices') && !READ_METHODS.has(method.toUpperCase()))

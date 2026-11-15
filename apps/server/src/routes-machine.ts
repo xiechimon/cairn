@@ -40,8 +40,8 @@ import { HttpError, parseWith } from './lib/errors.js';
 import { forwardedOrigin } from './lib/forwarded-origin.js';
 import { newRecordId } from './lib/ids.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
-import { isLoopbackPeer } from './lib/token-auth.js';
-import { githubAppOf } from './routes-helpers.js';
+import { isLoopbackPeer, pairedDeviceIdOf } from './lib/token-auth.js';
+import { githubAppOf, jsonBody } from './routes-helpers.js';
 import { transitionBranchSync } from './services/branch-sync.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
@@ -159,10 +159,6 @@ function unauthorized(): HttpError {
 const CLOSED_ORBS_MAX_BODY_BYTES = 64 * 1024;
 const COMPUTER_FRAMES_MAX_BODY_BYTES = 24 * 1024 * 1024;
 const DONE_MAX_BODY_BYTES = 16 * 1024 * 1024;
-
-async function jsonBody(c: Context): Promise<unknown> {
-  return c.req.json().catch(() => null);
-}
 
 function enrollOrigin(c: Context): string {
   const configured = process.env.CAIRN_WEB_ORIGIN?.trim();
@@ -305,6 +301,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       teamId: entry.teamId,
       name: entry.name ?? 'machine',
       serverUrl: originOf(c),
+      ownerApproved: pairedDeviceIdOf(c) === null,
     });
     entry.machine = machineJson;
     return c.json({ machine: machineJson });
