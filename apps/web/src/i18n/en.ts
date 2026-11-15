@@ -1886,6 +1886,7 @@ export const EN: Record<string, string> = {
   加词或筛选: 'Add words or a filter',
   快速筛选: 'Quick filters',
   '{n} 条 · {cost}': '{n#1 thread|# threads} · {cost}',
+  '{n} 条': '{n#1 thread|# threads}',
   '显示 {shown} / {total}': 'Showing {shown} of {total}',
   加载更多: 'Load more',
   正在加载活动: 'Loading activity',
