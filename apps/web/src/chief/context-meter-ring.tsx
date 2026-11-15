@@ -96,6 +96,7 @@ export function ContextMeterGlyph({ filled, busy = false }: { filled: number; bu
           stroke="currentColor"
           strokeWidth={STROKE}
           strokeLinecap="round"
+          className={busy ? 'motion-reduce:hidden' : undefined}
         />
       )}
     </svg>
