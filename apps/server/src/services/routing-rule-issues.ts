@@ -76,9 +76,12 @@ function ruleProblem(
   rule: RoutingRuleRow,
   machines: readonly MachineRow[],
 ): RuleProblem | null {
-  if (rule.use === 'coordinator' && coordinatorRunsOnPi()) {
-    const verdict = coordinatorRouteVerdict(db, rule.teamId);
-    if (verdict === null || !('refusal' in verdict)) return null;
+  const verdict =
+    rule.use === 'coordinator' && coordinatorRunsOnPi()
+      ? coordinatorRouteVerdict(db, rule.teamId)
+      : null;
+  if (verdict !== null) {
+    if (!('refusal' in verdict)) return null;
     return { reason: COORDINATOR_REFUSAL_REASON[verdict.refusal], provider: rule.provider };
   }
   const runtime = stepRuntimeFor(rule.provider);

@@ -356,6 +356,27 @@ describe('routing rule issues and the one-click fix', () => {
     ]);
   });
 
+  test('coordinator in-server on Claude Code: judged by the Runners like any Claude Code rule', async () => {
+    const s = bootServer();
+    setCoordinatorServerContextEnabled(true);
+    onTestFinished(() => setCoordinatorServerContextEnabled(false));
+    const machineId = insertMachine(s);
+    seedRoute(s, 'coordinator', {
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+      machineId,
+    });
+    expect((await settings(s)).ruleIssues).toMatchObject([
+      { use: 'coordinator', reason: 'runtime-disabled', runtime: 'claude-code' },
+    ]);
+    s.db
+      .update(machineTable)
+      .set({ claudeCodeReport: subscriptionClaudeReport })
+      .where(eq(machineTable.id, machineId))
+      .run();
+    expect((await settings(s)).ruleIssues).toEqual([]);
+  });
+
   test('a healthy citation_check rule on a relay provider is not flagged and reads back byte-identical', async () => {
     const s = bootServer();
     insertMachine(s);
