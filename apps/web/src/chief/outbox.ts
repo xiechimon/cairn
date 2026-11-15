@@ -32,6 +32,7 @@ export interface Outbox {
     deliver: Deliver,
   ): string;
   discard(key: string): OutboxEntry | null;
+  land(key: string, messageId: string): void;
   settle(threadId: string | null, known: ReadonlySet<string>): void;
 }
 
@@ -70,7 +71,9 @@ export function createOutbox(
           ),
         );
       } catch {
-        patch(key, (failed) => ({ ...failed, state: 'failed' }));
+        patch(key, (failed) =>
+          failed.state === 'sending' ? { ...failed, state: 'failed' } : failed,
+        );
       }
     });
   };
@@ -98,6 +101,11 @@ export function createOutbox(
       returned = [...returned, entry];
       replace(list.filter((candidate) => candidate.key !== key));
       return entry;
+    },
+    land(key, messageId) {
+      patch(key, (entry) =>
+        entry.state === 'sending' ? { ...entry, state: 'sent', messageId } : entry,
+      );
     },
     settle(threadId, known) {
       const kept = list.filter(

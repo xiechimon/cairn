@@ -208,7 +208,9 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   }, [newestPageOnly, activeThreadId, queryClient]);
   const streamHandlers = useMemo(
     () => ({
-      onMessage: (row: TranscriptRow) => {
+      onMessage: (row: TranscriptRow, clientMessageId?: string) => {
+        if (row.role === 'user' && clientMessageId !== undefined)
+          chiefOutbox.land(clientMessageId, row.id);
         const reason = chiefTurnErrorOfContent(row.content);
         if (reason === null) return;
         toast.error(t('Coordinator 本轮执行失败'), { description: reason });

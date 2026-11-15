@@ -9,6 +9,7 @@ import {
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { NotFoundError } from '../services/builds.js';
+import { chiefMessageStored } from '../services/chief.js';
 import { askQuestionContentOf } from '../services/chief-questions.js';
 import { storeQuickReplies } from '../services/chief-quick-replies.js';
 import { releaseUnconsumedSteer } from '../services/chief-turns.js';
@@ -24,7 +25,7 @@ import {
 import { bindCoordinatorRun, coordinatorRuns } from '../services/coordinator-runs.js';
 import { finishCoordinatorTurn, recordStepUsage } from '../services/coordinator-steps.js';
 import { stopStepComputer } from '../services/machine-computer.js';
-import { isChiefConversation, type MachineDeps } from '../services/machine-deps.js';
+import { isChiefConversation, type MachineDeps, ownedStep } from '../services/machine-deps.js';
 import { executeRelayToolCall, machineAsk } from '../services/machine-relay.js';
 import {
   fetchStop,
@@ -201,9 +202,13 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
         ...(signal === undefined ? {} : { signal }),
       }),
     transcriptRow: async (stepId, row, entryId) => {
-      const owned = stepRow(stepId);
+      const owned = ownedStep(deps, null, stepId);
       deps.db.transaction(() => {
-        reportTranscriptRow(deps, null, stepId, row);
+        if (
+          !isChiefConversation(owned.buildId) ||
+          !chiefMessageStored(deps.db, { ...row, threadId: owned.buildId })
+        )
+          reportTranscriptRow(deps, null, stepId, row);
         if (entryId !== undefined && isChiefConversation(owned.buildId)) {
           mapEntry(row.id, owned.buildId, entryId);
           if (!coordinatorInputs(deps.db, owned.buildId).some((input) => input.stepId === stepId))
