@@ -845,9 +845,9 @@ Reach:
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `resource-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/mcp-servers.md](features/mcp-servers.md)
-- Research: **gap**: no note on MCP configuration surfaces in t3code and Amp
-- Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md)
-- Backend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md)
+- Research: [docs/research/mcp-connectors-2026-11-15.md](../../../docs/research/mcp-connectors-2026-11-15.md)
+- Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](../../../docs/design/mcp-connectors.md)
+- Backend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](../../../docs/design/mcp-connectors.md)
 - Evidence: `apps/server/test/mcp-servers.test.ts`, `apps/daemon/test/mcp-config.test.ts`
 
 ### projects
