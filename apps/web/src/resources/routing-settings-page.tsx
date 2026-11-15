@@ -45,7 +45,7 @@ export const ROUTING_SETTINGS_HREF = '/app/resources/routing-settings';
 export const COORDINATOR_ROUTE_ANCHOR = 'route-coordinator';
 export const COORDINATOR_ROUTING_HREF = `${settingsHref('work-routing')}#${COORDINATOR_ROUTE_ANCHOR}`;
 
-const CREATABLE_USES: readonly RouteUse[] = ['coordinator', 'review', 'citation_check'];
+const CREATABLE_USES: readonly RouteUse[] = ['coordinator', 'session', 'review', 'citation_check'];
 
 const USE_LABELS: Record<RouteUse, string> = {
   coordinator: 'Coordinator',
