@@ -122,7 +122,7 @@ Reach:
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `chief-report-sentence`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`
 - Research: [docs/research/duet-proactive-coordinator.md](../../../docs/research/duet-proactive-coordinator.md)
-- Frontend design: **gap**: the report row and retro proposal card have no design
+- Frontend design: [apps/web/DESIGN-RULES.md](../../../apps/web/DESIGN-RULES.md)
 - Backend design: **gap**: no design for report content, timing, quiet rules and retro proposal storage
 - Evidence: `apps/web/e2e/chief-daily-report.spec.ts`, `apps/server/test/chief-report.test.ts`, `apps/server/test/chief-digest.test.ts`, `apps/server/test/chief-router-tools.test.ts`
 

@@ -440,9 +440,9 @@
       "research": [
         "docs/research/duet-proactive-coordinator.md"
       ],
-      "frontendDesign": {
-        "gap": "the report row and retro proposal card have no design"
-      },
+      "frontendDesign": [
+        "apps/web/DESIGN-RULES.md"
+      ],
       "backendDesign": {
         "gap": "no design for report content, timing, quiet rules and retro proposal storage"
       },

@@ -126,8 +126,8 @@ export function chiefReportMarkdown(report: ChiefReportContent, t: Translate): s
       `- ${t('合并：')}${y.merged
         .map((pr) =>
           pr.prUrl === null
-            ? `[#${pr.seq} ${mdText(pr.title)}](todo:${pr.id})`
-            : `[PR ${pr.prNumber ?? ''} · #${pr.seq} ${mdText(pr.title)}](${pr.prUrl})`,
+            ? `[${mdText(pr.title)}](todo:${pr.id})`
+            : `[PR ${pr.prNumber ?? ''} · ${mdText(pr.title)}](${pr.prUrl})`,
         )
         .join('、')}`,
     );

@@ -94,7 +94,7 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
     await expect(doc).toContainText(
       '完成 1 · 合并 1 · 失败 1 · 重跑 2 · 等额度 0 · 审查通过 3 / 拦下 1',
     );
-    await expect(doc.getByRole('link', { name: /PR 77/ })).toHaveAttribute(
+    await expect(doc.getByRole('link', { name: 'PR 77 · 修复看板拖拽后计数不刷新' })).toHaveAttribute(
       'href',
       'https://github.com/o/r/pull/77',
     );
