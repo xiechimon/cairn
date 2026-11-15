@@ -224,7 +224,7 @@ export function TasksPanel({
   query,
 }: TasksPanelProps) {
   const { t } = useI18n();
-  const [tab, setTab] = useState<TasksTab>('active');
+  const [chosenTab, setTab] = useState<TasksTab | null>(null);
   const [adding, setAdding] = useState(false);
   const groups = bySection(entries);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
@@ -307,6 +307,12 @@ export function TasksPanel({
       </div>
     ) : null;
   const activeCount = ACTIVE_SECTIONS.reduce((sum, section) => sum + count(section), 0);
+  const loaded = query === undefined || !query.isPending;
+  const openingTab: TasksTab = activeCount === 0 && groups.up_next.length > 0 ? 'next' : 'active';
+  useEffect(() => {
+    if (chosenTab === null && loaded) setTab(openingTab);
+  }, [chosenTab, loaded, openingTab]);
+  const tab = chosenTab ?? openingTab;
   const quiet = (text: string) => (
     <p data-testid="tasks-quiet" className="m-0 px-2.5 py-2 text-ui text-content-tertiary">
       {text}
