@@ -21,6 +21,7 @@ describe('toModelOptions (#358 data-source projection, #770 providers section re
     ]);
     expect(rows).toEqual([
       {
+        runtime: 'claude-code',
         provider: 'claude-code',
         providerLabel: 'Claude Code',
         modelId: 'claude-opus-4-5',
@@ -33,6 +34,7 @@ describe('toModelOptions (#358 data-source projection, #770 providers section re
     const rows = toModelOptions([piSource([{ id: 'm-a', name: 'M A' }])]);
     expect(rows).toEqual([
       {
+        runtime: 'pi',
         provider: 'pi',
         providerLabel: 'pi',
         modelId: 'm-a',
@@ -59,6 +61,7 @@ describe('toModelOptions (#358 data-source projection, #770 providers section re
     ]);
     expect(rows).toEqual([
       {
+        runtime: 'claude-code',
         provider: 'claude-code',
         providerLabel: 'Claude Code',
         modelId: 'm-x',
@@ -67,13 +70,17 @@ describe('toModelOptions (#358 data-source projection, #770 providers section re
     ]);
   });
 
-  it('F5b: same model id across families (pi section + claude-code section) → dedup by model id', () => {
+  it('F5b: the same model id from two providers stays two rows, each naming its provider', () => {
     const rows = toModelOptions([
-      piSource([{ id: 'm-relay', name: 'relay 名' }]),
-      ccSource([{ id: 'm-relay', name: '槽位名' }]),
+      { ...piSource([{ id: 'm-relay', name: 'relay' }]), provider: 'vani', providerLabel: 'Vani' },
+      { ...piSource([{ id: 'm-relay', name: 'relay' }]), provider: 'local-llm', providerLabel: '' },
+      ccSource([{ id: 'm-relay', name: 'slot' }]),
     ]);
-
-    expect(rows.map((r) => r.modelId)).toEqual(['m-relay']);
+    expect(rows.map((r) => [r.runtime, r.provider, r.providerLabel, r.modelId])).toEqual([
+      ['pi', 'vani', 'Vani', 'm-relay'],
+      ['pi', 'local-llm', 'pi', 'm-relay'],
+      ['claude-code', 'claude-code', 'Claude Code', 'm-relay'],
+    ]);
   });
 
   it('F6: uninstalled section (models=[]) → no row contribution, no crash', () => {

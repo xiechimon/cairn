@@ -8,6 +8,7 @@ import { SegmentedTabs } from '../components/segmented.js';
 import { SETTINGS_HINT_CLS, SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
+import { toastError } from '../components/ui/toaster.js';
 import type { ChiefContent, ChiefSettingsTab } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight } from '../icons/index.js';
@@ -42,7 +43,13 @@ export function ChiefSettings({ chief, onBack }: { chief: ChiefContent; onBack: 
   const wakes = live ? (chiefQ.data?.wakes ?? []) : [];
   const saveCharter = live
     ? (value: string) =>
-        mutations.patchChief.mutate({ charter: value }, { onSuccess: () => setCharterOpen(false) })
+        mutations.patchChief.mutate(
+          { charter: value },
+          {
+            onSuccess: () => setCharterOpen(false),
+            onError: (error) => toastError(t('章程没有保存，你写的内容还在编辑框里。'), error),
+          },
+        )
     : undefined;
   return (
     <div className="flex min-w-0 flex-1 flex-col">

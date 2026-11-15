@@ -8,6 +8,7 @@ import {
   type PatchRoutingRuleBody,
   type PatchWorkPolicyBody,
   type PolicyUse,
+  PROVIDER_PRESET_IDS,
   type RemoteToolDef,
   type RequiredCapabilities,
   type RouteOverride,
@@ -15,17 +16,22 @@ import {
   type RoutingRuleRecord,
   type RunnerOs,
   runnerOsOf,
+  type SessionDefault,
   type StepKind,
   type TeamRoutingSettings,
   type TodoSourceKind,
   type WorkPolicyRecord,
   withPlatform,
 } from '@cairn/shared';
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, sql } from 'drizzle-orm';
+import { usesHostCodexLogin } from '../coordinator/codex-login.js';
+import { builtinModelIds, isBuiltinProvider } from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
-import { build, machine, routingRule, step, todo, workPolicy } from '../db/schema.js';
+import { build, machine, provider, routingRule, step, todo, workPolicy } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { paidClaudeAllowed } from './model-routing.js';
+import { DEFAULT_SESSION_MODEL, DEFAULT_SESSION_PROVIDER } from './routing-migration.js';
 import { decideStepRoute } from './step-route.js';
 
 type RoutingRuleRow = typeof routingRule.$inferSelect;
@@ -69,7 +75,71 @@ export function chiefRemoteTools(): readonly RemoteToolDef[] {
   return [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS, ...CHIEF_REPLY_TOOLS];
 }
 
-function ruleRow(db: Pick<Db, 'select'>, teamId: string, use: RouteUse): RoutingRuleRow | null {
+const LEGACY_RUNTIME_PROVIDER = 'pi';
+const DEFAULT_SESSION_RULE_ID = 'default-session';
+const CODEX_LOGIN_PRESENT = new Set(['ok', 'expired']);
+
+export function keylessEndpoint(providerId: string): boolean {
+  const presets: readonly string[] = PROVIDER_PRESET_IDS;
+  return !presets.includes(providerId) && !isBuiltinProvider(providerId);
+}
+
+function servingProviders(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+  modelId: string | null,
+  storedOnly = false,
+): { providerId: string; runnable: boolean }[] {
+  return db
+    .select({
+      providerId: provider.providerId,
+      baseUrl: provider.baseUrl,
+      models: provider.models,
+      keyed: sql<number>`${provider.apiKeyCipher} is not null`,
+    })
+    .from(provider)
+    .where(eq(provider.teamId, teamId))
+    .orderBy(asc(provider.createdAt), asc(provider.id))
+    .all()
+    .flatMap((row) => {
+      const stored =
+        modelId === null ? row.models.length > 0 : row.models.some((m) => m.id === modelId);
+      const builtin =
+        !storedOnly && modelId !== null && builtinModelIds(row.providerId).has(modelId);
+      if (!stored && !builtin) return [];
+      const runnable =
+        row.keyed === 1 ||
+        keylessEndpoint(row.providerId) ||
+        usesHostCodexLogin(row.providerId, row.baseUrl);
+      return [
+        { providerId: row.providerId, runnable, rank: (stored ? 0 : 2) + (runnable ? 0 : 1) },
+      ];
+    })
+    .sort((a, b) => a.rank - b.rank)
+    .map(({ providerId, runnable }) => ({ providerId, runnable }));
+}
+
+export function resolveRuleProvider<T extends RoutingRuleRow>(
+  db: Pick<Db, 'select'>,
+  rule: T,
+  storedOnly = false,
+): T {
+  if (rule.provider !== LEGACY_RUNTIME_PROVIDER) return rule;
+  const ownRow = db
+    .select({ id: provider.id })
+    .from(provider)
+    .where(and(eq(provider.teamId, rule.teamId), eq(provider.providerId, LEGACY_RUNTIME_PROVIDER)))
+    .get();
+  if (ownRow !== undefined) return rule;
+  const served = servingProviders(db, rule.teamId, rule.modelId, storedOnly)[0];
+  return served === undefined ? rule : { ...rule, provider: served.providerId };
+}
+
+function storedRuleRow(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+  use: RouteUse,
+): RoutingRuleRow | null {
   return (
     db
       .select()
@@ -79,7 +149,92 @@ function ruleRow(db: Pick<Db, 'select'>, teamId: string, use: RouteUse): Routing
   );
 }
 
-export function routeForStep(
+function ruleRow(db: Pick<Db, 'select'>, teamId: string, use: RouteUse): RoutingRuleRow | null {
+  const row = storedRuleRow(db, teamId, use);
+  return row === null ? null : resolveRuleProvider(db, row);
+}
+
+function sessionHarness(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+): 'claude-code' | 'codex-login' | null {
+  const rows = db
+    .select({
+      report: machine.claudeCodeReport,
+      enabled: machine.enabledRuntimes,
+      capabilities: machine.capabilities,
+    })
+    .from(machine)
+    .where(eq(machine.teamId, teamId))
+    .all();
+  if (rows.some((row) => row.report?.installed === true && row.enabled.includes('claude-code'))) {
+    return 'claude-code';
+  }
+  const codex = rows.some(
+    (row) =>
+      CODEX_LOGIN_PRESENT.has(row.capabilities?.codexLogin?.state ?? 'absent') &&
+      row.enabled.includes('pi'),
+  );
+  return codex ? 'codex-login' : null;
+}
+
+function providerSessionChoice(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+): { provider: string; modelId: string } | null {
+  const rows = db
+    .select({ providerId: provider.providerId, models: provider.models })
+    .from(provider)
+    .where(eq(provider.teamId, teamId))
+    .all();
+  for (const { providerId, runnable } of servingProviders(db, teamId, null)) {
+    if (!runnable) continue;
+    const models = rows.find((row) => row.providerId === providerId)?.models ?? [];
+    const model = models.find(
+      (m) => m.id !== '' && paidClaudeAllowed(db, teamId, providerId, m.id),
+    );
+    if (model !== undefined) return { provider: providerId, modelId: model.id };
+  }
+  return null;
+}
+
+function defaultSessionChoice(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+): (SessionDefault & { provider: string; modelId: string }) | null {
+  const harness = sessionHarness(db, teamId);
+  if (harness !== null) {
+    return { reason: harness, provider: DEFAULT_SESSION_PROVIDER, modelId: DEFAULT_SESSION_MODEL };
+  }
+  const choice = providerSessionChoice(db, teamId);
+  return choice === null ? null : { reason: 'provider', ...choice };
+}
+
+function defaultSessionRule(db: Pick<Db, 'select'>, teamId: string): RoutingRuleRow | null {
+  const choice = defaultSessionChoice(db, teamId);
+  if (choice === null) return null;
+  return {
+    id: DEFAULT_SESSION_RULE_ID,
+    teamId,
+    use: 'session',
+    provider: choice.provider,
+    modelId: choice.modelId,
+    thinkingLevel: null,
+    fallbackModels: null,
+    machineId: null,
+    requiredCapabilities: null,
+    tools: null,
+    mcpServers: null,
+    skillsAllowlist: null,
+    defaultSkill: null,
+    secrets: null,
+    seededFromAgentId: null,
+    createdAt: 0,
+    updatedAt: 0,
+  };
+}
+
+function storedRouteForStep(
   db: Pick<Db, 'select'>,
   todoRow: RoutedTodo,
   kind: StepKind,
@@ -91,6 +246,18 @@ export function routeForStep(
     if (checker !== null) return checker;
   }
   return ruleRow(db, todoRow.teamId, 'session');
+}
+
+export function routeForStep(
+  db: Pick<Db, 'select'>,
+  todoRow: RoutedTodo,
+  kind: StepKind,
+): RoutingRuleRow | null {
+  const stored = storedRouteForStep(db, todoRow, kind);
+  if (stored !== null || kind === 'review' || (!isSessionStepKind(kind) && kind !== 'merge')) {
+    return stored;
+  }
+  return defaultSessionRule(db, todoRow.teamId);
 }
 
 function policyUse(kind: StepKind): 'session' | 'review' | null {
@@ -239,7 +406,15 @@ export function profileForStep(
     machineId: base.machineId,
     required: base.requiredCapabilities,
   });
-  if (decision.chosen === null) return base;
+  if (decision.chosen === null) {
+    const stockSeed =
+      base.provider === DEFAULT_SESSION_PROVIDER && base.modelId === DEFAULT_SESSION_MODEL;
+    const choice =
+      stockSeed && sessionHarness(db, todoRow.teamId) === null
+        ? providerSessionChoice(db, todoRow.teamId)
+        : null;
+    return choice === null ? base : { ...base, ...choice };
+  }
   return {
     ...base,
     provider: decision.chosen.provider,
@@ -256,7 +431,7 @@ export function coordinatorProfile(db: Pick<Db, 'select'>, teamId: string): Rout
 export const VERIFY_MEMORY_OWNER_SUFFIX = ':verify';
 
 export function memoryOwnerOf(db: Pick<Db, 'select'>, teamId: string, kind: StepKind): string {
-  const route = routeForStep(db, { teamId }, kind) ?? ruleRow(db, teamId, 'session');
+  const route = storedRouteForStep(db, { teamId }, kind) ?? storedRuleRow(db, teamId, 'session');
   const owner = route?.id ?? teamId;
   return kind === 'verify' ? `${owner}${VERIFY_MEMORY_OWNER_SUFFIX}` : owner;
 }
@@ -325,7 +500,13 @@ export function listRoutingSettings(db: Db, teamId: string): TeamRoutingSettings
     .all()
     .map(toWorkPolicyRecord)
     .sort((a, b) => a.use.localeCompare(b.use));
-  return { rules, policies };
+  if (rules.some((rule) => rule.use === 'session')) return { rules, policies };
+  const choice = defaultSessionChoice(db, teamId);
+  return {
+    rules,
+    policies,
+    sessionDefault: choice ?? { reason: 'none', provider: null, modelId: null },
+  };
 }
 
 function requireTeamMachine(db: Db, teamId: string, machineId: string): void {
@@ -351,7 +532,15 @@ export function upsertRoutingRule(
   if (body.machineId != null) requireTeamMachine(db, teamId, body.machineId);
   const now = nowMs();
   if (existing === undefined) {
-    if (body.provider === undefined || body.modelId === undefined) {
+    const fallback =
+      use === 'session' && body.provider === undefined && body.modelId === undefined
+        ? defaultSessionChoice(db, teamId)
+        : null;
+    const created = {
+      provider: body.provider ?? fallback?.provider,
+      modelId: body.modelId ?? fallback?.modelId,
+    };
+    if (created.provider === undefined || created.modelId === undefined) {
       throw new HttpError(400, 'provider and modelId are required to create a routing rule');
     }
     const id = newRecordId();
@@ -360,8 +549,8 @@ export function upsertRoutingRule(
         id,
         teamId,
         use,
-        provider: body.provider,
-        modelId: body.modelId,
+        provider: created.provider,
+        modelId: created.modelId,
         thinkingLevel: body.thinkingLevel ?? null,
         fallbackModels: body.fallbackModels ?? null,
         machineId: body.machineId ?? null,

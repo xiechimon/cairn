@@ -98,6 +98,7 @@ export const conversationMessageEventSchema = z.object({
   conversationId: recordId.optional(),
   message: transcriptRowSchema,
   deliveredQueue: z.object({ conversationId: recordId, messageId: recordId }).optional(),
+  clientMessageId: z.string().min(1).max(200).optional(),
 });
 export type ConversationMessageEvent = z.infer<typeof conversationMessageEventSchema>;
 

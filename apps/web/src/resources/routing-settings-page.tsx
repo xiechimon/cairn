@@ -3,6 +3,7 @@ import {
   type PolicyUse,
   type RouteUse,
   type RoutingRuleRecord,
+  type SessionDefault,
   type TeamRoutingSettings,
   THINKING_LEVELS,
   type ThinkingLevel,
@@ -38,14 +39,18 @@ import type { ModelOption } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
-import { AgentModelSelect, AgentRuntimeSelect } from '../routes/agent-model-select.js';
+import {
+  AgentModelSelect,
+  AgentRuntimeSelect,
+  runtimeOfProvider,
+} from '../routes/agent-model-select.js';
 import { settingsHref } from '../settings/settings-href.js';
 
 export const ROUTING_SETTINGS_HREF = '/app/resources/routing-settings';
 export const COORDINATOR_ROUTE_ANCHOR = 'route-coordinator';
 export const COORDINATOR_ROUTING_HREF = `${settingsHref('work-routing')}#${COORDINATOR_ROUTE_ANCHOR}`;
 
-const CREATABLE_USES: readonly RouteUse[] = ['coordinator', 'review', 'citation_check'];
+const CREATABLE_USES: readonly RouteUse[] = ['coordinator', 'session', 'review', 'citation_check'];
 
 const USE_LABELS: Record<RouteUse, string> = {
   coordinator: 'Coordinator',
@@ -66,9 +71,38 @@ function fixtureSettings(search: URLSearchParams): TeamRoutingSettings | null {
   return raw ?? null;
 }
 
+function SessionDefaultHint({
+  sessionDefault,
+  options,
+}: {
+  sessionDefault: SessionDefault;
+  options: ModelOption[];
+}) {
+  const { t } = useI18n();
+  const row = options.find(
+    (o) => o.provider === sessionDefault.provider && o.modelId === sessionDefault.modelId,
+  );
+  const text =
+    sessionDefault.reason === 'claude-code'
+      ? t('当前默认：Claude Code（因为有 Runner 装了 Claude Code）')
+      : sessionDefault.reason === 'codex-login'
+        ? t('当前默认：Codex（因为有 Runner 登录了 Codex）')
+        : sessionDefault.reason === 'provider'
+          ? t(
+              '当前默认：{model} · {provider}（因为还没有 Runner 装 Claude Code，用最早添加的服务商）',
+              {
+                model: row?.modelName ?? sessionDefault.modelId ?? '',
+                provider: row?.providerLabel ?? sessionDefault.provider ?? '',
+              },
+            )
+          : t('当前没有可用的默认：添加服务商，或在 Runner 上装 Claude Code');
+  return <span data-testid="routing-session-default">{text}</span>;
+}
+
 function RuleEditor({
   use,
   rule,
+  sessionDefault,
   machines,
   hasDefault,
   options,
@@ -77,6 +111,7 @@ function RuleEditor({
 }: {
   use: RouteUse;
   rule: RoutingRuleRecord | null;
+  sessionDefault?: SessionDefault | undefined;
   machines: { id: string; name: string }[];
   hasDefault: boolean;
   options: ModelOption[];
@@ -91,6 +126,9 @@ function RuleEditor({
   const { t } = useI18n();
   const [provider, setProvider] = useState<string | null>(rule?.provider ?? null);
   const [modelId, setModelId] = useState<string | null>(rule?.modelId ?? null);
+  const [runtime, setRuntime] = useState<string | null>(() =>
+    runtimeOfProvider(rule?.provider ?? null, options),
+  );
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(
     (rule?.thinkingLevel as ThinkingLevel | null | undefined) ?? 'off',
   );
@@ -110,18 +148,28 @@ function RuleEditor({
       data-testid={rule === null ? `routing-rule-new-${use}` : `routing-rule-${use}`}
     >
       <SettingsCard>
-        <SettingsRow label={t(USE_LABELS[use])} hint={t('模型与首选 Runner')}>
+        <SettingsRow
+          label={t(USE_LABELS[use])}
+          hint={
+            rule === null && sessionDefault !== undefined ? (
+              <SessionDefaultHint sessionDefault={sessionDefault} options={options} />
+            ) : (
+              t('模型与首选 Runner')
+            )
+          }
+        >
           <span className="font-mono text-meta text-content-tertiary">{use}</span>
         </SettingsRow>
         <SettingsRow label={t('运行时')}>
           <AgentRuntimeSelect
             ariaLabel={t('运行时')}
-            value={provider}
+            value={runtime}
             options={options}
             unsetLabel={t('选择运行时')}
             onPick={(next) => {
-              if (next === provider) return;
-              setProvider(next);
+              if (next === runtime) return;
+              setRuntime(next);
+              setProvider(null);
               setModelId(null);
             }}
             prefix="routing-rule-runtime"
@@ -131,10 +179,19 @@ function RuleEditor({
         <SettingsRow label={t('模型')}>
           <AgentModelSelect
             ariaLabel={t('模型')}
-            provider={provider}
+            runtime={runtime}
+            provider={
+              provider === 'pi'
+                ? (options.find((row) => row.runtime === 'pi' && row.modelId === modelId)
+                    ?.provider ?? provider)
+                : provider
+            }
             modelId={modelId}
             options={options}
-            onPick={(next) => setModelId(next)}
+            onPick={(next) => {
+              setProvider(next?.provider ?? null);
+              setModelId(next?.modelId ?? null);
+            }}
             prefix="routing-rule-model"
             triggerClassName={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-56')}
           />
@@ -368,6 +425,7 @@ export function RoutingSettingsPage() {
                   key={`new-${use}`}
                   use={use}
                   rule={null}
+                  sessionDefault={use === 'session' ? settings.sessionDefault : undefined}
                   machines={machines}
                   hasDefault={hasDefault}
                   options={modelOptions}

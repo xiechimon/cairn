@@ -2,8 +2,10 @@ import { type ProviderConfig, redactSecrets, type SecretBox } from '@cairn/share
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { routingRule } from '../db/schema.js';
-import { coordinatorRoute, paidClaudeAllowed } from '../services/coordinator-route.js';
+import { coordinatorRoute } from '../services/coordinator-route.js';
+import { paidClaudeAllowed } from '../services/model-routing.js';
 import { openProviderKey } from '../services/providers.js';
+import { resolveRuleProvider } from '../services/routing-rules.js';
 import { readCodexLogin, usesHostCodexLogin } from './codex-login.js';
 
 export interface CoordinatorModelRoute {
@@ -57,11 +59,15 @@ export function coordinatorProviders(
   if (rule === null) return null;
   const router = routeOf(deps, teamId, rule.provider, rule.modelId, rule.thinkingLevel ?? null);
   if (router === null) return null;
-  const compaction = deps.db
+  const storedCompaction = deps.db
     .select()
     .from(routingRule)
     .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, 'compaction')))
     .get();
+  const compaction =
+    storedCompaction === undefined
+      ? undefined
+      : resolveRuleProvider(deps.db, storedCompaction, true);
   const compactionRoute =
     compaction !== undefined &&
     paidClaudeAllowed(deps.db, teamId, compaction.provider, compaction.modelId)

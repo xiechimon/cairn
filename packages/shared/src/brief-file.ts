@@ -1,7 +1,8 @@
 import { isBackendRuntimeId } from './agent-backend.js';
 
-export const BRIEF_MARKER_BEGIN = '<!-- BEGIN CAIRN-RUNTIME (auto-managed; do not edit) -->';
-export const BRIEF_MARKER_END = '<!-- END CAIRN-RUNTIME -->';
+import { BRIEF_MARKER_BEGIN, BRIEF_MARKER_END } from './brief-markers.js';
+
+export { BRIEF_MARKER_BEGIN, BRIEF_MARKER_END };
 
 export const BRIEF_MANAGED_SEPARATOR = '\n\n';
 

@@ -143,6 +143,7 @@ export function composeWorkerSystemPrompt(
     attachments?: boolean;
     decisionBoundary?: boolean;
     project?: { name: string; instructions?: string | undefined };
+    charter?: string | undefined;
   },
 ): string | undefined {
   const parts: string[] = [];
@@ -153,6 +154,7 @@ export function composeWorkerSystemPrompt(
   }
   if (description) parts.push(description);
   if (opts?.decisionBoundary) parts.push(WORKER_DECISION_BOUNDARY);
+  if (opts?.charter) parts.push(`## 团队章程\n${opts.charter}`);
   if (opts?.project?.instructions) {
     parts.push(`## 项目说明（${opts.project.name}）\n${opts.project.instructions}`);
   }

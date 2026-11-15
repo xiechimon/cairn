@@ -5,6 +5,7 @@ import {
   type ClaudeAuthStateWire,
   type ClaudeCodeReport,
   type ClaudeLogin,
+  DEFAULT_CLAUDE_CODE_MODELS,
   parseClaudeCodeModelSource,
 } from '@cairn/shared';
 import type { ClaudeCodeAuthProbe } from './claude-code-auth.js';
@@ -37,10 +38,14 @@ export function readClaudeCodeReport(
     raw = undefined;
   }
   const source = parseClaudeCodeModelSource(raw ?? null, hostname());
+  const binaryFound = extra.bin != null;
   return {
-    installed: source.installed,
+    installed: source.installed || binaryFound,
     hostname: source.hostname,
-    models: source.models,
+    models:
+      binaryFound && source.models.length === 0
+        ? DEFAULT_CLAUDE_CODE_MODELS.map((model) => ({ ...model }))
+        : source.models,
     ...(extra.bin !== undefined ? { bin: extra.bin } : {}),
     ...(extra.auth ? { auth: toWireAuth(extra.auth) } : {}),
     ...(extra.login !== undefined ? { login: extra.login } : {}),

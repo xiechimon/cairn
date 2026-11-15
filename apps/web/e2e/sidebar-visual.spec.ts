@@ -211,12 +211,13 @@ test('the row menu matches the reference metrics and order', async ({ page }) =>
   await trigger.click();
   const menu = page.locator('[data-slot="dropdown-menu-content"]');
   await expect(menu.getByRole('menuitem')).toHaveText([
-    '重命名',
-    '项目设置',
-    '移到分组',
-    '归档',
-    '删除',
+    /^重命名/,
+    /^项目设置/,
+    /^移到分组/,
+    /^归档/,
+    /^删除…/,
   ]);
+  await expect(menu.getByTestId('menu-key-hint')).toHaveText(['R', 'S', 'M', 'A', 'D']);
   await menu.evaluate((el) =>
     Promise.all(el.getAnimations({ subtree: true }).map((animation) => animation.finished)),
   );

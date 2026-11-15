@@ -5,6 +5,7 @@ import {
   buildMergedPrGuardInstruction,
   buildMergedPrGuardNote,
   buildTaskPromptText,
+  chiefIdFormat,
   claudeLoginBlocksClaim,
   claudeRateBlock,
   confinementDispatchReady,
@@ -23,6 +24,7 @@ import {
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
   WORKER_THREAD_REPORT_TOOL,
+  workerBriefTextSchema,
 } from '@cairn/shared';
 import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm';
 import {
@@ -87,10 +89,10 @@ import { mergedCatalogModels } from './model-liveness.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import {
   chiefRemoteTools,
+  coordinatorProfile,
   memoryOpsAreTeamScoped,
   memoryOwnerOf,
   type RouteProfile,
-  routeProfile,
 } from './routing-rules.js';
 import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
@@ -151,7 +153,7 @@ function claimCandidates(deps: MachineDeps, _machineId: string, teamId: string):
 
 function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: string) {
   return deps.db
-    .select({ stepRow: step, threadRow: chiefThread, chiefRow: chief, ruleRow: routingRule })
+    .select({ stepRow: step, threadRow: chiefThread, chiefRow: chief })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
     .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
@@ -169,7 +171,10 @@ function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: str
     )
     .orderBy(asc(step.createdAt))
     .all()
-    .map((row) => ({ ...row, agentRow: routeProfile(row.ruleRow) }))
+    .flatMap((row) => {
+      const agentRow = coordinatorProfile(deps.db, teamId);
+      return agentRow === null ? [] : [{ ...row, agentRow }];
+    })
     .filter((row) => !serverTakesTurn(deps.db, teamId, row.stepRow));
 }
 
@@ -586,6 +591,15 @@ async function tryClaim(
           ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
         };
     const projectRow = projectOfTodo(db, cand.todoRow);
+    const charterOwner = cand.todoRow.ownerId ?? cand.todoRow.createdBy;
+    const charter =
+      charterOwner !== null
+        ? db
+            .select({ charter: chief.charter })
+            .from(chief)
+            .where(eq(chief.id, chiefIdFormat(charterOwner, teamId)))
+            .get()?.charter
+        : undefined;
     const repoRef = projectRepoRef(projectRow, origin);
     const mergeTarget =
       cand.stepRow.kind === 'merge' ? parseHostedMergeInstruction(cand.stepRow.prompt) : null;
@@ -660,6 +674,7 @@ async function tryClaim(
         ...(projectRow?.instructions != null ? { instructions: projectRow.instructions } : {}),
         repo,
       },
+      ...(charter && workerBriefTextSchema.safeParse(charter).success ? { charter } : {}),
       agent: {
         id: agentRow.id,
         displayName: agentRow.displayName,

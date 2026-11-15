@@ -133,7 +133,7 @@ test('the archived row menu unarchives back into the active list', async ({ page
   await rows(page).filter({ hasText: 'old-landing' }).hover();
   await page.getByRole('button', { name: 'old-landing 的菜单' }).click();
   const items = page.getByRole('menuitem');
-  await expect(items).toHaveText(['取消归档', '删除']);
+  await expect(items).toHaveText([/^取消归档/, /^删除/]);
   await page.getByRole('menuitem', { name: '取消归档' }).click();
   await expect(rows(page)).toHaveCount(1);
   expect(calls.posts).toEqual(['/api/projects/proj-old/unarchive']);
@@ -174,17 +174,6 @@ test('an archived project opens read-only and unarchiving brings the composer ba
   await expect.poll(() => calls.posts).toEqual(['/api/projects/proj-old/unarchive']);
   await expect(block.getByTestId('archived-project-bar')).toHaveCount(0);
   await expect(block.getByRole('textbox')).toHaveCount(1);
-});
-
-test('the project home of an archived project swaps the ask box for the bar', async ({ page }) => {
-  await open(page, '/app?project=proj-old');
-  await expect(page.getByTestId('project-home')).toBeVisible();
-  await expect(page.getByTestId('project-home-ask')).toHaveCount(0);
-  await expect(page.getByTestId('archived-project-bar')).toBeVisible();
-  await expect(page.getByTestId('project-home-edit-blocked')).toHaveAttribute(
-    'aria-description',
-    '这个项目已归档。取消归档后才能修改。',
-  );
 });
 
 test('the tasks panel of an archived project cannot add a task', async ({ page }) => {

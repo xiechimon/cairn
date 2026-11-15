@@ -689,7 +689,7 @@ test('Escape on the chips or the question bubble menu dismisses with a five-seco
   expect(cancelled).toEqual([]);
   await page.getByTestId('chief-question-text').hover();
   await page.getByTestId('chief-question-tools').getByTestId('chief-msg-more').click();
-  await expect(page.getByTestId('chief-question-dismiss')).toHaveText('取消提问');
+  await expect(page.getByTestId('chief-question-dismiss')).toHaveText(/^取消提问/);
   await page.getByTestId('chief-question-dismiss').click();
   await expect(card).toHaveCount(0);
   await expect.poll(() => cancelled.length, { timeout: 8000 }).toBe(1);
