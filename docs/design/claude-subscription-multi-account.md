@@ -29,7 +29,7 @@ All under `/api/teams/:id/claude-subscriptions`.
 | `POST /:cid/disable` | Disable. Refused with the same running-task rule when the account has running tasks. |
 | `DELETE /:cid` | As today; refused with the running-task rule when this is the enabled account with running tasks; a deleted enabled account leaves none enabled. |
 
-Errors are `409` with `code`: `running-tasks` (message states the count), `precheck-failed` (with `reason`: `auth`, `timeout`, `unavailable`, `failed`), `expired`, `conflict` (a concurrent change won; retry). `429` from the verification window passes through. The page lists the blocking runs with the existing per-account steps contract (`GET /:cid/steps`, outcome `running`), which this change backs with `step.claudeSubscriptionId`.
+Errors are `409` with the body `{ error, code, reason?, running? }`, all top level (the web client reads `error` and `reason` from the body): `code` is `running-tasks` (with `running`: the number of blocking running steps; nothing changed), `precheck-failed` (with `reason`: `auth`, `timeout`, `unavailable` or `failed`; the old account stays enabled), `expired`, or `conflict` (a concurrent change won; retry). `HttpError` gains an optional set of extra body fields so these routes use it; `reason` keeps its existing meaning for other routes. `429` from the verification window passes through. The page lists the blocking runs with `GET /:cid/steps?limit=20` (the existing `AccountStepsPage` shape, outcome `running`), which this change backs with `step.claudeSubscriptionId`. `GET /stickiness` is not built: with one enabled account there is no per-thread account stickiness, and the page treats the 404 as empty.
 
 ### Switch transaction
 
