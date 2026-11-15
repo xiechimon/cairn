@@ -101,9 +101,10 @@ export async function isCairnPage(
   resolve: LookupAll = lookupAll,
   own: readonly string[] = machineAddresses(),
 ): Promise<boolean> {
-  if (!/^https?:\/\//i.test(raw.trim())) return false;
-  const page = originOf(raw.trim());
-  if (page === null) return false;
+  const text = raw.trim().replace(/^(blob|filesystem):/i, '');
+  if (!/^https?:\/\//i.test(text)) return false;
+  const page = originOf(text);
+  if (page === null) return true;
   const origins = cairnOrigins.flatMap((origin) => {
     const parsed = origin.trim() === '' ? null : originOf(origin.trim());
     return parsed === null ? [] : [parsed];
@@ -116,4 +117,24 @@ export async function isCairnPage(
   }
   const addresses = await resolve(bare).catch(() => null);
   return addresses === null || addresses.some((address) => isMachineAddress(address, own));
+}
+
+const LOOPBACK_NAMES = ['127.0.0.1', 'localhost', '[::1]'];
+
+export function cairnBlockPatterns(cairnOrigins: readonly string[]): string[] {
+  const patterns = new Set<string>();
+  for (const origin of cairnOrigins) {
+    let url: URL;
+    try {
+      url = new URL(origin.trim().includes('://') ? origin.trim() : `https://${origin.trim()}`);
+    } catch {
+      continue;
+    }
+    const port = url.port === '' ? '' : `:${url.port}`;
+    patterns.add(`${url.protocol}//${url.host}/*`);
+    for (const scheme of ['http:', 'https:']) {
+      for (const name of LOOPBACK_NAMES) patterns.add(`${scheme}//${name}${port}/*`);
+    }
+  }
+  return [...patterns];
 }

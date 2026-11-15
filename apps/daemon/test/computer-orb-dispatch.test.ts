@@ -18,7 +18,7 @@ import {
 } from '../src/computer/guard.js';
 import type { ComputerProvider, ScopedComputerProviders } from '../src/computer/provider.js';
 
-const FAST = { flushMs: 20, heartbeatMs: 5_000, retryBaseMs: 5, retryMaxMs: 20 };
+const FAST = { flushMs: 20, heartbeatMs: 5_000, retryBaseMs: 5, retryMaxMs: 20, cairnOrigins: [] };
 
 function fakeClient() {
   const frames: ComputerFrame[] = [];

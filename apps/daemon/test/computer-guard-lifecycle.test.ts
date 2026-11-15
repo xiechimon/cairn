@@ -224,6 +224,7 @@ test.each(['direct', 'nested', 'heredoc'] as const)(
     let executed = 0;
     const frames: ComputerFrameBody[] = [];
     const dispatcher = createComputerDispatcher({
+      cairnOrigins: [],
       host: {
         async execute() {
           executed += 1;
