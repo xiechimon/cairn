@@ -111,9 +111,13 @@ test('the adapter authenticates outbound and bridges a Unix screen stream withou
   });
   await new Promise<void>((resolve) => net.listen(path, resolve));
   let closed = 0;
+  const logs: string[] = [];
+  const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+  cleanup.push(() => info.mockRestore());
   adapter = new OutboundComputerScreens({
     serverUrl: origin,
     getToken: () => TOKEN,
+    log: (msg) => logs.push(msg),
     provider: {
       async connectScreen(target) {
         expect(target.kind).toBe('view');
@@ -154,9 +158,18 @@ test('the adapter authenticates outbound and bridges a Unix screen stream withou
   viewer.send(framebufferRequest);
   expect((await echoed)[0]).toEqual(framebufferRequest);
   expect(Buffer.concat(input)).toEqual(Buffer.concat([handshake, framebufferRequest]));
-  viewer.close();
+  viewer.close(4321);
   await running;
   expect(closed).toBe(1);
+  expect(info).toHaveBeenCalledWith(
+    'computer screen closed',
+    expect.objectContaining({ kind: 'view', reason: 'viewer closed (code 4321)' }),
+  );
+  expect(logs).toEqual([
+    expect.stringMatching(
+      /^computer screen view [a-f0-9]{8} closed after \d+s: server closed the websocket \(code 1006\); sent \d+ bytes, buffered peak \d+, at close \d+$/,
+    ),
+  ]);
 });
 
 test('failed machine authentication cannot start a desktop or PTY resource', async () => {
