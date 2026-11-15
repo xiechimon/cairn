@@ -6,6 +6,8 @@ import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { paidClaudeAllowed } from './model-routing.js';
 import { defaultCoordinatorRule, keylessEndpoint, resolveRuleProvider } from './routing-rules.js';
 
+const CLAUDE_CODE_PROVIDER = 'claude-code';
+
 export type CoordinatorRouteRefusal =
   | 'no-api-key-provider'
   | 'rule-provider-missing'
@@ -30,6 +32,7 @@ export function coordinatorRouteVerdict(
   if (!coordinatorRunsOnPi()) return null;
   const rule = coordinatorRule(db, teamId) ?? defaultCoordinatorRule(db, teamId) ?? undefined;
   if (rule === undefined) return { refusal: 'no-api-key-provider' };
+  if (rule.provider === CLAUDE_CODE_PROVIDER) return null;
   const row = db
     .select({ baseUrl: provider.baseUrl, keyed: sql<number>`${provider.apiKeyCipher} is not null` })
     .from(provider)
