@@ -1,0 +1,60 @@
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { getModelLiveness, refreshRelayCatalog } from '../src/services/model-liveness.js';
+import { bootServer, req } from './helpers.js';
+
+let server: Server;
+let origin = '';
+const paths: string[] = [];
+let providerCount = 0;
+
+beforeAll(async () => {
+  server = createServer((request, response) => {
+    paths.push(request.url ?? '');
+    if (request.url?.endsWith('/v1/models') || request.url?.endsWith('/v4/models')) {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ data: [{ id: 'listed-model' }] }));
+      return;
+    }
+    response.writeHead(404);
+    response.end();
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+});
+
+afterAll(async () => {
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+});
+
+describe('refreshRelayCatalog probes the models list under the base URL', () => {
+  test.each([
+    ['/v1', '/v1/models'],
+    ['/v1/', '/v1/models'],
+    ['/api/coding/paas/v4', '/api/coding/paas/v4/models'],
+    ['', '/v1/models'],
+    ['/anthropic', '/anthropic/v1/models'],
+  ])('base URL ending %j requests %s', async (suffix, expected) => {
+    const s = bootServer();
+    try {
+      providerCount += 1;
+      const providerId = `probe-${providerCount}`;
+      const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/providers`, {
+        providerId,
+        label: 'Probe',
+        baseUrl: `${origin}${suffix}`,
+        api: 'openai-completions',
+        apiKey: 'sk-probe',
+        models: [{ id: 'listed-model', name: 'Listed' }],
+      });
+      expect(res.status).toBe(201);
+      paths.length = 0;
+      await refreshRelayCatalog({ db: s.db, box: s.secretBox }, s.team.id, providerId);
+      expect(paths).toEqual([expected]);
+      expect(getModelLiveness(providerId, 'listed-model')).toBe('alive');
+    } finally {
+      s.dispose();
+    }
+  });
+});
