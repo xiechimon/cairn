@@ -121,6 +121,19 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
   'coordinator-paid-claude': 'Coordinator 规则用的是付费 Claude（{name}），但团队只允许用订阅',
 };
 
+const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
+  'sandbox-unavailable':
+    '排队中：执行机的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）',
+  'runtime-disabled': '排队中：执行机上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）',
+  'model-unavailable': '排队中：执行机用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）',
+  'local-path': '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了（前面 {ahead} 个）',
+  'claude-rate-limited': '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
+  'claude-logged-out':
+    '排队中：执行机上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
+  'claude-usage-refused':
+    '排队中：团队只用 Claude 订阅，执行机上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）',
+};
+
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
   label: string;
   vars: Record<string, string | number>;
@@ -160,13 +173,17 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
       vars: { missing: queue.blocked.missing.join('、'), ahead },
     };
   }
+  const refusalLabels =
+    queue.waitingFor == null ? UNNAMED_RUNNER_REFUSAL_LABELS : RUNNER_REFUSAL_LABELS;
   const refusal =
-    queue.blocked === undefined ? undefined : RUNNER_REFUSAL_LABELS[queue.blocked.kind];
+    queue.blocked === undefined
+      ? undefined
+      : (refusalLabels[queue.blocked.kind] ?? RUNNER_REFUSAL_LABELS[queue.blocked.kind]);
   if (refusal !== undefined) {
     return {
       label: refusal,
       vars: {
-        machine: queue.waitingFor?.name ?? '执行机',
+        machine: queue.waitingFor?.name ?? '',
         runtime: queue.blocked?.missing.join('、') ?? '',
         name: queue.blocked?.missing.join('、') ?? '',
         ahead,

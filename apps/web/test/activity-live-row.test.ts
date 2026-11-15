@@ -3,6 +3,8 @@ import { describe, expect, test } from 'vitest';
 import { activityLabel } from '../src/api/activity.js';
 import { mapChief, mapTranscript } from '../src/api/mappers.js';
 import type { TranscriptItem } from '../src/fixtures/records.js';
+import { EN } from '../src/i18n/en.js';
+import { translate } from '../src/i18n/translate.js';
 import { NOW, todo } from './helpers.js';
 
 const BUILD: BuildRecord = {
@@ -325,6 +327,25 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
       label: '排队中：等空闲执行机（前面 {ahead} 个）',
       labelVars: { ahead: 0 },
     });
+  });
+
+  test('Q2b: a refusal with no named machine keeps each locale in its own language', () => {
+    const items = render({
+      steps: [
+        queuedStep({
+          position: 1,
+          waitingFor: null,
+          blocked: { kind: 'runtime-disabled', missing: ['codex'] },
+        }),
+      ],
+    });
+    const row = tail(items) as { label: string; labelVars: Record<string, string | number> };
+    expect(translate('zh', EN, row.label, row.labelVars)).toBe(
+      '排队中：执行机上没有检测到 codex，装好后重启执行机（前面 0 个）',
+    );
+    expect(translate('en', EN, row.label, row.labelVars)).toBe(
+      'Queued: the Runner has not detected codex. Install it, then restart the Runner (0 ahead)',
+    );
   });
 
   test('Q3: projection absent (old server) → existing labels verbatim unchanged', () => {

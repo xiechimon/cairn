@@ -921,6 +921,20 @@ export const EN: Record<string, string> = {
     "This machine's system does not support the task sandbox, so it cannot take tasks.",
   '任务沙箱没就绪，这台执行机接不了任务。Linux 上后台服务要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。':
     'The task sandbox is not ready, so this Runner cannot take tasks. On Linux the daemon must run as its own systemd user unit with bubblewrap (`bwrap`) installed: update the CLI, then run `{command} restart` on this machine.',
+  '排队中：执行机的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）':
+    'Queued: the task sandbox on the Runner is not ready, so it cannot take tasks. The Runner page shows why and how to fix it ({ahead} ahead)',
+  '排队中：执行机上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）':
+    'Queued: the Runner has not detected {runtime}. Install it, then restart the Runner ({ahead} ahead)',
+  '排队中：执行机用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）':
+    'Queued: the Runner cannot use the model for this step. Pick another model in work routing ({ahead} ahead)',
+  '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了（前面 {ahead} 个）':
+    'Queued: a local project only runs on the Runner that holds it, so this Runner cannot run it ({ahead} ahead)',
+  '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）':
+    'Queued: Claude is rate limited on the Runner; this continues once the limit lifts ({ahead} ahead)',
+  '排队中：执行机上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）':
+    'Queued: Claude Code is not logged in on the Runner. Run claude on that machine to log in ({ahead} ahead)',
+  '排队中：团队只用 Claude 订阅，执行机上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）':
+    'Queued: this team uses Claude subscriptions only and Claude Code on the Runner is not logged in with one. Log in with a subscription there, or allow pay as you go in Usage & connections ({ahead} ahead)',
   '排队中：{machine} 的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）':
     'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks. The Runner page shows why and how to fix it ({ahead} ahead)',
   '任务沙箱没就绪：后台服务没有作为自己的 systemd user unit 运行。在这台机器上运行 `{command} restart`，它会自己起一个；还不行的话，检查 `systemd-run --user` 能不能用。':
