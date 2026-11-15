@@ -124,6 +124,11 @@ const routingSettingsFixture: FixtureSet = {
   ...resourcesDefault,
   resources: {
     ...RESOURCES,
+    topModels: [
+      { provider: 'claude-code', modelId: 'claude-sonnet-5', thinkingLevel: 'high' },
+      { provider: 'pi', modelId: 'gpt-5.2', thinkingLevel: 'medium' },
+      { provider: 'gone-proxy', modelId: 'glm-5.3', thinkingLevel: 'max' },
+    ],
     routingSettings: {
       rules: [
         {

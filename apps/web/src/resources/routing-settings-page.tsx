@@ -17,6 +17,7 @@ import { toModelOptions } from '../api/mappers.js';
 import { ROUTE_USE_LABELS } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
+import { useTopModels, useTopModelsMutations } from '../api/top-models.js';
 import { QueryBoundary } from '../components/query-state.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
@@ -39,6 +40,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
 import { settingsHref } from '../settings/settings-href.js';
+import { suggestedTopModels, TopModelsCard } from './top-models-card.js';
 
 export const ROUTING_SETTINGS_HREF = '/app/resources/routing-settings';
 export const COORDINATOR_ROUTE_ANCHOR = 'route-coordinator';
@@ -285,6 +287,8 @@ export function RoutingSettingsPage() {
   const machinesQ = useMachines(teamId, live);
   const modelSourcesQ = useModelSources(teamId, live);
   const mutations = useRoutingSettingsMutations(teamId);
+  const topModelsQ = useTopModels(teamId, live);
+  const topModelMutations = useTopModelsMutations(teamId);
   const settings = live
     ? (settingsQ.data ?? EMPTY_SETTINGS)
     : (fixture.resources?.routingSettings ?? EMPTY_SETTINGS);
@@ -295,6 +299,8 @@ export function RoutingSettingsPage() {
   const options = toModelOptions(
     live ? (modelSourcesQ.data?.sources ?? []) : (fixture.resources?.providerSources ?? []),
   );
+  const storedTopModels = live ? topModelsQ.data?.models : fixture.resources?.topModels;
+  const topModels = storedTopModels ?? suggestedTopModels(options);
   const { hash } = useLocation();
   const loaded = !live || settingsQ.data !== undefined;
   useEffect(() => {
@@ -346,6 +352,24 @@ export function RoutingSettingsPage() {
               onSave={save('session')}
             />
           </SettingsCard>
+          {(!live || topModelsQ.data !== undefined) && (
+            <TopModelsCard
+              models={topModels}
+              options={options}
+              onChange={(next) => {
+                if (!live) return;
+                topModelMutations.put.mutate(next, {
+                  onError: (error) => toastError(t('保存失败，请重试。'), error),
+                });
+              }}
+              onReset={() => {
+                if (!live) return;
+                topModelMutations.reset.mutate(undefined, {
+                  onError: (error) => toastError(t('保存失败，请重试。'), error),
+                });
+              }}
+            />
+          )}
           <SettingsSection testId="routing-agents" title={t('Coordinator 和其他 Agent')}>
             <SettingsCard>
               {agentUses.map((use) => (
