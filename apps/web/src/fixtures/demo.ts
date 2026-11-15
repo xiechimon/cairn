@@ -602,6 +602,7 @@ function demoFixtureOf(): FixtureSet {
       threadTitle: '把购物车相关的事排一下…',
       agent: { id: BUILDER.id, displayName: BUILDER.displayName, avatarUrl: null },
       stream: DEMO_CHIEF_STREAM,
+      context: { tokens: 38_000, contextWindow: 200_000 },
     },
     schedules: [
       {

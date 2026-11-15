@@ -496,7 +496,7 @@ export function HomeC({
       : surface.load;
   const composerPlaceholder =
     projectName != null
-      ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
+      ? t('在 {name} 里发消息', { name: projectName })
       : t('给 Coordinator 发消息');
   const archivedBar =
     archived === null ? null : (
@@ -605,11 +605,7 @@ export function HomeC({
                 showBindGate={!live}
                 todoGlances={todoGlances}
                 prefill={prefill}
-                placeholder={
-                  projectName != null
-                    ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
-                    : t('给 Coordinator 发消息')
-                }
+                placeholder={composerPlaceholder}
                 composerTools={setupStep !== null && <ComposerSetupHint step={setupStep} />}
                 composerRef={(node) => {
                   composerRef.current = node;

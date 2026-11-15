@@ -1638,7 +1638,7 @@ export const EN: Record<string, string> = {
   对话加载失败: 'Could not load the conversation',
   '对话记录还在，重试一下。': 'Your conversation is still there. Try again.',
   待你决定: 'Needs you',
-  '跟 Coordinator 说（在 {name} 里）…': 'Talk to the Coordinator (in {name})…',
+  '在 {name} 里发消息': 'Message in {name}',
   '{name}，你想在 {project} 里做什么？': '{name}, what would you like to do in {project}?',
   首页: 'Home',
   'Claude 登录需要处理': 'Claude sign-in needs attention',
