@@ -884,6 +884,8 @@ export const EN: Record<string, string> = {
   // the fix, offline = waiting.
   '排队中：没有 Runner 满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）':
     'Queued: no Runner meets the capability requirements (missing {missing}) — it runs on the next heartbeat once they are installed ({ahead} ahead)',
+  '排队中：这台 Runner 没有开启 {runtime} 运行时——在它的「运行时」里打开（前面 {ahead} 个）':
+    'Queued: this Runner has the {runtime} runtime turned off — turn it on under Runtimes on the Runner ({ahead} ahead)',
   '排队中：等 {machine} 上线（前面 {ahead} 个）':
     'Queued: waiting for {machine} to come online ({ahead} ahead)',
   '排队中：等 Runner 上线（前面 {ahead} 个）':

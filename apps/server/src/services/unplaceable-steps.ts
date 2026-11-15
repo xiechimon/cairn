@@ -50,9 +50,11 @@ export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowM
     const snippet =
       queue.blocked.kind === 'capability-missing'
         ? `没有在线 Runner 满足要求（缺 ${queue.blocked.missing.join('、')}），步骤已等 ${minutes} 分钟`
-        : preferredName !== null
-          ? `${preferredName} 不能跑这一步，不会改派到其他 Runner，步骤已等 ${minutes} 分钟`
-          : `没有在线 Runner 能跑这一步，步骤已等 ${minutes} 分钟`;
+        : queue.blocked.kind === 'runtime-disabled'
+          ? `${preferredName ?? '目标 Runner'} 没有开启 ${queue.blocked.missing.join('、')} 运行时，步骤已等 ${minutes} 分钟（在该 Runner 的「运行时」里开启）`
+          : preferredName !== null
+            ? `${preferredName} 不能跑这一步，不会改派到其他 Runner，步骤已等 ${minutes} 分钟`
+            : `没有在线 Runner 能跑这一步，步骤已等 ${minutes} 分钟`;
     notifyNoMachine(deps, todoRow, snippet);
     raised += 1;
   }

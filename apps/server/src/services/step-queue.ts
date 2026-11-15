@@ -9,7 +9,7 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, machine, routingRule, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
-import { missingCapabilities, runtimeGatePasses } from './dispatch-eligibility.js';
+import { missingCapabilities, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
 import {
   platformFallbackMachineId,
@@ -171,7 +171,9 @@ export function stepQueueProjector(db: Db, teamId: string) {
       blocked:
         gap?.kind === 'capability'
           ? { kind: 'capability-missing', missing: gap.missing }
-          : undefined,
+          : gap?.kind === 'runtime'
+            ? { kind: 'runtime-disabled', missing: [stepRuntimeFor(facts.model.provider)] }
+            : undefined,
     };
   }
 
@@ -189,6 +191,9 @@ export function stepQueueProjector(db: Db, teamId: string) {
     const agentRow = agentForRow(row);
     const provider =
       ('fallback' in row ? row.fallback?.model?.provider : undefined) ?? agentRow?.provider;
+    if (agentRow?.modelId != null && !runtimeGatePasses(home, provider)) {
+      return { kind: 'runtime-disabled', missing: [stepRuntimeFor(provider)] };
+    }
     if (agentRow?.modelId != null && runtimeGatePasses(home, provider)) {
       const missing = missingCapabilities(home, agentRow);
       if (missing.length > 0) return { kind: 'capability-missing', missing };

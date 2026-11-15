@@ -287,12 +287,30 @@ describe('#1251 queue projection blocked bit (worker steps)', () => {
     });
   });
 
-  test('failure mode 6: runtime gate block does not impersonate a capability cause -> blocked absent (existing seam keeps its presentation)', () => {
+  test('failure mode 6: a disabled runtime gets its own blocked kind, not a capability cause', () => {
     const w = makeWorld();
     insertRule(w, 'session', { mcpServers: ['figma'] });
     insertMachine(w, { id: 'm-r6', runtimes: [], capabilities: { mcpServers: [], skills: [] } });
     const target = insertPendingWorkerStep(w, { homeMachineId: 'm-r6' });
-    expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toBeUndefined();
+    expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toEqual({
+      kind: 'runtime-disabled',
+      missing: ['pi'],
+    });
+  });
+
+  test('a Claude Code step on a machine that only has pi enabled names the runtime to turn on', () => {
+    const w = makeWorld();
+    seedRoute(w.s, 'session', { provider: 'claude-code', modelId: 'claude-sonnet-5-5' });
+    insertMachine(w, {
+      id: 'm-r8',
+      runtimes: ['pi'],
+      capabilities: { mcpServers: [], skills: [] },
+    });
+    const target = insertPendingWorkerStep(w, { homeMachineId: 'm-r8' });
+    expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toEqual({
+      kind: 'runtime-disabled',
+      missing: ['claude-code'],
+    });
   });
 
   test('failure mode 1 addendum: models dimension missing items named the same shape', () => {

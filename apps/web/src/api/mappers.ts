@@ -139,6 +139,13 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
       vars: { missing: queue.blocked.missing.join('、'), ahead },
     };
   }
+  if (queue.blocked?.kind === 'runtime-disabled') {
+    return {
+      label:
+        '排队中：这台 Runner 没有开启 {runtime} 运行时——在它的「运行时」里打开（前面 {ahead} 个）',
+      vars: { runtime: queue.blocked.missing.join('、'), ahead },
+    };
+  }
   if (queue.blocked?.kind === 'machine-offline') {
     return queue.waitingFor != null
       ? {
