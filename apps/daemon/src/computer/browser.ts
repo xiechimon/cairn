@@ -309,7 +309,22 @@ function actionArgv(action: z.infer<typeof actActionSchema>): string[] {
 }
 
 function refPresent(snapshot: string, ref: string): boolean {
-  return snapshot.includes(`[ref=${bareRef(ref)}]`);
+  const escaped = bareRef(ref).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`[[ ]ref=${escaped}[\\],]`).test(snapshot);
+}
+
+function sameSite(target: string, href: string): boolean {
+  const host = (value: string) => {
+    try {
+      return new URL(value).hostname.replace(/^www\./, '');
+    } catch {
+      return null;
+    }
+  };
+  const want = host(target);
+  const got = host(href);
+  if (want === null || got === null) return false;
+  return got === want || got.endsWith(`.${want}`) || want.endsWith(`.${got}`);
 }
 
 function refuse(message: string, started: boolean): never {
@@ -441,6 +456,7 @@ export async function runBrowserTool(
     if (href.startsWith('chrome-error://')) {
       refuse(`✗ Navigation failed: ${url} did not load`, started);
     }
+    if (!sameSite(url, href)) return null;
     const title = (await pageValue('title')) ?? '';
     return { code: 0, text: `✓ ${title}\n  ${href}` };
   };
