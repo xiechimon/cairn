@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
-import { ACCESS_TOKEN_FILE_NAME, ENV_VARS, parseAccessTokenFile } from '@cairn/shared';
+import {
+  ACCESS_TOKEN_FILE_NAME,
+  DESKTOP_SHELL_USER_AGENT,
+  ENV_VARS,
+  parseAccessTokenFile,
+} from '@cairn/shared';
 import {
   app,
   BrowserWindow,
@@ -130,10 +135,17 @@ function openWindow(origin: string): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
     height: 800,
+    minWidth: 760,
+    minHeight: 520,
     show: false,
     title: 'Cairn',
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 18, y: 18 },
     webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
+  window.webContents.setUserAgent(
+    `${window.webContents.getUserAgent()} ${DESKTOP_SHELL_USER_AGENT}`,
+  );
   window.once('ready-to-show', () => window.show());
   window.on('close', (event) => {
     if (quitting) return;

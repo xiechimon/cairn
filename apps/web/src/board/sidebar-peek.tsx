@@ -127,7 +127,7 @@ export function SidebarPeek({
               ref={triggerRef}
               variant="ghost"
               data-testid="sidebar-reopen"
-              className="fixed top-2.5 left-2.5 z-(--z-backdrop-low) size-7 text-content-tertiary"
+              className="sidebar-peek-trigger fixed top-2.5 left-2.5 z-(--z-backdrop-low) size-7 text-content-tertiary"
               aria-label={t('展开侧边栏')}
               onClick={onExpand}
               onPointerMove={moveOnTrigger}

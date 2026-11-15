@@ -726,3 +726,25 @@ body:has([data-testid="chief-body"]),
 #root :has([data-testid="chief-body"]) {
   overscroll-behavior: none;
 }
+
+:root[data-shell="mac-desktop"] .sidebar-team-row {
+  padding-left: 70px;
+  -webkit-app-region: drag;
+}
+
+:root[data-shell="mac-desktop"] .sidebar-team-row :is(button, a) {
+  -webkit-app-region: no-drag;
+}
+
+:root[data-shell="mac-desktop"] .sidebar-peek-trigger {
+  left: 78px;
+}
+
+.desktop-drag-strip {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: var(--z-gate);
+  height: 8px;
+  pointer-events: none;
+  -webkit-app-region: drag;
+}
