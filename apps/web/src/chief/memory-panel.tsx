@@ -151,7 +151,7 @@ export function MemoryPanel({
     );
   })();
 
-  const empty = memoriesQ.data !== undefined && injected.length + lookup.length === 0;
+  const empty = (!live || memoriesQ.data !== undefined) && injected.length + lookup.length === 0;
   const content = open === null ? null : splitMemoryContent(open.content);
   return (
     <div ref={listRef} data-testid="memory-list">

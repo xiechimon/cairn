@@ -826,7 +826,6 @@ export const EN: Record<string, string> = {
   本机加速路径: 'Local acceleration path',
   '绝对路径，留空即清除': 'Absolute path; empty to clear',
   // #1242 项目身份可变面：设置页名称/描述编辑 + local→github 转换卡。
-  保存名称: 'Save name',
   更换项目图标: 'Change project icon',
   搜索图标: 'Search icons',
   没有匹配的图标: 'No matching icons',
