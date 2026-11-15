@@ -78,7 +78,7 @@ async function fillLiveForm(page: Page, opts: { kind: 'local' | 'github'; value:
 /** Open the menu from either face: none-state = click the trigger button,
  *  input face (github/local) = click the swap button. */
 async function selectLiveRow(page: Page, label: string) {
-  const swap = page.getByRole('button', { name: '选择仓库' });
+  const swap = page.getByRole('button', { name: '切换仓库来源' });
   if (await swap.isVisible()) await swap.click();
   else await page.locator('#prj-new-repo').click();
   const menu = page.getByRole('menu', { name: '仓库' });
@@ -121,7 +121,7 @@ test('the `本地文件夹` row swaps the trigger for the path input; swap reope
   await expect(input).toHaveAttribute('aria-label', '本地文件夹');
   await input.fill('/Users/me/code/my-app');
   await expect(input).toHaveValue('/Users/me/code/my-app');
-  await page.getByRole('button', { name: '选择仓库' }).click();
+  await page.getByRole('button', { name: '切换仓库来源' }).click();
   const reopened = page.getByRole('menu', { name: '仓库' });
   await expect(reopened).toBeVisible();
   await expect(
@@ -132,7 +132,7 @@ test('the `本地文件夹` row swaps the trigger for the path input; swap reope
 test('switching forms drops the other face input', async ({ page }) => {
   await selectRow(page, 'GitHub 仓库');
   await revealManualRepoInput(page);
-  await page.getByRole('button', { name: '选择仓库' }).click();
+  await page.getByRole('button', { name: '切换仓库来源' }).click();
   await page.getByRole('menuitemradio', { name: '本地文件夹' }).click();
   await expect(page.getByRole('textbox', { name: 'GitHub 仓库' })).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: '本地文件夹' })).toHaveCount(1);
@@ -242,6 +242,27 @@ test('untouched submit posts a repo-less body and lands on the new project conve
   expect(bodies).toEqual([{ name: 'Plain', teamId: 'team-1' }]);
 });
 
+test('a picked icon is saved on the new project right after create', async ({ page }) => {
+  await stubBoot(page);
+  const bodies = await stubCreateProject(page, () => ({ json: okProject }));
+  const patches: Record<string, unknown>[] = [];
+  await page.route('**/api/projects/proj-1', (route, request) => {
+    if (request.method() !== 'PATCH') return route.fallback();
+    patches.push(JSON.parse(request.postData() ?? '{}'));
+    return route.fulfill({ json: { ...okProject, icon: 'rocket' } });
+  });
+  await page.goto(NEW_PROJECT_LIVE);
+  await expect(page.locator('#prj-new-name')).toBeFocused();
+  await page.getByRole('button', { name: '更换项目图标' }).click();
+  await page.getByTestId('project-icon-picker').getByRole('button', { name: 'rocket' }).click();
+  await page.keyboard.press('Escape');
+  await page.locator('#prj-new-name').fill('Iconed');
+  await page.getByRole('button', { name: '创建项目' }).click();
+  await expect(page).toHaveURL(/\/app\?project=proj-1&chat=1$/);
+  expect(bodies).toEqual([{ name: 'Iconed', teamId: 'team-1' }]);
+  await expect.poll(() => patches).toEqual([{ icon: 'rocket' }]);
+});
+
 test('local and github submits carry kind + their wire field', async ({ page }) => {
   await stubBoot(page);
   const bodies = await stubCreateProject(page, () => ({ json: okProject }));
@@ -266,11 +287,15 @@ test('empty local path / invalid github ref keep `创建项目` disabled', async
   await stubCreateProject(page, () => ({ json: okProject }));
   await page.goto(NEW_PROJECT_LIVE);
   const submit = page.getByRole('button', { name: '创建项目' });
+  const why = page.getByTestId('form-actions-hint');
+  await expect(why).toHaveText('填好项目名称后可以创建。');
   await page.locator('#prj-new-name').fill('Gated');
   await selectLiveRow(page, '本地文件夹');
   await expect(submit).toBeDisabled();
+  await expect(why).toHaveText('填好本地文件夹路径后可以创建。');
   await page.locator('#prj-new-repo').fill('/tmp/ok');
   await expect(submit).toBeEnabled();
+  await expect(why).toHaveCount(0);
   await selectLiveRow(page, 'GitHub 仓库');
   await expect(submit).toBeDisabled();
   await revealManualRepoInput(page);
