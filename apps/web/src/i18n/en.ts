@@ -774,8 +774,8 @@ export const EN: Record<string, string> = {
   '加载中…': 'Loading…',
   文件加载失败: 'Failed to load file',
   二进制文件暂不支持预览: 'Binary files cannot be previewed',
-  '项目图标，可选。不选时显示文件夹图标。':
-    'Project icon, optional. A folder shows when none is picked.',
+  '项目图标，可选。不选时显示方盒图标。':
+    'Project icon, optional. A box shows when none is picked.',
   '例如：我的应用': 'e.g. My App',
   切换仓库来源: 'Switch repository source',
   '图标没能保存，请在项目设置里重试。': 'The icon was not saved. Try again in project settings.',

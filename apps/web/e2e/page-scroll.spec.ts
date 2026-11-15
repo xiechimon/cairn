@@ -225,7 +225,7 @@ test('new project page scrolls to the bottom (#1032)', async ({ page }) => {
   const heading = page.getByRole('button', { name: '创建项目' });
   await expect(heading).toBeAttached();
 
-  const hint = page.getByText('项目图标，可选。不选时显示文件夹图标。');
+  const hint = page.getByText('项目图标，可选。不选时显示方盒图标。');
   await expect(hint).toBeVisible();
   await expectScrollerReachesBottom(page, hint, heading);
 });
