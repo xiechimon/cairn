@@ -80,9 +80,19 @@ export const sessionDefaultSchema = z.object({
 });
 export type SessionDefault = z.infer<typeof sessionDefaultSchema>;
 
+export const COORDINATOR_DEFAULT_REASONS = ['anthropic-key', 'provider', 'none'] as const;
+
+export const coordinatorDefaultSchema = z.object({
+  reason: z.enum(COORDINATOR_DEFAULT_REASONS),
+  provider: z.string().nullable(),
+  modelId: z.string().nullable(),
+});
+export type CoordinatorDefault = z.infer<typeof coordinatorDefaultSchema>;
+
 export const teamRoutingSettingsSchema = z.object({
   rules: z.array(routingRuleRecordSchema),
   policies: z.array(workPolicyRecordSchema),
   sessionDefault: sessionDefaultSchema.optional(),
+  coordinatorDefault: coordinatorDefaultSchema.optional(),
 });
 export type TeamRoutingSettings = z.infer<typeof teamRoutingSettingsSchema>;

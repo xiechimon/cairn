@@ -2,7 +2,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 import { settleTransitions } from './helpers.js';
 
 const SKILLS = '/app/resources/skills?scenario=01';
-const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks';
+const LISTED_SKILLS = '/app/resources/skills?scenario=06';
 const ROUTING_POLICIES = '/app/settings/work-routing?scenario=routing-settings';
 const ACCEPT = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34';
 
@@ -196,8 +196,8 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
   });
 
   test('input-group draws the field ring on the shell, not the control', async ({ page }) => {
-    await themed(page, 'dark', TASKS);
-    const control = page.getByRole('textbox', { name: '搜索任务' });
+    await themed(page, 'dark', LISTED_SKILLS);
+    const control = page.getByRole('textbox', { name: '搜索技能...' });
     await expect(control).toBeVisible();
     await focusKeyboard(control);
     const controlInfo = await readFocus(control);

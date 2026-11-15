@@ -497,32 +497,6 @@ describe('import dedup guardrails (C family)', () => {
     { number: 9, title: 'issue nine', state: 'open', labels: [] },
   ];
 
-  test('W14/C1+C2 list filtering: self-created and already-imported issues no longer appear, the rest unchanged', async () => {
-    const mock = ghMock({
-      [`GET ${ISSUES_PATH}`]: { body: LIST_BODY },
-      [`GET ${issuePath(7)}`]: {
-        body: { number: 7, title: 'issue seven', body: null, state: 'open', labels: [] },
-      },
-      [`GET /repos/${REPO}/labels`]: { body: [] },
-      [`POST ${ISSUES_PATH}`]: { status: 201, body: { number: 9, title: 'x', state: 'open' } },
-    });
-    const s = bootServer({ githubFetch: mock.impl });
-    seedConnection(s);
-    const projectId = await postGithubProject(s.app);
-    const imported = await call(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
-      body: { number: 7 },
-    });
-    expect(imported.status).toBe(201);
-    const created = await createTask(s.app, projectId);
-    await flushSelfIssueWrites();
-    expect((await getTodo(s.app, created.id)).sourceRef).toBe(`github:${REPO}#9`);
-    const list = await call(s.app, 'GET', `/api/projects/${projectId}/github/issues`);
-    expect(list.status).toBe(200);
-    const face = (await list.json()) as { issues: Array<{ number: number }> };
-    expect(face.issues).toEqual([]);
-    s.dispose();
-  });
-
   test('W15/C3 direct POST importing an issue that already has a task -> 409 (same rule as self-created)', async () => {
     const mock = ghMock({
       [`GET ${ISSUES_PATH}`]: { body: LIST_BODY },

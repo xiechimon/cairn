@@ -155,10 +155,3 @@ test('autonomy card: save failure is visible', async ({ page }) => {
   await card.getByRole('button', { name: '保存后台自动任务设置' }).click();
   await expect(page.getByText('保存失败，请重试。')).toBeVisible();
 });
-
-test('project tasks: a github-backed project has no file tab, even with a stale tab query', async ({ page }) => {
-  await stubWorld(page);
-  await page.goto(`/app/project/${GITHUB_PROJECT_ID}/tasks?tab=files`);
-  await expect(page.getByRole('textbox', { name: '搜索任务' })).toBeVisible();
-  await expect(page.getByRole('tab', { name: '文件', exact: true })).toHaveCount(0);
-});

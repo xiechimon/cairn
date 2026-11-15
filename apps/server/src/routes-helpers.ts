@@ -3,7 +3,6 @@ import {
   apiKeyRecordSchema,
   BRAND,
   categoryFreeTaskInputSchema,
-  githubIssueStateSchema,
   type MemoryRecord,
   phaseSchema,
   routeOverrideSchema,
@@ -36,11 +35,6 @@ export function requireProject(ctx: AppContext, id: string): typeof project.$inf
   if (!row) throw notFound(`project ${id}`);
   return row;
 }
-
-export const githubIssuesQuerySchema = z.object({
-  state: githubIssueStateSchema,
-  page: z.coerce.number().int().min(1),
-});
 
 export const patchTodoBodySchema = categoryFreeTaskInputSchema.pipe(
   z.object({

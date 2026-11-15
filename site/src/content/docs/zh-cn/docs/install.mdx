@@ -1,0 +1,86 @@
+---
+title: 安装
+description: 启动 Cairn 服务端，打开网页应用。
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+服务端就是网页应用、Coordinator 和数据库。你只跑一份，放在你平时用浏览器的机器上，或者一台常开的主机上。光有服务端就能四处看看；要让 agent 真正干活，还要[连接一台 Runner](/zh-cn/docs/runner/) 并[接入模型](/zh-cn/docs/models/)。
+
+## 需要什么
+
+- **Node.js 22 或 24。** 这两条 LTS 线有预编译的 `better-sqlite3`；别的版本可能要从源码编译，得装编译工具链。
+- 服务端跑在 Linux 或 macOS 上。Windows 要多走下面的配对一步。
+
+## 启动服务端
+
+<Steps>
+
+1. 一行命令跑起来：
+
+   ```sh
+   npx @xiechimon/cairn
+   ```
+
+   它会下载 Cairn 并只在本机回环地址上服务。它不会打印网址，地址就是下面这个。第一次启动会在 `~/.cairn` 下建数据库、跑迁移、建一个默认团队。换端口：`PORT=9000 npx @xiechimon/cairn`，这时 Runner 要加 `--server http://127.0.0.1:9000`。
+
+2. 在同一台机器的浏览器里打开 **[http://127.0.0.1:8787/app](http://127.0.0.1:8787/app)**。
+
+3. 让浏览器登录：
+
+   <Tabs syncKey="os">
+   <TabItem label="Linux">
+   服务端所在机器上的浏览器会通过本机回环自动登录，什么都不用粘贴。
+   </TabItem>
+   <TabItem label="macOS / Windows">
+   这两个系统拿不到本机回环的对端证明，第一个浏览器会话要用 owner 令牌换一个配对码。第一次启动时令牌写在 `~/.cairn/token`（权限 0600）：
+
+   ```sh
+   curl -s -X POST -H "Authorization: Bearer $(cat ~/.cairn/token)" \
+     http://127.0.0.1:8787/api/remote/pairing
+   ```
+
+   在浏览器的配对页输入返回的配对码。
+   </TabItem>
+   </Tabs>
+
+</Steps>
+
+界面跟随浏览器语言，可以在 `设置` → `账号` → `语言` 里切换。之后首页会提示你完成三步设置：接入模型来源、连接一台 Runner、打开工作路由。接下来几页按这个顺序讲。
+
+<Aside type="caution">
+服务端只监听 `127.0.0.1`，非浏览器的客户端一律要带令牌。不要在没有令牌的情况下把它绑到公网地址；见下面的 [用 Docker 跑](#用-docker-跑) 和 [在手机上访问](#在手机上访问)。
+</Aside>
+
+## 数据放在哪
+
+都在 `~/.cairn` 下（设 `CAIRN_HOME` 可以换位置）：服务端有 `server/server.db` 和 `server/secretbox.key`；Runner 有 `machine.json`、`daemon.log` 和 `workspaces/`。**备份就是复制整个目录。** 只拷数据库没用，因为密钥是加密存的，少了密钥文件解不开。
+
+## 用 Docker 跑
+
+只有服务端和网页应用做成了镜像；agent 还是通过你自己机器上的 Runner 干活。镜像绑定 `0.0.0.0`，所有状态放在 `/data`，没有令牌就拒绝启动：
+
+```sh
+docker build -t cairn .
+docker run -d --name cairn -v cairn-data:/data \
+  -e CAIRN_TOKEN="$(openssl rand -hex 32)" -p 8787:8787 cairn
+```
+
+在[仓库](https://github.com/xiechimon/cairn)的检出目录里构建。前面要有 TLS 终结，因为令牌放在请求头里。备份整个 `/data` 卷。
+
+## 在手机上访问
+
+在本机回环的服务端前面挂 [Tailscale Serve](https://github.com/xiechimon/cairn/blob/main/docs/deploy/tailscale-mobile.md)。这样 Cairn 只在你的私有 tailnet 里可达，不用公网地址；每台新设备仍要用设置里 `远程访问` 生成的一次性配对码登录。走 Serve 的 HTTPS 之后，iOS 还能把 Cairn 添加到主屏幕、收推送。
+
+## 从源码构建
+
+需要 Node.js 22.19 或更高，以及 pnpm（比如用 `corepack enable`）：
+
+```sh
+git clone https://github.com/xiechimon/cairn
+cd cairn
+pnpm install
+pnpm start
+```
+
+`pnpm start` 会构建网页并启动同源托管它的服务端。服务端和 Runner 的全部环境变量见 [configuration.md](https://github.com/xiechimon/cairn/blob/main/docs/configuration.md)。

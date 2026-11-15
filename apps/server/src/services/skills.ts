@@ -10,7 +10,8 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { homedir } from 'node:os';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import {
   type CreateSkillBody,
   MAX_SKILL_FILE_BYTES,
@@ -47,7 +48,7 @@ export function scanLocalSkills(skillsDir: string): LocalSkill[] {
   return [...builtins, ...team].sort((a, b) => a.id.localeCompare(b.id));
 }
 
-function scanSkillsRoot(skillsDir: string, builtin: boolean): LocalSkill[] {
+export function scanSkillsRoot(skillsDir: string, builtin: boolean): LocalSkill[] {
   let entryNames: string[];
   try {
     entryNames = readdirSync(skillsDir, { withFileTypes: true }).map((e) => e.name);
@@ -88,6 +89,47 @@ function scanSkillsRoot(skillsDir: string, builtin: boolean): LocalSkill[] {
     out.push({ id, name: id, description: fm.description ?? null, dirName, dir, builtin });
   }
   return out;
+}
+
+export function sharedAgentSkillRoots(): [agents: string, claude: string] {
+  return [join(homedir(), '.agents', 'skills'), join(homedir(), '.claude', 'skills')];
+}
+
+export function realpathOfNearest(path: string): string {
+  const missing: string[] = [];
+  let cur = resolve(path);
+  for (;;) {
+    try {
+      return join(realpathSync(cur), ...missing);
+    } catch {}
+    const parent = dirname(cur);
+    if (parent === cur) return resolve(path);
+    missing.unshift(basename(cur));
+    cur = parent;
+  }
+}
+
+export function pathsOverlap(a: string, b: string): boolean {
+  const ra = realpathOfNearest(a);
+  const rb = realpathOfNearest(b);
+  return ra === rb || ra.startsWith(rb + sep) || rb.startsWith(ra + sep);
+}
+
+function isInsideSharedSkillRoot(path: string): boolean {
+  const target = realpathOfNearest(path);
+  return sharedAgentSkillRoots().some((root) => {
+    const real = realpathOfNearest(root);
+    return target === real || target.startsWith(real + sep);
+  });
+}
+
+function assertCairnWritable(path: string): void {
+  if (isInsideSharedSkillRoot(path)) {
+    throw new HttpError(
+      409,
+      `refusing to write ${path}: it is inside a skills directory that other agent tools share (~/.agents/skills or ~/.claude/skills), which Cairn only reads; point CAIRN_SKILLS_DIR at a Cairn-owned directory`,
+    );
+  }
 }
 
 export function resolveLocalSkill(
@@ -341,6 +383,7 @@ export function createLocalSkill(
   }
   const truth = assertFrontmatterCoherence(entry.content, body);
   const dir = join(opts.skillsDir, body.name);
+  assertCairnWritable(dir);
   let occupied = true;
   try {
     statSync(dir);
@@ -368,7 +411,9 @@ export function rollbackLocalSkillCreate(
   opts: { db: Db; skillsDir: string },
   skillId: string,
 ): void {
-  rmSync(join(opts.skillsDir, skillId), { recursive: true, force: true });
+  const dir = join(opts.skillsDir, skillId);
+  assertCairnWritable(dir);
+  rmSync(dir, { recursive: true, force: true });
   const rows = opts.db
     .select()
     .from(skillAudit)
@@ -391,6 +436,13 @@ export function updateLocalSkill(
   if (resolved.skill.builtin) {
     throw new HttpError(409, `skill ${skillId} ships with Cairn and cannot be edited`);
   }
+  if (lstatSync(resolved.dir).isSymbolicLink()) {
+    throw new HttpError(
+      409,
+      `skill ${skillId} is a link to ${realpathSync(resolved.dir)}; edit it at its source`,
+    );
+  }
+  assertCairnWritable(resolved.dir);
   const bytes = assertWriteFiles(body.files);
   const entry = body.files.find((f) => f.path === SKILL_ENTRY_FILE);
   let name: string;

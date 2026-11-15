@@ -28,15 +28,6 @@ test('search rows: fresh reads `待开始`, review `审核`, done `已完成`', 
   await expect(panel(page).getByText('待处理', { exact: true })).toHaveCount(0);
 });
 
-test('project task rows: fresh reads `待开始`, review `审核`', async ({ page }) => {
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=22');
-  const status = (title: string) =>
-    page.getByTestId('task-row').filter({ hasText: title }).getByTestId('task-status');
-  await expect(status(FRESH_TITLE)).toHaveText('待开始');
-  await expect(status('r3 lifecycle probe」')).toHaveText('审核');
-  await expect(page.getByText('待处理', { exact: true })).toHaveCount(0);
-});
-
 // Live face: no ?scenario= in the URL = live data source; page.route answers
 // it (stubLiveBoot discipline from schedules-live.spec.ts).
 const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };

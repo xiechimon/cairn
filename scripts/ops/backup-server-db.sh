@@ -6,6 +6,7 @@ usage() {
   cat >&2 <<'EOF'
 usage: backup-server-db.sh --db <server.db> --out <dir> [--keep N]
          [--attachments <dir> --attachments-out <dir>] [--coordinator <dir> --coordinator-out <dir>]
+         [--skills <dir> --skills-out <dir>]
          [--remote <rsync destination>]
 
   --db               live server DB, copied with sqlite3 .backup and checked with integrity_check
@@ -18,6 +19,8 @@ usage: backup-server-db.sh --db <server.db> --out <dir> [--keep N]
                      DB with sqlite3 .backup, checked with integrity_check and written gzipped into
                      --coordinator-out/coordinator-<UTC timestamp>/, keeping the newest --keep runs. A store
                      newer than the DB copy is a reconcile case at the next boot, never a restore failure
+  --skills           Cairn skills directory (<CAIRN_HOME>/skills); written as --skills-out/skills-<UTC timestamp>.tar.gz,
+                     keeping the newest --keep; the source is only read
   --remote           existing rsync destination root (for example dmit-backup:); receives db/ and attachments/
                      with no remote shell, no deletes and no overwrites; the receiver rotates its own copies
 
@@ -33,12 +36,14 @@ ATTACHMENTS=""
 ATTACHMENTS_OUT=""
 COORDINATOR=""
 COORDINATOR_OUT=""
+SKILLS=""
+SKILLS_OUT=""
 REMOTE=""
 KEEP=48
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --db | --out | --attachments | --attachments-out | --coordinator | --coordinator-out | --remote | --keep)
+    --db | --out | --attachments | --attachments-out | --coordinator | --coordinator-out | --skills | --skills-out | --remote | --keep)
       [ $# -ge 2 ] && [[ "$2" != -* ]] || { echo "$1 requires a value" >&2; usage; }
       case "$1" in
         --db) DB="$2" ;;
@@ -47,6 +52,8 @@ while [ $# -gt 0 ]; do
         --attachments-out) ATTACHMENTS_OUT="$2" ;;
         --coordinator) COORDINATOR="$2" ;;
         --coordinator-out) COORDINATOR_OUT="$2" ;;
+        --skills) SKILLS="$2" ;;
+        --skills-out) SKILLS_OUT="$2" ;;
         --remote) REMOTE="$2" ;;
         --keep) KEEP="$2" ;;
       esac
@@ -66,6 +73,11 @@ fi
 
 if [[ -n "$COORDINATOR" && -z "$COORDINATOR_OUT" || -z "$COORDINATOR" && -n "$COORDINATOR_OUT" ]]; then
   echo "--coordinator and --coordinator-out go together" >&2
+  usage
+fi
+
+if [[ -n "$SKILLS" && -z "$SKILLS_OUT" || -z "$SKILLS" && -n "$SKILLS_OUT" ]]; then
+  echo "--skills and --skills-out go together" >&2
   usage
 fi
 
@@ -129,6 +141,22 @@ if [ -n "$COORDINATOR" ]; then
       while IFS= read -r d; do rm -rf -- "$d" || exit 1; done
   ) || fail "rotate $COORDINATOR_OUT"
   echo "[$ts] coordinator stores copied: $stores"
+fi
+
+if [ -n "$SKILLS" ]; then
+  [ -d "$SKILLS" ] || fail "skills not found: $SKILLS"
+  mkdir -p "$SKILLS_OUT" || fail "create $SKILLS_OUT"
+  archive="$SKILLS_OUT/skills-$ts.tar.gz"
+  [ ! -e "$archive" ] || fail "$archive already exists"
+  tar -czf "$tmp/skills.tar.gz" -C "$SKILLS" --exclude=./.migrating --exclude=secretbox.key --exclude='*.pem' . ||
+    fail "archive skills"
+  mv "$tmp/skills.tar.gz" "$archive" || fail "write $archive"
+  (
+    cd "$SKILLS_OUT" &&
+      { ls -1 skills-*.tar.gz 2>/dev/null || true; } | sort -r | tail -n +$((KEEP + 1)) |
+      while IFS= read -r f; do rm -f -- "$f" || exit 1; done
+  ) || fail "rotate $SKILLS_OUT"
+  echo "[$ts] skills archived: $archive"
 fi
 
 if [ -n "$ATTACHMENTS" ]; then
@@ -199,6 +227,9 @@ if [ -n "$REMOTE" ]; then
   fi
   if [ -n "$COORDINATOR" ]; then
     "${push[@]}" "$COORDINATOR_OUT/" "${dest}coordinator/" || fail "push coordinator stores to ${dest}coordinator/"
+  fi
+  if [ -n "$SKILLS" ]; then
+    "${push[@]}" "$SKILLS_OUT/" "${dest}skills/" || fail "push skills to ${dest}skills/"
   fi
   echo "[$ts] pushed to $dest"
 fi

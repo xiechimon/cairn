@@ -145,13 +145,12 @@ for (const theme of ['light', 'dark'] as const) {
     const expanded = await press('.sidebar-team-collapse');
     expect(expanded.hovered.opacity).toBe('1');
     expect(expanded.held).toEqual(expanded.hovered);
-    await expect(page.locator('.rail-toggle')).toBeVisible();
+    await expect(page.getByTestId('sidebar-reopen')).toBeVisible();
 
-    // collapsed rail: the expand toggle, and its release is the expand path
-    const rail = await press('.rail-toggle');
-    expect(rail.hovered.opacity).toBe('1');
-    expect(rail.held).toEqual(rail.hovered);
-    await expect(page.locator('.board-sidebar--collapsed')).toHaveCount(0);
+    const collapsed = await press('[data-testid="sidebar-reopen"]');
+    expect(collapsed.hovered.opacity).toBe('1');
+    expect(collapsed.held).toEqual(collapsed.hovered);
+    await expect(page.getByTestId('sidebar-reopen')).toHaveCount(0);
   });
 }
 

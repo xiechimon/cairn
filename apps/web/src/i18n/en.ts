@@ -257,7 +257,6 @@ export const EN: Record<string, string> = {
   '无法撤销归档。': 'Could not undo the archive.',
   '无法移动项目。': 'Could not move the project.',
   有任务在等你: 'A task is waiting on you',
-  '{name}：有任务在等你': '{name}: A task is waiting on you',
   移到分组: 'Move to group',
   新建分组: 'New group',
   移出分组: 'Remove from group',
@@ -556,10 +555,7 @@ export const EN: Record<string, string> = {
   '搜索技能...': 'Search skills...',
   排序: 'Sort',
   尚无技能: 'No skills yet',
-  // spec 13 + XMON-109（spec 13 回摆）技能面：双入口口径——本地目录或页面
-  // 新建都会出现在这里（{dir} = SKILLS_DIR_DEFAULT）。
-  '把包含 SKILL.md 的技能目录放进 {dir}，或新建一个技能，即会出现在这里。':
-    'Drop a skill folder containing SKILL.md into {dir}, or create a new skill here, and it will show up in this list.',
+  '用「导入」或「新建」添加技能。': 'Add skills with Import or New.',
   // XMON-114（spec 13 回摆）技能写面：新建/编辑弹窗与错误态。
   新建技能: 'New skill',
   编辑技能: 'Edit skill',
@@ -615,27 +611,18 @@ export const EN: Record<string, string> = {
   '1 次运行': '1 run',
   '{n} 次运行': '{n## run|# runs}',
   根目录: 'Root',
-  '搜索任务…': 'Search todos…',
   搜索任务: 'Search todos',
   筛选: 'Filter',
-  列表视图: 'List view',
-  网格视图: 'Grid view',
-  暂无内容: 'Nothing yet',
-  '创建第一个任务以开始使用。': 'Create your first todo to get started.',
   // #446（ADR 0005 读向）项目页「从 GitHub issue 建任务」入口 + 选择弹层
   // （状态过滤 / 分页 / 三态行）。
-  '从 GitHub issue 建任务': 'New task from GitHub issue',
   打开: 'Open',
   已关闭: 'Closed',
   '运行失败了，先重跑才能完成': 'The run failed; rerun it before marking it done',
   '已归档，不能标记完成': 'Archived, so it cannot be marked done',
   'Coordinator 在问你，到对话里回答':
     'A question from the Coordinator; answer it in the conversation',
-  'issue 列表加载失败': 'Failed to load issues',
-  '这个状态下没有 issue': 'No issues in this state',
   上一页: 'Previous page',
   下一页: 'Next page',
-  '第 {page} 页': 'Page {page}',
   // #452（ADR 0006 写向）详情页来源 issue 行：未建成 + 重试入口 / 回显
   // （号 + 状态 + 上游现值标题）/ 不一致中性提示（只提示不覆盖）。
   'GitHub issue 未建成': 'GitHub issue not created',
@@ -957,7 +944,6 @@ export const EN: Record<string, string> = {
   '远程（HTTP）': 'Remote (HTTP)',
   '2 天前': '2d ago',
   // —— overlay dialogs (issues #66 / #68) ——
-  新建任务: 'New task',
   删除任务: 'Delete todo',
   '确定删除该任务？此操作不可撤销。': 'Delete this todo? This cannot be undone.',
   // #306 sched-card 菜单删除确认（DeleteConfirm 家族泛化随加）。
@@ -970,7 +956,6 @@ export const EN: Record<string, string> = {
   撤销: 'Undo',
   完成任务: 'Complete task',
   负责人: 'Owner',
-  'issue 状态': 'Issue state',
   'Coordinator 用的模型额度已用完': "The Coordinator's model is out of quota",
   'Coordinator 用的模型暂时过载': "The Coordinator's model is overloaded",
   将改动合并到默认分支: 'Merge the changes into the default branch',
@@ -1067,12 +1052,9 @@ export const EN: Record<string, string> = {
   粘贴密钥的值: 'Paste the secret value',
   '值将加密存储，保存后无法再次查看。':
     'The value is stored encrypted and cannot be viewed again after saving.',
-  // wayfinder #178 project tasks toolbar (filter/sort menus, match-empty line)
   全部: 'All',
   进行中: 'In progress',
-  最近更新: 'Recently updated',
   标题: 'Title',
-  没有匹配的任务: 'No matching tasks',
   // wayfinder #175 add-provider dialog family (field authority = shared
   // createProviderBodySchema / r3 §2; protocol tab labels stay English
   // verbatim, never translated)
@@ -1381,6 +1363,13 @@ export const EN: Record<string, string> = {
   '等 Runner 上线': 'waiting for a Runner to come online',
   '缺 {missing}': 'missing {missing}',
   排队中: 'queued',
+  '已交给 Coordinator 安排': 'Handed to the Coordinator',
+  'Coordinator 正在安排这个任务...': 'The Coordinator is arranging this task...',
+  'Coordinator 没能安排这个任务：{reason}': 'The Coordinator could not arrange this task: {reason}',
+  'Coordinator 没有派发这个任务，原因见上面的回复。点「开始」再试一次。':
+    'The Coordinator did not dispatch this task; its reply above says why. Press Start to try again.',
+  'Coordinator 没有派发这个任务，也没有说明原因。点「开始」再试一次。':
+    'The Coordinator did not dispatch this task and gave no reason. Press Start to try again.',
   'Coordinator 正在编排这张任务，等这一轮结束再发起。':
     'The Coordinator is already orchestrating this task — wait for this round to finish.',
   '重复发起只会多排一轮编排，不会更快开始。':
@@ -1698,6 +1687,12 @@ export const EN: Record<string, string> = {
     'Current default: {model} · {provider} (no Runner has Claude Code, so the first provider you added is used)',
   '当前没有可用的默认：添加服务商，或在 Runner 上装 Claude Code':
     'No default yet: add a provider, or install Claude Code on a Runner',
+  '当前默认：{model} · {provider}（因为团队有 Anthropic API key）':
+    'Current default: {model} · {provider} (the team has an Anthropic API key)',
+  '当前默认：{model} · {provider}（因为这是最早添加、Coordinator 能直接用的服务商）':
+    'Current default: {model} · {provider} (the first provider you added that the Coordinator can use)',
+  '当前没有可用的默认：添加一个有 API key 的服务商，或在这里创建规则':
+    'No default yet: add a provider with an API key, or create the rule here',
   '设为默认 Runner': 'Make default Runner',
   '已是默认 Runner': 'Default Runner',
   '设为默认 Runner 失败，请重试。': 'Could not change the default Runner. Try again.',

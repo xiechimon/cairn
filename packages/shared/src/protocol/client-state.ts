@@ -21,11 +21,6 @@ export const LOCAL_STORAGE_KEYS: readonly ClientStateKey[] = [
     source: 'r2 §1.5（团队页视图切换）',
   },
   {
-    key: 'cairn.projectTasksLayout',
-    valueShape: 'list | grid',
-    source: '[推断] #178（project 任务页视图切换，与 teamMembersLayout 同形；原键未观测）',
-  },
-  {
     key: 'cairn.cache.session-v1',
     valueShape: '{token:"",cookieName:"",expiresAt,user{…}}——会话走 cookie，token 字段留空',
     source: 'r2 §1.5',

@@ -45,7 +45,7 @@ const COMPUTED_KEYS = new Set<string>([
   CHIEF_INPUT_PLACEHOLDER_STEERING,
 
   SKILL_PAGE_COPY.empty,
-  SKILL_PAGE_COPY.directoryHint,
+  SKILL_PAGE_COPY.hint,
 
   ...Object.values(LOCAL_ERROR_REASON_COPY),
 

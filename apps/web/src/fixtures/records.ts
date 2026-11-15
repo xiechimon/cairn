@@ -396,6 +396,7 @@ export type TranscriptItem =
       signalAt?: number;
       skills?: SkillFact[];
       blocked?: true;
+      blockedKind?: StepQueueBlocked['kind'];
     }
   | { kind: 'skills'; read: string[]; denied: string[] }
   | { kind: 'plan'; title: string; preview: string; seconds?: number; createdAt?: number }

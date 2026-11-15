@@ -24,6 +24,7 @@ import type { DaemonLogger } from './log.js';
 import { type MachineApi, MachineApiError } from './machine-client.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
+import { deliverablesDirOf } from './step-deliverables.js';
 import { prepareStepEnv } from './step-env.js';
 import { reportStepProvenance, stepSkillsCatalog } from './step-executor-record.js';
 import { finishStepRun } from './step-finish.js';
@@ -195,6 +196,11 @@ async function runClaimedStep(
   if (isInfoBuild) {
     mkdirSync(dirname(reportFile), { recursive: true });
     if (!opts.resume) rmSync(reportFile, { force: true });
+    if (claimed.deliverables !== undefined) {
+      for (const folder of ['pages', 'slides']) {
+        mkdirSync(join(deliverablesDirOf(reportFile), folder), { recursive: true });
+      }
+    }
   }
 
   const claimedEntry = journal.claim({

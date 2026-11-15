@@ -438,6 +438,39 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     expect(transcriptRows(client).some((r) => r.id === 'git-credential-s1')).toBe(false);
   }, 20_000);
 
+  test('a local repo push that succeeds writes no git credential row', async () => {
+    const workspace = fakeWorkspace({});
+    const { client } = await setup(
+      claimedStep('build', { kind: 'local', cloneUrl: '/tmp/user-repo' }),
+      { git: null, workspace },
+    );
+    expect(workspace.pushes).toEqual([{ branch: 'cairn/conv-conv-1', cred: null }]);
+    expect(client.doneBodies[0]!.body.status).toBe('success');
+    expect(transcriptRows(client).some((r) => r.id === 'git-credential-s1')).toBe(false);
+  }, 20_000);
+
+  test('a push that falls back to machine credentials keeps the credential row before the agent output', async () => {
+    const workspace = fakeWorkspace({
+      pushWithToken: () => {
+        throw new Error(MEA_AUTH_FAILURE);
+      },
+    });
+    let clock = 1_000;
+    const { client } = await setup(
+      claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+      { git: GITHUB_TOKEN, workspace, now: () => (clock += 10) },
+    );
+    const rows = transcriptRows(client);
+    const credential = rows.find((r) => r.id === 'git-credential-s1');
+    const firstAssistant = rows.find((r) => r.role === 'assistant');
+    expect(systemRowOf(credential?.content)).toEqual({
+      kind: GIT_CREDENTIAL_ROW_KIND,
+      source: 'machine',
+    });
+    expect(firstAssistant).toBeDefined();
+    expect(credential!.createdAt).toBeLessThan(firstAssistant!.createdAt);
+  }, 20_000);
+
   test('failure mode 6: prepare already fell back (provenance machine) → provenance line surfaces with prepare (visible even on rounds where push never fired)', async () => {
     const workspace = fakeWorkspace({
       credentialSource: 'machine',

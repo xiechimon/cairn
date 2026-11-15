@@ -48,6 +48,9 @@ test('a fresh install creates the coordinator rule in the UI and the Coordinator
   await expect(creator).toBeVisible();
   await expect(settings.getByTestId('routing-rule-new-session')).toBeVisible();
   await expect(settings.getByTestId('routing-session-default')).toContainText('e2e-model · e2e relay');
+  await expect(settings.getByTestId('routing-coordinator-default')).toContainText(
+    '当前默认：e2e-model · e2e relay',
+  );
   await expect(creator.locator('.routing-rule-level-select')).toBeDisabled();
 
   await creator.locator('.routing-rule-model-select').click();

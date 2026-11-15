@@ -2,7 +2,6 @@ import {
   createProjectBodySchema,
   type FsListResult,
   type FsPickResult,
-  githubIssuesResponseSchema,
   importGithubIssueBodySchema,
   type NamedPromptId,
   namedPromptIdSchema,
@@ -21,7 +20,6 @@ import { newRecordId, nowMs } from './lib/ids.js';
 import {
   githubAppOf,
   githubIssueDepsOf,
-  githubIssuesQuerySchema,
   jsonBody,
   requestOrigin,
   requireProject,
@@ -45,7 +43,7 @@ import {
   validateGithubLocalSlotPath,
   validateLocalRepoPath,
 } from './services/git.js';
-import { importGithubIssue, listProjectGithubIssues } from './services/github-issues.js';
+import { importGithubIssue } from './services/github-issues.js';
 import { listNamedPrompts, putNamedPrompt, resetNamedPrompt } from './services/named-prompts.js';
 import {
   projectMergeConfigOf,
@@ -123,23 +121,6 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     if (todoIds.length === 0) return c.json([]);
     const builds = ctx.db.select().from(build).where(inArray(build.todoId, todoIds)).all();
     return c.json(builds.map(toBuildRecord));
-  });
-
-  app.get('/api/projects/:id/github/issues', async (c) => {
-    const row = requireProject(ctx, c.req.param('id'));
-    const query = parseWith(
-      githubIssuesQuerySchema,
-      {
-        state: c.req.query('state') ?? 'open',
-        page: c.req.query('page') ?? '1',
-      },
-      'query',
-    );
-    const face = await listProjectGithubIssues(githubIssueDepsOf(ctx), row, {
-      state: query.state,
-      page: query.page,
-    });
-    return c.json(githubIssuesResponseSchema.parse(face));
   });
 
   app.post('/api/projects/:id/github/issues/import', async (c) => {

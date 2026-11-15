@@ -82,6 +82,19 @@ test('a project link lands on that project conversation', async ({ page }) => {
   await expect(composer(page)).toBeVisible();
 });
 
+test('an old project tasks link lands on that project conversation with the Tasks panel open', async ({
+  page,
+}) => {
+  await page.goto(`/app/project/${PROJECT_ID}/tasks?scenario=home-c`);
+  await expect(page).toHaveURL(
+    new RegExp(`/app\\?scenario=home-c&project=${PROJECT_ID}&chat=1&pane=tasks$`),
+  );
+  await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('cairn');
+  await expect(
+    page.locator('.side-panel [data-slot="task-row-frame"]').first(),
+  ).toBeVisible();
+});
+
 test('a first run greets in a bubble and offers starter replies, with nothing pinned', async ({
   page,
 }) => {

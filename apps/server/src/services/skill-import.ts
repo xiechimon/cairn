@@ -155,6 +155,12 @@ function collectFromLocalPath(rawPath: string, skillsDir: string): Collected {
       `localPath ${rawPath} resolves inside the cairn skills directory (${skillsDir}) — it is already visible to cairn; import from a directory outside it`,
     );
   }
+  if (rootReal.startsWith(real + sep)) {
+    throw new HttpError(
+      400,
+      `localPath ${rawPath} contains the cairn skills directory (${skillsDir}); import a single skill directory instead`,
+    );
+  }
   const files: SkillFileBody[] = [];
   let total = 0;
   const walk = (dir: string): void => {

@@ -1,0 +1,86 @@
+---
+title: Install
+description: Start the Cairn server and open the web app.
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+The server is the web app, the Coordinator and the database. You run one copy, on the machine you browse from or on an always-on host. It alone is enough to look around; agents start working once you [connect a Runner](/docs/runner/) and [a model](/docs/models/).
+
+## Requirements
+
+- **Node.js 22 or 24.** These LTS lines ship prebuilt `better-sqlite3` binaries; other versions may fall back to compiling from source and need a build toolchain.
+- Linux or macOS for the server. Windows needs the pairing step below.
+
+## Start the server
+
+<Steps>
+
+1. Run Cairn with one command:
+
+   ```sh
+   npx @xiechimon/cairn
+   ```
+
+   It downloads Cairn and serves it on loopback. It prints no URL; the address is below. The first boot creates the database under `~/.cairn`, runs migrations and seeds a default team. To use another port: `PORT=9000 npx @xiechimon/cairn`; Runners then need `--server http://127.0.0.1:9000`.
+
+2. Open **[http://127.0.0.1:8787/app](http://127.0.0.1:8787/app)** in a browser on the same machine.
+
+3. Sign in the browser:
+
+   <Tabs syncKey="os">
+   <TabItem label="Linux">
+   A browser on the server's own machine is signed in automatically through a loopback session. There is nothing to paste.
+   </TabItem>
+   <TabItem label="macOS / Windows">
+   These systems have no loopback peer proof, so the first browser session uses a pairing code minted with the owner token. The first start writes that token to `~/.cairn/token` (mode 0600):
+
+   ```sh
+   curl -s -X POST -H "Authorization: Bearer $(cat ~/.cairn/token)" \
+     http://127.0.0.1:8787/api/remote/pairing
+   ```
+
+   Open the returned code on the browser's pairing page.
+   </TabItem>
+   </Tabs>
+
+</Steps>
+
+The interface follows your browser's language; switch it under `Settings` → `Account` → `Language`. The home page then asks you to finish three setup steps: connect a model source, connect a Runner, and open work routing. The next pages cover them in that order.
+
+<Aside type="caution">
+The server listens on `127.0.0.1` only and always requires a token for non-browser clients. Do not bind it to a public address without a token; see [Run it in Docker](#run-it-in-docker) and [Reach it from your phone](#reach-it-from-your-phone).
+</Aside>
+
+## Where your data lives
+
+Everything is under `~/.cairn` (set `CAIRN_HOME` to move it): the server keeps `server/server.db` and `server/secretbox.key`; a Runner keeps `machine.json`, `daemon.log` and `workspaces/`. **To back up, copy the whole directory.** The database is useless without the key file, because secrets are stored encrypted.
+
+## Run it in Docker
+
+Only the server and web app are containerized; agents still run through a Runner on your own machines. The image binds `0.0.0.0`, keeps all state under `/data` and refuses to start without a token:
+
+```sh
+docker build -t cairn .
+docker run -d --name cairn -v cairn-data:/data \
+  -e CAIRN_TOKEN="$(openssl rand -hex 32)" -p 8787:8787 cairn
+```
+
+Build from a checkout of the [repository](https://github.com/xiechimon/cairn). Terminate TLS in front of the container, since the token travels in a header. Back up the whole `/data` volume.
+
+## Reach it from your phone
+
+Put [Tailscale Serve](https://github.com/xiechimon/cairn/blob/main/docs/deploy/tailscale-mobile.md) in front of the loopback server. It makes Cairn reachable on your private tailnet without a public address; each new device still signs in with a one-time pairing code from `Remote access` in settings. HTTPS through Serve also lets iOS add Cairn to the home screen and receive push.
+
+## Build from source
+
+Requires Node.js 22.19 or later and pnpm (for example through `corepack enable`):
+
+```sh
+git clone https://github.com/xiechimon/cairn
+cd cairn
+pnpm install
+pnpm start
+```
+
+`pnpm start` builds the web UI and starts the server hosting it on the same origin. Every server and Runner environment variable is listed in [configuration.md](https://github.com/xiechimon/cairn/blob/main/docs/configuration.md).

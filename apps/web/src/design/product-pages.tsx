@@ -3,7 +3,6 @@ import { Button } from '../components/ui/button.js';
 import { Popover, PopoverTrigger } from '../components/ui/popover.js';
 import { Folder } from '../icons/index.js';
 import { DirBrowser } from '../pages/dir-browser.js';
-import { GithubIssuesDialog } from '../pages/github-issues-dialog.js';
 import { ProjectAutonomyCard } from '../pages/project-autonomy-card.js';
 import { ProjectBaseBranchSelect } from '../pages/project-base-branch-select.js';
 import type { GalleryTheme } from './design-doc.js';
@@ -42,7 +41,6 @@ function ScenarioFrame({ title, url, theme }: { title: string; url: string; them
 export function ProductPagesSection({ theme }: { theme: GalleryTheme }) {
   const [picked, setPicked] = useState<string | null>(null);
   const [dirOpen, setDirOpen] = useState(false);
-  const [issuesOpen, setIssuesOpen] = useState(false);
   return (
     <Section
       id="product-pages"
@@ -84,26 +82,6 @@ export function ProductPagesSection({ theme }: { theme: GalleryTheme }) {
         <Cell label="ProjectBaseBranchSelect">
           <ProjectBaseBranchSelect project={GALLERY_PROJECT} />
         </Cell>
-      </Specimen>
-      <Specimen
-        id="import-from-github"
-        title="Import from GitHub"
-        note={picked ?? 'GithubIssuesDialog: filter by state, page, click an issue to import'}
-        stage="canvas"
-      >
-        <Button variant="outline" onClick={() => setIssuesOpen(true)}>
-          Import a GitHub issue
-        </Button>
-        <GithubIssuesDialog
-          open={issuesOpen}
-          onClose={() => setIssuesOpen(false)}
-          projectId={PROJECT}
-          teamId={TEAM}
-          onImported={(record) => {
-            setPicked(`Imported #${record.seqNum}`);
-            setIssuesOpen(false);
-          }}
-        />
       </Specimen>
       <Specimen
         id="schedule-rows"

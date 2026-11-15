@@ -124,6 +124,26 @@ describe('runBrowserTool', () => {
     ).rejects.toThrow(/not in a fresh snapshot/);
   });
 
+  test('finds refs that follow other attributes, and does not mistake e70 for e7', async () => {
+    const snapshot = '- heading "BOSS直聘" [level=3, ref=e70]\n';
+    const log: string[] = [];
+    await runBrowserTool(
+      recordingProvider(log, snapshot),
+      'browser_act',
+      { actions: [{ kind: 'click', ref: '@e70' }] },
+      { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
+    );
+    expect(log.at(-1)).toContain('click @e70');
+    await expect(
+      runBrowserTool(
+        recordingProvider([], snapshot),
+        'browser_act',
+        { actions: [{ kind: 'click', ref: '@e7' }] },
+        { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
+      ),
+    ).rejects.toThrow(/not in a fresh snapshot/);
+  });
+
   test('treats nonzero snapshot exits as failures even when stderr has text', async () => {
     const provider: ComputerProvider = {
       async execute() {
@@ -978,5 +998,28 @@ describe('opening a page like a person', () => {
     await expect(
       navigate(addressBarProvider(log, { window: '42', url: 'chrome-error://chromewebdata/' })),
     ).rejects.toMatchObject({ delivery: 'unknown' });
+  });
+
+  test('when the typed address turns into a search, it opens the URL directly', async () => {
+    const log: string[] = [];
+    await navigate(
+      addressBarProvider(log, {
+        window: '42',
+        url: 'https://www.google.com/search?q=s%3A%2F%2Fwww.zhipin.com%2F',
+        title: 's://www.zhipin.com/ - Google Search',
+      }),
+      'https://www.zhipin.com/',
+    );
+    expect(log.some((line) => line.startsWith('xdotool type'))).toBe(true);
+    expect(log.some((line) => line.endsWith(' open https://www.zhipin.com/'))).toBe(true);
+  });
+
+  test('a redirect to a subdomain of the same site is accepted without reopening', async () => {
+    const log: string[] = [];
+    await navigate(
+      addressBarProvider(log, { window: '42', url: 'https://m.zhipin.com/web/' }),
+      'https://www.zhipin.com/',
+    );
+    expect(log.some((line) => line.endsWith(' open https://www.zhipin.com/'))).toBe(false);
   });
 });

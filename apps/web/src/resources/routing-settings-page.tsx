@@ -1,4 +1,5 @@
 import {
+  type CoordinatorDefault,
   MODEL_SOURCE_RUNTIME_LABELS,
   type ModelSourceRuntime,
   type RouteUse,
@@ -89,6 +90,33 @@ function SessionDefaultHint({
             )
           : t('当前没有可用的默认：添加服务商，或在 Runner 上装 Claude Code');
   return <span data-testid="routing-session-default">{text}</span>;
+}
+
+function CoordinatorDefaultHint({
+  coordinatorDefault,
+  options,
+}: {
+  coordinatorDefault: CoordinatorDefault;
+  options: ModelOption[];
+}) {
+  const { t } = useI18n();
+  const row = options.find(
+    (o) => o.provider === coordinatorDefault.provider && o.modelId === coordinatorDefault.modelId,
+  );
+  const vars = {
+    model: row?.modelName ?? coordinatorDefault.modelId ?? '',
+    provider: row?.providerLabel ?? coordinatorDefault.provider ?? '',
+  };
+  const text =
+    coordinatorDefault.reason === 'anthropic-key'
+      ? t('当前默认：{model} · {provider}（因为团队有 Anthropic API key）', vars)
+      : coordinatorDefault.reason === 'provider'
+        ? t(
+            '当前默认：{model} · {provider}（因为这是最早添加、Coordinator 能直接用的服务商）',
+            vars,
+          )
+        : t('当前没有可用的默认：添加一个有 API key 的服务商，或在这里创建规则');
+  return <span data-testid="routing-coordinator-default">{text}</span>;
 }
 
 function currentOption(rule: RoutingRuleRecord | null, options: readonly ModelOption[]) {
@@ -329,9 +357,18 @@ export function RoutingSettingsPage() {
                   use={use}
                   label={t(ROUTE_USE_LABELS[use])}
                   hint={
-                    use === 'coordinator' && ruleOf(use) === null
-                      ? t('先给 Coordinator 选模型，它才能回答你的消息。')
-                      : t(USE_HINTS[use])
+                    use === 'coordinator' && ruleOf(use) === null ? (
+                      settings.coordinatorDefault !== undefined ? (
+                        <CoordinatorDefaultHint
+                          coordinatorDefault={settings.coordinatorDefault}
+                          options={options}
+                        />
+                      ) : (
+                        t('先给 Coordinator 选模型，它才能回答你的消息。')
+                      )
+                    ) : (
+                      t(USE_HINTS[use])
+                    )
                   }
                   rule={ruleOf(use)}
                   options={options}

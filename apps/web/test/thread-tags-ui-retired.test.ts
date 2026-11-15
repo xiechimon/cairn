@@ -12,8 +12,3 @@ test('web client has no unused category queries or assignment argument', () => {
   expect(hooks).not.toMatch(/\b(?:useTags|useProjectTags|TagRecord|tagIds)\b/);
   expect(hooks).not.toContain('/tags');
 });
-
-test('GitHub issue label queries and chips remain independent', () => {
-  expect(source('api/hooks.ts')).toContain('export function useGithubIssues');
-  expect(source('pages/github-issues-dialog.tsx')).toContain('<TagChip');
-});

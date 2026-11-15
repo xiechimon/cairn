@@ -499,3 +499,30 @@ test('--coordinator and --coordinator-out go together', () => {
   const result = f.run(['--db', f.db, '--out', join(f.backups, 'db'), '--coordinator', f.server]);
   assert.equal(result.status, 2);
 });
+
+test('the skills directory is archived read-only, rotated by --keep and pushed with the db', () => {
+  const f = fixture();
+  const skills = join(f.root, 'skills');
+  write(join(skills, 'deploy', 'SKILL.md'), 'deploy skill');
+  write(join(skills, '.migrating', 'half', 'SKILL.md'), 'half copied');
+  const before = files(skills);
+  const out = join(f.backups, 'skills');
+  write(join(out, 'skills-20200101T000000Z.tar.gz'), 'old');
+  const result = f.run([...f.full, '--skills', skills, '--skills-out', out, '--keep', '1']);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /skills archived/);
+  const archives = readdirSync(out);
+  assert.equal(archives.length, 1);
+  const listing = spawnSync('tar', ['-tzf', join(out, archives[0])], { encoding: 'utf8' });
+  assert.equal(listing.status, 0, listing.stderr);
+  assert.match(listing.stdout, /deploy\/SKILL\.md/);
+  assert.doesNotMatch(listing.stdout, /\.migrating/);
+  assert.deepEqual(files(skills), before);
+  assert.deepEqual(readdirSync(join(f.receiver, 'skills')), archives);
+});
+
+test('--skills and --skills-out go together', () => {
+  const f = fixture();
+  const result = f.run(['--db', f.db, '--out', join(f.backups, 'db'), '--skills', f.server]);
+  assert.equal(result.status, 2);
+});

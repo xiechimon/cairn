@@ -222,3 +222,26 @@ test('verification limits concurrent and repeated calls per connection for ten s
   expect(runCount()).toBe(3);
   expect(logs.join('')).not.toContain(TOKEN);
 });
+
+describe('the setup token is stored only for the owner session', () => {
+  test('anonymous callers are refused, the owner stores it, and no response or list carries it', async () => {
+    const s = bootServer({ authToken: 'owner-secret-0123456789abcdef' });
+    const path = `/api/teams/${s.team.id}/claude-subscriptions`;
+    const anonymous = await req(s.app, 'POST', path, { label: 'Personal', token: TOKEN });
+    expect([401, 403]).toContain(anonymous.status);
+    expect(s.db.all(sql`SELECT id FROM claude_subscription`)).toEqual([]);
+    const headers = {
+      authorization: 'Bearer owner-secret-0123456789abcdef',
+      'content-type': 'application/json',
+    };
+    const saved = await s.app.request(path, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ label: 'Personal', token: TOKEN }),
+    });
+    expect(saved.status).toBe(201);
+    expect(await saved.text()).not.toContain(TOKEN);
+    const list = await s.app.request(path, { headers });
+    expect(await list.text()).not.toContain(TOKEN);
+  });
+});
