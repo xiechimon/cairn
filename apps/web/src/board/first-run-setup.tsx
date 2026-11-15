@@ -394,7 +394,7 @@ function ConfirmBody({ setup }: { setup: Setup }) {
                 )}
                 <Button
                   variant="link"
-                  className="ml-auto h-6 p-0 text-(--card-button) no-underline hover:underline pointer-coarse:h-11"
+                  className="ml-auto h-6 p-0 underline decoration-content-tertiary underline-offset-4 hover:decoration-current pointer-coarse:h-11"
                   render={<Link to={`${settingsHref('work-routing')}#route-${use}`} />}
                 >
                   {t('换一个')}
