@@ -279,7 +279,12 @@ export function SettingsDangerZone({
 }: SettingsDangerZoneProps) {
   return (
     <SettingsCard className={className}>
-      <SettingsRow label={label} hint={description}>
+      <SettingsRow
+        label={label}
+        hint={description}
+        className="[&>span:first-child]:max-w-none"
+        hintClassName="break-keep text-balance"
+      >
         <Button
           variant="destructive"
           className={DIALOG_PRIMARY_BUTTON}

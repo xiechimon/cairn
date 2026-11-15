@@ -550,6 +550,14 @@ function demoFixtureOf(): FixtureSet {
     },
     usageNav: true,
     projectNames: { [PROJECT_ID_DEMO]: PROJECT },
+    project: {
+      name: PROJECT,
+      repoName: 'cairn-demo/demo-shop',
+      hosted: false,
+      repoKind: 'github',
+      defaultBranch: 'main',
+      description: '演示用的网店：商品、购物车和结算。',
+    },
     team: {
       members: 4,
       agents: [

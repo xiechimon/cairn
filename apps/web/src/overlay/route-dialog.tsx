@@ -1,12 +1,5 @@
 import { cn } from 'cn';
-import {
-  createContext,
-  type ReactNode,
-  type RefObject,
-  useCallback,
-  useContext,
-  useRef,
-} from 'react';
+import { createContext, type ReactNode, type RefObject, useContext, useRef } from 'react';
 import { Button } from '../components/ui/button.js';
 import { DialogClose, DialogTitle } from '../components/ui/dialog.js';
 import { DialogShell, dialogWidth } from '../components/ui/dialog-shell.js';
@@ -19,10 +12,6 @@ const RouteDialogClose = createContext<() => void>(() => undefined);
 export const RouteDialogCloseProvider = RouteDialogClose.Provider;
 
 const ignoreBackdropClick = () => undefined;
-
-function keepFieldEscape(event: KeyboardEvent) {
-  if (event.key === 'Escape' && isEditableTarget(event.target)) event.stopPropagation();
-}
 
 export function RouteDialog({
   title,
@@ -42,17 +31,15 @@ export function RouteDialog({
   const { t } = useI18n();
   const onClose = useContext(RouteDialogClose);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const attachBody = useCallback((body: HTMLDivElement | null) => {
-    bodyRef.current = body;
-    if (body === null) return;
-    body.addEventListener('keydown', keepFieldEscape);
-    return () => body.removeEventListener('keydown', keepFieldEscape);
-  }, []);
   return (
     <DialogShell
       bare
       title={title}
-      onClose={onClose}
+      onClose={(details) => {
+        if (details?.reason === 'escape-key' && isEditableTarget(details.event?.target ?? null))
+          return;
+        onClose();
+      }}
       zIndex="calc(var(--z-narrow-chrome) + 2)"
       onBackdropClick={ignoreBackdropClick}
       initialFocus={initialFocus ?? (size === 'page' ? bodyRef : undefined)}
@@ -69,7 +56,7 @@ export function RouteDialog({
         {actions}
       </header>
       <div
-        ref={attachBody}
+        ref={bodyRef}
         tabIndex={-1}
         data-testid="route-dialog-body"
         className={cn('min-h-0 flex-auto overflow-y-auto outline-none', !bleed && 'px-4 pt-4 pb-5')}
