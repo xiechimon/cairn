@@ -14,6 +14,7 @@ afterPack: scripts/after-pack.cjs
 npmRebuild: false
 publish: null
 mac:
+  artifactName: ${productName}-${version}-${arch}.${ext}
   icon: ../../assets/AppIcon.icns
   category: public.app-category.developer-tools
   identity: '-'
