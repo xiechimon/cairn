@@ -23,6 +23,7 @@ Proved offline by `integration/test/coordinator-claude-code-e2e.test.ts`: real s
 | 4 | Session lost on the Runner (other machine, cleaned session files). The daemon falls back to a new session with system prompt and latest message only. | Unchanged and recorded as a known loss. Fixing it needs a wire field plus a daemon prefix that must stay out of the journal and the transcript row; not worth it before real use shows the need. |
 | 5 | Latency: one claude process per turn, `resume` of the session. | Unchanged. Baseline: Runner chief turns claimed in a median of 75 ms and ran a median of 88 s including tools. Measured on a real run after the Runner runtime is available. |
 | 6 | Runner offline. | The turn waits. No silent fallback to an API key or the server runtime: it would spend a different bill than the owner chose. |
+| 7 | A Coordinator tool schema outside the Claude Code backend's vocabulary. `decide_report_suggestion` (added on main) used `enum`; the backend fails closed on it, so every Claude Code Coordinator turn failed before the first message. Found by the end-to-end test after rebasing. | The `decision` parameter is a plain string whose description names the two values; the server already rejects anything else (`chief-router-tools.ts`). A daemon test converts every Coordinator tool schema through the backend's `parametersToShape`, so a later tool cannot silently break the Claude Code Coordinator again. The backend's fail-closed vocabulary is unchanged. |
 
 ## Persistence and protocol
 
