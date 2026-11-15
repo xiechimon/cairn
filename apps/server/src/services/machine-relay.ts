@@ -38,7 +38,7 @@ import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js'
 import { stepScopeProjectId } from './picked-project.js';
 import { refuseRestrictedTurnTool } from './report-turn.js';
 import {
-  coordinatorProfile,
+  coordinatorMemoryOwner,
   memoryOpsAreTeamScoped,
   memoryOwnerOf,
   profileForStep,
@@ -190,7 +190,7 @@ export async function executeRelayToolCall(
         userId: threadRow.userId,
         chiefId: chiefRow.id,
         threadId,
-        chiefAgentId: coordinatorProfile(deps.db, threadRow.teamId)?.id ?? null,
+        chiefAgentId: coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
         conversationId: threadId,
         turnPrompt: row.prompt,
         turnMessageIds: row.ownerMessageIds ?? [],

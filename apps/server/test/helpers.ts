@@ -85,6 +85,7 @@ export function bootServer(
     webOrigin?: string;
     pushEndpointHosts?: ReadonlySet<string>;
     mcpConfigPath?: string;
+    mcpFetch?: AppContext['mcpFetch'];
     backupStatusPath?: string;
     deployRecordPath?: string;
     remote?: Partial<NonNullable<AppContext['remote']>>;
@@ -175,6 +176,7 @@ export function bootServer(
       loopbackOwner: opts.loopbackOwner ?? null,
       accessVerifier: opts.accessVerifier ?? null,
       mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
+      ...(opts.mcpFetch !== undefined ? { mcpFetch: opts.mcpFetch } : {}),
     };
     const app = createApp(appContext, opts.logger);
     const rawRequest = app.request.bind(app);

@@ -1,136 +1,21 @@
-import type {
-  ChiefReportContent,
-  ChiefReportTodoRef,
-  IntakeItem,
-  RetroProposal,
+import {
+  type ChiefReportContent,
+  type ChiefReportSuggestion,
+  type ChiefReportTodoRef,
+  chiefReportSuggestions,
+  type RetroProposalStatus,
 } from '@cairn/shared';
-import { type ReactNode, useState } from 'react';
-import { Link } from 'react-router';
-import { useApiMutations } from '../api/hooks.js';
-import { useLiveData } from '../api/provider.js';
-import { ThreadLink } from '../board/thread-link.js';
-import { Button } from '../components/ui/button.js';
-import { MessageScrollerItem } from '../components/ui/message-scroller.js';
-import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
+import { ResearchReportCard } from './research-report.js';
 
-const CARD_CLS =
-  'mt-6 flex flex-col gap-5 rounded-(--radius-reply) bg-(--reply-bubble-fill) px-4 py-3.5 text-ui leading-6 text-foreground';
-const SECTION_CLS = 'flex min-w-0 flex-col gap-1';
-const LABEL_CLS = 'text-meta text-content-tertiary';
-const REF_CLS = 'text-foreground hover:underline';
-const ONE_LINE_CLS = 'my-3 text-center text-meta text-content-tertiary';
+type Translate = ReturnType<typeof useI18n>['t'];
 
-function TodoRefs({ refs }: { refs: readonly ChiefReportTodoRef[] }) {
-  if (refs.length === 0) return null;
-  return (
-    <span className="flex flex-wrap gap-x-2">
-      {refs.map((ref) => (
-        <ThreadLink key={ref.id} todoId={ref.id} className={REF_CLS}>
-          {ref.title}
-        </ThreadLink>
-      ))}
-    </span>
-  );
+function mdText(text: string): string {
+  return text.replace(/\s+/g, ' ').replace(/[\\`*_[\]<>#|~]/g, '\\$&');
 }
 
-function Decision({
-  proposal,
-  children,
-}: {
-  proposal: Pick<RetroProposal, 'id' | 'status' | 'todoId'>;
-  children: (status: RetroProposal['status'], footer: ReactNode) => ReactNode;
-}) {
-  const { t } = useI18n();
-  const { live, teamId } = useLiveData();
-  const mutations = useApiMutations(teamId);
-  const [local, setLocal] = useState<Pick<RetroProposal, 'status' | 'todoId'> | null>(null);
-  const status = local?.status ?? proposal.status;
-  const todoId = local?.todoId ?? proposal.todoId;
-  const decide = (decision: 'accept' | 'dismiss') => {
-    if (!live) {
-      setLocal({ status: decision === 'accept' ? 'accepted' : 'dismissed', todoId: null });
-      return;
-    }
-    mutations.decideRetroProposal.mutate(
-      { proposalId: proposal.id, decision },
-      {
-        onSuccess: (updated) => setLocal({ status: updated.status, todoId: updated.todoId }),
-        onError: (error) => toastError(t('没能更新这条建议，请重试。'), error),
-      },
-    );
-  };
-  const footer =
-    status === 'draft' ? (
-      <span className="flex gap-2 pt-1">
-        <Button
-          size="sm"
-          disabled={mutations.decideRetroProposal.isPending}
-          onClick={() => decide('accept')}
-        >
-          {t('建成线程')}
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={mutations.decideRetroProposal.isPending}
-          onClick={() => decide('dismiss')}
-        >
-          {t('不用了')}
-        </Button>
-      </span>
-    ) : (
-      <span className="text-meta text-content-tertiary">
-        {status === 'accepted' ? (
-          todoId === null ? (
-            t('已建成线程')
-          ) : (
-            <ThreadLink todoId={todoId} className={REF_CLS}>
-              {t('已建成线程')}
-            </ThreadLink>
-          )
-        ) : (
-          t('已忽略')
-        )}
-      </span>
-    );
-  return children(status, footer);
-}
-
-function ProposalItem({ proposal }: { proposal: RetroProposal }) {
-  const { t } = useI18n();
-  const source = proposal.source;
-  return (
-    <Decision proposal={proposal}>
-      {(status, footer) => (
-        <li
-          data-testid="chief-report-proposal"
-          data-status={status}
-          className="flex min-w-0 flex-col gap-1 data-[status=dismissed]:opacity-60"
-        >
-          <span className="font-medium text-foreground">{proposal.title}</span>
-          <span>{proposal.what}</span>
-          <span className="text-meta text-content-tertiary">
-            {t('为什么没拦住：{why}', { why: proposal.why })}
-          </span>
-          <span className="text-meta text-content-tertiary">
-            {t('防护：{safeguard}', { safeguard: proposal.safeguard })}
-          </span>
-          <span className="text-meta text-content-tertiary">
-            {t('出处：')}
-            {source.todoId === null ? (
-              t('协调者对话')
-            ) : (
-              <ThreadLink todoId={source.todoId} className={REF_CLS}>
-                {source.label}
-              </ThreadLink>
-            )}
-          </span>
-          {footer}
-        </li>
-      )}
-    </Decision>
-  );
+function todoLinks(refs: readonly ChiefReportTodoRef[]): string {
+  return refs.map((ref) => `[${mdText(ref.title)}](todo:${ref.id})`).join('、');
 }
 
 function sourceHost(url: string): string {
@@ -141,179 +26,166 @@ function sourceHost(url: string): string {
   }
 }
 
-function IntakeRow({ item }: { item: IntakeItem }) {
-  const { t } = useI18n();
+function statusLabel(status: RetroProposalStatus, t: Translate): string {
+  if (status === 'accepted') return t('已建成线程');
+  if (status === 'dismissed') return t('已忽略');
+  return t('待你决定');
+}
+
+function suggestionLines(entry: ChiefReportSuggestion, t: Translate): string[] {
+  const pad = ' '.repeat(String(entry.n).length + 2);
+  const state = statusLabel(entry.item.status, t);
+  const made =
+    entry.item.status === 'accepted' && entry.item.todoId !== null
+      ? `[${state}](todo:${entry.item.todoId})`
+      : state;
+  if (entry.kind === 'retro') {
+    const p = entry.item;
+    const source =
+      p.source.todoId === null
+        ? t('协调者对话')
+        : `[${mdText(p.source.label)}](todo:${p.source.todoId})`;
+    return [
+      `${entry.n}. **${mdText(p.title)}** · ${made}`,
+      `${pad}${mdText(p.what)}`,
+      `${pad}- ${t('为什么没拦住：{why}', { why: mdText(p.why) })}`,
+      `${pad}- ${t('防护：{safeguard}', { safeguard: mdText(p.safeguard) })}`,
+      `${pad}- ${t('出处：')}${source}`,
+    ];
+  }
+  const item = entry.item;
+  return [
+    `${entry.n}. **${mdText(item.claim)}** · ${made}`,
+    `${pad}- ${t('来源：')}[${mdText(sourceHost(item.url))}](${item.url})`,
+    ...(item.matches === ''
+      ? []
+      : [`${pad}- ${t('对应：{matches}', { matches: mdText(item.matches) })}`]),
+    ...(item.action === ''
+      ? []
+      : [`${pad}- ${t('建议动作：{action}', { action: mdText(item.action) })}`]),
+  ];
+}
+
+function isQuiet(report: ChiefReportContent): boolean {
+  const y = report.yesterday;
   return (
-    <Decision proposal={item}>
-      {(status, footer) => (
-        <li
-          data-testid="chief-report-intake-item"
-          data-status={status}
-          className="flex min-w-0 flex-col gap-1 data-[status=dismissed]:opacity-60"
-        >
-          <span className="font-medium text-foreground">{item.claim}</span>
-          <span className="text-meta text-content-tertiary">
-            {t('来源：')}
-            <a href={item.url} target="_blank" rel="noopener noreferrer" className={REF_CLS}>
-              {sourceHost(item.url)}
-            </a>
-          </span>
-          <span className="text-meta text-content-tertiary">
-            {t('对应：{matches}', { matches: item.matches })}
-          </span>
-          <span className="text-meta text-content-tertiary">
-            {t('建议动作：{action}', { action: item.action })}
-          </span>
-          {footer}
-        </li>
-      )}
-    </Decision>
+    y.finishedCount + y.mergedCount + y.failedCount + y.retries + y.quotaWaits === 0 &&
+    y.verdicts.pass + y.verdicts.block === 0
   );
 }
 
-export function ChiefReportRow({ report }: { report: ChiefReportContent }) {
-  const { t } = useI18n();
+function undecidedCount(suggestions: readonly ChiefReportSuggestion[]): number {
+  return suggestions.filter((entry) => entry.item.status === 'draft').length;
+}
+
+export function chiefReportSentence(report: ChiefReportContent, t: Translate): string {
   const y = report.yesterday;
-  const intake = report.intake ?? [];
-  const quietYesterday =
-    y.finishedCount + y.mergedCount + y.failedCount + y.retries + y.quotaWaits === 0 &&
-    y.verdicts.pass + y.verdicts.block === 0;
-  if (
-    report.status === 'posted' &&
-    quietYesterday &&
-    report.retro.length === 0 &&
-    intake.length === 0
-  )
-    return (
-      <MessageScrollerItem style={{ contentVisibility: 'visible' }}>
-        <p className={ONE_LINE_CLS} data-testid="chief-report" data-variant="one-line">
-          {t('今天的日报：昨天没有新进展。')}
-          {report.needsYou.count > 0 && (
-            <Link to="/app" className={REF_CLS}>
-              {t('{n} 件等你', { n: report.needsYou.count })}
-            </Link>
-          )}
-        </p>
-      </MessageScrollerItem>
+  const counts = { done: y.finishedCount, merged: y.mergedCount, failed: y.failedCount };
+  if (report.status !== 'posted')
+    return t('日报没写成，先看昨天的数字：完成 {done} · 合并 {merged} · 失败 {failed}', counts);
+  const k = undecidedCount(chiefReportSuggestions(report));
+  const head =
+    isQuiet(report) && k === 0
+      ? t('今天的日报写好了：昨天没有新进展')
+      : t('今天的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}', counts);
+  return k === 0 ? head : `${head}${t('，有 {k} 条建议等你决定', { k })}`;
+}
+
+export function chiefReportMarkdown(report: ChiefReportContent, t: Translate): string {
+  const y = report.yesterday;
+  const suggestions = report.status === 'posted' ? chiefReportSuggestions(report) : [];
+  const retro = suggestions.filter((entry) => entry.kind === 'retro');
+  const intake = suggestions.filter((entry) => entry.kind === 'intake');
+  const out: string[] = [];
+  out.push(
+    report.status === 'retrying'
+      ? t('日报没写成，过一会儿再试一次；先看昨天的数字。')
+      : report.status === 'failed'
+        ? t('日报两次都没写成；下面是昨天的原始数字。')
+        : chiefReportSentence(report, t),
+  );
+  out.push('', `## ${t('昨天（{day}）的进展', { day: report.covers })}`, '');
+  out.push(
+    t(
+      '完成 {done} · 合并 {merged} · 失败 {failed} · 重跑 {retries} · 等额度 {quota} · 审查通过 {pass} / 拦下 {block}',
+      {
+        done: y.finishedCount,
+        merged: y.mergedCount,
+        failed: y.failedCount,
+        retries: y.retries,
+        quota: y.quotaWaits,
+        pass: y.verdicts.pass,
+        block: y.verdicts.block,
+      },
+    ),
+  );
+  const refs: string[] = [];
+  if (y.finished.length > 0) refs.push(`- ${t('完成：')}${todoLinks(y.finished)}`);
+  if (y.merged.length > 0)
+    refs.push(
+      `- ${t('合并：')}${y.merged
+        .map((pr) =>
+          pr.prUrl === null
+            ? `[${mdText(pr.title)}](todo:${pr.id})`
+            : `[PR ${pr.prNumber ?? ''} · ${mdText(pr.title)}](${pr.prUrl})`,
+        )
+        .join('、')}`,
     );
+  if (y.failed.length > 0) refs.push(`- ${t('失败：')}${todoLinks(y.failed)}`);
+  if (refs.length > 0) out.push('', ...refs);
+  out.push('', `## ${t('等你的事')}`, '');
+  out.push(
+    report.needsYou.count === 0
+      ? t('没有等你的事')
+      : t('写日报时有 {n} 件等你，现在的情况看任务面板。', { n: report.needsYou.count }),
+  );
+  if (report.status === 'posted' && report.retroRan) {
+    out.push('', `## ${t('复盘建议')}`, '');
+    if (retro.length === 0) out.push(t('昨天的对话里没找到值得改的地方'));
+    else for (const entry of retro) out.push(...suggestionLines(entry, t));
+  }
+  if (intake.length > 0) {
+    out.push('', `## ${t('外部动态')}`, '');
+    for (const entry of intake) out.push(...suggestionLines(entry, t));
+  }
+  const notes: string[] = [];
+  if (suggestions.length > 0)
+    notes.push(
+      t(
+        '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 2 条不用了」。',
+        {
+          day: report.day,
+        },
+      ),
+    );
+  if (report.truncated.length > 0)
+    notes.push(
+      t('这些来源太长，只读了后面的部分：{sources}。', {
+        sources: report.truncated.map(mdText).join('、'),
+      }),
+    );
+  if (notes.length > 0) out.push('', '---', '', ...notes.flatMap((note) => [note, '']));
+  return `${out.join('\n').trimEnd()}\n`;
+}
+
+export function ChiefReportMessage({ report }: { report: ChiefReportContent }) {
+  const { t } = useI18n();
   return (
-    <MessageScrollerItem style={{ contentVisibility: 'visible' }}>
-      <section
-        data-testid="chief-report"
-        data-status={report.status}
-        aria-label={t('今天的日报')}
-        className={CARD_CLS}
-      >
-        <h3 className="m-0 text-ui font-medium text-foreground">
-          {t('今天的日报 · 昨天（{day}）', { day: report.covers })}
-        </h3>
-        {report.status !== 'posted' && (
-          <p className="m-0 text-meta text-content-tertiary" data-testid="chief-report-notice">
-            {report.status === 'retrying'
-              ? t('日报没写成，过一会儿再试一次；先看昨天的数字。')
-              : t('日报两次都没写成；下面是昨天的原始数字。')}
-          </p>
-        )}
-        <div className={SECTION_CLS} data-testid="chief-report-yesterday">
-          <span className={LABEL_CLS}>{t('昨天的进展')}</span>
-          <div className="flex min-w-0 flex-col gap-1">
-            <span>
-              {t(
-                '完成 {done} · 合并 {merged} · 失败 {failed} · 重跑 {retries} · 等额度 {quota} · 审查通过 {pass} / 拦下 {block}',
-                {
-                  done: y.finishedCount,
-                  merged: y.mergedCount,
-                  failed: y.failedCount,
-                  retries: y.retries,
-                  quota: y.quotaWaits,
-                  pass: y.verdicts.pass,
-                  block: y.verdicts.block,
-                },
-              )}
-            </span>
-            {y.finished.length > 0 && (
-              <span className="flex flex-wrap gap-x-2">
-                <span className="text-content-tertiary">{t('完成：')}</span>
-                <TodoRefs refs={y.finished} />
-              </span>
-            )}
-            {y.merged.length > 0 && (
-              <span className="flex flex-wrap gap-x-2">
-                <span className="text-content-tertiary">{t('合并：')}</span>
-                {y.merged.map((pr) =>
-                  pr.prUrl === null ? (
-                    <ThreadLink key={pr.id} todoId={pr.id} className={REF_CLS}>
-                      #{pr.seq} {pr.title}
-                    </ThreadLink>
-                  ) : (
-                    <a
-                      key={pr.id}
-                      href={pr.prUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={REF_CLS}
-                    >
-                      PR {pr.prNumber ?? ''} · #{pr.seq} {pr.title}
-                    </a>
-                  ),
-                )}
-              </span>
-            )}
-            {y.failed.length > 0 && (
-              <span className="flex flex-wrap gap-x-2">
-                <span className="text-content-tertiary">{t('失败：')}</span>
-                <TodoRefs refs={y.failed} />
-              </span>
-            )}
-          </div>
-        </div>
-        <div className={SECTION_CLS} data-testid="chief-report-needs-you">
-          <span className={LABEL_CLS}>{t('等你的事')}</span>
-          <span>
-            {report.needsYou.count === 0 ? (
-              t('没有等你的事')
-            ) : (
-              <Link to="/app" className={REF_CLS}>
-                {t('{n} 件等你，去处理', { n: report.needsYou.count })}
-              </Link>
-            )}
-          </span>
-        </div>
-        {report.status === 'posted' && report.retroRan && (
-          <div className={SECTION_CLS} data-testid="chief-report-retro">
-            <span className={LABEL_CLS}>{t('复盘')}</span>
-            {report.retro.length === 0 ? (
-              <span>{t('昨天的对话里没找到值得改的地方')}</span>
-            ) : (
-              <ul className="m-0 flex list-none flex-col gap-4 p-0">
-                {report.retro.map((proposal) => (
-                  <ProposalItem key={proposal.id} proposal={proposal} />
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-        {report.status === 'posted' && intake.length > 0 && (
-          <div className={SECTION_CLS} data-testid="chief-report-intake">
-            <span className={LABEL_CLS}>{t('外部动态')}</span>
-            <ul className="m-0 flex list-none flex-col gap-4 p-0">
-              {intake.map((item) => (
-                <IntakeRow key={item.id} item={item} />
-              ))}
-            </ul>
-          </div>
-        )}
-        {(report.truncated.length > 0 || report.retro.length > 0) && (
-          <p className="m-0 text-meta text-content-tertiary">
-            {report.truncated.length > 0 &&
-              t('这些来源太长，只读了后面的部分：{sources}。', {
-                sources: report.truncated.join('、'),
-              })}
-            {report.retro.length > 0 &&
-              t('复盘建议只是草稿：点「建成线程」才会建线程，建好后也要你自己开始。')}
-          </p>
-        )}
-      </section>
-    </MessageScrollerItem>
+    <>
+      <p className="m-0" data-testid="chief-report-sentence">
+        {chiefReportSentence(report, t)}
+      </p>
+      <ResearchReportCard
+        inline
+        className="mt-1"
+        report={{
+          title: report.day,
+          content: chiefReportMarkdown(report, t),
+          createdAt: report.madeAt,
+          final: null,
+          label: { card: t('日报'), doc: t('日报') },
+        }}
+      />
+    </>
   );
 }

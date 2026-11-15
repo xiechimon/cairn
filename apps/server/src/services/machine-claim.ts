@@ -90,6 +90,7 @@ import { mergedCatalogModels } from './model-liveness.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import {
   chiefRemoteTools,
+  coordinatorMemoryOwner,
   coordinatorProfile,
   memoryOpsAreTeamScoped,
   memoryOwnerOf,
@@ -266,7 +267,7 @@ function chiefClaimPayload(
     deps,
     stepRow,
     threadRow,
-    agentRow.id,
+    coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
   );
   const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
   const locked = digest || mailTurn;

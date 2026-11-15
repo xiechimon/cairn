@@ -1,6 +1,6 @@
 import { and, eq, isNull, lt, or } from 'drizzle-orm';
-import type { Db } from '../db/client.js';
 import { coordinatorLease } from '../db/schema.js';
+import type { SyncDb } from '../db/types.js';
 
 export const LEASE_STALE_MS = 45_000;
 
@@ -17,7 +17,7 @@ export class LeaseHeldError extends Error {
 }
 
 export function acquireLease(
-  db: Db,
+  db: SyncDb,
   storeKey: string,
   owner: string,
   options: { now?: () => number; staleMs?: number } = {},
@@ -37,15 +37,17 @@ export function acquireLease(
         lt(coordinatorLease.heartbeatAt, at - staleMs),
       ),
     })
-    .run();
-  if (taken.changes === 0) throw new LeaseHeldError(storeKey);
+    .returning({ storeKey: coordinatorLease.storeKey })
+    .get();
+  if (taken === undefined) throw new LeaseHeldError(storeKey);
   return {
     heartbeat: () =>
       db
         .update(coordinatorLease)
         .set({ heartbeatAt: now() })
         .where(and(eq(coordinatorLease.storeKey, storeKey), eq(coordinatorLease.owner, owner)))
-        .run().changes > 0,
+        .returning({ storeKey: coordinatorLease.storeKey })
+        .get() !== undefined,
     release: () => {
       db.update(coordinatorLease)
         .set({ owner: null })

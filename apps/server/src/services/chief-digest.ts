@@ -64,7 +64,7 @@ import {
 } from './memory-consolidation.js';
 import { rememberMemoryFile } from './memory-documents.js';
 import type { VapidKeys } from './push.js';
-import { coordinatorProfile } from './routing-rules.js';
+import { coordinatorMemoryOwner, coordinatorProfile } from './routing-rules.js';
 import { serverTimezone } from './schedules.js';
 
 export const CHIEF_DIGEST_THRESHOLD_CHARS = 40_000;
@@ -282,7 +282,7 @@ export function queueDigestStep(
 ): string {
   const { db } = deps;
   const digestThreadId = chiefDigestThreadId(chiefRow.id);
-  const agentId = coordinatorProfile(db, chiefRow.teamId)?.id;
+  const agentId = coordinatorMemoryOwner(db, chiefRow.teamId);
   const prompt =
     agentId !== undefined && memoryPassDue(db, chiefRow.id, chiefRow.teamId, agentId, now)
       ? withMemoryPass(basePrompt, memoryPassSection(db, chiefRow.id, chiefRow.teamId, agentId))
@@ -613,7 +613,7 @@ export function finishChiefDigest(
       .from(chiefThread)
       .where(eq(chiefThread.id, stepRow.buildId))
       .get();
-    const agentId = owner === undefined ? undefined : coordinatorProfile(db, owner.teamId)?.id;
+    const agentId = owner === undefined ? undefined : coordinatorMemoryOwner(db, owner.teamId);
     const memory =
       parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
         ? (parsed as { memory?: unknown }).memory
@@ -631,7 +631,7 @@ export function finishChiefDigest(
     prompt.includes(MAIL_FENCE_OPEN) ||
     prompt.includes(THREAD_FENCE_OPEN)
       ? null
-      : (coordinatorProfile(db, chiefRow.teamId)?.id ?? null);
+      : (coordinatorMemoryOwner(db, chiefRow.teamId) ?? null);
   const content: ChiefDigestContent = {
     kind: CHIEF_DIGEST_KIND,
     reason: meta[4] === 'daily' ? 'daily' : 'threshold',

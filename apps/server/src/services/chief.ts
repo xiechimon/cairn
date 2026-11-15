@@ -74,7 +74,11 @@ import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
 import { deadEndBlocker } from './blockers.js';
-import { answerQuestion, askQuestionContentOf } from './chief-questions.js';
+import {
+  APPROVAL_CARD_ID_PREFIX,
+  answerQuestion,
+  askQuestionContentOf,
+} from './chief-questions.js';
 import {
   addTurnOwnerMessage,
   CHIEF_ABANDONED_STEP_MS,
@@ -104,7 +108,12 @@ import {
   reportRefCurrent,
   reportRefOfPrompt,
 } from './report-turn.js';
-import { chiefRemoteTools, coordinatorProfile, type RouteProfile } from './routing-rules.js';
+import {
+  chiefRemoteTools,
+  coordinatorMemoryOwner,
+  coordinatorProfile,
+  type RouteProfile,
+} from './routing-rules.js';
 import { type LocalSkill, scanLocalSkills } from './skills.js';
 import { stepQueueProjector } from './step-queue.js';
 import { getTodo } from './todos.js';
@@ -253,7 +262,7 @@ export function getChiefEnvelope(
   threadId?: string,
 ): ChiefGetResponse {
   const row = ensureChief(deps, teamId);
-  const agentRow = coordinatorProfile(deps.db, teamId, coordinatorRunsOnPi());
+  const agentRow = coordinatorProfile(deps.db, teamId);
   return {
     chief: toChiefRecord(row, agentRow),
     agentActor: agentRow ? coordinatorRecordOf(agentRow) : null,
@@ -397,7 +406,7 @@ export function openProjectChannel(
     existing !== undefined
       ? { row: existing, created: false }
       : insertCoordinatorThread(deps, chiefRow, picked);
-  if (created && coordinatorProfile(deps.db, teamId, coordinatorRunsOnPi())?.modelId) {
+  if (created && coordinatorProfile(deps.db, teamId)?.modelId) {
     enqueueChiefStep(deps, row.id, {
       prompt: promptWithPickedProject(
         picked,
@@ -516,7 +525,7 @@ export function getChiefThread(deps: { db: Db }, threadId: string): ThreadRow | 
 }
 
 function requireCoordinatorRule(deps: ChiefDeps, teamId: string): RouteProfile {
-  const profile = coordinatorProfile(deps.db, teamId, coordinatorRunsOnPi());
+  const profile = coordinatorProfile(deps.db, teamId);
   if (profile === null) {
     throw new HttpError(
       409,
@@ -546,8 +555,10 @@ export function chiefBinding(
   teamId: string,
 ): { agentId: string | null; canOrchestrate: boolean } {
   const profile = coordinatorProfile(deps.db, teamId);
-  if (profile === null) return { agentId: null, canOrchestrate: false };
-  return { agentId: profile.id, canOrchestrate: !!profile.modelId };
+  return {
+    agentId: coordinatorMemoryOwner(deps.db, teamId) ?? null,
+    canOrchestrate: !!profile?.modelId,
+  };
 }
 
 function pickedProjectOf(
@@ -1574,11 +1585,12 @@ export function buildChiefSystemPrompt(
 ): ChiefSystemPrompt {
   const chiefRow = ensureChief(deps, teamId);
   const coordinator = coordinatorProfile(deps.db, teamId);
+  const memoryOwner = coordinatorMemoryOwner(deps.db, teamId);
   const projects = deps.db.select().from(project).where(eq(project.teamId, teamId)).all();
   const skills = scanLocalSkills(deps.skillsDir);
-  const injected = coordinator
+  const injected = memoryOwner
     ? injectMemoryDocuments(deps.db, {
-        agentId: coordinator.id,
+        agentId: memoryOwner,
         teamId,
         threadId: threadId ?? undefined,
         projectId: null,
@@ -1627,6 +1639,7 @@ export function buildChiefSystemPrompt(
     '- 跟进：threads 列出你开的 thread 和各自一行汇报，needs_you 列出谁在等人。',
     '- 转话：用户对某条 thread 的补充和纠正，用 message_thread 原话转给它；对它待答问题的回答，用 answer_question {todoId, requestId, answer} 原话转达（requestId 来自 needs_you 或问题唤醒），不改写，不替用户做决定。要它停下用 stop_thread。',
     '- 上报：thread 的问题只有你能替用户答时才自己答，否则用 ask_user 或 notify_user 带给用户，用户答了再用 answer_question 转回去。',
+    '- 日报：日报是一份文档，里面的建议按编号排。用户说某天日报「第 N 条建线程 / 不用了」时，用 decide_report_suggestion 照做，没说哪天就是最新那份；用户没明确说，就不动它们。',
     '',
     '### 决策边界',
     ...COORDINATOR_DECISION_RULES.map((rule) => `- ${rule}`),
@@ -1653,6 +1666,7 @@ export function buildChiefSystemPrompt(
     '- 用户要你直接操作电脑（打开网页、点击、填写）时，你自己用 browser_navigate、browser_snapshot、browser_act 做。',
     '- 一步没成功不要马上交回用户：工具说动作没执行、ref 不在最新快照里、元素被遮挡，或者页面不是目标页时，先重新 browser_snapshot，再换一个元素、先滚动，或者用链接里的网址直接 browser_navigate。同一回合最多重试 3 次，仍不行再汇报试了什么、卡在哪、现在停在哪个页面。',
     '- 遇到登录、验证码、滑块或短信码，用 request_takeover 请用户接管；交还后先 browser_snapshot 再继续。',
+    '- 网站拦下了自动操作（目标页打开后被关掉、变成空白页或换成别的网站，或者页面明说禁止自动访问）时，不要再重试，也不要设法绕过拦截：直接用 request_takeover 请用户自己操作，并说明是哪个网站拦下的。',
     '- 发消息或邮件、付款、下单、改账号设置、删除这类不可撤销或对外的动作，执行前先用 ask_user 问用户。',
     '',
     '### 事件回合',
@@ -1866,6 +1880,9 @@ type ChiefMessageWrite = {
 };
 
 function storedChiefMessage(db: Db, row: ChiefMessageWrite) {
+  if (row.id.startsWith(APPROVAL_CARD_ID_PREFIX)) {
+    throw new HttpError(403, 'approval cards are written only by the server');
+  }
   return {
     ...row,
     content: scrubMailFenceContent(row.content),

@@ -75,7 +75,7 @@
                   "@modelcontextprotocol/sdk/*",
                   "@modelcontextprotocol/sdk/*/*"
                 ],
-                "message": "Seam discipline: the MCP SDK is consumed only by services/mcp-face.ts on the server and src/backend/ on the daemon."
+                "message": "Seam discipline: the MCP SDK is consumed only by services/mcp-face.ts and services/mcp-servers.ts on the server and src/backend/ on the daemon."
               },
               {
                 "group": [
@@ -226,6 +226,7 @@
         "!apps/server/src/db/client.ts",
         "!apps/server/src/legacy/**",
         "!apps/server/src/services/mcp-face.ts",
+        "!apps/server/src/services/mcp-servers.ts",
         "!apps/server/src/services/schedules.ts"
       ],
       "linter": {
@@ -245,7 +246,7 @@
                       "@modelcontextprotocol/sdk/*",
                       "@modelcontextprotocol/sdk/*/*"
                     ],
-                    "message": "Seam discipline: the MCP SDK is consumed only by services/mcp-face.ts on the server and src/backend/ on the daemon."
+                    "message": "Seam discipline: the MCP SDK is consumed only by services/mcp-face.ts and services/mcp-servers.ts on the server and src/backend/ on the daemon."
                   },
                   {
                     "group": [
@@ -305,6 +306,7 @@
         "apps/server/src/db/client.ts",
         "apps/server/src/legacy/**",
         "apps/server/src/services/mcp-face.ts",
+        "apps/server/src/services/mcp-servers.ts",
         "apps/server/src/services/schedules.ts"
       ],
       "linter": {

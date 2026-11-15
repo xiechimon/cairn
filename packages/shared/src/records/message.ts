@@ -202,6 +202,22 @@ export const chiefReportContentSchema = z.object({
 });
 export type ChiefReportContent = z.infer<typeof chiefReportContentSchema>;
 
+export type ChiefReportSuggestion =
+  | { n: number; kind: 'retro'; item: RetroProposal }
+  | { n: number; kind: 'intake'; item: IntakeItem };
+
+export function chiefReportSuggestions(
+  report: Pick<ChiefReportContent, 'retro' | 'intake'>,
+): ChiefReportSuggestion[] {
+  const retro = report.retro.map((item, i) => ({ n: i + 1, kind: 'retro' as const, item }));
+  const intake = (report.intake ?? []).map((item, i) => ({
+    n: retro.length + i + 1,
+    kind: 'intake' as const,
+    item,
+  }));
+  return [...retro, ...intake];
+}
+
 export const CHIEF_TURN_STOPPED_KIND = 'chief_turn_stopped';
 export const chiefTurnStoppedContentSchema = z.object({
   kind: z.literal(CHIEF_TURN_STOPPED_KIND),
