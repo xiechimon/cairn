@@ -10,6 +10,7 @@ const clockParts = (ts: number, tz: string) =>
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
+      weekday: 'short',
       hourCycle: 'h23',
     })
       .formatToParts(ts)
@@ -36,19 +37,20 @@ const monthDay = (clock: Record<string, string>, t: TFunc) =>
     monthShort: EN_MONTHS[Number(clock.month) - 1] ?? '',
   });
 
-const RUN_WORD: Record<ScheduleRecord['kind'], string> = {
-  hourly: '每小时运行',
-  daily: '每天运行',
-  weekly: '每周运行',
-  once: '运行一次',
-  cron: 'Cron',
-};
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const WEEKDAY_KEYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
 export function scheduleCadence(schedule: ScheduleRecord, t: TFunc): string {
   const anchor = clockParts(schedule.at, schedule.tz);
-  const start =
-    schedule.kind === 'cron' ? '' : `${monthDay(anchor, t)} ${anchor.hour}:${anchor.minute} `;
-  return `${start}${t(RUN_WORD[schedule.kind])}`;
+  const time = `${anchor.hour}:${anchor.minute}`;
+  if (schedule.kind === 'daily') return t('每天 {time}', { time });
+  if (schedule.kind === 'weekly') {
+    const day = WEEKDAY_KEYS[WEEKDAYS.indexOf(anchor.weekday ?? '')];
+    return t('每{weekday} {time}', { weekday: day === undefined ? '' : t(day), time });
+  }
+  if (schedule.kind === 'hourly') return t('每小时运行');
+  if (schedule.kind === 'once') return t('运行一次');
+  return 'Cron';
 }
 
 export function scheduleNext(schedule: ScheduleRecord, now: number, t: TFunc): string {

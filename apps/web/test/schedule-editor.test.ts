@@ -2,6 +2,7 @@ import type { ScheduleRecord } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { mapSchedules } from '../src/api/mappers.js';
 import type { ScheduleRecord as DisplaySchedule } from '../src/fixtures/records.js';
+import { EN } from '../src/i18n/en.js';
 import { type TFunc, translate } from '../src/i18n/translate.js';
 import { scheduleSummary } from '../src/pages/schedule-summary.js';
 import { scheduleBody, scheduleDraft, scheduleEnded, schedulePauseReason, scheduleTime, scheduleViewState } from '../src/schedules/schedule-model.js';
@@ -20,14 +21,22 @@ describe('schedule editor wire values', () => {
   test('schedule summaries use the saved timezone for the same raw anchor and next run', () => {
     const schedule: DisplaySchedule = { ...record, at: Date.UTC(2026, 10, 5, 14, 15), nextRunAt: Date.UTC(2026, 10, 5, 14, 15) };
     const now = Date.UTC(2026, 10, 5, 13);
-    expect(scheduleSummary({ ...schedule, tz: 'America/New_York' }, now, t)).toBe('11月5日 09:15 每天运行 · 下次 今天 09:15');
-    expect(scheduleSummary({ ...schedule, tz: 'Asia/Shanghai' }, now, t)).toBe('11月5日 22:15 每天运行 · 下次 今天 22:15');
+    expect(scheduleSummary({ ...schedule, tz: 'America/New_York' }, now, t)).toBe('每天 09:15 · 下次 今天 09:15');
+    expect(scheduleSummary({ ...schedule, tz: 'Asia/Shanghai' }, now, t)).toBe('每天 22:15 · 下次 今天 22:15');
+  });
+  test('weekly summaries name the weekday in the saved timezone', () => {
+    const at = Date.UTC(2026, 10, 5, 20, 15);
+    const schedule: DisplaySchedule = { ...record, kind: 'weekly', at, nextRunAt: at };
+    expect(scheduleSummary({ ...schedule, tz: 'Asia/Shanghai' }, NOW, t)).toBe('每周五 04:15 · 下次 11月6日 04:15');
+    expect(scheduleSummary({ ...schedule, tz: 'America/New_York' }, NOW, t)).toBe('每周四 15:15 · 下次 11月5日 15:15');
+    const en: TFunc = (source, vars) => translate('en', EN, source, vars);
+    expect(scheduleSummary({ ...schedule, tz: 'Asia/Shanghai' }, NOW, en)).toBe('Fri weekly at 04:15 · Next Nov 6 04:15');
   });
   test('Today follows the saved timezone across midnight rather than the fixed UTC+8 date', () => {
     const nextRunAt = Date.UTC(2026, 10, 5, 6, 15);
     const schedule: DisplaySchedule = { ...record, at: nextRunAt, nextRunAt, tz: 'America/New_York' };
-    expect(scheduleSummary(schedule, Date.UTC(2026, 10, 5, 4, 30), t)).toBe('11月5日 01:15 每天运行 · 下次 11月5日 01:15');
-    expect(scheduleSummary(schedule, Date.UTC(2026, 10, 5, 5, 30), t)).toBe('11月5日 01:15 每天运行 · 下次 今天 01:15');
+    expect(scheduleSummary(schedule, Date.UTC(2026, 10, 5, 4, 30), t)).toBe('每天 01:15 · 下次 11月5日 01:15');
+    expect(scheduleSummary(schedule, Date.UTC(2026, 10, 5, 5, 30), t)).toBe('每天 01:15 · 下次 今天 01:15');
   });
   test('actual mapped missing-next rows never show an epoch date in shared summaries', () => {
     const [schedule] = mapSchedules([{ ...record, kind: 'once', nextRunAt: null }]);
