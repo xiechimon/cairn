@@ -2,17 +2,25 @@ import { createHash } from 'node:crypto';
 import {
   type ActionEntry,
   type ActionSurface,
+  type AskUserQuestion,
   projectArchiveAction,
   projectDeleteAction,
   projectUnarchiveAction,
   SLICE1_ACTIONS,
+  type TodoDeleteInput,
+  todoDeleteAction,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { actionJournal, project } from '../db/schema.js';
+import { actionJournal, project, todo } from '../db/schema.js';
 import { HttpError, notFound, parseWith } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { proposeAction, settlePendingProposal } from './action-proposals.js';
+import {
+  APPROVE_CHOICE,
+  proposeAction,
+  REFUSE_CHOICE,
+  settlePendingProposal,
+} from './action-proposals.js';
 import { deleteProject } from './projects.js';
 
 export interface ExecuteActionDeps {
@@ -33,7 +41,68 @@ export interface ExecuteActionRequest {
 
 export type ExecuteActionResult =
   | { status: 'executed'; journalId: string; output: unknown }
-  | { status: 'pending'; proposalId: string };
+  | { status: 'pending'; proposalId: string; created: boolean };
+
+const CARD_TITLE_MAX_CHARS = 80;
+const CARD_PROJECT_MAX_CHARS = 40;
+
+function cardText(raw: string, max: number): string {
+  const plain = raw
+    .normalize('NFKC')
+    .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
+    .replace(/[^\p{L}\p{M}\p{N}\s\-_.,:/@]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return plain.length > max ? `${plain.slice(0, max)}…` : plain;
+}
+
+interface BoundProposal {
+  input: unknown;
+  card?: AskUserQuestion[];
+}
+
+function bindTodoDelete(db: Db, input: TodoDeleteInput, teamId: string): BoundProposal {
+  const rows = db
+    .select({
+      id: todo.id,
+      v: todo.v,
+      seqNum: todo.seqNum,
+      title: todo.title,
+      phase: todo.phase,
+      projectName: project.name,
+    })
+    .from(todo)
+    .innerJoin(project, eq(project.id, todo.projectId))
+    .where(and(inArray(todo.id, input.todoIds), eq(todo.teamId, teamId)))
+    .all();
+  const missing = input.todoIds.find((id) => !rows.some((row) => row.id === id));
+  if (missing !== undefined) throw notFound(`todo ${missing}`);
+  const lines = rows
+    .sort((a, b) => a.seqNum - b.seqNum)
+    .map(
+      (row) =>
+        `#${row.seqNum}「${cardText(row.title, CARD_TITLE_MAX_CHARS)}」（项目 ${cardText(row.projectName, CARD_PROJECT_MAX_CHARS)}，${row.phase}）`,
+    );
+  return {
+    input: {
+      todoIds: input.todoIds,
+      versions: Object.fromEntries(rows.map((row) => [row.id, row.v])),
+    },
+    card: [
+      {
+        header: '审批',
+        question: `删除 ${rows.length} 个任务：${lines.join('；')}。它们的构建、对话和定时会一起删除，无法恢复。`,
+        options: [{ label: APPROVE_CHOICE }, { label: REFUSE_CHOICE }],
+      },
+    ],
+  };
+}
+
+function bindProposal(db: Db, entry: ActionEntry, input: unknown, teamId: string): BoundProposal {
+  if (entry.id === todoDeleteAction.id) return bindTodoDelete(db, input as TodoDeleteInput, teamId);
+  requireOwnedProject(db, entry.targetOf(input), teamId);
+  return { input };
+}
 
 type JournalTx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
@@ -85,28 +154,31 @@ export function executeAction(
   deps: ExecuteActionDeps,
   request: ExecuteActionRequest,
 ): ExecuteActionResult {
-  const registry = request.registry ?? SLICE1_ACTIONS;
+  const registry: readonly ActionEntry[] = request.registry ?? SLICE1_ACTIONS;
   const entry = registry.find((item) => item.id === request.id);
   if (entry === undefined) throw new HttpError(400, `unknown action ${request.id}`);
   const input = parseWith(entry.inputSchema, request.input, 'input');
-  const parsed = input as { projectId: string };
   if (entry.class === 'owner-only') throw new HttpError(403, `action ${entry.id} is owner-only`);
   if (!entry.surfaces.includes(request.surface)) {
     throw new HttpError(403, `action ${entry.id} is not on surface ${request.surface}`);
   }
-  const targetId = entry.targetOf(parsed);
+  const targetId = entry.targetOf(input);
   if (request.actor === 'coordinator' && entry.class === 'confirm-once') {
     if (!request.threadId) throw new HttpError(400, 'coordinator confirm-once requires a threadId');
-    requireOwnedProject(deps.db, targetId, request.teamId);
+    const bound = bindProposal(deps.db, entry, input, request.teamId);
     const proposed = proposeAction(deps.db, {
       teamId: request.teamId,
       actionId: entry.id,
       targetId,
-      input,
+      input: bound.input,
       threadId: request.threadId,
       scopeProjectId: request.scopeProjectId ?? null,
+      ...(bound.card === undefined ? {} : { card: bound.card }),
     });
-    return { status: 'pending', proposalId: proposed.proposalId };
+    return { status: 'pending', ...proposed };
+  }
+  if (entry.id === todoDeleteAction.id) {
+    throw new HttpError(403, `action ${entry.id} runs only through an approved proposal`);
   }
   requireOwnedProject(deps.db, targetId, request.teamId);
   const hash = inputHash(input);

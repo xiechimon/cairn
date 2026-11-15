@@ -558,7 +558,8 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'delete_todos',
-    description: 'Delete todos permanently (builds and transcripts cascade).',
+    description:
+      'Ask the owner to approve deleting todos permanently (builds and transcripts cascade). Nothing is deleted by this call: the server sends the owner an approval card and deletes only after the owner approves it there. Tell the owner you are waiting for that approval and end the turn.',
     parameters: obj({ todoIds: idArr('Todo ids to delete.') }, ['todoIds']),
   },
   {
