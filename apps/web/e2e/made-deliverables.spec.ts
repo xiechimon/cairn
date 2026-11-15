@@ -118,6 +118,7 @@ test('the dialog lists each file with a download above the report and explains s
 
   await made.getByRole('button', { name: 'Export benchmark page' }).click();
   const dialog = page.getByRole('dialog', { name: 'Export benchmark page' });
+  await expect(dialog.getByTestId('research-report-meta')).toHaveText(/^网页\s*·\s*定稿/);
   const files = dialog.getByTestId('made-files');
   await expect(files.getByTestId('made-file')).toHaveText([/^benchmark\.html网页 · 2 KB · 预览不运行脚本下载$/]);
   const download = files.getByRole('link', { name: '下载 benchmark.html' });
@@ -139,7 +140,9 @@ test('the dialog lists each file with a download above the report and explains s
   await page.keyboard.press('Escape');
 
   await made.getByRole('button', { name: 'Export review deck' }).click();
-  const deck = page.getByRole('dialog', { name: 'Export review deck' }).getByTestId('made-files');
+  const deckDialog = page.getByRole('dialog', { name: 'Export review deck' });
+  await expect(deckDialog.getByTestId('research-report-meta')).toHaveText(/^PPT\s*·\s*定稿/);
+  const deck = deckDialog.getByTestId('made-files');
   await expect(deck.getByTestId('made-file')).toHaveText([
     /^review\.pptxPPT · 3\.1 MB · 下载后打开下载$/,
     /^appendix\.html网页 · 2 KB · 预览不运行脚本下载$/,

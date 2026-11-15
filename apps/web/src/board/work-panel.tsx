@@ -65,6 +65,7 @@ function MadeReport({
     () => ({ buildId: todo.latestBuildId, title: todo.title, phase: todo.phase }),
     [todo.latestBuildId, todo.title, todo.phase],
   );
+  const { t } = useI18n();
   const { report, settled } = useBuildReport(thread);
   useEffect(() => {
     if (settled && report === null) {
@@ -73,8 +74,14 @@ function MadeReport({
     }
   }, [settled, report, onClose, onOpenThread, todo.id]);
   if (report === null) return null;
+  const kind =
+    todo.madeKind === 'slides' ? t('PPT') : todo.madeKind === 'page' ? t('网页') : undefined;
   return (
-    <ResearchReportDialog report={report} open onClose={onClose}>
+    <ResearchReportDialog
+      report={kind === undefined ? report : { ...report, label: { card: kind, doc: kind } }}
+      open
+      onClose={onClose}
+    >
       <MadeFiles deliverables={todo.deliverables} />
     </ResearchReportDialog>
   );
