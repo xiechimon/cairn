@@ -16,6 +16,7 @@ const app = await electron.launch({
   executablePath: join(resolve(appPath), 'Contents', 'MacOS', 'Cairn'),
   timeout: LAUNCH_TIMEOUT_MS,
 });
+const child = app.process();
 try {
   const window = await app.firstWindow({ timeout: LAUNCH_TIMEOUT_MS });
   await window.waitForLoadState('load');
@@ -45,7 +46,7 @@ try {
   assert.deepEqual(closed, { windows: 1, visible: false }, 'closing the window did not hide it');
   assert.equal((await fetch(origin)).status, 200, 'the server stopped when the window closed');
 
-  const exited = new Promise((done) => app.process().once('exit', done));
+  const exited = new Promise((done) => child.once('exit', done));
   await app
     .evaluate(({ app: electronApp }) => {
       electronApp.quit();
@@ -62,5 +63,5 @@ try {
     `desktop smoke passed: ${origin} signed in, no pairing gate, close hides, quit stops the server`,
   );
 } finally {
-  if (app.process().exitCode === null && app.process().signalCode === null) await app.close();
+  if (child.exitCode === null && child.signalCode === null) await app.close();
 }
