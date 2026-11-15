@@ -45,6 +45,10 @@ const RESULTS = [
     items: [{ attachmentId: 'att-scripted', kind: 'page', name: 'board.html', sizeBytes: 900 }],
     skipped: [],
   }),
+  research('large', 14, 'Large export table', {
+    items: [{ attachmentId: 'att-large', kind: 'page', name: 'table.html', sizeBytes: 300 * 1024 }],
+    skipped: [],
+  }),
   research('deck', 13, 'Export review deck', {
     items: [
       { attachmentId: 'att-deck', kind: 'slides', name: 'review.pptx', sizeBytes: DECK_BYTES },
@@ -56,6 +60,7 @@ const RESULTS = [
 
 async function openMade(page: Page) {
   const tracker: string[] = [];
+  const fetched: string[] = [];
   await page.route('https://tracker.example/**', (route) => {
     tracker.push(route.request().url());
     return route.fulfill({ status: 204 });
@@ -67,18 +72,19 @@ async function openMade(page: Page) {
     }
     const attachment = /^\/api\/attachments\/(att-[a-z]+)$/.exec(path)?.[1];
     if (attachment === undefined) return undefined;
+    fetched.push(attachment);
     const body = attachment === 'att-scripted' ? SCRIPTED_HTML : PAGE_HTML;
     return route.fulfill({ status: 200, contentType: 'text/html', body });
   });
   await page.goto('/app?pane=made');
-  return { made: page.getByRole('complementary', { name: '成果' }), tracker };
+  return { made: page.getByRole('complementary', { name: '成果' }), tracker, fetched };
 }
 
 test('Made groups pages and decks, previews a script-free page and never a scripted one', async ({
   page,
 }) => {
-  const { made, tracker } = await openMade(page);
-  await expect(made.getByTestId('made-group').locator('h3')).toHaveText(['文档1', '网页2', 'PPT1']);
+  const { made, tracker, fetched } = await openMade(page);
+  await expect(made.getByTestId('made-group').locator('h3')).toHaveText(['文档1', '网页3', 'PPT1']);
 
   const pageCard = made.getByTestId('made-card').filter({ hasText: 'Export benchmark page' });
   const thumb = pageCard.getByTestId('made-page-frame');
@@ -91,6 +97,12 @@ test('Made groups pages and decks, previews a script-free page and never a scrip
   const scriptedCard = made.getByTestId('made-card').filter({ hasText: 'Live export board' });
   await expect(scriptedCard.getByTestId('made-card-excerpt')).toHaveText('Opening line of scripted.');
   await expect(scriptedCard.getByTestId('made-page-frame')).toHaveCount(0);
+
+  const largeCard = made.getByTestId('made-card').filter({ hasText: 'Large export table' });
+  await largeCard.scrollIntoViewIfNeeded();
+  await expect(largeCard.getByTestId('made-card-excerpt')).toHaveText('Opening line of large.');
+  await expect(largeCard.getByTestId('made-page-frame')).toHaveCount(0);
+  expect(fetched).not.toContain('att-large');
 
   const deckCard = made.getByTestId('made-card').filter({ hasText: 'Export review deck' });
   await expect(deckCard.getByTestId('made-card-meta')).toHaveText(/^3\.1 MB · /);

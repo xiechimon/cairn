@@ -13,6 +13,8 @@ const PAGE_CSP =
 
 const THUMB_WIDTH = 800;
 
+export const THUMB_MAX_BYTES = 256 * 1024;
+
 const SKIP_REASON: Record<string, string> = {
   'unsupported-kind': '不是网页或 PPT',
   'outside-kind-folder': '不是网页或 PPT',
