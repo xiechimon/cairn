@@ -1684,6 +1684,14 @@ export const EN: Record<string, string> = {
   '首选 Runner': 'Preferred Runner',
   不固定: 'Any machine',
   '跟随默认 Runner': 'Follow the default Runner',
+  '当前默认：Claude Code（因为有 Runner 装了 Claude Code）':
+    'Current default: Claude Code (a Runner has Claude Code installed)',
+  '当前默认：Codex（因为有 Runner 登录了 Codex）':
+    'Current default: Codex (a Runner is signed in to Codex)',
+  '当前默认：{model} · {provider}（因为还没有 Runner 装 Claude Code，用最早添加的服务商）':
+    'Current default: {model} · {provider} (no Runner has Claude Code, so the first provider you added is used)',
+  '当前没有可用的默认：添加服务商，或在 Runner 上装 Claude Code':
+    'No default yet: add a provider, or install Claude Code on a Runner',
   '设为默认 Runner': 'Make default Runner',
   '已是默认 Runner': 'Default Runner',
   '设为默认 Runner 失败，请重试。': 'Could not change the default Runner. Try again.',

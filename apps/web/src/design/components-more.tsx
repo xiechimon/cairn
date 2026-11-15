@@ -43,18 +43,26 @@ import { Cell, Section, Specimen } from './specimen.js';
 
 const MODEL_OPTIONS: ModelOption[] = [
   {
+    runtime: 'claude-code',
     provider: 'claude-code',
     providerLabel: 'Claude Code',
     modelId: 'claude-opus-5-5',
     modelName: 'Claude Opus 5.5',
   },
   {
+    runtime: 'claude-code',
     provider: 'claude-code',
     providerLabel: 'Claude Code',
     modelId: 'claude-sonnet-5-5',
     modelName: 'Claude Sonnet 5.5',
   },
-  { provider: 'codex', providerLabel: 'Codex', modelId: 'gpt-6.1-sol', modelName: 'GPT-6.1 Sol' },
+  {
+    runtime: 'pi',
+    provider: 'openai-codex',
+    providerLabel: 'Codex',
+    modelId: 'gpt-6.1-sol',
+    modelName: 'GPT-6.1 Sol',
+  },
 ];
 
 export function StructureSection() {
@@ -140,7 +148,10 @@ export function StructureSection() {
 
 export function IdentitySection() {
   const [runtime, setRuntime] = useState<string | null>('claude-code');
-  const [model, setModel] = useState<string | null>('claude-sonnet-5-5');
+  const [model, setModel] = useState<{ provider: string; modelId: string } | null>({
+    provider: 'claude-code',
+    modelId: 'claude-sonnet-5-5',
+  });
   return (
     <Section
       id="identity"
@@ -184,8 +195,9 @@ export function IdentitySection() {
             </SettingsRow>
             <SettingsRow label="Model">
               <AgentModelSelect
-                provider={runtime}
-                modelId={model}
+                runtime={runtime}
+                provider={model?.provider ?? null}
+                modelId={model?.modelId ?? null}
                 options={MODEL_OPTIONS}
                 onPick={setModel}
                 prefix="gallery-model"

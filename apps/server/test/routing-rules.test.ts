@@ -18,6 +18,7 @@ import { coordinatorRoute } from '../src/services/coordinator-route.js';
 import { createProvider } from '../src/services/providers.js';
 import {
   coordinatorProfile,
+  listRoutingSettings,
   memoryOwnerOf,
   profileForStep,
   routeForStep,
@@ -631,6 +632,23 @@ describe('rules store provider ids, with a read-time default for Session', () =>
       provider: 'claude-code',
       modelId: 'claude-sonnet-5-5',
     });
+  });
+
+  test('routing settings report the read-time Session default and why, until a Session rule is stored', async () => {
+    const s = bare();
+    const sessionDefault = () => listRoutingSettings(s.db, s.team.id).sessionDefault;
+    piOnlyRunner(s);
+    expect(sessionDefault()).toEqual({ reason: 'none', provider: null, modelId: null });
+    addProvider(s, 'vani', { models: ['m1'] });
+    expect(sessionDefault()).toEqual({ reason: 'provider', provider: 'vani', modelId: 'm1' });
+    piOnlyRunner(s, 'ok');
+    expect(sessionDefault()).toMatchObject({ reason: 'codex-login', provider: 'claude-code' });
+    claudeRunner(s, false);
+    expect(sessionDefault()).toMatchObject({ reason: 'claude-code', provider: 'claude-code' });
+    seedRoute(s, 'session', { provider: 'vani', modelId: 'm1' });
+    expect(sessionDefault()).toBeUndefined();
+    const res = await req(s.app, 'GET', `/api/teams/${s.team.id}/routing-settings`);
+    expect(((await res.json()) as { sessionDefault?: unknown }).sessionDefault).toBeUndefined();
   });
 
   test('memory ownership stays on the stored rule, not the read-time default', () => {

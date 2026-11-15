@@ -1345,28 +1345,27 @@ export function toModelOptions(sources: ModelSource[]): ModelOption[] {
       }
     }
   }
-
   const options: ModelOption[] = [];
   const seen = new Set<string>();
-  const push = (option: ModelOption) => {
-    const ccDim = option.provider === 'claude-code' && option.machineId !== undefined;
-    const key = ccDim ? `${option.provider}/${option.machineId}/${option.modelId}` : option.modelId;
-    if (seen.has(key)) return;
-    seen.add(key);
-    const lv = livenessByModelId.get(option.modelId);
-    if (lv !== undefined && lv !== 'unknown') option.liveness = lv;
-    options.push(option);
-  };
   for (const source of sources) {
-    const providerLabel = RUNTIME_LABELS[source.runtime] ?? source.runtime;
+    const provider = source.provider ?? source.runtime;
+    const providerLabel =
+      source.providerLabel || (RUNTIME_LABELS[source.runtime] ?? source.runtime);
     for (const m of source.models) {
       if (m.id === '') continue;
-      push({
-        provider: source.runtime,
+      const ccDim = source.runtime === 'claude-code' && source.machineId !== undefined;
+      const key = ccDim ? `${provider}/${source.machineId}/${m.id}` : `${provider}/${m.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const lv = livenessByModelId.get(m.id);
+      options.push({
+        runtime: source.runtime,
+        provider,
         providerLabel,
         modelId: m.id,
         modelName: m.name,
         ...(source.machineId !== undefined ? { machineId: source.machineId } : {}),
+        ...(lv !== undefined && lv !== 'unknown' ? { liveness: lv } : {}),
       });
     }
   }
