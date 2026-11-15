@@ -12,13 +12,17 @@ import type { Db } from '../db/client.js';
 import { build, message, todo, tokenUsage } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { type BuildDeps, startBuilds } from './builds.js';
-import { modelsAreIndependent } from './merge-gate/model-identity.js';
 import {
   CITATION_CHECK_SOURCE_KIND,
   CITATION_PARKED_MARK,
   failureNeedsHuman,
 } from './needs-you.js';
-import { routeForStep } from './routing-rules.js';
+import {
+  type CitationCheckPin,
+  citationAttemptRecordId,
+  citationCheckerChoice,
+  parseCitationCheckPin,
+} from './routing-rules.js';
 import { createAutonomousTodo } from './todos.js';
 
 const TIER_MARKER_KIND = 'research-tier';
@@ -129,22 +133,15 @@ function checkerTodo(db: Db, source: SourceReport) {
     .get();
 }
 
-function independent(models: readonly string[], others: readonly string[]): boolean {
-  return (
-    models.length > 0 &&
-    others.length > 0 &&
-    models.every((model) => others.every((other) => modelsAreIndependent(model, other)))
-  );
-}
-
 interface CitationAttemptState {
   attempts: number;
   parked: boolean;
+  pin: CitationCheckPin | null;
   createdAt: number | null;
 }
 
 function citationAttemptId(source: Pick<SourceReport, 'buildId' | 'attachmentId'>): string {
-  return `research-citation-attempt-${source.buildId}:${source.attachmentId}`;
+  return citationAttemptRecordId(source.buildId, source.attachmentId);
 }
 
 function citationAttemptState(
@@ -156,17 +153,18 @@ function citationAttemptState(
     .from(message)
     .where(eq(message.id, citationAttemptId(source)))
     .get();
-  if (!row) return { attempts: 0, parked: false, createdAt: null };
+  if (!row) return { attempts: 0, parked: false, pin: null, createdAt: null };
   try {
     const value: unknown = typeof row.content === 'string' ? JSON.parse(row.content) : row.content;
     const record = typeof value === 'object' && value !== null ? value : {};
     return {
       attempts: 'attempts' in record && typeof record.attempts === 'number' ? record.attempts : 0,
       parked: 'parked' in record && record.parked === true,
+      pin: 'pin' in record ? parseCitationCheckPin(record.pin) : null,
       createdAt: row.createdAt,
     };
   } catch {
-    return { attempts: 0, parked: false, createdAt: row.createdAt };
+    return { attempts: 0, parked: false, pin: null, createdAt: row.createdAt };
   }
 }
 
@@ -175,7 +173,7 @@ function recordCitationAttempt(
   source: Pick<SourceReport, 'buildId' | 'attachmentId'>,
   kind: 'research-citation-requested' | 'research-citation-blocked' | 'research-citation-parked',
   reason: string,
-  patch: { attempts?: number; parked?: boolean; touch?: boolean } = {},
+  patch: { attempts?: number; parked?: boolean; pin?: CitationCheckPin; touch?: boolean } = {},
 ): void {
   const state = citationAttemptState(db, source);
   const content = JSON.stringify({
@@ -183,6 +181,7 @@ function recordCitationAttempt(
     reason,
     attempts: patch.attempts ?? state.attempts,
     parked: patch.parked ?? state.parked,
+    pin: patch.pin ?? state.pin,
   });
   const createdAt = patch.touch === false ? (state.createdAt ?? 0) : nowMs();
   db.insert(message)
@@ -265,24 +264,9 @@ export function openCitationCheck(
   if (source.models.length === 0 || citedUrls(source.content).size === 0) {
     return blocked(deps, source, 'Source report needs observed model usage and cited URLs.');
   }
-  const route = routeForStep(
-    deps.db,
-    { teamId: source.teamId, sourceKind: CITATION_CHECK_SOURCE_KIND },
-    'build',
-  );
-  if (route === null) {
-    return blocked(
-      deps,
-      source,
-      'No citation_check or session routing rule is available for the citation checker.',
-    );
-  }
-  if (!independent(source.models, [route.modelId])) {
-    return blocked(
-      deps,
-      source,
-      `The ${route.use} route cannot run an independent citation checker.`,
-    );
+  const pin = citationCheckerChoice(deps.db, source.teamId, state.pin);
+  if (pin === null) {
+    return blocked(deps, source, 'No runnable model is available for the citation checker.');
   }
   const spec = [
     '# Citation check',
@@ -295,6 +279,13 @@ export function openCitationCheck(
     RESEARCH_DATA_NOTE,
     quoteIssueLines(source.content),
   ].join('\n');
+  recordCitationAttempt(
+    deps.db,
+    source,
+    'research-citation-requested',
+    'Starting an independent citation check.',
+    { pin, touch: false },
+  );
   const row =
     existing ??
     createAutonomousTodo(deps, {
@@ -334,7 +325,7 @@ export function checkedResearchReport(db: Db, buildId: string): CheckedResearchR
     !audit ||
     audit.teamId !== source.teamId ||
     audit.projectId !== source.projectId ||
-    !independent(source.models, audit.models)
+    audit.models.length === 0
   )
     return null;
   const blocks = [...audit.content.matchAll(/```json\s*\n([\s\S]*?)\n```/g)];
