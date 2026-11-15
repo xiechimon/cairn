@@ -119,7 +119,6 @@ describe('Coordinator rule that selects Claude Code', () => {
   test('the server never takes the turn; a rule without a provider row still refuses', () => {
     const { s } = world();
     expect(coordinatorRouteVerdict(s.db, s.team.id)).toBeNull();
-    s.db.delete(chiefThreadTable).run();
     const other = world('ghost-provider');
     expect(coordinatorRouteVerdict(other.s.db, other.s.team.id)).toMatchObject({
       refusal: 'rule-provider-missing',
@@ -186,5 +185,78 @@ describe('Coordinator rule that selects Claude Code', () => {
     expect(replay.length).toBeLessThanOrEqual(CHIEF_REPLAY_MAX_CHARS + 200);
     expect(replay).toContain('line 39 ');
     expect(replay).not.toContain('line 0 ');
+  });
+
+  test('a thread that ran on a Runner, then in the server, then on a Runner again replays the server era', async () => {
+    const { s, machineId } = world();
+    message(s, 'a1', 'user', 'runner era question', 10);
+    chiefStep(s, 'old-runner', 11, ['a1']);
+    s.db
+      .update(stepTable)
+      .set({ status: 'done', machineId, claimedAt: 11 })
+      .where(eq(stepTable.id, 'old-runner'))
+      .run();
+    message(s, 'a2', 'assistant', 'runner era answer', 12);
+    message(s, 'a3', 'user', 'server era question', 20);
+    chiefStep(s, 'server-turn', 21, ['a3']);
+    s.db
+      .update(stepTable)
+      .set({ status: 'done', claimedAt: 21 })
+      .where(eq(stepTable.id, 'server-turn'))
+      .run();
+    message(s, 'a4', 'assistant', 'server era answer', 22);
+    message(s, 'a5', 'user', 'back on claude', 30);
+    chiefStep(s, 'new-runner', 31, ['a5']);
+    const claimed = await claimAs(s, machineId);
+    expect(claimed?.step.id).toBe('new-runner');
+    const replay = replayOf(claimed?.chief?.systemPrompt);
+    expect(replay).toContain('server era answer');
+    expect(replay).toContain('runner era answer');
+    expect(replay).not.toContain('back on claude');
+  });
+
+  test('a mail turn never carries the replay', async () => {
+    const { s, machineId } = world();
+    s.db
+      .update(machineTable)
+      .set({ latestCliVersion: '99.0.0' })
+      .where(eq(machineTable.id, machineId))
+      .run();
+    message(s, 'm1', 'user', 'earlier talk', 10);
+    s.db
+      .insert(stepTable)
+      .values({
+        id: 'mail1',
+        buildId: 't1',
+        kind: 'chief',
+        status: 'pending',
+        createdAt: 20,
+        prompt: '[wake:wake] provenance=mail:abc\nnew mail',
+        ownerMessageIds: [],
+      })
+      .run();
+    const claimed = await claimAs(s, machineId);
+    expect(claimed?.step.id).toBe('mail1');
+    expect(replayOf(claimed?.chief?.systemPrompt)).toBeNull();
+  });
+
+  test('tool-heavy threads still replay the conversation behind the tool calls', async () => {
+    const { s, machineId } = world();
+    message(s, 'h1', 'user', 'a question from long ago', 5);
+    message(s, 'h2', 'assistant', 'an answer from long ago', 6);
+    for (let i = 0; i < 120; i++) {
+      message(
+        s,
+        `tc${i}`,
+        'assistant',
+        { kind: 'toolcall', call: { name: 'projects', arguments: {} } },
+        10 + i,
+      );
+    }
+    message(s, 'cur', 'user', 'now', 200);
+    chiefStep(s, 's1', 201, ['cur']);
+    const claimed = await claimAs(s, machineId);
+    const replay = replayOf(claimed?.chief?.systemPrompt) ?? '';
+    expect(replay).toContain('an answer from long ago');
   });
 });
