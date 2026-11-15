@@ -191,7 +191,7 @@ export function ChiefReportMessage({ report }: { report: ChiefReportContent }) {
           content: chiefReportMarkdown(report, t),
           createdAt: report.madeAt,
           final: null,
-          label: { card: t('日报'), doc: t('日报') },
+          label: t('日报'),
         }}
       />
     </>
