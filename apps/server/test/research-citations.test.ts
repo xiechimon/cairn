@@ -525,6 +525,14 @@ describe('research citation handoff', () => {
     },
   );
 
+  test('an audit with no recorded checker usage never ran and is not accepted', async () => {
+    const { s, opened } = await world();
+    const checker = openCitationCheck(s.svc, opened.buildId)!;
+    land(s, checker.buildId, receipt(), 'gpt-6.1-sol');
+    s.db.delete(tokenUsage).where(eq(tokenUsage.buildId, checker.buildId)).run();
+    expect(checkedResearchReport(s.db, opened.buildId)).toBeNull();
+  });
+
   test('an unknown source model cannot pass by declaring an independent checker', async () => {
     const { s, opened } = await world();
     s.db.delete(tokenUsage).where(eq(tokenUsage.buildId, opened.buildId)).run();

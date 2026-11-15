@@ -260,7 +260,6 @@ describe('the router agrees with what dispatch can execute', () => {
   test('citation checkers keep their rule instead of being routed', async () => {
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: true });
-    seedRoute(w.s, 'citation_check', { provider: 'claude-code', modelId: 'claude-sonnet-5-5' });
     const todoRow = await buildTodo(w, `difficulty:hard ${'migrate the queue '.repeat(10)}`);
     w.s.db
       .update(todoTable)

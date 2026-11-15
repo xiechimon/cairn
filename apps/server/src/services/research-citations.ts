@@ -321,7 +321,13 @@ export function checkedResearchReport(db: Db, buildId: string): CheckedResearchR
   const checker = checkerTodo(db, source);
   if (!checker?.latestBuildId || checker.archivedAt !== null) return null;
   const audit = sourceReport(db, checker.latestBuildId);
-  if (!audit || audit.teamId !== source.teamId || audit.projectId !== source.projectId) return null;
+  if (
+    !audit ||
+    audit.teamId !== source.teamId ||
+    audit.projectId !== source.projectId ||
+    audit.models.length === 0
+  )
+    return null;
   const blocks = [...audit.content.matchAll(/```json\s*\n([\s\S]*?)\n```/g)];
   const raw = blocks[0]?.[1];
   if (blocks.length !== 1 || raw === undefined) return null;

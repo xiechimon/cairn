@@ -462,9 +462,9 @@ function storedRouteForStep(
   if (!isSessionStepKind(kind) && kind !== 'merge') return null;
   if (todoRow.sourceKind === 'research-citation-check') {
     const pin = citationCheckPin(db, todoRow.sourceRef);
-    return pin === null
-      ? ruleRow(db, todoRow.teamId, 'citation_check')
-      : pinnedCitationRule(todoRow.teamId, pin);
+    if (pin !== null) return pinnedCitationRule(todoRow.teamId, pin);
+    const checker = ruleRow(db, todoRow.teamId, 'citation_check');
+    if (checker !== null) return checker;
   }
   return ruleRow(db, todoRow.teamId, 'session');
 }
@@ -475,12 +475,7 @@ export function routeForStep(
   kind: StepKind,
 ): RoutingRuleRow | null {
   const stored = storedRouteForStep(db, todoRow, kind);
-  if (
-    stored !== null ||
-    kind === 'review' ||
-    todoRow.sourceKind === 'research-citation-check' ||
-    (!isSessionStepKind(kind) && kind !== 'merge')
-  ) {
+  if (stored !== null || kind === 'review' || (!isSessionStepKind(kind) && kind !== 'merge')) {
     return stored;
   }
   return defaultSessionRule(db, todoRow.teamId);
