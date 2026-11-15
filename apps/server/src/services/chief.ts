@@ -1418,7 +1418,7 @@ function wakeFactText(
       return `任务 ${ref} 停驻在 ${todo.phase} 关口，等人处理。不要自己放行：需要用户知道或决定时，用 notify_user 或 ask_user 说明，否则直接结束本轮。`;
     }
     case 'report':
-      return `任务 ${ref} 已交付研究报告，验收归你。先用 attachment 读下面 Report 行里 attachment= 的报告，再四选一：有用户该知道的结论，就用 notify_user 发 2–5 行，第一行是结论，带 [#${todo.seqNum}](todo:${todo.id})，然后 complete_todos 收下；报告没有新信息、Report 行是 origin=none，就用 complete_todos 带 silent: true 静默收下，不发通知；需要补充或返工，用 message_thread 让它继续；不再需要，用 close_todos 关掉。这一轮只能读资料和处理这一个任务，别的工具会被拒绝。`;
+      return `任务 ${ref} 已交付研究报告，验收归你。先用 attachment 读下面 Report 行里 attachment= 的报告，再四选一：有用户该知道的结论，就用 notify_user 发 2–5 行，第一行是结论（报告卡片会自动附在通知下面，不用再写任务链接或标题），然后 complete_todos 收下；报告没有新信息、Report 行是 origin=none，就用 complete_todos 带 silent: true 静默收下，不发通知；需要补充或返工，用 message_thread 让它继续；不再需要，用 close_todos 关掉。这一轮只能读资料和处理这一个任务，别的工具会被拒绝。`;
     case 'settle':
       return `任务 ${ref} 已合并完成（done）。对话里已记下这条，不用再告诉用户；该任务的关注已自动解除。`;
     case 'failed':

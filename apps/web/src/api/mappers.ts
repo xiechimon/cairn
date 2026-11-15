@@ -49,6 +49,7 @@ import {
   REVIEW_VERDICT_KIND,
   RUNNER_OS_LABELS,
   replyQuoteText,
+  reportAckContentSchema,
   resolvedBuildPrNumber,
   reviewVerdictSchema,
   reworkNoteWithoutReason,
@@ -1633,7 +1634,23 @@ function collectChiefStream(
       const notice = chiefNoticeContentSchema.safeParse(parsed);
       if (notice.success) {
         pendingTools = [];
-        items.push({ kind: 'robot', markdown: notice.data.message, seconds: '', id: m.id });
+        items.push({
+          kind: 'robot',
+          markdown: notice.data.message,
+          seconds: '',
+          id: m.id,
+          ...(notice.data.report !== undefined ? { report: notice.data.report } : {}),
+        });
+        continue;
+      }
+      const ack = reportAckContentSchema.safeParse(parsed);
+      if (ack.success) {
+        items.push({
+          kind: 'report-ack',
+          id: m.id,
+          todoId: ack.data.todoId,
+          buildId: ack.data.buildId,
+        });
         continue;
       }
       const runnerOffline = runnerOfflineContentSchema.safeParse(parsed);

@@ -79,7 +79,7 @@ function MadeReport({
     todo.madeKind === 'slides' ? t('PPT') : todo.madeKind === 'page' ? t('网页') : undefined;
   return (
     <ResearchReportDialog
-      report={kind === undefined ? report : { ...report, label: { card: kind, doc: kind } }}
+      report={kind === undefined ? report : { ...report, label: kind }}
       open
       onClose={onClose}
     >

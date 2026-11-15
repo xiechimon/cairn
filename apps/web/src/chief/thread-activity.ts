@@ -23,9 +23,18 @@ export function subThreadRowIds(
   glances: ReadonlyMap<string, TodoGlance>,
 ): ReadonlySet<string> {
   const shown = new Set(stream.flatMap((item) => (item.kind === 'task-card' ? [item.todoId] : [])));
+  const delivered = new Set(
+    stream.flatMap((item) => {
+      if (item.kind === 'report-ack') return [`${item.todoId}\0${item.buildId}`];
+      if (item.kind === 'robot' && item.report !== undefined)
+        return [`${item.report.todoId}\0${item.report.buildId}`];
+      return [];
+    }),
+  );
   const kept = new Set<string>();
   for (const item of stream) {
     if (item.kind !== 'thread-report' && item.kind !== 'thread-message') continue;
+    if (item.kind === 'thread-report' && delivered.has(`${item.todoId}\0${item.buildId}`)) continue;
     const parentId = glances.get(item.todoId)?.parentId;
     if (shown.has(item.todoId) || (parentId !== undefined && shown.has(parentId))) continue;
     shown.add(item.todoId);
@@ -40,6 +49,7 @@ export function groupThreadEvents(
 ): GroupedRow[] {
   return rows.flatMap((row): GroupedRow[] => {
     const { item } = row;
+    if (item.kind === 'report-ack') return [];
     if (item.kind !== 'thread-report' && item.kind !== 'thread-message') return [row];
     if (!kept.has(item.id)) return [];
     return [
