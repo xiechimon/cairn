@@ -1,5 +1,5 @@
 import { ChevronRight, Clock, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useSchedules } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -9,7 +9,12 @@ import { withCreatedSchedules, withoutDeleted } from '../fixtures/deletions.js';
 import type { ScheduleRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { scheduleSummary } from '../pages/schedule-summary.js';
+import {
+  scheduleCadence,
+  scheduleNext,
+  scheduleSummary,
+  scheduleUnnamedCron,
+} from '../pages/schedule-summary.js';
 import { scheduleEnded, schedulePauseReason } from '../schedules/schedule-model.js';
 import { type ScheduleCandidate, SchedulePopover } from '../schedules/schedule-popover.js';
 import { ScheduleRowMenu } from './tasks-schedule-menu.js';
@@ -20,8 +25,7 @@ function byNextRun(a: ScheduleRecord, b: ScheduleRecord): number {
   return key(a) - key(b);
 }
 
-const ROW_ICON =
-  'flex size-7 flex-none items-center justify-center rounded-(--radius-control) bg-(--hover-1)';
+const ROW_ICON = 'flex size-7 flex-none items-center justify-center';
 
 export function TasksScheduleList({
   projectId,
@@ -36,18 +40,19 @@ export function TasksScheduleList({
   const [searchParams] = useSearchParams();
   const { live } = useLiveData();
   const query = useSchedules(live);
-  const [editing, setEditing] = useState<string | null>(null);
+  const [editing, setEditing] = useState<ScheduleRecord | null>(null);
   const [creating, setCreating] = useState(false);
   const [endedOpen, setEndedOpen] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
   const fixture = resolveScenario(searchParams);
-  const rows = withoutDeleted(
+  const listed = withoutDeleted(
     live
       ? (query.data ?? []).map((row) => ({ ...row, at: row.at ?? now }))
       : withCreatedSchedules(fixture.schedules ?? []),
-  )
-    .filter((row) => projectId === null || row.projectId === projectId)
-    .sort(byNextRun);
-  const scheduled = new Set(rows.map((row) => row.todoId));
+  ).filter((row) => projectId === null || row.projectId === projectId);
+  const scheduled = new Set(listed.map((row) => row.todoId));
+  const editingDeleted = editing !== null && !listed.some((row) => row.todoId === editing.todoId);
+  const rows = (editingDeleted ? [...listed, editing] : listed).sort(byNextRun);
   const free = candidates.filter((candidate) => !scheduled.has(candidate.id));
   const current = rows.filter((row) => !scheduleEnded(row));
   const ended = rows.filter(scheduleEnded);
@@ -55,6 +60,7 @@ export function TasksScheduleList({
     <SchedulePopover
       schedule={null}
       candidates={free}
+      anchor={empty ? undefined : listRef}
       now={now}
       open={creating}
       onOpenChange={setCreating}
@@ -79,7 +85,34 @@ export function TasksScheduleList({
     </SchedulePopover>
   );
   const row = (schedule: ScheduleRecord) => {
+    const deletedHere = editingDeleted && editing.todoId === schedule.todoId;
     const reason = schedule.enabled === false ? (schedule.pausedReason ?? null) : null;
+    const cron = scheduleUnnamedCron(schedule, t);
+    const cadence =
+      cron === null ? (
+        scheduleCadence(schedule, t)
+      ) : (
+        <>
+          {t('自定义')} <code className="font-mono">{cron}</code>
+        </>
+      );
+    const status = deletedHere ? (
+      t('已删除')
+    ) : reason !== null ? (
+      schedulePauseReason(reason, t)
+    ) : scheduleEnded(schedule) ? (
+      t(schedule.lastRunAt ? '已运行' : '停止前没有运行')
+    ) : schedule.enabled === false ? (
+      <>
+        {cadence} · {t('已暂停')}
+      </>
+    ) : cron === null ? (
+      scheduleSummary(schedule, now, t)
+    ) : (
+      <>
+        {cadence} · {scheduleNext(schedule, now, t)}
+      </>
+    );
     return (
       <div
         key={schedule.id}
@@ -88,14 +121,16 @@ export function TasksScheduleList({
       >
         <SchedulePopover
           schedule={schedule}
+          deleted={deletedHere}
+          anchor={listRef}
           now={now}
-          open={editing === schedule.id}
-          onOpenChange={(open) => setEditing(open ? schedule.id : null)}
+          open={editing?.todoId === schedule.todoId}
+          onOpenChange={(open) => setEditing(open ? schedule : null)}
           trigger={
             <Button
               variant="ghost"
               data-slot="schedule-row"
-              className="h-auto w-full items-start justify-start gap-4 rounded-(--radius-tile) py-2 pr-11 pl-2.5 text-left font-normal whitespace-normal hover:bg-transparent pointer-coarse:pr-12 dark:hover:bg-transparent"
+              className="h-auto w-full items-center justify-start gap-4 rounded-(--radius-tile) py-2 pr-11 pl-2.5 text-left font-normal whitespace-normal hover:bg-transparent pointer-coarse:pr-12 dark:hover:bg-transparent"
             />
           }
         >
@@ -110,20 +145,18 @@ export function TasksScheduleList({
               className="truncate text-meta leading-4.5 text-content-tertiary"
               title={reason ?? undefined}
             >
-              {schedule.enabled === false
-                ? reason === null
-                  ? t('已暂停')
-                  : schedulePauseReason(reason, t)
-                : scheduleSummary(schedule, now, t)}
+              {status}
             </span>
           </span>
         </SchedulePopover>
-        <div
-          data-slot="schedule-row-menu"
-          className="absolute top-3 right-2 opacity-0 group-focus-within/task:opacity-100 group-hover/task:opacity-100 has-aria-expanded:opacity-100 pointer-coarse:top-0 pointer-coarse:right-0 pointer-coarse:opacity-100"
-        >
-          <ScheduleRowMenu schedule={schedule} now={now} onEdit={() => setEditing(schedule.id)} />
-        </div>
+        {!deletedHere && (
+          <div
+            data-slot="schedule-row-menu"
+            className="absolute top-1/2 right-2 -translate-y-1/2 opacity-0 group-focus-within/task:opacity-100 group-hover/task:opacity-100 has-aria-expanded:opacity-100 pointer-coarse:right-0 pointer-coarse:opacity-100"
+          >
+            <ScheduleRowMenu schedule={schedule} now={now} onEdit={() => setEditing(schedule)} />
+          </div>
+        )}
       </div>
     );
   };
@@ -145,32 +178,38 @@ export function TasksScheduleList({
         </div>
       }
     >
-      <section
-        data-testid="tasks-section"
-        data-section="scheduled"
-        className="flex flex-col gap-0.5"
-      >
-        {current.map(row)}
-        {newSchedule(false)}
-      </section>
-      {ended.length > 0 && (
-        <section data-testid="schedules-ended" className="mt-2 flex flex-col gap-0.5">
-          <Button
-            variant="ghost"
-            aria-expanded={endedOpen}
-            onClick={() => setEndedOpen((open) => !open)}
-            className="h-8 justify-start gap-2 px-2.5 text-ui font-normal text-foreground"
-          >
-            <ChevronRight
-              aria-hidden
-              className={`size-4 text-content-tertiary transition-transform ${endedOpen ? 'rotate-90' : ''}`}
-            />
-            {t('已结束')}
-            <span className="text-content-tertiary tabular-nums">{ended.length}</span>
-          </Button>
-          {endedOpen && ended.map(row)}
+      <div ref={listRef} className="flex flex-col">
+        <section
+          data-testid="tasks-section"
+          data-section="scheduled"
+          className="flex flex-col gap-0.5"
+        >
+          {current.map(row)}
+          {newSchedule(false)}
         </section>
-      )}
+        {ended.length > 0 && (
+          <section data-testid="schedules-ended" className="mt-2 flex flex-col gap-0.5">
+            <Button
+              variant="ghost"
+              aria-expanded={endedOpen}
+              onClick={() => setEndedOpen((open) => !open)}
+              className="h-8 justify-start gap-4 rounded-(--radius-tile) px-2.5 text-ui font-normal text-foreground aria-expanded:bg-transparent pointer-coarse:h-11 dark:aria-expanded:bg-transparent"
+            >
+              <span className={ROW_ICON}>
+                <ChevronRight
+                  aria-hidden
+                  className={`size-4 text-content-tertiary transition-transform ${endedOpen ? 'rotate-90' : ''}`}
+                />
+              </span>
+              <span className="flex items-baseline gap-2">
+                {t('已结束')}
+                <span className="text-content-tertiary tabular-nums">{ended.length}</span>
+              </span>
+            </Button>
+            {endedOpen && ended.map(row)}
+          </section>
+        )}
+      </div>
     </QueryBoundary>
   );
 }

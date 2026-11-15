@@ -180,7 +180,7 @@ test('radio group: arrow keys move focus and select, roving tabindex follows', a
   await expect(weekdays).toHaveAttribute('tabindex', '0');
   await expect(daily).toHaveAttribute('tabindex', '-1');
   await page.keyboard.press('End');
-  await expect(group.getByRole('radio', { name: '自定义 cron' })).toHaveAttribute(
+  await expect(group.getByRole('radio', { name: '自定义' })).toHaveAttribute(
     'aria-checked',
     'true',
   );

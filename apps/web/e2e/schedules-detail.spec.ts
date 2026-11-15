@@ -103,7 +103,7 @@ test('a schedule row opens the editor with its runs, saved prompt and a link to 
   await expect(popover.getByTestId('schedule-popover-runs')).toContainText('Last run');
   await expect(popover.getByRole('textbox', { name: 'Saved prompt' })).toHaveValue(INITIAL.prompt);
   await expect(popover.getByRole('radio', { name: 'Daily', exact: true })).toHaveAttribute('aria-checked', 'true');
-  await expect(popover).toContainText('Asia/Shanghai');
+  await expect(popover.getByTitle('Asia/Shanghai')).toHaveText('China Standard Time');
   await scheduleShot(page, 'schedule-editor-desktop.png');
   await expect(popover).toContainText('Runs on the hour may start a few minutes late.');
   await popover.getByRole('link', { name: 'Open task', exact: true }).click();
@@ -218,7 +218,7 @@ for (const surface of ['global', 'project'] as const) {
     await setup(page, { kind: 'once', nextRunAt: null });
     await reach(page);
     await expandEnded(page);
-    await expect(scheduleRow(page)).toContainText('No upcoming runs');
+    await expect(scheduleRow(page)).toContainText('Ran');
     await expect(scheduleRow(page)).not.toContainText('Jan 1');
   });
 }
@@ -246,7 +246,7 @@ test('Weekdays and custom cron send the actual discriminated API body', async ({
   await expect(editor(page)).toBeHidden();
   expect(probe.calls.at(-1)?.body).toMatchObject({ kind: 'cron', cron: '0 9 * * 1-5', prompt: INITIAL.prompt, enabled: true });
   await scheduleRow(page).click();
-  await editor(page).getByRole('radio', { name: 'Custom cron', exact: true }).click();
+  await editor(page).getByRole('radio', { name: 'Custom', exact: true }).click();
   const expression = editor(page).getByRole('textbox', { name: 'Cron expression' });
   await expression.fill('* *');
   await expect(expression).toHaveAttribute('aria-invalid', 'true');
