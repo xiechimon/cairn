@@ -25,6 +25,7 @@ import {
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { blockedNow } from '../services/blockers.js';
+import { parseChiefTrigger } from '../services/chief.js';
 import { isChiefDigestStep } from '../services/chief-digest.js';
 import { hasEarlierLiveChiefStep } from '../services/chief-turns.js';
 import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
@@ -680,7 +681,18 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
   const wake = (threadId: string): void => {
     if (closing) return;
     dirty.add(threadId);
-    if (draining.has(threadId)) return;
+    if (draining.has(threadId)) {
+      if (
+        liveSteps(threadId).some(
+          (row) =>
+            row.status === 'pending' &&
+            !isChiefDigestStep(row) &&
+            parseChiefTrigger(row.prompt) === 'user',
+        )
+      )
+        runtime.yieldSuggestions(threadId);
+      return;
+    }
     queueMicrotask(() => startDrain(threadId));
   };
 
