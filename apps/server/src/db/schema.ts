@@ -24,6 +24,7 @@ import type {
   MailAccountStatus,
   MailEventStatus,
   MailRank,
+  McpConnectorStatus,
   MemoryCandidateStatus,
   MemoryLayer,
   ModelRef,
@@ -1435,6 +1436,35 @@ export const claudeSubscription = sqliteTable('claude_subscription', {
   expiresAt: epochMs('expiresAt'),
   createdAt: epochMs('createdAt').notNull(),
 });
+
+export const mcpConnector = sqliteTable(
+  'mcp_connector',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    slug: text('slug').notNull(),
+    label: text('label').notNull(),
+    catalogId: text('catalogId'),
+    url: text('url').notNull(),
+    headerNames: json<string[]>('headerNames').notNull(),
+    valuesCipher: text('valuesCipher'),
+    status: text('status').$type<McpConnectorStatus>().notNull(),
+    statusReason: text('statusReason'),
+    toolCount: integer('toolCount'),
+    checkedAt: epochMs('checkedAt'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('mcp_connector_team_slug_idx').on(t.teamId, t.slug),
+    check(
+      'mcp_connector_status',
+      sql`${t.status} in ('unchecked', 'connected', 'needs_auth', 'error')`,
+    ),
+  ],
+);
 
 export const clientMessage = sqliteTable(
   'client_message',
