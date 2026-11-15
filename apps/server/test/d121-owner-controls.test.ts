@@ -22,6 +22,7 @@ import { applyBuildStepAction, sweepPlanAutoConfirm } from '../src/services/buil
 import { confirmBuild } from '../src/services/chief-tools.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
+import { newMcpOAuthState } from '../src/services/mcp-servers.js';
 import { req } from './helpers.js';
 
 const cleanups: (() => void)[] = [];
@@ -54,6 +55,7 @@ function world() {
     enrollments: new Map(),
     oauthStates: new Map(),
     xaiDeviceStates: new Map(),
+    mcpOAuthState: newMcpOAuthState(),
     oauthClient: null,
     authToken: null,
     reposDir: dir,

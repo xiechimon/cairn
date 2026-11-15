@@ -29,7 +29,7 @@ test('fixture mode shows the `示例数据` chip naming the scenario, site-wide 
   const chip = page.locator('.fixture-mode-chip');
   await expect(chip).toBeVisible();
   await expect(chip).toContainText('示例数据');
-  await expect(chip).toContainText('scenario 11');
+  await expect(chip).toContainText('场景 11');
   // Bridge-level, not page-local: the board face carries the same chip.
   await page.goto('/app?scenario=01');
   await expect(page.locator('.fixture-mode-chip')).toBeVisible();

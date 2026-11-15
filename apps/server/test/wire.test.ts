@@ -60,6 +60,7 @@ const INFERRED_ROUTES = [
   'PATCH /api/teams/{id}/mcp-connectors/{cid}',
   'DELETE /api/teams/{id}/mcp-connectors/{cid}',
   'POST /api/teams/{id}/mcp-connectors/{cid}/check',
+  'POST /api/teams/{id}/mcp-connectors/oauth/start',
   'GET /api/teams/{id}/secrets',
   'POST /api/teams/{id}/secrets',
   'PATCH /api/teams/{id}/secrets/{sid}',

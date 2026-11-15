@@ -611,7 +611,7 @@ export function ruleProfileForStep(
     : { ...profile, machineId: null };
 }
 
-const ROUTED_PROVIDERS = ['claude-code', CODEX_MODEL.provider];
+export const ROUTED_PROVIDERS = ['claude-code', CODEX_MODEL.provider];
 
 export function profileForStep(
   db: Pick<Db, 'select'>,

@@ -284,7 +284,7 @@ describe('routing rule issues and the one-click fix', () => {
     const machineId = insertMachine(s);
     seedRoute(s, 'session', { provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
     expect((await settings(s)).ruleIssues).toMatchObject([
-      { use: 'session', reason: 'provider-missing', provider: 'openai-codex' },
+      { use: 'session', reason: 'runtime-disabled', runtime: 'pi' },
     ]);
     const row = s.db.select().from(machineTable).where(eq(machineTable.id, machineId)).get()!;
     s.db
@@ -293,6 +293,30 @@ describe('routing rule issues and the one-click fix', () => {
       .where(eq(machineTable.id, machineId))
       .run();
     expect((await settings(s)).ruleIssues).toEqual([]);
+  });
+
+  test('a capability-routed Session rule is not flagged while the Runner can run Claude Code or Codex', async () => {
+    const s = bootServer();
+    const machineId = insertMachine(s);
+    const row = s.db.select().from(machineTable).where(eq(machineTable.id, machineId)).get()!;
+    s.db
+      .update(machineTable)
+      .set({ capabilities: { ...row.capabilities!, codexLogin: { state: 'ok' } } })
+      .where(eq(machineTable.id, machineId))
+      .run();
+    seedRoute(s, 'session', { provider: 'claude-code', modelId: 'claude-sonnet-5-5', machineId });
+    expect((await settings(s)).ruleIssues).toEqual([]);
+    s.db
+      .update(machineTable)
+      .set({ capabilities: row.capabilities, claudeCodeReport: subscriptionClaudeReport })
+      .where(eq(machineTable.id, machineId))
+      .run();
+    seedRoute(s, 'session', { provider: 'openai-codex', modelId: 'gpt-6.1-sol', machineId });
+    expect((await settings(s)).ruleIssues).toEqual([]);
+    seedRoute(s, 'review', { provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
+    expect((await settings(s)).ruleIssues).toMatchObject([
+      { use: 'review', reason: 'provider-missing', provider: 'openai-codex' },
+    ]);
   });
 
   test('paid-claude: a keyed Claude rule is flagged until the team allows paid Claude', async () => {

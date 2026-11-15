@@ -88,7 +88,7 @@ export function CreateSecretDialog({
           <FormField
             label={t('范围')}
             htmlFor="dlg-secret-scope"
-            help={t('项目密钥只发给该项目的 thread，同名时优先于团队密钥。')}
+            help={t('项目密钥只发给该项目的对话，同名时优先于团队密钥。')}
           >
             <Select
               items={[

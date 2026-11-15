@@ -435,10 +435,6 @@ const COORDINATOR_FIXES: Partial<
     { label: '填写 API key', href: settingsHref('providers') },
     { label: '换 Coordinator 模型', href: COORDINATOR_ROUTING_HREF },
   ],
-  'coordinator-paid-claude': [
-    { label: '允许按量付费', href: settingsHref('routing') },
-    { label: '换 Coordinator 模型', href: COORDINATOR_ROUTING_HREF },
-  ],
 };
 
 export function CoordinatorFixLinks({ kind }: { kind: StepQueueBlocked['kind'] | undefined }) {
@@ -487,7 +483,7 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
           ? t('{name} 已恢复，{n} 个任务已开工。', { name, n: count('started') })
           : t('{name} 已恢复。', { name })}
         {queued > 0 && t('还有 {n} 个在排队。', { n: queued })}
-        {moved > 0 && t('{n} 个已改到其他 Runner。', { n: moved })}
+        {moved > 0 && t('{n} 个已改到其他执行机。', { n: moved })}
       </CoordinatorSaid>
     );
   }
@@ -520,7 +516,7 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
             : t('{name} 还没连上过。', { name })}
           {waiting > 0
             ? t('{n} 个任务在等它。', { n: waiting })
-            : t('等它的任务都已改到其他 Runner。')}
+            : t('等它的任务都已改到其他执行机。')}
         </span>
         {notice.lastSeenAt > 0 &&
           t('最后在线 {ago}。', { ago: relativeTime(notice.lastSeenAt, now, t) })}
@@ -533,7 +529,7 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
                 {todo.title}
               </ThreadLink>
               {todo.state === 'moved' && (
-                <span className="text-content-tertiary"> · {t('已改到其他 Runner')}</span>
+                <span className="text-content-tertiary"> · {t('已改到其他执行机')}</span>
               )}
             </li>
           ))}

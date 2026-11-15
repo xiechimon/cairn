@@ -9,7 +9,7 @@ const scope = (page: Page) => settings(page).getByRole('combobox', { name: '设�
 test('model services open with a scope sentence and keep the scope in the URL', async ({ page }) => {
   await page.goto('/app/settings/providers?scenario=providers-fleet');
   await expect(settings(page).getByTestId('settings-scope')).toContainText('设置作用于');
-  await expect(scope(page)).toContainText('所有 Runner');
+  await expect(scope(page)).toContainText('所有执行机');
   await scope(page).click();
   await page.getByRole('option', { name: /build-box/ }).first().click();
   await expect(page).toHaveURL(/scope=/);
@@ -17,24 +17,12 @@ test('model services open with a scope sentence and keep the scope in the URL', 
   await expect(scope(page).locator('svg.lucide-monitor')).toBeVisible();
   await expect(settings(page).getByTestId('settings-checked')).toContainText('已检查');
   await scope(page).click();
-  await page.getByRole('option', { name: '所有 Runner', exact: true }).click();
+  await page.getByRole('option', { name: '所有执行机', exact: true }).click();
   expect(new URL(page.url()).searchParams.has('scope')).toBe(false);
   await expect(scope(page).locator('svg.lucide-server')).toBeVisible();
 });
 
-test('routing carries the same sentence and says routing applies to all machines', async ({
-  page,
-}) => {
-  await page.goto('/app/settings/routing?scenario=providers-fleet');
-  await expect(settings(page).getByTestId('settings-scope')).toContainText('设置作用于');
-  await expect(settings(page).getByTestId('settings-scope-note')).toHaveCount(0);
-  await scope(page).click();
-  await page.getByRole('option', { name: /build-box/ }).first().click();
-  await expect(page).toHaveURL(/scope=/);
-  await expect(settings(page).getByTestId('settings-scope-note')).toContainText('对所有 Runner 生效');
-});
-
-test('English scope copy names all machines and keeps rules and policies in the nav', async ({
+test('English scope copy names all machines and keeps the model selector in the nav', async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
@@ -44,7 +32,7 @@ test('English scope copy names all machines and keeps rules and policies in the 
   await selector.click();
   await expect(page.getByRole('option', { name: 'All Runners', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('link', { name: 'Rules & policies', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Model selector', exact: true })).toBeVisible();
 });
 
 test('gallery scope preserves duplicate suffixes and offline markers with icons', async ({ page }) => {
@@ -128,7 +116,7 @@ test('scope menu wraps long machine names without clipping or overlapping adjace
   const selected = page.getByRole('option', { name: new RegExp(machineName), selected: true });
   const itemBox = await selected.boundingBox();
   const textBox = await selected.locator('> :first-child').boundingBox();
-  const previousBox = await page.getByRole('option', { name: '所有 Runner', exact: true }).boundingBox();
+  const previousBox = await page.getByRole('option', { name: '所有执行机', exact: true }).boundingBox();
   const nextBox = await page.getByRole('option', { name: 'next-machine', exact: true }).boundingBox();
   expect(itemBox).not.toBeNull();
   expect(textBox).not.toBeNull();

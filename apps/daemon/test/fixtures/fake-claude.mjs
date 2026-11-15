@@ -64,6 +64,16 @@ createInterface({ input: process.stdin }).on('line', (line) => {
   }
   if (message.type !== 'user' || handled) return;
   handled = true;
+  const content = message.message?.content;
+  const firstUserText =
+    typeof content === 'string'
+      ? content
+      : Array.isArray(content)
+        ? content.map((block) => (typeof block?.text === 'string' ? block.text : '')).join('')
+        : '';
+  if (process.env.FAKE_CLAUDE_PROMPT_LOG) {
+    appendFileSync(process.env.FAKE_CLAUDE_PROMPT_LOG, `${JSON.stringify({ firstUserText })}\n`);
+  }
   const marker = join(process.cwd(), 'fake-claude-edit.txt');
   writeFileSync(
     join(process.cwd(), 'plan.md'),

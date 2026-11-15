@@ -59,13 +59,13 @@ export function ThreadUsageDetails({
     { label: t('Token 数'), value: summary.tokens },
     { label: t('缓存命中'), value: summary.cached },
     { label: t('模型列表'), value: summary.models.join(' · ') },
-    { label: t('Runner'), value: summary.machines.join(' · ') },
+    { label: t('执行机'), value: summary.machines.join(' · ') },
   ].filter((row) => row.value !== '');
   return (
     <section
       data-testid="thread-usage"
       data-state={state}
-      aria-label={t('thread 用量')}
+      aria-label={t('对话用量')}
       className={cn('flex min-w-0 flex-col gap-2', className)}
     >
       <div className="flex min-h-6 items-center justify-between gap-2">
@@ -122,8 +122,8 @@ export function ThreadUsageRing(view: ThreadUsageView) {
                   variant="ghost"
                   size="icon"
                   type="button"
-                  aria-label={reading ?? t('thread 用量')}
-                  aria-description={reading === null ? undefined : t('thread 用量')}
+                  aria-label={reading ?? t('对话用量')}
+                  aria-description={reading === null ? undefined : t('对话用量')}
                   data-testid="thread-usage-ring"
                   data-state={state}
                   data-percent={percent ?? undefined}

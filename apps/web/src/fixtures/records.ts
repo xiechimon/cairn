@@ -324,6 +324,7 @@ export interface ResourcesContent {
   secrets?: SecretRecord[];
   accounts?: AccountsContent;
   routingSettings?: import('@cairn/shared').TeamRoutingSettings;
+  topModels?: import('@cairn/shared').TopModel[] | null;
 }
 
 export interface DocSegment {

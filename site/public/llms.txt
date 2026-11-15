@@ -1,0 +1,27 @@
+# Cairn
+
+> Cairn is an open-source, self-hosted personal assistant for people who write code. Agents run on your own machines using your model subscriptions or API keys. Each person runs their own copy; there is no hosted service.
+
+The server hosts the web app, Coordinator and database. Runners execute work on your machines. A model source is also required. Mail, calendar and job search are planned, not shipped.
+
+## English documentation
+
+- [Overview](https://cairn.xmon.me/docs/intro/): What Cairn is, its three pieces, and who it is for.
+- [Install](https://cairn.xmon.me/docs/install/): Requirements, starting the server, backups and private phone access.
+- [Connect a model](https://cairn.xmon.me/docs/models/): Subscriptions, API keys and compatible endpoints.
+- [Connect a Runner](https://cairn.xmon.me/docs/runner/): Machine enrollment and keeping a Runner online.
+- [Your first task](https://cairn.xmon.me/docs/first-task/): Create a project and follow a task to a result.
+- [FAQ](https://cairn.xmon.me/docs/faq/): Cost, privacy, limitations and troubleshooting.
+
+## Chinese documentation
+
+- [Overview in Chinese](https://cairn.xmon.me/zh-cn/docs/intro/): Product scope and architecture.
+- [Install in Chinese](https://cairn.xmon.me/zh-cn/docs/install/): Installation and private access.
+- [Models in Chinese](https://cairn.xmon.me/zh-cn/docs/models/): Model source setup.
+- [Runners in Chinese](https://cairn.xmon.me/zh-cn/docs/runner/): Runner enrollment and operation.
+- [First task in Chinese](https://cairn.xmon.me/zh-cn/docs/first-task/): Getting started with a project.
+- [FAQ in Chinese](https://cairn.xmon.me/zh-cn/docs/faq/): Common questions and troubleshooting.
+
+## Source
+
+- [GitHub repository](https://github.com/xiechimon/cairn): Source code, Apache-2.0 license and issue tracker.
