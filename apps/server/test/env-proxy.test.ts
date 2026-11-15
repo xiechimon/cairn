@@ -77,7 +77,10 @@ test('the OAuth fetch goes through HTTPS_PROXY and still refuses a non-public ho
 
 test('a malformed proxy URL is ignored without throwing or echoing its credentials', () => {
   const original = getGlobalDispatcher();
-  const env = { HTTPS_PROXY: 'http://user:secret@bad host:1', HTTP_PROXY: 'socks5://127.0.0.1:1' };
+  const env = {
+    HTTPS_PROXY: 'http://user:secret@bad host:1',
+    HTTP_PROXY: 'http://u:50%off@127.0.0.1:1',
+  };
   try {
     expect(installEnvProxy(env)).toEqual({ proxy: null, ignored: true });
     expect(getGlobalDispatcher()).toBe(original);

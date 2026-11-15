@@ -8,8 +8,17 @@ export interface EnvProxy {
   noProxy: string;
 }
 
-const isProxyUrl = (value: string) =>
-  URL.canParse(value) && ['http:', 'https:'].includes(new URL(value).protocol);
+function isProxyUrl(value: string): boolean {
+  if (!URL.canParse(value)) return false;
+  const url = new URL(value);
+  try {
+    decodeURIComponent(url.username);
+    decodeURIComponent(url.password);
+  } catch {
+    return false;
+  }
+  return url.protocol === 'http:' || url.protocol === 'https:';
+}
 
 const proxyValues = (env: NodeJS.ProcessEnv) => ({
   http: env.http_proxy || env.HTTP_PROXY || '',
