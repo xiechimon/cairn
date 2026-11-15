@@ -177,6 +177,7 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
   private readonly stopping = new Map<string, Promise<void>>();
   private readonly takeovers = new Map<string, number>();
   private readonly handoffs = new Map<string, Promise<void>>();
+  private readonly ownerBrowsers = new Set<string>();
   private readonly now: () => number;
 
   constructor(private readonly options: HostDesktopsOptions) {
@@ -284,7 +285,7 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     return () => {
       if (released) return;
       released = true;
-      if (kind === 'control') void this.handBack(scopeKey);
+      if (kind === 'control') this.handBack(scopeKey);
       this.leave(scopeKey);
     };
   }
@@ -306,27 +307,36 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
         ? this.handoff(scopeKey, () => this.openOwnerBrowser(scopeKey))
         : this.handoffs.get(scopeKey));
     } catch (error) {
-      void this.handBack(scopeKey);
+      this.handBack(scopeKey);
       throw error;
     }
   }
 
-  private handBack(scopeKey: string): Promise<void> {
+  private handBack(scopeKey: string): void {
     const count = (this.takeovers.get(scopeKey) ?? 1) - 1;
-    if (count > 0) {
-      this.takeovers.set(scopeKey, count);
-      return Promise.resolve();
-    }
-    this.takeovers.delete(scopeKey);
+    if (count > 0) this.takeovers.set(scopeKey, count);
+    else this.takeovers.delete(scopeKey);
+  }
+
+  private closeOwnerBrowser(scopeKey: string): Promise<void> {
+    if (!this.ownerBrowsers.has(scopeKey)) return this.handoffs.get(scopeKey) ?? Promise.resolve();
     return this.handoff(scopeKey, async () => {
+      if (this.takeovers.has(scopeKey) || !this.ownerBrowsers.has(scopeKey)) return;
       await this.run(['systemctl', '--user', 'stop', this.ownerUnit(scopeKey)]);
+      this.ownerBrowsers.delete(scopeKey);
     });
   }
 
   private async openOwnerBrowser(scopeKey: string): Promise<void> {
+    const unit = this.ownerUnit(scopeKey);
+    if (
+      this.ownerBrowsers.has(scopeKey) &&
+      (await this.run(['systemctl', '--user', 'is-active', unit])).code === 0
+    )
+      return;
     const desktop = await this.desktop(scopeKey);
     const session = browserSessionName(scopeKey);
-    let url = 'about:blank';
+    let url: string | undefined;
     const listed = await browserCommand(desktop.provider, ['--json', 'session', 'list'])
       .then(({ text }) => sessionList.safeParse(JSON.parse(text)))
       .catch(() => undefined);
@@ -342,7 +352,6 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     await this.profileReleased(profile);
     const browser = this.browserExecutable();
     if (browser === undefined) throw new ComputerRefusal('This machine has no Chromium installed');
-    const unit = this.ownerUnit(scopeKey);
     await this.run(['systemctl', '--user', 'stop', unit]);
     await this.run(['systemctl', '--user', 'reset-failed', unit]);
     const proxy =
@@ -369,9 +378,10 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
       '--no-default-browser-check',
       '--hide-crash-restore-bubble',
       ...(proxy ? [`--proxy-server=${proxy}`] : []),
-      url,
+      url ?? '--restore-last-session',
     ]);
     if (started.code !== 0) throw new ComputerRefusal('The owner browser could not be started');
+    this.ownerBrowsers.add(scopeKey);
   }
 
   private async profileReleased(profile: string): Promise<void> {
@@ -520,8 +530,10 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     const current = this.desktops.get(scopeKey);
     if (current?.display === display) return current;
     const desktop = { display, provider: this.provider(home, display) };
-    if (!this.takeovers.has(scopeKey))
+    if (!this.takeovers.has(scopeKey)) {
       await this.run(['systemctl', '--user', 'stop', this.ownerUnit(scopeKey)]);
+      this.ownerBrowsers.delete(scopeKey);
+    }
     await this.importSavedLogin(scopeKey, home, desktop.provider).catch(() => {});
     this.desktops.set(scopeKey, desktop);
     return desktop;
@@ -556,7 +568,8 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
         this.enter(scopeKey);
         let events: AsyncIterable<ComputerProcessEvent>;
         try {
-          await this.handoffs.get(scopeKey);
+          if (request.argv[0] === AGENT_BROWSER_BINARY) await this.closeOwnerBrowser(scopeKey);
+          else await this.handoffs.get(scopeKey);
           events = await (await provider()).execute(request);
         } catch (error) {
           leave();
@@ -629,6 +642,7 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
       () => {},
     );
     await provider.killAll();
+    this.ownerBrowsers.delete(scopeKey);
     this.desktops.delete(scopeKey);
     this.lastUsed.delete(scopeKey);
     await this.run(['systemctl', '--user', 'stop', unit]);
