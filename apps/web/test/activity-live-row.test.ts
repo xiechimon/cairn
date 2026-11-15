@@ -453,4 +453,23 @@ describe('mapChief queue projection (#1108 Q6)', () => {
       label: '排队中：等 {machine} 上线（前面 {ahead} 个）',
     });
   });
+
+  test('Q8: an unroutable Coordinator names its one cause and carries the kind its fix links need', () => {
+    expect(
+      chiefOfThread({
+        ...THREAD_Q,
+        turnQueue: {
+          position: 1,
+          waitingFor: null,
+          blocked: { kind: 'coordinator-provider-no-key', missing: ['deepseek'] },
+        },
+      }).stream?.at(-1),
+    ).toMatchObject({
+      kind: 'streaming',
+      blocked: true,
+      blockedKind: 'coordinator-provider-no-key',
+      label: 'Coordinator 规则用的服务商「{name}」没有 API key',
+      labelVars: { name: 'deepseek' },
+    });
+  });
 });

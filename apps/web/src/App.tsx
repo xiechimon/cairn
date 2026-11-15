@@ -42,15 +42,25 @@ function RouteBoundary({ children }: { children: ReactNode }) {
   return <SubtreeErrorBoundary resetKey={`${pathname}${search}`}>{children}</SubtreeErrorBoundary>;
 }
 
-const PAGE_ROUTES: RouteObject[] = [
+function withBoundary(routes: RouteObject[]): RouteObject[] {
+  return routes.map((route) => ({
+    ...route,
+    element: route.element === null ? null : <RouteBoundary>{route.element}</RouteBoundary>,
+  }));
+}
+
+const DIALOG_ROUTES = withBoundary([
+  { path: ACTIVITY_PATH, element: <ActivityPage /> },
+  { path: '/app/project/new', element: <ProjectNewPage /> },
+  { path: '/app/project/:id/settings', element: <ProjectSettingsPage /> },
+]);
+
+const PAGE_ROUTES = withBoundary([
   { path: '/app', element: <BoardPage /> },
   { path: '/app/todo/:id', element: <TodoRedirect /> },
   { path: '/app/schedules', element: <SchedulesPage /> },
-  { path: ACTIVITY_PATH, element: <ActivityPage /> },
-  { path: '/app/project/new', element: <ProjectNewPage /> },
   { path: '/app/project/:id', element: <ProjectHomeRedirect /> },
   { path: '/app/project/:id/tasks', element: <ProjectTasksPage /> },
-  { path: '/app/project/:id/settings', element: <ProjectSettingsPage /> },
   { path: '/app/team', element: <SettingsRedirect section="work-routing" /> },
   { path: `${SETTINGS_HREF}/team`, element: <SettingsRedirect section="work-routing" /> },
   { path: '/app/account', element: <SettingsRedirect section="account" /> },
@@ -66,10 +76,7 @@ const PAGE_ROUTES: RouteObject[] = [
   { path: ROUTING_SETTINGS_HREF, element: <SettingsRedirect section="work-routing" /> },
   { path: `${SETTINGS_HREF}/:section?`, element: null },
   { path: '*', element: <Navigate to="/app" replace /> },
-].map((route) => ({
-  ...route,
-  element: route.element === null ? null : <RouteBoundary>{route.element}</RouteBoundary>,
-}));
+]);
 
 export const router = createBrowserRouter([
   {
@@ -79,7 +86,7 @@ export const router = createBrowserRouter([
         element: <PwaBridge />,
         children: [
           {
-            element: <ChiefRoot routes={PAGE_ROUTES} />,
+            element: <ChiefRoot routes={PAGE_ROUTES} dialogRoutes={DIALOG_ROUTES} />,
             children: [{ path: '*', element: null }],
           },
         ],

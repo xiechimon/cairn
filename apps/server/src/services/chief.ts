@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import type {
   ActiveRun,
   AgentRecord,
@@ -1775,6 +1776,29 @@ function scrubMailFenceContent(content: unknown): unknown {
   return content;
 }
 
+export function chiefMessageStored(
+  db: Db,
+  row: {
+    id: string;
+    threadId: string;
+    role: 'system' | 'user' | 'assistant';
+    content: unknown;
+    createdAt: number;
+  },
+): boolean {
+  const stored = db.select().from(chiefMessage).where(eq(chiefMessage.id, row.id)).get();
+  return (
+    stored !== undefined &&
+    stored.threadId === row.threadId &&
+    stored.role === row.role &&
+    stored.createdAt === row.createdAt &&
+    isDeepStrictEqual(
+      stored.content,
+      JSON.parse(JSON.stringify(scrubMailFenceContent(row.content))),
+    )
+  );
+}
+
 export function upsertChiefMessage(
   db: Db,
   row: {
@@ -1851,7 +1875,8 @@ export function sweepAbandonedChiefSteps(
       : undefined;
     const stale =
       row.lastHeartbeatAt !== null && now - row.lastHeartbeatAt > CHIEF_ABANDONED_STEP_MS;
-    if (machineRow === undefined || !machineRow.online) {
+    const live = machineRow?.online === true && !deps.machineHub?.silentSinceDrop(machineRow.id);
+    if (!live) {
       if (!stale) continue;
       deps.db
         .update(step)

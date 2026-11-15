@@ -5,6 +5,7 @@ import {
   buildMergedPrGuardInstruction,
   buildMergedPrGuardNote,
   buildTaskPromptText,
+  chiefIdFormat,
   claudeLoginBlocksClaim,
   claudeRateBlock,
   confinementDispatchReady,
@@ -23,6 +24,7 @@ import {
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
   WORKER_THREAD_REPORT_TOOL,
+  workerBriefTextSchema,
 } from '@cairn/shared';
 import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm';
 import {
@@ -65,6 +67,7 @@ import {
 import { projectOfTodo, projectRepoRef } from './git.js';
 import { listProjectGithubLabelVocab } from './github-labels.js';
 import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
+import { deliverableCapability, failEarlierClaimDeliverables } from './machine-deliverables.js';
 import {
   type MachineDeps,
   profileForStep,
@@ -87,10 +90,10 @@ import { mergedCatalogModels } from './model-liveness.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import {
   chiefRemoteTools,
+  coordinatorProfile,
   memoryOpsAreTeamScoped,
   memoryOwnerOf,
   type RouteProfile,
-  routeProfile,
 } from './routing-rules.js';
 import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
@@ -151,7 +154,7 @@ function claimCandidates(deps: MachineDeps, _machineId: string, teamId: string):
 
 function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: string) {
   return deps.db
-    .select({ stepRow: step, threadRow: chiefThread, chiefRow: chief, ruleRow: routingRule })
+    .select({ stepRow: step, threadRow: chiefThread, chiefRow: chief })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
     .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
@@ -169,7 +172,10 @@ function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: str
     )
     .orderBy(asc(step.createdAt))
     .all()
-    .map((row) => ({ ...row, agentRow: routeProfile(row.ruleRow) }))
+    .flatMap((row) => {
+      const agentRow = coordinatorProfile(deps.db, teamId);
+      return agentRow === null ? [] : [{ ...row, agentRow }];
+    })
     .filter((row) => !serverTakesTurn(deps.db, teamId, row.stepRow));
 }
 
@@ -508,7 +514,8 @@ async function tryClaim(
       );
       if (brake.autonomyPaused || brake.dailyCapReached) continue;
     }
-    const claimedAt = nowMs();
+    const claimedAt = Math.max(nowMs(), (cand.stepRow.claimedAt ?? 0) + 1);
+    const deliverables = deliverableCapability(cand.stepRow.kind, cand.todoRow.output, claimedAt);
     let won = false;
     try {
       won = db.transaction((tx) => {
@@ -536,6 +543,7 @@ async function tryClaim(
           )
           .run();
         if (res.changes === 0) return false;
+        if (deliverables !== undefined) failEarlierClaimDeliverables(db, cand.stepRow.id);
         if (
           cand.stepRow.kind !== 'review' &&
           cand.todoRow.sourceKind !== 'research-citation-check'
@@ -586,6 +594,15 @@ async function tryClaim(
           ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
         };
     const projectRow = projectOfTodo(db, cand.todoRow);
+    const charterOwner = cand.todoRow.ownerId ?? cand.todoRow.createdBy;
+    const charter =
+      charterOwner !== null
+        ? db
+            .select({ charter: chief.charter })
+            .from(chief)
+            .where(eq(chief.id, chiefIdFormat(charterOwner, teamId)))
+            .get()?.charter
+        : undefined;
     const repoRef = projectRepoRef(projectRow, origin);
     const mergeTarget =
       cand.stepRow.kind === 'merge' ? parseHostedMergeInstruction(cand.stepRow.prompt) : null;
@@ -660,6 +677,7 @@ async function tryClaim(
         ...(projectRow?.instructions != null ? { instructions: projectRow.instructions } : {}),
         repo,
       },
+      ...(charter && workerBriefTextSchema.safeParse(charter).success ? { charter } : {}),
       agent: {
         id: agentRow.id,
         displayName: agentRow.displayName,
@@ -682,6 +700,7 @@ async function tryClaim(
       remoteTools: workerRemoteTools(cand.stepRow.kind, isGithubProject, namesTask),
       localTools: claimLocalTools(agentRow.tools),
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
+      ...(deliverables !== undefined ? { deliverables } : {}),
     };
   }
   return claimChiefTurn(deps, machineId, teamId, maxWorkers, Number.POSITIVE_INFINITY);

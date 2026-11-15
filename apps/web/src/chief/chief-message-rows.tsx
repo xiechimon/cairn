@@ -1,6 +1,7 @@
-import { parseReplyQuote, type RunnerOfflineContent } from '@cairn/shared';
+import { parseReplyQuote, type RunnerOfflineContent, type StepQueueBlocked } from '@cairn/shared';
 import { CircleAlert } from 'lucide-react';
 import { type CSSProperties, Fragment, memo, type ReactNode, useContext, useState } from 'react';
+import { Link } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
@@ -26,6 +27,8 @@ import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { dateTimeFormat } from '../lib/date-format.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
+import { COORDINATOR_ROUTING_HREF } from '../resources/routing-settings-page.js';
+import { settingsHref } from '../settings/settings-href.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefReportRow } from './chief-report-row.js';
 import { TaskRefRow } from './chief-task-ref-row.js';
@@ -423,6 +426,44 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
   );
 }
 
+const COORDINATOR_FIXES: Partial<
+  Record<StepQueueBlocked['kind'], { label: string; href: string }[]>
+> = {
+  'coordinator-provider-missing': [
+    { label: '添加服务商', href: settingsHref('providers') },
+    { label: '改 Coordinator 规则', href: COORDINATOR_ROUTING_HREF },
+  ],
+  'coordinator-provider-no-key': [
+    { label: '填写 API key', href: settingsHref('providers') },
+    { label: '换 Coordinator 模型', href: COORDINATOR_ROUTING_HREF },
+  ],
+  'coordinator-paid-claude': [
+    { label: '允许按量付费', href: settingsHref('routing') },
+    { label: '换 Coordinator 模型', href: COORDINATOR_ROUTING_HREF },
+  ],
+};
+
+function CoordinatorFixLinks({ kind }: { kind: StepQueueBlocked['kind'] | undefined }) {
+  const { t } = useI18n();
+  const fixes = kind === undefined ? undefined : COORDINATOR_FIXES[kind];
+  if (fixes === undefined) return null;
+  return (
+    <span className="mt-1 flex flex-wrap gap-2">
+      {fixes.map((fix) => (
+        <Button
+          key={fix.label}
+          variant="outline"
+          size="sm"
+          data-testid="queue-blocked-fix"
+          render={<Link to={fix.href} />}
+        >
+          {t(fix.label)}
+        </Button>
+      ))}
+    </span>
+  );
+}
+
 const RUNNER_CHECKS_MD = [
   '1. 电脑开着，没有休眠',
   '2. 能打开 Cairn 网页（网络和到服务器的线路正常）',
@@ -728,8 +769,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               label={item.label}
               labelVars={item.labelVars}
               labelDetail={item.labelDetail}
-              waiting={item.waiting === true}
               notice={isLiveNotice(item.label, item.labelDetail)}
+              blocked={item.blocked === true}
+              blockedActions={<CoordinatorFixLinks kind={item.blockedKind} />}
             />
           </MessageContent>
         </Message>

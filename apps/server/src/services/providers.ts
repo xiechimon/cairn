@@ -1,6 +1,5 @@
 import { hostname } from 'node:os';
 import {
-  type ModelSourceModel,
   type ModelSourcesEnvelope,
   PROVIDER_OAUTH_PRESET_IDS,
   PROVIDER_PRESET_IDS,
@@ -11,11 +10,12 @@ import {
   type SecretBox,
 } from '@cairn/shared';
 import { and, asc, eq } from 'drizzle-orm';
+import { builtinModelIds } from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
 import { machine, provider } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { mergedCatalogModels } from './model-liveness.js';
+import { getModelLiveness } from './model-liveness.js';
 
 export interface ProviderDeps {
   db: Db;
@@ -126,22 +126,26 @@ export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvel
 }
 
 export function getModelSources(deps: ProviderDeps, teamId: string): ModelSourcesEnvelope {
-  const catalog = mergedCatalogModels();
-  const catalogIds = new Set(catalog.map((m) => m.id));
-  const piModels: ModelSourceModel[] = [...catalog];
-  for (const p of listProviders(deps, teamId)) {
-    for (const m of p.models) {
-      if (m.id === '' || catalogIds.has(m.id)) continue;
-      piModels.push({
-        id: m.id,
-        name: m.name !== '' ? m.name : m.id,
-        liveness: 'unknown',
-      });
-    }
-  }
+  const piSources: ModelSourcesEnvelope['sources'] = listProviders(deps, teamId).map((p) => {
+    const stored = p.models.filter((m) => m.id !== '');
+    const models =
+      stored.length > 0
+        ? stored.map((m) => ({ id: m.id, name: m.name !== '' ? m.name : m.id }))
+        : [...builtinModelIds(p.providerId)].map((id) => ({ id, name: id }));
+    return {
+      runtime: 'pi' as const,
+      provider: p.providerId,
+      providerLabel: p.label,
+      installed: true,
+      hostname: hostname(),
+      models: models.map((m) => ({ ...m, liveness: getModelLiveness(p.providerId, m.id) })),
+    };
+  });
   return {
     sources: [
-      { runtime: 'pi', installed: true, hostname: hostname(), models: piModels },
+      ...(piSources.length > 0
+        ? piSources
+        : [{ runtime: 'pi' as const, installed: true, hostname: hostname(), models: [] }]),
       ...listClaudeCodeSources(deps.db, teamId),
     ],
   };

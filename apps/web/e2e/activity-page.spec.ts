@@ -172,6 +172,10 @@ test('the collapsed rail keeps Activity and Settings as direct links', async ({ 
   await activity.focus();
   await activity.press('Enter');
   await expect(page).toHaveURL(/\/app\/activity/);
+  await expect(page.getByRole('dialog', { name: 'Activity' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Activity' })).toHaveCount(0);
+  await expect(page).toHaveURL(/\/app\?scenario=activity$/);
   await page.getByTestId('sidebar-settings').click();
   await expect(page).toHaveURL(/\/app\/settings/);
 });
@@ -182,7 +186,8 @@ test('the phone drawer Activity link opens the page and dismisses the sidebar', 
   await page.getByTestId('narrow-menu').click();
   await page.getByTestId('sidebar-activity').click();
   await expect(page).toHaveURL(/\/app\/activity/);
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(1);
+  await expect(page.getByRole('dialog', { name: 'Activity' })).toBeVisible();
   await expect(groups(page).first()).toBeVisible();
 });
 
@@ -243,13 +248,9 @@ test('at 390px nothing overflows sideways and rows stay readable', async ({ page
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBe(0);
-  const titleLeft = await page.getByRole('heading', { name: 'Activity', exact: true }).evaluate((node) => {
-    const range = document.createRange();
-    range.selectNodeContents(node.querySelector('span') ?? node);
-    return range.getBoundingClientRect().left;
-  });
-  const menuBox = await page.locator('.app-menu-trigger').boundingBox();
-  expect(titleLeft).toBeGreaterThanOrEqual((menuBox?.x ?? 0) + (menuBox?.width ?? 0));
+  const box = await page.getByRole('dialog', { name: 'Activity' }).boundingBox();
+  expect(box?.x).toBeGreaterThanOrEqual(0);
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(390);
   await expect(rows(page).first().getByTestId('activity-row-cost')).toBeVisible();
   await evidenceShot(page, 'activity-phone.png');
 });

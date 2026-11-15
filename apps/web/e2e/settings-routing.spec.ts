@@ -12,6 +12,7 @@ test('settings work-routing shows the empty state and the create-rule editors', 
   await expect(settings.getByTestId('routing-settings-empty')).toBeVisible();
   await expect(settings.getByText('还没有路由规则')).toBeVisible();
   await expect(settings.getByTestId('routing-rule-new-coordinator')).toBeVisible();
+  await expect(settings.getByTestId('routing-rule-new-session')).toBeVisible();
   await expect(settings.getByTestId('routing-rule-new-review')).toBeVisible();
   await expect(settings.getByTestId('routing-rule-new-citation_check')).toBeVisible();
 });
@@ -42,7 +43,9 @@ test('settings work-routing rule pickers list catalog runtimes and models', asyn
   const runtimeMenu = page.locator('.routing-rule-runtime-menu');
   await expect(runtimeMenu).toBeVisible();
   await expect(runtimeMenu.locator('.routing-rule-runtime-row', { hasText: 'Claude Code' })).toBeVisible();
-  await expect(runtimeMenu.locator('.routing-rule-runtime-row', { hasText: 'pi' })).toBeVisible();
+  const builtin = runtimeMenu.locator('.routing-rule-runtime-row', { hasText: '内置 (pi)' });
+  await expect(builtin).toBeVisible();
+  await expect(builtin).toContainText('用你添加的服务商的模型');
   await page.keyboard.press('Escape');
 
   await session.locator('.routing-rule-model-select').click();

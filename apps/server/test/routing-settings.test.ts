@@ -14,7 +14,11 @@ describe('routing settings API (D60 PR8)', () => {
     const res = await req(s.app, 'GET', `/api/teams/${s.team.id}/routing-settings`);
     expect(res.status).toBe(200);
     const body = (await res.json()) as TeamRoutingSettings;
-    expect(body).toEqual({ rules: [], policies: [] });
+    expect(body).toEqual({
+      rules: [],
+      policies: [],
+      sessionDefault: { reason: 'none', provider: null, modelId: null },
+    });
   });
 
   test('PATCH creates a session rule and a later PATCH updates it', async () => {

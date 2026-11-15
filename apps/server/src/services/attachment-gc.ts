@@ -9,6 +9,8 @@ export const ATTACHMENT_PENDING_TTL_MS = 24 * 60 * 60 * 1000;
 export const ATTACHMENT_ORPHAN_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 export const TEAM_ATTACHMENTS_QUOTA_BYTES = 1024 * 1024 * 1024;
 export const ATTACHMENT_GC_INTERVAL_MS = 60 * 60 * 1000;
+const UPLOAD_PART_GRACE_MS = 30 * 60 * 1000;
+const UPLOAD_PART_RE = /\.part-[0-9a-f]{16}$/;
 
 export interface GcLogger {
   info(meta: Record<string, unknown>, msg: string): void;
@@ -131,17 +133,18 @@ export function* sweepAttachmentBatches(
   }
   const reap = (victims: typeof rows, kind: 'pending' | 'orphan') => {
     for (const v of victims) {
-      deps.db.delete(attachment).where(eq(attachment.id, v.id)).run();
-      const abs = join(deps.attachmentsDir, v.storageKey);
       try {
-        if (existsSync(abs)) unlinkSync(abs);
+        unlinkSync(join(deps.attachmentsDir, v.storageKey));
       } catch (err) {
-        deps.logger.info(
-          { attachmentId: v.id, key: v.storageKey, err: String(err) },
-          'attachment gc unlink failed (row already gone)',
-        );
-        continue;
+        if (!isMissingFile(err)) {
+          deps.logger.info(
+            { attachmentId: v.id, key: v.storageKey, err: String(err) },
+            'attachment gc unlink failed (row kept for the next sweep)',
+          );
+          continue;
+        }
       }
+      deps.db.delete(attachment).where(eq(attachment.id, v.id)).run();
       if (kind === 'pending') stats.pending += 1;
       else stats.orphan += 1;
       stats.reclaimedBytes += v.sizeBytes;
@@ -158,6 +161,37 @@ export function* sweepAttachmentBatches(
     `attachment gc: ${stats.pending} pending, ${stats.orphan} orphan, ${stats.reclaimedBytes} bytes reclaimed`,
   );
   return stats;
+}
+
+function isMissingFile(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'code' in err && err.code === 'ENOENT';
+}
+
+export function sweepUploadParts(
+  deps: { attachmentsDir: string; logger: GcLogger },
+  now: number = nowMs(),
+): number {
+  if (!existsSync(deps.attachmentsDir)) return 0;
+  const cutoff = now - UPLOAD_PART_GRACE_MS;
+  let removed = 0;
+  for (const team of readdirSync(deps.attachmentsDir, { withFileTypes: true })) {
+    if (!team.isDirectory()) continue;
+    const dir = join(deps.attachmentsDir, team.name);
+    for (const name of readdirSync(dir)) {
+      if (!UPLOAD_PART_RE.test(name)) continue;
+      const abs = join(dir, name);
+      try {
+        if (statSync(abs).mtimeMs > cutoff) continue;
+        unlinkSync(abs);
+        removed += 1;
+      } catch (err) {
+        if (!isMissingFile(err)) {
+          deps.logger.info({ path: abs, err: String(err) }, 'upload part gc unlink failed');
+        }
+      }
+    }
+  }
+  return removed;
 }
 
 export function sweepStepSessions(

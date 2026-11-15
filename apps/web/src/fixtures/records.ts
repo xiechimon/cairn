@@ -3,6 +3,7 @@ import {
   type ChiefDigestItem,
   type ChiefReportContent,
   type ClaudeLogin,
+  type ConfinementReport,
   type GithubRepoSummary,
   type MachineExecutor,
   type MachineHardware,
@@ -22,6 +23,7 @@ import {
   type SecretRecord,
   type SkillFact,
   type StepPromptOrigin,
+  type StepQueueBlocked,
   type TagRecord,
   type TaskRequest,
   type ThreadMessageContent,
@@ -292,6 +294,7 @@ export interface MachineRow {
     hardware?: MachineHardware;
     executor?: MachineExecutor;
     osPlatform?: MachineOsPlatform;
+    confinement?: ConfinementReport;
     computer?: true;
     ownComputer?: true;
     browser?: true;
@@ -393,6 +396,7 @@ export type TranscriptItem =
       labelVars?: Record<string, string | number>;
       signalAt?: number;
       skills?: SkillFact[];
+      blocked?: true;
     }
   | { kind: 'skills'; read: string[]; denied: string[] }
   | { kind: 'plan'; title: string; preview: string; seconds?: number; createdAt?: number }
@@ -401,6 +405,7 @@ export type TranscriptItem =
   | {
       kind: 'note';
       text: string;
+      vars?: Record<string, string>;
       id?: string;
     }
   | { kind: 'scheduled'; id?: string; stepId?: string }
@@ -645,7 +650,8 @@ export type ChiefStreamItem =
       labelVars?: Record<string, string | number>;
       labelDetail?: { label: string; vars: Record<string, string | number> };
       signalAt?: number;
-      waiting?: boolean;
+      blocked?: true;
+      blockedKind?: StepQueueBlocked['kind'];
     };
 
 export interface ChiefToolRow {
@@ -663,6 +669,7 @@ export interface ChiefThreadRef {
 export type ChiefSettingsTab = 'routing' | 'charter' | 'memory' | 'watches';
 
 export interface ModelOption {
+  runtime: string;
   provider: string;
   machineId?: string;
   providerLabel: string;

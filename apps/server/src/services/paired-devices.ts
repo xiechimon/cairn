@@ -7,7 +7,7 @@ import {
   PAIRING_CODE_TTL_MS,
   type PairedDevice,
 } from '@cairn/shared';
-import { and, asc, count, eq, isNotNull, isNull, lte, or } from 'drizzle-orm';
+import { and, asc, count, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { apnsDevice, pairedDevice, pairingGrant, pushSubscription } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -169,7 +169,20 @@ export interface PairingGrantView {
   createdAt: number;
 }
 
-export function issuePairingGrant(db: Db, now = nowMs()): IssuedPairingGrant {
+export interface RelayPairingScope {
+  installationId: string;
+  generation: number;
+}
+
+function grantScope(scope: RelayPairingScope | null): string | null {
+  return scope === null ? null : `${scope.installationId}:${scope.generation}`;
+}
+
+export function issuePairingGrant(
+  db: Db,
+  now = nowMs(),
+  relayScope: RelayPairingScope | null = null,
+): IssuedPairingGrant {
   db.delete(pairingGrant)
     .where(
       or(
@@ -195,7 +208,13 @@ export function issuePairingGrant(db: Db, now = nowMs()): IssuedPairingGrant {
   const id = newRecordId();
   const expiresAt = now + PAIRING_CODE_TTL_MS;
   db.insert(pairingGrant)
-    .values({ id, codeHash: hashCredential(code), expiresAt, createdAt: now })
+    .values({
+      id,
+      codeHash: hashCredential(code),
+      relayScope: grantScope(relayScope),
+      expiresAt,
+      createdAt: now,
+    })
     .run();
   return { id, code, expiresAt };
 }
@@ -204,7 +223,13 @@ export function listPairingGrants(db: Db, now = nowMs()): PairingGrantView[] {
   return db
     .select()
     .from(pairingGrant)
-    .where(and(isNull(pairingGrant.revokedAt), isNull(pairingGrant.redeemedAt)))
+    .where(
+      and(
+        isNull(pairingGrant.relayScope),
+        isNull(pairingGrant.revokedAt),
+        isNull(pairingGrant.redeemedAt),
+      ),
+    )
     .all()
     .filter((row) => row.expiresAt > now)
     .map((row) => ({ id: row.id, expiresAt: row.expiresAt, createdAt: row.createdAt }));
@@ -219,29 +244,68 @@ export function revokePairingGrant(db: Db, id: string, now = nowMs()): boolean {
 
 export function pairFromGrant(
   db: Db,
-  input: { code: string; teamId: string; name: string },
-): { device: PairedDevice; token: string; sessionToken: string } | null {
+  input: { code: string; teamId: string; name: string; relayScope?: RelayPairingScope },
+): { device: PairedDevice; token: string; sessionToken: string; sessionExpiresAt: number } | null {
   return db.transaction((tx) => {
     if (!hasRoomForDevice(tx)) {
       throw new HttpError(409, 'too many paired devices; revoke one first');
     }
-    if (!redeemPairingGrant(tx, input.code)) return null;
+    if (!redeemPairingGrant(tx, input.code, undefined, input.relayScope)) return null;
     const created = createPairedDevice(tx, { teamId: input.teamId, name: input.name });
-    const session = issueBrowserSession(tx, 'device', created.device.id);
-    return { device: created.device, token: created.token, sessionToken: session.token };
+    const session = issueBrowserSession(
+      tx,
+      'device',
+      created.device.id,
+      undefined,
+      undefined,
+      input.relayScope?.installationId ?? null,
+    );
+    return {
+      device: created.device,
+      token: created.token,
+      sessionToken: session.token,
+      sessionExpiresAt: session.expiresAt,
+    };
   });
 }
 
-export function redeemPairingGrant(db: Db, code: string, now = nowMs()): boolean {
-  const row = db
-    .select()
-    .from(pairingGrant)
-    .where(eq(pairingGrant.codeHash, hashCredential(code)))
-    .get();
-  if (row === undefined || row.revokedAt !== null || row.redeemedAt !== null) return false;
-  if (row.expiresAt <= now) return false;
-  db.update(pairingGrant).set({ redeemedAt: now }).where(eq(pairingGrant.id, row.id)).run();
-  return true;
+export function redeemPairingGrant(
+  db: Db,
+  code: string,
+  now = nowMs(),
+  relayScope: RelayPairingScope | null = null,
+): boolean {
+  const scope = grantScope(relayScope);
+  return (
+    db
+      .update(pairingGrant)
+      .set({ redeemedAt: now })
+      .where(
+        and(
+          eq(pairingGrant.codeHash, hashCredential(code)),
+          scope === null ? isNull(pairingGrant.relayScope) : eq(pairingGrant.relayScope, scope),
+          isNull(pairingGrant.revokedAt),
+          isNull(pairingGrant.redeemedAt),
+          gt(pairingGrant.expiresAt, now),
+        ),
+      )
+      .run().changes === 1
+  );
+}
+
+export function revokeRelayPairingGrants(db: Db, installationId: string, now = nowMs()): void {
+  db.transaction((tx) => {
+    const pending = tx
+      .select()
+      .from(pairingGrant)
+      .where(and(isNull(pairingGrant.revokedAt), isNull(pairingGrant.redeemedAt)))
+      .all();
+    for (const row of pending) {
+      if (row.relayScope?.startsWith(`${installationId}:`)) {
+        tx.update(pairingGrant).set({ revokedAt: now }).where(eq(pairingGrant.id, row.id)).run();
+      }
+    }
+  });
 }
 
 export function revokePairedDevice(db: Db, teamId: string, id: string): boolean {

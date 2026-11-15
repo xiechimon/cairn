@@ -39,6 +39,25 @@ const LOGIN_STATE = {
   unknown: { label: '状态未知', dot: 'bg-content-dim', text: 'text-content-tertiary' },
 } as const;
 
+export function sandboxNotice(capabilities: MachineRow['capabilities']): string | null {
+  if (capabilities?.osPlatform !== 'linux') return null;
+  const report = capabilities.confinement;
+  if (report === undefined) {
+    return '这台 Runner 没上报任务沙箱状态，接不了任务。更新 CLI 后在这台机器上运行 `{command} restart`。';
+  }
+  switch (report.state) {
+    case 'ready':
+    case 'not-applicable':
+      return null;
+    case 'checking':
+      return '正在检查任务沙箱，检查完才接任务。';
+    case 'unavailable':
+      return report.reason === 'unsupported-platform'
+        ? '这台机器的系统不支持任务沙箱，接不了任务。'
+        : '任务沙箱没就绪，这台 Runner 接不了任务。Linux 上 daemon 要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。';
+  }
+}
+
 const isMachineRuntime = (value: string): value is MachineRuntime =>
   (MACHINE_RUNTIMES as readonly string[]).includes(value);
 
@@ -167,6 +186,9 @@ export function MachineDetailPane({
       );
   const notice = claudeLoginNotice(machine.claudeLogin, Date.now());
   const loginWarning = notice === null ? null : formatClaudeLoginWarning(notice, machine.name, t);
+  const sandboxKey = online ? sandboxNotice(machine.capabilities) : null;
+  const sandbox =
+    sandboxKey === null ? null : t(sandboxKey, { command: PUBLISHED_PACKAGES.cli.command });
 
   const runtimes: string[] = [
     ...MACHINE_RUNTIMES,
@@ -187,7 +209,11 @@ export function MachineDetailPane({
           {t('重新连接 {name} 后才能修改它的设置。', { name: machine.name })}
         </p>
       )}
-      {(offline !== null || loginWarning !== null || chief.running || chief.waiting) && (
+      {(offline !== null ||
+        loginWarning !== null ||
+        sandbox !== null ||
+        chief.running ||
+        chief.waiting) && (
         <SettingsSection title={t('状态')}>
           <SettingsCard>
             {offline !== null && (
@@ -214,6 +240,23 @@ export function MachineDetailPane({
                 />
                 <span>
                   <TextWithCode text={loginWarning} />
+                </span>
+              </div>
+            )}
+            {sandbox !== null && (
+              <div
+                data-testid="machine-sandbox"
+                data-sandbox={machine.capabilities?.confinement?.state ?? 'unreported'}
+                role="status"
+                className="flex items-start gap-2 settings-flat-block px-4 py-3 text-meta text-content-secondary"
+              >
+                <TriangleAlert
+                  aria-hidden
+                  strokeWidth={1.75}
+                  className="mt-0.5 size-4 flex-none text-content-secondary"
+                />
+                <span>
+                  <TextWithCode text={sandbox} />
                 </span>
               </div>
             )}

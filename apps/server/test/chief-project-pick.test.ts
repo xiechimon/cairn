@@ -78,10 +78,12 @@ describe('composer project chip reaches the chief (#2009)', () => {
     });
     expect(res.status).toBe(201);
     expect(chiefPrompts(H.threadId).at(-1)).toContain(`cairn-site（id: ${site}）`);
-    expect(publish).toHaveBeenCalledWith(
+    expect(
+      publish.mock.calls.map(([conversationId, message]) => [conversationId, message]),
+    ).toContainEqual([
       H.threadId,
       expect.objectContaining({ content: '再把字号也统一', projectId: site }),
-    );
+    ]);
   });
 
   test('a project name cannot break out of the chip marker', async () => {

@@ -113,6 +113,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       },
       "type": "array",
     },
+    "charter": {
+      "type": "string",
+    },
     "chief": {
       "additionalProperties": false,
       "properties": {
@@ -142,6 +145,53 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     },
     "conversationId": {
       "type": "string",
+    },
+    "deliverables": {
+      "additionalProperties": false,
+      "properties": {
+        "generation": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        "limits": {
+          "additionalProperties": false,
+          "properties": {
+            "maxFiles": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "maxPageBytes": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "maxSlidesBytes": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "maxTotalBytes": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+          },
+          "required": [
+            "maxFiles",
+            "maxTotalBytes",
+            "maxPageBytes",
+            "maxSlidesBytes",
+          ],
+          "type": "object",
+        },
+      },
+      "required": [
+        "generation",
+        "limits",
+      ],
+      "type": "object",
     },
     "instruction": {
       "type": [
@@ -1116,6 +1166,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
               },
               "type": "array",
             },
+            "charter": {
+              "type": "string",
+            },
             "chief": {
               "additionalProperties": false,
               "properties": {
@@ -1145,6 +1198,53 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             },
             "conversationId": {
               "type": "string",
+            },
+            "deliverables": {
+              "additionalProperties": false,
+              "properties": {
+                "generation": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer",
+                },
+                "limits": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "maxFiles": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "maxPageBytes": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "maxSlidesBytes": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "maxTotalBytes": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "maxFiles",
+                    "maxTotalBytes",
+                    "maxPageBytes",
+                    "maxSlidesBytes",
+                  ],
+                  "type": "object",
+                },
+              },
+              "required": [
+                "generation",
+                "limits",
+              ],
+              "type": "object",
             },
             "instruction": {
               "type": [
@@ -1960,6 +2060,51 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     "commit": {
       "type": "string",
     },
+    "deliverables": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string",
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+          "sha256",
+        ],
+        "type": "object",
+      },
+      "maxItems": 5,
+      "type": "array",
+    },
+    "deliverablesSkipped": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 120,
+            "type": "string",
+          },
+          "reason": {
+            "maxLength": 64,
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+          "reason",
+        ],
+        "type": "object",
+      },
+      "maxItems": 20,
+      "type": "array",
+    },
     "errorMessage": {
       "type": "string",
     },
@@ -2031,6 +2176,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     },
     "gateHeadSha": {
       "type": "string",
+    },
+    "generation": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
     },
     "hasChanges": {
       "type": "boolean",
@@ -2756,6 +2906,18 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       "maxItems": 250,
       "type": "array",
     },
+    "connectionId": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
   },
   "type": "object",
 }
@@ -2833,6 +2995,25 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       },
       "required": [
         "type",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "connectionId": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string",
+        },
+        "type": {
+          "const": "hello",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "connectionId",
       ],
       "type": "object",
     },
@@ -3708,11 +3889,49 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "deliverables": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "page",
+              "slides",
+            ],
+            "type": "string",
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string",
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string",
+          },
+          "size": {
+            "maximum": 20971520,
+            "minimum": 0,
+            "type": "integer",
+          },
+        },
+        "required": [
+          "kind",
+          "name",
+          "size",
+          "sha256",
+        ],
+        "type": "object",
+      },
+      "maxItems": 5,
+      "type": "array",
+    },
     "files": {
       "items": {
         "additionalProperties": false,
         "properties": {
           "name": {
+            "maxLength": 120,
             "type": "string",
           },
           "size": {
@@ -3726,7 +3945,13 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         ],
         "type": "object",
       },
+      "maxItems": 8,
       "type": "array",
+    },
+    "generation": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
     },
   },
   "required": [
@@ -3741,6 +3966,48 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "deliverables": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "attachmentId": {
+            "type": "string",
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string",
+            },
+            "propertyNames": {
+              "type": "string",
+            },
+            "type": "object",
+          },
+          "method": {
+            "const": "PUT",
+            "type": "string",
+          },
+          "name": {
+            "type": "string",
+          },
+          "received": {
+            "type": "boolean",
+          },
+          "url": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+          "attachmentId",
+          "received",
+          "url",
+          "method",
+          "headers",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "uploads": {
       "items": {
         "additionalProperties": false,
@@ -4588,6 +4855,11 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
     {
       "additionalProperties": false,
       "properties": {
+        "clientMessageId": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string",
+        },
         "conversationId": {
           "type": "string",
         },
@@ -4967,7 +5239,16 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                       "enum": [
                         "machine-offline",
                         "capability-missing",
+                        "sandbox-unavailable",
                         "runtime-disabled",
+                        "model-unavailable",
+                        "local-path",
+                        "claude-rate-limited",
+                        "claude-logged-out",
+                        "claude-usage-refused",
+                        "coordinator-provider-missing",
+                        "coordinator-provider-no-key",
+                        "coordinator-paid-claude",
                       ],
                       "type": "string",
                     },
@@ -5750,9 +6031,14 @@ exports[`body/envelope schema snapshots > patchChiefBody > patchChiefBody.json 1
       ],
     },
     "charter": {
-      "type": [
-        "string",
-        "null",
+      "anyOf": [
+        {
+          "maxLength": 16000,
+          "type": "string",
+        },
+        {
+          "type": "null",
+        },
       ],
     },
   },
@@ -6470,7 +6756,16 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
               "enum": [
                 "machine-offline",
                 "capability-missing",
+                "sandbox-unavailable",
                 "runtime-disabled",
+                "model-unavailable",
+                "local-path",
+                "claude-rate-limited",
+                "claude-logged-out",
+                "claude-usage-refused",
+                "coordinator-provider-missing",
+                "coordinator-provider-no-key",
+                "coordinator-paid-claude",
               ],
               "type": "string",
             },
@@ -9964,7 +10259,16 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
                   "enum": [
                     "machine-offline",
                     "capability-missing",
+                    "sandbox-unavailable",
                     "runtime-disabled",
+                    "model-unavailable",
+                    "local-path",
+                    "claude-rate-limited",
+                    "claude-logged-out",
+                    "claude-usage-refused",
+                    "coordinator-provider-missing",
+                    "coordinator-provider-no-key",
+                    "coordinator-paid-claude",
                   ],
                   "type": "string",
                 },

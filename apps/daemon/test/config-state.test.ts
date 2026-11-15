@@ -59,10 +59,22 @@ function withUmask<T>(mask: number, fn: () => T): T {
 describe('loadDaemonConfig (Settings seam precedence)', () => {
   test('defaults: CAIRN_SERVER defaults to DEFAULT_SERVER_URL, hostname name, ~/.cairn home', () => {
     const cfg = loadDaemonConfig({}, {});
-    expect(cfg.serverUrl).toBe(DEFAULT_SERVER_URL);
+    expect(loadDaemonConfig({ home: tmp() }, {}).serverUrl).toBe(DEFAULT_SERVER_URL);
     expect(cfg.home.endsWith(BRAND.homeDirName)).toBe(true);
     expect(cfg.workspacesDir).toBe(join(cfg.home, 'workspaces'));
     expect(cfg.foreground).toBe(false);
+  });
+
+  test('an enrolled home keeps its server when neither the flag nor the env names one', () => {
+    const home = tmp();
+    saveMachineJson(statePaths(home), { ...sampleMachine, serverUrl: 'http://127.0.0.1:8797' });
+    expect(loadDaemonConfig({ home }, {}).serverUrl).toBe('http://127.0.0.1:8797');
+    expect(loadDaemonConfig({ home }, { [ENV_VARS.server]: 'http://env:2' }).serverUrl).toBe(
+      'http://env:2',
+    );
+    expect(loadDaemonConfig({ home, serverUrl: 'http://explicit:1' }, {}).serverUrl).toBe(
+      'http://explicit:1',
+    );
   });
 
   test('env layer: the CAIRN_* five-item vocabulary (r3 §1.1 observed under the original TDS_* names, same shape at the replacement phase)', () => {

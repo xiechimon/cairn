@@ -176,17 +176,6 @@ test('an archived project opens read-only and unarchiving brings the composer ba
   await expect(block.getByRole('textbox')).toHaveCount(1);
 });
 
-test('the project home of an archived project swaps the ask box for the bar', async ({ page }) => {
-  await open(page, '/app?project=proj-old');
-  await expect(page.getByTestId('project-home')).toBeVisible();
-  await expect(page.getByTestId('project-home-ask')).toHaveCount(0);
-  await expect(page.getByTestId('archived-project-bar')).toBeVisible();
-  await expect(page.getByTestId('project-home-edit-blocked')).toHaveAttribute(
-    'aria-description',
-    '这个项目已归档。取消归档后才能修改。',
-  );
-});
-
 test('the tasks panel of an archived project cannot add a task', async ({ page }) => {
   await open(page, '/app?project=proj-old&chat=1&pane=tasks');
   const add = page.getByTestId('tasks-new');

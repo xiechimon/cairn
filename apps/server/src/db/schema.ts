@@ -859,6 +859,7 @@ export const pairingGrant = sqliteTable(
   {
     id: text('id').primaryKey(),
     codeHash: text('codeHash').notNull(),
+    relayScope: text('relayScope'),
     expiresAt: epochMs('expiresAt').notNull(),
     createdAt: epochMs('createdAt').notNull(),
     revokedAt: epochMs('revokedAt'),
@@ -874,6 +875,7 @@ export const browserSession = sqliteTable(
     tokenHash: text('tokenHash').notNull(),
     kind: text('kind').notNull(),
     deviceId: text('deviceId').references(() => pairedDevice.id, { onDelete: 'cascade' }),
+    relayScope: text('relayScope'),
     expiresAt: epochMs('expiresAt').notNull(),
     createdAt: epochMs('createdAt').notNull(),
   },
@@ -1226,8 +1228,11 @@ export const attachment = sqliteTable('attachment', {
   sizeBytes: integer('sizeBytes').notNull(),
   storageKey: text('storageKey').notNull(),
   grantId: text('grantId').notNull(),
-  scope: text('scope').$type<'spec' | 'message'>().notNull(),
-  status: text('status').$type<'pending' | 'ready' | 'failed'>().notNull().default('pending'),
+  scope: text('scope').$type<'spec' | 'message' | 'deliverable'>().notNull(),
+  status: text('status')
+    .$type<'pending' | 'received' | 'ready' | 'failed'>()
+    .notNull()
+    .default('pending'),
   createdAt: epochMs('createdAt').notNull(),
 });
 

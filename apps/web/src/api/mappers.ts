@@ -11,6 +11,7 @@ import type {
   SecretRecord,
   SkillRecord,
   StepActivity,
+  StepQueueBlocked,
   TokenUsage,
   ToolCallRecord,
   UsageCost,
@@ -100,6 +101,23 @@ import { activityLabel } from './activity.js';
 import type { MachineProvider } from './claude-accounts.js';
 import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
 
+const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
+  'sandbox-unavailable':
+    '排队中：{machine} 的任务沙箱没就绪，接不了任务——在那台机器上运行 cairn restart，原因见 Runner 页（前面 {ahead} 个）',
+  'runtime-disabled': '排队中：{machine} 没开 {runtime}——到 Runner 页打开（前面 {ahead} 个）',
+  'model-unavailable':
+    '排队中：{machine} 用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）',
+  'local-path': '排队中：本地项目只在它所在的 Runner 上跑，{machine} 跑不了（前面 {ahead} 个）',
+  'claude-rate-limited': '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
+  'claude-logged-out':
+    '排队中：{machine} 上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
+  'claude-usage-refused':
+    '排队中：团队只用 Claude 订阅，{machine} 上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）',
+  'coordinator-provider-missing': 'Coordinator 规则用的服务商「{name}」还没添加',
+  'coordinator-provider-no-key': 'Coordinator 规则用的服务商「{name}」没有 API key',
+  'coordinator-paid-claude': 'Coordinator 规则用的是付费 Claude（{name}），但团队只允许用订阅',
+};
+
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
   label: string;
   vars: Record<string, string | number>;
@@ -139,11 +157,17 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
       vars: { missing: queue.blocked.missing.join('、'), ahead },
     };
   }
-  if (queue.blocked?.kind === 'runtime-disabled') {
+  const refusal =
+    queue.blocked === undefined ? undefined : RUNNER_REFUSAL_LABELS[queue.blocked.kind];
+  if (refusal !== undefined) {
     return {
-      label:
-        '排队中：这台 Runner 没有开启 {runtime} 运行时——在它的「运行时」里打开（前面 {ahead} 个）',
-      vars: { runtime: queue.blocked.missing.join('、'), ahead },
+      label: refusal,
+      vars: {
+        machine: queue.waitingFor?.name ?? 'Runner',
+        runtime: queue.blocked?.missing.join('、') ?? '',
+        name: queue.blocked?.missing.join('、') ?? '',
+        ahead,
+      },
     };
   }
   if (queue.blocked?.kind === 'machine-offline') {
@@ -691,7 +715,12 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         if (text === CONFIRM_ANNOUNCEMENT && m.actor === SERVER_ACTOR) continue;
         entries.push({
           at: m.createdAt,
-          item: { kind: 'note', text: `${m.actor ?? userName} ${text}`, id: m.id },
+          item: {
+            kind: 'note',
+            text: `{name} ${text}`,
+            vars: { name: m.actor ?? userName },
+            id: m.id,
+          },
         });
         continue;
       }
@@ -898,6 +927,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     items.push({
       kind: 'streaming',
       startedAt: running.createdAt,
+      ...(queued != null && running.queue?.blocked != null ? { blocked: true as const } : {}),
       label:
         queued != null
           ? queued.label
@@ -1317,28 +1347,27 @@ export function toModelOptions(sources: ModelSource[]): ModelOption[] {
       }
     }
   }
-
   const options: ModelOption[] = [];
   const seen = new Set<string>();
-  const push = (option: ModelOption) => {
-    const ccDim = option.provider === 'claude-code' && option.machineId !== undefined;
-    const key = ccDim ? `${option.provider}/${option.machineId}/${option.modelId}` : option.modelId;
-    if (seen.has(key)) return;
-    seen.add(key);
-    const lv = livenessByModelId.get(option.modelId);
-    if (lv !== undefined && lv !== 'unknown') option.liveness = lv;
-    options.push(option);
-  };
   for (const source of sources) {
-    const providerLabel = RUNTIME_LABELS[source.runtime] ?? source.runtime;
+    const provider = source.provider ?? source.runtime;
+    const providerLabel =
+      source.providerLabel || (RUNTIME_LABELS[source.runtime] ?? source.runtime);
     for (const m of source.models) {
       if (m.id === '') continue;
-      push({
-        provider: source.runtime,
+      const ccDim = source.runtime === 'claude-code' && source.machineId !== undefined;
+      const key = ccDim ? `${provider}/${source.machineId}/${m.id}` : `${provider}/${m.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const lv = livenessByModelId.get(m.id);
+      options.push({
+        runtime: source.runtime,
+        provider,
         providerLabel,
         modelId: m.id,
         modelName: m.name,
         ...(source.machineId !== undefined ? { machineId: source.machineId } : {}),
+        ...(lv !== undefined && lv !== 'unknown' ? { liveness: lv } : {}),
       });
     }
   }
@@ -1777,6 +1806,9 @@ export function mapChief(
         const queued = connectingLine(turnQueue);
         chiefStream.push({
           kind: 'streaming',
+          ...(turnQueue.blocked != null
+            ? { blocked: true as const, blockedKind: turnQueue.blocked.kind }
+            : {}),
           label: queued.label,
           ...(queued.vars !== undefined ? { labelVars: queued.vars } : {}),
           ...(queued.detail !== undefined ? { labelDetail: queued.detail } : {}),

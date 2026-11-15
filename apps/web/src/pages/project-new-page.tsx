@@ -28,8 +28,8 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, ChevronRight, ImageFrame } from '../icons/index.js';
+import { RouteDialog } from '../overlay/route-dialog.js';
 import { DirBrowser } from './dir-browser.js';
-import { PageShell } from './shell.js';
 
 const REPO_TRIGGER_CLS = `${FORM_CONTROL_CLS} flex-1 justify-between px-2.5 font-normal`;
 
@@ -351,7 +351,7 @@ export function ProjectNewPage() {
   };
 
   return (
-    <PageShell route="project-new" fixture={fixture} selected="none" title={t('新建项目')}>
+    <RouteDialog title={t('新建项目')} size="form">
       <FormStack>
         <div className="flex items-center gap-4">
           <span className="prj-new-avatar flex size-14 flex-none items-center justify-center rounded-full bg-card text-content-tertiary ring-1 ring-border">
@@ -645,6 +645,6 @@ export function ProjectNewPage() {
           }}
         />
       </FormStack>
-    </PageShell>
+    </RouteDialog>
   );
 }

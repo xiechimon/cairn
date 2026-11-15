@@ -126,6 +126,7 @@ export function nextBackoffMs(current: number, cap = CLAIM_BACKOFF_CAP_MS): numb
 }
 
 export const PRESENCE_TIMEOUT_MS = 20_000;
+export const GOODBYE_TIMEOUT_MS = 2_000;
 export const DISPATCHER_RESET_FAILURE_THRESHOLD = 3;
 
 export const DAEMON_MAX_CONCURRENT_ENV = 'CAIRN_DAEMON_MAX_CONCURRENT';
@@ -406,9 +407,11 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   });
 
   let networkFailures = 0;
+  let connectionId: string | null = null;
   const presenceReporter = new ComputerPresenceReporter({
     source: opts.computerPresence ?? computerOrbs ?? hostDesktops,
     body: () => ({
+      connectionId,
       cliVersion: DAEMON_VERSION,
       claudeCode: claudeReport(),
       capabilities: capabilitiesReport(),
@@ -788,6 +791,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         await client.stream(
           streamCtrl.signal,
           (ev) => {
+            if (ev.type === 'hello') connectionId = ev.connectionId;
             if (ev.type === 'shutdown') void stop();
             if (ev.type === 'steer') void deliverSteer(ev.stepId);
             if (ev.type === 'stop') void deliverStop(ev.stepId);
@@ -940,6 +944,13 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     void screens.close();
     caffeinate?.kill();
     await presenceReporter.close();
+    if (connectionId !== null && client.offline) {
+      await client
+        .offline({ connectionId }, AbortSignal.timeout(GOODBYE_TIMEOUT_MS))
+        .catch((err: unknown) => {
+          logger.machine(`goodbye failed: ${err instanceof Error ? err.message : String(err)}`);
+        });
+    }
     await computerDispatcher.close();
     if (orbComputer instanceof OrbComputerProvider) await orbComputer.close();
     hostDesktops?.close();

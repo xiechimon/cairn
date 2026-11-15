@@ -18,6 +18,21 @@ export function isClaudeModel(providerId: string | null, modelId: string | null)
   );
 }
 
+export function paidClaudeAllowed(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+  providerId: string,
+  modelId: string,
+): boolean {
+  if (!isClaudeModel(providerId, modelId)) return true;
+  const usage = db
+    .select({ claudeUsage: team.claudeUsage })
+    .from(team)
+    .where(eq(team.id, teamId))
+    .get();
+  return usage?.claudeUsage === 'allow-paid';
+}
+
 export function getModelRouting(db: Db, teamId: string) {
   const now = nowMs();
   const settings = db.select().from(team).where(eq(team.id, teamId)).get();

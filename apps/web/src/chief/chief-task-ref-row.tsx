@@ -75,7 +75,7 @@ export function TaskRefRow({
             className="size-1.5 flex-none rounded-full bg-(--card-button)"
           />
         )}
-        <span className="sr-only">{`，${t(PHASE_UI[taskRef.phase].chip)}`}</span>
+        <span className="sr-only">{`${t('，')}${t(PHASE_UI[taskRef.phase].chip)}`}</span>
       </PopoverTrigger>
       <PopoverContent
         side="top"

@@ -409,5 +409,5 @@ test('CAIRN_ORB_RUNTIME=podman switches the CLI to the container check and nspaw
 
 test('the nspawn check function is untouched by the container runtime', () => {
   assert.equal(typeof checkHost, 'function');
-  assert.throws(() => checkHost({ user: 'someone-else' }), /as ian without sudo/);
+  assert.throws(() => checkHost({ user: 'someone-else', owner: 'ian' }), /as ian without sudo/);
 });

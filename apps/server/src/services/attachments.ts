@@ -245,20 +245,7 @@ export function writeAttachmentFile(
   key: string,
   fileBytes: Uint8Array,
 ): void {
-  const attachmentsRoot = resolve(attachmentsDir);
-  const fullPath = resolve(attachmentsDir, key);
-  const rootPrefix = attachmentsRoot.endsWith(sep) ? attachmentsRoot : attachmentsRoot + sep;
-  if (fullPath !== attachmentsRoot && !fullPath.startsWith(rootPrefix)) {
-    throw new HttpError(400, 'attachment key escapes attachments directory');
-  }
-  const parentDir = dirname(fullPath);
-  mkdirSync(parentDir, { recursive: true });
-  const realRoot = realpathSync(attachmentsDir);
-  const realParent = realpathSync(parentDir);
-  const realPrefix = realRoot.endsWith(sep) ? realRoot : realRoot + sep;
-  if (realParent !== realRoot && !realParent.startsWith(realPrefix)) {
-    throw new HttpError(400, 'attachment key escapes attachments directory');
-  }
+  const fullPath = containedAttachmentPath(attachmentsDir, key);
   const openFlags =
     constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW;
   let fd: number;
@@ -277,6 +264,24 @@ export function writeAttachmentFile(
   }
 }
 
+export function containedAttachmentPath(attachmentsDir: string, key: string): string {
+  const attachmentsRoot = resolve(attachmentsDir);
+  const fullPath = resolve(attachmentsDir, key);
+  const rootPrefix = attachmentsRoot.endsWith(sep) ? attachmentsRoot : attachmentsRoot + sep;
+  if (fullPath !== attachmentsRoot && !fullPath.startsWith(rootPrefix)) {
+    throw new HttpError(400, 'attachment key escapes attachments directory');
+  }
+  const parentDir = dirname(fullPath);
+  mkdirSync(parentDir, { recursive: true });
+  const realRoot = realpathSync(attachmentsDir);
+  const realParent = realpathSync(parentDir);
+  const realPrefix = realRoot.endsWith(sep) ? realRoot : realRoot + sep;
+  if (realParent !== realRoot && !realParent.startsWith(realPrefix)) {
+    throw new HttpError(400, 'attachment key escapes attachments directory');
+  }
+  return fullPath;
+}
+
 export interface AttachmentRow {
   id: string;
   teamId: string;
@@ -284,8 +289,8 @@ export interface AttachmentRow {
   mimeType: string;
   sizeBytes: number;
   storageKey: string;
-  scope: 'spec' | 'message';
-  status: 'pending' | 'ready' | 'failed';
+  scope: 'spec' | 'message' | 'deliverable';
+  status: 'pending' | 'received' | 'ready' | 'failed';
   createdAt: number;
 }
 
