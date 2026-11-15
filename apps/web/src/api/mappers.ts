@@ -113,8 +113,12 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
     '排队中：{machine} 上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
   'claude-usage-refused':
     '排队中：团队只用 Claude 订阅，{machine} 上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）',
-  'coordinator-unroutable':
-    'Coordinator 用不了它的模型：规则里的连接没有 API key，或要走付费 Claude——到工作路由改 Coordinator 规则',
+  'coordinator-provider-missing':
+    'Coordinator 规则用的服务商「{name}」不存在——到「服务商」里添加它，或到工作路由改 Coordinator 规则',
+  'coordinator-provider-no-key':
+    'Coordinator 规则用的服务商「{name}」没有 API key——到「服务商」给它填上 key，或到工作路由换一个能用的模型',
+  'coordinator-paid-claude':
+    'Coordinator 规则用的是付费 Claude（{name}），团队只允许用订阅——在「用量与连接」里允许按量付费，或到工作路由换模型',
 };
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
@@ -164,6 +168,7 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
       vars: {
         machine: queue.waitingFor?.name ?? 'Runner',
         runtime: queue.blocked?.missing.join('、') ?? '',
+        name: queue.blocked?.missing.join('、') ?? '',
         ahead,
       },
     };
