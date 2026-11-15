@@ -35,6 +35,8 @@ export type ClaudeAuthStateWire = z.infer<typeof claudeAuthStateSchema>;
 
 export const modelSourceSchema = z.object({
   runtime: modelSourceRuntimeSchema,
+  provider: z.string().min(1).optional(),
+  providerLabel: z.string().optional(),
   installed: z.boolean(),
   hostname: z.string(),
   machineId: z.string().optional(),
@@ -48,6 +50,12 @@ export const modelSourcesEnvelopeSchema = z.object({
   sources: z.array(modelSourceSchema),
 });
 export type ModelSourcesEnvelope = z.infer<typeof modelSourcesEnvelopeSchema>;
+
+export const DEFAULT_CLAUDE_CODE_MODELS: readonly ModelSourceModel[] = [
+  { id: 'claude-opus-5-5', name: 'claude-opus-5-5', slot: 'builtin' },
+  { id: 'claude-sonnet-5-5', name: 'claude-sonnet-5-5', slot: 'builtin' },
+  { id: 'claude-haiku-5-5', name: 'claude-haiku-5-5', slot: 'builtin' },
+];
 
 export const CLAUDE_MODEL_SLOT_PATTERN = /^ANTHROPIC_([A-Z0-9_]+)_MODEL$/;
 

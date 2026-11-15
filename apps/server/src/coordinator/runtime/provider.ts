@@ -23,9 +23,14 @@ export const DEFAULT_CONTEXT_WINDOW = 200_000;
 const DEFAULT_MAX_TOKENS = 8_192;
 const KEYLESS_PLACEHOLDER = 'cairn-keyless';
 
-function isBuiltinProvider(providerId: string): providerId is BuiltinProvider {
+export function isBuiltinProvider(providerId: string): providerId is BuiltinProvider {
   const builtin: readonly string[] = getBuiltinProviders();
   return builtin.includes(providerId);
+}
+
+export function builtinModelIds(providerId: string): ReadonlySet<string> {
+  if (!isBuiltinProvider(providerId)) return new Set();
+  return new Set(getBuiltinModels(providerId).map((model) => model.id));
 }
 
 export function catalogContextWindow(providerId: string, modelId: string): number {

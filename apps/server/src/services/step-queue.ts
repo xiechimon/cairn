@@ -1,5 +1,8 @@
 import {
   type ChiefThread,
+  confinementDispatchReady,
+  isChiefDigestThreadId,
+  MODEL_SOURCE_RUNTIME_LABELS,
   parseLocalMergeInstruction,
   RUNNER_OS_LABELS,
   type StepQueueBlocked,
@@ -9,7 +12,14 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, machine, routingRule, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
-import { missingCapabilities, runtimeGatePasses } from './dispatch-eligibility.js';
+import { coordinatorInServerEnabled } from './coordinator-context.js';
+import { type CoordinatorRouteRefusal, coordinatorRouteVerdict } from './coordinator-route.js';
+import {
+  type MachineIneligibility,
+  missingCapabilities,
+  runtimeGatePasses,
+  stepRuntimeFor,
+} from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
 import {
   platformFallbackMachineId,
@@ -30,6 +40,48 @@ import {
   type RouteProfile,
   routeForStep,
 } from './routing-rules.js';
+
+function ineligibleBlocked(gap: MachineIneligibility, runtime: string): StepQueueBlocked {
+  switch (gap.kind) {
+    case 'capability':
+      return { kind: 'capability-missing', missing: gap.missing };
+    case 'confinement':
+      return { kind: 'sandbox-unavailable', missing: [] };
+    case 'runtime':
+      return { kind: 'runtime-disabled', missing: [runtime] };
+    case 'model':
+      return { kind: 'model-unavailable', missing: [] };
+    case 'local-path':
+      return { kind: 'local-path', missing: [] };
+    case 'claude-blocked':
+      return { kind: 'claude-rate-limited', missing: [] };
+    case 'claude-login':
+      return { kind: 'claude-logged-out', missing: [] };
+    case 'claude-usage':
+      return { kind: 'claude-usage-refused', missing: [] };
+  }
+}
+
+function coordinatorRefusalBlocked(
+  refusal: CoordinatorRouteRefusal,
+  rule: { provider: string; modelId: string } | undefined,
+): StepQueueBlocked {
+  switch (refusal) {
+    case 'no-api-key-provider':
+    case 'rule-provider-missing':
+      return {
+        kind: 'coordinator-provider-missing',
+        missing: rule === undefined ? [] : [rule.provider],
+      };
+    case 'rule-provider-has-no-key':
+      return {
+        kind: 'coordinator-provider-no-key',
+        missing: rule === undefined ? [] : [rule.provider],
+      };
+    case 'paid-claude-not-allowed':
+      return { kind: 'coordinator-paid-claude', missing: rule === undefined ? [] : [rule.modelId] };
+  }
+}
 
 export interface QueueTargetStep {
   id: string;
@@ -169,16 +221,33 @@ export function stepQueueProjector(db: Db, teamId: string) {
     return {
       verdict,
       blocked:
-        gap?.kind === 'capability'
-          ? { kind: 'capability-missing', missing: gap.missing }
-          : undefined,
+        gap === null
+          ? undefined
+          : ineligibleBlocked(
+              gap,
+              MODEL_SOURCE_RUNTIME_LABELS[stepRuntimeFor(facts.model.provider)],
+            ),
     };
   }
 
+  let serverRoute: ReturnType<typeof coordinatorRouteVerdict> | undefined;
   function blockedFor(
     target: QueueTargetStep,
     row: (typeof queue)[number],
   ): StepQueueBlocked | undefined {
+    if (
+      !('todoRow' in row) &&
+      coordinatorInServerEnabled() &&
+      !isChiefDigestThreadId(row.threadId)
+    ) {
+      serverRoute ??= coordinatorRouteVerdict(db, teamId);
+      if (serverRoute !== null) {
+        if (!('refusal' in serverRoute)) return undefined;
+        if (target.homeMachineId === null) {
+          return coordinatorRefusalBlocked(serverRoute.refusal, serverRoute.rule);
+        }
+      }
+    }
     if (target.homeMachineId === null) {
       return { kind: 'machine-offline', missing: [] };
     }
@@ -189,9 +258,18 @@ export function stepQueueProjector(db: Db, teamId: string) {
     const agentRow = agentForRow(row);
     const provider =
       ('fallback' in row ? row.fallback?.model?.provider : undefined) ?? agentRow?.provider;
-    if (agentRow?.modelId != null && runtimeGatePasses(home, provider)) {
+    if (agentRow?.modelId != null) {
+      if (!runtimeGatePasses(home, provider)) {
+        return {
+          kind: 'runtime-disabled',
+          missing: [MODEL_SOURCE_RUNTIME_LABELS[stepRuntimeFor(provider)]],
+        };
+      }
       const missing = missingCapabilities(home, agentRow);
       if (missing.length > 0) return { kind: 'capability-missing', missing };
+    }
+    if (!confinementDispatchReady(home.capabilities)) {
+      return { kind: 'sandbox-unavailable', missing: [] };
     }
     return undefined;
   }

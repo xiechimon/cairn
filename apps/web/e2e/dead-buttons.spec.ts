@@ -305,7 +305,7 @@ test('detail transcript message tools carry no restore action (#884)', async ({ 
   const tools = block.getByTestId('msg-tools');
   await expect(tools.getByRole('button')).toHaveCount(1);
   await tools.getByTestId('chief-msg-more').click();
-  await expect(page.getByRole('menuitem')).toHaveText(['复制']);
+  await expect(page.getByRole('menuitem')).toHaveText([/^复制/]);
 });
 
 test('fail row `查看原始错误` opens the raw-error dialog with the full text (#1258)', async ({

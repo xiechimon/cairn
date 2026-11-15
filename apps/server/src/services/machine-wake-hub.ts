@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import type {
   ComputerCall,
   ComputerScreenRequest,
@@ -5,7 +6,18 @@ import type {
   MachineSyncCommand,
 } from '@cairn/shared';
 
+export const MACHINE_OFFLINE_GRACE_MS = 45_000;
+
+export type PresenceAdmission = 'online' | 'seen' | 'ignore';
+
+interface MachineGrace {
+  connectionId: string;
+  timer: ReturnType<typeof setTimeout>;
+  presenceSinceDrop: boolean;
+}
+
 export class MachineWakeHub {
+  private readonly graces = new Map<string, MachineGrace>();
   private readonly waiters = new Map<string, Set<() => void>>();
   private readonly streams = new Map<string, Set<(ev: MachineStreamEvent) => void>>();
   private readonly stopListeners = new Map<string, Set<() => void>>();
@@ -15,11 +27,14 @@ export class MachineWakeHub {
     string,
     {
       teamId: string;
+      connectionId: string;
       send: (ev: MachineStreamEvent) => void;
       close: () => void;
       release: () => void;
     }
   >();
+
+  constructor(private readonly offlineGraceMs: number = MACHINE_OFFLINE_GRACE_MS) {}
 
   wakeSeq(teamId: string): number {
     return this.wakeSeqs.get(teamId) ?? 0;
@@ -97,6 +112,7 @@ export class MachineWakeHub {
     close: () => void = () => {},
   ): () => void {
     this.revokeMachine(machineId);
+    const connectionId = randomBytes(16).toString('base64url');
     const unsubscribeTeam = this.subscribe(teamId, send);
     let released = false;
     const release = () => {
@@ -109,11 +125,72 @@ export class MachineWakeHub {
         for (const listener of this.disconnectListeners) listener(machineId);
       }
     };
-    this.streamsByMachine.set(machineId, { teamId, send, close, release });
+    this.streamsByMachine.set(machineId, { teamId, connectionId, send, close, release });
     return release;
   }
 
+  connectionId(machineId: string): string | undefined {
+    return this.streamsByMachine.get(machineId)?.connectionId;
+  }
+
+  dropConnection(machineId: string, connectionId: string, onExpire: () => void): boolean {
+    if (this.streamsByMachine.get(machineId)?.connectionId !== connectionId) return false;
+    this.releaseMachine(machineId);
+    this.cancelGrace(machineId);
+    const timer = setTimeout(() => {
+      if (this.graces.get(machineId)?.connectionId !== connectionId) return;
+      if (this.streamsByMachine.has(machineId)) return;
+      this.graces.delete(machineId);
+      onExpire();
+    }, this.offlineGraceMs);
+    this.graces.set(machineId, { connectionId, timer, presenceSinceDrop: false });
+    return true;
+  }
+
+  endConnection(machineId: string, connectionId: string): boolean {
+    const current = this.streamsByMachine.get(machineId)?.connectionId === connectionId;
+    const grace = this.graces.get(machineId)?.connectionId === connectionId;
+    if (!current && !grace) return false;
+    const entry = current ? this.streamsByMachine.get(machineId) : undefined;
+    if (entry) {
+      this.releaseMachine(machineId);
+      try {
+        entry.close();
+      } catch {}
+    }
+    this.cancelGrace(machineId);
+    return true;
+  }
+
+  cancelGrace(machineId: string): void {
+    const grace = this.graces.get(machineId);
+    if (!grace) return;
+    clearTimeout(grace.timer);
+    this.graces.delete(machineId);
+  }
+
+  admitPresence(machineId: string, connectionId: string | null | undefined): PresenceAdmission {
+    const grace = this.graces.get(machineId);
+    if (connectionId === undefined) {
+      if (grace) grace.presenceSinceDrop = true;
+      return 'online';
+    }
+    if (connectionId === null) return 'seen';
+    if (this.streamsByMachine.get(machineId)?.connectionId === connectionId) return 'online';
+    if (grace?.connectionId === connectionId) {
+      grace.presenceSinceDrop = true;
+      return 'seen';
+    }
+    return 'ignore';
+  }
+
+  silentSinceDrop(machineId: string): boolean {
+    const grace = this.graces.get(machineId);
+    return grace !== undefined && !grace.presenceSinceDrop;
+  }
+
   revokeMachine(machineId: string): void {
+    this.cancelGrace(machineId);
     const entry = this.streamsByMachine.get(machineId);
     if (!entry) return;
     this.streamsByMachine.delete(machineId);

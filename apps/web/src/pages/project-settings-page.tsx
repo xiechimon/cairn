@@ -29,10 +29,11 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, SquarePen } from '../icons/index.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
+import { RouteDialog } from '../overlay/route-dialog.js';
 import { ProjectAutonomyCard } from './project-autonomy-card.js';
 import { ProjectBaseBranchSelect } from './project-base-branch-select.js';
 import { ProjectConcurrencySelect } from './project-concurrency-select.js';
-import { PageShell, TabGroup } from './shell.js';
+import { TabGroup } from './shell.js';
 
 const TABS = [
   { id: 'basic', label: '基本信息' },
@@ -40,7 +41,10 @@ const TABS = [
   { id: 'memory', label: '记忆' },
 ];
 
-const ROW_INPUT_CLS = `${FORM_CONTROL_CLS} w-72`;
+const ROW_INPUT_CLS = `${FORM_CONTROL_CLS} w-72 min-w-0 max-sm:flex-1`;
+
+const NARROW_ROWS_CLS =
+  'max-sm:[&_.settings-row]:flex-wrap max-sm:[&_.settings-row]:py-3 max-sm:[&_.settings-row>span]:w-full max-sm:[&_.settings-row>span]:max-w-full';
 const ROW_ICON_CLS = 'text-content-tertiary';
 export function ProjectSettingsPage() {
   const { t } = useI18n();
@@ -93,13 +97,7 @@ export function ProjectSettingsPage() {
           ? t('本地文件夹')
           : undefined;
   return (
-    <PageShell
-      route="project-settings"
-      fixture={fixture}
-      selected="none"
-      title={t('设置')}
-      back={{ pathname: `/app/project/${id ?? ''}`, search: searchParams.toString() }}
-    >
+    <RouteDialog title={t('项目设置')} size="page">
       <div className="flex flex-col gap-4">
         <SettingsHeader
           avatarClassName={cn('prj-set-avatar', project?.icon != null && 'rounded-xl')}
@@ -160,7 +158,7 @@ export function ProjectSettingsPage() {
           )
         ) : (
           <>
-            <SettingsCard className="prj-set-card">
+            <SettingsCard className={cn('prj-set-card', NARROW_ROWS_CLS)}>
               <SettingsRow label={t('名称')}>
                 {live && wireProject !== undefined ? (
                   <>
@@ -462,6 +460,6 @@ export function ProjectSettingsPage() {
           navigate('/app');
         }}
       />
-    </PageShell>
+    </RouteDialog>
   );
 }

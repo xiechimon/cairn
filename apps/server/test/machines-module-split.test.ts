@@ -39,6 +39,7 @@ describe('machines.ts facade', () => {
       'machineRunningCount',
       'machineSkillFile',
       'machineSkillsManifest',
+      'markConnected',
       'markOffline',
       'markPresence',
       'meetsMcpVersionGate',

@@ -8,25 +8,21 @@ import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
 import { MachineName, machineLabel } from '../components/machine-label.js';
+import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { SETTINGS_SELECT_TRIGGER_CLS, SettingsSelectTrigger } from '../components/settings-list.js';
 import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch.js';
 import { AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu.js';
+import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
-import { type ChiefState, MachineDetailPane } from './machine-detail-pane.js';
+import { type ChiefState, MachineDetailPane, sandboxNotice } from './machine-detail-pane.js';
 
 export type RowSection = 'runtime' | 'capabilities';
 
@@ -200,6 +196,7 @@ export function MachineRowView({
   const osPlatform = machine.capabilities?.osPlatform;
   const osName = osPlatform === undefined ? undefined : OS_NAMES[osPlatform];
   const osUnreported = machine.capabilities !== undefined && osPlatform === undefined;
+  const sandboxBlocked = online && sandboxNotice(machine.capabilities) !== null;
   const canMutate = machine.id != null && online;
   const acceptFrozen = !canMutate || mutations.patchMachine.isPending;
   const acceptBlockedReason = online
@@ -337,6 +334,11 @@ export function MachineRowView({
               {t('更新 Cairn 后才能接有平台要求的任务')}
             </p>
           )}
+          {sandboxBlocked && (
+            <p data-testid="machine-sandbox-hint" className="pl-5 text-meta text-content-secondary">
+              {t('任务沙箱没就绪，暂时接不了任务——展开看怎么修')}
+            </p>
+          )}
         </div>
         <ExplainDisabledToggle
           className="relative z-10"
@@ -372,30 +374,34 @@ export function MachineRowView({
           >
             <Ellipsis aria-hidden strokeWidth={1.75} />
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="bottom" align="end" sideOffset={4} className="w-auto min-w-40">
-            <DropdownMenuItem
+          <KeyedMenuContent side="bottom" align="end" sideOffset={4} className="w-auto min-w-40">
+            <KeyedMenuItem
+              shortcut="F"
               data-testid="machine-menu-default"
               disabled={isDefault || machine.id == null || mutations.patchMachine.isPending}
               onClick={makeDefault}
             >
               {isDefault ? t('已是默认 Runner') : t('设为默认 Runner')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            </KeyedMenuItem>
+            <KeyedMenuItem
+              shortcut="M"
               data-testid="machine-menu-evacuate"
               disabled={others.length === 0}
               onClick={() => setEvacuateOpen(true)}
             >
               {t('整机迁移')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            </KeyedMenuItem>
+            <KeyedMenuItem
+              shortcut="D"
+              confirms
               data-testid="machine-menu-delete"
               disabled={deleting}
               title={t('删除后，这台 Runner 要重新注册才能再接任务')}
               onClick={() => setConfirmOpen(true)}
             >
               {t('删除 Runner')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
+            </KeyedMenuItem>
+          </KeyedMenuContent>
         </DropdownMenu>
       </div>
       {expanded && (

@@ -112,13 +112,6 @@ test.describe('wide screens', () => {
     await expectRail(page);
   });
 
-  test('a project home with a task thread open keeps the rail', async ({ page }) => {
-    await page.goto('/app?scenario=home-c&project=ZAQczKCu0MOAzC1ZqcFlX&thread=home-c-working-a');
-    await expect(page.getByTestId('project-home')).toBeVisible();
-    await expect(page.getByTestId('side-chat')).toBeVisible();
-    await expectRail(page);
-  });
-
   test('every rail icon has an accessible name and a tooltip', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
     await page.goto(HOME);

@@ -46,6 +46,8 @@ test('a fresh install creates the coordinator rule in the UI and the Coordinator
   const settings = page.getByRole('dialog', { name: '设置' });
   const creator = settings.getByTestId('routing-rule-new-coordinator');
   await expect(creator).toBeVisible();
+  await expect(settings.getByTestId('routing-rule-new-session')).toBeVisible();
+  await expect(settings.getByTestId('routing-session-default')).toContainText('e2e-model · e2e relay');
   await expect(creator.getByRole('button', { name: '创建' })).toBeDisabled();
 
   await creator.locator('.routing-rule-runtime-select').click();
@@ -58,8 +60,11 @@ test('a fresh install creates the coordinator rule in the UI and the Coordinator
   await expect(settings.getByTestId('routing-rule-new-coordinator')).toHaveCount(0);
   const settingsBody = (await (
     await fetch(`${server.base}/api/teams/${teamId}/routing-settings`)
-  ).json()) as { rules: { use: string }[] };
-  expect(settingsBody.rules.map((rule) => rule.use)).toContain('coordinator');
+  ).json()) as { rules: { use: string; provider: string; modelId: string }[] };
+  expect(settingsBody.rules.find((rule) => rule.use === 'coordinator')).toMatchObject({
+    provider: 'e2e-relay',
+    modelId: 'e2e-model',
+  });
 
   await page.goto(`${server.base}/app`);
   await composer().fill('second message after the rule');

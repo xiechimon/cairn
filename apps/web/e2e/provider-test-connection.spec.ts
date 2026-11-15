@@ -49,6 +49,26 @@ test('connection check shows only a status and scrubbed failure details', async 
   await expect(outcome).not.toContainText('small-model');
 });
 
+test('a provider with no models cannot be tested and says what to add, without a request', async ({ page }) => {
+  const posts: string[] = [];
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    if (path === '/api/teams/t1/providers/prov-relay/test') {
+      posts.push(route.request().method());
+      return json({ status: 'failed', reason: 'No model is configured. Add a model and try again.' });
+    }
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [{ ...RECORD, models: [] }], canTestConnection: true });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    return undefined;
+  });
+  await page.goto('/app/resources/providers');
+  const editor = page.getByTestId('provider-editor');
+  await expect(editor.getByLabel('名称')).toHaveValue('Relay connection');
+  await expect(editor.getByRole('button', { name: '测试', exact: true })).toBeDisabled();
+  await expect(editor.getByText('先在下面的模型列表里添加一个模型，才能测试')).toBeVisible();
+  await expect(editor.getByTestId('provider-test-result')).toHaveCount(0);
+  expect(posts).toEqual([]);
+});
+
 for (const pending of [false, true]) {
   test(`editing connection settings invalidates a ${pending ? 'pending' : 'completed'} check`, async ({ page }) => {
     let record = { ...RECORD };

@@ -84,6 +84,22 @@ describe.each(entryPoints)('%s with a client message id', (_name, urlOf) => {
     expect(userMessages().map((row) => row.content)).toEqual(['original text']);
   });
 
+  test('the stream event for the stored message names the client key', async () => {
+    const events: { type?: string; message?: { id?: string }; clientMessageId?: string }[] = [];
+    H.s.convHub.subscribe(H.threadId, {
+      nextSeq: () => 1,
+      send: (payload: object) => {
+        events.push(payload);
+        return Promise.resolve();
+      },
+    });
+    const sent = await post(urlOf(), { content: 'hello', clientMessageId: 'key-1' });
+    const event = events.find(
+      (candidate) => candidate.type === 'message' && candidate.message?.id === sent.body.message.id,
+    );
+    expect(event?.clientMessageId).toBe('key-1');
+  });
+
   test('a replay publishes no second conversation event', async () => {
     const publish = vi.spyOn(H.s.convHub, 'publishMessage');
     await post(urlOf(), { content: 'hello', clientMessageId: 'key-1' });

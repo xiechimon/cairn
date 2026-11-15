@@ -87,9 +87,9 @@ async function openMachineStream(app: Hono, token: string) {
           const frame = buf.slice(0, idx);
           buf = buf.slice(idx + 2);
           for (const line of frame.split('\n')) {
-            if (line.startsWith('data:')) {
-              events.push(JSON.parse(line.slice(5).trim()) as MachineStreamEvent);
-            }
+            if (!line.startsWith('data:')) continue;
+            const ev = JSON.parse(line.slice(5).trim()) as MachineStreamEvent;
+            if (ev.type !== 'hello') events.push(ev);
           }
           idx = buf.indexOf('\n\n');
         }

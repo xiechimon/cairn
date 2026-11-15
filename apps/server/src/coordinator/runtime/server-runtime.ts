@@ -91,6 +91,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
   const busy = new Map<string, number>();
   const lastUsed = new Map<string, number>();
   const closing = new Map<string, Promise<void>>();
+  const suggestionYields = new Map<string, AbortController>();
 
   const stateOf = (threadId: string, forceReseed = false): ThreadState => {
     const existing = open.get(threadId);
@@ -208,6 +209,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     },
     closeThread,
     isOpen: (threadId: string) => open.has(threadId),
+    yieldSuggestions: (threadId: string) => suggestionYields.get(threadId)?.abort(),
     runTurn: async (turn: ServerTurn): Promise<MachineDoneBody> => {
       const { claimed } = turn;
       const threadId = claimed.chief?.threadId ?? '';
@@ -223,6 +225,8 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       };
       const state = prepare(stateOf(threadId));
       busy.set(threadId, (busy.get(threadId) ?? 0) + 1);
+      const suggestionYield = new AbortController();
+      suggestionYields.set(threadId, suggestionYield);
       try {
         let current = state;
         const synced = await syncToRewind(
@@ -271,11 +275,12 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
               conversationGate: current.gate,
               volatile: current.volatile,
               volatileText: turn.volatileText,
+              suggestionYield: suggestionYield.signal,
             },
             turn.claimed,
           );
-        if (!mailTurn) return run(prior.conversationId);
-        return withRegisteredMailConversation(
+        if (!mailTurn) return await run(prior.conversationId);
+        return await withRegisteredMailConversation(
           await current.harness,
           context,
           prior.conversationId,
@@ -284,6 +289,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
           run,
         );
       } finally {
+        if (suggestionYields.get(threadId) === suggestionYield) suggestionYields.delete(threadId);
         const left = (busy.get(threadId) ?? 1) - 1;
         if (left <= 0) busy.delete(threadId);
         else busy.set(threadId, left);

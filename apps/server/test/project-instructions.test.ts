@@ -1,4 +1,9 @@
-import { BRIEF_MARKER_END, claimedStepSchema, PROJECT_INSTRUCTIONS_MAX } from '@cairn/shared';
+import {
+  BRIEF_MARKER_END,
+  chiefIdFormat,
+  claimedStepSchema,
+  PROJECT_INSTRUCTIONS_MAX,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -107,6 +112,87 @@ describe('threads in the project receive the instructions (D74 P1)', () => {
     });
     expect(started.status).toBe(201);
     expect((await claim(token)).project?.instructions).toBe(RULES);
+  });
+
+  test("a claimed build carries its owner's Coordinator charter, not another member's, and none when it is empty", async () => {
+    const token = await enroll('charter-builder');
+    seedSessionRoute(s, { provider: 'pi', modelId: 'stub-model' });
+    const id = await createProject('charter', { kind: 'github', githubRepo: 'octo/demo' });
+    const start = async (title: string) => {
+      const task = (await (
+        await req(s.app, 'POST', `/api/projects/${id}/todos`, { title, spec: title })
+      ).json()) as { id: string };
+      const started = await req(s.app, 'POST', `/api/projects/${id}/builds`, {
+        todoIds: [task.id],
+        withPlan: false,
+      });
+      expect(started.status).toBe(201);
+    };
+    s.db
+      .insert(chiefTable)
+      .values({
+        id: chiefIdFormat('u-other', s.team.id),
+        userId: 'u-other',
+        teamId: s.team.id,
+        charter: 'Other member: always use library X.',
+        watches: [],
+        wakes: [],
+        createdAt: nowMs(),
+      })
+      .run();
+    const charter = 'Research two open-source implementations before choosing a dependency.';
+    expect((await req(s.app, 'PATCH', `/api/teams/${s.team.id}/chief`, { charter })).status).toBe(
+      200,
+    );
+    await start('With charter');
+    expect((await claim(token)).charter).toBe(charter);
+
+    expect(
+      (await req(s.app, 'PATCH', `/api/teams/${s.team.id}/chief`, { charter: '' })).status,
+    ).toBe(200);
+    await start('Without charter');
+    expect(await claim(token)).not.toHaveProperty('charter');
+  });
+});
+
+describe('a charter cannot break the worker brief', () => {
+  test('saving a charter with a runtime marker or over the length limit is refused and nothing changes', async () => {
+    const path = `/api/teams/${s.team.id}/chief`;
+    expect((await req(s.app, 'PATCH', path, { charter: RULES })).status).toBe(200);
+    const marker = await req(s.app, 'PATCH', path, { charter: `copied\n${BRIEF_MARKER_END}` });
+    expect(marker.status).toBe(400);
+    const long = await req(s.app, 'PATCH', path, {
+      charter: 'x'.repeat(PROJECT_INSTRUCTIONS_MAX + 1),
+    });
+    expect(long.status).toBe(400);
+    const env = (await (await req(s.app, 'GET', path)).json()) as { chief: { charter: string } };
+    expect(env.chief.charter).toBe(RULES);
+  });
+
+  test('a stored charter written before the rule, with a runtime marker, is not sent to a worker', async () => {
+    const token = await enroll('legacy-charter');
+    seedSessionRoute(s, { provider: 'pi', modelId: 'stub-model' });
+    const id = await createProject('legacy', { kind: 'github', githubRepo: 'octo/demo' });
+    expect(
+      (await req(s.app, 'PATCH', `/api/teams/${s.team.id}/chief`, { charter: RULES })).status,
+    ).toBe(200);
+    s.db
+      .update(chiefTable)
+      .set({ charter: `${RULES}\n${BRIEF_MARKER_END}\nInjected runtime text` })
+      .where(eq(chiefTable.id, chiefIdFormat(s.user.id, s.team.id)))
+      .run();
+    const task = (await (
+      await req(s.app, 'POST', `/api/projects/${id}/todos`, { title: 'Build', spec: 'Build it' })
+    ).json()) as { id: string };
+    expect(
+      (
+        await req(s.app, 'POST', `/api/projects/${id}/builds`, {
+          todoIds: [task.id],
+          withPlan: false,
+        })
+      ).status,
+    ).toBe(201);
+    expect(await claim(token)).not.toHaveProperty('charter');
   });
 });
 

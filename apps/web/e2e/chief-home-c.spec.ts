@@ -65,7 +65,6 @@ test('the sidebar lists project names only, and the project chat filters the tas
   await expect(rows).toHaveCount(2);
   await rows.filter({ hasText: 'cairn' }).click();
   await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}&chat=1`));
-  await expect(page.getByTestId('project-home')).toHaveCount(0);
   await expect(page.getByTestId('tasks-badge')).toHaveText('2');
   const refs = page.getByTestId('chief-stream').getByTestId('chief-task-ref');
   await expect(refs).toHaveCount(1);
@@ -81,7 +80,6 @@ test('a project link lands on that project conversation', async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/app\\?scenario=home-c&project=${PROJECT_ID}&chat=1$`));
   await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('cairn');
   await expect(composer(page)).toBeVisible();
-  await expect(page.getByTestId('project-home')).toHaveCount(0);
 });
 
 test('a first run greets in a bubble and offers starter replies, with nothing pinned', async ({

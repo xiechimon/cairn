@@ -1,3 +1,4 @@
+import type { MachineCapabilities } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -15,6 +16,8 @@ import {
   sweepAbandonedBuildSteps,
 } from '../src/services/build-abandoned-sweep.js';
 import { sweepAbandonedChiefSteps } from '../src/services/chief.js';
+import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
+import { createProvider } from '../src/services/providers.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import { toTodoRecord } from '../src/services/todos.js';
 import { bootServer, seedRoute, type TestServer } from './helpers.js';
@@ -48,7 +51,7 @@ function insertMachine(
     id: string;
     online?: boolean;
     runtimes?: string[];
-    capabilities?: { mcpServers: string[]; skills: string[] } | null;
+    capabilities?: MachineCapabilities | null;
     claudeModels?: string[];
   },
 ): void {
@@ -151,6 +154,7 @@ function insertPendingChiefStep(
     homeMachineId?: string | null;
     createdAgo?: number;
     requiredCapabilities?: { mcpServers?: string[] } | null;
+    route?: { provider: string; modelId: string };
   },
 ): { id: string; createdAt: number; homeMachineId: string | null; threadId: string } {
   const suffix = Math.random().toString(36).slice(2, 8);
@@ -160,8 +164,7 @@ function insertPendingChiefStep(
   const id = `step-chief-cr-${suffix}`;
   const homeMachineId = opts.homeMachineId ?? null;
   seedRoute(w.s, 'coordinator', {
-    provider: 'stub-gw',
-    modelId: 'stub-model',
+    ...(opts.route ?? { provider: 'stub-gw', modelId: 'stub-model' }),
     machineId: homeMachineId,
     requiredCapabilities: opts.requiredCapabilities ?? null,
   });
@@ -287,12 +290,39 @@ describe('#1251 queue projection blocked bit (worker steps)', () => {
     });
   });
 
-  test('failure mode 6: runtime gate block does not impersonate a capability cause -> blocked absent (existing seam keeps its presentation)', () => {
+  test('failure mode 6: runtime gate block names the disabled runtime, not a capability', () => {
     const w = makeWorld();
     insertRule(w, 'session', { mcpServers: ['figma'] });
     insertMachine(w, { id: 'm-r6', runtimes: [], capabilities: { mcpServers: [], skills: [] } });
     const target = insertPendingWorkerStep(w, { homeMachineId: 'm-r6' });
-    expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toBeUndefined();
+    expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toEqual({
+      kind: 'runtime-disabled',
+      missing: ['pi'],
+    });
+  });
+
+  test('an online Linux Runner whose task sandbox is not ready -> sandbox-unavailable, not a plain wait', () => {
+    const w = makeWorld();
+    insertRule(w, 'session');
+    insertMachine(w, {
+      id: 'm-sandbox',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        osPlatform: 'linux',
+        confinement: {
+          invocation: '00000000-0000-4000-8000-000000000001',
+          generation: 1,
+          revision: 3,
+          state: 'unavailable',
+          reason: 'startup-failed',
+        },
+      },
+    });
+    const target = insertPendingWorkerStep(w, { homeMachineId: 'm-sandbox' });
+    const info = stepQueueProjector(w.s.db, w.teamId).project(target);
+    expect(info?.blocked).toEqual({ kind: 'sandbox-unavailable', missing: [] });
+    expect(info?.waitingFor?.name).toBe('m-sandbox');
   });
 
   test('failure mode 1 addendum: models dimension missing items named the same shape', () => {
@@ -327,6 +357,80 @@ describe('#1251 queue projection blocked bit (chief turns)', () => {
       kind: 'capability-missing',
       missing: ['MCP server "figma"'],
     });
+  });
+});
+
+describe('in-server Coordinator turns', () => {
+  function addProvider(w: ReasonWorld, providerId: string, modelId: string, apiKey?: string) {
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.teamId,
+        body: {
+          providerId,
+          label: providerId,
+          baseUrl: 'https://gw.example.com/v1',
+          api: 'openai-completions',
+          ...(apiKey === undefined ? {} : { apiKey }),
+          models: [{ id: modelId, name: modelId }],
+        },
+        createdBy: w.s.user.id,
+      },
+    );
+  }
+
+  function blockedOf(w: ReasonWorld, route?: { provider: string; modelId: string }) {
+    const target = insertPendingChiefStep(w, { homeMachineId: null, ...(route ? { route } : {}) });
+    const projector = stepQueueProjector(w.s.db, w.teamId);
+    const pending = projector.pendingChiefOf(target.threadId);
+    return pending === null ? null : projector.project(pending)?.blocked;
+  }
+
+  test.each([
+    [
+      'a provider that does not exist',
+      undefined,
+      undefined,
+      { kind: 'coordinator-provider-missing', missing: ['stub-gw'] },
+    ],
+    [
+      'a preset provider with no key',
+      'deepseek',
+      undefined,
+      { kind: 'coordinator-provider-no-key', missing: ['deepseek'] },
+    ],
+    [
+      'a keyed Claude model on a subscription-only team',
+      'claude-gateway',
+      'gw-key',
+      { kind: 'coordinator-paid-claude', missing: ['claude-sonnet-5-5'] },
+    ],
+  ] as const)(
+    'the server refuses %s, with no Runner to fall back to -> that one reason, not machine-offline',
+    (_name, providerId, apiKey, expected) => {
+      setCoordinatorInServer(true);
+      try {
+        const w = makeWorld();
+        const modelId = providerId === 'claude-gateway' ? 'claude-sonnet-5-5' : 'deepseek-chat';
+        if (providerId !== undefined) addProvider(w, providerId, modelId, apiKey);
+        expect(
+          blockedOf(w, providerId === undefined ? undefined : { provider: providerId, modelId }),
+        ).toEqual(expected);
+      } finally {
+        setCoordinatorInServer(false);
+      }
+    },
+  );
+
+  test('a routable rule leaves the turn to the server with no blocked reason', () => {
+    setCoordinatorInServer(true);
+    try {
+      const w = makeWorld();
+      addProvider(w, 'vani', 'deepseek-chat', 'vani-key');
+      expect(blockedOf(w, { provider: 'vani', modelId: 'deepseek-chat' })).toBeUndefined();
+    } finally {
+      setCoordinatorInServer(false);
+    }
   });
 });
 

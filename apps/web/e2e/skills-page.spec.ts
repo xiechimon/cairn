@@ -72,7 +72,7 @@ test('live list consumes GET /api/skills (wire shape unchanged after the server 
   expect(hits[0]).toContain('teamId=team-1');
 });
 
-test('regression #486/#494: skills list reachable by wheel, scrollbar hugs the panel right edge', async ({ page }) => {
+test('regression #486/#494: skills list reachable by wheel, scrollbar hugs the panel right edge, last row keeps a bottom gap, actions share the heading row', async ({ page }) => {
   await stubBoot(page);
 
   const rows = Array.from({ length: 20 }, (_, i) => ({
@@ -105,7 +105,7 @@ test('regression #486/#494: skills list reachable by wheel, scrollbar hugs the p
       const box = (el) => {
         if (el == null) return null;
         const r = el.getBoundingClientRect();
-        return { x: r.x, right: r.right, width: r.width };
+        return { x: r.x, right: r.right, width: r.width, bottom: r.bottom };
       };
       return { host: box(host), pane: box(pane), col: box(colEl) };
     }, shellSel);
@@ -131,10 +131,20 @@ test('regression #486/#494: skills list reachable by wheel, scrollbar hugs the p
   expect(box?.y).toBeGreaterThanOrEqual(0);
   expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(733);
 
+  const after = await readScrollLayer();
+  expect((after.host?.bottom ?? 0) - ((box?.y ?? 0) + (box?.height ?? 0))).toBeGreaterThanOrEqual(
+    24,
+  );
+
   expect((await col.boundingBox())?.width).toBe(widthBefore);
   const topbar = await page.getByTestId('page-toolbar').boundingBox();
   expect(topbar?.y).toBe(topbarBefore?.y);
-  expect(topbar?.height).toBe(36);
+  expect(topbar?.height).toBe(32);
+  const head = await page.getByTestId('settings-head').boundingBox();
+  expect((topbar?.y ?? 0) + (topbar?.height ?? 0) / 2).toBeCloseTo(
+    (head?.y ?? -1) + (head?.height ?? 0) / 2,
+    0,
+  );
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });
 

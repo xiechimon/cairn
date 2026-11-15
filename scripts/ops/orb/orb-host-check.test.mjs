@@ -15,6 +15,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { makeTestTempDir, releaseTestTempDir } from '../../test-tmpdir.mjs';
 import { readMetadata, runGuestCheck, waitForNetwork } from './guest-check.mjs';
 import { checkHost, parseHostCheck } from './orb-host-check.mjs';
 
@@ -172,6 +173,7 @@ function fakeHost(
     networkdDirectory,
     ufwRulesFile: join(root, 'user.rules'),
     user: 'ian',
+    owner: 'ian',
     name: 'cairn-orb-check-fixture',
     wait,
   };
@@ -284,7 +286,10 @@ test('invalid firewall port configuration fails before host commands', () => {
     [22, NaN],
     [22, 1.5],
   ]) {
-    assert.throws(() => checkHost({ run: f.run, user: 'ian', blockedPorts }), /ports/i);
+    assert.throws(
+      () => checkHost({ run: f.run, user: 'ian', owner: 'ian', blockedPorts }),
+      /ports/i,
+    );
   }
   assert.equal(f.calls.length, 0);
 });
@@ -293,7 +298,12 @@ for (const failure of ['', 'curl', 'timeout', 'test']) {
   test(`guest metadata probes execute as bounded local commands: ${failure || 'pass'}`, (t) => {
     const root = mkdtempSync(join(tmpdir(), 'cairn-orb-guest-'));
     t.after(() => rmSync(root, { recursive: true, force: true }));
-    const request = { version: 1, requestId: 'request-123', blockedPorts: [22, 5231] };
+    const request = {
+      version: 1,
+      requestId: 'request-123',
+      blockedPorts: [22, 5231],
+      owner: 'ian',
+    };
     writeFileSync(join(root, 'check-request'), JSON.stringify(request));
     const calls = [];
     runGuestCheck({
@@ -343,9 +353,19 @@ for (const failure of ['', 'curl', 'timeout', 'test']) {
 }
 
 test('guest refuses malformed requests before invoking probes', (t) => {
-  const root = mkdtempSync(join(tmpdir(), 'cairn-orb-guest-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  for (const request of [{}, { version: 1, requestId: 'x', blockedPorts: [22, 7890] }]) {
+  const root = makeTestTempDir('cairn-orb-guest-');
+  t.after(() => releaseTestTempDir(root));
+  for (const request of [
+    {},
+    { version: 1, requestId: 'x', blockedPorts: [22, 7890], owner: 'ian' },
+    { version: 1, requestId: 'x', blockedPorts: [22, 5231] },
+    ...['', 'Ian', 'ian/../root', 'a b', 42, null].map((owner) => ({
+      version: 1,
+      requestId: 'x',
+      blockedPorts: [22, 5231],
+      owner,
+    })),
+  ]) {
     writeFileSync(join(root, 'check-request'), JSON.stringify(request));
     assert.throws(() =>
       runGuestCheck({ directory: root, run: () => assert.fail('unexpected probe') }),
@@ -670,7 +690,12 @@ for (const ready of [false, true]) {
     t.after(() => rmSync(root, { recursive: true, force: true }));
     writeFileSync(
       join(root, 'check-request'),
-      JSON.stringify({ version: 1, requestId: 'network-test', blockedPorts: [22, 5231] }),
+      JSON.stringify({
+        version: 1,
+        requestId: 'network-test',
+        blockedPorts: [22, 5231],
+        owner: 'ian',
+      }),
     );
     let elapsed = 0;
     const calls = [];
@@ -875,4 +900,64 @@ test('failed clone cleanup reports the image removal failure', (t) => {
   assert.equal(result.ok, false);
   assert.ok(result.errors.some((error) => error.includes('remove failed')));
   assert.ok(f.calls.some((call) => call.includes('remove') && call.includes(f.name)));
+});
+
+test('the host check compares the current user with the owner file, not a fixed account', (t) => {
+  const f = fakeHost(t);
+  assert.throws(
+    () => checkHost({ ...f, user: 'ian', owner: 'alice' }),
+    /Run the host check as alice without sudo/,
+  );
+  assert.throws(
+    () => checkHost({ ...f, user: 'alice', owner: 'ian' }),
+    /Run the host check as ian without sudo/,
+  );
+  assert.throws(() => checkHost({ ...f, user: 'root', owner: 'alice' }), /as alice without sudo/);
+  assert.equal(checkHost({ ...f, user: 'alice', owner: 'alice' }).ok, true);
+});
+
+test('the host check fails closed when the owner file is missing or invalid', (t) => {
+  const f = fakeHost(t);
+  const { owner, ...withoutOwner } = f;
+  const directory = makeTestTempDir('cairn-orb-owner-');
+  t.after(() => releaseTestTempDir(directory));
+  assert.throws(
+    () => checkHost({ ...withoutOwner, ownerFile: join(directory, 'owner') }),
+    /Cannot read the orb owner file/,
+  );
+  writeFileSync(join(directory, 'owner'), 'Not Valid\n');
+  assert.throws(
+    () => checkHost({ ...withoutOwner, ownerFile: join(directory, 'owner') }),
+    /Invalid orb owner/,
+  );
+  writeFileSync(join(directory, 'owner'), 'ian\n');
+  assert.equal(checkHost({ ...withoutOwner, ownerFile: join(directory, 'owner') }).ok, true);
+  assert.equal(f.calls.length > 0, true);
+});
+
+test('the host passes the owner to the guest and the guest checks that home is absent', (t) => {
+  const f = fakeHost(t);
+  const requests = [];
+  const wait = () => {
+    const path = join(f.runtimeRoot, f.name, 'check-request');
+    if (existsSync(path)) requests.push(JSON.parse(readFileSync(path, 'utf8')));
+    f.wait();
+  };
+  checkHost({ ...f, user: 'alice', owner: 'alice', wait });
+  assert.ok(requests.length > 0);
+  assert.ok(requests.every((request) => request.owner === 'alice'));
+  const root = mkdtempSync(join(tmpdir(), 'cairn-orb-guest-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(join(root, 'check-request'), JSON.stringify(requests[0]));
+  const calls = [];
+  runGuestCheck({
+    directory: root,
+    network: { timeoutMs: 0, now: () => 0, wait: () => {} },
+    run: (cmd, args) => {
+      calls.push([cmd, ...args].join(' '));
+      return { status: 0, stdout: '' };
+    },
+  });
+  assert.ok(calls.includes('test ! -e /home/alice'));
+  assert.ok(!calls.some((call) => call.includes('/home/ian')));
 });

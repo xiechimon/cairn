@@ -138,6 +138,22 @@ test('switching forms drops the other face input', async ({ page }) => {
   await expect(page.getByRole('textbox', { name: '本地文件夹' })).toHaveCount(1);
 });
 
+test('Escape in a field keeps the half-filled form; Escape outside a field closes it to the page underneath', async ({
+  page,
+}) => {
+  await page.goto(NEW_PROJECT);
+  const dialog = page.getByRole('dialog', { name: '新建项目' });
+  const name = page.locator('#prj-new-name');
+  await name.fill('half typed');
+  await name.press('Escape');
+  await expect(dialog).toBeVisible();
+  await expect(name).toHaveValue('half typed');
+  await page.getByTestId('route-dialog-head').click();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(/\/app\?scenario=01$/);
+});
+
 test('Escape closes the repo popover', async ({ page }) => {
   await openMenu(page);
   await page.keyboard.press('Escape');

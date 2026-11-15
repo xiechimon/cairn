@@ -180,7 +180,7 @@ function fireDesktopNotification(record: NotificationRecord): void {
 }
 
 export interface ConversationStreamHandlers {
-  onMessage?: (row: TranscriptRow) => void;
+  onMessage?: (row: TranscriptRow, clientMessageId?: string) => void;
   onStep?: (step: ConversationStepEvent['step']) => void;
 }
 
@@ -277,7 +277,11 @@ export function startConversationStream(
           if (isChiefConversationId(conversationId)) {
             void invalidateConverged(qc, { queryKey: ['tasks'] });
           }
-          onMessage?.(row);
+          const clientMessageId = conversationMessageEventSchema.shape.clientMessageId.safeParse(
+            ev.clientMessageId,
+          ).data;
+          if (clientMessageId === undefined) onMessage?.(row);
+          else onMessage?.(row, clientMessageId);
           break;
         }
         case 'step': {
