@@ -194,6 +194,18 @@ test('pick from this machine: imported and unimportable rows are disabled, two p
   await expect(rows.nth(1)).toContainText('已勾选另一个同名技能');
   await expect(submit).toHaveText('导入 1 个');
 
+  await expect(rows.first()).not.toContainText(SHARED);
+
+  const all = dialog.getByTestId('skill-candidate-all');
+  await expect(all).toBeChecked();
+  await all.click();
+  await expect(submit).toHaveText('导入');
+  await all.click();
+  await expect(rows.nth(0).getByRole('checkbox')).toBeChecked();
+  await expect(rows.nth(1).getByRole('checkbox')).not.toBeChecked();
+  await expect(rows.filter({ hasText: 'review' }).getByRole('checkbox')).not.toBeChecked();
+  await expect(submit).toHaveText('导入 1 个');
+
   await dialog.getByRole('textbox', { name: '搜索技能' }).fill('nodesc');
   await expect(rows).toHaveCount(1);
 });

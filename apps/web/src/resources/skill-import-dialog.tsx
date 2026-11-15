@@ -57,26 +57,63 @@ function ErrorLine({ error }: { error: ErrorCopy }) {
   );
 }
 
+function importable(c: SkillImportCandidate): boolean {
+  return !c.alreadyImported && c.problem === null;
+}
+
+function addableCandidates(
+  candidates: SkillImportCandidate[],
+  selected: Set<string>,
+): SkillImportCandidate[] {
+  const taken = new Set(candidates.filter((c) => selected.has(c.sourcePath)).map((c) => c.id));
+  const out: SkillImportCandidate[] = [];
+  for (const c of candidates) {
+    if (!importable(c) || selected.has(c.sourcePath) || taken.has(c.id)) continue;
+    taken.add(c.id);
+    out.push(c);
+  }
+  return out;
+}
+
 function CandidateList({
   candidates,
   selected,
   failed,
   onToggle,
+  onSelectAll,
 }: {
   candidates: SkillImportCandidate[];
   selected: Set<string>;
   failed: Map<string, ErrorCopy>;
   onToggle: (c: SkillImportCandidate) => void;
+  onSelectAll: (all: boolean) => void;
 }) {
   const { t } = useI18n();
   const selectedIds = new Set(
     candidates.filter((c) => selected.has(c.sourcePath)).map((c) => c.id),
   );
+  const shownSelected = candidates.some((c) => selected.has(c.sourcePath));
+  const addable = addableCandidates(candidates, selected);
   return (
     <div
       data-testid="skill-candidates"
       className="max-h-80 overflow-y-auto rounded-md border border-border bg-card dark:bg-input/30"
     >
+      <label
+        htmlFor="skill-candidate-all"
+        className="sticky top-0 z-[1] flex cursor-pointer items-center gap-3 border-b border-border bg-card px-3 py-2 text-ui text-foreground has-disabled:cursor-default dark:bg-popover"
+      >
+        <Checkbox
+          id="skill-candidate-all"
+          data-testid="skill-candidate-all"
+          checked={shownSelected && addable.length === 0}
+          indeterminate={shownSelected && addable.length > 0}
+          disabled={!shownSelected && addable.length === 0}
+          onCheckedChange={() => onSelectAll(addable.length > 0)}
+          aria-label={t('全选')}
+        />
+        {t('全选')}
+      </label>
       {candidates.map((c, index) => {
         const checkboxId = `skill-candidate-${index}`;
         const checked = selected.has(c.sourcePath);
@@ -116,9 +153,6 @@ function CandidateList({
                   {c.description}
                 </span>
               )}
-              <span className="truncate font-mono text-meta text-content-tertiary">
-                {c.sourcePath}
-              </span>
               {error !== undefined && <ErrorLine error={error} />}
             </span>
           </label>
@@ -177,6 +211,14 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
       const next = new Set(prev);
       if (next.has(c.sourcePath)) next.delete(c.sourcePath);
       else next.add(c.sourcePath);
+      return next;
+    });
+
+  const selectAll = (all: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (all) for (const c of addableCandidates(shown, prev)) next.add(c.sourcePath);
+      else for (const c of shown) next.delete(c.sourcePath);
       return next;
     });
 
@@ -272,6 +314,7 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
                   selected={selected}
                   failed={failed}
                   onToggle={toggle}
+                  onSelectAll={selectAll}
                 />
               )}
               <p className="text-meta text-content-tertiary">

@@ -596,6 +596,7 @@ export const EN: Record<string, string> = {
   '拉取来源失败——稍后重试。': 'Fetching the source failed — try again later.',
   '导入失败，请重试。': 'Import failed, please retry.',
   从本机选择: 'From this machine',
+  全选: 'Select all',
   '路径或 GitHub': 'Path or GitHub',
   搜索技能: 'Search skills',
   '导入 {count} 个': 'Import {count}',
