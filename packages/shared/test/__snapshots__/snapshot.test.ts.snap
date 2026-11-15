@@ -7154,6 +7154,68 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
               },
               "type": "array",
             },
+            "deliverables": {
+              "additionalProperties": false,
+              "properties": {
+                "items": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "attachmentId": {
+                        "type": "string",
+                      },
+                      "kind": {
+                        "enum": [
+                          "page",
+                          "slides",
+                        ],
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "sizeBytes": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                    },
+                    "required": [
+                      "attachmentId",
+                      "kind",
+                      "name",
+                      "sizeBytes",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "skipped": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                      },
+                      "reason": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "name",
+                      "reason",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "items",
+                "skipped",
+              ],
+              "type": "object",
+            },
             "githubLabelIds": {
               "items": {
                 "type": "string",
@@ -11991,6 +12053,68 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         "type": "object",
       },
       "type": "array",
+    },
+    "deliverables": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "attachmentId": {
+                "type": "string",
+              },
+              "kind": {
+                "enum": [
+                  "page",
+                  "slides",
+                ],
+                "type": "string",
+              },
+              "name": {
+                "type": "string",
+              },
+              "sizeBytes": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+            },
+            "required": [
+              "attachmentId",
+              "kind",
+              "name",
+              "sizeBytes",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "skipped": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+              },
+              "reason": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "name",
+              "reason",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+      },
+      "required": [
+        "items",
+        "skipped",
+      ],
+      "type": "object",
     },
     "githubLabelIds": {
       "items": {
