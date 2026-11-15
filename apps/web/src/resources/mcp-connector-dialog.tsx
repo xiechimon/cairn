@@ -4,7 +4,8 @@ import {
   type McpConnectorRecord,
   mcpCatalogEntry,
 } from '@cairn/shared';
-import { useState } from 'react';
+import { cn } from 'cn';
+import { type Ref, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApiMutations } from '../api/hooks.js';
 import { FORM_CONTROL_CLS, FormField, FormStack } from '../components/form-layout.js';
@@ -14,10 +15,18 @@ import {
   DIALOG_TEXT_BUTTON,
   DialogShell,
 } from '../components/ui/dialog-shell.js';
+import { Field } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
 import { Plus, X } from '../icons/index.js';
-import { McpConnectorIcon } from './mcp-connector-icon.js';
+import { DeleteConfirm } from '../overlay/delete-confirm.js';
+
+const PALE_DISABLED = 'disabled:bg-secondary/50 disabled:text-content-dim disabled:opacity-100';
+
+const FIELD_CLS = cn(FORM_CONTROL_CLS, 'placeholder:text-content-tertiary');
+
+const VALUE_BOX_CLS =
+  'm-0 rounded-(--radius-control) bg-muted px-3 py-2 font-mono text-ui text-foreground break-all';
 
 export type McpDialogTarget =
   | { kind: 'catalog'; entry: McpCatalogEntry }
@@ -74,7 +83,7 @@ function submitError(t: Translate, error: unknown): string {
   if (error instanceof ApiError && error.status === 409)
     return t('这个标识已经被占用了，换一个标识再试。');
   if (error instanceof ApiError && error.status === 400)
-    return t('有字段格式不对。地址要以 https:// 开头，标识只能用小写字母、数字和 -。');
+    return t('有字段格式不对。地址要以 https:// 开头，标识只能用小写字母、数字和连字符（-）。');
   return t('没能保存，稍后重试。');
 }
 
@@ -147,8 +156,10 @@ function DialogFoot({
   onCancel,
   danger,
   secondary,
+  primaryRef,
 }: {
   primary: FootAction;
+  primaryRef?: Ref<HTMLButtonElement>;
   onCancel: () => void;
   danger?: FootAction;
   secondary?: FootAction;
@@ -156,16 +167,6 @@ function DialogFoot({
   const { t } = useI18n();
   return (
     <div className="flex w-full items-center gap-2">
-      {secondary !== undefined && (
-        <Button
-          variant="ghost"
-          className={DIALOG_TEXT_BUTTON}
-          onClick={secondary.onClick}
-          disabled={secondary.disabled}
-        >
-          {secondary.label}
-        </Button>
-      )}
       {danger !== undefined && (
         <Button
           variant="ghost"
@@ -176,12 +177,23 @@ function DialogFoot({
           {danger.label}
         </Button>
       )}
+      {secondary !== undefined && (
+        <Button
+          variant="ghost"
+          className={DIALOG_TEXT_BUTTON}
+          onClick={secondary.onClick}
+          disabled={secondary.disabled}
+        >
+          {secondary.label}
+        </Button>
+      )}
       <span className="flex-1" />
       <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onCancel}>
         {t('取消')}
       </Button>
       <Button
-        className={DIALOG_PRIMARY_BUTTON}
+        ref={primaryRef}
+        className={cn(DIALOG_PRIMARY_BUTTON, PALE_DISABLED)}
         onClick={primary.onClick}
         disabled={primary.disabled}
       >
@@ -223,7 +235,7 @@ function TokenField({
               href={entry.tokenHelpUrl}
               target="_blank"
               rel="noreferrer"
-              className="text-foreground underline underline-offset-2"
+              className="whitespace-nowrap text-foreground underline underline-offset-2"
             >
               {t('去 {name} 创建', { name: entry.name })}
             </a>
@@ -235,7 +247,7 @@ function TokenField({
         id="mcp-token"
         type="password"
         autoComplete="off"
-        className={FORM_CONTROL_CLS}
+        className={FIELD_CLS}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -282,7 +294,6 @@ function CatalogConnectDialog({
     <DialogShell
       title={t('连接 {name}', { name: entry.name })}
       subtitle={t(entry.description)}
-      headerAction={<McpConnectorIcon catalogId={entry.id} />}
       size="s"
       onClose={onClose}
       footer={
@@ -382,9 +393,9 @@ function CustomServerDialog({
         <FormField label={t('名称')} htmlFor="mcp-label">
           <Input
             id="mcp-label"
-            className={FORM_CONTROL_CLS}
+            className={FIELD_CLS}
             value={label}
-            placeholder={t('团队知识库')}
+            placeholder={t('例如：团队知识库')}
             onChange={(event) => {
               setLabel(event.target.value);
               if (!slugTouched) setSlug(slugOf(event.target.value));
@@ -394,34 +405,36 @@ function CustomServerDialog({
         <FormField
           label={t('标识')}
           htmlFor="mcp-slug"
-          help={t('Agent 用这个名字调用它。只能用小写字母、数字和 -。')}
+          help={t('Agent 用这个名字调用它。只能用小写字母、数字和连字符（-）。')}
         >
           <Input
             id="mcp-slug"
-            className={FORM_CONTROL_CLS}
+            className={FIELD_CLS}
             value={slug}
-            placeholder="team-wiki"
+            placeholder={t('例如：team-wiki')}
             onChange={(event) => {
               setSlugTouched(true);
               setSlug(event.target.value);
             }}
           />
         </FormField>
-        <FormField label={t('地址')} htmlFor="mcp-url" help={t('必须以 https:// 开头。')}>
+        <FormField
+          label={t('地址')}
+          htmlFor="mcp-url"
+          help={t('必须以 https:// 开头。支持浏览器登录的服务器不用填请求头。')}
+        >
           <Input
             id="mcp-url"
-            className={FORM_CONTROL_CLS}
+            className={FIELD_CLS}
             value={url}
-            placeholder="https://example.com/mcp"
+            placeholder={t('例如：https://example.com/mcp')}
             onChange={(event) => setUrl(event.target.value)}
           />
         </FormField>
         <FormField
           label={t('请求头（可选）')}
           htmlFor="mcp-header-name-0"
-          help={t(
-            '值加密存在本机服务器上，保存后看不到原文。服务器支持浏览器登录时，不填请求头，点「用浏览器登录」。',
-          )}
+          help={t('值加密保存在本机，保存后看不到原文。')}
         >
           <div className="flex flex-col gap-2">
             {headers.map((header, index) => (
@@ -429,7 +442,7 @@ function CustomServerDialog({
                 <Input
                   id={`mcp-header-name-${index}`}
                   aria-label={t('请求头名称')}
-                  className={`${FORM_CONTROL_CLS} w-40 flex-none`}
+                  className={cn(FIELD_CLS, 'w-32 flex-none sm:w-40')}
                   value={header.name}
                   placeholder="Authorization"
                   onChange={(event) => setHeader(index, { name: event.target.value })}
@@ -438,7 +451,7 @@ function CustomServerDialog({
                   aria-label={t('请求头的值')}
                   type="password"
                   autoComplete="off"
-                  className={`${FORM_CONTROL_CLS} min-w-0 flex-1`}
+                  className={cn(FIELD_CLS, 'min-w-0 flex-1')}
                   value={header.value}
                   placeholder="Bearer …"
                   onChange={(event) => setHeader(index, { value: event.target.value })}
@@ -490,7 +503,10 @@ function ManageConnectorDialog({
   const [token, setToken] = useState('');
   const [current, setCurrent] = useState(connector);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const primaryRef = useRef<HTMLButtonElement>(null);
   const oauth = current.authKind === 'oauth';
+  const needsAuth = oauth && current.status === 'needs_auth';
   const pending =
     mutations.patchMcpConnector.isPending ||
     mutations.checkMcpConnector.isPending ||
@@ -510,45 +526,57 @@ function ManageConnectorDialog({
     else mutations.checkMcpConnector.mutate(current.id, after);
   };
   const remove = () => {
+    setConfirmDelete(false);
     if (!live) return onClose();
     mutations.deleteMcpConnector.mutate(current.id, {
       onSuccess: onClose,
       onError: (error) => setSaveError(submitError(t, error)),
     });
   };
+  const recheck = {
+    label: token !== '' ? t('保存并检查') : t('重新检查'),
+    onClick: recheckOrSave,
+    disabled: pending,
+  };
+  const reconnect = {
+    label: t('重新连接'),
+    onClick: () => onSignIn({ kind: 'reconnect', connector: current }),
+    disabled: pending,
+  };
+  if (confirmDelete)
+    return (
+      <DeleteConfirm
+        open
+        title={t('确定删除 {name} 这个连接？', { name: current.label })}
+        summary={current.url}
+        ariaLabel={t('删除连接')}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={remove}
+      />
+    );
   return (
     <DialogShell
       title={current.label}
       subtitle={<ConnectorStatus record={current} />}
-      headerAction={<McpConnectorIcon catalogId={current.catalogId} />}
       size="s"
+      initialFocus={primaryRef}
       onClose={onClose}
       footer={
         <DialogFoot
-          primary={{
-            label: token !== '' ? t('保存并检查') : t('重新检查'),
-            onClick: recheckOrSave,
-            disabled: pending,
-          }}
+          primaryRef={primaryRef}
+          primary={needsAuth ? reconnect : recheck}
           onCancel={onClose}
-          danger={{ label: t('删除'), onClick: remove, disabled: pending }}
-          {...(oauth
-            ? {
-                secondary: {
-                  label: t('重新连接'),
-                  onClick: () => onSignIn({ kind: 'reconnect', connector: current }),
-                  disabled: pending,
-                },
-              }
-            : {})}
+          danger={{ label: t('删除'), onClick: () => setConfirmDelete(true), disabled: pending }}
+          {...(oauth ? { secondary: needsAuth ? recheck : reconnect } : {})}
         />
       }
     >
       <FormStack className="max-w-none">
-        <DialogError message={connectorProblem(t, current)} />
-        <FormField label={t('地址')} htmlFor="mcp-manage-url">
-          <Input id="mcp-manage-url" readOnly className={FORM_CONTROL_CLS} value={current.url} />
-        </FormField>
+        {!needsAuth && <DialogError message={connectorProblem(t, current)} />}
+        <Field>
+          <span className="text-ui font-medium text-foreground">{t('地址')}</span>
+          <p className={VALUE_BOX_CLS}>{current.url}</p>
+        </Field>
         {oauth && (
           <p className="m-0 text-meta text-content-tertiary">
             {t(
@@ -580,7 +608,7 @@ export function ConnectorStatus({ record }: { record: McpConnectorRecord }) {
   const { t } = useI18n();
   if (record.status === 'connected')
     return (
-      <span className="inline-flex items-center gap-1.5 text-meta text-running-text">
+      <span className="inline-flex items-center gap-1.5 text-meta text-content-secondary">
         <span aria-hidden className="size-1.5 flex-none rounded-full bg-running" />
         {record.toolCount !== null
           ? t('已连接 · {n} 个工具', { n: record.toolCount })
@@ -595,16 +623,23 @@ export function ConnectorStatus({ record }: { record: McpConnectorRecord }) {
       </span>
     );
   if (record.status === 'error')
-    return <span className="text-meta text-destructive">{t('连不上')}</span>;
+    return (
+      <span className="inline-flex items-center gap-1.5 text-meta text-destructive">
+        <span aria-hidden className="size-1.5 flex-none rounded-full bg-destructive" />
+        {t('连不上')}
+      </span>
+    );
   return <span className="text-meta text-content-tertiary">{t('还没检查')}</span>;
 }
 
 export function McpSignInDialog({
   signIn,
+  onLeave,
   onClose,
   onUseToken,
 }: {
   signIn: McpSignIn;
+  onLeave: () => void;
   onClose: () => void;
   onUseToken: (entry: McpCatalogEntry) => void;
 }) {
@@ -614,14 +649,16 @@ export function McpSignInDialog({
     <DialogShell
       title={t('前往 {host} 登录', { host: signIn.host })}
       subtitle={t('连接 {name}', { name: signIn.name })}
-      headerAction={<McpConnectorIcon catalogId={entry?.id ?? null} />}
       size="s"
       onClose={onClose}
       footer={
         <DialogFoot
           primary={{
             label: t('前往登录'),
-            onClick: () => window.location.assign(signIn.authorizationUrl),
+            onClick: () => {
+              onLeave();
+              window.location.assign(signIn.authorizationUrl);
+            },
           }}
           onCancel={onClose}
           {...(entry?.auth.includes('token')
@@ -631,13 +668,8 @@ export function McpSignInDialog({
       }
     >
       <FormStack className="max-w-none">
-        <p className="m-0 text-ui text-foreground">
-          {t('接下来会打开下面这个网址登录并授权，授权后自动回到这里。')}
-        </p>
-        <p
-          data-testid="mcp-signin-host"
-          className="m-0 rounded-(--radius-control) bg-muted px-3 py-2 font-mono text-ui text-foreground break-all"
-        >
+        <p className="m-0 text-ui text-foreground">{t('登录并授权后会自动回到这里。')}</p>
+        <p data-testid="mcp-signin-host" className={VALUE_BOX_CLS}>
           {signIn.host}
         </p>
         <p className="m-0 text-meta text-content-tertiary">

@@ -3,8 +3,8 @@ import {
   type McpCatalogEntry,
   type McpConnectorRecord,
   type StartMcpConnectorOAuthBody,
+  startMcpConnectorOAuthBodySchema,
 } from '@cairn/shared';
-import { cn } from 'cn';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
@@ -14,11 +14,10 @@ import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { NoticeBanner } from '../components/notice-banner.js';
 import { QueryBoundary } from '../components/query-state.js';
-import { SettingsSection } from '../components/settings-list.js';
+import { SettingsFlat, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { resolveScenario } from '../fixtures/scenario.js';
-import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import { Ban, Plus } from '../icons/index.js';
 import { PageShell } from '../pages/shell.js';
@@ -49,7 +48,67 @@ type FixtureDialog =
   | { kind: 'manage'; connectorId: string }
   | { kind: 'authorizing'; catalogId: string }
   | { kind: 'confirm'; name: string; host: string }
-  | { kind: 'landing'; reason: string };
+  | { kind: 'landing'; reason: string; name?: string };
+
+interface SignInAttempt {
+  name: string;
+  body: StartMcpConnectorOAuthBody;
+  catalogId?: string;
+}
+
+interface SignInNotice {
+  title: string;
+  body: string;
+  retry?: SignInAttempt;
+}
+
+type Translate = (text: string, vars?: Record<string, string>) => string;
+
+const ATTEMPT_KEY = 'cairn.mcpSignInAttempt';
+
+function saveAttempt(attempt: SignInAttempt) {
+  try {
+    sessionStorage.setItem(ATTEMPT_KEY, JSON.stringify(attempt));
+  } catch {}
+}
+
+function readAttempt(): SignInAttempt | null {
+  try {
+    const raw: unknown = JSON.parse(sessionStorage.getItem(ATTEMPT_KEY) ?? 'null');
+    if (typeof raw !== 'object' || raw === null || !('name' in raw) || !('body' in raw))
+      return null;
+    const body = startMcpConnectorOAuthBodySchema.safeParse(raw.body);
+    if (typeof raw.name !== 'string' || !body.success) return null;
+    const catalogId =
+      'catalogId' in raw && typeof raw.catalogId === 'string' ? raw.catalogId : null;
+    return { name: raw.name, body: body.data, ...(catalogId !== null ? { catalogId } : {}) };
+  } catch {
+    return null;
+  }
+}
+
+function forgetAttempt() {
+  try {
+    sessionStorage.removeItem(ATTEMPT_KEY);
+  } catch {}
+}
+
+function landingNotice(t: Translate, reason: string | null, attempt: SignInAttempt | null) {
+  const name = attempt?.name ?? t('这个服务');
+  const body =
+    reason === 'denied'
+      ? t('你取消了授权，这次什么都没有保存。')
+      : reason === 'state'
+        ? t('登录等得太久已经失效，重新接入一次。')
+        : reason === 'conflict'
+          ? t('授权期间这个连接有了变动，这次授权没有保存。')
+          : t('{name} 没有完成授权，可以再试一次。', { name });
+  return {
+    title: t('没能连上 {name}', { name }),
+    body,
+    ...(attempt !== null ? { retry: attempt } : {}),
+  };
+}
 
 function initialTarget(
   ui: FixtureDialog | undefined,
@@ -85,21 +144,31 @@ export function McpServersPage() {
   const [authorizing, setAuthorizing] = useState<string | null>(
     fixtureDialog?.kind === 'authorizing' ? fixtureDialog.catalogId : null,
   );
-  const [signIn, setSignIn] = useState<McpSignIn | null>(
+  const [signIn, setSignIn] = useState<(McpSignIn & { attempt?: SignInAttempt }) | null>(
     fixtureDialog?.kind === 'confirm'
       ? { name: fixtureDialog.name, host: fixtureDialog.host, authorizationUrl: '#' }
       : null,
   );
-  const [landingError, setLandingError] = useState<string | null>(
-    fixtureDialog?.kind === 'landing' ? oauthReasonCopy(fixtureDialog.reason, t) : null,
-  );
+  const [notice, setNotice] = useState<SignInNotice | null>(() => {
+    if (fixtureDialog?.kind !== 'landing') return null;
+    const entry = MCP_CATALOG.find((e) => e.name === fixtureDialog.name);
+    return landingNotice(
+      t,
+      fixtureDialog.reason,
+      entry !== undefined ? catalogAttempt(entry) : null,
+    );
+  });
   const connectedCatalog = new Set(connectors.map((c) => c.catalogId));
   const available = MCP_CATALOG.filter((entry) => !connectedCatalog.has(entry.id));
 
   useEffect(() => {
     const oauth = searchParams.get('oauth');
     if (oauth === null) return;
-    setLandingError(oauth === 'error' ? oauthReasonCopy(searchParams.get('reason'), t) : null);
+    if (oauth === 'error') setNotice(landingNotice(t, searchParams.get('reason'), readAttempt()));
+    else {
+      setNotice(null);
+      forgetAttempt();
+    }
     const next = new URLSearchParams(searchParams);
     next.delete('oauth');
     next.delete('reason');
@@ -107,53 +176,53 @@ export function McpServersPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, t]);
 
-  const startSignIn = (
-    key: string,
-    body: StartMcpConnectorOAuthBody,
-    name: string,
-    entry?: McpCatalogEntry,
-  ) => {
-    setLandingError(null);
+  const startSignIn = (attempt: SignInAttempt) => {
+    setNotice(null);
+    const { name } = attempt;
+    const entry = MCP_CATALOG.find((e) => e.id === attempt.catalogId);
+    const withEntry = entry !== undefined ? { entry } : {};
     if (!live) {
       const host = entry !== undefined ? hostOf(entry.url) : name;
-      return setSignIn({ name, host, authorizationUrl: '#', ...(entry ? { entry } : {}) });
+      return setSignIn({ name, host, authorizationUrl: '#', attempt, ...withEntry });
     }
-    setAuthorizing(key);
-    mutations.startMcpConnectorOAuth.mutate(body, {
+    const failed = (body: string, retry: boolean) =>
+      setNotice({
+        title: t('没能连上 {name}', { name }),
+        body,
+        ...(retry ? { retry: attempt } : {}),
+      });
+    setAuthorizing(attemptKey(attempt));
+    mutations.startMcpConnectorOAuth.mutate(attempt.body, {
       onSuccess: ({ authorizationUrl }) =>
         URL.canParse(authorizationUrl) && new URL(authorizationUrl).protocol === 'https:'
           ? setSignIn({
               name,
               host: new URL(authorizationUrl).host,
               authorizationUrl,
-              ...(entry ? { entry } : {}),
+              attempt,
+              ...withEntry,
             })
-          : setLandingError(t('没能开始登录 {name}，稍后重试。', { name })),
-      onError: (error) => setLandingError(signInError(t, error, name)),
+          : failed(t('没能开始登录，稍后再试。'), true),
+      onError: (error) => {
+        const status = error instanceof ApiError ? error.status : null;
+        failed(signInError(t, status, name), status !== 400 && status !== 409);
+      },
       onSettled: () => setAuthorizing(null),
     });
   };
 
   const requestSignIn = (request: McpOAuthRequest) => {
     setDialog(null);
-    if (request.kind === 'custom') return startSignIn(request.slug, request, request.label);
-    const entry = MCP_CATALOG.find((e) => e.id === request.connector.catalogId);
-    startSignIn(
-      request.connector.id,
-      { kind: 'reconnect', connectorId: request.connector.id },
-      request.connector.label,
-      entry,
-    );
+    if (request.kind === 'custom') return startSignIn({ name: request.label, body: request });
+    startSignIn({
+      name: request.connector.label,
+      body: { kind: 'reconnect', connectorId: request.connector.id },
+      ...(request.connector.catalogId !== null ? { catalogId: request.connector.catalogId } : {}),
+    });
   };
 
   const connect = (entry: McpCatalogEntry) => {
-    if (entry.auth.includes('oauth'))
-      return startSignIn(
-        entry.id,
-        { kind: 'catalog', catalogId: entry.id, slug: entry.id },
-        entry.name,
-        entry,
-      );
+    if (entry.auth.includes('oauth')) return startSignIn(catalogAttempt(entry));
     if (entry.auth.includes('none')) {
       if (live)
         mutations.createMcpConnector.mutate({
@@ -192,83 +261,99 @@ export function McpServersPage() {
         empty={null}
       >
         <div className="mt-6 flex flex-col gap-8">
-          {landingError !== null && (
-            <NoticeBanner
-              tone="danger"
-              icon={Ban}
-              title={landingError}
-              data-testid="mcp-oauth-error"
-              actions={
-                <Button variant="ghost" size="sm" onClick={() => setLandingError(null)}>
-                  {t('知道了')}
-                </Button>
-              }
-            />
-          )}
-          {connectors.length > 0 && (
-            <SettingsSection title={t('已接入')} testId="mcp-connected">
-              <CardGrid>
-                {connectors.map((record) => {
-                  const entry = MCP_CATALOG.find((e) => e.id === record.catalogId);
-                  return (
-                    <ConnectorCard
-                      key={record.id}
-                      catalogId={record.catalogId}
-                      name={record.label}
-                      description={entry !== undefined ? t(entry.description) : hostOf(record.url)}
-                      status={<ConnectorStatus record={record} />}
-                      action={
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDialog({ kind: 'manage', connector: record })}
-                          aria-label={t('管理 {name}', { name: record.label })}
-                        >
-                          {t('管理')}
-                        </Button>
-                      }
-                    />
-                  );
-                })}
-              </CardGrid>
-            </SettingsSection>
-          )}
-          {available.length > 0 && (
-            <SettingsSection title={t('可接入')} testId="mcp-catalog">
-              <CardGrid>
-                {available.map((entry) => (
-                  <ConnectorCard
-                    key={entry.id}
-                    catalogId={entry.id}
-                    name={entry.name}
-                    description={t(entry.description)}
-                    status={
-                      authorizing === entry.id ? (
-                        <span className="text-meta text-content-tertiary">
-                          {t('正在找到 {name} 的登录地址…', { name: entry.name })}
-                        </span>
-                      ) : undefined
-                    }
-                    action={
+          <SettingsFlat>
+            {notice !== null && (
+              <NoticeBanner
+                tone="danger"
+                icon={Ban}
+                title={notice.title}
+                body={notice.body}
+                data-testid="mcp-oauth-error"
+                actions={
+                  <>
+                    <Button variant="ghost" size="sm" onClick={() => setNotice(null)}>
+                      {t('知道了')}
+                    </Button>
+                    {notice.retry !== undefined && (
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={authorizing === entry.id}
-                        onClick={() => connect(entry)}
-                        aria-label={t('接入 {name}', { name: entry.name })}
+                        onClick={() => notice.retry !== undefined && startSignIn(notice.retry)}
                       >
-                        {authorizing === entry.id ? t('正在准备…') : t('接入')}
+                        {t('重试')}
                       </Button>
-                    }
-                  />
-                ))}
-              </CardGrid>
-            </SettingsSection>
-          )}
+                    )}
+                  </>
+                }
+              />
+            )}
+            {connectors.length > 0 && (
+              <SettingsSection title={t('已接入')} testId="mcp-connected">
+                <CardGrid>
+                  {connectors.map((record) => {
+                    const entry = MCP_CATALOG.find((e) => e.id === record.catalogId);
+                    return (
+                      <ConnectorCard
+                        key={record.id}
+                        catalogId={record.catalogId}
+                        name={record.label}
+                        description={
+                          entry !== undefined ? t(entry.description) : hostOf(record.url)
+                        }
+                        status={<ConnectorStatus record={record} />}
+                        action={
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDialog({ kind: 'manage', connector: record })}
+                            aria-label={t('管理 {name}', { name: record.label })}
+                          >
+                            {t('管理')}
+                          </Button>
+                        }
+                      />
+                    );
+                  })}
+                </CardGrid>
+              </SettingsSection>
+            )}
+            {available.length > 0 && (
+              <SettingsSection title={t('可接入')} testId="mcp-catalog">
+                <CardGrid>
+                  {available.map((entry) => (
+                    <ConnectorCard
+                      key={entry.id}
+                      catalogId={entry.id}
+                      name={entry.name}
+                      description={t(entry.description)}
+                      status={
+                        authorizing === entry.id ? (
+                          <span className="text-meta text-content-tertiary">
+                            {t('正在找到 {name} 的登录地址…', { name: entry.name })}
+                          </span>
+                        ) : undefined
+                      }
+                      action={
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={authorizing === entry.id}
+                          onClick={() => connect(entry)}
+                          aria-label={t('接入 {name}', { name: entry.name })}
+                        >
+                          {authorizing === entry.id ? t('正在准备…') : t('接入')}
+                        </Button>
+                      }
+                    />
+                  ))}
+                </CardGrid>
+              </SettingsSection>
+            )}
+          </SettingsFlat>
           {local.length > 0 && (
             <SettingsSection
               title={t('本机配置')}
-              description={t('来自服务器所在电脑的 ~/.claude.json，在那里修改。')}
+              description={t('来自服务器所在电脑的本机配置文件，在那里修改。')}
               testId="mcp-local"
             >
               <ResourceList className="mt-0">
@@ -299,6 +384,7 @@ export function McpServersPage() {
       {signIn !== null && (
         <McpSignInDialog
           signIn={signIn}
+          onLeave={() => signIn.attempt !== undefined && saveAttempt(signIn.attempt)}
           onClose={() => setSignIn(null)}
           onUseToken={(entry) => {
             setSignIn(null);
@@ -310,18 +396,23 @@ export function McpServersPage() {
   );
 }
 
-function signInError(
-  t: (text: string, vars?: Record<string, string>) => string,
-  error: unknown,
-  name: string,
-): string {
-  if (error instanceof ApiError && error.status === 409)
-    return t('标识 {name} 已经被占用了，先删掉旧的连接或换个名字。', { name });
-  if (error instanceof ApiError && error.status === 400)
-    return t('{name} 不支持浏览器登录。改用令牌或请求头连接。', { name });
-  if (error instanceof ApiError && error.status === 502)
-    return t('{name} 的登录服务没有接受 Cairn 的注册，稍后重试。', { name });
-  return t('没能开始登录 {name}，稍后重试。', { name });
+function signInError(t: Translate, status: number | null, name: string): string {
+  if (status === 409) return t('这个标识已经被占用，先删掉旧的连接或换个名字。');
+  if (status === 400) return t('{name} 不支持浏览器登录，改用令牌或请求头连接。', { name });
+  if (status === 502) return t('{name} 的登录服务没有接受 Cairn 的注册，稍后再试。', { name });
+  return t('没能开始登录，稍后再试。');
+}
+
+function catalogAttempt(entry: McpCatalogEntry): SignInAttempt {
+  return {
+    name: entry.name,
+    catalogId: entry.id,
+    body: { kind: 'catalog', catalogId: entry.id, slug: entry.id },
+  };
+}
+
+function attemptKey({ body }: SignInAttempt): string {
+  return body.kind === 'reconnect' ? body.connectorId : body.slug;
 }
 
 const hostOf = (url: string) => (URL.canParse(url) ? new URL(url).host : url);
@@ -347,14 +438,14 @@ function ConnectorCard({
     <Card
       size="sm"
       data-connector-card={catalogId ?? name}
-      className={cn('min-h-28 gap-2 rounded-(--radius-card) px-4 ring-border')}
+      className="gap-2 rounded-(--radius-card) px-4 ring-border"
     >
       <div className="flex items-center gap-3">
         <McpConnectorIcon catalogId={catalogId} />
         <span className="min-w-0 flex-1 truncate text-ui font-medium text-foreground">{name}</span>
         {action}
       </div>
-      <p className="m-0 line-clamp-2 text-meta text-content-tertiary">{description}</p>
+      <p className="m-0 line-clamp-2 text-meta text-content-secondary">{description}</p>
       {status !== undefined && <div className="mt-auto">{status}</div>}
     </Card>
   );

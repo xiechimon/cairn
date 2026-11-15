@@ -150,6 +150,21 @@ test('mcp page: catalog cards connect, add-server opens a form, local rows stay 
   await page.getByTestId('mcp-add-server').click();
   await expect(page.getByRole('dialog', { name: '添加 MCP 服务器' })).toBeVisible();
 
+  await page.goto('/app/resources/mcp-servers?scenario=mcp-manage-needs-auth');
+  const manage = page.getByRole('dialog', { name: 'Cloudflare' });
+  await expect(manage.getByTestId('dialog-foot').getByRole('button').last()).toHaveText('重新连接');
+  await manage.getByRole('button', { name: '删除' }).click();
+  const confirm = page.getByRole('alertdialog', { name: '删除连接' });
+  await expect(confirm).toBeVisible();
+  await expect(manage).toHaveCount(0);
+  await confirm.getByRole('button', { name: '取消' }).click();
+  await expect(manage).toBeVisible();
+
+  await page.goto('/app/resources/mcp-servers?scenario=mcp-oauth-denied');
+  const banner = page.getByTestId('mcp-oauth-error');
+  await expect(banner).toContainText('没能连上 Linear');
+  await expect(banner.getByRole('button', { name: '重试' })).toBeVisible();
+
   await page.goto('/app/resources/mcp-servers?scenario=07');
   await expect(page.locator('[data-testid="resource-row"][data-mcp]')).toHaveCount(1);
   await expect(page.locator('[data-testid="resource-row"] button')).toHaveCount(0);

@@ -587,5 +587,5 @@ export const resourcesMcpConfirmHost: FixtureSet = {
 
 export const resourcesMcpOAuthDenied: FixtureSet = {
   ...resourcesMcpConnectors,
-  ui: { mcpDialog: { kind: 'landing', reason: 'denied' } },
+  ui: { mcpDialog: { kind: 'landing', reason: 'denied', name: 'Linear' } },
 };

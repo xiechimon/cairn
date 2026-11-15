@@ -2171,8 +2171,6 @@ export const EN: Record<string, string> = {
   运行机器: 'Machine',
   目录: 'Folder',
   还没分配机器: 'No machine yet',
-  '授权期间这个连接已有变动，没有保存这次授权。请重新连接。':
-    'The connection changed while you were signing in, so this sign-in was not saved. Reconnect it.',
   '{name} 拒绝了这个令牌。检查令牌是否填对、有没有过期，然后换一个新的。':
     '{name} rejected this token. Check that it is correct and not expired, then use a new one.',
   '令牌有效，但权限不够。给令牌加上需要的权限后重新检查。':
@@ -2187,8 +2185,6 @@ export const EN: Record<string, string> = {
     'Refreshing the sign-in for {name} failed. Check again later.',
   '{name} 返回了错误。稍后重新检查。': '{name} returned an error. Check again later.',
   '这个标识已经被占用了，换一个标识再试。': 'This ID is already taken. Choose another one.',
-  '有字段格式不对。地址要以 https:// 开头，标识只能用小写字母、数字和 -。':
-    'A field is invalid. The URL must start with https://, and the ID may use only lowercase letters, digits and -.',
   '没能保存，稍后重试。': "Couldn't save. Try again later.",
   令牌: 'Token',
   '{label}（可选）': '{label} (optional)',
@@ -2203,12 +2199,8 @@ export const EN: Record<string, string> = {
   用浏览器登录: 'Sign in with browser',
   团队知识库: 'Team wiki',
   标识: 'ID',
-  'Agent 用这个名字调用它。只能用小写字母、数字和 -。':
-    'Agents call it by this name. Lowercase letters, digits and - only.',
   '必须以 https:// 开头。': 'Must start with https://.',
   '请求头（可选）': 'Headers (optional)',
-  '值加密存在本机服务器上，保存后看不到原文。服务器支持浏览器登录时，不填请求头，点「用浏览器登录」。':
-    "Values are stored encrypted on your server and can't be viewed after saving. If the server supports browser sign-in, leave headers empty and choose Sign in with browser.",
   请求头名称: 'Header name',
   请求头的值: 'Header value',
   删除这个请求头: 'Remove this header',
@@ -2226,8 +2218,6 @@ export const EN: Record<string, string> = {
   '前往 {host} 登录': 'Sign in at {host}',
   前往登录: 'Continue to sign in',
   改用令牌: 'Use a token instead',
-  '接下来会打开下面这个网址登录并授权，授权后自动回到这里。':
-    "You'll sign in and approve access at the address below, then come back here automatically.",
   '先确认这个网址属于 {name}，不认识就取消。':
     "Make sure this address belongs to {name}. If you don't recognize it, cancel.",
   知道了: 'Dismiss',
@@ -2239,30 +2229,51 @@ export const EN: Record<string, string> = {
   '正在准备…': 'Preparing…',
   接入: 'Connect',
   本机配置: 'Local config',
-  '来自服务器所在电脑的 ~/.claude.json，在那里修改。':
+  '来自服务器所在电脑的本机配置文件，在那里修改。':
     "From ~/.claude.json on the server's computer. Edit it there.",
-  '标识 {name} 已经被占用了，先删掉旧的连接或换个名字。':
-    'The ID {name} is already taken. Delete the old connection or pick another name.',
-  '{name} 不支持浏览器登录。改用令牌或请求头连接。':
-    "{name} doesn't support browser sign-in. Connect with a token or headers.",
-  '{name} 的登录服务没有接受 Cairn 的注册，稍后重试。':
-    "{name}'s sign-in service didn't accept Cairn's registration. Try again later.",
-  '没能开始登录 {name}，稍后重试。': "Couldn't start signing in to {name}. Try again later.",
-  '仓库、Issue、Pull Request 与 Actions': 'Repositories, issues, pull requests and Actions',
-  'Workers、DNS、R2 等 Cloudflare API': 'Workers, DNS, R2 and other Cloudflare APIs',
-  'Issue、项目与周期': 'Issues, projects and cycles',
+  '仓库、议题、拉取请求与工作流': 'Repositories, issues, pull requests and workflows',
+  '边缘函数、域名解析与对象存储': 'Edge functions, DNS and object storage',
+  '议题、项目与迭代周期': 'Issues, projects and cycles',
   页面与数据库: 'Pages and databases',
   '错误与性能问题（测试版）': 'Errors and performance issues (beta)',
   '数据库、函数与项目管理（测试版）': 'Databases, functions and project management (beta)',
-  '最新的库文档与代码示例，免登录直接用，也支持登录账号':
-    'Up-to-date library docs and code examples; works without sign-in, account sign-in also supported',
-  '模型、数据集与 Spaces': 'Models, datasets and Spaces',
+  '模型、数据集与演示应用': 'Models, datasets and demo apps',
   个人访问令牌: 'Personal access token',
   'API 令牌': 'API token',
   访问令牌: 'Access token',
-  '新建细粒度令牌，选好仓库，把 Contents、Issues、Pull requests 设为读写；勾了只读就只给读取。':
-    'Create a fine-grained token, pick the repositories, and set Contents, Issues and Pull requests to read and write; with read-only on, read access is enough.',
   只读: 'Read-only',
   工具集: 'Toolsets',
   '项目 ref': 'Project ref',
+  '有字段格式不对。地址要以 https:// 开头，标识只能用小写字母、数字和连字符（-）。':
+    'A field is not valid. The URL must start with https://, and the identifier may use only lowercase letters, digits and hyphens (-).',
+  '例如：团队知识库': 'For example: Team wiki',
+  'Agent 用这个名字调用它。只能用小写字母、数字和连字符（-）。':
+    'Agents call it by this name. Use only lowercase letters, digits and hyphens (-).',
+  '例如：team-wiki': 'For example: team-wiki',
+  '必须以 https:// 开头。支持浏览器登录的服务器不用填请求头。':
+    'Must start with https://. A server that supports browser sign-in needs no headers.',
+  '例如：https://example.com/mcp': 'For example: https://example.com/mcp',
+  '值加密保存在本机，保存后看不到原文。':
+    'Values are encrypted on this machine and cannot be viewed after saving.',
+  '确定删除 {name} 这个连接？': 'Delete the {name} connection?',
+  删除连接: 'Delete connection',
+  '登录并授权后会自动回到这里。': 'After you sign in and approve, you come back here.',
+  这个服务: 'this service',
+  '你取消了授权，这次什么都没有保存。': 'You cancelled the sign-in, so nothing was saved.',
+  '登录等得太久已经失效，重新接入一次。': 'The sign-in waited too long and expired. Connect again.',
+  '授权期间这个连接有了变动，这次授权没有保存。':
+    'The connection changed during sign-in, so this sign-in was not saved.',
+  '{name} 没有完成授权，可以再试一次。': '{name} did not finish the sign-in. You can try again.',
+  '没能连上 {name}': 'Could not connect {name}',
+  '没能开始登录，稍后再试。': 'Could not start the sign-in. Try again later.',
+  '这个标识已经被占用，先删掉旧的连接或换个名字。':
+    'This identifier is taken. Delete the old connection or pick another name.',
+  '{name} 不支持浏览器登录，改用令牌或请求头连接。':
+    'Browser sign-in is not available for {name}. Connect with a token or headers instead.',
+  '{name} 的登录服务没有接受 Cairn 的注册，稍后再试。':
+    "{name}'s sign-in service did not accept Cairn's registration. Try again later.",
+  '新建细粒度令牌，选好仓库，给 Contents、Issues、Pull requests 读写权限。':
+    'Create a fine-grained token, pick the repositories, and give Contents, Issues and Pull requests read and write access.',
+  '最新的库文档与代码示例，也支持登录':
+    'Up-to-date library docs and code examples; sign-in also supported',
 };

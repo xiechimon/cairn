@@ -160,7 +160,7 @@ export interface OverlayUi {
     | { kind: 'manage'; connectorId: string }
     | { kind: 'authorizing'; catalogId: string }
     | { kind: 'confirm'; name: string; host: string }
-    | { kind: 'landing'; reason: string };
+    | { kind: 'landing'; reason: string; name?: string };
 }
 
 export interface ScheduleRecord {
