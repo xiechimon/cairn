@@ -27,7 +27,7 @@ export function formatClock(totalSeconds: number): string {
 const HEAD =
   'flex min-w-0 max-w-full items-center gap-1 overflow-hidden whitespace-nowrap text-(--text-tertiary)';
 
-const HEAD_SIZE = { detail: 'text-ui leading-6', chief: 'text-meta leading-5' } as const;
+const HEAD_SIZE = 'text-ui leading-6';
 
 const HEAD_BTN =
   "chat-interaction h-auto min-h-0 w-fit cursor-pointer justify-start rounded-md border-none bg-transparent px-0 py-0.5 text-left font-normal hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
@@ -101,7 +101,6 @@ export interface LiveRowProps {
   labelVars?: TVars;
   labelDetail?: { label: string; vars: TVars };
   quiet?: boolean;
-  waiting?: boolean;
   notice?: boolean;
   blocked?: boolean;
   disclosure?: { expand: string; collapse: string } | null;
@@ -114,7 +113,6 @@ export function LiveRow({
   labelVars,
   labelDetail,
   quiet = false,
-  waiting = false,
   notice = true,
   blocked = false,
   disclosure = null,
@@ -122,9 +120,7 @@ export function LiveRow({
 }: LiveRowProps) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
-  const labelCls = waiting
-    ? 'chat-streaming-label truncate'
-    : 'chat-streaming-label truncate shimmer motion-reduce:shimmer-none';
+  const labelCls = 'chat-streaming-label truncate shimmer motion-reduce:shimmer-none';
   const body = (
     <>
       <span
@@ -137,7 +133,7 @@ export function LiveRow({
     </>
   );
   const testid = variant === 'detail' ? 'live-row' : undefined;
-  if (variant === 'chief' && !waiting) {
+  if (variant === 'chief') {
     const labelText = t(label, labelVars);
     if (blocked) return <BlockedTyping text={labelText} />;
     if (!notice) return <TypingDots label={labelText} />;
@@ -155,13 +151,13 @@ export function LiveRow({
   return (
     <div className="flex min-w-0 flex-col">
       {disclosure == null ? (
-        <span className={quiet ? 'sr-only' : `${HEAD} ${HEAD_SIZE[variant]}`} data-testid={testid}>
+        <span className={quiet ? 'sr-only' : `${HEAD} ${HEAD_SIZE}`} data-testid={testid}>
           {body}
         </span>
       ) : (
         <Button
           variant="ghost"
-          className={`${HEAD} ${HEAD_SIZE[variant]} ${HEAD_BTN}`}
+          className={`${HEAD} ${HEAD_SIZE} ${HEAD_BTN}`}
           data-testid={testid}
           aria-label={t(expanded ? disclosure.collapse : disclosure.expand)}
           aria-expanded={expanded}
@@ -171,12 +167,7 @@ export function LiveRow({
         </Button>
       )}
       {disclosure != null && expanded && children}
-      {!waiting &&
-        (variant === 'chief' ? (
-          <TypingDots className="mt-1" />
-        ) : (
-          <LivePulse className="mt-1 ml-0.5" />
-        ))}
+      <LivePulse className="mt-1 ml-0.5" />
     </div>
   );
 }
