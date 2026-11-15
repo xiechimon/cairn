@@ -60,6 +60,7 @@ import {
   correctionFromGithubLabels,
   todoGithubLabelIds,
 } from './github-labels.js';
+import { retireTodoDeliverables } from './machine-deliverables.js';
 import { priorSessionOf, soleOnlineMachineId, teamDefaultMachineId } from './machine-routing.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodo } from './notifications.js';
@@ -917,6 +918,7 @@ export function deleteTodo(deps: TodoDeps, id: string): boolean {
     queueIssueClose(db, row.teamId, row.sourceRef, DELETED_TASK_ISSUE_COMMENT);
   }
   db.delete(schedule).where(eq(schedule.todoId, id)).run();
+  retireTodoDeliverables(db, [id]);
   db.delete(todo).where(eq(todo.id, id)).run();
   return true;
 }

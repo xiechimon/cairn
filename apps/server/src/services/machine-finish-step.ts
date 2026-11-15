@@ -59,6 +59,7 @@ import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTod
 import { githubReadToken } from './github-autonomous-token.js';
 import { applyLocalMergeReport } from './local-merge.js';
 import { stopStepComputer } from './machine-computer.js';
+import { failUnpublishedDeliverables, withEventsAfterCommit } from './machine-deliverables.js';
 import {
   isChiefConversation,
   type MachineDeps,
@@ -199,7 +200,14 @@ export async function finishStep(
   stepId: string,
   body: MachineDoneBody,
 ): Promise<void> {
+  const claimed = deps.db.select().from(step).where(eq(step.id, stepId)).get();
+  if (body.generation !== undefined && claimed?.claimedAt !== body.generation) {
+    throw conflict(`step ${stepId} was claimed again after generation ${body.generation}`);
+  }
   await finishStepReport(deps, machineId, stepId, body);
+  if (claimed?.status === 'claimed' && claimed.machineId === machineId && claimed.claimedAt) {
+    failUnpublishedDeliverables(deps.db, stepId, claimed.claimedAt);
+  }
   stopStepComputer(deps, stepId);
   const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (row && !isChiefConversation(row.buildId)) await drainTaskMessageQueue(deps, row.buildId);
@@ -567,20 +575,28 @@ async function finishStepReport(
     return;
   }
   if (outcome.status === 'success') {
-    completeStep(deps, stepId, {
-      hasChanges: outcome.hasChanges,
-      ...(outcome.workBranchDrift !== undefined
-        ? { workBranchDrift: outcome.workBranchDrift }
-        : {}),
-      ...(outcome.findings !== undefined ? { findings: outcome.findings } : {}),
-      ...(outcome.findingsError !== undefined ? { findingsError: outcome.findingsError } : {}),
-      ...(outcome.verifyVerdict !== undefined ? { verifyVerdict: outcome.verifyVerdict } : {}),
-      ...(outcome.verifyVerdictError !== undefined
-        ? { verifyVerdictError: outcome.verifyVerdictError }
-        : {}),
-      ...(outcome.report !== undefined ? { report: outcome.report } : {}),
-      verdictReport,
-    });
+    const manifest =
+      body.generation !== undefined
+        ? { generation: body.generation, files: body.deliverables ?? [] }
+        : undefined;
+    const complete = (completeDeps: MachineDeps) =>
+      completeStep(completeDeps, stepId, {
+        hasChanges: outcome.hasChanges,
+        ...(outcome.workBranchDrift !== undefined
+          ? { workBranchDrift: outcome.workBranchDrift }
+          : {}),
+        ...(outcome.findings !== undefined ? { findings: outcome.findings } : {}),
+        ...(outcome.findingsError !== undefined ? { findingsError: outcome.findingsError } : {}),
+        ...(outcome.verifyVerdict !== undefined ? { verifyVerdict: outcome.verifyVerdict } : {}),
+        ...(outcome.verifyVerdictError !== undefined
+          ? { verifyVerdictError: outcome.verifyVerdictError }
+          : {}),
+        ...(outcome.report !== undefined ? { report: outcome.report } : {}),
+        ...(manifest !== undefined ? { deliverables: manifest } : {}),
+        verdictReport,
+      });
+    if (manifest !== undefined) withEventsAfterCommit(deps, complete);
+    else complete(deps);
     publishStepStatus(deps, stepId);
     emitRuntimeStepSpan(deps.db, stepId);
     return;

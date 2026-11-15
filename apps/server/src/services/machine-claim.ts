@@ -67,6 +67,7 @@ import {
 import { projectOfTodo, projectRepoRef } from './git.js';
 import { listProjectGithubLabelVocab } from './github-labels.js';
 import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
+import { deliverableCapability, failEarlierClaimDeliverables } from './machine-deliverables.js';
 import {
   type MachineDeps,
   profileForStep,
@@ -541,6 +542,7 @@ async function tryClaim(
           )
           .run();
         if (res.changes === 0) return false;
+        failEarlierClaimDeliverables(db, cand.stepRow.id);
         if (
           cand.stepRow.kind !== 'review' &&
           cand.todoRow.sourceKind !== 'research-citation-check'
@@ -637,6 +639,7 @@ async function tryClaim(
           .map((answer) => answer.requestId)
           .filter((requestId) => decided.has(requestId))
       : [];
+    const deliverables = deliverableCapability(cand.stepRow.kind, cand.todoRow.output, claimedAt);
     return {
       step: {
         id: cand.stepRow.id,
@@ -697,6 +700,7 @@ async function tryClaim(
       remoteTools: workerRemoteTools(cand.stepRow.kind, isGithubProject, namesTask),
       localTools: claimLocalTools(agentRow.tools),
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
+      ...(deliverables !== undefined ? { deliverables } : {}),
     };
   }
   return claimChiefTurn(deps, machineId, teamId, maxWorkers, Number.POSITIVE_INFINITY);
