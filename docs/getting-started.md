@@ -58,7 +58,9 @@ The watch-mode dev stack, one process each: `pnpm dev:web`, `pnpm dev:server`, `
 
 ## Keep the daemon running on Linux
 
-On Linux, tasks run in a sandbox that needs the daemon to be its own systemd user unit. A daemon started with `cairn start` from a terminal usually cannot start that sandbox: it shows Online but never takes a task. After enrolling the machine as in [Run builds on your own machines](#run-builds-on-your-own-machines), stop it with `cairn stop` and create `~/.config/systemd/user/cairn-daemon.service`, using `command -v cairn` and `command -v node` for the two paths:
+On Linux, tasks run in a sandbox that needs the daemon to be its own systemd user unit. `cairn start` and `cairn restart` run it as a transient user unit, `cairn-daemon-<id>.service`, and print its name. When `systemd-run --user` fails they print a warning and start a plain background process instead; that daemon shows Online but cannot start the sandbox.
+
+A transient unit ends when you log out or reboot. To keep the daemon running, enroll the machine as in [Run builds on your own machines](#run-builds-on-your-own-machines), stop it with `cairn stop` and create `~/.config/systemd/user/cairn-daemon.service`, using `command -v cairn` and `command -v node` for the two paths:
 
 ```ini
 [Unit]
