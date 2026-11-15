@@ -14,6 +14,7 @@ export * from './chief-event.js';
 export * from './claude-subscription.js';
 export * from './commit-identity.js';
 export * from './coordinator-identity.js';
+export * from './desktop-shell.js';
 export * from './experience-candidate.js';
 export * from './failure-attribution.js';
 export * from './failure-replay-candidate.js';

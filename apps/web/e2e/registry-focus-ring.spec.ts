@@ -3,7 +3,7 @@ import { settleTransitions } from './helpers.js';
 
 const SKILLS = '/app/resources/skills?scenario=01';
 const LISTED_SKILLS = '/app/resources/skills?scenario=06';
-const ROUTING_POLICIES = '/app/settings/work-routing?scenario=routing-settings';
+const ACCOUNT = '/app/account?scenario=13';
 const ACCEPT = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34';
 
 const BADGES = '/design.html';
@@ -179,7 +179,7 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
     expectGlobalOutline(unchecked);
     expect(unchecked.borderTopColor).toBe(hexToRgb(unchecked.inputColor));
 
-    await themed(page, 'dark', ROUTING_POLICIES);
+    await themed(page, 'dark', ACCOUNT);
     const sw = page.locator('[data-slot="switch"]').first();
     await expect(sw).toBeVisible();
     await focusKeyboard(sw);

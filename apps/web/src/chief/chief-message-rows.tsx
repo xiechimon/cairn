@@ -435,10 +435,6 @@ const COORDINATOR_FIXES: Partial<
     { label: '填写 API key', href: settingsHref('providers') },
     { label: '换 Coordinator 模型', href: COORDINATOR_ROUTING_HREF },
   ],
-  'coordinator-paid-claude': [
-    { label: '允许按量付费', href: settingsHref('routing') },
-    { label: '换 Coordinator 模型', href: COORDINATOR_ROUTING_HREF },
-  ],
 };
 
 export function CoordinatorFixLinks({ kind }: { kind: StepQueueBlocked['kind'] | undefined }) {

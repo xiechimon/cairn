@@ -54,6 +54,14 @@ export default defineConfig({
       head: [
         { tag: 'meta', attrs: { property: 'og:image', content: 'https://cairn.xmon.me/img/share-card-en.png' } },
         { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
+        {
+          tag: 'script',
+          attrs: {
+            defer: true,
+            src: 'https://static.cloudflareinsights.com/beacon.min.js',
+            'data-cf-beacon': '{"token":"a2f5ef9618404d5ea00a0820a8a1fba3"}',
+          },
+        },
       ],
     }),
   ],

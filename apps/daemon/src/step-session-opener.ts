@@ -60,12 +60,19 @@ export class StepSessionOpener {
 
   open(): Promise<AgentSessionHandle> {
     const { backend, sessionOpts } = this.input;
-    if (this.continueId === null) return backend.createSession(sessionOpts);
+    if (this.continueId === null) return backend.createSession(this.newSessionOpts());
     return backend.continueSession(this.continueId, sessionOpts).catch(async (err: unknown) => {
       if (!(err instanceof SessionNotResumableError)) throw err;
       await this.fallBackToNewSession();
-      return backend.createSession(sessionOpts);
+      return backend.createSession(this.newSessionOpts());
     });
+  }
+
+  private newSessionOpts(): SessionOpts {
+    const { sessionOpts, claimed } = this.input;
+    const history = claimed.chief?.history;
+    if (history === undefined || sessionOpts.prompt === undefined) return sessionOpts;
+    return { ...sessionOpts, prompt: `${history}\n\n${sessionOpts.prompt}` };
   }
 
   async retryWithoutImages(failureText: string, blocked: boolean): Promise<boolean> {

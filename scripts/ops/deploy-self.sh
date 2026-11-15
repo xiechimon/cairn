@@ -373,10 +373,55 @@ drain_steps() {
   wait_for_steps
 }
 
-allow_builds_block() {
-  git -C "$CHECKOUT" show "$1:pnpm-workspace.yaml" 2>/dev/null |
-    awk '/^allowBuilds:/{inside=1; print; next} inside && /^[^[:space:]#]/{inside=0} inside{print}'
+WORKSPACE_BUILD_GUARD='
+import { createRequire } from "node:module";
+const { parseDocument } = createRequire(process.argv[1])("yaml");
+const reasons = [];
+const read = (text, label) => {
+  const document = parseDocument(text, { uniqueKeys: true });
+  const problems = [...document.errors, ...document.warnings];
+  if (problems.length > 0) {
+    reasons.push(`${label} pnpm-workspace.yaml does not parse cleanly: ${String(problems[0].message).split("\n")[0]}`);
+    return {};
+  }
+  return document.toJS() ?? {};
+};
+const plain = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+const hasMergeKey = (value) =>
+  Array.isArray(value)
+    ? value.some(hasMergeKey)
+    : plain(value) && Object.entries(value).some(([key, child]) => key === "<<" || hasMergeKey(child));
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const booleans = (map) => plain(map) && Object.values(map).every((value) => typeof value === "boolean");
+const previous = read(process.argv[2], "previous");
+const target = read(process.argv[3], "target");
+if (!plain(previous) || !plain(target)) {
+  reasons.push("pnpm-workspace.yaml is not a mapping");
+} else {
+  if (hasMergeKey(target)) reasons.push("target pnpm-workspace.yaml uses a merge key");
+  for (const key of new Set([...Object.keys(previous), ...Object.keys(target)])) {
+    if (key !== "allowBuilds" && /build|script|pnpmfile|hook|config.?dependenc/i.test(key) && !same(previous[key], target[key])) {
+      reasons.push(`${key} changed`);
+    }
+  }
+  const before = previous.allowBuilds ?? {};
+  const after = target.allowBuilds ?? {};
+  if (!booleans(before) || !booleans(after)) {
+    if (!same(before, after)) reasons.push("allowBuilds changed and is not a map of booleans");
+  } else {
+    for (const [name, allowed] of Object.entries(after)) {
+      if (allowed && before[name] !== true) reasons.push(`allowBuilds permits ${name}`);
+    }
+    for (const [name, allowed] of Object.entries(before)) {
+      if (!allowed && after[name] !== false) reasons.push(`allowBuilds stops denying ${name}`);
+    }
+  }
 }
+if (reasons.length > 0) {
+  console.log(reasons.join("; "));
+  process.exit(1);
+}
+'
 
 hook_lines() {
   { git -C "$CHECKOUT" show "$1:$2" 2>/dev/null || true; } |
@@ -408,8 +453,14 @@ assert_deployable() {
     grep -qxF "$name"$'\t'success <<<"$checks" || refuse "required check $name is not green on $TARGET"
   done
 
-  [ "$(allow_builds_block "$PREVIOUS")" = "$(allow_builds_block "$TARGET")" ] ||
-    refuse "allowBuilds in pnpm-workspace.yaml changed; deploy by hand after reviewing install scripts"
+  local previous_workspace target_workspace build_changes
+  previous_workspace="$(git -C "$CHECKOUT" show "$PREVIOUS:pnpm-workspace.yaml")" ||
+    refuse "cannot read pnpm-workspace.yaml at $PREVIOUS"
+  target_workspace="$(git -C "$CHECKOUT" show "$TARGET:pnpm-workspace.yaml")" ||
+    refuse "cannot read pnpm-workspace.yaml at $TARGET"
+  build_changes="$(node --input-type=module -e "$WORKSPACE_BUILD_GUARD" "$CHECKOUT/package.json" \
+    "$previous_workspace" "$target_workspace" 2>&1)" ||
+    refuse "pnpm-workspace.yaml may permit new install scripts; deploy by hand after review: ${build_changes:-the build settings guard failed}"
   local hooks
   hooks="$(install_hooks_changed)"
   [ -z "$hooks" ] || refuse "install hooks or pnpm config changed; deploy by hand after review: $hooks"

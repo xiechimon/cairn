@@ -14,8 +14,8 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `appearance` | `设置` (Settings) › `外观` (Appearance) | [Appearance and visual system](#appearance) |
 | `projects` | `设置` (Settings) › `项目` | [Projects](#projects) |
 | `providers` | `设置` (Settings) › `模型` (Model) › `模型服务` (Providers) | [Model providers and subscriptions](#providers) |
-| `routing` | `设置` (Settings) › `模型` (Model) › `用量与连接` (Usage & connections) | [Model and work routing](#routing) |
-| `work-routing` | `设置` (Settings) › `模型` (Model) › `规则与策略` (Rules & policies) | [Model and work routing](#routing) |
+| `work-routing` | `设置` (Settings) › `模型` (Model) › `模型选择` (Model selector) | [Model and work routing](#routing) |
+| `routing` | `设置` (Settings) › `模型` (Model) › `模型路由` (Model routing) | [Model and work routing](#routing) |
 | `machines` | `设置` (Settings) › `执行环境` (Execution) › `执行机` (Runners) | [Machines](#machines) |
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
 | `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
@@ -322,9 +322,9 @@ Reach:
 
 ### routing
 
-**Model and work routing** (shipped, centrality 1). Which model and machine each kind of work uses: model routing, work routing rules and policies, capabilities and a per-thread override.
+**Model and work routing** (shipped, centrality 1). Which model each kind of work uses: the Model selector page (default model for new tasks, the Coordinator and other agents with model and thinking level), the Model routing page (providers with quota, Claude billing, and a graph wiring each rule to its provider), capabilities and a per-thread override.
 
-States: A routing graph from kinds of work to models, an empty state, rules per use, and a per-thread override dialog.
+States: A graph from each use to its provider with dashed wires for unavailable providers, an empty state, one picker row per use with runtimes no Runner enabled greyed out, and a per-thread override dialog.
 
 Reach:
 
@@ -333,9 +333,9 @@ Reach:
 3. `settings work-routing`
 
 - Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`, `/app/settings/team`, `/app/team`
-- Settings: `设置` (Settings) › `模型` (Model) › `用量与连接` (Usage & connections); `设置` (Settings) › `模型` (Model) › `规则与策略` (Rules & policies)
+- Settings: `设置` (Settings) › `模型` (Model) › `模型选择` (Model selector); `设置` (Settings) › `模型` (Model) › `模型路由` (Model routing)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-platform`, `route-override-save`, `routing-coordinator-default`, `routing-empty`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-session-default`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
+- Test ids in its code: `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-platform`, `route-override-save`, `routing-add-provider`, `routing-agents`, `routing-coordinator-default`, `routing-empty`, `routing-provider-row`, `routing-providers`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-session-default`
 - Research: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](../../../docs/research/agent-machine-routing.md) (not on main)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md)

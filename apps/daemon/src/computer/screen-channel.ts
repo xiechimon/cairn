@@ -24,6 +24,13 @@ export interface OutboundComputerScreenOptions {
   serverUrl: string;
   getToken: () => string;
   provider: ComputerScreenProvider;
+  log?: (msg: string) => void;
+}
+
+function closeReason(reason: unknown): string {
+  if (typeof reason === 'string') return reason;
+  if (reason instanceof DOMException && reason.name === 'TimeoutError') return 'capability expired';
+  return 'unknown';
 }
 
 export class OutboundComputerScreens {
@@ -61,7 +68,7 @@ export class OutboundComputerScreens {
   async close(): Promise<void> {
     this.closing = true;
     const calls = [...this.calls.values()];
-    for (const call of calls) call.controller.abort();
+    for (const call of calls) call.controller.abort('daemon shutting down');
     let timer: NodeJS.Timeout | undefined;
     try {
       await Promise.race([
@@ -94,9 +101,18 @@ export class OutboundComputerScreens {
       headers: { authorization: `Bearer ${this.options.getToken()}` },
     });
     websocket.binaryType = 'arraybuffer';
-    const abort = () => controller.abort();
-    websocket.addEventListener('close', abort, { once: true });
-    websocket.addEventListener('error', abort, { once: true });
+    const openedAt = Date.now();
+    let sentBytes = 0;
+    let peakBuffered = 0;
+    const abort = (reason: string) => controller.abort(reason);
+    websocket.addEventListener(
+      'close',
+      (event) =>
+        abort(
+          `server closed the websocket (code ${event.code}${event.reason ? `, ${event.reason}` : ''})`,
+        ),
+      { once: true },
+    );
     let connection: ComputerScreenConnection | undefined;
     let provider: Promise<ComputerScreenConnection> | undefined;
     const released = new WeakSet<ComputerScreenConnection>();
@@ -125,7 +141,7 @@ export class OutboundComputerScreens {
         try {
           outgoing = viewGate.accept(bytes);
         } catch {
-          abort();
+          abort('view-only input rejected');
           return;
         }
         if (outgoing.length === 0) {
@@ -135,7 +151,7 @@ export class OutboundComputerScreens {
       }
       connection.stream.write(outgoing, (error) => {
         pendingBytes -= bytes.length;
-        if (error) abort();
+        if (error) abort(`desktop write failed (${error.message})`);
       });
     };
     const receive = (event: MessageEvent): void => {
@@ -143,13 +159,13 @@ export class OutboundComputerScreens {
         !(event.data instanceof ArrayBuffer) ||
         event.data.byteLength > COMPUTER_SCREEN_MAX_FRAME_BYTES
       ) {
-        abort();
+        abort('server sent an oversized or non-binary frame');
         return;
       }
       const bytes = Buffer.from(event.data);
       pendingBytes += bytes.length;
       if (pendingBytes > COMPUTER_SCREEN_MAX_BUFFER_BYTES) {
-        abort();
+        abort(`input to the desktop backed up (${pendingBytes} bytes pending)`);
         return;
       }
       if (connection) write(bytes);
@@ -165,9 +181,11 @@ export class OutboundComputerScreens {
       provider = this.options.provider.connectScreen({ ...request, signal });
       connection = await Promise.race([provider, cancelled]);
       if (signal.aborted) return;
-      connection.stream.on('error', abort);
-      connection.stream.on('end', abort);
-      connection.stream.on('close', abort);
+      connection.stream.on('error', (error: Error) =>
+        abort(`desktop stream failed (${error.message})`),
+      );
+      connection.stream.on('end', () => abort('desktop stream ended'));
+      connection.stream.on('close', () => abort('desktop stream closed'));
       connection.stream.on('data', (chunk: unknown) => {
         if (signal.aborted || websocket.readyState !== WebSocket.OPEN) return;
         const bytes = Buffer.isBuffer(chunk)
@@ -176,21 +194,30 @@ export class OutboundComputerScreens {
             ? Buffer.from(chunk)
             : undefined;
         if (!bytes) {
-          abort();
+          abort('desktop stream sent a non-byte chunk');
           return;
         }
         for (let offset = 0; offset < bytes.length; offset += COMPUTER_SCREEN_MAX_FRAME_BYTES) {
           const frame = bytes.subarray(offset, offset + COMPUTER_SCREEN_MAX_FRAME_BYTES);
           if (websocket.bufferedAmount + frame.length > COMPUTER_SCREEN_MAX_BUFFER_BYTES) {
-            abort();
+            abort(
+              `output to the server backed up (${websocket.bufferedAmount} bytes buffered, next frame ${frame.length})`,
+            );
             return;
           }
           websocket.send(frame);
+          sentBytes += frame.length;
+          peakBuffered = Math.max(peakBuffered, websocket.bufferedAmount);
         }
       });
       for (const bytes of pending.splice(0)) write(bytes);
       await closed;
+    } catch (error) {
+      abort(`failed (${error instanceof Error ? error.message : String(error)})`);
     } finally {
+      this.options.log?.(
+        `computer screen ${request.kind} ${request.id.slice(0, 8)} closed after ${Math.round((Date.now() - openedAt) / 1000)}s: ${closeReason(signal.reason)}; sent ${sentBytes} bytes, buffered peak ${peakBuffered}, at close ${websocket.bufferedAmount}`,
+      );
       controller.abort();
       signal.removeEventListener('abort', stopped);
       websocket.removeEventListener('message', receive);
