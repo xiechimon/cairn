@@ -243,6 +243,7 @@ export function SettingsDialog({
   const navigate = useNavigate();
   const tabs = useMediaQuery(SETTINGS_TABS_QUERY);
   const [matchLabel, setMatchLabel] = useState<string | null>(null);
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLElement | null>(null);
   const machineNote = useMachineNote();
   const titleId = useId();
   const section = SECTIONS.find((s) => s.id === sectionParam) ?? null;
@@ -371,16 +372,19 @@ export function SettingsDialog({
               </div>
             )}
             {shown !== undefined && (
-              <h2
-                data-testid="settings-head"
-                className="m-0 flex-none truncate px-4 pt-4 pb-3 text-card-title font-semibold text-foreground"
-              >
-                {t(shown.label)}
-              </h2>
+              <div className="flex flex-none items-center gap-3 px-4 pt-4 pb-3">
+                <h2
+                  data-testid="settings-head"
+                  className="m-0 min-w-0 truncate text-card-title font-semibold text-foreground"
+                >
+                  {t(shown.label)}
+                </h2>
+                <div ref={setToolbarSlot} className="-my-1.5 ml-auto flex flex-none items-center" />
+              </div>
             )}
             <div data-testid="settings-body" className="flex min-h-0 flex-auto">
               <SettingsMatchProvider value={matchLabel}>
-                <EmbeddedShell.Provider value>{body}</EmbeddedShell.Provider>
+                <EmbeddedShell.Provider value={{ toolbarSlot }}>{body}</EmbeddedShell.Provider>
               </SettingsMatchProvider>
             </div>
           </div>
