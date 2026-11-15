@@ -2171,7 +2171,6 @@ export const EN: Record<string, string> = {
   运行机器: 'Machine',
   目录: 'Folder',
   还没分配机器: 'No machine yet',
-  // MCP connectors (#4870)
   '授权期间这个连接已有变动，没有保存这次授权。请重新连接。':
     'The connection changed while you were signing in, so this sign-in was not saved. Reconnect it.',
   '{name} 拒绝了这个令牌。检查令牌是否填对、有没有过期，然后换一个新的。':
