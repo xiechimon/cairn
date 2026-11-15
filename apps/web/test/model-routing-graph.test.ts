@@ -122,4 +122,18 @@ describe('routing targets and the rule graph', () => {
       },
     ]);
   });
+
+  test('top models come first, each wired to its own provider, and one whose provider is gone breaks', () => {
+    const groups = ruleGraphGroups({ rules: [], policies: [] }, targets, options, t, [
+      { provider: 'openai-codex', modelId: 'gpt-6.1-sol', thinkingLevel: 'medium' },
+      { provider: 'claude-code', modelId: 'claude-opus-5-5', thinkingLevel: 'high' },
+      { provider: 'deleted-provider', modelId: 'glm-5.3', thinkingLevel: null },
+    ]);
+    expect(groups[0]?.label).toBe('常用模型');
+    expect(groups[0]?.nodes.map((node) => [node.name, node.target ?? null, node.broken])).toEqual([
+      ['GPT-6.1 Sol', 'provider:rec-codex', false],
+      ['claude-opus-5-5', 'subscription:main', false],
+      ['glm-5.3', null, true],
+    ]);
+  });
 });

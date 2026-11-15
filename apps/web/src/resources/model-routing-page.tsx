@@ -14,6 +14,7 @@ import {
 } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
+import { useTopModels } from '../api/top-models.js';
 import { ClaudeMark } from '../components/brand-marks.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { QuotaRow } from '../components/settings/quota-row.js';
@@ -26,6 +27,7 @@ import { settingsHref } from '../settings/settings-href.js';
 import { legacyAccountsSearch, opensLegacyAccounts } from '../settings/settings-redirect.js';
 import { MODEL_ROUTING_HREF } from './hrefs.js';
 import { providerKind, providerMark } from './provider-editors.js';
+import { suggestedTopModels } from './top-models-card.js';
 
 const EMPTY_SETTINGS: TeamRoutingSettings = { rules: [], policies: [] };
 
@@ -84,6 +86,7 @@ function RoutingContent() {
   const routingQ = useModelRouting(teamId, live);
   const settingsQ = useRoutingSettings(teamId, live);
   const sourcesQ = useModelSources(teamId, live);
+  const topModelsQ = useTopModels(teamId, live);
 
   const routing: ModelRouting | undefined = live
     ? Array.isArray(routingQ.data?.edges)
@@ -106,7 +109,9 @@ function RoutingContent() {
   const options = toModelOptions(
     live ? (sourcesQ.data?.sources ?? []) : (fixture.resources?.providerSources ?? []),
   );
-  const groups = ruleGraphGroups(settings, targets, options, t);
+  const topModels =
+    (live ? topModelsQ.data?.models : fixture.resources?.topModels) ?? suggestedTopModels(options);
+  const groups = ruleGraphGroups(settings, targets, options, t, topModels);
 
   return (
     <PageShell

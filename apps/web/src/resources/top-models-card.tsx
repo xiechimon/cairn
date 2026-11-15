@@ -122,80 +122,86 @@ function TopModelRow({
         transition,
       }}
       className={cn(
-        'relative flex min-h-12 items-center gap-2.5 border-t border-border bg-card px-3 py-1.5 sm:gap-3 sm:px-4',
+        'relative flex min-h-12 items-center gap-x-3 border-t border-border bg-card px-4 py-1.5 max-sm:flex-wrap max-sm:gap-y-1 max-sm:py-2',
         isDragging && 'z-10 shadow-(--e2)',
       )}
     >
-      <button
-        type="button"
-        aria-label={t('拖动排序 {model}', { model: name })}
-        className="top-model-grip flex-none cursor-grab touch-none rounded-sm text-content-tertiary outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical aria-hidden className="size-4" />
-      </button>
-      <Vendor aria-hidden className="size-5 flex-none text-foreground" />
-      <span className="flex min-w-0 flex-auto items-center gap-2">
-        <span
-          className={cn(
-            'truncate text-ui font-medium',
-            option === undefined ? 'text-content-tertiary' : 'text-foreground',
-          )}
+      <span className="flex min-w-0 flex-auto items-center gap-3 max-sm:basis-full">
+        <button
+          type="button"
+          aria-label={t('拖动排序 {model}', { model: name })}
+          className="top-model-grip flex-none cursor-grab touch-none rounded-sm text-content-tertiary outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
         >
-          {name}
-        </span>
-        {model.modelId === PICKED && (
-          <span className="flex-none rounded-sm bg-secondary px-1.5 text-caption text-content-secondary max-sm:hidden">
-            {t('推荐')}
+          <GripVertical aria-hidden className="size-4" />
+        </button>
+        <Vendor aria-hidden className="size-5 flex-none text-foreground" />
+        <span className="flex min-w-0 flex-auto items-center gap-2">
+          <span
+            className={cn(
+              'truncate text-ui font-medium',
+              option === undefined ? 'text-content-tertiary' : 'text-foreground',
+            )}
+          >
+            {name}
           </span>
-        )}
-        {blurb !== undefined && (
-          <span className="truncate text-meta text-content-tertiary max-sm:hidden">{t(blurb)}</span>
-        )}
+          {model.modelId === PICKED && (
+            <span className="flex-none rounded-sm bg-secondary px-1.5 text-caption text-content-secondary max-sm:hidden">
+              {t('推荐')}
+            </span>
+          )}
+          {blurb !== undefined && (
+            <span className="truncate text-meta text-content-tertiary max-sm:hidden">
+              {t(blurb)}
+            </span>
+          )}
+        </span>
       </span>
-      <span
-        data-testid="top-model-provider"
-        className="inline-flex h-6 max-w-36 flex-none items-center gap-1 rounded-full bg-secondary px-2 text-caption text-content-secondary max-sm:max-w-24"
-      >
-        {option === undefined ? (
-          t('不可用')
-        ) : (
-          <>
-            <Chip aria-hidden className="size-4 flex-none" />
-            <span className="truncate">{option.providerLabel}</span>
-          </>
-        )}
-      </span>
-      <Select
-        value={level}
-        onValueChange={(next) => {
-          if (next !== null) onLevel(next === 'off' ? null : (next as ThinkingLevel));
-        }}
-      >
-        <SelectTrigger
-          aria-label={t('{model} 的思考强度', { model: name })}
-          className="top-model-level w-24 flex-none border-transparent bg-transparent shadow-none hover:bg-muted max-sm:w-22"
+      <span className="flex flex-none items-center gap-1 max-sm:basis-full max-sm:pl-8">
+        <span
+          data-testid="top-model-provider"
+          className="inline-flex h-6 max-w-36 flex-none items-center gap-1 rounded-full bg-secondary px-2 text-caption text-content-secondary max-sm:mr-auto max-sm:max-w-40"
         >
-          <SelectValue>{levelLabel(level)}</SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {THINKING_LEVELS.map((value) => (
-            <SelectItem key={value} value={value}>
-              {levelLabel(value)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={t('删除 {model}', { model: name })}
-        className="top-model-remove flex-none text-content-tertiary"
-        onClick={onRemove}
-      >
-        <X aria-hidden />
-      </Button>
+          {option === undefined ? (
+            t('不可用')
+          ) : (
+            <>
+              <Chip aria-hidden className="size-4 flex-none" />
+              <span className="truncate">{option.providerLabel}</span>
+            </>
+          )}
+        </span>
+        <Select
+          value={level}
+          onValueChange={(next) => {
+            if (next !== null) onLevel(next === 'off' ? null : (next as ThinkingLevel));
+          }}
+        >
+          <SelectTrigger
+            aria-label={t('{model} 的思考强度', { model: name })}
+            className="top-model-level ml-2 w-28 flex-none max-sm:ml-1 max-sm:w-24 border-transparent bg-transparent shadow-none hover:bg-muted"
+          >
+            <SelectValue>{levelLabel(level)}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {THINKING_LEVELS.map((value) => (
+              <SelectItem key={value} value={value}>
+                {levelLabel(value)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t('删除 {model}', { model: name })}
+          className="top-model-remove flex-none text-content-tertiary"
+          onClick={onRemove}
+        >
+          <X aria-hidden />
+        </Button>
+      </span>
     </li>
   );
 }

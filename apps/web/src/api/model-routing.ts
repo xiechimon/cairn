@@ -5,6 +5,7 @@ import type {
   RoutingEdge,
   RoutingQuota,
   TeamRoutingSettings,
+  TopModel,
 } from '@cairn/shared';
 import { useQuery } from '@tanstack/react-query';
 import type { RoutingSourceGroup } from '../components/settings/routing-graph.js';
@@ -149,7 +150,17 @@ export function ruleGraphGroups(
   targets: readonly RoutingTargetRow[],
   options: readonly ModelOption[],
   t: TFunc,
+  topModels: readonly TopModel[] = [],
 ): RoutingSourceGroup[] {
+  const top = topModels.map((model) => {
+    const target = targetOfRule(model.provider, targets);
+    return {
+      id: `top:${model.provider}/${model.modelId}`,
+      name: modelName(model.provider, model.modelId, options),
+      ...(target !== undefined ? { target: target.id } : {}),
+      broken: target === undefined || target.unavailable,
+    };
+  });
   const agents: RoutingSourceGroup['nodes'] = [];
   for (const use of GRAPH_USES) {
     const rule = settings.rules.find((r) => r.use === use);
@@ -168,6 +179,7 @@ export function ruleGraphGroups(
     });
   }
   const groups: RoutingSourceGroup[] = [];
+  if (top.length > 0) groups.push({ label: t('常用模型'), nodes: top });
   if (agents.length > 0) groups.push({ label: t('Coordinator 和其他 Agent'), nodes: agents });
   const claude = targetOfRule(CLAUDE_CODE_TARGET, targets);
   if (claude !== undefined) {
