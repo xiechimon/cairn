@@ -3,8 +3,9 @@ import { z } from 'zod';
 
 export const DESKTOP_SHELL_USER_AGENT = 'CairnDesktop/mac';
 export const DESKTOP_RELEASE_TAG_PREFIX = 'desktop-v';
-export const DESKTOP_RELEASES_URL =
-  'https://api.github.com/repos/xiechimon/cairn/releases?per_page=30';
+export const DESKTOP_RELEASE_MANIFEST = 'desktop-latest.json';
+export const DESKTOP_RELEASES_BASE = 'https://github.com/xiechimon/cairn/releases';
+export const DESKTOP_MANIFEST_URL = `${DESKTOP_RELEASES_BASE}/latest/download/${DESKTOP_RELEASE_MANIFEST}`;
 
 export type DesktopUpdateBlocker = 'development' | 'not-in-applications' | 'read-only';
 
@@ -25,42 +26,31 @@ export interface DesktopUpdate {
   sha256: string;
 }
 
-const SHA256_DIGEST = /^sha256:([0-9a-f]{64})$/;
-
-const desktopReleaseSchema = z.object({
-  tag_name: z.string(),
-  draft: z.boolean(),
-  prerelease: z.boolean(),
-  assets: z.array(
-    z.object({
-      name: z.string(),
-      browser_download_url: z.url(),
-      size: z.number().int().positive(),
-      digest: z.string().nullish(),
-    }),
-  ),
+const desktopReleaseFileSchema = z.strictObject({
+  name: z.string().regex(/^Cairn-[0-9A-Za-z.+-]+\.zip$/),
+  size: z.number().int().positive(),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
 });
 
-export const desktopReleasesSchema = z.array(desktopReleaseSchema);
+export const desktopReleaseManifestSchema = z.strictObject({
+  version: z.string().refine((value) => semver.valid(value) === value, 'not a semver version'),
+  files: z.record(z.string(), desktopReleaseFileSchema),
+});
 
-export function newestDesktopUpdate(
-  releases: z.infer<typeof desktopReleasesSchema>,
+export type DesktopReleaseManifest = z.infer<typeof desktopReleaseManifestSchema>;
+
+export function desktopUpdateFrom(
+  manifest: DesktopReleaseManifest,
   currentVersion: string,
   arch: string,
 ): DesktopUpdate | null {
-  let newest: DesktopUpdate | null = null;
-  for (const release of releases) {
-    if (release.draft || release.prerelease) continue;
-    if (!release.tag_name.startsWith(DESKTOP_RELEASE_TAG_PREFIX)) continue;
-    const version = semver.valid(release.tag_name.slice(DESKTOP_RELEASE_TAG_PREFIX.length));
-    if (version === null || !semver.gt(version, currentVersion)) continue;
-    if (newest !== null && !semver.gt(version, newest.version)) continue;
-    const asset = release.assets.find(
-      (candidate) => candidate.name === `Cairn-${version}-${arch}.zip`,
-    );
-    const sha256 = SHA256_DIGEST.exec(asset?.digest ?? '')?.[1];
-    if (asset === undefined || sha256 === undefined) continue;
-    newest = { version, url: asset.browser_download_url, size: asset.size, sha256 };
-  }
-  return newest;
+  if (!semver.gt(manifest.version, currentVersion)) return null;
+  const file = manifest.files[arch];
+  if (file === undefined) return null;
+  return {
+    version: manifest.version,
+    url: `${DESKTOP_RELEASES_BASE}/download/${DESKTOP_RELEASE_TAG_PREFIX}${manifest.version}/${file.name}`,
+    size: file.size,
+    sha256: file.sha256,
+  };
 }

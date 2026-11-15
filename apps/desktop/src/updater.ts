@@ -5,17 +5,18 @@ import { access, mkdtemp, rename, rm } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import {
-  DESKTOP_RELEASES_URL,
+  DESKTOP_MANIFEST_URL,
   type DesktopUpdate,
   type DesktopUpdateBlocker,
   type DesktopUpdateState,
-  desktopReleasesSchema,
-  newestDesktopUpdate,
+  desktopReleaseManifestSchema,
+  desktopUpdateFrom,
 } from '@cairn/shared';
 import { app } from 'electron';
 
 const run = promisify(execFile);
-const GITHUB_HEADERS = { Accept: 'application/vnd.github+json', 'User-Agent': 'Cairn-Desktop' };
+const REQUEST_HEADERS = { 'User-Agent': 'Cairn-Desktop' };
+const NO_MANIFEST = 404;
 const APP_BUNDLE_NAME = 'Cairn.app';
 
 export interface Updater {
@@ -48,7 +49,7 @@ async function download(
   target: string,
   onPercent: (percent: number) => void,
 ): Promise<void> {
-  const response = await fetch(update.url, { headers: { 'User-Agent': 'Cairn-Desktop' } });
+  const response = await fetch(update.url, { headers: REQUEST_HEADERS });
   if (!response.ok || response.body === null) {
     throw new Error(`download failed with HTTP ${response.status}`);
   }
@@ -108,10 +109,17 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
     }
     set({ status: 'checking' });
     try {
-      const response = await fetch(DESKTOP_RELEASES_URL, { headers: GITHUB_HEADERS });
-      if (!response.ok) throw new Error(`GitHub answered HTTP ${response.status}`);
-      const releases = desktopReleasesSchema.parse(await response.json());
-      pending = newestDesktopUpdate(releases, app.getVersion(), process.arch);
+      const response = await fetch(DESKTOP_MANIFEST_URL, { headers: REQUEST_HEADERS });
+      if (!response.ok && response.status !== NO_MANIFEST) {
+        throw new Error(`GitHub answered HTTP ${response.status}`);
+      }
+      pending = response.ok
+        ? desktopUpdateFrom(
+            desktopReleaseManifestSchema.parse(await response.json()),
+            app.getVersion(),
+            process.arch,
+          )
+        : null;
       set(
         pending === null
           ? { status: 'current', version: app.getVersion() }

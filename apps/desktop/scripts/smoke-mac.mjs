@@ -43,7 +43,7 @@ try {
     return bridge.state();
   });
   assert.ok(
-    ['current', 'available', 'error'].includes(update?.status),
+    ['current', 'available'].includes(update?.status),
     `the update check ended in ${JSON.stringify(update)}`,
   );
   console.log(`update check: ${JSON.stringify(update)}`);
