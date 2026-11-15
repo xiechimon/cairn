@@ -121,12 +121,14 @@ export function McpServersPage() {
     setAuthorizing(key);
     mutations.startMcpConnectorOAuth.mutate(body, {
       onSuccess: ({ authorizationUrl }) =>
-        setSignIn({
-          name,
-          host: hostOf(authorizationUrl),
-          authorizationUrl,
-          ...(entry ? { entry } : {}),
-        }),
+        URL.canParse(authorizationUrl) && new URL(authorizationUrl).protocol === 'https:'
+          ? setSignIn({
+              name,
+              host: new URL(authorizationUrl).host,
+              authorizationUrl,
+              ...(entry ? { entry } : {}),
+            })
+          : setLandingError(t('没能开始登录 {name}，稍后重试。', { name })),
       onError: (error) => setLandingError(signInError(t, error, name)),
       onSettled: () => setAuthorizing(null),
     });
