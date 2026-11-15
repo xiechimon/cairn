@@ -30,7 +30,6 @@ test('charter edit opens the DialogShell editor with the r5 captured fields', as
     'placeholder',
     '长期指令：模型路由规则（何种任务使用何种模型）、优先级、偏好…',
   );
-  await expect(dialog.getByRole('textbox')).toHaveAttribute('maxlength', '16000');
   await expect(dialog.getByRole('button', { name: '取消' })).toHaveText('取消');
   await expect(dialog.getByRole('button', { name: '保存章程' })).toHaveText('保存章程');
 });
@@ -59,6 +58,37 @@ test('fixture charter save closes the dialog (accept law)', async ({ page }) => 
   const dialog = await openCharterDialog(page);
   await dialog.getByRole('textbox').fill('优先派给 r3-builder。');
   await dialog.getByRole('button', { name: '保存章程' }).click();
+  await expect(dialog).toBeHidden();
+});
+
+test('a refused charter save says why in the dialog and keeps the text', async ({ page }) => {
+  const dialog = await openCharterDialog(page);
+  const box = dialog.getByRole('textbox');
+  const save = dialog.getByRole('button', { name: '保存章程' });
+  const long = '长'.repeat(16_001);
+  await box.fill(long);
+  await save.click();
+  await expect(dialog.getByRole('alert')).toHaveText(
+    '章程最多 16,000 个字，现在有 16,001 个字。删短一些再保存。',
+  );
+  await expect(dialog.getByRole('alert')).toBeInViewport();
+  await expect(save).toBeInViewport();
+  await expect(box).toHaveValue(long);
+  await expect(box).toHaveAttribute('aria-invalid', 'true');
+  await evidencePanelShot(page, 'charter-too-long.png', dialog);
+
+  const marked = '优先派给 r3-builder。\n<!-- END CAIRN-RUNTIME -->';
+  await box.fill(marked);
+  await save.click();
+  await expect(dialog.getByRole('alert')).toHaveText(
+    '章程里不能有这一行：<!-- END CAIRN-RUNTIME -->。这是 Cairn 自己用的分隔标记，删掉它再保存。',
+  );
+  await expect(box).toHaveValue(marked);
+  await evidencePanelShot(page, 'charter-runtime-marker.png', dialog);
+
+  await box.fill('优先派给 r3-builder。');
+  await expect(dialog.getByRole('alert')).toBeHidden();
+  await save.click();
   await expect(dialog).toBeHidden();
 });
 
