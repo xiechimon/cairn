@@ -15,12 +15,11 @@ import {
   TOOL_BTN_CLS,
 } from '../chief/composer-surface.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
+import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { type QueuedCapsule, QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
@@ -193,22 +192,22 @@ export function Composer({
           {t('更多')}
         </TooltipContent>
       </Tooltip>
-      <DropdownMenuContent
+      <KeyedMenuContent
         side="top"
         sideOffset={6}
         aria-label={t('更多')}
         finalFocus={textareaRef}
         className={MENU_CONTENT_CLS}
       >
-        <DropdownMenuItem disabled={attaching || !onAttachment} onClick={openFilePicker}>
+        <KeyedMenuItem shortcut="A" disabled={attaching || !onAttachment} onClick={openFilePicker}>
           <Paperclip width={20} height={20} />
           {t('添加附件')}
-        </DropdownMenuItem>
+        </KeyedMenuItem>
         {aiReview && (
-          <DropdownMenuItem onClick={onReview}>
+          <KeyedMenuItem shortcut="R" onClick={onReview}>
             <SearchPlus width={20} height={20} />
             {t('审阅')}
-          </DropdownMenuItem>
+          </KeyedMenuItem>
         )}
         {narrow && menuMeter != null && (
           <>
@@ -216,7 +215,7 @@ export function Composer({
             {menuMeter}
           </>
         )}
-      </DropdownMenuContent>
+      </KeyedMenuContent>
     </DropdownMenu>
   );
 

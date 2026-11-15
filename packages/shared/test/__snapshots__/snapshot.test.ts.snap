@@ -113,6 +113,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       },
       "type": "array",
     },
+    "charter": {
+      "type": "string",
+    },
     "chief": {
       "additionalProperties": false,
       "properties": {
@@ -1115,6 +1118,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "type": "string",
               },
               "type": "array",
+            },
+            "charter": {
+              "type": "string",
             },
             "chief": {
               "additionalProperties": false,
@@ -4588,6 +4594,11 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
     {
       "additionalProperties": false,
       "properties": {
+        "clientMessageId": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string",
+        },
         "conversationId": {
           "type": "string",
         },
@@ -5749,9 +5760,14 @@ exports[`body/envelope schema snapshots > patchChiefBody > patchChiefBody.json 1
       ],
     },
     "charter": {
-      "type": [
-        "string",
-        "null",
+      "anyOf": [
+        {
+          "maxLength": 16000,
+          "type": "string",
+        },
+        {
+          "type": "null",
+        },
       ],
     },
   },

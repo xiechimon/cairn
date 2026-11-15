@@ -83,8 +83,10 @@ test('with a model source the chip asks for a machine and the hint shows the sta
 }) => {
   await open(page, { ...fresh(), providers: [{ id: 'p1', name: 'gw' }] });
   await expect(chip(page)).toHaveAttribute('data-step', 'machine');
+  await expect(chip(page)).toHaveText('连接一台 Runner');
   await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/machines/);
   await expect(hint(page).locator('code')).toHaveText(/ start$/);
+  await expect(hint(page)).toContainText('在要干活的电脑上运行');
 });
 
 test('with a source and a machine the chip opens work routing', async ({ page }) => {
@@ -106,11 +108,28 @@ test('a machine going offline only advances the chip when it is the first gap', 
   };
   await open(page, world);
   await expect(chip(page)).toHaveAttribute('data-step', 'machine');
+  await expect(chip(page)).toHaveText('omarchy 离线');
+  await expect(hint(page)).toHaveText(/^在 omarchy 上运行 .+ start 让它重新上线$/);
   world.machines = [ONLINE];
   await page.evaluate(() => {
     for (const es of window.__es) es.emit({ type: 'machine_presence', machineId: 'm1', online: true });
   });
   await expect(chip(page)).toHaveAttribute('data-step', 'coordinator');
+});
+
+test('with several runners all offline the chip counts them instead of asking to connect one', async ({
+  page,
+}) => {
+  await open(page, {
+    ...fresh(),
+    providers: [{ id: 'p1', name: 'gw' }],
+    machines: [
+      { ...ONLINE, online: false },
+      { id: 'm2', name: 'mac', online: false },
+    ],
+  });
+  await expect(chip(page)).toHaveText('2 台 Runner 都离线');
+  await expect(hint(page)).toContainText('在其中一台上运行');
 });
 
 test('the chip and hint are gone once the provider, a machine and the Coordinator are ready', async ({

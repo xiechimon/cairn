@@ -338,6 +338,7 @@ async function runClaimedStep(
           attachments: true,
           decisionBoundary: claimed.step.kind === 'plan' || isBuildStepKind(claimed.step.kind),
           ...(claimed.project !== undefined ? { project: claimed.project } : {}),
+          ...(claimed.charter !== undefined ? { charter: claimed.charter } : {}),
         });
   const remoteTools = claimed.remoteTools;
   const claimedMcp = claimed.mcpServers;

@@ -1,7 +1,9 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { openSync } from 'node:fs';
 import { createDaemonLogger } from './log.js';
 import { nextBackoffMs } from './machine-loop.js';
+import { ensurePrivateDir } from './private-fs.js';
 import { clearDaemonJson, loadDaemonJson, statePaths, writeDaemonJson } from './state.js';
 
 function nodeCliArgv(cliPath: string, rest: string[]): string[] {
@@ -14,22 +16,88 @@ export interface SupervisorOpts {
   cliPath?: string;
 }
 
-export function spawnSupervisor(opts: SupervisorOpts): { pid: number } {
+export type SupervisorStart =
+  | { pid: number; unit: string }
+  | { pid: number; unit: null; unitFailure: string | null };
+
+const SYSTEMD_OWNED_ENV = new Set([
+  'INVOCATION_ID',
+  'JOURNAL_STREAM',
+  'SYSTEMD_EXEC_PID',
+  'MANAGERPID',
+  'NOTIFY_SOCKET',
+  'LISTEN_PID',
+  'LISTEN_FDS',
+  'LISTEN_FDNAMES',
+  'WATCHDOG_PID',
+  'WATCHDOG_USEC',
+]);
+
+function userUnitArgv(unit: string, daemonLog: string, command: string[]): string[] {
+  const inherited = Object.keys(process.env).filter(
+    (name) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && !SYSTEMD_OWNED_ENV.has(name),
+  );
+  return [
+    '--user',
+    `--unit=${unit}`,
+    '--description=Cairn daemon',
+    '--collect',
+    '--quiet',
+    '--same-dir',
+    `--property=StandardOutput=append:${daemonLog}`,
+    `--property=StandardError=append:${daemonLog}`,
+    ...inherited.map((name) => `--setenv=${name}`),
+    '--',
+    ...command,
+  ];
+}
+
+function startUserUnit(
+  daemonLog: string,
+  command: string[],
+): { pid: number; unit: string } | { failure: string } {
+  const unit = `cairn-daemon-${randomUUID().slice(0, 8)}.service`;
+  const started = spawnSync('systemd-run', userUnitArgv(unit, daemonLog, command), {
+    stdio: ['ignore', 'ignore', 'pipe'],
+    encoding: 'utf8',
+    timeout: 15_000,
+  });
+  if (started.error !== undefined || started.status !== 0) {
+    const stderr = typeof started.stderr === 'string' ? started.stderr.trim() : '';
+    return { failure: started.error?.message ?? (stderr || `exit ${started.status}`) };
+  }
+  const shown = spawnSync('systemctl', ['--user', 'show', '--property=MainPID', '--value', unit], {
+    encoding: 'utf8',
+    timeout: 5_000,
+  });
+  const pid = Number.parseInt(typeof shown.stdout === 'string' ? shown.stdout : '', 10);
+  return { pid: Number.isInteger(pid) ? pid : 0, unit };
+}
+
+export function spawnSupervisor(opts: SupervisorOpts): SupervisorStart {
   const paths = statePaths(opts.home);
   const existing = loadDaemonJson(paths);
   if (existing && isAlive(existing.pid)) {
     throw new Error(`daemon already running (pid ${existing.pid})`);
   }
-  const logFd = openSync(paths.daemonLog, 'a');
+  ensurePrivateDir(paths.home);
   const cliPath = opts.cliPath ?? process.argv[1] ?? '';
-  const child = spawn(process.execPath, nodeCliArgv(cliPath, ['supervise', ...opts.runnerArgv]), {
+  const argv = nodeCliArgv(cliPath, ['supervise', ...opts.runnerArgv]);
+  let unitFailure: string | null = null;
+  if (process.platform === 'linux') {
+    const started = startUserUnit(paths.daemonLog, [process.execPath, ...argv]);
+    if ('unit' in started) return started;
+    unitFailure = started.failure;
+  }
+  const logFd = openSync(paths.daemonLog, 'a');
+  const child = spawn(process.execPath, argv, {
     detached: true,
     stdio: ['ignore', logFd, logFd],
     env: process.env,
   });
   child.unref();
   if (child.pid === undefined) throw new Error('failed to spawn supervisor');
-  return { pid: child.pid };
+  return { pid: child.pid, unit: null, unitFailure };
 }
 
 export function isAlive(pid: number): boolean {

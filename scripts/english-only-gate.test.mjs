@@ -99,7 +99,7 @@ test('diff mode reds added Chinese lines and Chinese commit messages only', () =
 });
 
 test('runtime markers match the daemon brief markers', () => {
-  const brief = readFileSync(resolve('packages/shared/src/brief-file.ts'), 'utf8');
+  const brief = readFileSync(resolve('packages/shared/src/brief-markers.ts'), 'utf8');
   assert.ok(brief.includes(`'${RUNTIME_BLOCK_BEGIN}'`));
   assert.ok(brief.includes(`'${RUNTIME_BLOCK_END}'`));
 });

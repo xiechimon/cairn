@@ -18,20 +18,27 @@ async function mockSlowSend(page: Page, total = 250): Promise<Row[]> {
       return json([{ ...THREAD, activeRun: running ? { phase: 'chief' } : null }]);
     if (path !== `/api/conversations/${THREAD.id}/messages`) return undefined;
     if (route.request().method() === 'POST') {
-      const content = (route.request().postDataJSON() as { content: string }).content;
-      return new Promise<void>((resolve) =>
+      const sent = route.request().postDataJSON() as { content: string; clientMessageId: string };
+      const message: Row = {
+        id: `s-${history.length}`,
+        role: 'user',
+        content: sent.content,
+        createdAt: Date.now(),
+      };
+      return new Promise<void>((resolve) => {
         setTimeout(() => {
-          const message: Row = {
-            id: `s-${history.length}`,
-            role: 'user',
-            content,
-            createdAt: Date.now(),
-          };
           history.push(message);
           running = true;
+          for (const ev of [
+            { type: 'message', message, clientMessageId: sent.clientMessageId },
+            { type: 'step', step: { id: message.id, status: 'claimed' } },
+          ])
+            emit(page, ev).catch(() => undefined);
+        }, 100);
+        setTimeout(() => {
           void json({ thread: THREAD, message }, 201).then(resolve);
-        }, 300),
-      );
+        }, 300);
+      });
     }
     const before = new URL(route.request().url()).searchParams.get('before');
     const end = before === null ? history.length : history.findIndex((row) => row.id === before);
@@ -373,7 +380,7 @@ for (const width of [1440, 390]) {
       await expect(row(page, 'answer 249')).toBeInViewport();
       await home(page).getByTestId('chief-composer-input').fill('Send without jumping');
       await viewport(page).evaluate((node) => {
-        const frames: { shown: boolean; copies: number; sending: boolean; gap: number; opacity: number }[] = [];
+        const frames: { shown: boolean; copies: number; sending: boolean; gap: number; opacity: number; dots: number }[] = [];
         const started = performance.now();
         const sample = () => {
           const copies = [...node.querySelectorAll('[data-testid="chief-bubble"]')].filter(
@@ -392,6 +399,7 @@ for (const width of [1440, 390]) {
                   parseFloat(getComputedStyle(node).paddingBottom) -
                   newest.getBoundingClientRect().bottom,
             opacity: Number(getComputedStyle(node).opacity),
+            dots: node.querySelectorAll('[data-testid="typing-dots"]').length,
           });
           if (performance.now() - started < 1200) requestAnimationFrame(sample);
           else node.setAttribute('data-send-frames', JSON.stringify(frames));
@@ -406,6 +414,7 @@ for (const width of [1440, 390]) {
         sending: boolean;
         gap: number;
         opacity: number;
+        dots: number;
       }[];
       await evidenceJson(`send-motion-${width}-${colorScheme}.json`, frames);
       const firstShown = frames.findIndex((frame) => frame.shown);
@@ -415,6 +424,9 @@ for (const width of [1440, 390]) {
       expect(visible.some((frame) => !frame.sending)).toBe(true);
       expect(visible.every((frame) => frame.shown && frame.copies === 1 && frame.opacity === 1)).toBe(true);
       expect(Math.max(...visible.map((frame) => Math.abs(frame.gap)))).toBeLessThanOrEqual(2);
+      const typing = frames.findIndex((frame) => frame.dots > 0);
+      expect(typing).toBeGreaterThanOrEqual(0);
+      expect(frames.slice(typing).every((frame) => frame.dots > 0)).toBe(true);
       await expect(row(page, 'Send without jumping')).toBeInViewport();
       await expect(home(page).getByTestId('typing-dots')).toBeInViewport();
       expect(await viewport(page).evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);

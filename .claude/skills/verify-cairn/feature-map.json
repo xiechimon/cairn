@@ -1578,8 +1578,8 @@
     {
       "id": "projects",
       "name": "Projects",
-      "summary": "Projects as filter and context: create from a local repo or GitHub, project home, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings or the sidebar's archived filter, an archived project opened read-only, and delete.",
-      "states": "A new-project form for a local folder or a GitHub repository, a project home, settings for base branch, concurrency, autonomy and instructions, archived or deleted.",
+      "summary": "Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings or the sidebar's archived filter, an archived project opened read-only, and delete.",
+      "states": "A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived or deleted.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -1587,7 +1587,6 @@
           "apps/web/src/pages/project-new-page.tsx",
           "apps/web/src/pages/project-page.tsx",
           "apps/web/src/pages/project-settings-page.tsx",
-          "apps/web/src/board/project-home.tsx",
           "apps/web/src/settings/archived-projects-section.tsx"
         ],
         "server": [
@@ -1674,8 +1673,7 @@
         ]
       },
       "reach": [
-        "open /app/project/<id of a project listed by the projects API>",
-        "click testid:project-home-links",
+        "open /app/project/<id of a project listed by the projects API>/tasks",
         "open /app/todo/<id of a thread listed by the todos API>",
         "click testid:source-issue-retry"
       ],

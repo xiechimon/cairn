@@ -194,22 +194,32 @@ test('the Schedules tab lists schedules while the tasks request has failed', asy
   await expect(panel.locator('[data-slot="schedule-row"]')).toContainText('Nightly release checks');
 });
 
+const PROJECT_SCHEDULES = '/app?project=proj-1&chat=1&pane=tasks';
+const projectSchedulesPanel = (page: Page) => page.getByRole('complementary', { name: 'Tasks', exact: true });
+const projectScheduleRow = (page: Page) =>
+  page.locator('[data-slot="schedule-row"]', { hasText: 'Nightly release checks' });
+
+async function openProjectSchedules(page: Page) {
+  await page.goto(PROJECT_SCHEDULES);
+  await projectSchedulesPanel(page).getByRole('tab', { name: 'Schedules' }).click();
+}
+
 for (const surface of ['global', 'project'] as const) {
-  const path = surface === 'global' ? '/app/schedules' : '/app?project=proj-1';
+  const visit = (page: Page) => (surface === 'global' ? page.goto('/app/schedules') : openProjectSchedules(page));
   const summary = (page: Page) => surface === 'global'
     ? page.locator('.sched-card')
-    : page.locator('[data-slot="scheduled-task-row"]');
+    : projectScheduleRow(page);
   test(`${surface} summary uses the saved timezone across midnight`, async ({ page }) => {
     const at = Date.UTC(2026, 10, 5, 6, 15);
     await setup(page, { at, nextRunAt: at, tz: 'America/New_York' });
     await page.clock.setFixedTime(Date.UTC(2026, 10, 5, 4, 30));
-    await page.goto(path);
+    await visit(page);
     await expect(summary(page)).toContainText('Nov 5 01:15 Runs daily · Next Nov 5 01:15');
     await expect(summary(page)).not.toContainText('Next today');
   });
   test(`${surface} summary preserves missing-next data through its actual consumer`, async ({ page }) => {
     await setup(page, { kind: 'once', nextRunAt: null });
-    await page.goto(path);
+    await visit(page);
     await expect(summary(page)).toContainText('No upcoming runs');
     await expect(summary(page)).not.toContainText('Jan 1');
   });
@@ -271,32 +281,12 @@ test('a finished one-time schedule shows its last run and no pause control', asy
   await scheduleShot(page, 'schedule-detail-finished-once-actions.png');
 });
 
-test('the project scheduled-task row opens details before opening its thread', async ({ page }) => {
+test('the project schedule row opens details before opening its thread', async ({ page }) => {
   await setup(page);
-  await page.goto('/app?project=proj-1');
-  await page.locator('[data-slot="scheduled-task-row"]', { hasText: 'Nightly release checks' }).click();
+  await openProjectSchedules(page);
+  await projectScheduleRow(page).click();
   await expect(detail(page)).toBeVisible();
   await expect(page).not.toHaveURL(/thread=/);
-});
-
-test('Open thread from a project dialog does not restore focus to the surviving schedule row', async ({ page }) => {
-  await setup(page);
-  await page.route('**/api/todos/todo-1', (route) => route.fulfill({ json: { ...TASK, phase: 'done', latestBuildId: null, hasPlan: false } }));
-  await page.goto('/app?project=proj-1');
-  const trigger = page.locator('[data-slot="scheduled-task-row"]', { hasText: 'Nightly release checks' });
-  await trigger.click();
-  await expect(detail(page)).toBeVisible();
-  await trigger.evaluate((element) => {
-    const row = element as HTMLElement;
-    row.dataset.returnFocusCount = '0';
-    row.addEventListener('focus', () => { row.dataset.returnFocusCount = String(Number(row.dataset.returnFocusCount) + 1); });
-  });
-  await detail(page).getByRole('link', { name: 'Open thread', exact: true }).click();
-  await expect(page).toHaveURL(/project=proj-1.*thread=todo-1/);
-  await expect(page.getByTestId('side-chat')).toBeVisible();
-  await settleTransitions(page);
-  await expect(trigger).toHaveAttribute('data-return-focus-count', '0');
-  await expect(trigger).not.toBeFocused();
 });
 
 test('Delete requires confirmation and a rejected deletion remains retryable', async ({ page }) => {

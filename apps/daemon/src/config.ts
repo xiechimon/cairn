@@ -9,6 +9,7 @@ import {
   WORKSPACES_DIR_GUARD_CANON,
 } from '@cairn/shared';
 import { z } from 'zod';
+import { loadMachineJson, statePaths } from './state.js';
 
 export const daemonConfigSchema = z.object({
   serverUrl: z.string(),
@@ -60,7 +61,11 @@ export function loadDaemonConfig(
   }
   const apiKey = input.apiKey ?? env[ENV_VARS.apiKey];
   const teamId = input.teamId ?? env[ENV_VARS.team];
-  const serverUrl = input.serverUrl ?? env[ENV_VARS.server] ?? DEFAULT_SERVER_URL;
+  const serverUrl =
+    input.serverUrl ??
+    env[ENV_VARS.server] ??
+    loadMachineJson(statePaths(home))?.serverUrl ??
+    DEFAULT_SERVER_URL;
   const skillsDir = resolve(
     input.skillsDir ?? env[ENV_VARS.skillsDir] ?? join(homedir(), '.agents', 'skills'),
   );

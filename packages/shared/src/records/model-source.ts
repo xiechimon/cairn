@@ -49,6 +49,12 @@ export const modelSourcesEnvelopeSchema = z.object({
 });
 export type ModelSourcesEnvelope = z.infer<typeof modelSourcesEnvelopeSchema>;
 
+export const DEFAULT_CLAUDE_CODE_MODELS: readonly ModelSourceModel[] = [
+  { id: 'claude-opus-5-5', name: 'claude-opus-5-5', slot: 'builtin' },
+  { id: 'claude-sonnet-5-5', name: 'claude-sonnet-5-5', slot: 'builtin' },
+  { id: 'claude-haiku-5-5', name: 'claude-haiku-5-5', slot: 'builtin' },
+];
+
 export const CLAUDE_MODEL_SLOT_PATTERN = /^ANTHROPIC_([A-Z0-9_]+)_MODEL$/;
 
 export function parseClaudeCodeModelSource(raw: unknown, hostname: string): ModelSource {

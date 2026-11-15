@@ -56,8 +56,6 @@ export const EN: Record<string, string> = {
   '跑了 {n} 条命令': 'Ran {n#1 command|# commands}',
   '改了 {n} 个文件': 'Edited {n#1 file|# files}',
   测试通过: 'Tests pass',
-  改完测试通过: 'Edited, tests pass',
-  改完测试未通过: 'Edited, tests fail',
   测试未通过: 'Tests fail',
   '改了 {files}': 'Edited {files}',
   '改了 {files}，测试通过': 'Edited {files}, tests pass',
@@ -215,7 +213,6 @@ export const EN: Record<string, string> = {
   管理定时: 'Manage schedules',
   接下来: 'Up next',
   已暂停: 'Paused',
-  本周合并: 'Merged this week',
   全团队: 'Whole team',
   '仅 {name}': 'Only {name}',
   '项目密钥只发给该项目的 thread，同名时优先于团队密钥。':
@@ -227,25 +224,12 @@ export const EN: Record<string, string> = {
   '本项目同时运行的 thread 上限。你发的消息会插队，并可多用一个位置。':
     'How many threads in this project run at once. Your own messages go first and may use one extra slot.',
   项目说明: 'Instructions',
-  项目记忆: 'Project memory',
   定时任务: 'Schedules',
   没有定时任务: 'No schedules',
-  '问 Coordinator 关于 {name} 的事…': 'Ask the Coordinator about {name}…',
-  '这个项目还没有 thread': 'No threads in this project yet',
-  '在上面问 Coordinator，它会开 thread 来做。':
-    'Ask the Coordinator above and it will open threads for the work.',
-  '还没有项目说明。写在这里的规则会被本项目的每个 thread 和 Coordinator 读到。':
-    'No instructions yet. Every thread and the Coordinator in this project will read the rules written here.',
-  'Coordinator 在本项目学到的事会记在这里，默认只在本项目内使用。即将上线。':
-    'What the Coordinator learns in this project will be kept here, used only in this project by default. Coming soon.',
-  目前用团队密钥: 'Team secrets for now',
-  '目前跟随 Runner 上限': 'Runner limits for now',
   保存项目说明: 'Save instructions',
   '例如：仓库内容用英文；改动后跑 pnpm lint；不要 force push。':
     'For example: repository content is English; run pnpm lint after changes; never force push.',
   '项目说明保存失败，请重试。': 'Could not save the instructions. Try again.',
-  没有在进行的任务: 'Nothing in progress',
-  没有空闲的任务: 'Nothing idle',
   还没有完成的文档: 'No finished documents yet',
   '调研报告等文档完成后会出现在这里。':
     'Research reports and other documents show up here once they finish.',
@@ -254,8 +238,11 @@ export const EN: Record<string, string> = {
   '添加模型服务商，或在 Runner 上登录 Claude Code':
     'Add a provider, or sign in to Claude Code on a Runner',
   '连接一台 Runner': 'Connect a Runner',
-  运行: 'Run',
-  '连接这台 Runner': 'to connect this Runner',
+  '在要干活的电脑上运行 `{command}`': 'Run `{command}` on the computer that should do the work',
+  '{name} 离线': '{name} is offline',
+  '在 {name} 上运行 `{command}` 让它重新上线': 'Run `{command}` on {name} to bring it back',
+  '{n} 台 Runner 都离线': '{n#1 Runner is|# Runners are} offline',
+  '在其中一台上运行 `{command}` 让它重新上线': 'Run `{command}` on one of them to bring it back',
   'Coordinator 还不能回答': 'The Coordinator cannot answer yet',
   '点输入框下方的按钮，把模型来源、Runner 和 Coordinator 接上，再发一次。':
     'Use the button below the box to connect a model source, a Runner and the Coordinator, then send again.',
@@ -861,6 +848,12 @@ export const EN: Record<string, string> = {
     "Switch the Coordinator's Agent? The Coordinator's memory lives on the Agent it runs on. After switching to <agent>, the memory becomes <agent>'s — the current memory is not migrated.",
   编辑章程: 'Edit charter',
   保存章程: 'Save charter',
+  '章程里不能有这一行：{marker}。这是 Cairn 自己用的分隔标记，删掉它再保存。':
+    'The charter cannot contain this line: {marker}. Cairn uses it as its own separator. Delete it, then save.',
+  '章程最多 {max} 个字，现在有 {n} 个字。删短一些再保存。':
+    'A charter can be at most {max#1 character|# characters}; this one has {n}. Shorten it, then save.',
+  '章程没有保存，你写的内容还在编辑框里。':
+    'The charter was not saved. Your text is still in the editor.',
   '长期指令：模型路由规则（何种任务使用何种模型）、优先级、偏好…':
     'Long-term instructions: model routing rules (which model for which work), priorities, preferences…',
   // #209 编辑分配接线：chip-popover「编辑分配」→ agent 选择弹层（#182 家族
@@ -923,7 +916,12 @@ export const EN: Record<string, string> = {
   已下架: 'Delisted',
   [PROBE_TOOL_CALL_LABEL]: `Calling tool: ${PROBE_TOOL_PILLS[1]}`,
   '方案 · v1': 'Plan · v1',
-  'Xmon Dai 发起了合并': 'Xmon Dai started a merge',
+  '{name} 发起了合并': '{name} started a merge',
+  '{name} 发起了 AI 审核': '{name} started an AI review',
+  '{name} 通过了确认': '{name} approved the plan',
+  '{name} 标记为已完成': '{name} marked it done',
+  '{name} 发起了交付验证': '{name} started delivery verification',
+  '{name} 发起了拆解': '{name} started splitting the task',
   '运行在 ': 'Running on ',
   '远程（HTTP）': 'Remote (HTTP)',
   '2 天前': '2d ago',
@@ -1214,6 +1212,7 @@ export const EN: Record<string, string> = {
   更新技能: 'Update skills',
   运行时: 'Runtime',
   '内置 (pi)': 'Built-in (pi)',
+  用你添加的服务商的模型: "runs your providers' models",
   '允许该 Agent 通过合并分支进行发布（例如将 develop 合并进 main）。':
     'Let this Agent publish by merging branches (for example develop into main).',
   '允许该 Agent 创建 git tag，这可能触发发布流程。':
@@ -1625,7 +1624,6 @@ export const EN: Record<string, string> = {
   'Gemini CLI 还不上报版本和模型；打开后，这台 Runner 会接 Gemini 步骤。':
     'Gemini CLI does not report its version or models yet; when on, this Runner takes Gemini steps.',
   '{n} 个模型': '{n#1 model|# models}',
-  '· {n} 步': '· {n#1 step|# steps}',
   '{n} 个已下架': '{n} retired',
   '使用所有 Runner 的服务商': 'Uses providers for all Runners',
   范围: 'Scope',

@@ -32,7 +32,7 @@ test('a reply that created a task gets one reference row with the state, and the
   await expect(ref).toContainText('Read the cairn repo');
   await expect(ref.locator('svg[data-glyph="progress"]')).toHaveCount(1);
   await expect(ref).not.toContainText('In progress');
-  await expect(ref).toHaveAccessibleName(/Read the cairn repo.*Running/);
+  await expect(ref).toHaveAccessibleName(/Read the cairn repo ?, Running/);
   const mention = stream.locator('a[data-slot="task-mention"]');
   await expect(mention).toHaveText('Read the cairn repo');
   await expect(mention.locator('svg')).toHaveCount(0);

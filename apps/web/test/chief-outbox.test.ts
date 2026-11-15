@@ -58,6 +58,18 @@ describe('chief outbox', () => {
     expect(box.entries()).toEqual([]);
   });
 
+  test('a message the stream reports stored lands before its send call answers and stays sent', async () => {
+    const box = outbox();
+    const { calls, deliver } = gate();
+    box.enqueue({ threadId: 't1', projectId: null, text: 'hello' }, deliver);
+    await flush();
+    box.land('key-1', 'm9');
+    expect(unlandedItems(box.entries(), 't1', new Set(['m9']))).toEqual([]);
+    calls[0]?.reject(new Error('response lost'));
+    await flush();
+    expect(box.entries()[0]).toMatchObject({ state: 'sent', messageId: 'm9' });
+  });
+
   test('a rejected message turns failed and keeps its text and key', async () => {
     const box = outbox();
     const { calls, deliver } = gate();
