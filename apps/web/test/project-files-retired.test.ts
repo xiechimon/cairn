@@ -6,9 +6,7 @@ const source = (path: string) => readFileSync(fileURLToPath(new URL(`../src/${pa
 
 test('project files has no route or navigation entry', () => {
   expect(source('App.tsx')).not.toContain("path: '/app/project/:id/files'");
-  for (const path of ['board/project-home.tsx', 'board/home-c.tsx']) {
-    expect(source(path)).not.toMatch(/\/app\/project\/\$\{[^}]+\}\/files/);
-  }
+  expect(source('board/home-c.tsx')).not.toMatch(/\/app\/project\/\$\{[^}]+\}\/files/);
 });
 
 test('the project file component is removed rather than hidden', () => {

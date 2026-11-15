@@ -6,13 +6,12 @@ import {
   useChief,
   useMachines,
   useProjects,
-  useSchedules,
   useSearchResults,
   useTasks,
   useTeams,
   useTodos,
 } from '../api/hooks.js';
-import { mapMachines, mapSchedules, toDisplayTodo } from '../api/mappers.js';
+import { mapMachines, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { AppSidebar } from '../board/app-sidebar.js';
 import type { ArchivedProjectState } from '../board/archived-project-bar.js';
@@ -22,7 +21,6 @@ import { FirstPrCard, firstPrCardInfo } from '../board/first-pr-card.js';
 import { type HomeBannerKind, pickHomeBanners } from '../board/home-banners.js';
 import { HomeC } from '../board/home-c.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
-import { ProjectHome, type ProjectHomeProject } from '../board/project-home.js';
 import { ProjectNotFound, ProjectsFailed, ProjectsLoading } from '../board/project-not-found.js';
 import { type SuggestableProject, suggestProjects } from '../board/project-suggestions.js';
 import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
@@ -57,7 +55,6 @@ export function BoardPage() {
 
   const todosQ = useTodos(teamId, live);
   const tasksQ = useTasks(teamId, live);
-  const schedulesQ = useSchedules(live);
   const projectsQ = useProjects(teamId, live);
   const machinesQ = useMachines(teamId, live);
   const chiefQ = useChief(teamId, live);
@@ -98,21 +95,8 @@ export function BoardPage() {
             );
           },
         };
-  const homeProject: ProjectHomeProject | null =
-    homeProjectId === null || homeProjectName === null
-      ? null
-      : {
-          id: homeProjectId,
-          name: homeProjectName,
-          description: liveProject?.description,
-          instructions: liveProject?.instructions,
-          repo: liveProject?.githubRepo ?? liveProject?.repoName,
-          baseBranch: liveProject?.baseBranch,
-          icon: liveProject?.icon ?? fixture.projectAvatars?.[homeProjectId]?.icon,
-          color: liveProject?.color ?? fixture.projectAvatars?.[homeProjectId]?.color,
-        };
   const projectLookup =
-    homeProjectId === null || homeProject !== null || (!live && fixture.projectNames == null)
+    homeProjectId === null || homeProjectName !== null || (!live && fixture.projectNames == null)
       ? 'resolved'
       : live && teamId === undefined && teamsQ.isError
         ? 'failed'
@@ -121,12 +105,7 @@ export function BoardPage() {
           : projectsQ.isError
             ? 'failed'
             : 'loading';
-  const projectChat = searchParams.get('chat') === '1';
-  const schedules = live ? mapSchedules(schedulesQ.data ?? []) : (fixture.schedules ?? []);
   const now = live ? Date.now() : fixture.now;
-  const chatParams = new URLSearchParams(searchParams);
-  chatParams.set('chat', '1');
-  const projectChatHref = `/app?${chatParams.toString()}`;
 
   const fixtureTodos = useMemo(() => withoutDeleted(fixture.todos), [fixture]);
   const liveTodos = useMemo(() => (todosQ.data ?? []).map(toDisplayTodo), [todosQ.data]);
@@ -218,8 +197,7 @@ export function BoardPage() {
     chiefView !== 'settings' &&
     projectLookup !== 'loading' &&
     projectLookup !== 'failed' &&
-    !(projectLookup === 'unknown' && homeProjectId !== null) &&
-    !(homeProject !== null && !projectChat);
+    !(projectLookup === 'unknown' && homeProjectId !== null);
   return (
     <div className="board-shell flex h-full overflow-hidden bg-(--surface-1)" data-route="board">
       <AppSidebar
@@ -264,18 +242,6 @@ export function BoardPage() {
                   params.delete(THREAD_PARAM);
                   return `/app?${params.toString()}`;
                 }}
-              />
-            </div>
-          ) : homeProject !== null && !projectChat ? (
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <ProjectHome
-                key={homeProject.id}
-                project={homeProject}
-                todos={todos}
-                schedules={schedules}
-                now={now}
-                chatHref={projectChatHref}
-                archived={archivedState}
               />
             </div>
           ) : (
