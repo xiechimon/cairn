@@ -43,7 +43,7 @@ export function openReadOnlyView(): ReadOnlyView {
 }
 
 export interface ComputerScreenProviderOptions {
-  holdComputer?: (scopeKey: string) => Promise<() => void>;
+  holdComputer?: (scopeKey: string, kind: 'view' | 'control') => Promise<() => void>;
   socketPath?: (scopeKey: string, kind: 'view' | 'control') => string;
   socketWaitMs?: number;
   connect?: (path: string) => Socket;
@@ -136,7 +136,7 @@ export function createComputerScreenProvider(
       }
       if (!options.socketPath) throw new Error('This machine has no computer screen');
       const release = options.holdComputer
-        ? await options.holdComputer(request.scopeKey)
+        ? await options.holdComputer(request.scopeKey, request.kind)
         : () => {};
       try {
         const connection = await openUnixScreen(
