@@ -32,6 +32,7 @@ import { builtinModelIds, isBuiltinProvider } from '../coordinator/runtime/provi
 import type { Db } from '../db/client.js';
 import {
   build,
+  chief,
   machine,
   message,
   provider,
@@ -654,7 +655,10 @@ export function coordinatorProfile(db: Pick<Db, 'select'>, teamId: string): Rout
 }
 
 export function coordinatorMemoryOwner(db: Pick<Db, 'select'>, teamId: string): string | undefined {
-  return storedRuleRow(db, teamId, 'coordinator')?.id;
+  const stored = storedRuleRow(db, teamId, 'coordinator');
+  if (stored !== null) return stored.id;
+  if (!coordinatorRunsOnPi() || defaultCoordinatorRule(db, teamId) === null) return undefined;
+  return db.select({ id: chief.id }).from(chief).where(eq(chief.teamId, teamId)).get()?.id;
 }
 
 export const VERIFY_MEMORY_OWNER_SUFFIX = ':verify';
