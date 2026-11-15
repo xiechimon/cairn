@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import type { ScopedComputerProviders } from '../src/computer/provider.js';
+import { MachineApiError } from '../src/machine-client.js';
 import { PINNED_AGENT_BROWSER_VERSION } from '../src/orb/computer.js';
 import { boot, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 import { FakeOrbProvider } from './orb-fake.js';
@@ -46,6 +47,30 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
     await handle.stop();
     await handle.done;
     expect(lines).toContain('[machine] Shutting down…');
+  });
+
+  test('startup waits for a server that is restarting instead of exiting', async () => {
+    const api = new FakeMachineApi();
+    const me = api.me.bind(api);
+    let failures = 2;
+    api.me = async () => {
+      if (failures > 0) {
+        failures -= 1;
+        throw new TypeError('fetch failed');
+      }
+      return me();
+    };
+    const { lines } = await boot({ api });
+    expect(lines.filter((l) => l.includes('server not reachable at startup'))).toHaveLength(2);
+    expect(lines).toContain('Online (machineId=m1); polling http://server');
+  });
+
+  test('startup still stops when the server rejects the machine', async () => {
+    const api = new FakeMachineApi();
+    api.me = async () => {
+      throw new MachineApiError(401, 'unauthorized');
+    };
+    await expect(boot({ api })).rejects.toThrow('machine api 401');
   });
 
   test('#1251 capability manifest uploaded with enroll and every presence beat (injected stub pins content)', async () => {
