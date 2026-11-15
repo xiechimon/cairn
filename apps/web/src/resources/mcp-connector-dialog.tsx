@@ -228,7 +228,7 @@ function TokenField({
           {entry.tokenHelp !== undefined
             ? t(entry.tokenHelp)
             : required
-              ? t('令牌加密存在本机服务器上，保存后看不到原文。')
+              ? t('加密保存在本机，保存后看不到原文。')
               : t('不填也能用；填了额度更高。')}{' '}
           {entry.tokenHelpUrl !== undefined && (
             <a
@@ -389,7 +389,7 @@ function CustomServerDialog({
         />
       }
     >
-      <FormStack className="max-w-none">
+      <FormStack className="max-w-none text-balance [word-break:keep-all]">
         <FormField label={t('名称')} htmlFor="mcp-label">
           <Input
             id="mcp-label"
@@ -547,8 +547,8 @@ function ManageConnectorDialog({
     return (
       <DeleteConfirm
         open
-        title={t('确定删除 {name} 这个连接？', { name: current.label })}
-        summary={current.url}
+        title={t('确定删除 {name} 这个连接？此操作不可撤销。', { name: current.label })}
+        summary={t('删除后 Agent 不能再用 {name} 的工具。', { name: current.label })}
         ariaLabel={t('删除连接')}
         onClose={() => setConfirmDelete(false)}
         onConfirm={remove}
@@ -589,13 +589,17 @@ function ManageConnectorDialog({
         )}
         {!oauth && entry?.auth.includes('token') && (
           <TokenField
-            entry={{
-              ...entry,
-              tokenLabel: t('换一个{label}', { label: t(entry.tokenLabel ?? '令牌') }),
-            }}
+            entry={
+              current.authKind === 'none'
+                ? entry
+                : {
+                    ...entry,
+                    tokenLabel: t('换一个{label}', { label: t(entry.tokenLabel ?? '令牌') }),
+                  }
+            }
             value={token}
             onChange={setToken}
-            required
+            required={current.authKind !== 'none'}
           />
         )}
         <DialogError message={saveError} />

@@ -37,7 +37,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
     auth: ['token'],
     tokenLabel: '个人访问令牌',
     tokenHelpUrl: 'https://github.com/settings/personal-access-tokens/new',
-    tokenHelp: '新建细粒度令牌，选好仓库，给 Contents、Issues、Pull requests 读写权限。',
+    tokenHelp: '新建细粒度令牌，选好仓库，给 Contents、Issues、Pull\u00a0requests 读写权限。',
     options: [
       { id: 'readonly', label: '只读', kind: 'header', name: 'X-MCP-Readonly', input: 'flag' },
       { id: 'toolsets', label: '工具集', kind: 'header', name: 'X-MCP-Toolsets', input: 'text' },

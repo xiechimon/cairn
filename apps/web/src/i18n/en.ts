@@ -2188,8 +2188,6 @@ export const EN: Record<string, string> = {
   '没能保存，稍后重试。': "Couldn't save. Try again later.",
   令牌: 'Token',
   '{label}（可选）': '{label} (optional)',
-  '令牌加密存在本机服务器上，保存后看不到原文。':
-    "The token is stored encrypted on your server and can't be viewed after saving.",
   '不填也能用；填了额度更高。': 'Works without one; a key raises your limits.',
   '去 {name} 创建': 'Create one on {name}',
   '连接 {name}': 'Connect {name}',
@@ -2255,15 +2253,12 @@ export const EN: Record<string, string> = {
   '例如：https://example.com/mcp': 'For example: https://example.com/mcp',
   '值加密保存在本机，保存后看不到原文。':
     'Values are encrypted on this machine and cannot be viewed after saving.',
-  '确定删除 {name} 这个连接？': 'Delete the {name} connection?',
   删除连接: 'Delete connection',
   '登录并授权后会自动回到这里。': 'After you sign in and approve, you come back here.',
-  这个服务: 'this service',
   '你取消了授权，这次什么都没有保存。': 'You cancelled the sign-in, so nothing was saved.',
   '登录等得太久已经失效，重新接入一次。': 'The sign-in waited too long and expired. Connect again.',
   '授权期间这个连接有了变动，这次授权没有保存。':
     'The connection changed during sign-in, so this sign-in was not saved.',
-  '{name} 没有完成授权，可以再试一次。': '{name} did not finish the sign-in. You can try again.',
   '没能连上 {name}': 'Could not connect {name}',
   '没能开始登录，稍后再试。': 'Could not start the sign-in. Try again later.',
   '这个标识已经被占用，先删掉旧的连接或换个名字。':
@@ -2272,8 +2267,16 @@ export const EN: Record<string, string> = {
     'Browser sign-in is not available for {name}. Connect with a token or headers instead.',
   '{name} 的登录服务没有接受 Cairn 的注册，稍后再试。':
     "{name}'s sign-in service did not accept Cairn's registration. Try again later.",
-  '新建细粒度令牌，选好仓库，给 Contents、Issues、Pull requests 读写权限。':
-    'Create a fine-grained token, pick the repositories, and give Contents, Issues and Pull requests read and write access.',
   '最新的库文档与代码示例，也支持登录':
     'Up-to-date library docs and code examples; sign-in also supported',
+  '登录没有完成，可以再试一次。': 'The sign-in did not finish. You can try again.',
+  没能完成登录: 'Could not finish the sign-in',
+  '删除后 Agent 不能再用 {name} 的工具。':
+    "After deletion, Agents can no longer use {name}'s tools.",
+  '加密保存在本机，保存后看不到原文。':
+    'Encrypted on this machine; it cannot be viewed after saving.',
+  '确定删除 {name} 这个连接？此操作不可撤销。':
+    'Delete the {name} connection? This cannot be undone.',
+  '新建细粒度令牌，选好仓库，给 Contents、Issues、Pull\u00a0requests 读写权限。':
+    'Create a fine-grained token, pick the repositories, and give Contents, Issues and Pull requests read and write access.',
 };
