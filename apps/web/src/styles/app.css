@@ -384,6 +384,16 @@
   z-index: var(--z-modal-scrim);
 }
 
+html:has([data-slot="demo-banner"])
+  :is([data-slot="dialog-overlay"], [data-slot="alert-dialog-overlay"]) {
+  top: 2.25rem;
+}
+
+html:has([data-slot="demo-banner"]) .app-drawer {
+  top: 2.25rem;
+  height: calc(100% - 2.25rem);
+}
+
 @supports (corner-shape: superellipse(1.5)) {
   .board-notify-banner {
     corner-shape: superellipse(1.5);

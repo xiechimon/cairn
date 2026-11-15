@@ -7,6 +7,7 @@ export function DemoBanner() {
   return (
     <div
       data-testid="demo-banner"
+      data-slot="demo-banner"
       className="flex h-9 flex-none items-center gap-3 overflow-hidden border-b border-border bg-background px-4 text-ui whitespace-nowrap"
     >
       <span className="flex-none font-medium text-foreground">{t('演示数据')}</span>

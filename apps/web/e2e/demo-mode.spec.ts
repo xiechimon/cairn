@@ -99,6 +99,15 @@ test('banner: 演示数据 + site and showcase links, bilingual, survives naviga
   const box = await banner.boundingBox();
   expect(box?.width).toBeLessThanOrEqual(390);
   expect(await banner.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+
+  await page.goto(`${demo.base}/app`);
+  const bannerBox = await banner.boundingBox();
+  const menuBox = await page.getByTestId('narrow-menu').boundingBox();
+  expect(menuBox?.y ?? 0).toBeGreaterThanOrEqual((bannerBox?.y ?? 0) + (bannerBox?.height ?? 0));
+  await page.getByTestId('narrow-menu').click();
+  await expect(page.locator('.app-drawer')).toBeVisible();
+  const drawerBox = await page.locator('.app-drawer').boundingBox();
+  expect(drawerBox?.y ?? 0).toBeGreaterThanOrEqual((bannerBox?.y ?? 0) + (bannerBox?.height ?? 0));
 });
 
 test('banner follows the locale', async ({ page }) => {
@@ -122,7 +131,7 @@ test('the selling points browse end to end with no backend traffic', async ({ pa
   await page.goto(`${demo.base}/app/todo/${DEMO.cartMerge}`);
   await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
   await expect(page.getByText('AI 审核', { exact: false }).first()).toBeVisible();
-  await expect(page.getByText('blocking').first()).toBeVisible();
+  await expect(page.getByText('必须修改').first()).toBeVisible();
 
   await page.goto(`${demo.base}/app/todo/${DEMO.rateLimit}`);
   await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
@@ -140,6 +149,11 @@ test('the selling points browse end to end with no backend traffic', async ({ pa
 
   await page.goto(`${demo.base}/app`);
   await expect(home(page).getByText('购物车').first()).toBeVisible();
+
+  await page.goto(`${demo.base}/app?pane=tasks`);
+  await expect(page.locator('[data-testid="tasks-section"][data-section="ready_for_review"]')).toContainText(
+    '给登录接口加限流与防刷',
+  );
 
   await page.goto(`${demo.base}/app/resources/machines`);
   await expect(page.getByTestId('machine-item').filter({ hasText: 'dev-mac' })).toBeVisible();
