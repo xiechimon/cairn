@@ -124,6 +124,12 @@ export function resolveRuleProvider<T extends RoutingRuleRow>(
   storedOnly = false,
 ): T {
   if (rule.provider !== LEGACY_RUNTIME_PROVIDER) return rule;
+  const ownRow = db
+    .select({ id: provider.id })
+    .from(provider)
+    .where(and(eq(provider.teamId, rule.teamId), eq(provider.providerId, LEGACY_RUNTIME_PROVIDER)))
+    .get();
+  if (ownRow !== undefined) return rule;
   const served = servingProviders(db, rule.teamId, rule.modelId, storedOnly)[0];
   return served === undefined ? rule : { ...rule, provider: served.providerId };
 }

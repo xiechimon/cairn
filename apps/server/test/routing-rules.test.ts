@@ -552,6 +552,14 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     expect(session(s)).toMatchObject({ provider: 'pi', modelId: 'nobody-serves-this' });
   });
 
+  test('a team that owns a provider named pi keeps its pi rules on that provider', () => {
+    const s = bare();
+    addProvider(s, 'vani', { models: ['m1'] });
+    addProvider(s, 'pi', { models: ['m1'] });
+    seedRoute(s, 'session', { provider: 'pi', modelId: 'm1' });
+    expect(session(s)).toMatchObject({ provider: 'pi', modelId: 'm1' });
+  });
+
   test('a pi rule for a built-in vendor model resolves for Runners but not for the in-server Coordinator', () => {
     const s = bare();
     const modelId = [...builtinModelIds('deepseek')][0]!;
