@@ -151,7 +151,7 @@ export const copy = {
       'Cairn is a self-hosted personal assistant for people who write code. Say what you want in one conversation; agents research and build on your own machines with your own subscriptions, code lands through a merge gate, and anything that cannot be undone waits for your yes.',
     nav: { docs: 'Docs', github: 'GitHub', theme: 'Toggle theme' },
     eyebrow: ['Self-hosted', 'Apache-2.0', 'For one person'],
-    h1: ['A personal assistant for people who write code,', 'on your own machines'],
+    h1: ['A personal assistant for people who write code, ', 'on your own machines'],
     lede: 'Say what you want in one conversation and only make the calls. Agents read how open-source projects solved it before they build, on your machines and your subscriptions. Code lands through a merge gate, and nothing that cannot be undone happens without your yes.',
     start: 'Get started',
     copy: 'Copy',
