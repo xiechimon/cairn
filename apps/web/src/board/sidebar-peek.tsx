@@ -31,6 +31,7 @@ export function SidebarPeek({
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const edgeRef = useRef<HTMLDivElement>(null);
   const timer = useRef<number | undefined>(undefined);
   const hovered = useRef(false);
   const armed = useRef(startArmed);
@@ -39,6 +40,23 @@ export function SidebarPeek({
   const opening = useRef(false);
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  useEffect(() => {
+    if (armed.current) return;
+    const arm = (event: globalThis.PointerEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Node &&
+        (triggerRef.current?.contains(target) || edgeRef.current === target)
+      ) {
+        return;
+      }
+      armed.current = true;
+      window.removeEventListener('pointermove', arm);
+    };
+    window.addEventListener('pointermove', arm);
+    return () => window.removeEventListener('pointermove', arm);
+  }, []);
 
   useEffect(() => {
     if (!open && focusTrigger.current) {
@@ -79,7 +97,6 @@ export function SidebarPeek({
     window.clearTimeout(timer.current);
   };
   const leave = (event: PointerEvent) => {
-    armed.current = true;
     opening.current = false;
     if (event.pointerType === 'touch') return;
     hovered.current = false;
@@ -136,6 +153,7 @@ export function SidebarPeek({
         </TooltipContent>
       </Tooltip>
       <div
+        ref={edgeRef}
         aria-hidden
         data-testid="sidebar-peek-edge"
         className="fixed inset-y-0 left-0 z-(--z-floating) w-2"
