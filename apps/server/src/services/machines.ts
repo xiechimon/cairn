@@ -509,7 +509,8 @@ export function markPresence(
     .run();
   const computerChanged = applyComputerPresence(db, machineId, row.teamId, body.computers, nowMs());
   if (becameOnline || loginChanged || computerChanged) {
-    hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online: true }));
+    const online = admitOnline || row.online;
+    hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online }));
   }
 }
 

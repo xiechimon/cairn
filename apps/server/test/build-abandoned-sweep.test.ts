@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, onTestFinished, test } from 'vitest';
+import { afterAll, describe, expect, onTestFinished, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
@@ -451,6 +451,36 @@ describe('Runner offline grace keeps baseline recovery (docs/design/runner-offli
       expect(stepRowOf(w).status).toBe(status);
     },
   );
+
+  test('after the grace expires a stale progressed step is released even if the old connection still reports', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const w = makeWorld({
+      status: 'claimed',
+      createdAgo: 600_000,
+      heartbeatAgo: 122_000,
+      machineOnline: true,
+    });
+    const hub = w.s.machineHub;
+    hub.subscribeMachine(w.teamId, w.machineId, () => {});
+    const connectionId = hub.connectionId(w.machineId)!;
+    hub.dropConnection(w.machineId, connectionId, () =>
+      w.s.db
+        .update(machineTable)
+        .set({ online: false })
+        .where(eq(machineTable.id, w.machineId))
+        .run(),
+    );
+    hub.admitPresence(w.machineId, connectionId);
+    vi.advanceTimersByTime(45_000);
+    expect(hub.admitPresence(w.machineId, connectionId)).toBe('ignore');
+
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+    expect(stepRowOf(w).status).toBe('pending');
+  });
 });
 
 describe('#1257 unclaimed suspension when the home machine is offline (home-machine form of sweepAbandonedBuildSteps)', () => {

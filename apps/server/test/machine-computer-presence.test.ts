@@ -69,6 +69,19 @@ describe('computer observations in machine presence', () => {
     expect(f.read()?.runningSince).toBeNull();
   });
 
+  test('a reports-only presence on an offline machine updates the computer and publishes online: false', async () => {
+    const f = await setup();
+    f.s.db.update(machine).set({ online: false }).where(eq(machine.id, f.id)).run();
+    const res = await post(f.s, '/api/machine/presence', f.token, {
+      connectionId: null,
+      ...f.report('running'),
+    });
+    expect(res.status).toBe(200);
+    expect(f.read()?.state).toBe('running');
+    expect(f.s.db.select().from(machine).where(eq(machine.id, f.id)).get()?.online).toBe(false);
+    expect(f.events).toEqual([{ type: 'machine_presence', machineId: f.id, online: false }]);
+  });
+
   test('repeated running observations keep the start time and produce no duplicate event', async () => {
     const f = await setup();
     await post(f.s, '/api/machine/presence', f.token, f.report('running'));

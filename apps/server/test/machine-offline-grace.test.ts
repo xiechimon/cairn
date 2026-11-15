@@ -4,8 +4,15 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
-import { machine as machineTable, team as teamTable } from '../src/db/schema.js';
+import {
+  build as buildTable,
+  machine as machineTable,
+  project as projectTable,
+  team as teamTable,
+  todo as todoTable,
+} from '../src/db/schema.js';
 import { createApiKey } from '../src/services/api-keys.js';
+import { createBranchSync } from '../src/services/branch-sync.js';
 import { MACHINE_OFFLINE_GRACE_MS, MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import { sweepStaleMachines } from '../src/services/machines.js';
 import { bootServer, type TestServer } from './helpers.js';
@@ -145,6 +152,14 @@ const goodbye = (s: TestServer, token: string | undefined, connectionId: string)
   });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+const loginReport = (state: 'ok' | 'expiring') => ({
+  installed: true,
+  hostname: 'grace-box',
+  models: [{ id: 'stub-model', name: 'stub-model' }],
+  auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
+  login: { state },
+});
 
 describe('Runner offline grace (docs/design/runner-offline-grace.md)', () => {
   test('grace timer fires at exactly the grace length, not before', () => {
@@ -400,6 +415,92 @@ describe('Runner offline grace (docs/design/runner-offline-grace.md)', () => {
     expect(s.machineHub.silentSinceDrop(m.machineId)).toBe(false);
   });
 
+  test('a queued timer callback for a cancelled or superseded grace changes nothing', () => {
+    vi.useFakeTimers();
+    const hub = new MachineWakeHub(1_000);
+    const callbacks: (() => void)[] = [];
+    const realSetTimeout = globalThis.setTimeout;
+    const spy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+      fn: () => void,
+      ms?: number,
+    ) => {
+      callbacks.push(fn);
+      return realSetTimeout(() => {}, ms);
+    }) as typeof setTimeout);
+    hub.subscribeMachine('t', 'm', () => {});
+    const a = hub.connectionId('m')!;
+    const expiredA = vi.fn();
+    hub.dropConnection('m', a, expiredA);
+    hub.cancelGrace('m');
+    callbacks.at(-1)!();
+    expect(expiredA).not.toHaveBeenCalled();
+
+    hub.subscribeMachine('t', 'm', () => {});
+    const b = hub.connectionId('m')!;
+    hub.dropConnection('m', a, expiredA);
+    const expiredB = vi.fn();
+    hub.dropConnection('m', b, expiredB);
+    const timerB = callbacks.at(-1)!;
+    hub.subscribeMachine('t', 'm', () => {});
+    timerB();
+    expect(expiredB).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  test('the ping loop finding the current token invalid marks offline at once, with no grace', async () => {
+    const s = boot({ pingIntervalMs: 20 });
+    const m = await enroll(s, issueKey(s));
+    await openStream(s, m.token, m.machineId);
+    const started = Date.now();
+    s.db
+      .update(machineTable)
+      .set({ tokenHash: createHash('sha256').update('other').digest('hex') })
+      .where(eq(machineTable.id, m.machineId))
+      .run();
+    await waitFor(() => !machineRow(s, m.machineId).online, GRACE_MS);
+    expect(Date.now() - started).toBeLessThan(GRACE_MS);
+    expect(s.machineHub.connectionId(m.machineId)).toBeUndefined();
+    expect(s.machineHub.silentSinceDrop(m.machineId)).toBe(false);
+  });
+
+  test('a reports-only presence publishes the stored online state, not online: true', async () => {
+    const s = boot();
+    const m = await enroll(s, issueKey(s));
+    const a = await openStream(s, m.token, m.machineId);
+    await goodbye(s, m.token, a.connectionId);
+    const events = presenceEvents(s, m.machineId);
+    const res = await call(s.app, 'POST', '/api/machine/presence', {
+      cred: m.token,
+      body: { connectionId: null, claudeCode: loginReport('expiring') },
+    });
+    expect(res.status).toBe(200);
+    expect(machineRow(s, m.machineId).online).toBe(false);
+    expect(machineRow(s, m.machineId).claudeCodeReport?.login?.state).toBe('expiring');
+    expect(events).toEqual([false]);
+
+    const b = await openStream(s, m.token, m.machineId);
+    await b.drop();
+    await call(s.app, 'POST', '/api/machine/presence', {
+      cred: m.token,
+      body: { connectionId: b.connectionId, claudeCode: loginReport('ok') },
+    });
+    expect(machineRow(s, m.machineId).online).toBe(true);
+    expect(events).toEqual([false, true, true]);
+  });
+
+  test('another machine token cannot end or feed a pending grace', async () => {
+    const s = boot();
+    const a = await enroll(s, issueKey(s), 'box-a');
+    const b = await enroll(s, issueKey(s), 'box-b');
+    const sb = await openStream(s, b.token, b.machineId);
+    await sb.drop();
+    expect(await (await goodbye(s, a.token, sb.connectionId)).json()).toEqual({ applied: false });
+    await presence(s, a.token, sb.connectionId);
+    expect(s.machineHub.silentSinceDrop(b.machineId)).toBe(true);
+    expect(machineRow(s, b.machineId).online).toBe(true);
+    await waitFor(() => !machineRow(s, b.machineId).online);
+  });
+
   test('14: during grace pushed commands find no connection', async () => {
     const s = boot();
     const m = await enroll(s, issueKey(s));
@@ -419,5 +520,41 @@ describe('Runner offline grace (docs/design/runner-offline-grace.md)', () => {
         force: false,
       }),
     ).toBe(false);
+    s.db.insert(projectTable).values({ id: 'proj-g', name: 'g', teamId: s.team.id }).run();
+    s.db
+      .insert(todoTable)
+      .values({
+        id: 'todo-g',
+        teamId: s.team.id,
+        projectId: 'proj-g',
+        title: 'g',
+        phase: 'building',
+        phaseAt: 1,
+        seqNum: 1,
+      })
+      .run();
+    s.db
+      .insert(buildTable)
+      .values({
+        id: 'build-g',
+        todoId: 'todo-g',
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: 1,
+      })
+      .run();
+    expect(() =>
+      createBranchSync(s.svc, {
+        buildId: 'build-g',
+        machineId: m.machineId,
+        teamId: s.team.id,
+        projectId: 'proj-g',
+        cloneUrl: null,
+        directory: '/tmp/g',
+        ref: 'main',
+        commit: 'a'.repeat(40),
+        force: false,
+      }),
+    ).toThrow('machine stream disconnected');
   });
 });

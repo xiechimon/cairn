@@ -1,7 +1,7 @@
 import type { ClaimedStep } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { afterAll, describe, expect, onTestFinished, test } from 'vitest';
+import { afterAll, describe, expect, onTestFinished, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   chiefMessage,
@@ -360,4 +360,28 @@ describe('Runner offline grace keeps baseline Coordinator recovery (docs/design/
       expect(stepRowOf(w).status).toBe(status);
     },
   );
+
+  test('after the grace expires a stale claimed turn is released even if the old connection still reports', async () => {
+    const w = await sendChiefTurn();
+    const token = await enrollMachine(w.s, w.teamId);
+    bindChiefAgent(w.s, w.s.db.select().from(machineTable).limit(1).all()[0]!.id);
+    const claimed = await claimStep(w.s, token);
+    const machineId = claimed.step.machineId!;
+    setMachineOnline(w.s, machineId, true);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const hub = w.s.machineHub;
+    hub.subscribeMachine(w.teamId, machineId, () => {});
+    const connectionId = hub.connectionId(machineId)!;
+    hub.dropConnection(machineId, connectionId, () => setMachineOnline(w.s, machineId, false));
+    hub.admitPresence(machineId, connectionId);
+    vi.advanceTimersByTime(45_000);
+    expect(hub.admitPresence(machineId, connectionId)).toBe('ignore');
+
+    sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).lastHeartbeatAt! + CHIEF_ABANDONED_STEP_MS + 1);
+
+    expect(stepRowOf(w).status).toBe('pending');
+  });
 });
