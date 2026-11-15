@@ -47,6 +47,23 @@ export const importSkillBodySchema = z
   });
 export type ImportSkillBody = z.infer<typeof importSkillBodySchema>;
 
+export const skillImportCandidateSchema = z.object({
+  id: z.string(),
+  description: z.string().nullable(),
+  sourcePath: z.string(),
+  alreadyImported: z.boolean(),
+  problem: z.enum(['missing-name', 'invalid-name', 'missing-description']).nullable(),
+});
+export type SkillImportCandidate = z.infer<typeof skillImportCandidateSchema>;
+
+export const skillImportCandidatesResponseSchema = z.object({
+  candidates: z.array(skillImportCandidateSchema),
+  skippedSources: z.array(
+    z.object({ root: z.string(), reason: z.enum(['missing', 'unreadable']) }),
+  ),
+});
+export type SkillImportCandidatesResponse = z.infer<typeof skillImportCandidatesResponseSchema>;
+
 export const SKILL_DIR_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 const SKILL_FRONTMATTER_RE = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;

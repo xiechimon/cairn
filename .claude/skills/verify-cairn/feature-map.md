@@ -1017,7 +1017,7 @@ Reach:
 
 **Skills** (shipped, centrality 3). Skills read from each machine and team skills imported and injected into threads.
 
-States: An empty list, skills per machine, an import dialog, and a skill injected into a thread shown in the transcript.
+States: An empty list, skills per machine, an import dialog with a pick-from-this-machine tab (imported and unimportable skills disabled, one error per failed pick) and a path or GitHub tab, and a skill injected into a thread shown in the transcript.
 
 Reach:
 
@@ -1027,12 +1027,12 @@ Reach:
 - Web routes: `/app/resources/skills`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `resource-empty`, `resource-import`
+- Test ids in its code: `resource-empty`, `resource-import`, `skill-candidate`, `skill-candidates`, `skill-candidates-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/skills-page.md](features/skills-page.md), [.claude/skills/verify-cairn/features/skill-import.md](features/skill-import.md), [.claude/skills/verify-cairn/features/skills-injection.md](features/skills-injection.md)
 - Research: **gap**: no current note on how Amp, t3code and Claude Code manage skills across machines
 - Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md)
 - Backend design: [docs/spec/14-skills-execution-surface-injection.md](../../../docs/spec/14-skills-execution-surface-injection.md)
-- Evidence: `apps/web/e2e/skills-page.spec.ts`, `apps/web/e2e/skill-import.spec.ts`, `apps/daemon/test/skills-catalog.test.ts`
+- Evidence: `apps/web/e2e/skills-page.spec.ts`, `apps/web/e2e/skill-import.spec.ts`, `apps/server/test/skill-import.test.ts`, `apps/daemon/test/skills-catalog.test.ts`
 
 ### git-release-tags
 

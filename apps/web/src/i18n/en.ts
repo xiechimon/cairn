@@ -595,6 +595,20 @@ export const EN: Record<string, string> = {
   '来源未通过校验。': 'The source failed validation.',
   '拉取来源失败——稍后重试。': 'Fetching the source failed — try again later.',
   '导入失败，请重试。': 'Import failed, please retry.',
+  从本机选择: 'From this machine',
+  '路径或 GitHub': 'Path or GitHub',
+  搜索技能: 'Search skills',
+  '导入 {count} 个': 'Import {count}',
+  已导入: 'Imported',
+  已勾选另一个同名技能: 'Another skill with this name is selected',
+  'SKILL.md 缺少名称': 'SKILL.md has no name',
+  名称不能用作目录名: 'The name cannot be used as a directory name',
+  'SKILL.md 缺少描述': 'SKILL.md has no description',
+  '本机 ~/.agents/skills 和 ~/.claude/skills 里没有技能。':
+    'No skills in ~/.agents/skills or ~/.claude/skills on this machine.',
+  '没有匹配的技能。': 'No matching skills.',
+  '导入会把技能复制到 Cairn 自己的目录，原目录不会被改动。':
+    'Importing copies the skill into Cairn’s own directory; the original is left unchanged.',
   '尚无 MCP 服务器': 'No MCP servers yet',
   // spec 13/#368 本地 config 只读制：空态文案 = 配置指引（无添加钮）。
   '读取 server 本机 ~/.claude.json 的 mcpServers 段：在该文件添加配置并刷新，即出现在这里。MCP 服务器为 Agent 提供额外工具；授权在每个 Agent 的页面上单独进行。':
