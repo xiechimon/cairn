@@ -1,16 +1,11 @@
-import {
-  claudeLoginBlocksClaim,
-  claudeRateBlock,
-  isBuildStepKind,
-  type RunnerOs,
-  runnerOsOf,
-} from '@cairn/shared';
+import { claudeRateBlock, isBuildStepKind, type RunnerOs, runnerOsOf } from '@cairn/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type build, type machine, step, team } from '../db/schema.js';
 import { claudeUsageGatePasses } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import {
+  claudeCodeLoginBlocked,
   type MachineIneligibility,
   machineEligibility,
   machineRunningCount,
@@ -44,8 +39,11 @@ export function workerIneligibility(
     claudeRateBlocked: claudeRateBlock(machineRow.claudeRateLimits ?? [], now) !== null,
     claudeLoginBlocked:
       claudeCode &&
-      !hasActiveClaudeSubscription({ db }, machineRow.teamId) &&
-      claudeLoginBlocksClaim(machineRow.claudeCodeReport?.login, now),
+      claudeCodeLoginBlocked(
+        machineRow.claudeCodeReport,
+        hasActiveClaudeSubscription({ db }, machineRow.teamId),
+        now,
+      ),
     claudeUsageRefused:
       !facts.localMerge && !claudeUsageGatePasses({ db }, machineRow, facts.model),
   });

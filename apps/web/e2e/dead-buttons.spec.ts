@@ -40,7 +40,7 @@ test('schedules fixture face: topbar `新建` opens the dialog, freq tabs respon
   await expect(dialog).toBeHidden();
   await expect(page.locator('.sched-card')).toHaveCount(1);
 
-  await expect(page.locator('.sched-card')).toContainText('每周运行');
+  await expect(page.locator('.sched-card')).toContainText(/每周[一二三四五六日] \d{2}:\d{2}/);
 });
 
 test('machines rows carry only live controls, no dead inline buttons (#222 shipped + #1108 narrowed)', async ({
@@ -48,7 +48,7 @@ test('machines rows carry only live controls, no dead inline buttons (#222 shipp
 }) => {
   await page.goto('/app/settings/machines?scenario=06&machine=TlZ2sSD4EJCxjNJqVhdo_');
 
-  await expect(page.getByTestId('machine-accept-toggle').first()).toBeVisible();
+  await expect(page.getByTestId('machine-menu').first()).toBeVisible();
 
   await expect(page.locator('[data-testid="machine-item"] > div:first-child button:not([data-testid])')).toHaveCount(0);
 });

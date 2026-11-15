@@ -1142,6 +1142,13 @@
       "when": 1794738431035,
       "tag": "0167_mcp_connector",
       "breakpoints": true
+    },
+    {
+      "idx": 168,
+      "version": "6",
+      "when": 1794750403189,
+      "tag": "0168_colorful_mole_man",
+      "breakpoints": true
     }
   ]
 }

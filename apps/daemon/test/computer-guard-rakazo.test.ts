@@ -104,6 +104,7 @@ describe('computer lifecycle command guard', () => {
       'ls -la /home/agent/.agent-browser',
       'cp -r .agent-browser /tmp/copy',
       'tar czf /tmp/s.tgz /home/agent/.Agent-Browser/sessions',
+      'cp ~/.cairn/browser-profile/Default/Cookies /tmp/c',
     ]) {
       expect(protectedComputerLifecycleRefusal(command)).toBe('browser profile path');
     }

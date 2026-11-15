@@ -1,16 +1,14 @@
-import { MACHINE_RUNTIMES, type MachineOsPlatform, type MachineRuntime } from '@cairn/shared';
+import type { MachineOsPlatform } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { ChevronRight, Ellipsis } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
 import { MachineName, machineLabel } from '../components/machine-label.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { SETTINGS_SELECT_TRIGGER_CLS, SettingsSelectTrigger } from '../components/settings-list.js';
-import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch.js';
 import { AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
@@ -41,9 +39,6 @@ export function rowStatus(machine: MachineRow, notice: 'expired' | 'expiring' | 
   if (notice === 'expiring') return { label: '登录将过期', dot: 'bg-(--card-button)' };
   return { label: '在线', dot: 'bg-running' };
 }
-
-const isMachineRuntime = (value: string): value is MachineRuntime =>
-  (MACHINE_RUNTIMES as readonly string[]).includes(value);
 
 export function MachineRowView({
   machine,
@@ -90,43 +85,9 @@ export function MachineRowView({
       `[data-testid="machine-${section === 'runtime' ? 'runtimes' : 'capabilities'}"]`,
     );
     target?.scrollIntoView({ block: 'nearest' });
-    if (section === 'runtime') {
-      target
-        ?.querySelector<HTMLElement>('[data-testid="provider-toggle"]:not([disabled])')
-        ?.focus();
-    }
   }, [expanded, section]);
 
   const pickedTarget = others.find((m) => m.id === evacuateTarget);
-  const [draft, setDraft] = useState<string[] | null>(null);
-  const shown = draft === null ? machine : { ...machine, enabledRuntimes: draft };
-  const enabled = (shown.enabledRuntimes ?? []).some(isMachineRuntime);
-  const writeRuntimes = (enabledRuntimes: MachineRuntime[]) => {
-    if (!live) {
-      if (blockDemoWrite()) return;
-      setDraft(enabledRuntimes);
-      return;
-    }
-    mutations.patchMachine.mutate(
-      { id: machineId, body: { enabledRuntimes } },
-      { onError: (error) => toastError(t('保存失败，请重试。'), error) },
-    );
-  };
-  const setAccepting = (next: boolean) => {
-    if (next) {
-      onOpenSection('runtime');
-      toast(t('选择这台 Runner 接哪些运行时'));
-      return;
-    }
-    writeRuntimes([]);
-  };
-  const toggleRuntime = (runtime: MachineRuntime, next: boolean) => {
-    const current = (shown.enabledRuntimes ?? []).filter(isMachineRuntime);
-    writeRuntimes(
-      next ? [...new Set([...current, runtime])] : current.filter((r) => r !== runtime),
-    );
-  };
-
   const evacuate = async () => {
     if (evacuateTarget === null) return;
     setEvacuating(true);
@@ -197,11 +158,6 @@ export function MachineRowView({
   const osName = osPlatform === undefined ? undefined : OS_NAMES[osPlatform];
   const osUnreported = machine.capabilities !== undefined && osPlatform === undefined;
   const sandboxBlocked = online && sandboxNotice(machine.capabilities) !== null;
-  const canMutate = machine.id != null && online;
-  const acceptFrozen = !canMutate || mutations.patchMachine.isPending;
-  const acceptBlockedReason = online
-    ? undefined
-    : t('重新连接 {name} 后才能修改它的设置。', { name: machine.name });
   const bodyId = `machine-body-${machineId}`;
   return (
     <div
@@ -340,26 +296,6 @@ export function MachineRowView({
             </p>
           )}
         </div>
-        <ExplainDisabledToggle
-          className="relative z-10"
-          disabled={acceptFrozen}
-          reason={acceptBlockedReason}
-        >
-          <ToggleSwitch
-            data-testid="machine-accept-toggle"
-            aria-label={t('{name} 接任务', { name: machine.name })}
-            checked={enabled}
-            disabled={acceptFrozen}
-            title={
-              online
-                ? enabled
-                  ? undefined
-                  : t('选择这台 Runner 接哪些运行时')
-                : acceptBlockedReason
-            }
-            onCheckedChange={setAccepting}
-          />
-        </ExplainDisabledToggle>
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
@@ -406,12 +342,7 @@ export function MachineRowView({
       </div>
       {expanded && (
         <div id={bodyId} ref={bodyRef}>
-          <MachineDetailPane
-            machine={shown}
-            chief={chief}
-            pending={mutations.patchMachine.isPending}
-            onToggleRuntime={toggleRuntime}
-          />
+          <MachineDetailPane machine={machine} chief={chief} />
         </div>
       )}
       <AlertDialogShell

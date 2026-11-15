@@ -6,7 +6,6 @@ import {
   buildMergedPrGuardNote,
   buildTaskPromptText,
   chiefIdFormat,
-  claudeLoginBlocksClaim,
   claudeRateBlock,
   confinementDispatchReady,
   fencedTitle,
@@ -59,6 +58,7 @@ import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js'
 import { readDeployLease } from './deploy-lease.js';
 import {
   capabilityGatePasses,
+  claudeCodeLoginBlocked,
   machineRunningCount,
   projectRunningCount,
   runtimeGatePasses,
@@ -233,8 +233,11 @@ function claudeCodeLoginBlocks(
   provider: string | null | undefined,
 ): boolean {
   if (stepRuntimeFor(provider) !== 'claude-code') return false;
-  if (hasActiveClaudeSubscription(deps, machineRow.teamId)) return false;
-  return claudeLoginBlocksClaim(machineRow.claudeCodeReport?.login, nowMs());
+  return claudeCodeLoginBlocked(
+    machineRow.claudeCodeReport,
+    hasActiveClaudeSubscription(deps, machineRow.teamId),
+    nowMs(),
+  );
 }
 
 function buildChiefClaim(

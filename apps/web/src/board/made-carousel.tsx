@@ -1,4 +1,4 @@
-import { Lock } from 'lucide-react';
+import { Lock, Presentation } from 'lucide-react';
 import {
   type FocusEvent,
   type ReactNode,
@@ -16,6 +16,7 @@ import { Skeleton } from '../components/ui/skeleton.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight } from '../icons/index.js';
+import { PageThumb, primaryPage, THUMB_MAX_BYTES, usePageHtml } from './made-files.js';
 import { MADE_GROUP_LABEL, type MadeGroupKey } from './made-groups.js';
 
 const CARD_CLS =
@@ -68,7 +69,17 @@ export function MadeCard({
 }) {
   const { t } = useI18n();
   const ref = useRef<HTMLLIElement | null>(null);
-  const { excerpt, loading } = useCardExcerpt(todo, useSeen(ref));
+  const seen = useSeen(ref);
+  const { excerpt, loading } = useCardExcerpt(todo, seen);
+  const candidate = todo.madeKind === 'page' ? primaryPage(todo.deliverables) : undefined;
+  const page =
+    candidate !== undefined && candidate.sizeBytes <= THUMB_MAX_BYTES ? candidate : undefined;
+  const pageHtml = usePageHtml(page, seen).data;
+  const thumbHtml = pageHtml?.scripted === false ? pageHtml.html : undefined;
+  const slides =
+    todo.madeKind === 'slides'
+      ? todo.deliverables?.items.find((item) => item.kind === 'slides')
+      : undefined;
   return (
     <li ref={ref} className="flex snap-start">
       <article data-testid="made-card" className={`${CARD_CLS} hover:bg-(--menu-hover)`}>
@@ -79,13 +90,17 @@ export function MadeCard({
           className="absolute inset-0 size-full rounded-(--radius-card) p-0 hover:bg-transparent focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-inset dark:hover:bg-transparent"
         />
         <h4 className="pointer-events-none relative m-0 flex-none text-ui font-medium text-foreground">
-          <span className="line-clamp-2">{todo.title}</span>
+          <span className={thumbHtml !== undefined ? 'line-clamp-1' : 'line-clamp-2'}>
+            {todo.title}
+          </span>
         </h4>
         <div
           data-testid="made-card-preview"
           className="pointer-events-none relative mt-1.5 min-h-0 flex-1 overflow-hidden"
         >
-          {todo.previewUrl !== undefined ? (
+          {page !== undefined && thumbHtml !== undefined ? (
+            <PageThumb html={thumbHtml} title={page.name} />
+          ) : todo.previewUrl !== undefined ? (
             <img
               src={todo.previewUrl}
               alt=""
@@ -109,6 +124,9 @@ export function MadeCard({
           )}
         </div>
         <div className="pointer-events-none relative mt-2 flex h-5 flex-none items-center gap-2">
+          {slides !== undefined && (
+            <Presentation aria-hidden="true" className="size-4 flex-none text-content-tertiary" />
+          )}
           <span
             data-testid="made-card-meta"
             className="min-w-0 flex-1 truncate text-meta text-content-tertiary"

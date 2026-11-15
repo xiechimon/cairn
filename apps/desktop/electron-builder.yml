@@ -1,0 +1,23 @@
+appId: io.github.xiechimon.cairn
+productName: Cairn
+directories:
+  output: release
+files:
+  - dist/main.mjs
+  - package.json
+extraResources:
+  - from: server
+    to: server
+afterPack: scripts/after-pack.cjs
+npmRebuild: false
+publish: null
+mac:
+  icon: ../../assets/AppIcon.icns
+  category: public.app-category.developer-tools
+  identity: '-'
+  hardenedRuntime: false
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]

@@ -9186,6 +9186,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "mail_event",
   "mail_rule",
   "mcp_connector",
+  "team_top_models",
 ]
 `;
 
@@ -9293,6 +9294,21 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "POST",
     "note": "D60 PR8: seed missing session/review rules and policies from agents",
     "path": "/api/teams/{id}/routing-settings/seed",
+  },
+  {
+    "method": "GET",
+    "note": "team Top Models list or null",
+    "path": "/api/teams/{id}/top-models",
+  },
+  {
+    "method": "PUT",
+    "note": "replace the Top Models list",
+    "path": "/api/teams/{id}/top-models",
+  },
+  {
+    "method": "DELETE",
+    "note": "reset to the suggested list",
+    "path": "/api/teams/{id}/top-models",
   },
   {
     "method": "PATCH",
