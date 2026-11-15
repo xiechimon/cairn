@@ -64,8 +64,11 @@ const reportRow = (overrides: Record<string, unknown> = {}): Row => ({
   createdAt: 30,
 });
 
+const ZONE = 'Asia/Shanghai';
+const TODAY = new Intl.DateTimeFormat('en-CA', { timeZone: ZONE }).format(Date.now());
+
 test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
-  test.use({ viewport: { width: 1280, height: 1500 } });
+  test.use({ viewport: { width: 1280, height: 1500 }, timezoneId: ZONE });
 
   test('the chat shows one sentence and a document card; the document holds the numbered suggestions', async ({
     page,
@@ -78,7 +81,7 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
     await page.goto('/app');
     const row = page.getByTestId('home-c').getByTestId('chief-report');
     await expect(row.getByTestId('chief-report-sentence')).toHaveText(
-      '今天的日报写好了：完成 1 · 合并 1 · 失败 1，有 2 条建议等你决定',
+      '2026-10-27 的日报写好了：完成 1 · 合并 1 · 失败 1，有 2 条建议等你决定',
     );
     await expect(row.getByRole('button')).toHaveCount(1);
     const card = row.getByTestId('research-report-card');
@@ -178,7 +181,9 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
     await expect(doc).not.toContainText('复盘建议');
   });
 
-  test('a quiet yesterday is one short sentence', async ({ page }) => {
+  test('a quiet day says today only for today’s report, and names the day of an older one', async ({
+    page,
+  }) => {
     const quiet = {
       finished: [],
       finishedCount: 0,
@@ -190,22 +195,24 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
       quotaWaits: 0,
       verdicts: { pass: 0, block: 0 },
     };
+    const sentence = page
+      .getByTestId('home-c')
+      .getByTestId('chief-report')
+      .getByTestId('chief-report-sentence');
     await mockLive(page, {
       threads: [THREAD],
       messages: [
         ...HISTORY,
-        reportRow({
-          yesterday: quiet,
-          needsYou: { count: 1, todos: [], questions: 1 },
-          retro: [],
-          truncated: [],
-        }),
+        reportRow({ day: TODAY, yesterday: quiet, retro: [], truncated: [] }),
       ],
     });
     await page.goto('/app');
-    const row = page.getByTestId('home-c').getByTestId('chief-report');
-    await expect(row.getByTestId('chief-report-sentence')).toHaveText(
-      '今天的日报写好了：昨天没有新进展',
-    );
+    await expect(sentence).toHaveText('今天的日报写好了：昨天没有新进展');
+    await mockLive(page, {
+      threads: [THREAD],
+      messages: [...HISTORY, reportRow({ yesterday: quiet, retro: [], truncated: [] })],
+    });
+    await page.goto('/app');
+    await expect(sentence).toHaveText('2026-10-27 的日报写好了：2026-10-26 没有新进展');
   });
 });
