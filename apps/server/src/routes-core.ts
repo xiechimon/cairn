@@ -44,6 +44,7 @@ import {
   markNotificationUnread,
 } from './services/notifications.js';
 import { deviceStreams, pairedDeviceExists } from './services/paired-devices.js';
+import { routingRuleIssues } from './services/routing-rule-issues.js';
 import {
   listRoutingSettings,
   upsertRoutingRule,
@@ -152,7 +153,10 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/routing-settings', (c) => {
     const id = c.req.param('id');
     requireTeam(ctx, id);
-    return c.json(listRoutingSettings(ctx.db, id, coordinatorRunsOnPi()));
+    return c.json({
+      ...listRoutingSettings(ctx.db, id, coordinatorRunsOnPi()),
+      ruleIssues: routingRuleIssues(ctx.db, id),
+    });
   });
 
   app.get('/api/teams/:id/top-models', (c) => {

@@ -63,7 +63,7 @@ export interface RouteConstraints {
   required: RequiredCapabilities | null;
 }
 
-function machineSatisfies(
+export function machineSatisfies(
   row: typeof machine.$inferSelect,
   constraints: RouteConstraints,
 ): boolean {
