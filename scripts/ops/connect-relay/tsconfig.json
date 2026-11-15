@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["ledger.ts"]
+  "include": ["ledger.ts", "registry.ts"]
 }

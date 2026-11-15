@@ -58,12 +58,26 @@ export class RelayLedger {
           'CREATE TABLE relay_daily (day INTEGER PRIMARY KEY, dynamic INTEGER NOT NULL, pairs INTEGER NOT NULL, upgrades INTEGER NOT NULL, inbound INTEGER NOT NULL, output INTEGER NOT NULL)',
         );
         sql.exec(
+          'CREATE TABLE relay_grant (digest TEXT PRIMARY KEY, epoch TEXT NOT NULL, expiresAt INTEGER NOT NULL)',
+        );
+        sql.exec(
+          'CREATE TABLE relay_session (position INTEGER PRIMARY KEY AUTOINCREMENT, digest TEXT NOT NULL UNIQUE, deviceId TEXT NOT NULL, expiresAt INTEGER NOT NULL)',
+        );
+        sql.exec(
           'INSERT INTO relay_installation VALUES (1, ?, 1, ?, ?)',
           this.installation,
           day,
           now,
         );
         sql.exec('INSERT INTO relay_daily VALUES (?, 0, 0, 0, 0, 0)', day);
+      }
+      if (
+        tables.length > 0 &&
+        ['relay_installation', 'relay_daily', 'relay_grant', 'relay_session'].some(
+          (name) => !tables.some((table) => table.name === name),
+        )
+      ) {
+        throw new Error('ledger unavailable');
       }
       const markers = sql
         .exec<Marker>('SELECT installation, version, day, lastAt FROM relay_installation LIMIT 2')
