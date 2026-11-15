@@ -1,4 +1,10 @@
-import { describe, expect, test } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { describe, expect, onTestFinished, test } from 'vitest';
+import { routingRule } from '../src/db/schema.js';
+import { buildChiefSystemPrompt } from '../src/services/chief.js';
+import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
+import { createProvider } from '../src/services/providers.js';
+import { coordinatorMemoryOwner } from '../src/services/routing-rules.js';
 import { AGENT_ID, H, registerChiefHarness, relay } from './chief-harness.js';
 
 registerChiefHarness();
@@ -33,5 +39,40 @@ describe('save_memory write path (r5 section 6)', () => {
       offset = page.nextOffset;
     }
     expect(count).toBe(106);
+  });
+
+  test('on the default coordinator route the memory is saved under the chief and read back next turn', async () => {
+    H.s.db.delete(routingRule).where(eq(routingRule.use, 'coordinator')).run();
+    setCoordinatorServerContextEnabled(true);
+    onTestFinished(() => setCoordinatorServerContextEnabled(false));
+    expect(coordinatorMemoryOwner(H.s.db, H.teamId)).toBeUndefined();
+    createProvider(
+      { db: H.s.db, box: H.s.secretBox },
+      {
+        teamId: H.teamId,
+        body: {
+          providerId: 'vani',
+          label: 'Vani',
+          baseUrl: 'https://vani.example.com/v1',
+          api: 'openai-completions',
+          apiKey: 'vani-key',
+          models: [{ id: 'glm-5.3', name: 'glm' }],
+        },
+        createdBy: H.userId,
+      },
+    );
+    const owner = coordinatorMemoryOwner(H.s.db, H.teamId) ?? null;
+    const mem = (await relay(
+      'save_memory',
+      { scope: 'team', file: 'prefs', content: 'deploys go out on Fridays only' },
+      { chiefAgentId: owner },
+    )) as { agentId: string };
+    expect(mem.agentId).toBe(H.chiefId);
+    const next = buildChiefSystemPrompt(
+      { db: H.s.db, hub: H.s.hub, user: H.s.user, skillsDir: H.s.skillsDir },
+      H.teamId,
+      H.threadId,
+    );
+    expect(next.text).toContain('记忆文件：1 个');
   });
 });

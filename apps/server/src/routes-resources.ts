@@ -28,6 +28,7 @@ import type { Db } from './db/client.js';
 import { build, machine, provider, routingRule, step, team, todo } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubUserRepos } from './lib/github.js';
+import { nowMs } from './lib/ids.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import {
   createApiKeyBodySchema,
@@ -249,7 +250,11 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const row = ctx.db.select().from(machine).where(eq(machine.id, id)).get();
     if (!row) throw notFound(`machine ${id}`);
     requireTeam(ctx, row.teamId);
-    ctx.db.update(routingRule).set({ machineId: null }).where(eq(routingRule.machineId, id)).run();
+    ctx.db
+      .update(routingRule)
+      .set({ machineId: null, updatedAt: nowMs() })
+      .where(eq(routingRule.machineId, id))
+      .run();
     ctx.db.update(team).set({ defaultMachineId: null }).where(eq(team.defaultMachineId, id)).run();
     const releasePendingOutput = pendingComputerOutputRelease(ctx.db, id);
     ctx.db.delete(machine).where(eq(machine.id, id)).run();
@@ -293,7 +298,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       }
       ctx.db
         .update(routingRule)
-        .set({ machineId: dst.id })
+        .set({ machineId: dst.id, updatedAt: nowMs() })
         .where(eq(routingRule.id, rule.id))
         .run();
       moved.push(rule.id);

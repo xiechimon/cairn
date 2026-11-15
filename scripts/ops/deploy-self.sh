@@ -321,7 +321,7 @@ classify_runtime() {
   while IFS= read -r path; do
     case "$path" in
       *package.json | pnpm-lock.yaml | pnpm-workspace.yaml) RUNTIME=daemon ;;
-      apps/server/* | apps/web/* | integration/test/* | docs/* | packages/shared/src/tables.ts | packages/shared/test/vocabulary.test.ts | packages/shared/test/__snapshots__/snapshot.test.ts.snap | .claude/skills/verify-cairn/feature-map.json | .claude/skills/verify-cairn/feature-map.md | scripts/ops/deploy-self.sh | scripts/ops/deploy-watch.sh | scripts/ops/deploy-self.test.mjs | scripts/ops/bootstrap-deploy.sh) ;;
+      apps/server/* | apps/web/* | apps/ios/* | integration/* | docs/* | .github/* | README.md | README.zh.md | AGENTS.md | CLAUDE.md | CONTEXT.md | packages/shared/src/tables.ts | packages/shared/test/vocabulary.test.ts | packages/shared/test/__snapshots__/snapshot.test.ts.snap | .claude/skills/verify-cairn/feature-map.json | .claude/skills/verify-cairn/feature-map.md | scripts/ops/deploy-self.sh | scripts/ops/deploy-watch.sh | scripts/ops/deploy-self.test.mjs | scripts/ops/bootstrap-deploy.sh) ;;
       *) RUNTIME=daemon ;;
     esac
   done < <(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET")

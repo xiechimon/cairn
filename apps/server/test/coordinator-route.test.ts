@@ -265,6 +265,18 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
     setCoordinatorServerContextEnabled(false);
   });
 
+  test('coordinatorRoute: a keyed Anthropic provider is the default route and writes no rule', async () => {
+    const w = await world({ rule: false });
+    setCoordinatorServerContextEnabled(true);
+    addAnthropicKey(w);
+    allowPaidClaude(w);
+    expect(coordinatorRoute(w.s.db, w.teamId)).toMatchObject({ provider: 'anthropic' });
+    expect(
+      w.s.db.select().from(routingRule).where(eq(routingRule.use, 'coordinator')).all(),
+    ).toEqual([]);
+    setCoordinatorServerContextEnabled(false);
+  });
+
   test('coordinatorRoute: a keyed Anthropic provider needs allow-paid', async () => {
     const w = await world();
     setCoordinatorServerContextEnabled(true);

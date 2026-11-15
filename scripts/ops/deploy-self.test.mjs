@@ -1028,6 +1028,40 @@ test('server-only deploys under continuous active work without stopping either d
   assert.equal(sqlite(f.db, "select status from step where id='s0'"), 'claimed');
 });
 
+test('iOS, docs, integration and CI changes deploy without restarting the daemon', () => {
+  const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
+  writeFileSync(join(f.fake, 'lease-unsupported'), '');
+  const target = pushTarget(f, 'surfaces that never reach the daemon', {
+    files: {
+      'apps/ios/Cairn/App/CairnApp.swift': '// swift\n',
+      'README.md': '# Cairn\n',
+      'README.zh.md': '# Cairn\n',
+      'AGENTS.md': '# rules\n',
+      'integration/eval/coordinator-routing/upload.mts': 'export {};\n',
+      '.github/workflows/ci.yml': 'name: ci\n',
+      'marker.txt': 'previous\n',
+    },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(f.log('systemctl.log'), /(?:stop|start) cairn-daemon/);
+  assert.equal(sqlite(f.db, "select status from step where id='s0'"), 'claimed');
+});
+
+test('a daemon source change alongside an allowlisted path still restarts the daemon', () => {
+  const f = fixture();
+  const target = pushTarget(f, 'ios plus daemon', {
+    files: {
+      'apps/ios/Cairn/App/CairnApp.swift': '// swift\n',
+      'apps/daemon/src/machine-loop.ts': 'export {};\n',
+    },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(f.log('systemctl.log'), /stop cairn-daemon/);
+  assert.match(f.log('systemctl.log'), /start cairn-daemon/);
+});
+
 test('a Coordinator computer call in flight holds the deploy instead of being cut', () => {
   const f = fixture({ openComputerCalls: ['browser_act'] });
   const target = pushTarget(f, 'server', { files: { 'apps/server/src/probe.ts': 'export {};\n' } });
