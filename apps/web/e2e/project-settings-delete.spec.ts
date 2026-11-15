@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { mockLive } from './chief-home-mock';
 
 const SETTINGS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c';
 const PROJECT_NAME = 'r3-lifecycle';
@@ -71,4 +72,26 @@ test('confirm deletes and lands on the board with the project row gone', async (
   await expect(page).toHaveURL('/app');
 
   await expect(page.locator(PROJECT_ROW)).toHaveCount(0);
+});
+
+test('while projects load, every tab shows the loading state instead of empty rows', async ({
+  page,
+}) => {
+  await mockLive(page, { threads: [], messages: [], todos: [] });
+  await page.route('**/api/projects?**', () => undefined);
+  await page.route('**/api/projects', () => undefined);
+  for (const tab of ['basic', 'repo', 'memory']) {
+    await page.goto(`/app/project/p-loading/settings?tab=${tab}`);
+    await expect(page.getByTestId('project-loading')).toBeVisible();
+    await expect(page.locator('.prj-set-card')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '删除', exact: true })).toHaveCount(0);
+  }
+});
+
+test('an id the fixture does not list shows not found instead of an empty form', async ({
+  page,
+}) => {
+  await page.goto('/app/project/nope-project/settings?scenario=activity');
+  await expect(page.getByTestId('project-settings-missing')).toContainText('找不到这个项目');
+  await expect(page.getByRole('button', { name: '删除', exact: true })).toHaveCount(0);
 });

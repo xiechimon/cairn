@@ -13,10 +13,6 @@ export const RouteDialogCloseProvider = RouteDialogClose.Provider;
 
 const ignoreBackdropClick = () => undefined;
 
-function keepFieldEscape(event: KeyboardEvent) {
-  if (event.key === 'Escape' && isEditableTarget(event.target)) event.stopPropagation();
-}
-
 export function RouteDialog({
   title,
   size,
@@ -33,17 +29,27 @@ export function RouteDialog({
   const { t } = useI18n();
   const onClose = useContext(RouteDialogClose);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const fieldEscape = useRef(false);
   const attachBody = useCallback((body: HTMLDivElement | null) => {
     bodyRef.current = body;
     if (body === null) return;
-    body.addEventListener('keydown', keepFieldEscape);
-    return () => body.removeEventListener('keydown', keepFieldEscape);
+    const markFieldEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !isEditableTarget(event.target)) return;
+      fieldEscape.current = true;
+      setTimeout(() => {
+        fieldEscape.current = false;
+      });
+    };
+    body.addEventListener('keydown', markFieldEscape);
+    return () => body.removeEventListener('keydown', markFieldEscape);
   }, []);
   return (
     <DialogShell
       bare
       title={title}
-      onClose={onClose}
+      onClose={() => {
+        if (!fieldEscape.current) onClose();
+      }}
       zIndex="calc(var(--z-narrow-chrome) + 2)"
       onBackdropClick={ignoreBackdropClick}
       initialFocus={size === 'page' ? bodyRef : undefined}
