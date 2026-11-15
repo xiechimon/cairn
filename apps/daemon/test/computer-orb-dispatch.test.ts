@@ -247,8 +247,13 @@ describe('orb routing', () => {
     const fake = fakeClient();
     const huge = `boom ${'y'.repeat(5_000)}`;
     const provider: ComputerProvider = {
-      async execute() {
+      async execute(request) {
         return (async function* () {
+          if (request.argv.at(-1) === 'url') {
+            yield { kind: 'stdout' as const, text: 'https://example.com/\n' };
+            yield { kind: 'exit' as const, code: 0 };
+            return;
+          }
           yield { kind: 'stderr' as const, text: huge };
           yield { kind: 'exit' as const, code: 1 };
         })();

@@ -8,6 +8,7 @@ import {
   LOGIN_DETECTION_SCRIPT,
   runBrowserTool,
 } from '../src/computer/browser.js';
+import { isCairnPage } from '../src/computer/host-screen-self.js';
 import type { ComputerProvider, ComputerRefusal } from '../src/computer/provider.js';
 
 function recordingProvider(log: string[], snapshot = '- button "Go" [ref=e1]\n'): ComputerProvider {
@@ -78,7 +79,7 @@ describe('runBrowserTool', () => {
       { actions: [{ kind: 'click', ref: 'e1' }] },
       { timeoutMs: 5_000, signal: new AbortController().signal, session: 's' },
     );
-    expect(log[0]).toContain('snapshot -i');
+    expect(log.filter((line) => !line.endsWith(' get url'))[0]).toContain('snapshot -i');
     expect(log.at(-1)).toContain('click @e1');
   });
 
@@ -146,8 +147,13 @@ describe('runBrowserTool', () => {
 
   test('treats nonzero snapshot exits as failures even when stderr has text', async () => {
     const provider: ComputerProvider = {
-      async execute() {
+      async execute(request) {
         return (async function* () {
+          if (request.argv.at(-1) === 'url') {
+            yield { kind: 'stdout' as const, text: 'https://example.com/\n' };
+            yield { kind: 'exit' as const, code: 0 };
+            return;
+          }
           yield { kind: 'stderr' as const, text: 'browser crashed\n' };
           yield { kind: 'exit' as const, code: 1 };
         })();
@@ -183,7 +189,7 @@ describe('runBrowserTool', () => {
             yield { kind: 'exit' as const, code: 0 };
             return;
           }
-          if (request.argv.includes('click')) {
+          if (request.argv.includes('click') || request.argv.at(-1) === 'url') {
             yield { kind: 'stdout' as const, text: 'clicked\n' };
             yield { kind: 'exit' as const, code: 0 };
             return;
@@ -256,7 +262,7 @@ describe('runBrowserTool', () => {
         signal: new AbortController().signal,
       },
     );
-    expect(timeouts).toEqual([4_000, 3_600, 3_200, 2_800, 2_400, 2_000, 1_600, 1_200]);
+    expect(timeouts).toEqual([4_000, 3_600, 3_200, 2_800, 2_400, 2_000, 1_600, 1_200, 800, 400]);
   });
 
   test('aborts later batch actions once the shared deadline elapses', async () => {
@@ -364,7 +370,7 @@ describe('login form detection', () => {
       detectingProvider(log, evalResult(['password', 'one-time-code'])),
       'browser_snapshot',
     );
-    expect(log[1]).toBe(
+    expect(log.filter((line) => !line.endsWith(' get url'))[1]).toBe(
       `agent-browser --session s --restore --headed --init-script .cairn/agent-cursor.js --json eval ${LOGIN_DETECTION_SCRIPT}`,
     );
     expect(result.loginForm).toEqual({ signals: ['password', 'one-time-code'] });
@@ -1021,5 +1027,145 @@ describe('opening a page like a person', () => {
       'https://www.zhipin.com/',
     );
     expect(log.some((line) => line.endsWith(' open https://www.zhipin.com/'))).toBe(false);
+  });
+});
+
+describe('Cairn pages', () => {
+  const CAIRN = ['http://127.0.0.1:8787'];
+  const none = async () => [] as string[];
+
+  function pageAt(log: string[], pages: string[]): ComputerProvider {
+    let current = pages[0] ?? 'about:blank';
+    return {
+      async execute(request) {
+        const line = request.argv.join(' ');
+        log.push(line);
+        return (async function* () {
+          if (line.endsWith(' get url')) {
+            yield { kind: 'stdout' as const, text: `${current}\n` };
+          } else {
+            if (/ open (?!about:blank)/.test(line)) current = pages[1] ?? current;
+            yield { kind: 'stdout' as const, text: 'ok\n' };
+          }
+          yield { kind: 'exit' as const, code: 0 };
+        })();
+      },
+      async listFiles() {
+        return [];
+      },
+      async readFile() {
+        return '';
+      },
+      async writeFile() {},
+      async killAll() {},
+    };
+  }
+  const run = { timeoutMs: 5_000, signal: new AbortController().signal, cairnOrigins: CAIRN };
+
+  test('every address that reaches this machine on the Cairn port is Cairn', async () => {
+    for (const url of [
+      'http://127.0.0.1:8787/app',
+      'http://localhost:8787/',
+      'http://LOCALHOST:8787',
+      'http://[::1]:8787/',
+      'http://127.9.9.9:8787/',
+      'http://2130706433:8787/',
+      'http://0x7f.1:8787/',
+      'http://[::ffff:127.0.0.1]:8787/',
+      'http://0.0.0.0:8787/',
+      'http://app.localhost:8787/',
+      'http://192.168.1.20:8787/',
+    ]) {
+      expect(await isCairnPage(url, CAIRN, none, ['192.168.1.20']), url).toBe(true);
+    }
+  });
+
+  test('a name that resolves to this machine, or does not resolve, counts on the Cairn port', async () => {
+    expect(
+      await isCairnPage('http://rebind.example:8787/', CAIRN, async () => ['127.0.0.1'], []),
+    ).toBe(true);
+    const failing = async (): Promise<string[]> => {
+      throw new Error('ENOTFOUND');
+    };
+    expect(await isCairnPage('http://gone.example:8787/', CAIRN, failing, [])).toBe(true);
+  });
+
+  test('other ports, other machines and configured public origins are told apart', async () => {
+    const remote = async () => ['93.184.216.34'];
+    expect(await isCairnPage('http://127.0.0.1:3000/', CAIRN, none, [])).toBe(false);
+    expect(await isCairnPage('http://site.example:8787/', CAIRN, remote, [])).toBe(false);
+    expect(await isCairnPage('https://example.com/', CAIRN, remote, [])).toBe(false);
+    const origins = [...CAIRN, 'https://cairn.tail1234.ts.net'];
+    expect(await isCairnPage('https://cairn.tail1234.ts.net/app', origins, remote, [])).toBe(true);
+    expect(await isCairnPage('https://other.tail1234.ts.net/', origins, remote, [])).toBe(false);
+  });
+
+  test('navigating to Cairn is refused before anything runs', async () => {
+    const log: string[] = [];
+    await expect(
+      runBrowserTool(
+        pageAt(log, ['about:blank']),
+        'browser_navigate',
+        { url: 'http://localhost:8787/app' },
+        run,
+      ),
+    ).rejects.toMatchObject({
+      delivery: 'not_delivered',
+      message: expect.stringMatching(/is Cairn itself/),
+    });
+    expect(log.some((line) => / open /.test(line))).toBe(false);
+  });
+
+  test('a page that redirects to Cairn is left for a blank page and refused', async () => {
+    const log: string[] = [];
+    await expect(
+      runBrowserTool(
+        pageAt(log, ['about:blank', 'http://127.0.0.1:8787/app']),
+        'browser_navigate',
+        { url: 'https://example.com/' },
+        {
+          ...run,
+          isCairnPage: (url, origins) =>
+            isCairnPage(url, origins, async () => ['93.184.216.34'], []),
+        },
+      ),
+    ).rejects.toThrow(/127\.0\.0\.1:8787\/app is Cairn itself/);
+    expect(log.at(-1)).toMatch(/ open about:blank$/);
+  });
+
+  test('acting or reading on a Cairn page is refused without clicking', async () => {
+    for (const [tool, params] of [
+      ['browser_act', { actions: [{ kind: 'click', ref: 'e1' }] }],
+      ['browser_snapshot', {}],
+    ] as const) {
+      const log: string[] = [];
+      await expect(
+        runBrowserTool(pageAt(log, ['http://127.0.0.1:8787/app']), tool, params, run),
+      ).rejects.toThrow(/is Cairn itself/);
+      expect(log.some((line) => / (click|snapshot)/.test(line))).toBe(false);
+    }
+  });
+
+  test('an ordinary page is still opened and clicked', async () => {
+    const log: string[] = [];
+    const site = {
+      ...run,
+      isCairnPage: (url: string, origins: readonly string[]) =>
+        isCairnPage(url, origins, async () => ['93.184.216.34'], []),
+    };
+    await runBrowserTool(
+      pageAt(log, ['about:blank', 'https://example.com/']),
+      'browser_navigate',
+      { url: 'https://example.com/' },
+      site,
+    );
+    const acting: string[] = [];
+    await runBrowserTool(
+      pageAt(acting, ['https://example.com/']),
+      'browser_act',
+      { actions: [{ kind: 'press', text: 'Enter' }] },
+      site,
+    );
+    expect(acting.some((line) => line.endsWith(' press Enter'))).toBe(true);
   });
 });

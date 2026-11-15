@@ -738,6 +738,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     ...(hostComputer ? { host: hostComputer } : {}),
     ...(hostScreen ? { screen: hostScreen } : {}),
     ...(orbComputer ? { orb: orbComputer } : {}),
+    cairnOrigins: [
+      config.serverUrl,
+      ...(capEnv.CAIRN_WEB_ORIGINS ?? '').split(',').filter((origin) => origin.trim() !== ''),
+    ],
   });
   const deliverSync = async (cmd: import('@cairn/shared').MachineSyncCommand): Promise<void> => {
     await performSync({ client, logger }, cmd);

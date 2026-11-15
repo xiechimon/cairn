@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { LOGIN_SIGNALS, type LoginForm, type LoginSignal } from '@cairn/shared';
 import { z } from 'zod';
+import { isCairnPage } from './host-screen-self.js';
 import type { ComputerProcessEvent, ComputerProvider } from './provider.js';
 import { ComputerRefusal } from './provider.js';
 
@@ -214,7 +215,12 @@ export interface BrowserRunOptions {
   deadlineAt?: number;
   timeoutMs?: number;
   now?: () => number;
+  cairnOrigins?: readonly string[];
+  isCairnPage?: (url: string, cairnOrigins: readonly string[]) => Promise<boolean>;
 }
+
+const CAIRN_PAGE_REFUSAL =
+  'is Cairn itself; the agent browser never opens or operates Cairn, so approvals stay with the owner';
 
 export function browserSessionName(scopeKey: string | undefined): string {
   if (scopeKey === undefined || scopeKey.length === 0) return AGENT_BROWSER_SESSION;
@@ -501,6 +507,16 @@ export async function runBrowserTool(
     };
   };
 
+  const cairnOrigins = options.cairnOrigins ?? [];
+  const cairnPage = options.isCairnPage ?? isCairnPage;
+  const refuseOnCairn = async (what: string): Promise<void> => {
+    const url = await pageValue('url');
+    if (url === null)
+      refuse(`${what} refused: the current page address could not be read`, started);
+    if (await cairnPage(url, cairnOrigins))
+      refuse(`${what} refused: ${url} ${CAIRN_PAGE_REFUSAL}`, started);
+  };
+
   if (tool === 'browser_navigate') {
     const parsed = navigateParams.safeParse(params);
     if (!parsed.success) {
@@ -510,14 +526,23 @@ export async function runBrowserTool(
     if (!/^https?:\/\//i.test(url)) {
       refuse('browser_navigate only accepts http(s) URLs', started);
     }
+    if (await cairnPage(url, cairnOrigins)) {
+      refuse(`browser_navigate refused: ${url} ${CAIRN_PAGE_REFUSAL}`, started);
+    }
     const result = (await navigateByAddressBar(url)) ?? (await execute([...prefix, 'open', url]));
     if (result.code !== 0 && result.code !== null) {
       refuse(result.text || `agent-browser open failed with exit code ${result.code}`, started);
+    }
+    const landed = await pageValue('url');
+    if (landed === null || (await cairnPage(landed, cairnOrigins))) {
+      await execute([...prefix, 'open', 'about:blank']);
+      refuse(`browser_navigate refused: ${landed ?? url} ${CAIRN_PAGE_REFUSAL}`, started);
     }
     return withDetection(result.text || `opened ${url}`);
   }
 
   if (tool === 'browser_snapshot') {
+    await refuseOnCairn('browser_snapshot');
     const result = await execute([...prefix, 'snapshot', '-i']);
     if (result.code !== 0 && result.code !== null) {
       refuse(result.text || `agent-browser snapshot failed with exit code ${result.code}`, started);
@@ -531,6 +556,7 @@ export async function runBrowserTool(
   }
   const lines: string[] = [];
   for (const action of parsed.data.actions) {
+    await refuseOnCairn(`browser_act ${action.kind}`);
     if (action.ref !== undefined) {
       const snap = await read([...prefix, 'snapshot', '-i']);
       if (snap.code !== 0 && snap.code !== null) {
