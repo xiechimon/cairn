@@ -2,9 +2,10 @@ import { createHash } from 'node:crypto';
 import { otlpTraceIdOfTurn } from '@cairn/shared/otel';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { eq } from 'drizzle-orm';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '../../src/db/client.js';
 import { coordinatorTurnSnapshot, project, step, todo } from '../../src/db/schema.js';
+import * as ids from '../../src/lib/ids.js';
 import {
   capturePreCallWorld,
   captureToolResult,
@@ -13,6 +14,14 @@ import {
   sealCoordinatorTurnSnapshot,
 } from '../../src/services/coordinator-turn-capture.js';
 import { boot, stub, type World, world } from './runner-world.js';
+
+beforeEach(() => {
+  vi.spyOn(ids, 'newRecordId')
+    .mockReturnValueOnce('snapshot-owner')
+    .mockReturnValueOnce('snapshot-team-fixture');
+});
+
+afterEach(() => vi.restoreAllMocks());
 
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
@@ -104,13 +113,18 @@ describe('coordinator turn snapshot writer', () => {
   });
 
   it('keeps the turn successful when snapshot sealing fails and never inserts a second row', async () => {
-    const w = await world('hello');
-    const { faux } = stub('all quiet');
+    vi.mocked(ids.newRecordId).mockRestore();
+    vi.spyOn(ids, 'newRecordId')
+      .mockReturnValueOnce('snapshot-owner-sk')
+      .mockReturnValueOnce('snapshot-team-fixture');
+    const w = await world('please create a task');
+    const { faux } = toolThenCreateTodo(w);
     const coordinator = boot(w, faux, {});
     coordinator.wake(w.threadId);
     await coordinator.idle();
     const first = snapshotRow(w.s.db, w.stepId);
-    expect(first).toBeDefined();
+    expect(first?.status).toBe('unusable');
+    expect(first?.payload).toBeNull();
 
     const before = w.s.db.select().from(coordinatorTurnSnapshot).all().length;
     expect(before).toBe(1);
@@ -253,7 +267,13 @@ it('does not count the repeated pre-call todo projection against the record cap'
       })
       .run();
   }
-  const { faux } = toolThenCreateTodo(w);
+  const faux = fauxProvider({ provider: 'stub', models: [{ id: 'm', contextWindow: 200_000 }] });
+  faux.setResponses([
+    ...Array.from({ length: 51 }, () =>
+      fauxAssistantMessage([fauxToolCall('projects', {})], { stopReason: 'toolUse' }),
+    ),
+    fauxAssistantMessage('all quiet'),
+  ]);
   const coordinator = boot(w, faux);
   coordinator.wake(w.threadId);
   await coordinator.idle();
@@ -262,7 +282,8 @@ it('does not count the repeated pre-call todo projection against the record cap'
   expect(row?.status).toBe('sealed');
   const payload = JSON.parse(row?.payload ?? 'null');
   expect(payload?.claim?.initialTodos).toHaveLength(200);
-  expect((payload?.toolViews ?? []).length).toBeGreaterThan(0);
+  expect(payload?.toolViews).toHaveLength(51);
+  for (const view of payload.toolViews) expect(view.preCallTodos).toHaveLength(200);
 });
 
 it('seals a closure whose text mentions bearer auth descriptively', async () => {

@@ -85,6 +85,7 @@ export interface ComposerSurfaceProps {
   above: ReactNode;
   tools: ReactNode;
   context?: ChiefContextUsage | null | undefined;
+  running?: boolean | undefined;
   threadId?: string | null;
   handleRef?: Ref<ComposerSurfaceHandle>;
   dropActive?: boolean;
@@ -111,6 +112,7 @@ export function ComposerSurface({
   above,
   tools,
   context = null,
+  running = false,
   threadId = null,
   handleRef,
   dropActive = false,
@@ -123,6 +125,7 @@ export function ComposerSurface({
   const shownContext = live ? chiefQ.data?.context : context;
   const contextPercent = contextPercentOf(shownContext);
   const meterContext = contextPercent == null ? null : (shownContext ?? null);
+  const contextLoading = live && (chiefQ.isLoading || (running && meterContext == null));
   const wire = useComposerWire({
     editable,
     draft: binding.draft,
@@ -195,7 +198,7 @@ export function ComposerSurface({
       : wire.draft !== '' ||
         wire.tokens.length > 0 ||
         pendingAttachments.some((entry) => !entry.failed);
-  const showMeter = !live || contextPercent != null;
+  const showMeter = !live || contextPercent != null || contextLoading || running;
   const plusMenu = (
     <DropdownMenu>
       <Tooltip>
@@ -242,7 +245,7 @@ export function ComposerSurface({
         {narrow && showMeter && (
           <>
             <DropdownMenuSeparator />
-            <ContextMeterLine context={meterContext} />
+            <ContextMeterLine context={meterContext} busy={running} loading={contextLoading} />
           </>
         )}
       </DropdownMenuContent>
@@ -435,7 +438,7 @@ export function ComposerSurface({
           {tools}
           {showMeter && (
             <span className="ml-auto flex">
-              <ContextMeterRing context={meterContext} />
+              <ContextMeterRing context={meterContext} busy={running} loading={contextLoading} />
             </span>
           )}
         </div>

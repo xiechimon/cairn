@@ -1,13 +1,7 @@
 import { PanelLeft } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import {
-  useApiMutations,
-  useMachines,
-  useProjects,
-  useSearchResults,
-  useTodos,
-} from '../api/hooks.js';
+import { useApiMutations, useProjects, useSearchResults, useTodos } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { queryPhase, withTeamsFailure } from '../components/query-state.js';
@@ -28,7 +22,6 @@ import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { toastArchived } from './archive-toast.js';
 import { useAttentionTitle } from './attention-title.js';
-import { fleetStatus } from './fleet-status.js';
 import { setDrawerOpen, useDrawerOpen } from './narrow-drawer.js';
 import {
   BoardSidebar,
@@ -113,7 +106,6 @@ export function AppSidebar({
   const { t } = useI18n();
   const { live, teamId, teamsQuery } = useLiveData();
   const todosQ = useTodos(teamId, live);
-  const machinesQ = useMachines(teamId, live);
   const mutations = useApiMutations(teamId);
   const navigate = useNavigate();
   const projectsQ = useProjects(teamId, live);
@@ -177,10 +169,6 @@ export function AppSidebar({
   const waiting = useMemo(() => waitingProjectIds(tasks), [tasks]);
   const statuses = useMemo(() => projectStatuses(tasks), [tasks]);
   useAttentionTitle(needsYouBadge(tasks.entries, tasks.questions));
-  const fixtureMachines = fixture.resources?.machines;
-  const fleet = fleetStatus(live ? (machinesQ.data ?? []) : (fixtureMachines ?? []));
-  const machinesOnline =
-    live || fixtureMachines != null ? fleet.online : fixture.chief != null ? 1 : 0;
   const { search: locationSearch } = location;
   useTypeToCompose();
   const editFixture = (id: string, patch: Partial<SidebarProject>) =>
@@ -297,9 +285,6 @@ export function AppSidebar({
     },
   };
   const sidebarProps = {
-    machinesOnline,
-    machinesOffline: fleet.offline,
-    offlineMachineNames: fleet.offlineNames,
     waiting,
     onSearch: onSearch ?? (() => search.setOpen(true)),
     usageNav: fixture.usageNav === true,

@@ -81,4 +81,12 @@ describe('ContextMeterRing', () => {
     const html = renderRing({ context: { tokens: 18_885, contextWindow: 1_000_000 } });
     expect(html).toContain('aria-label="已用 1.9万 / 100万"');
   });
+
+  test('names the initial usage fetch instead of claiming a mock reading', () => {
+    const html = renderRing({ loading: true });
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('aria-label="正在加载用量…"');
+    expect(html).not.toContain('上下文（示意）');
+    expect(html).not.toContain('%');
+  });
 });

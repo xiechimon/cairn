@@ -56,6 +56,7 @@ interface QueryBoundaryProps {
   errorWins?: boolean;
   className?: string;
   skeletonRows?: number;
+  skeleton?: ReactNode;
   children: ReactNode;
 }
 
@@ -68,6 +69,7 @@ export function QueryBoundary({
   errorWins,
   className,
   skeletonRows = 3,
+  skeleton,
   children,
 }: QueryBoundaryProps) {
   const { t } = useI18n();
@@ -84,9 +86,10 @@ export function QueryBoundary({
         <span role="status" className="sr-only">
           {loadingLabel}
         </span>
-        {Array.from({ length: skeletonRows }, (_, i) => (
-          <Skeleton key={i} className="h-10 w-full animate-none" />
-        ))}
+        {skeleton ??
+          Array.from({ length: skeletonRows }, (_, i) => (
+            <Skeleton key={i} className="h-10 w-full animate-none" />
+          ))}
       </div>
     );
   }

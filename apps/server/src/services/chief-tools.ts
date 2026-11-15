@@ -73,7 +73,7 @@ import type { OAuthClientConfig } from './oauth.js';
 import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
 import { getModelSources } from './providers.js';
 import type { VapidKeys } from './push.js';
-import { setTodoPlatform } from './routing-rules.js';
+import { assertPlatformChangeAllowed, setTodoPlatform } from './routing-rules.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
 import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
@@ -616,14 +616,16 @@ export async function executeChiefTool(
     }
     case 'update_todo': {
       const { platform, ...body } = parseWith(coordinatorUpdateTodoParamsSchema, params, 'params');
-      const todoRow = requireTeamTodo(db, body.todoId, ctx.teamId);
-      if (platform !== undefined) {
-        setTodoPlatform(db, todoRow, platform === 'any' ? null : platform);
-        svc.machineHub?.wake(ctx.teamId);
-      }
+      const os = platform === undefined ? undefined : platform === 'any' ? null : platform;
+      const moves =
+        os !== undefined &&
+        assertPlatformChangeAllowed(db, requireTeamTodo(db, body.todoId, ctx.teamId), os);
       const record = updateRequestTodo(svc, ctx, body);
       if (!record) throw new HttpError(404, `todo ${body.todoId}`);
-      return json(record);
+      if (!moves || os === undefined) return json(record);
+      setTodoPlatform(db, requireTeamTodo(db, body.todoId, ctx.teamId), os);
+      svc.machineHub?.wake(ctx.teamId);
+      return json({ ...record, ...getTodo(svc, body.todoId) });
     }
     case 'delete_todos': {
       const ids = strArr(params, 'todoIds');

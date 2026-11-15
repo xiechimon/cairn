@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { build as buildTable, step as stepTable, todo as todoTable } from '../src/db/schema.js';
 import { AGENT_ID, H, ownerTodo, registerChiefHarness, relay } from './chief-harness.js';
+import { req } from './helpers.js';
 
 registerChiefHarness();
 
@@ -57,6 +58,20 @@ describe('Coordinator platform need', () => {
     expect(overrideOf()).toEqual({ requiredCapabilities: { os: 'macos' } });
     await relay('update_todo', { todoId: created.id, platform: 'any' });
     expect(overrideOf()).toBeNull();
+  });
+
+  test('update_todo whose title is refused leaves the platform unchanged', async () => {
+    const res = await req(H.s.app, 'POST', `/api/projects/${H.projectId}/todos`, {
+      title: 'board task',
+      spec: 's',
+    });
+    const { id } = (await res.json()) as { id: string };
+    await expect(
+      relay('update_todo', { todoId: id, title: '打包 iOS 版本', platform: 'macos' }),
+    ).rejects.toThrow(/no cited request/);
+    expect(
+      H.s.db.select().from(todoTable).where(eq(todoTable.id, id)).get()?.routeOverride ?? null,
+    ).toBeNull();
   });
 });
 

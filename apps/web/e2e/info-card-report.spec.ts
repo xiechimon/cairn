@@ -218,6 +218,8 @@ for (const theme of ['light', 'dark'] as const) {
     const doc = page.getByTestId('research-report-doc');
     await expect(doc.getByText('登录页轨迹调研')).toBeVisible();
     await expect(doc.getByText('登录页轨迹调研')).toBeInViewport();
+    await expect(page.getByTestId('research-report-meta')).toBeInViewport();
+    await expect(page.getByRole('heading', { name: '调研登录页 agent 轨迹' })).toBeInViewport();
     await expect(doc.getByText('4 条正常收口')).toBeVisible();
     await expect(doc).not.toContainText('info-report');
     await evidenceShot(page, `report-document-${theme}.png`);

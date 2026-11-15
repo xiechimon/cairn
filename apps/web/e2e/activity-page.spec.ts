@@ -156,13 +156,13 @@ test('a row opens its thread and the sidebar Activity link opens the page', asyn
   await expect(page).toHaveURL(/thread=act-gallery/);
 });
 
-test('the footer keeps Activity and Settings next to the offline status', async ({ page }) => {
+test('the footer keeps Activity and Settings and no computers link', async ({ page }) => {
   await page.goto('/app?scenario=activity');
   const footer = page.getByTestId('sidebar-footer');
   await expect(footer.getByTestId('sidebar-settings')).toBeVisible();
   await expect(footer.getByTestId('sidebar-activity')).toBeVisible();
   await expect(page.getByTestId('sidebar-user-menu')).toHaveCount(0);
-  await expect(page.getByTestId('sidebar-attention')).toBeVisible();
+  await expect(page.getByTestId('sidebar-attention')).toHaveCount(0);
 });
 
 test('the collapsed rail keeps Activity and Settings as direct links', async ({ page }) => {

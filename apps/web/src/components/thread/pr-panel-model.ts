@@ -55,12 +55,6 @@ export function prCardModelOfRow(row: PrPanelRow, now: number): PrCardModel {
   };
 }
 
-export function prByThread(rows: readonly PrPanelRow[] | undefined): Map<string, PrPanelRow> {
-  const byThread = new Map<string, PrPanelRow>();
-  for (const row of rows ?? []) if (!byThread.has(row.threadId)) byThread.set(row.threadId, row);
-  return byThread;
-}
-
 export function prChecksText(checks: PrPanelRow['checks']): string | null {
   return checks.total > 0 ? `${checks.passed}/${checks.total}` : null;
 }

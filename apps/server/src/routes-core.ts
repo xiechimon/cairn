@@ -49,6 +49,12 @@ import {
 } from './services/routing-rules.js';
 import { filterKnownSkillIds } from './services/skills.js';
 
+const ACCESS_REFUSALS = {
+  invalid: { status: 401, error: 'Unauthorized' },
+  'not-allowed': { status: 403, error: 'this account is not allowed' },
+  unavailable: { status: 503, error: 'Cloudflare Access keys are unavailable' },
+} as const;
+
 export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   app.use('/api/*', async (c, next) => {
     if (!getCookie(c, SESSION_COOKIE) && !isOpenRemotePath(c.req.path)) {
@@ -79,12 +85,12 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       return c.json({ error: 'same-origin proof required' }, 403);
     }
     const verdict = await ctx.accessVerifier(c.req.header('cf-access-jwt-assertion'));
-    if (verdict.kind === 'unavailable') {
-      return c.json({ error: 'Cloudflare Access keys are unavailable' }, 503);
+    if (verdict.kind !== 'owner') {
+      const refusal = ACCESS_REFUSALS[verdict.kind];
+      ctx.logger?.info({ outcome: verdict.kind, status: refusal.status }, 'access exchange');
+      return c.json({ error: refusal.error }, refusal.status);
     }
-    if (verdict.kind === 'invalid') return c.json({ error: 'Unauthorized' }, 401);
-    if (verdict.kind === 'not-allowed')
-      return c.json({ error: 'this account is not allowed' }, 403);
+    ctx.logger?.info({ outcome: verdict.kind, status: 200 }, 'access exchange');
     const session = issueBrowserSession(ctx.db, 'owner', null, undefined, verdict.expiresAt);
     setAuthCookie(c, session.token, requestIsSecure(c), session.expiresAt);
     return c.json({ ok: true });

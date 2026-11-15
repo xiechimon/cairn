@@ -5,7 +5,7 @@ import {
   COORDINATOR_SUMMARY_TRANSCRIPT_MAX_CHARS,
   shortEvent,
 } from '@cairn/shared';
-import type { Message } from '@earendil-works/pi-ai';
+import type { AssistantMessage, Message } from '@earendil-works/pi-ai';
 import type { Models } from '@earendil-works/pi-ai/models';
 import {
   type CompactionSettings,
@@ -13,7 +13,12 @@ import {
   defineExtension,
   hook,
 } from '@earendil-works/pi-durable';
-import { recordCompactionSuccess, reportCompactionFailure } from './failure-report.js';
+import {
+  type FailureScope,
+  recordCompactionSuccess,
+  reportCompactionFailure,
+  startSummaryCall,
+} from './failure-report.js';
 
 export const BACKGROUND_COMPACTION_AT = 150_000;
 export const COMPACTION_RESERVE_TOKENS = 16_384;
@@ -164,24 +169,41 @@ export async function foldSummary(
 export function summarizerFor(
   models: Pick<Models, 'getModel' | 'completeSimple'>,
   ref: ModelRef | null,
+  scope: FailureScope & { stage?: string } = {},
 ): Summarize {
   const model = ref === null ? undefined : models.getModel(ref.provider, ref.modelId);
   if (model === undefined) {
     throw new Error(`summary model ${ref?.provider}/${ref?.modelId} is not available`);
   }
   return async (prompt) => {
-    const reply = await models.completeSimple(
-      model,
-      {
-        systemPrompt: SUMMARY_SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
-      },
-      { reasoning: 'low' },
-    );
-    if (reply.stopReason !== 'stop') {
-      throw new Error(`summary request ended ${reply.stopReason}: ${reply.errorMessage ?? ''}`);
+    const report = startSummaryCall(scope, scope.stage ?? 'summary-fold', model);
+    let reply: AssistantMessage | undefined;
+    let failure: unknown;
+    let httpStatus: number | undefined;
+    try {
+      reply = await models.completeSimple(
+        model,
+        {
+          systemPrompt: SUMMARY_SYSTEM_PROMPT,
+          messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+        },
+        {
+          reasoning: 'low',
+          onResponse: (response) => {
+            httpStatus = response.status;
+          },
+        },
+      );
+      if (reply.stopReason !== 'stop') {
+        throw new Error(`summary request ended ${reply.stopReason}: ${reply.errorMessage ?? ''}`);
+      }
+      return textOf(reply.content);
+    } catch (error) {
+      failure = error;
+      throw error;
+    } finally {
+      report(reply, failure, httpStatus);
     }
-    return textOf(reply.content);
   };
 }
 
@@ -200,14 +222,18 @@ export function coordinatorCompactionExtension(
           try {
             const cached = await api.memo<string>(SUMMARY_MEMO, context);
             if (cached !== undefined) return { summary: cached };
-            const summarize = summarizerFor(api.models, summaryModel());
+            const ref = summaryModel();
+            const summarize = summarizerFor(api.models, ref, scope);
             const { previous, rest } = splitPreviousSummary(compaction.messages);
             const lines = transcriptLines(rest);
             const flusher = flush();
             if (flusher !== null && (await api.memo<boolean>(FLUSH_MEMO, context)) === undefined) {
               const flushStartAt = Date.now();
               try {
-                await flusher.run(flushTranscript(lines), summarize);
+                await flusher.run(
+                  flushTranscript(lines),
+                  summarizerFor(api.models, ref, { ...scope, stage: 'memory-flush' }),
+                );
                 recordCompactionSuccess(scope, 'memory-flush', flushStartAt);
               } catch (error) {
                 reportCompactionFailure(scope, 'memory-flush', error, flushStartAt);

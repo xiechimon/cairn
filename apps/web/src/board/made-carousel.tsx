@@ -1,70 +1,120 @@
-import { FileText, GitPullRequest, Globe, Lock, Package, Palette } from 'lucide-react';
-import { type FocusEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { Lock } from 'lucide-react';
+import {
+  type FocusEvent,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { reportSummaryOf, useBuildReport } from '../chief/research-report.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
+import { Skeleton } from '../components/ui/skeleton.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight } from '../icons/index.js';
-import { MADE_GROUP_LABEL, type MadeGroupKey, madeKindOf } from './made-groups.js';
+import { MADE_GROUP_LABEL, type MadeGroupKey } from './made-groups.js';
 
-const KIND_ICON: Record<MadeGroupKey, typeof FileText> = {
-  document: FileText,
-  design: Palette,
-  page: Globe,
-  code: GitPullRequest,
-  other: Package,
-};
+const CARD_CLS =
+  'relative flex h-38 w-full flex-col overflow-hidden rounded-(--radius-card) bg-background px-4 pt-3.5 pb-3 shadow-(--e1-lift)';
+
+const CAROUSEL_CLS =
+  '-mt-px mr-2.5 mb-0 ml-2.5 grid list-none auto-cols-[calc((100cqw-var(--spacing)*19)/2)] grid-flow-col gap-3 overflow-x-auto overscroll-x-contain scroll-px-1.5 px-1.5 pt-0.5 pb-1 snap-x snap-mandatory data-next:mr-10.5 data-prev:ml-10.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
+
+const SKELETON_DELAY_MS = 200;
+
+const BAR = 'rounded-sm bg-border';
+
+function useSeen(ref: RefObject<Element | null>): boolean {
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (el === null || seen) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) setSeen(true);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref, seen]);
+  return seen;
+}
+
+function useCardExcerpt(todo: TodoRecord, seen: boolean): { excerpt: string; loading: boolean } {
+  const thread = useMemo(
+    () =>
+      seen && todo.output === 'info' && todo.latestBuildId !== null
+        ? { buildId: todo.latestBuildId, title: todo.title, phase: todo.phase }
+        : null,
+    [seen, todo.output, todo.latestBuildId, todo.title, todo.phase],
+  );
+  const { report, settled } = useBuildReport(thread);
+  return {
+    excerpt: report === null ? '' : reportSummaryOf(report.content),
+    loading: thread !== null && !settled,
+  };
+}
 
 export function MadeCard({
   todo,
   meta,
-  pr,
   onOpen,
 }: {
   todo: TodoRecord;
   meta: string;
-  pr: { number: number; url: string } | undefined;
   onOpen: () => void;
 }) {
   const { t } = useI18n();
-  const kind = madeKindOf(todo);
-  const Icon = KIND_ICON[kind];
+  const ref = useRef<HTMLLIElement | null>(null);
+  const { excerpt, loading } = useCardExcerpt(todo, useSeen(ref));
   return (
-    <li className="flex snap-start">
-      <article
-        data-testid="made-card"
-        data-kind={kind}
-        className="relative flex h-36 w-full flex-col overflow-hidden rounded-(--radius-card) bg-background shadow-(--e1-lift) hover:bg-(--menu-hover)"
-      >
+    <li ref={ref} className="flex snap-start">
+      <article data-testid="made-card" className={`${CARD_CLS} hover:bg-(--menu-hover)`}>
         <Button
           variant="ghost"
           aria-label={todo.title}
           onClick={onOpen}
           className="absolute inset-0 size-full rounded-(--radius-card) p-0 hover:bg-transparent focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-inset dark:hover:bg-transparent"
         />
-        <h4 className="pointer-events-none relative m-0 flex-none px-4 pt-5 text-card-title font-semibold text-foreground">
+        <h4 className="pointer-events-none relative m-0 flex-none text-ui font-medium text-foreground">
           <span className="line-clamp-2">{todo.title}</span>
         </h4>
-        <div className="pointer-events-none relative mt-1.5 flex h-5 flex-none items-center gap-2 px-4">
-          <span className="flex size-5 flex-none items-center justify-center rounded-(--cds-radius-md) bg-secondary text-content-secondary">
-            <Icon aria-hidden="true" className="size-4" />
-          </span>
+        <div
+          data-testid="made-card-preview"
+          className="pointer-events-none relative mt-1.5 min-h-0 flex-1 overflow-hidden"
+        >
+          {todo.previewUrl !== undefined ? (
+            <img
+              src={todo.previewUrl}
+              alt=""
+              loading="lazy"
+              className="size-full rounded-(--radius-tile) border border-border object-cover object-top"
+            />
+          ) : excerpt !== '' ? (
+            <p
+              data-testid="made-card-excerpt"
+              className="m-0 line-clamp-3 text-meta text-content-secondary"
+            >
+              {excerpt}
+            </p>
+          ) : (
+            loading && (
+              <div data-testid="made-card-excerpt-loading" className="flex flex-col gap-2 pt-1">
+                <Skeleton className={`h-2.5 w-full ${BAR}`} />
+                <Skeleton className={`h-2.5 w-3/4 ${BAR}`} />
+              </div>
+            )
+          )}
+        </div>
+        <div className="pointer-events-none relative mt-2 flex h-5 flex-none items-center gap-2">
           <span
             data-testid="made-card-meta"
             className="min-w-0 flex-1 truncate text-meta text-content-tertiary"
           >
             {meta}
           </span>
-          {pr !== undefined && (
-            <a
-              href={pr.url}
-              target="_blank"
-              rel="noreferrer"
-              className="pointer-events-auto flex-none text-meta text-content-secondary hover:text-foreground"
-            >
-              {`PR #${pr.number}`}
-            </a>
-          )}
           {todo.visibility === 'private' && (
             <span className="flex flex-none text-content-tertiary">
               <Lock aria-hidden="true" className="size-4" />
@@ -72,28 +122,34 @@ export function MadeCard({
             </span>
           )}
         </div>
-        <div
-          data-testid="made-card-preview"
-          className="pointer-events-none absolute inset-x-3 bottom-0 h-12 overflow-hidden rounded-t-(--radius-tile) border border-b-0 border-border bg-background"
-        >
-          {todo.previewUrl === undefined ? (
-            <div
-              data-testid="made-card-placeholder"
-              className="flex size-full items-start justify-center bg-secondary pt-5 text-content-dim"
-            >
-              <Icon aria-hidden="true" className="size-5.5" />
-            </div>
-          ) : (
-            <img
-              src={todo.previewUrl}
-              alt=""
-              loading="lazy"
-              className="size-full object-cover object-top"
-            />
-          )}
-        </div>
       </article>
     </li>
+  );
+}
+
+export function MadeSkeleton() {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShown(true), SKELETON_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+  if (!shown) return null;
+  return (
+    <div data-testid="made-skeleton" aria-hidden="true" className="pt-5">
+      <Skeleton className={`mx-4 mb-2.5 h-3.5 w-14 ${BAR}`} />
+      <div className="@container">
+        <div className={CAROUSEL_CLS}>
+          {[0, 1].map((key) => (
+            <div key={key} className={CARD_CLS}>
+              <Skeleton className={`h-3.5 w-4/5 ${BAR}`} />
+              <Skeleton className={`mt-3 h-2.5 w-full ${BAR}`} />
+              <Skeleton className={`mt-2 h-2.5 w-2/3 ${BAR}`} />
+              <Skeleton className={`mt-auto h-2.5 w-2/5 ${BAR}`} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -163,7 +219,7 @@ export function MadeCarousel({
         data-next={edges.next || undefined}
         onScroll={measure}
         onFocus={followFocus}
-        className="-mt-px mr-2.5 mb-0 ml-2.5 grid list-none auto-cols-[calc((100cqw-var(--spacing)*19)/2)] grid-flow-col gap-3 overflow-x-auto overscroll-x-contain scroll-px-1.5 px-1.5 pt-0.5 pb-1 snap-x snap-mandatory data-next:mr-10.5 data-prev:ml-10.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className={CAROUSEL_CLS}
       >
         {children}
       </ul>

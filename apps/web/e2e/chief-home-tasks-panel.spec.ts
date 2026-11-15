@@ -542,12 +542,12 @@ test('Made groups finished work by kind with counts, as horizontal rows of previ
   await expect(first).toContainText('仅自己可见');
   await expect(first.locator('img')).toHaveCount(1);
   const other = groups.nth(2).getByTestId('made-card').first();
-  await expect(other.getByTestId('made-card-placeholder')).toBeVisible();
   await expect(other.locator('img')).toHaveCount(0);
+  await expect(other.getByTestId('made-card-preview')).toBeEmpty();
   const box = await first.boundingBox();
   const second = await groups.nth(0).getByTestId('made-card').nth(1).boundingBox();
   expect(Math.abs((box?.y ?? 0) - (second?.y ?? 1))).toBeLessThan(1);
-  expect(box?.height).toBe(144);
+  expect(box?.height).toBe(152);
   await expect(madePanel(page)).not.toContainText('Unread dot on threads');
 });
 
@@ -772,4 +772,41 @@ test('a research report waiting on the owner is already in Made, marked as waiti
   await expect(cards).toHaveCount(1);
   await expect(cards.first()).toContainText('Research export formats');
   await expect(cards.first().getByTestId('made-card-meta')).toHaveText(/^待你决定 · /);
+});
+
+test('Made lists finished documents with the opening line of each report and leaves code changes out', async ({
+  page,
+}) => {
+  const research = {
+    ...TASK,
+    id: 'todo-research',
+    seqNum: 10,
+    title: 'Research export formats',
+    phase: 'done',
+    output: 'info',
+    latestBuildId: 'build-research',
+  };
+  const merged = { ...TASK, id: 'todo-merged', seqNum: 11, title: 'Wire the export', phase: 'done', output: 'code' };
+  const report = {
+    id: 'info-report-build-research',
+    role: 'system',
+    createdAt: 30,
+    content: JSON.stringify({
+      kind: 'info-report',
+      attachmentId: 'att-r',
+      attachmentToken: '![report.md](attachment:t1/att-r.md)',
+      content:
+        '## Export formats\n\nParquet halves the file size of CSV, see [the benchmark](https://example.com/bench).\n\n- Parquet keeps types',
+    }),
+  };
+  const page0 = { chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null };
+  await mockLive(page, { threads: [THREAD], messages: [], todos: [research, merged] }, (path, _route, json) =>
+    path === '/api/conversations/build-research/messages' ? json({ messages: [report], ...page0 }) : undefined,
+  );
+  await page.goto('/app?pane=made');
+  await expect(madePanel(page).getByTestId('made-group').locator('h3')).toHaveText(['文档1']);
+  await expect(madePanel(page)).not.toContainText('Wire the export');
+  await expect(madePanel(page).getByTestId('made-card-excerpt')).toHaveText(
+    'Parquet halves the file size of CSV, see the benchmark.',
+  );
 });

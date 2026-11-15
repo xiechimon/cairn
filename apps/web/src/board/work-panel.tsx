@@ -1,7 +1,7 @@
 import { PackageCheck, Search, SearchX } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router';
-import { useArchivedTodos, useProjects, usePrs } from '../api/hooks.js';
+import { useArchivedTodos, useProjects } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { ResearchReportDialog, useBuildReport } from '../chief/research-report.js';
@@ -10,13 +10,12 @@ import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
-import { prByThread } from '../components/thread/pr-panel-model.js';
 import { Button } from '../components/ui/button.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { MadeCard, MadeCarousel } from './made-carousel.js';
-import { groupMade, MADE_GROUP_LABEL, madeKindOf, matchesMadeQuery } from './made-groups.js';
+import { MadeCard, MadeCarousel, MadeSkeleton } from './made-carousel.js';
+import { groupMade, MADE_GROUP_LABEL, madeGroupOf, matchesMadeQuery } from './made-groups.js';
 import { MadeSearch } from './made-search.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { threadStatus } from './thread-copy.js';
@@ -77,7 +76,8 @@ function MadeReport({
 }
 
 const isMade = (todo: TodoRecord) =>
-  threadStatus(todo) === 'done' || (todo.output === 'info' && todo.phase === 'needs_input');
+  madeGroupOf(todo) !== null &&
+  (threadStatus(todo) === 'done' || (todo.output === 'info' && todo.phase === 'needs_input'));
 
 export function WorkPanel({
   todos,
@@ -90,7 +90,6 @@ export function WorkPanel({
   const { t } = useI18n();
   const title = t('成果');
   const { live: connected, teamId } = useLiveData();
-  const prOf = prByThread(usePrs(teamId, undefined, connected).data);
   const projectNames = useProjectNames();
   const [tab, setTab] = useState<MadeTab>('all');
   const [searching, setSearching] = useState(false);
@@ -113,9 +112,13 @@ export function WorkPanel({
   const showProject = projectId === null;
   const projectOf = (todo: TodoRecord) =>
     showProject ? projectNames.get(todo.projectId) : undefined;
-  const made = source.filter((todo) =>
-    matchesMadeQuery(todo.title, projectOf(todo), query, t(MADE_GROUP_LABEL[madeKindOf(todo)])),
-  );
+  const made = source.filter((todo) => {
+    const group = madeGroupOf(todo);
+    return (
+      group !== null &&
+      matchesMadeQuery(todo.title, projectOf(todo), query, t(MADE_GROUP_LABEL[group]))
+    );
+  });
   const groups = groupMade(made);
   const activeQuery: QueryLike | undefined =
     tab === 'archived' && connected ? archivedQ : todosQuery;
@@ -139,8 +142,8 @@ export function WorkPanel({
         <EmptyState
           testId="made-empty"
           icon={PackageCheck}
-          title={t('还没有完成的工作')}
-          description={t('任务合并完成后会出现在这里。')}
+          title={t('还没有完成的文档')}
+          description={t('调研报告等文档完成后会出现在这里。')}
           className="mt-[10vh]"
         />
       )
@@ -178,7 +181,6 @@ export function WorkPanel({
                   relativeTime(todo.phaseAt, now, t),
                   projectOf(todo),
                 ])}
-                pr={prOf.get(todo.id)}
                 onOpen={() =>
                   todo.output === 'info' && todo.latestBuildId !== null
                     ? setReportTodo(todo)
@@ -248,6 +250,7 @@ export function WorkPanel({
           isEmpty={made.length === 0}
           loadingLabel={t('正在加载成果')}
           errorTitle={t('成果没能加载')}
+          skeleton={<MadeSkeleton />}
           empty={body}
         >
           {body}

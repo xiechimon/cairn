@@ -148,13 +148,22 @@ export function assertPlatformUnlocked(db: Pick<Db, 'select'>, todoId: string): 
   if (started !== undefined) throw new HttpError(409, PLATFORM_LOCKED_MESSAGE);
 }
 
+export function assertPlatformChangeAllowed(
+  db: Pick<Db, 'select'>,
+  todoRow: Pick<typeof todo.$inferSelect, 'id' | 'routeOverride'>,
+  os: RunnerOs | null,
+): boolean {
+  if ((todoRow.routeOverride?.requiredCapabilities?.os ?? null) === os) return false;
+  assertPlatformUnlocked(db, todoRow.id);
+  return true;
+}
+
 export function setTodoPlatform(
   db: Db,
   todoRow: Pick<typeof todo.$inferSelect, 'id' | 'routeOverride' | 'v'>,
   os: RunnerOs | null,
 ): void {
-  if ((todoRow.routeOverride?.requiredCapabilities?.os ?? null) === os) return;
-  assertPlatformUnlocked(db, todoRow.id);
+  if (!assertPlatformChangeAllowed(db, todoRow, os)) return;
   db.update(todo)
     .set({ routeOverride: withPlatform(todoRow.routeOverride, os), v: todoRow.v + 1 })
     .where(eq(todo.id, todoRow.id))

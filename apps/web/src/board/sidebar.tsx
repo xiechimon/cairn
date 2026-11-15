@@ -5,7 +5,6 @@ import {
   Archive,
   ChartColumn,
   ChevronLeft,
-  Monitor,
   PanelLeft,
   Plus,
   Search,
@@ -31,6 +30,7 @@ import {
   SidebarProjectGroupHeader,
   SidebarProjectRow,
   SidebarProjectRowSkeleton,
+  type SidebarRename,
   type TreePlace,
 } from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
@@ -45,7 +45,6 @@ import { DeleteArchivedProjectsConfirm } from '../overlay/delete-archived-projec
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF } from '../settings/settings-href.js';
-import { fleetSummary } from './fleet-status.js';
 import { coordinatorSearch } from './open-composer.js';
 import { isArchivedProject } from './project-archive.js';
 import {
@@ -60,8 +59,6 @@ import {
   type ProjectStatus,
   sidebarProjects,
 } from './sidebar-projects.js';
-import { THREAD_PARAM } from './thread-copy.js';
-import { PANE_PARAM } from './work-panel.js';
 
 export type SidebarSelected =
   | 'board'
@@ -99,9 +96,6 @@ const CANON_PROJECTS: readonly SidebarProject[] = [{ id: PROJECT_ID, name: PROJE
 interface BoardSidebarProps {
   collapsed?: boolean;
   onToggle?: () => void;
-  machinesOnline?: number;
-  machinesOffline?: number;
-  offlineMachineNames?: string[];
   onSearch?: () => void;
   usageNav?: boolean;
   selected?: SidebarSelected;
@@ -211,43 +205,6 @@ function DeleteAllButton({ count, onDelete }: { count: number; onDelete: () => v
   return empty ? <SidebarTip label={t('没有可删除的已归档项目')}>{button}</SidebarTip> : button;
 }
 
-function FleetChip({
-  tone,
-  online,
-  className,
-}: {
-  tone: 'online' | 'offline';
-  online: number;
-  className?: string;
-}) {
-  return (
-    <span
-      aria-hidden
-      data-slot="fleet-chip"
-      className={cn(
-        'relative grid size-6 flex-none place-items-center rounded-full bg-(--sidebar-press) text-foreground',
-        className,
-      )}
-    >
-      <Monitor className="size-4" strokeWidth={STROKE} />
-      <span
-        data-slot="fleet-badge"
-        className={cn(
-          'absolute -right-0.5 -bottom-0.5 size-2 rounded-full ring-2 ring-(--sidebar-surface)',
-          online === 0
-            ? cn(
-                'rounded-full border bg-(--sidebar-surface)',
-                tone === 'offline' ? 'border-destructive' : 'border-content-tertiary',
-              )
-            : tone === 'offline'
-              ? 'bg-destructive'
-              : 'bg-running',
-        )}
-      />
-    </span>
-  );
-}
-
 function FooterIcon({
   label,
   to,
@@ -295,6 +252,64 @@ function RailTip({
   );
 }
 
+function useRowRename(label: string, save: (name: string) => Promise<void> | undefined) {
+  const [editing, setEditing] = useState(false);
+  const [pending, setPending] = useState<string | null>(null);
+  const rename: SidebarRename | null = editing
+    ? {
+        label,
+        onCancel: () => setEditing(false),
+        onCommit: (next) => {
+          setEditing(false);
+          setPending(next);
+          Promise.resolve(save(next))
+            .catch(() => undefined)
+            .finally(() => setPending(null));
+        },
+      }
+    : null;
+  return { rename, pending, start: () => setEditing(true) };
+}
+
+function GroupHeaderItem({
+  name,
+  expanded,
+  count,
+  waiting,
+  spaced,
+  onToggle,
+  actions,
+}: {
+  name: string;
+  expanded: boolean;
+  count: number;
+  waiting: string | null;
+  spaced: boolean;
+  onToggle: () => void;
+  actions: SidebarProjectActions | undefined;
+}) {
+  const { t } = useI18n();
+  const { rename, pending, start } = useRowRename(t('分组名称'), (next) =>
+    actions?.renameGroup(name, next),
+  );
+  return (
+    <SidebarProjectGroupHeader
+      name={pending ?? name}
+      expanded={expanded}
+      count={count}
+      waiting={waiting}
+      spaced={spaced}
+      onToggle={onToggle}
+      rename={rename}
+      menu={
+        actions === undefined ? undefined : (
+          <SidebarGroupMenu name={name} onRename={start} onUngroup={() => actions.ungroup(name)} />
+        )
+      }
+    />
+  );
+}
+
 const ProjectRowItem = memo(function ProjectRowItem({
   row,
   place,
@@ -320,6 +335,10 @@ const ProjectRowItem = memo(function ProjectRowItem({
   navigate: NavigateFunction;
   actionsRef: RefObject<SidebarProjectActions | undefined> | null;
 }) {
+  const { t } = useI18n();
+  const { rename, pending, start } = useRowRename(t('项目名称'), (next) =>
+    actionsRef?.current?.rename(row.id, next),
+  );
   const appSearch = (set: Record<string, string>) => {
     const next = new URLSearchParams(plain);
     for (const [key, value] of Object.entries(set)) next.set(key, value);
@@ -339,22 +358,15 @@ const ProjectRowItem = memo(function ProjectRowItem({
         groups={groups}
         onMove={(group) => actionsRef.current?.move(row.id, group)}
         onArchive={() => actionsRef.current?.archive(row.id)}
-        onRename={async (name) => actionsRef.current?.rename(row.id, name)}
+        onRename={start}
         onDelete={() => actionsRef.current?.remove(row.id)}
-        onHome={() => navigate({ pathname: '/app', search: appSearch({ project: row.id }) })}
-        onTasks={() => navigate({ pathname: `/app/project/${row.id}/tasks`, search: plain })}
         onSettings={() => navigate({ pathname: `/app/project/${row.id}/settings`, search: plain })}
-        onInstructions={() =>
-          navigate({
-            pathname: `/app/project/${row.id}/settings`,
-            search: appSearch({ tab: 'memory' }),
-          })
-        }
       />
     );
   return (
     <SidebarProjectRow
-      name={row.name}
+      name={pending ?? row.name}
+      rename={rename}
       icon={row.icon}
       place={place}
       flat={flat}
@@ -373,9 +385,6 @@ const ProjectRowItem = memo(function ProjectRowItem({
 export function BoardSidebar({
   collapsed = false,
   onToggle,
-  machinesOffline = 0,
-  machinesOnline = 0,
-  offlineMachineNames = [],
   onSearch,
   usageNav = false,
   selected = 'board',
@@ -400,10 +409,6 @@ export function BoardSidebar({
     return { pathname: '/app', search: `?${next}` };
   };
   const plain = `?${baseParams}`;
-  const machinesParams = new URLSearchParams(pathname === '/app' ? search : baseParams);
-  machinesParams.delete(THREAD_PARAM);
-  machinesParams.set(PANE_PARAM, 'machines');
-  const machinesTarget = { pathname: '/app', search: `?${machinesParams}` };
   const newProjectTarget = { pathname: '/app/project/new', search: plain };
   const coordinatorTarget = { pathname: '/app', search: coordinatorSearch(search) };
   const allProjects = projects ?? CANON_PROJECTS;
@@ -479,11 +484,6 @@ export function BoardSidebar({
 
   const settingsTarget = { pathname: SETTINGS_HREF, search: plain };
   const activityTarget = { pathname: ACTIVITY_PATH, search: plain };
-  const fleet = fleetSummary(
-    { online: machinesOnline, offline: machinesOffline, offlineNames: offlineMachineNames },
-    t,
-  );
-  const [fleetMain = ''] = (fleet?.label ?? '').split(' · ');
 
   if (collapsed) {
     const railLink = (
@@ -561,18 +561,6 @@ export function BoardSidebar({
           </RailTip>
         </nav>
         <div className="flex flex-none flex-col items-center gap-0.5 pt-2">
-          {fleet != null && (
-            <RailTip
-              label={fleet.title}
-              icon={<FleetChip tone={fleet.tone} online={machinesOnline} />}
-            >
-              <Link
-                {...railLink(machinesTarget, false, fleet.title)}
-                data-testid="sidebar-attention"
-                data-fleet={fleet.tone}
-              />
-            </RailTip>
-          )}
           <RailTip label={t('活动')} icon={<Activity className={ICON} strokeWidth={STROKE} />}>
             <Link {...railLink(activityTarget, false, t('活动'))} data-testid="sidebar-activity" />
           </RailTip>
@@ -722,22 +710,14 @@ export function BoardSidebar({
             const groupWaiting = group.projects.some((row) => waiting.has(row.id));
             return (
               <div key={group.name} className="flex flex-col gap-0.5">
-                <SidebarProjectGroupHeader
+                <GroupHeaderItem
                   name={group.name}
                   expanded={expanded}
                   count={group.projects.length}
                   waiting={groupWaiting ? waitingLabel : null}
                   spaced={spaced}
                   onToggle={() => toggleGroup(group.name)}
-                  menu={
-                    actions === undefined ? undefined : (
-                      <SidebarGroupMenu
-                        name={group.name}
-                        onRename={(next) => actions.renameGroup(group.name, next)}
-                        onUngroup={() => actions.ungroup(group.name)}
-                      />
-                    )
-                  }
+                  actions={actions}
                 />
                 {expanded && projectRows(group.projects)}
               </div>
@@ -786,21 +766,7 @@ export function BoardSidebar({
         data-testid="sidebar-footer"
         className="flex h-14 flex-none items-center gap-1 border-t border-border pr-2 pl-1"
       >
-        {fleet == null ? (
-          <span className="flex-1" />
-        ) : (
-          <Link
-            data-testid="sidebar-attention"
-            data-fleet={fleet.tone}
-            to={machinesTarget}
-            title={fleet.title}
-            aria-label={fleet.title}
-            className={`flex h-9.5 min-w-0 flex-1 items-center gap-2.5 rounded-(--cds-radius-lg) pr-2 pl-2 text-ui whitespace-nowrap text-foreground no-underline hover:bg-sidebar-hover active:bg-(--sidebar-active) pointer-coarse:h-11 ${FOCUS}`}
-          >
-            <FleetChip tone={fleet.tone} online={machinesOnline} />
-            <span className="min-w-0 truncate">{fleetMain}</span>
-          </Link>
-        )}
+        <span className="flex-1" />
         {usageNav && (
           <FooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
             <ChartColumn className={ICON} strokeWidth={STROKE} />

@@ -1,13 +1,20 @@
 import type { ProjectIcon } from '@cairn/shared';
 import { cn } from 'cn';
 import { Archive, Box, ChevronDown, ChevronRight, Folder } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { PROJECT_ICON_COMPONENTS } from '../../board/project-icon-map.js';
 import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
 import { Skeleton } from '../ui/skeleton.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.js';
 
 export type TreePlace = 'only' | 'first' | 'middle' | 'last';
+
+export interface SidebarRename {
+  label: string;
+  onCommit: (name: string) => void;
+  onCancel: () => void;
+}
 
 export interface SidebarProjectRowProps {
   name: string;
@@ -20,6 +27,7 @@ export interface SidebarProjectRowProps {
   flat?: boolean;
   onClick?: () => void;
   menu?: ReactNode;
+  rename?: SidebarRename | null;
 }
 
 export const SIDEBAR_ROW =
@@ -99,6 +107,63 @@ export function TreeGuide({ place }: { place: TreePlace }) {
   );
 }
 
+function SidebarNameField({
+  name,
+  rename,
+  className,
+  children,
+}: {
+  name: string;
+  rename: SidebarRename;
+  className: string;
+  children: ReactNode;
+}) {
+  const settled = useRef(false);
+  const field = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    field.current?.focus();
+    field.current?.select();
+  }, []);
+  const finish = (value: string) => {
+    if (settled.current) return;
+    settled.current = true;
+    const next = value.trim();
+    if (next === '' || next === name) rename.onCancel();
+    else rename.onCommit(next);
+  };
+  return (
+    <div
+      data-slot="sidebar-rename"
+      className={cn(
+        SIDEBAR_ROW,
+        'flex items-center bg-background inset-ring-1 inset-ring-(--focus-ring)',
+        className,
+      )}
+    >
+      {children}
+      <Input
+        aria-label={rename.label}
+        defaultValue={name}
+        ref={field}
+        onBlur={(event) => finish(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing) return;
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            finish(event.currentTarget.value);
+          } else if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            settled.current = true;
+            rename.onCancel();
+          }
+        }}
+        className="h-auto min-w-0 flex-1 border-0 bg-transparent p-0 text-ui text-foreground outline-hidden focus-visible:border-0 focus-visible:ring-0 md:text-ui dark:bg-transparent"
+      />
+    </div>
+  );
+}
+
 export function SidebarRowActions({
   children,
   pinned = false,
@@ -120,7 +185,22 @@ export function SidebarProjectRow({
   flat = false,
   onClick,
   menu,
+  rename = null,
 }: SidebarProjectRowProps) {
+  if (rename !== null) {
+    return (
+      <div className={cn('group/row relative flex flex-none', !flat && 'ml-5.5')}>
+        {!flat && <TreeGuide place={place} />}
+        <SidebarNameField
+          name={name}
+          rename={rename}
+          className={flat ? 'pr-2 pl-1.5' : 'pr-2 pl-2.5'}
+        >
+          <ProjectGlyph icon={icon} />
+        </SidebarNameField>
+      </div>
+    );
+  }
   const button = (
     <Button
       variant="ghost"
@@ -213,6 +293,7 @@ export function SidebarProjectGroupHeader({
   spaced = false,
   onToggle,
   menu,
+  rename = null,
 }: {
   name: string;
   expanded: boolean;
@@ -221,7 +302,17 @@ export function SidebarProjectGroupHeader({
   spaced?: boolean;
   onToggle: () => void;
   menu?: ReactNode;
+  rename?: SidebarRename | null;
 }) {
+  if (rename !== null) {
+    return (
+      <div className={cn('group/row relative flex flex-none', spaced && 'mt-4')}>
+        <SidebarNameField name={name} rename={rename} className="h-6.5 pr-2 pl-1.5">
+          <Folder className="size-5 flex-none text-sidebar-ink" strokeWidth={1.75} />
+        </SidebarNameField>
+      </div>
+    );
+  }
   return (
     <div className={cn('group/row relative flex flex-none', spaced && 'mt-4')}>
       <Button

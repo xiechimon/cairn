@@ -283,7 +283,11 @@ export const machinesMasterDetail: FixtureSet = {
         recommendedConcurrent: 4,
         concurrencySource: 'measured',
         concurrencyRange: { min: 1, max: 8 },
-        capabilities: { mcpServers: ['github', 'linear'], skills: ['review', 'ship', 'verify'] },
+        capabilities: {
+          mcpServers: ['github', 'linear'],
+          skills: ['review', 'ship', 'verify'],
+          osPlatform: 'linux',
+        },
         claudeLogin: { state: 'ok', expiresAt: Date.now() + 30 * LOGIN_DAY_MS },
         providers: [
           {
@@ -397,7 +401,7 @@ export const providersFleet: FixtureSet = {
         name: MACHINE_NAME,
         online: true,
         enabledRuntimes: ['pi', 'claude-code'],
-        capabilities: { mcpServers: [], skills: [], executor: 'host' },
+        capabilities: { mcpServers: [], skills: [], executor: 'host', osPlatform: 'darwin' },
       },
       {
         id: 'fleet-box',
@@ -405,7 +409,7 @@ export const providersFleet: FixtureSet = {
         name: 'build-box',
         online: true,
         enabledRuntimes: ['pi', 'claude-code'],
-        capabilities: { mcpServers: [], skills: [], executor: 'host' },
+        capabilities: { mcpServers: [], skills: [], executor: 'host', osPlatform: 'linux' },
       },
       {
         id: 'fleet-box-orb',
@@ -413,7 +417,7 @@ export const providersFleet: FixtureSet = {
         name: 'build-box-orb',
         online: true,
         enabledRuntimes: ['claude-code'],
-        capabilities: { mcpServers: [], skills: [], executor: 'orb' },
+        capabilities: { mcpServers: [], skills: [], executor: 'orb', osPlatform: 'linux' },
       },
       {
         id: 'fleet-old',

@@ -185,6 +185,6 @@ describe('summarizerFor', () => {
       { provider: 'p', modelId: 'm' },
     );
     expect(await summarize('x')).toBe('done');
-    expect(seen).toEqual([{ reasoning: 'low' }]);
+    expect(seen).toEqual([expect.objectContaining({ reasoning: 'low' })]);
   });
 });

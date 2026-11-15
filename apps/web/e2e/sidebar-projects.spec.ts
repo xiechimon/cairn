@@ -167,9 +167,10 @@ for (const theme of ['light', 'dark'] as const) {
     await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
     await open(page, [PROJECT]);
     await openMenu(page, 'cairn');
-    await page.getByRole('menuitem', { name: '重命名' }).click();
-    const dialog = page.getByRole('dialog', { name: '重命名项目' });
-    const save = dialog.getByRole('button', { name: '保存' });
+    await page.getByRole('menuitem', { name: '移到分组' }).click();
+    await page.getByRole('menuitem', { name: '新建分组' }).click();
+    const dialog = page.getByRole('dialog', { name: '新建分组' });
+    const save = dialog.getByRole('button', { name: '移入' });
     await expect(save).toBeDisabled();
     const look = await dialog.evaluate((el) => {
       const token = (name: string, alpha = '') => {
@@ -206,27 +207,47 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('Rename saves the new name and keeps the input when the save fails', async ({ page }) => {
+test('Rename edits the name in the row: Enter saves, Escape and an unchanged name do not', async ({
+  page,
+}) => {
   const projects = [PROJECT, project('proj-2', 'dogfood-sandbox')];
   const patches: { id: string; body: unknown }[] = [];
-  const fail = { patch: true };
-  await open(page, projects, [], patches, fail);
+  await open(page, projects, [], patches);
   await openMenu(page, 'dogfood-sandbox');
   await page.getByRole('menuitem', { name: '重命名' }).click();
-  const dialog = page.getByRole('dialog', { name: '重命名项目' });
-  await expect(dialog.getByText('项目名称', { exact: true })).toBeVisible();
-  await dialog.getByRole('textbox', { name: '项目名称' }).fill('sandbox');
-  await dialog.getByRole('button', { name: '保存' }).click();
-  await expect(page.getByText('无法重命名项目。')).toBeVisible();
-  await expect(dialog.getByRole('textbox')).toHaveValue('sandbox');
-  fail.patch = false;
-  await dialog.getByRole('button', { name: '保存' }).click();
-  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const field = sidebar(page).getByRole('textbox', { name: '项目名称' });
+  await expect(field).toBeFocused();
+  await expect(field).toHaveValue('dogfood-sandbox');
+  await field.fill('scratch');
+  await field.press('Escape');
+  await expect(field).toHaveCount(0);
+  await expect(rows(page)).toHaveText(['cairn', 'dogfood-sandbox']);
+  await openMenu(page, 'dogfood-sandbox');
+  await page.getByRole('menuitem', { name: '重命名' }).click();
+  await field.press('Enter');
+  await expect(field).toHaveCount(0);
+  expect(patches).toEqual([]);
+  await openMenu(page, 'dogfood-sandbox');
+  await page.getByRole('menuitem', { name: '重命名' }).click();
+  await field.fill('  sandbox ');
+  await field.press('Enter');
   await expect(rows(page)).toHaveText(['cairn', 'sandbox']);
-  expect(patches).toEqual([
-    { id: 'proj-2', body: { name: 'sandbox' } },
-    { id: 'proj-2', body: { name: 'sandbox' } },
-  ]);
+  expect(patches).toEqual([{ id: 'proj-2', body: { name: 'sandbox' } }]);
+});
+
+test('a failed in-place rename puts the old name back and says so', async ({ page }) => {
+  const projects = [PROJECT, project('proj-2', 'dogfood-sandbox')];
+  const patches: { id: string; body: unknown }[] = [];
+  await open(page, projects, [], patches, { patch: true });
+  await openMenu(page, 'dogfood-sandbox');
+  await page.getByRole('menuitem', { name: '重命名' }).click();
+  const field = sidebar(page).getByRole('textbox', { name: '项目名称' });
+  await field.fill('sandbox');
+  await field.blur();
+  await expect(page.getByText('无法重命名项目。')).toBeVisible();
+  await expect(rows(page)).toHaveText(['cairn', 'dogfood-sandbox']);
+  expect(patches).toEqual([{ id: 'proj-2', body: { name: 'sandbox' } }]);
 });
 
 test('Delete asks for the name, then removes the project', async ({ page }) => {
@@ -243,27 +264,11 @@ test('Delete asks for the name, then removes the project', async ({ page }) => {
   expect(patches).toEqual([{ id: 'proj-2', body: 'DELETE' }]);
 });
 
-test('the row menu keeps the project home, tasks and settings pages reachable', async ({ page }) => {
+test('Project settings is the one page the row menu opens', async ({ page }) => {
   await open(page, [PROJECT]);
-  await openMenu(page, 'cairn');
-  await page.getByRole('menuitem', { name: '项目主页' }).click();
-  await expect(page).toHaveURL(/\/app\?(?!.*chat=1).*project=proj-1/);
-  await page.goBack();
-  await openMenu(page, 'cairn');
-  await page.getByRole('menuitem', { name: '任务' }).click();
-  await expect(page).toHaveURL(/\/app\/project\/proj-1\/tasks(\?|$)/);
-  await page.goBack();
   await openMenu(page, 'cairn');
   await page.getByRole('menuitem', { name: '项目设置' }).click();
   await expect(page).toHaveURL(/\/app\/project\/proj-1\/settings(\?|$)/);
-});
-
-test('Project instructions opens the memory tab of the project settings', async ({ page }) => {
-  await open(page, [PROJECT]);
-  await openMenu(page, 'cairn');
-  await page.getByRole('menuitem', { name: '项目说明' }).click();
-  await expect(page).toHaveURL(/\/app\/project\/proj-1\/settings\?tab=memory$/);
-  await expect(page.getByText('像 AGENTS.md：本项目的每个 thread 和 Coordinator 都会读到并遵守。')).toBeVisible();
 });
 
 test('the group menu renames a group and ungroups its projects', async ({ page }) => {
@@ -277,9 +282,10 @@ test('the group menu renames a group and ungroups its projects', async ({ page }
   await groupHeaders(page).hover();
   await page.getByRole('button', { name: '分组 Side 的菜单' }).click();
   await page.getByRole('menuitem', { name: '重命名分组' }).click();
-  const dialog = page.getByRole('dialog', { name: '重命名分组' });
-  await dialog.getByRole('textbox').fill('Clients');
-  await dialog.getByRole('button', { name: '保存' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const field = sidebar(page).getByRole('textbox', { name: '分组名称' });
+  await field.fill('Clients');
+  await field.press('Enter');
   await expect(groupHeaders(page)).toHaveText(['Clients']);
   await groupHeaders(page).hover();
   await page.getByRole('button', { name: '分组 Clients 的菜单' }).click();

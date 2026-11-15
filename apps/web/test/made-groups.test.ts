@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { groupMade, madeKindOf, matchesMadeQuery } from '../src/board/made-groups.js';
+import { groupMade, madeGroupOf, matchesMadeQuery } from '../src/board/made-groups.js';
 
-describe('madeKindOf', () => {
+describe('madeGroupOf', () => {
   it('uses the explicit kind first', () => {
-    expect(madeKindOf({ madeKind: 'design', output: 'code' })).toBe('design');
+    expect(madeGroupOf({ madeKind: 'design', output: 'code' })).toBe('design');
   });
 
   it('falls back to the deliverable output, then to other', () => {
-    expect(madeKindOf({ output: 'code' })).toBe('code');
-    expect(madeKindOf({ output: 'info' })).toBe('document');
-    expect(madeKindOf({})).toBe('other');
+    expect(madeGroupOf({ output: 'info' })).toBe('document');
+    expect(madeGroupOf({})).toBe('other');
+  });
+
+  it('leaves code changes out of Made', () => {
+    expect(madeGroupOf({ output: 'code' })).toBeNull();
+    expect(madeGroupOf({ madeKind: 'code', output: 'info' })).toBeNull();
   });
 });
 
@@ -20,6 +24,7 @@ describe('groupMade', () => {
       { id: 'legacy', phaseAt: 5 },
       { id: 'new-doc', madeKind: 'document' as const, phaseAt: 9 },
       { id: 'design', madeKind: 'design' as const, phaseAt: 3 },
+      { id: 'pr', output: 'code' as const, phaseAt: 7 },
     ];
     const groups = groupMade(items);
     expect(groups.map((g) => g.key)).toEqual(['document', 'design', 'other']);

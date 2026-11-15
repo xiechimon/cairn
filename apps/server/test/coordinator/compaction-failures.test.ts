@@ -11,6 +11,7 @@ import {
   compactionWindow,
   coordinatorCompactionExtension,
   coordinatorCompactionSettings,
+  summarizerFor,
 } from '../../src/coordinator/runtime/compaction.js';
 import {
   COMPACTION_FAILURE_LOG,
@@ -34,10 +35,12 @@ const dirs: string[] = [];
 
 interface Span {
   name: string;
+  traceId: string;
+  parentSpanId?: string;
   startTimeUnixNano: string;
   endTimeUnixNano: string;
   status?: { code: number; message: string };
-  attributes: { key: string; value: { stringValue?: string; intValue?: string } }[];
+  attributes: { key: string; value: { stringValue?: string; intValue?: number } }[];
 }
 
 let logs: { fields: Record<string, unknown>; message: string }[] = [];
@@ -98,6 +101,94 @@ async function flushSpans(): Promise<void> {
 }
 
 describe('compaction failures are never silent', () => {
+  it.each(['stop', 'error', 'aborted', 'throw'] as const)(
+    'exports summary duration, correlation and scrubbed diagnostics for %s without content',
+    async (outcome) => {
+      const credential = 'custom-provider-credential-1234567890';
+      let currentStep = 'summary-step';
+      setFailureSink({
+        log: () => {},
+        stepOf: () => currentStep,
+        scrub: (_threadId, text) => text.replaceAll(credential, '<redacted>'),
+      });
+      const summarize = summarizerFor(
+        {
+          getModel: () => ({ provider: 'stub', id: 'sum' }),
+          completeSimple: async (
+            _model: unknown,
+            _context: unknown,
+            options: {
+              onResponse: (response: { status: number; headers: Record<string, string> }) => void;
+            },
+          ) => {
+            currentStep = 'next-step';
+            options.onResponse?.({ status: 429, headers: { authorization: credential } });
+            await new Promise((resolve) => setTimeout(resolve, 25));
+            if (outcome === 'throw') throw new Error(`timeout ${credential}`);
+            return {
+              ...fauxAssistantMessage('private summary content', {
+                stopReason: outcome,
+                errorMessage: outcome === 'stop' ? undefined : `WebSocket error ${credential}`,
+              }),
+              usage: { input: 17, output: 3, cacheRead: 5, cacheWrite: 2 },
+              diagnostics: [
+                {
+                  type: 'provider_transport_failure',
+                  timestamp: Date.now(),
+                  error: {
+                    message: `socket closed ${credential} wss://private-provider.example/request?secret=opaque-value`,
+                    code: 'ECONNRESET',
+                    stack: 'private stack',
+                  },
+                  details: {
+                    configuredTransport: 'auto',
+                    fallbackTransport: 'sse',
+                    payload: 'private request payload',
+                  },
+                },
+              ],
+            };
+          },
+        } as never,
+        { provider: 'stub', modelId: 'sum' },
+        { threadId: 'summary-thread', stage: 'seed-summary' },
+      );
+      if (outcome === 'stop')
+        expect(await summarize('private transcript')).toBe('private summary content');
+      else
+        await expect(summarize('private transcript')).rejects.toThrow(
+          outcome === 'throw' ? 'timeout' : outcome,
+        );
+      await flushSpans();
+      const span = spans.find((s) => s.name === 'summary seed-summary')!;
+      expect(span).toBeDefined();
+      expect(
+        Number(BigInt(span.endTimeUnixNano) - BigInt(span.startTimeUnixNano)),
+      ).toBeGreaterThanOrEqual(20_000_000);
+      expect(attr(span, 'cairn.step_id')).toBe('summary-step');
+      expect(attr(span, 'cairn.thread_id')).toBe('summary-thread');
+      expect(span.parentSpanId).toBeDefined();
+      expect(attr(span, 'gen_ai.provider.name')).toBe('stub');
+      expect(span.status?.code ?? 0).toBe(outcome === 'stop' ? 0 : 2);
+      if (outcome !== 'throw') {
+        expect(attr(span, 'cairn.provider.diagnostics')).toContain('ECONNRESET');
+        expect(
+          span.attributes.find((a) => a.key === 'gen_ai.usage.input_tokens')?.value.intValue,
+        ).toBe(24);
+      }
+      for (const text of [
+        credential,
+        'private transcript',
+        'private summary content',
+        'private stack',
+        'private request payload',
+        'private-provider.example',
+        'opaque-value',
+      ])
+        expect(JSON.stringify(spans)).not.toContain(text);
+    },
+  );
+
   it('a failing memory flush is logged, marked on a span and counted while compaction completes', async () => {
     const window = 80_000;
     const faux = fauxProvider({

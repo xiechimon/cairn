@@ -108,6 +108,20 @@ describe('todo.usageCost: persisted cost columns summed over every build of the 
       total: 0,
       priced: true,
     });
+    const listed = new Map(
+      ((await (await req(s.app, 'GET', '/api/todos')).json()) as unknown[])
+        .map((row) => todoRecordSchema.parse(row))
+        .map((row) => [row.id, row]),
+    );
+    expect(listed.get(priced)?.usageCost?.total).toBe(3.28125);
+    expect(
+      listed
+        .get(priced)
+        ?.buildHistory.map((b) => b.buildId)
+        .sort(),
+    ).toEqual(['build-a', 'build-b']);
+    expect(listed.get(other)?.usageCost?.total).toBe(0);
+    expect(listed.get(other)?.buildHistory.map((b) => b.buildId)).toEqual(['build-other']);
     s.dispose();
   });
 

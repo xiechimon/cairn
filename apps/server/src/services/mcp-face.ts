@@ -29,7 +29,7 @@ import {
   THREAD_TOOL_DESCRIPTIONS,
   THREAD_TOOL_SCHEMAS,
 } from './mcp-threads.js';
-import { setTodoPlatform } from './routing-rules.js';
+import { assertPlatformChangeAllowed, setTodoPlatform } from './routing-rules.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { scanLocalSkills } from './skills.js';
 import { createAutonomousTodo, getTodo, listTodos, updateAutonomousTodo } from './todos.js';
@@ -254,17 +254,18 @@ export async function executeMcpTool(
       parseWith(categoryFreeTaskInputSchema, args, 'arguments');
       const todoId = str(args, 'todoId');
       const platform = parseWith(updatePlatform.optional(), args.platform, 'platform');
+      const os = platform === undefined ? undefined : platform === 'any' ? null : platform;
       const row = requireTeamTodo(db, todoId, ctx.teamId);
-      if (platform !== undefined) {
-        setTodoPlatform(db, row, platform === 'any' ? null : platform);
-        deps.machineHub?.wake(ctx.teamId);
-      }
+      const moves = os !== undefined && assertPlatformChangeAllowed(db, row, os);
       const record = updateAutonomousTodo(svc, todoId, {
         ...(optStr(args, 'title') !== undefined ? { title: optStr(args, 'title') } : {}),
         ...(optStr(args, 'spec') !== undefined ? { spec: optStr(args, 'spec') } : {}),
       });
       if (!record) throw new HttpError(404, `todo ${todoId}`);
-      return json(record);
+      if (!moves || os === undefined) return json(record);
+      setTodoPlatform(db, requireTeamTodo(db, todoId, ctx.teamId), os);
+      deps.machineHub?.wake(ctx.teamId);
+      return json(getTodo(svc, todoId));
     }
     case 'message_todo': {
       return json(await messageTodo(deps, ctx.teamId, str(args, 'todoId'), str(args, 'content')));

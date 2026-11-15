@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createTodoRow, mockLive, TASK as BASE_TASK, THREAD } from './chief-home-mock';
+import { createTodoRow, mockLive, PROJECT, READY_MACHINE, TASK as BASE_TASK, THREAD } from './chief-home-mock';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
@@ -229,4 +229,34 @@ test('sibling tasks hang off one unbroken trunk: one stroke width, one x, an elb
   }
   expect(b!.tileTopGap).toBe(8);
   expect(c!.tileTopGap).toBe(8);
+});
+
+test('hovering a task row shows where it runs: project, machine and, for a local project, its folder', async ({
+  page,
+}) => {
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      { id: 'm1', role: 'user', content: 'Look at the repo', createdAt: 10 },
+      createTodoRow('m1b', TASK, 12),
+      { id: 'm2', role: 'assistant', content: 'Started it.', createdAt: 13 },
+    ],
+    todos: [TASK],
+    tasks: [],
+    projects: [{ ...PROJECT, name: 'notes-sync', repoKind: 'local', localPath: '/srv/notes-sync' }],
+    machines: [READY_MACHINE, { id: 'm-other', name: 'mac-mini', online: true }],
+  });
+  await page.route(`**/api/builds/${TASK.latestBuildId}/steps`, (route) =>
+    route.fulfill({ json: [{ id: 's1', machineId: 'm-other' }, { id: 's2', machineId: null }] }),
+  );
+  await page.goto('/app');
+  const ref = page.getByTestId('chief-stream').getByTestId('chief-task-ref');
+  await expect(page.getByTestId('chief-task-ref-hover')).toHaveCount(0);
+  await expect(ref).toHaveRole('link');
+  await ref.hover();
+  const card = page.getByTestId('chief-task-ref-hover');
+  await expect(card).toContainText('Read the cairn repo');
+  await expect(card.locator('[data-slot="task-ref-project"] dd')).toHaveText('notes-sync');
+  await expect(card.locator('[data-slot="task-ref-machine"] dd')).toHaveText('mac-mini');
+  await expect(card.locator('[data-slot="task-ref-folder"] dd')).toHaveText('/srv/notes-sync');
 });

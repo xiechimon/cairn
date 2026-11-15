@@ -204,6 +204,7 @@ test('a task row lists its own PRs under it: open PRs with their state, merged o
   await expect(open).toHaveText('#42 — Checks failed');
   await expect(open).toHaveAttribute('data-tone', 'failed');
   await expect(open).toHaveAttribute('href', /pull\/42$/);
+  await expect(open).toHaveRole('link');
   await expect(line.locator('[data-slot="task-pr-merged"]')).toHaveText('3 merged');
   await expect(line).not.toContainText('#99');
   await expect(page.getByTestId('work-prs')).toHaveCount(0);
@@ -235,15 +236,6 @@ test('the same PR reaches the Tasks row and the finish dialog', async ({ page })
   await page.getByTestId('side-chat').getByRole('button', { name: 'More actions…' }).click();
   await page.getByRole('menuitem', { name: 'Complete' }).click();
   await expect(page.getByTestId('accept-dialog-pr').getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
-});
-
-test('a finished task in Made links its newest PR', async ({ page }) => {
-  const done = { ...TASK, id: 'todo-9', seqNum: 9, title: 'Finished with a PR', phase: 'done', phaseAt: Date.now() };
-  await setup(page, { rows: [prRow({ threadId: 'todo-9', number: 77, url: 'https://github.com/xiechimon/cairn/pull/77', state: 'merged' }), prRow({ threadId: 'todo-9', number: 70, url: 'https://github.com/xiechimon/cairn/pull/70', state: 'closed' })] }, 'light', { todos: [done] });
-  await page.goto('/app?pane=made');
-  const row = page.getByRole('complementary', { name: 'Made' }).getByRole('link', { name: /PR #77/ });
-  await expect(row).toHaveAttribute('href', /pull\/77$/);
-  await expect(page.getByRole('complementary', { name: 'Made' }).getByRole('link', { name: /PR #70/ })).toHaveCount(0);
 });
 
 test('the changes view does not leak into the next thread after closing', async ({ page }) => {

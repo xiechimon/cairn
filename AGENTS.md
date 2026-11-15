@@ -48,6 +48,8 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 
 - Repository content is English, including code, docs, scripts, tests, commits, issues and PRs. Product UI source strings in `t()`, translations, matching fixtures and selectors, agent-facing product prompts and `README.zh.md` may be Chinese. Quote Chinese UI labels and paths in backticks in prose; translate any legacy prose section you touch.
 - Follow the user's language in conversation.
+- Debug model-side latency, failures, usage and tool execution in Langfuse first, following `docs/ops/langfuse.md#debugging-a-turn-or-task`. Use approved read access, locate the Coordinator step's trace or task build's trace, and check coverage before interpreting missing spans or timing fields.
+- For a reply missing from the page, continue with browser Network/Console, the server journal and read-only DB records; a successful model trace does not prove browser delivery. Keep credentials in the approved local secret source, out of threads, logs and committed files.
 - Read files in full before editing, and check consumers before moving or renaming paths. Ask before removing intentional functionality or changing intended behavior.
 - Do not write code comments; express intent through naming and code structure. Only English documentation of a public API or external behavior the code cannot show (browser/platform bugs or third-party quirks) is allowed. Delete other legacy comments when touched.
 - Use top-level imports only, avoid unexplained `any`, and inline one-line helpers with a single call site. Verify external package APIs against the installed version's types and source.

@@ -8,12 +8,9 @@ import {
   FolderOutput,
   FolderPlus,
   Funnel,
-  House,
-  ListChecks,
   Pencil,
   RotateCcw,
   Settings2,
-  StickyNote,
   Trash2,
 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useId, useState } from 'react';
@@ -44,10 +41,10 @@ import { isProjectFilter, PROJECT_FILTERS, type ProjectFilter } from './sidebar-
 
 const NAME_FORM = 'sidebar-name-form';
 
-export const SIDEBAR_MENU_CLS = 'w-42 min-w-42 rounded-(--radius-tile) p-1.5';
+export const SIDEBAR_MENU_CLS = 'w-auto min-w-42 rounded-(--radius-tile) p-1.5';
 
 export const SIDEBAR_MENU_ITEM_CLS =
-  'h-6.75 gap-2.5 rounded-(--cds-radius-md) px-2.5 text-meta focus:bg-(--sidebar-active) data-open:bg-(--sidebar-active) data-popup-open:bg-(--sidebar-active) [&_svg]:text-sidebar-ink [&_svg:not([class*=size-])]:size-5';
+  'h-6.75 gap-2.5 rounded-(--cds-radius-md) px-2.5 text-meta whitespace-nowrap focus:bg-(--sidebar-active) data-open:bg-(--sidebar-active) data-popup-open:bg-(--sidebar-active) [&_svg]:text-sidebar-ink [&_svg:not([class*=size-])]:size-5';
 
 const DANGER_ITEM_CLS = 'text-destructive [&_svg]:text-destructive';
 
@@ -165,12 +162,9 @@ function RowMenuContent({ children }: { children: ReactNode }) {
 export interface ProjectMenuActions {
   onMove: (group: string | null) => void;
   onArchive: () => void;
-  onRename: (name: string) => Promise<void>;
+  onRename: () => void;
   onDelete: () => void;
-  onHome: () => void;
-  onTasks: () => void;
   onSettings: () => void;
-  onInstructions: () => void;
 }
 
 export function SidebarProjectMenu({
@@ -181,42 +175,27 @@ export function SidebarProjectMenu({
   onArchive,
   onRename,
   onDelete,
-  onHome,
-  onTasks,
   onSettings,
-  onInstructions,
 }: {
   name: string;
   group: string | null;
   groups: readonly string[];
 } & ProjectMenuActions) {
   const { t } = useI18n();
-  const [dialog, setDialog] = useState<'group' | 'rename' | 'delete' | null>(null);
+  const [dialog, setDialog] = useState<'group' | 'delete' | null>(null);
   const close = () => setDialog(null);
   return (
     <>
       <DropdownMenu>
         <RowMenuTrigger label={t('{name} 的菜单', { name })} />
         <RowMenuContent>
-          <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={() => setDialog('rename')}>
+          <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onRename}>
             <Pencil />
             {t('重命名')}
-          </DropdownMenuItem>
-          <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onHome}>
-            <House />
-            {t('项目主页')}
-          </DropdownMenuItem>
-          <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onTasks}>
-            <ListChecks />
-            {t('任务')}
           </DropdownMenuItem>
           <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onSettings}>
             <Settings2 />
             {t('项目设置')}
-          </DropdownMenuItem>
-          <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onInstructions}>
-            <StickyNote />
-            {t('项目说明')}
           </DropdownMenuItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger
@@ -280,19 +259,6 @@ export function SidebarProjectMenu({
           onMove(created);
         }}
       />
-      <NameDialog
-        key={name}
-        open={dialog === 'rename'}
-        title={t('重命名项目')}
-        label={t('项目名称')}
-        confirmLabel={t('保存')}
-        initial={name}
-        onClose={close}
-        onSubmit={async (next) => {
-          await onRename(next);
-          close();
-        }}
-      />
       <DeleteProjectConfirm
         projectName={name}
         open={dialog === 'delete'}
@@ -312,41 +278,25 @@ export function SidebarGroupMenu({
   onUngroup,
 }: {
   name: string;
-  onRename: (next: string) => Promise<void>;
+  onRename: () => void;
   onUngroup: () => void;
 }) {
   const { t } = useI18n();
-  const [renaming, setRenaming] = useState(false);
   return (
-    <>
-      <DropdownMenu>
-        <RowMenuTrigger label={t('分组 {name} 的菜单', { name })} />
-        <RowMenuContent>
-          <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={() => setRenaming(true)}>
-            <Pencil />
-            {t('重命名分组')}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onUngroup}>
-            <FolderMinus />
-            {t('解散分组')}
-          </DropdownMenuItem>
-        </RowMenuContent>
-      </DropdownMenu>
-      <NameDialog
-        key={name}
-        open={renaming}
-        title={t('重命名分组')}
-        label={t('分组名称')}
-        confirmLabel={t('保存')}
-        initial={name}
-        onClose={() => setRenaming(false)}
-        onSubmit={async (next) => {
-          await onRename(next);
-          setRenaming(false);
-        }}
-      />
-    </>
+    <DropdownMenu>
+      <RowMenuTrigger label={t('分组 {name} 的菜单', { name })} />
+      <RowMenuContent>
+        <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onRename}>
+          <Pencil />
+          {t('重命名分组')}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className={SIDEBAR_MENU_ITEM_CLS} onClick={onUngroup}>
+          <FolderMinus />
+          {t('解散分组')}
+        </DropdownMenuItem>
+      </RowMenuContent>
+    </DropdownMenu>
   );
 }
 

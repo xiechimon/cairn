@@ -347,6 +347,39 @@
   transition-property: color, background-color, border-color;
 }
 
+.report-doc {
+  font-size: var(--type-ui);
+  line-height: 1.75;
+}
+
+.report-doc > .chat-md-block + .chat-md-block {
+  margin-top: 0.9em;
+}
+
+.report-doc > .chat-md-block + .chat-md-block[data-kind="head"] {
+  margin-top: 2em;
+}
+
+.report-doc > .chat-md-block[data-kind="head"] + .chat-md-block {
+  margin-top: 0.5em;
+}
+
+.report-doc .chat-md-head {
+  line-height: 1.45;
+}
+
+.report-doc .chat-md-head--1 {
+  font-size: var(--type-brand);
+}
+
+.report-doc .chat-md-head--2 {
+  font-size: var(--type-card-title);
+}
+
+.report-doc .chat-md-head--3 {
+  font-size: var(--type-ui);
+}
+
 .overlay-backdrop {
   z-index: var(--z-modal-scrim);
 }

@@ -23,6 +23,7 @@ interface GlanceSource {
   sourceRef?: string | null;
   output?: string;
   latestBuildId?: string | null;
+  projectId?: string;
 }
 
 export function todoGlanceOf(todo: GlanceSource): TodoGlance {
@@ -38,6 +39,7 @@ export function todoGlanceOf(todo: GlanceSource): TodoGlance {
     ...(parentId !== undefined ? { parentId } : {}),
     ...(todo.output === 'info' ? { report: true } : {}),
     ...(todo.latestBuildId != null ? { buildId: todo.latestBuildId } : {}),
+    ...(todo.projectId !== undefined ? { projectId: todo.projectId } : {}),
   };
 }
 

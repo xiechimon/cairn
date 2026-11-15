@@ -112,17 +112,6 @@ test('phone: full screen with the title row and a section tab strip', async ({ p
   await expect(settings(page).getByTestId('settings-head')).toHaveText('账号');
 });
 
-test('sidebar footer: a green dot and the online count', async ({ page }) => {
-  await page.goto('/app?scenario=10');
-  const status = page.getByTestId('sidebar-footer').getByTestId('sidebar-attention');
-  await expect(status).toContainText(/\d+ 台在线/);
-  await expect(status).toHaveAttribute('data-fleet', 'online');
-  const dot = await status.locator('[data-slot="fleet-badge"]').evaluate((el) => getComputedStyle(el).backgroundColor);
-  const [r, g, b] = dot.match(/\d+/g)?.map(Number) ?? [];
-  expect(g).toBeGreaterThan(r ?? 0);
-  expect(g).toBeGreaterThan(b ?? 0);
-});
-
 test('the machines nav row carries the online count as its description, not as a visible badge', async ({
   page,
 }) => {
