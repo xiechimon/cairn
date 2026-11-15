@@ -11,6 +11,7 @@ import type {
   SecretRecord,
   SkillRecord,
   StepActivity,
+  StepQueueBlocked,
   TokenUsage,
   ToolCallRecord,
   UsageCost,
@@ -100,6 +101,22 @@ import { activityLabel } from './activity.js';
 import type { MachineProvider } from './claude-accounts.js';
 import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
 
+const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
+  'sandbox-unavailable':
+    '排队中：{machine} 的任务沙箱没就绪，接不了任务——在那台机器上运行 cairn restart，原因见 Runner 页（前面 {ahead} 个）',
+  'runtime-disabled': '排队中：{machine} 没开 {runtime}——到 Runner 页打开（前面 {ahead} 个）',
+  'model-unavailable':
+    '排队中：{machine} 用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）',
+  'local-path': '排队中：本地项目只在它所在的 Runner 上跑，{machine} 跑不了（前面 {ahead} 个）',
+  'claude-rate-limited': '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
+  'claude-logged-out':
+    '排队中：{machine} 上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
+  'claude-usage-refused':
+    '排队中：团队只用 Claude 订阅，{machine} 上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）',
+  'coordinator-unroutable':
+    'Coordinator 用不了它的模型：规则里的连接没有 API key，或要走付费 Claude——到工作路由改 Coordinator 规则',
+};
+
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
   label: string;
   vars: Record<string, string | number>;
@@ -137,6 +154,18 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
       label:
         '排队中：没有 Runner 满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）',
       vars: { missing: queue.blocked.missing.join('、'), ahead },
+    };
+  }
+  const refusal =
+    queue.blocked === undefined ? undefined : RUNNER_REFUSAL_LABELS[queue.blocked.kind];
+  if (refusal !== undefined) {
+    return {
+      label: refusal,
+      vars: {
+        machine: queue.waitingFor?.name ?? 'Runner',
+        runtime: queue.blocked?.missing.join('、') ?? '',
+        ahead,
+      },
     };
   }
   if (queue.blocked?.kind === 'machine-offline') {
@@ -896,6 +925,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     items.push({
       kind: 'streaming',
       startedAt: running.createdAt,
+      ...(queued != null && running.queue?.blocked != null ? { blocked: true as const } : {}),
       label:
         queued != null
           ? queued.label
@@ -1775,6 +1805,7 @@ export function mapChief(
         const queued = connectingLine(turnQueue);
         chiefStream.push({
           kind: 'streaming',
+          ...(turnQueue.blocked != null ? { blocked: true as const } : {}),
           label: queued.label,
           ...(queued.vars !== undefined ? { labelVars: queued.vars } : {}),
           ...(queued.detail !== undefined ? { labelDetail: queued.detail } : {}),

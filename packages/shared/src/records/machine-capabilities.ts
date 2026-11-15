@@ -162,7 +162,18 @@ export function capabilityMissingLabels(missing: {
 }
 
 export const stepQueueBlockedSchema = z.object({
-  kind: z.enum(['machine-offline', 'capability-missing']),
+  kind: z.enum([
+    'machine-offline',
+    'capability-missing',
+    'sandbox-unavailable',
+    'runtime-disabled',
+    'model-unavailable',
+    'local-path',
+    'claude-rate-limited',
+    'claude-logged-out',
+    'claude-usage-refused',
+    'coordinator-unroutable',
+  ]),
   missing: z.array(z.string()),
   platform: runnerOsSchema.optional(),
 });

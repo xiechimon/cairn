@@ -47,12 +47,15 @@ export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowM
       homeMachineId === null
         ? null
         : (deps.db.select().from(machine).where(eq(machine.id, homeMachineId)).get()?.name ?? null);
+    const runnerName = queue.waitingFor?.name ?? preferredName;
     const snippet =
       queue.blocked.kind === 'capability-missing'
         ? `没有在线 Runner 满足要求（缺 ${queue.blocked.missing.join('、')}），步骤已等 ${minutes} 分钟`
-        : preferredName !== null
-          ? `${preferredName} 不能跑这一步，不会改派到其他 Runner，步骤已等 ${minutes} 分钟`
-          : `没有在线 Runner 能跑这一步，步骤已等 ${minutes} 分钟`;
+        : queue.blocked.kind === 'sandbox-unavailable' && runnerName !== null
+          ? `${runnerName} 的任务沙箱没就绪，接不了任务（Linux 上 daemon 要作为自己的 systemd user unit 运行，见 Runner 页），步骤已等 ${minutes} 分钟`
+          : preferredName !== null
+            ? `${preferredName} 不能跑这一步，不会改派到其他 Runner，步骤已等 ${minutes} 分钟`
+            : `没有在线 Runner 能跑这一步，步骤已等 ${minutes} 分钟`;
     notifyNoMachine(deps, todoRow, snippet);
     raised += 1;
   }
