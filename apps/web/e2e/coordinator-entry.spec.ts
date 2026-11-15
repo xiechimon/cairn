@@ -6,7 +6,6 @@ const ROUTES = [
   ['pages', '/app/schedules?scenario=11'],
   ['work-routing', '/app/settings/work-routing?scenario=12'],
   ['settings', '/app/settings?scenario=01'],
-  ['project', '/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks'],
   ['detail with unread', '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=detail-unread'],
   ['unread at the cap', '/app/schedules?scenario=chief-unread-cap'],
 ] as const;

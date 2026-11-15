@@ -28,31 +28,6 @@ export const githubConnectionStatusSchema = z.object({
 });
 export type GithubConnectionStatus = z.infer<typeof githubConnectionStatusSchema>;
 
-export const githubIssueLabelSchema = z.object({
-  name: z.string(),
-  color: z.string(),
-});
-export type GithubIssueLabel = z.infer<typeof githubIssueLabelSchema>;
-
-export const githubIssueSummarySchema = z.object({
-  number: z.number(),
-  title: z.string(),
-  state: z.enum(['open', 'closed']),
-  labels: z.array(githubIssueLabelSchema),
-});
-export type GithubIssueSummary = z.infer<typeof githubIssueSummarySchema>;
-
-export const GITHUB_ISSUE_STATES = ['open', 'closed', 'all'] as const;
-export const githubIssueStateSchema = z.enum(GITHUB_ISSUE_STATES);
-export type GithubIssueState = z.infer<typeof githubIssueStateSchema>;
-
-export const githubIssuesResponseSchema = z.object({
-  issues: z.array(githubIssueSummarySchema),
-  page: z.number().int(),
-  hasMore: z.boolean(),
-});
-export type GithubIssuesResponse = z.infer<typeof githubIssuesResponseSchema>;
-
 export const importGithubIssueBodySchema = z.object({
   number: z.number().int().positive(),
 });

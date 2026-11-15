@@ -18,6 +18,8 @@ import {
   api,
   bootRealServer,
   CONFINEMENT_READY_LAUNCH,
+  openPanelTask,
+  projectTasksUrl,
   type RealServer,
   waitFor,
 } from './helpers.js';
@@ -153,10 +155,10 @@ function collectConvStream(buildId: string): { types: Set<string>; stop(): void 
 }
 
 async function openProjectTasks(projectId: string): Promise<void> {
-  await page.goto(`${server.url}/app/project/${projectId}/tasks`);
-  await pexpect(
-    page.getByRole('complementary').getByRole('button', { name: 'Coordinator' }),
-  ).toBeVisible({ timeout: 30_000 });
+  await page.goto(projectTasksUrl(server.url, projectId));
+  await pexpect(page.getByRole('tab', { name: '进行中', exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
 }
 
 async function createAndStart(title: string): Promise<void> {
@@ -171,7 +173,8 @@ async function createAndStart(title: string): Promise<void> {
     ).id;
   await api(server.url, 'POST', `/api/projects/${projectId}/todos`, { title: '', spec: title });
   await openProjectTasks(projectId);
-  await pexpect(page.getByRole('link', { name: title })).toBeVisible({
+  await page.getByRole('tab', { name: '接下来', exact: true }).click();
+  await pexpect(page.locator('[data-slot="task-row"]').filter({ hasText: title })).toBeVisible({
     timeout: 30_000,
   });
   const todos = (await api(server.url, 'GET', '/api/todos')).body as {
@@ -194,7 +197,7 @@ async function createAndStart(title: string): Promise<void> {
 }
 
 async function openDetail(title: string): Promise<void> {
-  await page.getByRole('link', { name: title }).click();
+  await openPanelTask(page, title);
   await pexpect(page.getByTestId('side-chat')).toBeVisible({ timeout: 15_000 });
 }
 

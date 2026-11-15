@@ -8,20 +8,6 @@ test('thread review diffs remain available after project files retirement', asyn
   await expect(diff.getByTestId('doc-pane')).toBeVisible();
 });
 
-for (const scenario of ['r2-24', 'prj-local-tasks']) {
-  test(`project tasks make no browsing requests: ${scenario}`, async ({ page }) => {
-    const requests: string[] = [];
-    page.on('request', (request) => {
-      if (/\/api\/projects\/[^/]+\/(tree|file|commits)(?:[/?]|$)/.test(request.url())) requests.push(request.url());
-    });
-    await page.goto(`/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=${scenario}`);
-    await expect(page.getByTestId('task-row')).toHaveCount(2);
-    await expect(page.getByRole('tab', { name: '文件', exact: true })).toHaveCount(0);
-    await expect(page.getByRole('tab', { name: '历史', exact: true })).toHaveCount(0);
-    expect(requests).toEqual([]);
-  });
-}
-
 for (const query of ['', '?tab=files', '?tab=tasks']) {
   test(`old files entry exits to the home: ${query || 'no query'}`, async ({ page }) => {
     const requests: string[] = [];
