@@ -5,6 +5,7 @@ import {
   buildMergedPrGuardInstruction,
   buildMergedPrGuardNote,
   buildTaskPromptText,
+  chiefIdFormat,
   claudeLoginBlocksClaim,
   claudeRateBlock,
   confinementDispatchReady,
@@ -586,6 +587,15 @@ async function tryClaim(
           ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
         };
     const projectRow = projectOfTodo(db, cand.todoRow);
+    const charterOwner = cand.todoRow.ownerId ?? cand.todoRow.createdBy;
+    const charter =
+      charterOwner !== null
+        ? db
+            .select({ charter: chief.charter })
+            .from(chief)
+            .where(eq(chief.id, chiefIdFormat(charterOwner, teamId)))
+            .get()?.charter
+        : undefined;
     const repoRef = projectRepoRef(projectRow, origin);
     const mergeTarget =
       cand.stepRow.kind === 'merge' ? parseHostedMergeInstruction(cand.stepRow.prompt) : null;
@@ -660,6 +670,7 @@ async function tryClaim(
         ...(projectRow?.instructions != null ? { instructions: projectRow.instructions } : {}),
         repo,
       },
+      ...(charter ? { charter } : {}),
       agent: {
         id: agentRow.id,
         displayName: agentRow.displayName,

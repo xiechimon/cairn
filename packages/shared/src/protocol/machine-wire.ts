@@ -200,6 +200,7 @@ export const claimedStepSchema = z.object({
         .nullable(),
     })
     .optional(),
+  charter: z.string().optional(),
   agent: z
     .object({
       id: recordId,
