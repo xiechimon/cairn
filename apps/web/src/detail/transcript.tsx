@@ -240,7 +240,7 @@ function Row({
     case 'note':
       return (
         <StatusLine className="mt-5 justify-center text-center" testId="transcript-note">
-          {t(item.text)}
+          {t(item.text, item.vars)}
         </StatusLine>
       );
     case 'step-prompt':

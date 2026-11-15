@@ -401,6 +401,7 @@ export type TranscriptItem =
   | {
       kind: 'note';
       text: string;
+      vars?: Record<string, string>;
       id?: string;
     }
   | { kind: 'scheduled'; id?: string; stepId?: string }

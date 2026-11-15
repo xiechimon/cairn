@@ -18,6 +18,8 @@ import {
 import { describe, expect, test } from 'vitest';
 import { type MessageRow, mapTranscript } from '../src/api/mappers.js';
 import type { TodoRecord, TranscriptItem } from '../src/fixtures/records.js';
+import { EN } from '../src/i18n/en.js';
+import { translate } from '../src/i18n/translate.js';
 import { NOW, todo } from './helpers.js';
 
 const TITLE = '登录按钮圆角与悬停过渡';
@@ -78,7 +80,9 @@ function userItems(items: TranscriptItem[]) {
 }
 
 function noteItems(items: TranscriptItem[]) {
-  return items.filter((i): i is Extract<TranscriptItem, { kind: 'note' }> => i.kind === 'note');
+  return items
+    .filter((i): i is Extract<TranscriptItem, { kind: 'note' }> => i.kind === 'note')
+    .map((i) => ({ ...i, text: translate('zh', {}, i.text, i.vars) }));
 }
 
 describe('mapTranscript synthesized-prompt filtering (#612)', () => {
@@ -253,8 +257,10 @@ describe('mapTranscript synthesized-prompt filtering (#612)', () => {
     expect(automatic.some((item) => item.kind === 'note')).toBe(false);
     const byOwner = confirmed('Ada');
     expect(userItems(byOwner).map((item) => item.text)).toEqual(['确认']);
-    expect(byOwner).toContainEqual(
-      expect.objectContaining({ kind: 'note', text: `Ada ${CONFIRM_ANNOUNCEMENT}` }),
+    expect(noteItems(byOwner).map((item) => item.text)).toEqual([`Ada ${CONFIRM_ANNOUNCEMENT}`]);
+    const note = byOwner.find((item) => item.kind === 'note');
+    expect(note?.kind === 'note' && translate('en', EN, note.text, note.vars)).toBe(
+      'Ada approved the plan',
     );
   });
 
