@@ -101,7 +101,7 @@ function landingNotice(t: Translate, reason: string | null, attempt: SignInAttem
         ? t('登录等得太久已经失效，重新接入一次。')
         : reason === 'conflict'
           ? t('授权期间这个连接有了变动，这次授权没有保存。')
-          : t('登录没有完成，可以再试一次。');
+          : t('登录没有完成，在下面重新接入一次。');
   return {
     title: attempt !== null ? t('没能连上 {name}', { name: attempt.name }) : t('没能完成登录'),
     body,
@@ -348,30 +348,29 @@ export function McpServersPage() {
                 </CardGrid>
               </SettingsSection>
             )}
+            {local.length > 0 && (
+              <SettingsSection
+                title={t('本机配置')}
+                description={t('来自服务器所在电脑的本机配置文件，在那里修改。')}
+                testId="mcp-local"
+              >
+                <ResourceList className="mt-0">
+                  {local.map((server) => (
+                    <ResourceRow mcp key={server.name}>
+                      <RowText>
+                        <RowLine>
+                          <RowTitle>{server.name}</RowTitle>
+                          <RowMeta>{t(server.kind)}</RowMeta>
+                        </RowLine>
+                        <RowDesc>{server.url}</RowDesc>
+                      </RowText>
+                      <RowMeta>{t(server.ago)}</RowMeta>
+                    </ResourceRow>
+                  ))}
+                </ResourceList>
+              </SettingsSection>
+            )}
           </SettingsFlat>
-          {local.length > 0 && (
-            <SettingsSection
-              className="[&>div:first-child]:px-0"
-              title={t('本机配置')}
-              description={t('来自服务器所在电脑的本机配置文件，在那里修改。')}
-              testId="mcp-local"
-            >
-              <ResourceList className="mt-0">
-                {local.map((server) => (
-                  <ResourceRow mcp key={server.name}>
-                    <RowText>
-                      <RowLine>
-                        <RowTitle>{server.name}</RowTitle>
-                        <RowMeta>{t(server.kind)}</RowMeta>
-                      </RowLine>
-                      <RowDesc>{server.url}</RowDesc>
-                    </RowText>
-                    <RowMeta>{t(server.ago)}</RowMeta>
-                  </ResourceRow>
-                ))}
-              </ResourceList>
-            </SettingsSection>
-          )}
         </div>
       </QueryBoundary>
       <McpConnectorDialog

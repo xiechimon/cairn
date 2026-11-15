@@ -25,6 +25,8 @@ const PALE_DISABLED = 'disabled:bg-secondary/50 disabled:text-content-dim disabl
 
 const FIELD_CLS = cn(FORM_CONTROL_CLS, 'placeholder:text-content-tertiary');
 
+const DIALOG_FORM_CLS = 'max-w-none text-balance [word-break:keep-all]';
+
 const VALUE_BOX_CLS =
   'm-0 rounded-(--radius-control) bg-muted px-3 py-2 font-mono text-ui text-foreground break-all';
 
@@ -307,7 +309,7 @@ function CatalogConnectDialog({
         />
       }
     >
-      <FormStack className="max-w-none">
+      <FormStack className={DIALOG_FORM_CLS}>
         <TokenField entry={entry} value={token} onChange={setToken} required={tokenRequired} />
         <DialogError message={problem} />
       </FormStack>
@@ -389,7 +391,7 @@ function CustomServerDialog({
         />
       }
     >
-      <FormStack className="max-w-none text-balance [word-break:keep-all]">
+      <FormStack className={DIALOG_FORM_CLS}>
         <FormField label={t('名称')} htmlFor="mcp-label">
           <Input
             id="mcp-label"
@@ -547,8 +549,8 @@ function ManageConnectorDialog({
     return (
       <DeleteConfirm
         open
-        title={t('确定删除 {name} 这个连接？此操作不可撤销。', { name: current.label })}
-        summary={t('删除后 Agent 不能再用 {name} 的工具。', { name: current.label })}
+        title={t('确定删除这个连接？此操作不可撤销。')}
+        summary={t('{name}：删除后 Agent 不能再用它的工具。', { name: current.label })}
         ariaLabel={t('删除连接')}
         onClose={() => setConfirmDelete(false)}
         onConfirm={remove}
@@ -571,7 +573,7 @@ function ManageConnectorDialog({
         />
       }
     >
-      <FormStack className="max-w-none">
+      <FormStack className={DIALOG_FORM_CLS}>
         {!needsAuth && <DialogError message={connectorProblem(t, current)} />}
         <Field>
           <span className="text-ui font-medium text-foreground">{t('地址')}</span>
@@ -671,7 +673,7 @@ export function McpSignInDialog({
         />
       }
     >
-      <FormStack className="max-w-none">
+      <FormStack className={DIALOG_FORM_CLS}>
         <p className="m-0 text-ui text-foreground">{t('登录并授权后会自动回到这里。')}</p>
         <p data-testid="mcp-signin-host" className={VALUE_BOX_CLS}>
           {signIn.host}

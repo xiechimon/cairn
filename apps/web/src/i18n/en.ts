@@ -2269,14 +2269,13 @@ export const EN: Record<string, string> = {
     "{name}'s sign-in service did not accept Cairn's registration. Try again later.",
   '最新的库文档与代码示例，也支持登录':
     'Up-to-date library docs and code examples; sign-in also supported',
-  '登录没有完成，可以再试一次。': 'The sign-in did not finish. You can try again.',
+  '登录没有完成，在下面重新接入一次。': 'The sign-in did not finish. Connect again below.',
   没能完成登录: 'Could not finish the sign-in',
-  '删除后 Agent 不能再用 {name} 的工具。':
-    "After deletion, Agents can no longer use {name}'s tools.",
+  '{name}：删除后 Agent 不能再用它的工具。':
+    '{name}: Agents can no longer use its tools after deletion.',
   '加密保存在本机，保存后看不到原文。':
     'Encrypted on this machine; it cannot be viewed after saving.',
-  '确定删除 {name} 这个连接？此操作不可撤销。':
-    'Delete the {name} connection? This cannot be undone.',
+  '确定删除这个连接？此操作不可撤销。': 'Delete this connection? This cannot be undone.',
   '新建细粒度令牌，选好仓库，给 Contents、Issues、Pull\u00a0requests 读写权限。':
     'Create a fine-grained token, pick the repositories, and give Contents, Issues and Pull requests read and write access.',
 };
