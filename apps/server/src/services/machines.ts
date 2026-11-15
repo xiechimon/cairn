@@ -429,11 +429,14 @@ export function enrollMachine(
 
 export function authorizeEnrollmentMachine(
   deps: MachineDeps,
-  input: { teamId: string; name: string; serverUrl: string },
+  input: { teamId: string; name: string; serverUrl: string; ownerApproved: boolean },
 ): { machineId: string; token: string; teamId: string; serverUrl: string } {
   const { db } = deps;
   const token = newMachineToken();
   const isLocal = input.name === hostname();
+  if (isLocal && !input.ownerApproved) {
+    throw new HttpError(403, 'local machine requires owner approval');
+  }
   const existing = isLocal ? localMachineRow(db, input.teamId, input.name) : undefined;
   if (existing) {
     db.update(machine)
