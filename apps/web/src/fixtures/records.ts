@@ -668,6 +668,7 @@ export interface ChiefThreadRef {
 export type ChiefSettingsTab = 'routing' | 'charter' | 'memory' | 'watches';
 
 export interface ModelOption {
+  runtime: string;
   provider: string;
   machineId?: string;
   providerLabel: string;

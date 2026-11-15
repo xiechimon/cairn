@@ -38,7 +38,11 @@ import type { ModelOption } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
-import { AgentModelSelect, AgentRuntimeSelect } from '../routes/agent-model-select.js';
+import {
+  AgentModelSelect,
+  AgentRuntimeSelect,
+  runtimeOfProvider,
+} from '../routes/agent-model-select.js';
 import { settingsHref } from '../settings/settings-href.js';
 
 export const ROUTING_SETTINGS_HREF = '/app/resources/routing-settings';
@@ -91,6 +95,9 @@ function RuleEditor({
   const { t } = useI18n();
   const [provider, setProvider] = useState<string | null>(rule?.provider ?? null);
   const [modelId, setModelId] = useState<string | null>(rule?.modelId ?? null);
+  const [runtime, setRuntime] = useState<string | null>(() =>
+    runtimeOfProvider(rule?.provider ?? null, options),
+  );
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(
     (rule?.thinkingLevel as ThinkingLevel | null | undefined) ?? 'off',
   );
@@ -116,12 +123,13 @@ function RuleEditor({
         <SettingsRow label={t('运行时')}>
           <AgentRuntimeSelect
             ariaLabel={t('运行时')}
-            value={provider}
+            value={runtime}
             options={options}
             unsetLabel={t('选择运行时')}
             onPick={(next) => {
-              if (next === provider) return;
-              setProvider(next);
+              if (next === runtime) return;
+              setRuntime(next);
+              setProvider(null);
               setModelId(null);
             }}
             prefix="routing-rule-runtime"
@@ -131,10 +139,19 @@ function RuleEditor({
         <SettingsRow label={t('模型')}>
           <AgentModelSelect
             ariaLabel={t('模型')}
-            provider={provider}
+            runtime={runtime}
+            provider={
+              provider === 'pi'
+                ? (options.find((row) => row.runtime === 'pi' && row.modelId === modelId)
+                    ?.provider ?? provider)
+                : provider
+            }
             modelId={modelId}
             options={options}
-            onPick={(next) => setModelId(next)}
+            onPick={(next) => {
+              setProvider(next?.provider ?? null);
+              setModelId(next?.modelId ?? null);
+            }}
             prefix="routing-rule-model"
             triggerClassName={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-56')}
           />

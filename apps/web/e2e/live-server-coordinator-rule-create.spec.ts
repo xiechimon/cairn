@@ -59,8 +59,11 @@ test('a fresh install creates the coordinator rule in the UI and the Coordinator
   await expect(settings.getByTestId('routing-rule-new-coordinator')).toHaveCount(0);
   const settingsBody = (await (
     await fetch(`${server.base}/api/teams/${teamId}/routing-settings`)
-  ).json()) as { rules: { use: string }[] };
-  expect(settingsBody.rules.map((rule) => rule.use)).toContain('coordinator');
+  ).json()) as { rules: { use: string; provider: string; modelId: string }[] };
+  expect(settingsBody.rules.find((rule) => rule.use === 'coordinator')).toMatchObject({
+    provider: 'e2e-relay',
+    modelId: 'e2e-model',
+  });
 
   await page.goto(`${server.base}/app`);
   await composer().fill('second message after the rule');
