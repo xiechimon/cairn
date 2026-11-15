@@ -228,6 +228,43 @@ describe('runCoordinatorTurn', () => {
     await ordinaryHarness.close(ctx);
   });
 
+  it('asks for quick replies while the transcript is still being mirrored', async () => {
+    const { coordinatorModels } = setup();
+    const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx);
+    const api = fakeMachineApi();
+    api.canSuggestReplies = async () => true;
+    let asked = (): void => {};
+    const askedBeforeMirrored = new Promise<void>((resolve) => {
+      asked = resolve;
+    });
+    const complete = coordinatorModels.models.completeSimple.bind(coordinatorModels.models);
+    coordinatorModels.models.completeSimple = (...args) => {
+      asked();
+      return complete(...args);
+    };
+    const result = await runCoordinatorTurn(
+      {
+        harness,
+        models: coordinatorModels,
+        api,
+        context: ctx,
+        heartbeatMs: 1000,
+        now: () => 1,
+        afterMirror: () =>
+          Promise.race([
+            askedBeforeMirrored,
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('quick replies waited for the mirror')), 2_000),
+            ),
+          ]),
+      },
+      chiefStep('early', 'status?'),
+    );
+    expect(result.status).toBe('success');
+    expect(api.suggestions).toEqual([{ stepId: 'early', replies: ['继续看'] }]);
+    await harness.close(ctx);
+  });
+
   it('aborts prediction on stop without publishing stale chips', async () => {
     const { coordinatorModels } = setup();
     const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx);
