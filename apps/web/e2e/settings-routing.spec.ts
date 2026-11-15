@@ -42,7 +42,9 @@ test('settings work-routing rule pickers list catalog runtimes and models', asyn
   const runtimeMenu = page.locator('.routing-rule-runtime-menu');
   await expect(runtimeMenu).toBeVisible();
   await expect(runtimeMenu.locator('.routing-rule-runtime-row', { hasText: 'Claude Code' })).toBeVisible();
-  await expect(runtimeMenu.locator('.routing-rule-runtime-row', { hasText: 'pi' })).toBeVisible();
+  const builtin = runtimeMenu.locator('.routing-rule-runtime-row', { hasText: '内置 (pi)' });
+  await expect(builtin).toBeVisible();
+  await expect(builtin).toContainText('用你添加的服务商的模型');
   await page.keyboard.press('Escape');
 
   await session.locator('.routing-rule-model-select').click();
