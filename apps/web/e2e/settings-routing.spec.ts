@@ -170,3 +170,97 @@ test('top models start from the suggestion, save every edit as a whole list and 
   await expect(rows).toHaveCount(3);
   await expect(rows.nth(0)).toHaveAttribute('data-top-model', 'claude-opus-5-5');
 });
+
+test('rules that cannot run say why, preview what the fix changes, and offer no fix without a default', async ({
+  page,
+}) => {
+  await page.goto('/app/settings/work-routing?scenario=routing-rule-issues');
+  const issues = page.getByRole('dialog', { name: '设置' }).getByTestId('routing-rule-issues');
+  const session = issues.getByTestId('routing-rule-issue-session');
+  await expect(session).toContainText('新任务：没有执行机启用 Claude Code');
+  await expect(session).toContainText('修复后改用 GPT-5.2');
+  await expect(session).toContainText('并清空首选执行机、思考强度。');
+  await expect(session.getByTestId('routing-rule-fix-session')).toBeVisible();
+  const review = issues.getByTestId('routing-rule-issue-review');
+  await expect(review).toContainText('评审：');
+  await expect(review).toContainText('这个用途没有能自动换上的模型。');
+  await expect(review.getByRole('button')).toHaveCount(0);
+});
+
+const FIX = {
+  provider: 'relay',
+  modelId: 'glm-5.3',
+  thinkingLevel: null,
+  machineId: null,
+  expectedUpdatedAt: 1700,
+};
+
+async function mockIssue(
+  page: import('@playwright/test').Page,
+  patch: (body: unknown) => { status: number; body: unknown },
+) {
+  const seen = { gets: 0, patches: [] as unknown[] };
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    const method = route.request().method();
+    if (path === '/api/teams/t1/routing-settings') {
+      seen.gets += 1;
+      const fixed = seen.patches.length > 0 && seen.gets > 1;
+      return json({
+        rules: [],
+        policies: [],
+        ruleIssues: fixed
+          ? []
+          : [{ use: 'session', reason: 'provider-no-key', provider: 'relay', suggested: FIX }],
+      });
+    }
+    if (path === '/api/teams/t1/routing-rules/session' && method === 'PATCH') {
+      const body = route.request().postDataJSON();
+      seen.patches.push(body);
+      const reply = patch(body);
+      return json(reply.body, reply.status);
+    }
+    if (path === '/api/teams/t1/machines') return json([]);
+    if (path === '/api/teams/t1/top-models') return json({ models: null });
+    if (path === '/api/teams/t1/model-sources')
+      return json({
+        sources: [
+          {
+            runtime: 'pi',
+            provider: 'relay',
+            providerLabel: 'domestic-proxy',
+            installed: true,
+            models: [{ id: 'glm-5.3', name: 'GLM-5.3' }],
+          },
+        ],
+      });
+    return undefined;
+  });
+  return seen;
+}
+
+test('the fix sends the suggested change as is and the warning leaves once the rule is fixed', async ({
+  page,
+}) => {
+  const seen = await mockIssue(page, () => ({ status: 200, body: {} }));
+  await page.goto('/app/settings/work-routing');
+  const row = page.getByRole('dialog', { name: '设置' }).getByTestId('routing-rule-issue-session');
+  await expect(row).toContainText('新任务：服务商 domestic-proxy 没有 API key');
+  await expect(row).toContainText('修复后改用 GLM-5.3 · domestic-proxy，并清空首选执行机、思考强度。');
+  await row.getByTestId('routing-rule-fix-session').click();
+  await expect.poll(() => seen.patches).toEqual([FIX]);
+  await expect(row).toHaveCount(0);
+});
+
+test('a rule changed since it was read reloads the settings and says so', async ({ page }) => {
+  const seen = await mockIssue(page, () => ({
+    status: 409,
+    body: { error: 'routing rule changed since it was read' },
+  }));
+  await page.goto('/app/settings/work-routing');
+  const row = page.getByRole('dialog', { name: '设置' }).getByTestId('routing-rule-issue-session');
+  await row.getByTestId('routing-rule-fix-session').click();
+  await expect(page.locator('[data-sonner-toast]').first()).toContainText(
+    '这条规则刚被改过，已重新读取，请再看一眼。',
+  );
+  await expect.poll(() => seen.gets).toBeGreaterThan(1);
+});

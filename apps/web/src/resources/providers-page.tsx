@@ -6,13 +6,11 @@ import { useSearchParams } from 'react-router';
 import { accountStatusOf, type Verification } from '../api/account-verification.js';
 import {
   type AccountStep,
-  type StickyThread,
   type SubscriptionAccount,
   toClaudeAccount,
 } from '../api/claude-accounts.js';
 import {
   useClaudeSubscriptionSteps,
-  useClaudeSubscriptionStickiness,
   useClaudeSubscriptions,
   useCreateClaudeSubscription,
   useDeleteClaudeSubscription,
@@ -115,7 +113,6 @@ function teamEntries(
 interface SubscriptionEntryDeps {
   now: number;
   steps: Record<string, AccountStep[]>;
-  sticky: StickyThread[];
   verifications: Record<string, Verification>;
   actionsFor: (account: SubscriptionAccount) => SubscriptionActions;
   t: TFunc;
@@ -151,7 +148,6 @@ function subscriptionEntries(
           view={view}
           verifying={verification?.phase === 'verifying'}
           steps={deps.steps[account.id]}
-          sticky={deps.sticky.filter((thread) => thread.subscriptionId === account.id)}
           actions={deps.actionsFor(account)}
         />
       ),
@@ -273,10 +269,6 @@ export function ProvidersPage() {
     ? (subscriptionsQ.data ?? []).filter((s) => s.state !== undefined).map((s) => s.id)
     : [];
   const stepsQ = useClaudeSubscriptionSteps(teamId, subscriptionApiIds, live);
-  const stickinessQ = useClaudeSubscriptionStickiness(
-    teamId,
-    live && subscriptionApiIds.length > 0,
-  );
   const stepsByAccount: Record<string, AccountStep[]> = live
     ? Object.fromEntries(
         subscriptionApiIds.flatMap((id, index) => {
@@ -285,9 +277,6 @@ export function ProvidersPage() {
         }),
       )
     : (fixtureAccounts?.stepsByAccount ?? {});
-  const stickiness: StickyThread[] = live
-    ? (stickinessQ.data?.threads ?? [])
-    : (fixtureAccounts?.stickiness ?? []);
 
   useEffect(() => {
     const oauth = searchParams.get('oauth');
@@ -418,7 +407,6 @@ export function ProvidersPage() {
           ...subscriptionEntries(subscriptions, {
             now,
             steps: stepsByAccount,
-            sticky: stickiness,
             verifications: verification.states,
             actionsFor: subscriptionActionsFor,
             t,

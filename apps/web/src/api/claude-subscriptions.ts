@@ -6,7 +6,7 @@ import type {
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { runVerification, type Verification, type VerifyOutcome } from './account-verification.js';
-import type { AccountStepsPage, ClaudeSubscriptionWire, StickyThread } from './claude-accounts.js';
+import type { AccountStepsPage, ClaudeSubscriptionWire } from './claude-accounts.js';
 import { ApiError, api } from './client.js';
 
 async function unlessMissing<T>(request: Promise<T>): Promise<T | null> {
@@ -71,19 +71,6 @@ export function useClaudeSubscriptionSteps(
         ),
       enabled: live && teamId !== undefined,
     })),
-  });
-}
-
-export function useClaudeSubscriptionStickiness(teamId: string | undefined, live: boolean) {
-  return useQuery({
-    queryKey: ['claude-subscription-stickiness', teamId],
-    queryFn: () =>
-      unlessMissing(
-        api.get<{ threads: StickyThread[] }>(
-          `/api/teams/${teamId}/claude-subscriptions/stickiness`,
-        ),
-      ),
-    enabled: live && teamId !== undefined,
   });
 }
 
