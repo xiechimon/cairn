@@ -104,7 +104,7 @@ describe('#1104 B: a step with no session routing rule ends failed at the claim 
     const buildId = await startBuild(w, unroutedId);
 
     expect(await claim(w)).toBeNull();
-    expectFailedFunnel(w.s, buildId, unroutedId, 'no session routing rule');
+    expectFailedFunnel(w.s, buildId, unroutedId, 'has nothing to run it: add a model provider');
 
     seedSessionRoute(w.s, { provider: 'stub-gw', modelId: 'stub-model' });
     const routedId = await createTodo(w);
@@ -127,7 +127,7 @@ describe('#1104 B: a step with no session routing rule ends failed at the claim 
       expect(buildRow.triggerSource).toBe('schedule');
 
       await claim(w);
-      expectFailedFunnel(w.s, buildRow.id, todoId, 'no session routing rule');
+      expectFailedFunnel(w.s, buildRow.id, todoId, 'has nothing to run it: add a model provider');
     } finally {
       scheduler.stop();
     }
