@@ -25,11 +25,9 @@ describe('a pending question stops the conversation saying it is working', () =>
     { kind: 'streaming', label: '处理中...', startedAt: 5, signalAt: 6 },
   ];
 
-  test('the streaming row becomes a waiting row without a clock or signal', () => {
-    const [row] = awaitingStream(stream, true);
-    expect(row).toMatchObject({ kind: 'streaming', label: '在等你回答', waiting: true });
-    expect(row).not.toHaveProperty('startedAt');
-    expect(row).not.toHaveProperty('signalAt');
+  test('the working row leaves the stream so the question card stands alone', () => {
+    const user: ChiefStreamItem = { kind: 'user', text: 'hi' };
+    expect(awaitingStream([user, ...stream], true)).toEqual([user]);
   });
 
   test('with no pending question the stream is returned untouched', () => {

@@ -646,7 +646,6 @@ export type ChiefStreamItem =
       labelVars?: Record<string, string | number>;
       labelDetail?: { label: string; vars: Record<string, string | number> };
       signalAt?: number;
-      waiting?: boolean;
     };
 
 export interface ChiefToolRow {
