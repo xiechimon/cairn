@@ -337,10 +337,11 @@ export function updateMcpConnector(
       );
     if (patch.token !== undefined || patch.options !== undefined) {
       const current = catalogState(entry, row, openHeaders(deps, row));
+      const options = patch.options ?? current.options;
       target = catalogTarget(
         entry,
         patch.token ?? current.token,
-        patch.options ?? current.options,
+        oauth ? { ...entry.oauthOptions, ...options } : options,
         oauth,
       );
     }
@@ -603,14 +604,18 @@ function oauthTarget(
   deps: McpConnectorDeps,
   teamId: string,
   body: StartMcpConnectorOAuthBody,
-): { target: McpOAuthTarget; url: string } {
+): { target: McpOAuthTarget; url: string; custom: boolean; scope?: string } {
   if (body.kind === 'reconnect') {
     const row = connectorRow(deps, teamId, body.connectorId);
     if (row.authKind !== 'oauth')
       throw new HttpError(400, 'only a browser sign-in connector can reconnect');
+    const entry = row.catalogId === null ? undefined : mcpCatalogEntry(row.catalogId);
+    const scope = entry?.oauthScope;
     return {
       target: { kind: 'reconnect', connectorId: row.id, authRevision: row.authRevision },
       url: row.url,
+      custom: entry === undefined,
+      ...(scope === undefined ? {} : { scope }),
     };
   }
   assertSlugFree(deps, teamId, body.slug);
@@ -625,10 +630,11 @@ function oauthTarget(
         headers: {},
       },
       url: body.url,
+      custom: true,
     };
   const entry = mcpCatalogEntry(body.catalogId);
   if (!entry) throw notFound(`catalog entry ${body.catalogId}`);
-  const built = catalogTarget(entry, undefined, body.options ?? {}, true);
+  const built = catalogTarget(entry, undefined, { ...entry.oauthOptions, ...body.options }, true);
   return {
     target: {
       kind: 'new',
@@ -639,6 +645,8 @@ function oauthTarget(
       headers: built.headers,
     },
     url: built.url,
+    custom: false,
+    ...(entry.oauthScope === undefined ? {} : { scope: entry.oauthScope }),
   };
 }
 
@@ -734,10 +742,12 @@ export async function prepareMcpConnectorOAuth(
   teamId: string,
   input: { body: StartMcpConnectorOAuthBody; origin: string; state: string },
 ): Promise<{ authorizationUrl: string; pending: McpOAuthPending }> {
-  const { target, url } = oauthTarget(deps, teamId, input.body);
+  const { target, url, custom, scope: catalogScope } = oauthTarget(deps, teamId, input.body);
   const { redirectUri, applicationType } = redirectFor(input.origin);
   const fetchFn = guardedOAuthFetch(deps);
-  const { asUrl, resource, scope } = await discoverAuthServer(fetchFn, url);
+  const discovered = await discoverAuthServer(fetchFn, url);
+  const { asUrl, resource } = discovered;
+  const scope = catalogScope ?? discovered.scope;
   let issAdvertised = false;
   const metadataFetch: typeof fetch = async (request, init) => {
     const res = await fetchFn(request, init);
@@ -773,6 +783,11 @@ export async function prepareMcpConnectorOAuth(
     new URL(metadata.authorization_endpoint).protocol !== 'https:'
   )
     throw new HttpError(400, 'the authorization endpoint must be https');
+  if (custom && !issAdvertised)
+    throw new HttpError(
+      400,
+      'a custom server must name its issuer on the sign-in answer (RFC 9207); use headers',
+    );
   const client = await oauthClient(deps, fetchFn, {
     asUrl,
     metadata,

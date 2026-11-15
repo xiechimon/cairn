@@ -47,7 +47,7 @@ export function DialogFootRow({ hint, children }: { hint?: ReactNode; children?:
   return (
     <div data-testid="dialog-foot" className={DIALOG_FOOT_CLS}>
       {hint != null && <div className={DIALOG_HINT_CLS}>{hint}</div>}
-      <div className="ml-auto flex items-center gap-2">{children}</div>
+      <div className="ml-auto flex flex-1 items-center justify-end gap-2">{children}</div>
     </div>
   );
 }

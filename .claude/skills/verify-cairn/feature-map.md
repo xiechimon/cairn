@@ -843,7 +843,7 @@ Reach:
 - Web routes: `/app/resources/mcp-servers`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `MCP`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `resource-empty`
+- Test ids in its code: `mcp-add-server`, `mcp-catalog`, `mcp-connected`, `mcp-local`, `mcp-oauth-error`
 - Verify recipes: [.claude/skills/verify-cairn/features/mcp-servers.md](features/mcp-servers.md)
 - Research: [docs/research/mcp-connectors-2026-11-15.md](../../../docs/research/mcp-connectors-2026-11-15.md)
 - Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](../../../docs/design/mcp-connectors.md)
