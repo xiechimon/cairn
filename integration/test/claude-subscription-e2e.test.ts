@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -37,7 +37,20 @@ let workspacesDir = '';
 const saved: Record<string, string | undefined> = {};
 
 beforeAll(async () => {
+  const userHome = makeTestTempDir('cairn-it-user-home-');
+  mkdirSync(join(userHome, '.claude'), { recursive: true });
+  writeFileSync(
+    join(userHome, '.claude', 'settings.json'),
+    `${JSON.stringify({
+      model: 'sonnet',
+      env: {
+        ANTHROPIC_DEFAULT_SONNET_MODEL: 'claude-sonnet-5-5',
+        ANTHROPIC_DEFAULT_HAIKU_MODEL: 'claude-haiku-5-5',
+      },
+    })}\n`,
+  );
   for (const [key, value] of Object.entries({
+    HOME: userHome,
     CAIRN_CLAUDE_BIN: FAKE,
     CLAUDE_BIN: FAKE,
   })) {
