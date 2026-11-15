@@ -1439,7 +1439,6 @@ export const EN: Record<string, string> = {
   '添加模型服务失败，请重试。': 'Could not add the provider. Try again.',
   '添加密钥失败，请重试。': 'Could not add the secret. Try again.',
   '新建 API 密钥失败，请重试。': 'Could not create the API key. Try again.',
-  '删除记忆失败，请重试。': 'Could not delete the memory. Try again.',
   待回答的提问: 'Pending questions',
   '提交回答失败，草稿还在，请再试一次。':
     'Could not send your answer. Your draft is still here. Try Submit again.',
@@ -1464,11 +1463,6 @@ export const EN: Record<string, string> = {
   '取消提问失败，请重试。': 'Could not dismiss the question. Try again.',
   备用模型: 'Fallback models',
   选择运行时: 'Choose runtime',
-  已忘掉: 'Forgotten',
-  '让 Coordinator 忘掉这条': 'Make the Coordinator forget this',
-  决定: 'Decided',
-  还开着: 'Still open',
-  记住了: 'Remembered',
   '没能更新这条建议，请重试。': "Couldn't update this suggestion. Try again.",
   建议回复: 'Suggested replies',
   '为什么没拦住：{why}': 'Why it slipped through: {why}',
@@ -1506,14 +1500,6 @@ export const EN: Record<string, string> = {
     'These sources were too long, so only their latest part was read: {sources}. ',
   '复盘建议只是草稿：点「建成线程」才会建线程，建好后也要你自己开始。':
     'Retro suggestions are drafts: a thread is created only when you choose "Make it a thread", and you still start it yourself.',
-  'Coordinator 把昨天的对话整理成了 {n} 条摘要':
-    "The Coordinator summarized yesterday's chat into {n## item|# items}",
-  '对话太长了，Coordinator 把上面的内容整理成了 {n} 条摘要':
-    'The chat got long, so the Coordinator summarized everything above into {n## item|# items}',
-  '昨天的摘要 · {time} 整理': "Yesterday's summary · made at {time}",
-  '上面内容的摘要 · {time} 整理': 'Summary of the chat above · made at {time}',
-  '原文都还在，往上滑就能看到。Coordinator 接着聊时用的是这份摘要；任务的进度它会直接去任务里查，不靠记对话。摘要漏了或写错了，直接在下面告诉 Coordinator。':
-    'The original messages are still here; scroll up to see them. The Coordinator continues from this summary and checks task progress in the tasks themselves, not from memory of the chat. If something is missing or wrong, tell the Coordinator below.',
   执行: 'Build',
   合并: 'Merge',
   运行中: 'Running',
