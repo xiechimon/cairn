@@ -3,6 +3,7 @@ import {
   type PolicyUse,
   type RouteUse,
   type RoutingRuleRecord,
+  type SessionDefault,
   type TeamRoutingSettings,
   THINKING_LEVELS,
   type ThinkingLevel,
@@ -70,9 +71,38 @@ function fixtureSettings(search: URLSearchParams): TeamRoutingSettings | null {
   return raw ?? null;
 }
 
+function SessionDefaultHint({
+  sessionDefault,
+  options,
+}: {
+  sessionDefault: SessionDefault;
+  options: ModelOption[];
+}) {
+  const { t } = useI18n();
+  const row = options.find(
+    (o) => o.provider === sessionDefault.provider && o.modelId === sessionDefault.modelId,
+  );
+  const text =
+    sessionDefault.reason === 'claude-code'
+      ? t('当前默认：Claude Code（因为有 Runner 装了 Claude Code）')
+      : sessionDefault.reason === 'codex-login'
+        ? t('当前默认：Codex（因为有 Runner 登录了 Codex）')
+        : sessionDefault.reason === 'provider'
+          ? t(
+              '当前默认：{model} · {provider}（因为还没有 Runner 装 Claude Code，用最早添加的服务商）',
+              {
+                model: row?.modelName ?? sessionDefault.modelId ?? '',
+                provider: row?.providerLabel ?? sessionDefault.provider ?? '',
+              },
+            )
+          : t('当前没有可用的默认：添加服务商，或在 Runner 上装 Claude Code');
+  return <span data-testid="routing-session-default">{text}</span>;
+}
+
 function RuleEditor({
   use,
   rule,
+  sessionDefault,
   machines,
   hasDefault,
   options,
@@ -81,6 +111,7 @@ function RuleEditor({
 }: {
   use: RouteUse;
   rule: RoutingRuleRecord | null;
+  sessionDefault?: SessionDefault | undefined;
   machines: { id: string; name: string }[];
   hasDefault: boolean;
   options: ModelOption[];
@@ -117,7 +148,16 @@ function RuleEditor({
       data-testid={rule === null ? `routing-rule-new-${use}` : `routing-rule-${use}`}
     >
       <SettingsCard>
-        <SettingsRow label={t(USE_LABELS[use])} hint={t('模型与首选 Runner')}>
+        <SettingsRow
+          label={t(USE_LABELS[use])}
+          hint={
+            rule === null && sessionDefault !== undefined ? (
+              <SessionDefaultHint sessionDefault={sessionDefault} options={options} />
+            ) : (
+              t('模型与首选 Runner')
+            )
+          }
+        >
           <span className="font-mono text-meta text-content-tertiary">{use}</span>
         </SettingsRow>
         <SettingsRow label={t('运行时')}>
@@ -385,6 +425,7 @@ export function RoutingSettingsPage() {
                   key={`new-${use}`}
                   use={use}
                   rule={null}
+                  sessionDefault={use === 'session' ? settings.sessionDefault : undefined}
                   machines={machines}
                   hasDefault={hasDefault}
                   options={modelOptions}
