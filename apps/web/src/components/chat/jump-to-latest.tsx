@@ -37,7 +37,8 @@ export function JumpToLatestButton({
     const sync = () => {
       const dist = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
       if (followingRef.current && dist > 2) scrollToEnd({ behavior: 'instant' });
-      setActive(dist > threshold);
+      const endSpace = Number.parseFloat(getComputedStyle(viewport).paddingBottom) || 0;
+      setActive(dist - endSpace > threshold);
     };
     const stopFollowing = () => {
       followingRef.current = false;

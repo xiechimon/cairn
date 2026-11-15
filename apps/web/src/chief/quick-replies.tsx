@@ -4,7 +4,7 @@ import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { useI18n } from '../i18n/provider.js';
 
 export const REPLY_CHIP_CLS =
-  'h-7 min-h-7 max-w-full cursor-pointer rounded-full border border-border bg-transparent px-2.5 py-0 text-left text-ui font-normal whitespace-normal text-foreground hover:bg-(--menu-hover) dark:bg-transparent dark:hover:bg-(--menu-hover)';
+  'h-7 min-h-7 pointer-coarse:h-11 pointer-coarse:min-h-11 max-w-full cursor-pointer rounded-full border border-border bg-transparent px-2.5 py-0 text-left text-ui font-normal whitespace-normal text-foreground hover:bg-(--menu-hover) dark:bg-transparent dark:hover:bg-(--menu-hover)';
 
 export function QuickReplies({
   replies,

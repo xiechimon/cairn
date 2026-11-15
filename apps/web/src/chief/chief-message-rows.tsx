@@ -616,7 +616,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               <span className="underline decoration-current/40 underline-offset-3">
                 {item.machineName}
               </span>
-              {t('上')}
+              {t(' 上')}
             </>
           )}
         </StatusLine>
