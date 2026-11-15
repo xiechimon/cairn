@@ -15,6 +15,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { hasActiveClaudeSubscription } from '../src/services/claude-subscriptions.js';
+import { claimPendingChiefStep } from '../src/services/coordinator-steps.js';
 import { claimStep, markPresence } from '../src/services/machines.js';
 import {
   bootServer,
@@ -737,6 +738,17 @@ describe('several stored subscriptions, one enabled', () => {
     const body = await (await credentialsOf(s, machineId, stepId)).text();
     expect(body).not.toContain(tokenOf('a'));
     expect(body).not.toContain(tokenOf('b'));
+  });
+
+  test('the in-server Coordinator claim never records an account', async () => {
+    const { s } = await world();
+    await save(s, 'First', 'a');
+    const machineId = insertMachine(s, { name: 'unused', claudeCodeReport: report() });
+    const stepId = insertChief(s, machineId, 'claude-code');
+    const pending = stepRow(s, stepId);
+    expect(pending).toBeDefined();
+    expect(claimPendingChiefStep(s.db, pending as NonNullable<typeof pending>, null)).toBe(true);
+    expect(stepRow(s, stepId)).toMatchObject({ status: 'claimed', claudeSubscriptionId: null });
   });
 
   test('a step on a runtime other than Claude Code records no account', async () => {
