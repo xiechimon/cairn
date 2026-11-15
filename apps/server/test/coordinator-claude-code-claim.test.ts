@@ -2,13 +2,11 @@ import type { ClaudeCodeReport } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
-  chiefMessage,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
   machine as machineTable,
   step as stepTable,
 } from '../src/db/schema.js';
-import { CHIEF_REPLAY_MAX_CHARS } from '../src/services/chief-replay.js';
 import {
   setCoordinatorInServer,
   setCoordinatorServerContextEnabled,
@@ -23,8 +21,6 @@ afterEach(() => {
   setCoordinatorInServer(false);
   setCoordinatorServerContextEnabled(false);
 });
-
-const LEAKED = `sk-ant-oat01-${'Zq9XvB2m'.repeat(8)}`;
 
 function world(provider = 'claude-code') {
   setCoordinatorInServer(true);
@@ -70,27 +66,10 @@ function world(provider = 'claude-code') {
   return { s, machineId };
 }
 
-function message(
-  s: TestServer,
-  id: string,
-  role: 'user' | 'assistant',
-  content: unknown,
-  createdAt: number,
-): void {
-  s.db.insert(chiefMessage).values({ id, threadId: 't1', role, content, createdAt }).run();
-}
-
-function chiefStep(s: TestServer, id: string, createdAt: number, ownerMessageIds: string[]): void {
+function chiefStep(s: TestServer, id: string, createdAt: number): void {
   s.db
     .insert(stepTable)
-    .values({
-      id,
-      buildId: 't1',
-      kind: 'chief',
-      status: 'pending',
-      createdAt,
-      ownerMessageIds,
-    })
+    .values({ id, buildId: 't1', kind: 'chief', status: 'pending', createdAt })
     .run();
 }
 
@@ -110,11 +89,6 @@ function claimAs(s: TestServer, machineId: string) {
   );
 }
 
-const replayOf = (systemPrompt: string | undefined): string | null => {
-  const at = systemPrompt?.indexOf('## 此前的对话') ?? -1;
-  return at === -1 ? null : (systemPrompt?.slice(at) ?? null);
-};
-
 describe('Coordinator rule that selects Claude Code', () => {
   test('the server never takes the turn; a rule without a provider row still refuses', () => {
     const { s } = world();
@@ -125,138 +99,11 @@ describe('Coordinator rule that selects Claude Code', () => {
     });
   });
 
-  test('the Runner claims a thread that has history from before its first Runner turn, and every later turn carries the same replay', async () => {
+  test('the Runner claims the chief step and the server does not', async () => {
     const { s, machineId } = world();
-    message(s, 'm1', 'user', 'plan the release', 10);
-    message(s, 'm2', 'assistant', 'I drafted the plan', 11);
-    message(s, 'm3', 'user', `my key is ${LEAKED}`, 12);
-    message(
-      s,
-      'm4',
-      'assistant',
-      { kind: 'toolcall', call: { name: 'projects', arguments: {} } },
-      13,
-    );
-    message(s, 'm5', 'user', 'what is next?', 20);
-    chiefStep(s, 's1', 21, ['m5']);
-    const first = await claimAs(s, machineId);
-    expect(first?.step.id).toBe('s1');
-    const replay = replayOf(first?.chief?.systemPrompt);
-    expect(replay).toContain('plan the release');
-    expect(replay).toContain('I drafted the plan');
-    expect(replay).not.toContain(LEAKED);
-    expect(replay).toContain('[REDACTED]');
-    expect(replay).not.toContain('projects');
-    expect(replay).not.toContain('what is next?');
-
-    s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, 's1')).run();
-    message(s, 'm6', 'assistant', 'next is review', 22);
-    message(s, 'm7', 'user', 'and after?', 30);
-    chiefStep(s, 's2', 31, ['m7']);
-    const second = await claimAs(s, machineId);
-    expect(second?.step.id).toBe('s2');
-    expect(replayOf(second?.chief?.systemPrompt)).toBe(replay);
-  });
-
-  test('a thread that began on Claude Code gets no replay section', async () => {
-    const { s, machineId } = world();
-    message(s, 'm1', 'user', 'first message', 10);
-    chiefStep(s, 's1', 11, ['m1']);
+    chiefStep(s, 's1', 3);
     const claimed = await claimAs(s, machineId);
-    expect(claimed?.step.id).toBe('s1');
-    expect(replayOf(claimed?.chief?.systemPrompt)).toBeNull();
-  });
-
-  test('the replay keeps the newest lines within the cap', async () => {
-    const { s, machineId } = world();
-    for (let i = 0; i < 40; i++) {
-      message(
-        s,
-        `h${i}`,
-        i % 2 === 0 ? 'user' : 'assistant',
-        `line ${i} ${'x'.repeat(400)}`,
-        10 + i,
-      );
-    }
-    message(s, 'cur', 'user', 'now', 100);
-    chiefStep(s, 's1', 101, ['cur']);
-    const claimed = await claimAs(s, machineId);
-    const replay = replayOf(claimed?.chief?.systemPrompt) ?? '';
-    expect(replay.length).toBeLessThanOrEqual(CHIEF_REPLAY_MAX_CHARS + 200);
-    expect(replay).toContain('line 39 ');
-    expect(replay).not.toContain('line 0 ');
-  });
-
-  test('a thread that ran on a Runner, then in the server, then on a Runner again replays the server era', async () => {
-    const { s, machineId } = world();
-    message(s, 'a1', 'user', 'runner era question', 10);
-    chiefStep(s, 'old-runner', 11, ['a1']);
-    s.db
-      .update(stepTable)
-      .set({ status: 'done', machineId, claimedAt: 11 })
-      .where(eq(stepTable.id, 'old-runner'))
-      .run();
-    message(s, 'a2', 'assistant', 'runner era answer', 12);
-    message(s, 'a3', 'user', 'server era question', 20);
-    chiefStep(s, 'server-turn', 21, ['a3']);
-    s.db
-      .update(stepTable)
-      .set({ status: 'done', claimedAt: 21 })
-      .where(eq(stepTable.id, 'server-turn'))
-      .run();
-    message(s, 'a4', 'assistant', 'server era answer', 22);
-    message(s, 'a5', 'user', 'back on claude', 30);
-    chiefStep(s, 'new-runner', 31, ['a5']);
-    const claimed = await claimAs(s, machineId);
-    expect(claimed?.step.id).toBe('new-runner');
-    const replay = replayOf(claimed?.chief?.systemPrompt);
-    expect(replay).toContain('server era answer');
-    expect(replay).toContain('runner era answer');
-    expect(replay).not.toContain('back on claude');
-  });
-
-  test('a mail turn never carries the replay', async () => {
-    const { s, machineId } = world();
-    s.db
-      .update(machineTable)
-      .set({ latestCliVersion: '99.0.0' })
-      .where(eq(machineTable.id, machineId))
-      .run();
-    message(s, 'm1', 'user', 'earlier talk', 10);
-    s.db
-      .insert(stepTable)
-      .values({
-        id: 'mail1',
-        buildId: 't1',
-        kind: 'chief',
-        status: 'pending',
-        createdAt: 20,
-        prompt: '[wake:wake] provenance=mail:abc\nnew mail',
-        ownerMessageIds: [],
-      })
-      .run();
-    const claimed = await claimAs(s, machineId);
-    expect(claimed?.step.id).toBe('mail1');
-    expect(replayOf(claimed?.chief?.systemPrompt)).toBeNull();
-  });
-
-  test('tool-heavy threads still replay the conversation behind the tool calls', async () => {
-    const { s, machineId } = world();
-    message(s, 'h1', 'user', 'a question from long ago', 5);
-    message(s, 'h2', 'assistant', 'an answer from long ago', 6);
-    for (let i = 0; i < 120; i++) {
-      message(
-        s,
-        `tc${i}`,
-        'assistant',
-        { kind: 'toolcall', call: { name: 'projects', arguments: {} } },
-        10 + i,
-      );
-    }
-    message(s, 'cur', 'user', 'now', 200);
-    chiefStep(s, 's1', 201, ['cur']);
-    const claimed = await claimAs(s, machineId);
-    const replay = replayOf(claimed?.chief?.systemPrompt) ?? '';
-    expect(replay).toContain('an answer from long ago');
+    expect(claimed?.step).toMatchObject({ id: 's1', machineId });
+    expect(claimed?.agent).toMatchObject({ provider: 'claude-code', modelId: 'sonnet' });
   });
 });
