@@ -9,12 +9,19 @@ function setTheme(page: Page, theme: 'light' | 'dark') {
   return page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
 }
 
+async function openDialog(page: Page, url: string) {
+  await page.goto(url);
+  await page
+    .getByRole('dialog')
+    .evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+}
+
 for (const theme of ['light', 'dark'] as const) {
   test(`project settings: header, one card of equal rows, danger zone card (${theme})`, async ({
     page,
   }) => {
     await setTheme(page, theme);
-    await page.goto(SETTINGS);
+    await openDialog(page, SETTINGS);
 
     const header = page.locator('.settings-header');
     await expect(header.getByRole('heading', { name: 'r3-lifecycle' })).toBeVisible();
@@ -74,7 +81,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await setTheme(page, theme);
-    await page.goto(NEW_PROJECT);
+    await openDialog(page, NEW_PROJECT);
 
     const avatar = page.locator('.prj-new-avatar');
     const avatarBox = await avatar.boundingBox();

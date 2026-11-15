@@ -1,5 +1,11 @@
 import { useRef } from 'react';
-import { type Location, useLocation, useNavigate } from 'react-router';
+import {
+  type Location,
+  matchRoutes,
+  type RouteObject,
+  useLocation,
+  useNavigate,
+} from 'react-router';
 import { settingsSectionOf } from './settings-href.js';
 
 interface PageEntry {
@@ -24,14 +30,15 @@ function arrivedBySettingsRedirect(location: Location): boolean {
   );
 }
 
-export function useSettingsOverlay() {
+export function useSettingsOverlay(dialogRoutes: RouteObject[]) {
   const location = useLocation();
   const navigate = useNavigate();
   const section = settingsSectionOf(location.pathname);
+  const open = section !== null || matchRoutes(dialogRoutes, location) !== null;
   const lastPage = useRef<PageEntry | null>(null);
   const pageBeforeLast = useRef<PageEntry | null>(null);
   const undoneRedirect = useRef<Location | null>(null);
-  if (section === null) {
+  if (!open) {
     if (lastPage.current?.location !== location) {
       pageBeforeLast.current = lastPage.current;
       lastPage.current = { location, historyIndex: currentHistoryIndex() };
@@ -58,5 +65,5 @@ export function useSettingsOverlay() {
       { replace: true },
     );
   };
-  return { section, pageLocation, close };
+  return { open, section, pageLocation, close };
 }

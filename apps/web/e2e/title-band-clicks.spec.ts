@@ -57,17 +57,3 @@ for (const [route, scenario] of [
     await expectOwnsCenter(page, '[data-testid="resource-new"]');
   });
 }
-
-for (const [route, backTo] of [
-  [
-    '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c',
-    /\/app\?scenario=r2-24c&project=ZAQczKCu0MOAzC1ZqcFlX&chat=1$/,
-  ],
-] as const) {
-  test(`detail back owns its hit area and navigates to the parent — ${route}`, async ({ page }) => {
-    await page.goto(route);
-    await expectOwnsCenter(page, '[aria-label="返回"]');
-    await page.locator('[aria-label="返回"]').click();
-    await expect(page).toHaveURL(backTo);
-  });
-}

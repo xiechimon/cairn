@@ -34,14 +34,6 @@ test('a project picked in search opens its conversation', async ({ page }) => {
   await expect(home(page)).toHaveCount(0);
 });
 
-test('the back link of the project settings opens the project conversation', async ({ page }) => {
-  await page.goto(`/app/project/${PROJECT_ID}/settings?scenario=home-c`);
-  await page.getByTestId('page-topbar').getByRole('link', { name: 'Back' }).click();
-  await expect(page).toHaveURL(new RegExp(`/app\\?scenario=home-c&project=${PROJECT_ID}&chat=1$`));
-  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeVisible();
-  await expect(home(page)).toHaveCount(0);
-});
-
 test('the threads are this project only, grouped by state with counts', async ({ page }) => {
   await page.goto(projectHome());
   await expect(group(page, 'Needs you')).toContainText('Connect a Claude subscription token');

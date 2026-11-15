@@ -1,11 +1,9 @@
 import { createContext, type ReactNode, useContext } from 'react';
-import { Link, type To } from 'react-router';
 import { AppSidebar } from '../board/app-sidebar.js';
 import type { SidebarSelected } from '../board/sidebar.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import type { FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronLeft } from '../icons/index.js';
 
 export const SHEET_PANEL =
   'relative isolate flex min-w-0 flex-1 overflow-hidden border-l border-border bg-background max-[640px]:border-0';
@@ -48,7 +46,6 @@ interface PageShellProps {
   fixture: FixtureSet;
   selected?: SidebarSelected;
   title: ReactNode;
-  back?: To;
   tabs?: PageTab[];
   tab?: string;
   onTab?: (id: string) => void;
@@ -62,7 +59,6 @@ export function PageShell({
   fixture,
   selected,
   title,
-  back,
   tabs,
   tab,
   onTab,
@@ -70,7 +66,6 @@ export function PageShell({
   bleed = false,
   children,
 }: PageShellProps) {
-  const { t } = useI18n();
   const embedded = useContext(EmbeddedShell);
   return (
     <div
@@ -99,15 +94,6 @@ export function PageShell({
               data-testid="page-topbar"
               className="flex h-14 flex-none items-center gap-3 border-b border-border px-6 whitespace-nowrap"
             >
-              {back != null && (
-                <Link
-                  className="-mr-1 -ml-2 flex size-7 flex-none items-center justify-center rounded-md text-content-tertiary"
-                  to={back}
-                  aria-label={t('返回')}
-                >
-                  <ChevronLeft width={20} height={20} />
-                </Link>
-              )}
               <h1 className="min-w-0 truncate voice-title text-page text-foreground">{title}</h1>
               {tabs != null && tab != null && <TabGroup tabs={tabs} tab={tab} onTab={onTab} />}
               <div className="ml-auto flex flex-none items-center gap-0.5">{actions}</div>
