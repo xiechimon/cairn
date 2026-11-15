@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { todoGlanceOf } from '../src/chief/chief-task-refs.js';
+import { mapChiefStream, type MessageRow } from '../src/api/mappers.js';
+import { foldTaskCards, placeReportCards, todoGlanceOf } from '../src/chief/chief-task-refs.js';
 import { groupThreadEvents, subThreadRowIds } from '../src/chief/thread-activity.js';
 import type { TodoGlance } from '../src/detail/segments.js';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
@@ -108,5 +109,66 @@ describe('todoGlanceOf', () => {
         sourceRef: 'before-plan:code',
       }).parentId,
     ).toBeUndefined();
+  });
+});
+
+describe('a research report the Coordinator delivered shows once, inside its notice', () => {
+  const row = (id: string, content: unknown): MessageRow => ({
+    id,
+    role: 'system',
+    content: JSON.stringify(content),
+    createdAt: 100,
+  });
+  const threadReport = (id: string, todoId: string, buildId: string, phase: string) =>
+    row(id, { kind: 'thread-report', todoId, buildId, phase, seqNum: 1, title: todoId });
+  const notice = (id: string, todoId: string, buildId: string) =>
+    row(id, {
+      kind: 'chief_notice',
+      message: `[#1](todo:${todoId}) found the answer.`,
+      provenance: `report:${todoId}`,
+      report: { todoId, buildId },
+    });
+  const research = (buildId: string) =>
+    todoGlanceOf({ phase: 'done', title: 'research', output: 'info', latestBuildId: buildId });
+  const reportGlances = new Map<string, TodoGlance>([
+    ['told', research('b-told')],
+    ['silent', research('b-silent')],
+    ['unanswered', research('b-unanswered')],
+    ['reworked', research('b-new')],
+  ]);
+  const stream = mapChiefStream([
+    threadReport('r-told', 'told', 'b-told', 'review'),
+    notice('n-told', 'told', 'b-told'),
+    threadReport('d-told', 'told', 'b-told', 'done'),
+    threadReport('r-silent', 'silent', 'b-silent', 'review'),
+    row('ack-silent', { kind: 'report_ack', mode: 'silent', todoId: 'silent', buildId: 'b-silent' }),
+    threadReport('r-unanswered', 'unanswered', 'b-unanswered', 'review'),
+    notice('n-reworked', 'reworked', 'b-old'),
+    threadReport('r-reworked', 'reworked', 'b-new', 'review'),
+  ]);
+  const kept = subThreadRowIds(stream, reportGlances);
+  const { rows, startedBy } = foldTaskCards(
+    groupThreadEvents(
+      stream.map((item, i) => ({ item, i })),
+      kept,
+    ),
+    reportGlances,
+  );
+  const reports = placeReportCards(rows, startedBy, reportGlances, new Set());
+  const bubble = (id: string) => rows.find(({ item }) => 'id' in item && item.id === id)?.item;
+
+  test('a notice or a silent acknowledgement replaces the standalone row for that build', () => {
+    expect([...kept]).toEqual(['r-unanswered', 'r-reworked']);
+    expect(rows.map(({ item }) => item.kind)).toEqual([
+      'robot',
+      'thread-activity',
+      'robot',
+      'thread-activity',
+    ]);
+  });
+
+  test('the notice carries the report line only while its build is still the delivered one', () => {
+    expect(reports.get(bubble('n-told')!)).toEqual(['told']);
+    expect(reports.has(bubble('n-reworked')!)).toBe(false);
   });
 });

@@ -85,7 +85,7 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
     );
     await expect(row.getByRole('button')).toHaveCount(1);
     const card = row.getByTestId('research-report-card');
-    await expect(card).toHaveText('日报2026-10-27');
+    await expect(card).toHaveText('2026-10-27');
     await expect(card).not.toHaveAttribute('data-stage');
     await row.scrollIntoViewIfNeeded();
     await evidencePanelShot(page, 'daily-report.png', row);
