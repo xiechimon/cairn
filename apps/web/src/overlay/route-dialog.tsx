@@ -48,7 +48,7 @@ export function RouteDialog({
       onBackdropClick={ignoreBackdropClick}
       initialFocus={size === 'page' ? bodyRef : undefined}
       width={size === 'page' ? 'var(--settings-w)' : dialogWidth('m')}
-      className={size === 'page' ? 'h-(--settings-h)' : undefined}
+      className={size === 'page' ? 'route-page-dialog h-(--settings-h)' : undefined}
     >
       <header
         data-testid="route-dialog-head"
@@ -72,7 +72,7 @@ export function RouteDialog({
           <Button
             variant="ghost"
             size="icon-sm"
-            className="absolute top-2 right-3 text-content-tertiary hover:text-foreground"
+            className="absolute top-2 right-3 text-content-tertiary hover:text-foreground pointer-coarse:top-0 pointer-coarse:right-1 pointer-coarse:size-11"
           />
         }
         aria-label={t('关闭')}
