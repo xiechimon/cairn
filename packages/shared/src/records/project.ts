@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { BRIEF_MARKER_BEGIN, BRIEF_MARKER_END } from '../brief-file.js';
 import { epochMs, recordId } from './common.js';
 import { mergePolicySchema } from './merge-gate.js';
+import { workerBriefTextSchema } from './worker-brief-text.js';
 
 export const PROJECT_REPO_KINDS = ['hosted', 'github', 'local'] as const;
 export const evidenceStoreSchema = z.enum(['attachments', 'repository']);
@@ -125,16 +125,7 @@ export const createProjectBodySchema = z.object({
 });
 export type CreateProjectBody = z.infer<typeof createProjectBodySchema>;
 
-export const PROJECT_INSTRUCTIONS_MAX = 16_000;
 export const PROJECT_MAX_CONCURRENT = 16;
-
-export const workerBriefTextSchema = z
-  .string()
-  .max(PROJECT_INSTRUCTIONS_MAX)
-  .refine(
-    (text) => !text.includes(BRIEF_MARKER_BEGIN) && !text.includes(BRIEF_MARKER_END),
-    'Must not contain the Cairn runtime markers',
-  );
 
 export const patchProjectBodySchema = z
   .object({
