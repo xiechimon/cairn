@@ -21,7 +21,7 @@ import { withoutDeleted } from '../fixtures/deletions.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { PageShell } from '../pages/shell.js';
+import { RouteDialog } from '../overlay/route-dialog.js';
 import {
   type ActivityGroup,
   type ActivityRow,
@@ -182,11 +182,9 @@ export function ActivityPage() {
   const failed = activity.state === 'error';
 
   return (
-    <PageShell
-      route="activity"
-      fixture={fixture}
-      selected="none"
-      title={<span className="max-[640px]:pl-8">{t('活动')}</span>}
+    <RouteDialog
+      title={t('活动')}
+      size="page"
       bleed
       actions={
         !loading &&
@@ -360,6 +358,6 @@ export function ActivityPage() {
           </StoneTrail>
         )}
       </div>
-    </PageShell>
+    </RouteDialog>
   );
 }
