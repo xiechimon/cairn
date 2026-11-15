@@ -60,6 +60,7 @@ export function ArchivedProjectsSection() {
         empty={
           <EmptyState
             testId="archived-projects-empty"
+            className="mt-6"
             icon={Archive}
             title={t('没有已归档的项目')}
             description={t('在侧栏项目菜单里归档的项目会出现在这里。')}

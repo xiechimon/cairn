@@ -80,7 +80,7 @@ export function AccountPage() {
     <PageShell route="account" fixture={fixture} selected="none" title={t('账号')}>
       <div className="flex flex-col gap-6">
         <ProfileHeader
-          className="account-header"
+          className="account-header px-0"
           avatarClassName="account-avatar"
           avatar={
             <SeededAvatar
