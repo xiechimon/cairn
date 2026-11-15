@@ -31,6 +31,7 @@ import type { Db } from '../db/client.js';
 import { build, machine, provider, routingRule, step, todo, workPolicy } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { paidClaudeAllowed } from './model-routing.js';
 import { DEFAULT_SESSION_MODEL, DEFAULT_SESSION_PROVIDER } from './routing-migration.js';
 import { decideStepRoute } from './step-route.js';
@@ -236,6 +237,7 @@ export function anthropicCoordinatorChoice(
         isNotNull(provider.apiKeyCipher),
       ),
     )
+    .orderBy(asc(provider.createdAt), asc(provider.id))
     .all()
     .find((row) => isAnthropicApi(row.baseUrl) && row.models.length > 0);
   if (source === undefined) return null;
@@ -508,14 +510,15 @@ export function profileForStep(
   };
 }
 
-export function coordinatorProfile(
-  db: Pick<Db, 'select'>,
-  teamId: string,
-  withDefault = false,
-): RouteProfile | null {
+export function coordinatorProfile(db: Pick<Db, 'select'>, teamId: string): RouteProfile | null {
   const route =
-    ruleRow(db, teamId, 'coordinator') ?? (withDefault ? defaultCoordinatorRule(db, teamId) : null);
+    ruleRow(db, teamId, 'coordinator') ??
+    (coordinatorRunsOnPi() ? defaultCoordinatorRule(db, teamId) : null);
   return route === null ? null : routeProfile(route);
+}
+
+export function coordinatorMemoryOwner(db: Pick<Db, 'select'>, teamId: string): string | undefined {
+  return storedRuleRow(db, teamId, 'coordinator')?.id;
 }
 
 export const VERIFY_MEMORY_OWNER_SUFFIX = ':verify';

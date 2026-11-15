@@ -21,14 +21,13 @@ import {
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
-import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { queueCoordinatorInput } from './coordinator-inputs.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContext } from './project-instructions.js';
 import { publishStepRow } from './quota-wait.js';
-import { coordinatorProfile } from './routing-rules.js';
+import { coordinatorMemoryOwner, coordinatorProfile } from './routing-rules.js';
 
 type StepRow = typeof step.$inferSelect;
 
@@ -147,7 +146,7 @@ export function chiefOutage(db: Db, chiefId: string): ChiefOutage | null {
   const latest = rows[0];
   if (latest === undefined) return null;
   const chiefRow = db.select().from(chief).where(eq(chief.id, chiefId)).get();
-  const agentRow = chiefRow ? coordinatorProfile(db, chiefRow.teamId, coordinatorRunsOnPi()) : null;
+  const agentRow = chiefRow ? coordinatorProfile(db, chiefRow.teamId) : null;
   const ran = latest.fallback?.model ?? {
     provider: agentRow?.provider ?? null,
     modelId: agentRow?.modelId ?? null,
@@ -248,7 +247,7 @@ export function steerChiefMessage(
     scope !== null && scope !== stepScopeProjectId(running)
       ? projectTurnContext(deps.db, {
           teamId: thread.teamId,
-          agentId: coordinatorProfile(deps.db, thread.teamId)?.id ?? null,
+          agentId: coordinatorMemoryOwner(deps.db, thread.teamId) ?? null,
           projectId: scope,
           threadId,
         })
