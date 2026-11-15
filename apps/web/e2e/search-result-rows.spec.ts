@@ -80,10 +80,12 @@ test('idle: no always-on; hovering a row lights exactly that one row', async ({ 
 test('↑↓ keyboard cursor takes over the highlight; Enter jumps to the cursor row', async ({ page }) => {
   await page.goto(BOARD);
   await searchProbe(page);
+  await expect(panel(page).getByText('打开', { exact: true })).toHaveCount(0);
 
   await page.keyboard.press('ArrowDown');
   const first = todoRows(page).first();
   await expect(first).toHaveAttribute('data-selected', '');
+  await expect(panel(page).getByText('打开', { exact: true })).toBeVisible();
   await expect.poll(() => isLit(first)).toBe(true);
 
   await page.keyboard.press('ArrowDown');
