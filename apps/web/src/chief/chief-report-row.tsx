@@ -1,38 +1,18 @@
-import type {
-  ChiefReportContent,
-  ChiefReportTodoRef,
-  IntakeItem,
-  RetroProposal,
-} from '@cairn/shared';
+import type { ChiefReportContent, IntakeItem, RetroProposal } from '@cairn/shared';
 import { type ReactNode, useState } from 'react';
-import { Link } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { Button } from '../components/ui/button.js';
+import { DialogShell } from '../components/ui/dialog-shell.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 
-const CARD_CLS =
-  'mt-6 flex flex-col gap-5 rounded-(--radius-reply) bg-(--reply-bubble-fill) px-4 py-3.5 text-ui leading-6 text-foreground';
-const SECTION_CLS = 'flex min-w-0 flex-col gap-1';
-const LABEL_CLS = 'text-meta text-content-tertiary';
 const REF_CLS = 'text-foreground hover:underline';
-const ONE_LINE_CLS = 'my-3 text-center text-meta text-content-tertiary';
-
-function TodoRefs({ refs }: { refs: readonly ChiefReportTodoRef[] }) {
-  if (refs.length === 0) return null;
-  return (
-    <span className="flex flex-wrap gap-x-2">
-      {refs.map((ref) => (
-        <ThreadLink key={ref.id} todoId={ref.id} className={REF_CLS}>
-          {ref.title}
-        </ThreadLink>
-      ))}
-    </span>
-  );
-}
+const LINE_CLS = 'my-3 text-center text-meta text-content-tertiary';
+const OPEN_CLS = 'px-0 text-meta font-normal no-underline hover:underline';
+const DRAFTS_SHOWN_MS = 7 * 24 * 60 * 60 * 1000;
 
 function Decision({
   proposal,
@@ -173,147 +153,74 @@ function IntakeRow({ item }: { item: IntakeItem }) {
 
 export function ChiefReportRow({ report }: { report: ChiefReportContent }) {
   const { t } = useI18n();
+  const [shown, setShown] = useState<ReadonlySet<string> | null>(null);
   const y = report.yesterday;
   const intake = report.intake ?? [];
-  const quietYesterday =
+  const drafts = [...report.retro, ...intake].filter((item) => item.status === 'draft');
+  const decidable = drafts.length > 0 && Date.now() - report.madeAt <= DRAFTS_SHOWN_MS;
+  const quiet =
     y.finishedCount + y.mergedCount + y.failedCount + y.retries + y.quotaWaits === 0 &&
     y.verdicts.pass + y.verdicts.block === 0;
-  if (
-    report.status === 'posted' &&
-    quietYesterday &&
-    report.retro.length === 0 &&
-    intake.length === 0
-  )
-    return (
-      <MessageScrollerItem style={{ contentVisibility: 'visible' }}>
-        <p className={ONE_LINE_CLS} data-testid="chief-report" data-variant="one-line">
-          {t('今天的日报：昨天没有新进展。')}
-          {report.needsYou.count > 0 && (
-            <Link to="/app" className={REF_CLS}>
-              {t('{n} 件等你', { n: report.needsYou.count })}
-            </Link>
-          )}
-        </p>
-      </MessageScrollerItem>
-    );
+  const counts = { done: y.finishedCount, merged: y.mergedCount, failed: y.failedCount };
+  const summary =
+    report.status !== 'posted'
+      ? t('日报没写成，昨天：完成 {done} · 合并 {merged} · 失败 {failed}', counts)
+      : quiet
+        ? t('今天的日报：昨天没有新进展')
+        : t('今天的日报：完成 {done} · 合并 {merged} · 失败 {failed}', counts);
+  const retro = report.retro.filter((item) => shown?.has(item.id));
+  const outside = intake.filter((item) => shown?.has(item.id));
   return (
     <MessageScrollerItem style={{ contentVisibility: 'visible' }}>
-      <section
-        data-testid="chief-report"
-        data-status={report.status}
-        aria-label={t('今天的日报')}
-        className={CARD_CLS}
-      >
-        <h3 className="m-0 text-ui font-medium text-foreground">
-          {t('今天的日报 · 昨天（{day}）', { day: report.covers })}
-        </h3>
-        {report.status !== 'posted' && (
-          <p className="m-0 text-meta text-content-tertiary" data-testid="chief-report-notice">
-            {report.status === 'retrying'
-              ? t('日报没写成，过一会儿再试一次；先看昨天的数字。')
-              : t('日报两次都没写成；下面是昨天的原始数字。')}
-          </p>
+      <p className={LINE_CLS} data-testid="chief-report" data-status={report.status}>
+        {summary}
+        {decidable && (
+          <>
+            {' · '}
+            <Button
+              variant="link"
+              size="xs"
+              data-testid="chief-report-open"
+              className={OPEN_CLS}
+              onClick={() => setShown(new Set(drafts.map((item) => item.id)))}
+            >
+              {t('{n} 条建议等你决定 →', { n: drafts.length })}
+            </Button>
+          </>
         )}
-        <div className={SECTION_CLS} data-testid="chief-report-yesterday">
-          <span className={LABEL_CLS}>{t('昨天的进展')}</span>
-          <div className="flex min-w-0 flex-col gap-1">
-            <span>
-              {t(
-                '完成 {done} · 合并 {merged} · 失败 {failed} · 重跑 {retries} · 等额度 {quota} · 审查通过 {pass} / 拦下 {block}',
-                {
-                  done: y.finishedCount,
-                  merged: y.mergedCount,
-                  failed: y.failedCount,
-                  retries: y.retries,
-                  quota: y.quotaWaits,
-                  pass: y.verdicts.pass,
-                  block: y.verdicts.block,
-                },
-              )}
-            </span>
-            {y.finished.length > 0 && (
-              <span className="flex flex-wrap gap-x-2">
-                <span className="text-content-tertiary">{t('完成：')}</span>
-                <TodoRefs refs={y.finished} />
-              </span>
-            )}
-            {y.merged.length > 0 && (
-              <span className="flex flex-wrap gap-x-2">
-                <span className="text-content-tertiary">{t('合并：')}</span>
-                {y.merged.map((pr) =>
-                  pr.prUrl === null ? (
-                    <ThreadLink key={pr.id} todoId={pr.id} className={REF_CLS}>
-                      #{pr.seq} {pr.title}
-                    </ThreadLink>
-                  ) : (
-                    <a
-                      key={pr.id}
-                      href={pr.prUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={REF_CLS}
-                    >
-                      PR {pr.prNumber ?? ''} · #{pr.seq} {pr.title}
-                    </a>
-                  ),
-                )}
-              </span>
-            )}
-            {y.failed.length > 0 && (
-              <span className="flex flex-wrap gap-x-2">
-                <span className="text-content-tertiary">{t('失败：')}</span>
-                <TodoRefs refs={y.failed} />
-              </span>
-            )}
-          </div>
-        </div>
-        <div className={SECTION_CLS} data-testid="chief-report-needs-you">
-          <span className={LABEL_CLS}>{t('等你的事')}</span>
-          <span>
-            {report.needsYou.count === 0 ? (
-              t('没有等你的事')
-            ) : (
-              <Link to="/app" className={REF_CLS}>
-                {t('{n} 件等你，去处理', { n: report.needsYou.count })}
-              </Link>
-            )}
-          </span>
-        </div>
-        {report.status === 'posted' && report.retroRan && (
-          <div className={SECTION_CLS} data-testid="chief-report-retro">
-            <span className={LABEL_CLS}>{t('复盘')}</span>
-            {report.retro.length === 0 ? (
-              <span>{t('昨天的对话里没找到值得改的地方')}</span>
-            ) : (
+      </p>
+      <DialogShell
+        open={shown !== null}
+        onClose={() => setShown(null)}
+        title={t('等你决定的建议')}
+        subtitle={t('来自 {day} 的日报', { day: report.covers })}
+      >
+        <div className="flex flex-col gap-5" data-testid="chief-report-drafts">
+          {retro.length > 0 && (
+            <section className="flex min-w-0 flex-col gap-2" data-testid="chief-report-retro">
+              <h3 className="m-0 text-meta font-normal text-content-tertiary">{t('复盘')}</h3>
               <ul className="m-0 flex list-none flex-col gap-4 p-0">
-                {report.retro.map((proposal) => (
+                {retro.map((proposal) => (
                   <ProposalItem key={proposal.id} proposal={proposal} />
                 ))}
               </ul>
-            )}
-          </div>
-        )}
-        {report.status === 'posted' && intake.length > 0 && (
-          <div className={SECTION_CLS} data-testid="chief-report-intake">
-            <span className={LABEL_CLS}>{t('外部动态')}</span>
-            <ul className="m-0 flex list-none flex-col gap-4 p-0">
-              {intake.map((item) => (
-                <IntakeRow key={item.id} item={item} />
-              ))}
-            </ul>
-          </div>
-        )}
-        {(report.truncated.length > 0 || report.retro.length > 0) && (
+            </section>
+          )}
+          {outside.length > 0 && (
+            <section className="flex min-w-0 flex-col gap-2" data-testid="chief-report-intake">
+              <h3 className="m-0 text-meta font-normal text-content-tertiary">{t('外部动态')}</h3>
+              <ul className="m-0 flex list-none flex-col gap-4 p-0">
+                {outside.map((item) => (
+                  <IntakeRow key={item.id} item={item} />
+                ))}
+              </ul>
+            </section>
+          )}
           <p className="m-0 text-meta text-content-tertiary">
-            {report.truncated.length > 0 &&
-              t('这些来源太长，只读了后面的部分：{sources}。', {
-                sources: report.truncated.join('、'),
-              })}
-            {report.retro.length > 0 &&
-              t('复盘建议只是草稿：点「建成线程」才会建线程，建好后也要你自己开始。')}
+            {t('点「建成线程」才会建线程，建好后也要你自己开始。')}
           </p>
-        )}
-      </section>
+        </div>
+      </DialogShell>
     </MessageScrollerItem>
   );
 }

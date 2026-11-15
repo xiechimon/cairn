@@ -233,7 +233,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### daily-report
 
-**Daily report and retro** (shipped). The Coordinator posts an 08:00 report in the conversation and proposes retro changes the user accepts or rejects.
+**Daily report and retro** (shipped). The Coordinator posts an 08:00 report as one line in the conversation; its undecided retro and intake suggestions open in a dialog where the user accepts or rejects them.
 
 - Research: [docs/research/duet-proactive-coordinator.md](research/duet-proactive-coordinator.md)
 - Frontend design: **gap**: the report row and retro proposal card have no design

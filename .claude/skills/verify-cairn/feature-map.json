@@ -413,8 +413,8 @@
     {
       "id": "daily-report",
       "name": "Daily report and retro",
-      "summary": "The Coordinator posts an 08:00 report in the conversation and proposes retro changes the user accepts or rejects.",
-      "states": "A report row in the conversation with yesterday, needs-you and intake sections, and retro proposals that can be accepted or rejected.",
+      "summary": "The Coordinator posts an 08:00 report as one line in the conversation; its undecided retro and intake suggestions open in a dialog where the user accepts or rejects them.",
+      "states": "One report line with yesterday's counts (quiet, failed, or with a link to undecided suggestions for a week), and a dialog listing the undecided retro and intake suggestions.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -433,7 +433,7 @@
       },
       "reach": [
         "open /app",
-        "click testid:chief-report"
+        "click testid:chief-report-open"
       ],
       "research": [
         "docs/research/duet-proactive-coordinator.md"
