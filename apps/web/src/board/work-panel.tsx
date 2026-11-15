@@ -234,7 +234,7 @@ export function WorkPanel({
               data-testid="made-search-toggle"
               aria-pressed={searching}
               onClick={toggleSearch}
-              className="text-content-secondary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+              className="text-content-secondary hover:text-foreground pointer-coarse:size-11 aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
             />
           }
         >

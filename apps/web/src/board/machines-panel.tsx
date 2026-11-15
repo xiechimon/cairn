@@ -157,7 +157,7 @@ function SectionLabel({ className, children }: { className?: string; children: R
 const ROW_CLS =
   'h-auto w-full justify-start gap-5 rounded-none py-2 pr-4 pl-5 text-left font-normal whitespace-normal hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 
-const LINE_ROW_CLS = 'h-9 py-0';
+const LINE_ROW_CLS = 'h-9 py-0 pointer-coarse:h-11';
 
 function LineRow({
   icon,
@@ -234,7 +234,7 @@ function MachineCard({
                 }}
               />
             }
-            className="h-7 flex-none px-2 text-ui font-normal text-foreground"
+            className="h-7 flex-none px-2 text-ui font-normal text-foreground pointer-coarse:h-11"
           >
             {t('编辑')}
           </Button>
@@ -354,7 +354,7 @@ export function MachinesPanel({
             aria-busy={checking}
             disabled={checking}
             onClick={recheck}
-            className="h-7 min-w-16 px-2 text-ui font-normal text-foreground disabled:opacity-100"
+            className="h-7 min-w-16 px-2 text-ui font-normal text-foreground pointer-coarse:h-11 disabled:opacity-100"
           >
             {checking ? (
               <Spinner
