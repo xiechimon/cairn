@@ -437,6 +437,19 @@ describe('in-server Coordinator turns', () => {
     },
   );
 
+  test('a Claude Code rule with no Runner to run it is a machine reason, not a missing provider', () => {
+    setCoordinatorInServer(true);
+    try {
+      const w = makeWorld();
+      expect(blockedOf(w, { provider: 'claude-code', modelId: 'sonnet' })).toEqual({
+        kind: 'machine-offline',
+        missing: [],
+      });
+    } finally {
+      setCoordinatorInServer(false);
+    }
+  });
+
   test('a routable rule leaves the turn to the server with no blocked reason', () => {
     setCoordinatorInServer(true);
     try {

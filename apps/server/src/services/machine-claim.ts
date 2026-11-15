@@ -49,6 +49,7 @@ import {
   CHIEF_DIGEST_REMOTE_TOOLS,
   isChiefDigestStep,
 } from './chief-digest.js';
+import { chiefReplaySection } from './chief-replay.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { claudeUsageGatePasses, refreshClaudeRateParks } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
@@ -271,6 +272,7 @@ function chiefClaimPayload(
   );
   const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
   const locked = digest || mailTurn;
+  const replay = locked ? null : chiefReplaySection(deps.db, threadRow.id);
   const chiefMcp = locked
     ? []
     : claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
@@ -303,7 +305,7 @@ function chiefClaimPayload(
     },
     chief: {
       threadId: threadRow.id,
-      systemPrompt,
+      systemPrompt: replay === null ? systemPrompt : `${systemPrompt}\n\n${replay}`,
       trigger,
     },
     remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : mailTurn ? [] : chiefRemoteTools())],
