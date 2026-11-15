@@ -52,7 +52,7 @@ beforeAll(async () => {
     HOME: userHome,
     CAIRN_CLAUDE_BIN: FAKE,
     CLAUDE_BIN: FAKE,
-    FAKE_CLAUDE_LOG: claudeLog,
+    FAKE_CLAUDE_PROMPT_LOG: claudeLog,
   })) {
     saved[key] = process.env[key];
     process.env[key] = value;
