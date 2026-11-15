@@ -35,8 +35,8 @@ import { projectOfTodo } from './git.js';
 import { resolveProjectGithubLabelIds } from './github-labels.js';
 import { forwardComputerCall } from './machine-computer.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
-import { refuseMailTurnTool } from './mail.js';
 import { stepScopeProjectId } from './picked-project.js';
+import { refuseRestrictedTurnTool } from './report-turn.js';
 import {
   coordinatorMemoryOwner,
   memoryOpsAreTeamScoped,
@@ -58,7 +58,7 @@ export async function machineAsk(
   opts: { holdMs: number; signal?: AbortSignal } = { holdMs: ASK_HOLD_MS },
 ): Promise<MachineAskResponse> {
   const row = ownedStep(deps, machineId, stepId);
-  refuseMailTurnTool(row.prompt, 'ask_user');
+  refuseRestrictedTurnTool(row.prompt, 'ask_user');
   if (row.kind === 'session') {
     return askWorkerQuestion(deps, row, body, opts);
   }
@@ -108,7 +108,7 @@ export async function executeRelayToolCall(
   signal?: AbortSignal,
 ): Promise<string> {
   const row = ownedStep(deps, machineId, stepId);
-  refuseMailTurnTool(row.prompt, name);
+  refuseRestrictedTurnTool(row.prompt, name, params);
   if (isComputerBrowserTool(name) || name === 'request_takeover') {
     if (row.kind !== 'chief') {
       throw new HttpError(400, 'browser tools require a chief step');

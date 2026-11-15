@@ -27,11 +27,11 @@ import {
   deliverMailEvent,
   mailNotice,
   rankMailEvent,
-  refuseMailTurnTool,
   transitionMailAccount,
 } from '../src/services/mail.js';
 import { validateMemoryText } from '../src/services/memory.js';
 import { pushToUserSafely } from '../src/services/push.js';
+import { refuseRestrictedTurnTool } from '../src/services/report-turn.js';
 import { createSecret, openSecretValues } from '../src/services/secrets.js';
 import {
   bootServer,
@@ -592,7 +592,7 @@ describe('mail connector slice 1', () => {
       /mail turn cannot call set_secret/,
     );
     expect(() =>
-      refuseMailTurnTool('[wake:wake] provenance=watch:todo\n', 'create_todo'),
+      refuseRestrictedTurnTool('[wake:wake] provenance=watch:todo\n', 'create_todo'),
     ).not.toThrow();
   });
 });
