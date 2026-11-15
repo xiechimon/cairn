@@ -267,6 +267,7 @@ export const claimedStepSchema = z.object({
       threadId: recordId,
       systemPrompt: z.string(),
       trigger: z.enum(['user', 'gate', 'settle', 'failed', 'wake']),
+      history: z.string().optional(),
     })
     .optional(),
   remoteTools: z.array(remoteToolDefSchema).optional(),
