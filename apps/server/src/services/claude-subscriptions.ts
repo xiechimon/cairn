@@ -7,7 +7,7 @@ import type {
 import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, claudeSubscription, machine, step, todo } from '../db/schema.js';
-import { conflict, HttpError, notFound } from '../lib/errors.js';
+import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { verifyClaudeSubscription } from './claude-subscription-verification.js';
 
@@ -154,7 +154,9 @@ export async function enableClaudeSubscription(
     });
   } catch (error) {
     if (error instanceof Error && /UNIQUE/i.test(error.message)) {
-      throw conflict('The enabled account changed; try again.');
+      throw new HttpError(409, 'The enabled account changed; try again.', undefined, {
+        code: 'conflict',
+      });
     }
     throw error;
   }

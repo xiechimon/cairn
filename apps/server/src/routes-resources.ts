@@ -482,7 +482,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/claude-subscriptions/:cid/steps', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 20) || 20, 1), 100);
+    const limit = Math.min(Math.max(Math.trunc(Number(c.req.query('limit') ?? 20)) || 20, 1), 100);
     return c.json(listSubscriptionSteps(keysvc, teamId, c.req.param('cid'), limit));
   });
 
