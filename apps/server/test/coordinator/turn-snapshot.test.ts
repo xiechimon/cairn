@@ -3,7 +3,7 @@ import { chiefIdFormat } from '@cairn/shared';
 import { otlpTraceIdOfTurn } from '@cairn/shared/otel';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '../../src/db/client.js';
 import { coordinatorTurnSnapshot, project, step, todo } from '../../src/db/schema.js';
 import * as ids from '../../src/lib/ids.js';
@@ -43,7 +43,7 @@ function snapshotRow(db: Db, turnId: string) {
     .get();
 }
 
-function toolThenCreateTodo(w: World) {
+function toolThenCreateTodo(w: World, quote = 'create a task') {
   w.s.db.insert(project).values({ id: 'p0', teamId: w.teamId, name: 'docs' }).run();
   const faux = fauxProvider({ provider: 'stub', models: [{ id: 'm', contextWindow: 200_000 }] });
   faux.setResponses(
@@ -54,7 +54,7 @@ function toolThenCreateTodo(w: World) {
         [
           fauxToolCall('create_todo', {
             projectId: 'p0',
-            quotes: ['create a task'],
+            quotes: [quote],
           }),
         ],
         { stopReason: 'toolUse' },
@@ -114,12 +114,9 @@ describe('coordinator turn snapshot writer', () => {
   });
 
   it('keeps the turn successful when snapshot sealing fails and never inserts a second row', async () => {
-    vi.mocked(ids.newRecordId).mockRestore();
-    vi.spyOn(ids, 'newRecordId')
-      .mockReturnValueOnce('snapshot-owner-sk')
-      .mockReturnValueOnce('snapshot-team-fixture');
-    const w = await world('please create a task');
-    const { faux } = toolThenCreateTodo(w);
+    const quote = `create a task mentioning chief-${'x'.repeat(19)}sk-${'A'.repeat(21)}`;
+    const w = await world(quote);
+    const { faux } = toolThenCreateTodo(w, quote);
     const coordinator = boot(w, faux, {});
     coordinator.wake(w.threadId);
     await coordinator.idle();
@@ -132,15 +129,18 @@ describe('coordinator turn snapshot writer', () => {
     expect(w.s.db.select().from(step).where(eq(step.id, w.stepId)).get()?.status).toBe('done');
   });
 
-  it.each(['0123456789012345678sk', '0123456789012345678SK', 'sk-012345678901234567'])(
+  it.each([
+    '0123456789012345678sk',
+    '0123456789012345678SK',
+    'sk-012345678901234567',
+    'snapshot-owner-sk',
+  ])(
     'records tool-boundary views for create_todo with pre-call world and committed effects for owner %s',
     async (ownerId) => {
-      const seedIds = vi
-        .spyOn(ids, 'newRecordId')
+      vi.mocked(ids.newRecordId)
         .mockReset()
         .mockReturnValueOnce(ownerId)
         .mockReturnValueOnce('012345678901234567890');
-      onTestFinished(() => seedIds.mockRestore());
       const w = await world('please create a task');
       const { faux } = toolThenCreateTodo(w);
       const coordinator = boot(w, faux);
@@ -162,6 +162,59 @@ describe('coordinator turn snapshot writer', () => {
       expect(result.id).toBe(created[0]?.id);
       expect(result.sourceBuildId).toBe(chiefIdFormat(ownerId, w.teamId));
       expect(result.sourceBuildId).toBe(created[0]?.sourceBuildId);
+    },
+  );
+
+  it.each([
+    'params',
+    'body',
+    'nested field',
+    'wrong identity',
+    'wrong tool',
+    'non-JSON result',
+    'duplicate field',
+  ])(
+    'rejects chief-shaped credentials in %s instead of trusting their shape or field name',
+    async (location) => {
+      vi.mocked(ids.newRecordId)
+        .mockReset()
+        .mockReturnValueOnce('0123456789012345678sk')
+        .mockReturnValueOnce('012345678901234567890');
+      const w = await world('hello');
+      const chiefId = chiefIdFormat(w.s.user.id, w.teamId);
+      const tool = location === 'wrong tool' ? 'projects' : 'create_todo';
+      const result = {
+        sourceBuildId:
+          location === 'wrong identity' ? `chief-${'x'.repeat(19)}sk-${'A'.repeat(21)}` : chiefId,
+        ...(location === 'body' ? { spec: chiefId } : {}),
+        ...(location === 'nested field' ? { nested: { sourceBuildId: chiefId } } : {}),
+      };
+      openTurnCapture(w.stepId);
+      capturePreCallWorld(
+        w.s.db,
+        w.stepId,
+        w.teamId,
+        tool,
+        'untrusted',
+        location === 'params' ? { sourceBuildId: chiefId } : {},
+      );
+      captureToolResult(
+        w.stepId,
+        tool,
+        location === 'non-JSON result'
+          ? result
+          : location === 'duplicate field'
+            ? `{"spec":"${chiefId}","spec":"safe","sourceBuildId":"${chiefId}"}`
+            : JSON.stringify(result),
+      );
+      const stepRow = w.s.db.select().from(step).where(eq(step.id, w.stepId)).get()!;
+      sealCoordinatorTurnSnapshot(w.s.db, stepRow, w.teamId, 'success', 1234);
+
+      expect(snapshotRow(w.s.db, w.stepId)).toMatchObject({
+        status: 'unusable',
+        payload: null,
+        digest: null,
+      });
     },
   );
 
