@@ -126,16 +126,18 @@ test('long project names truncate to one 34px line', async ({ page }) => {
   expect(m.rowHeight).toBe(34);
 });
 
-test('collapsed rail keeps `Coordinator` with its badge dot and the expand toggle', async ({ page }) => {
+test('collapsed leaves only the expand toggle; the peek opens `Coordinator` and expands', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app/schedules?scenario=01');
-  const aside = sidebar(page);
-  expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(48);
-  const home = aside.getByRole('link', { name: /Coordinator/ });
-  await expect(home).toBeVisible();
+  await expect(sidebar(page)).toHaveCount(0);
+  await page.getByTestId('sidebar-reopen').hover();
+  const peek = page.getByTestId('sidebar-peek');
+  const home = peek.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' });
   await home.click();
   await expect(page.getByTestId('home-c')).toBeVisible();
+  await page.mouse.move(700, 400);
+  await page.getByTestId('sidebar-reopen').hover();
   await expect(home).toHaveAttribute('aria-current', 'page');
-  await aside.getByRole('button', { name: '展开侧边栏' }).click();
-  expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(220);
+  await peek.getByRole('button', { name: '展开侧边栏' }).click();
+  expect(await sidebar(page).evaluate((el) => el.getBoundingClientRect().width)).toBe(220);
 });

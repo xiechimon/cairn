@@ -136,23 +136,6 @@ test('always-on mutual exclusion: page-layer pill dims while the panel is open, 
   await expect.poll(() => pillBg(pill)).not.toBe(TRANSPARENT); // restored
 });
 
-test('always-on mutual exclusion holds on the collapsed rail form', async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem('cairn.sidebar-collapsed', '1');
-  });
-  await page.goto(BOARD);
-  const rail = litPill(page);
-  await expect(rail).toHaveCount(1);
-  expect(await pillBg(rail)).not.toBe(TRANSPARENT);
-
-  await openPanel(page);
-  await expect.poll(() => pillBg(rail)).toBe(TRANSPARENT);
-
-  await page.keyboard.press('Escape');
-  await expect(panel(page)).toBeHidden();
-  await expect.poll(() => pillBg(rail)).not.toBe(TRANSPARENT);
-});
-
 // XMON-79: the caret was shaved to a sliver in the state ⌘K opens in. The
 // field was a frameless inline input (the old .input--palette skin, retired
 // with the #574 move to components/ui/input) that inherited .input's 8px

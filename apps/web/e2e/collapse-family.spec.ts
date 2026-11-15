@@ -27,15 +27,6 @@ test('an owner group folds to its count, flips aria and survives reload', async 
   await expect(projectRows(page)).toHaveCount(4);
 });
 
-test('the rail lists every project with no fold of its own', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.goto('/app?scenario=sidebar-ref');
-
-  await expect(page.locator('.rail-row [data-slot="project-glyph"]')).toHaveCount(4);
-  await expect(page.locator('.rail-row[aria-label="技能"]')).toHaveCount(0);
-  await expect(page.locator('.rail-group')).toHaveCount(0);
-});
-
 test('resources live in settings, not the sidebar', async ({ page }) => {
   await page.goto('/app?scenario=01');
   await expect(skills(page)).toHaveCount(0);

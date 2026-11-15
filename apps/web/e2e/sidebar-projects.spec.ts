@@ -303,15 +303,18 @@ test('the group menu renames a group and ungroups its projects', async ({ page }
   ]);
 });
 
-test('the collapsed rail names a waiting project with its status', async ({ page }) => {
+test('the collapsed sidebar peeks on hover with the waiting dot on its project', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await open(
     page,
     [PROJECT, project('proj-2', 'dogfood-sandbox')],
     [task('t-rev', 'proj-1', 'Review the relay', 'review', 'ready_for_review')],
   );
-  await expect(sidebar(page).getByRole('link', { name: 'cairn：有任务在等你' })).toBeVisible();
-  await expect(sidebar(page).getByRole('link', { name: 'dogfood-sandbox', exact: true })).toBeVisible();
+  await expect(page.getByRole('complementary')).toHaveCount(0);
+  await page.getByTestId('sidebar-reopen').hover();
+  const rows = page.getByTestId('sidebar-peek').locator('[data-slot="sidebar-project-row"]');
+  await expect(rows.filter({ hasText: 'cairn' }).locator('[data-slot="needs-you-dot"]')).toBeVisible();
+  await expect(rows.filter({ hasText: 'dogfood-sandbox' }).locator('[data-slot="needs-you-dot"]')).toHaveCount(0);
 });
 
 test.describe('on a touch screen', () => {

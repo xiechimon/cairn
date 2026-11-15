@@ -180,11 +180,10 @@ test('opening the file panel hides the sidebar like the other panels', async ({ 
   await page.goto(TEXT_DEEP_LINK);
   await expect(page.getByTestId('file-preview-panel')).toBeVisible();
   await expect(page.getByTestId('side-panel-resize')).toBeAttached();
-  await expect(page.locator('.board-sidebar')).toHaveCount(0);
+  await expect(page.locator('.board-shell > .board-sidebar')).toHaveCount(0);
   await expect(page.getByTestId('sidebar-reopen')).toBeVisible();
   await page.getByTestId('file-preview-panel').getByRole('button', { name: '关闭' }).click();
-  await expect(page.locator('.board-sidebar')).toBeVisible();
-  await expect(page.locator('.board-sidebar--collapsed')).toHaveCount(0);
+  await expect(page.locator('.board-shell > .board-sidebar')).toBeVisible();
   await expect(page.getByTestId('sidebar-reopen')).toHaveCount(0);
 });
 

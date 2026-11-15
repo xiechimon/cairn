@@ -708,13 +708,14 @@ test('the composer has no in-progress pill above it', async ({ page }) => {
   await expect(page.getByTestId('in-progress-pill')).toHaveCount(0);
 });
 
-test('the sidebar has no Schedules row in any layout', async ({ page }) => {
+test('Schedules is a footer icon in the sidebar, not a tree row', async ({ page }) => {
   await page.goto(HOME);
   const aside = page.locator('.board-sidebar');
   await expect(aside.getByRole('button', { name: '定时' })).toHaveCount(0);
-  await page.evaluate(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.reload();
-  await expect(page.getByRole('complementary').first().getByRole('link', { name: '定时' })).toHaveCount(0);
+  await expect(aside.locator('nav').getByRole('link', { name: '定时' })).toHaveCount(0);
+  await page.getByTestId('sidebar-footer').getByRole('link', { name: '定时' }).click();
+  await expect(page).toHaveURL(/\/app\/schedules/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('定时');
 });
 
 test('at phone width the panel overlays without horizontal overflow', async ({ page }) => {
