@@ -4588,6 +4588,11 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
     {
       "additionalProperties": false,
       "properties": {
+        "clientMessageId": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string",
+        },
         "conversationId": {
           "type": "string",
         },
