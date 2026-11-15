@@ -20,15 +20,15 @@ import { toModelOptions } from '../api/mappers.js';
 import { useModelRouting } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
+import { withCodeSpans } from '../components/notice-banner.js';
 import { SettingsCard } from '../components/settings-list.js';
+import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { Spinner } from '../components/ui/spinner.js';
-import { Switch } from '../components/ui/switch.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { COORDINATOR_ROUTING_HREF } from '../resources/routing-settings-page.js';
 import { safeSessionStorage } from '../safe-storage.js';
 import { settingsHref } from '../settings/settings-href.js';
 import {
@@ -99,7 +99,7 @@ function StepGlyph({ n, state }: { n: number; state: 'done' | 'now' | 'open' }) 
       <span
         role="img"
         aria-label={t('已完成')}
-        className="grid size-5 flex-none place-items-center rounded-full bg-content-tertiary text-background"
+        className="grid size-5 flex-none place-items-center rounded-full bg-foreground text-background"
       >
         <Check className="size-4" />
       </span>
@@ -130,7 +130,7 @@ function Step({
   n: number;
   title: string;
   state: 'done' | 'now' | 'open';
-  summary?: string;
+  summary?: ReactNode;
   children?: ReactNode;
 }) {
   return (
@@ -146,13 +146,13 @@ function Step({
           {title}
         </span>
         {summary !== undefined && (
-          <span className="ml-auto min-w-0 truncate text-meta text-content-tertiary">
+          <span className="ml-auto min-w-0 truncate text-right text-meta text-content-tertiary max-[640px]:whitespace-normal">
             {summary}
           </span>
         )}
       </div>
       {state === 'now' && children !== undefined && (
-        <div className="px-4 pb-4 pl-12 max-[640px]:pl-4">{children}</div>
+        <div className="px-4 pt-1 pb-4 pl-12 max-[640px]:pl-4">{children}</div>
       )}
     </section>
   );
@@ -172,14 +172,16 @@ function SourceRow({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-border py-3 first:border-t">
-      <span className="grid size-7 flex-none place-items-center rounded-lg bg-secondary text-content-secondary">
+    <div className="flex flex-wrap items-start gap-x-3 gap-y-2 py-3">
+      <span className="grid size-8 flex-none place-items-center rounded-lg bg-background text-content-secondary ring-1 ring-border">
         {icon}
       </span>
-      <div className="min-w-0 flex-1">
-        <div className="font-title text-foreground">{title}</div>
+      <div className="min-w-48 flex-1 text-pretty">
+        <div className="text-foreground">
+          <span className="font-title">{title}</span>
+          <span className="text-meta whitespace-nowrap text-content-tertiary"> · {usedBy}</span>
+        </div>
         <div className="text-meta text-content-secondary">{status}</div>
-        <div className="text-caption text-content-tertiary">{usedBy}</div>
       </div>
       {action}
     </div>
@@ -205,64 +207,70 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
         t('本机执行机没有启动，查不到 Claude Code。退出 Cairn 再打开一次。')
       )
     ) : login ? (
-      t('这台电脑上找到了已登录的 Claude Code')
+      t('已在这台电脑上登录')
     ) : (
-      t('没找到已登录的 Claude Code。在终端运行 claude 登录后，这里会自己更新。')
+      withCodeSpans(t('没找到已登录的 Claude Code。在终端运行 `claude` 登录后，这里会自己更新。'))
     );
   const hasProvider = progress.models.coordinator;
   return (
     <>
-      <p className="m-0 mb-3 text-content-secondary">
-        {t('Coordinator 和任务取模型的地方不同：Claude Code 登录只能给任务用。')}
-      </p>
-      <SourceRow
-        icon={<SquareTerminal className="size-4" />}
-        title={t('这台电脑上的 Claude Code')}
-        status={ccStatus}
-        usedBy={t('只给任务用')}
-        action={
-          online !== undefined && login ? (
-            <span className="flex items-center gap-2 text-meta text-content-secondary">
-              {ccEnabled ? t('已启用') : t('启用')}
-              <Switch
-                checked={ccEnabled}
-                aria-label={t('让任务用这台电脑上的 Claude Code')}
-                onCheckedChange={(next) =>
-                  patchMachine.mutate(
-                    {
-                      id: online.id,
-                      body: {
-                        enabledRuntimes: MACHINE_RUNTIMES.filter((runtime) =>
-                          runtime === 'claude-code'
-                            ? next
-                            : (online.enabledRuntimes ?? []).includes(runtime),
-                        ),
+      <div className="divide-y divide-border">
+        <SourceRow
+          icon={<SquareTerminal className="size-5" />}
+          title={t('本机 Claude Code')}
+          status={ccStatus}
+          usedBy={t('只给任务用')}
+          action={
+            online !== undefined && login ? (
+              <div className="flex min-h-8 items-center">
+                <ToggleSwitch
+                  className="pointer-coarse:after:-inset-y-3"
+                  checked={ccEnabled}
+                  aria-label={t('让任务用这台电脑上的 Claude Code')}
+                  onCheckedChange={(next) =>
+                    patchMachine.mutate(
+                      {
+                        id: online.id,
+                        body: {
+                          enabledRuntimes: MACHINE_RUNTIMES.filter((runtime) =>
+                            runtime === 'claude-code'
+                              ? next
+                              : (online.enabledRuntimes ?? []).includes(runtime),
+                          ),
+                        },
                       },
-                    },
-                    { onError: (error) => toastError(t('保存失败，请重试。'), error) },
-                  )
-                }
-              />
-            </span>
-          ) : undefined
-        }
-      />
-      <SourceRow
-        icon={<KeyRound className="size-4" />}
-        title={t('服务商')}
-        status={hasProvider ? t('已添加，Coordinator 能用') : t('Claude token、API key 或本地模型')}
-        usedBy={t('Coordinator 和任务都能用')}
-        action={
-          hasProvider ? undefined : (
-            <Button variant="outline" render={<Link to={settingsHref('providers')} />}>
-              <Plus />
-              {t('添加服务商')}
-            </Button>
-          )
-        }
-      />
+                      { onError: (error) => toastError(t('保存失败，请重试。'), error) },
+                    )
+                  }
+                />
+              </div>
+            ) : undefined
+          }
+        />
+        <SourceRow
+          icon={<KeyRound className="size-5" />}
+          title={t('服务商')}
+          status={
+            hasProvider ? t('已添加，Coordinator 能用') : t('Claude 订阅、API key 或本地模型')
+          }
+          usedBy={t('Coordinator 和任务都能用')}
+          action={
+            hasProvider ? undefined : (
+              <div className="flex min-h-8 items-center max-[640px]:w-full max-[640px]:pl-11">
+                <Button
+                  className="pointer-coarse:h-11"
+                  render={<Link to={settingsHref('providers')} />}
+                >
+                  <Plus />
+                  {t('添加服务商')}
+                </Button>
+              </div>
+            )
+          }
+        />
+      </div>
       {progress.models.tasks && !progress.models.coordinator && (
-        <p className="m-0 mt-3 flex items-start gap-2 text-meta text-content-secondary">
+        <p className="m-0 mt-1 flex items-start gap-2 text-pretty text-meta text-content-secondary">
           <span className="mt-1.5 size-1.5 flex-none rounded-full bg-(--card-button)" />
           {t('任务已经能跑了。Coordinator 用不了 Claude Code 登录，还需要一个服务商。')}
         </p>
@@ -334,8 +342,18 @@ function ConfirmBody({ setup }: { setup: Setup }) {
   const { patchRule } = useRoutingSettingsMutations(setup.teamId);
   const picks = picksOf(setup, t);
   const rows = [
-    { who: t('Coordinator'), what: t('和你对话、拆任务、派活'), pick: picks[0] },
-    { who: t('新任务'), what: t('写代码和做调研的 Agent 默认用它'), pick: picks[1] },
+    {
+      use: 'coordinator',
+      who: t('Coordinator'),
+      what: t('和你对话、拆任务、派活'),
+      pick: picks[0],
+    },
+    {
+      use: 'session',
+      who: t('新任务'),
+      what: t('写代码和做调研的 Agent 默认用它'),
+      pick: picks[1],
+    },
   ];
   const ready = picks.every((p) => p != null);
   const confirm = async () => {
@@ -356,42 +374,48 @@ function ConfirmBody({ setup }: { setup: Setup }) {
       <p className="m-0 mb-3 text-content-secondary">
         {t('Cairn 按你接入的模型挑了这两个。确认后才会保存，以后可以在设置里改。')}
       </p>
-      {rows.map(({ who, what, pick }) => {
-        const [model, provider] = pick == null ? [null, null] : modelLabel(pick, setup.options);
-        return (
-          <div
-            key={who}
-            data-testid={`first-run-pick-${pick?.use ?? who}`}
-            className="flex items-start gap-3 border-b border-border py-3 first:border-t"
-          >
-            <div className="min-w-0 flex-1">
-              <div className="font-title text-foreground">{who}</div>
-              <div className="text-meta text-content-tertiary">{what}</div>
-              {pick == null ? (
-                <div className="mt-2 text-meta text-destructive">{t('还没有能用的模型')}</div>
-              ) : (
-                <>
-                  <div className="mt-2 flex flex-wrap items-baseline gap-2">
+      <div className="divide-y divide-border">
+        {rows.map(({ use, who, what, pick }) => {
+          const [model, provider] = pick == null ? [null, null] : modelLabel(pick, setup.options);
+          return (
+            <div key={who} data-testid={`first-run-pick-${use}`} className="py-3">
+              <div className="text-pretty">
+                <span className="text-foreground">{who}</span>
+                <span className="text-meta text-content-tertiary"> · {what}</span>
+              </div>
+              <div className="mt-1 flex min-h-6 flex-wrap items-center gap-x-2">
+                {pick == null ? (
+                  <span className="text-meta text-destructive">{t('还没有能用的模型')}</span>
+                ) : (
+                  <>
                     <span className="font-title text-foreground">{model}</span>
                     <span className="text-meta text-content-secondary">{provider}</span>
-                  </div>
-                  <div className="text-meta text-content-tertiary">{pick.why}</div>
-                </>
+                  </>
+                )}
+                <Button
+                  variant="link"
+                  className="ml-auto h-6 p-0 text-(--card-button) no-underline hover:underline pointer-coarse:h-11"
+                  render={<Link to={`${settingsHref('work-routing')}#route-${use}`} />}
+                >
+                  {t('换一个')}
+                </Button>
+              </div>
+              {pick != null && (
+                <div className="text-pretty text-meta text-content-tertiary">{pick.why}</div>
               )}
             </div>
-            <Button variant="ghost" render={<Link to={COORDINATOR_ROUTING_HREF} />}>
-              {t('换一个')}
-            </Button>
-          </div>
-        );
-      })}
-      <div className="mt-4">
+          );
+        })}
+      </div>
+      <div className="mt-3">
         <Button
           data-testid="first-run-confirm"
+          className="pointer-coarse:h-11"
           disabled={!ready || patchRule.isPending}
           onClick={() => void confirm()}
         >
-          {t('确认这两个模型')}
+          {patchRule.isPending && <Spinner className="size-4" />}
+          {patchRule.isPending ? t('保存中…') : t('确认这两个模型')}
         </Button>
       </div>
     </>
@@ -403,47 +427,64 @@ export function FirstRunSetup({ setup, onSkip }: { setup: Setup; onSkip: () => v
   const progress = setup.progress;
   if (progress === undefined) return null;
   const open = setupOpenStep(progress);
-  const modelsDone = progress.models.coordinator && progress.models.tasks;
   const stateOf = (step: SetupStepId): 'done' | 'now' | 'open' =>
     open === step ? 'now' : step === 'models' || open === null ? 'done' : 'open';
+  const saved =
+    open === null
+      ? picksOf(setup, t).flatMap((pick, i) =>
+          pick == null
+            ? []
+            : [
+                i > 0 && (
+                  <span key="sep" className="max-[640px]:hidden">
+                    {' · '}
+                  </span>
+                ),
+                <span key={pick.use} className="max-[640px]:block">
+                  {t('{role}：{model}', {
+                    role: pick.use === 'coordinator' ? t('Coordinator') : t('任务'),
+                    model: modelLabel(pick, setup.options)[0],
+                  })}
+                </span>,
+              ],
+        )
+      : undefined;
   return (
     <main
       data-testid="first-run-setup"
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-background"
     >
       <div className="mx-auto w-full max-w-160 px-6 pt-22 pb-12 max-[640px]:px-4 max-[640px]:pt-21">
-        <h1 className="m-0 voice-title text-page text-foreground">{t('先把模型配好')}</h1>
-        <p className="m-0 mt-2 mb-6 text-content-secondary">
-          {t('Cairn 在这台电脑上跑 Agent，用你自己的模型。下面两步做完，就能建第一个项目。')}
+        <h1 className="m-0 voice-title text-page text-foreground">
+          {open === null ? t('模型配好了') : t('先把模型配好')}
+        </h1>
+        <p className="m-0 mt-2 mb-6 text-pretty text-content-secondary">
+          {open === null
+            ? t('现在可以建第一个项目了。模型以后可以在设置里改。')
+            : t('Cairn 在这台电脑上跑 Agent，用你自己的模型。做完下面两步就能建第一个项目。')}
         </p>
         <SettingsCard>
           <Step
             n={1}
             title={t('接入模型')}
             state={stateOf('models')}
-            summary={
-              modelsDone
-                ? t('Coordinator 和任务都有模型')
-                : progress.models.tasks
-                  ? t('Coordinator 还缺服务商')
-                  : undefined
-            }
+            summary={open === 'models' ? undefined : t('Coordinator 和任务都有模型')}
           >
             <ModelsBody setup={setup} progress={progress} />
           </Step>
-          <Step n={2} title={t('确认模型')} state={stateOf('confirm')}>
+          <Step n={2} title={t('确认模型')} state={stateOf('confirm')} summary={saved}>
             <ConfirmBody setup={setup} />
           </Step>
         </SettingsCard>
-        <div className="mt-6 flex flex-wrap items-center gap-3">
+        <div className="mt-8 flex flex-wrap items-center gap-3">
           {open === null ? (
-            <Button render={<Link to="/app/project/new" />}>
+            <Button className="pointer-coarse:h-11" render={<Link to="/app/project/new" />}>
               <Plus />
               {t('新建第一个项目')}
             </Button>
           ) : (
             <>
-              <Button variant="outline" disabled>
+              <Button className="pointer-coarse:h-11" disabled>
                 <Plus />
                 {t('新建第一个项目')}
               </Button>
@@ -452,17 +493,17 @@ export function FirstRunSetup({ setup, onSkip }: { setup: Setup; onSkip: () => v
           )}
         </div>
         {open !== null && (
-          <p className="m-0 mt-8 text-meta text-content-tertiary">
-            {t('不急的话可以')}{' '}
+          <p className="m-0 mt-6 text-pretty text-meta text-content-tertiary">
+            {t('不急的话可以')}
             <Button
               variant="link"
-              className="h-auto p-0 text-meta text-content-secondary"
+              className="inline-flex h-auto min-h-6 p-0 align-baseline text-meta text-foreground underline decoration-content-tertiary underline-offset-4 pointer-coarse:-my-3 pointer-coarse:py-3"
               onClick={() => {
                 skipSetup();
                 onSkip();
               }}
             >
-              {t('先去看看')}
+              {t('先跳过，去主页看看')}
             </Button>
             {t('，下次打开 Cairn 时这页还在。')}
           </p>

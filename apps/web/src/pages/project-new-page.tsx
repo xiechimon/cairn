@@ -13,7 +13,7 @@ import { ApiError } from '../api/client.js';
 import { useApiMutations, useGithubConnection, useGithubRepos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { projectCreationBlocked, setupOpenStep } from '../board/first-run-checklist-model.js';
-import { missingStepCopy, SETUP_HREF, useFirstRunSetup } from '../board/first-run-setup.js';
+import { SETUP_HREF, useFirstRunSetup } from '../board/first-run-setup.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
 import { Button } from '../components/ui/button.js';
@@ -361,8 +361,13 @@ export function ProjectNewPage() {
     return (
       <RouteDialog title={t('新建项目')} size="form">
         <FormStack>
-          <p data-testid="project-new-blocked" className="m-0 text-ui text-content-secondary">
-            {missingStepCopy(blockedStep, t)}
+          <p
+            data-testid="project-new-blocked"
+            className="m-0 text-pretty text-ui text-content-secondary"
+          >
+            {blockedStep === 'models'
+              ? t('建项目前要先把模型配好，还差第 1 步：接入模型。')
+              : t('建项目前要先把模型配好，还差第 2 步：确认模型。')}
           </p>
           <FormActions primary={{ label: t('去完成设置'), onClick: () => navigate(SETUP_HREF) }} />
         </FormStack>

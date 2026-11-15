@@ -23,7 +23,7 @@ test('a fresh install creates the coordinator rule in the UI and the Coordinator
   const composer = () => page.getByTestId('home-c').getByTestId('chief-composer-input');
 
   await page.goto(`${server.base}/app`);
-  await page.getByTestId('first-run-setup').getByRole('button', { name: '先去看看' }).click();
+  await page.getByTestId('first-run-setup').getByRole('button', { name: '先跳过，去主页看看' }).click();
   await composer().fill('first message before any rule');
   await composer().press('Enter');
   await expect.poll(() => sendStatuses).toEqual([409]);

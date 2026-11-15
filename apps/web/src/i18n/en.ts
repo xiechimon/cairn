@@ -258,18 +258,14 @@ export const EN: Record<string, string> = {
     'The local Runner is starting; it checks Claude Code on this computer once it is up',
   '本机执行机没有启动，查不到 Claude Code。退出 Cairn 再打开一次。':
     'The local Runner did not start, so Claude Code cannot be checked. Quit Cairn and open it again.',
-  '这台电脑上找到了已登录的 Claude Code': 'Found a signed-in Claude Code on this computer',
-  '没找到已登录的 Claude Code。在终端运行 claude 登录后，这里会自己更新。':
-    'No signed-in Claude Code found. Run claude in a terminal and sign in; this updates by itself.',
-  'Coordinator 和任务取模型的地方不同：Claude Code 登录只能给任务用。':
-    'The Coordinator and tasks get models from different places: a Claude Code sign-in only serves tasks.',
-  '这台电脑上的 Claude Code': 'Claude Code on this computer',
+  已在这台电脑上登录: 'Signed in on this computer',
+  '{role}：{model}': '{role}: {model}',
+  '没找到已登录的 Claude Code。在终端运行 `claude` 登录后，这里会自己更新。':
+    'No signed-in Claude Code found. Run `claude` in a terminal and sign in; this updates by itself.',
+  '本机 Claude Code': 'Claude Code on this computer',
   只给任务用: 'Tasks only',
-  已启用: 'On',
-  启用: 'Turn on',
   '让任务用这台电脑上的 Claude Code': 'Let tasks use Claude Code on this computer',
   '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
-  'Claude token、API key 或本地模型': 'A Claude token, an API key or a local model',
   'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
   '任务已经能跑了。Coordinator 用不了 Claude Code 登录，还需要一个服务商。':
     'Tasks can run now. The Coordinator cannot use a Claude Code sign-in and still needs a provider.',
@@ -290,15 +286,23 @@ export const EN: Record<string, string> = {
   换一个: 'Change',
   确认这两个模型: 'Confirm both models',
   先把模型配好: 'Set up your models first',
-  'Cairn 在这台电脑上跑 Agent，用你自己的模型。下面两步做完，就能建第一个项目。':
+  'Cairn 在这台电脑上跑 Agent，用你自己的模型。做完下面两步就能建第一个项目。':
     'Cairn runs agents on this computer with your own models. Finish the two steps below to create your first project.',
+  模型配好了: 'Your models are set',
+  '现在可以建第一个项目了。模型以后可以在设置里改。':
+    'You can create your first project now. You can change the models in Settings later.',
+  'Claude 订阅、API key 或本地模型': 'A Claude subscription, an API key or a local model',
+  '先跳过，去主页看看': 'skip for now and look around',
+  '建项目前要先把模型配好，还差第 1 步：接入模型。':
+    'Set up your models before creating a project. Step 1 is still open: connect models.',
+  '建项目前要先把模型配好，还差第 2 步：确认模型。':
+    'Set up your models before creating a project. Step 2 is still open: confirm models.',
+  '保存中…': 'Saving…',
   接入模型: 'Connect models',
   'Coordinator 和任务都有模型': 'The Coordinator and tasks both have models',
-  'Coordinator 还缺服务商': 'The Coordinator needs a provider',
   确认模型: 'Confirm models',
   新建第一个项目: 'Create your first project',
-  不急的话可以: 'No rush:',
-  先去看看: 'look around first',
+  不急的话可以: 'No rush: ',
   '，下次打开 Cairn 时这页还在。': '; this page is here the next time you open Cairn.',
   去完成设置: 'Finish setup',
   '在要干活的电脑上运行 `{command}`': 'Run `{command}` on the computer that should do the work',
