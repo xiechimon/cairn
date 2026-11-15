@@ -118,7 +118,9 @@ function CoordinatorDefaultHint({
   return <span data-testid="routing-coordinator-default">{text}</span>;
 }
 
-function currentOption(rule: RoutingRuleRecord | null, options: readonly ModelOption[]) {
+type RuleModel = Pick<RoutingRuleRecord, 'provider' | 'modelId'>;
+
+function currentOption(rule: RuleModel | null, options: readonly ModelOption[]) {
   if (rule === null) return undefined;
   if (rule.provider === 'pi') {
     return options.find((o) => o.runtime === 'pi' && o.modelId === rule.modelId);
@@ -126,25 +128,33 @@ function currentOption(rule: RoutingRuleRecord | null, options: readonly ModelOp
   return options.find((o) => o.provider === rule.provider && o.modelId === rule.modelId);
 }
 
-function ModelPicker({
+export function ModelPicker({
   use,
   rule,
   options,
   enabledRuntimes,
   onPick,
+  trigger,
 }: {
   use: RouteUse;
-  rule: RoutingRuleRecord | null;
+  rule: RuleModel | null;
   options: ModelOption[];
   enabledRuntimes: ReadonlySet<string> | null;
   onPick: (option: ModelOption) => void;
+  trigger?: { label: string; className: string };
 }) {
   const { t } = useI18n();
   const picked = currentOption(rule, options);
   const byKey = new Map(options.map((o) => [modelKey(o), o]));
   const runtimes = [...new Set(options.map((o) => o.runtime))];
+  const coordinatorCannot = (runtime: string) => use === 'coordinator' && runtime !== 'pi';
   const runtimeOff = (runtime: string) =>
-    enabledRuntimes !== null && runtime !== 'pi' && !enabledRuntimes.has(runtime);
+    coordinatorCannot(runtime) ||
+    (enabledRuntimes !== null && runtime !== 'pi' && !enabledRuntimes.has(runtime));
+  const runtimeLabel = (runtime: string) =>
+    runtime === 'pi'
+      ? t('服务商')
+      : (MODEL_SOURCE_RUNTIME_LABELS[runtime as ModelSourceRuntime] ?? runtime);
   return (
     <Select
       value={picked === undefined ? null : modelKey(picked)}
@@ -154,36 +164,50 @@ function ModelPicker({
       }}
     >
       <SelectTrigger
-        aria-label={t('{use} 的模型', { use: t(ROUTE_USE_LABELS[use]) })}
-        className={cn(
-          SETTINGS_SELECT_TRIGGER_CLS,
-          'routing-rule-model-select w-56 max-sm:h-7 max-sm:w-auto max-sm:min-w-0 max-sm:flex-1 max-sm:text-meta',
-        )}
+        aria-label={
+          trigger === undefined
+            ? t('{use} 的模型', { use: t(ROUTE_USE_LABELS[use]) })
+            : t('{label}（{use} 的模型）', { label: trigger.label, use: t(ROUTE_USE_LABELS[use]) })
+        }
+        className={
+          trigger?.className ??
+          cn(
+            SETTINGS_SELECT_TRIGGER_CLS,
+            'routing-rule-model-select w-56 max-sm:h-7 max-sm:w-auto max-sm:min-w-0 max-sm:flex-1 max-sm:text-meta',
+          )
+        }
       >
-        <SelectValue>
-          {picked !== undefined
-            ? picked.modelName
-            : rule !== null
-              ? t('{model}（不可用）', { model: rule.modelId })
-              : t('未设置模型')}
-        </SelectValue>
+        {trigger !== undefined ? (
+          trigger.label
+        ) : (
+          <SelectValue>
+            {picked !== undefined
+              ? picked.modelName
+              : rule !== null
+                ? t('{model}（不可用）', { model: rule.modelId })
+                : t('未设置模型')}
+          </SelectValue>
+        )}
       </SelectTrigger>
-      <SelectContent className="routing-rule-model-menu w-max min-w-(--anchor-width) max-w-(--available-width)">
+      <SelectContent
+        className="routing-rule-model-menu w-max min-w-(--anchor-width) max-w-(--available-width)"
+        {...(trigger === undefined ? {} : { alignItemWithTrigger: false, align: 'end' as const })}
+      >
         {runtimes.map((runtime) => (
           <SelectGroup key={runtime}>
             <SelectLabel>
-              {runtimeOff(runtime)
-                ? t('{runtime}（没有执行机启用）', {
-                    runtime: MODEL_SOURCE_RUNTIME_LABELS[runtime as ModelSourceRuntime] ?? runtime,
-                  })
-                : (MODEL_SOURCE_RUNTIME_LABELS[runtime as ModelSourceRuntime] ?? runtime)}
+              {coordinatorCannot(runtime)
+                ? t('{runtime}（Coordinator 用不了）', { runtime: runtimeLabel(runtime) })
+                : runtimeOff(runtime)
+                  ? t('{runtime}（没有执行机启用）', { runtime: runtimeLabel(runtime) })
+                  : runtimeLabel(runtime)}
             </SelectLabel>
             {options
               .filter((o) => o.runtime === runtime)
               .map((o) => (
                 <SelectItem
                   key={`${o.machineId ?? ''}/${modelKey(o)}`}
-                  className="routing-rule-model-row"
+                  className="routing-rule-model-row pointer-coarse:min-h-11"
                   value={modelKey(o)}
                   disabled={o.liveness === 'dead' || runtimeOff(runtime)}
                 >
