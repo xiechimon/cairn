@@ -923,7 +923,7 @@ Reach:
 
 - Web routes: `/app/schedules`
 - Keyboard shortcuts in its code: `D`
-- Test ids in its code: `schedule-detail-body`, `schedules-ended`, `schedules-error`, `schedules-loading`
+- Test ids in its code: `schedule-detail-body`, `schedule-popover`, `schedule-popover-runs`, `schedules-ended`, `schedules-error`, `schedules-loading`
 - Research: **gap**: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model
 - Frontend design: **gap**: the schedules page and detail dialog have no design
 - Backend design: **gap**: no design for due events, missed runs and continue-thread schedules

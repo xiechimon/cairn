@@ -51,7 +51,7 @@ describe('schedule editor wire values', () => {
   test('custom cron is trimmed and sent without a made-up client parser', () => {
     const body = scheduleBody({ ...scheduleDraft(record, NOW), trigger: 'custom', cron: '  */20 8-17 * * MON-FRI  ' }, record, NOW);
     expect(body).toMatchObject({ kind: 'cron', cron: '*/20 8-17 * * MON-FRI' });
-    expect(() => scheduleBody({ ...scheduleDraft(record, NOW), trigger: 'custom', cron: '* *' }, record, NOW)).toThrow('Use five cron fields');
+    expect(() => scheduleBody({ ...scheduleDraft(record, NOW), trigger: 'custom', cron: '* *' }, record, NOW)).toThrow('cron 需要 5 段');
   });
   test('named timezone converts its wall clock rather than the browser timezone', () => {
     expect(scheduleTime('2026-11-05', '09', '15', 'Asia/Shanghai')).toBe(Date.UTC(2026, 10, 5, 1, 15));
@@ -62,7 +62,7 @@ describe('schedule editor wire values', () => {
     expect(scheduleTime('2026-03-08', '02', '30', 'America/New_York')).toBeNull();
   });
   test('past one-time values are rejected without silently changing the chosen date', () => {
-    expect(() => scheduleBody({ ...scheduleDraft(record, NOW), trigger: 'once', date: '2026-11-04', hour: '09', minute: '00' }, record, NOW)).toThrow('Choose a future time');
+    expect(() => scheduleBody({ ...scheduleDraft(record, NOW), trigger: 'once', date: '2026-11-04', hour: '09', minute: '00' }, record, NOW)).toThrow('单次定时要选一个将来的时间');
   });
   test('a finished once row is distinct from a paused or auto-disabled row', () => {
     expect(scheduleViewState({ ...record, kind: 'once', nextRunAt: null })).toBe('finished');

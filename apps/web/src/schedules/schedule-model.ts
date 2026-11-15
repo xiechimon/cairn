@@ -1,4 +1,5 @@
 import type { CreateScheduleBody, ScheduleRecord } from '@cairn/shared';
+import type { ScheduleRecord as DisplaySchedule } from '../fixtures/records.js';
 import type { TFunc } from '../i18n/translate.js';
 
 export type ScheduleTrigger = 'once' | 'hourly' | 'daily' | 'weekdays' | 'weekly' | 'custom';
@@ -115,16 +116,14 @@ export function scheduleBody(
   };
   if (draft.trigger === 'custom') {
     const cron = draft.cron.trim();
-    if (cron.split(/\s+/).length !== 5)
-      throw new Error('Use five cron fields: minute hour day month weekday.');
+    if (cron.split(/\s+/).length !== 5) throw new Error('cron 需要 5 段：分 时 日 月 周。');
     return { ...base, kind: 'cron', cron };
   }
   if (draft.trigger === 'weekdays')
     return { ...base, kind: 'cron', cron: `${Number(draft.minute)} ${Number(draft.hour)} * * 1-5` };
   const at = scheduleTime(draft.date, draft.hour, draft.minute, schedule.tz);
-  if (at === null) throw new Error('Choose a valid date and time in this timezone.');
-  if (draft.trigger === 'once' && at <= now)
-    throw new Error('Choose a future time for a one-time schedule.');
+  if (at === null) throw new Error('请选择这个时区里有效的日期和时间。');
+  if (draft.trigger === 'once' && at <= now) throw new Error('单次定时要选一个将来的时间。');
   return { ...base, kind: draft.trigger, at };
 }
 
@@ -163,4 +162,16 @@ export function scheduleEnded(schedule: {
   nextRunAt: number | null;
 }): boolean {
   return schedule.kind === 'once' && (schedule.enabled === false || schedule.nextRunAt === null);
+}
+
+export function toWireSchedule(schedule: DisplaySchedule): ScheduleRecord {
+  return {
+    ...schedule,
+    cron: schedule.cron ?? null,
+    prompt: schedule.prompt ?? '',
+    enabled: schedule.enabled ?? true,
+    pausedReason: schedule.pausedReason ?? null,
+    lastRunAt: schedule.lastRunAt ?? null,
+    lastRunStatus: schedule.lastRunStatus ?? null,
+  };
 }
