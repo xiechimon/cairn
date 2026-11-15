@@ -77,6 +77,7 @@ function ActivityThreadRow({
       tone={tone}
       age={relativeTime(row.todo.phaseAt, now, t)}
       onOpen={onOpen}
+      flush
       reason={
         <span className="inline-flex max-w-full items-center gap-1.5">
           <ToneGlyph
