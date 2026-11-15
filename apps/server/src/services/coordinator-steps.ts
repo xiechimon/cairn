@@ -81,7 +81,7 @@ export function chiefTurnContext(
   deps: MachineDeps,
   stepRow: StepRow,
   threadRow: ThreadRow,
-  agentId: string,
+  agentId: string | null,
 ) {
   const digest = isChiefDigestStep(stepRow);
   const ctx = digest ? null : chiefClaimContext(deps, threadRow.id);
@@ -99,13 +99,16 @@ export function chiefTurnContext(
     );
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
-  const injected = injectMemoryDocuments(deps.db, {
-    agentId,
-    teamId: threadRow.teamId,
-    threadId: threadRow.id,
-    projectId: null,
-    recordUse: !digest,
-  });
+  const injected =
+    agentId === null
+      ? { memories: [], omitted: 0, fileCount: 0 }
+      : injectMemoryDocuments(deps.db, {
+          agentId,
+          teamId: threadRow.teamId,
+          threadId: threadRow.id,
+          projectId: null,
+          recordUse: !digest,
+        });
   const memories = [
     ...injected.memories.map(({ title, content }) => ({ title, content })),
     { title: '记忆文件', content: `${injected.fileCount} 个；用 memories 按需读取。` },

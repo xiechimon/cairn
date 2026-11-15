@@ -6,7 +6,7 @@ import { project } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { ensureMemoryIndex, listStoredMemoryEntries, memoryIndexText } from '../services/memory.js';
 import { appendMemoryIndex, memoryDocumentVersion } from '../services/memory-documents.js';
-import { coordinatorProfile } from '../services/routing-rules.js';
+import { coordinatorMemoryOwner } from '../services/routing-rules.js';
 import type { MemoryFlush } from './runtime/compaction.js';
 
 const EXISTING_MAX_CHARS = 8_000;
@@ -55,7 +55,7 @@ export function applyFlush(
   raw: string,
 ): FlushResult {
   const result: FlushResult = { saved: 0, updated: 0, skipped: 0 };
-  const agentId = coordinatorProfile(db, scope.teamId)?.id;
+  const agentId = coordinatorMemoryOwner(db, scope.teamId);
   if (agentId === undefined) return result;
   const projects = new Set(
     db
@@ -90,7 +90,7 @@ export function applyFlush(
 }
 
 function existingLines(db: Db, scope: { teamId: string; threadId: string }): string {
-  const agentId = coordinatorProfile(db, scope.teamId)?.id;
+  const agentId = coordinatorMemoryOwner(db, scope.teamId);
   if (agentId === undefined) return '(none)';
   const owner = { agentId, teamId: scope.teamId };
   const scopes = new Set([null, ...listStoredMemoryEntries(db, owner).map((row) => row.projectId)]);

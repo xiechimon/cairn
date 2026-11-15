@@ -96,7 +96,12 @@ import { injectMemoryDocuments } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import { ownershipOf, rescheduleOwnershipHandoff } from './owner.js';
 import { PICKED_PROJECT_OPEN, stepScopeProjectId } from './picked-project.js';
-import { chiefRemoteTools, coordinatorProfile, type RouteProfile } from './routing-rules.js';
+import {
+  chiefRemoteTools,
+  coordinatorMemoryOwner,
+  coordinatorProfile,
+  type RouteProfile,
+} from './routing-rules.js';
 import { type LocalSkill, scanLocalSkills } from './skills.js';
 import { stepQueueProjector } from './step-queue.js';
 import { getTodo } from './todos.js';
@@ -245,7 +250,7 @@ export function getChiefEnvelope(
   threadId?: string,
 ): ChiefGetResponse {
   const row = ensureChief(deps, teamId);
-  const agentRow = coordinatorProfile(deps.db, teamId, coordinatorRunsOnPi());
+  const agentRow = coordinatorProfile(deps.db, teamId);
   return {
     chief: toChiefRecord(row, agentRow),
     agentActor: agentRow ? coordinatorRecordOf(agentRow) : null,
@@ -389,7 +394,7 @@ export function openProjectChannel(
     existing !== undefined
       ? { row: existing, created: false }
       : insertCoordinatorThread(deps, chiefRow, picked);
-  if (created && coordinatorProfile(deps.db, teamId, coordinatorRunsOnPi())?.modelId) {
+  if (created && coordinatorProfile(deps.db, teamId)?.modelId) {
     enqueueChiefStep(deps, row.id, {
       prompt: promptWithPickedProject(
         picked,
@@ -508,7 +513,7 @@ export function getChiefThread(deps: { db: Db }, threadId: string): ThreadRow | 
 }
 
 function requireCoordinatorRule(deps: ChiefDeps, teamId: string): RouteProfile {
-  const profile = coordinatorProfile(deps.db, teamId, coordinatorRunsOnPi());
+  const profile = coordinatorProfile(deps.db, teamId);
   if (profile === null) {
     throw new HttpError(
       409,
@@ -538,8 +543,10 @@ export function chiefBinding(
   teamId: string,
 ): { agentId: string | null; canOrchestrate: boolean } {
   const profile = coordinatorProfile(deps.db, teamId);
-  if (profile === null) return { agentId: null, canOrchestrate: false };
-  return { agentId: profile.id, canOrchestrate: !!profile.modelId };
+  return {
+    agentId: coordinatorMemoryOwner(deps.db, teamId) ?? null,
+    canOrchestrate: !!profile?.modelId,
+  };
 }
 
 function pickedProjectOf(
@@ -1523,11 +1530,12 @@ export function buildChiefSystemPrompt(
 ): ChiefSystemPrompt {
   const chiefRow = ensureChief(deps, teamId);
   const coordinator = coordinatorProfile(deps.db, teamId);
+  const memoryOwner = coordinatorMemoryOwner(deps.db, teamId);
   const projects = deps.db.select().from(project).where(eq(project.teamId, teamId)).all();
   const skills = scanLocalSkills(deps.skillsDir);
-  const injected = coordinator
+  const injected = memoryOwner
     ? injectMemoryDocuments(deps.db, {
-        agentId: coordinator.id,
+        agentId: memoryOwner,
         teamId,
         threadId: threadId ?? undefined,
         projectId: null,
