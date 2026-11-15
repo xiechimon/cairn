@@ -5,6 +5,7 @@ import { basename, dirname, join } from 'node:path';
 import type { Duplex } from 'node:stream';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { WorkspaceHookNoteData } from '@cairn/shared';
+import { withoutPinnedEnv } from '../backend/pinned-env.js';
 import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
 import { defaultOrbDistSource, publishOrbDist } from './dist.js';
 import { assertOrbMachineName, orbMachineName } from './names.js';
@@ -138,7 +139,7 @@ export class HostOrbProvider implements OrbProvider {
     argv: readonly string[],
     options: OrbExecOptions,
   ): Promise<OrbExecResult> {
-    const env = { ...process.env, ...options.env };
+    const env = { ...withoutPinnedEnv(process.env), ...options.env };
     delete env.CAIRN_ORB;
     return this.runner(argv, { ...options, env });
   }

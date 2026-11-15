@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { BoundGitCredentials } from '@cairn/shared';
+import { withoutPinnedEnv } from './backend/pinned-env.js';
 import { gitCredentialEnv } from './git.js';
 
 export const HOOK_OUTPUT_CHAR_LIMIT = 100_000;
@@ -54,8 +55,8 @@ export async function runWorkspaceHook(
   log(`${name} hook: running`);
   const env: NodeJS.ProcessEnv =
     credentials !== null
-      ? { ...process.env, ...gitCredentialEnv(credentials) }
-      : { ...process.env };
+      ? { ...withoutPinnedEnv(process.env), ...gitCredentialEnv(credentials) }
+      : withoutPinnedEnv(process.env);
   const startedAt = Date.now();
   let kept = '';
   let total = 0;

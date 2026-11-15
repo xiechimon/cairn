@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { BoundGitCredentials, CommitIdentity, GitCredentialSource } from '@cairn/shared';
 import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
+import { withoutPinnedEnv } from './backend/pinned-env.js';
 import { loopbackNoProxy } from './proxy.js';
 
 export interface GitRunResult {
@@ -32,7 +33,7 @@ export function runGit(
   opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number; input?: string } = {},
 ): Promise<GitRunResult> {
   return new Promise((resolve, reject) => {
-    const env = { ...process.env, ...opts.env };
+    const env = { ...withoutPinnedEnv(process.env), ...opts.env };
     const noProxy = LOOPBACK_URL_HOSTS.reduce<string | undefined>(
       (merged, host) => loopbackNoProxy({ NO_PROXY: merged }, `http://${host}`),
       env.NO_PROXY ?? env.no_proxy,

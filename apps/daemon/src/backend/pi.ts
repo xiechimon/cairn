@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import type {
   AgentBackend,
   AgentBackendCapabilities,
@@ -39,6 +39,7 @@ import {
   type ExtensionUIContext,
   generateSummary,
   type InlineExtension,
+  type McpExtensionOptions,
   type McpServerConfig,
   ModelRuntime,
   SessionManager,
@@ -51,6 +52,7 @@ import { probeModelImageSupport, rememberNoVision } from './image-support.js';
 import { connectFailedLine } from './mcp-config.js';
 import { PiStepSpanSink, runtimeChildEnv } from './otel.js';
 import { PI_RETRY_SETTINGS } from './pi-retry.js';
+import { pinProcessEnv } from './pinned-env.js';
 import {
   enrichProviderError,
   type ProviderResponseSink,
@@ -246,6 +248,33 @@ const MCP_TOOL_ALLOWLIST = [
   'list_mcp_resource_templates',
   'read_mcp_resource',
 ] as const;
+
+type McpCredentials = NonNullable<McpExtensionOptions['credentials']>;
+type McpServerState = NonNullable<
+  Awaited<ReturnType<ReturnType<McpCredentials['forServer']>['load']>>
+>;
+
+function inMemoryMcpCredentials(): McpCredentials {
+  const states = new Map<string, McpServerState>();
+  const keyOf = (name: string, serverUrl: string) => `${name}\u0000${serverUrl}`;
+  const credentials: Pick<McpCredentials, 'forServer' | 'tokens' | 'remove'> = {
+    forServer: (name, serverUrl) => ({
+      load: async () => states.get(keyOf(name, serverUrl)),
+      save: async (state) => {
+        states.set(keyOf(name, serverUrl), state);
+      },
+      withRefreshLock: (fn) => fn(),
+    }),
+    tokens: (name, serverUrl) => states.get(keyOf(name, serverUrl))?.tokens,
+    remove: (name, serverUrl) => states.delete(keyOf(name, serverUrl)),
+  };
+  return credentials as unknown as McpCredentials;
+}
+
+function shellPathFor(agentDir: string): Record<string, string> {
+  const key = Object.keys(process.env).find((name) => name.toLowerCase() === 'path') ?? 'PATH';
+  return { [key]: [join(agentDir, 'bin'), process.env[key]].filter(Boolean).join(delimiter) };
+}
 
 function mcpServerConfig(endpoint: McpEndpoint): McpServerConfig {
   return endpoint.transport === 'stdio'
@@ -863,6 +892,8 @@ export interface PiBackendOpts {
 export class PiBackend implements AgentBackend {
   readonly capabilities = PI_CAPABILITIES;
 
+  private readonly mcpCredentials = inMemoryMcpCredentials();
+
   readonly brief: BriefChannel = {
     backendId: 'pi',
     composeBody: (opts, base) =>
@@ -889,10 +920,7 @@ export class PiBackend implements AgentBackend {
   constructor(private readonly opts: PiBackendOpts) {
     mkdirSync(opts.agentDir, { recursive: true });
     mkdirSync(opts.sessionDir, { recursive: true });
-    for (const [key, value] of Object.entries(piUnattendedEnvPins(process.env))) {
-      process.env[key] = value;
-    }
-    process.env.PI_CODING_AGENT_DIR = opts.agentDir;
+    pinProcessEnv(piUnattendedEnvPins(process.env));
   }
 
   async createSession(opts: SessionOpts): Promise<AgentSessionHandle> {
@@ -1018,7 +1046,11 @@ export class PiBackend implements AgentBackend {
       extensionFactories: [
         gateExtension,
         mcpRegisterExtension,
-        createMcpExtension({ loadConfig: () => ({ servers: [], errors: [] }) }),
+        createMcpExtension({
+          loadConfig: () => ({ servers: [], errors: [] }),
+          credentials: this.mcpCredentials,
+          logPath: join(this.opts.agentDir, 'mcp.log'),
+        }),
       ],
     });
     await loader.reload();
@@ -1086,7 +1118,10 @@ export class PiBackend implements AgentBackend {
     }
     const envBash = defineTool(
       createBashToolDefinition(opts.cwd, {
-        spawnHook: (ctx) => ({ ...ctx, env: runtimeChildEnv({ ...ctx.env, ...opts.env }) }),
+        spawnHook: (ctx) => ({
+          ...ctx,
+          env: runtimeChildEnv({ ...ctx.env, ...shellPathFor(this.opts.agentDir), ...opts.env }),
+        }),
       }),
     );
     const { session } = await createAgentSession({
