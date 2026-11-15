@@ -184,8 +184,9 @@ export function buildProgram(): Command {
   program
     .command('restart')
     .description('Restart the background daemon')
+    .option('--server <url>', 'server URL (default: the one this machine enrolled with)')
     .action(async (_opts: StartOptions, cmd: Command) => {
-      const config = loadDaemonConfig({});
+      const config = loadDaemonConfig(configInput(cmd.opts<StartOptions>()));
       await stopSupervisor(config.home);
       reportStarted(
         spawnSupervisor({

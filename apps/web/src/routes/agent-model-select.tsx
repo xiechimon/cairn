@@ -51,7 +51,9 @@ export function AgentRuntimeSelect({
 }: AgentRuntimeSelectProps) {
   const { t } = useI18n();
   const rowLabelId = useSettingsRowLabelId();
-  const groups = providerGroups(options);
+  const groups = providerGroups(options).map((group) =>
+    group.provider === 'pi' ? { ...group, providerLabel: t(BUILTIN_RUNTIME_LABEL) } : group,
+  );
   const unset = unsetLabel ?? t(BUILTIN_RUNTIME_LABEL);
   const label = providerEchoLabel(value, groups, unset);
 
@@ -69,13 +71,16 @@ export function AgentRuntimeSelect({
       >
         <SelectValue>{label}</SelectValue>
       </SelectTrigger>
-      <SelectContent aria-label={t('运行时')} className={`${prefix}-menu`}>
+      <SelectContent aria-label={t('运行时')} className={cn(`${prefix}-menu`, MODEL_MENU_FIT)}>
         <SelectItem className={`${prefix}-row`} value={null}>
           {unset}
         </SelectItem>
         {groups.map((group) => (
           <SelectItem key={group.provider} className={`${prefix}-row`} value={group.provider}>
             {group.providerLabel}
+            {group.provider === 'pi' && (
+              <span className="text-meta text-content-tertiary">{t('用你添加的服务商的模型')}</span>
+            )}
           </SelectItem>
         ))}
       </SelectContent>

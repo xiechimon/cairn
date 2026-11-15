@@ -1212,6 +1212,7 @@ export const EN: Record<string, string> = {
   更新技能: 'Update skills',
   运行时: 'Runtime',
   '内置 (pi)': 'Built-in (pi)',
+  用你添加的服务商的模型: "runs your providers' models",
   '允许该 Agent 通过合并分支进行发布（例如将 develop 合并进 main）。':
     'Let this Agent publish by merging branches (for example develop into main).',
   '允许该 Agent 创建 git tag，这可能触发发布流程。':
