@@ -248,7 +248,6 @@ export interface FixtureSet {
   ui?: OverlayUi;
   usageNav?: boolean;
   schedules?: ScheduleRecord[];
-  scheduleForm?: 'hourly' | 'daily' | 'weekly' | 'once';
   project?: ProjectContent;
   team?: TeamContent;
   apiKeys?: ApiKeysContent;
@@ -333,6 +332,7 @@ export interface ResourcesContent {
   secrets?: SecretRecord[];
   accounts?: AccountsContent;
   routingSettings?: import('@cairn/shared').TeamRoutingSettings;
+  topModels?: import('@cairn/shared').TopModel[] | null;
 }
 
 export interface DocSegment {
@@ -570,6 +570,7 @@ export type ChiefStreamItem =
   | { kind: 'note'; text: string; machineName?: string }
   | { kind: 'error'; text: string; createdAt?: number }
   | { kind: 'handoff'; todoId: string; id?: string }
+  | { kind: 'report-ack'; id: string; todoId: string; buildId: string }
   | {
       kind: 'takeover';
       id: string;
@@ -630,6 +631,7 @@ export type ChiefStreamItem =
       createdAt?: number;
       fallbackModel?: string;
       projectId?: string | null;
+      report?: { todoId: string; buildId: string };
     }
   | {
       kind: 'thinking';

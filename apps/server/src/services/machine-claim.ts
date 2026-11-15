@@ -43,14 +43,15 @@ import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { holdBlockedBuild } from './blockers.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
 import { turnProvenance } from './chief.js';
+import { chiefHistoryFor } from './chief-claim-history.js';
 import {
   CHIEF_DIGEST_MIN_CLI_VERSION,
   CHIEF_DIGEST_REMOTE_TOOLS,
   isChiefDigestStep,
 } from './chief-digest.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
-import { claudeUsageGatePasses, refreshClaudeRateParks } from './claude-rate-limit.js';
-import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { refreshClaudeRateParks } from './claude-rate-limit.js';
+import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
@@ -250,10 +251,10 @@ function buildChiefClaim(
   if (!agentRow.modelId) return null;
   const model = effectiveModel(agentRow, stepRow);
   if (!machineRow || !runtimeGatePasses(machineRow, model.provider)) return null;
-  if (!claudeUsageGatePasses(deps, machineRow, model)) return null;
   if (claudeCodeLoginBlocks(deps, machineRow, model.provider)) return null;
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
-  if (!claimPendingChiefStep(deps.db, stepRow, machineId)) return null;
+  const bindTeamId = stepRuntimeFor(model.provider) === 'claude-code' ? threadRow.teamId : null;
+  if (!claimPendingChiefStep(deps.db, stepRow, machineId, bindTeamId)) return null;
   return chiefClaimPayload(deps, machineId, stepRow, threadRow, agentRow, machineRow);
 }
 
@@ -274,6 +275,7 @@ function chiefClaimPayload(
   );
   const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
   const locked = digest || mailTurn;
+  const history = locked ? null : chiefHistoryFor(deps.db, threadRow, stepRow);
   const chiefMcp = locked
     ? []
     : claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
@@ -308,6 +310,7 @@ function chiefClaimPayload(
       threadId: threadRow.id,
       systemPrompt,
       trigger,
+      ...(history !== null ? { history } : {}),
     },
     remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : mailTurn ? [] : chiefRemoteTools())],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
@@ -535,6 +538,10 @@ async function tryClaim(
             lastHeartbeatAt: claimedAt,
             skillInjection,
             blockerHandoff,
+            claudeSubscriptionId:
+              stepRuntimeFor(model.provider) === 'claude-code'
+                ? enabledSubscriptionId({ db: tx }, teamId)
+                : null,
             holdReason: null,
             holdUntil: null,
           })

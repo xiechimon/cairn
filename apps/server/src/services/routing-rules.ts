@@ -45,7 +45,6 @@ import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { machineRuntimeAvailable } from './dispatch-eligibility.js';
-import { paidClaudeAllowed } from './model-routing.js';
 import { DEFAULT_SESSION_MODEL, DEFAULT_SESSION_PROVIDER } from './routing-migration.js';
 import { capabilityCandidates, decideStepRoute } from './step-route.js';
 
@@ -222,9 +221,7 @@ function providerSessionChoice(
   for (const { providerId, runnable } of servingProviders(db, teamId, null)) {
     if (!runnable) continue;
     const models = rows.find((row) => row.providerId === providerId)?.models ?? [];
-    const model = models.find(
-      (m) => m.id !== '' && paidClaudeAllowed(db, teamId, providerId, m.id),
-    );
+    const model = models.find((m) => m.id !== '');
     if (model !== undefined) return { provider: providerId, modelId: model.id };
   }
   return null;
@@ -299,9 +296,7 @@ export function defaultCoordinatorChoice(
       keylessEndpoint(row.providerId) ||
       (usesHostCodexLogin(row.providerId, row.baseUrl) && codexLoginAvailable());
     if (!runnable) continue;
-    const model = row.models.find(
-      (m) => m.id !== '' && paidClaudeAllowed(db, teamId, row.providerId, m.id),
-    );
+    const model = row.models.find((m) => m.id !== '');
     if (model !== undefined) {
       return { reason: 'provider', provider: row.providerId, modelId: model.id };
     }
@@ -438,7 +433,7 @@ export function citationCheckerChoice(
       .filter((served) => served.runnable)
       .flatMap(({ providerId }) =>
         (providerRows.find((row) => row.providerId === providerId)?.models ?? [])
-          .filter((m) => m.id !== '' && paidClaudeAllowed(db, teamId, providerId, m.id))
+          .filter((m) => m.id !== '')
           .map((m) => defaultPin({ provider: providerId, modelId: m.id })),
       ),
   ];
@@ -611,7 +606,7 @@ export function ruleProfileForStep(
     : { ...profile, machineId: null };
 }
 
-const ROUTED_PROVIDERS = ['claude-code', CODEX_MODEL.provider];
+export const ROUTED_PROVIDERS = ['claude-code', CODEX_MODEL.provider];
 
 export function profileForStep(
   db: Pick<Db, 'select'>,

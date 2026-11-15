@@ -2,6 +2,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 import { settleTransitions } from './helpers.js';
 
 const SETTINGS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c';
+const NEW_SCHEDULE = '/app?scenario=home-c&pane=tasks&tab=scheduled';
 
 const CARD_DARK = 'rgb(48, 48, 48)';
 const CARD_LIGHT = 'rgb(255, 255, 255)';
@@ -71,16 +72,19 @@ test('page tabs: selected chip keeps its fill under hover, same geometry as the 
 test('sched freq: the chosen radio reads against the track, hover keeps the rest ink', async ({
   page,
 }) => {
-  await page.goto('/app/schedules?scenario=r3-92');
+  await page.goto(NEW_SCHEDULE);
+  await page.getByTestId('schedule-new').click();
   const group = page.getByRole('radiogroup', { name: '频率' });
   const active = group.getByRole('radio', { checked: true });
   const weekly = group.getByRole('radio', { name: '每周' });
 
-  expect(await bg(active)).toBe(CARD_DARK);
+  expect(await bg(active)).not.toBe(CARD_DARK);
+  expect(await bg(active)).not.toBe(await bg(group));
   expect(await bg(group)).not.toBe(CARD_DARK);
   await expectSharedInk(weekly, active);
 
-  await themed(page, 'light', '/app/schedules?scenario=r3-92');
+  await themed(page, 'light', NEW_SCHEDULE);
+  await page.getByTestId('schedule-new').click();
   const lightGroup = page.getByRole('radiogroup', { name: '频率' });
   const lightActive = lightGroup.getByRole('radio', { checked: true });
   expect(await bg(lightActive)).toBe(CARD_LIGHT);

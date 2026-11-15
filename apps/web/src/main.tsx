@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { toast } from 'sonner';
 import { App } from './App.js';
 import { chiefOutbox } from './chief/outbox.js';
+import { markDesktopShell } from './desktop-shell.js';
 import { EN } from './i18n/en.js';
 import { applyLocaleLang, readStoredLocale } from './i18n/locale.js';
 import { translate } from './i18n/translate.js';
@@ -17,6 +18,7 @@ import './styles/app.css';
 
 const bootStorage = safeLocalStorage();
 paintTheme(readStoredTheme(bootStorage));
+markDesktopShell(document.documentElement, navigator.userAgent);
 followSystemTheme(bootStorage);
 applyLocaleLang(readStoredLocale(bootStorage));
 trackPointerFocus();

@@ -24,6 +24,7 @@ import { threadStatus } from './thread-copy.js';
 export type WorkPane = 'tasks' | 'made' | 'machines' | 'file';
 
 export const PANE_PARAM = 'pane';
+export const TASKS_TAB_PARAM = 'tab';
 
 export function paneOf(value: string | null): WorkPane | null {
   return value === 'tasks' || value === 'made' || value === 'machines' || value === 'file'
@@ -78,7 +79,7 @@ function MadeReport({
     todo.madeKind === 'slides' ? t('PPT') : todo.madeKind === 'page' ? t('网页') : undefined;
   return (
     <ResearchReportDialog
-      report={kind === undefined ? report : { ...report, label: { card: kind, doc: kind } }}
+      report={kind === undefined ? report : { ...report, label: kind }}
       open
       onClose={onClose}
     >

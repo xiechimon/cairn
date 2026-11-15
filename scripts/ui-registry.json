@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "5278f5909274049d5236b976f5bc274705cc80c7",
+    "sha": "a57ab1382d49206996ebe77b6a343539fa5bd068",
     "date": "2026-11-15"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -148,8 +148,8 @@
       "kind": "registry",
       "upstreamItem": "popover",
       "status": "deviated",
-      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). Paper menu face: popup consumes --radius-popover (10px) + --shadow-popover (light 1px ring + soft pool, dark inset highlight); text-sm -> text-ui (DESIGN.md type scale). Portal keepMounted exposed on PopoverContent so the Tasks panel PR hover cards are pre-rendered and open instantly (1 consumer, owner 2026-11-13).",
-      "hash": "0faffc4c5ed799be8c2eef1c2ef89d7957bc114f8de5feb64293712b71550fe8"
+      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). Paper menu face: popup consumes --radius-popover (10px) + --shadow-popover (light 1px ring + soft pool, dark inset highlight); text-sm -> text-ui (DESIGN.md type scale). Portal keepMounted exposed on PopoverContent so the Tasks panel PR hover cards are pre-rendered and open instantly (1 consumer, owner 2026-11-13). Positioner anchor exposed on PopoverContent so the phone schedule editor covers the whole schedule list instead of its row (1 consumer, 2026-11-15).",
+      "hash": "5cb475ad76d7cfa53819af51ebeb560588d6d43117dc9404f7e73e13d7585e12"
     },
     "seeded-avatar.tsx": {
       "kind": "adapter",

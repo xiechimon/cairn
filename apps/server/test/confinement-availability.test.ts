@@ -29,7 +29,6 @@ function eligibility(confinement: unknown, osPlatform = 'linux') {
     localProject: false,
     claudeRateBlocked: false,
     claudeLoginBlocked: false,
-    claudeUsageRefused: false,
   };
   return machineEligibility(input);
 }

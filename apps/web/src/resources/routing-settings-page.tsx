@@ -1,76 +1,67 @@
 import {
-  AGENT_TOOL_SWITCHES,
   type CoordinatorDefault,
-  type PolicyUse,
+  MODEL_SOURCE_RUNTIME_LABELS,
+  type ModelSourceRuntime,
   type RouteUse,
   type RoutingRuleRecord,
   type SessionDefault,
   type TeamRoutingSettings,
   THINKING_LEVELS,
   type ThinkingLevel,
-  type WorkPolicyRecord,
 } from '@cairn/shared';
 import { cn } from 'cn';
-import { Route } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
-import { useMachines, useModelSources, useTeams } from '../api/hooks.js';
+import { useMachines, useModelSources } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
+import { ROUTE_USE_LABELS } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
-import { EmptyState } from '../components/empty-state.js';
-import { MachineName, machineLabel } from '../components/machine-label.js';
+import { useTopModels, useTopModelsMutations } from '../api/top-models.js';
 import { QueryBoundary } from '../components/query-state.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
   SettingsCard,
   SettingsRow,
+  SettingsSection,
 } from '../components/settings-list.js';
-import { ToggleSwitch } from '../components/toggle-switch.js';
-import { Button } from '../components/ui/button.js';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select.js';
-import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { toastError } from '../components/ui/toaster.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
-import {
-  AgentModelSelect,
-  AgentRuntimeSelect,
-  runtimeOfProvider,
-} from '../routes/agent-model-select.js';
 import { settingsHref } from '../settings/settings-href.js';
+import { suggestedTopModels, TopModelsCard } from './top-models-card.js';
 
 export const ROUTING_SETTINGS_HREF = '/app/resources/routing-settings';
 export const COORDINATOR_ROUTE_ANCHOR = 'route-coordinator';
 export const COORDINATOR_ROUTING_HREF = `${settingsHref('work-routing')}#${COORDINATOR_ROUTE_ANCHOR}`;
 
-const CREATABLE_USES: readonly RouteUse[] = ['coordinator', 'session', 'review', 'citation_check'];
+const AGENT_USES: readonly RouteUse[] = ['coordinator'];
 
-const USE_LABELS: Record<RouteUse, string> = {
-  coordinator: 'Coordinator',
-  session: '会话',
-  review: '评审',
-  digest: '摘要',
-  compaction: '压缩',
-  citation_check: '引文检查',
+const STORED_ONLY_USES: readonly RouteUse[] = ['digest', 'compaction'];
+
+const USE_HINTS: Partial<Record<RouteUse, string>> = {
+  coordinator: '你对话的协调者，派活和汇报',
+  digest: '每日报告和对话摘要',
+  compaction: '上下文快满时压缩对话',
 };
 
-const POLICY_LABELS: Record<PolicyUse, string> = {
-  session: '会话权限',
-  review: '评审权限',
-};
+const EMPTY_SETTINGS: TeamRoutingSettings = { rules: [], policies: [] };
 
-function fixtureSettings(search: URLSearchParams): TeamRoutingSettings | null {
-  const raw = resolveScenario(search).resources?.routingSettings;
-  return raw ?? null;
-}
+const modelKey = (option: Pick<ModelOption, 'provider' | 'modelId'>) =>
+  JSON.stringify([option.provider, option.modelId]);
+
+const levelLabel = (level: string) => level.charAt(0).toUpperCase() + level.slice(1);
 
 function SessionDefaultHint({
   sessionDefault,
@@ -127,246 +118,186 @@ function CoordinatorDefaultHint({
   return <span data-testid="routing-coordinator-default">{text}</span>;
 }
 
-function RuleEditor({
+type RuleModel = Pick<RoutingRuleRecord, 'provider' | 'modelId'>;
+
+function currentOption(rule: RuleModel | null, options: readonly ModelOption[]) {
+  if (rule === null) return undefined;
+  if (rule.provider === 'pi') {
+    return options.find((o) => o.runtime === 'pi' && o.modelId === rule.modelId);
+  }
+  return options.find((o) => o.provider === rule.provider && o.modelId === rule.modelId);
+}
+
+export function ModelPicker({
   use,
   rule,
-  sessionDefault,
-  coordinatorDefault,
-  machines,
-  hasDefault,
   options,
-  live,
+  enabledRuntimes,
+  onPick,
+  trigger,
+}: {
+  use: RouteUse;
+  rule: RuleModel | null;
+  options: ModelOption[];
+  enabledRuntimes: ReadonlySet<string> | null;
+  onPick: (option: ModelOption) => void;
+  trigger?: { label: string; className: string };
+}) {
+  const { t } = useI18n();
+  const picked = currentOption(rule, options);
+  const byKey = new Map(options.map((o) => [modelKey(o), o]));
+  const runtimes = [...new Set(options.map((o) => o.runtime))];
+  const coordinatorCannot = (runtime: string) => use === 'coordinator' && runtime !== 'pi';
+  const runtimeOff = (runtime: string) =>
+    coordinatorCannot(runtime) ||
+    (enabledRuntimes !== null && runtime !== 'pi' && !enabledRuntimes.has(runtime));
+  const runtimeLabel = (runtime: string) =>
+    runtime === 'pi'
+      ? t('服务商')
+      : (MODEL_SOURCE_RUNTIME_LABELS[runtime as ModelSourceRuntime] ?? runtime);
+  return (
+    <Select
+      value={picked === undefined ? null : modelKey(picked)}
+      onValueChange={(next) => {
+        const option = next === null ? undefined : byKey.get(next as string);
+        if (option !== undefined) onPick(option);
+      }}
+    >
+      <SelectTrigger
+        aria-label={
+          trigger === undefined
+            ? t('{use} 的模型', { use: t(ROUTE_USE_LABELS[use]) })
+            : t('{label}（{use} 的模型）', { label: trigger.label, use: t(ROUTE_USE_LABELS[use]) })
+        }
+        className={
+          trigger?.className ??
+          cn(
+            SETTINGS_SELECT_TRIGGER_CLS,
+            'routing-rule-model-select w-56 max-sm:h-7 max-sm:w-auto max-sm:min-w-0 max-sm:flex-1 max-sm:text-meta',
+          )
+        }
+      >
+        {trigger !== undefined ? (
+          trigger.label
+        ) : (
+          <SelectValue>
+            {picked !== undefined
+              ? picked.modelName
+              : rule !== null
+                ? t('{model}（不可用）', { model: rule.modelId })
+                : t('未设置模型')}
+          </SelectValue>
+        )}
+      </SelectTrigger>
+      <SelectContent
+        className="routing-rule-model-menu w-max min-w-(--anchor-width) max-w-(--available-width)"
+        {...(trigger === undefined ? {} : { alignItemWithTrigger: false, align: 'end' as const })}
+      >
+        {runtimes.map((runtime) => (
+          <SelectGroup key={runtime}>
+            <SelectLabel>
+              {coordinatorCannot(runtime)
+                ? t('{runtime}（Coordinator 用不了）', { runtime: runtimeLabel(runtime) })
+                : runtimeOff(runtime)
+                  ? t('{runtime}（没有执行机启用）', { runtime: runtimeLabel(runtime) })
+                  : runtimeLabel(runtime)}
+            </SelectLabel>
+            {options
+              .filter((o) => o.runtime === runtime)
+              .map((o) => (
+                <SelectItem
+                  key={`${o.machineId ?? ''}/${modelKey(o)}`}
+                  className="routing-rule-model-row pointer-coarse:min-h-11"
+                  value={modelKey(o)}
+                  disabled={o.liveness === 'dead' || runtimeOff(runtime)}
+                >
+                  {o.liveness === 'dead' ? `${o.modelName}（${t('已下架')}）` : o.modelName}
+                  {o.provider !== o.runtime && (
+                    <span className="text-meta text-content-tertiary">{o.providerLabel}</span>
+                  )}
+                </SelectItem>
+              ))}
+          </SelectGroup>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function RuleRow({
+  use,
+  label,
+  hint,
+  rule,
+  options,
+  enabledRuntimes,
   onSave,
 }: {
   use: RouteUse;
+  label: string;
+  hint: ReactNode;
   rule: RoutingRuleRecord | null;
-  sessionDefault?: SessionDefault | undefined;
-  coordinatorDefault?: CoordinatorDefault | undefined;
-  machines: { id: string; name: string }[];
-  hasDefault: boolean;
   options: ModelOption[];
-  live: boolean;
-  onSave?: (body: {
+  enabledRuntimes: ReadonlySet<string> | null;
+  onSave: (body: {
     provider: string;
     modelId: string;
     thinkingLevel: ThinkingLevel | null;
-    machineId: string | null;
   }) => void;
 }) {
   const { t } = useI18n();
-  const [provider, setProvider] = useState<string | null>(rule?.provider ?? null);
-  const [modelId, setModelId] = useState<string | null>(rule?.modelId ?? null);
-  const [runtime, setRuntime] = useState<string | null>(() =>
-    runtimeOfProvider(rule?.provider ?? null, options),
-  );
-  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(
-    (rule?.thinkingLevel as ThinkingLevel | null | undefined) ?? 'off',
-  );
-  const [machineId, setMachineId] = useState(rule?.machineId ?? null);
-  const mustNameMachine = use === 'session' && machines.length > 1 && !hasDefault;
-  const unsetLabel = hasDefault ? t('跟随默认执行机') : t('不固定');
-  const pickedMachine = machines.find((m) => m.id === machineId);
-  const dirty =
-    rule === null ||
-    provider !== rule.provider ||
-    modelId !== rule.modelId ||
-    (thinkingLevel === 'off' ? null : thinkingLevel) !== rule.thinkingLevel ||
-    machineId !== rule.machineId;
+  const level = (rule?.thinkingLevel as ThinkingLevel | null | undefined) ?? 'off';
   return (
     <div
       id={`route-${use}`}
       data-testid={rule === null ? `routing-rule-new-${use}` : `routing-rule-${use}`}
     >
-      <SettingsCard>
-        <SettingsRow
-          label={t(USE_LABELS[use])}
-          hint={
-            rule === null && sessionDefault !== undefined ? (
-              <SessionDefaultHint sessionDefault={sessionDefault} options={options} />
-            ) : rule === null && coordinatorDefault !== undefined ? (
-              <CoordinatorDefaultHint coordinatorDefault={coordinatorDefault} options={options} />
-            ) : (
-              t('模型与首选执行机')
-            )
-          }
-        >
-          <span className="font-mono text-meta text-content-tertiary">{use}</span>
-        </SettingsRow>
-        <SettingsRow label={t('运行时')}>
-          <AgentRuntimeSelect
-            ariaLabel={t('运行时')}
-            value={runtime}
-            options={options}
-            unsetLabel={t('选择运行时')}
-            onPick={(next) => {
-              if (next === runtime) return;
-              setRuntime(next);
-              setProvider(null);
-              setModelId(null);
+      <SettingsRow label={label} hint={hint} className="flex-wrap gap-y-2 py-2.5">
+        <div className="flex items-center justify-end gap-1.5 max-sm:w-full">
+          <Select
+            value={level}
+            disabled={rule === null}
+            onValueChange={(next) => {
+              if (rule === null || next === null) return;
+              onSave({
+                provider: rule.provider,
+                modelId: rule.modelId,
+                thinkingLevel: next === 'off' ? null : (next as ThinkingLevel),
+              });
             }}
-            prefix="routing-rule-runtime"
-            triggerClassName={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-44')}
-          />
-        </SettingsRow>
-        <SettingsRow label={t('模型')}>
-          <AgentModelSelect
-            ariaLabel={t('模型')}
-            runtime={runtime}
-            provider={
-              provider === 'pi'
-                ? (options.find((row) => row.runtime === 'pi' && row.modelId === modelId)
-                    ?.provider ?? provider)
-                : provider
-            }
-            modelId={modelId}
-            options={options}
-            onPick={(next) => {
-              setProvider(next?.provider ?? null);
-              setModelId(next?.modelId ?? null);
-            }}
-            prefix="routing-rule-model"
-            triggerClassName={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-56')}
-          />
-        </SettingsRow>
-        <SettingsRow label={t('思考强度')}>
-          <Select value={thinkingLevel} onValueChange={(next) => setThinkingLevel(next ?? 'off')}>
-            <SelectTrigger
-              aria-label={t('思考强度')}
-              className={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-36')}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {THINKING_LEVELS.map((level) => (
-                <SelectItem key={level} value={level}>
-                  {level}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </SettingsRow>
-        <SettingsRow label={t('首选执行机')}>
-          <Select value={machineId} onValueChange={(next) => setMachineId(next)}>
-            <SelectTrigger
-              aria-label={t('首选执行机')}
-              className={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-44')}
-            >
-              <SelectValue>
-                {machineId === null
-                  ? mustNameMachine
-                    ? t('选择执行机')
-                    : unsetLabel
-                  : pickedMachine === undefined
-                    ? undefined
-                    : (machineLabel(pickedMachine, machines) ?? machineId)}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {mustNameMachine ? null : <SelectItem value={null}>{unsetLabel}</SelectItem>}
-              {machines.map((machine) => (
-                <SelectItem key={machine.id} value={machine.id}>
-                  <MachineName machine={machine} all={machines} />
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </SettingsRow>
-        {live && onSave !== undefined && (
-          <SettingsRow
-            label={rule === null ? t('创建') : t('保存')}
-            hint={
-              rule === null
-                ? t('这条路由还没有规则，选好运行时与模型后创建。')
-                : dirty
-                  ? t('有未保存的改动')
-                  : t('已与服务器一致')
-            }
           >
-            <Button
-              disabled={
-                !dirty ||
-                provider == null ||
-                modelId == null ||
-                (mustNameMachine && machineId == null)
-              }
-              onClick={() => {
-                if (provider == null || modelId == null) return;
-                onSave({
-                  provider,
-                  modelId,
-                  thinkingLevel: thinkingLevel === 'off' ? null : thinkingLevel,
-                  machineId,
-                });
-              }}
+            <SelectTrigger
+              aria-label={t('{use} 的思考强度', { use: label })}
+              className={cn(
+                SETTINGS_SELECT_TRIGGER_CLS,
+                'routing-rule-level-select w-28 flex-none max-sm:h-7 max-sm:w-24 max-sm:text-meta',
+              )}
             >
-              {rule === null ? t('创建') : t('保存')}
-            </Button>
-          </SettingsRow>
-        )}
-      </SettingsCard>
-    </div>
-  );
-}
-
-function PolicyEditor({
-  policy,
-  live,
-  onSave,
-}: {
-  policy: WorkPolicyRecord;
-  live: boolean;
-  onSave?: (body: { tools: string[] }) => void;
-}) {
-  const { t } = useI18n();
-  const [tools, setTools] = useState(() => new Set(policy.tools));
-  const dirty = tools.size !== policy.tools.length || policy.tools.some((tool) => !tools.has(tool));
-  const toggle = (tool: string) => {
-    setTools((prev) => {
-      const next = new Set(prev);
-      if (next.has(tool)) next.delete(tool);
-      else next.add(tool);
-      return next;
-    });
-  };
-  return (
-    <div data-testid={`work-policy-${policy.use}`}>
-      <SettingsCard>
-        <SettingsRow
-          label={t(POLICY_LABELS[policy.use])}
-          hint={t('声明可写工具；密钥与 MCP 只读展示')}
-        >
-          <span className="font-mono text-meta text-content-tertiary">{policy.use}</span>
-        </SettingsRow>
-        {AGENT_TOOL_SWITCHES.map((tool) => (
-          <SettingsRow key={tool} label={t(tool)}>
-            <ToggleSwitch
-              checked={tools.has(tool)}
-              disabled={!live || onSave === undefined}
-              onCheckedChange={() => toggle(tool)}
-              aria-label={t(tool)}
-            />
-          </SettingsRow>
-        ))}
-        <SettingsRow
-          label={t('MCP 服务器')}
-          hint={policy.mcpServers.length === 0 ? t('未配置') : policy.mcpServers.join(', ')}
-        >
-          <span className="text-meta text-content-secondary">{policy.mcpServers.length}</span>
-        </SettingsRow>
-        <SettingsRow
-          label={t('密钥')}
-          hint={policy.secrets.length === 0 ? t('未配置') : policy.secrets.join(', ')}
-        >
-          <span className="text-meta text-content-secondary">{policy.secrets.length}</span>
-        </SettingsRow>
-        {live && onSave !== undefined && (
-          <SettingsRow label={t('保存')} hint={dirty ? t('有未保存的改动') : t('已与服务器一致')}>
-            <Button disabled={!dirty} onClick={() => onSave({ tools: [...tools] })}>
-              {t('保存')}
-            </Button>
-          </SettingsRow>
-        )}
-      </SettingsCard>
+              <SelectValue>{levelLabel(level)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {THINKING_LEVELS.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {levelLabel(value)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <ModelPicker
+            use={use}
+            rule={rule}
+            options={options}
+            enabledRuntimes={enabledRuntimes}
+            onPick={(option) =>
+              onSave({
+                provider: option.provider,
+                modelId: option.modelId,
+                thinkingLevel: level === 'off' ? null : level,
+              })
+            }
+          />
+        </div>
+      </SettingsRow>
     </div>
   );
 }
@@ -378,124 +309,120 @@ export function RoutingSettingsPage() {
   const { live, teamId } = useLiveData();
   const settingsQ = useRoutingSettings(teamId, live);
   const machinesQ = useMachines(teamId, live);
-  const teamsQ = useTeams(live);
   const modelSourcesQ = useModelSources(teamId, live);
   const mutations = useRoutingSettingsMutations(teamId);
-  const settings: TeamRoutingSettings = live
-    ? (settingsQ.data ?? { rules: [], policies: [] })
-    : (fixtureSettings(searchParams) ?? { rules: [], policies: [] });
+  const topModelsQ = useTopModels(teamId, live);
+  const topModelMutations = useTopModelsMutations(teamId);
+  const settings = live
+    ? (settingsQ.data ?? EMPTY_SETTINGS)
+    : (fixture.resources?.routingSettings ?? EMPTY_SETTINGS);
   const machines = live
-    ? (machinesQ.data ?? []).map((machine) => ({ id: machine.id, name: machine.name }))
-    : (fixture.resources?.machines ?? [])
-        .filter((machine): machine is typeof machine & { id: string } => machine.id != null)
-        .map((machine) => ({ id: machine.id, name: machine.name }));
-  const defaultMachineId = live ? (teamsQ.data?.[0]?.defaultMachineId ?? null) : null;
-  const hasDefault = machines.some((machine) => machine.id === defaultMachineId);
-  const modelOptions = live
-    ? toModelOptions(modelSourcesQ.data?.sources ?? [])
-    : toModelOptions(fixture.resources?.providerSources ?? []);
-  const empty = settings.rules.length === 0 && settings.policies.length === 0;
+    ? (machinesQ.data ?? []).map((m) => m.enabledRuntimes)
+    : (fixture.resources?.machines ?? []).map((m) => m.enabledRuntimes ?? []);
+  const enabledRuntimes = machines.length === 0 ? null : new Set(machines.flat());
+  const options = toModelOptions(
+    live ? (modelSourcesQ.data?.sources ?? []) : (fixture.resources?.providerSources ?? []),
+  );
+  const storedTopModels = live ? topModelsQ.data?.models : fixture.resources?.topModels;
+  const topModels = storedTopModels ?? suggestedTopModels(options);
   const { hash } = useLocation();
   const loaded = !live || settingsQ.data !== undefined;
-  const missingUses = loaded
-    ? CREATABLE_USES.filter((use) => !settings.rules.some((rule) => rule.use === use))
-    : [];
   useEffect(() => {
     if (!loaded || hash === '') return;
     document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
   }, [loaded, hash]);
-  const saveRule = (
-    use: RouteUse,
-    body: Parameters<typeof mutations.patchRule.mutate>[0]['body'],
-  ) =>
-    mutations.patchRule.mutate(
-      { use, body },
-      {
-        onSuccess: () => toastSuccess(t('规则已保存')),
-        onError: (error) => toastError(t('保存失败，请重试。'), error),
-      },
-    );
+  const ruleOf = (use: RouteUse) => settings.rules.find((rule) => rule.use === use) ?? null;
+  const save =
+    (use: RouteUse) =>
+    (body: { provider: string; modelId: string; thinkingLevel: ThinkingLevel | null }) => {
+      if (!live) return;
+      mutations.patchRule.mutate(
+        { use, body },
+        { onError: (error) => toastError(t('保存失败，请重试。'), error) },
+      );
+    };
+  const agentUses = [...AGENT_USES, ...STORED_ONLY_USES.filter((use) => ruleOf(use) !== null)];
+  const session = ruleOf('session');
   return (
-    <PageShell route={ROUTING_SETTINGS_HREF} title={t('规则与策略')} fixture={fixture}>
+    <PageShell route={ROUTING_SETTINGS_HREF} title={t('模型选择')} fixture={fixture}>
       <QueryBoundary
         query={live ? settingsQ : undefined}
         isEmpty={live && settingsQ.data === undefined}
-        loadingLabel={t('正在加载规则与策略')}
-        errorTitle={t('规则与策略没能加载')}
+        loadingLabel={t('正在加载模型选择')}
+        errorTitle={t('模型选择没能加载')}
         className="mt-6"
         empty={null}
       >
-        <div className="flex flex-col gap-6">
-          {empty && (
-            <EmptyState
-              testId="routing-settings-empty"
-              className="mt-2"
-              icon={Route}
-              title={t('还没有路由规则')}
-              description={t('先创建 Coordinator 规则，它才能回答你的消息。')}
+        <div className="flex flex-col gap-8 pt-1 pb-16">
+          <p className="m-0 px-1 text-meta text-content-tertiary">
+            {t(
+              '选新任务默认用哪个模型，以及 Coordinator 和其他 Agent 各用什么模型、思考多深。改动马上生效。',
+            )}
+          </p>
+          <SettingsCard>
+            <RuleRow
+              use="session"
+              label={t('新任务默认用')}
+              hint={
+                session === null && settings.sessionDefault !== undefined ? (
+                  <SessionDefaultHint sessionDefault={settings.sessionDefault} options={options} />
+                ) : (
+                  t('新任务用这个模型和思考强度开始')
+                )
+              }
+              rule={session}
+              options={options}
+              enabledRuntimes={enabledRuntimes}
+              onSave={save('session')}
+            />
+          </SettingsCard>
+          {(!live || topModelsQ.data !== undefined) && (
+            <TopModelsCard
+              models={topModels}
+              options={options}
+              onChange={(next) => {
+                if (!live) return;
+                topModelMutations.put.mutate(next, {
+                  onError: (error) => toastError(t('保存失败，请重试。'), error),
+                });
+              }}
+              onReset={() => {
+                if (!live) return;
+                topModelMutations.reset.mutate(undefined, {
+                  onError: (error) => toastError(t('保存失败，请重试。'), error),
+                });
+              }}
             />
           )}
-          {(settings.rules.length > 0 || missingUses.length > 0) && (
-            <div className="flex flex-col gap-4">
-              <h2 className="m-0 px-1 text-card-title font-medium text-foreground">
-                {t('路由规则')}
-              </h2>
-              {settings.rules.map((rule) => (
-                <RuleEditor
-                  key={rule.id}
-                  use={rule.use}
-                  rule={rule}
-                  machines={machines}
-                  hasDefault={hasDefault}
-                  options={modelOptions}
-                  live={live}
-                  onSave={live ? (body) => saveRule(rule.use, body) : undefined}
-                />
-              ))}
-              {missingUses.map((use) => (
-                <RuleEditor
-                  key={`new-${use}`}
+          <SettingsSection testId="routing-agents" title={t('Coordinator 和其他 Agent')}>
+            <SettingsCard>
+              {agentUses.map((use) => (
+                <RuleRow
+                  key={use}
                   use={use}
-                  rule={null}
-                  sessionDefault={use === 'session' ? settings.sessionDefault : undefined}
-                  coordinatorDefault={
-                    use === 'coordinator' ? settings.coordinatorDefault : undefined
+                  label={t(ROUTE_USE_LABELS[use])}
+                  hint={
+                    use === 'coordinator' && ruleOf(use) === null ? (
+                      settings.coordinatorDefault !== undefined ? (
+                        <CoordinatorDefaultHint
+                          coordinatorDefault={settings.coordinatorDefault}
+                          options={options}
+                        />
+                      ) : (
+                        t('先给 Coordinator 选模型，它才能回答你的消息。')
+                      )
+                    ) : (
+                      t(USE_HINTS[use] ?? '')
+                    )
                   }
-                  machines={machines}
-                  hasDefault={hasDefault}
-                  options={modelOptions}
-                  live={live}
-                  onSave={live ? (body) => saveRule(use, body) : undefined}
+                  rule={ruleOf(use)}
+                  options={options}
+                  enabledRuntimes={enabledRuntimes}
+                  onSave={save(use)}
                 />
               ))}
-            </div>
-          )}
-          {settings.policies.length > 0 && (
-            <div className="flex flex-col gap-4">
-              <h2 className="m-0 px-1 text-card-title font-medium text-foreground">
-                {t('工作策略')}
-              </h2>
-              {settings.policies.map((policy) => (
-                <PolicyEditor
-                  key={policy.id}
-                  policy={policy}
-                  live={live}
-                  onSave={
-                    live
-                      ? (body) =>
-                          mutations.patchPolicy.mutate(
-                            { use: policy.use, body },
-                            {
-                              onSuccess: () => toastSuccess(t('规则已保存')),
-                              onError: (error) => toastError(t('保存失败，请重试。'), error),
-                            },
-                          )
-                      : undefined
-                  }
-                />
-              ))}
-            </div>
-          )}
+            </SettingsCard>
+          </SettingsSection>
         </div>
       </QueryBoundary>
     </PageShell>

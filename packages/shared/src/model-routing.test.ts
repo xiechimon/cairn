@@ -14,12 +14,9 @@ const connections = [
 test.each([70, 71, 100])(
   'weekly usage %i routes new implementation and independent review',
   (usedPercent) => {
-    const { edges } = resolveRouting(
-      [{ use: 'review' }, { use: 'implementation' }],
-      connections,
-      [{ connectionId: 'codex', windows: [{ window: 'week', usedPercent }] }],
-      {},
-    );
+    const { edges } = resolveRouting([{ use: 'review' }, { use: 'implementation' }], connections, [
+      { connectionId: 'codex', windows: [{ window: 'week', usedPercent }] },
+    ]);
     expect(edges[1]).toMatchObject({
       connectionId: 'claude',
       modelId: 'claude-sonnet-5-5',
@@ -35,9 +32,9 @@ test.each([
   { quota: [{ connectionId: 'codex', windows: [{ window: '5h' as const, usedPercent: 99 }] }] },
   { quota: [{ connectionId: 'claude', windows: [{ window: 'week' as const, usedPercent: 99 }] }] },
 ])('unknown, sufficient or unrelated quotas do not switch implementation', ({ quota }) => {
-  expect(
-    resolveRouting([{ use: 'implementation' }], connections, quota, {}).edges[0],
-  ).toMatchObject({ connectionId: 'codex' });
+  expect(resolveRouting([{ use: 'implementation' }], connections, quota).edges[0]).toMatchObject({
+    connectionId: 'codex',
+  });
 });
 
 test('in-flight implementation preserves model, effort and connection even at exhaustion', () => {
@@ -46,58 +43,50 @@ test('in-flight implementation preserves model, effort and connection even at ex
     inFlight: { modelId: 'gpt-6.1-sol', effort: 'high' as const, connectionId: 'codex' },
   };
   expect(
-    resolveRouting(
-      [use, { use: 'review' }],
-      connections,
-      [{ connectionId: 'codex', windows: [{ window: 'week', usedPercent: 100 }] }],
-      {},
-    ).edges,
+    resolveRouting([use, { use: 'review' }], connections, [
+      { connectionId: 'codex', windows: [{ window: 'week', usedPercent: 100 }] },
+    ]).edges,
   ).toMatchObject([{ ...use.inFlight, use: 'implementation' }, { connectionId: 'claude' }]);
-  expect(resolveRouting([use], [], [], {}).edges[0]).toMatchObject({
+  expect(resolveRouting([use], [], []).edges[0]).toMatchObject({
     ...use.inFlight,
     unavailable: true,
   });
 });
 
 test.each(['manual', 'schedule'] as const)(
-  '%s Claude use cannot select a paid key by default',
+  '%s Claude use selects a paid key and still prefers a subscription',
   (trigger) => {
-    const paid: RoutingConnection[] = [{ ...connections[1], id: 'key', kind: 'api-key' }];
-    expect(resolveRouting([{ use: 'coordinator', trigger }], paid, [], {}).edges[0]).toMatchObject({
-      connectionId: null,
-      unavailable: true,
-      reason: 'subscription-only',
+    const paid: RoutingConnection = { ...connections[1], id: 'key', kind: 'api-key' };
+    expect(resolveRouting([{ use: 'coordinator', trigger }], [paid], []).edges[0]).toMatchObject({
+      connectionId: 'key',
+      modelId: 'claude-opus-5-5',
     });
     expect(
-      resolveRouting([{ use: 'coordinator', trigger }], paid, [], { claudeUsage: 'allow-paid' })
-        .edges[0],
-    ).toMatchObject({ connectionId: 'key' });
+      resolveRouting([{ use: 'coordinator', trigger }], [paid, connections[1]], []).edges[0],
+    ).toMatchObject({ connectionId: 'claude' });
   },
 );
 
 test('review parks rather than sharing the implementation vendor', () => {
   expect(
-    resolveRouting([{ use: 'implementation' }, { use: 'review' }], [connections[0]], [], {})
-      .edges[1],
+    resolveRouting([{ use: 'implementation' }, { use: 'review' }], [connections[0]], []).edges[1],
   ).toMatchObject({ connectionId: null, unavailable: true });
 });
 
-test('an in-flight paid Claude use parks under subscription-only without changing its model', () => {
+test('an in-flight paid Claude use keeps running on its key', () => {
   const paid: RoutingConnection = { ...connections[1], id: 'key', kind: 'api-key' };
   const request = {
     use: 'coordinator' as const,
     inFlight: { modelId: 'claude-opus-5-5', effort: 'high' as const, connectionId: 'key' },
   };
-  expect(resolveRouting([request], [paid], [], {}).edges[0]).toMatchObject({
-    ...request.inFlight,
-    unavailable: true,
-    reason: 'subscription-only',
-  });
+  const edge = resolveRouting([request], [paid], []).edges[0];
+  expect(edge).toMatchObject(request.inFlight);
+  expect(edge?.unavailable).toBeUndefined();
 });
 
 test('a Claude-only team can implement while independent review remains unavailable', () => {
   expect(
-    resolveRouting([{ use: 'implementation' }, { use: 'review' }], [connections[1]], [], {}).edges,
+    resolveRouting([{ use: 'implementation' }, { use: 'review' }], [connections[1]], []).edges,
   ).toMatchObject([
     { connectionId: 'claude', modelId: 'claude-sonnet-5-5' },
     { connectionId: null, unavailable: true, modelId: 'gpt-6.1-sol' },

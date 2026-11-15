@@ -146,7 +146,7 @@ Scheduled tasks, the search syntax with the activity view, and the sidebar with 
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Scheduled tasks](#schedules) | 3 | Research: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model<br>Frontend design: the schedules page and detail dialog have no design<br>Backend design: no design for due events, missed runs and continue-thread schedules |
+| [Scheduled tasks](#schedules) | 3 | Research: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model<br>Frontend design: the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md<br>Backend design: no design for due events, missed runs and continue-thread schedules |
 | [Search and activity](#search-and-activity) | 3 | Research: no note on Amp's search syntax and activity filters<br>Backend design: no design for the search syntax, index and ranking |
 | [Sidebar](#sidebar) | 3 | Backend design: no design for unread and read marks across devices |
 
@@ -320,7 +320,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### routing
 
-**Model and work routing** (shipped). Which model and machine each kind of work uses: model routing, work routing rules and policies, capabilities and a per-thread override.
+**Model and work routing** (shipped). Which model each kind of work uses: the Model selector page (default model for new tasks, the Coordinator and other agents with model and thinking level), the Model routing page (providers with quota, Claude billing, and a graph wiring each rule to its provider), capabilities and a per-thread override.
 
 - Research: [docs/research/capability-routing-2026-11-06.md](research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](research/agent-machine-routing.md) (not on main)
 - Frontend design: [docs/design/references/settings](design/references/settings)
@@ -384,7 +384,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### first-run
 
-**First run** (shipped). The home checklist, connection banners and the first-PR card that take a new user to a first merged PR.
+**First run** (shipped). The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.
 
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](design/references/first-run)
@@ -563,7 +563,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 **Scheduled tasks** (shipped). Recurring work that starts or continues threads on a schedule, with run-now and a project schedule.
 
 - Research: **gap**: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model
-- Frontend design: **gap**: the schedules page and detail dialog have no design
+- Frontend design: **gap**: the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md
 - Backend design: **gap**: no design for due events, missed runs and continue-thread schedules
 
 ### search-and-activity

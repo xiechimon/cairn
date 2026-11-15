@@ -50,7 +50,6 @@ export function toTeamRecord(
     name: row.name,
     createdAt: row.createdAt,
     plan: row.plan,
-    claudeUsage: row.claudeUsage,
     avatarStyle: row.avatarStyle,
     ...(pauses === undefined ? {} : { autonomyPaused: pauses.length > 0, autonomyPauses: pauses }),
     coAuthorTrailer: row.coAuthorTrailer,

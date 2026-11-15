@@ -191,15 +191,17 @@ function wireSchedule(i: number) {
   };
 }
 
-test('schedules page scrolls to the bottom (#1032)', async ({ page }) => {
+test('the schedules tab scrolls to its last row and the new schedule button (#1032)', async ({ page }) => {
   await stubLiveBoot(page);
   await page.route('**/api/schedules*', (route) =>
     route.fulfill({ json: Array.from({ length: 30 }, (_, i) => wireSchedule(i)) }),
   );
-  await page.goto('/app/schedules');
-  const cards = page.locator('.sched-card');
-  await expect(cards).toHaveCount(30);
-  await expectScrollerReachesBottom(page, cards.first(), cards.last());
+  await page.goto('/app?pane=tasks&tab=scheduled');
+  const rows = page
+    .getByRole('complementary', { name: '任务' })
+    .locator('[data-slot="schedule-row"]');
+  await expect(rows).toHaveCount(30);
+  await expectScrollerReachesBottom(page, rows.first(), page.getByTestId('schedule-new'));
 });
 
 test('project settings page scrolls to the bottom (#1032)', async ({ page }) => {

@@ -7,40 +7,40 @@ test('feedback route is gone — old URL redirects to the home', async ({ page }
   await expect(page.locator('[data-route="feedback"]')).toHaveCount(0);
 });
 
-test('schedules empty state drops the `查看文档` button; `新建定时` really opens and saves (#149, #1037)', async ({
+const EMPTY_SCHEDULES = '/app?scenario=11&pane=tasks&tab=scheduled';
+const SCHEDULES = '/app?scenario=home-c&pane=tasks&tab=scheduled';
+
+test('the empty schedules tab has no docs button; its `新建定时` really opens the editor (#149, #1037)', async ({
   page,
 }) => {
-  await page.goto('/app/schedules?scenario=11');
-  await expect(page.locator('.sched-empty')).toBeVisible();
-  await expect(page.locator('.sched-empty-docs')).toHaveCount(0);
-  const emptyNew = page.locator('.sched-empty').getByRole('button', { name: '新建定时' });
-  await expect(emptyNew).toBeVisible();
-
+  await page.goto(EMPTY_SCHEDULES);
+  await expect(page.getByTestId('tasks-schedules-empty')).toBeVisible();
+  await expect(page.getByRole('button', { name: '查看文档' })).toHaveCount(0);
+  const emptyNew = page.getByTestId('schedule-new');
+  await expect(emptyNew).toHaveText('新建定时');
   await emptyNew.click();
-  const dialog = page.getByRole('dialog', { name: '新建定时' });
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole('button', { name: '保存' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(page.locator('.sched-card')).toHaveCount(1);
-  await expect(page.locator('.sched-empty')).toHaveCount(0);
+  const popover = page.getByTestId('schedule-popover');
+  await expect(popover).toContainText('新建定时');
+  await expect(popover).toContainText('这里还没有可以定时的任务');
+  await popover.getByRole('button', { name: '取消' }).click();
+  await expect(popover).toBeHidden();
 });
 
-test('schedules fixture face: topbar `新建` opens the dialog, freq tabs respond, save lands a card (#1037)', async ({
+test('schedules fixture face: the new schedule editor frequency radios respond and Save closes it (#1037)', async ({
   page,
 }) => {
-  await page.goto('/app/schedules?scenario=11');
-  await expect(page.locator('.page-new-action')).toHaveCount(0);
-  await page.locator('.sched-empty').getByRole('button', { name: '新建定时' }).click();
-  const dialog = page.getByRole('dialog', { name: '新建定时' });
-  await expect(dialog).toBeVisible();
+  await page.goto(SCHEDULES);
+  await page.getByTestId('schedule-new').click();
+  const popover = page.getByTestId('schedule-popover');
+  await expect(popover).toBeVisible();
 
-  await dialog.getByRole('radio', { name: '每周' }).click();
-  await expect(dialog.getByRole('radio', { checked: true })).toHaveText('每周');
-  await dialog.getByRole('button', { name: '保存' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(page.locator('.sched-card')).toHaveCount(1);
-
-  await expect(page.locator('.sched-card')).toContainText(/每周[一二三四五六日] \d{2}:\d{2}/);
+  await popover.getByRole('radio', { name: '每周' }).click();
+  await expect(popover.getByRole('radio', { checked: true })).toHaveText('每周');
+  await expect(popover.getByLabel('从哪天开始每周重复')).toBeVisible();
+  const save = popover.getByRole('button', { name: '保存' });
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect(popover).toBeHidden();
 });
 
 test('machines rows carry only live controls, no dead inline buttons (#222 shipped + #1108 narrowed)', async ({
@@ -181,16 +181,17 @@ test('project settings drops the avatar `更换` ink (#307, supersedes the #177 
   await expect(page.locator('span.prj-set-branch')).toBeVisible();
 });
 
-test('sched card `更多` opens a menu and deletes the row through the confirm (#306)', async ({
+test('schedule row `更多` opens a menu and its delete asks through the confirm (#306)', async ({
   page,
 }) => {
-  await page.goto('/app/schedules?scenario=r3-93');
-  const card = page.locator('.sched-card');
-  await expect(card).toHaveCount(1);
-  const more = page.locator('.sched-card-more');
+  await page.goto('/app?scenario=r3-93&pane=tasks&tab=scheduled');
+  const frame = page.locator('[data-slot="schedule-row-frame"]');
+  await expect(frame).toHaveCount(1);
+  const more = frame.getByTestId('schedule-row-menu-button');
+  await frame.hover();
   await expect(more).toHaveAttribute('aria-expanded', 'false');
   await more.click();
-  const menu = page.locator('.sched-card-menu');
+  const menu = page.getByRole('menu');
   await expect(menu).toBeVisible();
   await expect(more).toHaveAttribute('aria-expanded', 'true');
 
@@ -199,7 +200,7 @@ test('sched card `更多` opens a menu and deletes the row through the confirm (
 
   await more.click();
   await expect(menu).toBeVisible();
-  await menu.locator('.sched-card-menu-row').click();
+  await menu.getByRole('menuitem', { name: /删除/ }).click();
 
   const confirm = page.getByRole('alertdialog');
   await expect(confirm).toBeVisible();
@@ -207,9 +208,6 @@ test('sched card `更多` opens a menu and deletes the row through the confirm (
   await expect(confirm).not.toContainText('#1');
   await confirm.getByRole('button', { name: '删除' }).click();
   await expect(confirm).toBeHidden();
-  await expect(page.locator('.sched-card')).toHaveCount(0);
-
-  await expect(page.locator('.sched-empty')).toBeVisible();
 });
 
 test('skills `排序` opens the single-select listbox, picking an option closes it (#306)', async ({

@@ -49,6 +49,7 @@ import {
   REVIEW_VERDICT_KIND,
   RUNNER_OS_LABELS,
   replyQuoteText,
+  reportAckContentSchema,
   resolvedBuildPrNumber,
   reviewVerdictSchema,
   reworkNoteWithoutReason,
@@ -114,11 +115,8 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
   'claude-rate-limited': '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
   'claude-logged-out':
     '排队中：{machine} 上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
-  'claude-usage-refused':
-    '排队中：团队只用 Claude 订阅，{machine} 上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）',
   'coordinator-provider-missing': 'Coordinator 规则用的服务商「{name}」还没添加',
   'coordinator-provider-no-key': 'Coordinator 规则用的服务商「{name}」没有 API key',
-  'coordinator-paid-claude': 'Coordinator 规则用的是付费 Claude（{name}），但团队只允许用订阅',
 };
 
 const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
@@ -130,8 +128,6 @@ const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], st
   'claude-rate-limited': '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
   'claude-logged-out':
     '排队中：执行机上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
-  'claude-usage-refused':
-    '排队中：团队只用 Claude 订阅，执行机上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）',
 };
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
@@ -1636,7 +1632,23 @@ function collectChiefStream(
       const notice = chiefNoticeContentSchema.safeParse(parsed);
       if (notice.success) {
         pendingTools = [];
-        items.push({ kind: 'robot', markdown: notice.data.message, seconds: '', id: m.id });
+        items.push({
+          kind: 'robot',
+          markdown: notice.data.message,
+          seconds: '',
+          id: m.id,
+          ...(notice.data.report !== undefined ? { report: notice.data.report } : {}),
+        });
+        continue;
+      }
+      const ack = reportAckContentSchema.safeParse(parsed);
+      if (ack.success) {
+        items.push({
+          kind: 'report-ack',
+          id: m.id,
+          todoId: ack.data.todoId,
+          buildId: ack.data.buildId,
+        });
         continue;
       }
       const runnerOffline = runnerOfflineContentSchema.safeParse(parsed);

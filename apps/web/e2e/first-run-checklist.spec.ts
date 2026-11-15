@@ -70,7 +70,7 @@ const LOCAL_LOGIN = {
 test('a fresh install shows one chip for the first missing step and no card', async ({ page }) => {
   await open(page, fresh());
   await expect(chip(page)).toHaveCount(1);
-  await expect(chip(page)).toHaveAttribute('data-step', 'model-source');
+  await expect(chip(page)).toHaveAttribute('data-step', 'models');
   await expect(chip(page)).toHaveText('接入模型来源');
   await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/providers/);
   await expect(hint(page)).toContainText('Claude Code');
@@ -78,10 +78,10 @@ test('a fresh install shows one chip for the first missing step and no card', as
   await expect(page.getByTestId('chief-gate')).toHaveCount(0);
 });
 
-test('with a model source the chip asks for a machine and the hint shows the start command', async ({
+test('with models on both sides the chip asks for a machine and the hint shows the start command', async ({
   page,
 }) => {
-  await open(page, { ...fresh(), providers: [{ id: 'p1', name: 'gw' }] });
+  await open(page, { ...fresh(), providers: [{ id: 'p1', name: 'gw' }], bound: true });
   await expect(chip(page)).toHaveAttribute('data-step', 'machine');
   await expect(chip(page)).toHaveText('连接一台执行机');
   await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/machines/);
@@ -89,21 +89,19 @@ test('with a model source the chip asks for a machine and the hint shows the sta
   await expect(hint(page)).toContainText('在要干活的电脑上运行');
 });
 
-test('with a source and a machine the chip opens work routing', async ({ page }) => {
+test('a model source the Coordinator cannot use still asks for a provider', async ({ page }) => {
   await open(page, { ...fresh(), providers: [{ id: 'p1', name: 'gw' }], machines: [ONLINE] });
-  await expect(chip(page)).toHaveAttribute('data-step', 'coordinator');
-  await expect(chip(page)).toHaveText('打开工作路由');
-  await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/work-routing/);
-  await expect(hint(page)).toContainText('Coordinator 规则');
+  await expect(chip(page)).toHaveAttribute('data-step', 'models');
+  await expect(chip(page)).toHaveText('Coordinator 还缺模型');
+  await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/providers/);
+  await expect(hint(page)).toContainText('Coordinator 用不了 Claude Code 登录');
 });
 
-test('a machine going offline only advances the chip when it is the first gap', async ({
-  page,
-}) => {
+test('a machine coming back online clears the chip', async ({ page }) => {
   const world: World = {
     providers: [{ id: 'p1', name: 'gw' }],
     machines: [{ ...ONLINE, online: false }],
-    bound: false,
+    bound: true,
     teamPaths: [],
   };
   await open(page, world);
@@ -114,7 +112,7 @@ test('a machine going offline only advances the chip when it is the first gap', 
   await page.evaluate(() => {
     for (const es of window.__es) es.emit({ type: 'machine_presence', machineId: 'm1', online: true });
   });
-  await expect(chip(page)).toHaveAttribute('data-step', 'coordinator');
+  await expect(chip(page)).toHaveCount(0);
 });
 
 test('with several runners all offline the chip counts them instead of asking to connect one', async ({
@@ -123,6 +121,7 @@ test('with several runners all offline the chip counts them instead of asking to
   await open(page, {
     ...fresh(),
     providers: [{ id: 'p1', name: 'gw' }],
+    bound: true,
     machines: [
       { ...ONLINE, online: false },
       { id: 'm2', name: 'mac', online: false },
@@ -132,7 +131,7 @@ test('with several runners all offline the chip counts them instead of asking to
   await expect(hint(page)).toContainText('在其中一台上运行');
 });
 
-test('the chip and hint are gone once the provider, a machine and the Coordinator are ready', async ({
+test('the chip and hint are gone once the Coordinator, a model source and a machine are ready', async ({
   page,
 }) => {
   await open(page, {
@@ -184,18 +183,20 @@ test('sending before the Coordinator is ready shows an actionable translated mes
   await expect(page.locator('[data-sonner-toast]')).not.toContainText('chief agent not bound');
 });
 
-test('a machine-local Claude Code login completes the model step with no provider record', async ({
+test('a machine-local Claude Code login alone leaves the Coordinator without a model', async ({
   page,
 }) => {
   await open(page, { ...fresh(), connections: [LOCAL_LOGIN], machines: [ONLINE] });
-  await expect(chip(page)).toHaveAttribute('data-step', 'coordinator');
+  await expect(chip(page)).toHaveAttribute('data-step', 'models');
+  await expect(chip(page)).toHaveText('Coordinator 还缺模型');
 });
 
-test('an unavailable local login does not complete the model step', async ({ page }) => {
+test('an unavailable local login does not count as a model source', async ({ page }) => {
   await open(page, {
     ...fresh(),
     connections: [{ ...LOCAL_LOGIN, available: false }],
     machines: [ONLINE],
   });
-  await expect(chip(page)).toHaveAttribute('data-step', 'model-source');
+  await expect(chip(page)).toHaveAttribute('data-step', 'models');
+  await expect(chip(page)).toHaveText('接入模型来源');
 });

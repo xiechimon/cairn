@@ -95,7 +95,6 @@ export const RULE_ISSUE_REASONS = [
   'machine-unusable',
   'provider-missing',
   'provider-no-key',
-  'paid-claude',
 ] as const;
 export type RuleIssueReason = (typeof RULE_ISSUE_REASONS)[number];
 

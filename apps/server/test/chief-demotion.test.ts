@@ -9,7 +9,6 @@ import {
   claudeSubscription,
   machine as machineTable,
   step as stepTable,
-  team as teamTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import { sweepAbandonedChiefSteps } from '../src/services/chief.js';
@@ -251,7 +250,6 @@ describe('#1260 route re-source: chief step destination = the coordinator rule h
 
   test('a home machine whose Claude Code is logged out waits until the team has a subscription', async () => {
     const w = await setupWorld({ provider: 'claude-code' });
-    w.s.db.update(teamTable).set({ claudeUsage: 'allow-paid' }).run();
     w.s.db
       .update(machineTable)
       .set({
@@ -268,6 +266,7 @@ describe('#1260 route re-source: chief step destination = the coordinator rule h
         label: 'team',
         tokenCipher: 'cipher',
         expiresAt: null,
+        enabledAt: 1,
         createdAt: 1,
       })
       .run();

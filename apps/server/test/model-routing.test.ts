@@ -2,12 +2,10 @@ import type { RoutingConnection, RoutingEdge, RoutingQuota } from '@cairn/shared
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
-import { build, chief, chiefThread, machine, project, step, team, todo } from '../src/db/schema.js';
-import { seed } from '../src/db/seed.js';
+import { build, chief, chiefThread, machine, project, step, todo } from '../src/db/schema.js';
 import { refreshClaudeRateParks } from '../src/services/claude-rate-limit.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { createProvider } from '../src/services/providers.js';
-import { sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
 import {
   bootServer,
   insertMachine,
@@ -185,21 +183,6 @@ test('Codex routing omits quota windows without a server usage source', async ()
   expect(body.edges.some((edge) => edge.reason === 'codex-quota<=30%')).toBe(false);
 });
 
-test('Claude usage defaults safely, persists through reseeding and rejects invalid settings', async () => {
-  const s = bootServer();
-  expect(seed(s.db).team).toMatchObject({ claudeUsage: 'subscription-only' });
-  const path = `/api/teams/${s.team.id}`;
-  expect((await req(s.app, 'PATCH', path, { claudeUsage: 'invalid' })).status).toBe(400);
-  expect((await req(s.app, 'PATCH', path, { claudeUsage: 'allow-paid' })).status).toBe(200);
-  expect(seed(s.db).team).toMatchObject({ claudeUsage: 'allow-paid' });
-  expect(await (await req(s.app, 'GET', '/api/teams')).json()).toMatchObject([
-    { claudeUsage: 'allow-paid' },
-  ]);
-  expect(
-    (await req(s.app, 'PATCH', '/api/teams/other', { claudeUsage: 'allow-paid' })).status,
-  ).toBe(404);
-});
-
 test.each([
   { triggerSource: 'user', mode: 'direct' },
   { triggerSource: 'schedule', mode: 'direct' },
@@ -207,7 +190,7 @@ test.each([
   { triggerSource: 'user', mode: 'native' },
   { triggerSource: 'user', mode: 'takeover' },
 ] as const)(
-  '$triggerSource $mode paid Claude step parks before claim and resumes only after opt-in',
+  '$triggerSource $mode paid Claude step is claimed without a usage opt-in',
   async ({ triggerSource, mode }) => {
     const s = bootServer();
     const mid = insertMachine(
@@ -359,41 +342,23 @@ test.each([
       reposDir: s.reposDir,
       attachmentsDir: s.attachmentsDir,
     };
-    expect(await claimStep(deps, claimant, s.team.id, 0, 'http://localhost')).toBeNull();
-    expect(s.db.select().from(step).where(eq(step.id, 'pending')).get()).toMatchObject({
-      status: 'waiting_quota',
-      machineId: null,
-      quotaBlock:
-        mode === 'takeover'
-          ? { source: 'claude_rate_limit', reason: 'Claude subscription five_hour rejected' }
-          : { source: 'subscription_policy', reason: 'subscription-only' },
-    });
-    expect(s.db.select().from(step).where(eq(step.id, 'coordinator-step')).get()).toMatchObject({
-      status: 'waiting_quota',
-      quotaBlock:
-        mode === 'takeover'
-          ? { source: 'claude_rate_limit', reason: 'Claude subscription five_hour rejected' }
-          : { source: 'subscription_policy', reason: 'subscription-only' },
-    });
-    expect(s.db.select().from(step).where(eq(step.id, 'running')).get()).toMatchObject({
-      status: 'claimed',
-      machineId: mid,
-      fallback: null,
-    });
-    sweepQuotaWaitSteps(s.svc, Date.now() + 30 * 24 * 60 * 60 * 1000);
-    expect(s.db.select().from(step).where(eq(step.id, 'pending')).get()?.status).toBe(
-      mode === 'takeover' ? 'pending' : 'waiting_quota',
-    );
-    await req(s.app, 'PATCH', `/api/teams/${s.team.id}`, { claudeUsage: 'allow-paid' });
+    const claimed = await claimStep(deps, claimant, s.team.id, 0, 'http://localhost');
     if (mode === 'takeover') {
-      expect(await claimStep(deps, claimant, s.team.id, 0, 'http://localhost')).toBeNull();
+      expect(claimed).toBeNull();
+      expect(s.db.select().from(step).where(eq(step.id, 'pending')).get()).toMatchObject({
+        status: 'waiting_quota',
+        machineId: null,
+        quotaBlock: {
+          source: 'claude_rate_limit',
+          reason: 'Claude subscription five_hour rejected',
+        },
+      });
     } else {
-      expect(await claimStep(deps, claimant, s.team.id, 0, 'http://localhost')).toMatchObject({
+      expect(claimed).toMatchObject({
         step: { id: 'pending' },
         agent: { provider: mode === 'native' ? 'claude-code' : 'anthropic' },
       });
     }
-    expect(s.db.select().from(team).get()).toMatchObject({ claudeUsage: 'allow-paid' });
   },
 );
 

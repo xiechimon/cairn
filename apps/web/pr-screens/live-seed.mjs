@@ -50,7 +50,6 @@ export async function seedWorld(server) {
     models: [{ id: 'stub-model', name: 'stub-model' }],
   });
 
-  await call('PATCH', `/api/teams/${teamId}`, { claudeUsage: 'allow-paid' });
   for (const use of ['session', 'review']) {
     await call('PATCH', `/api/teams/${teamId}/routing-rules/${use}`, {
       provider: 'stub-gw',

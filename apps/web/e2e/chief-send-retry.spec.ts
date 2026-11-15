@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { PROJECT } from './chief-home-mock';
 
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: 'ian', avatarUrl: null };
@@ -107,6 +108,7 @@ async function mockCoordinator(
       return json({ thread: THREAD, message: row }, 201);
     }
     if (path === '/api/teams') return json([TEAM]);
+    if (path === '/api/projects') return json([PROJECT]);
     if (path === '/api/user/me') return json(USER);
     if (path === '/api/teams/t1/notifications') return json({ unreadThreadIds: [] });
     if (path === '/api/teams/t1/chief/threads') {

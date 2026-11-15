@@ -119,6 +119,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     "chief": {
       "additionalProperties": false,
       "properties": {
+        "history": {
+          "type": "string",
+        },
         "systemPrompt": {
           "type": "string",
         },
@@ -1172,6 +1175,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "chief": {
               "additionalProperties": false,
               "properties": {
+                "history": {
+                  "type": "string",
+                },
                 "systemPrompt": {
                   "type": "string",
                 },
@@ -5245,10 +5251,8 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                         "local-path",
                         "claude-rate-limited",
                         "claude-logged-out",
-                        "claude-usage-refused",
                         "coordinator-provider-missing",
                         "coordinator-provider-no-key",
-                        "coordinator-paid-claude",
                       ],
                       "type": "string",
                     },
@@ -6762,10 +6766,8 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
                 "local-path",
                 "claude-rate-limited",
                 "claude-logged-out",
-                "claude-usage-refused",
                 "coordinator-provider-missing",
                 "coordinator-provider-no-key",
-                "coordinator-paid-claude",
               ],
               "type": "string",
             },
@@ -10344,10 +10346,8 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
                     "local-path",
                     "claude-rate-limited",
                     "claude-logged-out",
-                    "claude-usage-refused",
                     "coordinator-provider-missing",
                     "coordinator-provider-no-key",
-                    "coordinator-paid-claude",
                   ],
                   "type": "string",
                 },
@@ -11867,13 +11867,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
         "string",
         "null",
       ],
-    },
-    "claudeUsage": {
-      "enum": [
-        "subscription-only",
-        "allow-paid",
-      ],
-      "type": "string",
     },
     "coAuthorTrailer": {
       "default": true,

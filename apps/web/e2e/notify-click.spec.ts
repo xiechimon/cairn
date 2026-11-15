@@ -380,7 +380,7 @@ test.describe('push notification click loop (XMON-106)', () => {
   test('T4: a chief deep link off the home navigates to the Coordinator page on the target thread, and the param is stripped', async ({ page }) => {
     await stubEventSource(page);
     await mockLiveApi(page);
-    await page.goto('/app/schedules?chief=chief-bbb');
+    await page.goto('/app/machines/authorize?chief=chief-bbb');
 
     const home = page.getByTestId('home-c');
     await expect(home.getByTestId('chief-stream')).toContainText('线程乙的消息');

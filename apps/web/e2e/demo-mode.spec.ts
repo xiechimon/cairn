@@ -89,7 +89,7 @@ test('banner: 演示数据 + site and showcase links, bilingual, survives naviga
   );
 
   await page.getByTestId('sidebar-settings').click();
-  await page.getByRole('dialog', { name: '设置' }).getByRole('link', { name: '规则与策略' }).click();
+  await page.getByRole('dialog', { name: '设置' }).getByRole('link', { name: '模型选择' }).click();
   await expect(page).toHaveURL(/\/app\/settings\/work-routing$/);
   await expect(banner).toBeVisible();
   await expect(banner).toBeInViewport();
@@ -99,6 +99,15 @@ test('banner: 演示数据 + site and showcase links, bilingual, survives naviga
   const box = await banner.boundingBox();
   expect(box?.width).toBeLessThanOrEqual(390);
   expect(await banner.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+
+  await page.goto(`${demo.base}/app`);
+  const bannerBox = await banner.boundingBox();
+  const menuBox = await page.getByTestId('narrow-menu').boundingBox();
+  expect(menuBox?.y ?? 0).toBeGreaterThanOrEqual((bannerBox?.y ?? 0) + (bannerBox?.height ?? 0));
+  await page.getByTestId('narrow-menu').click();
+  await expect(page.locator('.app-drawer')).toBeVisible();
+  const drawerBox = await page.locator('.app-drawer').boundingBox();
+  expect(drawerBox?.y ?? 0).toBeGreaterThanOrEqual((bannerBox?.y ?? 0) + (bannerBox?.height ?? 0));
 });
 
 test('banner follows the locale', async ({ page }) => {
@@ -122,7 +131,7 @@ test('the selling points browse end to end with no backend traffic', async ({ pa
   await page.goto(`${demo.base}/app/todo/${DEMO.cartMerge}`);
   await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
   await expect(page.getByText('AI 审核', { exact: false }).first()).toBeVisible();
-  await expect(page.getByText('blocking').first()).toBeVisible();
+  await expect(page.getByText('必须修改').first()).toBeVisible();
 
   await page.goto(`${demo.base}/app/todo/${DEMO.rateLimit}`);
   await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
@@ -141,12 +150,19 @@ test('the selling points browse end to end with no backend traffic', async ({ pa
   await page.goto(`${demo.base}/app`);
   await expect(home(page).getByText('购物车').first()).toBeVisible();
 
+  await page.goto(`${demo.base}/app?pane=tasks`);
+  await expect(page.locator('[data-testid="tasks-section"][data-section="ready_for_review"]')).toContainText(
+    '给登录接口加限流与防刷',
+  );
+
   await page.goto(`${demo.base}/app/resources/machines`);
   await expect(page.getByTestId('machine-item').filter({ hasText: 'dev-mac' })).toBeVisible();
   await expect(page.getByTestId('machine-item').filter({ hasText: 'build-box' })).toBeVisible();
 
   await page.goto(`${demo.base}/app/schedules`);
-  await expect(page.getByRole('heading', { name: /定时/ }).first()).toBeVisible();
+  const tasks = page.getByRole('complementary', { name: '任务' });
+  await expect(tasks.getByRole('tab', { name: '定时' })).toHaveAttribute('aria-selected', 'true');
+  await expect(tasks.locator('[data-slot="schedule-row"]', { hasText: '重建搜索索引' })).toBeVisible();
 
   expectQuiet(traffic);
 });
@@ -195,7 +211,7 @@ test('write: the primary action and the delete confirm are blocked', async ({ pa
 
 test('write: sending to the Coordinator is blocked', async ({ page }) => {
   const traffic = watchTraffic(page);
-  await page.goto(`${demo.base}/app/schedules`);
+  await page.goto(`${demo.base}/app?pane=tasks&tab=scheduled`);
   await pressOpenCoordinator(page);
   const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
   await input.fill('把购物车那张票提到最前面');

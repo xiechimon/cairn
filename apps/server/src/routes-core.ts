@@ -205,9 +205,6 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const id = c.req.param('id');
     requireTeam(ctx, id);
     const body = parseWith(patchTeamBodySchema, await jsonBody(c), 'body');
-    if (body.claudeUsage !== undefined) {
-      ctx.db.update(team).set({ claudeUsage: body.claudeUsage }).where(eq(team.id, id)).run();
-    }
     if (body.coAuthorTrailer !== undefined) {
       ctx.db
         .update(team)

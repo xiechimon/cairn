@@ -2,8 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { pressAndExpect } from './helpers.js';
 
 const BOARD = '/app?scenario=01';
-const SCHED = '/app/schedules?scenario=r3-92';
-/** UA (Chromium) default focus ring: outline auto + this blue. */
+const SCHED = '/app?scenario=11&pane=tasks&tab=scheduled';
 const UA_BLUE = 'rgb(0, 95, 204)';
 
 async function focusedOutline(page: Page) {
@@ -30,12 +29,12 @@ function expectVisibleRing(info: { style: string; color: string; shadow: string 
 
 test.describe('#15 focus ring incorporated', () => {
   test('click + key on the `新建定时` button: never the UA blue box', async ({ page }) => {
-    await page.goto('/app/schedules?scenario=11');
-    const pageNew = page.locator('.sched-empty').getByRole('button', { name: '新建定时' });
+    await page.goto(SCHED);
+    const pageNew = page.getByTestId('schedule-new');
     await pageNew.click();
-    const schedDialog = page.getByRole('dialog', { name: '新建定时' });
-    await expect(schedDialog).toBeVisible();
-    await pressAndExpect(page, 'Escape', schedDialog, 'hidden');
+    const popover = page.getByTestId('schedule-popover');
+    await expect(popover).toBeVisible();
+    await pressAndExpect(page, 'Escape', popover, 'hidden');
     await expect(pageNew).toBeFocused();
     await page.waitForTimeout(250);
     const info2 = await focusedOutline(page);
@@ -66,45 +65,23 @@ test.describe('#15 focus ring incorporated', () => {
   });
 });
 
-test.describe('#10 schedules `新建定时` dialog = registry Dialog fullscreen family (fade-in)', () => {
-  const overlay = (page: Page) => page.locator('[data-slot="dialog-overlay"]');
-
-  test('scrim covers the full viewport — sidebar included', async ({ page }) => {
+test.describe('#10 the schedule popover closes from outside clicks and `取消`', () => {
+  const popover = (page: Page) => page.getByTestId('schedule-popover');
+  const openNew = async (page: Page) => {
     await page.goto(SCHED);
-    await expect(overlay(page)).toBeVisible();
-    const covers = await page.evaluate(() => {
-      // a point deep inside the sidebar, far from the centered panel
-      const el = document.elementFromPoint(100, 400);
-      return el?.closest('[data-slot="dialog-overlay"]') != null;
-    });
-    expect(covers).toBe(true);
+    await page.getByTestId('schedule-new').click();
+    await expect(popover(page)).toBeVisible();
+  };
+
+  test('a click outside closes it', async ({ page }) => {
+    await openNew(page);
+    await page.mouse.click(700, 80);
+    await expect(popover(page)).toBeHidden();
   });
 
-  test('Esc closes the overlay', async ({ page }) => {
-    await page.goto(SCHED);
-    await expect(overlay(page)).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(overlay(page)).toBeHidden();
-  });
-
-  test('backdrop click closes; entry rides the registry fade-in', async ({ page }) => {
-    await page.goto(SCHED);
-    const scrim = overlay(page);
-    await expect(scrim).toBeVisible();
-
-    await expect(scrim).toHaveCSS('animation-name', 'enter');
-    // scrim far from the 488-wide centered panel
-    await page.mouse.click(80, 80);
-    await expect(scrim).toBeHidden();
-  });
-
-  test('X and `取消` close the fixture face too (no dead buttons)', async ({ page }) => {
-    await page.goto(SCHED);
-    await page.getByRole('dialog').getByRole('button', { name: '取消' }).click();
-    await expect(overlay(page)).toBeHidden();
-
-    await page.goto(SCHED);
-    await page.getByRole('button', { name: '关闭' }).click();
-    await expect(overlay(page)).toBeHidden();
+  test('`取消` closes the fixture face too (no dead buttons)', async ({ page }) => {
+    await openNew(page);
+    await popover(page).getByRole('button', { name: '取消' }).click();
+    await expect(popover(page)).toBeHidden();
   });
 });

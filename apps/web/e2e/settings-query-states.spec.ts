@@ -7,7 +7,7 @@ const PANES = [
     section: 'routing',
     endpoint: 'model-routing',
     empty: '[data-testid="routing-section"]',
-    ok: { edges: [], connections: [], quota: [], settings: { claudeUsage: 'subscription-only' } },
+    ok: { edges: [], connections: [], quota: [] },
   },
   { section: 'mcp', endpoint: 'mcp-servers', empty: '[data-testid="resource-empty"]', ok: [] },
   { section: 'secrets', endpoint: 'secrets', empty: '[data-testid="resource-empty"]', ok: [] },

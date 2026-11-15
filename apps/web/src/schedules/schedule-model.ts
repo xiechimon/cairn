@@ -102,6 +102,10 @@ export function scheduleDraft(
   };
 }
 
+export function cronHasFiveFields(cron: string): boolean {
+  return cron.trim().split(/\s+/).length === 5;
+}
+
 export function scheduleBody(
   draft: ScheduleDraft,
   schedule: Pick<ScheduleRecord, 'todoId' | 'projectId' | 'tz' | 'enabled'>,
@@ -116,7 +120,7 @@ export function scheduleBody(
   };
   if (draft.trigger === 'custom') {
     const cron = draft.cron.trim();
-    if (cron.split(/\s+/).length !== 5) throw new Error('cron 需要 5 段：分 时 日 月 周。');
+    if (!cronHasFiveFields(cron)) throw new Error('Cron 需要 5 段：分 时 日 月 周。');
     return { ...base, kind: 'cron', cron };
   }
   if (draft.trigger === 'weekdays')

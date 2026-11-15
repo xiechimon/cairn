@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings';
+const NEW_SCHEDULE = '/app?scenario=home-c&pane=tasks&tab=scheduled';
 
 interface Control {
   name: string;
@@ -155,7 +156,8 @@ for (const control of [CONTROLS[1]]) {
 }
 
 test('pointer click leaves no focus ring', async ({ page }) => {
-  await themed(page, 'light', '/app/schedules?scenario=r3-92');
+  await themed(page, 'light', NEW_SCHEDULE);
+  await page.getByTestId('schedule-new').click();
   const weekly = page.getByRole('radio', { name: '每周' });
   await weekly.click();
   await expect(weekly).toHaveAttribute('aria-checked', 'true');
@@ -165,7 +167,8 @@ test('pointer click leaves no focus ring', async ({ page }) => {
 });
 
 test('radio group: arrow keys move focus and select, roving tabindex follows', async ({ page }) => {
-  await themed(page, 'light', '/app/schedules?scenario=r3-92');
+  await themed(page, 'light', NEW_SCHEDULE);
+  await page.getByTestId('schedule-new').click();
   const group = page.getByRole('radiogroup', { name: '频率' });
   const daily = group.getByRole('radio', { name: '每天' });
   await expect(daily).toHaveAttribute('aria-checked', 'true');
@@ -177,7 +180,7 @@ test('radio group: arrow keys move focus and select, roving tabindex follows', a
   await expect(weekdays).toHaveAttribute('tabindex', '0');
   await expect(daily).toHaveAttribute('tabindex', '-1');
   await page.keyboard.press('End');
-  await expect(group.getByRole('radio', { name: '自定义 cron' })).toHaveAttribute(
+  await expect(group.getByRole('radio', { name: '自定义' })).toHaveAttribute(
     'aria-checked',
     'true',
   );

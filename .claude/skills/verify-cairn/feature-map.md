@@ -14,8 +14,8 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `appearance` | `设置` (Settings) › `外观` (Appearance) | [Appearance and visual system](#appearance) |
 | `projects` | `设置` (Settings) › `项目` | [Projects](#projects) |
 | `providers` | `设置` (Settings) › `模型` (Model) › `模型服务` (Providers) | [Model providers and subscriptions](#providers) |
-| `routing` | `设置` (Settings) › `模型` (Model) › `用量与连接` (Usage & connections) | [Model and work routing](#routing) |
-| `work-routing` | `设置` (Settings) › `模型` (Model) › `规则与策略` (Rules & policies) | [Model and work routing](#routing) |
+| `work-routing` | `设置` (Settings) › `模型` (Model) › `模型选择` (Model selector) | [Model and work routing](#routing) |
+| `routing` | `设置` (Settings) › `模型` (Model) › `模型路由` (Model routing) | [Model and work routing](#routing) |
 | `machines` | `设置` (Settings) › `执行环境` (Execution) › `执行机` (Runners) | [Machines](#machines) |
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
 | `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
@@ -322,9 +322,9 @@ Reach:
 
 ### routing
 
-**Model and work routing** (shipped, centrality 1). Which model and machine each kind of work uses: model routing, work routing rules and policies, capabilities and a per-thread override.
+**Model and work routing** (shipped, centrality 1). Which model each kind of work uses: the Model selector page (default model for new tasks, the Coordinator and other agents with model and thinking level), the Model routing page (providers with quota, Claude billing, and a graph wiring each rule to its provider), capabilities and a per-thread override.
 
-States: A routing graph from kinds of work to models, an empty state, rules per use, and a per-thread override dialog.
+States: A graph from each use to its provider with dashed wires for unavailable providers, an empty state, one picker row per use with runtimes no Runner enabled greyed out, and a per-thread override dialog.
 
 Reach:
 
@@ -333,9 +333,9 @@ Reach:
 3. `settings work-routing`
 
 - Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`, `/app/settings/team`, `/app/team`
-- Settings: `设置` (Settings) › `模型` (Model) › `用量与连接` (Usage & connections); `设置` (Settings) › `模型` (Model) › `规则与策略` (Rules & policies)
+- Settings: `设置` (Settings) › `模型` (Model) › `模型选择` (Model selector); `设置` (Settings) › `模型` (Model) › `模型路由` (Model routing)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-platform`, `route-override-save`, `routing-coordinator-default`, `routing-empty`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-session-default`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
+- Test ids in its code: `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-platform`, `route-override-save`, `routing-add-provider`, `routing-agents`, `routing-coordinator-default`, `routing-empty`, `routing-provider-row`, `routing-providers`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-session-default`
 - Research: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](../../../docs/research/agent-machine-routing.md) (not on main)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md)
@@ -478,22 +478,23 @@ Reach:
 
 ### first-run
 
-**First run** (shipped, centrality 2). The home checklist, connection banners and the first-PR card that take a new user to a first merged PR.
+**First run** (shipped, centrality 2). The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.
 
-States: A checklist on the home page until a machine, a model and a project are set, a setup hint on the composer, then a first-PR card.
+States: A team with no projects lands on a two-step setup page (connect models for the Coordinator and tasks, confirm both models) that can be skipped; the first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.
 
 Reach:
 
 1. `open /app`
-2. `click testid:composer-setup-chip`
+2. `click testid:first-run-confirm`
+3. `click testid:composer-setup-chip`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`
+- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`, `first-run-confirm`, `first-run-pick-*`, `first-run-setup`, `first-run-step-*`
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](../../../docs/design/references/first-run)
 - Backend design: **gap**: no design for checklist state, first-PR detection and the 10-minute path
-- Evidence: `apps/web/e2e/first-run-checklist.spec.ts`, `apps/web/e2e/first-pr-report.spec.ts`, `apps/server/test/first-pr-report.test.ts`
+- Evidence: `apps/web/e2e/first-run-setup.spec.ts`, `apps/web/e2e/first-run-checklist.spec.ts`, `apps/web/e2e/first-pr-report.spec.ts`, `apps/server/test/first-pr-report.test.ts`
 
 ### machine-enrollment
 
@@ -866,7 +867,7 @@ Reach:
 - Web routes: `/app/project/:id`, `/app/project/:id/settings`, `/app/project/:id/tasks`, `/app/project/new`
 - Settings: `设置` (Settings) › `项目`
 - Keyboard shortcuts in its code: `G`, `L`
-- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`
+- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`, `project-new-blocked`
 - Verify recipes: [.claude/skills/verify-cairn/features/project-new-form.md](features/project-new-form.md), [.claude/skills/verify-cairn/features/github-oauth-picker.md](features/github-oauth-picker.md), [.claude/skills/verify-cairn/features/local-repo-api.md](features/local-repo-api.md)
 - Research: [docs/research/project-coordinators.md](../../../docs/research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
@@ -914,18 +915,19 @@ Reach:
 
 **Scheduled tasks** (shipped, centrality 3). Recurring work that starts or continues threads on a schedule, with run-now and a project schedule.
 
-States: Loading, empty, a list of schedules with cadence, a detail dialog with run now, and an error state.
+States: Loading, empty, a list of schedules with cadence in the Tasks panel Schedules tab, a small popover editor with run now, a collapsed ended group, and an error state.
 
 Reach:
 
-1. `open /app/schedules`
-2. `click testid:schedule-detail-body`
+1. `open /app`
+2. `click testid:sidebar-schedules`
+3. `click testid:schedule-new`
 
 - Web routes: `/app/schedules`
-- Keyboard shortcuts in its code: `D`
-- Test ids in its code: `schedule-detail-body`, `schedule-popover`, `schedule-popover-runs`, `schedules-ended`, `schedules-error`, `schedules-loading`
+- Keyboard shortcuts in its code: `D`, `E`, `N`, `P`
+- Test ids in its code: `schedule-new`, `schedule-popover`, `schedule-popover-runs`, `schedule-row-menu-button`, `schedules-ended`, `tasks-schedules-empty`, `tasks-section`
 - Research: **gap**: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model
-- Frontend design: **gap**: the schedules page and detail dialog have no design
+- Frontend design: **gap**: the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md
 - Backend design: **gap**: no design for due events, missed runs and continue-thread schedules
 - Evidence: `apps/web/e2e/schedules-live.spec.ts`, `apps/server/test/schedules.test.ts`, `apps/server/test/due-events.test.ts`
 

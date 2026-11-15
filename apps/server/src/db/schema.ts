@@ -11,7 +11,6 @@ import type {
   ChiefWatch,
   ClaudeCodeReport,
   ClaudeRateLimitWindow,
-  ClaudeUsage,
   ComputerCallState,
   ComputerControlHolder,
   ComputerImage,
@@ -87,7 +86,6 @@ export const team = sqliteTable('team', {
   name: text('name').notNull(),
   createdAt: epochMs('createdAt').notNull(),
   plan: text('plan').notNull().default('free'),
-  claudeUsage: text('claudeUsage').$type<ClaudeUsage>().notNull().default('subscription-only'),
   avatarStyle: text('avatarStyle'),
   coAuthorTrailer: bool('coAuthorTrailer').notNull().default(true),
   requestInstructorReview: bool('requestInstructorReview').notNull().default(false),
@@ -324,6 +322,7 @@ export const step = sqliteTable(
     scopeProjectId: text('scopeProjectId'),
     ownerMessageIds: json<string[]>('ownerMessageIds'),
     byPerson: bool('byPerson').notNull().default(false),
+    claudeSubscriptionId: text('claudeSubscriptionId'),
     freshSession: bool('freshSession').notNull().default(false),
     skillInjection: json<SkillInjectionRecord>('skillInjection'),
     blockerHandoff: json<BlockerHandoffRecord>('blockerHandoff'),
@@ -1428,16 +1427,25 @@ export const scheduleReport = sqliteTable(
   (t) => [index('schedule_report_project_idx').on(t.projectId, t.generatedAt)],
 );
 
-export const claudeSubscription = sqliteTable('claude_subscription', {
-  id: text('id').primaryKey(),
-  teamId: text('teamId')
-    .notNull()
-    .references(() => team.id, { onDelete: 'cascade' }),
-  label: text('label').notNull(),
-  tokenCipher: text('tokenCipher').notNull(),
-  expiresAt: epochMs('expiresAt'),
-  createdAt: epochMs('createdAt').notNull(),
-});
+export const claudeSubscription = sqliteTable(
+  'claude_subscription',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    label: text('label').notNull(),
+    tokenCipher: text('tokenCipher').notNull(),
+    expiresAt: epochMs('expiresAt'),
+    enabledAt: epochMs('enabledAt'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('claude_subscription_one_enabled')
+      .on(t.teamId)
+      .where(sql`${t.enabledAt} is not null`),
+  ],
+);
 
 export const mcpConnector = sqliteTable(
   'mcp_connector',

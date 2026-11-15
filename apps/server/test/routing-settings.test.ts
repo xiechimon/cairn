@@ -7,7 +7,7 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, onTestFinished, test } from 'vitest';
-import { machine as machineTable, routingRule, team as teamTable } from '../src/db/schema.js';
+import { machine as machineTable, routingRule } from '../src/db/schema.js';
 import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
 import { createProvider } from '../src/services/providers.js';
 import {
@@ -284,7 +284,7 @@ describe('routing rule issues and the one-click fix', () => {
     const machineId = insertMachine(s);
     seedRoute(s, 'session', { provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
     expect((await settings(s)).ruleIssues).toMatchObject([
-      { use: 'session', reason: 'provider-missing', provider: 'openai-codex' },
+      { use: 'session', reason: 'runtime-disabled', runtime: 'pi' },
     ]);
     const row = s.db.select().from(machineTable).where(eq(machineTable.id, machineId)).get()!;
     s.db
@@ -295,24 +295,28 @@ describe('routing rule issues and the one-click fix', () => {
     expect((await settings(s)).ruleIssues).toEqual([]);
   });
 
-  test('paid-claude: a keyed Claude rule is flagged until the team allows paid Claude', async () => {
+  test('a capability-routed Session rule is not flagged while the Runner can run Claude Code or Codex', async () => {
     const s = bootServer();
-    insertMachine(s);
-    addProvider(s, 'anthropic', {
-      baseUrl: 'https://api.anthropic.com',
-      api: 'anthropic-messages',
-      models: ['claude-haiku-5-5'],
-    });
-    seedRoute(s, 'session', { provider: 'anthropic', modelId: 'claude-haiku-5-5' });
-    expect((await settings(s)).ruleIssues).toMatchObject([
-      { use: 'session', reason: 'paid-claude', provider: 'anthropic', suggested: null },
-    ]);
+    const machineId = insertMachine(s);
+    const row = s.db.select().from(machineTable).where(eq(machineTable.id, machineId)).get()!;
     s.db
-      .update(teamTable)
-      .set({ claudeUsage: 'allow-paid' })
-      .where(eq(teamTable.id, s.team.id))
+      .update(machineTable)
+      .set({ capabilities: { ...row.capabilities!, codexLogin: { state: 'ok' } } })
+      .where(eq(machineTable.id, machineId))
       .run();
+    seedRoute(s, 'session', { provider: 'claude-code', modelId: 'claude-sonnet-5-5', machineId });
     expect((await settings(s)).ruleIssues).toEqual([]);
+    s.db
+      .update(machineTable)
+      .set({ capabilities: row.capabilities, claudeCodeReport: subscriptionClaudeReport })
+      .where(eq(machineTable.id, machineId))
+      .run();
+    seedRoute(s, 'session', { provider: 'openai-codex', modelId: 'gpt-6.1-sol', machineId });
+    expect((await settings(s)).ruleIssues).toEqual([]);
+    seedRoute(s, 'review', { provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
+    expect((await settings(s)).ruleIssues).toMatchObject([
+      { use: 'review', reason: 'provider-missing', provider: 'openai-codex' },
+    ]);
   });
 
   test('coordinator in-server: the issue comes from the route verdict and the fix is the Coordinator default', async () => {
@@ -330,6 +334,27 @@ describe('routing rule issues and the one-click fix', () => {
         suggested: { provider: 'vani', modelId: 'glm-5.3', expectedUpdatedAt: before.updatedAt },
       },
     ]);
+  });
+
+  test('coordinator in-server on Claude Code: judged by the Runners like any Claude Code rule', async () => {
+    const s = bootServer();
+    setCoordinatorServerContextEnabled(true);
+    onTestFinished(() => setCoordinatorServerContextEnabled(false));
+    const machineId = insertMachine(s);
+    seedRoute(s, 'coordinator', {
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+      machineId,
+    });
+    expect((await settings(s)).ruleIssues).toMatchObject([
+      { use: 'coordinator', reason: 'runtime-disabled', runtime: 'claude-code' },
+    ]);
+    s.db
+      .update(machineTable)
+      .set({ claudeCodeReport: subscriptionClaudeReport })
+      .where(eq(machineTable.id, machineId))
+      .run();
+    expect((await settings(s)).ruleIssues).toEqual([]);
   });
 
   test('a healthy citation_check rule on a relay provider is not flagged and reads back byte-identical', async () => {

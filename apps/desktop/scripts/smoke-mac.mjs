@@ -16,6 +16,7 @@ const app = await electron.launch({
   executablePath: join(resolve(appPath), 'Contents', 'MacOS', 'Cairn'),
   timeout: LAUNCH_TIMEOUT_MS,
 });
+const child = app.process();
 try {
   const window = await app.firstWindow({ timeout: LAUNCH_TIMEOUT_MS });
   await window.waitForLoadState('load');
@@ -35,7 +36,32 @@ try {
   assert.equal(await window.locator(PAIRING_INPUT).count(), 0, 'the pairing gate is showing');
 
   await window.screenshot({ path: screenshotPath });
-  console.log(`desktop smoke passed: ${window.url()} signed in, no pairing gate`);
+  const origin = new URL(window.url()).origin;
+
+  const closed = await app.evaluate(({ BrowserWindow }) => {
+    const [shown] = BrowserWindow.getAllWindows();
+    shown?.close();
+    return { windows: BrowserWindow.getAllWindows().length, visible: shown?.isVisible() ?? false };
+  });
+  assert.deepEqual(closed, { windows: 1, visible: false }, 'closing the window did not hide it');
+  assert.equal((await fetch(origin)).status, 200, 'the server stopped when the window closed');
+
+  const exited = new Promise((done) => child.once('exit', done));
+  await app
+    .evaluate(({ app: electronApp }) => {
+      electronApp.quit();
+    })
+    .catch(() => {});
+  await exited;
+  const reachable = await fetch(origin).then(
+    () => true,
+    () => false,
+  );
+  assert.equal(reachable, false, 'the server outlived the app');
+
+  console.log(
+    `desktop smoke passed: ${origin} signed in, no pairing gate, close hides, quit stops the server`,
+  );
 } finally {
-  await app.close();
+  if (child.exitCode === null && child.signalCode === null) await app.close();
 }

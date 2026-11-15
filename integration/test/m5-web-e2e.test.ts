@@ -407,9 +407,20 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
 
   test('scheduled run parks at review: create once schedule in UI → tick trigger → continues the latest build → parks at review + started-by-schedule marker (r3 §9)', async () => {
     await page.goto(`${server.url}/app/schedules`);
-    await page.getByRole('button', { name: '新建定时', exact: true }).click();
-    await pexpect(page.getByRole('dialog', { name: '新建定时' })).toBeVisible();
-    await page.getByRole('radio', { name: '单次' }).click();
+    const tasksPanel = page.getByRole('complementary', { name: '任务' });
+    await pexpect(tasksPanel.getByRole('tab', { name: '定时' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await tasksPanel.getByTestId('schedule-new').click();
+    const editor = page.getByTestId('schedule-popover');
+    await pexpect(editor).toContainText('新建定时');
+    await editor.getByRole('combobox', { name: '任务' }).click();
+    await page
+      .getByRole('listbox')
+      .getByRole('option', { name: 'M5 脊柱探针', exact: true })
+      .click();
+    await editor.getByRole('radio', { name: '单次' }).click();
     const next = new Date(Date.now() + 60_000);
     let minute = Math.ceil(next.getMinutes() / 15) * 15;
     let hour = next.getHours();
@@ -424,8 +435,10 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     };
     await pickSelect('时', pad(hour));
     await pickSelect('分', pad(minute));
-    await page.getByRole('button', { name: '保存' }).click();
-    await pexpect(page.getByText('下次')).toBeVisible({ timeout: 15_000 });
+    await editor.getByRole('button', { name: '保存' }).click();
+    await pexpect(
+      tasksPanel.locator('[data-slot="schedule-row"]', { hasText: 'M5 脊柱探针' }),
+    ).toContainText('下次', { timeout: 15_000 });
     const schedules = (await api(server.url, 'GET', '/api/schedules')).body as {
       id: string;
       kind: string;

@@ -343,10 +343,8 @@ test('a research report is one card under its research row; hover shows a summar
   const card = reply.getByTestId('chief-reply-bubble').getByTestId('research-report-card');
   await expect(reply.getByTestId('chief-task-refs').getByTestId('research-report-card')).toHaveCount(0);
   await expect(card).toHaveCount(1);
-  await expect(card).toContainText('调研报告已生成');
-  await expect(card).toContainText('Research export formats');
+  await expect(card).toHaveText('Research export formats');
   await expect(card).toHaveAttribute('data-stage', 'draft');
-  await expect(card.getByText('初稿')).toBeVisible();
   await expect(page.getByTestId('chief-question-report')).toHaveCount(0);
 
   await card.hover();

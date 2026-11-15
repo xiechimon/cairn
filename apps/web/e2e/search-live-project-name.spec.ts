@@ -108,7 +108,7 @@ test('live, projects loaded: pre-response rows carry each todo’s own project',
   await search.install();
 
   const todosRead = page.waitForResponse((response) => response.url().includes('/api/todos?'));
-  await page.goto('/app/schedules');
+  await page.goto('/app');
   await expect(page.locator('[data-slot="sidebar-project-row"]').filter({ hasText: 'atlas' })).toBeVisible();
   await todosRead;
   await openPanel(page);
@@ -145,7 +145,7 @@ test('live, projects read failed: pre-response rows show no project line', async
   await search.install();
 
   const todosRead = page.waitForResponse((response) => response.url().includes('/api/todos?'));
-  await page.goto('/app/schedules');
+  await page.goto('/app');
   await todosRead;
   await openPanel(page);
 

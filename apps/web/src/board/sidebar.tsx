@@ -58,10 +58,10 @@ import {
   type ProjectStatus,
   sidebarProjects,
 } from './sidebar-projects.js';
+import { PANE_PARAM, TASKS_TAB_PARAM } from './work-panel.js';
 
 export type SidebarSelected =
   | 'board'
-  | 'schedules'
   | 'none'
   | '/app/resources/skills'
   | '/app/resources/mcp-servers'
@@ -369,8 +369,14 @@ export function BoardSidebar({
   const { search, pathname } = useLocation();
   const baseParams = new URLSearchParams(search);
   const projectParam = pathname === '/app' ? baseParams.get('project') : null;
+  const schedulesActive =
+    pathname === '/app' &&
+    projectParam === null &&
+    baseParams.get(PANE_PARAM) === 'tasks' &&
+    baseParams.get(TASKS_TAB_PARAM) === 'scheduled';
   baseParams.delete('project');
   baseParams.delete('chat');
+  baseParams.delete(TASKS_TAB_PARAM);
   const plain = `?${baseParams}`;
   const newProjectTarget = { pathname: '/app/project/new', search: plain };
   const coordinatorTarget = { pathname: '/app', search: coordinatorSearch(search) };
@@ -439,8 +445,10 @@ export function BoardSidebar({
   }, []);
   const navRef = useRef<HTMLElement | null>(null);
   useScrollFade(navRef);
-  const coordinatorActive = selected === 'board' && activeProject === null;
-  const schedulesActive = pathname === '/app/schedules';
+  const coordinatorActive = selected === 'board' && activeProject === null && !schedulesActive;
+  const schedulesParams = new URLSearchParams(baseParams);
+  schedulesParams.set(PANE_PARAM, 'tasks');
+  schedulesParams.set(TASKS_TAB_PARAM, 'scheduled');
 
   const settingsTarget = { pathname: SETTINGS_HREF, search: plain };
   const activityTarget = { pathname: ACTIVITY_PATH, search: plain };
@@ -607,7 +615,7 @@ export function BoardSidebar({
             SIDEBAR_FOOT_ROW,
             schedulesActive && 'bg-(--sidebar-active) text-foreground hover:bg-(--sidebar-active)',
           )}
-          to={{ pathname: '/app/schedules', search: plain }}
+          to={{ pathname: '/app', search: `?${schedulesParams}` }}
         >
           <Clock className={ICON} strokeWidth={STROKE} />
           {t('定时')}

@@ -606,17 +606,11 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     expect(session(s)).toMatchObject({ provider: 'claude-code' });
   });
 
-  test('the provider default skips Claude models the team does not pay for, and nothing runnable means no rule', () => {
+  test('the provider default takes a Claude model on a provider, and nothing runnable means no rule', () => {
     const s = bare();
     piOnlyRunner(s);
     expect(session(s)).toBeNull();
     addProvider(s, 'claude-proxy', { key: false, models: ['claude-sonnet-5-5'] });
-    expect(session(s)).toBeNull();
-    s.db
-      .update(teamTable)
-      .set({ claudeUsage: 'allow-paid' })
-      .where(eq(teamTable.id, s.team.id))
-      .run();
     expect(session(s)).toMatchObject({ provider: 'claude-proxy', modelId: 'claude-sonnet-5-5' });
   });
 

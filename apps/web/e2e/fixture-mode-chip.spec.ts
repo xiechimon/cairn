@@ -25,7 +25,7 @@ async function stubLiveBoot(page: Page) {
 test('fixture mode shows the `示例数据` chip naming the scenario, site-wide (#1037)', async ({
   page,
 }) => {
-  await page.goto('/app/schedules?scenario=11');
+  await page.goto('/app?scenario=11&pane=tasks&tab=scheduled');
   const chip = page.locator('.fixture-mode-chip');
   await expect(chip).toBeVisible();
   await expect(chip).toContainText('示例数据');
@@ -36,13 +36,14 @@ test('fixture mode shows the `示例数据` chip naming the scenario, site-wide 
 });
 
 test('the chip never swallows clicks — pointer-events-none (#1037)', async ({ page }) => {
-  await page.goto('/app/schedules?scenario=11');
+  await page.goto('/app?scenario=11&pane=tasks&tab=scheduled');
   await expect(page.locator('.fixture-mode-chip')).toHaveCSS('pointer-events', 'none');
 });
 
 test('live face renders no fixture chip (#1037)', async ({ page }) => {
   await stubLiveBoot(page);
-  await page.goto('/app/schedules');
+  await page.goto('/app?pane=tasks&tab=scheduled');
+  await expect(page.getByRole('complementary', { name: '任务' })).toBeVisible();
   await expect(page.locator('.fixture-mode-chip')).toHaveCount(0);
 });
 
