@@ -380,6 +380,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           }
         : {},
     ),
+    log: (msg) => logger.machine(msg),
   });
 
   let networkFailures = 0;
