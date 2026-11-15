@@ -173,12 +173,16 @@ test('Playwright admission precedes webServer startup and spans the test run', a
   for (const name of ['playwright.config.ts', 'package.json'])
     cpSync(join(repo, 'apps/web', name), join(web, name));
   const marker = join(root, 'server-started');
+  const closed = createServer();
+  await new Promise((done) => closed.listen(0, '127.0.0.1', done));
+  const closedPort = closed.address().port;
+  await new Promise((done) => closed.close(done));
   writeFileSync(
     join(web, 'probe.config.ts'),
     `
 import base from './playwright.config.ts';
 export default { ...base, globalSetup: undefined, testDir: './e2e', webServer: {
- command: ${JSON.stringify(`${process.execPath} server.cjs`)}, url: 'http://127.0.0.1:0', timeout: 1000
+ command: ${JSON.stringify(`${process.execPath} server.cjs`)}, url: 'http://127.0.0.1:${closedPort}', timeout: 1000
 } };
 `,
   );
