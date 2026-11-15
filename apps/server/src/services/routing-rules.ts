@@ -106,7 +106,7 @@ const DEFAULT_SESSION_RULE_ID = 'default-session';
 const DEFAULT_COORDINATOR_RULE_ID = 'default-coordinator';
 const COORDINATOR_MODEL_PREFERENCE = [/haiku/i, /sonnet/i];
 const ANTHROPIC_API_HOST = 'api.anthropic.com';
-const CODEX_LOGIN_PRESENT = new Set(['ok', 'expired']);
+export const CODEX_LOGIN_PRESENT = new Set(['ok', 'expired']);
 const CITATION_CHECKER_RULE_ID = 'default-citation-check';
 const CITATION_HARNESS_MODELS = [
   { provider: 'claude-code', modelId: 'claude-sonnet-5-5' },
@@ -230,7 +230,7 @@ function providerSessionChoice(
   return null;
 }
 
-function defaultSessionChoice(
+export function defaultSessionChoice(
   db: Pick<Db, 'select'>,
   teamId: string,
 ): (SessionDefault & { provider: string; modelId: string }) | null {
@@ -768,6 +768,9 @@ export function upsertRoutingRule(
     .from(routingRule)
     .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, use)))
     .get();
+  if (body.expectedUpdatedAt !== undefined && existing?.updatedAt !== body.expectedUpdatedAt) {
+    throw new HttpError(409, 'routing rule changed since it was read');
+  }
   if (body.machineId != null) requireTeamMachine(db, teamId, body.machineId);
   const now = nowMs();
   if (existing === undefined) {
