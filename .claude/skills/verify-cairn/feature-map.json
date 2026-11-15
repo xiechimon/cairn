@@ -1024,7 +1024,6 @@
         ],
         "daemon": [
           "apps/daemon/src/computer",
-          "apps/daemon/src/orb/computer.ts",
           "apps/daemon/src/machine-loop.ts"
         ]
       },
@@ -1061,7 +1060,7 @@
         "apps/daemon/test/computer-guard.test.ts",
         "apps/daemon/test/computer-browser.test.ts",
         "apps/daemon/test/machine-boot.test.ts",
-        "apps/daemon/test/orb-computer.test.ts"
+        "apps/daemon/test/computer-host-desktop.test.ts"
       ],
       "batch": "B4"
     },
