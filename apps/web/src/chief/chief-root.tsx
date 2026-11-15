@@ -4,6 +4,7 @@ import { useLiveData } from '../api/provider.js';
 import { useOpenComposer } from '../board/open-composer.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { isEditableTarget } from '../overlay/hotkeys.js';
+import { RouteDialogCloseProvider } from '../overlay/route-dialog.js';
 import { SettingsDialog } from '../settings/settings-page.js';
 import { useSettingsOverlay } from '../settings/use-settings-overlay.js';
 import { questionDockState } from './question-dock-state.js';
@@ -44,11 +45,22 @@ function useOpenCoordinatorKey(): void {
   }, [openComposer]);
 }
 
-export function ChiefRoot({ routes }: { routes: RouteObject[] }) {
-  const settings = useSettingsOverlay();
+export function ChiefRoot({
+  routes,
+  dialogRoutes,
+}: {
+  routes: RouteObject[];
+  dialogRoutes: RouteObject[];
+}) {
+  const settings = useSettingsOverlay(dialogRoutes);
   const { pathname = '/app', search = '' } = settings.pageLocation;
   const searchParams = useMemo(() => new URLSearchParams(search), [search]);
   const page = useRoutes(routes, settings.pageLocation);
+  const dialogOrNone = useMemo(
+    () => [...dialogRoutes, { path: '*', element: null }],
+    [dialogRoutes],
+  );
+  const dialog = useRoutes(dialogOrNone);
   const navigate = useNavigate();
   const fixture = resolveScenario(searchParams);
   const onHome = pathname === '/app';
@@ -96,11 +108,13 @@ export function ChiefRoot({ routes }: { routes: RouteObject[] }) {
   );
   return (
     <ChiefRootContext.Provider value={api}>
-      <div className="contents" inert={settings.section !== null}>
+      <div className="contents" inert={settings.open}>
         {page}
       </div>
-      {settings.section !== null && (
+      {settings.section !== null ? (
         <SettingsDialog section={settings.section} onClose={settings.close} />
+      ) : (
+        <RouteDialogCloseProvider value={settings.close}>{dialog}</RouteDialogCloseProvider>
       )}
     </ChiefRootContext.Provider>
   );

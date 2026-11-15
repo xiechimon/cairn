@@ -127,7 +127,7 @@ test('422 unavailable → overlay opens automatically; after Escape/outside clic
   await expect(page.getByRole('status')).toBeVisible();
 
   await openBrowser(page);
-  await page.mouse.click(10, 10);
+  await page.getByTestId('route-dialog-head').click();
   await expect(page.getByRole('dialog', DIALOG)).not.toBeVisible();
   await expect(input).toHaveValue('');
   await expect(page.getByRole('status')).toBeVisible();

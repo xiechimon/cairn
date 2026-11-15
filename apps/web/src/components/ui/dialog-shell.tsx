@@ -161,6 +161,7 @@ export function DialogShell({
           />
           <DialogPrimitive.Popup
             data-slot="dialog-content"
+            initialFocus={initialFocus}
             finalFocus={restore}
             className={
               viewportRoot

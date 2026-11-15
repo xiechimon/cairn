@@ -74,22 +74,6 @@ for (const theme of ['light', 'dark'] as const) {
     expect(m.gap).toBe(3);
   });
 
-  test(`page shell back chevron hover shows no background change (${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c');
-
-    const read = () =>
-      page.evaluate(() => {
-        const cs = getComputedStyle(document.querySelector('[aria-label="返回"]')!);
-        return { bg: cs.backgroundColor, color: cs.color };
-      });
-    const rest = await read();
-    await page.hover('[aria-label="返回"]');
-    await page.waitForTimeout(300); // past any 150ms color step
-    const hovered = await read();
-    expect(hovered).toEqual(rest);
-  });
-
   test(`the sidebar collapse toggle rests bare and shows the row hover on hover (${theme})`, async ({
     page,
   }) => {
@@ -168,30 +152,6 @@ for (const theme of ['light', 'dark'] as const) {
     expect(rail.hovered.opacity).toBe('1');
     expect(rail.held).toEqual(rail.hovered);
     await expect(page.locator('.board-sidebar--collapsed')).toHaveCount(0);
-  });
-}
-
-for (const theme of ['light', 'dark'] as const) {
-  test(`page shell back chevron keeps a keyboard focus ring (${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c');
-    // keyboard modality: tab until the back chevron owns focus
-    for (let i = 0; i < 40; i++) {
-      const onBack = await page.evaluate(
-        () => document.activeElement?.matches('[aria-label="返回"]') ?? false,
-      );
-      if (onBack) break;
-      await page.keyboard.press('Tab');
-    }
-
-    await expect(page.locator('[aria-label="返回"]')).toBeFocused();
-    const ring = await page.evaluate(() => {
-      const cs = getComputedStyle(document.querySelector('[aria-label="返回"]')!);
-      return { w: cs.outlineWidth, style: cs.outlineStyle, color: cs.outlineColor };
-    });
-    expect(ring.style).toBe('solid');
-    expect(ring.w).toBe('2px');
-    expect(ring.color).toBe(theme === 'dark' ? 'rgb(235, 181, 80)' : 'rgb(154, 101, 0)');
   });
 }
 
