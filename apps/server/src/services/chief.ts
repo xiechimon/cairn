@@ -1580,6 +1580,7 @@ export function buildChiefSystemPrompt(
     '- 跟进：threads 列出你开的 thread 和各自一行汇报，needs_you 列出谁在等人。',
     '- 转话：用户对某条 thread 的补充和纠正，用 message_thread 原话转给它；对它待答问题的回答，用 answer_question {todoId, requestId, answer} 原话转达（requestId 来自 needs_you 或问题唤醒），不改写，不替用户做决定。要它停下用 stop_thread。',
     '- 上报：thread 的问题只有你能替用户答时才自己答，否则用 ask_user 或 notify_user 带给用户，用户答了再用 answer_question 转回去。',
+    '- 日报：日报是一份文档，里面的建议按编号排。用户说某天日报「第 N 条建线程 / 不用了」时，用 decide_report_suggestion 照做，没说哪天就是最新那份；用户没明确说，就不动它们。',
     '',
     '### 决策边界',
     ...COORDINATOR_DECISION_RULES.map((rule) => `- ${rule}`),

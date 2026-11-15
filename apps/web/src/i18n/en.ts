@@ -1484,7 +1484,6 @@ export const EN: Record<string, string> = {
   '取消提问失败，请重试。': 'Could not dismiss the question. Try again.',
   备用模型: 'Fallback models',
   选择运行时: 'Choose runtime',
-  '没能更新这条建议，请重试。': "Couldn't update this suggestion. Try again.",
   建议回复: 'Suggested replies',
   '为什么没拦住：{why}': 'Why it slipped through: {why}',
   '防护：{safeguard}': 'Safeguard: {safeguard}',
@@ -1494,15 +1493,12 @@ export const EN: Record<string, string> = {
   不用了: 'Dismiss',
   已建成线程: 'Made into a thread',
   已忽略: 'Dismissed',
-  '今天的日报：昨天没有新进展。': "Today's report: nothing new yesterday. ",
   '{n} 件等你': '{n## item|# items} waiting on you',
   今天的日报: "Today's report",
-  '今天的日报 · 昨天（{day}）': "Today's report · yesterday ({day})",
   '日报没写成，过一会儿再试一次；先看昨天的数字。':
     "The report couldn't be written; it will try once more shortly. Here are yesterday's numbers.",
   '日报两次都没写成；下面是昨天的原始数字。':
     "The report failed twice; here are yesterday's raw numbers.",
-  昨天的进展: 'Yesterday',
   '完成 {done} · 合并 {merged} · 失败 {failed} · 重跑 {retries} · 等额度 {quota} · 审查通过 {pass} / 拦下 {block}':
     'Done {done} · merged {merged} · failed {failed} · reruns {retries} · quota waits {quota} · reviews passed {pass} / blocked {block}',
   '失败：': 'Failed: ',
@@ -1510,17 +1506,27 @@ export const EN: Record<string, string> = {
   '合并：': 'Merged: ',
   等你的事: 'Needs you',
   没有等你的事: 'Nothing is waiting on you',
-  '{n} 件等你，去处理': '{n## item|# items} waiting on you, open the inbox',
   复盘: 'Retro',
   外部动态: 'Outside developments',
+  复盘建议: 'Retro suggestions',
+  日报: 'Daily report',
+  '昨天（{day}）的进展': 'Yesterday ({day})',
+  '今天的日报写好了：昨天没有新进展': "Today's report is ready: nothing new yesterday",
+  '今天的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}':
+    "Today's report is ready: done {done} · merged {merged} · failed {failed}",
+  '，有 {k} 条建议等你决定': ', {k## suggestion needs|# suggestions need} your decision',
+  '日报没写成，先看昨天的数字：完成 {done} · 合并 {merged} · 失败 {failed}':
+    "The report couldn't be written. Yesterday's numbers: done {done} · merged {merged} · failed {failed}",
+  '写日报时有 {n} 件等你，现在的情况看任务面板。':
+    '{n## item was|# items were} waiting on you when the report was written; the Tasks panel shows the current state.',
+  '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 2 条不用了」。':
+    'To act on a suggestion, tell the Coordinator in the chat, for example "make #1 of the {day} report a thread" or "dismiss #2".',
   '来源：': 'Source: ',
   '对应：{matches}': 'Matches: {matches}',
   '建议动作：{action}': 'Suggested action: {action}',
   昨天的对话里没找到值得改的地方: "Nothing in yesterday's conversations needs a safeguard",
   '这些来源太长，只读了后面的部分：{sources}。':
     'These sources were too long, so only their latest part was read: {sources}. ',
-  '复盘建议只是草稿：点「建成线程」才会建线程，建好后也要你自己开始。':
-    'Retro suggestions are drafts: a thread is created only when you choose "Make it a thread", and you still start it yourself.',
   执行: 'Build',
   合并: 'Merge',
   运行中: 'Running',
