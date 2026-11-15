@@ -122,7 +122,7 @@ function TopModelRow({
         transition,
       }}
       className={cn(
-        'relative flex min-h-12 items-center gap-x-3 border-t border-border bg-card px-4 py-1.5 max-sm:flex-wrap max-sm:gap-y-1 max-sm:py-2',
+        'relative flex min-h-12 items-center gap-x-3 border-t border-border bg-card px-4 py-1.5 max-sm:flex-wrap max-sm:gap-x-2.5 max-sm:gap-y-0.5 max-sm:px-3 max-sm:py-1.5',
         isDragging && 'z-10 shadow-(--e2)',
       )}
     >
@@ -136,11 +136,11 @@ function TopModelRow({
         >
           <GripVertical aria-hidden className="size-4" />
         </button>
-        <Vendor aria-hidden className="size-5 flex-none text-foreground" />
+        <Vendor aria-hidden className="size-5 flex-none text-foreground max-sm:size-4" />
         <span className="flex min-w-0 flex-auto items-center gap-2">
           <span
             className={cn(
-              'truncate text-ui font-medium',
+              'truncate text-ui font-medium max-sm:text-meta',
               option === undefined ? 'text-content-tertiary' : 'text-foreground',
             )}
           >
@@ -158,10 +158,10 @@ function TopModelRow({
           )}
         </span>
       </span>
-      <span className="flex flex-none items-center gap-1 max-sm:basis-full max-sm:pl-8">
+      <span className="flex flex-none items-center gap-1 max-sm:basis-full max-sm:pl-6">
         <span
           data-testid="top-model-provider"
-          className="inline-flex h-6 max-w-36 flex-none items-center gap-1 rounded-full bg-secondary px-2 text-caption text-content-secondary max-sm:mr-auto max-sm:max-w-40"
+          className="inline-flex h-6 max-sm:h-5 max-w-36 flex-none items-center gap-1 rounded-full bg-secondary px-2 text-caption text-content-secondary max-sm:mr-auto max-sm:max-w-40"
         >
           {option === undefined ? (
             t('不可用')
@@ -180,7 +180,7 @@ function TopModelRow({
         >
           <SelectTrigger
             aria-label={t('{model} 的思考强度', { model: name })}
-            className="top-model-level ml-2 w-28 flex-none max-sm:ml-1 max-sm:w-24 border-transparent bg-transparent shadow-none hover:bg-muted"
+            className="top-model-level ml-2 w-28 flex-none max-sm:ml-1 max-sm:h-7 max-sm:w-24 max-sm:text-meta border-transparent bg-transparent shadow-none hover:bg-muted"
           >
             <SelectValue>{levelLabel(level)}</SelectValue>
           </SelectTrigger>
@@ -238,9 +238,9 @@ export function TopModelsCard({
       data-testid="top-models"
       className="overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)"
     >
-      <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 max-sm:px-3 max-sm:py-2.5">
         <div className="flex min-w-0 flex-col">
-          <h2 className="m-0 truncate text-card-title font-semibold text-foreground">
+          <h2 className="m-0 truncate text-card-title font-semibold text-foreground max-sm:text-ui">
             {t('常用模型')}
           </h2>
           <p className="m-0 text-meta text-content-tertiary">
@@ -317,7 +317,7 @@ export function TopModelsCard({
           </SortableContext>
         </DndContext>
       )}
-      <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
+      <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 max-sm:px-3 max-sm:py-2.5">
         <span className="text-meta text-content-tertiary">{t('恢复成推荐的模型和顺序。')}</span>
         <Button variant="outline" size="sm" data-testid="top-models-reset" onClick={onReset}>
           {t('恢复推荐')}

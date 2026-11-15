@@ -90,7 +90,7 @@ export function RoutingGraph({
       ref={boxRef}
       data-slot="routing-graph"
       onPointerLeave={() => setHot(null)}
-      className="relative grid grid-cols-[minmax(0,15rem)_minmax(1.5rem,1fr)_minmax(0,17rem)] py-1"
+      className="relative grid grid-cols-[minmax(0,15rem)_minmax(1.5rem,1fr)_minmax(0,17rem)] py-1 max-sm:grid-cols-[minmax(0,8.5rem)_minmax(2.5rem,1fr)_minmax(0,8.5rem)]"
     >
       <svg aria-hidden className="pointer-events-none absolute inset-0 size-full overflow-visible">
         {wires.map((wire) => (
@@ -114,7 +114,7 @@ export function RoutingGraph({
           />
         ))}
       </svg>
-      <div className="col-start-1 flex flex-col gap-4">
+      <div className="col-start-1 flex flex-col gap-4 max-sm:gap-3">
         {groups.map((group) => (
           <div key={group.label} className="flex flex-col gap-1.5">
             <div className="px-0.5 text-caption font-medium text-content-tertiary">
@@ -132,7 +132,7 @@ export function RoutingGraph({
                     data-wire-out={key}
                     onPointerEnter={() => setHot(key)}
                     className={cn(
-                      'flex h-8 items-center gap-2 border-t border-border px-2.5 text-meta first:border-t-0',
+                      'flex h-8 items-center gap-2 border-t border-border px-2.5 text-meta first:border-t-0 max-sm:h-7 max-sm:px-2 max-sm:text-caption',
                       hotNodes.has(key) && 'bg-sidebar-hover',
                       node.broken === true ? 'text-destructive' : 'text-foreground',
                     )}
@@ -161,7 +161,7 @@ export function RoutingGraph({
             data-wire-in={target.id}
             onPointerEnter={() => setHot(target.id)}
             className={cn(
-              'flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-2.5 text-meta whitespace-nowrap',
+              'flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-2.5 text-meta whitespace-nowrap max-sm:h-8 max-sm:gap-1.5 max-sm:px-2 max-sm:text-caption',
               target.unavailable === true && 'border-dashed text-content-tertiary',
               hotNodes.has(target.id) && 'bg-sidebar-hover',
             )}

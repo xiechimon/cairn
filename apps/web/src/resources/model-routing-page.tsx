@@ -46,12 +46,14 @@ function TargetRow({ target }: { target: RoutingTargetRow }) {
       replace
       data-testid="routing-provider-row"
       data-routing-provider={target.id}
-      className="flex min-h-13 items-center gap-3 border-t border-border px-4 py-2 text-ui text-foreground no-underline outline-none first:border-t-0 hover:bg-sidebar-hover focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex min-h-13 items-center gap-3 border-t border-border px-4 py-2 text-ui text-foreground max-sm:min-h-11 max-sm:gap-2.5 max-sm:px-3 max-sm:text-meta no-underline outline-none first:border-t-0 hover:bg-sidebar-hover focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <Mark aria-hidden className="size-5 flex-none" />
+      <Mark aria-hidden className="size-5 flex-none max-sm:size-4" />
       <span className="flex min-w-0 flex-auto items-baseline gap-2">
         <span className="truncate font-medium">{target.name}</span>
-        <span className="truncate text-meta text-content-tertiary">{detail}</span>
+        <span className="truncate text-meta text-content-tertiary max-sm:text-caption">
+          {detail}
+        </span>
       </span>
       {target.unavailable && (
         <span className="flex-none rounded-sm border border-border px-1.5 text-caption text-content-tertiary">

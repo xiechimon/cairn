@@ -157,7 +157,7 @@ function ModelPicker({
         aria-label={t('{use} 的模型', { use: t(ROUTE_USE_LABELS[use]) })}
         className={cn(
           SETTINGS_SELECT_TRIGGER_CLS,
-          'routing-rule-model-select w-56 max-sm:w-auto max-sm:min-w-0 max-sm:flex-1',
+          'routing-rule-model-select w-56 max-sm:h-7 max-sm:w-auto max-sm:min-w-0 max-sm:flex-1 max-sm:text-meta',
         )}
       >
         <SelectValue>
@@ -246,7 +246,7 @@ function RuleRow({
               aria-label={t('{use} 的思考强度', { use: label })}
               className={cn(
                 SETTINGS_SELECT_TRIGGER_CLS,
-                'routing-rule-level-select w-28 flex-none',
+                'routing-rule-level-select w-28 flex-none max-sm:h-7 max-sm:w-24 max-sm:text-meta',
               )}
             >
               <SelectValue>{levelLabel(level)}</SelectValue>
