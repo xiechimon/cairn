@@ -243,6 +243,10 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect(prompt).toContain('quotes 填这张卡覆盖的用户原句');
     expect(prompt).toContain('spec 不添加路由说明');
     expect(prompt).toContain('先后顺序用 dependsOn 表达');
+    expect(prompt).toContain('唯一的例外是用户要你直接操作电脑');
+    expect(prompt).toContain('同一回合最多重试 3 次');
+    expect(prompt).toContain('用 request_takeover 请用户接管');
+    expect(prompt).toContain('执行前先用 ask_user 问用户');
   });
 
   test('systemPrompt is one language and grouped into sections in a fixed order', () => {
@@ -263,6 +267,7 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
       '### 决策边界',
       '### 项目归属',
       '### 回答',
+      '### 电脑操作',
       '### 事件回合',
       '### 记忆',
       '### 第三方文字',
