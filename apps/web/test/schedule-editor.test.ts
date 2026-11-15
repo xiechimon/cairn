@@ -38,9 +38,10 @@ describe('schedule editor wire values', () => {
     expect(scheduleSummary(cron('15 */6 * * *'), NOW, t)).toBe('每 6 小时 · 下次 11月5日 06:15');
     expect(scheduleSummary(cron('30 8 * * 1-5'), NOW, t)).toBe('工作日 08:30 · 下次 11月5日 06:15');
     expect(scheduleSummary(cron('5 7 * * *'), NOW, t)).toBe('每天 07:05 · 下次 11月5日 06:15');
+    expect(scheduleSummary(cron('0 9 1 * *'), NOW, t)).toBe('每月 1 日 09:00 · 下次 11月5日 06:15');
     expect(scheduleUnnamedCron(cron('15 */6 * * *'), t)).toBeNull();
-    expect(scheduleUnnamedCron(cron('0 9 1 * *'), t)).toBe('0 9 1 * *');
-    expect(scheduleUnnamedCron({ ...cron('0 9 1 * *'), kind: 'daily' }, t)).toBeNull();
+    expect(scheduleUnnamedCron(cron('0 9 1,15 * *'), t)).toBe('0 9 1,15 * *');
+    expect(scheduleUnnamedCron({ ...cron('0 9 1,15 * *'), kind: 'daily' }, t)).toBeNull();
   });
   test('Today follows the saved timezone across midnight rather than the fixed UTC+8 date', () => {
     const nextRunAt = Date.UTC(2026, 10, 5, 6, 15);
