@@ -58,7 +58,7 @@ const stepSize: Record<string, [number, number]> = {
         document.documentElement.dataset.theme = theme;
         const browserZh = (navigator.language || '').toLowerCase().startsWith('zh');
         if (lang === 'en' && langPref !== 'en' && (langPref === 'zh' || browserZh)) {
-          location.replace('/zh-cn/');
+          location.replace(`/zh-cn/${location.search}${location.hash}`);
         }
       })();
     </script>
