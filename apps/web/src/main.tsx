@@ -5,7 +5,7 @@ import { App } from './App.js';
 import { applyLocaleLang, readStoredLocale } from './i18n/locale.js';
 import { trackPointerFocus } from './pointer-focus.js';
 import { safeLocalStorage, safeSessionStorage } from './safe-storage.js';
-import { reloadOnStaleBuild } from './stale-build-reload.js';
+import { entryScriptOf, reloadOnNewDeploy, reloadOnStaleBuild } from './stale-build-reload.js';
 import { followSystemTheme, paintTheme, readStoredTheme } from './theme.js';
 import './styles/fonts.css';
 import './styles/motion.css';
@@ -22,6 +22,31 @@ reloadOnStaleBuild({
   reload: () => window.location.reload(),
   now: Date.now,
 });
+const currentEntry = entryScriptOf(document.documentElement.outerHTML);
+if (currentEntry !== null) {
+  reloadOnNewDeploy({
+    target: document,
+    currentEntry,
+    latestEntry: async () => {
+      const response = await fetch('/', { cache: 'no-store' });
+      return response.ok ? entryScriptOf(await response.text()) : null;
+    },
+    visible: () => document.visibilityState === 'visible',
+    busy: () => {
+      const field = document.activeElement;
+      if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {
+        return field.value !== '';
+      }
+      return (
+        field instanceof HTMLElement && field.isContentEditable && field.innerText.trim() !== ''
+      );
+    },
+    reload: () => window.location.reload(),
+    storage: safeSessionStorage(),
+    now: Date.now,
+    every: (run) => window.setInterval(run, 60_000),
+  });
+}
 
 const container = document.getElementById('root');
 if (container == null) {
