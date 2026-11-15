@@ -55,7 +55,7 @@ describe('runBrowserTool', () => {
     expect(
       log.filter((line) => !line.startsWith('xdotool ') && !/ get (title|url)$/.test(line))[0],
     ).toContain(
-      'agent-browser --session chief_1 --restore --headed --init-script .cairn/agent-cursor.js open https://example.com',
+      'agent-browser --session chief_1 --headed --init-script .cairn/agent-cursor.js open https://example.com',
     );
   });
 
@@ -365,7 +365,7 @@ describe('login form detection', () => {
       'browser_snapshot',
     );
     expect(log[1]).toBe(
-      `agent-browser --session s --restore --headed --init-script .cairn/agent-cursor.js --json eval ${LOGIN_DETECTION_SCRIPT}`,
+      `agent-browser --session s --headed --init-script .cairn/agent-cursor.js --json eval ${LOGIN_DETECTION_SCRIPT}`,
     );
     expect(result.loginForm).toEqual({ signals: ['password', 'one-time-code'] });
     expect(result.text.startsWith('[login form: password, one-time-code]\n')).toBe(true);
@@ -480,13 +480,13 @@ describe('secret field guard', () => {
     const log: string[] = [];
     await act(fieldProvider(log, { type: 'tel', autocomplete: 'tel' }), 'fill');
     expect(log).toContain(
-      'agent-browser --session s --restore --headed --init-script .cairn/agent-cursor.js get attr @e2 type',
+      'agent-browser --session s --headed --init-script .cairn/agent-cursor.js get attr @e2 type',
     );
     expect(log).toContain(
-      'agent-browser --session s --restore --headed --init-script .cairn/agent-cursor.js get attr @e2 autocomplete',
+      'agent-browser --session s --headed --init-script .cairn/agent-cursor.js get attr @e2 autocomplete',
     );
     expect(log).toContain(
-      'agent-browser --session s --restore --headed --init-script .cairn/agent-cursor.js focus @e2',
+      'agent-browser --session s --headed --init-script .cairn/agent-cursor.js focus @e2',
     );
     const typed = log
       .filter((line) => line.includes(' keyboard type '))
@@ -694,7 +694,7 @@ describe('agent cursor on the live screen', () => {
     expect(draw).toBeGreaterThan(box);
     expect(act).toBeGreaterThan(draw);
     expect(log[draw]).toBe(
-      `agent-browser --session s --restore --headed --init-script .cairn/agent-cursor.js --json eval ${agentCursorScript(120, 210, 'click')}`,
+      `agent-browser --session s --headed --init-script .cairn/agent-cursor.js --json eval ${agentCursorScript(120, 210, 'click')}`,
     );
   });
 

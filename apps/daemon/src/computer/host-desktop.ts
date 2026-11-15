@@ -6,11 +6,14 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
+  renameSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { COMPUTER_PRESENCE_LIMIT, type ComputerPresence } from '@cairn/shared';
+import { z } from 'zod';
 import { AGENT_BROWSER_BINARY, browserSessionName } from './browser.js';
 import { executableOnPath } from './contained-spawn.js';
 import { HostComputerProvider } from './host.js';
@@ -43,7 +46,9 @@ export const HOST_DESKTOP_PROGRAMS = [
 export const HOST_DESKTOP_BROWSERS = ['chromium', 'google-chrome-stable'] as const;
 export const HOST_DESKTOP_READY_MS = 20_000;
 export const HOST_DESKTOP_IDLE_STOP_MS = 10 * 60_000;
-const BROWSER_CLOSE_TIMEOUT_MS = 30_000;
+const BROWSER_COMMAND_TIMEOUT_MS = 30_000;
+const PROFILE_RELEASE_MS = 10_000;
+const BROWSER_PROFILE = join('.cairn', 'browser-profile');
 export const OMARCHY_WALLPAPER = '.local/state/omarchy/current/background';
 const UNIT_PREFIX = 'cairn-desktop-';
 
@@ -89,6 +94,50 @@ export interface CommandResult {
 
 export type CommandRunner = (argv: readonly string[]) => Promise<CommandResult>;
 
+const savedLogin = z.object({
+  cookies: z.array(
+    z.object({
+      name: z.string(),
+      value: z.string(),
+      domain: z.string(),
+      path: z.string(),
+      expires: z.number().optional(),
+      httpOnly: z.boolean().optional(),
+      secure: z.boolean().optional(),
+      sameSite: z.enum(['Strict', 'Lax', 'None']).optional(),
+    }),
+  ),
+});
+
+const sessionList = z.object({ data: z.object({ sessions: z.array(z.string()) }) });
+
+function processAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+async function browserCommand(
+  provider: HostComputerProvider,
+  args: readonly string[],
+): Promise<{ code: number | null; text: string }> {
+  const events = await provider.execute({
+    argv: [AGENT_BROWSER_BINARY, ...args],
+    timeoutMs: BROWSER_COMMAND_TIMEOUT_MS,
+    signal: new AbortController().signal,
+  });
+  let text = '';
+  let code: number | null = null;
+  for await (const event of events) {
+    if (event.kind === 'stdout') text += event.text;
+    else if (event.kind === 'exit') code = event.code;
+  }
+  return { code, text: text.trim() };
+}
+
 function runCommand(argv: readonly string[]): Promise<CommandResult> {
   return new Promise((resolve) => {
     execFile(argv[0] as string, argv.slice(1), { timeout: 15_000 }, (error, stdout) => {
@@ -126,6 +175,8 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
   private readonly lastUsed = new Map<string, number>();
   private readonly busy = new Map<string, number>();
   private readonly stopping = new Map<string, Promise<void>>();
+  private readonly takeovers = new Map<string, number>();
+  private readonly handoffs = new Map<string, Promise<void>>();
   private readonly now: () => number;
 
   constructor(private readonly options: HostDesktopsOptions) {
@@ -181,6 +232,21 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     return join(this.options.root, this.id(scopeKey));
   }
 
+  private ownerUnit(scopeKey: string): string {
+    return `${UNIT_PREFIX}${this.id(scopeKey)}-browser.service`;
+  }
+
+  private homeEnv(home: string): string[] {
+    return [
+      `--setenv=PATH=${this.env.PATH ?? ''}`,
+      `--setenv=HOME=${home}`,
+      `--setenv=XDG_CONFIG_HOME=${join(home, '.config')}`,
+      `--setenv=XDG_DATA_HOME=${join(home, '.local', 'share')}`,
+      `--setenv=XDG_CACHE_HOME=${join(home, '.cache')}`,
+      `--setenv=XDG_STATE_HOME=${join(home, '.local', 'state')}`,
+    ];
+  }
+
   socketPath(scopeKey: string, kind: 'view' | 'control'): string {
     return join(this.directory(scopeKey), 'computer', kind === 'view' ? 'view.sock' : 'vnc.sock');
   }
@@ -205,10 +271,11 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     return (await this.desktop(scopeKey)).display;
   }
 
-  async hold(scopeKey: string): Promise<() => void> {
+  async hold(scopeKey: string, kind: 'view' | 'control' = 'view'): Promise<() => void> {
     this.enter(scopeKey);
     try {
       await this.desktop(scopeKey);
+      if (kind === 'control') await this.takeOver(scopeKey);
     } catch (error) {
       this.leave(scopeKey);
       throw error;
@@ -217,8 +284,140 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     return () => {
       if (released) return;
       released = true;
+      if (kind === 'control') void this.handBack(scopeKey);
       this.leave(scopeKey);
     };
+  }
+
+  private handoff(scopeKey: string, step: () => Promise<void>): Promise<void> {
+    const next = (this.handoffs.get(scopeKey) ?? Promise.resolve()).then(step);
+    this.handoffs.set(
+      scopeKey,
+      next.catch(() => {}),
+    );
+    return next;
+  }
+
+  private async takeOver(scopeKey: string): Promise<void> {
+    const count = this.takeovers.get(scopeKey) ?? 0;
+    this.takeovers.set(scopeKey, count + 1);
+    try {
+      await (count === 0
+        ? this.handoff(scopeKey, () => this.openOwnerBrowser(scopeKey))
+        : this.handoffs.get(scopeKey));
+    } catch (error) {
+      void this.handBack(scopeKey);
+      throw error;
+    }
+  }
+
+  private handBack(scopeKey: string): Promise<void> {
+    const count = (this.takeovers.get(scopeKey) ?? 1) - 1;
+    if (count > 0) {
+      this.takeovers.set(scopeKey, count);
+      return Promise.resolve();
+    }
+    this.takeovers.delete(scopeKey);
+    return this.handoff(scopeKey, async () => {
+      await this.run(['systemctl', '--user', 'stop', this.ownerUnit(scopeKey)]);
+    });
+  }
+
+  private async openOwnerBrowser(scopeKey: string): Promise<void> {
+    const desktop = await this.desktop(scopeKey);
+    const session = browserSessionName(scopeKey);
+    let url = 'about:blank';
+    const listed = await browserCommand(desktop.provider, ['--json', 'session', 'list'])
+      .then(({ text }) => sessionList.safeParse(JSON.parse(text)))
+      .catch(() => undefined);
+    if (listed?.success && listed.data.data.sessions.includes(session)) {
+      const current = await browserCommand(desktop.provider, ['--session', session, 'get', 'url']);
+      const last = current.text.split('\n').at(-1)?.trim() ?? '';
+      if (/^https?:\/\//i.test(last)) url = last;
+      await browserCommand(desktop.provider, ['--session', session, 'close']);
+    }
+    const directory = this.directory(scopeKey);
+    const home = join(directory, 'home');
+    const profile = join(home, BROWSER_PROFILE);
+    await this.profileReleased(profile);
+    const browser = this.browserExecutable();
+    if (browser === undefined) throw new ComputerRefusal('This machine has no Chromium installed');
+    const unit = this.ownerUnit(scopeKey);
+    await this.run(['systemctl', '--user', 'stop', unit]);
+    await this.run(['systemctl', '--user', 'reset-failed', unit]);
+    const proxy =
+      this.env.https_proxy || this.env.HTTPS_PROXY || this.env.http_proxy || this.env.HTTP_PROXY;
+    const started = await this.run([
+      'systemd-run',
+      '--user',
+      '--collect',
+      `--unit=${unit}`,
+      `--property=BindsTo=${UNIT_PREFIX}${this.id(scopeKey)}.service`,
+      ...this.homeEnv(home),
+      `--setenv=DISPLAY=${desktop.display}`,
+      '--',
+      'env',
+      '-u',
+      'WAYLAND_DISPLAY',
+      '-u',
+      'WAYLAND_SOCKET',
+      browser,
+      `--user-data-dir=${profile}`,
+      '--ozone-platform=x11',
+      '--password-store=basic',
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--hide-crash-restore-bubble',
+      ...(proxy ? [`--proxy-server=${proxy}`] : []),
+      url,
+    ]);
+    if (started.code !== 0) throw new ComputerRefusal('The owner browser could not be started');
+  }
+
+  private async profileReleased(profile: string): Promise<void> {
+    const deadline = this.now() + PROFILE_RELEASE_MS;
+    for (;;) {
+      let owner: string;
+      try {
+        owner = readlinkSync(join(profile, 'SingletonLock'));
+      } catch {
+        return;
+      }
+      const pid = Number(owner.slice(owner.lastIndexOf('-') + 1));
+      if (!Number.isInteger(pid) || pid <= 0 || !processAlive(pid)) return;
+      if (this.now() >= deadline) throw new ComputerRefusal('The agent browser did not close');
+      await sleep(100);
+    }
+  }
+
+  private async importSavedLogin(scopeKey: string, home: string, provider: HostComputerProvider) {
+    const session = browserSessionName(scopeKey);
+    const saved = join(home, '.agent-browser', 'sessions', `${session}-${session}.json`);
+    if (!existsSync(saved)) return;
+    const parsed = savedLogin.safeParse(JSON.parse(readFileSync(saved, 'utf8')));
+    for (const cookie of parsed.success ? parsed.data.cookies : []) {
+      if (cookie.name === '') continue;
+      await browserCommand(provider, [
+        '--session',
+        session,
+        'cookies',
+        'set',
+        cookie.name,
+        cookie.value,
+        '--domain',
+        cookie.domain,
+        '--path',
+        cookie.path,
+        ...(cookie.httpOnly ? ['--http-only'] : []),
+        ...(cookie.secure ? ['--secure'] : []),
+        ...(cookie.sameSite ? ['--same-site', cookie.sameSite] : []),
+        ...(cookie.expires !== undefined && cookie.expires > 0
+          ? ['--expires', String(Math.floor(cookie.expires))]
+          : []),
+      ]);
+    }
+    await browserCommand(provider, ['--session', session, 'close']);
+    renameSync(saved, `${saved}.imported`);
   }
 
   private enter(scopeKey: string): void {
@@ -295,12 +494,7 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
         '--user',
         '--collect',
         `--unit=${unit}`,
-        `--setenv=PATH=${this.env.PATH ?? ''}`,
-        `--setenv=HOME=${home}`,
-        `--setenv=XDG_CONFIG_HOME=${join(home, '.config')}`,
-        `--setenv=XDG_DATA_HOME=${join(home, '.local', 'share')}`,
-        `--setenv=XDG_CACHE_HOME=${join(home, '.cache')}`,
-        `--setenv=XDG_STATE_HOME=${join(home, '.local', 'state')}`,
+        ...this.homeEnv(home),
         '--',
         'dbus-run-session',
         '--',
@@ -326,6 +520,9 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     const current = this.desktops.get(scopeKey);
     if (current?.display === display) return current;
     const desktop = { display, provider: this.provider(home, display) };
+    if (!this.takeovers.has(scopeKey))
+      await this.run(['systemctl', '--user', 'stop', this.ownerUnit(scopeKey)]);
+    await this.importSavedLogin(scopeKey, home, desktop.provider).catch(() => {});
     this.desktops.set(scopeKey, desktop);
     return desktop;
   }
@@ -341,6 +538,8 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
         PATH: this.path,
         AGENT_BROWSER_EXECUTABLE_PATH: this.browserExecutable(),
         AGENT_BROWSER_NO_VERSION_CHECK: '1',
+        AGENT_BROWSER_PROFILE: join(home, BROWSER_PROFILE),
+        AGENT_BROWSER_ARGS: '--hide-crash-restore-bubble',
       },
     });
   }
@@ -350,9 +549,14 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     const leave = () => this.leave(scopeKey);
     return {
       execute: async (request) => {
+        if (this.takeovers.has(scopeKey) && request.argv[0] === AGENT_BROWSER_BINARY)
+          throw new ComputerRefusal(
+            'The owner has taken over this browser; wait until they hand it back',
+          );
         this.enter(scopeKey);
         let events: AsyncIterable<ComputerProcessEvent>;
         try {
+          await this.handoffs.get(scopeKey);
           events = await (await provider()).execute(request);
         } catch (error) {
           leave();
@@ -421,21 +625,9 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     const provider =
       this.desktops.get(scopeKey)?.provider ??
       this.provider(join(directory, 'home'), this.ready(directory) ?? '');
-    const controller = new AbortController();
-    try {
-      const events = await provider.execute({
-        argv: [
-          AGENT_BROWSER_BINARY,
-          '--session',
-          browserSessionName(scopeKey),
-          '--restore',
-          'close',
-        ],
-        timeoutMs: BROWSER_CLOSE_TIMEOUT_MS,
-        signal: controller.signal,
-      });
-      for await (const _event of events);
-    } catch {}
+    await browserCommand(provider, ['--session', browserSessionName(scopeKey), 'close']).catch(
+      () => {},
+    );
     await provider.killAll();
     this.desktops.delete(scopeKey);
     this.lastUsed.delete(scopeKey);
