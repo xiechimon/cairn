@@ -68,5 +68,6 @@ export interface AppContext {
   loopbackOwner?: LoopbackOwner | null;
   accessVerifier?: AccessVerifier | null;
   mcpConfigPath: string;
+  mcpFetch?: typeof fetch;
   logger?: Logger;
 }

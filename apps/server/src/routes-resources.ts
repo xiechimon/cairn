@@ -1,6 +1,7 @@
 import {
   capabilitiesResponseSchema,
   createClaudeSubscriptionSchema,
+  createMcpConnectorBodySchema,
   createProviderBodySchema,
   createScheduleBodySchema,
   createSkillBodySchema,
@@ -10,6 +11,7 @@ import {
   type MachineRunningThread,
   PHASE_VALUES,
   patchMachineBodySchema,
+  patchMcpConnectorBodySchema,
   patchProviderBodySchema,
   patchScheduleBodySchema,
   redactSecrets,
@@ -58,7 +60,15 @@ import {
   machineRunningCount,
   toMachineRecord,
 } from './services/machines.js';
-import { listMcpServers } from './services/mcp-servers.js';
+import {
+  checkMcpConnector,
+  createMcpConnector,
+  deleteMcpConnector,
+  listMcpConnectors,
+  listMcpServers,
+  type McpConnectorDeps,
+  updateMcpConnector,
+} from './services/mcp-servers.js';
 import { mergedCatalogModels, refreshAllRelayCatalogs } from './services/model-liveness.js';
 import {
   abortOAuthCallback,
@@ -664,6 +674,54 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         })),
       }),
     );
+  });
+
+  const mcpDeps = (): McpConnectorDeps => ({
+    db: ctx.db,
+    box: ctx.secretBox,
+    mcpConfigPath: ctx.mcpConfigPath,
+    fetch: ctx.mcpFetch ?? globalThis.fetch,
+  });
+
+  app.get('/api/teams/:id/mcp-connectors', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(listMcpConnectors(mcpDeps(), teamId));
+  });
+
+  app.post('/api/teams/:id/mcp-connectors', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = parseWith(createMcpConnectorBodySchema, await jsonBody(c), 'body');
+    const created = createMcpConnector(mcpDeps(), teamId, body);
+    return c.json(await checkMcpConnector(mcpDeps(), teamId, created.id), 201);
+  });
+
+  app.patch('/api/teams/:id/mcp-connectors/:cid', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = parseWith(patchMcpConnectorBodySchema, await jsonBody(c), 'body');
+    const { record, targetChanged } = updateMcpConnector(
+      mcpDeps(),
+      teamId,
+      c.req.param('cid'),
+      body,
+    );
+    return c.json(targetChanged ? await checkMcpConnector(mcpDeps(), teamId, record.id) : record);
+  });
+
+  app.delete('/api/teams/:id/mcp-connectors/:cid', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    if (!deleteMcpConnector(mcpDeps(), teamId, c.req.param('cid')))
+      throw notFound(`mcp connector ${c.req.param('cid')}`);
+    return c.body(null, 204);
+  });
+
+  app.post('/api/teams/:id/mcp-connectors/:cid/check', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(await checkMcpConnector(mcpDeps(), teamId, c.req.param('cid')));
   });
 
   app.get('/api/teams/:id/secrets', (c) => {

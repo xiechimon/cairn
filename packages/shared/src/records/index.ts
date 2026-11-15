@@ -39,6 +39,7 @@ export * from './github-label.js';
 export * from './harness-profile.js';
 export * from './machine.js';
 export * from './machine-capabilities.js';
+export * from './mcp-connector.js';
 export * from './mcp-server.js';
 export * from './memory.js';
 export * from './merge-gate.js';
