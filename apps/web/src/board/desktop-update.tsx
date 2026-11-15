@@ -1,5 +1,4 @@
 import type { DesktopUpdateBlocker, DesktopUpdateState } from '@cairn/shared';
-import { cn } from 'cn';
 import { CircleArrowUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from '../components/ui/button.js';
@@ -82,16 +81,17 @@ export function DesktopUpdateButton({
     <Tooltip>
       <TooltipTrigger
         render={
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             data-testid="desktop-update"
             aria-label={label}
-            className={cn('grid place-items-center', idleClassName)}
+            className={idleClassName}
             disabled={state.status === 'checking' || state.status === 'unsupported'}
             onClick={() => void bridge.check()}
           >
             {icon}
-          </button>
+          </Button>
         }
       />
       <TooltipContent side="top" sideOffset={6}>
