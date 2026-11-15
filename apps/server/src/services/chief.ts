@@ -29,7 +29,6 @@ import {
   chiefTurnErrorContentSchema,
   fencedTitle,
   ISSUE_FENCE_OPEN,
-  isBackendRuntimeId,
   isChiefDigestThreadId,
   MAIL_FENCE_OPEN,
   mailSharedTranscript,
@@ -95,6 +94,7 @@ import {
   replayAfterConflict,
 } from './client-message.js';
 import { coordinatorRunsOnPi, lastTurnContext, wakeCoordinator } from './coordinator-context.js';
+import { runtimeGatePasses } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemoryDocuments } from './memory.js';
@@ -203,14 +203,6 @@ function refreshWatches(deps: ChiefDeps, watches: ChiefWatch[]): ChiefWatch[] {
   });
 }
 
-function chiefRuntimeGatePasses(
-  machineRow: { enabledRuntimes: string[] },
-  agentProvider: string | null | undefined,
-): boolean {
-  const runtime = isBackendRuntimeId(agentProvider) ? 'claude-code' : 'pi';
-  return machineRow.enabledRuntimes.includes(runtime);
-}
-
 function chiefOrchestration(deps: ChiefDeps, teamId: string): ChiefGetResponse['orchestration'] {
   const steps = deps.db
     .select({ machineId: step.machineId, status: step.status })
@@ -243,7 +235,7 @@ function chiefOrchestration(deps: ChiefDeps, teamId: string): ChiefGetResponse['
     if (home === null) continue;
     const machineRow = deps.db.select().from(machine).where(eq(machine.id, home)).get();
     const offline = machineRow === undefined || !machineRow.online;
-    if (!offline && chiefRuntimeGatePasses(machineRow, agentRow?.provider)) continue;
+    if (!offline && runtimeGatePasses(machineRow, agentRow?.provider)) continue;
     bump(home).waiting += 1;
   }
   return {

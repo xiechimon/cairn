@@ -9,6 +9,7 @@ import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { claudeSubscription, machine, provider, team } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { machineRuntimeAvailable } from './dispatch-eligibility.js';
 
 const CLAUDE_ROUTING_MODELS = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
 
@@ -80,7 +81,6 @@ export function getModelRouting(db: Db, teamId: string) {
         models: ['gpt-6.1-sol'],
         available:
           row.online &&
-          row.enabledRuntimes.includes('pi') &&
           codexLogin.state === 'ok' &&
           codexLogin.expiresAt !== undefined &&
           codexLogin.expiresAt > now,
@@ -96,9 +96,8 @@ export function getModelRouting(db: Db, teamId: string) {
       kind: paid ? 'api-key' : 'subscription',
       models: CLAUDE_ROUTING_MODELS,
       available:
-        report?.installed === true &&
+        machineRuntimeAvailable(row, 'claude-code') &&
         row.online &&
-        row.enabledRuntimes.includes('claude-code') &&
         report?.auth?.state !== 'not-logged-in' &&
         report?.login?.state !== 'expired',
     });

@@ -20,7 +20,6 @@ function eligibility(confinement: unknown, osPlatform = 'linux') {
     machine: {
       id: 'machine-one',
       name: 'machine-one',
-      enabledRuntimes: ['pi', 'claude-code', 'gemini'],
       claudeCodeReport: null,
       capabilities: capabilities ?? null,
     },
