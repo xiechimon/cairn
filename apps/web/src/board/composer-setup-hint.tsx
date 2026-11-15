@@ -7,13 +7,14 @@ import { useLiveData } from '../api/provider.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { Key, Monitor, Settings } from '../icons/index.js';
-import { COORDINATOR_ROUTING_HREF } from '../resources/routing-settings-page.js';
+import { Key, Monitor } from '../icons/index.js';
 import { settingsHref } from '../settings/settings-href.js';
 import {
   coordinatorCanAnswer,
   type FirstRunStepId,
   firstRunSteps,
+  type ModelSides,
+  modelSides,
   modelSourceCount,
   nextOpenStep,
 } from './first-run-checklist-model.js';
@@ -23,21 +24,31 @@ const CHIP_CLS =
 
 const CODE_CLS = 'rounded bg-(--menu-hover) px-1 py-px font-mono text-meta text-(--text-secondary)';
 
-export function useComposerSetupStep(): FirstRunStepId | null {
+export interface ComposerSetupStep {
+  next: FirstRunStepId;
+  models: ModelSides;
+}
+
+export function useComposerSetupStep(): ComposerSetupStep | null {
   const { live, teamId } = useLiveData();
   const providersQ = useProviders(teamId, live);
   const routingQ = useModelRouting(teamId, live);
   const machinesQ = useMachines(teamId, live);
   const chiefQ = useChief(teamId, live);
-  const steps = firstRunSteps({
-    modelSources: modelSourceCount(
+  const models = modelSides(
+    coordinatorCanAnswer(chiefQ.data),
+    modelSourceCount(
       providersQ.data?.providers,
       routingQ.data === undefined ? undefined : (routingQ.data.connections ?? []),
     ),
-    machinesOnline: machinesQ.data?.filter((machine) => machine.online).length,
-    coordinatorCanAnswer: coordinatorCanAnswer(chiefQ.data),
-  });
-  return live ? nextOpenStep(steps) : null;
+  );
+  const next = nextOpenStep(
+    firstRunSteps({
+      models,
+      machinesOnline: machinesQ.data?.filter((machine) => machine.online).length,
+    }),
+  );
+  return live && next !== null && models !== undefined ? { next, models } : null;
 }
 
 function withCode(text: string): ReactNode {
@@ -80,32 +91,31 @@ function runnerStep(
   };
 }
 
-export function ComposerSetupHint({ next }: { next: FirstRunStepId }) {
+export function ComposerSetupHint({ step: { next, models } }: { step: ComposerSetupStep }) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const machinesQ = useMachines(teamId, live);
   const runner = runnerStep(machinesQ.data, `${PUBLISHED_PACKAGES.cli.command} start`, t);
   const copy: Record<FirstRunStepId, { icon: ReactNode; label: string; hint: ReactNode }> = {
-    'model-source': {
+    models: {
       icon: <Key width={16} height={16} />,
-      label: t('接入模型来源'),
-      hint: t('添加模型服务商，或在 Runner 上登录 Claude Code'),
+      ...(models.tasks
+        ? {
+            label: t('Coordinator 还缺模型'),
+            hint: t('添加一个服务商，Coordinator 用不了 Claude Code 登录'),
+          }
+        : {
+            label: t('接入模型来源'),
+            hint: t('添加模型服务商，或在 Runner 上登录 Claude Code'),
+          }),
     },
     machine: {
       icon: <Monitor width={16} height={16} />,
       ...runner,
     },
-    coordinator: {
-      icon: <Settings width={16} height={16} />,
-      label: t('打开工作路由'),
-      hint: t('先创建 Coordinator 规则，它才能回答你的消息。'),
-    },
   };
   const { icon, label, hint } = copy[next];
-  const href =
-    next === 'coordinator'
-      ? COORDINATOR_ROUTING_HREF
-      : settingsHref(next === 'model-source' ? 'providers' : 'machines');
+  const href = settingsHref(next === 'models' ? 'providers' : 'machines');
   return (
     <>
       <Button

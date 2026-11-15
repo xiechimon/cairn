@@ -12,6 +12,8 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
 import { useApiMutations, useGithubConnection, useGithubRepos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { projectCreationBlocked, setupOpenStep } from '../board/first-run-checklist-model.js';
+import { missingStepCopy, SETUP_HREF, useFirstRunSetup } from '../board/first-run-setup.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
 import { Button } from '../components/ui/button.js';
@@ -316,6 +318,11 @@ export function ProjectNewPage() {
     rows[next]?.focus();
   };
 
+  const setup = useFirstRunSetup();
+  const blockedStep =
+    setup.progress !== undefined && projectCreationBlocked(setup)
+      ? setupOpenStep(setup.progress)
+      : null;
   const [submittedPath, setSubmittedPath] = useState<string | null>(null);
   const createError = mutations.createProject.error;
   const localErrorCopy = (reason: string | undefined, message: string): string =>
@@ -349,6 +356,19 @@ export function ProjectNewPage() {
       },
     });
   };
+
+  if (blockedStep !== null) {
+    return (
+      <RouteDialog title={t('新建项目')} size="form">
+        <FormStack>
+          <p data-testid="project-new-blocked" className="m-0 text-ui text-content-secondary">
+            {missingStepCopy(blockedStep, t)}
+          </p>
+          <FormActions primary={{ label: t('去完成设置'), onClick: () => navigate(SETUP_HREF) }} />
+        </FormStack>
+      </RouteDialog>
+    );
+  }
 
   return (
     <RouteDialog title={t('新建项目')} size="form">

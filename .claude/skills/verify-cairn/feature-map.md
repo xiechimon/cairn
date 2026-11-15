@@ -478,22 +478,23 @@ Reach:
 
 ### first-run
 
-**First run** (shipped, centrality 2). The home checklist, connection banners and the first-PR card that take a new user to a first merged PR.
+**First run** (shipped, centrality 2). The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.
 
-States: A checklist on the home page until a machine, a model and a project are set, a setup hint on the composer, then a first-PR card.
+States: A team with no projects lands on a two-step setup page (connect models for the Coordinator and tasks, confirm both models) that can be skipped; the first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.
 
 Reach:
 
 1. `open /app`
-2. `click testid:composer-setup-chip`
+2. `click testid:first-run-confirm`
+3. `click testid:composer-setup-chip`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`
+- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`, `first-run-confirm`, `first-run-pick-*`, `first-run-setup`, `first-run-step-*`
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](../../../docs/design/references/first-run)
 - Backend design: **gap**: no design for checklist state, first-PR detection and the 10-minute path
-- Evidence: `apps/web/e2e/first-run-checklist.spec.ts`, `apps/web/e2e/first-pr-report.spec.ts`, `apps/server/test/first-pr-report.test.ts`
+- Evidence: `apps/web/e2e/first-run-setup.spec.ts`, `apps/web/e2e/first-run-checklist.spec.ts`, `apps/web/e2e/first-pr-report.spec.ts`, `apps/server/test/first-pr-report.test.ts`
 
 ### machine-enrollment
 
@@ -866,7 +867,7 @@ Reach:
 - Web routes: `/app/project/:id`, `/app/project/:id/settings`, `/app/project/:id/tasks`, `/app/project/new`
 - Settings: `设置` (Settings) › `项目`
 - Keyboard shortcuts in its code: `G`, `L`
-- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`
+- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`, `project-new-blocked`
 - Verify recipes: [.claude/skills/verify-cairn/features/project-new-form.md](features/project-new-form.md), [.claude/skills/verify-cairn/features/github-oauth-picker.md](features/github-oauth-picker.md), [.claude/skills/verify-cairn/features/local-repo-api.md](features/local-repo-api.md)
 - Research: [docs/research/project-coordinators.md](../../../docs/research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
