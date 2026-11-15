@@ -394,6 +394,24 @@ html:has([data-slot="demo-banner"]) .app-drawer {
   height: calc(100% - 2.25rem);
 }
 
+@media (max-width: 640px) {
+  .route-page-dialog {
+    --settings-w: 100%;
+    --settings-h: 100%;
+    top: 0;
+    left: 0;
+    translate: none;
+    max-height: none;
+    border-radius: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  html:has([data-slot="demo-banner"]) .route-page-dialog {
+    top: 2.25rem;
+    --settings-h: calc(100% - 2.25rem);
+  }
+}
+
 @supports (corner-shape: superellipse(1.5)) {
   .board-notify-banner {
     corner-shape: superellipse(1.5);

@@ -22,16 +22,16 @@ test('threads are grouped by day with a count and the cost of each group', async
     '3 threads · $2.23',
     '2 threads · $4.72',
     '1 thread · $2.47',
-    '2 threads · —',
+    '2 threads',
   ]);
   await expect(group(page, 'today').getByRole('heading')).toHaveText('Today');
   await expect(group(page, 'yesterday').getByRole('heading')).toHaveText('Yesterday');
   await expect(group(page, 'week').getByRole('heading')).toHaveText('Earlier this week');
   await expect(group(page, 'older').getByRole('heading')).toHaveText('Earlier');
-  await expect(page.getByTestId('activity-summary')).toHaveText('8 threads · —');
+  await expect(page.getByTestId('activity-summary')).toHaveText('8 threads');
 });
 
-test('a row shows its state, project, reason, cost and time; unpriced cost is a dash', async ({
+test('a row shows its state, project, reason, cost and time; unpriced cost is left out', async ({
   page,
 }) => {
   await page.goto(ACTIVITY);
@@ -42,12 +42,13 @@ test('a row shows its state, project, reason, cost and time; unpriced cost is a 
   await expect(failed).toContainText('30m ago');
   await expect(failed).toContainText('Failed. Open it to retry.');
   const unpriced = rows(page).filter({ hasText: 'Backfill usage rows' });
-  await expect(unpriced.getByTestId('activity-row-cost')).toHaveText('—');
+  await expect(unpriced.getByTestId('activity-row-cost')).toHaveCount(0);
+  await expect(unpriced).not.toContainText('—');
 });
 
 for (const scenario of [
-  { name: 'all unknown', costs: [null, { total: 0, priced: false }], expected: '—', rowCosts: ['—', '—'] },
-  { name: 'mixed known and partial positive wire cost', costs: [{ total: 2.5, priced: true }, { total: 1, priced: false }], expected: '—', rowCosts: ['$2.50', '—'] },
+  { name: 'all unknown', costs: [null, { total: 0, priced: false }], expected: null, rowCosts: [] },
+  { name: 'mixed known and partial positive wire cost', costs: [{ total: 2.5, priced: true }, { total: 1, priced: false }], expected: null, rowCosts: ['$2.50'] },
   { name: 'known free', costs: [{ total: 0, priced: true }, { total: 0, priced: true }], expected: '$0.00', rowCosts: ['$0.00', '$0.00'] },
   { name: 'all known', costs: [{ total: 2.5, priced: true }, { total: 1, priced: true }], expected: '$3.50', rowCosts: ['$2.50', '$1.00'] },
 ]) {
@@ -63,8 +64,9 @@ for (const scenario of [
     });
     await page.goto('/app/activity');
     await expect(rows(page)).toHaveCount(2);
-    await expect(page.getByTestId('activity-summary')).toHaveText(`2 threads · ${scenario.expected}`);
-    await expect(page.getByTestId('activity-group-total')).toHaveText(`2 threads · ${scenario.expected}`);
+    const total = scenario.expected === null ? '2 threads' : `2 threads · ${scenario.expected}`;
+    await expect(page.getByTestId('activity-summary')).toHaveText(total);
+    await expect(page.getByTestId('activity-group-total')).toHaveText(total);
     await expect(page.getByTestId('activity-row-cost')).toHaveText(scenario.rowCosts);
   });
 }
@@ -256,6 +258,7 @@ test('at 390px nothing overflows sideways and rows stay readable', async ({ page
   expect(box?.x).toBeGreaterThanOrEqual(0);
   expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(390);
   await expect(rows(page).first().getByTestId('activity-row-cost')).toBeVisible();
+  await expect(rows(page).first().getByText('Failed. Open it to retry.')).toBeVisible();
   await evidenceShot(page, 'activity-phone.png');
 });
 
