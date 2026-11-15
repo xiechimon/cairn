@@ -440,6 +440,7 @@ export function BoardSidebar({
   const navRef = useRef<HTMLElement | null>(null);
   useScrollFade(navRef);
   const coordinatorActive = selected === 'board' && activeProject === null;
+  const schedulesActive = pathname === '/app/schedules';
 
   const settingsTarget = { pathname: SETTINGS_HREF, search: plain };
   const activityTarget = { pathname: ACTIVITY_PATH, search: plain };
@@ -599,6 +600,18 @@ export function BoardSidebar({
       </nav>
 
       <div data-testid="sidebar-pinned" className="flex flex-none flex-col gap-0.5 px-2 pb-2">
+        <Link
+          data-testid="sidebar-schedules"
+          aria-current={schedulesActive ? 'page' : undefined}
+          className={cn(
+            SIDEBAR_FOOT_ROW,
+            schedulesActive && 'bg-(--sidebar-active) text-foreground hover:bg-(--sidebar-active)',
+          )}
+          to={{ pathname: '/app/schedules', search: plain }}
+        >
+          <Clock className={ICON} strokeWidth={STROKE} />
+          {t('定时')}
+        </Link>
         {archivedPage ? (
           <Button
             variant="ghost"
@@ -646,13 +659,6 @@ export function BoardSidebar({
           </FooterIcon>
         )}
         <div className="flex flex-none items-center gap-0.5">
-          <FooterIcon
-            label={t('定时')}
-            testId="sidebar-schedules"
-            to={{ pathname: '/app/schedules', search: plain }}
-          >
-            <Clock className={ICON} strokeWidth={STROKE} />
-          </FooterIcon>
           <FooterIcon label={t('活动')} testId="sidebar-activity" to={activityTarget}>
             <Activity className={ICON} strokeWidth={STROKE} />
           </FooterIcon>
