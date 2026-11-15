@@ -1228,8 +1228,11 @@ export const attachment = sqliteTable('attachment', {
   sizeBytes: integer('sizeBytes').notNull(),
   storageKey: text('storageKey').notNull(),
   grantId: text('grantId').notNull(),
-  scope: text('scope').$type<'spec' | 'message'>().notNull(),
-  status: text('status').$type<'pending' | 'ready' | 'failed'>().notNull().default('pending'),
+  scope: text('scope').$type<'spec' | 'message' | 'deliverable'>().notNull(),
+  status: text('status')
+    .$type<'pending' | 'received' | 'ready' | 'failed'>()
+    .notNull()
+    .default('pending'),
   createdAt: epochMs('createdAt').notNull(),
 });
 

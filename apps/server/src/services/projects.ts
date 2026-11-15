@@ -35,6 +35,7 @@ import type { ConversationStreamHub } from './events.js';
 import { isGithubRepoRef, validateGithubLocalSlotPath } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
 import { dispatchHostedCleanup, enqueueHostedCleanup } from './hosted-cleanup.js';
+import { retireTodoDeliverables } from './machine-deliverables.js';
 import { moveProjectMemoriesToTeam } from './memory.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { insertMessageRow } from './transcript.js';
@@ -198,6 +199,7 @@ export function deleteProject(
       tx.delete(stopPending).where(inArray(stopPending.conversationId, buildIds)).run();
       tx.delete(step).where(inArray(step.buildId, buildIds)).run();
     }
+    retireTodoDeliverables(deps.db, todoIds);
     tx.delete(schedule).where(eq(schedule.projectId, id)).run();
     tx.delete(tag).where(eq(tag.projectId, id)).run();
     tx.delete(secret).where(eq(secret.projectId, id)).run();
