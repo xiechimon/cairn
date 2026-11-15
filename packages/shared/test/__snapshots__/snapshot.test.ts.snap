@@ -4967,6 +4967,7 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                       "enum": [
                         "machine-offline",
                         "capability-missing",
+                        "runtime-disabled",
                       ],
                       "type": "string",
                     },
@@ -6469,6 +6470,7 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
               "enum": [
                 "machine-offline",
                 "capability-missing",
+                "runtime-disabled",
               ],
               "type": "string",
             },
@@ -9962,6 +9964,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
                   "enum": [
                     "machine-offline",
                     "capability-missing",
+                    "runtime-disabled",
                   ],
                   "type": "string",
                 },
