@@ -267,6 +267,11 @@ describe.each(['subscription-only', 'allow-paid'] as const)('%s machine auth', (
           expect(
             s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()?.machineId,
           ).toBe(null);
+        } else if (claudeUsage === 'allow-paid' && (noReport || auth?.state === 'not-logged-in')) {
+          expect(claimed).toBeNull();
+          expect(s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()).toMatchObject(
+            { status: 'pending', machineId: null },
+          );
         } else if (claudeUsage === 'allow-paid' || subscription) {
           expect(claimed?.step).toMatchObject({ id: stepId, machineId: claimantId });
         } else {
