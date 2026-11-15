@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "a57ab1382d49206996ebe77b6a343539fa5bd068",
+    "sha": "97d0bba71e7d83252dd0b30c879ee719a7050eff",
     "date": "2026-11-15"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -70,7 +70,7 @@
     "dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "Paper dialog adapter (apps/web/DESIGN.md 弹窗与菜单) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog / overlay/route-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes, and bare forwards initialFocus. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers. headerAction puts one quiet header action (memory Delete) left of the close button in regular faces.",
-      "hash": "3819bcb300b2c9f36795b024c328b68a064a68a9e98b6c42fbdd85cc74894fb7"
+      "hash": "f82cfb9d3751d9fc4e4f08f9cd6fd4ca388b3400098a63b34d25d8add54d1726"
     },
     "dialog.tsx": {
       "kind": "registry",

@@ -1,12 +1,5 @@
 import { cn } from 'cn';
-import {
-  createContext,
-  type ReactNode,
-  type RefObject,
-  useCallback,
-  useContext,
-  useRef,
-} from 'react';
+import { createContext, type ReactNode, type RefObject, useContext, useRef } from 'react';
 import { Button } from '../components/ui/button.js';
 import { DialogClose, DialogTitle } from '../components/ui/dialog.js';
 import { DialogShell, dialogWidth } from '../components/ui/dialog-shell.js';
@@ -38,26 +31,14 @@ export function RouteDialog({
   const { t } = useI18n();
   const onClose = useContext(RouteDialogClose);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const fieldEscape = useRef(false);
-  const attachBody = useCallback((body: HTMLDivElement | null) => {
-    bodyRef.current = body;
-    if (body === null) return;
-    const markFieldEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !isEditableTarget(event.target)) return;
-      fieldEscape.current = true;
-      setTimeout(() => {
-        fieldEscape.current = false;
-      });
-    };
-    body.addEventListener('keydown', markFieldEscape);
-    return () => body.removeEventListener('keydown', markFieldEscape);
-  }, []);
   return (
     <DialogShell
       bare
       title={title}
-      onClose={() => {
-        if (!fieldEscape.current) onClose();
+      onClose={(details) => {
+        if (details?.reason === 'escape-key' && isEditableTarget(details.event?.target ?? null))
+          return;
+        onClose();
       }}
       zIndex="calc(var(--z-narrow-chrome) + 2)"
       onBackdropClick={ignoreBackdropClick}
@@ -75,7 +56,7 @@ export function RouteDialog({
         {actions}
       </header>
       <div
-        ref={attachBody}
+        ref={bodyRef}
         tabIndex={-1}
         data-testid="route-dialog-body"
         className={cn('min-h-0 flex-auto overflow-y-auto outline-none', !bleed && 'px-4 pt-4 pb-5')}
