@@ -86,7 +86,7 @@ export function ProductPagesSection({ theme }: { theme: GalleryTheme }) {
       <Specimen
         id="schedule-rows"
         title="Schedule rows"
-        note="Iframe of scenario r3-93 in the Tasks panel 定时 tab"
+        note="Iframe of scenario r3-93 in the Tasks panel Schedules tab"
         stage="canvas"
         className="block"
       >
