@@ -44,7 +44,7 @@ Reach:
 - Research: [docs/research/coordinator-computer.md](../../../docs/research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](../../../docs/research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](../../../docs/research/user-computer-model-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the computer feed, screen view, browser toggle and control handover have no design
 - Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
-- Evidence: `apps/web/e2e/machines-computer-feed.spec.ts`, `apps/web/test/machine-capabilities.test.ts`, `apps/server/test/computer-screen-routes.test.ts`, `apps/server/test/computer-feed-routes.test.ts`, `apps/daemon/test/computer-guard.test.ts`, `apps/daemon/test/computer-browser.test.ts`, `apps/daemon/test/machine-boot.test.ts`, `apps/daemon/test/orb-computer.test.ts`
+- Evidence: `apps/web/e2e/machines-computer-feed.spec.ts`, `apps/web/test/machine-capabilities.test.ts`, `apps/server/test/computer-screen-routes.test.ts`, `apps/server/test/computer-feed-routes.test.ts`, `apps/daemon/test/computer-guard.test.ts`, `apps/daemon/test/computer-browser.test.ts`, `apps/daemon/test/machine-boot.test.ts`, `apps/daemon/test/computer-host-desktop.test.ts`
 
 ### coordinator-chat
 
