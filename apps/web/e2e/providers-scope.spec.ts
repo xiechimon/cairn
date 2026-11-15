@@ -126,7 +126,7 @@ test('machine without a Claude Code report says so instead of guessing', async (
 test('empty team: the list offers to add a provider and opens the picker', async ({ page }) => {
   await page.goto('/app/resources/providers?scenario=providers-empty');
   await expect(page.getByTestId('provider-instance')).toHaveCount(0);
-  await page.getByRole('button', { name: '添加服务商' }).click();
+  await page.getByTestId('providers-empty').getByRole('button', { name: '添加服务商' }).click();
   await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeVisible();
 });
 
