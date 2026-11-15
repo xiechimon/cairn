@@ -540,6 +540,11 @@ describe('MCP connector OAuth', () => {
     const silent = bootOAuth();
     expect((await silent.start(acme)).res.status).toBe(400);
     expect(silent.world.registrations).toHaveLength(0);
+    const catalog = await silent.start(linearStart);
+    await silent.callback({ code: 'code-ok', state: catalog.state, iss: AS });
+    silent.s.db.update(mcpConnector).set({ catalogId: 'retired' }).run();
+    const retired = await silent.start({ kind: 'reconnect', connectorId: silent.row()?.id ?? '' });
+    expect(retired.res.status).toBe(400);
     const t = bootOAuth({ metadata: { authorization_response_iss_parameter_supported: true } });
     const relayed = await t.start(acme);
     expect(relayed.res.status).toBe(200);

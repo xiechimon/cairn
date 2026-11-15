@@ -609,11 +609,12 @@ function oauthTarget(
     const row = connectorRow(deps, teamId, body.connectorId);
     if (row.authKind !== 'oauth')
       throw new HttpError(400, 'only a browser sign-in connector can reconnect');
-    const scope = row.catalogId === null ? undefined : mcpCatalogEntry(row.catalogId)?.oauthScope;
+    const entry = row.catalogId === null ? undefined : mcpCatalogEntry(row.catalogId);
+    const scope = entry?.oauthScope;
     return {
       target: { kind: 'reconnect', connectorId: row.id, authRevision: row.authRevision },
       url: row.url,
-      custom: row.catalogId === null,
+      custom: entry === undefined,
       ...(scope === undefined ? {} : { scope }),
     };
   }
