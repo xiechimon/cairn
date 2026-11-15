@@ -11,7 +11,6 @@ import {
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { COMPUTER_PRESENCE_LIMIT, type ComputerPresence } from '@cairn/shared';
-import { computerMachineName, PINNED_AGENT_BROWSER_VERSION } from '../orb/computer.js';
 import { AGENT_BROWSER_BINARY, browserSessionName } from './browser.js';
 import { executableOnPath } from './contained-spawn.js';
 import { HostComputerProvider } from './host.js';
@@ -23,6 +22,13 @@ import {
   ComputerRefusal,
   type ScopedComputerProviders,
 } from './provider.js';
+
+export const PINNED_AGENT_BROWSER_VERSION = '0.41.2';
+
+export function computerMachineName(scopeKey: string): string {
+  if (scopeKey === '') throw new Error('Computer scope key is empty');
+  return `cairn-orb-computer-${createHash('sha256').update(scopeKey).digest('hex').slice(0, 40)}`;
+}
 
 export const HOST_DESKTOP_PROGRAMS = [
   'systemd-run',
