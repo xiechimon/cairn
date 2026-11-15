@@ -904,11 +904,7 @@ export const CHIEF_ROUTER_TOOLS: readonly RemoteToolDef[] = [
       {
         day: str('Report date YYYY-MM-DD from the report title; omit for the newest report.'),
         n: num('Suggestion number in the report, starting at 1.'),
-        decision: {
-          type: 'string',
-          enum: ['accept', 'dismiss'],
-          description: 'accept or dismiss.',
-        },
+        decision: str('Exactly "accept" or "dismiss".'),
       },
       ['n', 'decision'],
     ),

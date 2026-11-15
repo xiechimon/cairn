@@ -240,7 +240,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
       coordinatorInServerEnabled() &&
       !isChiefDigestThreadId(row.threadId)
     ) {
-      serverRoute ??= coordinatorRouteVerdict(db, teamId);
+      if (serverRoute === undefined) serverRoute = coordinatorRouteVerdict(db, teamId);
       if (serverRoute !== null) {
         if (!('refusal' in serverRoute)) return undefined;
         if (target.homeMachineId === null) {
