@@ -261,8 +261,8 @@ export function openCitationCheck(
       existing,
       `Citation check stopped after ${state.attempts} attempts.`,
     );
-  if (source.models.length === 0 || citedUrls(source.content).size === 0) {
-    return blocked(deps, source, 'Source report needs observed model usage and cited URLs.');
+  if (citedUrls(source.content).size === 0) {
+    return blocked(deps, source, 'Source report needs cited URLs.');
   }
   const pin = citationCheckerChoice(deps.db, source.teamId, state.pin);
   if (pin === null) {
