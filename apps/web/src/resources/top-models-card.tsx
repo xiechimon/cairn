@@ -127,15 +127,16 @@ function TopModelRow({
       )}
     >
       <span className="flex min-w-0 flex-auto items-center gap-3 max-sm:basis-full">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-xs"
           aria-label={t('拖动排序 {model}', { model: name })}
-          className="top-model-grip flex-none cursor-grab touch-none rounded-sm text-content-tertiary outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+          className="top-model-grip -mx-1 cursor-grab touch-none text-content-tertiary active:cursor-grabbing"
           {...attributes}
           {...listeners}
         >
           <GripVertical aria-hidden className="size-4" />
-        </button>
+        </Button>
         <Vendor aria-hidden className="size-5 flex-none text-foreground max-sm:size-4" />
         <span className="flex min-w-0 flex-auto items-center gap-2">
           <span
