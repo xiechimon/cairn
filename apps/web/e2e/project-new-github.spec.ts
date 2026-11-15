@@ -118,7 +118,7 @@ test('7b. unconnected-face manual link → input; swap button can go back to the
   await page.getByRole('button', { name: '手动输入 owner/repo' }).click();
   const input = page.locator('#prj-new-repo');
   await expect(input).toHaveAttribute('placeholder', 'owner/repo');
-  await page.getByRole('button', { name: '选择仓库' }).click();
+  await page.getByRole('button', { name: '切换仓库来源' }).click();
   await expect(page.getByRole('menu', { name: '仓库' })).toBeVisible();
 });
 

@@ -50,7 +50,7 @@ export function ProjectIconPicker({
         align="start"
         sideOffset={8}
         data-testid="project-icon-picker"
-        className="w-69 gap-0 rounded-xl p-1"
+        className="w-69 gap-0 rounded-xl p-1 pointer-coarse:w-72"
       >
         <div className="relative px-1.5 pt-1.5 pb-1">
           <Search
@@ -62,10 +62,10 @@ export function ProjectIconPicker({
             placeholder={t('搜索图标')}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="h-8 pl-8"
+            className="h-8 pl-8 pointer-coarse:h-11"
           />
         </div>
-        <fieldset className="m-0 grid min-h-34 min-w-0 grid-cols-8 content-start gap-0 border-0 px-1.5 py-1">
+        <fieldset className="m-0 grid min-h-34 min-w-0 grid-cols-8 content-start gap-0 border-0 px-1.5 py-1 pointer-coarse:grid-cols-6">
           <legend className="sr-only">{t('图标')}</legend>
           {shown.map((name) => {
             const Icon = PROJECT_ICON_COMPONENTS[name];
@@ -80,7 +80,7 @@ export function ProjectIconPicker({
                 data-icon={name}
                 onClick={() => onChange({ icon: name })}
                 className={cn(
-                  'grid size-8 h-8 min-w-0 cursor-pointer p-0 font-normal place-items-center rounded-(--radius-menu-item) text-content-secondary hover:bg-(--menu-hover) hover:text-foreground',
+                  'grid size-8 h-8 min-w-0 cursor-pointer p-0 font-normal place-items-center pointer-coarse:size-11 rounded-(--radius-menu-item) text-content-secondary hover:bg-(--menu-hover) hover:text-foreground',
                   selected && 'bg-(--menu-hover) text-foreground',
                   FOCUS,
                 )}
@@ -90,7 +90,7 @@ export function ProjectIconPicker({
             );
           })}
           {shown.length === 0 && (
-            <p className="col-span-8 m-0 px-1 py-2 text-ui text-content-tertiary">
+            <p className="col-span-full m-0 px-1 py-2 text-ui text-content-tertiary">
               {t('没有匹配的图标')}
             </p>
           )}
@@ -100,7 +100,7 @@ export function ProjectIconPicker({
             variant="ghost"
             disabled={icon == null && color == null}
             onClick={() => onChange({ icon: null, color: null })}
-            className="h-8 w-full justify-start px-2.5 text-ui font-normal text-foreground hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)"
+            className="h-8 w-full justify-start px-2.5 pointer-coarse:h-11 text-ui font-normal text-foreground hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)"
           >
             {t('重置图标')}
           </Button>
