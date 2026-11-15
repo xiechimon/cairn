@@ -113,11 +113,8 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
   'claude-rate-limited': '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
   'claude-logged-out':
     '排队中：{machine} 上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
-  'claude-usage-refused':
-    '排队中：团队只用 Claude 订阅，{machine} 上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「模型路由」里允许按量付费（前面 {ahead} 个）',
   'coordinator-provider-missing': 'Coordinator 规则用的服务商「{name}」还没添加',
   'coordinator-provider-no-key': 'Coordinator 规则用的服务商「{name}」没有 API key',
-  'coordinator-paid-claude': 'Coordinator 规则用的是付费 Claude（{name}），但团队只允许用订阅',
 };
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {

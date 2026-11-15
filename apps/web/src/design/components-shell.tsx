@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { ListCard, ListRow } from '../components/list-card.js';
 import { NoticeBanner } from '../components/notice-banner.js';
-import { SegmentedRadio } from '../components/segmented.js';
 import { QuotaRow } from '../components/settings/quota-row.js';
 import {
   RoutingGraph,
@@ -282,7 +281,6 @@ const ROUTING_TARGETS: RoutingTarget[] = [
 ];
 
 export function RoutingSection() {
-  const [mode, setMode] = useState<'subscriptions' | 'payg'>('subscriptions');
   return (
     <Section
       id="routing"
@@ -296,15 +294,6 @@ export function RoutingSection() {
         code={`<RoutingGraph groups={[{ label: 'Agents', nodes: [{ id: 'coordinator', name: 'Coordinator', tag: 'Claude Opus 5.5', target: 'claude' }] }]} targets={[{ id: 'claude', name: 'Claude subscription', runtime: 'Claude Code' }]} />`}
       >
         <div className="flex w-full max-w-170 flex-col gap-4">
-          <SegmentedRadio
-            label="Routing mode"
-            value={mode}
-            onChange={setMode}
-            options={[
-              { value: 'subscriptions', label: 'Subscriptions only' },
-              { value: 'payg', label: 'Allow pay as you go' },
-            ]}
-          />
           <RoutingGraph groups={ROUTING_GROUPS} targets={ROUTING_TARGETS} />
           <div className="flex w-56 flex-col gap-0.5">
             <QuotaRow name="Claude subscription" label="5h" left={68} />

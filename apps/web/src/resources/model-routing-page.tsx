@@ -1,13 +1,11 @@
-import type { ClaudeUsage, TeamRoutingSettings } from '@cairn/shared';
-import { useQueryClient } from '@tanstack/react-query';
+import type { TeamRoutingSettings } from '@cairn/shared';
 import { ChevronRight, Plus } from 'lucide-react';
 import { Link, Navigate, useSearchParams } from 'react-router';
 import { toClaudeAccount } from '../api/claude-accounts.js';
 import { useClaudeSubscriptions } from '../api/claude-subscriptions.js';
-import { useApiMutations, useModelSources, useProviders } from '../api/hooks.js';
+import { useModelSources, useProviders } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import {
-  MODEL_ROUTING_KEY,
   type ModelRouting,
   type RoutingTargetRow,
   routingTargets,
@@ -20,9 +18,7 @@ import { ClaudeMark } from '../components/brand-marks.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { QuotaRow } from '../components/settings/quota-row.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
-import { SettingsCard, SettingsRow, SettingsSegmented } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
-import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
@@ -81,7 +77,6 @@ function RoutingContent() {
   const fixture = resolveScenario(searchParams);
   const fixtureAccounts = fixture.resources?.accounts;
   const { live, teamId } = useLiveData();
-  const client = useQueryClient();
   const now = live ? Date.now() : fixture.now;
 
   const subscriptionsQ = useClaudeSubscriptions(teamId, live);
@@ -89,7 +84,6 @@ function RoutingContent() {
   const routingQ = useModelRouting(teamId, live);
   const settingsQ = useRoutingSettings(teamId, live);
   const sourcesQ = useModelSources(teamId, live);
-  const mutations = useApiMutations(teamId);
 
   const routing: ModelRouting | undefined = live
     ? Array.isArray(routingQ.data?.edges)
@@ -113,18 +107,6 @@ function RoutingContent() {
     live ? (sourcesQ.data?.sources ?? []) : (fixture.resources?.providerSources ?? []),
   );
   const groups = ruleGraphGroups(settings, targets, options, t);
-  const claudeUsage: ClaudeUsage = routing?.settings.claudeUsage ?? 'subscription-only';
-
-  const setClaudeUsage = (next: ClaudeUsage) => {
-    if (!live) return;
-    mutations.patchTeam.mutate(
-      { claudeUsage: next },
-      {
-        onSuccess: () => void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] }),
-        onError: (error) => toastError(t('保存失败，请重试。'), error),
-      },
-    );
-  };
 
   return (
     <PageShell
@@ -163,29 +145,6 @@ function RoutingContent() {
               ))}
             </div>
           )}
-          <SettingsCard>
-            <SettingsRow
-              label={t('Claude 付费方式')}
-              hint={
-                <span data-testid="claude-usage-hint">
-                  {claudeUsage === 'subscription-only'
-                    ? t('只用订阅，按 token 付费的 Claude 调用一律拦下，包括后台任务。')
-                    : t('订阅不够时，可以改用按 token 付费的 Claude API key。')}
-                </span>
-              }
-              className="flex-wrap gap-y-2 py-2.5"
-            >
-              <SettingsSegmented
-                label={t('Claude 付费方式')}
-                value={claudeUsage}
-                onChange={setClaudeUsage}
-                options={[
-                  { value: 'subscription-only', label: t('只用订阅') },
-                  { value: 'allow-paid', label: t('允许按量付费') },
-                ]}
-              />
-            </SettingsRow>
-          </SettingsCard>
           <section data-testid="routing-section" className="mt-5 overflow-x-auto">
             {groups.length === 0 ? (
               <p data-testid="routing-empty" className="m-0 px-1 text-meta text-content-tertiary">

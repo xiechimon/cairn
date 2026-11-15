@@ -44,15 +44,12 @@ export const ROUTING_SETTINGS_HREF = '/app/resources/routing-settings';
 export const COORDINATOR_ROUTE_ANCHOR = 'route-coordinator';
 export const COORDINATOR_ROUTING_HREF = `${settingsHref('work-routing')}#${COORDINATOR_ROUTE_ANCHOR}`;
 
-const AGENT_USES: readonly RouteUse[] = ['coordinator', 'review', 'citation_check'];
+const AGENT_USES: readonly RouteUse[] = ['coordinator'];
 
 const STORED_ONLY_USES: readonly RouteUse[] = ['digest', 'compaction'];
 
-const USE_HINTS: Record<RouteUse, string> = {
+const USE_HINTS: Partial<Record<RouteUse, string>> = {
   coordinator: '你对话的协调者，派活和汇报',
-  session: '新任务用这个模型和思考强度开始',
-  review: '检查任务交回来的改动',
-  citation_check: '核对调研报告里的引用',
   digest: '每日报告和对话摘要',
   compaction: '上下文快满时压缩对话',
 };
@@ -340,7 +337,7 @@ export function RoutingSettingsPage() {
                 session === null && settings.sessionDefault !== undefined ? (
                   <SessionDefaultHint sessionDefault={settings.sessionDefault} options={options} />
                 ) : (
-                  t(USE_HINTS.session)
+                  t('新任务用这个模型和思考强度开始')
                 )
               }
               rule={session}
@@ -367,7 +364,7 @@ export function RoutingSettingsPage() {
                         t('先给 Coordinator 选模型，它才能回答你的消息。')
                       )
                     ) : (
-                      t(USE_HINTS[use])
+                      t(USE_HINTS[use] ?? '')
                     )
                   }
                   rule={ruleOf(use)}

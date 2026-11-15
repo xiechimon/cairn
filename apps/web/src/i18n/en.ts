@@ -891,14 +891,10 @@ export const EN: Record<string, string> = {
     'Queued: Claude is rate limited on {machine}; this continues once the limit lifts ({ahead} ahead)',
   '排队中：{machine} 上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）':
     'Queued: Claude Code is not logged in on {machine}. Run claude on that machine to log in ({ahead} ahead)',
-  '排队中：团队只用 Claude 订阅，{machine} 上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「模型路由」里允许按量付费（前面 {ahead} 个）':
-    'Queued: this team uses Claude subscriptions only and Claude Code on {machine} is not logged in with one. Log in with a subscription there, or allow pay as you go in Model routing ({ahead} ahead)',
   'Coordinator 规则用的服务商「{name}」还没添加':
     'The Coordinator rule uses the provider "{name}", which has not been added',
   'Coordinator 规则用的服务商「{name}」没有 API key':
     'The Coordinator rule uses the provider "{name}", which has no API key',
-  'Coordinator 规则用的是付费 Claude（{name}），但团队只允许用订阅':
-    'The Coordinator rule uses paid Claude ({name}), but this team allows subscriptions only',
   '改 Coordinator 规则': 'Change the Coordinator rule',
   '填写 API key': 'Add the API key',
   '换 Coordinator 模型': 'Pick another Coordinator model',
@@ -1565,7 +1561,6 @@ export const EN: Record<string, string> = {
   '{model} · 默认': '{model} · default',
   'Claude 订阅': 'Claude subscription',
   'Runner 上的登录': 'Login on a Runner',
-  'Claude 付费方式': 'Claude billing',
   '还没有路由。添加服务商，再在「模型选择」里给 Coordinator 选模型，这里会画出它走哪个服务商。':
     'No routing yet. Add a provider, then pick the Coordinator model in Model selector, and this shows which provider it runs on.',
   '{runtime} · 不可用': '{runtime} · unavailable',
@@ -1576,8 +1571,6 @@ export const EN: Record<string, string> = {
   新任务默认用: 'New tasks start on',
   '你对话的协调者，派活和汇报': 'The coordinator you talk to; it hands out work and reports back',
   新任务用这个模型和思考强度开始: 'New tasks start with this model and thinking level',
-  检查任务交回来的改动: 'Checks the changes a task hands back',
-  核对调研报告里的引用: 'Checks the citations in research reports',
   每日报告和对话摘要: 'Daily reports and conversation summaries',
   上下文快满时压缩对话: 'Compacts a conversation when the context is nearly full',
   '选新任务默认用哪个模型，以及 Coordinator 和其他 Agent 各用什么模型、思考多深。改动马上生效。':
@@ -1588,13 +1581,6 @@ export const EN: Record<string, string> = {
   '「{name}」验证通过': '{name} verified',
   '验证中…': 'Verifying…',
   '重命名失败，请重试。': 'Could not rename. Try again.',
-  付费方式: 'Billing',
-  '只用订阅，按 token 付费的 Claude 调用一律拦下，包括后台任务。':
-    'Subscriptions only: paid-per-token Claude calls are blocked, background tasks included.',
-  '订阅不够时，可以改用按 token 付费的 Claude API key。':
-    'When subscriptions run out, Claude may fall back to a paid-per-token API key.',
-  只用订阅: 'Subscriptions only',
-  允许按量付费: 'Allow pay as you go',
   '移除「{name}」？': 'Remove {name}?',
   '移除失败，请重试。': 'Could not remove. Try again.',
   'API key': 'API key',

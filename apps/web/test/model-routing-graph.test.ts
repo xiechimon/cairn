@@ -51,7 +51,6 @@ describe('routing targets and the rule graph', () => {
     ],
     quota: [],
     edges: [],
-    settings: { claudeUsage: 'subscription-only' },
   };
   const targets = routingTargets({
     subscriptions: [expired, live],

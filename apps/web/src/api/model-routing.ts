@@ -1,5 +1,4 @@
 import type {
-  ClaudeUsage,
   ProviderRecord,
   RouteUse,
   RoutingConnection,
@@ -18,7 +17,6 @@ export interface ModelRouting {
   edges: RoutingEdge[];
   connections: RoutingConnection[];
   quota: RoutingQuota[];
-  settings: { claudeUsage: ClaudeUsage };
 }
 
 export const MODEL_ROUTING_KEY = 'model-routing';

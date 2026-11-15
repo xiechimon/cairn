@@ -10,8 +10,11 @@ test('model selector with no rules offers a picker per use and no Runner or poli
     'page',
   );
   await expect(settings.getByTestId('settings-head')).toHaveText('模型选择');
-  for (const use of ['session', 'coordinator', 'review', 'citation_check']) {
+  for (const use of ['session', 'coordinator']) {
     await expect(settings.getByTestId(`routing-rule-new-${use}`)).toBeVisible();
+  }
+  for (const use of ['review', 'citation_check']) {
+    await expect(settings.locator(`#route-${use}`)).toHaveCount(0);
   }
   await expect(settings.getByTestId('routing-rule-new-coordinator')).toContainText(
     '先给 Coordinator 选模型',
@@ -21,7 +24,7 @@ test('model selector with no rules offers a picker per use and no Runner or poli
   await expect(settings.getByRole('button', { name: '创建' })).toHaveCount(0);
 });
 
-test('model selector shows stored rules with their model and thinking level, never policies', async ({
+test('model selector shows stored rules with their model and thinking level, never review or policies', async ({
   page,
 }) => {
   await page.goto('/app/settings/work-routing?scenario=routing-settings');
@@ -29,9 +32,7 @@ test('model selector shows stored rules with their model and thinking level, nev
   const session = settings.getByTestId('routing-rule-session');
   await expect(session.locator('.routing-rule-model-select')).toContainText('claude-sonnet-5');
   await expect(session.locator('.routing-rule-level-select')).toContainText('High');
-  const review = settings.getByTestId('routing-rule-review');
-  await expect(review.locator('.routing-rule-model-select')).toContainText('GPT-5.2');
-  await expect(review.locator('.routing-rule-level-select')).toContainText('Medium');
+  await expect(settings.getByTestId('routing-rule-review')).toHaveCount(0);
   await expect(settings.getByTestId('routing-rule-new-coordinator')).toBeVisible();
   await expect(settings.locator('[data-testid^="work-policy-"]')).toHaveCount(0);
 });
@@ -52,8 +53,7 @@ test('the model menu groups by runtime and greys a runtime no Runner has turned 
   await page.goto('/app/settings/work-routing?scenario=routing-settings-pi-only');
   await page
     .getByRole('dialog', { name: '设置' })
-    .getByTestId('routing-rule-review')
-    .locator('.routing-rule-model-select')
+    .locator('#route-session .routing-rule-model-select')
     .click();
   const piOnly = page.locator('.routing-rule-model-menu');
   await expect(piOnly.getByText('Claude Code（没有 Runner 启用）')).toBeVisible();

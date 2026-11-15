@@ -74,11 +74,10 @@ test('the settings nav lists Providers, Model selector and Model routing', async
   await expect(page.getByRole('heading', { name: '模型选择', exact: true })).toBeVisible();
 });
 
-test('live: rename, verify, remove and the Claude usage switch hit the agreed routes', async ({
+test('live: rename, verify and remove hit the agreed routes', async ({
   page,
 }) => {
   const calls: string[] = [];
-  let usage: 'subscription-only' | 'allow-paid' = 'subscription-only';
   const subscriptions = [
     {
       id: 's1',
@@ -150,13 +149,7 @@ test('live: rename, verify, remove and the Claude usage switch hit the agreed ro
           },
         ],
         quota: [],
-        settings: { claudeUsage: usage },
       });
-    if (path === '/api/teams/t1' && method === 'PATCH') {
-      usage = route.request().postDataJSON().claudeUsage;
-      calls.push(`PATCH team ${usage}`);
-      return json({ id: 't1', name: 't' });
-    }
     return undefined;
   });
   await page.goto('/app/resources/providers');
@@ -188,9 +181,4 @@ test('live: rename, verify, remove and the Claude usage switch hit the agreed ro
   await confirm.getByRole('button', { name: '移除', exact: true }).click();
   await expect.poll(() => calls).toContain('DELETE s2');
 
-  await page.goto('/app/settings/routing');
-  await expect(page.getByTestId('claude-usage-hint')).toContainText('只用订阅');
-  await page.getByRole('radio', { name: '允许按量付费' }).click();
-  await expect.poll(() => calls).toContain('PATCH team allow-paid');
-  await expect(page.getByTestId('claude-usage-hint')).toContainText('按 token 付费的 Claude API key');
 });

@@ -364,7 +364,6 @@ export const ACCOUNT_ROUTING: ModelRouting = {
       unavailable: true,
     },
   ],
-  settings: { claudeUsage: 'subscription-only' },
 };
 
 export const ACCOUNTS: AccountsContent = {
@@ -443,7 +442,6 @@ export const accountsEmpty: FixtureSet = {
         connections: [],
         quota: [],
         edges: [],
-        settings: { claudeUsage: 'subscription-only' },
       },
     },
   },
