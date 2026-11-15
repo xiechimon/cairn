@@ -1,0 +1,45 @@
+---
+title: What Cairn is
+description: A self-hosted personal assistant for people who write code, and how its three pieces fit together.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Cairn is a self-hosted personal assistant for people who write code. You tell one Coordinator what you want, in one conversation. It opens a thread for each piece of work, the thread runs on your own machine with your own model subscription, and it comes back to you only when a decision is yours.
+
+- **A thread researches before it builds.** It reads how two or three strong open-source projects solved the problem, then decides libraries, layout, naming and tests itself.
+- **Every report ends with two lists.** *Decided myself*, each choice with its reason, and *Needs your decision*, at most three items with options and a recommendation.
+- **Code lands through a merge gate.** Before an agent merges, the gate counts only review verdicts bound to the current patch. Anything that cannot be undone waits for your yes.
+
+Cairn is for one person. You run your own copy; someone else who wants it runs theirs.
+
+## The three pieces
+
+| Piece | What it is | Where it runs |
+|---|---|---|
+| **Server** | The web app you open in a browser, the Coordinator and the database. One per person. | Any machine you browse from, or an always-on host. Data lives in `~/.cairn`. |
+| **Runner** | The `cairn` daemon that claims work and runs threads, each in its own git worktree. | Every machine where agents should work. The server's machine can be a Runner too. |
+| **Model source** | Your own subscription or API key: Claude Code, Codex, Gemini, or any provider. | Added in the web app, or signed in on a Runner. Cairn never resells compute. |
+
+You need all three before the Coordinator can answer. The pages below walk through them in order.
+
+## Getting started
+
+<CardGrid>
+  <LinkCard title="Install" description="Start the server and open the web app." href="/docs/install/" />
+  <LinkCard title="Connect a model" description="Add a subscription, an API key or a custom endpoint." href="/docs/models/" />
+  <LinkCard title="Connect a Runner" description="Let agents work on one of your machines." href="/docs/runner/" />
+  <LinkCard title="Your first task" description="Say what you want and follow it to a result." href="/docs/first-task/" />
+</CardGrid>
+
+## What is planned, not shipped
+
+- **Your own affairs.** Mail, calendar and job search as a project with no repository, where agents read, sort and draft, and sending and submitting wait for you. Not available yet.
+- **Showcase recordings.** End-to-end recordings of real work, with the pull requests and numbers you can trace.
+
+## It is not the right fit if you want
+
+- a tool a team shares, with shared channels, roles and billing ([Amp Spaces](https://ampcode.com/docs/spaces) or [Multica](https://github.com/multica-ai/multica));
+- only a better interface for driving Claude Code or Codex yourself ([T3 Code](https://github.com/pingdotgg/t3code));
+- an assistant that lives in your chat apps ([OpenClaw](https://github.com/openclaw/openclaw) or [Hermes Agent](https://github.com/NousResearch/hermes-agent));
+- a hosted service with nothing to install or keep running.

@@ -1,0 +1,60 @@
+---
+title: 常见问题
+description: 常见问题，以及事情不动时该查什么。
+---
+
+## 要花钱吗？
+
+不要。全部代码 Apache-2.0，没有功能分级；只有评测任务集里一个私有、轮换的留出子集不公开。没有托管的控制面，也不转售算力。你只为自己本来就在用的模型订阅或 API key 付钱。
+
+## 团队能共用一份 Cairn 吗？
+
+不能。Cairn 只给一个人用：你跑你自己的一份，别人想用就跑他自己的。要团队共用、有共享频道、角色和账单的工具，可以看看 [Amp Spaces](https://ampcode.com/docs/spaces) 或 [Multica](https://github.com/multica-ai/multica)。
+
+## 有托管版吗？
+
+没有。Cairn 跑在你自己的机器上。如果你想要什么都不用装、不用维护，它不适合你。
+
+## 我的代码和凭证会去哪？
+
+都留在你自己的机器上。thread 跑在你的 Runner 上，每个在 `~/.cairn/workspaces` 下自己的 git worktree 里。你添加的服务商 key 加密存在你的服务端。模型调用从你的机器直接发给你选的服务商。
+
+## 能帮我处理邮件、日程、求职吗？
+
+现在还不能。这部分在规划中：作为一个没有仓库的项目，agent 读、整理、起草，发送和提交等你点头。
+
+## Coordinator 不回话
+
+首页会显示还缺哪一步设置。按顺序过一遍：
+
+1. `接入模型来源`：添加服务商，或在 Runner 上登录 Claude Code。见[接入模型](/zh-cn/docs/models/)。
+2. `连接一台 Runner`：至少要有一台 Runner 在线。见[连接 Runner](/zh-cn/docs/runner/)。
+3. `打开工作路由`：在 `规则与策略` 的 `Coordinator` 卡片上选 `内置 (pi)` 和一个模型，点 `创建`。没有这条规则，Coordinator 拒绝对话。
+
+## Runner 显示在线，任务却一直排队
+
+在 Linux 上，这是任务沙箱没就绪：没装 bubblewrap（`bwrap`），或者守护进程不是独立的 systemd 用户单元。任务的 `排队中` 后面会写明。装好 `bwrap`，看 `cairn start` 的输出里有没有关于 `systemd-run --user` 的警告，然后把守护进程跑成用户服务：见[在 Linux 上保持常驻](/zh-cn/docs/runner/#在-linux-上保持常驻)。`cairn logs -f` 能看到守护进程在干什么。
+
+## Runner 掉线了
+
+用 `cairn start` 启动的 Runner 在你注销或重启后就停了。再跑一次 `cairn start`，或者装上用户单元让它自己起来。凭证存在 `~/.cairn/machine.json`，不用重新批准。
+
+## 注册链接过期了
+
+10 分钟内没人批准这台机器。再跑一次 `cairn start` 拿新链接。
+
+## `cairn` 跑成了另一个程序
+
+`@xiechimon/cairn` 和 `@xiechimon/cairn-cli` 都会装一个 `cairn` 命令，后装的占用名字。服务端用 `npx @xiechimon/cairn` 跑，全局只装 CLI。
+
+## 能在手机上用吗？
+
+能。在服务端前面挂 Tailscale Serve，再用设置里 `远程访问` 生成的一次性配对码让手机登录。服务端不需要公网地址。步骤见 [Tailscale 指南](https://github.com/xiechimon/cairn/blob/main/docs/deploy/tailscale-mobile.md)。
+
+## 怎么备份或搬家？
+
+复制整个 `~/.cairn` 目录，Docker 下就是 `/data` 卷。数据库和 `secretbox.key` 必须放在一起：密钥就是用它加密的。
+
+## 去哪求助？
+
+到 [GitHub Discussions](https://github.com/xiechimon/cairn/discussions) 的 Q&A 提问；bug 提到 [issue](https://github.com/xiechimon/cairn/issues)。安全问题按 [SECURITY.md](https://github.com/xiechimon/cairn/blob/main/SECURITY.md) 私下报告，不要发在这两个地方。

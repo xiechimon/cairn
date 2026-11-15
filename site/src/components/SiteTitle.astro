@@ -1,0 +1,43 @@
+---
+import Mark from './Mark.astro';
+
+const { siteTitleHref, lang } = Astro.locals.starlightRoute;
+const docsLabel = lang === 'zh-CN' ? '文档' : 'Docs';
+---
+
+<span class="title-row">
+  <a href={siteTitleHref} class="site-title">
+    <Mark size={22} />
+    <span class="wordmark" translate="no">Cairn</span>
+  </a>
+  <span class="docs-label">{docsLabel}</span>
+</span>
+
+<style>
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-width: 0;
+  }
+  .site-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .wordmark {
+    font-family: var(--font-serif);
+    font-size: 1.25rem;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .docs-label {
+    padding-left: 0.625rem;
+    border-left: 1px solid var(--line);
+    color: var(--ink-3);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+</style>
