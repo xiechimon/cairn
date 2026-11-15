@@ -17,9 +17,9 @@ const TRIGGER_LABELS: Record<ScheduleTrigger, string> = {
   once: '单次',
   hourly: '每小时',
   daily: '每天',
-  weekdays: 'Weekdays',
+  weekdays: '工作日',
   weekly: '每周',
-  custom: 'Custom cron',
+  custom: '自定义 cron',
 };
 const HOURS = Array.from({ length: 24 }, (_, value) => String(value).padStart(2, '0'));
 const MINUTES = ['00', '15', '30', '45'];
@@ -52,9 +52,9 @@ export function ScheduleFields({
       />
       {value.trigger === 'custom' ? (
         <FormField
-          label={t('Cron expression')}
+          label={t('Cron 表达式')}
           htmlFor={`${id}-cron`}
-          help={t('Cron is evaluated by the server in {timezone}.', { timezone: tz })}
+          help={t('服务器按 {timezone} 计算 cron。', { timezone: tz })}
         >
           <Input
             id={`${id}-cron`}
@@ -67,7 +67,7 @@ export function ScheduleFields({
           />
           {!cronValid && (
             <span id={`${id}-cron-error`} role="alert" className="text-meta text-destructive">
-              {t('Use five cron fields: minute hour day month weekday.')}
+              {t('cron 需要 5 段：分 时 日 月 周。')}
             </span>
           )}
         </FormField>
@@ -75,7 +75,7 @@ export function ScheduleFields({
         <>
           {(value.trigger === 'once' || value.trigger === 'weekly') && (
             <FormField
-              label={t(value.trigger === 'weekly' ? 'Day to repeat each week' : '日期')}
+              label={t(value.trigger === 'weekly' ? '从哪天开始每周重复' : '日期')}
               htmlFor={`${id}-date`}
             >
               <Input
@@ -132,15 +132,9 @@ export function ScheduleFields({
         </>
       )}
       {(value.trigger === 'custom' ? /^0\s/.test(value.cron.trim()) : value.minute === '00') && (
-        <p className="m-0 text-meta text-content-tertiary">
-          {t('Runs on the hour may start a few minutes late.')}
-        </p>
+        <p className="m-0 text-meta text-content-tertiary">{t('整点运行可能会晚几分钟开始。')}</p>
       )}
-      <FormField
-        label={t('Saved prompt')}
-        htmlFor={`${id}-prompt`}
-        help={t('Leave empty to use the thread description.')}
-      >
+      <FormField label={t('提示词')} htmlFor={`${id}-prompt`} help={t('留空就按任务描述运行。')}>
         <Textarea
           id={`${id}-prompt`}
           value={value.prompt}

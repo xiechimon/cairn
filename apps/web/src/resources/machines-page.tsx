@@ -1,8 +1,8 @@
-import { claudeLoginNotice } from '@cairn/shared';
+import { claudeLoginNotice, type ModelSource } from '@cairn/shared';
 import { Monitor, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useChief, useMachines, useTeams } from '../api/hooks.js';
+import { useChief, useMachines, useModelSources, useTeams } from '../api/hooks.js';
 import { mapMachines } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -20,13 +20,46 @@ import { MachineRowView, type RowSection, rowStatus } from './machine-row.js';
 
 export const MACHINES_HREF = '/app/resources/machines';
 
+const CLAUDE_LOGIN = {
+  'logged-in': 'logged-in',
+  'not-logged-in': 'logged-out',
+  unknown: 'unknown',
+} as const;
+
+function withClaudeLogin(machine: MachineRow, sources: readonly ModelSource[]): MachineRow {
+  const source = sources.find(
+    (s) =>
+      s.runtime === 'claude-code' &&
+      (s.machineId === undefined ? s.hostname === machine.name : s.machineId === machine.id),
+  );
+  if (machine.providers !== undefined || source?.auth === undefined) return machine;
+  const login = CLAUDE_LOGIN[source.auth.state];
+  return {
+    ...machine,
+    providers: [
+      {
+        runtime: 'claude-code',
+        login,
+        plan: null,
+        version: source.bin?.version ?? null,
+        loginCommand: login === 'logged-out' ? 'claude /login' : null,
+        enabled: true,
+        observedAt: 0,
+      },
+    ],
+  };
+}
+
 export function MachinesPage() {
   const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
   const { live, teamId } = useLiveData();
   const machinesQ = useMachines(teamId, live);
-  const machines = live ? mapMachines(machinesQ.data ?? []) : (fixture.resources?.machines ?? []);
+  const sourcesQ = useModelSources(teamId, live);
+  const machines = live
+    ? mapMachines(machinesQ.data ?? []).map((m) => withClaudeLogin(m, sourcesQ.data?.sources ?? []))
+    : (fixture.resources?.machines ?? []);
   const chiefQ = useChief(teamId, live);
   const orchestration = live ? chiefQ.data?.orchestration : undefined;
   const activityOf = (machineId?: string) =>

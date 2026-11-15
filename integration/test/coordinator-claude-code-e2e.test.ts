@@ -108,10 +108,6 @@ describe('a Coordinator rule that selects Claude Code runs the turn on the Runne
     );
     expect(stored.status).toBe(201);
     const machineRow = server.db.select().from(machineTable).get();
-    const enabled = await api(server.url, 'PATCH', `/api/machines/${machineRow?.id}`, {
-      enabledRuntimes: ['pi', 'claude-code'],
-    });
-    expect(enabled.status).toBe(200);
     const patched = await api(
       server.url,
       'PATCH',

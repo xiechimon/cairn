@@ -210,7 +210,19 @@ describe('#1312 other-machine mark on a resumed session', () => {
     expect(confirm2.status).toBe(202);
     w.s.db
       .update(machineTable)
-      .set({ enabledRuntimes: [] })
+      .set({
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          osPlatform: 'linux',
+          confinement: {
+            state: 'checking',
+            invocation: 'a6f64985-e79a-4c69-a840-5d8c0853188d',
+            generation: 1,
+            revision: 1,
+          },
+        },
+      })
       .where(eq(machineTable.id, w.machineAId))
       .run();
     w.s.db
@@ -224,30 +236,24 @@ describe('#1312 other-machine mark on a resumed session', () => {
 });
 
 describe('#682 runtime real gate (semantics unchanged, home-machine version)', () => {
-  test('home machine without the step-needed runtime -> cannot claim; enabled back -> claims (PATCH hot write)', async () => {
+  test('a stored all-off runtime list no longer gates: the pi step claims and the switch write is refused', async () => {
     const w = await setupWorld();
+    w.s.db
+      .update(machineTable)
+      .set({ enabledRuntimes: [] })
+      .where(eq(machineTable.id, w.machineAId))
+      .run();
     const off = await req(w.s.app, 'PATCH', `/api/machines/${w.machineAId}`, {
       enabledRuntimes: [],
     });
-    expect(off.status).toBe(200);
+    expect(off.status).toBe(409);
     const todoId = await createTodo(w.s, w.projectId);
     await startBuild(w.s, w.projectId, todoId);
-    expect(await claim(w.s.app, w.tokenA)).toBeNull();
-
-    const on = await req(w.s.app, 'PATCH', `/api/machines/${w.machineAId}`, {
-      enabledRuntimes: ['pi'],
-    });
-    expect(on.status).toBe(200);
-    const got = await claim(w.s.app, w.tokenA);
-    expect(got).not.toBeNull();
+    expect(await claim(w.s.app, w.tokenA)).not.toBeNull();
   });
 
-  test('a claude-code step cannot be claimed on a pi-only home machine; re-pin to a dual-enabled machine claims', async () => {
+  test('a claude-code step cannot be claimed on a home machine without Claude Code; re-pin to one that has it claims', async () => {
     const w = await setupWorld();
-    const dual = await req(w.s.app, 'PATCH', `/api/machines/${w.machineBId}`, {
-      enabledRuntimes: ['pi', 'claude-code'],
-    });
-    expect(dual.status).toBe(200);
     w.s.db
       .update(machineTable)
       .set({ claudeCodeReport: { ...subscriptionClaudeReport, installed: false } })
@@ -279,6 +285,34 @@ describe('#682 runtime real gate (semantics unchanged, home-machine version)', (
     expect(repin.status).toBe(200);
     const got = await claim(w.s.app, w.tokenB);
     expect(got).not.toBeNull();
+  });
+
+  test('a home machine stored as pi-only claims a claude-code step once it reports Claude Code', async () => {
+    const w = await setupWorld();
+    w.s.db
+      .update(machineTable)
+      .set({
+        enabledRuntimes: ['pi'],
+        claudeCodeReport: {
+          ...subscriptionClaudeReport,
+          hostname: 'home-mbp',
+          models: [{ id: 'stub-model', name: 'stub-model', slot: 'default' }],
+        },
+      })
+      .where(eq(machineTable.id, w.machineAId))
+      .run();
+    const todoId = await createTodo(w.s, w.projectId);
+    seedSessionRoute(w.s, {
+      provider: 'claude-code',
+      modelId: 'stub-model',
+      machineId: w.machineAId,
+    });
+    const res = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
+      todoIds: [todoId],
+    });
+    expect(res.status).toBe(201);
+    const got = await claim(w.s.app, w.tokenA);
+    expect(got?.agent?.provider).toBe('claude-code');
   });
 });
 
@@ -383,17 +417,12 @@ describe('#895 GET /chief orchestration envelope (#1260 re-source)', () => {
     expect(activityA?.waiting).toBe(1);
   });
 
-  test('failure mode H: waiting criterion -- home machine online but runtime gate off also counts (T3 gap visibility)', async () => {
+  test('failure mode H: waiting criterion -- home machine online but without the Coordinator runtime also counts (T3 gap visibility)', async () => {
     const w = await setupWorld();
     seedRoute(w.s, 'coordinator', {
-      provider: 'stub-gw',
+      provider: 'claude-code',
       modelId: 'stub-model',
-      machineId: w.machineAId,
-    });
-    const repin = await rebind(w, 'coordinator', w.machineBId);
-    expect(repin.status).toBe(200);
-    await req(w.s.app, 'PATCH', `/api/machines/${w.machineBId}`, {
-      enabledRuntimes: ['claude-code'],
+      machineId: w.machineBId,
     });
     w.s.db
       .update(machineTable)

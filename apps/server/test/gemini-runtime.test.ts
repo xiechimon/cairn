@@ -8,8 +8,12 @@ describe('Gemini dispatch eligibility', () => {
     expect(stepRuntimeFor('claude-code')).toBe('claude-code');
   });
 
-  test('requires explicit Gemini opt-in before a machine can claim the step', () => {
-    expect(runtimeGatePasses({ enabledRuntimes: ['pi', 'claude-code'] }, 'gemini')).toBe(false);
-    expect(runtimeGatePasses({ enabledRuntimes: ['gemini'] }, 'gemini')).toBe(true);
+  test('no machine can claim a Gemini step until its permission requests pass the command gate', () => {
+    const machine = {
+      claudeCodeReport: { installed: true },
+      capabilities: { executor: 'orb' as const },
+    };
+    expect(runtimeGatePasses(machine, 'gemini')).toBe(false);
+    expect(runtimeGatePasses(machine, 'claude-code')).toBe(true);
   });
 });

@@ -99,7 +99,7 @@ describe('openResearchThread', () => {
           teamId: w.teamId,
           name: 'Research host',
           online: true,
-          enabledRuntimes: ['claude-code'],
+          claudeCodeReport: { installed: true, hostname: 'Research host', models: [] },
           capabilities: { mcpServers: [], skills: [], executor: 'host' },
         }),
       )

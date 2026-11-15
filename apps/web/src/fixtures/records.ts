@@ -28,6 +28,7 @@ import {
   type TaskRequest,
   type ThreadMessageContent,
   type ThreadReportContent,
+  type TodoDeliverables,
   type TodoOutputKind,
   type TodoOwner,
   type TodoSection,
@@ -55,7 +56,7 @@ export interface BuildRef {
   createdAt: number;
 }
 
-export type MadeKind = 'document' | 'design' | 'page' | 'code';
+export type MadeKind = 'document' | 'design' | 'page' | 'slides' | 'code';
 
 export interface TodoRecord {
   id: string;
@@ -94,6 +95,7 @@ export interface TodoRecord {
   output?: TodoOutputKind;
   section?: TodoSection | null;
   madeKind?: MadeKind;
+  deliverables?: TodoDeliverables;
   previewUrl?: string;
   visibility?: 'private' | 'team';
   routeOverride?: RouteOverride | null;

@@ -1,10 +1,8 @@
 import type { ClaudeCodeReport } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   chief as chiefTable,
   chiefThread as chiefThreadTable,
-  machine as machineTable,
   step as stepTable,
 } from '../src/db/schema.js';
 import {
@@ -34,11 +32,6 @@ function world(provider = 'claude-code') {
     auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
   } as ClaudeCodeReport;
   const machineId = insertMachine(s, { name: 'omarchy', claudeCodeReport: report });
-  s.db
-    .update(machineTable)
-    .set({ enabledRuntimes: ['pi', 'claude-code'] })
-    .where(eq(machineTable.id, machineId))
-    .run();
   seedRoute(s, 'coordinator', {
     provider,
     modelId: 'sonnet',
