@@ -8,9 +8,18 @@ export interface EnvProxy {
   noProxy: string;
 }
 
+const isProxyUrl = (value: string) =>
+  URL.canParse(value) && ['http:', 'https:'].includes(new URL(value).protocol);
+
+const proxyValues = (env: NodeJS.ProcessEnv) => ({
+  http: env.http_proxy || env.HTTP_PROXY || '',
+  https: env.https_proxy || env.HTTPS_PROXY || '',
+});
+
 export function envProxyOf(env: NodeJS.ProcessEnv): EnvProxy | null {
-  const httpProxy = env.http_proxy || env.HTTP_PROXY || '';
-  const httpsProxy = env.https_proxy || env.HTTPS_PROXY || '';
+  const values = proxyValues(env);
+  const httpProxy = isProxyUrl(values.http) ? values.http : '';
+  const httpsProxy = isProxyUrl(values.https) ? values.https : '';
   if (!httpProxy && !httpsProxy) return null;
   const listed = (env.no_proxy ?? env.NO_PROXY ?? '')
     .split(',')
@@ -23,10 +32,14 @@ export function envProxyOf(env: NodeJS.ProcessEnv): EnvProxy | null {
   };
 }
 
-export function installEnvProxy(env: NodeJS.ProcessEnv = process.env): string | null {
+export function installEnvProxy(env: NodeJS.ProcessEnv = process.env): {
+  proxy: string | null;
+  ignored: boolean;
+} {
+  const ignored = Object.values(proxyValues(env)).some((value) => value && !isProxyUrl(value));
   const proxy = envProxyOf(env);
-  if (proxy === null) return null;
-  const shown = new URL(proxy.httpsProxy || proxy.httpProxy);
+  if (proxy === null) return { proxy: null, ignored };
   setGlobalDispatcher(new EnvHttpProxyAgent(proxy));
-  return `${shown.protocol}//${shown.host}`;
+  const shown = new URL(proxy.httpsProxy || proxy.httpProxy);
+  return { proxy: `${shown.protocol}//${shown.host}`, ignored };
 }

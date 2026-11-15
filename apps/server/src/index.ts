@@ -72,16 +72,14 @@ const logger = createServerLogger(logSecrets, {
     : { transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' } } }),
 });
 
-try {
-  const proxy = installEnvProxy();
-  if (proxy !== null)
-    logger.info({ proxy }, 'outbound requests go through the proxy from the environment');
-} catch (error) {
-  logger.warn(
-    { err: error },
-    'the proxy environment variable is not a valid URL; outbound requests go direct',
+const envProxy = installEnvProxy();
+if (envProxy.ignored)
+  logger.warn('a proxy environment variable is not an http(s) URL and is ignored');
+if (envProxy.proxy !== null)
+  logger.info(
+    { proxy: envProxy.proxy },
+    'outbound requests go through the proxy from the environment',
   );
-}
 
 const refusal = authStartupRefusal(loadedConfig);
 if (refusal !== null) {

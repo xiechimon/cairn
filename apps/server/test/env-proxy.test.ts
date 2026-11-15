@@ -45,11 +45,12 @@ test('the server sends built-in fetch through HTTP_PROXY and keeps loopback dire
   const proxy = await startProxy(target);
   const original = getGlobalDispatcher();
   try {
-    expect(installEnvProxy({})).toBeNull();
+    expect(installEnvProxy({})).toEqual({ proxy: null, ignored: false });
     expect(getGlobalDispatcher()).toBe(original);
-    expect(installEnvProxy({ HTTP_PROXY: `http://user:secret@127.0.0.1:${proxy.port}` })).toBe(
-      `http://127.0.0.1:${proxy.port}`,
-    );
+    expect(installEnvProxy({ HTTP_PROXY: `http://user:secret@127.0.0.1:${proxy.port}` })).toEqual({
+      proxy: `http://127.0.0.1:${proxy.port}`,
+      ignored: false,
+    });
     const viaProxy = await globalThis.fetch(`http://127.0.0.2:${target}/`);
     expect(await viaProxy.text()).toBe('from-target');
     expect(proxy.seen).toHaveLength(1);
@@ -72,4 +73,16 @@ test('the OAuth fetch goes through HTTPS_PROXY and still refuses a non-public ho
     () => undefined,
   );
   expect(proxy.seen).toEqual(['93.184.215.14:443']);
+});
+
+test('a malformed proxy URL is ignored without throwing or echoing its credentials', () => {
+  const original = getGlobalDispatcher();
+  const env = { HTTPS_PROXY: 'http://user:secret@bad host:1', HTTP_PROXY: 'socks5://127.0.0.1:1' };
+  try {
+    expect(installEnvProxy(env)).toEqual({ proxy: null, ignored: true });
+    expect(getGlobalDispatcher()).toBe(original);
+    expect(() => createPublicOAuthFetch(env)).not.toThrow();
+  } finally {
+    setGlobalDispatcher(original);
+  }
 });
