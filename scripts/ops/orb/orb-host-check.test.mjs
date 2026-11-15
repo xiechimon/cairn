@@ -15,6 +15,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { makeTestTempDir, releaseTestTempDir } from '../../test-tmpdir.mjs';
 import { readMetadata, runGuestCheck, waitForNetwork } from './guest-check.mjs';
 import { checkHost, parseHostCheck } from './orb-host-check.mjs';
 
@@ -352,8 +353,8 @@ for (const failure of ['', 'curl', 'timeout', 'test']) {
 }
 
 test('guest refuses malformed requests before invoking probes', (t) => {
-  const root = mkdtempSync(join(tmpdir(), 'cairn-orb-guest-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = makeTestTempDir('cairn-orb-guest-');
+  t.after(() => releaseTestTempDir(root));
   for (const request of [
     {},
     { version: 1, requestId: 'x', blockedPorts: [22, 7890], owner: 'ian' },
@@ -918,8 +919,8 @@ test('the host check compares the current user with the owner file, not a fixed 
 test('the host check fails closed when the owner file is missing or invalid', (t) => {
   const f = fakeHost(t);
   const { owner, ...withoutOwner } = f;
-  const directory = mkdtempSync(join(tmpdir(), 'cairn-orb-owner-'));
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const directory = makeTestTempDir('cairn-orb-owner-');
+  t.after(() => releaseTestTempDir(directory));
   assert.throws(
     () => checkHost({ ...withoutOwner, ownerFile: join(directory, 'owner') }),
     /Cannot read the orb owner file/,
