@@ -389,10 +389,12 @@ export async function runBrowserTool(
       [...prefix, 'focus', ref],
     ];
     for (const step of steps) {
+      await refuseOffBoundTab(`browser_act ${kind}`);
       const prepared = await execute(step);
       if (prepared.code !== 0 && prepared.code !== null) return prepared;
     }
     for (const burst of bursts) {
+      await refuseOffBoundTab(`browser_act ${kind}`);
       const typed = await execute([...prefix, 'keyboard', 'type', burst]);
       if (typed.code !== 0 && typed.code !== null) return typed;
       await sleep(TYPING_PAUSE_MS, undefined, { signal: options.signal }).catch(() => {});
@@ -608,6 +610,12 @@ export async function runBrowserTool(
     if (result.code !== 0 && result.code !== null) {
       refuse(result.text || `agent-browser open failed with exit code ${result.code}`, started);
     }
+    if (cairnOrigins.length > 0 && (await activeTab()) !== boundTab) {
+      refuse(
+        'browser_navigate refused: another tab became active while opening; call again to act on it',
+        started,
+      );
+    }
     const landed = cairnOrigins.length === 0 ? url : await currentUrl();
     if (landed === null || (await cairnPage(landed, cairnOrigins))) {
       await execute([...prefix, 'open', 'about:blank']);
@@ -627,6 +635,7 @@ export async function runBrowserTool(
     if (result.code !== 0 && result.code !== null) {
       refuse(result.text || `agent-browser snapshot failed with exit code ${result.code}`, started);
     }
+    await refuseOffBoundTab('browser_snapshot');
     return withDetection(result.text || '(empty snapshot)');
   }
 

@@ -1085,6 +1085,11 @@ describe('Cairn pages', () => {
             yield { kind: 'exit' as const, code: 0 };
             return;
           }
+          if (line.endsWith(' snapshot -i')) {
+            yield { kind: 'stdout' as const, text: '- textbox "Search" [ref=e1]\n' };
+            yield { kind: 'exit' as const, code: 0 };
+            return;
+          }
           if (line.endsWith(' --json get url')) {
             yield {
               kind: 'stdout' as const,
@@ -1318,5 +1323,30 @@ describe('Cairn pages', () => {
     expect(lastBlock).toBeGreaterThan(0);
     expect(lastBlock).toBeLessThan(press);
     expect(log[lastBlock]).toContain('network unroute http://127.0.0.1:8787/*');
+  });
+
+  test('a tab that becomes active while typing gets none of the remaining keystrokes', async () => {
+    const log: string[] = [];
+    await expect(
+      runBrowserTool(
+        pageAt(log, ['https://example.com/'], 0, ['T1', 'T1', 'T1', 'T1', 'T2']),
+        'browser_act',
+        { actions: [{ kind: 'fill', ref: 'e1', text: 'abc\t\t\n' }] },
+        { ...run, timeoutMs: 60_000 },
+      ),
+    ).rejects.toThrow(/another tab became active/);
+    expect(log.some((line) => line.includes(' focus @e1'))).toBe(true);
+    expect(log.some((line) => line.includes(' keyboard type '))).toBe(false);
+  });
+
+  test('a snapshot taken after another tab became active is thrown away', async () => {
+    await expect(
+      runBrowserTool(
+        pageAt([], ['https://example.com/'], 0, ['T1', 'T2']),
+        'browser_snapshot',
+        {},
+        run,
+      ),
+    ).rejects.toThrow(/another tab became active/);
   });
 });
