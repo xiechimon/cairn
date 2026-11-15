@@ -1,0 +1,69 @@
+name: desktop-mac
+
+on:
+  pull_request:
+    paths:
+      - apps/desktop/**
+      - .github/workflows/desktop-mac.yml
+  push:
+    branches: [main]
+    paths:
+      - apps/desktop/**
+      - .github/workflows/desktop-mac.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-mac-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  package:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the web UI and the server
+        run: |
+          pnpm --filter @cairn/web build
+          pnpm --filter @xiechimon/cairn build
+          node apps/server/scripts/stage-web.mjs
+
+      - name: Stage the server into the desktop app
+        run: pnpm --filter @cairn/desktop stage
+
+      - name: Package the arm64 DMG
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        working-directory: apps/desktop
+        run: |
+          node build.mjs
+          pnpm exec electron-builder --mac dmg --arm64
+
+      - name: Launch the packaged app and check the owner sign-in
+        working-directory: apps/desktop
+        run: pnpm smoke
+
+      - name: Upload the DMG and the smoke screenshot
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cairn-mac-arm64
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/smoke.png
+          if-no-files-found: ignore
+          retention-days: 7

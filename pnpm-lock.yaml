@@ -332,6 +332,9 @@ importers:
       '@cairn/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@playwright/test':
+        specifier: 'catalog:'
+        version: 1.63.0
       electron:
         specifier: 45.2.1
         version: 45.2.1(supports-color@10.2.2)

@@ -108,7 +108,12 @@ function signOwnPagesIn(origin: string, token: string): void {
         callback({});
         return;
       }
-      callback({ requestHeaders: { ...details.requestHeaders, Authorization: `Bearer ${token}` } });
+      const requestHeaders = Object.fromEntries(
+        Object.entries(details.requestHeaders).filter(
+          ([name]) => name.toLowerCase() !== 'authorization',
+        ),
+      );
+      callback({ requestHeaders: { ...requestHeaders, Authorization: `Bearer ${token}` } });
     },
   );
 }

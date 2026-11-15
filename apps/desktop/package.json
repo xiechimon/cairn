@@ -19,10 +19,12 @@
     "build": "node build.mjs",
     "start": "node build.mjs && electron .",
     "dist:mac": "node build.mjs && electron-builder --mac",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke-mac.mjs release/mac-arm64/Cairn.app release/smoke.png"
   },
   "devDependencies": {
     "@cairn/shared": "workspace:*",
+    "@playwright/test": "catalog:",
     "electron": "45.2.1",
     "electron-builder": "26.18.1",
     "esbuild": "0.28.2",
