@@ -193,7 +193,7 @@ test('the toolbar sits beside the hovered bubble: right of a reply, left of an o
   expect(own && ownPill && own.x - (ownPill.x + ownPill.width)).toBeCloseTo(12, 0);
   await expect(tools(question).getByTestId('chief-msg-stamp')).toBeVisible();
   await tools(question).getByTestId('chief-msg-more').click();
-  await expect(page.getByRole('menuitem')).toHaveText(['复制', '恢复到此处']);
+  await expect(page.getByRole('menuitem')).toHaveText([/^复制/, /^恢复到此处/]);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('menuitem')).toHaveCount(0);
 });

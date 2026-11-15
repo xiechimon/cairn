@@ -12,11 +12,10 @@ import {
 import { useChief } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useNarrow } from '../board/use-narrow.js';
+import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
@@ -231,24 +230,28 @@ export function ComposerSurface({
           {t('更多')}
         </TooltipContent>
       </Tooltip>
-      <DropdownMenuContent
+      <KeyedMenuContent
         side="top"
         sideOffset={6}
         aria-label={t('更多')}
         finalFocus={textareaRef}
         className={MENU_CONTENT_CLS}
       >
-        <DropdownMenuItem disabled={attaching || onAttachment == null} onClick={openFilePicker}>
+        <KeyedMenuItem
+          shortcut="A"
+          disabled={attaching || onAttachment == null}
+          onClick={openFilePicker}
+        >
           <Paperclip width={20} height={20} />
           {t('添加附件')}
-        </DropdownMenuItem>
+        </KeyedMenuItem>
         {narrow && showMeter && (
           <>
             <DropdownMenuSeparator />
             <ContextMeterLine context={meterContext} busy={running} loading={contextLoading} />
           </>
         )}
-      </DropdownMenuContent>
+      </KeyedMenuContent>
     </DropdownMenu>
   );
   return (

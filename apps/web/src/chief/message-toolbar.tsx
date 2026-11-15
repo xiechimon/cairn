@@ -3,13 +3,9 @@ import { Ellipsis, Reply, X } from 'lucide-react';
 import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { IconTooltip } from '../components/icon-tooltip.js';
+import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { Button, PlainButton } from '../components/ui/button.js';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu.js';
+import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { useI18n } from '../i18n/provider.js';
 import { Copy, Restore } from '../icons/index.js';
@@ -207,28 +203,34 @@ export function MessageToolbar({
             {t('更多')}
           </TooltipContent>
         </Tooltip>
-        <DropdownMenuContent align="start" aria-label={t('更多')} className="w-auto min-w-40">
-          <DropdownMenuItem data-action="copy" data-testid="chief-msg-copy" onClick={onCopy}>
+        <KeyedMenuContent align="start" aria-label={t('更多')} className="w-auto min-w-40">
+          <KeyedMenuItem
+            shortcut="C"
+            data-action="copy"
+            data-testid="chief-msg-copy"
+            onClick={onCopy}
+          >
             <Copy width={20} height={20} />
             {t('复制')}
-          </DropdownMenuItem>
+          </KeyedMenuItem>
           {onRewind !== undefined && (
-            <DropdownMenuItem data-action="rewind" onClick={onRewind}>
+            <KeyedMenuItem shortcut="R" data-action="rewind" onClick={onRewind}>
               <Restore width={20} height={20} />
               {t('恢复到此处')}
-            </DropdownMenuItem>
+            </KeyedMenuItem>
           )}
           {onDismiss !== undefined && (
-            <DropdownMenuItem
+            <KeyedMenuItem
+              shortcut="D"
               variant="destructive"
               data-testid="chief-question-dismiss"
               onClick={onDismiss}
             >
               <X width={20} height={20} />
               {t('取消提问')}
-            </DropdownMenuItem>
+            </KeyedMenuItem>
           )}
-        </DropdownMenuContent>
+        </KeyedMenuContent>
       </DropdownMenu>
     </div>
   );
