@@ -40,7 +40,7 @@ const NAV_ROWS = [
 ];
 
 export const ROW_BASE =
-  'flex h-8 w-full cursor-pointer items-center justify-start gap-2.5 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:text-foreground [&>svg]:flex-none [&>svg:not([data-glyph])]:text-content-tertiary';
+  'flex h-8 pointer-coarse:h-11 w-full cursor-pointer items-center justify-start gap-2.5 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:text-foreground [&>svg]:flex-none [&>svg:not([data-glyph])]:text-content-tertiary';
 
 export const ROW_LIT = 'bg-(--menu-hover) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 
@@ -546,17 +546,19 @@ export function SearchPanel({
             className="mx-1.5 mb-1.5 max-h-64 min-h-24 shrink overflow-y-auto shadow-none ring-1 ring-border"
           />
         )}
-        <div className="flex h-9 flex-none items-center gap-4 border-t border-border px-3.5 text-caption text-content-tertiary">
-          <span className="flex items-center gap-1.5">
+        <div className="flex h-9 flex-none items-center gap-4 border-t border-border px-3.5 text-caption text-content-tertiary pointer-coarse:h-12">
+          <span className="flex items-center gap-1.5 pointer-coarse:hidden">
             <ShortcutHint keys={['up', 'down']} />
             {t('移动')}
           </span>
-          <span className="flex items-center gap-1.5">
-            <ShortcutHint keys={['enter']} />
-            {t('打开')}
-          </span>
+          {kbd && (
+            <span className="flex items-center gap-1.5 pointer-coarse:hidden">
+              <ShortcutHint keys={['enter']} />
+              {t('打开')}
+            </span>
+          )}
           {activeContext != null && (
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1.5 pointer-coarse:hidden">
               <ShortcutHint keys={['backspace']} />
               {t('移除上下文')}
             </span>
@@ -565,15 +567,17 @@ export function SearchPanel({
             <Button
               variant="ghost"
               size="xs"
-              className="text-content-tertiary"
+              className="text-content-tertiary pointer-coarse:h-11"
               aria-expanded={helpOpen}
               onClick={() => setHelpOpen((value) => !value)}
             >
               <CircleHelp data-icon="inline-start" />
               {t('语法')}
             </Button>
-            <ShortcutHint keys={['Esc']} />
-            {t('关闭')}
+            <span className="flex items-center gap-1.5 pointer-coarse:hidden">
+              <ShortcutHint keys={['Esc']} />
+              {t('关闭')}
+            </span>
           </span>
         </div>
       </div>
