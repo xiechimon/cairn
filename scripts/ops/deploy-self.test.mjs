@@ -178,6 +178,7 @@ echo "pnpm $* @ $(git -C "${checkout}" rev-parse HEAD 2>/dev/null)" >> "${fake}/
     `for variable in GH_TOKEN GITHUB_TOKEN GIT_CONFIG_VALUE_0; do
   [ -z "\${!variable-}" ] || echo "$variable" >> "${fake}/artifact-credential-names"
 done
+[ "$1" = --input-type=module ] && exec "${process.execPath}" "$@"
 echo "node $*" >> "${fake}/node.log"
 [ -f "${fake}/migrate-fail" ] && exit 1
 db="\${@: -1}"
@@ -288,6 +289,7 @@ else printf 000; fi`,
 
   const env = {
     PATH: `${bin}:${SYSTEM_PATH}`,
+    NODE_PATH: join(import.meta.dirname, '../../node_modules'),
     HOME: dir,
     GIT_CONFIG_NOSYSTEM: '1',
     CAIRN_CHECKOUT: checkout,
@@ -374,6 +376,66 @@ test('refuses a target that changes install-script permissions or hooks', () => 
   assert.equal(result.status, 2, result.stderr);
   assert.match(result.stderr, /install hooks/);
   assert.equal(f.log('pnpm.log'), '');
+});
+
+function fixtureWithWorkspace(workspace) {
+  const f = fixture();
+  const base = pushTarget(f, 'base', { files: { 'pnpm-workspace.yaml': workspace } });
+  git(f.checkout, 'fetch', '-q', 'origin', 'main');
+  git(f.checkout, 'checkout', '-q', base);
+  return f;
+}
+
+const workspace = (allowBuilds, extra = '') =>
+  `packages:\n  - apps/*\n\nallowBuilds:\n  ${allowBuilds}\n${extra}`;
+
+test('deploys an allowBuilds change that permits no new install script', () => {
+  for (const [previous, next] of [
+    ['esbuild: true', 'esbuild: true\n  electron: false\n  electron-winstaller: false'],
+    ['esbuild: true', 'esbuild: true\n  electron: false # reviewed'],
+    ['esbuild: true\n  sharp: true', 'esbuild: true\n  sharp: false'],
+    ['esbuild: true\n  sharp: true', 'esbuild: true'],
+  ]) {
+    const f = fixtureWithWorkspace(workspace(previous));
+    const target = pushTarget(f, 'target', { files: { 'pnpm-workspace.yaml': workspace(next) } });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 0, `${previous} -> ${next}\n${result.stderr}`);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), target);
+  }
+});
+
+test('refuses a pnpm-workspace.yaml change that may permit a new install script', () => {
+  const base = workspace('esbuild: true\n  sharp: false');
+  for (const [next, reason] of [
+    [workspace('esbuild: true\n  sharp: false\n  evil: true'), /allowBuilds permits evil/],
+    [workspace('esbuild: true\n  sharp: true'), /allowBuilds permits sharp/],
+    [workspace('esbuild: true\n  sharp:\n    true'), /allowBuilds permits sharp/],
+    [workspace('esbuild: true'), /allowBuilds stops denying sharp/],
+    [workspace('esbuild: true\n  sharp: "no"'), /allowBuilds changed and is not a map of booleans/],
+    [
+      'packages:\n  - apps/*\n"allow\\u0042uilds": {esbuild: true, sharp: false, evil: true}\n',
+      /allowBuilds permits evil/,
+    ],
+    [
+      workspace('esbuild: true\n  sharp: false\n  evil: true').replace(/^/gm, ' '),
+      /allowBuilds permits evil/,
+    ],
+    [`${base}allowBuilds:\n  evil: true\n`, /does not parse cleanly/],
+    [`${base}"dangerouslyAllowAll\\u0042uilds": true\n`, /dangerouslyAllowAllBuilds changed/],
+    [`${base}pnpmfile: ./hooks.cjs\n`, /pnpmfile changed/],
+    [`x: &a\n  evil: true\n${base}  <<: *a\n`, /merge key/],
+    [workspace('esbuild: true\n  sharp: false\n  evil: !custom true'), /does not parse cleanly/],
+  ]) {
+    const f = fixtureWithWorkspace(base);
+    const before = git(f.checkout, 'rev-parse', 'HEAD');
+    const target = pushTarget(f, 'target', { files: { 'pnpm-workspace.yaml': next } });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 2, `${next}\n${result.stderr}`);
+    assert.match(result.stderr, /pnpm-workspace.yaml may permit new install scripts/);
+    assert.match(result.stderr, reason, next);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), before);
+    assert.equal(f.log('pnpm.log'), '');
+  }
 });
 
 test('refuses the same postinstall added to two manifests', () => {
