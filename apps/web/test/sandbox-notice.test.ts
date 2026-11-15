@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { sandboxNotice } from '../src/resources/machine-detail-pane.js';
 
 const GENERIC =
-  '任务沙箱没就绪，这台 Runner 接不了任务。Linux 上 daemon 要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。';
+  '任务沙箱没就绪，这台执行机接不了任务。Linux 上后台服务要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。';
 
 const unavailable = (reason: 'startup-failed' | 'cleanup-failed', confinementCause?: unknown) =>
   ({

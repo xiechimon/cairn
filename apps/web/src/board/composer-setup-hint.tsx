@@ -75,7 +75,7 @@ function runnerStep(
   const [only] = offline;
   if (only === undefined) {
     return {
-      label: t('连接一台 Runner'),
+      label: t('连接一台执行机'),
       hint: withCode(t('在要干活的电脑上运行 `{command}`', { command })),
     };
   }
@@ -86,7 +86,7 @@ function runnerStep(
     };
   }
   return {
-    label: t('{n} 台 Runner 都离线', { n: offline.length }),
+    label: t('{n} 台执行机都离线', { n: offline.length }),
     hint: withCode(t('在其中一台上运行 `{command}` 让它重新上线', { command })),
   };
 }
@@ -106,7 +106,7 @@ export function ComposerSetupHint({ step: { next, models } }: { step: ComposerSe
           }
         : {
             label: t('接入模型来源'),
-            hint: t('添加模型服务商，或在 Runner 上登录 Claude Code'),
+            hint: t('添加模型服务商，或在执行机上登录 Claude Code'),
           }),
     },
     machine: {

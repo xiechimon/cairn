@@ -148,6 +148,21 @@ export const MCP_CONNECTOR_STATUSES = ['unchecked', 'connected', 'needs_auth', '
 export const mcpConnectorStatusSchema = z.enum(MCP_CONNECTOR_STATUSES);
 export type McpConnectorStatus = z.infer<typeof mcpConnectorStatusSchema>;
 
+export const MCP_CONNECTOR_AUTH_KINDS = ['none', 'static', 'oauth'] as const;
+export const mcpConnectorAuthKindSchema = z.enum(MCP_CONNECTOR_AUTH_KINDS);
+export type McpConnectorAuthKind = z.infer<typeof mcpConnectorAuthKindSchema>;
+
+export interface McpConnectorOAuthMeta {
+  issuer: string;
+  authorizationServerUrl: string;
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+  tokenAuthMethods: string[];
+  resource: string;
+  redirectUri: string;
+  scope: string | null;
+}
+
 export const mcpConnectorRecordSchema = z.object({
   id: recordId,
   teamId: recordId,
@@ -156,6 +171,7 @@ export const mcpConnectorRecordSchema = z.object({
   catalogId: z.string().nullable(),
   url: z.string(),
   headerNames: z.array(z.string()),
+  authKind: mcpConnectorAuthKindSchema,
   status: mcpConnectorStatusSchema,
   statusReason: z.string().nullable(),
   toolCount: z.number().int().nullable(),
@@ -201,3 +217,25 @@ export const patchMcpConnectorBodySchema = z
   })
   .refine((body) => Object.keys(body).length > 0, { message: 'empty patch' });
 export type PatchMcpConnectorBody = z.infer<typeof patchMcpConnectorBodySchema>;
+
+export const startMcpConnectorOAuthBodySchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('catalog'),
+    catalogId: z.string(),
+    slug: mcpConnectorSlugSchema,
+    options: catalogOptionsSchema.optional(),
+  }),
+  z.strictObject({
+    kind: z.literal('custom'),
+    slug: mcpConnectorSlugSchema,
+    label: z.string().trim().min(1).max(80),
+    url: mcpConnectorUrlSchema,
+  }),
+  z.strictObject({
+    kind: z.literal('reconnect'),
+    connectorId: recordId,
+  }),
+]);
+export type StartMcpConnectorOAuthBody = z.infer<typeof startMcpConnectorOAuthBodySchema>;
+
+export const startMcpConnectorOAuthResponseSchema = z.object({ authorizationUrl: z.string() });

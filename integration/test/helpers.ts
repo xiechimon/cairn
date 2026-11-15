@@ -27,6 +27,7 @@ import { createApiKey } from '../../apps/server/src/services/api-keys.js';
 import { type BuildDeps, enqueueStep } from '../../apps/server/src/services/builds.js';
 import { ConversationStreamHub, TeamStreamHub } from '../../apps/server/src/services/events.js';
 import { MachineWakeHub } from '../../apps/server/src/services/machine-wake-hub.js';
+import { newMcpOAuthState } from '../../apps/server/src/services/mcp-servers.js';
 import { createScheduler } from '../../apps/server/src/services/scheduler.js';
 import { setTodoPhase } from '../../apps/server/src/services/todos.js';
 import { stampPersonSendBody } from '../../apps/server/test/helpers.js';
@@ -133,6 +134,7 @@ export async function bootRealServer(opts: {
       enrollments: new Map(),
       oauthStates: new Map(),
       xaiDeviceStates: new Map(),
+      mcpOAuthState: newMcpOAuthState(),
       oauthClient: null,
       reposDir,
       attachmentsDir,

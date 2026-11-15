@@ -83,7 +83,7 @@ test('with models on both sides the chip asks for a machine and the hint shows t
 }) => {
   await open(page, { ...fresh(), providers: [{ id: 'p1', name: 'gw' }], bound: true });
   await expect(chip(page)).toHaveAttribute('data-step', 'machine');
-  await expect(chip(page)).toHaveText('连接一台 Runner');
+  await expect(chip(page)).toHaveText('连接一台执行机');
   await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/machines/);
   await expect(hint(page).locator('code')).toHaveText(/ start$/);
   await expect(hint(page)).toContainText('在要干活的电脑上运行');
@@ -127,7 +127,7 @@ test('with several runners all offline the chip counts them instead of asking to
       { id: 'm2', name: 'mac', online: false },
     ],
   });
-  await expect(chip(page)).toHaveText('2 台 Runner 都离线');
+  await expect(chip(page)).toHaveText('2 台执行机都离线');
   await expect(hint(page)).toContainText('在其中一台上运行');
 });
 

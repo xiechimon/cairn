@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:net';
 import { join } from 'node:path';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   type CommandRunner,
@@ -289,10 +289,37 @@ esac
     expect(systemd.active.has(owner)).toBe(true);
     await expect(browser.execute(request)).rejects.toThrow('taken over');
     second();
-    await vi.waitFor(() => expect(systemd.active.has(owner)).toBe(false));
-    for await (const _event of await browser.execute(request));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(systemd.active.has(owner)).toBe(true);
+
+    const reconnected = await desktops.hold('chief:a', 'control');
+    reconnected();
+    expect(systemd.calls.filter((argv) => argv.includes(`--unit=${owner}`))).toHaveLength(1);
+    expect(systemd.active.has(owner)).toBe(true);
+
+    const events = await browser.execute(request);
+    const ownerActiveAtSnapshot = systemd.active.has(owner);
+    for await (const _event of events);
+    expect(ownerActiveAtSnapshot).toBe(false);
     expect(lines().at(-1)).toBe(`${profile}|snapshot`);
     expect(systemd.calls.filter((argv) => argv.includes(`--unit=${owner}`))).toHaveLength(1);
+  });
+
+  test('taking control with no agent page restores the owner browser last session', async () => {
+    const { root, env } = workspace([...PROGRAMS, 'chromium']);
+    fakeAgentBrowser(
+      env.PATH,
+      join(root, 'agent-browser.log'),
+      `echo '{"success":true,"data":{"sessions":[]}}'\n`,
+    );
+    const systemd = fakeSystemd('98');
+    const desktops = new HostDesktops({ root, toolsRoot: root, env, run: systemd.run });
+    (await desktops.hold('chief:a', 'control'))();
+    const started =
+      systemd.calls.find(
+        (argv) => argv[0] === 'systemd-run' && argv.some((arg) => arg.endsWith('-browser.service')),
+      ) ?? [];
+    expect(started.at(-1)).toBe('--restore-last-session');
   });
 
   test('a desktop imports the old saved login into the browser profile once', async () => {

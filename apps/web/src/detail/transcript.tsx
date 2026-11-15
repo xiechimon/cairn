@@ -396,7 +396,7 @@ function Row({
                 </span>
                 {liveStep.machine != null && (
                   <span className="[overflow-wrap:anywhere]">
-                    {t('Runner：{n}', { n: liveStep.machine })}
+                    {t('执行机：{n}', { n: liveStep.machine })}
                   </span>
                 )}
                 {(item.skills ?? []).map((s) => (
@@ -406,8 +406,8 @@ function Row({
                     data-testid="skill-line"
                   >
                     {s.denied
-                      ? t('✕ skill: {n}（已挡下）', { n: s.name })
-                      : t('skill: {n}', { n: s.name })}
+                      ? t('✕ 技能：{n}（已挡下）', { n: s.name })
+                      : t('读取技能：{n}', { n: s.name })}
                   </span>
                 ))}
                 <LiveSignal at={item.signalAt} className="[overflow-wrap:anywhere]" />

@@ -18,6 +18,7 @@ import {
   SKILL_ENTRY_FILE,
   setSecretBodySchema,
   skillRecordSchema,
+  startMcpConnectorOAuthBodySchema,
   THINKING_LEVELS,
   testProviderBodySchema,
 } from '@cairn/shared';
@@ -28,6 +29,7 @@ import type { Db } from './db/client.js';
 import { build, machine, provider, routingRule, step, team, todo } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubUserRepos } from './lib/github.js';
+import { nowMs } from './lib/ids.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import {
   createApiKeyBodySchema,
@@ -67,6 +69,7 @@ import {
   listMcpConnectors,
   listMcpServers,
   type McpConnectorDeps,
+  publicOAuthFetch,
   updateMcpConnector,
 } from './services/mcp-servers.js';
 import { mergedCatalogModels, refreshAllRelayCatalogs } from './services/model-liveness.js';
@@ -77,6 +80,7 @@ import {
   OAuthFlowError,
   type OAuthStateKind,
   startGithubConnectionAuthorize,
+  startMcpConnectorAuthorize,
   startOAuthAuthorize,
 } from './services/oauth.js';
 import { ProviderTestLimiter, testProviderConnection } from './services/provider-test.js';
@@ -249,7 +253,11 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const row = ctx.db.select().from(machine).where(eq(machine.id, id)).get();
     if (!row) throw notFound(`machine ${id}`);
     requireTeam(ctx, row.teamId);
-    ctx.db.update(routingRule).set({ machineId: null }).where(eq(routingRule.machineId, id)).run();
+    ctx.db
+      .update(routingRule)
+      .set({ machineId: null, updatedAt: nowMs() })
+      .where(eq(routingRule.machineId, id))
+      .run();
     ctx.db.update(team).set({ defaultMachineId: null }).where(eq(team.defaultMachineId, id)).run();
     const releasePendingOutput = pendingComputerOutputRelease(ctx.db, id);
     ctx.db.delete(machine).where(eq(machine.id, id)).run();
@@ -274,7 +282,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, src.teamId);
     const body = parseWith(evacuateMachineBodySchema, await jsonBody(c), 'body');
     if (body.targetMachineId === id) {
-      throw new HttpError(400, '源 Runner 与目标 Runner 相同——无操作不是迁移。');
+      throw new HttpError(400, '源执行机与目标执行机相同——无操作不是迁移。');
     }
     const dst = ctx.db
       .select()
@@ -293,7 +301,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       }
       ctx.db
         .update(routingRule)
-        .set({ machineId: dst.id })
+        .set({ machineId: dst.id, updatedAt: nowMs() })
         .where(eq(routingRule.id, rule.id))
         .run();
       moved.push(rule.id);
@@ -518,12 +526,22 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     return c.body(null, 204);
   });
 
+  const mcpDeps = (): McpConnectorDeps => ({
+    db: ctx.db,
+    box: ctx.secretBox,
+    mcpConfigPath: ctx.mcpConfigPath,
+    fetch: ctx.mcpFetch ?? globalThis.fetch,
+    oauthFetch: ctx.mcpFetch ?? publicOAuthFetch,
+    oauthState: ctx.mcpOAuthState,
+  });
+
   const oauthDeps = (): OAuthDeps => ({
     db: ctx.db,
     box: ctx.secretBox,
     states: ctx.oauthStates,
     fetch: ctx.oauthFetch ?? globalThis.fetch,
     client: ctx.oauthClient,
+    mcp: mcpDeps(),
   });
 
   const xaiDeviceDeps = () => ({
@@ -579,7 +597,9 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const landingFor = (kind: OAuthStateKind | undefined) =>
       kind === 'github-connection'
         ? { path: '/app/project/new', flag: '&github=connection' }
-        : { path: '/app/resources/providers', flag: '' };
+        : kind === 'mcp-connector'
+          ? { path: '/app/resources/mcp-servers', flag: '' }
+          : { path: '/app/resources/providers', flag: '' };
     const landing = (
       origin: string | undefined,
       kind: OAuthStateKind | undefined,
@@ -605,17 +625,23 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       const outcome = await completeOAuthCallback(oauthDeps(), {
         code,
         state,
+        iss: c.req.query('iss'),
         createdBy: ctx.user.id,
       });
       const result =
         outcome.kind === 'provider'
           ? `oauth=connected&provider=${outcome.presetId}`
-          : 'oauth=connected';
+          : outcome.kind === 'mcp-connector'
+            ? `oauth=connected&connector=${outcome.connectorId}`
+            : 'oauth=connected';
       return landing(outcome.origin, outcome.kind, result);
     } catch (err) {
       if (err instanceof OAuthFlowError) {
         if (err.reason === 'exchange-failed' && err.origin !== undefined) {
           return landing(err.origin, err.kind, 'oauth=error&reason=exchange');
+        }
+        if (err.reason === 'conflict' && err.origin !== undefined) {
+          return landing(err.origin, err.kind, 'oauth=error&reason=conflict');
         }
         if (err.reason === 'bad-state') return badStateLanding(err);
       }
@@ -685,13 +711,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     );
   });
 
-  const mcpDeps = (): McpConnectorDeps => ({
-    db: ctx.db,
-    box: ctx.secretBox,
-    mcpConfigPath: ctx.mcpConfigPath,
-    fetch: ctx.mcpFetch ?? globalThis.fetch,
-  });
-
   app.get('/api/teams/:id/mcp-connectors', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
@@ -725,6 +744,19 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     if (!deleteMcpConnector(mcpDeps(), teamId, c.req.param('cid')))
       throw notFound(`mcp connector ${c.req.param('cid')}`);
     return c.body(null, 204);
+  });
+
+  app.post('/api/teams/:id/mcp-connectors/oauth/start', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = parseWith(startMcpConnectorOAuthBodySchema, await jsonBody(c), 'body');
+    return c.json(
+      await startMcpConnectorAuthorize(oauthDeps(), {
+        teamId,
+        origin: c.req.header('origin') ?? requestOrigin(c),
+        body,
+      }),
+    );
   });
 
   app.post('/api/teams/:id/mcp-connectors/:cid/check', async (c) => {

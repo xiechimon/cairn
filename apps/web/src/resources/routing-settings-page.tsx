@@ -85,18 +85,18 @@ function SessionDefaultHint({
   );
   const text =
     sessionDefault.reason === 'claude-code'
-      ? t('当前默认：Claude Code（因为有 Runner 装了 Claude Code）')
+      ? t('当前默认：Claude Code（因为有执行机装了 Claude Code）')
       : sessionDefault.reason === 'codex-login'
-        ? t('当前默认：Codex（因为有 Runner 登录了 Codex）')
+        ? t('当前默认：Codex（因为有执行机登录了 Codex）')
         : sessionDefault.reason === 'provider'
           ? t(
-              '当前默认：{model} · {provider}（因为还没有 Runner 装 Claude Code，用最早添加的服务商）',
+              '当前默认：{model} · {provider}（因为还没有执行机装 Claude Code，用最早添加的服务商）',
               {
                 model: row?.modelName ?? sessionDefault.modelId ?? '',
                 provider: row?.providerLabel ?? sessionDefault.provider ?? '',
               },
             )
-          : t('当前没有可用的默认：添加服务商，或在 Runner 上装 Claude Code');
+          : t('当前没有可用的默认：添加服务商，或在执行机上装 Claude Code');
   return <span data-testid="routing-session-default">{text}</span>;
 }
 
@@ -164,7 +164,7 @@ function RuleEditor({
   );
   const [machineId, setMachineId] = useState(rule?.machineId ?? null);
   const mustNameMachine = use === 'session' && machines.length > 1 && !hasDefault;
-  const unsetLabel = hasDefault ? t('跟随默认 Runner') : t('不固定');
+  const unsetLabel = hasDefault ? t('跟随默认执行机') : t('不固定');
   const pickedMachine = machines.find((m) => m.id === machineId);
   const dirty =
     rule === null ||
@@ -186,7 +186,7 @@ function RuleEditor({
             ) : rule === null && coordinatorDefault !== undefined ? (
               <CoordinatorDefaultHint coordinatorDefault={coordinatorDefault} options={options} />
             ) : (
-              t('模型与首选 Runner')
+              t('模型与首选执行机')
             )
           }
         >
@@ -245,16 +245,16 @@ function RuleEditor({
             </SelectContent>
           </Select>
         </SettingsRow>
-        <SettingsRow label={t('首选 Runner')}>
+        <SettingsRow label={t('首选执行机')}>
           <Select value={machineId} onValueChange={(next) => setMachineId(next)}>
             <SelectTrigger
-              aria-label={t('首选 Runner')}
+              aria-label={t('首选执行机')}
               className={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-44')}
             >
               <SelectValue>
                 {machineId === null
                   ? mustNameMachine
-                    ? t('选择 Runner')
+                    ? t('选择执行机')
                     : unsetLabel
                   : pickedMachine === undefined
                     ? undefined

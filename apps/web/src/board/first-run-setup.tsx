@@ -199,10 +199,10 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
       setup.machines.length === 0 ? (
         <span className="inline-flex items-center gap-2">
           <Spinner className="size-3.5" aria-label={t('启动中')} />
-          {t('本机 Runner 正在启动，启动后会检查这台电脑上的 Claude Code')}
+          {t('本机执行机正在启动，启动后会检查这台电脑上的 Claude Code')}
         </span>
       ) : (
-        t('本机 Runner 没有启动，查不到 Claude Code。退出 Cairn 再打开一次。')
+        t('本机执行机没有启动，查不到 Claude Code。退出 Cairn 再打开一次。')
       )
     ) : login ? (
       t('这台电脑上找到了已登录的 Claude Code')

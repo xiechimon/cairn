@@ -120,7 +120,7 @@ function StatusLine({
         {platformWait !== null
           ? platformWait.machine !== null
             ? t('等 {machine} 上线', { machine: platformWait.machine })
-            : t('还没有 {platform} Runner', { platform: RUNNER_OS_LABELS[platformWait.platform] })
+            : t('还没有 {platform} 执行机', { platform: RUNNER_OS_LABELS[platformWait.platform] })
           : todo.quotaWait != null
             ? t('等额度')
             : waitingOnChecks
@@ -137,7 +137,7 @@ function StatusLine({
         <>
           <span aria-hidden="true">·</span>
           <Link to={MACHINES_HREF} className="flex-none text-(--chat-link) hover:underline">
-            {t('添加 Runner')}
+            {t('添加执行机')}
           </Link>
         </>
       )}
