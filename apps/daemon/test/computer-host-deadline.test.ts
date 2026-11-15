@@ -19,6 +19,7 @@ test('shutdown after host start retains ambiguous delivery', async () => {
   const frames: ComputerFrameBody[] = [];
   let dispatcher: ReturnType<typeof createComputerDispatcher>;
   dispatcher = createComputerDispatcher({
+    cairnOrigins: [],
     host: {
       async execute() {
         writeFileSync(marker, 'started');
@@ -62,6 +63,7 @@ test('a completed command keeps its result while output drains past the executio
   provider = new HostComputerProvider({ home: root, killGraceMs: 20, streamDrainMs: 3000 });
   const frames: ComputerFrameBody[] = [];
   const dispatcher = createComputerDispatcher({
+    cairnOrigins: [],
     host: provider,
     commandTimeoutMs: 2000,
     client: {
@@ -213,6 +215,7 @@ describe.each(['realpath', 'stat'] as const)('host preflight delayed at %s', (st
       const gate = holdPreflight(stage);
       const frames: ComputerFrameBody[] = [];
       const dispatcher = createComputerDispatcher({
+        cairnOrigins: [],
         host: provider,
         client: {
           async computerFrames(_callId, body) {
@@ -283,6 +286,7 @@ describe.each(['realpath', 'stat'] as const)('host preflight delayed at %s', (st
       const execute = vi.spyOn(provider, 'execute');
       const frames: ComputerFrameBody[] = [];
       const dispatcher = createComputerDispatcher({
+        cairnOrigins: [],
         host: provider,
         client: {
           async computerFrames(_callId, body) {
