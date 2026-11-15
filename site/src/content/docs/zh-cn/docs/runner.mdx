@@ -1,0 +1,94 @@
+---
+title: 连接 Runner
+description: 让 agent 在你的一台机器上干活。
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+Runner 就是装在要让 agent 干活的机器上的 `cairn` 守护进程。它从你的服务端领活，每个 thread 在这台机器上自己的 git worktree 里跑，代码和凭证都留在这台机器上。Runner 可以就是服务端所在的那台机器，以后再加别的。
+
+<Aside type="tip">
+优先用一台常开的机器：台式机、家里的服务器或 VPS。笔记本会休眠、断网，活就得等它回来。
+</Aside>
+
+## 用浏览器授权注册
+
+这是默认方式，也是网页里 `添加 Runner` 对话框给出的步骤。
+
+<Steps>
+
+1. 在要干活的机器上安装 CLI：
+
+   ```sh
+   npm install -g @xiechimon/cairn-cli@latest
+   ```
+
+2. 启动它：
+
+   ```sh
+   cairn start
+   ```
+
+   它会打印一个链接：`Open <url> and approve this machine (expires in 10 minutes).`。如果服务端不在这台机器的 `http://127.0.0.1:8787`，加上 `--server <url>`。
+
+3. 在已经登录 Cairn 的浏览器里打开这个链接，在 `授权 Runner` 页点 `确认授权`。
+
+4. 网页里这台 Runner 显示在线。之后它在后台常驻，不用开着终端。凭证存在 `~/.cairn/machine.json`，以后再启动不用重新批准。
+
+</Steps>
+
+## 用 API key 注册
+
+在手边没有浏览器的云服务器上，展开同一个对话框里的 `在云服务器上运行？改用 API key 注册`，到 `API 密钥` 里创建一个 key（明文只显示一次），然后执行：
+
+```sh
+cairn start --api-key <cairn_...> --team <teamId>
+```
+
+对话框会帮你填好团队 ID。
+
+## 日常命令
+
+```sh
+cairn start          # 在后台启动
+cairn stop
+cairn restart
+cairn status         # 本机和守护进程的状态
+cairn logs -f        # 跟踪 daemon.log
+```
+
+## 在 Linux 上保持常驻
+
+在 Linux 上，任务跑在沙箱里。沙箱需要装好 [bubblewrap](https://github.com/containers/bubblewrap)（`bwrap`，多数发行版的包名是 `bubblewrap`），并且守护进程是一个独立的 systemd 用户单元。`cairn start` 和 `cairn restart` 会把它作为一个随会话存在的单元 `cairn-daemon-<id>.service` 运行，并打印单元名。
+
+<Aside type="caution" title="显示在线，但任务一直排队">
+如果 `systemd-run --user` 失败，`cairn start` 会打一条警告，退回成普通后台进程。这样的 Runner 显示在线，却起不了沙箱，任务只会一直排队，`Runner` 设置页里它那一行会写“任务沙箱没就绪”。看一眼启动输出，装好 `bwrap`，再用下面的单元。
+</Aside>
+
+这种单元在你注销或重启后就没了。要让 Runner 一直在：先按上面注册一次，用 `cairn stop` 停掉，再建 `~/.config/systemd/user/cairn-daemon.service`。两个路径用 `command -v cairn` 和 `command -v node` 查：
+
+```ini title="~/.config/systemd/user/cairn-daemon.service"
+[Unit]
+Description=Cairn daemon
+
+[Service]
+Environment=PATH=/directory/of/node:/usr/local/bin:/usr/bin:/bin
+ExecStart=/path/to/cairn start --foreground
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+```sh
+systemctl --user daemon-reload
+systemctl --user enable --now cairn-daemon.service
+```
+
+## 服务端和 Runner 在同一台机器上
+
+两个包都会装一个 `cairn` 命令。同一台机器上两个都全局安装的话，后装的那个占用这个名字。干净的分法是：服务端用 `npx @xiechimon/cairn`，Runner 用全局安装的 `@xiechimon/cairn-cli`。
+
+## Runner 在另一台机器上
+
+服务端只监听本机回环。服务端在一台常开主机上、Runner 在另一台机器上时：启动服务端时把 `HOST` 设成那台主机的局域网地址，同时设置 `CAIRN_TOKEN`（没有令牌时它拒绝绑定非回环地址），再用 `--server http://<主机>:8787` 启动 Runner。见 [configuration.md](https://github.com/xiechimon/cairn/blob/main/docs/configuration.md)。

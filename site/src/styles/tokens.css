@@ -1,0 +1,130 @@
+:root {
+  --font-sans:
+    "instrumentSans", "instrumentSans Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-serif:
+    "sourceSerif4", Georgia, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", serif;
+  --font-mono: "jetbrainsMono", "jetbrainsMono Fallback", ui-monospace, Menlo, Monaco, Consolas, monospace;
+
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-panel: 18px;
+
+  --canvas: #fafafa;
+  --sheet: #ffffff;
+  --card: #f7f7f7;
+  --secondary: #f2f2f2;
+  --hover: rgb(0 0 0 / 0.05);
+  --line: rgb(0 0 0 / 0.1);
+  --line-strong: rgb(0 0 0 / 0.16);
+  --ink: #0a0a0a;
+  --ink-2: #3a3a3a;
+  --ink-3: #545454;
+  --ink-4: #6e6e6e;
+  --accent: #9a6500;
+  --accent-soft: #f7ecd2;
+  --accent-ink: #6e4900;
+  --running: #5f8f4f;
+  --danger: #a33a2a;
+  --danger-soft: #f5ddd6;
+  --primary: #0a0a0a;
+  --on-primary: #ffffff;
+  --popover: #ffffff;
+  --shadow-float: 0 2px 6px rgb(0 0 0 / 0.08), 0 8px 20px rgb(0 0 0 / 0.1);
+  --shadow-shot: 0 1px 2px rgb(0 0 0 / 0.04), 0 12px 40px rgb(0 0 0 / 0.08);
+
+  --sl-font: var(--font-sans);
+  --sl-font-mono: var(--font-mono);
+  --sl-content-width: 46rem;
+  --sl-line-height: 1.7;
+  --sl-line-height-headings: 1.25;
+  --sl-text-h1: 2.25rem;
+  --sl-text-h2: 1.5rem;
+  --sl-text-h3: 1.1875rem;
+  --sl-text-h4: 1.0625rem;
+  --sl-text-h5: 1rem;
+}
+
+@media (min-width: 50em) {
+  :root {
+    --sl-text-h1: 2.5rem;
+    --sl-text-h2: 1.5rem;
+    --sl-text-h3: 1.1875rem;
+    --sl-text-h4: 1.0625rem;
+  }
+}
+
+:root[data-theme="dark"] {
+  --canvas: #1f1f1f;
+  --sheet: #191919;
+  --card: #202020;
+  --secondary: #262626;
+  --hover: rgb(255 255 255 / 0.075);
+  --line: rgb(255 255 255 / 0.1);
+  --line-strong: rgb(255 255 255 / 0.16);
+  --ink: #f7f7f7;
+  --ink-2: #c4c4c4;
+  --ink-3: #a3a3a3;
+  --ink-4: #8a8a8a;
+  --accent: #ebb550;
+  --accent-soft: #33290f;
+  --accent-ink: #f2cf86;
+  --running: #82b46f;
+  --danger: #f09a88;
+  --danger-soft: #4a2a24;
+  --primary: #f7f7f7;
+  --on-primary: #191919;
+  --popover: #303030;
+  --shadow-float: 0 2px 6px rgb(0 0 0 / 0.2), 0 8px 24px rgb(0 0 0 / 0.32);
+  --shadow-shot: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 48px rgb(0 0 0 / 0.4);
+}
+
+:root,
+:root[data-theme="light"],
+:root[data-theme="dark"] {
+  --sl-color-white: var(--ink);
+  --sl-color-gray-1: var(--ink);
+  --sl-color-gray-2: var(--ink);
+  --sl-color-gray-3: var(--ink-2);
+  --sl-color-gray-4: var(--ink-3);
+  --sl-color-gray-5: var(--line-strong);
+  --sl-color-gray-6: var(--secondary);
+  --sl-color-gray-7: var(--canvas);
+  --sl-color-black: var(--sheet);
+
+  --sl-color-accent-low: var(--accent-soft);
+  --sl-color-accent: var(--accent);
+  --sl-color-accent-high: var(--accent-ink);
+  --sl-color-text: var(--ink);
+  --sl-color-text-accent: var(--accent);
+  --sl-color-text-invert: var(--on-primary);
+  --sl-color-bg: var(--sheet);
+  --sl-color-bg-nav: var(--sheet);
+  --sl-color-bg-sidebar: var(--sheet);
+  --sl-color-bg-inline-code: var(--secondary);
+  --sl-color-bg-accent: var(--primary);
+  --sl-color-hairline-light: var(--line);
+  --sl-color-hairline: var(--line);
+  --sl-color-hairline-shade: var(--line);
+  --sl-color-backdrop-overlay: rgb(0 0 0 / 0.4);
+
+  --sl-color-blue-low: var(--secondary);
+  --sl-color-blue: var(--ink-3);
+  --sl-color-blue-high: var(--ink);
+  --sl-color-purple-low: var(--secondary);
+  --sl-color-purple: var(--ink-3);
+  --sl-color-purple-high: var(--ink);
+  --sl-color-green-low: var(--secondary);
+  --sl-color-green: var(--running);
+  --sl-color-green-high: var(--ink);
+  --sl-color-orange-low: var(--accent-soft);
+  --sl-color-orange: var(--accent);
+  --sl-color-orange-high: var(--accent-ink);
+  --sl-color-red-low: var(--danger-soft);
+  --sl-color-red: var(--danger);
+  --sl-color-red-high: var(--danger);
+
+  --sl-shadow-sm: none;
+  --sl-shadow-md: var(--shadow-float);
+  --sl-shadow-lg: var(--shadow-float);
+}
