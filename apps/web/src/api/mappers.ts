@@ -293,6 +293,14 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     output: w.output,
     section: w.section ?? null,
     ...(w.verified !== undefined ? { verified: w.verified } : {}),
+    ...(w.deliverables !== undefined
+      ? {
+          deliverables: w.deliverables,
+          ...(w.deliverables.items[0] !== undefined
+            ? { madeKind: w.deliverables.items[0].kind }
+            : {}),
+        }
+      : {}),
     ...(w.routeOverride !== undefined ? { routeOverride: w.routeOverride } : {}),
   };
 }
