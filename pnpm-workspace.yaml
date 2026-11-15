@@ -6,9 +6,15 @@ packages:
   - integration
   - site
 
+hoistPattern:
+  - '*'
+  - '!electron'
+
 allowBuilds:
   '@google/genai': false
   better-sqlite3: false
+  electron: false
+  electron-winstaller: false
   esbuild: true
   protobufjs: false
 
