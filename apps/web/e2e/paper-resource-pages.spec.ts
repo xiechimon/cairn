@@ -7,7 +7,6 @@ const light = async (page: Page, url: string) => {
 
 for (const [name, url] of [
   ['skills', '/app/resources/skills?scenario=01'],
-  ['mcp', '/app/resources/mcp-servers?scenario=01'],
   ['secrets', '/app/resources/secrets?scenario=01'],
   ['machines', '/app/resources/machines?scenario=01'],
 ] as const) {

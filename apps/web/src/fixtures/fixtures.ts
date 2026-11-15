@@ -124,6 +124,13 @@ export {
   resourcesCcMissing,
   resourcesCcNoConfig,
   resourcesDefault,
+  resourcesMcpAddServer,
+  resourcesMcpAuthorizing,
+  resourcesMcpConfirmHost,
+  resourcesMcpConnectGithub,
+  resourcesMcpConnectors,
+  resourcesMcpManageNeedsAuth,
+  resourcesMcpOAuthDenied,
   resourcesSkillsList,
 } from './resources.js';
 export {

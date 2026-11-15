@@ -641,10 +641,6 @@ export const EN: Record<string, string> = {
   '没有匹配的技能。': 'No matching skills.',
   '导入会把技能复制到 Cairn 自己的目录，原目录不会被改动。':
     'Importing copies the skill into Cairn’s own directory; the original is left unchanged.',
-  '尚无 MCP 服务器': 'No MCP servers yet',
-  // spec 13/#368 本地 config 只读制：空态文案 = 配置指引（无添加钮）。
-  '读取服务器本机 ~/.claude.json 的 mcpServers 段：在该文件添加配置并刷新，即出现在这里。MCP 服务器为 Agent 提供额外工具；授权在每个 Agent 的页面上单独进行。':
-    'Reads the mcpServers section of ~/.claude.json on the cairn server machine — add entries there and refresh to see them here. MCP servers give Agents extra tools; authorization happens per Agent, on its own page.',
   尚无密钥: 'No secrets yet',
   '团队密钥按 Agent 授权，在需要它的执行步中下发，不预置进任务 shell 环境。值只写不读：保存后只能覆盖或删除，无法再次查看。':
     'Team secrets are granted per Agent and released to the build steps that need them — never pre-set into the task shell environment. Values are write-only: once saved they can be overwritten or deleted, never viewed again.',
@@ -2175,4 +2171,99 @@ export const EN: Record<string, string> = {
   运行机器: 'Machine',
   目录: 'Folder',
   还没分配机器: 'No machine yet',
+  // MCP connectors (#4870)
+  '授权期间这个连接已有变动，没有保存这次授权。请重新连接。':
+    'The connection changed while you were signing in, so this sign-in was not saved. Reconnect it.',
+  '{name} 拒绝了这个令牌。检查令牌是否填对、有没有过期，然后换一个新的。':
+    '{name} rejected this token. Check that it is correct and not expired, then use a new one.',
+  '令牌有效，但权限不够。给令牌加上需要的权限后重新检查。':
+    'The token works but lacks permissions. Grant the permissions it needs, then check again.',
+  '{name} 10 秒内没有响应。稍后重新检查。':
+    '{name} did not answer within 10 seconds. Check again later.',
+  '连不上这个地址。检查地址是否正确、服务器是否在线。':
+    "Can't reach this address. Check the URL and that the server is online.",
+  '{name} 的授权已失效，重新连接一次。': 'The sign-in for {name} is no longer valid. Reconnect it.',
+  '{name} 收回了这次授权，重新连接一次。': '{name} revoked this sign-in. Reconnect it.',
+  '刷新 {name} 的授权时出错，稍后重新检查。':
+    'Refreshing the sign-in for {name} failed. Check again later.',
+  '{name} 返回了错误。稍后重新检查。': '{name} returned an error. Check again later.',
+  '这个标识已经被占用了，换一个标识再试。': 'This ID is already taken. Choose another one.',
+  '有字段格式不对。地址要以 https:// 开头，标识只能用小写字母、数字和 -。':
+    'A field is invalid. The URL must start with https://, and the ID may use only lowercase letters, digits and -.',
+  '没能保存，稍后重试。': "Couldn't save. Try again later.",
+  令牌: 'Token',
+  '{label}（可选）': '{label} (optional)',
+  '令牌加密存在本机服务器上，保存后看不到原文。':
+    "The token is stored encrypted on your server and can't be viewed after saving.",
+  '不填也能用；填了额度更高。': 'Works without one; a key raises your limits.',
+  '去 {name} 创建': 'Create one on {name}',
+  '连接 {name}': 'Connect {name}',
+  '正在连接…': 'Connecting…',
+  '添加 MCP 服务器': 'Add MCP server',
+  '任何支持远程 MCP 的服务器都可以加进来。': 'Add any server that speaks remote MCP.',
+  用浏览器登录: 'Sign in with browser',
+  团队知识库: 'Team wiki',
+  标识: 'ID',
+  'Agent 用这个名字调用它。只能用小写字母、数字和 -。':
+    'Agents call it by this name. Lowercase letters, digits and - only.',
+  '必须以 https:// 开头。': 'Must start with https://.',
+  '请求头（可选）': 'Headers (optional)',
+  '值加密存在本机服务器上，保存后看不到原文。服务器支持浏览器登录时，不填请求头，点「用浏览器登录」。':
+    "Values are stored encrypted on your server and can't be viewed after saving. If the server supports browser sign-in, leave headers empty and choose Sign in with browser.",
+  请求头名称: 'Header name',
+  请求头的值: 'Header value',
+  删除这个请求头: 'Remove this header',
+  添加请求头: 'Add header',
+  保存并检查: 'Save and check',
+  重新检查: 'Check again',
+  重新连接: 'Reconnect',
+  '用浏览器登录连接。删除只移除本机保存的令牌，{name} 那边的授权要在它的设置里撤销。':
+    "Connected by browser sign-in. Deleting removes only the tokens stored here; revoke the grant in {name}'s settings.",
+  '换一个{label}': 'Replace {label}',
+  '已连接 · {n} 个工具': 'Connected · {n#1 tool|# tools}',
+  需要重新授权: 'Needs sign-in',
+  连不上: 'Unreachable',
+  还没检查: 'Not checked yet',
+  '前往 {host} 登录': 'Sign in at {host}',
+  前往登录: 'Continue to sign in',
+  改用令牌: 'Use a token instead',
+  '接下来会打开下面这个网址登录并授权，授权后自动回到这里。':
+    "You'll sign in and approve access at the address below, then come back here automatically.",
+  '先确认这个网址属于 {name}，不认识就取消。':
+    "Make sure this address belongs to {name}. If you don't recognize it, cancel.",
+  知道了: 'Dismiss',
+  已接入: 'Connected',
+  '管理 {name}': 'Manage {name}',
+  可接入: 'Available',
+  '正在找到 {name} 的登录地址…': 'Finding the sign-in page for {name}…',
+  '接入 {name}': 'Connect {name}',
+  '正在准备…': 'Preparing…',
+  接入: 'Connect',
+  本机配置: 'Local config',
+  '来自服务器所在电脑的 ~/.claude.json，在那里修改。':
+    "From ~/.claude.json on the server's computer. Edit it there.",
+  '标识 {name} 已经被占用了，先删掉旧的连接或换个名字。':
+    'The ID {name} is already taken. Delete the old connection or pick another name.',
+  '{name} 不支持浏览器登录。改用令牌或请求头连接。':
+    "{name} doesn't support browser sign-in. Connect with a token or headers.",
+  '{name} 的登录服务没有接受 Cairn 的注册，稍后重试。':
+    "{name}'s sign-in service didn't accept Cairn's registration. Try again later.",
+  '没能开始登录 {name}，稍后重试。': "Couldn't start signing in to {name}. Try again later.",
+  '仓库、Issue、Pull Request 与 Actions': 'Repositories, issues, pull requests and Actions',
+  'Workers、DNS、R2 等 Cloudflare API': 'Workers, DNS, R2 and other Cloudflare APIs',
+  'Issue、项目与周期': 'Issues, projects and cycles',
+  页面与数据库: 'Pages and databases',
+  '错误与性能问题（测试版）': 'Errors and performance issues (beta)',
+  '数据库、函数与项目管理（测试版）': 'Databases, functions and project management (beta)',
+  '最新的库文档与代码示例，免登录直接用，也支持登录账号':
+    'Up-to-date library docs and code examples; works without sign-in, account sign-in also supported',
+  '模型、数据集与 Spaces': 'Models, datasets and Spaces',
+  个人访问令牌: 'Personal access token',
+  'API 令牌': 'API token',
+  访问令牌: 'Access token',
+  '新建细粒度令牌，选好仓库，把 Contents、Issues、Pull requests 设为读写；勾了只读就只给读取。':
+    'Create a fine-grained token, pick the repositories, and set Contents, Issues and Pull requests to read and write; with read-only on, read access is enough.',
+  只读: 'Read-only',
+  工具集: 'Toolsets',
+  '项目 ref': 'Project ref',
 };
