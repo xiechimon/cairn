@@ -419,8 +419,7 @@
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/chief/chief-report-row.tsx",
-          "apps/web/src/chief/chief-digest-row.tsx"
+          "apps/web/src/chief/chief-report-row.tsx"
         ],
         "server": [
           "apps/server/src/services/chief-report.ts",

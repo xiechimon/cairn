@@ -1623,19 +1623,7 @@ function collectChiefStream(
         items.push({ kind: 'daily-report', id: m.id, report: dailyReport.data });
         continue;
       }
-      const digest = chiefDigestContentSchema.safeParse(parsed);
-      if (digest.success) {
-        if (digest.data.items.length === 0) continue;
-        pendingTools = [];
-        items.push({
-          kind: 'digest',
-          id: m.id,
-          reason: digest.data.reason,
-          madeAt: digest.data.madeAt,
-          items: digest.data.items,
-        });
-        continue;
-      }
+      if (chiefDigestContentSchema.safeParse(parsed).success) continue;
     }
     const call = toolCallOfContent(m.content);
     if (call?.name === SUGGEST_REPLIES_TOOL_NAME) continue;
