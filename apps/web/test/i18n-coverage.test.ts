@@ -10,6 +10,7 @@ import {
   CHIEF_INPUT_PLACEHOLDER_STEERING,
   CHIEF_REBIND_CONFIRM_COPY,
   FS_PICK_ERROR_COPY,
+  GATE_ANNOUNCEMENTS,
   LOCAL_ERROR_REASON_COPY,
   MEMORY_UI_COPY,
   NOTIFICATION_BANNER_COPY,
@@ -63,6 +64,8 @@ const COMPUTED_KEYS = new Set<string>([
 
   MEMORY_UI_COPY.searchPlaceholder,
   MEMORY_UI_COPY.sort,
+
+  ...GATE_ANNOUNCEMENTS.map((announcement) => `{name} ${announcement}`),
 ]);
 
 const EXCLUDED_DIRS = ['fixtures', 'api'];
