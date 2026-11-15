@@ -68,6 +68,8 @@ export function workPurposes(steps: readonly WorkStep[], running: boolean, t: TF
   return [...new Set(purposes.filter((purpose) => purpose !== ''))].slice(0, NAMED_PURPOSES);
 }
 
+const FILE_NAME = /([\w.-]+\.[A-Za-z]\w*)/;
+
 function touchedFiles(steps: readonly WorkStep[], action: 'read' | 'edit'): string[] {
   const paths = steps.flatMap((step) =>
     step.kind === 'call' && step.action === action && !step.running && !step.error
@@ -175,7 +177,11 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
             stepTarget(call)
           )
         }
-        mono={call !== null && call.description === undefined && call.command !== undefined}
+        mono={
+          call !== null &&
+          call.description === undefined &&
+          (call.command !== undefined || call.action === 'edit' || call.action === 'read')
+        }
         trailing={
           <>
             {call?.diff !== undefined && (
@@ -226,7 +232,10 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
               prompt={call.command !== undefined}
               command={call.command ?? call.target ?? call.label}
             />
-            <TraceOutput data-testid="tool-output">
+            <TraceOutput
+              data-testid="tool-output"
+              className={call.error && changeLines === null ? 'text-destructive' : undefined}
+            >
               {call.error && changeLines !== null && call.output !== null && (
                 <span className="block text-destructive" data-testid="edit-error">
                   {call.output}
@@ -299,7 +308,21 @@ export function WorkTrace({
       <div className="flex items-center gap-1">
         <TraceGroupSummary
           data-testid="work-summary"
-          summary={running && purposes.length > 0 ? purposes.join(t('，')) : (result ?? text)}
+          summary={
+            running && purposes.length > 0
+              ? purposes.join(t('，'))
+              : result === null
+                ? text
+                : result.split(FILE_NAME).map((part, index) =>
+                    index % 2 === 1 ? (
+                      <span key={`${index}-${part}`} className="font-mono text-code">
+                        {part}
+                      </span>
+                    ) : (
+                      part
+                    ),
+                  )
+          }
           summaryTitle={failed === null ? detail : `${detail} ${failed}`}
           failed={failed}
           open={expanded}

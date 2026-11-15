@@ -210,7 +210,7 @@ function demoFixtureOf(): FixtureSet {
             id: '1',
             severity: 'blocking',
             summary: '合并覆盖了促销价',
-            description: 'mergeGuestCart 直接以 guest 行的 updatedAt 取价，会把闪购价顶掉。',
+            description: '`mergeGuestCart` 直接以 guest 行的 `updatedAt` 取价，会把闪购价顶掉。',
             file: 'src/cart/merge.ts',
             line: 42,
             suggestion: '两边都有的 SKU 保留低价那行。',
@@ -355,13 +355,13 @@ function demoFixtureOf(): FixtureSet {
       {
         kind: 'verify',
         passed: true,
-        conclusion: 'auth 套件 41 条全绿，限流窗口与提示文案均有覆盖。',
+        conclusion: '单测：auth 套件 41 条全绿，限流窗口与提示文案均有覆盖。',
         evidence: [{ path: 'src/auth/rate-limit.test.ts', note: '新增 9 条' }],
       },
       {
         kind: 'verify',
         passed: false,
-        conclusion: 'e2e 登录流有 2 条用例失败，疑似新 429 响应未进用例断言。',
+        conclusion: 'e2e：登录流有 2 条用例失败，疑似新 429 响应未进用例断言。',
         evidence: [
           { path: 'e2e/auth/login.spec.ts' },
           { path: 'test-results/auth-e2e.log', note: '第 3/41 条' },
