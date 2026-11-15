@@ -83,6 +83,9 @@ test.each([
       },
     });
     try {
+      await context.route('https://static.cloudflareinsights.com/**', (route) =>
+        route.fulfill({ contentType: 'application/javascript', body: '' }),
+      );
       const page = await context.newPage();
       const suffix = '?utm_source=chatgpt.com&utm_campaign=first%20task&tag=a&tag=b#install';
       await page.goto(`${baseUrl}${path}${suffix}`);
@@ -122,5 +125,37 @@ test('llms.txt serves a document index whose public site links resolve', async (
     const target = new URL(href!);
     const page = await fetch(`${baseUrl}${target.pathname}`);
     expect(page.status, href).toBe(200);
+  }
+});
+
+test('all public pages load one deferred Cloudflare beacon with the site token', async () => {
+  const context = await browser.newContext({ locale: 'en-US' });
+  try {
+    await context.route('https://static.cloudflareinsights.com/**', (route) =>
+      route.fulfill({ contentType: 'application/javascript', body: '' }),
+    );
+    const page = await context.newPage();
+    const docs = ['intro', 'install', 'models', 'runner', 'first-task', 'faq'];
+    const paths = [
+      '/',
+      '/zh-cn/',
+      ...docs.flatMap((slug) => [`/docs/${slug}/`, `/zh-cn/docs/${slug}/`]),
+      '/missing-page/',
+    ];
+    for (const path of paths) {
+      const response = await page.goto(`${baseUrl}${path}`);
+      expect(response?.status(), path).toBe(path === '/missing-page/' ? 404 : 200);
+      const beacon = page.locator(
+        'script[src="https://static.cloudflareinsights.com/beacon.min.js"]',
+      );
+      await browserExpect(beacon).toHaveCount(1);
+      expect(await beacon.getAttribute('defer'), path).not.toBeNull();
+      expect(JSON.parse((await beacon.getAttribute('data-cf-beacon')) ?? '{}'), path).toEqual({
+        token: 'a2f5ef9618404d5ea00a0820a8a1fba3',
+      });
+      await browserExpect(page.locator('script[src*="vercel-insights"]')).toHaveCount(0);
+    }
+  } finally {
+    await context.close();
   }
 });
