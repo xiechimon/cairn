@@ -730,6 +730,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               labelDetail={item.labelDetail}
               waiting={item.waiting === true}
               notice={isLiveNotice(item.label, item.labelDetail)}
+              blocked={item.blocked === true}
             />
           </MessageContent>
         </Message>

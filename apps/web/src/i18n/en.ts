@@ -884,6 +884,30 @@ export const EN: Record<string, string> = {
     'Queued: no {platform} Runner yet · needs {platform}',
   '排队中：等 {machine} 上线 · 需要 {platform}（前面 {ahead} 个）':
     'Queued: waiting for {machine} to come online · needs {platform} ({ahead} ahead)',
+  '这台 Runner 没上报任务沙箱状态，接不了任务。更新 CLI 后在这台机器上运行 `{command} restart`。':
+    'This Runner has not reported its task sandbox, so it cannot take tasks. Update the CLI, then run `{command} restart` on this machine.',
+  '正在检查任务沙箱，检查完才接任务。':
+    'Checking the task sandbox; this Runner takes tasks once the check passes.',
+  '这台机器的系统不支持任务沙箱，接不了任务。':
+    "This machine's system does not support the task sandbox, so it cannot take tasks.",
+  '任务沙箱没就绪，这台 Runner 接不了任务。Linux 上 daemon 要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。':
+    'The task sandbox is not ready, so this Runner cannot take tasks. On Linux the daemon must run as its own systemd user unit with bubblewrap (`bwrap`) installed: update the CLI, then run `{command} restart` on this machine.',
+  '排队中：{machine} 的任务沙箱没就绪，接不了任务——在那台机器上运行 cairn restart，原因见 Runner 页（前面 {ahead} 个）':
+    'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks. Run cairn restart on that machine; the Runner page shows why ({ahead} ahead)',
+  '排队中：{machine} 没开 {runtime}——到 Runner 页打开（前面 {ahead} 个）':
+    'Queued: {machine} has {runtime} turned off. Turn it on in the Runner page ({ahead} ahead)',
+  '排队中：{machine} 用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）':
+    'Queued: {machine} cannot use the model for this step. Pick another model in work routing ({ahead} ahead)',
+  '排队中：本地项目只在它所在的 Runner 上跑，{machine} 跑不了（前面 {ahead} 个）':
+    'Queued: a local project only runs on the Runner that holds it, so {machine} cannot run it ({ahead} ahead)',
+  '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）':
+    'Queued: Claude is rate limited on {machine}; this continues once the limit lifts ({ahead} ahead)',
+  '排队中：{machine} 上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）':
+    'Queued: Claude Code is not logged in on {machine}. Run claude on that machine to log in ({ahead} ahead)',
+  '排队中：团队只用 Claude 订阅，{machine} 上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）':
+    'Queued: this team uses Claude subscriptions only and Claude Code on {machine} is not logged in with one. Log in with a subscription there, or allow pay as you go in Usage & connections ({ahead} ahead)',
+  'Coordinator 用不了它的模型：规则里的连接没有 API key，或要走付费 Claude——到工作路由改 Coordinator 规则':
+    'The Coordinator cannot use its model: the connection in its rule has no API key, or it needs paid Claude. Change the Coordinator rule in work routing',
   运行平台: 'Platform',
   '不限时用默认 Runner': 'Any uses the default Runner',
   '需要 {platform}': 'needs {platform}',
@@ -1941,6 +1965,8 @@ export const EN: Record<string, string> = {
   '最后在线 {time}': 'Last seen {time}',
   系统未知: 'Unknown OS',
   '更新 Cairn 后才能接有平台要求的任务': 'Update Cairn to take tasks that need a platform',
+  '任务沙箱没就绪，暂时接不了任务——展开看怎么修':
+    'Task sandbox not ready, so this Runner cannot take tasks. Expand to see how to fix it',
   '选择这台 Runner 接哪些运行时': 'Choose which runtimes this Runner takes work for',
   '重新连接 {name} 后才能修改它的设置。': 'Reconnect {name} to change its settings.',
   '在这台 Runner 上确认它已联网、没有休眠，然后运行 `{command}` 重新启动。上线后这里会自动变回在线。':

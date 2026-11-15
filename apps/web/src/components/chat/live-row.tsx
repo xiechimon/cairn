@@ -79,6 +79,15 @@ export function TypingDots({
   );
 }
 
+export function BlockedTyping({ text }: { text: string }) {
+  return (
+    <span className="flex min-w-0 flex-col items-start gap-1" data-testid="queue-blocked">
+      <TypingDots />
+      <span className="text-meta text-content-secondary [overflow-wrap:anywhere]">{text}</span>
+    </span>
+  );
+}
+
 export function LiveSignal({ at, className }: { at?: number | null; className: string }) {
   const { t } = useI18n();
   const secs = useLiveSeconds(at ?? null);
@@ -94,6 +103,7 @@ export interface LiveRowProps {
   quiet?: boolean;
   waiting?: boolean;
   notice?: boolean;
+  blocked?: boolean;
   disclosure?: { expand: string; collapse: string } | null;
   children?: ReactNode;
 }
@@ -106,6 +116,7 @@ export function LiveRow({
   quiet = false,
   waiting = false,
   notice = true,
+  blocked = false,
   disclosure = null,
   children,
 }: LiveRowProps) {
@@ -128,6 +139,7 @@ export function LiveRow({
   const testid = variant === 'detail' ? 'live-row' : undefined;
   if (variant === 'chief' && !waiting) {
     const labelText = t(label, labelVars);
+    if (blocked) return <BlockedTyping text={labelText} />;
     if (!notice) return <TypingDots label={labelText} />;
     return (
       <Tooltip>
