@@ -14,7 +14,7 @@ export function FormStack({ className, children }: { className?: string; childre
 interface FormFieldProps {
   label: string;
   htmlFor: string;
-  help?: string;
+  help?: ReactNode;
   className?: string;
   children: ReactNode;
 }

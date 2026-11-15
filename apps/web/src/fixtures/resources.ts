@@ -1,4 +1,4 @@
-import type { ModelSource, ProviderRecord } from '@cairn/shared';
+import type { McpConnectorRecord, ModelSource, ProviderRecord } from '@cairn/shared';
 import {
   legacyDone,
   legacyReview,
@@ -7,6 +7,7 @@ import {
   MACHINE_REMOTE_ID,
   MACHINE_REMOTE_NAME,
   r7,
+  TEAM_ID,
 } from './core.js';
 import type { FixtureSet, ResourcesContent } from './records.js';
 
@@ -488,4 +489,103 @@ export const providersFleet: FixtureSet = {
 export const providersEmpty: FixtureSet = {
   ...resourcesDefault,
   resources: { ...RESOURCES, providers: [], providerSources: [PROVIDER_SOURCE_PI] },
+};
+
+const connector = (
+  id: string,
+  fields: Pick<
+    McpConnectorRecord,
+    'slug' | 'label' | 'catalogId' | 'url' | 'headerNames' | 'status' | 'authKind'
+  > &
+    Partial<McpConnectorRecord>,
+): McpConnectorRecord => ({
+  id,
+  teamId: TEAM_ID,
+  statusReason: null,
+  toolCount: null,
+  checkedAt: r7(13, 10),
+  createdAt: r7(9, 0),
+  updatedAt: r7(13, 10),
+  ...fields,
+});
+
+const MCP_CONNECTORS: McpConnectorRecord[] = [
+  connector('mcp-github', {
+    slug: 'github',
+    label: 'GitHub',
+    catalogId: 'github',
+    url: 'https://api.githubcopilot.com/mcp/',
+    headerNames: ['Authorization', 'X-MCP-Readonly'],
+    authKind: 'static',
+    status: 'connected',
+    toolCount: 41,
+  }),
+  connector('mcp-context7', {
+    slug: 'context7',
+    label: 'Context7',
+    catalogId: 'context7',
+    url: 'https://mcp.context7.com/mcp',
+    headerNames: [],
+    authKind: 'none',
+    status: 'connected',
+    toolCount: 2,
+  }),
+  connector('mcp-cloudflare', {
+    slug: 'cloudflare',
+    label: 'Cloudflare',
+    catalogId: 'cloudflare',
+    url: 'https://mcp.cloudflare.com/mcp',
+    headerNames: [],
+    authKind: 'oauth',
+    status: 'needs_auth',
+    statusReason: 'refresh_rejected',
+  }),
+  connector('mcp-wiki', {
+    slug: 'team-wiki',
+    label: '团队知识库',
+    catalogId: null,
+    url: 'https://wiki.example.com/mcp',
+    headerNames: ['Authorization'],
+    authKind: 'static',
+    status: 'error',
+    statusReason: 'timeout',
+  }),
+];
+
+export const resourcesMcpConnectors: FixtureSet = {
+  ...resourcesDefault,
+  resources: { ...RESOURCES, mcpConnectors: MCP_CONNECTORS },
+};
+
+export const resourcesMcpConnectGithub: FixtureSet = {
+  ...resourcesDefault,
+  resources: { ...RESOURCES, mcpConnectors: MCP_CONNECTORS.slice(1) },
+  ui: { mcpDialog: { kind: 'catalog', catalogId: 'github' } },
+};
+
+export const resourcesMcpAddServer: FixtureSet = {
+  ...resourcesMcpConnectors,
+  ui: { mcpDialog: { kind: 'custom' } },
+};
+
+export const resourcesMcpManageNeedsAuth: FixtureSet = {
+  ...resourcesMcpConnectors,
+  ui: { mcpDialog: { kind: 'manage', connectorId: 'mcp-cloudflare' } },
+};
+
+export const resourcesMcpAuthorizing: FixtureSet = {
+  ...resourcesMcpConnectors,
+  ui: { mcpDialog: { kind: 'authorizing', catalogId: 'notion' } },
+};
+
+export const resourcesMcpConfirmHost: FixtureSet = {
+  ...resourcesMcpConnectors,
+  ui: {
+    mcpDialog: { kind: 'confirm', name: '团队知识库', host: 'auth.wiki.example.com' },
+  },
+};
+
+export const resourcesMcpOAuthDenied: FixtureSet = {
+  ...resourcesMcpConnectors,
+  ui: { mcpDialog: { kind: 'landing', reason: 'denied', name: 'Linear' } },
 };

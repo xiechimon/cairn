@@ -154,6 +154,13 @@ export interface OverlayUi {
   langDropdownOpen?: boolean;
   notificationBanner?: boolean;
   notificationPermission?: NotificationPermission;
+  mcpDialog?:
+    | { kind: 'catalog'; catalogId: string }
+    | { kind: 'custom' }
+    | { kind: 'manage'; connectorId: string }
+    | { kind: 'authorizing'; catalogId: string }
+    | { kind: 'confirm'; name: string; host: string }
+    | { kind: 'landing'; reason: string; name?: string };
 }
 
 export interface ScheduleRecord {
@@ -317,6 +324,7 @@ export interface MachineRow {
 export interface ResourcesContent {
   skills: SkillRow[];
   mcpServers: McpRow[];
+  mcpConnectors?: import('@cairn/shared').McpConnectorRecord[];
   machines: MachineRow[];
   providerSources: ModelSource[];
   providers?: ProviderRecord[];

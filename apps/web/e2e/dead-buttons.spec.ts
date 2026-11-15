@@ -130,23 +130,45 @@ test('resources empty state drops the `查看文档` link (#307); skills empty-s
   await expect(secretsEmpty.getByRole('button', { name: '添加密钥' })).toBeVisible();
 });
 
-test('mcp page is read-only: no create entry, no per-row more-menu ink, empty state points at ~/.claude.json (#368)', async ({
+test('mcp page: catalog cards connect, add-server opens a form, local rows stay read-only (#4870)', async ({
   page,
 }) => {
-
   await page.goto('/app/resources/mcp-servers?scenario=01');
-  await expect(page.getByRole('button', { name: '新建', exact: true })).toHaveCount(0);
-  const empty = page.getByTestId('resource-empty');
-  await expect(empty).toBeVisible();
-  await expect(empty.getByRole('button')).toHaveCount(0);
-  await expect(empty.locator('p')).toContainText('~/.claude.json');
+  const catalog = page.getByTestId('mcp-catalog');
+  await expect(catalog.locator('[data-connector-card]')).toHaveCount(8);
+  await expect(page.getByTestId('resource-empty')).toHaveCount(0);
+  await catalog.getByRole('button', { name: '接入 Linear' }).click();
+  const signIn = page.getByRole('dialog', { name: '前往 mcp.linear.app 登录' });
+  await expect(signIn).toBeVisible();
+  await expect(signIn.getByTestId('mcp-signin-host')).toHaveText('mcp.linear.app');
+  await signIn.getByRole('button', { name: '改用令牌' }).click();
+  await expect(page.getByRole('dialog', { name: '连接 Linear' })).toBeVisible();
+  await page.getByRole('button', { name: '取消' }).click();
+  await catalog.getByRole('button', { name: '接入 GitHub' }).click();
+  await expect(page.getByRole('dialog', { name: '连接 GitHub' })).toContainText('Pull requests');
+  await page.getByRole('button', { name: '取消' }).click();
+  await page.getByTestId('mcp-add-server').click();
+  await expect(page.getByRole('dialog', { name: '添加 MCP 服务器' })).toBeVisible();
+
+  await page.goto('/app/resources/mcp-servers?scenario=mcp-manage-needs-auth');
+  const manage = page.getByRole('dialog', { name: 'Cloudflare' });
+  await expect(manage.getByTestId('dialog-foot').getByRole('button').last()).toHaveText('重新连接');
+  await manage.getByRole('button', { name: '删除' }).click();
+  const confirm = page.getByRole('alertdialog', { name: '删除连接' });
+  await expect(confirm).toBeVisible();
+  await expect(manage).toHaveCount(0);
+  await confirm.getByRole('button', { name: '取消' }).click();
+  await expect(manage).toBeVisible();
+
+  await page.goto('/app/resources/mcp-servers?scenario=mcp-oauth-denied');
+  const banner = page.getByTestId('mcp-oauth-error');
+  await expect(banner).toContainText('没能连上 Linear');
+  await expect(banner.getByRole('button', { name: '重试' })).toBeVisible();
 
   await page.goto('/app/resources/mcp-servers?scenario=07');
   await expect(page.locator('[data-testid="resource-row"][data-mcp]')).toHaveCount(1);
   await expect(page.locator('[data-testid="resource-row"] button')).toHaveCount(0);
-  await expect(page.getByRole('dialog')).toHaveCount(1);
   await expect(page.getByRole('dialog', { name: '设置' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '新建', exact: true })).toHaveCount(0);
 });
 
 test('project settings drops the avatar `更换` ink (#307, supersedes the #177 chrome verdict)', async ({
