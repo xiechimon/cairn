@@ -21,6 +21,9 @@ export interface McpCatalogEntry {
   auth: readonly McpConnectorAuth[];
   tokenLabel?: string;
   tokenHelpUrl?: string;
+  tokenHelp?: string;
+  oauthScope?: string;
+  oauthOptions?: Readonly<Record<string, string>>;
   options: readonly McpCatalogOption[];
 }
 
@@ -34,6 +37,8 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
     auth: ['token'],
     tokenLabel: '个人访问令牌',
     tokenHelpUrl: 'https://github.com/settings/personal-access-tokens/new',
+    tokenHelp:
+      '新建细粒度令牌，选好仓库，把 Contents、Issues、Pull requests 设为读写；勾了只读就只给读取。',
     options: [
       { id: 'readonly', label: '只读', kind: 'header', name: 'X-MCP-Readonly', input: 'flag' },
       { id: 'toolsets', label: '工具集', kind: 'header', name: 'X-MCP-Toolsets', input: 'text' },
@@ -88,6 +93,8 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
     auth: ['oauth', 'token'],
     tokenLabel: '个人访问令牌',
     tokenHelpUrl: 'https://supabase.com/dashboard/account/tokens',
+    oauthScope: 'organizations:read projects:read database:read analytics:read',
+    oauthOptions: { readonly: 'true' },
     options: [
       { id: 'project', label: '项目 ref', kind: 'query', name: 'project_ref', input: 'text' },
       { id: 'readonly', label: '只读', kind: 'query', name: 'read_only', input: 'flag' },
@@ -96,7 +103,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   {
     id: 'context7',
     name: 'Context7',
-    description: '最新的库文档与代码示例',
+    description: '最新的库文档与代码示例，免登录直接用，也支持登录账号',
     url: 'https://mcp.context7.com/mcp',
     docsUrl: 'https://github.com/upstash/context7',
     auth: ['none', 'token'],
@@ -113,6 +120,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
     auth: ['none', 'oauth', 'token'],
     tokenLabel: '访问令牌',
     tokenHelpUrl: 'https://huggingface.co/settings/tokens',
+    oauthScope: 'openid profile read-mcp',
     options: [],
   },
 ];

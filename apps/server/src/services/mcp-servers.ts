@@ -603,14 +603,16 @@ function oauthTarget(
   deps: McpConnectorDeps,
   teamId: string,
   body: StartMcpConnectorOAuthBody,
-): { target: McpOAuthTarget; url: string } {
+): { target: McpOAuthTarget; url: string; scope?: string } {
   if (body.kind === 'reconnect') {
     const row = connectorRow(deps, teamId, body.connectorId);
     if (row.authKind !== 'oauth')
       throw new HttpError(400, 'only a browser sign-in connector can reconnect');
+    const scope = row.catalogId === null ? undefined : mcpCatalogEntry(row.catalogId)?.oauthScope;
     return {
       target: { kind: 'reconnect', connectorId: row.id, authRevision: row.authRevision },
       url: row.url,
+      ...(scope === undefined ? {} : { scope }),
     };
   }
   assertSlugFree(deps, teamId, body.slug);
@@ -628,7 +630,7 @@ function oauthTarget(
     };
   const entry = mcpCatalogEntry(body.catalogId);
   if (!entry) throw notFound(`catalog entry ${body.catalogId}`);
-  const built = catalogTarget(entry, undefined, body.options ?? {}, true);
+  const built = catalogTarget(entry, undefined, { ...entry.oauthOptions, ...body.options }, true);
   return {
     target: {
       kind: 'new',
@@ -639,6 +641,7 @@ function oauthTarget(
       headers: built.headers,
     },
     url: built.url,
+    ...(entry.oauthScope === undefined ? {} : { scope: entry.oauthScope }),
   };
 }
 
@@ -734,10 +737,12 @@ export async function prepareMcpConnectorOAuth(
   teamId: string,
   input: { body: StartMcpConnectorOAuthBody; origin: string; state: string },
 ): Promise<{ authorizationUrl: string; pending: McpOAuthPending }> {
-  const { target, url } = oauthTarget(deps, teamId, input.body);
+  const { target, url, scope: catalogScope } = oauthTarget(deps, teamId, input.body);
   const { redirectUri, applicationType } = redirectFor(input.origin);
   const fetchFn = guardedOAuthFetch(deps);
-  const { asUrl, resource, scope } = await discoverAuthServer(fetchFn, url);
+  const discovered = await discoverAuthServer(fetchFn, url);
+  const { asUrl, resource } = discovered;
+  const scope = catalogScope ?? discovered.scope;
   let issAdvertised = false;
   const metadataFetch: typeof fetch = async (request, init) => {
     const res = await fetchFn(request, init);

@@ -519,6 +519,20 @@ describe('MCP connector OAuth', () => {
     );
   });
 
+  test('a catalog entry asks for its own smallest scope and default options', async () => {
+    const t = bootOAuth({ resource: 'https://mcp.supabase.com/mcp' });
+    const started = await t.start({ kind: 'catalog', catalogId: 'supabase', slug: 'supabase' });
+    expect(started.url?.searchParams.get('scope')).toBe(
+      'organizations:read projects:read database:read analytics:read',
+    );
+    await t.callback({ code: 'code-ok', state: started.state, iss: AS });
+    expect(t.row()?.url).toBe('https://mcp.supabase.com/mcp?read_only=true');
+    const again = await t.start({ kind: 'reconnect', connectorId: t.row()?.id ?? '' });
+    expect(again.url?.searchParams.get('scope')).toBe(
+      'organizations:read projects:read database:read analytics:read',
+    );
+  });
+
   test('start refuses servers and origins it cannot sign in with safely', async () => {
     const cases: [AuthWorldOptions, string?][] = [
       [{ metadata: { code_challenge_methods_supported: undefined } }],
