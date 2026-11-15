@@ -1,15 +1,17 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { StepEvent } from '@cairn/shared';
 import { afterEach, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { createClaudeCodeBackend } from '../src/backend/claude-code.js';
 
 const FAKE = resolve(__dirname, 'fixtures/fake-claude.mjs');
 
+const dirs: string[] = [];
 afterEach(() => {
   delete process.env.FAKE_CLAUDE_LOG;
+  for (const dir of dirs.splice(0)) releaseTestTempDir(dir);
 });
 
 test.each([
@@ -18,7 +20,8 @@ test.each([
 ])(
   'a stored setup-token reaches the real claude spawn path and the task edits its workspace (orb=%s)',
   async (inOrb, via) => {
-    const dir = mkdtempSync(join(tmpdir(), 'fake-claude-'));
+    const dir = makeTestTempDir('fake-claude-');
+    dirs.push(dir);
     const log = join(dir, 'log');
     process.env.FAKE_CLAUDE_LOG = log;
     const token = 'sk-ant-oat01-synthetic-token';
