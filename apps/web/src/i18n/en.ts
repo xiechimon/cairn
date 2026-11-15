@@ -251,7 +251,7 @@ export const EN: Record<string, string> = {
   '在要干活的电脑上运行 `{command}`': 'Run `{command}` on the computer that should do the work',
   '{name} 离线': '{name} is offline',
   '在 {name} 上运行 `{command}` 让它重新上线': 'Run `{command}` on {name} to bring it back',
-  '{n} 台 Runner 都离线': '{n} Runners are offline',
+  '{n} 台 Runner 都离线': '{n#1 Runner is|# Runners are} offline',
   '在其中一台上运行 `{command}` 让它重新上线': 'Run `{command}` on one of them to bring it back',
   'Coordinator 还不能回答': 'The Coordinator cannot answer yet',
   '点输入框下方的按钮，把模型来源、Runner 和 Coordinator 接上，再发一次。':
