@@ -19,8 +19,8 @@
 | status shipped | 44 |
 | status partial | 8 |
 | status planned | 3 |
-| research, frontend design and backend design all present or not applicable | 24 |
-| Research gaps | 13 |
+| research, frontend design and backend design all present or not applicable | 25 |
+| Research gaps | 12 |
 | Frontend design gaps | 19 |
 | Backend design gaps | 19 |
 | notes cited but not on main | 21 |
@@ -70,7 +70,7 @@
 | [Built-in git hosting](#git-hosting) | 3 | shipped | gap | n/a | gap | B11 |
 | [GitHub connection and issues](#github) | 3 | shipped | yes | yes | yes |  |
 | [Harness profile](#harness-profile) | 3 | partial | yes (not on main) | gap | yes | B9 |
-| [MCP servers](#mcp-servers) | 3 | shipped | gap | yes | yes | B9 |
+| [MCP servers](#mcp-servers) | 3 | shipped | yes | yes | yes |  |
 | [Projects](#projects) | 3 | shipped | yes | yes | yes |  |
 | [Quota wait](#quota-wait) | 3 | shipped | yes | gap | gap | B9 |
 | [Research before retry and plan](#research-loop) | 3 | shipped | yes | n/a | yes |  |
@@ -165,7 +165,6 @@ Settings that change how harnesses run on each machine: skills, MCP servers, the
 | Feature | Centrality | Missing |
 |---|---|---|
 | [Harness profile](#harness-profile) | 3 | Frontend design: the settings section planned in plan §22.7 is not in the repository |
-| [MCP servers](#mcp-servers) | 3 | Research: no note on MCP configuration surfaces in t3code and Amp |
 | [Quota wait](#quota-wait) | 3 | Frontend design: the quota banner and waiting thread state have no design<br>Backend design: no design for rate-limit events, account cooldown and resume |
 | [Skills](#skills) | 3 | Research: no current note on how Amp, t3code and Claude Code manage skills across machines |
 
@@ -531,9 +530,9 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 **MCP servers** (shipped). The read-only list of MCP servers configured on each machine.
 
-- Research: **gap**: no note on MCP configuration surfaces in t3code and Amp
-- Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md)
-- Backend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md)
+- Research: [docs/research/mcp-connectors-2026-11-15.md](research/mcp-connectors-2026-11-15.md)
+- Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](design/mcp-connectors.md)
+- Backend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](design/mcp-connectors.md)
 
 ### projects
 

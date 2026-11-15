@@ -2040,20 +2040,21 @@
       "verify": [
         ".claude/skills/verify-cairn/features/mcp-servers.md"
       ],
-      "research": {
-        "gap": "no note on MCP configuration surfaces in t3code and Amp"
-      },
+      "research": [
+        "docs/research/mcp-connectors-2026-11-15.md"
+      ],
       "frontendDesign": [
-        "docs/spec/13-resources-view-localization.md"
+        "docs/spec/13-resources-view-localization.md",
+        "docs/design/mcp-connectors.md"
       ],
       "backendDesign": [
-        "docs/spec/13-resources-view-localization.md"
+        "docs/spec/13-resources-view-localization.md",
+        "docs/design/mcp-connectors.md"
       ],
       "evidence": [
         "apps/server/test/mcp-servers.test.ts",
         "apps/daemon/test/mcp-config.test.ts"
-      ],
-      "batch": "B9"
+      ]
     },
     {
       "id": "harness-profile",

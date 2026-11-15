@@ -1,0 +1,54 @@
+# MCP connectors: prior art and official remote servers
+
+Date: 2026-11-15. Question: how should personal Cairn offer one-click connection of public services through their official remote MCP servers, plus an "add any MCP server" form, while credentials stay on the owner's machines? Feeds [the design](../design/mcp-connectors.md).
+
+Labels: verified = read first-hand in the doc, source or live metadata; inferred = derived from verified facts; guess = the rest. Live `.well-known` metadata was fetched on 2026-11-15. No real OAuth flow or dynamic registration was completed against any vendor.
+
+## Products and projects
+
+| Source | Where servers are configured | Auth | Where credentials live | Status shown | Link |
+|---|---|---|---|---|---|
+| MCP spec 2026-07-28 (latest) | n/a | Protected resource metadata (RFC 9728), then RFC 8414 or OIDC discovery; registration order pre-registered, Client ID Metadata Document (CIMD), Dynamic Client Registration (DCR, deprecated); PKCE S256; `resource` (RFC 8707) on authorize and token; `iss` check (RFC 9207); redirect must be localhost or https verified | client "MUST implement secure token storage", client credentials keyed by issuer verified | n/a | [authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization) |
+| Claude Code | `~/.claude.json` (local, user), `.mcp.json` (project) via `claude mcp add` verified | headers, or OAuth with CIMD, DCR or `--client-id`; loopback callback verified | Linux `~/.claude/.credentials.json` (`mcpOAuth`, 0600), macOS Keychain verified | `claude mcp list`: Connected, Needs authentication, Failed to connect verified | [docs](https://code.claude.com/docs/en/mcp) |
+| Claude.ai connectors | Directory plus custom connector (URL, sign-in mode, OAuth client choice, headers) verified | Anthropic's cloud is the client; callback `https://claude.ai/api/mcp/auth_callback`; public port 443 only verified | Anthropic servers, "stored encrypted" verified | per-chat toggles; per tool Always allow, Needs approval, Blocked verified | [support 11175166](https://support.claude.com/en/articles/11175166) |
+| Amp | Settings → Integrations & MCP (personal, workspace, project) or local `amp.mcpServers` verified | remote definitions: OAuth via ampcode.com, bearer, none; local: CIMD then DCR, or manual client verified | ampcode.com (secret headers encrypted, never shown again) or the runner's secret storage verified | cards with Reconnect and Refresh Tools; per tool Allow, Ask First, Disabled verified | [docs](https://ampcode.com/docs/markdown/customize/mcp) |
+| OpenHands (agent-server `2aae48b6`, UI `02c438a7`) | settings UI and catalog install modal; `sse`, `shttp`, `stdio`; auth `none`, `api_key`, `bearer`, `header`, `oauth2` verified | agent-server runs OAuth (discovery, DCR, PKCE), redirect to `<callback_base_url>/api/mcp/oauth/redirect` or loopback; re-registers when the redirect URI changes verified | local `settings.json`, 0600, Fernet with `OH_SECRET_KEY`; UI sees only `**********` verified | unchecked, checking, healthy (verified or connectivity-only), failed with kind verified | [mcp_router.py](https://github.com/OpenHands/software-agent-sdk/blob/2aae48b67a57fa852ebca946ac64ee8b8500e889/openhands-agent-server/openhands/agent_server/mcp_router.py#L554-L640) |
+| LibreChat (`5473f910`) | `librechat.yaml` `mcpServers` plus UI builder for HTTP and SSE only verified | per-user OAuth with the MCP SDK (DCR, PKCE), callback `${DOMAIN_SERVER}/api/mcp/:serverName/oauth/callback`; refresh with an optimistic lock verified | MongoDB, AES with `CREDS_KEY`; access, refresh and client info as separate records verified | badge: connecting, connected, needs-auth, error; reinitialize route verified | [handler.ts](https://github.com/danny-avila/LibreChat/blob/5473f91036bbe388cdcdd60f3ecac22e6138cf47/packages/api/src/mcp/oauth/handler.ts#L707-L800) |
+
+OpenHands' catalog (`OpenHands/extensions` `integrations/catalog/*.json`, 79 entries) gives each entry `connectionOptions[]` with transport and auth strategy, credential label and help; its GitHub entry offers OAuth and PAT against `https://api.githubcopilot.com/mcp/` verified ([github.json](https://github.com/OpenHands/extensions/blob/b98ac0671a51cc91bab3609bf4d334c7c832dd98/integrations/catalog/github.json)).
+
+## Installed SDK
+
+`@modelcontextprotocol/sdk` 1.30.0, pinned in `apps/server` and `apps/daemon`; `LATEST_PROTOCOL_VERSION = '2025-11-25'` verified. `client/auth.js` exports `auth`, `discoverOAuthProtectedResourceMetadata`, `discoverAuthorizationServerMetadata`, `startAuthorization`, `exchangeAuthorization`, `refreshAuthorization`, `registerClient`, `selectResourceURL` and the `OAuthClientProvider` interface (`clientInformation`, `saveClientInformation`, `tokens`, `saveTokens`, `redirectToAuthorization`, `saveCodeVerifier`, `codeVerifier`, `validateResourceURL`, `invalidateCredentials`, `saveDiscoveryState`) verified. It supports pre-registered clients, CIMD (https `clientMetadataUrl` only), DCR and refresh verified. Gaps against the spec verified: `resource` is sent only when protected resource metadata exists; no refusal when `code_challenge_methods_supported` is absent; no RFC 9207 `iss` check; no `application_type`.
+
+## Official remote servers
+
+| Service | Endpoint | Auth | DCR | Token header | Self-hosted client without vendor approval | Source |
+|---|---|---|---|---|---|---|
+| GitHub | `https://api.githubcopilot.com/mcp/` (`/readonly`, `/x/{toolset}`) | OAuth with a pre-registered GitHub or OAuth App, or PAT verified | no verified | `Authorization: Bearer <PAT>` verified | PAT yes per docs (not called) verified; OAuth needs the owner's own app | [remote-server.md](https://github.com/github/github-mcp-server/blob/0663b830582af923e30fb14cb2e10dd3248baa86/docs/remote-server.md), [host-integration.md](https://github.com/github/github-mcp-server/blob/0663b830582af923e30fb14cb2e10dd3248baa86/docs/host-integration.md) |
+| Cloudflare | `https://mcp.cloudflare.com/mcp` | OAuth or API token verified | yes, also CIMD verified | `Authorization: Bearer <token>` verified | yes inferred | [cloudflare/mcp](https://github.com/cloudflare/mcp) |
+| Cloudflare docs | `https://docs.mcp.cloudflare.com/mcp` | none verified | n/a | n/a | yes | [README](https://github.com/cloudflare/mcp-server-cloudflare) |
+| Linear | `https://mcp.linear.app/mcp` (`/readonly`) | OAuth or API key verified | yes verified | Bearer verified | yes verified | [linear.app/docs/mcp](https://linear.app/docs/mcp) |
+| Notion | `https://mcp.notion.com/mcp` | OAuth; token on Business and Enterprise only verified | yes verified | Bearer verified | yes inferred | [developers.notion.com](https://developers.notion.com/docs/get-started-with-mcp) |
+| Sentry (beta) | `https://mcp.sentry.dev/mcp` | OAuth verified | yes verified | none remote inferred | yes inferred | [docs.sentry.io](https://docs.sentry.io/product/sentry-mcp/) |
+| Supabase (beta) | `https://mcp.supabase.com/mcp?project_ref=…&read_only=true` | OAuth or PAT verified | yes verified | Bearer verified | yes inferred | [supabase.com](https://supabase.com/docs/guides/getting-started/mcp) |
+| Context7 | `https://mcp.context7.com/mcp` | API key (optional) or OAuth verified | yes verified | Bearer verified | yes inferred | [upstash/context7](https://github.com/upstash/context7) |
+| Hugging Face | `https://huggingface.co/mcp` | anonymous, OAuth (`?login`) or token verified | yes verified | Bearer verified | yes inferred | [hf-mcp-server](https://github.com/huggingface/hf-mcp-server) |
+| GitLab | `https://gitlab.com/api/v4/mcp` | OAuth or fine-grained PAT; group must allow MCP verified | yes verified | Bearer inferred | yes inferred | [docs.gitlab.com](https://docs.gitlab.com/user/gitlab_duo/model_context_protocol/mcp_server/) |
+| Stripe (preview) | `https://mcp.stripe.com` | OAuth or agent API key verified | yes verified | Bearer verified | yes inferred | [docs.stripe.com/mcp](https://docs.stripe.com/mcp) |
+| Vercel | `https://mcp.vercel.com` | OAuth, CIMD or reviewed clients only verified | not for us verified | none | no: needs a public CIMD document | [vercel.com/docs](https://vercel.com/docs/mcp/vercel-mcp) |
+| Figma | `https://mcp.figma.com/mcp` | OAuth, catalog-listed clients only verified | not for us | none | no | [figma docs](https://developers.figma.com/docs/figma-mcp-server/remote-server-installation/) |
+| Slack | `https://mcp.slack.com/mcp` | own Slack app, confidential client verified | no verified | n/a | only with an internal Slack app | [docs.slack.dev](https://docs.slack.dev/ai/slack-mcp-server/) |
+| Atlassian | `https://mcp.atlassian.com/v2/mcp` | OAuth with admin-allowlisted redirect domain, or admin-enabled token verified | yes verified | Basic or Bearer verified | only after admin steps | [support.atlassian.com](https://support.atlassian.com/atlassian-rovo-mcp-server/docs/getting-started-with-the-atlassian-remote-mcp-server/) |
+
+## Pattern that fits Cairn
+
+The hosted products (Claude.ai, Amp remote definitions) broker OAuth in their own cloud and keep tokens there, which personal Cairn must not copy. The fit is OpenHands' agent-server shape inferred: the self-hosted server is the OAuth client, the redirect lands on the owner's own origin, tokens are encrypted at rest with a local key, the browser never sees a value, and a runtime that cannot finish OAuth only refreshes or reports "authorize again". From LibreChat take the separate storage of access token, refresh token and client info, the refresh lock and the needs-auth badge. From Claude Code and Amp take the status vocabulary (connected, needs authentication, failed) and write-only secret headers.
+
+Registration: DCR is the only zero-setup path for a private origin inferred. CIMD needs a public HTTPS `client_id` document the vendor's authorization server can fetch, which a localhost or tailnet-only Cairn cannot host inferred; it becomes possible if Cairn ever publishes one. GitHub needs a PAT or the owner's own OAuth App.
+
+## Recommendation
+
+- First catalog (8): GitHub (PAT, toolset and read-only options), Cloudflare (OAuth or API token), Linear, Notion, Sentry, Supabase, Context7, Hugging Face. Next: Cloudflare docs, GitLab, Stripe. Deferred: Vercel, Figma, Slack, Atlassian.
+- OAuth through the SDK's `client/auth.js` functions inside one server bridge, with three local additions for the gaps above: always send `resource`, refuse a server without S256 in its metadata, check `iss` on the callback. Send `application_type` `native` for a loopback origin and `web` otherwise.
+- Code areas: `packages/shared/src/records/` (catalog, connector record), `apps/server/src/services/mcp-servers.ts` (bridge, list), `apps/server/src/services/oauth.ts` and the callback route, `apps/server/src/services/machine-step-token.ts`, `apps/daemon/src/step-skill-tool.ts`, `apps/daemon/src/backend/mcp-config.ts`, `apps/web/src/resources/mcp-servers-page.tsx`.
