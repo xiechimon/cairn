@@ -1,7 +1,7 @@
 import type { CreateScheduleBody } from '@cairn/shared';
 import { cn } from 'cn';
 import { Clock, Lightbulb, Plus, TriangleAlert } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useProjects, useSchedules, useTeams, useTodos } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
@@ -11,6 +11,7 @@ import { EmptyState } from '../components/empty-state.js';
 import { FormActions } from '../components/form-layout.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
+import { StoneGroup } from '../components/stone/stone-group.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
@@ -31,7 +32,13 @@ import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PHASE_UI } from '../phase.js';
 import { ScheduleDetailController } from '../schedules/schedule-detail-dialog.js';
 import { ScheduleFields } from '../schedules/schedule-fields.js';
-import { type ScheduleDraft, scheduleBody, scheduleDraft } from '../schedules/schedule-model.js';
+import {
+  type ScheduleDraft,
+  scheduleBody,
+  scheduleDraft,
+  scheduleEnded,
+  schedulePauseReason,
+} from '../schedules/schedule-model.js';
 import { scheduleSummary } from './schedule-summary.js';
 import { PageShell } from './shell.js';
 
@@ -48,6 +55,13 @@ function ScheduleCard({
 }) {
   const { t } = useI18n();
   const ui = PHASE_UI[schedule.todo.phase];
+  const reason = schedule.enabled === false ? (schedule.pausedReason ?? null) : null;
+  const status =
+    schedule.enabled === false
+      ? reason === null
+        ? t('已暂停')
+        : schedulePauseReason(reason, t)
+      : scheduleSummary(schedule, now, t);
   return (
     <div className={cn('sched-card', SETTINGS_ROW_CLS)}>
       <Button
@@ -58,7 +72,10 @@ function ScheduleCard({
       >
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-ui text-foreground">{schedule.todo.title}</span>
-          <span className="truncate text-meta text-content-tertiary">{`${schedule.enabled === false ? (schedule.pausedReason ?? t('已暂停')) : scheduleSummary(schedule, now, t)} · ${schedule.todo.projectName}`}</span>
+          <span
+            className="truncate text-meta text-content-tertiary"
+            title={reason ?? undefined}
+          >{`${status} · ${schedule.todo.projectName}`}</span>
         </span>
       </Button>
       <StatusChip tone={ui.tone} className="flex-none">
@@ -224,6 +241,21 @@ export function SchedulesPage() {
       : withCreatedSchedules(fixture.schedules ?? []),
   );
   const [selected, setSelected] = useState<ScheduleRecord | null>(null);
+  const [endedOpen, setEndedOpen] = useState(false);
+  const current = schedules.filter((schedule) => !scheduleEnded(schedule));
+  const ended = schedules.filter(scheduleEnded);
+  const card = (schedule: ScheduleRecord): ReactNode => (
+    <ScheduleCard
+      key={schedule.id}
+      schedule={schedule}
+      now={now}
+      onOpen={() => setSelected(schedule)}
+      onDelete={() => {
+        setDeleteTarget(schedule);
+        setConfirmOpen(true);
+      }}
+    />
+  );
   const [deleteTarget, setDeleteTarget] = useState<ScheduleRecord | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const liveTodos = (todosQ.data ?? []).map(toDisplayTodo);
@@ -373,20 +405,22 @@ export function SchedulesPage() {
           }}
         />
       ) : (
-        <SettingsCard className="mt-4">
-          {schedules.map((schedule) => (
-            <ScheduleCard
-              key={schedule.id}
-              schedule={schedule}
-              now={now}
-              onOpen={() => setSelected(schedule)}
-              onDelete={() => {
-                setDeleteTarget(schedule);
-                setConfirmOpen(true);
-              }}
-            />
-          ))}
-        </SettingsCard>
+        <>
+          {current.length > 0 && <SettingsCard className="mt-4">{current.map(card)}</SettingsCard>}
+          {ended.length > 0 && (
+            <div data-testid="schedules-ended" className="mt-4">
+              <StoneGroup
+                tone="resolved"
+                label={t('已结束')}
+                count={ended.length}
+                collapsed={!endedOpen}
+                onCollapsedChange={(collapsed) => setEndedOpen(!collapsed)}
+              >
+                <SettingsCard>{ended.map(card)}</SettingsCard>
+              </StoneGroup>
+            </div>
+          )}
+        </>
       )}
       <ScheduleForm
         value={draft}
