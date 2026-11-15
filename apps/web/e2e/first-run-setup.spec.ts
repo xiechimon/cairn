@@ -27,6 +27,21 @@ async function open(page: Page, world: World, path = '/app') {
         });
       }
       if (p === '/api/teams/t1/machines') return json([MACHINE]);
+      if (p === '/api/teams/t1/model-sources') {
+        return json({
+          sources: [
+            {
+              runtime: 'pi',
+              provider: 'p1',
+              providerLabel: 'Claude token',
+              models: [
+                { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+                { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
+              ],
+            },
+          ],
+        });
+      }
       if (p === '/api/teams/t1/routing-settings') {
         return json({
           rules: world.rules,
@@ -69,6 +84,20 @@ test('a team with no projects lands on the setup page, and confirming saves both
   await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
   expect(world.patches[0]?.body).toEqual({ provider: 'p1', modelId: 'claude-opus-5-5' });
   await expect(setup.getByRole('link', { name: '新建第一个项目' })).toBeVisible();
+});
+
+test('the change control opens the model picker, and confirming saves the model picked there', async ({ page }) => {
+  const world = fresh();
+  await open(page, world);
+  const coordinator = page.getByTestId('first-run-pick-coordinator');
+  await coordinator.getByRole('combobox').click();
+  await page.getByRole('option', { name: 'Claude Sonnet 5.5' }).click();
+  await expect(coordinator).toContainText('Claude Sonnet 5.5');
+  await expect(coordinator).toContainText('你换的，原本推荐 Claude Opus 5.5');
+  expect(world.patches).toEqual([]);
+  await page.getByTestId('first-run-confirm').click();
+  await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
+  expect(world.patches[0]?.body).toEqual({ provider: 'p1', modelId: 'claude-sonnet-5-5' });
 });
 
 test('a Claude Code login alone leaves step 1 open and says the Coordinator still needs a provider', async ({ page }) => {

@@ -296,6 +296,10 @@ export const EN: Record<string, string> = {
   '建项目前要先把模型配好，还差第 2 步：确认模型。':
     'Set up your models before creating a project. Step 2 is still open: confirm models.',
   '保存中…': 'Saving…',
+  你换的: 'Your pick',
+  '{label}（{use} 的模型）': '{label} ({use} model)',
+  '你换的，原本推荐 {model}': 'Your pick; Cairn suggested {model}',
+  '{runtime}（Coordinator 用不了）': '{runtime} (the Coordinator cannot use it)',
   接入模型: 'Connect models',
   'Coordinator 和任务都有模型': 'The Coordinator and tasks both have models',
   确认模型: 'Confirm models',

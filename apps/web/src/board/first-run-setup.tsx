@@ -6,7 +6,7 @@ import {
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { Check, KeyRound, Plus, SquareTerminal } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
 import {
   useApiMutations,
@@ -29,6 +29,7 @@ import { toastError } from '../components/ui/toaster.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
+import { ModelPicker } from '../resources/routing-settings-page.js';
 import { safeSessionStorage } from '../safe-storage.js';
 import { settingsHref } from '../settings/settings-href.js';
 import {
@@ -340,16 +341,47 @@ function modelLabel(pick: Pick, options: readonly ModelOption[]): [string, strin
 function ConfirmBody({ setup }: { setup: Setup }) {
   const { t } = useI18n();
   const { patchRule } = useRoutingSettingsMutations(setup.teamId);
-  const picks = picksOf(setup, t);
+  const [changed, setChanged] = useState<Partial<Record<Pick['use'], ModelOption>>>({});
+  const suggested = picksOf(setup, t);
+  const picks = suggested.map((pick, i) => {
+    const use: Pick['use'] = i === 0 ? 'coordinator' : 'session';
+    const option = changed[use];
+    if (option === undefined) return pick;
+    return {
+      use,
+      provider: option.provider,
+      modelId: option.modelId,
+      stored: false,
+      why:
+        pick == null
+          ? t('你换的')
+          : t('你换的，原本推荐 {model}', { model: modelLabel(pick, setup.options)[0] }),
+    };
+  });
+  const pickFor = (use: Pick['use'], index: number) => (option: ModelOption) => {
+    const original = suggested[index];
+    const same =
+      original != null &&
+      original.provider === option.provider &&
+      original.modelId === option.modelId;
+    setChanged((prev) => {
+      const { [use]: _, ...rest } = prev;
+      return same ? rest : { ...rest, [use]: option };
+    });
+  };
+  const enabledRuntimes =
+    setup.machines.length === 0
+      ? null
+      : new Set(setup.machines.flatMap((machine) => machine.enabledRuntimes ?? []));
   const rows = [
     {
-      use: 'coordinator',
+      use: 'coordinator' as const,
       who: t('Coordinator'),
       what: t('和你对话、拆任务、派活'),
       pick: picks[0],
     },
     {
-      use: 'session',
+      use: 'session' as const,
       who: t('新任务'),
       what: t('写代码和做调研的 Agent 默认用它'),
       pick: picks[1],
@@ -365,6 +397,7 @@ function ConfirmBody({ setup }: { setup: Setup }) {
           body: { provider: p.provider, modelId: p.modelId },
         });
       }
+      setChanged({});
     } catch (error) {
       toastError(t('保存失败，请重试。'), error);
     }
@@ -375,7 +408,7 @@ function ConfirmBody({ setup }: { setup: Setup }) {
         {t('Cairn 按你接入的模型挑了这两个。确认后才会保存，以后可以在设置里改。')}
       </p>
       <div className="divide-y divide-border">
-        {rows.map(({ use, who, what, pick }) => {
+        {rows.map(({ use, who, what, pick }, index) => {
           const [model, provider] = pick == null ? [null, null] : modelLabel(pick, setup.options);
           return (
             <div key={who} data-testid={`first-run-pick-${use}`} className="py-3">
@@ -392,13 +425,20 @@ function ConfirmBody({ setup }: { setup: Setup }) {
                     <span className="text-meta text-content-secondary">{provider}</span>
                   </>
                 )}
-                <Button
-                  variant="link"
-                  className="ml-auto h-6 p-0 underline decoration-content-tertiary underline-offset-4 hover:decoration-current pointer-coarse:h-11"
-                  render={<Link to={`${settingsHref('work-routing')}#route-${use}`} />}
-                >
-                  {t('换一个')}
-                </Button>
+                <span className="ml-auto">
+                  <ModelPicker
+                    use={use}
+                    rule={pick ?? null}
+                    options={setup.options}
+                    enabledRuntimes={enabledRuntimes}
+                    onPick={pickFor(use, index)}
+                    trigger={{
+                      label: t('换一个'),
+                      className:
+                        'h-6 gap-1 rounded-sm border-0 bg-transparent p-0 text-ui text-foreground underline decoration-content-tertiary underline-offset-4 hover:decoration-current data-[size=default]:h-6 dark:bg-transparent dark:hover:bg-transparent pointer-coarse:h-11 pointer-coarse:data-[size=default]:h-11',
+                    }}
+                  />
+                </span>
               </div>
               {pick != null && (
                 <div className="text-pretty text-meta text-content-tertiary">{pick.why}</div>

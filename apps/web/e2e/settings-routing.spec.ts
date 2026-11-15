@@ -50,6 +50,23 @@ test('the model menu groups by runtime and greys a runtime no Runner has turned 
   await expect(haiku).not.toHaveAttribute('data-disabled', '');
   await expect(menu.locator('.routing-rule-model-row', { hasText: 'GPT-5.2' })).toBeVisible();
   await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await settings
+    .getByTestId('routing-rule-new-coordinator')
+    .locator('.routing-rule-model-select')
+    .click();
+  const coordinatorMenu = page.locator('.routing-rule-model-menu:visible');
+  await expect(coordinatorMenu.getByText('Claude Code（Coordinator 用不了）')).toBeVisible();
+  await expect(
+    coordinatorMenu.locator('.routing-rule-model-row', { hasText: 'claude-haiku-4-5' }),
+  ).toHaveAttribute('data-disabled', '');
+  await expect(
+    coordinatorMenu.locator('.routing-rule-model-row', { hasText: 'GPT-5.2' }),
+  ).not.toHaveAttribute(
+    'data-disabled',
+    '',
+  );
+  await page.keyboard.press('Escape');
 
   await page.goto('/app/settings/work-routing?scenario=routing-settings-pi-only');
   await page
