@@ -1718,3 +1718,11 @@ export const mailRule = sqliteTable(
     check('mail_rule_pattern', sql`length(trim(${t.pattern})) > 0`),
   ],
 );
+
+export const teamTopModels = sqliteTable('team_top_models', {
+  teamId: text('teamId')
+    .primaryKey()
+    .references(() => team.id, { onDelete: 'cascade' }),
+  models: text('models').notNull(),
+  updatedAt: epochMs('updatedAt').notNull(),
+});
