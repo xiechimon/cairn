@@ -6,7 +6,6 @@ import {
   buildMergedPrGuardNote,
   buildTaskPromptText,
   chiefIdFormat,
-  claudeLoginBlocksClaim,
   claudeRateBlock,
   confinementDispatchReady,
   fencedTitle,
@@ -58,6 +57,7 @@ import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js'
 import { readDeployLease } from './deploy-lease.js';
 import {
   capabilityGatePasses,
+  claudeCodeLoginBlocked,
   machineRunningCount,
   projectRunningCount,
   runtimeGatePasses,
@@ -90,6 +90,7 @@ import { mergedCatalogModels } from './model-liveness.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import {
   chiefRemoteTools,
+  coordinatorMemoryOwner,
   coordinatorProfile,
   memoryOpsAreTeamScoped,
   memoryOwnerOf,
@@ -231,8 +232,11 @@ function claudeCodeLoginBlocks(
   provider: string | null | undefined,
 ): boolean {
   if (stepRuntimeFor(provider) !== 'claude-code') return false;
-  if (hasActiveClaudeSubscription(deps, machineRow.teamId)) return false;
-  return claudeLoginBlocksClaim(machineRow.claudeCodeReport?.login, nowMs());
+  return claudeCodeLoginBlocked(
+    machineRow.claudeCodeReport,
+    hasActiveClaudeSubscription(deps, machineRow.teamId),
+    nowMs(),
+  );
 }
 
 function buildChiefClaim(
@@ -266,7 +270,7 @@ function chiefClaimPayload(
     deps,
     stepRow,
     threadRow,
-    agentRow.id,
+    coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
   );
   const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
   const locked = digest || mailTurn;

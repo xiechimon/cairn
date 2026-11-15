@@ -44,7 +44,7 @@ Reach:
 - Research: [docs/research/coordinator-computer.md](../../../docs/research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](../../../docs/research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](../../../docs/research/user-computer-model-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the computer feed, screen view, browser toggle and control handover have no design
 - Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
-- Evidence: `apps/web/e2e/machines-computer-feed.spec.ts`, `apps/web/test/machine-capabilities.test.ts`, `apps/server/test/computer-screen-routes.test.ts`, `apps/server/test/computer-feed-routes.test.ts`, `apps/daemon/test/computer-guard.test.ts`, `apps/daemon/test/computer-browser.test.ts`, `apps/daemon/test/machine-boot.test.ts`, `apps/daemon/test/orb-computer.test.ts`
+- Evidence: `apps/web/e2e/machines-computer-feed.spec.ts`, `apps/web/test/machine-capabilities.test.ts`, `apps/server/test/computer-screen-routes.test.ts`, `apps/server/test/computer-feed-routes.test.ts`, `apps/daemon/test/computer-guard.test.ts`, `apps/daemon/test/computer-browser.test.ts`, `apps/daemon/test/machine-boot.test.ts`, `apps/daemon/test/computer-host-desktop.test.ts`
 
 ### coordinator-chat
 
@@ -60,7 +60,7 @@ Reach:
 
 - Web routes: `/app`
 - Keyboard shortcuts in its code: `A`, `C`, `D`, `R`
-- Test ids in its code: `chief-body`, `chief-bubble`, `chief-composer-block`, `chief-composer-input`, `chief-composer-placeholder`, `chief-default-rule`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-home-scroll`, `chief-msg`, `chief-msg-block-tools`, `chief-msg-col`, `chief-msg-copy`, `chief-msg-foot`, `chief-msg-more`, `chief-msg-reply`, `chief-msg-sending`, `chief-msg-stamp`, `chief-msg-tools-touch`, `chief-note`, `chief-outage`, `chief-question`, `chief-question-asked`, `chief-question-chips`, `chief-question-dismiss`, `chief-question-error`, `chief-question-input-*`, `chief-question-line`, `chief-question-option-*`, `chief-question-submit`, `chief-question-text`, `chief-question-tools`, `chief-question-tools-touch`, `chief-quick-replies`, `chief-quick-reply`, `chief-reply`, `chief-reply-bubble`, `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`, `chief-routing-row`, `chief-runner-offline`, `chief-sent-attachment`, `chief-sent-attachments`, `chief-settings-col`, `chief-settings-topbar`, `chief-status-live`, `chief-status-mark`, `chief-status-pill`, `chief-stopped`, `chief-stream`, `chief-sub-thread`, `chief-takeover`, `chief-takeover-failed`, `chief-takeover-give-back`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-take`, `chief-takeover-time-left`, `chief-task-created`, `chief-task-ref`, `chief-task-ref-hover`, `chief-task-refs`, `chief-task-started`, `chief-time-divider`, `chief-turn-error`, `chief-turn-retry`, `chief-virtual-rows`, `composer-context-meter`, `composer-plus`, `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `home-c`, `home-c-error`, `home-c-pane-buttons`, `memory-list`, `panel-error`, `project-instructions-input`, `queue-blocked-fix`, `reply-quote`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`, `tasks-badge`, `tasks-toggle`
+- Test ids in its code: `chief-body`, `chief-bubble`, `chief-composer-block`, `chief-composer-input`, `chief-composer-placeholder`, `chief-default-rule`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-home-scroll`, `chief-msg`, `chief-msg-block-tools`, `chief-msg-col`, `chief-msg-copy`, `chief-msg-foot`, `chief-msg-more`, `chief-msg-reply`, `chief-msg-sending`, `chief-msg-stamp`, `chief-msg-tools-touch`, `chief-note`, `chief-outage`, `chief-question`, `chief-question-asked`, `chief-question-chips`, `chief-question-dismiss`, `chief-question-error`, `chief-question-input-*`, `chief-question-line`, `chief-question-option-*`, `chief-question-submit`, `chief-question-text`, `chief-question-tools`, `chief-question-tools-touch`, `chief-quick-replies`, `chief-quick-reply`, `chief-reply`, `chief-reply-bubble`, `chief-report`, `chief-report-sentence`, `chief-routing-row`, `chief-runner-offline`, `chief-sent-attachment`, `chief-sent-attachments`, `chief-settings-col`, `chief-settings-topbar`, `chief-status-live`, `chief-status-mark`, `chief-status-pill`, `chief-stopped`, `chief-stream`, `chief-sub-thread`, `chief-takeover`, `chief-takeover-failed`, `chief-takeover-give-back`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-take`, `chief-takeover-time-left`, `chief-task-created`, `chief-task-ref`, `chief-task-ref-hover`, `chief-task-refs`, `chief-task-started`, `chief-time-divider`, `chief-turn-error`, `chief-turn-retry`, `chief-virtual-rows`, `composer-context-meter`, `composer-plus`, `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `home-c`, `home-c-error`, `home-c-pane-buttons`, `memory-list`, `panel-error`, `project-instructions-input`, `queue-blocked-fix`, `reply-quote`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`, `tasks-badge`, `tasks-toggle`
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-segments.md](features/chief-segments.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md)
 - Research: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/research/dsh-sig-walk-2026-11.md](../../../docs/research/dsh-sig-walk-2026-11.md), [docs/research/pi-durable-spike.md](../../../docs/research/pi-durable-spike.md) (not on main), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
@@ -109,22 +109,22 @@ Reach:
 
 ### daily-report
 
-**Daily report and retro** (shipped, centrality 1). The Coordinator posts an 08:00 report in the conversation and proposes retro changes the user accepts or rejects.
+**Daily report and retro** (shipped, centrality 1). The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro and intake suggestions by telling the Coordinator.
 
-States: A report row in the conversation with yesterday, needs-you and intake sections, and retro proposals that can be accepted or rejected.
+States: A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro and intake suggestions and each one's state.
 
 Reach:
 
 1. `open /app`
-2. `click testid:chief-report`
+2. `click testid:research-report-card`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`
+- Test ids in its code: `chief-report-sentence`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`
 - Research: [docs/research/duet-proactive-coordinator.md](../../../docs/research/duet-proactive-coordinator.md)
-- Frontend design: **gap**: the report row and retro proposal card have no design
+- Frontend design: [apps/web/DESIGN-RULES.md](../../../apps/web/DESIGN-RULES.md)
 - Backend design: **gap**: no design for report content, timing, quiet rules and retro proposal storage
-- Evidence: `apps/web/e2e/chief-daily-report.spec.ts`, `apps/server/test/chief-report.test.ts`, `apps/server/test/chief-digest.test.ts`
+- Evidence: `apps/web/e2e/chief-daily-report.spec.ts`, `apps/server/test/chief-report.test.ts`, `apps/server/test/chief-digest.test.ts`, `apps/server/test/chief-router-tools.test.ts`
 
 ### engine-view
 
@@ -923,7 +923,7 @@ Reach:
 
 - Web routes: `/app/schedules`
 - Keyboard shortcuts in its code: `D`
-- Test ids in its code: `schedule-detail-body`, `schedules-error`, `schedules-loading`
+- Test ids in its code: `schedule-detail-body`, `schedule-popover`, `schedule-popover-runs`, `schedules-ended`, `schedules-error`, `schedules-loading`
 - Research: **gap**: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model
 - Frontend design: **gap**: the schedules page and detail dialog have no design
 - Backend design: **gap**: no design for due events, missed runs and continue-thread schedules
@@ -1017,7 +1017,7 @@ Reach:
 
 **Skills** (shipped, centrality 3). Skills read from each machine and team skills imported and injected into threads.
 
-States: An empty list, skills per machine, an import dialog, and a skill injected into a thread shown in the transcript.
+States: An empty list, skills per machine, an import dialog with a pick-from-this-machine tab (imported and unimportable skills disabled, one error per failed pick) and a path or GitHub tab, and a skill injected into a thread shown in the transcript.
 
 Reach:
 
@@ -1027,12 +1027,12 @@ Reach:
 - Web routes: `/app/resources/skills`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `resource-empty`, `resource-import`
+- Test ids in its code: `resource-empty`, `resource-import`, `skill-candidate`, `skill-candidate-all`, `skill-candidates`, `skill-candidates-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/skills-page.md](features/skills-page.md), [.claude/skills/verify-cairn/features/skill-import.md](features/skill-import.md), [.claude/skills/verify-cairn/features/skills-injection.md](features/skills-injection.md)
 - Research: **gap**: no current note on how Amp, t3code and Claude Code manage skills across machines
 - Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md)
 - Backend design: [docs/spec/14-skills-execution-surface-injection.md](../../../docs/spec/14-skills-execution-surface-injection.md)
-- Evidence: `apps/web/e2e/skills-page.spec.ts`, `apps/web/e2e/skill-import.spec.ts`, `apps/daemon/test/skills-catalog.test.ts`
+- Evidence: `apps/web/e2e/skills-page.spec.ts`, `apps/web/e2e/skill-import.spec.ts`, `apps/server/test/skill-import.test.ts`, `apps/daemon/test/skills-catalog.test.ts`
 
 ### git-release-tags
 

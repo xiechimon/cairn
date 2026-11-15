@@ -42,9 +42,18 @@ export const EN: Record<string, string> = {
   Archive: 'Archive',
   'Could not unarchive task.': 'Could not unarchive task.',
   'Could not archive task.': 'Could not archive task.',
-  '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.':
+  'Claude 订阅': 'Claude subscription',
+  '添加 Claude 订阅': 'Add Claude subscription',
+  '在你的电脑上运行 `claude setup-token`，把输出的 token 粘贴到下面。':
+    'Run `claude setup-token` on your machine, then paste the token below.',
+  'Claude Code 步骤会使用最近添加且未过期的订阅。Token 加密保存，保存后无法再查看。':
+    'Claude Code steps use the most recently added unexpired connection. Tokens are encrypted and cannot be viewed after saving.',
+  '到期日（可选）': 'Expires on (optional)',
+  '保存失败，请检查填写内容后重试。':
+    'Could not save the connection. Check the fields and try again.',
+  '{name}：Claude 订阅的 token 已过期。运行 `claude setup-token`，再添加一个新的订阅。':
     '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.',
-  '{name}: Claude subscription token expires in {days} days. Run `claude setup-token` and add a new connection.':
+  '{name}：Claude 订阅的 token 将在 {days} 天后过期。运行 `claude setup-token`，再添加一个新的订阅。':
     '{name}: Claude subscription token expires in {days## day|# days}. Run `claude setup-token` and add a new connection.',
   Archived: 'Archived',
   Agent: 'Agent',
@@ -210,7 +219,6 @@ export const EN: Record<string, string> = {
   再检查一次: 'Check again',
   在进行: 'In progress',
   等你处理: 'Needs you',
-  管理定时: 'Manage schedules',
   接下来: 'Up next',
   已暂停: 'Paused',
   全团队: 'Whole team',
@@ -474,6 +482,23 @@ export const EN: Record<string, string> = {
   每天运行: 'Runs daily',
   每周运行: 'Runs weekly',
   运行一次: 'Runs once',
+  '任务已归档，定时随之停用': 'The task was archived, so the schedule stopped',
+  '执行任务的 agent 暂停了它': 'The agent working on the task paused it',
+  '连续 10 次定时运行都没人回复，已自动暂停':
+    'Paused after 10 scheduled runs with no reply from a person',
+  '提交代码时被仓库检查拦下，这一轮没能完成': "The repository's commit check stopped this run",
+  '运行出错，已停用': 'The run failed, so the schedule stopped',
+  已结束: 'Ended',
+  下次运行: 'Next run',
+  上次运行: 'Last run',
+  还没运行过: 'Not run yet',
+  没有下一次: 'No upcoming run',
+  选择任务: 'Choose a task',
+  成功: 'Succeeded',
+  跳过: 'Skipped',
+  '定时没能保存，请重试。': 'Could not save the schedule. Try again.',
+  '这里还没有可以定时的任务。先建一个任务，或者直接让 Coordinator 帮你建定时。':
+    'There is no task to schedule here yet. Add a task first, or ask the Coordinator to set up the schedule.',
   '{mo}月{d}日': '{monthShort} {d}',
   '下次 {day} {time}': 'Next {day} {time}',
   自动: 'Auto',
@@ -592,6 +617,21 @@ export const EN: Record<string, string> = {
   '来源未通过校验。': 'The source failed validation.',
   '拉取来源失败——稍后重试。': 'Fetching the source failed — try again later.',
   '导入失败，请重试。': 'Import failed, please retry.',
+  从本机选择: 'From this machine',
+  全选: 'Select all',
+  '路径或 GitHub': 'Path or GitHub',
+  搜索技能: 'Search skills',
+  '导入 {count} 个': 'Import {count}',
+  已导入: 'Imported',
+  已勾选另一个同名技能: 'Another skill with this name is selected',
+  'SKILL.md 缺少名称': 'SKILL.md has no name',
+  名称不能用作目录名: 'The name cannot be used as a directory name',
+  'SKILL.md 缺少描述': 'SKILL.md has no description',
+  '本机 ~/.agents/skills 和 ~/.claude/skills 里没有技能。':
+    'No skills in ~/.agents/skills or ~/.claude/skills on this machine.',
+  '没有匹配的技能。': 'No matching skills.',
+  '导入会把技能复制到 Cairn 自己的目录，原目录不会被改动。':
+    'Importing copies the skill into Cairn’s own directory; the original is left unchanged.',
   '尚无 MCP 服务器': 'No MCP servers yet',
   // spec 13/#368 本地 config 只读制：空态文案 = 配置指引（无添加钮）。
   '读取 server 本机 ~/.claude.json 的 mcpServers 段：在该文件添加配置并刷新，即出现在这里。MCP 服务器为 Agent 提供额外工具；授权在每个 Agent 的页面上单独进行。':
@@ -879,10 +919,18 @@ export const EN: Record<string, string> = {
     "This machine's system does not support the task sandbox, so it cannot take tasks.",
   '任务沙箱没就绪，这台 Runner 接不了任务。Linux 上 daemon 要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。':
     'The task sandbox is not ready, so this Runner cannot take tasks. On Linux the daemon must run as its own systemd user unit with bubblewrap (`bwrap`) installed: update the CLI, then run `{command} restart` on this machine.',
-  '排队中：{machine} 的任务沙箱没就绪，接不了任务——在那台机器上运行 cairn restart，原因见 Runner 页（前面 {ahead} 个）':
-    'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks. Run cairn restart on that machine; the Runner page shows why ({ahead} ahead)',
-  '排队中：{machine} 没开 {runtime}——到 Runner 页打开（前面 {ahead} 个）':
-    'Queued: {machine} has {runtime} turned off. Turn it on in the Runner page ({ahead} ahead)',
+  '排队中：{machine} 的任务沙箱没就绪，接不了任务——原因和修法见 Runner 页（前面 {ahead} 个）':
+    'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks. The Runner page shows why and how to fix it ({ahead} ahead)',
+  '任务沙箱没就绪：daemon 没有作为自己的 systemd user unit 运行。在这台机器上运行 `{command} restart`，它会自己起一个；还不行的话，检查 `systemd-run --user` 能不能用。':
+    'The task sandbox is not ready: the daemon is not running as its own systemd user unit. Run `{command} restart` on this machine, which starts one; if that does not help, check that `systemd-run --user` works.',
+  '任务沙箱没就绪：这台机器没装 bubblewrap（`bwrap`）。装好后（如 `sudo pacman -S bubblewrap` 或 `sudo apt install bubblewrap`），Runner 每分钟会自己再检查一次。':
+    'The task sandbox is not ready: bubblewrap (`bwrap`) is not installed on this machine. Install it (for example `sudo pacman -S bubblewrap` or `sudo apt install bubblewrap`); the Runner checks again every minute.',
+  '任务沙箱没就绪：家目录里的 FUSE 挂载 `{mountPoint}` 挡住了沙箱，通常是某个 AppImage 程序在 TMPDIR 指向家目录时留下的。关掉那个程序，或让它的 TMPDIR 指向家目录以外，Runner 每分钟会自己再检查一次。':
+    'The task sandbox is not ready: the FUSE mount `{mountPoint}` in your home folder blocks it, usually left by an AppImage app started with TMPDIR inside home. Close that app, or start it with TMPDIR outside home; the Runner checks again every minute.',
+  '任务沙箱没就绪：沙箱没法覆盖你的家目录，常见原因是家目录里有 FUSE 挂载（比如 AppImage 程序）。用 `findmnt -l | grep fuse` 找到它并关掉对应程序，Runner 每分钟会自己再检查一次。':
+    'The task sandbox is not ready: it cannot overlay your home folder, usually because of a FUSE mount there (such as an AppImage app). Find it with `findmnt -l | grep fuse` and close that app; the Runner checks again every minute.',
+  '排队中：{machine} 上没有检测到 {runtime}，装好后重启 Runner（前面 {ahead} 个）':
+    'Queued: {machine} has not detected {runtime}. Install it, then restart the Runner ({ahead} ahead)',
   '排队中：{machine} 用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）':
     'Queued: {machine} cannot use the model for this step. Pick another model in work routing ({ahead} ahead)',
   '排队中：本地项目只在它所在的 Runner 上跑，{machine} 跑不了（前面 {ahead} 个）':
@@ -1118,6 +1166,8 @@ export const EN: Record<string, string> = {
   // command strings themselves stay untranslated — brand slots via BRAND)
   '有条件时优先使用云主机：笔记本会休眠或断网，云主机常在线，构建更稳定。':
     'Prefer a cloud host when you can: laptops sleep or drop off the network, while cloud hosts stay online and build more reliably.',
+  '当前地址只适用于这台电脑。添加另一台电脑前，请用 Tailscale 地址打开 Cairn，再复制命令。':
+    'This address only works on this computer. To add another computer, open Cairn at its Tailscale address before copying the command.',
   '在待接入的 Runner 上执行以下命令。浏览器将打开登录页，授权团队 {team} 后 Runner 即可上线。此后它在后台常驻运行，无需保持终端开启。':
     'Run the following commands on the Runner you want to connect. Your browser will open a sign-in page; once you authorize the team {team}, the Runner comes online. It then keeps running in the background — no need to keep the terminal open.',
   '安装 CLI': 'Install the CLI',
@@ -1145,6 +1195,10 @@ export const EN: Record<string, string> = {
   确认授权: 'Authorize',
   '正在授权…': 'Authorizing…',
   '授权完成，Runner 已注册。': 'Authorized — the Runner is registered.',
+  '授权完成，{name} 已注册为 Runner。': 'Authorized — {name} is registered as a Runner.',
+  机器名: 'Machine name',
+  '这个名字由发起方自报。只有你刚在这台机器上运行了 `cairn start`，且终端里显示的名字与这里一致，才确认授权。':
+    'The requester reports this name itself. Confirm only if you just ran `cairn start` on this machine and its terminal shows the same name.',
   '授权链接已失效，请在 Runner 上重新发起。':
     'This authorization link has expired — restart enrollment on the executor Runner.',
   '浏览器授权注册 →': 'Browser authorization →',
@@ -1448,24 +1502,20 @@ export const EN: Record<string, string> = {
   '取消提问失败，请重试。': 'Could not dismiss the question. Try again.',
   备用模型: 'Fallback models',
   '没能更新这条建议，请重试。': "Couldn't update this suggestion. Try again.",
+  选择运行时: 'Choose runtime',
   建议回复: 'Suggested replies',
   '为什么没拦住：{why}': 'Why it slipped through: {why}',
   '防护：{safeguard}': 'Safeguard: {safeguard}',
   '出处：': 'Source: ',
   协调者对话: 'Coordinator chat',
-  建成线程: 'Make it a thread',
-  不用了: 'Dismiss',
   已建成线程: 'Made into a thread',
   已忽略: 'Dismissed',
-  '今天的日报：昨天没有新进展。': "Today's report: nothing new yesterday. ",
   '{n} 件等你': '{n## item|# items} waiting on you',
   今天的日报: "Today's report",
-  '今天的日报 · 昨天（{day}）': "Today's report · yesterday ({day})",
   '日报没写成，过一会儿再试一次；先看昨天的数字。':
     "The report couldn't be written; it will try once more shortly. Here are yesterday's numbers.",
   '日报两次都没写成；下面是昨天的原始数字。':
     "The report failed twice; here are yesterday's raw numbers.",
-  昨天的进展: 'Yesterday',
   '完成 {done} · 合并 {merged} · 失败 {failed} · 重跑 {retries} · 等额度 {quota} · 审查通过 {pass} / 拦下 {block}':
     'Done {done} · merged {merged} · failed {failed} · reruns {retries} · quota waits {quota} · reviews passed {pass} / blocked {block}',
   '失败：': 'Failed: ',
@@ -1473,17 +1523,30 @@ export const EN: Record<string, string> = {
   '合并：': 'Merged: ',
   等你的事: 'Needs you',
   没有等你的事: 'Nothing is waiting on you',
-  '{n} 件等你，去处理': '{n## item|# items} waiting on you, open the inbox',
   复盘: 'Retro',
   外部动态: 'Outside developments',
+  复盘建议: 'Retro suggestions',
+  日报: 'Daily report',
+  '昨天（{day}）的进展': 'Yesterday ({day})',
+  '今天的日报写好了：昨天没有新进展': "Today's report is ready: nothing new yesterday",
+  '{day} 的日报写好了：{covers} 没有新进展': 'The {day} report is ready: nothing new on {covers}',
+  '{day} 的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}':
+    'The {day} report is ready: done {done} · merged {merged} · failed {failed}',
+  '今天的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}':
+    "Today's report is ready: done {done} · merged {merged} · failed {failed}",
+  '，有 {k} 条建议等你决定': ', {k## suggestion needs|# suggestions need} your decision',
+  '日报没写成，先看昨天的数字：完成 {done} · 合并 {merged} · 失败 {failed}':
+    "The report couldn't be written. Yesterday's numbers: done {done} · merged {merged} · failed {failed}",
+  '写日报时有 {n} 件等你，现在的情况看任务面板。':
+    '{n## item was|# items were} waiting on you when the report was written; the Tasks panel shows the current state.',
+  '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 2 条不用了」。':
+    'To act on a suggestion, tell the Coordinator in the chat, for example "make #1 of the {day} report a thread" or "dismiss #2".',
   '来源：': 'Source: ',
   '对应：{matches}': 'Matches: {matches}',
   '建议动作：{action}': 'Suggested action: {action}',
   昨天的对话里没找到值得改的地方: "Nothing in yesterday's conversations needs a safeguard",
   '这些来源太长，只读了后面的部分：{sources}。':
     'These sources were too long, so only their latest part was read: {sources}. ',
-  '复盘建议只是草稿：点「建成线程」才会建线程，建好后也要你自己开始。':
-    'Retro suggestions are drafts: a thread is created only when you choose "Make it a thread", and you still start it yourself.',
   执行: 'Build',
   合并: 'Merge',
   运行中: 'Running',
@@ -1514,9 +1577,13 @@ export const EN: Record<string, string> = {
   首页: 'Home',
   'Claude 登录需要处理': 'Claude sign-in needs attention',
   '{kind} 步骤': '{kind} step',
-  '{name} 接任务': 'Run steps on {name}',
   '{time} 重置': 'resets {time}',
   '冷却至 {time}': 'Cooling until {time}',
+  已检测到: 'Detected',
+  '没有检测到，装好后重启 Runner': 'Not detected. Install it, then restart the Runner',
+  接入命令闸前不能用: 'Unavailable until it uses the command gate',
+  '这台 Runner 上检测到的执行器。检测到就能接任务，不用开关。':
+    'Runtimes detected on this Runner. Anything detected takes tasks; there is nothing to switch on.',
   可用: 'Available',
   '固定于 {ago}': 'pinned {ago}',
   '固定账户的 thread': 'Sticky threads',
@@ -1532,7 +1599,6 @@ export const EN: Record<string, string> = {
   评审: 'Review',
   账户: 'Accounts',
   还没有额度读数: 'No quota reading yet',
-  '这台 Runner 还不能单独开关 {name}': '{name} cannot be switched on this Runner yet',
   '这台 Runner 还没有上报 provider 状态': 'This Runner has not reported its providers yet',
   重命名: 'Rename',
   重命名分组: 'Rename group',
@@ -1559,7 +1625,6 @@ export const EN: Record<string, string> = {
   'Coordinator 和其他 Agent': 'Coordinator and other agents',
   '所有 Claude 模型': 'All Claude models',
   '{model} · 默认': '{model} · default',
-  'Claude 订阅': 'Claude subscription',
   'Runner 上的登录': 'Login on a Runner',
   '还没有路由。添加服务商，再在「模型选择」里给 Coordinator 选模型，这里会画出它走哪个服务商。':
     'No routing yet. Add a provider, then pick the Coordinator model in Model selector, and this shows which provider it runs on.',
@@ -1597,7 +1662,6 @@ export const EN: Record<string, string> = {
   发送中: 'Sending',
   '回复这个任务…': 'Reply to this task…',
   回复这个任务: 'Reply to this task',
-  '启用 {name}': 'Enable {name}',
   添加服务商: 'Add provider',
   '移除 {name}': 'Remove {name}',
   '加密保存，保存后不能再查看': 'Encrypted; cannot be viewed after saving',
@@ -1640,7 +1704,6 @@ export const EN: Record<string, string> = {
   '添加 API key、订阅或自定义端点后，它们的模型会出现在这里。':
     'Add an API key, subscription or custom endpoint and its models show up here.',
   还没上报: 'Not reported yet',
-  接入命令闸前不能开启: 'Locked until it uses the command gate',
   模型列表: 'Models',
   '已安装，登录状态未知': 'Installed, sign-in unknown',
   '{online}/{total} 台电脑在线': '{online} of {total#1 computer|# computers} online',
@@ -1816,18 +1879,15 @@ export const EN: Record<string, string> = {
   'Schedule time unavailable': 'Schedule time unavailable',
   'Uses the thread description': 'Uses the thread description',
   '{n} {n#automation|automations}': '{n} {n#automation|automations}',
-  Weekdays: 'Weekdays',
-  'Custom cron': 'Custom cron',
-  'Cron expression': 'Cron expression',
-  'Cron is evaluated by the server in {timezone}.':
-    'Cron is evaluated by the server in {timezone}.',
-  'Use five cron fields: minute hour day month weekday.':
-    'Use five cron fields: minute hour day month weekday.',
-  'Day to repeat each week': 'Day to repeat each week',
-  'Runs on the hour may start a few minutes late.':
-    'Runs on the hour may start a few minutes late.',
-  'Saved prompt': 'Saved prompt',
-  'Leave empty to use the thread description.': 'Leave empty to use the thread description.',
+  工作日: 'Weekdays',
+  '自定义 cron': 'Custom cron',
+  'Cron 表达式': 'Cron expression',
+  '服务器按 {timezone} 计算 cron。': 'Cron is evaluated by the server in {timezone}.',
+  'cron 需要 5 段：分 时 日 月 周。': 'Use five cron fields: minute hour day month weekday.',
+  从哪天开始每周重复: 'Day to repeat each week',
+  '整点运行可能会晚几分钟开始。': 'Runs on the hour may start a few minutes late.',
+  提示词: 'Saved prompt',
+  '留空就按任务描述运行。': 'Leave empty to use the thread description.',
   'Loading scheduled task…': 'Loading scheduled task…',
   'This scheduled task is no longer available.': 'This scheduled task is no longer available.',
   'Schedule changes are unavailable in this preview.':
@@ -1848,9 +1908,8 @@ export const EN: Record<string, string> = {
   'Schedule update failed': 'Schedule update failed',
   'Open schedule {title}': 'Open schedule {title}',
   'Open thread': 'Open thread',
-  'Choose a valid date and time in this timezone.':
-    'Choose a valid date and time in this timezone.',
-  'Choose a future time for a one-time schedule.': 'Choose a future time for a one-time schedule.',
+  '请选择这个时区里有效的日期和时间。': 'Choose a valid date and time in this timezone.',
+  '单次定时要选一个将来的时间。': 'Choose a future time for a one-time schedule.',
   'The scheduled task could not be loaded.': 'The scheduled task could not be loaded.',
   'Schedule setup could not be loaded.': 'Schedule setup could not be loaded.',
   'Loading schedule setup…': 'Loading schedule setup…',
@@ -1873,8 +1932,6 @@ export const EN: Record<string, string> = {
   显示更多: 'Show more',
   'PR 状态加载失败，稍后会自动重试。': 'Could not load the PR status; retrying shortly.',
   '这台 Runner 在 Coordinator 里的角色': "This Runner's role for the Coordinator",
-  '这台 Runner 上能接任务的执行器，以及它们的登录状态。':
-    'The runtimes that can take tasks on this Runner, and their sign-in state.',
   能力: 'Capabilities',
   '这台 Runner 上报的 MCP 与技能清单': 'The MCP servers and skills this Runner reports',
   管理: 'Manage',
@@ -1883,6 +1940,7 @@ export const EN: Record<string, string> = {
   '已接入的 Runner': 'Connected Runners',
   '已检查 {ago}': 'Checked {ago}',
   接任务中: 'Taking tasks',
+  用途与连接: 'Uses and connections',
   '连接断开，正在重连…': 'Connection lost, reconnecting…',
   '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
   设置作用于: 'Settings apply to',
@@ -1954,7 +2012,6 @@ export const EN: Record<string, string> = {
   '更新 Cairn 后才能接有平台要求的任务': 'Update Cairn to take tasks that need a platform',
   '任务沙箱没就绪，暂时接不了任务——展开看怎么修':
     'Task sandbox not ready, so this Runner cannot take tasks. Expand to see how to fix it',
-  '选择这台 Runner 接哪些运行时': 'Choose which runtimes this Runner takes work for',
   '重新连接 {name} 后才能修改它的设置。': 'Reconnect {name} to change its settings.',
   '在这台 Runner 上确认它已联网、没有休眠，然后运行 `{command}` 重新启动。上线后这里会自动变回在线。':
     'On this Runner, make sure it is online and awake, then run `{command}` to start it again. It turns online here by itself.',
@@ -2001,7 +2058,6 @@ export const EN: Record<string, string> = {
   正在加载定时: 'Loading schedules',
   '添加任务…': 'Add a task…',
   添加任务: 'Add a task',
-  查看详情: 'View details',
   添加: 'Add',
   '任务没有添加上，请重试。': 'The task was not added. Try again.',
   打开任务: 'Open task',
@@ -2055,6 +2111,18 @@ export const EN: Record<string, string> = {
   文档: 'Documents',
   设计: 'Designs',
   网页: 'Web pages',
+  PPT: 'Slides',
+  下载后打开: 'Open after download',
+  '含脚本，下载后打开': 'Has scripts; open after download',
+  预览不运行脚本: 'Preview runs no scripts',
+  '未收录 {n} 个文件：': '{n#1 file|# files} not included: ',
+  '不是网页或 PPT': 'Not a page or deck',
+  文件太大: 'Too large',
+  超出总大小上限: 'Over the total size limit',
+  超出文件数上限: 'Over the file count limit',
+  和另一个文件重名: 'Same name as another file',
+  上传没有成功: 'Upload failed',
+  没能读取: 'Could not be read',
   '之前的 {n} 步': '{n} earlier steps',
   '收起之前的 {n} 步': 'Hide {n} earlier steps',
   已允许这一次: 'Allowed once',

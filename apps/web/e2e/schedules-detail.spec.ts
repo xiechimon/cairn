@@ -67,8 +67,12 @@ async function scheduleShot(page: Page, name: string, theme: 'light' | 'dark' = 
   await settleTransitions(page);
   await evidencePanelShot(page, name, detail(page));
 }
-async function open(page: Page) {
+async function expandEnded(page: Page) {
+  await page.getByTestId('schedules-ended').getByRole('button', { name: /Ended/ }).click();
+}
+async function open(page: Page, ended = false) {
   await page.goto('/app/schedules');
+  if (ended) await expandEnded(page);
   await page.getByRole('button', { name: 'Open schedule Nightly release checks', exact: true }).click();
   await expect(detail(page)).toBeVisible();
 }
@@ -145,15 +149,15 @@ test('auto-disabled Re-enable preserves the reason on failure and clears it only
   probe.rejectNext();
   await enable.click();
   await expect(detail(page).getByRole('alert')).toContainText('Schedule update failed');
-  await expect(detail(page)).toContainText('Task archived');
+  await expect(detail(page)).toContainText('The task was archived, so the schedule stopped');
   probe.holdChanges();
   await enable.click();
   await expect(enable).toBeDisabled();
-  await expect(detail(page)).toContainText('Task archived');
+  await expect(detail(page)).toContainText('The task was archived, so the schedule stopped');
   await enable.evaluate((element) => { element.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
   expect(probe.calls).toHaveLength(2);
   probe.releaseChanges();
-  await expect(detail(page)).not.toContainText('Task archived');
+  await expect(detail(page)).not.toContainText('The task was archived, so the schedule stopped');
   await expect(detail(page).getByRole('switch')).toBeChecked();
   await expect(enable).toHaveCount(0);
   expect(probe.calls.map((call) => call.body)).toEqual([{ enabled: true }, { enabled: true }]);
@@ -168,8 +172,8 @@ test('Run now schedules the actual run endpoint and reports queued status', asyn
   expect(probe.calls).toContainEqual({ method: 'POST', path: '/api/schedules/schedule-1/run', body: {} });
 });
 
-test('the Tasks panel lists schedules in the Schedules tab only, and a row menu opens the schedules page', async ({ page }) => {
-  await setup(page, { kind: 'once', nextRunAt: null });
+test('the Tasks panel lists schedules in the Schedules tab only, and the row menu edits in the small editor', async ({ page }) => {
+  await setup(page);
   await page.goto('/app?pane=tasks');
   const panel = page.getByRole('complementary', { name: 'Tasks', exact: true });
   await expect(panel.locator('[data-slot="schedule-row"]')).toHaveCount(0);
@@ -179,12 +183,12 @@ test('the Tasks panel lists schedules in the Schedules tab only, and a row menu 
   const frame = panel.locator('[data-slot="schedule-row-frame"]').first();
   await frame.hover();
   await frame.getByTestId('schedule-row-menu-button').click();
-  await page.getByRole('menuitem', { name: /Manage schedules/ }).click();
-  await expect(page).toHaveURL(/\/app\/schedules$/);
+  await page.getByRole('menuitem', { name: /Edit/ }).click();
+  await expect(page.getByTestId('schedule-popover')).toContainText('Nightly release checks');
 });
 
 test('the Schedules tab lists schedules while the tasks request has failed', async ({ page }) => {
-  await setup(page, { kind: 'once', nextRunAt: null });
+  await setup(page);
   await page.route('**/api/tasks?*', (route) => route.fulfill({ status: 500, body: '{}' }));
   await page.goto('/app?pane=tasks');
   const panel = page.getByRole('complementary', { name: 'Tasks', exact: true });
@@ -220,6 +224,7 @@ for (const surface of ['global', 'project'] as const) {
   test(`${surface} summary preserves missing-next data through its actual consumer`, async ({ page }) => {
     await setup(page, { kind: 'once', nextRunAt: null });
     await visit(page);
+    await expandEnded(page);
     await expect(summary(page)).toContainText('No upcoming runs');
     await expect(summary(page)).not.toContainText('Jan 1');
   });
@@ -271,7 +276,7 @@ test('auto-disabled records do not invent an upcoming epoch time', async ({ page
 
 test('a finished one-time schedule shows its last run and no pause control', async ({ page }) => {
   await setup(page, { kind: 'once', nextRunAt: null });
-  await open(page);
+  await open(page, true);
   await expect(detail(page)).toContainText('Finished one-time schedule');
   await expect(detail(page)).toContainText('No upcoming runs');
   await scheduleShot(page, 'schedule-detail-finished-once.png');
@@ -336,7 +341,7 @@ for (const theme of ['light', 'dark'] as const) {
 
 test('a completed once row with enabled false cannot be resumed', async ({ page }) => {
   const probe = await setup(page, { kind: 'once', nextRunAt: null, enabled: false, pausedReason: null });
-  await open(page);
+  await open(page, true);
   await expect(detail(page)).toContainText('Finished one-time schedule');
   await expect(detail(page)).toContainText('No upcoming runs');
   const active = detail(page).getByRole('switch');
@@ -443,3 +448,31 @@ for (const resource of ['todos', 'projects'] as const) {
     await expect(dialog.getByRole('textbox', { name: 'Saved prompt' })).toHaveValue('Keep this setup draft');
   });
 }
+
+test('ended one-time schedules fold into a collapsed 已结束 group with plain reasons', async ({ page }) => {
+  await page.clock.setFixedTime(NOW);
+  await page.addInitScript(() => localStorage.setItem('cairn.locale', 'zh'));
+  const once = { ...INITIAL, kind: 'once', cron: null, enabled: false, nextRunAt: null, lastRunStatus: 'failed' };
+  const rows = [
+    INITIAL,
+    { ...once, id: 'archived', todoId: 'todo-2', pausedReason: 'Task archived', todo: { ...INITIAL.todo, title: 'Stop retry storms' } },
+    { ...once, id: 'commit', todoId: 'todo-3', pausedReason: 'git commit failed (1): pnpm-lock.yaml is staged with external dependency changes.', todo: { ...INITIAL.todo, title: '审核登录变更' } },
+  ];
+  await mockLive(page, { threads: [], messages: [], todos: [{ ...TASK, phase: 'done' }], projects: [PROJECT] }, (path, route, json) =>
+    path.startsWith('/api/schedules') && route.request().method() === 'GET' ? json(rows) : undefined,
+  );
+  await page.goto('/app/schedules');
+  const ended = page.getByTestId('schedules-ended');
+  const header = ended.getByRole('button', { name: /已结束/ });
+  await expect(header).toHaveAttribute('aria-expanded', 'false');
+  await expect(header).toContainText('2');
+  await expect(page.getByRole('button', { name: /Nightly release checks/ })).toBeVisible();
+  await expect(page.getByText('Stop retry storms')).toHaveCount(0);
+  await header.click();
+  await expect(ended.getByText('任务已归档，定时随之停用 · cairn')).toBeVisible();
+  const commit = ended.getByText('提交代码时被仓库检查拦下，这一轮没能完成 · cairn');
+  await expect(commit).toBeVisible();
+  await expect(commit).toHaveAttribute('title', /^git commit failed/);
+  await expect(page.locator('.sched-card').first()).toContainText('Nightly release checks');
+  await expect(page.getByText(/Task archived/)).toHaveCount(0);
+});

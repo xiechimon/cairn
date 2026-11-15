@@ -152,7 +152,7 @@ for (const locale of ['zh', 'en']) {
       await page.goto('/app/schedules?scenario=01');
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(locale === 'zh' ? '定时' : 'Schedules');
       await reveal();
-      await expect(sidebar.locator('[aria-current="page"]')).toHaveCount(0);
+      await expect(sidebar.locator('[aria-current="page"]')).toHaveAccessibleName(locale === 'zh' ? '定时' : 'Schedules');
       await sidebar.locator('[data-slot="sidebar-nav-row"]').filter({ hasText: home }).click();
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(home);
       await reveal();

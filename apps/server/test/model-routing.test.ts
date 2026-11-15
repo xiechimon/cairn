@@ -470,9 +470,9 @@ test.each([
   { state: 'missing', expiry: 'none', online: true, runtime: true, available: false },
   { state: 'ok', expiry: 'none', online: true, runtime: true, available: false },
   { state: 'ok', expiry: 'future', online: false, runtime: true, available: false },
-  { state: 'ok', expiry: 'future', online: true, runtime: false, available: false },
+  { state: 'ok', expiry: 'future', online: true, runtime: false, available: true },
 ])(
-  'machine Codex routing: $state/$expiry online=$online pi=$runtime',
+  'machine Codex routing: $state/$expiry online=$online stored pi=$runtime',
   async ({ state, expiry, online, runtime, available }) => {
     const s = bootServer();
     const apiKey = await issueApiKey(s);

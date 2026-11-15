@@ -2,6 +2,7 @@ import {
   type AgentTodoItem,
   type ChiefReportContent,
   type ClaudeLogin,
+  type ConfinementCause,
   type ConfinementReport,
   type GithubRepoSummary,
   type MachineExecutor,
@@ -27,6 +28,7 @@ import {
   type TaskRequest,
   type ThreadMessageContent,
   type ThreadReportContent,
+  type TodoDeliverables,
   type TodoOutputKind,
   type TodoOwner,
   type TodoSection,
@@ -54,7 +56,7 @@ export interface BuildRef {
   createdAt: number;
 }
 
-export type MadeKind = 'document' | 'design' | 'page' | 'code';
+export type MadeKind = 'document' | 'design' | 'page' | 'slides' | 'code';
 
 export interface TodoRecord {
   id: string;
@@ -93,6 +95,7 @@ export interface TodoRecord {
   output?: TodoOutputKind;
   section?: TodoSection | null;
   madeKind?: MadeKind;
+  deliverables?: TodoDeliverables;
   previewUrl?: string;
   visibility?: 'private' | 'team';
   routeOverride?: RouteOverride | null;
@@ -294,6 +297,7 @@ export interface MachineRow {
     executor?: MachineExecutor;
     osPlatform?: MachineOsPlatform;
     confinement?: ConfinementReport;
+    confinementCause?: ConfinementCause;
     computer?: true;
     ownComputer?: true;
     browser?: true;

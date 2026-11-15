@@ -38,7 +38,6 @@ import {
 import { Section, Specimen } from './specimen.js';
 
 const NOW = r7(13, 14);
-const TOGGLEABLE: readonly string[] = ['pi', 'claude-code', 'gemini'];
 
 const SCOPE_MACHINES = [
   { id: 'scope-mac-a1b2', kind: 'local', name: 'studio', online: true },
@@ -183,7 +182,6 @@ function SubscriptionDetailSpecimen({ state }: { state: 'ok' }) {
 
 function ProviderPanelSpecimen() {
   const [selected, setSelected] = useState('anthropic');
-  const [cli, setCli] = useState(true);
   const items: ProviderItem[] = [
     {
       id: 'anthropic',
@@ -205,8 +203,7 @@ function ProviderPanelSpecimen() {
       Mark: ClaudeMark,
       version: '2.1.316',
       status: 'Not signed in',
-      tone: cli ? 'warn' : 'off',
-      toggle: { checked: cli, onChange: setCli },
+      tone: 'warn',
     },
   ];
   return (
@@ -277,7 +274,7 @@ function SettingsNavSpecimen() {
 
 export function AccountsSection() {
   const { t } = useI18n();
-  const [machine, setMachine] = useState<MachineWithProviders | undefined>(PROVIDER_MACHINES[0]);
+  const machine: MachineWithProviders | undefined = PROVIDER_MACHINES[0];
   const [scopeValue, setScopeValue] = useState(TEAM_SCOPE);
   const [scopeCheckedAt] = useState(() => Date.now());
   return (
@@ -379,23 +376,11 @@ export function AccountsSection() {
         title="Providers on one machine"
         note="shown on the machine detail page: signed in, signed out with its login command, unknown"
         stage="sheet"
-        code={`<MachineProvidersCard machine={machine} toggleable={canToggle} onToggle={toggle} online={<OnlineStatus on />} />`}
+        code={`<MachineProvidersCard machine={machine} online={<OnlineStatus on />} />`}
       >
         {machine !== undefined && (
           <div className="w-full">
-            <MachineProvidersCard
-              machine={machine}
-              toggleable={(runtime) => TOGGLEABLE.includes(runtime)}
-              online={<OnlineStatus on={machine.online} />}
-              onToggle={(runtime, next) =>
-                setMachine({
-                  ...machine,
-                  providers: machine.providers?.map((p) =>
-                    p.runtime === runtime ? { ...p, enabled: next } : p,
-                  ),
-                })
-              }
-            />
+            <MachineProvidersCard machine={machine} online={<OnlineStatus on={machine.online} />} />
           </div>
         )}
       </Specimen>

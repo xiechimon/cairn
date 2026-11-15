@@ -105,8 +105,9 @@ import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
 
 const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
   'sandbox-unavailable':
-    '排队中：{machine} 的任务沙箱没就绪，接不了任务——在那台机器上运行 cairn restart，原因见 Runner 页（前面 {ahead} 个）',
-  'runtime-disabled': '排队中：{machine} 没开 {runtime}——到 Runner 页打开（前面 {ahead} 个）',
+    '排队中：{machine} 的任务沙箱没就绪，接不了任务——原因和修法见 Runner 页（前面 {ahead} 个）',
+  'runtime-disabled':
+    '排队中：{machine} 上没有检测到 {runtime}，装好后重启 Runner（前面 {ahead} 个）',
   'model-unavailable':
     '排队中：{machine} 用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）',
   'local-path': '排队中：本地项目只在它所在的 Runner 上跑，{machine} 跑不了（前面 {ahead} 个）',
@@ -290,6 +291,14 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     output: w.output,
     section: w.section ?? null,
     ...(w.verified !== undefined ? { verified: w.verified } : {}),
+    ...(w.deliverables !== undefined
+      ? {
+          deliverables: w.deliverables,
+          ...(w.deliverables.items[0] !== undefined
+            ? { madeKind: w.deliverables.items[0].kind }
+            : {}),
+        }
+      : {}),
     ...(w.routeOverride !== undefined ? { routeOverride: w.routeOverride } : {}),
   };
 }

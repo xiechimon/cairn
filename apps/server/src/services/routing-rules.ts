@@ -16,6 +16,7 @@ import {
   type RouteUse,
   type RoutingRuleRecord,
   type RunnerOs,
+  requiredCapabilitiesSchema,
   runnerOsOf,
   type SessionDefault,
   type StepKind,
@@ -25,15 +26,27 @@ import {
   withPlatform,
 } from '@cairn/shared';
 import { and, asc, eq, isNotNull, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import { codexLoginAvailable, usesHostCodexLogin } from '../coordinator/codex-login.js';
 import { builtinModelIds, isBuiltinProvider } from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
-import { build, machine, provider, routingRule, step, todo, workPolicy } from '../db/schema.js';
+import {
+  build,
+  machine,
+  message,
+  provider,
+  routingRule,
+  step,
+  todo,
+  workPolicy,
+} from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { coordinatorRunsOnPi } from './coordinator-context.js';
+import { machineRuntimeAvailable } from './dispatch-eligibility.js';
 import { paidClaudeAllowed } from './model-routing.js';
 import { DEFAULT_SESSION_MODEL, DEFAULT_SESSION_PROVIDER } from './routing-migration.js';
-import { decideStepRoute } from './step-route.js';
+import { capabilityCandidates, decideStepRoute } from './step-route.js';
 
 type RoutingRuleRow = typeof routingRule.$inferSelect;
 type WorkPolicyRow = typeof workPolicy.$inferSelect;
@@ -60,8 +73,19 @@ export interface RouteProfile {
 export interface RoutedTodo {
   teamId: string;
   sourceKind?: TodoSourceKind | null;
+  sourceRef?: string | null;
   routeOverride?: RouteOverride | null;
 }
+
+export const citationCheckPinSchema = z.object({
+  ruleId: z.string().min(1),
+  provider: z.string().min(1),
+  modelId: z.string().min(1),
+  machineId: z.string().nullable(),
+  requiredCapabilities: requiredCapabilitiesSchema.nullable(),
+  thinkingLevel: z.string().nullable(),
+});
+export type CitationCheckPin = z.infer<typeof citationCheckPinSchema>;
 
 const USE_DISPLAY_NAMES: Record<RouteUse, string> = {
   coordinator: 'Coordinator',
@@ -82,6 +106,12 @@ const DEFAULT_COORDINATOR_RULE_ID = 'default-coordinator';
 const COORDINATOR_MODEL_PREFERENCE = [/haiku/i, /sonnet/i];
 const ANTHROPIC_API_HOST = 'api.anthropic.com';
 const CODEX_LOGIN_PRESENT = new Set(['ok', 'expired']);
+const CITATION_CHECKER_RULE_ID = 'default-citation-check';
+const CITATION_HARNESS_MODELS = [
+  { provider: 'claude-code', modelId: 'claude-sonnet-5-5' },
+  { provider: 'claude-code', modelId: 'claude-haiku-5-5' },
+  CODEX_MODEL,
+];
 
 export function keylessEndpoint(providerId: string): boolean {
   const presets: readonly string[] = PROVIDER_PRESET_IDS;
@@ -164,20 +194,17 @@ function sessionHarness(
 ): 'claude-code' | 'codex-login' | null {
   const rows = db
     .select({
-      report: machine.claudeCodeReport,
-      enabled: machine.enabledRuntimes,
+      claudeCodeReport: machine.claudeCodeReport,
       capabilities: machine.capabilities,
     })
     .from(machine)
     .where(eq(machine.teamId, teamId))
     .all();
-  if (rows.some((row) => row.report?.installed === true && row.enabled.includes('claude-code'))) {
+  if (rows.some((row) => machineRuntimeAvailable(row, 'claude-code'))) {
     return 'claude-code';
   }
-  const codex = rows.some(
-    (row) =>
-      CODEX_LOGIN_PRESENT.has(row.capabilities?.codexLogin?.state ?? 'absent') &&
-      row.enabled.includes('pi'),
+  const codex = rows.some((row) =>
+    CODEX_LOGIN_PRESENT.has(row.capabilities?.codexLogin?.state ?? 'absent'),
   );
   return codex ? 'codex-login' : null;
 }
@@ -236,6 +263,7 @@ export function anthropicCoordinatorChoice(
         isNotNull(provider.apiKeyCipher),
       ),
     )
+    .orderBy(asc(provider.createdAt), asc(provider.id))
     .all()
     .find((row) => isAnthropicApi(row.baseUrl) && row.models.length > 0);
   if (source === undefined) return null;
@@ -319,6 +347,112 @@ function syntheticRule(
   };
 }
 
+export function citationAttemptRecordId(buildId: string, attachmentId: string): string {
+  return `research-citation-attempt-${buildId}:${attachmentId}`;
+}
+
+export function parseCitationCheckPin(value: unknown): CitationCheckPin | null {
+  return citationCheckPinSchema.safeParse(value).data ?? null;
+}
+
+function citationCheckPin(
+  db: Pick<Db, 'select'>,
+  sourceRef: string | null | undefined,
+): CitationCheckPin | null {
+  const [buildId, attachmentId] = sourceRef?.split(':') ?? [];
+  if (!buildId || !attachmentId) return null;
+  const row = db
+    .select({ content: message.content })
+    .from(message)
+    .where(eq(message.id, citationAttemptRecordId(buildId, attachmentId)))
+    .get();
+  try {
+    const value: unknown =
+      typeof row?.content === 'string' ? JSON.parse(row.content) : row?.content;
+    return typeof value === 'object' && value !== null && 'pin' in value
+      ? parseCitationCheckPin(value.pin)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function pinnedCitationRule(teamId: string, pin: CitationCheckPin): RoutingRuleRow {
+  return {
+    ...syntheticRule(teamId, 'session', pin),
+    id: pin.ruleId,
+    use: 'citation_check',
+    machineId: pin.machineId,
+    requiredCapabilities: pin.requiredCapabilities,
+    thinkingLevel: pin.thinkingLevel,
+  };
+}
+
+function rulePin(rule: RoutingRuleRow): CitationCheckPin {
+  return {
+    ruleId: rule.id,
+    provider: rule.provider,
+    modelId: rule.modelId,
+    machineId: rule.machineId,
+    requiredCapabilities: rule.requiredCapabilities,
+    thinkingLevel: rule.thinkingLevel,
+  };
+}
+
+function defaultPin(choice: { provider: string; modelId: string }): CitationCheckPin {
+  return {
+    ruleId: CITATION_CHECKER_RULE_ID,
+    ...choice,
+    machineId: null,
+    requiredCapabilities: null,
+    thinkingLevel: null,
+  };
+}
+
+export function citationCheckerChoice(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+  previous: CitationCheckPin | null,
+): CitationCheckPin | null {
+  const checker = ruleRow(db, teamId, 'citation_check');
+  if (checker !== null) return rulePin(checker);
+  const harness = capabilityCandidates(db, teamId, { machineId: null, required: null }).filter(
+    (candidate) => candidate.available,
+  );
+  const runnable = (choice: { provider: string; modelId: string }) =>
+    harness.some((c) => c.provider === choice.provider && c.modelId === choice.modelId) ||
+    servingProviders(db, teamId, choice.modelId).some(
+      (served) => served.providerId === choice.provider && served.runnable,
+    );
+  const session = ruleRow(db, teamId, 'session');
+  const providerRows = db
+    .select({ providerId: provider.providerId, models: provider.models })
+    .from(provider)
+    .where(eq(provider.teamId, teamId))
+    .all();
+  const candidates = [
+    ...(session !== null && runnable(session) ? [rulePin(session)] : []),
+    ...CITATION_HARNESS_MODELS.filter(runnable).map(defaultPin),
+    ...servingProviders(db, teamId, null)
+      .filter((served) => served.runnable)
+      .flatMap(({ providerId }) =>
+        (providerRows.find((row) => row.providerId === providerId)?.models ?? [])
+          .filter((m) => m.id !== '' && paidClaudeAllowed(db, teamId, providerId, m.id))
+          .map((m) => defaultPin({ provider: providerId, modelId: m.id })),
+      ),
+  ];
+  const kept =
+    previous === null
+      ? undefined
+      : candidates.find(
+          (pin) =>
+            pin.provider === previous.provider &&
+            pin.modelId === previous.modelId &&
+            pin.machineId === previous.machineId,
+        );
+  return kept === undefined ? (candidates[0] ?? null) : previous;
+}
+
 function storedRouteForStep(
   db: Pick<Db, 'select'>,
   todoRow: RoutedTodo,
@@ -327,6 +461,8 @@ function storedRouteForStep(
   if (kind === 'review') return ruleRow(db, todoRow.teamId, 'review');
   if (!isSessionStepKind(kind) && kind !== 'merge') return null;
   if (todoRow.sourceKind === 'research-citation-check') {
+    const pin = citationCheckPin(db, todoRow.sourceRef);
+    if (pin !== null) return pinnedCitationRule(todoRow.teamId, pin);
     const checker = ruleRow(db, todoRow.teamId, 'citation_check');
     if (checker !== null) return checker;
   }
@@ -508,14 +644,15 @@ export function profileForStep(
   };
 }
 
-export function coordinatorProfile(
-  db: Pick<Db, 'select'>,
-  teamId: string,
-  withDefault = false,
-): RouteProfile | null {
+export function coordinatorProfile(db: Pick<Db, 'select'>, teamId: string): RouteProfile | null {
   const route =
-    ruleRow(db, teamId, 'coordinator') ?? (withDefault ? defaultCoordinatorRule(db, teamId) : null);
+    ruleRow(db, teamId, 'coordinator') ??
+    (coordinatorRunsOnPi() ? defaultCoordinatorRule(db, teamId) : null);
   return route === null ? null : routeProfile(route);
+}
+
+export function coordinatorMemoryOwner(db: Pick<Db, 'select'>, teamId: string): string | undefined {
+  return storedRuleRow(db, teamId, 'coordinator')?.id;
 }
 
 export const VERIFY_MEMORY_OWNER_SUFFIX = ':verify';

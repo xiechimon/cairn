@@ -231,6 +231,7 @@
   --overlay-scrim: rgb(0 0 0 / 0.5);
   --text-on-veil: #ffffff;
   --qr-light: #ffffff;
+  --page-preview: #ffffff;
   --qr-dark: #000000;
   --screen-letterbox: var(--qr-dark);
   --spot-soft: color-mix(in srgb, var(--card-button) 14%, var(--card));
@@ -388,6 +389,7 @@
   --overlay-scrim: rgb(0 0 0 / 0.4);
   --text-on-veil: #ffffff;
   --qr-light: #ffffff;
+  --page-preview: #ffffff;
   --qr-dark: #000000;
   --screen-letterbox: var(--qr-dark);
   --spot-soft: color-mix(in srgb, var(--card-button) 14%, var(--card));

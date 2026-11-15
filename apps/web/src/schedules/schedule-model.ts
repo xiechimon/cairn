@@ -1,4 +1,6 @@
 import type { CreateScheduleBody, ScheduleRecord } from '@cairn/shared';
+import type { ScheduleRecord as DisplaySchedule } from '../fixtures/records.js';
+import type { TFunc } from '../i18n/translate.js';
 
 export type ScheduleTrigger = 'once' | 'hourly' | 'daily' | 'weekdays' | 'weekly' | 'custom';
 export interface ScheduleDraft {
@@ -114,16 +116,14 @@ export function scheduleBody(
   };
   if (draft.trigger === 'custom') {
     const cron = draft.cron.trim();
-    if (cron.split(/\s+/).length !== 5)
-      throw new Error('Use five cron fields: minute hour day month weekday.');
+    if (cron.split(/\s+/).length !== 5) throw new Error('cron 需要 5 段：分 时 日 月 周。');
     return { ...base, kind: 'cron', cron };
   }
   if (draft.trigger === 'weekdays')
     return { ...base, kind: 'cron', cron: `${Number(draft.minute)} ${Number(draft.hour)} * * 1-5` };
   const at = scheduleTime(draft.date, draft.hour, draft.minute, schedule.tz);
-  if (at === null) throw new Error('Choose a valid date and time in this timezone.');
-  if (draft.trigger === 'once' && at <= now)
-    throw new Error('Choose a future time for a one-time schedule.');
+  if (at === null) throw new Error('请选择这个时区里有效的日期和时间。');
+  if (draft.trigger === 'once' && at <= now) throw new Error('单次定时要选一个将来的时间。');
   return { ...base, kind: draft.trigger, at };
 }
 
@@ -140,4 +140,38 @@ export function scheduleViewState(
     return 'finished';
   if (!schedule.enabled) return schedule.pausedReason === null ? 'paused' : 'disabled';
   return 'active';
+}
+
+const PAUSE_REASONS: Record<string, string> = {
+  'Task archived': '任务已归档，定时随之停用',
+  'Paused by worker': '执行任务的 agent 暂停了它',
+  'Paused after 10 consecutive scheduled runs without a human message':
+    '连续 10 次定时运行都没人回复，已自动暂停',
+};
+
+export function schedulePauseReason(reason: string, t: TFunc): string {
+  const known = PAUSE_REASONS[reason];
+  if (known !== undefined) return t(known);
+  if (reason.startsWith('git commit failed')) return t('提交代码时被仓库检查拦下，这一轮没能完成');
+  return /\n|error|failed|exit/i.test(reason) ? t('运行出错，已停用') : reason;
+}
+
+export function scheduleEnded(schedule: {
+  kind: string;
+  enabled?: boolean;
+  nextRunAt: number | null;
+}): boolean {
+  return schedule.kind === 'once' && (schedule.enabled === false || schedule.nextRunAt === null);
+}
+
+export function toWireSchedule(schedule: DisplaySchedule): ScheduleRecord {
+  return {
+    ...schedule,
+    cron: schedule.cron ?? null,
+    prompt: schedule.prompt ?? '',
+    enabled: schedule.enabled ?? true,
+    pausedReason: schedule.pausedReason ?? null,
+    lastRunAt: schedule.lastRunAt ?? null,
+    lastRunStatus: schedule.lastRunStatus ?? null,
+  };
 }

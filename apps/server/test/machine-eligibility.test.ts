@@ -16,7 +16,6 @@ function input(over: {
     machine: readyMachine({
       id: 'mac',
       name: 'mac',
-      enabledRuntimes: ['claude-code', 'pi'],
       claudeCodeReport: {
         installed: true,
         hostname: 'mac',
@@ -41,10 +40,32 @@ describe('D71 machineEligibility: hard constraints for a worker step on a machin
     expect(machineEligibility(input({}))).toBeNull();
   });
 
-  test('runtime not enabled on the machine', () => {
-    expect(machineEligibility(input({ machine: { enabledRuntimes: ['pi'] } }))?.kind).toBe(
+  test('Claude Code not detected on the machine', () => {
+    expect(
+      machineEligibility(
+        input({ machine: { claudeCodeReport: { installed: false, hostname: 'mac', models: [] } } }),
+      )?.kind,
+    ).toBe('runtime');
+  });
+
+  test('a machine whose daemon never reported Claude Code cannot take a claude-code step', () => {
+    expect(machineEligibility(input({ machine: { claudeCodeReport: null } }))?.kind).toBe(
       'runtime',
     );
+  });
+
+  test('an Orb executor runs claude-code steps without a host report', () => {
+    expect(
+      machineEligibility(
+        input({
+          machine: {
+            claudeCodeReport: null,
+            capabilities: { mcpServers: [], skills: [], executor: 'orb' },
+          },
+          model: { modelId: 'claude-opus-5-5' },
+        }),
+      ),
+    ).toBeNull();
   });
 
   test('claude-code model not configured on the machine and not live in the catalog', () => {
@@ -63,8 +84,12 @@ describe('D71 machineEligibility: hard constraints for a worker step on a machin
     ).toBeNull();
   });
 
-  test('a machine that never reported its model list fails closed', () => {
-    expect(machineEligibility(input({ machine: { claudeCodeReport: null } }))?.kind).toBe('model');
+  test('a machine that reports no model list fails closed', () => {
+    expect(
+      machineEligibility(
+        input({ machine: { claudeCodeReport: { installed: true, hostname: 'mac', models: [] } } }),
+      )?.kind,
+    ).toBe('model');
   });
 
   test('a model the catalog marks dead is refused even when the machine lists it', () => {
@@ -78,7 +103,10 @@ describe('D71 machineEligibility: hard constraints for a worker step on a machin
     expect(
       machineEligibility(
         input({
-          machine: { id: 'omarchy', claudeCodeReport: null },
+          machine: {
+            id: 'omarchy',
+            claudeCodeReport: { installed: true, hostname: 'omarchy', models: [] },
+          },
           agent: { machineId: 'omarchy' },
         }),
       ),

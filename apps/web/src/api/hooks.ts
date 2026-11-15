@@ -49,12 +49,12 @@ import type {
   ProviderTestResult,
   PrPanelRow,
   RemoteRoutesResponse,
-  RetroProposal,
   RouteOverride,
   ScheduleRecord,
   SearchResponse,
   SecretRecord,
   SetSecretBody,
+  SkillImportCandidatesResponse,
   SkillRecord,
   StepJournalRow,
   TeamMember,
@@ -613,6 +613,15 @@ export const useSkills = (teamId: string | undefined, enabled: boolean) =>
     enabled: enabled && teamId !== undefined,
   });
 
+export const useSkillImportCandidates = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['skillImportCandidates', teamId],
+    queryFn: () =>
+      api.get<SkillImportCandidatesResponse>(`/api/teams/${teamId}/skills/import-candidates`),
+    enabled: enabled && teamId !== undefined,
+    retry: false,
+  });
+
 export const useSkillFile = (
   teamId: string | undefined,
   skillId: string | undefined,
@@ -1105,14 +1114,6 @@ export function useApiMutations(teamId: string | undefined) {
     importSkill: useMutation({
       mutationFn: (body: ImportSkillBody) =>
         api.post<SkillRecord>(`/api/teams/${teamId}/skills/import`, body),
-      onSuccess: invalidateAll,
-    }),
-    decideRetroProposal: useMutation({
-      mutationFn: (input: { proposalId: string; decision: 'accept' | 'dismiss' }) =>
-        api.post<RetroProposal>(
-          `/api/teams/${teamId}/chief/retro-proposals/${input.proposalId}/${input.decision}`,
-          {},
-        ),
       onSuccess: invalidateAll,
     }),
     deleteMemory: useMutation({

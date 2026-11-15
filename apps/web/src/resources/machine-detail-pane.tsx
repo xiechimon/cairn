@@ -15,7 +15,6 @@ import {
   SettingsRow,
   SettingsSection,
 } from '../components/settings-list.js';
-import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { MachineAgentAccess } from './machine-agent-access.js';
@@ -51,10 +50,23 @@ export function sandboxNotice(capabilities: MachineRow['capabilities']): string 
       return null;
     case 'checking':
       return '正在检查任务沙箱，检查完才接任务。';
-    case 'unavailable':
-      return report.reason === 'unsupported-platform'
-        ? '这台机器的系统不支持任务沙箱，接不了任务。'
-        : '任务沙箱没就绪，这台 Runner 接不了任务。Linux 上 daemon 要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。';
+    case 'unavailable': {
+      if (report.reason === 'unsupported-platform')
+        return '这台机器的系统不支持任务沙箱，接不了任务。';
+      const cause = report.reason === 'startup-failed' ? capabilities.confinementCause : undefined;
+      switch (cause?.kind) {
+        case 'not-own-unit':
+          return '任务沙箱没就绪：daemon 没有作为自己的 systemd user unit 运行。在这台机器上运行 `{command} restart`，它会自己起一个；还不行的话，检查 `systemd-run --user` 能不能用。';
+        case 'bwrap-missing':
+          return '任务沙箱没就绪：这台机器没装 bubblewrap（`bwrap`）。装好后（如 `sudo pacman -S bubblewrap` 或 `sudo apt install bubblewrap`），Runner 每分钟会自己再检查一次。';
+        case 'home-overlay-failed':
+          return cause.mountPoint === undefined
+            ? '任务沙箱没就绪：沙箱没法覆盖你的家目录，常见原因是家目录里有 FUSE 挂载（比如 AppImage 程序）。用 `findmnt -l | grep fuse` 找到它并关掉对应程序，Runner 每分钟会自己再检查一次。'
+            : '任务沙箱没就绪：家目录里的 FUSE 挂载 `{mountPoint}` 挡住了沙箱，通常是某个 AppImage 程序在 TMPDIR 指向家目录时留下的。关掉那个程序，或让它的 TMPDIR 指向家目录以外，Runner 每分钟会自己再检查一次。';
+        default:
+          return '任务沙箱没就绪，这台 Runner 接不了任务。Linux 上 daemon 要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。';
+      }
+    }
   }
 }
 
@@ -86,43 +98,31 @@ export function TextWithCode({ text }: { text: string }) {
   );
 }
 
-function RuntimeRow({
-  machine,
-  runtime,
-  frozen,
-  blockedReason,
-  onToggle,
-}: {
-  machine: MachineRow;
-  runtime: string;
-  frozen: boolean;
-  blockedReason: string | undefined;
-  onToggle: (runtime: MachineRuntime, next: boolean) => void;
-}) {
+function runtimeAvailability(machine: MachineRow, runtime: string): string {
+  if (runtime === 'gemini') return '接入命令闸前不能用';
+  if (!isMachineRuntime(runtime)) return '已检测到';
+  return (machine.enabledRuntimes ?? []).includes(runtime)
+    ? '可用'
+    : '没有检测到，装好后重启 Runner';
+}
+
+function RuntimeRow({ machine, runtime }: { machine: MachineRow; runtime: string }) {
   const { t } = useI18n();
   const provider = machine.providers?.find((p) => p.runtime === runtime);
-  const toggleable = isMachineRuntime(runtime);
-  const enabled = toggleable
-    ? (machine.enabledRuntimes ?? []).includes(runtime)
-    : (provider?.enabled ?? false);
+  const availability = runtimeAvailability(machine, runtime);
+  const available = availability === '可用' || availability === '已检测到';
   const name = RUNTIME_NAMES[runtime] ?? runtime;
   const meta =
     provider === undefined
       ? []
       : [provider.plan, provider.version].filter((part): part is string => part !== null);
   const login = provider === undefined ? null : LOGIN_STATE[provider.login];
-  const switchDisabled = !toggleable || frozen;
-  const reason = !toggleable
-    ? t('这台 Runner 还不能单独开关 {name}', { name })
-    : frozen
-      ? blockedReason
-      : undefined;
   return (
     <div
       data-testid="provider-row"
       data-runtime={runtime}
       data-login={provider?.login}
-      data-enabled={enabled}
+      data-available={available}
       className={cn(SETTINGS_ROW_CLS, 'flex-wrap gap-y-1')}
     >
       <span className="flex min-w-0 flex-col">
@@ -143,36 +143,29 @@ function RuntimeRow({
               </span>
             </span>
           )}
-          {provider === undefined && <span>{enabled ? t('接任务中') : t('未开启')}</span>}
         </span>
       </span>
-      <ExplainDisabledToggle disabled={switchDisabled} reason={reason}>
-        <ToggleSwitch
-          data-testid="provider-toggle"
-          aria-label={t('{name} 接任务', { name })}
-          checked={enabled}
-          disabled={switchDisabled}
-          title={reason}
-          onCheckedChange={(next) => {
-            if (toggleable) onToggle(runtime, next);
-          }}
+      <span
+        data-testid="provider-availability"
+        className={cn(
+          'inline-flex items-center gap-1.5 text-meta',
+          available ? 'text-running-text' : 'text-content-tertiary',
+        )}
+      >
+        <span
+          aria-hidden
+          className={cn(
+            'size-1.5 flex-none rounded-full',
+            available ? 'bg-running' : 'bg-content-dim',
+          )}
         />
-      </ExplainDisabledToggle>
+        {t(availability)}
+      </span>
     </div>
   );
 }
 
-export function MachineDetailPane({
-  machine,
-  chief,
-  pending,
-  onToggleRuntime,
-}: {
-  machine: MachineRow;
-  chief: ChiefState;
-  pending: boolean;
-  onToggleRuntime: (runtime: MachineRuntime, next: boolean) => void;
-}) {
+export function MachineDetailPane({ machine, chief }: { machine: MachineRow; chief: ChiefState }) {
   const { t } = useI18n();
   const online = machine.online !== false;
 
@@ -188,7 +181,12 @@ export function MachineDetailPane({
   const loginWarning = notice === null ? null : formatClaudeLoginWarning(notice, machine.name, t);
   const sandboxKey = online ? sandboxNotice(machine.capabilities) : null;
   const sandbox =
-    sandboxKey === null ? null : t(sandboxKey, { command: PUBLISHED_PACKAGES.cli.command });
+    sandboxKey === null
+      ? null
+      : t(sandboxKey, {
+          command: PUBLISHED_PACKAGES.cli.command,
+          mountPoint: machine.capabilities?.confinementCause?.mountPoint ?? '',
+        });
 
   const runtimes: string[] = [
     ...MACHINE_RUNTIMES,
@@ -289,27 +287,11 @@ export function MachineDetailPane({
       <SettingsSection
         testId="machine-runtimes"
         title={t('运行时')}
-        description={t('这台 Runner 上能接任务的执行器，以及它们的登录状态。')}
+        description={t('这台 Runner 上检测到的执行器。检测到就能接任务，不用开关。')}
       >
-        {online && !(machine.enabledRuntimes ?? []).some(isMachineRuntime) && (
-          <p data-testid="machine-pick-runtimes" className="m-0 text-meta text-content-secondary">
-            {t('选择这台 Runner 接哪些运行时')}
-          </p>
-        )}
         <SettingsCard>
           {runtimes.map((runtime) => (
-            <RuntimeRow
-              key={runtime}
-              machine={machine}
-              runtime={runtime}
-              frozen={pending || !online}
-              blockedReason={
-                online
-                  ? undefined
-                  : t('重新连接 {name} 后才能修改它的设置。', { name: machine.name })
-              }
-              onToggle={onToggleRuntime}
-            />
+            <RuntimeRow key={runtime} machine={machine} runtime={runtime} />
           ))}
         </SettingsCard>
       </SettingsSection>

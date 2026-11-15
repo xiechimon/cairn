@@ -169,8 +169,18 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
     async (route) => {
       const blocker = await create();
       const id = await create({ blockedBy: [blocker] });
-      if (route === 'tool') await relay('delete_todos', { todoIds: [blocker] });
-      else expect((await req(H.s.app, 'DELETE', `/api/todos/${blocker}`)).status).toBe(204);
+      if (route === 'tool') {
+        const proposed = (await relay('delete_todos', { todoIds: [blocker] })) as {
+          proposalId: string;
+        };
+        const approved = await req(
+          H.s.app,
+          'POST',
+          `/api/teams/${H.teamId}/chief/threads/${H.threadId}/questions/approval-${proposed.proposalId}/answer`,
+          { answers: [{ header: '审批', choices: ['批准执行'] }] },
+        );
+        expect(approved.status).toBe(200);
+      } else expect((await req(H.s.app, 'DELETE', `/api/todos/${blocker}`)).status).toBe(204);
       releaseBlockedSteps(toolDeps());
       reconcileOwners(toolDeps());
       expect(sessions(id)[0]?.holdReason).toBe(BLOCKED_BY_HOLD);

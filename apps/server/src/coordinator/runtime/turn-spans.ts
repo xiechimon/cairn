@@ -55,19 +55,65 @@ export interface SetupTiming {
   end(threadId: string): void;
 }
 
+interface SetupMark {
+  name: string;
+  at: number;
+  maxEventLoopDelayMs: number;
+}
+
+const LOOP_TICK_MS = 10;
+
+interface LoopWatch {
+  take(): number;
+  stop(): void;
+}
+
+function watchEventLoop(): LoopWatch {
+  let last = performance.now();
+  let worst = 0;
+  const timer = setInterval(() => {
+    const at = performance.now();
+    worst = Math.max(worst, at - last - LOOP_TICK_MS);
+    last = at;
+  }, LOOP_TICK_MS);
+  return {
+    take: () => {
+      const at = performance.now();
+      const delay = Math.max(worst, at - last - LOOP_TICK_MS, 0);
+      worst = 0;
+      last = at;
+      return Math.round(delay);
+    },
+    stop: () => clearInterval(timer),
+  };
+}
+
 export function createSetupTiming(now: () => number = Date.now): SetupTiming {
-  const open = new Map<string, { turn: TurnIdentity; marks: { name: string; at: number }[] }>();
+  const open = new Map<string, { turn: TurnIdentity; marks: SetupMark[]; loop: LoopWatch }>();
+  const close = (threadId: string) => {
+    const setup = open.get(threadId);
+    if (setup === undefined) return undefined;
+    open.delete(threadId);
+    setup.loop.stop();
+    return setup;
+  };
   return {
     begin: (turn) => {
-      open.set(turn.threadId, { turn, marks: [{ name: 'start', at: now() }] });
+      close(turn.threadId);
+      open.set(turn.threadId, {
+        turn,
+        marks: [{ name: 'start', at: now(), maxEventLoopDelayMs: 0 }],
+        loop: watchEventLoop(),
+      });
     },
     mark: (threadId, name) => {
-      open.get(threadId)?.marks.push({ name, at: now() });
-    },
-    end: (threadId) => {
       const setup = open.get(threadId);
       if (setup === undefined) return;
-      open.delete(threadId);
+      setup.marks.push({ name, at: now(), maxEventLoopDelayMs: setup.loop.take() });
+    },
+    end: (threadId) => {
+      const setup = close(threadId);
+      if (setup === undefined) return;
       const { marks } = setup;
       try {
         emitCoordinatorTurnSpans(
@@ -77,6 +123,7 @@ export function createSetupTiming(now: () => number = Date.now): SetupTiming {
             name: mark.name,
             startAt: marks[i]?.at ?? mark.at,
             endAt: mark.at,
+            maxEventLoopDelayMs: mark.maxEventLoopDelayMs,
           })),
         );
       } catch {}

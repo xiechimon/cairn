@@ -1,6 +1,7 @@
 import type {
   ChiefReportContent,
   ChiefReportLedger,
+  ChiefReportSuggestion,
   ChiefReportTodoRef,
   IntakeItem,
   RetroProposal,
@@ -11,6 +12,7 @@ import {
   CHIEF_REPORT_RETRO_MAX,
   CHIEF_REPORT_ROW_ID_PREFIX,
   chiefReportContentSchema,
+  chiefReportSuggestions,
   INTAKE_SOURCE_KIND,
   ISSUE_FENCE_OPEN,
   isActiveStepStatus,
@@ -1033,6 +1035,13 @@ export function settleReportRun(
     .set({ status: empty ? 'empty' : 'posted' })
     .where(eq(chiefReport.id, rec.id))
     .run();
+}
+
+export function reportSuggestions(db: Db, reportId: string): ChiefReportSuggestion[] {
+  return chiefReportSuggestions({
+    retro: proposalsOf(db, reportId),
+    intake: intakeOf(db, reportId),
+  });
 }
 
 export function decideRetroProposal(

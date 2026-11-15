@@ -29,7 +29,7 @@ import { dateTimeFormat } from '../lib/date-format.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/routing-settings-page.js';
 import { settingsHref } from '../settings/settings-href.js';
-import { ChiefReportRow } from './chief-report-row.js';
+import { ChiefReportMessage } from './chief-report-row.js';
 import { TaskRefRow } from './chief-task-ref-row.js';
 import { childRefsOf, type TaskRef } from './chief-task-refs.js';
 import { isLiveNotice } from './live-notice.js';
@@ -598,7 +598,12 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'takeover') return <TakeoverCard item={item} />;
   if (item.kind === 'task-card')
     return <TaskStartedRow todoId={item.todoId} seq={item.seq} title={item.title} />;
-  if (item.kind === 'daily-report') return <ChiefReportRow report={item.report} />;
+  if (item.kind === 'daily-report')
+    return (
+      <CoordinatorSaid testId="chief-report">
+        <ChiefReportMessage report={item.report} />
+      </CoordinatorSaid>
+    );
   if (item.kind === 'runner-offline') return <RunnerOfflineRow notice={item.notice} />;
   if (item.kind === 'note')
     return (

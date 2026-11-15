@@ -3,22 +3,34 @@ import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import * as dbClient from '../src/db/client.js';
-import { build, chiefReport, message, todo, tokenUsage } from '../src/db/schema.js';
+import {
+  build,
+  chiefReport,
+  machine,
+  message,
+  routingRule,
+  team,
+  todo,
+  tokenUsage,
+} from '../src/db/schema.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
 import { ingestIntake } from '../src/services/intake-items.js';
+import { createProvider } from '../src/services/providers.js';
 import {
   checkedResearchReport,
   openCitationCheck,
   planResearchCitationChecks,
 } from '../src/services/research-citations.js';
 import { openResearchThread } from '../src/services/research-thread.js';
-import { profileForStep } from '../src/services/routing-rules.js';
+import { seedDefaultRouting } from '../src/services/routing-migration.js';
+import { listRoutingSettings, profileForStep } from '../src/services/routing-rules.js';
 import {
   bootServer,
   insertMachine,
   postProject,
   seedRoute,
   seedSessionRoute,
+  subscriptionClaudeReport,
   type TestServer,
 } from './helpers.js';
 
@@ -465,12 +477,6 @@ describe('research citation handoff', () => {
     expect(s.db.select().from(todo).all()).toHaveLength(1);
   });
 
-  test('a session route on the author vendor cannot masquerade as an independent checker', async () => {
-    const { s, opened } = await world(false);
-    expect(openCitationCheck(s.svc, opened.buildId)).toBeNull();
-    expect(s.db.select().from(todo).all()).toHaveLength(1);
-  });
-
   test('unsupported and unavailable claims stay explicitly marked in the handed-off report', async () => {
     const { s, opened } = await world();
     const checker = openCitationCheck(s.svc, opened.buildId)!;
@@ -510,19 +516,31 @@ describe('research citation handoff', () => {
   });
 
   test.each(['claude-opus-5-5', 'unknown-model'])(
-    'rejects the checker actual model %s',
+    'accepts a complete audit whatever model the checker actually ran, here %s',
     async (model) => {
       const { s, opened } = await world();
       const checker = openCitationCheck(s.svc, opened.buildId)!;
       land(s, checker.buildId, receipt(), model);
-      expect(checkedResearchReport(s.db, opened.buildId)).toBeNull();
+      expect(checkedResearchReport(s.db, opened.buildId)).not.toBeNull();
     },
   );
 
-  test('an unknown source model cannot pass by declaring an independent checker', async () => {
+  test('an audit with no recorded checker usage never ran and is not accepted', async () => {
+    const { s, opened } = await world();
+    const checker = openCitationCheck(s.svc, opened.buildId)!;
+    land(s, checker.buildId, receipt(), 'gpt-6.1-sol');
+    s.db.delete(tokenUsage).where(eq(tokenUsage.buildId, checker.buildId)).run();
+    expect(checkedResearchReport(s.db, opened.buildId)).toBeNull();
+  });
+
+  test('a report with no recorded token usage is still checked', async () => {
     const { s, opened } = await world();
     s.db.delete(tokenUsage).where(eq(tokenUsage.buildId, opened.buildId)).run();
-    expect(openCitationCheck(s.svc, opened.buildId)).toBeNull();
+    planResearchCitationChecks(s.svc);
+    const check = openCitationCheck(s.svc, opened.buildId)!;
+    expect(check).not.toBeNull();
+    land(s, check.buildId, receipt(), 'gpt-6.1-sol');
+    expect(checkedResearchReport(s.db, opened.buildId)).not.toBeNull();
   });
 
   test('an audit omitting a cited URL is incomplete', async () => {
@@ -602,5 +620,162 @@ describe('research citation handoff', () => {
       'gpt-6.1-sol',
     );
     expect(ingestIntake(s.db, target, Date.now())).toBe(1);
+  });
+});
+
+describe('citation checker routing', () => {
+  const claudeReport = {
+    ...subscriptionClaudeReport,
+    models: ['claude-sonnet-5-5', 'claude-haiku-5-5'].map((id) => ({ id, name: id })),
+  };
+
+  async function routedWorld(reportModel: string) {
+    const s = bootServer();
+    disposables.push(() => s.dispose());
+    const projectId = await postProject(s.app, 'citations');
+    const home = insertMachine(s, { enabledRuntimes: ['pi'] });
+    s.db.update(team).set({ defaultMachineId: home }).where(eq(team.id, s.team.id)).run();
+    seedSessionRoute(s, { provider: 'claude-code', modelId: 'claude-sonnet-5-5' });
+    const opened = openResearchThread(s.svc, {
+      teamId: s.team.id,
+      projectId,
+      tier: 2,
+      title: 'Paging',
+      question: 'What changed?',
+    });
+    land(s, opened.buildId, source, reportModel);
+    return { s, opened };
+  }
+
+  function keyedProvider(s: TestServer, providerId: string, models: string[]) {
+    createProvider(
+      { db: s.db, box: s.secretBox },
+      {
+        teamId: s.team.id,
+        body: {
+          providerId,
+          label: providerId,
+          baseUrl: 'http://127.0.0.1:8798/v1',
+          api: 'openai-completions',
+          apiKey: `${providerId}-key`,
+          models: models.map((id) => ({ id, name: id })),
+        },
+        createdBy: s.user.id,
+      },
+    );
+  }
+
+  function codexRunner(s: TestServer, expiresIn: number) {
+    const id = insertMachine(s, { enabledRuntimes: ['pi'] });
+    const row = s.db.select().from(machine).where(eq(machine.id, id)).get()!;
+    s.db
+      .update(machine)
+      .set({
+        capabilities: {
+          ...row.capabilities!,
+          codexLogin: {
+            state: expiresIn > 0 ? 'ok' : 'expired',
+            expiresAt: Date.now() + expiresIn,
+          },
+        },
+      })
+      .where(eq(machine.id, id))
+      .run();
+  }
+
+  function checkerModel(s: TestServer, todoId: string) {
+    const row = s.db.select().from(todo).where(eq(todo.id, todoId)).get()!;
+    const profile = profileForStep(s.db, row, 'build');
+    return profile === null ? null : `${profile.provider}/${profile.modelId}`;
+  }
+
+  test('a Session rule naming Claude Code on a team without Claude Code is not used for the checker', async () => {
+    const { s, opened } = await routedWorld('glm-5.3');
+    keyedProvider(s, 'relay', ['gpt-6.1-sol']);
+    const check = openCitationCheck(s.svc, opened.buildId)!;
+    expect(checkerModel(s, check.todoId)).toBe('relay/gpt-6.1-sol');
+  });
+
+  test.each([
+    ['a logged-out Claude Code and an expired Codex login', 'relay/gpt-6.1-sol'],
+    ['a logged-in Claude Code', 'claude-code/claude-sonnet-5-5'],
+    ['a current Codex login', 'openai-codex/gpt-6.1-sol'],
+  ] as const)('with %s the checker runs on %s', async (setup, expected) => {
+    const { s, opened } = await routedWorld('glm-5.3');
+    keyedProvider(s, 'relay', ['gpt-6.1-sol']);
+    insertMachine(s, {
+      claudeCodeReport:
+        setup === 'a logged-in Claude Code'
+          ? claudeReport
+          : { ...claudeReport, auth: { state: 'not-logged-in' } },
+    });
+    codexRunner(s, setup === 'a current Codex login' ? 3_600_000 : -60_000);
+    const check = openCitationCheck(s.svc, opened.buildId)!;
+    expect(checkerModel(s, check.todoId)).toBe(expected);
+  });
+
+  test('the chosen checker stays pinned while runtimes and rules change mid-check', async () => {
+    const { s, opened } = await routedWorld('claude-sonnet-5-5');
+    codexRunner(s, 3_600_000);
+    const check = openCitationCheck(s.svc, opened.buildId)!;
+    expect(checkerModel(s, check.todoId)).toBe('openai-codex/gpt-6.1-sol');
+    insertMachine(s, { claudeCodeReport: claudeReport });
+    keyedProvider(s, 'relay-186', ['glm-5.3']);
+    seedRoute(s, 'session', { provider: 'relay-186', modelId: 'glm-5.3' });
+    seedRoute(s, 'citation_check', { provider: 'relay-186', modelId: 'glm-5.3' });
+    expect(openCitationCheck(s.svc, opened.buildId)?.buildId).toBe(check.buildId);
+    expect(checkerModel(s, check.todoId)).toBe('openai-codex/gpt-6.1-sol');
+    s.db.update(todo).set({ phase: 'failed' }).where(eq(todo.id, check.todoId)).run();
+    expect(openCitationCheck(s.svc, opened.buildId)?.buildId).not.toBe(check.buildId);
+    expect(checkerModel(s, check.todoId)).toBe('relay-186/glm-5.3');
+  });
+
+  test('a retry keeps a pinned checker that can still run', async () => {
+    const { s, opened } = await routedWorld('claude-sonnet-5-5');
+    keyedProvider(s, 'relay', ['gpt-6.1-sol']);
+    const check = openCitationCheck(s.svc, opened.buildId)!;
+    expect(checkerModel(s, check.todoId)).toBe('relay/gpt-6.1-sol');
+    codexRunner(s, 3_600_000);
+    s.db.update(todo).set({ phase: 'failed' }).where(eq(todo.id, check.todoId)).run();
+    expect(openCitationCheck(s.svc, opened.buildId)?.buildId).not.toBe(check.buildId);
+    expect(checkerModel(s, check.todoId)).toBe('relay/gpt-6.1-sol');
+  });
+
+  test('a hand-set citation_check rule is used as written and never rewritten', async () => {
+    const { s, opened } = await routedWorld('claude-sonnet-5-5');
+    insertMachine(s, { claudeCodeReport: claudeReport });
+    keyedProvider(s, 'relay-186', ['glm-5.3']);
+    const ruleId = seedRoute(s, 'citation_check', { provider: 'relay-186', modelId: 'glm-5.3' });
+    const stored = () => s.db.select().from(routingRule).where(eq(routingRule.id, ruleId)).get();
+    const before = stored();
+    seedDefaultRouting(s.db);
+    listRoutingSettings(s.db, s.team.id);
+    const check = openCitationCheck(s.svc, opened.buildId)!;
+    expect(checkerModel(s, check.todoId)).toBe('relay-186/glm-5.3');
+    s.db.update(todo).set({ phase: 'failed' }).where(eq(todo.id, check.todoId)).run();
+    openCitationCheck(s.svc, opened.buildId);
+    expect(checkerModel(s, check.todoId)).toBe('relay-186/glm-5.3');
+    expect(stored()).toEqual(before);
+  });
+
+  test('a hand-set citation_check rule on the report model is used and its audit accepted', async () => {
+    const { s, opened } = await routedWorld('glm-5.3');
+    codexRunner(s, 3_600_000);
+    keyedProvider(s, 'relay-186', ['glm-5.3']);
+    seedRoute(s, 'citation_check', { provider: 'relay-186', modelId: 'glm-5.3' });
+    const check = openCitationCheck(s.svc, opened.buildId)!;
+    expect(checkerModel(s, check.todoId)).toBe('relay-186/glm-5.3');
+    land(s, check.buildId, receipt(), 'glm-5.3');
+    expect(checkedResearchReport(s.db, opened.buildId)).not.toBeNull();
+  });
+
+  test('with no citation_check rule the first runnable model is used even on the report vendor', async () => {
+    const { s, opened } = await routedWorld('claude-sonnet-5-5');
+    insertMachine(s, { claudeCodeReport: claudeReport });
+    codexRunner(s, 3_600_000);
+    const check = openCitationCheck(s.svc, opened.buildId)!;
+    expect(checkerModel(s, check.todoId)).toBe('claude-code/claude-sonnet-5-5');
+    land(s, check.buildId, receipt(), 'claude-sonnet-5-5');
+    expect(checkedResearchReport(s.db, opened.buildId)).not.toBeNull();
   });
 });

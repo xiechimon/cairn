@@ -178,6 +178,20 @@ try {
 `;
 
 const exec = promisify(execFile);
+const STDERR_TAIL_CHARS = 2048;
+const SYSTEMCTL_UNIT_NOT_LOADED = 5;
+
+export class ConfinementExitedError extends Error {
+  constructor(readonly stderrTail: string) {
+    super('Confinement exited before readiness');
+  }
+}
+
+export class ConfinementOwnerError extends Error {}
+
+function isUnitNotLoaded(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && error.code === SYSTEMCTL_UNIT_NOT_LOADED;
+}
 const ownerProperties = ['-p', 'ActiveState', '-p', 'InvocationID', '-p', 'ControlGroup'];
 
 export async function launchConfined(options: {
@@ -196,7 +210,7 @@ export async function launchConfined(options: {
   stop: () => Promise<void>;
 }> {
   if (!/^[a-zA-Z0-9_-]+\.service$/.test(options.owner))
-    throw new Error('Invalid confinement owner');
+    throw new ConfinementOwnerError('Invalid confinement owner');
   const timeout = options.timeoutMs ?? 10000;
   const control = async (...args: string[]) =>
     (await exec('systemctl', ['--user', ...args], { timeout })).stdout;
@@ -215,7 +229,7 @@ export async function launchConfined(options: {
     !fields.ControlGroup ||
     !selfGroup.endsWith(`:${fields.ControlGroup}`)
   )
-    throw new Error('Confinement owner is not this daemon invocation');
+    throw new ConfinementOwnerError('Confinement owner is not this daemon invocation');
   options.signal?.throwIfAborted();
   const unit = `cairn-confine-${randomUUID()}.service`;
   const nonce = `${fields.InvocationID}:${randomUUID()}`;
@@ -276,11 +290,15 @@ export async function launchConfined(options: {
         try {
           await control('stop', unit);
         } catch (error) {
-          if (
-            !(error instanceof Error && 'code' in error && error.code === 5) ||
-            (await Promise.race([exited, waitTimeout(timeout, undefined, { ref: false })])) !== 0
-          )
-            throw error;
+          if (!isUnitNotLoaded(error)) throw error;
+          const settled = await Promise.race([
+            exited.then(
+              () => true,
+              () => true,
+            ),
+            waitTimeout(timeout, false, { ref: false }),
+          ]);
+          if (!settled) throw error;
         }
       }
       assertConfinementCleanup(true, () => readFileSync(eventsPath, 'utf8'), 'path');
@@ -299,22 +317,29 @@ export async function launchConfined(options: {
     await new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => finish(new Error('Confinement startup timeout')), timeout);
       let received = '';
+      let stderrTail = '';
       const data = (chunk: Buffer) => {
         received += chunk.toString('utf8');
         if (received === `ready:${nonce}\n`) finish();
         else if (received.includes('\n') || received.length > 256)
           finish(new Error('Invalid confinement readiness'));
       };
+      const errorData = (chunk: Buffer) => {
+        stderrTail = (stderrTail + chunk.toString('utf8')).slice(-STDERR_TAIL_CHARS);
+      };
       const finish = (error?: Error) => {
         clearTimeout(timer);
         child.stdout.off('data', data);
         child.stdout.pause();
+        child.stderr.off('data', errorData);
+        child.stderr.pause();
         if (error) reject(error);
         else resolve();
       };
       child.stdout.on('data', data);
+      child.stderr.on('data', errorData);
       void exited.then(
-        () => finish(new Error('Confinement exited before readiness')),
+        () => finish(new ConfinementExitedError(stderrTail)),
         (error: Error) => finish(error),
       );
     });
@@ -355,6 +380,10 @@ export async function reconcileConfinement(reservation: {
     reservation.eventsPath.includes('..')
   )
     throw new Error('Invalid confinement reservation');
-  await exec('systemctl', ['--user', 'stop', reservation.unit], { timeout: 10000 });
+  try {
+    await exec('systemctl', ['--user', 'stop', reservation.unit], { timeout: 10000 });
+  } catch (error) {
+    if (!isUnitNotLoaded(error)) throw error;
+  }
   assertConfinementCleanup(true, () => readFileSync(reservation.eventsPath, 'utf8'), 'path');
 }

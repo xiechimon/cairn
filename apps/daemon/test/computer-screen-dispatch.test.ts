@@ -16,6 +16,7 @@ const finished: ScreenOutcome = { kind: 'done', text: 'observed', images: [] };
 function setup(screen?: HostScreen, cancelled = false) {
   const frames: ComputerFrame[] = [];
   const dispatcher = createComputerDispatcher({
+    cairnOrigins: [],
     client: {
       computerFrames: async (_id, body) => {
         frames.push(...body.frames);

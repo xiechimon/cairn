@@ -142,3 +142,64 @@ test('installed DO driver mutates the row but does not provide native changes me
     row: { lastSeenAt: 55 },
   });
 });
+
+test('production lease preserves owner fencing, strict expiry and persistence on DO storage', async () => {
+  const fields = (machineId, now, id = 'shared-store') => ({ id, machineId, now });
+  assert.deepEqual(await call('leases', 'lease-acquire', fields('alpha', 1_000)), {
+    acquired: true,
+  });
+  assert.deepEqual(await call('leases', 'lease-acquire', fields('alpha', 1_500)), {
+    acquired: true,
+  });
+  assert.deepEqual(await call('leases', 'lease-read', fields('alpha', 1_500)), {
+    storeKey: 'shared-store',
+    owner: 'alpha',
+    heartbeatAt: 1_500,
+  });
+  assert.deepEqual(await call('leases', 'lease-acquire', fields('beta', 1_501)), {
+    acquired: false,
+  });
+  assert.deepEqual(await call('leases', 'lease-heartbeat', fields('alpha', 2_000)), {
+    owned: true,
+  });
+  for (const now of [46_999, 47_000]) {
+    assert.deepEqual(await call('leases', 'lease-acquire', fields('beta', now)), {
+      acquired: false,
+    });
+  }
+  assert.deepEqual(await call('leases', 'lease-acquire', fields('beta', 47_001)), {
+    acquired: true,
+  });
+  assert.deepEqual(await call('leases', 'lease-heartbeat', fields('alpha', 47_002)), {
+    owned: false,
+  });
+  await call('leases', 'lease-release', fields('alpha', 47_003));
+  assert.deepEqual(await call('leases', 'lease-read', fields('beta', 47_003)), {
+    storeKey: 'shared-store',
+    owner: 'beta',
+    heartbeatAt: 47_001,
+  });
+  assert.deepEqual(await call('leases', 'lease-acquire', fields('alpha', 47_004)), {
+    acquired: false,
+  });
+  assert.deepEqual(await call('leases', 'lease-read', fields('beta', 47_004)), {
+    storeKey: 'shared-store',
+    owner: 'beta',
+    heartbeatAt: 47_001,
+  });
+  assert.deepEqual(await call('leases', 'lease-acquire', fields('alpha', 47_004, 'other-store')), {
+    acquired: true,
+  });
+  await runtime.dispose();
+  start();
+  assert.deepEqual(await call('leases', 'lease-acquire', fields('alpha', 47_005)), {
+    acquired: false,
+  });
+  assert.deepEqual(await call('leases', 'lease-acquire', fields('beta', 47_006)), {
+    acquired: true,
+  });
+  await call('leases', 'lease-release', fields('beta', 47_007));
+  assert.deepEqual(await call('leases', 'lease-acquire', fields('alpha', 47_008)), {
+    acquired: true,
+  });
+});

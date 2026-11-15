@@ -2,6 +2,7 @@ import type { PrPanelRow } from '@cairn/shared';
 import { cn } from 'cn';
 import { CircleCheck, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -224,7 +225,10 @@ export function TasksPanel({
   query,
 }: TasksPanelProps) {
   const { t } = useI18n();
-  const [chosenTab, setTab] = useState<TasksTab | null>(null);
+  const [searchParams] = useSearchParams();
+  const [chosenTab, setTab] = useState<TasksTab | null>(() =>
+    searchParams.get('tab') === 'scheduled' ? 'scheduled' : null,
+  );
   const [adding, setAdding] = useState(false);
   const groups = bySection(entries);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
@@ -413,7 +417,13 @@ export function TasksPanel({
       )}
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pt-2 pb-4">
         {tab === 'scheduled' ? (
-          <TasksScheduleList projectId={projectId} now={now} />
+          <TasksScheduleList
+            projectId={projectId}
+            now={now}
+            candidates={entries
+              .filter((entry) => entry.todo.archivedAt == null)
+              .map(({ todo }) => ({ id: todo.id, title: todo.title, projectId: todo.projectId }))}
+          />
         ) : (
           <QueryBoundary
             query={query}

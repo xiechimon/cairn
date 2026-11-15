@@ -171,13 +171,13 @@ test('radio group: arrow keys move focus and select, roving tabindex follows', a
   await expect(daily).toHaveAttribute('aria-checked', 'true');
   await keyboardFocus(daily);
   await page.keyboard.press('ArrowRight');
-  const weekdays = group.getByRole('radio', { name: 'Weekdays' });
+  const weekdays = group.getByRole('radio', { name: '工作日' });
   await expect(weekdays).toHaveAttribute('aria-checked', 'true');
   await expect(weekdays).toBeFocused();
   await expect(weekdays).toHaveAttribute('tabindex', '0');
   await expect(daily).toHaveAttribute('tabindex', '-1');
   await page.keyboard.press('End');
-  await expect(group.getByRole('radio', { name: 'Custom cron' })).toHaveAttribute(
+  await expect(group.getByRole('radio', { name: '自定义 cron' })).toHaveAttribute(
     'aria-checked',
     'true',
   );

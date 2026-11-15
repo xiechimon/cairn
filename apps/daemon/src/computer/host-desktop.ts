@@ -11,16 +11,24 @@ import {
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { COMPUTER_PRESENCE_LIMIT, type ComputerPresence } from '@cairn/shared';
-import { computerMachineName, PINNED_AGENT_BROWSER_VERSION } from '../orb/computer.js';
+import { AGENT_BROWSER_BINARY, browserSessionName } from './browser.js';
 import { executableOnPath } from './contained-spawn.js';
 import { HostComputerProvider } from './host.js';
 import type { ComputerInputFence, ComputerInputLease } from './input-fence.js';
 import type { ComputerPresenceSource } from './presence.js';
 import {
+  type ComputerProcessEvent,
   type ComputerProvider,
   ComputerRefusal,
   type ScopedComputerProviders,
 } from './provider.js';
+
+export const PINNED_AGENT_BROWSER_VERSION = '0.41.2';
+
+export function computerMachineName(scopeKey: string): string {
+  if (scopeKey === '') throw new Error('Computer scope key is empty');
+  return `cairn-orb-computer-${createHash('sha256').update(scopeKey).digest('hex').slice(0, 40)}`;
+}
 
 export const HOST_DESKTOP_PROGRAMS = [
   'systemd-run',
@@ -34,6 +42,8 @@ export const HOST_DESKTOP_PROGRAMS = [
 ] as const;
 export const HOST_DESKTOP_BROWSERS = ['chromium', 'google-chrome-stable'] as const;
 export const HOST_DESKTOP_READY_MS = 20_000;
+export const HOST_DESKTOP_IDLE_STOP_MS = 10 * 60_000;
+const BROWSER_CLOSE_TIMEOUT_MS = 30_000;
 export const OMARCHY_WALLPAPER = '.local/state/omarchy/current/background';
 const UNIT_PREFIX = 'cairn-desktop-';
 
@@ -95,6 +105,8 @@ export interface HostDesktopsOptions {
   run?: CommandRunner;
   inputFence?: ComputerInputFence;
   readyMs?: number;
+  idleStopMs?: number;
+  now?: () => number;
 }
 
 interface Desktop {
@@ -111,11 +123,16 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
   private readonly failed = new Set<string>();
   private readonly leases = new Map<string, ComputerInputLease>();
   private readonly listeners = new Set<() => void>();
+  private readonly lastUsed = new Map<string, number>();
+  private readonly busy = new Map<string, number>();
+  private readonly stopping = new Map<string, Promise<void>>();
+  private readonly now: () => number;
 
   constructor(private readonly options: HostDesktopsOptions) {
     this.hostRoot = options.root;
     this.env = options.env ?? process.env;
     this.run = options.run ?? runCommand;
+    this.now = options.now ?? Date.now;
   }
 
   private get path(): string | undefined {
@@ -188,23 +205,62 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     return (await this.desktop(scopeKey)).display;
   }
 
+  async hold(scopeKey: string): Promise<() => void> {
+    this.enter(scopeKey);
+    try {
+      await this.desktop(scopeKey);
+    } catch (error) {
+      this.leave(scopeKey);
+      throw error;
+    }
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.leave(scopeKey);
+    };
+  }
+
+  private enter(scopeKey: string): void {
+    this.busy.set(scopeKey, (this.busy.get(scopeKey) ?? 0) + 1);
+    this.lastUsed.set(scopeKey, this.now());
+  }
+
+  private leave(scopeKey: string): void {
+    const count = (this.busy.get(scopeKey) ?? 1) - 1;
+    if (count > 0) this.busy.set(scopeKey, count);
+    else this.busy.delete(scopeKey);
+    this.lastUsed.set(scopeKey, this.now());
+  }
+
+  private async using<T>(scopeKey: string, run: () => Promise<T>): Promise<T> {
+    this.enter(scopeKey);
+    try {
+      return await run();
+    } finally {
+      this.leave(scopeKey);
+    }
+  }
+
   private desktop(scopeKey: string): Promise<Desktop> {
     const running = this.pending.get(scopeKey);
     if (running) return running;
     this.failed.delete(scopeKey);
-    const operation = this.start(scopeKey).then(
-      (desktop) => {
-        this.pending.delete(scopeKey);
-        this.notify();
-        return desktop;
-      },
-      (error: unknown) => {
-        this.pending.delete(scopeKey);
-        this.failed.add(scopeKey);
-        this.notify();
-        throw error;
-      },
-    );
+    const operation = (this.stopping.get(scopeKey) ?? Promise.resolve())
+      .then(() => this.start(scopeKey))
+      .then(
+        (desktop) => {
+          this.pending.delete(scopeKey);
+          this.notify();
+          return desktop;
+        },
+        (error: unknown) => {
+          this.pending.delete(scopeKey);
+          this.failed.add(scopeKey);
+          this.notify();
+          throw error;
+        },
+      );
     this.pending.set(scopeKey, operation);
     this.notify();
     return operation;
@@ -269,32 +325,51 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     }
     const current = this.desktops.get(scopeKey);
     if (current?.display === display) return current;
-    const { WAYLAND_DISPLAY: _wayland, SSH_AUTH_SOCK: _agent, ...inherited } = this.env;
-    const desktop = {
-      display,
-      provider: new HostComputerProvider({
-        home,
-        env: {
-          ...inherited,
-          HOME: home,
-          DISPLAY: display,
-          PATH: this.path,
-          AGENT_BROWSER_EXECUTABLE_PATH: this.browserExecutable(),
-          AGENT_BROWSER_NO_VERSION_CHECK: '1',
-        },
-      }),
-    };
+    const desktop = { display, provider: this.provider(home, display) };
     this.desktops.set(scopeKey, desktop);
     return desktop;
   }
 
+  private provider(home: string, display: string): HostComputerProvider {
+    const { WAYLAND_DISPLAY: _wayland, SSH_AUTH_SOCK: _agent, ...inherited } = this.env;
+    return new HostComputerProvider({
+      home,
+      env: {
+        ...inherited,
+        HOME: home,
+        DISPLAY: display,
+        PATH: this.path,
+        AGENT_BROWSER_EXECUTABLE_PATH: this.browserExecutable(),
+        AGENT_BROWSER_NO_VERSION_CHECK: '1',
+      },
+    });
+  }
+
   forScope(scopeKey: string): ComputerProvider {
     const provider = async () => (await this.desktop(scopeKey)).provider;
+    const leave = () => this.leave(scopeKey);
     return {
-      execute: async (request) => (await provider()).execute(request),
-      listFiles: async (path) => (await provider()).listFiles(path),
-      readFile: async (path) => (await provider()).readFile(path),
-      writeFile: async (path, content) => (await provider()).writeFile(path, content),
+      execute: async (request) => {
+        this.enter(scopeKey);
+        let events: AsyncIterable<ComputerProcessEvent>;
+        try {
+          events = await (await provider()).execute(request);
+        } catch (error) {
+          leave();
+          throw error;
+        }
+        return (async function* () {
+          try {
+            yield* events;
+          } finally {
+            leave();
+          }
+        })();
+      },
+      listFiles: (path) => this.using(scopeKey, async () => (await provider()).listFiles(path)),
+      readFile: (path) => this.using(scopeKey, async () => (await provider()).readFile(path)),
+      writeFile: (path, content) =>
+        this.using(scopeKey, async () => (await provider()).writeFile(path, content)),
       killAll: async () => this.desktops.get(scopeKey)?.provider.killAll(),
     };
   }
@@ -303,9 +378,9 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
     await Promise.all([...this.desktops.values()].map((desktop) => desktop.provider.killAll()));
   }
 
-  async presence(): Promise<ComputerPresence[]> {
+  private known(): { scopeKey: string; unit: string }[] {
     if (!existsSync(this.options.root)) return [];
-    const known = readdirSync(this.options.root).flatMap((name) => {
+    return readdirSync(this.options.root).flatMap((name) => {
       try {
         const scopeKey = readFileSync(join(this.options.root, name, 'scope'), 'utf8');
         return scopeKey === '' ? [] : [{ scopeKey, unit: `${UNIT_PREFIX}${name}.service` }];
@@ -313,6 +388,62 @@ export class HostDesktops implements ScopedComputerProviders, ComputerPresenceSo
         return [];
       }
     });
+  }
+
+  async sweep(): Promise<void> {
+    const idleMs = this.options.idleStopMs ?? HOST_DESKTOP_IDLE_STOP_MS;
+    for (const { scopeKey, unit } of this.known()) {
+      const now = this.now();
+      if (!this.lastUsed.has(scopeKey)) this.lastUsed.set(scopeKey, now);
+      if (!this.idle(scopeKey, now, idleMs)) continue;
+      if ((await this.run(['systemctl', '--user', 'is-active', unit])).code !== 0) continue;
+      if (!this.idle(scopeKey, this.now(), idleMs)) continue;
+      const stop = this.stop(scopeKey, unit).finally(() => {
+        this.stopping.delete(scopeKey);
+        this.notify();
+      });
+      this.stopping.set(scopeKey, stop);
+      await stop;
+    }
+  }
+
+  private idle(scopeKey: string, now: number, idleMs: number): boolean {
+    return (
+      !this.busy.has(scopeKey) &&
+      !this.pending.has(scopeKey) &&
+      !this.stopping.has(scopeKey) &&
+      now - (this.lastUsed.get(scopeKey) ?? now) >= idleMs
+    );
+  }
+
+  private async stop(scopeKey: string, unit: string): Promise<void> {
+    const directory = this.directory(scopeKey);
+    const provider =
+      this.desktops.get(scopeKey)?.provider ??
+      this.provider(join(directory, 'home'), this.ready(directory) ?? '');
+    const controller = new AbortController();
+    try {
+      const events = await provider.execute({
+        argv: [
+          AGENT_BROWSER_BINARY,
+          '--session',
+          browserSessionName(scopeKey),
+          '--restore',
+          'close',
+        ],
+        timeoutMs: BROWSER_CLOSE_TIMEOUT_MS,
+        signal: controller.signal,
+      });
+      for await (const _event of events);
+    } catch {}
+    await provider.killAll();
+    this.desktops.delete(scopeKey);
+    this.lastUsed.delete(scopeKey);
+    await this.run(['systemctl', '--user', 'stop', unit]);
+  }
+
+  async presence(): Promise<ComputerPresence[]> {
+    const known = this.known();
     known.splice(COMPUTER_PRESENCE_LIMIT);
     if (known.length === 0) return [];
     const states = (

@@ -5,13 +5,12 @@ import { join } from 'node:path';
 import type { ComputerPresence, MachinePresenceBody } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { HOST_DESKTOP_PROGRAMS } from '../src/computer/host-desktop.js';
+import { computerMachineName, HOST_DESKTOP_PROGRAMS } from '../src/computer/host-desktop.js';
 import { ComputerPresenceReporter } from '../src/computer/presence.js';
 import { loadDaemonConfig } from '../src/config.js';
 import type { DaemonLogger } from '../src/log.js';
 import { MachineClient } from '../src/machine-client.js';
 import { runMachine } from '../src/machine-loop.js';
-import { computerMachineName } from '../src/orb/computer.js';
 import { statePaths } from '../src/state.js';
 import { FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
 

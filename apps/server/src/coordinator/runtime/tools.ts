@@ -190,7 +190,10 @@ export function coordinatorToolsExtension(
     unarchive_project: 'Unarchive a project so it can be changed again.',
   };
   const actionTools: RemoteToolDef[] = SLICE1_ACTIONS.filter(
-    (entry) => entry.surfaces.includes('coordinator') && entry.toolName !== 'delete_project',
+    (entry) =>
+      entry.surfaces.includes('coordinator') &&
+      entry.toolName !== 'delete_project' &&
+      !CHIEF_REMOTE_TOOLS.some((def) => def.name === entry.toolName),
   ).map((entry) => {
     const description = actionCopy[entry.toolName];
     if (description === undefined) throw new Error(`no Coordinator copy for ${entry.toolName}`);
