@@ -441,7 +441,7 @@ const COORDINATOR_FIXES: Partial<
   ],
 };
 
-function CoordinatorFixLinks({ kind }: { kind: StepQueueBlocked['kind'] | undefined }) {
+export function CoordinatorFixLinks({ kind }: { kind: StepQueueBlocked['kind'] | undefined }) {
   const { t } = useI18n();
   const fixes = kind === undefined ? undefined : COORDINATOR_FIXES[kind];
   if (fixes === undefined) return null;
