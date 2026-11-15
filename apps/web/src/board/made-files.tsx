@@ -46,6 +46,7 @@ export function usePageHtml(item: Deliverable | undefined, enabled = true) {
     enabled: enabled && id !== null,
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
+    select: classifyPage,
     queryFn: async () => {
       const res = await fetch(deliverableHref(id ?? ''), { credentials: 'same-origin' });
       if (!res.ok) throw new Error(`page ${res.status}`);
@@ -54,8 +55,24 @@ export function usePageHtml(item: Deliverable | undefined, enabled = true) {
   });
 }
 
-export function hasScript(html: string): boolean {
-  return /<script\b/i.test(html);
+const ACTIVE_TAGS = new Set(['script', 'iframe', 'frame', 'object', 'embed', 'applet', 'portal']);
+
+const SCRIPT_URL = /(?:java|vb)script:/;
+
+function activeIn(root: ParentNode): boolean {
+  for (const el of root.querySelectorAll('*')) {
+    if (ACTIVE_TAGS.has(el.localName.toLowerCase())) return true;
+    for (const attr of el.attributes) {
+      if (attr.name.toLowerCase().startsWith('on')) return true;
+      if (SCRIPT_URL.test(attr.value.replace(/[\t\n\r]/g, '').toLowerCase())) return true;
+    }
+    if (el instanceof HTMLTemplateElement && activeIn(el.content)) return true;
+  }
+  return false;
+}
+
+function classifyPage(html: string): { html: string; scripted: boolean } {
+  return { html, scripted: activeIn(new DOMParser().parseFromString(html, 'text/html')) };
 }
 
 export function PageFrame({
@@ -151,7 +168,7 @@ export function MadeFiles({ deliverables }: { deliverables: TodoDeliverables | u
   const html = usePageHtml(page);
   if (deliverables === undefined) return null;
   const { items, skipped } = deliverables;
-  const scripted = html.data !== undefined && hasScript(html.data);
+  const scripted = html.data?.scripted === true;
   const noteOf = (item: Deliverable) => {
     if (item.kind === 'slides') return t('下载后打开');
     if (item !== page) return undefined;
@@ -169,7 +186,7 @@ export function MadeFiles({ deliverables }: { deliverables: TodoDeliverables | u
               <FileRow item={item} note={noteOf(item)} />
               {item === page && html.data !== undefined && !scripted && (
                 <PageFrame
-                  html={html.data}
+                  html={html.data.html}
                   title={item.name}
                   className="block h-95 w-full border-t border-border bg-(--page-preview) max-sm:h-75"
                 />

@@ -4,6 +4,10 @@ import { mockLive, TASK, THREAD } from './chief-home-mock';
 const PAGE_HTML =
   '<!doctype html><html><body><h1>Export benchmark</h1><p>Parquet halves CSV.</p><img src="https://tracker.example/pixel.png" alt=""></body></html>';
 const SCRIPTED_HTML = '<html><body><h1>Live board</h1><script>document.title="ran"</script></body></html>';
+const HIDDEN_SCRIPTS: Record<string, string> = {
+  'att-handler': '<h1>Chart</h1><svg onload="document.title=1"></svg>',
+  'att-jsurl': '<h1>Links</h1><a href="java&#x73;cript&colon;void(document.title=1)">go</a>',
+};
 const DECK_BYTES = 3_250_586;
 
 const page0 = { chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null };
@@ -45,6 +49,14 @@ const RESULTS = [
     items: [{ attachmentId: 'att-scripted', kind: 'page', name: 'board.html', sizeBytes: 900 }],
     skipped: [],
   }),
+  research('handler', 15, 'Handler chart page', {
+    items: [{ attachmentId: 'att-handler', kind: 'page', name: 'chart.html', sizeBytes: 600 }],
+    skipped: [],
+  }),
+  research('jsurl', 16, 'Link list page', {
+    items: [{ attachmentId: 'att-jsurl', kind: 'page', name: 'links.html', sizeBytes: 600 }],
+    skipped: [],
+  }),
   research('large', 14, 'Large export table', {
     items: [{ attachmentId: 'att-large', kind: 'page', name: 'table.html', sizeBytes: 300 * 1024 }],
     skipped: [],
@@ -73,7 +85,8 @@ async function openMade(page: Page) {
     const attachment = /^\/api\/attachments\/(att-[a-z]+)$/.exec(path)?.[1];
     if (attachment === undefined) return undefined;
     fetched.push(attachment);
-    const body = attachment === 'att-scripted' ? SCRIPTED_HTML : PAGE_HTML;
+    const body =
+      attachment === 'att-scripted' ? SCRIPTED_HTML : (HIDDEN_SCRIPTS[attachment] ?? PAGE_HTML);
     return route.fulfill({ status: 200, contentType: 'text/html', body });
   });
   await page.goto('/app?pane=made');
@@ -84,7 +97,7 @@ test('Made groups pages and decks, previews a script-free page and never a scrip
   page,
 }) => {
   const { made, tracker, fetched } = await openMade(page);
-  await expect(made.getByTestId('made-group').locator('h3')).toHaveText(['文档1', '网页3', 'PPT1']);
+  await expect(made.getByTestId('made-group').locator('h3')).toHaveText(['文档1', '网页5', 'PPT1']);
 
   const pageCard = made.getByTestId('made-card').filter({ hasText: 'Export benchmark page' });
   const thumb = pageCard.getByTestId('made-page-frame');
@@ -138,6 +151,17 @@ test('the dialog lists each file with a download above the report and explains s
   await expect(scripted.getByTestId('made-file')).toContainText('含脚本，下载后打开');
   await expect(scripted.getByTestId('made-page-frame')).toHaveCount(0);
   await page.keyboard.press('Escape');
+
+  for (const title of ['Handler chart page', 'Link list page']) {
+    const card = made.getByTestId('made-card').filter({ hasText: title });
+    await card.scrollIntoViewIfNeeded();
+    await made.getByRole('button', { name: title }).click();
+    const files = page.getByRole('dialog', { name: title }).getByTestId('made-files');
+    await expect(files.getByTestId('made-file')).toContainText('含脚本，下载后打开');
+    await expect(files.getByTestId('made-page-frame')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(card.getByTestId('made-page-frame')).toHaveCount(0);
+  }
 
   await made.getByRole('button', { name: 'Export review deck' }).click();
   const deckDialog = page.getByRole('dialog', { name: 'Export review deck' });

@@ -16,7 +16,7 @@ import { Skeleton } from '../components/ui/skeleton.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight } from '../icons/index.js';
-import { hasScript, PageThumb, primaryPage, THUMB_MAX_BYTES, usePageHtml } from './made-files.js';
+import { PageThumb, primaryPage, THUMB_MAX_BYTES, usePageHtml } from './made-files.js';
 import { MADE_GROUP_LABEL, type MadeGroupKey } from './made-groups.js';
 
 const CARD_CLS =
@@ -75,7 +75,7 @@ export function MadeCard({
   const page =
     candidate !== undefined && candidate.sizeBytes <= THUMB_MAX_BYTES ? candidate : undefined;
   const pageHtml = usePageHtml(page, seen).data;
-  const thumbHtml = pageHtml !== undefined && !hasScript(pageHtml) ? pageHtml : undefined;
+  const thumbHtml = pageHtml?.scripted === false ? pageHtml.html : undefined;
   const slides =
     todo.madeKind === 'slides'
       ? todo.deliverables?.items.find((item) => item.kind === 'slides')
