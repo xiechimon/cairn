@@ -91,6 +91,7 @@ function TranscriptColumnInner({
     const gutter = viewport.offsetWidth - viewport.clientWidth;
     viewport.style.setProperty('--scrollbar-gutter', `${Math.min(gutter, 16)}px`);
   }, []);
+  const compactEnd = shortEnd || running === false;
   const anchoredKey = useRef<string | undefined>(undefined);
   const [openedKey, setOpenedKey] = useState<string | undefined>(undefined);
   const anchor = running === undefined || !settled ? null : openingAnchor(running, transcript);
@@ -121,9 +122,9 @@ function TranscriptColumnInner({
     <MessageScroller className={ROOT_CLS}>
       <FadeScrollerViewport
         ref={viewportRef}
-        reserveEnd={shortEnd}
+        reserveEnd={compactEnd}
         data-testid="transcript-col"
-        className={shortEnd ? VIEWPORT_CLS : `${VIEWPORT_CLS} pb-(--chat-extra-space)`}
+        className={compactEnd ? VIEWPORT_CLS : `${VIEWPORT_CLS} pb-(--chat-extra-space)`}
       >
         <MessageScrollerContent ref={setRows} className={CONTENT_CLS}>
           {lead}
@@ -137,9 +138,8 @@ function TranscriptColumnInner({
           />
         </MessageScrollerContent>
       </FadeScrollerViewport>
-      <JumpToLatestButton>
+      <JumpToLatestButton label={t('滚动到最新')}>
         <ArrowDown width={20} height={20} />
-        <span className="sr-only">{t('滚动到最新')}</span>
       </JumpToLatestButton>
       {earlier !== undefined && settled && (openedKey === threadKey || transcript.length === 0) && (
         <EarlierLoader

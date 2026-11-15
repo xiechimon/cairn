@@ -1,5 +1,6 @@
 import { cn } from 'cn';
 import { useEffect, useRef, useState } from 'react';
+import { IconTooltip } from '../icon-tooltip.js';
 import { Button } from '../ui/button.js';
 import { useMessageScroller } from '../ui/message-scroller.js';
 
@@ -10,6 +11,7 @@ const JUMP_BTN_CLS =
   'absolute bottom-3 inset-s-1/2 size-9 -translate-x-1/2 rounded-full border-0 bg-card text-content-secondary shadow-(--e2) transition-none hover:bg-card hover:text-foreground active:bg-accent active:text-foreground data-[active=false]:pointer-events-none data-[active=false]:opacity-0 data-[active=true]:opacity-100 rtl:translate-x-1/2';
 
 export function JumpToLatestButton({
+  label,
   threshold = JUMP_THRESHOLD,
   className,
   children,
@@ -22,6 +24,7 @@ export function JumpToLatestButton({
   children?: React.ReactNode;
   variant?: React.ComponentProps<typeof Button>['variant'];
   size?: React.ComponentProps<typeof Button>['size'];
+  label: string;
 } & Omit<React.ComponentProps<'button'>, 'children' | 'className'>) {
   const { scrollToEnd } = useMessageScroller();
   const [active, setActive] = useState(false);
@@ -65,28 +68,33 @@ export function JumpToLatestButton({
   }, [scrollToEnd, threshold]);
 
   return (
-    <Button
-      ref={btnRef}
-      type="button"
-      variant={variant}
-      size={size}
-      data-slot="message-scroller-jump"
-      data-testid="jump-to-latest"
-      data-active={active ? 'true' : 'false'}
-      data-direction="end"
-      aria-hidden={!active}
-      tabIndex={active ? 0 : -1}
-      className={cn(JUMP_BTN_CLS, className)}
-      {...props}
-      onClick={(e) => {
-        props.onClick?.(e);
-        if (e.defaultPrevented) return;
-        e.currentTarget.blur();
-        followingRef.current = true;
-        scrollToEnd({ behavior: 'instant' });
-      }}
+    <IconTooltip
+      label={label}
+      trigger={
+        <Button
+          ref={btnRef}
+          type="button"
+          variant={variant}
+          size={size}
+          data-slot="message-scroller-jump"
+          data-testid="jump-to-latest"
+          data-active={active ? 'true' : 'false'}
+          data-direction="end"
+          aria-hidden={!active}
+          tabIndex={active ? 0 : -1}
+          className={cn(JUMP_BTN_CLS, className)}
+          {...props}
+          onClick={(e) => {
+            props.onClick?.(e);
+            if (e.defaultPrevented) return;
+            e.currentTarget.blur();
+            followingRef.current = true;
+            scrollToEnd({ behavior: 'instant' });
+          }}
+        />
+      }
     >
       {children}
-    </Button>
+    </IconTooltip>
   );
 }
