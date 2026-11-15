@@ -577,7 +577,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       : {};
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
   if (item.kind === 'thread-activity') return <SubThreadRow activity={item} />;
-  if (item.kind === 'thread-report' || item.kind === 'thread-message') return null;
+  if (item.kind === 'thread-report' || item.kind === 'thread-message' || item.kind === 'report-ack')
+    return null;
   if (item.kind === 'error')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>

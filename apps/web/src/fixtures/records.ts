@@ -560,6 +560,7 @@ export type ChiefStreamItem =
   | { kind: 'note'; text: string; machineName?: string }
   | { kind: 'error'; text: string; createdAt?: number }
   | { kind: 'handoff'; todoId: string; id?: string }
+  | { kind: 'report-ack'; id: string; todoId: string; buildId: string }
   | {
       kind: 'takeover';
       id: string;
@@ -620,6 +621,7 @@ export type ChiefStreamItem =
       createdAt?: number;
       fallbackModel?: string;
       projectId?: string | null;
+      report?: { todoId: string; buildId: string };
     }
   | {
       kind: 'thinking';
