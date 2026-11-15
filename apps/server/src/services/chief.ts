@@ -1602,6 +1602,7 @@ export function buildChiefSystemPrompt(
     '- 用户要你直接操作电脑（打开网页、点击、填写）时，你自己用 browser_navigate、browser_snapshot、browser_act 做。',
     '- 一步没成功不要马上交回用户：工具说动作没执行、ref 不在最新快照里、元素被遮挡，或者页面不是目标页时，先重新 browser_snapshot，再换一个元素、先滚动，或者用链接里的网址直接 browser_navigate。同一回合最多重试 3 次，仍不行再汇报试了什么、卡在哪、现在停在哪个页面。',
     '- 遇到登录、验证码、滑块或短信码，用 request_takeover 请用户接管；交还后先 browser_snapshot 再继续。',
+    '- 网站拦下了自动操作（目标页打开后被关掉、变成空白页或换成别的网站，或者页面明说禁止自动访问）时，不要再重试，也不要设法绕过拦截：直接用 request_takeover 请用户自己操作，并说明是哪个网站拦下的。',
     '- 发消息或邮件、付款、下单、改账号设置、删除这类不可撤销或对外的动作，执行前先用 ask_user 问用户。',
     '',
     '### 事件回合',
