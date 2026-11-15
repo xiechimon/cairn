@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import type {
   AgentTokenUsage,
   ClaimedStep,
+  DeliverableCapability,
   PreparedWorkspace,
   QuotaBlock,
   SkillInjectionFacts,
@@ -12,8 +13,14 @@ import { clearCredentials, type StepCredentials } from './credentials.js';
 import type { StepJournal, TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import type { MachineApi } from './machine-client.js';
+import {
+  type DeliverableSnapshot,
+  deliverablesDirOf,
+  deliverablesOutboxOf,
+  snapshotDeliverables,
+} from './step-deliverables.js';
 import { composeDoneBody } from './step-done-body.js';
-import { putFinalArtifacts } from './step-final-upload.js';
+import { completeWithDeliverables, putFinalArtifacts } from './step-final-upload.js';
 import { readDeliveredPlan, readInfoReport } from './step-outputs.js';
 import { boundedChangesDiff, probeStepPr } from './step-pr-probe.js';
 
@@ -90,6 +97,31 @@ async function probeStepChanges(
   return { prProbe, changesDiff };
 }
 
+function safeSnapshot(
+  input: StepDeliveryInput,
+  capability: DeliverableCapability,
+  reportFile: string,
+): DeliverableSnapshot {
+  try {
+    return snapshotDeliverables({
+      sourceDir: deliverablesDirOf(reportFile),
+      outboxDir: input.outboxDir,
+      stepId: input.stepId,
+      capability,
+    });
+  } catch (err) {
+    input.logger.step(
+      `deliverable snapshot failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return {
+      generation: capability.generation,
+      copyDir: deliverablesOutboxOf(input.outboxDir, input.stepId),
+      files: [],
+      skipped: [{ name: 'deliverables', reason: 'snapshot-failed' }],
+    };
+  }
+}
+
 export async function deliverStepOutcome(input: StepDeliveryInput): Promise<void> {
   const { client, journal, logger, stepId, stopped, ws, repo, git } = input;
   let lastError = input.lastError;
@@ -153,9 +185,15 @@ export async function deliverStepOutcome(input: StepDeliveryInput): Promise<void
       ),
     input.session.sessionFile,
   );
+  const capability = input.claimed.deliverables;
+  const deliverables =
+    capability !== undefined && status === 'success' && input.infoReportFile !== null
+      ? safeSnapshot(input, capability, input.infoReportFile)
+      : null;
   journal.update(stepId, {
     state: 'awaiting-upload',
     doneBody,
+    deliverables,
     planContent,
     sessionFile: sessionFileForUpload ?? null,
   });
@@ -168,7 +206,7 @@ export async function deliverStepOutcome(input: StepDeliveryInput): Promise<void
   }
 
   try {
-    await client.done(stepId, doneBody);
+    await completeWithDeliverables(client, logger, journal, stepId, doneBody, deliverables);
   } catch (err) {
     logger.step(`done report failed: ${err instanceof Error ? err.message : String(err)}`);
     clearCredentials(input.creds);

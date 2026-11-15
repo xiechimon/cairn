@@ -6,6 +6,7 @@ import {
   appendBlockerHandoff,
   appendConfirmedPlanNote,
   appendDecisionsNote,
+  appendDeliverablesLocationNote,
   appendPlanLocationNote,
   appendReportLocationNote,
   appendWorkBranchNote,
@@ -23,6 +24,7 @@ import {
   type ReviewGate,
   WORKER_DECISION_BOUNDARY,
 } from '@cairn/shared';
+import { deliverablesDirOf } from './step-deliverables.js';
 
 export function buildTaskPrompt(claimed: ClaimedStep): string {
   const todo = claimed.todo;
@@ -66,12 +68,19 @@ function confirmedPlanFile(plansDir: string, convId: string): string | null {
   }
 }
 
+function appendInfoNotes(prompt: string, claimed: ClaimedStep, reportFile: string): string {
+  const withReport = appendReportLocationNote(prompt, reportFile);
+  return claimed.deliverables !== undefined
+    ? appendDeliverablesLocationNote(withReport, deliverablesDirOf(reportFile))
+    : withReport;
+}
+
 export function freshSessionPrompt(
   claimed: ClaimedStep,
   input: { isInfoBuild: boolean; reportFile: string; plansDir: string; convId: string },
 ): string {
   return input.isInfoBuild
-    ? appendReportLocationNote(buildTaskPrompt(claimed), input.reportFile)
+    ? appendInfoNotes(buildTaskPrompt(claimed), claimed, input.reportFile)
     : degradedFreshPrompt(claimed, input.plansDir, input.convId);
 }
 
@@ -209,7 +218,7 @@ export function planStepPrompt(
     basePrompt !== null && claimed.step.kind === 'plan'
       ? appendPlanLocationNote(basePrompt, join(paths.plansDir, convId, PLAN_FILE_NAME))
       : basePrompt !== null && isInfoBuild
-        ? appendReportLocationNote(basePrompt, reportFile)
+        ? appendInfoNotes(basePrompt, claimed, reportFile)
         : basePrompt;
   const prompt =
     promptWithPlanNote !== null &&
