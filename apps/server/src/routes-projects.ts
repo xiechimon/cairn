@@ -304,7 +304,7 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     }
     return c.json(
       answerProposal(
-        { db: ctx.db, reposDir: ctx.reposDir },
+        { db: ctx.db, reposDir: ctx.reposDir, hub: ctx.hub, user: ctx.user },
         {
           proposalId: c.req.param('id'),
           teamId: ctx.team.id,

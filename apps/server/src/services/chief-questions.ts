@@ -38,6 +38,13 @@ export const ASK_PARKED_REASON =
 
 const ASK_POLL_MS = 400;
 
+export const ACTION_PROPOSAL_CARD_MARKER = 'action-proposal:';
+
+export function proposalIdOfCard(content: AskUserQuestionContent): string | null {
+  const marker = content.askedFor?.find((entry) => entry.startsWith(ACTION_PROPOSAL_CARD_MARKER));
+  return marker === undefined ? null : marker.slice(ACTION_PROPOSAL_CARD_MARKER.length);
+}
+
 export function isOwnerAnswered(question: AskUserQuestionContent): boolean {
   return (
     question.status === 'answered' &&
@@ -121,7 +128,11 @@ function writeQuestion(
   db.update(chiefThread).set({ updatedAt: nowMs() }).where(eq(chiefThread.id, threadId)).run();
 }
 
-function publishRow(deps: ChiefQuestionDeps, threadId: string, requestId: string): void {
+export function publishQuestion(
+  deps: ChiefQuestionDeps,
+  threadId: string,
+  requestId: string,
+): void {
   const row = deps.db
     .select()
     .from(chiefMessage)
@@ -161,45 +172,74 @@ export function createOrGetQuestion(
     ...(input.provenance !== undefined ? { provenance: input.provenance } : {}),
     askedFor: input.askedFor,
   };
-  const threadRow = deps.db
-    .select()
-    .from(chiefThread)
-    .where(eq(chiefThread.id, input.threadId))
-    .get();
+  deps.db.transaction(() => {
+    writeQuestion(deps.db, input.threadId, input.requestId, content, nowMs());
+    notifyQuestion(deps, input.threadId, input.questions);
+  });
+  publishQuestion(deps, input.threadId, input.requestId);
+  pushQuestion(deps, input.threadId, input.requestId, input.questions);
+  return { content, created: true };
+}
+
+function notifyQuestion(
+  deps: ChiefQuestionDeps,
+  threadId: string,
+  questions: readonly AskUserQuestion[],
+): void {
+  if (deps.hub === undefined || deps.user === undefined) return;
+  const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   const chiefRow =
     threadRow === undefined
       ? undefined
       : deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
   const agentRow = chiefRow === undefined ? null : coordinatorProfile(deps.db, chiefRow.teamId);
-  deps.db.transaction(() => {
-    writeQuestion(deps.db, input.threadId, input.requestId, content, nowMs());
-    if (deps.hub !== undefined && deps.user !== undefined) {
-      notifyChiefMessage(
-        { db: deps.db, hub: deps.hub, user: deps.user },
-        {
-          threadId: input.threadId,
-          message: input.questions[0]?.question ?? '',
-          ...(agentRow
-            ? { agent: { name: agentRow.displayName, avatarUrl: null } }
-            : { agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl } }),
-        },
-      );
-    }
+  notifyChiefMessage(
+    { db: deps.db, hub: deps.hub, user: deps.user },
+    {
+      threadId,
+      message: questions[0]?.question ?? '',
+      ...(agentRow
+        ? { agent: { name: agentRow.displayName, avatarUrl: null } }
+        : { agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl } }),
+    },
+  );
+}
+
+function pushQuestion(
+  deps: ChiefQuestionDeps,
+  threadId: string,
+  requestId: string,
+  questions: readonly AskUserQuestion[],
+): void {
+  if (deps.user === undefined || deps.vapidKeys == null) return;
+  const teamId =
+    deps.db
+      .select({ teamId: chiefThread.teamId })
+      .from(chiefThread)
+      .where(eq(chiefThread.id, threadId))
+      .get()?.teamId ?? '';
+  const questionLines = questions.map((q) => {
+    const options = q.options.map((o) => o.label).join(' / ');
+    return options.length > 0 ? `${q.question}（${options}）` : q.question;
   });
-  publishRow(deps, input.threadId, input.requestId);
-  if (deps.user !== undefined && deps.vapidKeys != null) {
-    const questionLines = input.questions.map((q) => {
-      const options = q.options.map((o) => o.label).join(' / ');
-      return options.length > 0 ? `${q.question}（${options}）` : q.question;
-    });
-    pushToUserSafely(deps.db, deps.vapidKeys ?? null, deps.user.id, threadRow?.teamId ?? '', {
-      title: '需要你决定',
-      body: questionLines.join('\n'),
-      href: `/app?chief=${encodeURIComponent(input.threadId)}`,
-      tag: `${deps.user.id}:${input.requestId}`,
-    });
-  }
-  return { content, created: true };
+  pushToUserSafely(deps.db, deps.vapidKeys ?? null, deps.user.id, teamId, {
+    title: '需要你决定',
+    body: questionLines.join('\n'),
+    href: `/app?chief=${encodeURIComponent(threadId)}`,
+    tag: `${deps.user.id}:${requestId}`,
+  });
+}
+
+export function announceQuestion(
+  deps: ChiefQuestionDeps,
+  threadId: string,
+  requestId: string,
+): void {
+  const content = readQuestion(deps.db, threadId, requestId);
+  if (content === null) return;
+  notifyQuestion(deps, threadId, content.questions);
+  publishQuestion(deps, threadId, requestId);
+  pushQuestion(deps, threadId, requestId, content.questions);
 }
 
 export async function holdForQuestion(
@@ -216,7 +256,7 @@ export async function holdForQuestion(
     if (askedAt !== null && Date.now() - askedAt >= ASK_PARK_MS) {
       const parked: AskUserQuestionContent = { ...content, parkedAt: Date.now() };
       writeQuestion(deps.db, input.threadId, input.requestId, parked, askedAt);
-      publishRow(deps, input.threadId, input.requestId);
+      publishQuestion(deps, input.threadId, input.requestId);
       return parkedReply(parked);
     }
     if (Date.now() >= deadline) return null;
@@ -235,6 +275,9 @@ export function answerQuestion(
 ): AskUserQuestionContent {
   const content = readQuestion(deps.db, input.threadId, input.requestId);
   if (content === null) throw new HttpError(404, `question ${input.requestId}`);
+  if (proposalIdOfCard(content) !== null) {
+    throw new HttpError(403, 'an approval card is answered only on its card in Cairn');
+  }
   if (content.askedFor?.includes('job_submit') && input.answeredBy !== 'person') {
     throw new HttpError(403, 'only the owner can answer a job submission');
   }
@@ -285,7 +328,7 @@ export function answerQuestion(
     ...(input.answeredBy === undefined ? {} : { answeredBy: input.answeredBy }),
   };
   writeQuestion(deps.db, input.threadId, input.requestId, next, answeredAt);
-  publishRow(deps, input.threadId, input.requestId);
+  publishQuestion(deps, input.threadId, input.requestId);
   return next;
 }
 
@@ -301,7 +344,7 @@ export function cancelQuestion(
     cancelReason: input.reason,
   };
   writeQuestion(deps.db, input.threadId, input.requestId, next, nowMs());
-  publishRow(deps, input.threadId, input.requestId);
+  publishQuestion(deps, input.threadId, input.requestId);
 }
 
 export function cancelPendingQuestions(
@@ -318,7 +361,7 @@ export function cancelPendingQuestions(
     }
     const next: AskUserQuestionContent = { ...content, status: 'cancelled', cancelReason: reason };
     writeQuestion(deps.db, threadId, row.id, next, nowMs());
-    publishRow(deps, threadId, row.id);
+    publishQuestion(deps, threadId, row.id);
   }
 }
 
