@@ -201,7 +201,7 @@ function machineEntries(
         id: 'gemini',
         name: 'Gemini CLI',
         Mark: GeminiMark,
-        status: t('接入命令闸前不能用'),
+        status: t('暂不支持'),
         tone: 'off',
       },
       editor: <GeminiEditor machineName={machine.name} />,

@@ -250,7 +250,7 @@ export function SettingsSection({
         <div className="flex min-w-0 flex-col">
           <h2 className="m-0 truncate text-card-title font-semibold text-foreground">{title}</h2>
           {description != null && (
-            <p className="m-0 text-meta text-content-tertiary">{description}</p>
+            <p className="m-0 text-meta text-balance text-content-tertiary">{description}</p>
           )}
         </div>
         {action}
