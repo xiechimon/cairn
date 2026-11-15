@@ -1957,7 +1957,7 @@
       "id": "skills",
       "name": "Skills",
       "summary": "Skills read from each machine and team skills imported and injected into threads.",
-      "states": "An empty list, skills per machine, an import dialog, and a skill injected into a thread shown in the transcript.",
+      "states": "An empty list, skills per machine, an import dialog with a pick-from-this-machine tab (imported and unimportable skills disabled, one error per failed pick) and a path or GitHub tab, and a skill injected into a thread shown in the transcript.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2005,6 +2005,7 @@
       "evidence": [
         "apps/web/e2e/skills-page.spec.ts",
         "apps/web/e2e/skill-import.spec.ts",
+        "apps/server/test/skill-import.test.ts",
         "apps/daemon/test/skills-catalog.test.ts"
       ],
       "batch": "B9"

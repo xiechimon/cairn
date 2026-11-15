@@ -55,6 +55,7 @@ import type {
   SearchResponse,
   SecretRecord,
   SetSecretBody,
+  SkillImportCandidatesResponse,
   SkillRecord,
   StepJournalRow,
   TeamMember,
@@ -611,6 +612,15 @@ export const useSkills = (teamId: string | undefined, enabled: boolean) =>
     queryKey: ['skills', teamId],
     queryFn: () => api.get<SkillRecord[]>(`/api/skills?teamId=${teamId}`),
     enabled: enabled && teamId !== undefined,
+  });
+
+export const useSkillImportCandidates = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['skillImportCandidates', teamId],
+    queryFn: () =>
+      api.get<SkillImportCandidatesResponse>(`/api/teams/${teamId}/skills/import-candidates`),
+    enabled: enabled && teamId !== undefined,
+    retry: false,
   });
 
 export const useSkillFile = (
