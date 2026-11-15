@@ -862,6 +862,12 @@ export const EN: Record<string, string> = {
     "Switch the Coordinator's Agent? The Coordinator's memory lives on the Agent it runs on. After switching to <agent>, the memory becomes <agent>'s — the current memory is not migrated.",
   编辑章程: 'Edit charter',
   保存章程: 'Save charter',
+  '章程里不能有这一行：{marker}。这是 Cairn 自己用的分隔标记，删掉它再保存。':
+    'The charter cannot contain this line: {marker}. Cairn uses it as its own separator. Delete it, then save.',
+  '章程最多 {max} 个字，现在有 {n} 个字。删短一些再保存。':
+    'A charter can be at most {max} characters; this one has {n}. Shorten it, then save.',
+  '章程没有保存，你写的内容还在编辑框里。':
+    'The charter was not saved. Your text is still in the editor.',
   '长期指令：模型路由规则（何种任务使用何种模型）、优先级、偏好…':
     'Long-term instructions: model routing rules (which model for which work), priorities, preferences…',
   // #209 编辑分配接线：chip-popover「编辑分配」→ agent 选择弹层（#182 家族
