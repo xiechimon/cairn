@@ -60,7 +60,7 @@ export const copy = {
       items: [
         {
           title: '用你自己的订阅',
-          body: 'Claude Code、Codex、Gemini，或任何服务商的 API key。Cairn 不转售算力。',
+          body: 'Claude Code、Codex，或任何服务商的 API key（包括 Google 的 Gemini）。Cairn 不转售算力。',
         },
         {
           title: '你的机器，你的数据',
@@ -91,7 +91,7 @@ export const copy = {
       yes: [
         '写代码，或者跟代码一起工作，想让 agent 在后台干活、自己只拍板；',
         '有一台能一直开着的机器：台式机、家里的服务器或 VPS，最好再有笔记本或手机跟进；',
-        '已经在付 Claude Code、Codex 或 Gemini 的订阅，或者有 API key，想接着用而不是再买一份算力；',
+        '已经在付 Claude Code 或 Codex 的订阅，或者有 API key，想接着用而不是再买一份算力；',
         '希望代码、邮件和凭证留在自己的机器上。',
       ],
       noTitle: '不适合你，如果你想要',
@@ -188,7 +188,7 @@ export const copy = {
       items: [
         {
           title: 'Your own subscriptions',
-          body: 'Claude Code, Codex, Gemini, or an API key from any provider. Cairn never resells compute.',
+          body: "Claude Code, Codex, or an API key from any provider, Google's Gemini included. Cairn never resells compute.",
         },
         {
           title: 'Your machines, your data',
@@ -219,7 +219,7 @@ export const copy = {
       yes: [
         'write code, or work alongside code, and want agents to work in the background while you only make the calls;',
         'have a machine that can stay on, such as a desktop, a home server or a VPS, and ideally a laptop or a phone to follow along from;',
-        'already pay for Claude Code, Codex or Gemini, or have an API key, and want to keep using them rather than buy compute again;',
+        'already pay for Claude Code or Codex, or have an API key, and want to keep using them rather than buy compute again;',
         'want your code, mail and credentials to stay on your own machines.',
       ],
       noTitle: 'It is not the right fit if you want',
