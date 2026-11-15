@@ -105,6 +105,7 @@ export async function runCoordinatorTurn(
   let steerPoll: ReturnType<typeof setInterval> | undefined;
   let rootKey: string | null = null;
   let watch: Awaited<ReturnType<Conversation['watch']>> | undefined;
+  const suggestionAbort = new AbortController();
   try {
     const mailTurn = isMailWakeText(claimed.instruction ?? '');
     const root = await activeConversation(harness, deps.conversationId, context);
@@ -124,7 +125,6 @@ export async function runCoordinatorTurn(
     deps.volatile?.set(rootKey, volatileText === '' ? null : volatileText);
     deps.volatile?.setStep(rootKey, stepId);
     let stopping: Promise<void> | null = null;
-    const suggestionAbort = new AbortController();
     let polling = false;
     stopPoll = setInterval(() => {
       if (polling || stopping !== null) return;
@@ -308,6 +308,32 @@ export async function runCoordinatorTurn(
       )
         settled = record;
     }
+    const answerEntry =
+      settled.status === 'done' && settled.type === 'input'
+        ? await root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context)
+        : undefined;
+    const answer = answerEntry?.model?.[0];
+    const suggesting =
+      claimed.chief.trigger === 'user' &&
+      stopping === null &&
+      answer?.role === 'assistant' &&
+      answer.stopReason === 'stop' &&
+      answer.content.some((block) => block.type === 'text' && block.text.trim() !== '')
+        ? (api.canSuggestReplies?.(stepId) ?? Promise.resolve(false))
+            .then((allowed) =>
+              allowed
+                ? suggestAfterTurn(
+                    deps.models.models,
+                    root,
+                    { provider, modelId },
+                    context,
+                    { threadId, stepId },
+                    suggestionAbort.signal,
+                  )
+                : null,
+            )
+            .catch(() => null)
+        : Promise.resolve(null);
     await deps.inputs?.barrier();
     if (api.inputs === undefined && settled.entry !== undefined)
       await api.mapUserEntry?.(stepId, String(settled.entry));
@@ -367,27 +393,11 @@ export async function runCoordinatorTurn(
           : 'no answer';
       return done({ status: 'failed', errorMessage: `Coordinator turn ended: ${reason}` });
     }
-    const answerId = settled.answer;
-    const entry = await root.commit((tx) => tx.entry(AssistantEntry, answerId), context);
-    const answer = entry?.model?.[0];
     if (answer?.role !== 'assistant') {
       return done({ status: 'failed', errorMessage: 'Coordinator turn has no answer entry' });
     }
     const usage = turnUsage(answer, turnEntries);
-    const suggestion =
-      claimed.chief.trigger === 'user' &&
-      answer.stopReason === 'stop' &&
-      answer.content.some((block) => block.type === 'text' && block.text.trim() !== '') &&
-      (await api.canSuggestReplies?.(stepId).catch(() => false)) === true
-        ? await suggestAfterTurn(
-            deps.models.models,
-            root,
-            { provider, modelId },
-            context,
-            { threadId: claimed.chief.threadId, stepId },
-            suggestionAbort.signal,
-          ).catch(() => null)
-        : null;
+    const suggestion = await suggesting;
     if (suggestion !== null) {
       usage.input += suggestion.usage.input;
       usage.output += suggestion.usage.output;
@@ -410,6 +420,7 @@ export async function runCoordinatorTurn(
     }
     return finished;
   } finally {
+    suggestionAbort.abort();
     void watch?.stop();
     clearInterval(stopPoll);
     clearInterval(steerPoll);
