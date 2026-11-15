@@ -4,6 +4,7 @@ import type { Context } from 'hono';
 import { setCookie } from 'hono/cookie';
 import type { Db } from '../db/client.js';
 import { browserSession } from '../db/schema.js';
+import { CONNECT_AUTH_COOKIE, connectOriginOf } from '../lib/connect-listener.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { tailnetListenerOf } from '../lib/tailnet-listener.js';
@@ -64,16 +65,18 @@ export function setAuthCookie(
   secure: boolean,
   expiresAt = nowMs() + SESSION_TTL_MS,
 ): void {
-  setCookie(c, AUTH_COOKIE, token, {
+  const connect = connectOriginOf(c) !== null;
+  setCookie(c, connect ? CONNECT_AUTH_COOKIE : AUTH_COOKIE, token, {
     httpOnly: true,
     path: '/',
     sameSite: 'Lax',
-    secure,
+    secure: connect || secure,
     maxAge: Math.max(0, Math.floor((expiresAt - nowMs()) / 1000)),
   });
 }
 
 export function requestIsSecure(c: Context): boolean {
+  if (connectOriginOf(c) !== null) return true;
   if (tailnetListenerOf(c) !== null) return true;
   if (c.req.header('x-forwarded-proto') === 'https') return true;
   return new URL(c.req.url).protocol === 'https:';

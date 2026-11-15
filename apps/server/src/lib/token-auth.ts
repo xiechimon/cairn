@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import type { Context, Hono } from 'hono';
 import { AUTH_COOKIE, type ResolvedBrowserSession } from '../services/browser-session.js';
+import { admitConnectRequest, connectOriginOf } from './connect-listener.js';
 import { sha256Hex } from './crypto.js';
 
 const LOOPBACK_PEER_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
@@ -80,6 +81,7 @@ export interface TokenAuthOptions {
   resolveDeviceId?: (provided: string) => string | null;
   resolveSession?: (cookie: string) => ResolvedBrowserSession | null;
   redeemTicket?: (ticket: string) => ResolvedBrowserSession | null;
+  isDeviceActive?: (id: string) => boolean;
 }
 
 export type OwnerIdentity = { via: 'session' };
@@ -135,9 +137,12 @@ export function registerTokenAuth(
   token: string | null,
   options: TokenAuthOptions = {},
 ): void {
-  if (token === null) return;
-  const verifyOwner = makeVerifier(token);
+  const verifyOwner = token === null ? null : makeVerifier(token);
   app.use('*', async (c, next) => {
+    if (connectOriginOf(c) !== null) {
+      return admitConnectRequest(c, next, options, token !== null);
+    }
+    if (verifyOwner === null) return next();
     const verify = (provided: string): boolean => {
       if (verifyOwner(provided)) {
         c.set('ownerIdentity', { via: 'session' });

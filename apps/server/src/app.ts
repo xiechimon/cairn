@@ -104,6 +104,7 @@ export function createApp(ctx: AppContext, logger?: Logger): Hono {
   registerTokenAuth(app, ctx.authToken, {
     resolveDeviceId: (provided) => pairedDeviceIdOfToken(ctx.db, provided),
     resolveSession: (cookie) => resolveBrowserSession(ctx.db, cookie),
+    isDeviceActive: (id) => !deviceStreams.isRevoked(id) && pairedDeviceExists(ctx.db, id),
     redeemTicket: (ticket) => {
       const session = redeemStreamTicket(ticket);
       if (session?.kind !== 'device') return session;
