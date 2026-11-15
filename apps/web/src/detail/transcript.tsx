@@ -47,7 +47,8 @@ function formatElapsed(seconds: number, t: TFunc): string {
 const ROW_BASE = 'flex items-start';
 const AGENT_ROW = 'chat-row--agent group/message flex flex-col items-start';
 const USER_ROW = 'chat-row--user group/message flex flex-col items-end';
-const TOOLS_ROW = '-mx-4 overflow-x-clip px-4';
+const TOOLS_ROW =
+  '-ml-4 -mr-[calc(1rem-var(--scrollbar-gutter,0px))] overflow-x-clip pl-4 pr-[calc(1rem-var(--scrollbar-gutter,0px))]';
 
 const SCROLLER_ITEM_STYLE = { contentVisibility: 'visible' } as const;
 
