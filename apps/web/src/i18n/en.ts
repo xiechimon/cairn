@@ -643,7 +643,7 @@ export const EN: Record<string, string> = {
   'MCP 服务器': 'MCP Servers',
   添加执行机: 'Add Runner',
   自定义: 'Custom',
-  '搜索技能...': 'Search skills...',
+  '排序：{option}': 'Sort: {option}',
   排序: 'Sort',
   尚无技能: 'No skills yet',
   '用「导入」或「新建」添加技能。': 'Add skills with Import or New.',

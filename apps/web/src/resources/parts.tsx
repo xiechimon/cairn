@@ -11,7 +11,7 @@ export function ResourceNewButton({ onClick }: { onClick: () => void }) {
   const { t } = useI18n();
   return (
     <Button className={TOPBAR_PRIMARY_BUTTON} onClick={onClick} data-testid="resource-new">
-      <Plus aria-hidden strokeWidth={1.75} className="size-4" />
+      <Plus aria-hidden strokeWidth={1.75} className="size-5" />
       {t('新建')}
     </Button>
   );
