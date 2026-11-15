@@ -9,7 +9,7 @@ test('a review thread keeps its updates out of the conversation and in the plan 
   await page.goto(`${HOME}&thread=home-c-review`);
   await expect(panel(page)).toBeVisible();
   await expect(page.getByTestId('thread-updates')).toHaveCount(0);
-  await expect(page.getByTestId('side-chat-status')).toContainText('待你决定·1 条更新');
+  await expect(page.getByTestId('side-chat-status')).toContainText('待你审阅·1 条更新');
   await panel(page).getByRole('button', { name: '更多操作…' }).click();
   await page.getByRole('menuitem', { name: '计划' }).click();
   const plan = page.getByTestId('side-chat-plan');

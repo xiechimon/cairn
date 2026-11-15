@@ -470,7 +470,7 @@ export const EN: Record<string, string> = {
   '行过长，已退回整行高亮': 'Line too long — whole-line highlight only',
   '完成 {elapsed}': 'Done in {elapsed}',
   运行在: 'Running on',
-  上: '', // tail of 运行在 <machine> 上 — the en template needs no tail
+  ' 上': '',
   由定时发起: 'Started by schedule',
   收起: 'Collapse',
   // #933: the collapsed tool group's identity label (transcript action row).
@@ -920,17 +920,13 @@ export const EN: Record<string, string> = {
   // #1250（ADR 0018 层 1）review fan-out 三视角（ReviewDialog 勾选行）。
   // #509 审核选人独立性提示：默认值优先跨厂商；无跨厂商可选时出声。两档措辞
   // ——确证同源 vs 无法判定（未配置厂商 = 没有比对基准），都不静默。
-  // M7 #330 AI 审核消息渲染（r8 §3.1 真 findings 上线）：结论先行 + 编号 findings
-  // + 严重度后缀（(blocking)/(suggestion)/(info)）+ 方案引用块 + 修复建议。
-  // 服务端消息 kind = REVIEW_VERDICT_KIND（shared/message.ts 双端单源），
-  // findings 形态 = reviewVerdictSchema（shared/review.ts）。
   审核结论: 'Review conclusion',
   // #700：verdict 提取失败行——daemon findingsError 原因上浮，审核面以
   // danger 色 tag 与「审核未返回结论」兜底（旧 daemon 无信号）相区分。
   判定提取失败: 'Verdict extraction failed',
-  '(blocking)': '(blocking)',
-  '(suggestion)': '(suggestion)',
-  '(info)': '(info)',
+  必须修改: 'Must fix',
+  可改进: 'Could improve',
+  备注: 'Note',
   '建议：': 'Suggestion: ',
   '建议：{body}': 'Suggestion: {body}',
   '更换 Coordinator 的 Agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。':

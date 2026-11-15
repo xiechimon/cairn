@@ -35,6 +35,7 @@ import { EngineQuestion, EngineRawView, TakeOverDialog } from './engine-run-view
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { STATUS_WORDS } from './status-words.js';
+import { isWaiting, SECTION_LABEL } from './tasks-sections.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
 import type { ThreadChanges } from './thread-changes.js';
@@ -64,7 +65,7 @@ import { PANE_PARAM, TASKS_TAB_PARAM } from './work-panel.js';
 const OVERLAY_QUERY = '(max-width: 1100px)';
 
 export const THREAD_HEAD_BUTTON =
-  'size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-5.5 max-[640px]:size-8';
+  'size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-5.5 max-[640px]:size-8 pointer-coarse:size-11';
 
 const OPEN_SURFACE = '.overlay, [role="dialog"], [role="menu"], [role="listbox"]';
 
@@ -125,7 +126,9 @@ function StatusLine({
             ? t('等额度')
             : waitingOnChecks
               ? t(STATUS_WORDS.waitingChecks)
-              : t(threadCopy(todo).state)}
+              : needsYou && todo.section != null && isWaiting(todo.section)
+                ? t(SECTION_LABEL[todo.section])
+                : t(threadCopy(todo).state)}
       </span>
       {meta !== '' && (
         <>
