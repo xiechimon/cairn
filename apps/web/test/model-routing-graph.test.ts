@@ -1,8 +1,11 @@
+import type { ProviderRecord, RoutingRuleRecord, TeamRoutingSettings } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { toClaudeAccount } from '../src/api/claude-accounts.js';
-import { type ModelRouting, toRoutingGraph } from '../src/api/model-routing.js';
+import { type ModelRouting, routingTargets, ruleGraphGroups } from '../src/api/model-routing.js';
+import type { ModelOption } from '../src/fixtures/records.js';
 
-const t = (source: string) => source;
+const t = (source: string, vars?: Record<string, unknown>) =>
+  source.replace(/\{(\w+)\}/g, (_, key: string) => String(vars?.[key] ?? ''));
 const NOW = 1_000_000;
 
 describe('toClaudeAccount', () => {
@@ -24,55 +27,100 @@ describe('toClaudeAccount', () => {
   });
 });
 
-describe('toRoutingGraph', () => {
-  const routing: ModelRouting = {
-    connections: [
-      { id: 's1', vendor: 'anthropic', kind: 'subscription', models: [], available: true },
-      { id: 'p1', vendor: 'anthropic', kind: 'api-key', models: [] },
-      { id: 'p1', vendor: 'openai', kind: 'api-key', models: [] },
-      { id: 'machine:m1', vendor: 'anthropic', kind: 'subscription', models: [], available: false },
-    ],
-    quota: [
-      { connectionId: 'machine:m1', windows: [{ window: '5h', usedPercent: 130 }] },
-    ],
-    edges: [
-      { use: 'coordinator', modelId: 'claude-opus-5-5', effort: 'high', connectionId: 's1' },
-      { use: 'eval', modelId: 'x', effort: 'high', connectionId: null, reason: 'no-connection' },
-    ],
-    settings: { claudeUsage: 'subscription-only' },
-  };
-  const account = {
+const provider = (id: string, providerId: string, label: string) =>
+  ({ id, providerId, label }) as ProviderRecord;
+
+const rule = (use: RoutingRuleRecord['use'], providerId: string, modelId: string) =>
+  ({ id: `r-${use}`, use, provider: providerId, modelId }) as RoutingRuleRecord;
+
+describe('routing targets and the rule graph', () => {
+  const expired = toClaudeAccount(
+    { id: 'old', kind: 'claude-subscription', label: 'Old', expiresAt: NOW - 1, createdAt: 1 },
+    NOW,
+  );
+  const live = {
     ...toClaudeAccount(
-      { id: 's1', kind: 'claude-subscription', label: 'Main', expiresAt: null, createdAt: 1 },
+      { id: 'main', kind: 'claude-subscription', label: 'Main', expiresAt: null, createdAt: 2 },
       NOW,
     ),
-    plan: 'Max',
     windows: [{ name: 'five_hour', utilization: 0.25, resetsAt: null, observedAt: NOW }],
   };
-  const graph = toRoutingGraph(routing, {
-    accounts: [account],
-    providers: [{ id: 'p1', label: 'OpenRouter' }],
-    machineNames: new Map([['m1', 'omarchy']]),
-    t,
+  const routing: ModelRouting = {
+    connections: [
+      { id: 'rec-relay', vendor: 'openai', kind: 'api-key', models: [], available: false },
+    ],
+    quota: [],
+    edges: [],
+    settings: { claudeUsage: 'subscription-only' },
+  };
+  const targets = routingTargets({
+    subscriptions: [expired, live],
+    providers: [provider('rec-codex', 'openai-codex', 'ChatGPT'), provider('rec-relay', 'relay', 'Relay')],
+    routing,
+  });
+  const options: ModelOption[] = [
+    {
+      runtime: 'pi',
+      provider: 'openai-codex',
+      providerLabel: 'ChatGPT',
+      modelId: 'gpt-6.1-sol',
+      modelName: 'GPT-6.1 Sol',
+    },
+  ];
+
+  test('subscriptions, then providers, with quota as what is left and unreachable ones marked', () => {
+    expect(targets.map((target) => [target.id, target.runtime, target.unavailable])).toEqual([
+      ['subscription:old', 'claude-code', true],
+      ['subscription:main', 'claude-code', false],
+      ['provider:rec-codex', 'pi', false],
+      ['provider:rec-relay', 'pi', true],
+    ]);
+    expect(targets[1]?.quota).toEqual({ fiveHour: 75, week: null });
   });
 
-  test('names each connection once, from its account, provider or machine', () => {
-    expect(graph.connections.map((c) => c.name)).toEqual([
-      'Claude · Main',
-      'OpenRouter',
-      'Claude Code · omarchy',
+  test('a rule wires to its provider by slug, Claude Code to the live subscription, and a missing provider breaks', () => {
+    const settings: TeamRoutingSettings = {
+      rules: [
+        rule('coordinator', 'claude-code', 'claude-opus-5-5'),
+        rule('review', 'openai-codex', 'gpt-6.1-sol'),
+        rule('citation_check', 'deleted-provider', 'glm-5.3'),
+        rule('digest', 'relay', 'x'),
+      ],
+      policies: [],
+    };
+    const [agents, claude] = ruleGraphGroups(settings, targets, options, t);
+    expect(
+      agents?.nodes.map((node) => [node.id, node.target ?? null, node.broken, node.tag]),
+    ).toEqual([
+      ['coordinator', 'subscription:main', false, 'claude-opus-5-5'],
+      ['review', 'provider:rec-codex', false, 'GPT-6.1 Sol'],
+      ['citation_check', null, true, 'glm-5.3'],
+      ['digest', 'provider:rec-relay', true, 'x'],
+    ]);
+    expect(claude?.nodes).toEqual([
+      { id: 'claude-models', name: '所有 Claude 模型', target: 'subscription:main' },
     ]);
   });
 
-  test('quota reads as what is left, never below zero, and only for reported windows', () => {
-    expect(graph.connections[0]?.quota).toEqual({ fiveHour: 75, week: null });
-    expect(graph.connections[2]?.quota).toEqual({ fiveHour: 0, week: null });
-    expect(graph.connections[1]?.quota).toBeUndefined();
-  });
-
-  test('a use with no connection is drawn unavailable without a wire', () => {
-    expect(graph.jobs[1]).toMatchObject({ id: 'eval', unavailable: true });
-    expect(graph.jobs[1]?.connectionId).toBeUndefined();
-    expect(graph.connections[2]?.unavailable).toBe(true);
+  test('with no session rule the session default is drawn and labelled as the default', () => {
+    const [agents] = ruleGraphGroups(
+      {
+        rules: [],
+        policies: [],
+        sessionDefault: { reason: 'provider', provider: 'openai-codex', modelId: 'gpt-6.1-sol' },
+      },
+      targets,
+      options,
+      t,
+    );
+    expect(agents?.nodes).toEqual([
+      {
+        id: 'session',
+        name: '新任务',
+        tag: 'GPT-6.1 Sol · 默认',
+        target: 'provider:rec-codex',
+        broken: false,
+      },
+    ]);
   });
 });

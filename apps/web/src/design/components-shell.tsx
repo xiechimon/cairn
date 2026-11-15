@@ -5,9 +5,9 @@ import { ListCard, ListRow } from '../components/list-card.js';
 import { NoticeBanner } from '../components/notice-banner.js';
 import { SegmentedRadio } from '../components/segmented.js';
 import {
-  type RoutingConnection,
   RoutingGraph,
-  type RoutingJob,
+  type RoutingSourceGroup,
+  type RoutingTarget,
 } from '../components/settings/routing-graph.js';
 import { SettingsDangerZone } from '../components/settings-list.js';
 import { PhoneTabBar } from '../components/shell/phone-tab-bar.js';
@@ -258,35 +258,26 @@ export function CoordinatorStreamSection() {
   );
 }
 
-const ROUTING_JOBS: RoutingJob[] = [
+const ROUTING_GROUPS: RoutingSourceGroup[] = [
   {
-    id: 'coordinator',
-    name: 'Coordinator',
-    model: 'claude-opus-5-5',
-    tone: 1,
-    connectionId: 'claude',
+    label: 'Coordinator and other agents',
+    nodes: [
+      { id: 'coordinator', name: 'Coordinator', tag: 'Claude Opus 5.5', target: 'claude' },
+      { id: 'session', name: 'New tasks', tag: 'GPT-6.1 Sol', target: 'codex' },
+      { id: 'review', name: 'Review', tag: 'Claude Sonnet 5.5', target: 'claude' },
+      { id: 'digest', name: 'Digest', tag: 'GLM-5.3', target: 'proxy', broken: true },
+    ],
   },
   {
-    id: 'implementation',
-    name: 'Implementation',
-    model: 'gpt-6.1-sol',
-    tone: 3,
-    connectionId: 'codex',
-  },
-  { id: 'review', name: 'Review', model: 'claude-sonnet-5-5', tone: 4, connectionId: 'claude' },
-  {
-    id: 'mechanical',
-    name: 'Mechanical work',
-    model: 'claude-haiku-5-5',
-    tone: 2,
-    unavailable: true,
+    label: 'Claude Code',
+    nodes: [{ id: 'claude-models', name: 'All Claude models', target: 'claude' }],
   },
 ];
 
-const ROUTING_CONNECTIONS: RoutingConnection[] = [
-  { id: 'claude', name: 'Claude subscription', tier: 'Max 20x', quota: { fiveHour: 62, week: 78 } },
-  { id: 'codex', name: 'Codex', tier: 'Pro', quota: { fiveHour: 14, week: 39 } },
-  { id: 'openrouter', name: 'OpenRouter key', unavailable: true },
+const ROUTING_TARGETS: RoutingTarget[] = [
+  { id: 'claude', name: 'Claude subscription', runtime: 'Claude Code' },
+  { id: 'codex', name: 'ChatGPT', runtime: 'pi' },
+  { id: 'proxy', name: 'domestic-proxy', runtime: 'pi', unavailable: true },
 ];
 
 export function RoutingSection() {
@@ -295,13 +286,13 @@ export function RoutingSection() {
     <Section
       id="routing"
       title="Model routing parts"
-      lede="Jobs on the left name their model; a curve runs to the connection that serves them, which shows how much of its 5-hour and weekly quota is left. A bar turns ochre at 20% left."
+      lede="Each use on the left names its model; a curve runs to the provider that serves it. Hovering a node lights its wires. A rule whose provider is unavailable is a dashed rust wire."
     >
       <Specimen
         id="routing-nodes-and-quota-bar"
-        title="Routing nodes and quota bar"
+        title="Routing graph"
         stage="canvas"
-        code={`<RoutingGraph jobs={[{ id: 'coordinator', name: 'Coordinator', model: 'claude-opus-5-5', tone: 1, connectionId: 'claude' }]} connections={[{ id: 'claude', name: 'Claude subscription', tier: 'Max 20x', quota: { fiveHour: 62, week: 78 } }]} />`}
+        code={`<RoutingGraph groups={[{ label: 'Agents', nodes: [{ id: 'coordinator', name: 'Coordinator', tag: 'Claude Opus 5.5', target: 'claude' }] }]} targets={[{ id: 'claude', name: 'Claude subscription', runtime: 'Claude Code' }]} />`}
       >
         <div className="flex w-full max-w-170 flex-col gap-4">
           <SegmentedRadio
@@ -313,7 +304,7 @@ export function RoutingSection() {
               { value: 'payg', label: 'Allow pay as you go' },
             ]}
           />
-          <RoutingGraph jobs={ROUTING_JOBS} connections={ROUTING_CONNECTIONS} />
+          <RoutingGraph groups={ROUTING_GROUPS} targets={ROUTING_TARGETS} />
         </div>
       </Specimen>
     </Section>

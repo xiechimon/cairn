@@ -1,3 +1,4 @@
+import type { RoutingRuleRecord } from '@cairn/shared';
 import type {
   AccountMachine,
   AccountStep,
@@ -325,6 +326,13 @@ export const ACCOUNT_ROUTING: ModelRouting = {
       available: true,
     },
     {
+      id: 'prov-copilot',
+      vendor: 'openai',
+      kind: 'api-key',
+      models: ['gpt-4o'],
+      available: false,
+    },
+    {
       id: REMOTE_CLAUDE,
       vendor: 'anthropic',
       kind: 'subscription',
@@ -372,11 +380,45 @@ export const ACCOUNTS: AccountsContent = {
   routing: ACCOUNT_ROUTING,
 };
 
+const routingRule = (
+  use: RoutingRuleRecord['use'],
+  provider: string,
+  modelId: string,
+  thinkingLevel: string | null,
+): RoutingRuleRecord => ({
+  id: `rule-${use}`,
+  teamId: 't1',
+  use,
+  provider,
+  modelId,
+  thinkingLevel,
+  fallbackModels: null,
+  machineId: null,
+  requiredCapabilities: null,
+  seededFromAgentId: null,
+  createdAt: NOW - DAY,
+  updatedAt: NOW - DAY,
+});
+
 export const accountsDefault: FixtureSet = {
   ...resourcesDefault,
   now: NOW,
   resources: {
     ...RESOURCES,
+    providerSources: RESOURCES.providerSources.map((source) =>
+      source.runtime === 'pi'
+        ? { ...source, provider: 'r3-gateway', providerLabel: 'R3 网关' }
+        : source,
+    ),
+    routingSettings: {
+      rules: [
+        routingRule('coordinator', 'claude-code', 'claude-sonnet-5', 'high'),
+        routingRule('session', 'r3-gateway', 'gpt-5.2', 'medium'),
+        routingRule('review', 'r3-gateway', 'claude-opus-4-5', 'high'),
+        routingRule('citation_check', 'github-copilot', 'gpt-4o', null),
+      ],
+      policies: [],
+    },
     machines: RESOURCES.machines.map((machine) => {
       const providers = PROVIDER_MACHINES.find((m) => m.id === machine.id)?.providers;
       return providers === undefined ? machine : { ...machine, providers };

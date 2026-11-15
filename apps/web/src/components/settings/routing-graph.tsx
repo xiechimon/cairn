@@ -1,137 +1,48 @@
 import { cn } from 'cn';
-import { type ComponentProps, useLayoutEffect, useRef, useState } from 'react';
+import { type ComponentType, type SVGProps, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
-import { QuotaRow } from './quota-row.js';
 
-export interface RoutingJob {
+export interface RoutingSource {
   id: string;
   name: string;
-  model: string;
-  tone: 1 | 2 | 3 | 4 | 5 | 6;
-  connectionId?: string;
-  unavailable?: boolean;
+  tag?: string;
+  target?: string;
+  broken?: boolean;
 }
 
-export interface RoutingConnection {
+export interface RoutingSourceGroup {
+  label: string;
+  nodes: RoutingSource[];
+}
+
+export interface RoutingTarget {
   id: string;
   name: string;
-  tier?: string;
-  quota?: { fiveHour: number | null; week: number | null };
+  runtime: string;
+  Mark?: ComponentType<SVGProps<SVGSVGElement>>;
   unavailable?: boolean;
 }
 
 interface Wire {
-  key: string;
+  from: string;
+  to: string;
   d: string;
-  tone: RoutingJob['tone'];
+  broken: boolean;
 }
 
-const UNAVAILABLE_NODE =
-  'border-dashed bg-transparent shadow-none [border-color:color-mix(in_oklab,var(--destructive)_45%,transparent)]';
-
-function UnavailableTag() {
-  const { t } = useI18n();
-  return (
-    <span className="ml-auto rounded-sm bg-danger-soft px-1.5 py-px text-caption font-medium text-destructive">
-      {t('不可用')}
-    </span>
-  );
-}
-
-function Dot({ side, className, ...props }: { side: 'left' | 'right' } & ComponentProps<'span'>) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        'absolute top-[calc(50%-3px)] size-1.5 rounded-full bg-content-tertiary',
-        side === 'right' ? '-right-0.75' : '-left-0.75',
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
-function JobNode({ job }: { job: RoutingJob }) {
-  const { t } = useI18n();
-  const off = job.unavailable === true;
-  return (
-    <div
-      data-slot="routing-node"
-      data-unavailable={off ? '' : undefined}
-      className={cn('relative rounded-lg border bg-card text-meta', off && UNAVAILABLE_NODE)}
-    >
-      <div
-        className={cn(
-          'flex items-center gap-1.5 px-2.5 pt-1.75 pb-1.5 font-semibold',
-          off ? 'text-content-tertiary' : 'text-foreground',
-        )}
-      >
-        {job.name}
-        {off && <UnavailableTag />}
-      </div>
-      <div className="flex items-center justify-between border-t border-border px-2.5 pt-1.5 pb-1.75 text-content-secondary">
-        <span>{t('模型')}</span>
-        <span
-          className={cn('font-mono text-code', off ? 'text-content-tertiary' : 'text-foreground')}
-        >
-          {job.model}
-        </span>
-      </div>
-      {!off && <Dot side="right" data-wire-out={job.id} />}
-    </div>
-  );
-}
-
-function ConnectionNode({ connection }: { connection: RoutingConnection }) {
-  const { t } = useI18n();
-  const off = connection.unavailable === true;
-  return (
-    <div
-      data-slot="routing-node"
-      data-unavailable={off ? '' : undefined}
-      className={cn('relative rounded-lg border bg-card text-meta', off && UNAVAILABLE_NODE)}
-    >
-      <div
-        className={cn(
-          'flex items-center gap-1.5 px-2.5 pt-1.75 pb-1.5 font-semibold',
-          off ? 'text-content-tertiary' : 'text-foreground',
-        )}
-      >
-        {connection.name}
-        {off ? (
-          <UnavailableTag />
-        ) : (
-          connection.tier != null && (
-            <span className="ml-auto font-normal text-content-tertiary">{connection.tier}</span>
-          )
-        )}
-      </div>
-      {!off && connection.quota != null && (
-        <div className="px-2.5 pb-2">
-          {connection.quota.fiveHour !== null && (
-            <QuotaRow name={connection.name} label="5h" left={connection.quota.fiveHour} />
-          )}
-          {connection.quota.week !== null && (
-            <QuotaRow name={connection.name} label={t('周')} left={connection.quota.week} />
-          )}
-        </div>
-      )}
-      {!off && <Dot side="left" data-wire-in={connection.id} className="bg-(--text-dim)" />}
-    </div>
-  );
-}
+const sourceKey = (group: string, id: string) => `${group}/${id}`;
 
 export function RoutingGraph({
-  jobs,
-  connections,
+  groups,
+  targets,
 }: {
-  jobs: RoutingJob[];
-  connections: RoutingConnection[];
+  groups: RoutingSourceGroup[];
+  targets: RoutingTarget[];
 }) {
   const { t } = useI18n();
   const boxRef = useRef<HTMLDivElement>(null);
   const [wires, setWires] = useState<Wire[]>([]);
+  const [hot, setHot] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     const box = boxRef.current;
@@ -139,23 +50,27 @@ export function RoutingGraph({
     const draw = () => {
       const origin = box.getBoundingClientRect();
       const next: Wire[] = [];
-      for (const job of jobs) {
-        if (job.unavailable === true || job.connectionId == null) continue;
-        const from = box.querySelector(`[data-wire-out="${job.id}"]`);
-        const to = box.querySelector(`[data-wire-in="${job.connectionId}"]`);
-        if (from == null || to == null) continue;
-        const a = from.getBoundingClientRect();
-        const b = to.getBoundingClientRect();
-        const x1 = a.left + a.width / 2 - origin.left;
-        const y1 = a.top + a.height / 2 - origin.top;
-        const x2 = b.left + b.width / 2 - origin.left;
-        const y2 = b.top + b.height / 2 - origin.top;
-        const mid = (x1 + x2) / 2;
-        next.push({
-          key: job.id,
-          d: `M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}`,
-          tone: job.tone,
-        });
+      for (const group of groups) {
+        for (const node of group.nodes) {
+          if (node.target == null) continue;
+          const key = sourceKey(group.label, node.id);
+          const from = box.querySelector(`[data-wire-out="${CSS.escape(key)}"]`);
+          const to = box.querySelector(`[data-wire-in="${CSS.escape(node.target)}"]`);
+          if (from == null || to == null) continue;
+          const a = from.getBoundingClientRect();
+          const b = to.getBoundingClientRect();
+          const x1 = a.right - origin.left;
+          const y1 = a.top + a.height / 2 - origin.top;
+          const x2 = b.left - origin.left;
+          const y2 = b.top + b.height / 2 - origin.top;
+          const mid = (x1 + x2) / 2;
+          next.push({
+            from: key,
+            to: node.target,
+            d: `M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}`,
+            broken: node.broken === true,
+          });
+        }
       }
       setWires(next);
     };
@@ -163,35 +78,102 @@ export function RoutingGraph({
     const observer = new ResizeObserver(draw);
     observer.observe(box);
     return () => observer.disconnect();
-  }, [jobs, connections]);
+  }, [groups, targets]);
+
+  const lit = (wire: Wire) => hot !== null && (wire.from === hot || wire.to === hot);
+  const hotNodes = new Set(
+    hot === null ? [] : wires.filter(lit).flatMap((wire) => [wire.from, wire.to]),
+  );
 
   return (
     <div
       ref={boxRef}
       data-slot="routing-graph"
-      className="relative grid grid-cols-[minmax(0,14.5rem)_minmax(2rem,1fr)_minmax(0,14.5rem)] gap-y-2.5"
+      onPointerLeave={() => setHot(null)}
+      className="relative grid grid-cols-[minmax(0,15rem)_minmax(1.5rem,1fr)_minmax(0,17rem)] py-1"
     >
       <svg aria-hidden className="pointer-events-none absolute inset-0 size-full overflow-visible">
         {wires.map((wire) => (
           <path
-            key={wire.key}
+            key={`${wire.from}>${wire.to}`}
+            data-wire={wire.from}
+            data-broken={wire.broken ? '' : undefined}
             d={wire.d}
             fill="none"
-            strokeWidth={1.75}
-            style={{ stroke: 'var(--text-tertiary)' }}
+            strokeWidth={lit(wire) ? 2 : 1.5}
+            strokeDasharray={wire.broken ? '4 4' : undefined}
+            className="transition-opacity duration-(--dur-fast)"
+            style={{
+              stroke: wire.broken
+                ? 'var(--destructive)'
+                : lit(wire)
+                  ? 'var(--foreground)'
+                  : 'var(--text-dim)',
+              opacity: hot === null || lit(wire) ? 1 : 0.2,
+            }}
           />
         ))}
       </svg>
-      <div className="col-start-1 flex flex-col gap-2.5">
-        <div className="text-caption font-medium text-content-tertiary">{t('用途')}</div>
-        {jobs.map((job) => (
-          <JobNode key={job.id} job={job} />
+      <div className="col-start-1 flex flex-col gap-4">
+        {groups.map((group) => (
+          <div key={group.label} className="flex flex-col gap-1.5">
+            <div className="px-0.5 text-caption font-medium text-content-tertiary">
+              {group.label}
+            </div>
+            <div className="overflow-hidden rounded-lg border border-border bg-background">
+              {group.nodes.map((node) => {
+                const key = sourceKey(group.label, node.id);
+                return (
+                  <div
+                    key={node.id}
+                    data-slot="routing-node"
+                    data-routing-source={node.id}
+                    data-broken={node.broken === true ? '' : undefined}
+                    data-wire-out={key}
+                    onPointerEnter={() => setHot(key)}
+                    className={cn(
+                      'flex h-8 items-center gap-2 border-t border-border px-2.5 text-meta first:border-t-0',
+                      hotNodes.has(key) && 'bg-sidebar-hover',
+                      node.broken === true ? 'text-destructive' : 'text-foreground',
+                    )}
+                  >
+                    <span className="min-w-0 truncate">{node.name}</span>
+                    {node.tag != null && (
+                      <span className="ml-auto flex-none truncate text-caption text-content-tertiary max-sm:hidden">
+                        {node.tag}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         ))}
       </div>
-      <div className="col-start-3 flex flex-col justify-center gap-2.5">
-        <div className="text-caption font-medium text-content-tertiary">{t('连接')}</div>
-        {connections.map((connection) => (
-          <ConnectionNode key={connection.id} connection={connection} />
+      <div className="col-start-3 flex flex-col justify-center gap-2">
+        <div className="px-0.5 text-caption font-medium text-content-tertiary">{t('服务商')}</div>
+        {targets.map((target) => (
+          <div
+            key={target.id}
+            data-slot="routing-node"
+            data-routing-target={target.id}
+            data-unavailable={target.unavailable === true ? '' : undefined}
+            data-wire-in={target.id}
+            onPointerEnter={() => setHot(target.id)}
+            className={cn(
+              'flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-2.5 text-meta whitespace-nowrap',
+              target.unavailable === true && 'border-dashed text-content-tertiary',
+              hotNodes.has(target.id) && 'bg-sidebar-hover',
+            )}
+          >
+            {target.Mark != null && <target.Mark aria-hidden className="size-4 flex-none" />}
+            <span className="min-w-0 truncate">{target.name}</span>
+            <span className="ml-auto flex-none text-caption text-content-tertiary max-sm:hidden">
+              {target.unavailable === true
+                ? t('{runtime} · 不可用', { runtime: target.runtime })
+                : target.runtime}
+            </span>
+          </div>
         ))}
       </div>
     </div>

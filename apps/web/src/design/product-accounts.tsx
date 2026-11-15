@@ -7,7 +7,6 @@ import {
   type SubscriptionAccount,
   toClaudeAccount,
 } from '../api/claude-accounts.js';
-import { toRoutingGraph } from '../api/model-routing.js';
 import { MachineProvidersCard, useClock } from '../components/accounts/account-parts.js';
 import { ClaudeMark } from '../components/brand-marks.js';
 import { CheckedButton } from '../components/checked-button.js';
@@ -18,19 +17,14 @@ import {
   ProviderPanel,
 } from '../components/providers/provider-panel.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
-import { RoutingGraph } from '../components/settings/routing-graph.js';
 import { SettingsNav } from '../components/settings/settings-nav.js';
 import { SettingsSearch } from '../components/settings/settings-search.js';
 import { SettingsCard } from '../components/settings-list.js';
 import { SettingsScopeSentence, TEAM_SCOPE } from '../components/settings-scope.js';
 import {
-  ACCOUNT_MACHINES,
-  ACCOUNT_ROUTING,
   ACCOUNT_STEPS,
   ACCOUNT_STICKINESS,
   ACCOUNT_SUBSCRIPTIONS,
-  ACCOUNTS,
-  OTHER_ACCOUNTS,
   PROVIDER_MACHINES,
 } from '../fixtures/accounts.js';
 import { r7 } from '../fixtures/core.js';
@@ -64,11 +58,6 @@ const QUERY_PHASES = [
   { phase: 'error', query: { ...settledQuery, isError: true } },
   { phase: 'empty', query: settledQuery },
 ] as const;
-
-const ROUTING_ACCOUNTS: SubscriptionAccount[] = [
-  ...ACCOUNT_SUBSCRIPTIONS.map((wire) => toClaudeAccount(wire, NOW)),
-  ...OTHER_ACCOUNTS,
-];
 
 function fixtureAccount(label: string): SubscriptionAccount {
   const wire = ACCOUNT_SUBSCRIPTIONS.find((candidate) => candidate.label === label);
@@ -291,12 +280,6 @@ export function AccountsSection() {
   const [machine, setMachine] = useState<MachineWithProviders | undefined>(PROVIDER_MACHINES[0]);
   const [scopeValue, setScopeValue] = useState(TEAM_SCOPE);
   const [scopeCheckedAt] = useState(() => Date.now());
-  const graph = toRoutingGraph(ACCOUNT_ROUTING, {
-    accounts: ROUTING_ACCOUNTS,
-    providers: ACCOUNTS.providers,
-    machineNames: new Map(ACCOUNT_MACHINES.map((m) => [m.id, m.name])),
-    t,
-  });
   return (
     <Section
       id="accounts"
@@ -323,19 +306,6 @@ export function AccountsSection() {
       >
         <div className="flex w-full max-w-160 flex-col gap-6">
           <SubscriptionDetailSpecimen state="ok" />
-        </div>
-      </Specimen>
-      <Specimen
-        id="routing-from-the-api"
-        title="Routing from the API"
-        note="toRoutingGraph maps GET /model-routing onto the graph; nightly scan has no connection"
-        stage="sheet"
-        code={`<RoutingGraph {...toRoutingGraph(routing, { accounts, providers, machineNames, t })} />`}
-      >
-        <div className="w-full overflow-x-auto">
-          <div className="min-w-160">
-            <RoutingGraph jobs={graph.jobs} connections={graph.connections} />
-          </div>
         </div>
       </Specimen>
       <Specimen

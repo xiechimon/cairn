@@ -1,18 +1,17 @@
 import type {
   ClaudeUsage,
   ProviderRecord,
+  RouteUse,
   RoutingConnection,
   RoutingEdge,
   RoutingQuota,
-  RoutingUse,
+  TeamRoutingSettings,
 } from '@cairn/shared';
 import { useQuery } from '@tanstack/react-query';
-import type {
-  RoutingConnection as GraphConnection,
-  RoutingJob,
-} from '../components/settings/routing-graph.js';
+import type { RoutingSourceGroup } from '../components/settings/routing-graph.js';
+import type { ModelOption } from '../fixtures/records.js';
 import type { TFunc } from '../i18n/translate.js';
-import type { AccountVendor, SubscriptionAccount } from './claude-accounts.js';
+import type { SubscriptionAccount } from './claude-accounts.js';
 import { api } from './client.js';
 
 export interface ModelRouting {
@@ -35,24 +34,37 @@ export function useModelRouting(teamId: string | undefined, live: boolean) {
   });
 }
 
-const USE_LABELS: Record<RoutingUse, string> = {
+export const ROUTE_USE_LABELS: Record<RouteUse, string> = {
   coordinator: 'Coordinator',
-  implementation: '实现',
+  session: '新任务',
   review: '评审',
-  mechanical: '机械活',
-  eval: '评测',
-  'nightly-scan': '每晚扫描',
+  digest: '摘要',
+  compaction: '压缩',
+  citation_check: '引文检查',
 };
 
-const TONES = [1, 2, 3, 4, 5, 6] as const;
+const GRAPH_USES: readonly RouteUse[] = [
+  'coordinator',
+  'session',
+  'review',
+  'citation_check',
+  'digest',
+  'compaction',
+];
 
-const VENDOR_NAMES: Record<AccountVendor, string> = {
-  claude: 'Claude',
-  codex: 'ChatGPT',
-  grok: 'Grok',
-};
+const CLAUDE_CODE_TARGET = 'claude-code';
 
 const MACHINE_PREFIX = 'machine:';
+
+export interface RoutingTargetRow {
+  id: string;
+  name: string;
+  runtime: 'claude-code' | 'pi';
+  plan: string | null;
+  quota?: { fiveHour: number | null; week: number | null };
+  unavailable: boolean;
+  record?: ProviderRecord;
+}
 
 function leftOf(usedPercent: number | null | undefined): number | null {
   if (usedPercent == null || !Number.isFinite(usedPercent)) return null;
@@ -64,66 +76,107 @@ function accountLeft(account: SubscriptionAccount, name: string): number | null 
   return window === undefined ? null : leftOf(window.utilization * 100);
 }
 
-export interface RoutingGraphContext {
-  accounts: readonly SubscriptionAccount[];
-  providers: readonly Pick<ProviderRecord, 'id' | 'label'>[];
-  machineNames: ReadonlyMap<string, string>;
-  t: TFunc;
+function quotaOf(fiveHour: number | null, week: number | null) {
+  return fiveHour !== null || week !== null ? { quota: { fiveHour, week } } : {};
 }
 
-export function toRoutingGraph(
-  routing: ModelRouting,
-  { accounts, providers, machineNames, t }: RoutingGraphContext,
-): { jobs: RoutingJob[]; connections: GraphConnection[] } {
-  const seen = new Set<string>();
-  const connections: GraphConnection[] = [];
-  for (const connection of routing.connections) {
-    if (seen.has(connection.id)) continue;
-    seen.add(connection.id);
-    const unavailable = connection.available === false;
-    const account = accounts.find((a) => a.id === connection.id);
-    if (account !== undefined) {
-      const fiveHour = accountLeft(account, 'five_hour');
-      const week = accountLeft(account, 'seven_day');
-      connections.push({
-        id: connection.id,
-        name: `${VENDOR_NAMES[account.vendor]} · ${account.label}`,
-        ...(account.plan !== null ? { tier: account.plan } : {}),
-        ...(fiveHour !== null || week !== null ? { quota: { fiveHour, week } } : {}),
-        unavailable,
-      });
-      continue;
-    }
-    if (connection.id.startsWith(MACHINE_PREFIX)) {
-      const machineId = connection.id.slice(MACHINE_PREFIX.length);
-      const windows = routing.quota.find((q) => q.connectionId === connection.id)?.windows ?? [];
-      const fiveHour = leftOf(windows.find((w) => w.window === '5h')?.usedPercent);
-      const week = leftOf(windows.find((w) => w.window === 'week')?.usedPercent);
-      connections.push({
-        id: connection.id,
-        name: `Claude Code · ${machineNames.get(machineId) ?? machineId}`,
-        tier: connection.kind === 'subscription' ? t('订阅') : t('API key'),
-        ...(fiveHour !== null || week !== null ? { quota: { fiveHour, week } } : {}),
-        unavailable,
-      });
-      continue;
-    }
-    connections.push({
-      id: connection.id,
-      name: providers.find((p) => p.id === connection.id)?.label ?? connection.id,
-      tier: connection.kind === 'subscription' ? t('订阅') : t('API key'),
-      unavailable,
+export function routingTargets({
+  subscriptions,
+  providers,
+  routing,
+}: {
+  subscriptions: readonly SubscriptionAccount[];
+  providers: readonly ProviderRecord[];
+  routing: ModelRouting | undefined;
+}): RoutingTargetRow[] {
+  const rows: RoutingTargetRow[] = subscriptions.map((account) => ({
+    id: `subscription:${account.id}`,
+    name: account.label,
+    runtime: 'claude-code',
+    plan: account.plan,
+    ...quotaOf(accountLeft(account, 'five_hour'), accountLeft(account, 'seven_day')),
+    unavailable: account.state === 'expired',
+  }));
+  const machineClaude = (routing?.connections ?? []).filter(
+    (c) => c.id.startsWith(MACHINE_PREFIX) && c.vendor === 'anthropic' && !c.id.endsWith(':codex'),
+  );
+  if (rows.length === 0 && machineClaude.length > 0) {
+    const windows = routing?.quota.find((q) =>
+      machineClaude.some((c) => c.id === q.connectionId),
+    )?.windows;
+    rows.push({
+      id: CLAUDE_CODE_TARGET,
+      name: 'Claude Code',
+      runtime: 'claude-code',
+      plan: null,
+      ...quotaOf(
+        leftOf(windows?.find((w) => w.window === '5h')?.usedPercent),
+        leftOf(windows?.find((w) => w.window === 'week')?.usedPercent),
+      ),
+      unavailable: machineClaude.every((c) => c.available === false),
     });
   }
-  const jobs = routing.edges.map(
-    (edge, index): RoutingJob => ({
-      id: edge.use,
-      name: t(USE_LABELS[edge.use]),
-      model: edge.modelId,
-      tone: TONES[index % TONES.length] ?? 1,
-      ...(edge.connectionId !== null ? { connectionId: edge.connectionId } : {}),
-      unavailable: edge.unavailable === true || edge.connectionId === null,
-    }),
+  for (const record of providers) {
+    const connections = (routing?.connections ?? []).filter((c) => c.id === record.id);
+    rows.push({
+      id: `provider:${record.id}`,
+      name: record.label,
+      runtime: 'pi',
+      plan: null,
+      unavailable: connections.length > 0 && connections.every((c) => c.available === false),
+      record,
+    });
+  }
+  return rows;
+}
+
+function targetOfRule(provider: string, targets: readonly RoutingTargetRow[]) {
+  if (provider === CLAUDE_CODE_TARGET) {
+    const claude = targets.filter((target) => target.runtime === 'claude-code');
+    return claude.find((target) => !target.unavailable) ?? claude[0];
+  }
+  return targets.find((target) => target.record?.providerId === provider);
+}
+
+function modelName(provider: string, modelId: string, options: readonly ModelOption[]) {
+  return (
+    options.find((o) => o.provider === provider && o.modelId === modelId)?.modelName ??
+    options.find((o) => o.modelId === modelId)?.modelName ??
+    modelId
   );
-  return { jobs, connections };
+}
+
+export function ruleGraphGroups(
+  settings: TeamRoutingSettings,
+  targets: readonly RoutingTargetRow[],
+  options: readonly ModelOption[],
+  t: TFunc,
+): RoutingSourceGroup[] {
+  const agents: RoutingSourceGroup['nodes'] = [];
+  for (const use of GRAPH_USES) {
+    const rule = settings.rules.find((r) => r.use === use);
+    const fallback = rule === undefined && use === 'session' ? settings.sessionDefault : undefined;
+    const provider = rule?.provider ?? fallback?.provider ?? null;
+    const modelId = rule?.modelId ?? fallback?.modelId ?? null;
+    if (provider === null || modelId === null) continue;
+    const target = targetOfRule(provider, targets);
+    const name = modelName(provider, modelId, options);
+    agents.push({
+      id: use,
+      name: t(ROUTE_USE_LABELS[use]),
+      tag: rule === undefined ? t('{model} · 默认', { model: name }) : name,
+      ...(target !== undefined ? { target: target.id } : {}),
+      broken: target === undefined || target.unavailable,
+    });
+  }
+  const groups: RoutingSourceGroup[] = [];
+  if (agents.length > 0) groups.push({ label: t('Coordinator 和其他 Agent'), nodes: agents });
+  const claude = targetOfRule(CLAUDE_CODE_TARGET, targets);
+  if (claude !== undefined) {
+    groups.push({
+      label: 'Claude Code',
+      nodes: [{ id: 'claude-models', name: t('所有 Claude 模型'), target: claude.id }],
+    });
+  }
+  return groups;
 }
