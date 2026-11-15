@@ -28,7 +28,13 @@ import { ORB_RELAY_TOKEN_ENV, orbReleaseFromEntry } from './orb/protocol.js';
 import { runOrbServicesEnsure } from './orb/services-runtime.js';
 import { orbAgentHome, runOrbWorker } from './orb/worker.js';
 import { forgetMachine, loadDaemonJson, loadMachineJson, statePaths } from './state.js';
-import { isAlive, runSupervisor, spawnSupervisor, stopSupervisor } from './supervisor.js';
+import {
+  isAlive,
+  runSupervisor,
+  type SupervisorStart,
+  spawnSupervisor,
+  stopSupervisor,
+} from './supervisor.js';
 import { runTokenCommand } from './token-command.js';
 import { DAEMON_VERSION } from './version.js';
 
@@ -60,6 +66,23 @@ function passthroughArgv(opts: StartOptions): string[] {
   if (opts.server) argv.push('--server', opts.server);
   if (opts.workspacesDir) argv.push('--workspaces-dir', opts.workspacesDir);
   return argv;
+}
+
+function reportStarted(started: SupervisorStart): void {
+  if (started.unit !== null) {
+    process.stdout.write(
+      `Started in background as systemd user unit ${started.unit} (pid ${started.pid})\n`,
+    );
+    return;
+  }
+  process.stdout.write(`Started in background (pid ${started.pid})\n`);
+  if (started.unitFailure !== null) {
+    process.stderr.write(
+      `warning: could not start the daemon as a systemd user unit (${started.unitFailure}).\n` +
+        'The Runner will show Online but cannot start its task sandbox, so it will not take tasks.\n' +
+        'Run it under systemd instead: https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#keep-the-daemon-running-on-linux\n',
+    );
+  }
 }
 
 export async function runForeground(opts: StartOptions): Promise<void> {
@@ -104,7 +127,7 @@ export function buildProgram(): Command {
 
   program
     .command('start')
-    .description('Start the daemon (detached + supervisor by default)')
+    .description('Start the daemon in the background (a systemd user unit on Linux)')
     .option('-f, --foreground', 'run attached (for pm2/systemd/containers)')
     .option('--api-key <k>', 'API key for non-interactive enroll (overrides existing enroll)')
     .option('--team <id>', 'team id for non-interactive enroll')
@@ -127,11 +150,12 @@ export function buildProgram(): Command {
         }
         throw err;
       }
-      const { pid } = spawnSupervisor({
-        home: config.home,
-        runnerArgv: passthroughArgv(opts),
-      });
-      process.stdout.write(`Started in background (pid ${pid})\n`);
+      reportStarted(
+        spawnSupervisor({
+          home: config.home,
+          runnerArgv: passthroughArgv(opts),
+        }),
+      );
       await printEnrollmentUrl(config.home, config.serverUrl);
     });
 
@@ -163,11 +187,12 @@ export function buildProgram(): Command {
     .action(async (_opts: StartOptions, cmd: Command) => {
       const config = loadDaemonConfig({});
       await stopSupervisor(config.home);
-      const { pid } = spawnSupervisor({
-        home: config.home,
-        runnerArgv: passthroughArgv(cmd.opts<StartOptions>()),
-      });
-      process.stdout.write(`Started in background (pid ${pid})\n`);
+      reportStarted(
+        spawnSupervisor({
+          home: config.home,
+          runnerArgv: passthroughArgv(cmd.opts<StartOptions>()),
+        }),
+      );
       await printEnrollmentUrl(config.home, config.serverUrl);
     });
 
