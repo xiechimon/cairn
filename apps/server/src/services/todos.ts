@@ -51,6 +51,7 @@ import type { GithubWriteToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { checkBlockedBy, holdBlockedBuild, releaseBlockedSteps } from './blockers.js';
 import { triggerChiefWakes } from './chief.js';
+import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { assertCorrectionDone } from './correction.js';
 import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -372,8 +373,13 @@ function waitingOnOf(
     if (agentRow === null) continue;
     const prior =
       buildRow === undefined
-        ? { priorSessionId: null, priorMachineId: null, freshSession: true }
-        : priorSessionOf(deps.db, s, buildRow);
+        ? {
+            priorSessionId: null,
+            priorMachineId: null,
+            priorSubscriptionId: null,
+            freshSession: true,
+          }
+        : priorSessionOf(deps.db, s, buildRow, enabledSubscriptionId(deps, row.teamId));
     const named =
       !prior.freshSession && prior.priorSessionId !== null
         ? prior.priorMachineId

@@ -14,6 +14,8 @@ import { and, eq, or } from 'drizzle-orm';
 import { build, chiefThread, machine, type QuotaWaitRow, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { holdBlockedBuild } from './blockers.js';
+import { accountHeld } from './claude-account-hold.js';
+import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { capabilityGatePasses, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
 import { isChiefConversation, type MachineDeps, stepTeamId } from './machine-deps.js';
 import {
@@ -109,6 +111,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
   const byId = new Map(machines.map((row) => [row.id, row]));
   let changed = false;
   const defaultMachineId = teamDefaultMachineId(deps.db, teamId);
+  const enabledId = enabledSubscriptionId(deps, teamId);
   const consider = (
     stepRow: StepRow,
     agentRow: AgentRow,
@@ -117,8 +120,13 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
   ) => {
     const prior =
       buildRow === null
-        ? { priorSessionId: null, priorMachineId: null, freshSession: true }
-        : priorSessionOf(deps.db, stepRow, buildRow);
+        ? {
+            priorSessionId: null,
+            priorMachineId: null,
+            priorSubscriptionId: null,
+            freshSession: true,
+          }
+        : priorSessionOf(deps.db, stepRow, buildRow, enabledId);
     const sessionId =
       !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineId : null;
     const namedId = routeTargets(sessionId, agentRow.machineId)[0]?.machineId ?? null;
@@ -150,6 +158,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
       return;
     }
     if (stepRow.status !== 'pending' && stepRow.status !== 'waiting_quota') return;
+    if (buildRow !== null && accountHeld(stepRow, prior, enabledId)) return;
     const runnable =
       owner?.online === true &&
       runtimeGatePasses(owner, 'claude-code') &&

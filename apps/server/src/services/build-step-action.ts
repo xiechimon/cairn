@@ -71,7 +71,7 @@ export async function applyBuildStepAction(
       const eligibility = planAutoConfirmation(deps, buildId);
       if (!eligibility.eligible) throw new HttpError(409, eligibility.reason);
     }
-    applyBuildConfirm(deps, buildId, actorName);
+    applyBuildConfirm(deps, buildId, actorName, origin === 'person');
     return;
   }
   if (body.action === 'review') {

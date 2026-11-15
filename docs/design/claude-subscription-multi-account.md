@@ -67,7 +67,8 @@ A pending worker step is held, not claimable, when its runtime is `claude-code`,
 - It is evaluated again inside the claim transaction against the enabled account read in that same transaction; if the step became held, or the account the earlier gates used changed, the transaction returns false and the claim retries next tick. The `session` field uses the same fresh-or-continue decision.
 - A person-created step (the "continue", a retry, a message after a stop, and `build-confirm`, which gains `byPerson`) is never held. If the prior account differs it starts a new run: `priorSessionOf` returns no prior session and `freshSession`, so the claim says `new`, and the existing blocker handoff text carries the goal; files stay in the workspace.
 - Release path: a held step is released by the existing stop followed by the person's continue (a stopped pending step is finished by `applyStoppedStep`, and continue creates a `byPerson` step); the queue reason offers stop. No new supersede logic touches the build or todo phase.
-- Chief turns are not held. A thread whose last chief step ran on another account claims with `action: 'new'`; the history carry (#5011) supplies the earlier conversation.
+- A merge step is treated like a person step for the session decision: when the latest prior session ran on another account it starts a new run and is never held by that prior (its own stale binding still holds it).
+- Chief turns are never held, parked ones included. A chief turn claims with `action: 'new'` when the latest earlier chief step that reported a session (finish now records `step.sessionId` for chief turns) ran on another account; a turn that reported no session does not hide the session. A thread whose turns never recorded a session (before this change) falls back to the latest claimed chief step's binding. The history carry (#5011) supplies the earlier conversation.
 
 ## Every path that reads or writes the changed state
 

@@ -50,6 +50,7 @@ import {
   isChiefDigestStep,
 } from './chief-digest.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
+import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.js';
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
 import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
@@ -273,6 +274,18 @@ function chiefClaimPayload(
     threadRow,
     coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
   );
+  const boundSubscriptionId =
+    stepRuntimeFor(model.provider) === 'claude-code'
+      ? (deps.db
+          .select({ id: step.claudeSubscriptionId })
+          .from(step)
+          .where(eq(step.id, stepRow.id))
+          .get()?.id ?? null)
+      : null;
+  const continuesSession =
+    !stepRow.freshSession &&
+    threadRow.sessionId !== '' &&
+    !chiefLastRanOnOtherAccount(deps.db, threadRow.id, stepRow.id, boundSubscriptionId);
   const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
   const locked = digest || mailTurn;
   const history = locked ? null : chiefHistoryFor(deps.db, threadRow, stepRow);
@@ -289,8 +302,8 @@ function chiefClaimPayload(
     },
     conversationId: stepRow.buildId,
     session: {
-      action: !stepRow.freshSession && threadRow.sessionId !== '' ? 'continue' : 'new',
-      sessionId: !stepRow.freshSession && threadRow.sessionId !== '' ? threadRow.sessionId : null,
+      action: continuesSession ? 'continue' : 'new',
+      sessionId: continuesSession ? threadRow.sessionId : null,
     },
     ...(instruction !== null
       ? {
@@ -470,11 +483,11 @@ async function tryClaim(
       projectRunningCount(reader, cand.todoRow.projectId) >=
         projectCap + (cand.stepRow.byPerson ? 1 : 0);
     if (projectFull(db)) continue;
-    const { priorSessionId, priorMachineId, freshSession } = priorSessionOf(
-      db,
-      cand.stepRow,
-      cand.buildRow,
-    );
+    const claimRuntimeIsClaudeCode = stepRuntimeFor(model.provider) === 'claude-code';
+    const enabledId = enabledSubscriptionId({ db }, teamId);
+    const prior = priorSessionOf(db, cand.stepRow, cand.buildRow, enabledId);
+    const { priorSessionId, priorMachineId, freshSession } = prior;
+    if (claimRuntimeIsClaudeCode && accountHeld(cand.stepRow, prior, enabledId)) continue;
     const sessionOnOtherMachine =
       priorSessionId !== null && priorMachineId !== null && priorMachineId !== machineId;
     const sole = platformFallbackMachineId(
@@ -528,6 +541,12 @@ async function tryClaim(
       won = db.transaction((tx) => {
         if (!stillAuthorized()) return false;
         if (projectFull(tx)) return false;
+        const boundId = enabledSubscriptionId({ db: tx }, teamId);
+        if (claimRuntimeIsClaudeCode) {
+          if (boundId !== enabledId) return false;
+          const fresh = priorSessionOf(tx, cand.stepRow, cand.buildRow, boundId);
+          if (accountHeld(cand.stepRow, fresh, boundId)) return false;
+        }
         holdBlockedBuild(db, cand.stepRow.buildId);
         const res = tx
           .update(step)
@@ -538,10 +557,7 @@ async function tryClaim(
             lastHeartbeatAt: claimedAt,
             skillInjection,
             blockerHandoff,
-            claudeSubscriptionId:
-              stepRuntimeFor(model.provider) === 'claude-code'
-                ? enabledSubscriptionId({ db: tx }, teamId)
-                : null,
+            claudeSubscriptionId: claimRuntimeIsClaudeCode ? boundId : null,
             holdReason: null,
             holdUntil: null,
           })

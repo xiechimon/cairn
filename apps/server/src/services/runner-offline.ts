@@ -11,6 +11,7 @@ import { build, chiefMessage, machine, step, todo } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { type ChiefDeps, coordinatorThreadRow, ensureChief } from './chief.js';
+import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { projectOfTodo } from './git.js';
 import {
   priorSessionOf,
@@ -71,7 +72,12 @@ function waitingByMachine(db: Db): Map<string, Map<string, PendingRow>> {
 }
 
 function sessionStarted(db: Db, row: PendingRow): boolean {
-  const prior = priorSessionOf(db, row.stepRow, row.buildRow);
+  const prior = priorSessionOf(
+    db,
+    row.stepRow,
+    row.buildRow,
+    enabledSubscriptionId({ db }, row.todoRow.teamId),
+  );
   return !prior.freshSession && prior.priorSessionId !== null;
 }
 
