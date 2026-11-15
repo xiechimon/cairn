@@ -294,7 +294,7 @@ export function SubscriptionDetail({
           </SettingsSection>
         )}
         {sticky.length > 0 && (
-          <SettingsSection title={t('固定账户的 thread')}>
+          <SettingsSection title={t('固定账户的对话')}>
             <ListCard>
               {sticky.map((thread) => (
                 <StickyThreadRow key={thread.threadId} thread={thread} now={now} />

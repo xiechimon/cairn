@@ -145,7 +145,7 @@ export function scheduleViewState(
 
 const PAUSE_REASONS: Record<string, string> = {
   'Task archived': '任务已归档，定时随之停用',
-  'Paused by worker': '执行任务的 agent 暂停了它',
+  'Paused by worker': '执行任务的 Agent 暂停了它',
   'Paused after 10 consecutive scheduled runs without a human message':
     '连续 10 次定时运行都没人回复，已自动暂停',
 };

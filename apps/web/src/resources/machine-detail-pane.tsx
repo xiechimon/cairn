@@ -43,7 +43,7 @@ export function sandboxNotice(capabilities: MachineRow['capabilities']): string 
   if (capabilities?.osPlatform !== 'linux') return null;
   const report = capabilities.confinement;
   if (report === undefined) {
-    return '这台 Runner 没上报任务沙箱状态，接不了任务。更新 CLI 后在这台机器上运行 `{command} restart`。';
+    return '这台执行机没上报任务沙箱状态，接不了任务。更新 CLI 后在这台机器上运行 `{command} restart`。';
   }
   switch (report.state) {
     case 'ready':
@@ -57,15 +57,15 @@ export function sandboxNotice(capabilities: MachineRow['capabilities']): string 
       const cause = report.reason === 'startup-failed' ? capabilities.confinementCause : undefined;
       switch (cause?.kind) {
         case 'not-own-unit':
-          return '任务沙箱没就绪：daemon 没有作为自己的 systemd user unit 运行。在这台机器上运行 `{command} restart`，它会自己起一个；还不行的话，检查 `systemd-run --user` 能不能用。';
+          return '任务沙箱没就绪：后台服务没有作为自己的 systemd user unit 运行。在这台机器上运行 `{command} restart`，它会自己起一个；还不行的话，检查 `systemd-run --user` 能不能用。';
         case 'bwrap-missing':
-          return '任务沙箱没就绪：这台机器没装 bubblewrap（`bwrap`）。装好后（如 `sudo pacman -S bubblewrap` 或 `sudo apt install bubblewrap`），Runner 每分钟会自己再检查一次。';
+          return '任务沙箱没就绪：这台机器没装 bubblewrap（`bwrap`）。装好后（如 `sudo pacman -S bubblewrap` 或 `sudo apt install bubblewrap`），执行机每分钟会自己再检查一次。';
         case 'home-overlay-failed':
           return cause.mountPoint === undefined
-            ? '任务沙箱没就绪：沙箱没法覆盖你的家目录，常见原因是家目录里有 FUSE 挂载（比如 AppImage 程序）。用 `findmnt -l | grep fuse` 找到它并关掉对应程序，Runner 每分钟会自己再检查一次。'
-            : '任务沙箱没就绪：家目录里的 FUSE 挂载 `{mountPoint}` 挡住了沙箱，通常是某个 AppImage 程序在 TMPDIR 指向家目录时留下的。关掉那个程序，或让它的 TMPDIR 指向家目录以外，Runner 每分钟会自己再检查一次。';
+            ? '任务沙箱没就绪：沙箱没法覆盖你的家目录，常见原因是家目录里有 FUSE 挂载（比如 AppImage 程序）。用 `findmnt -l | grep fuse` 找到它并关掉对应程序，执行机每分钟会自己再检查一次。'
+            : '任务沙箱没就绪：家目录里的 FUSE 挂载 `{mountPoint}` 挡住了沙箱，通常是某个 AppImage 程序在 TMPDIR 指向家目录时留下的。关掉那个程序，或让它的 TMPDIR 指向家目录以外，执行机每分钟会自己再检查一次。';
         default:
-          return '任务沙箱没就绪，这台 Runner 接不了任务。Linux 上 daemon 要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。';
+          return '任务沙箱没就绪，这台执行机接不了任务。Linux 上后台服务要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。';
       }
     }
   }
@@ -126,7 +126,7 @@ function RuntimeRow({
   const login = provider === undefined ? null : LOGIN_STATE[provider.login];
   const switchDisabled = !toggleable || frozen;
   const reason = !toggleable
-    ? t('这台 Runner 还不能单独开关 {name}', { name })
+    ? t('这台执行机还不能单独开关 {name}', { name })
     : frozen
       ? blockedReason
       : undefined;
@@ -150,7 +150,7 @@ function RuntimeRow({
           )}
           {provider?.login === 'logged-out' && provider.loginCommand !== null && (
             <span>
-              {t('在这台 Runner 上运行')}{' '}
+              {t('在这台执行机上运行')}{' '}
               <span data-testid="provider-login-command">
                 <InlineCode>{provider.loginCommand}</InlineCode>
               </span>
@@ -279,7 +279,7 @@ export function MachineDetailPane({
               </div>
             )}
             {(chief.running || chief.waiting) && (
-              <SettingsRow label={t('Coordinator')} hint={t('这台 Runner 在 Coordinator 里的角色')}>
+              <SettingsRow label={t('Coordinator')} hint={t('这台执行机在 Coordinator 里的角色')}>
                 <span className="flex flex-wrap items-center justify-end gap-x-3 text-meta">
                   {chief.running && (
                     <span
@@ -294,7 +294,7 @@ export function MachineDetailPane({
                       className="inline-flex items-center gap-1.5 text-content-tertiary before:block before:size-1.5 before:rounded-full before:bg-content-dim before:content-['']"
                       data-orchestration="waiting"
                     >
-                      {t('Coordinator 等待 Runner')}
+                      {t('Coordinator 等待执行机')}
                     </span>
                   )}
                 </span>
@@ -307,11 +307,11 @@ export function MachineDetailPane({
       <SettingsSection
         testId="machine-runtimes"
         title={t('运行时')}
-        description={t('这台 Runner 上能接任务的执行器，以及它们的登录状态。')}
+        description={t('这台执行机上能接任务的执行器，以及它们的登录状态。')}
       >
         {online && !(machine.enabledRuntimes ?? []).some(isMachineRuntime) && (
           <p data-testid="machine-pick-runtimes" className="m-0 text-meta text-content-secondary">
-            {t('选择这台 Runner 接哪些运行时')}
+            {t('选择这台执行机接哪些运行时')}
           </p>
         )}
         <SettingsCard>
@@ -337,7 +337,7 @@ export function MachineDetailPane({
       {capabilities !== undefined && (
         <SettingsSection testId="machine-capabilities" title={t('能力')}>
           <SettingsCard>
-            <SettingsRow label={t('能力')} hint={t('这台 Runner 上报的 MCP 与技能清单')}>
+            <SettingsRow label={t('能力')} hint={t('这台执行机上报的 MCP 与技能清单')}>
               <span
                 className="text-meta text-content-secondary"
                 data-machine-capabilities={capabilities === null ? 'unreported' : 'reported'}

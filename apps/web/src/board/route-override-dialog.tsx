@@ -139,7 +139,7 @@ export function RouteOverrideDialog({
   return (
     <DialogShell
       title={t('路由覆盖')}
-      subtitle={t('本任务的 Runner 与执行要求；调度在规则开启后生效。')}
+      subtitle={t('本任务的执行机与执行要求；调度在规则开启后生效。')}
       open={open}
       onClose={onClose}
       size="m"
@@ -163,7 +163,7 @@ export function RouteOverrideDialog({
         <SettingsCard>
           <SettingsRow
             label={t('运行平台')}
-            hint={platformLocked ? t('运行中不能改，换平台请新开任务') : t('不限时用默认 Runner')}
+            hint={platformLocked ? t('运行中不能改，换平台请新开任务') : t('不限时用默认执行机')}
           >
             <Select
               value={platform}
@@ -176,11 +176,11 @@ export function RouteOverrideDialog({
                 data-testid="route-override-platform"
               >
                 <SelectValue>
-                  {platform === null ? t('不限（默认 Runner）') : RUNNER_OS_LABELS[platform]}
+                  {platform === null ? t('不限（默认执行机）') : RUNNER_OS_LABELS[platform]}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={null}>{t('不限（默认 Runner）')}</SelectItem>
+                <SelectItem value={null}>{t('不限（默认执行机）')}</SelectItem>
                 {RUNNER_OS.map((os) => (
                   <SelectItem key={os} value={os}>
                     {RUNNER_OS_LABELS[os]}
@@ -189,16 +189,16 @@ export function RouteOverrideDialog({
               </SelectContent>
             </Select>
           </SettingsRow>
-          <SettingsRow label={t('首选 Runner')} hint={t('不填则沿用规则的 Runner')}>
+          <SettingsRow label={t('首选执行机')} hint={t('不填则沿用规则的执行机')}>
             <Select value={machineId} onValueChange={(next) => setMachineId(next)}>
               <SelectTrigger
-                aria-label={t('首选 Runner')}
+                aria-label={t('首选执行机')}
                 className={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-44')}
                 data-testid="route-override-machine"
               >
                 <SelectValue>
                   {machineId === null
-                    ? t(machines.length > 1 && !sessionHasMachine ? '选择 Runner' : '不固定')
+                    ? t(machines.length > 1 && !sessionHasMachine ? '选择执行机' : '不固定')
                     : pickedMachine === undefined
                       ? machineId
                       : machineLabel(pickedMachine, machines)}
@@ -219,7 +219,7 @@ export function RouteOverrideDialog({
         </SettingsCard>
         <section className="flex flex-col gap-2">
           <h3 className="m-0 text-card-title font-medium text-foreground">{t('要求的 MCP')}</h3>
-          <p className={SETTINGS_HINT_CLS}>{t('派发时要求 Runner 已安装这些 MCP 服务器')}</p>
+          <p className={SETTINGS_HINT_CLS}>{t('派发时要求执行机已安装这些 MCP 服务器')}</p>
           {mcpOptions.length === 0 ? (
             <SettingsCard>
               <div className={cn(SETTINGS_ROW_CLS, 'gap-2')}>

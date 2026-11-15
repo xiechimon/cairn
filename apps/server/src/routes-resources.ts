@@ -275,7 +275,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, src.teamId);
     const body = parseWith(evacuateMachineBodySchema, await jsonBody(c), 'body');
     if (body.targetMachineId === id) {
-      throw new HttpError(400, '源 Runner 与目标 Runner 相同——无操作不是迁移。');
+      throw new HttpError(400, '源执行机与目标执行机相同——无操作不是迁移。');
     }
     const dst = ctx.db
       .select()
