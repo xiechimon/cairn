@@ -38,13 +38,17 @@ else
     home_changes=$("${CAIRN_ORB_NODE:-/usr/local/lib/cairn-orb/node}" "$(dirname -- "${BASH_SOURCE[0]}")/computer-home.mjs" "${home_args[@]}")
     [[ $home_changes =~ ^[01]' changes'$ ]] || { printf 'Invalid computer home preparation result\n' >&2; exit 1; }
     changes=$((changes + ${home_changes%% *}))
+    owner_file=$host_root/etc/cairn-orb/owner
+    [[ -f $owner_file && ! -L $owner_file ]] || { printf 'Cannot read the orb owner file %s; run install-host.sh as root first\n' "$owner_file" >&2; exit 1; }
+    owner=$(<"$owner_file")
+    [[ $owner =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || { printf 'Invalid orb owner in %s\n' "$owner_file" >&2; exit 1; }
     computer_dir=$host_root/run/cairn-orb/$name/computer
     if [[ ! -d $computer_dir ]]; then
       printf 'install %s mode 700\n' "$computer_dir"
       if ! $dry_run; then
-        ian_uid=$(id -u ian)
-        ian_gid=$(id -g ian)
-        install -d -o "$ian_uid" -g "$ian_gid" -m 700 "$computer_dir"
+        owner_uid=$(id -u "$owner")
+        owner_gid=$(id -g "$owner")
+        install -d -o "$owner_uid" -g "$owner_gid" -m 700 "$computer_dir"
       fi
       changes=$((changes + 1))
     fi
