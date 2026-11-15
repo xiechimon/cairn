@@ -8,18 +8,14 @@ import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
 import { MachineName, machineLabel } from '../components/machine-label.js';
+import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { SETTINGS_SELECT_TRIGGER_CLS, SettingsSelectTrigger } from '../components/settings-list.js';
 import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch.js';
 import { AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu.js';
+import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
@@ -372,30 +368,34 @@ export function MachineRowView({
           >
             <Ellipsis aria-hidden strokeWidth={1.75} />
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="bottom" align="end" sideOffset={4} className="w-auto min-w-40">
-            <DropdownMenuItem
+          <KeyedMenuContent side="bottom" align="end" sideOffset={4} className="w-auto min-w-40">
+            <KeyedMenuItem
+              shortcut="F"
               data-testid="machine-menu-default"
               disabled={isDefault || machine.id == null || mutations.patchMachine.isPending}
               onClick={makeDefault}
             >
               {isDefault ? t('已是默认 Runner') : t('设为默认 Runner')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            </KeyedMenuItem>
+            <KeyedMenuItem
+              shortcut="M"
               data-testid="machine-menu-evacuate"
               disabled={others.length === 0}
               onClick={() => setEvacuateOpen(true)}
             >
               {t('整机迁移')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            </KeyedMenuItem>
+            <KeyedMenuItem
+              shortcut="D"
+              confirms
               data-testid="machine-menu-delete"
               disabled={deleting}
               title={t('删除后，这台 Runner 要重新注册才能再接任务')}
               onClick={() => setConfirmOpen(true)}
             >
               {t('删除 Runner')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
+            </KeyedMenuItem>
+          </KeyedMenuContent>
         </DropdownMenu>
       </div>
       {expanded && (
