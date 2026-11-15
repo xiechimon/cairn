@@ -1,5 +1,5 @@
 import { CHIEF_DIGEST_ROW_ID_PREFIX, CHIEF_REPORT_ROW_ID_PREFIX } from '@cairn/shared';
-import { and, asc, eq, gt, like, lt, ne, not, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, like, lt, ne, not, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefMessage, chiefSummary } from '../db/schema.js';
 import { chiefTranscriptLines } from '../services/chief-digest.js';
@@ -7,6 +7,7 @@ import { foldSummary, type Summarize, summaryBatches } from './runtime/compactio
 import { recordCompactionSuccess } from './runtime/failure-report.js';
 
 export const SEED_SUMMARY_MAX_BATCHES = 8;
+export const SUMMARY_LAG_ROWS = 20;
 const SEED_SUMMARY_MAX_ROWS = 2_000;
 
 export interface RowPosition {
@@ -38,6 +39,31 @@ const strictlyBefore = (limit: RowPosition) =>
     lt(chiefMessage.createdAt, limit.at),
     and(eq(chiefMessage.createdAt, limit.at), lt(sql`rowid`, limit.rowid)),
   );
+
+export function laggingSeedWindowStart(
+  db: Db,
+  threadId: string,
+  keepRows: number,
+  lagRows: number,
+): RowPosition | null {
+  const prior = db.select().from(chiefSummary).where(eq(chiefSummary.threadId, threadId)).get();
+  const newest = db
+    .select({ at: chiefMessage.createdAt, rowid: sql<number>`rowid` })
+    .from(chiefMessage)
+    .where(
+      and(
+        conversational(threadId),
+        prior === undefined
+          ? undefined
+          : strictlyAfter({ at: prior.coveredAt, rowid: prior.coveredRowid }),
+      ),
+    )
+    .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
+    .limit(keepRows + lagRows)
+    .all();
+  if (newest.length < keepRows + lagRows) return null;
+  return newest[keepRows - 1] ?? null;
+}
 
 export async function seedSummary(
   db: Db,

@@ -1,7 +1,6 @@
 import {
   type ClaimedStep,
   contextTokensOf,
-  estimateTokens,
   isMailWakeText,
   type MachineDoneBody,
   type ModelUsage,
@@ -22,11 +21,7 @@ import {
 } from '@earendil-works/pi-durable';
 import { compactionWindow, type ModelRef } from './compaction.js';
 import { activeConversation, type Conversation } from './conversations.js';
-import {
-  reportCompactionFailure,
-  reportLiveCompactionFailure,
-  taskFailure,
-} from './failure-report.js';
+import { reportLiveCompactionFailure } from './failure-report.js';
 import type { InputReceipts } from './input-receipts.js';
 import type { MachineApi } from './machine-api.js';
 import { createTurnMirror } from './mirror.js';
@@ -34,7 +29,7 @@ import type { CoordinatorModels } from './models.js';
 import { suggestAfterTurn } from './suggest-replies.js';
 import type { ConversationGate, StepGate } from './tools.js';
 import { emitTurnSpans } from './turn-spans.js';
-import type { ColdSlimPlan, VolatileContext } from './volatile.js';
+import type { VolatileContext } from './volatile.js';
 
 const STOP_POLL_MS = 1_000;
 
@@ -53,8 +48,6 @@ export interface TurnDeps {
   conversationGate?: ConversationGate;
   volatile?: VolatileContext;
   volatileText?: string | null;
-  coldSlim?: ColdSlimPlan | null;
-  beforeDone?: () => void;
   onModel?: (ref: ModelRef) => void;
 }
 
@@ -78,35 +71,6 @@ function turnUsage(answer: AssistantMessage, entries: readonly EntryRecord[]): M
   return usage;
 }
 
-export const SWITCH_FOLD_INSTRUCTIONS =
-  'The Coordinator is switching models; keep everything the next model needs to continue.';
-
-async function foldBeforeModelSwitch(
-  deps: TurnDeps,
-  root: Conversation,
-  next: ModelRef,
-  scope: { threadId: string; stepId: string },
-): Promise<void> {
-  const current = (await root.agent(deps.context)).model;
-  if (current === undefined) return;
-  if (current.provider === next.provider && current.modelId === next.modelId) return;
-  const window = deps.models.models.getModel(next.provider, next.modelId)?.contextWindow;
-  if (window === undefined) return;
-  const view = await root.context(deps.context);
-  if (estimateTokens(JSON.stringify(view.messages)) < compactionWindow(window).backgroundAt) return;
-  try {
-    const task = await root.compact(SWITCH_FOLD_INSTRUCTIONS, deps.context);
-    const settled = await deps.harness.waitForTask(task, deps.context);
-    const { outcome } = settled.state;
-    if (outcome.status !== 'completed') {
-      const reason = outcome.error?.message ?? outcome.reason ?? outcome.status;
-      reportCompactionFailure(scope, 'model-switch-fold', taskFailure(reason));
-    }
-  } catch (error) {
-    reportCompactionFailure(scope, 'model-switch-fold', error);
-  }
-}
-
 export async function runCoordinatorTurn(
   deps: TurnDeps,
   claimed: ClaimedStep,
@@ -117,7 +81,6 @@ export async function runCoordinatorTurn(
   const stepId = claimed.step.id;
   let observation: OtelObservation | undefined;
   const done = async (body: MachineDoneBody) => {
-    if (body.status === 'success') deps.beforeDone?.();
     await deps.inputs?.barrier();
     await api.done(stepId, body, observation);
     await deps.inputs?.recover(harness);
@@ -160,7 +123,6 @@ export async function runCoordinatorTurn(
       .join('\n\n');
     deps.volatile?.set(rootKey, volatileText === '' ? null : volatileText);
     deps.volatile?.setStep(rootKey, stepId);
-    deps.volatile?.setColdSlim(rootKey, deps.coldSlim ?? null);
     let stopping: Promise<void> | null = null;
     const suggestionAbort = new AbortController();
     let polling = false;
@@ -241,12 +203,6 @@ export async function runCoordinatorTurn(
           });
       }, deps.stopPollMs ?? STOP_POLL_MS);
     }
-    await foldBeforeModelSwitch(
-      deps,
-      root,
-      { provider, modelId },
-      { threadId: claimed.chief.threadId, stepId },
-    );
     await root.configure(
       {
         model: { provider, modelId },
@@ -462,7 +418,6 @@ export async function runCoordinatorTurn(
       deps.conversationGate?.set(rootKey, null);
       deps.volatile?.set(rootKey, null);
       deps.volatile?.setStep(rootKey, null);
-      deps.volatile?.setColdSlim(rootKey, null);
     }
     clearInterval(heartbeat);
   }

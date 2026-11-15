@@ -4,7 +4,6 @@ import { emitCompactionSpan, emitSummaryCallSpan } from '../../runtime-otel.js';
 
 export type CompactionStage =
   | 'memory-flush'
-  | 'model-switch-fold'
   | 'seed-summary'
   | 'summary-model'
   | 'summary-fold'

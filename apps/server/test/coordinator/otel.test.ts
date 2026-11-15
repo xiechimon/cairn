@@ -145,7 +145,7 @@ describe('in-server Coordinator telemetry', () => {
   );
 
   it.each([false, true])(
-    'times cold summaries, streaming answers and suggestions (summary fails: %s)',
+    'times streaming answers, suggestions and the summary prepared after them (summary fails: %s)',
     async (summaryFails) => {
       vi.stubEnv('CAIRN_OTEL_ENDPOINT', endpoint);
       const spans = captureSpans();
@@ -237,26 +237,23 @@ describe('in-server Coordinator telemetry', () => {
       coordinator.wake(w.threadId);
       await coordinator.idle();
       await flushRuntimeOtel();
-      expect(observations.map((o) => o.stage)).toEqual(
-        summaryFails
-          ? ['summary', 'summary', 'answer', 'suggestion']
-          : ['summary', 'answer', 'suggestion'],
-      );
+      expect(observations.map((o) => o.stage)).toEqual(['answer', 'suggestion', 'summary']);
+      expect(observations[2]!.start).toBeGreaterThanOrEqual(observations[0]!.end!);
       const turn = spans.find((s) => s.name === 'coordinator turn')!;
       const summaries = spans.filter((s) => s.name === 'compaction seed-summary');
       const chats = spans.filter((s) => s.name === 'chat m');
-      expect(summaries).toHaveLength(summaryFails ? 2 : 1);
+      expect(summaries).toHaveLength(1);
       expect(chats).toHaveLength(2);
-      for (const [i, span] of [...summaries, ...chats].entries()) {
+      for (const [i, span] of [...chats, ...summaries].entries()) {
         const observed = observations[i]!;
         const start = Number(BigInt(span.startTimeUnixNano) / 1_000_000n);
         const end = Number(BigInt(span.endTimeUnixNano) / 1_000_000n);
-        expect(span.traceId).toBe(turn.traceId);
-        expect(span.parentSpanId).toBe(turn.spanId);
         expect(start).toBeLessThanOrEqual(observed.start + 5);
         expect(end).toBeGreaterThanOrEqual(observed.end! - 5);
         expect(end - start).toBeGreaterThanOrEqual(60);
-        if (i >= summaries.length) {
+        if (i < chats.length) {
+          expect(span.traceId).toBe(turn.traceId);
+          expect(span.parentSpanId).toBe(turn.spanId);
           const first = Date.parse(attr(span, 'langfuse.observation.completion_start_time') ?? '');
           expect(first).toBeGreaterThanOrEqual(observed.first! - 5);
           expect(first).toBeLessThanOrEqual(observed.end!);
