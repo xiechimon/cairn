@@ -165,7 +165,13 @@ export const mcpConnectorRecordSchema = z.object({
 });
 export type McpConnectorRecord = z.infer<typeof mcpConnectorRecordSchema>;
 
-const catalogOptionsSchema = z.record(z.string(), z.string().max(200));
+const catalogOptionsSchema = z.record(
+  z.string(),
+  z
+    .string()
+    .max(200)
+    .regex(/^[^\p{Cc}]*$/u, 'no control characters'),
+);
 
 export const createMcpConnectorBodySchema = z.discriminatedUnion('kind', [
   z.strictObject({

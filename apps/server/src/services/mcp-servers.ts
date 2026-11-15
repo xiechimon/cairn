@@ -20,7 +20,7 @@ import {
   StreamableHTTPClientTransport,
   StreamableHTTPError,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, ListToolsResultSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { and, asc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { machine, mcpConnector } from '../db/schema.js';
@@ -347,24 +347,35 @@ async function probeMcpServer(
   url: string,
   headers: Record<string, string>,
 ): Promise<ProbeResult> {
+  const timeout = deps.checkTimeoutMs ?? CHECK_TIMEOUT_MS;
+  const deadline = AbortSignal.timeout(timeout);
   const client = new Client({ name: BRAND.cliCommandName, version: '0.1.0' });
   const transport = new StreamableHTTPClientTransport(new URL(url), {
     requestInit: { headers },
-    fetch: deps.fetch,
+    fetch: (input, init) =>
+      deps.fetch(input, {
+        ...init,
+        redirect: 'manual',
+        signal: init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline,
+      }),
   });
-  const timeout = deps.checkTimeoutMs ?? CHECK_TIMEOUT_MS;
   try {
     await client.connect(transport, { timeout });
     let toolCount = 0;
     let cursor: string | undefined;
     for (let page = 0; page < MAX_TOOL_PAGES; page += 1) {
-      const result = await client.listTools(cursor === undefined ? {} : { cursor }, { timeout });
+      const result = await client.request(
+        { method: 'tools/list', params: cursor === undefined ? {} : { cursor } },
+        ListToolsResultSchema,
+        { timeout },
+      );
       toolCount += result.tools.length;
       cursor = result.nextCursor;
       if (cursor === undefined) break;
     }
     return { status: 'connected', statusReason: null, toolCount };
   } catch (err) {
+    if (deadline.aborted) return { status: 'error', statusReason: 'timeout', toolCount: null };
     return probeFailure(err);
   } finally {
     await client.close().catch(() => {});

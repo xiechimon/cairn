@@ -20,12 +20,18 @@ interface Seen {
   headers: Record<string, string>;
 }
 
-function fakeMcp(opts: { token?: string; status?: number; gate?: Promise<void> } = {}) {
+function fakeMcp(
+  opts: { token?: string; status?: number; gate?: Promise<void>; redirect?: string } = {},
+) {
   const seen: Seen[] = [];
   const mcpFetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const request = new Request(input, init);
     seen.push({ url: request.url, headers: Object.fromEntries(request.headers) });
     await opts.gate;
+    if (opts.redirect !== undefined) {
+      if (init?.redirect !== 'manual') throw new Error('redirect would be followed');
+      return new Response(null, { status: 307, headers: { location: opts.redirect } });
+    }
     if (opts.status !== undefined)
       return new Response('upstream echo Bearer leak', { status: opts.status });
     if (opts.token !== undefined && request.headers.get('authorization') !== `Bearer ${opts.token}`)
@@ -110,6 +116,20 @@ describe('MCP connectors', () => {
     expect(body).not.toContain('leak');
   });
 
+  test('a redirect is not followed, so header values never leave the chosen origin', async () => {
+    const mcp = fakeMcp({ redirect: 'http://10.0.0.5:8080/mcp' });
+    const { s, base } = boot(mcp.fetch);
+    const res = await req(s.app, 'POST', base, {
+      kind: 'custom',
+      slug: 'acme',
+      label: 'Acme',
+      url: 'https://mcp.acme.test/mcp',
+      headers: { 'X-Api-Key': 'k1' },
+    });
+    expect(await res.json()).toMatchObject({ status: 'error', statusReason: 'http_307' });
+    expect(mcp.seen.every((r) => r.url.startsWith('https://mcp.acme.test/'))).toBe(true);
+  });
+
   test('catalog entries build their url and headers and enforce their auth kinds', async () => {
     const mcp = fakeMcp();
     const { s, base } = boot(mcp.fetch);
@@ -143,6 +163,7 @@ describe('MCP connectors', () => {
       { catalogId: 'notion', slug: 'notion', token: 't' },
       { catalogId: 'github', slug: 'gh3', token: 't', options: { readonly: 'yes' } },
       { catalogId: 'github', slug: 'gh4', token: 't', options: { unknown: 'true' } },
+      { catalogId: 'github', slug: 'gh5', token: 't', options: { toolsets: 'repos\r\nX-Evil: 1' } },
     ];
     for (const body of refusals)
       expect((await req(s.app, 'POST', base, { kind: 'catalog', ...body })).status).toBe(400);
@@ -230,6 +251,30 @@ describe('MCP connectors', () => {
     updateMcpConnector(deps, s.team.id, created.id, { headers: { 'X-Key': 'new' } });
     release();
     expect(await check).toMatchObject({ status: 'unchecked', toolCount: null });
+  });
+
+  test('one deadline bounds the whole check, even when the server never answers', async () => {
+    const real = fakeMcp().fetch;
+    let calls = 0;
+    const hang = ((input: string | URL | Request, init?: RequestInit) => {
+      calls += 1;
+      if (calls === 1) return real(input, init);
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+      });
+    }) as typeof globalThis.fetch;
+    const { s, deps } = boot(hang);
+    const created = createMcpConnector(deps, s.team.id, {
+      kind: 'custom',
+      slug: 'acme',
+      label: 'Acme',
+      url: 'https://mcp.acme.test/mcp',
+    });
+    const started = Date.now();
+    const result = await checkMcpConnector({ ...deps, checkTimeoutMs: 300 }, s.team.id, created.id);
+    expect(calls).toBeGreaterThan(1);
+    expect(result).toMatchObject({ status: 'error', statusReason: 'timeout' });
+    expect(Date.now() - started).toBeLessThan(3_000);
   });
 
   test('every write route is owner-only and reads are not', () => {
