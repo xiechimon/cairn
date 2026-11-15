@@ -306,7 +306,9 @@ interface AuthWorldOptions {
   metadata?: Record<string, unknown>;
   resource?: string;
   authServer?: string;
-  refresh?: 'ok' | 'invalid_grant';
+  refresh?: 'ok' | 'invalid_grant' | 'invalid_client';
+  oidc?: boolean;
+  rejectClient?: string;
   refreshGate?: Promise<void>;
 }
 
@@ -343,8 +345,18 @@ function authWorld(opts: AuthWorldOptions = {}) {
         authorization_servers: [opts.authServer ?? AS],
         scopes_supported: ['read'],
       });
-    if (url.origin === AS && url.pathname === '/.well-known/oauth-authorization-server')
+    const metadataPath = opts.oidc
+      ? '/.well-known/openid-configuration'
+      : '/.well-known/oauth-authorization-server';
+    if (url.origin === AS && url.pathname === metadataPath)
       return json({
+        ...(opts.oidc
+          ? {
+              jwks_uri: `${AS}/jwks`,
+              subject_types_supported: ['public'],
+              id_token_signing_alg_values_supported: ['RS256'],
+            }
+          : {}),
         issuer: AS,
         authorization_endpoint: `${AS}/authorize`,
         token_endpoint: `${AS}/token`,
@@ -361,10 +373,13 @@ function authWorld(opts: AuthWorldOptions = {}) {
     if (url.origin === AS && url.pathname === '/token') {
       const params = new URLSearchParams(body);
       tokenRequests.push(params);
+      if (params.get('client_id') === opts.rejectClient)
+        return json({ error: 'invalid_client' }, 401);
       if (params.get('grant_type') === 'authorization_code')
         return params.get('code') === 'code-ok' ? issue() : json({ error: 'invalid_grant' }, 400);
       await opts.refreshGate;
       if (opts.refresh === 'invalid_grant') return json({ error: 'invalid_grant' }, 400);
+      if (opts.refresh === 'invalid_client') return json({ error: 'invalid_client' }, 401);
       return issue();
     }
     if (url.href === LINEAR) return mcp().fetch(request);
@@ -476,6 +491,32 @@ describe('MCP connector OAuth', () => {
     );
     expect(t.row()).toBeUndefined();
     expect(t.world.registrations).toHaveLength(1);
+  });
+
+  test('an issuer advertised through OIDC discovery is still required on the callback', async () => {
+    const t = bootOAuth({
+      oidc: true,
+      metadata: { authorization_response_iss_parameter_supported: true },
+    });
+    const started = await t.start(linearStart);
+    expect(started.res.status).toBe(200);
+    expect(await t.callback({ code: 'code-ok', state: started.state })).toContain(
+      'reason=exchange',
+    );
+    expect(t.world.tokenRequests).toHaveLength(0);
+  });
+
+  test('a registration the vendor rejects is dropped so the next start registers again', async () => {
+    const t = bootOAuth({ rejectClient: 'client-1' });
+    const first = await t.start(linearStart);
+    expect(await t.callback({ code: 'code-ok', state: first.state, iss: AS })).toContain(
+      'reason=exchange',
+    );
+    const second = await t.start(linearStart);
+    expect(second.url?.searchParams.get('client_id')).toBe('client-2');
+    expect(await t.callback({ code: 'code-ok', state: second.state, iss: AS })).toContain(
+      'oauth=connected',
+    );
   });
 
   test('start refuses servers and origins it cannot sign in with safely', async () => {
@@ -606,6 +647,20 @@ describe('MCP connector OAuth', () => {
     const record = await checkMcpConnector(t.deps, t.s.team.id, t.row()?.id ?? '');
     expect(record).toMatchObject({ status: 'needs_auth', statusReason: 'refresh_rejected' });
     expect(t.world.seen.filter((r) => r.url === LINEAR)).toHaveLength(probes);
+  });
+
+  test('a refresh the vendor answers with invalid_client asks for reconnect and registers again', async () => {
+    const t = bootOAuth({ refresh: 'invalid_client' });
+    const started = await t.start(linearStart);
+    await t.callback({ code: 'code-ok', state: started.state, iss: AS });
+    t.expire();
+    const id = t.row()?.id ?? '';
+    expect(await checkMcpConnector(t.deps, t.s.team.id, id)).toMatchObject({
+      status: 'needs_auth',
+      statusReason: 'refresh_rejected',
+    });
+    const again = await t.start({ kind: 'reconnect', connectorId: id });
+    expect(again.url?.searchParams.get('client_id')).toBe('client-2');
   });
 
   test('edits: an OAuth row refuses tokens and drops its tokens when its origin moves', async () => {

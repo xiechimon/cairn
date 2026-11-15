@@ -34,7 +34,10 @@ import {
   StreamableHTTPClientTransport,
   StreamableHTTPError,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { InvalidGrantError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
+import {
+  InvalidClientError,
+  InvalidGrantError,
+} from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import type {
   AuthorizationServerMetadata,
   OAuthClientInformationFull,
@@ -511,7 +514,14 @@ export async function checkMcpConnector(
   deps.db
     .update(mcpConnector)
     .set({ ...result, checkedAt: nowMs() })
-    .where(and(eq(mcpConnector.id, row.id), eq(mcpConnector.updatedAt, row.updatedAt)))
+    .where(
+      and(
+        eq(mcpConnector.id, row.id),
+        eq(mcpConnector.updatedAt, row.updatedAt),
+        eq(mcpConnector.authRevision, row.authRevision),
+        eq(mcpConnector.tokenGeneration, row.tokenGeneration),
+      ),
+    )
     .run();
   return toConnectorRecord(connectorRow(deps, teamId, id));
 }
@@ -593,7 +603,7 @@ function oauthTarget(
   deps: McpConnectorDeps,
   teamId: string,
   body: StartMcpConnectorOAuthBody,
-): { target: McpOAuthTarget; url: string; row: ConnectorRow | null } {
+): { target: McpOAuthTarget; url: string } {
   if (body.kind === 'reconnect') {
     const row = connectorRow(deps, teamId, body.connectorId);
     if (row.authKind !== 'oauth')
@@ -601,7 +611,6 @@ function oauthTarget(
     return {
       target: { kind: 'reconnect', connectorId: row.id, authRevision: row.authRevision },
       url: row.url,
-      row,
     };
   }
   assertSlugFree(deps, teamId, body.slug);
@@ -616,7 +625,6 @@ function oauthTarget(
         headers: {},
       },
       url: body.url,
-      row: null,
     };
   const entry = mcpCatalogEntry(body.catalogId);
   if (!entry) throw notFound(`catalog entry ${body.catalogId}`);
@@ -631,7 +639,6 @@ function oauthTarget(
       headers: built.headers,
     },
     url: built.url,
-    row: null,
   };
 }
 
@@ -673,6 +680,20 @@ async function discoverAuthServer(
   }
 }
 
+function registrationKey(issuer: string, redirectUri: string): string {
+  return `${issuer}\n${redirectUri}`;
+}
+
+function forgetClient(deps: McpConnectorDeps, key: string, clientId: string): void {
+  if (deps.oauthState.registrations.get(key)?.client_id === clientId)
+    deps.oauthState.registrations.delete(key);
+}
+
+function usableClient(client: OAuthClientInformationFull | undefined) {
+  const expires = client?.client_secret_expires_at;
+  return expires === undefined || expires === 0 || expires * 1000 > nowMs() ? client : undefined;
+}
+
 async function oauthClient(
   deps: McpConnectorDeps,
   fetchFn: typeof fetch,
@@ -681,19 +702,11 @@ async function oauthClient(
     metadata: AuthorizationServerMetadata;
     redirectUri: string;
     applicationType: 'native' | 'web';
-    row: ConnectorRow | null;
   },
 ): Promise<OAuthClientInformationFull> {
-  const key = `${input.metadata.issuer}\n${input.redirectUri}`;
-  const cached = deps.oauthState.registrations.get(key);
+  const key = registrationKey(input.metadata.issuer, input.redirectUri);
+  const cached = usableClient(deps.oauthState.registrations.get(key));
   if (cached) return cached;
-  const previous = input.row === null ? null : openOAuth(deps, input.row);
-  if (
-    previous !== null &&
-    input.row?.oauthMeta?.issuer === input.metadata.issuer &&
-    input.row.oauthMeta.redirectUri === input.redirectUri
-  )
-    return previous.client;
   const clientMetadata = {
     client_name: BRAND.manifestName,
     redirect_uris: [input.redirectUri],
@@ -721,13 +734,29 @@ export async function prepareMcpConnectorOAuth(
   teamId: string,
   input: { body: StartMcpConnectorOAuthBody; origin: string; state: string },
 ): Promise<{ authorizationUrl: string; pending: McpOAuthPending }> {
-  const { target, url, row } = oauthTarget(deps, teamId, input.body);
+  const { target, url } = oauthTarget(deps, teamId, input.body);
   const { redirectUri, applicationType } = redirectFor(input.origin);
   const fetchFn = guardedOAuthFetch(deps);
   const { asUrl, resource, scope } = await discoverAuthServer(fetchFn, url);
+  let issAdvertised = false;
+  const metadataFetch: typeof fetch = async (request, init) => {
+    const res = await fetchFn(request, init);
+    if (res.ok) {
+      const raw: unknown = await res
+        .clone()
+        .json()
+        .catch(() => null);
+      issAdvertised =
+        typeof raw === 'object' &&
+        raw !== null &&
+        'authorization_response_iss_parameter_supported' in raw &&
+        raw.authorization_response_iss_parameter_supported === true;
+    }
+    return res;
+  };
   let metadata: AuthorizationServerMetadata | undefined;
   try {
-    metadata = await discoverAuthorizationServerMetadata(asUrl, { fetchFn });
+    metadata = await discoverAuthorizationServerMetadata(asUrl, { fetchFn: metadataFetch });
   } catch {
     metadata = undefined;
   }
@@ -737,16 +766,18 @@ export async function prepareMcpConnectorOAuth(
     throw new HttpError(400, 'the authorization server does not support PKCE S256');
   if (metadata.registration_endpoint === undefined)
     throw new HttpError(400, 'the authorization server needs your own OAuth app');
-  if (new URL(metadata.issuer).origin !== new URL(asUrl).origin)
+  if (!URL.canParse(metadata.issuer) || new URL(metadata.issuer).origin !== new URL(asUrl).origin)
     throw new HttpError(400, 'the authorization server metadata names another issuer');
-  if (new URL(metadata.authorization_endpoint).protocol !== 'https:')
+  if (
+    !URL.canParse(metadata.authorization_endpoint) ||
+    new URL(metadata.authorization_endpoint).protocol !== 'https:'
+  )
     throw new HttpError(400, 'the authorization endpoint must be https');
   const client = await oauthClient(deps, fetchFn, {
     asUrl,
     metadata,
     redirectUri,
     applicationType,
-    row,
   });
   const { authorizationUrl, codeVerifier } = await startAuthorization(asUrl, {
     metadata,
@@ -773,9 +804,7 @@ export async function prepareMcpConnectorOAuth(
       metadata,
       client,
       codeVerifier,
-      issRequired:
-        (metadata as Record<string, unknown>).authorization_response_iss_parameter_supported ===
-        true,
+      issRequired: issAdvertised,
     },
   };
 }
@@ -785,7 +814,7 @@ export async function completeMcpConnectorOAuth(
   teamId: string,
   pending: McpOAuthPending,
   input: { code: string; iss: string | undefined },
-): Promise<McpConnectorRecord> {
+): Promise<string> {
   if (input.iss === undefined ? pending.issRequired : input.iss !== pending.meta.issuer)
     throw new McpOAuthError('issuer');
   let tokens: OAuthTokens;
@@ -799,7 +828,13 @@ export async function completeMcpConnectorOAuth(
       resource: new URL(pending.meta.resource),
       fetchFn: guardedOAuthFetch(deps),
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof InvalidClientError)
+      forgetClient(
+        deps,
+        registrationKey(pending.meta.issuer, pending.meta.redirectUri),
+        pending.client.client_id,
+      );
     throw new McpOAuthError('exchange');
   }
   const meta = { ...pending.meta, scope: tokens.scope ?? pending.meta.scope };
@@ -863,7 +898,12 @@ export async function completeMcpConnectorOAuth(
         .run().changes > 0;
     if (!changed) throw new McpOAuthError('conflict');
   }
-  return checkMcpConnector(deps, teamId, id);
+  try {
+    await checkMcpConnector(deps, teamId, id);
+  } catch (err) {
+    if (!(err instanceof HttpError)) throw err;
+  }
+  return id;
 }
 
 export function refreshMcpConnectorToken(
@@ -912,10 +952,13 @@ async function runRefresh(deps: McpConnectorDeps, teamId: string, id: string): P
       fetchFn: guardedOAuthFetch(deps),
     });
   } catch (err) {
+    const rejected = err instanceof InvalidGrantError || err instanceof InvalidClientError;
+    if (err instanceof InvalidClientError)
+      forgetClient(deps, registrationKey(meta.issuer, meta.redirectUri), secrets.client.client_id);
     deps.db
       .update(mcpConnector)
       .set(
-        err instanceof InvalidGrantError
+        rejected
           ? { status: 'needs_auth', statusReason: 'refresh_rejected', toolCount: null }
           : { status: 'error', statusReason: 'refresh_failed', toolCount: null },
       )

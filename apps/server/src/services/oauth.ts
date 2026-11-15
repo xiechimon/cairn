@@ -229,11 +229,11 @@ export async function completeOAuthCallback(
   const entry = consumeState(deps, input.state);
   if (entry.kind === 'mcp-connector') {
     try {
-      const record = await completeMcpConnectorOAuth(deps.mcp, entry.teamId, entry.pending, {
+      const connectorId = await completeMcpConnectorOAuth(deps.mcp, entry.teamId, entry.pending, {
         code: input.code,
         iss: input.iss,
       });
-      return { kind: 'mcp-connector', origin: entry.origin, connectorId: record.id };
+      return { kind: 'mcp-connector', origin: entry.origin, connectorId };
     } catch (err) {
       if (!(err instanceof McpOAuthError)) throw err;
       throw new OAuthFlowError(
