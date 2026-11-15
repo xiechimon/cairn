@@ -190,9 +190,13 @@ export function placeReportCards(
       continue;
     }
     if (item.kind !== 'robot' || item.typing === true) continue;
-    const ids = [...new Set((startedBy.get(item) ?? []).flatMap(withChildren))].filter(
-      (id) => glances.get(id)?.report === true && !seen.has(id),
-    );
+    const delivered =
+      item.report !== undefined && glances.get(item.report.todoId)?.buildId === item.report.buildId
+        ? [item.report.todoId]
+        : [];
+    const ids = [
+      ...new Set([...delivered, ...(startedBy.get(item) ?? []).flatMap(withChildren)]),
+    ].filter((id) => glances.get(id)?.report === true && !seen.has(id));
     for (const id of ids) seen.add(id);
     if (ids.length === 0) continue;
     const previous = placedReports.get(item);
