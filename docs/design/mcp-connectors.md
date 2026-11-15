@@ -1,6 +1,6 @@
 # MCP connectors
 
-Status: revision 3, proposal. Baseline `origin/main` at `36aa6dc1a`. An independent read-only reviewer reviewed revision 1 on 2026-11-15 (3 blockers, 11 should-fix) and re-checked revision 2 (gate placement, refresh compare, PR order, 9 new items); revision 3 answers both rounds (see "Review answers") and the reviewer's verdict on revision 2 was ready for the owner's decisions once those were fixed. Nothing here is built. Owner decisions are listed at the end and block code. Research: [mcp-connectors-2026-11-15](../research/mcp-connectors-2026-11-15.md).
+Status: revision 3, accepted by the owner (mon X) on 2026-11-15. Baseline `origin/main` at `36aa6dc1a`. An independent read-only reviewer reviewed revision 1 on 2026-11-15 (3 blockers, 11 should-fix) and re-checked revision 2 (gate placement, refresh compare, PR order, 9 new items); revision 3 answers both rounds (see "Review answers") and the reviewer's verdict on revision 2 was ready for the owner's decisions once those were fixed. Nothing here is built yet. The owner accepted all six decisions listed at the end. Research: [mcp-connectors-2026-11-15](../research/mcp-connectors-2026-11-15.md).
 
 ## Problem
 
@@ -174,12 +174,14 @@ Each security-surface PR gets `/security-review` on its head and the `Security r
 
 ## Owner decisions
 
+All six accepted by mon X on 2026-11-15.
+
 1. Accept the spec 13 reversal: the server database holds MCP connector credentials, sealed with the existing `SecretBox`.
 2. Approve the seam exception: `services/mcp-servers.ts` may use the MCP SDK on the server (Decision 5).
 3. Accept that connector tokens reach host steps and Orb guests in plaintext until the secret gateway carries them, as `secrets` do today.
 4. Confirm v1 scope: remote connectors for tasks first (PR 1 to 5); local command connectors (PR 6) and Coordinator connectors (PR 7) after.
-6. Accept that granting a connector to `任务` makes every task wait for a Runner on the new daemon (instead of running without the connector).
 5. Confirm the first catalog of eight, with GitHub token-only.
+6. Accept that granting a connector to `任务` makes every task wait for a Runner on the new daemon (instead of running without the connector).
 
 ## Out of scope
 
