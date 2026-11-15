@@ -51,7 +51,7 @@ import {
 } from './chief-digest.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { claudeUsageGatePasses, refreshClaudeRateParks } from './claude-rate-limit.js';
-import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
@@ -254,7 +254,8 @@ function buildChiefClaim(
   if (!claudeUsageGatePasses(deps, machineRow, model)) return null;
   if (claudeCodeLoginBlocks(deps, machineRow, model.provider)) return null;
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
-  if (!claimPendingChiefStep(deps.db, stepRow, machineId)) return null;
+  const bindTeamId = stepRuntimeFor(model.provider) === 'claude-code' ? threadRow.teamId : null;
+  if (!claimPendingChiefStep(deps.db, stepRow, machineId, bindTeamId)) return null;
   return chiefClaimPayload(deps, machineId, stepRow, threadRow, agentRow, machineRow);
 }
 
@@ -538,6 +539,10 @@ async function tryClaim(
             lastHeartbeatAt: claimedAt,
             skillInjection,
             blockerHandoff,
+            claudeSubscriptionId:
+              stepRuntimeFor(model.provider) === 'claude-code'
+                ? enabledSubscriptionId({ db: tx }, teamId)
+                : null,
             holdReason: null,
             holdUntil: null,
           })

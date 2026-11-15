@@ -1156,6 +1156,13 @@
       "when": 1794754115898,
       "tag": "0169_mcp_connector_oauth",
       "breakpoints": true
+    },
+    {
+      "idx": 170,
+      "version": "6",
+      "when": 1794757934772,
+      "tag": "0170_claude_subscription_enabled",
+      "breakpoints": true
     }
   ]
 }

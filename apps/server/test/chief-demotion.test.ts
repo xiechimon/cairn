@@ -268,6 +268,7 @@ describe('#1260 route re-source: chief step destination = the coordinator rule h
         label: 'team',
         tokenCipher: 'cipher',
         expiresAt: null,
+        enabledAt: 1,
         createdAt: 1,
       })
       .run();
