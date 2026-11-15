@@ -88,9 +88,15 @@ export const machinePresenceBodySchema = z.object({
   cliVersion: z.string().optional(),
   claudeCode: claudeCodeReportSchema.optional(),
   capabilities: z.unknown().optional(),
+  connectionId: z.string().min(1).max(64).nullable().optional(),
 });
 export type MachinePresenceBody = z.infer<typeof machinePresenceBodySchema>;
 export const machineOkResponseSchema = z.object({ ok: z.literal(true) });
+
+export const machineOfflineBodySchema = z.object({ connectionId: z.string().min(1).max(64) });
+export type MachineOfflineBody = z.infer<typeof machineOfflineBodySchema>;
+export const machineOfflineResponseSchema = z.object({ applied: z.boolean() });
+export type MachineOfflineResponse = z.infer<typeof machineOfflineResponseSchema>;
 
 export const machineRecoverResponseSchema = z.object({
   steps: z.array(stepRecordSchema),
@@ -258,6 +264,7 @@ export const machineSyncResultResponseSchema = machineOkResponseSchema;
 
 export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('wake') }),
+  z.object({ type: z.literal('hello'), connectionId: z.string().min(1).max(64) }),
   z.object({ type: z.literal('shutdown') }),
   z.object({ type: z.literal('steer'), stepId: recordId }),
   z.object({ type: z.literal('stop'), stepId: recordId }),
@@ -509,6 +516,12 @@ export const MACHINE_WIRE_EXTENSIONS = [
     path: '/api/machine/orbs/closed',
     reason:
       '[design] #2274 bounded held build ids checked for closed or archived orb cleanup, scoped to the authenticated machine and team',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/offline',
+    reason:
+      '[design] #4596 Runner goodbye on clean shutdown: ends only the caller machine connection named by connectionId (docs/design/runner-offline-grace.md)',
   },
   {
     method: 'GET',

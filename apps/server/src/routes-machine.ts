@@ -15,6 +15,7 @@ import {
   machineEnrollPollBodySchema,
   machineEnrollStartBodySchema,
   machineHeartbeatBodySchema,
+  machineOfflineBodySchema,
   machinePresenceBodySchema,
   machineSteerAckBodySchema,
   machineSyncResultBodySchema,
@@ -67,6 +68,7 @@ import {
   machineRunningCount,
   machineSkillFile,
   machineSkillsManifest,
+  markConnected,
   markOffline,
   markPresence,
   recoverSteps,
@@ -342,8 +344,22 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       () => jsonBody(c),
       async (row, decoded) => {
         const body = parseWith(machinePresenceBodySchema, decoded ?? {}, 'body');
-        markPresence(deps, row.id, body);
+        const admission = ctx.machineHub.admitPresence(row.id, body.connectionId);
+        if (admission !== 'ignore') markPresence(deps, row.id, body, admission === 'online');
         return c.json({ ok: true as const });
+      },
+    );
+  });
+
+  app.post('/api/machine/offline', async (c) => {
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineOfflineBodySchema, decoded ?? {}, 'body');
+        const applied = ctx.machineHub.endConnection(row.id, body.connectionId);
+        if (applied) markOffline(deps, row.id);
+        return c.json({ applied });
       },
     );
   });
@@ -406,9 +422,15 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
           void lastWrite.then(() => release());
         },
       );
+      const connectionId = ctx.machineHub.connectionId(row.id) ?? '';
+      markConnected(deps, row.id);
+      lastWrite = stream
+        .writeSSE({ data: JSON.stringify({ type: 'hello', connectionId }) })
+        .catch(() => {});
       // undici's default 300s body timeout (measured per received chunk) silently drops an idle SSE stream.
       const pingTimer = setInterval(() => {
         if (findMachineByToken(ctx.db, token)?.id !== row.id) {
+          if (ctx.machineHub.endConnection(row.id, connectionId)) markOffline(deps, row.id);
           release();
           return;
         }
@@ -419,7 +441,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         release = resolve;
       });
       stream.onAbort(() => {
-        markOffline(deps, row.id);
+        ctx.machineHub.dropConnection(row.id, connectionId, () => markOffline(deps, row.id));
         release();
       });
       await held;
