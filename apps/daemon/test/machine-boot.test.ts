@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { HOST_DESKTOP_PROGRAMS } from '../src/computer/host-desktop.js';
 import type { ScopedComputerProviders } from '../src/computer/provider.js';
-import { PINNED_AGENT_BROWSER_VERSION } from '../src/orb/computer.js';
 import { boot, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 import { FakeOrbProvider } from './orb-fake.js';
 import { testTempDir } from './test-temp-dir.js';
@@ -183,61 +183,68 @@ describe('D75 own computer opt-in', () => {
   });
 });
 
-describe('D75 orb computer capability', () => {
-  const report = async (orbComputer?: ScopedComputerProviders, env: NodeJS.ProcessEnv = {}) => {
-    const previous = { ...process.env };
-    Object.assign(process.env, env);
-    try {
-      const { handle, api } = await boot({
-        capabilitiesProbe: () => ({ mcpServers: [], skills: [] }),
-        capEnv: {},
-        ...(orbComputer ? { orbComputer } : {}),
-      });
-      await waitFor(() => api.presenceBodies.length > 0 || api.enrollBodies.length > 0);
-      const caps = (api.enrollBodies[0] as { capabilities?: { computer?: true; browser?: true } })
-        .capabilities;
-      await handle.stop();
-      await handle.done;
-      return caps;
-    } finally {
-      for (const key of Object.keys(process.env)) {
-        if (!(key in previous)) delete process.env[key];
-      }
-      Object.assign(process.env, previous);
+describe('D75 computer capability', () => {
+  const report = async (
+    options: {
+      orbComputer?: ScopedComputerProviders;
+      capEnv?: NodeJS.ProcessEnv;
+      platform?: string;
+    } = {},
+  ) => {
+    const { handle, api } = await boot({
+      capabilitiesProbe: () => ({ mcpServers: [], skills: [] }),
+      capEnv: options.capEnv ?? {},
+      ...(options.orbComputer ? { orbComputer: options.orbComputer } : {}),
+      ...(options.platform
+        ? {
+            confinementPlatform: options.platform,
+            confinementPreflight: async () => {
+              throw new Error('no confinement in this test');
+            },
+          }
+        : {}),
+    });
+    await waitFor(() => api.presenceBodies.length > 0 || api.enrollBodies.length > 0);
+    const caps = (api.enrollBodies[0] as { capabilities?: { computer?: true; browser?: true } })
+      .capabilities;
+    await handle.stop();
+    await handle.done;
+    return caps;
+  };
+
+  const desktopPrograms = () => {
+    const bin = join(testTempDir('machine-boot-desktop-'), 'bin');
+    mkdirSync(bin, { recursive: true });
+    for (const name of HOST_DESKTOP_PROGRAMS) {
+      writeFileSync(join(bin, name), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
     }
+    return bin;
   };
 
-  const orbComputer: ScopedComputerProviders = {
-    forScope: () => {
-      throw new Error('unused');
-    },
-    killAll: async () => {},
-  };
-
-  test('a daemon with an Orb computer provider reports computer', async () => {
-    expect((await report(orbComputer))?.computer).toBe(true);
+  test('an injected computer provider reports computer', async () => {
+    const orbComputer: ScopedComputerProviders = {
+      forScope: () => {
+        throw new Error('unused');
+      },
+      killAll: async () => {},
+    };
+    expect((await report({ orbComputer }))?.computer).toBe(true);
   });
 
-  test('a daemon without one does not', async () => {
-    expect((await report())?.computer).toBeUndefined();
-  });
-
-  test('browser stays off until the computer image marker pins agent-browser', async () => {
-    const caps = await report(orbComputer);
+  test('a Linux daemon with the desktop programs offers the host desktop', async () => {
+    const caps = await report({ platform: 'linux', capEnv: { PATH: desktopPrograms() } });
     expect(caps?.computer).toBe(true);
     expect(caps?.browser).toBeUndefined();
   });
 
-  test('browser is advertised when the computer image marker pins agent-browser', async () => {
-    const root = testTempDir('machine-boot-browser-');
-    const dir = join(root, 'var/lib/cairn-orb');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(
-      join(dir, 'computer-image'),
-      `recipe=abc\npackages=chromium\nagent-browser=${PINNED_AGENT_BROWSER_VERSION}\n`,
-    );
-    const caps = await report(orbComputer, { CAIRN_ORB_ROOT: root });
-    expect(caps?.computer).toBe(true);
-    expect(caps?.browser).toBe(true);
+  test('a Linux daemon missing them, or a Mac, offers no computer', async () => {
+    const empty = join(testTempDir('machine-boot-empty-'), 'bin');
+    mkdirSync(empty, { recursive: true });
+    expect(
+      (await report({ platform: 'linux', capEnv: { PATH: empty } }))?.computer,
+    ).toBeUndefined();
+    expect(
+      (await report({ platform: 'darwin', capEnv: { PATH: desktopPrograms() } }))?.computer,
+    ).toBeUndefined();
   });
 });
