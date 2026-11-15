@@ -84,10 +84,18 @@ export function chiefReportSentence(report: ChiefReportContent, t: Translate): s
   if (report.status !== 'posted')
     return t('日报没写成，先看昨天的数字：完成 {done} · 合并 {merged} · 失败 {failed}', counts);
   const k = undecidedCount(chiefReportSuggestions(report));
-  const head =
-    isQuiet(report) && k === 0
+  const today = report.day === new Intl.DateTimeFormat('en-CA').format(Date.now());
+  const quiet = isQuiet(report) && k === 0;
+  const head = today
+    ? quiet
       ? t('今天的日报写好了：昨天没有新进展')
-      : t('今天的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}', counts);
+      : t('今天的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}', counts)
+    : quiet
+      ? t('{day} 的日报写好了：{covers} 没有新进展', { day: report.day, covers: report.covers })
+      : t('{day} 的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}', {
+          day: report.day,
+          ...counts,
+        });
   return k === 0 ? head : `${head}${t('，有 {k} 条建议等你决定', { k })}`;
 }
 

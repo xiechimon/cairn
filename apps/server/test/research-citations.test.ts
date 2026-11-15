@@ -533,10 +533,14 @@ describe('research citation handoff', () => {
     expect(checkedResearchReport(s.db, opened.buildId)).toBeNull();
   });
 
-  test('an unknown source model cannot pass by declaring an independent checker', async () => {
+  test('a report with no recorded token usage is still checked', async () => {
     const { s, opened } = await world();
     s.db.delete(tokenUsage).where(eq(tokenUsage.buildId, opened.buildId)).run();
-    expect(openCitationCheck(s.svc, opened.buildId)).toBeNull();
+    planResearchCitationChecks(s.svc);
+    const check = openCitationCheck(s.svc, opened.buildId)!;
+    expect(check).not.toBeNull();
+    land(s, check.buildId, receipt(), 'gpt-6.1-sol');
+    expect(checkedResearchReport(s.db, opened.buildId)).not.toBeNull();
   });
 
   test('an audit omitting a cited URL is incomplete', async () => {

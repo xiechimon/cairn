@@ -1163,6 +1163,8 @@ export const EN: Record<string, string> = {
   // command strings themselves stay untranslated — brand slots via BRAND)
   '有条件时优先使用云主机：笔记本会休眠或断网，云主机常在线，构建更稳定。':
     'Prefer a cloud host when you can: laptops sleep or drop off the network, while cloud hosts stay online and build more reliably.',
+  '当前地址只适用于这台电脑。添加另一台电脑前，请用 Tailscale 地址打开 Cairn，再复制命令。':
+    'This address only works on this computer. To add another computer, open Cairn at its Tailscale address before copying the command.',
   '在待接入的 Runner 上执行以下命令。浏览器将打开登录页，授权团队 {team} 后 Runner 即可上线。此后它在后台常驻运行，无需保持终端开启。':
     'Run the following commands on the Runner you want to connect. Your browser will open a sign-in page; once you authorize the team {team}, the Runner comes online. It then keeps running in the background — no need to keep the terminal open.',
   '安装 CLI': 'Install the CLI',
@@ -1190,6 +1192,10 @@ export const EN: Record<string, string> = {
   确认授权: 'Authorize',
   '正在授权…': 'Authorizing…',
   '授权完成，Runner 已注册。': 'Authorized — the Runner is registered.',
+  '授权完成，{name} 已注册为 Runner。': 'Authorized — {name} is registered as a Runner.',
+  机器名: 'Machine name',
+  '这个名字由发起方自报。只有你刚在这台机器上运行了 `cairn start`，且终端里显示的名字与这里一致，才确认授权。':
+    'The requester reports this name itself. Confirm only if you just ran `cairn start` on this machine and its terminal shows the same name.',
   '授权链接已失效，请在 Runner 上重新发起。':
     'This authorization link has expired — restart enrollment on the executor Runner.',
   '浏览器授权注册 →': 'Browser authorization →',
@@ -1498,8 +1504,6 @@ export const EN: Record<string, string> = {
   '防护：{safeguard}': 'Safeguard: {safeguard}',
   '出处：': 'Source: ',
   协调者对话: 'Coordinator chat',
-  建成线程: 'Make it a thread',
-  不用了: 'Dismiss',
   已建成线程: 'Made into a thread',
   已忽略: 'Dismissed',
   '{n} 件等你': '{n## item|# items} waiting on you',
@@ -1521,6 +1525,9 @@ export const EN: Record<string, string> = {
   日报: 'Daily report',
   '昨天（{day}）的进展': 'Yesterday ({day})',
   '今天的日报写好了：昨天没有新进展': "Today's report is ready: nothing new yesterday",
+  '{day} 的日报写好了：{covers} 没有新进展': 'The {day} report is ready: nothing new on {covers}',
+  '{day} 的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}':
+    'The {day} report is ready: done {done} · merged {merged} · failed {failed}',
   '今天的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}':
     "Today's report is ready: done {done} · merged {merged} · failed {failed}",
   '，有 {k} 条建议等你决定': ', {k## suggestion needs|# suggestions need} your decision',

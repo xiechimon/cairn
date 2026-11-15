@@ -21,7 +21,8 @@ test('`添加 Runner` button opens the dialog with the two-step command blocks',
   const commands = dialog.locator('code');
   await expect(commands).toHaveCount(2);
   await expect(commands.nth(0)).toHaveText('npm install -g @xiechimon/cairn-cli@latest');
-  await expect(commands.nth(1)).toHaveText('cairn start');
+  await expect(commands.nth(1)).toHaveText(`cairn start --server ${new URL(page.url()).origin}`);
+  await expect(dialog.getByText('当前地址只适用于这台电脑。', { exact: false })).toBeVisible();
   // API key disclosure collapsed by default
   await expect(
     dialog.getByRole('button', { name: '在云服务器上运行？改用 API key 注册' }),
@@ -51,7 +52,7 @@ test('API key disclosure expands the key command and the api-keys link', async (
   await toggle.click();
 
   await expect(dialog.locator('code').filter({ hasText: '--api-key' })).toHaveText(
-    'cairn start --api-key <key> --team <teamId>',
+    `cairn start --server ${new URL(page.url()).origin} --api-key <key> --team <teamId>`,
   );
   const link = dialog.getByRole('link', { name: '获取 API key →' });
   await expect(link).toHaveText('获取 API key →');
@@ -76,5 +77,23 @@ test('copy buttons write their command to the clipboard', async ({ page, context
   await copy.nth(1).click();
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toBe('cairn start');
+    .toBe(`cairn start --server ${new URL(page.url()).origin}`);
+});
+
+test('both enrollment commands keep the remote HTTPS origin, not the new Runner loopback', async ({ page, baseURL }) => {
+  const origin = 'https://cairn.tailnet.example';
+  await page.route(`${origin}/**`, async (route) => {
+    const url = new URL(route.request().url());
+    const response = await route.fetch({ url: `${baseURL}${url.pathname}${url.search}` });
+    await route.fulfill({ response });
+  });
+  await page.goto(`${origin}${MACHINES}`);
+  await page.getByRole('button', { name: '添加 Runner' }).click();
+  const dialog = page.getByRole('dialog', { name: '添加 Runner' });
+  await expect(dialog.getByText('当前地址只适用于这台电脑。', { exact: false })).toHaveCount(0);
+  await expect(dialog.locator('code').nth(1)).toHaveText(`cairn start --server ${origin}`);
+  await dialog.getByRole('button', { name: '在云服务器上运行？改用 API key 注册' }).click();
+  await expect(dialog.locator('code').nth(2)).toHaveText(
+    `cairn start --server ${origin} --api-key <key> --team <teamId>`,
+  );
 });
