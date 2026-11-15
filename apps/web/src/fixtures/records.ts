@@ -3,6 +3,7 @@ import {
   type ChiefDigestItem,
   type ChiefReportContent,
   type ClaudeLogin,
+  type ConfinementReport,
   type GithubRepoSummary,
   type MachineExecutor,
   type MachineHardware,
@@ -292,6 +293,7 @@ export interface MachineRow {
     hardware?: MachineHardware;
     executor?: MachineExecutor;
     osPlatform?: MachineOsPlatform;
+    confinement?: ConfinementReport;
     computer?: true;
     ownComputer?: true;
     browser?: true;
@@ -393,6 +395,7 @@ export type TranscriptItem =
       labelVars?: Record<string, string | number>;
       signalAt?: number;
       skills?: SkillFact[];
+      blocked?: true;
     }
   | { kind: 'skills'; read: string[]; denied: string[] }
   | { kind: 'plan'; title: string; preview: string; seconds?: number; createdAt?: number }
@@ -646,6 +649,7 @@ export type ChiefStreamItem =
       labelVars?: Record<string, string | number>;
       labelDetail?: { label: string; vars: Record<string, string | number> };
       signalAt?: number;
+      blocked?: true;
     };
 
 export interface ChiefToolRow {

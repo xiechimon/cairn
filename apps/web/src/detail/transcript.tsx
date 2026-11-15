@@ -3,7 +3,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { MessageToolbar } from '../chief/message-toolbar.js';
 import { TranscriptReportCard } from '../chief/research-report.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
-import { LiveRow, LiveSignal, TypingDots } from '../components/chat/live-row.js';
+import { BlockedTyping, LiveRow, LiveSignal, TypingDots } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
 import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Button } from '../components/ui/button.js';
@@ -374,7 +374,11 @@ function Row({
       return (
         <div className={`${AGENT_ROW} ${margin} [&>*]:max-w-full`} data-row="agent">
           {liveStep == null ? (
-            <TypingDots testId="live-row" label={t(item.label, item.labelVars)} />
+            item.blocked === true ? (
+              <BlockedTyping text={t(item.label, item.labelVars)} />
+            ) : (
+              <TypingDots testId="live-row" label={t(item.label, item.labelVars)} />
+            )
           ) : (
             <LiveRow
               variant="detail"

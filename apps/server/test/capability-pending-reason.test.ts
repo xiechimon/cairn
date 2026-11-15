@@ -1,3 +1,4 @@
+import type { MachineCapabilities } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -15,6 +16,7 @@ import {
   sweepAbandonedBuildSteps,
 } from '../src/services/build-abandoned-sweep.js';
 import { sweepAbandonedChiefSteps } from '../src/services/chief.js';
+import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import { toTodoRecord } from '../src/services/todos.js';
 import { bootServer, seedRoute, type TestServer } from './helpers.js';
@@ -48,7 +50,7 @@ function insertMachine(
     id: string;
     online?: boolean;
     runtimes?: string[];
-    capabilities?: { mcpServers: string[]; skills: string[] } | null;
+    capabilities?: MachineCapabilities | null;
     claudeModels?: string[];
   },
 ): void {
@@ -287,12 +289,39 @@ describe('#1251 queue projection blocked bit (worker steps)', () => {
     });
   });
 
-  test('failure mode 6: runtime gate block does not impersonate a capability cause -> blocked absent (existing seam keeps its presentation)', () => {
+  test('failure mode 6: runtime gate block names the disabled runtime, not a capability', () => {
     const w = makeWorld();
     insertRule(w, 'session', { mcpServers: ['figma'] });
     insertMachine(w, { id: 'm-r6', runtimes: [], capabilities: { mcpServers: [], skills: [] } });
     const target = insertPendingWorkerStep(w, { homeMachineId: 'm-r6' });
-    expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toBeUndefined();
+    expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toEqual({
+      kind: 'runtime-disabled',
+      missing: ['pi'],
+    });
+  });
+
+  test('an online Linux Runner whose task sandbox is not ready -> sandbox-unavailable, not a plain wait', () => {
+    const w = makeWorld();
+    insertRule(w, 'session');
+    insertMachine(w, {
+      id: 'm-sandbox',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        osPlatform: 'linux',
+        confinement: {
+          invocation: '00000000-0000-4000-8000-000000000001',
+          generation: 1,
+          revision: 3,
+          state: 'unavailable',
+          reason: 'startup-failed',
+        },
+      },
+    });
+    const target = insertPendingWorkerStep(w, { homeMachineId: 'm-sandbox' });
+    const info = stepQueueProjector(w.s.db, w.teamId).project(target);
+    expect(info?.blocked).toEqual({ kind: 'sandbox-unavailable', missing: [] });
+    expect(info?.waitingFor?.name).toBe('m-sandbox');
   });
 
   test('failure mode 1 addendum: models dimension missing items named the same shape', () => {
@@ -327,6 +356,24 @@ describe('#1251 queue projection blocked bit (chief turns)', () => {
       kind: 'capability-missing',
       missing: ['MCP server "figma"'],
     });
+  });
+});
+
+describe('in-server Coordinator turns', () => {
+  test('a rule the server cannot route, with no Runner to fall back to -> coordinator-unroutable, not machine-offline', () => {
+    setCoordinatorInServer(true);
+    try {
+      const w = makeWorld();
+      const target = insertPendingChiefStep(w, { homeMachineId: null });
+      const projector = stepQueueProjector(w.s.db, w.teamId);
+      const pending = projector.pendingChiefOf(target.threadId);
+      expect(pending === null ? null : projector.project(pending)?.blocked).toEqual({
+        kind: 'coordinator-unroutable',
+        missing: [],
+      });
+    } finally {
+      setCoordinatorInServer(false);
+    }
   });
 });
 

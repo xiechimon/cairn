@@ -22,7 +22,7 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
-import { type ChiefState, MachineDetailPane } from './machine-detail-pane.js';
+import { type ChiefState, MachineDetailPane, sandboxNotice } from './machine-detail-pane.js';
 
 export type RowSection = 'runtime' | 'capabilities';
 
@@ -196,6 +196,7 @@ export function MachineRowView({
   const osPlatform = machine.capabilities?.osPlatform;
   const osName = osPlatform === undefined ? undefined : OS_NAMES[osPlatform];
   const osUnreported = machine.capabilities !== undefined && osPlatform === undefined;
+  const sandboxBlocked = online && sandboxNotice(machine.capabilities) !== null;
   const canMutate = machine.id != null && online;
   const acceptFrozen = !canMutate || mutations.patchMachine.isPending;
   const acceptBlockedReason = online
@@ -331,6 +332,11 @@ export function MachineRowView({
               className="pl-5 text-meta text-content-tertiary"
             >
               {t('更新 Cairn 后才能接有平台要求的任务')}
+            </p>
+          )}
+          {sandboxBlocked && (
+            <p data-testid="machine-sandbox-hint" className="pl-5 text-meta text-content-secondary">
+              {t('任务沙箱没就绪，暂时接不了任务——展开看怎么修')}
             </p>
           )}
         </div>

@@ -35,6 +35,8 @@ export type ClaudeAuthStateWire = z.infer<typeof claudeAuthStateSchema>;
 
 export const modelSourceSchema = z.object({
   runtime: modelSourceRuntimeSchema,
+  provider: z.string().min(1).optional(),
+  providerLabel: z.string().optional(),
   installed: z.boolean(),
   hostname: z.string(),
   machineId: z.string().optional(),
