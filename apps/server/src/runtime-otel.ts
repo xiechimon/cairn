@@ -376,6 +376,7 @@ export type CoordinatorTurnSpanRecord =
       name: string;
       startAt: number;
       endAt: number;
+      maxEventLoopDelayMs?: number;
     };
 
 function jsonText(value: unknown): string {
@@ -453,7 +454,12 @@ export function emitCoordinatorTurnSpans(
         kind: 'internal',
         startMs: record.startAt,
         endMs: Math.max(record.startAt, record.endAt),
-        attributes: langfuseEnvironmentAttributes(environment),
+        attributes: {
+          ...(record.maxEventLoopDelayMs === undefined
+            ? {}
+            : { 'cairn.event_loop.max_delay_ms': record.maxEventLoopDelayMs }),
+          ...langfuseEnvironmentAttributes(environment),
+        },
       };
     }
     const argumentText = jsonText(record.arguments);
