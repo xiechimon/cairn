@@ -172,6 +172,7 @@ test('the collapsed rail keeps Activity and Settings as direct links', async ({ 
   await activity.focus();
   await activity.press('Enter');
   await expect(page).toHaveURL(/\/app\/activity/);
+  await expect(page.getByRole('dialog', { name: 'Activity' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Activity' })).toHaveCount(0);
   await expect(page).toHaveURL(/\/app\?scenario=activity$/);
