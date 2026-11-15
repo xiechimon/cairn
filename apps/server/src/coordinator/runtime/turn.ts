@@ -50,6 +50,7 @@ export interface TurnDeps {
   volatileText?: string | null;
   onModel?: (ref: ModelRef) => void;
   suggestionYield?: AbortSignal;
+  setupPhase?: (name: string) => void;
 }
 
 function turnUsage(answer: AssistantMessage, entries: readonly EntryRecord[]): ModelUsage {
@@ -98,6 +99,7 @@ export async function runCoordinatorTurn(
   const token = await api.token(stepId);
   if (token.provider !== null) deps.models.useStepProvider(token.provider);
   if (token.provider?.apiKey) await deps.models.setApiKey(provider, token.provider.apiKey);
+  deps.setupPhase?.('token');
 
   const heartbeat = setInterval(() => void api.heartbeat(stepId).catch(() => {}), deps.heartbeatMs);
   deps.gate?.set(stepId);
@@ -166,6 +168,7 @@ export async function runCoordinatorTurn(
         if (record !== undefined) admitted.add(input.id);
       }
     }
+    deps.setupPhase?.('conversation');
     const drainSteers = async () => {
       if (mailTurn) return;
       while (inFlight && stopping === null && api.steer !== undefined) {
@@ -244,6 +247,7 @@ export async function runCoordinatorTurn(
       reportLiveCompactionFailure({ threadId, stepId }, call.value.docs['pi.live']);
       await mirror.onView(call.value);
     });
+    deps.setupPhase?.('configure');
     if (stopping !== null) {
       await stopping;
       return done({ status: 'stopped' });
@@ -279,6 +283,7 @@ export async function runCoordinatorTurn(
       },
       context,
     );
+    deps.setupPhase?.('submit');
     inFlight = true;
     let settled = await submission.wait(context);
     const firstEntry = settled.entry;
