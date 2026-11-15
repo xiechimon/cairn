@@ -1,8 +1,10 @@
 import type { CreateClaudeSubscription } from '@cairn/shared';
 import { useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
+import { withCodeSpans } from '../components/notice-banner.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
+import { useI18n } from '../i18n/provider.js';
 
 export function AddClaudeSubscriptionDialog({
   onClose,
@@ -15,13 +17,14 @@ export function AddClaudeSubscriptionDialog({
   pending: boolean;
   error: boolean;
 }) {
-  const [label, setLabel] = useState('Claude subscription');
+  const { t } = useI18n();
+  const [label, setLabel] = useState(t('Claude 订阅'));
   const [token, setToken] = useState('');
   const [expiry, setExpiry] = useState('');
   const expiresAt = expiry === '' ? null : new Date(expiry).getTime();
   return (
     <DialogShell
-      title="Add Claude subscription"
+      title={t('添加 Claude 订阅')}
       open
       onClose={onClose}
       size="s"
@@ -29,7 +32,7 @@ export function AddClaudeSubscriptionDialog({
         <FormActions
           className="pt-0"
           primary={{
-            label: 'Save',
+            label: t('保存'),
             disabled:
               pending ||
               !label.trim() ||
@@ -37,19 +40,18 @@ export function AddClaudeSubscriptionDialog({
               (expiresAt !== null && !Number.isFinite(expiresAt)),
             onClick: () => onCreate({ label: label.trim(), token: token.trim(), expiresAt }),
           }}
-          secondary={{ label: 'Cancel', onClick: onClose }}
+          secondary={{ label: t('取消'), onClick: onClose }}
         />
       }
     >
       <FormStack className="max-w-none">
         <p>
-          Run <code>claude setup-token</code> on your machine, then paste the token below.
+          {withCodeSpans(t('在你的电脑上运行 `claude setup-token`，把输出的 token 粘贴到下面。'))}
         </p>
         <p>
-          Claude Code steps use the most recently added unexpired connection. Tokens are encrypted
-          and cannot be viewed after saving.
+          {t('Claude Code 步骤会使用最近添加且未过期的订阅。Token 加密保存，保存后无法再查看。')}
         </p>
-        <FormField label="Name" htmlFor="subscription-label">
+        <FormField label={t('名称')} htmlFor="subscription-label">
           <Input
             className={FORM_CONTROL_CLS}
             id="subscription-label"
@@ -69,7 +71,7 @@ export function AddClaudeSubscriptionDialog({
             onChange={(event) => setToken(event.target.value)}
           />
         </FormField>
-        <FormField label="Expires on (optional)" htmlFor="subscription-expiry">
+        <FormField label={t('到期日（可选）')} htmlFor="subscription-expiry">
           <Input
             className={FORM_CONTROL_CLS}
             id="subscription-expiry"
@@ -78,9 +80,7 @@ export function AddClaudeSubscriptionDialog({
             onChange={(event) => setExpiry(event.target.value)}
           />
         </FormField>
-        {error && (
-          <p role="alert">Could not save the connection. Check the fields and try again.</p>
-        )}
+        {error && <p role="alert">{t('保存失败，请检查填写内容后重试。')}</p>}
       </FormStack>
     </DialogShell>
   );
