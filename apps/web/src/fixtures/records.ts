@@ -241,7 +241,6 @@ export interface FixtureSet {
   ui?: OverlayUi;
   usageNav?: boolean;
   schedules?: ScheduleRecord[];
-  scheduleForm?: 'hourly' | 'daily' | 'weekly' | 'once';
   project?: ProjectContent;
   team?: TeamContent;
   apiKeys?: ApiKeysContent;

@@ -3,9 +3,9 @@ import { expect, type Page, test } from '@playwright/test';
 const panel = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
 for (const [name, url] of [
-  ['pages', '/app/schedules?scenario=12'],
+  ['schedules panel', '/app?scenario=12&pane=tasks&tab=scheduled'],
 ] as const) {
-  test(`${name} page: search row opens the shared panel, Esc closes it`, async ({ page }) => {
+  test(`${name}: search row opens the shared panel, Esc closes it`, async ({ page }) => {
     await page.goto(url);
     await expect(panel(page)).toBeHidden();
 

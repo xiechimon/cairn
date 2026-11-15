@@ -17,7 +17,7 @@ const rootTheme = (page: Page) =>
  *  makes the measurement below deterministic. */
 const ROUTE_ANCHOR: Record<string, string> = {
   '/app': '[data-route="board"]',
-  '/app/schedules': '[data-route="schedules"]',
+  project: '[data-route="board"] [data-slot="sidebar-project-row"][aria-current="page"]',
 };
 
 /** Assert the sidebar box on `route` matches `box`: wait for the route's
@@ -60,17 +60,19 @@ const headContentX = (page: Page) =>
     };
   });
 
-test.describe('⌘J reaches the Coordinator page from every shell family', () => {
+test.describe('⌘J reaches the bare Coordinator page from the schedules panel', () => {
   const families = [
-    { name: 'board', route: '/app/schedules?scenario=01', home: '/app?scenario=01' },
-    { name: 'pages', route: '/app/schedules?scenario=11', home: '/app?scenario=11' },
+    { name: 'board', route: '/app?scenario=01&pane=tasks&tab=scheduled', home: '/app?scenario=01' },
+    { name: 'empty schedules', route: '/app?scenario=11&pane=tasks&tab=scheduled', home: '/app?scenario=11' },
   ] as const;
 
   for (const { name, route, home } of families) {
     test(`${name}: ⌘J navigates to the Coordinator page`, async ({ page }) => {
       await page.goto(route);
-      await expect(page.getByTestId('chief-composer-input')).toHaveCount(0);
+      await expect(page.getByRole('complementary', { name: '任务' })).toBeVisible();
+      await expect(page.getByTestId('chief-composer-input')).not.toBeFocused();
       await pressOpenCoordinator(page);
+      await expect(page.getByRole('complementary', { name: '任务' })).toHaveCount(0);
       await expect(page).toHaveURL(new RegExp(`${home.replace('?', '\\?')}$`));
       await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeFocused();
     });
@@ -78,33 +80,30 @@ test.describe('⌘J reaches the Coordinator page from every shell family', () =>
 });
 
 test.describe('sidebar form is route-invariant', () => {
-  test('expanded sidebar keeps identical geometry across /app ↔ /app/schedules hops', async ({
+  test('expanded sidebar keeps identical geometry across /app ↔ project hops', async ({
     page,
   }) => {
     await page.goto('/app?scenario=01');
     const sidebar = page.getByRole('complementary');
     const boardBox = await captureSidebarBox(page, sidebar, '/app');
 
-    await page.goto('/app/schedules?scenario=01');
-    await expectSidebarBox(page, sidebar, '/app/schedules', boardBox);
+    await sidebar.locator('[data-slot="sidebar-project-row"]').first().click();
+    await expectSidebarBox(page, sidebar, 'project', boardBox);
 
     await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click();
     await expect(page).toHaveURL('/app?scenario=01');
     await expectSidebarBox(page, sidebar, '/app', boardBox);
   });
 
-  test('the brand head holds its inner geometry across the /app → /app/schedules hop', async ({
+  test('the brand head holds its inner geometry across the /app → project hop', async ({
     page,
   }) => {
     await page.goto('/app?scenario=01');
     await expect(page.locator(ROUTE_ANCHOR['/app'])).toBeVisible();
     const board = await headContentX(page);
 
-    await page.goto('/app/schedules?scenario=01');
-    // the active face repaints the row's background only (Paper Grouped
-    // sidebar: sheet + hairline); the icon and the name must not drift as it
-    // lights.
-    await expect(page.locator(ROUTE_ANCHOR['/app/schedules'])).toBeVisible();
+    await page.getByRole('complementary').locator('[data-slot="sidebar-project-row"]').first().click();
+    await expect(page.locator(ROUTE_ANCHOR.project)).toBeVisible();
     await expect.poll(() => headContentX(page)).toEqual(board);
   });
 
@@ -114,16 +113,17 @@ test.describe('sidebar form is route-invariant', () => {
     await page.addInitScript((k) => {
       localStorage.setItem(k, '1');
     }, SIDEBAR_KEY);
-    for (const route of ['/app?scenario=03', '/app/schedules?scenario=03']) {
+    for (const route of ['/app?scenario=03', '/app?scenario=03&project=ZAQczKCu0MOAzC1ZqcFlX&chat=1']) {
       await page.goto(route);
       await expect(page.getByTestId('sidebar-reopen')).toBeVisible();
       await expect(page.getByRole('complementary')).toHaveCount(0);
     }
   });
 
-  test('the collapse toggle works off-board and the state rides back', async ({ page }) => {
-    await page.goto('/app/schedules?scenario=12');
-    await expect(page.locator('[data-route="schedules"]')).toBeVisible();
+  test('the collapse toggle works on a project and the state rides back', async ({ page }) => {
+    await page.goto('/app?scenario=12');
+    await page.getByRole('complementary').locator('[data-slot="sidebar-project-row"]').first().click();
+    await expect(page.locator(ROUTE_ANCHOR.project)).toBeVisible();
     await page.getByRole('button', { name: '收起侧边栏' }).click();
     await expect(page.getByTestId('sidebar-reopen')).toBeVisible();
     // the toggle writes storage synchronously before its state flip; poll

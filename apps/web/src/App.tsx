@@ -19,7 +19,6 @@ import { TokenGate } from './overlay/token-gate.js';
 import { ProjectNewPage } from './pages/project-new-page.js';
 import { ProjectHomeRedirect } from './pages/project-redirect.js';
 import { ProjectSettingsPage } from './pages/project-settings-page.js';
-import { SchedulesPage } from './pages/schedules-page.js';
 import { PwaBridge } from './pwa/register.js';
 import { MODEL_ROUTING_HREF, PROVIDERS_HREF } from './resources/hrefs.js';
 import { MachineDetailRedirect } from './resources/machine-detail-page.js';
@@ -57,7 +56,7 @@ const DIALOG_ROUTES = withBoundary([
 const PAGE_ROUTES = withBoundary([
   { path: '/app', element: <BoardPage /> },
   { path: '/app/todo/:id', element: <TodoRedirect /> },
-  { path: '/app/schedules', element: <SchedulesPage /> },
+  { path: '/app/schedules', element: <ProjectHomeRedirect pane="tasks" tab="scheduled" /> },
   { path: '/app/project/:id', element: <ProjectHomeRedirect /> },
   { path: '/app/project/:id/tasks', element: <ProjectHomeRedirect pane="tasks" /> },
   { path: '/app/team', element: <SettingsRedirect section="work-routing" /> },

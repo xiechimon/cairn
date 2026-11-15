@@ -149,7 +149,8 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
 
   test('a page other than home has no Coordinator; cmd+J navigates to it', async ({ page }) => {
     await mockLive(page, { threads: [THREAD], messages: HISTORY });
-    await page.goto('/app/schedules');
+    await page.goto('/app/machines/authorize');
+    await expect(page.getByRole('region', { name: '授权 Runner' })).toBeVisible();
     await expect(page.getByTestId('home-c')).toHaveCount(0);
     await expect(page.getByTestId('chief-composer-input')).toHaveCount(0);
     await pressOpenCoordinator(page);

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useI18n } from '../i18n/provider.js';
 import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
-import { PANE_PARAM, type WorkPane } from './work-panel.js';
+import { PANE_PARAM, TASKS_TAB_PARAM, type WorkPane } from './work-panel.js';
 
 export const NARROW_FLOAT_CLS = 'pointer-events-auto bg-popover shadow-(--e2)';
 
@@ -63,6 +63,7 @@ export function PhoneTabs({
     const params = new URLSearchParams(search);
     params.delete(THREAD_PARAM);
     params.delete(VIEW_PARAM);
+    params.delete(TASKS_TAB_PARAM);
     if (next === null) params.delete(PANE_PARAM);
     else params.set(PANE_PARAM, next);
     const query = params.toString();

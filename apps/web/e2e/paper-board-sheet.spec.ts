@@ -1,7 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
 const HOME = '/app?scenario=01';
-const SCHEDULES = '/app/schedules?scenario=11';
 
 const sheetOf = (page: Page, selector: string) =>
   page.locator(selector).evaluate((el) => {
@@ -30,7 +29,7 @@ test.use({ viewport: { width: 1440, height: 900 } });
 for (const theme of ['light', 'dark'] as const) {
   for (const collapsed of [false, true]) {
     const label = `${theme}${collapsed ? ', collapsed' : ''}`;
-    test(`home sheet is the same flat sheet as the page shell (${label})`, async ({ page }) => {
+    test(`home sheet is one flat sheet beside the sidebar (${label})`, async ({ page }) => {
       await page.addInitScript(
         ([t, r]) => {
           localStorage.setItem('cairn-theme', t);
@@ -40,12 +39,9 @@ for (const theme of ['light', 'dark'] as const) {
       );
       await page.goto(HOME);
       const home = await sheetOf(page, '.board-sheet');
-      await page.goto(SCHEDULES);
-      const pages = await sheetOf(page, '.page-main');
 
       const left = collapsed ? 0 : 220;
       expect(home.box).toEqual({ x: left, y: 0, w: 1440 - left, h: 900 });
-      expect(home).toEqual(pages);
       expect(home.radius).toBe('0px');
       expect(home.borderLeftWidth).toBe(collapsed ? '0px' : '1px');
       expect(home.borderTopWidth).toBe('0px');

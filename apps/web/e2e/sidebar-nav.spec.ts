@@ -135,6 +135,7 @@ for (const locale of ['zh', 'en']) {
         if (layout === 'phone') await page.getByRole('button', { name: locale === 'zh' ? '展开侧边栏' : 'Expand sidebar' }).click();
         if (layout === 'peek') {
           await page.mouse.move(700, 400);
+          await expect(page.getByTestId('sidebar-peek')).not.toHaveAttribute('data-open', '');
           await page.getByTestId('sidebar-reopen').hover();
           await expect(page.getByTestId('sidebar-peek')).toHaveAttribute('data-open', '');
         }
@@ -149,9 +150,19 @@ for (const locale of ['zh', 'en']) {
         exact: true,
       })).toBeVisible();
       await expect(sidebar.getByRole('button', { name: locale === 'zh' ? '项目' : 'Project', exact: true })).toHaveCount(0);
-      await page.goto('/app/schedules?scenario=01');
-      await expect(page.getByRole('heading', { level: 1 })).toHaveText(locale === 'zh' ? '定时' : 'Schedules');
+      await sidebar.getByTestId('sidebar-schedules').click();
+      await expect(page).toHaveURL('/app?scenario=01&pane=tasks&tab=scheduled');
+      await expect(
+        page
+          .getByRole('complementary', { name: locale === 'zh' ? '任务' : 'Tasks', exact: true })
+          .getByRole('tab', { name: locale === 'zh' ? '定时' : 'Schedules' }),
+      ).toHaveAttribute('aria-selected', 'true');
+      if (layout === 'expanded') {
+        await page.getByTestId('sidebar-reopen').click();
+        await page.mouse.move(700, 400);
+      }
       await reveal();
+      await expect(sidebar.locator('[aria-current="page"]')).toHaveCount(1);
       await expect(sidebar.locator('[aria-current="page"]')).toHaveAccessibleName(locale === 'zh' ? '定时' : 'Schedules');
       await sidebar.locator('[data-slot="sidebar-nav-row"]').filter({ hasText: home }).click();
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(home);

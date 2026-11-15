@@ -23,7 +23,7 @@ for (const width of [360, 390]) {
       ).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(drawer).toBeHidden();
-      await page.goto('/app/schedules');
+      await page.goto('/app?pane=tasks&tab=scheduled');
       await menu.click();
       await drawer.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click();
       await expect(page).toHaveURL(/\/app(\?|$)/);
