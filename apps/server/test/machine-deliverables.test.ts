@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { type ClaimedStep, machineEnrollResponseSchema } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -14,6 +14,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { sweepAttachments, sweepUploadParts } from '../src/services/attachment-gc.js';
+import { DeliverableUploadGate } from '../src/services/machine-deliverables.js';
 import { deleteTodo } from '../src/services/todos.js';
 import { bootServer, issueApiKey, postProject, seedSessionRoute } from './helpers.js';
 
@@ -199,6 +200,7 @@ describe('Made deliverables over the machine wire', () => {
         .filter((r) => r.scope === 'deliverable')
         .map((r) => r.status),
     ).toEqual(['failed']);
+    expect(w.rows().find((r) => r.scope === 'deliverable')!.sizeBytes).toBe(0);
     const fresh = (
       (await (await w.grant(second.step.id, newGen, [pageEntry])).json()) as {
         deliverables: { attachmentId: string }[];
@@ -342,6 +344,179 @@ describe('Made deliverables over the machine wire', () => {
         .where(eq(messageTable.id, `deliverables-${w.buildId}`))
         .get(),
     ).toBeUndefined();
+  });
+
+  test('deliverable fields without a generation are refused before any write', async () => {
+    const w = await world();
+    const claimed = await w.claim();
+    const g = claimed.deliverables!.generation;
+    const [row] = (
+      (await (await w.grant(claimed.step.id, g, [pageEntry])).json()) as {
+        deliverables: { attachmentId: string }[];
+      }
+    ).deliverables;
+    await w.put(row!.attachmentId, PAGE);
+    for (const extra of [
+      { deliverables: [{ name: pageEntry.name, sha256: pageEntry.sha256 }] },
+      { deliverablesSkipped: [{ name: 'chart.png', reason: 'unsupported' }] },
+    ]) {
+      const res = await w.done(claimed.step.id, { status: 'success', report: '# r', ...extra });
+      expect(res.status).toBe(400);
+    }
+    expect(
+      w.s.db.select().from(stepTable).where(eq(stepTable.id, claimed.step.id)).get()!.status,
+    ).toBe('claimed');
+    expect(w.rows().find((r) => r.id === row!.attachmentId)!.status).toBe('received');
+  });
+
+  test('a published PDF downloads and the skipped list reaches the message', async () => {
+    const w = await world();
+    const claimed = await w.claim();
+    const g = claimed.deliverables!.generation;
+    const pdf = Buffer.from('%PDF-1.4\n%%EOF\n', 'latin1');
+    const entry = { kind: 'slides', name: 'deck.pdf', size: pdf.length, sha256: sha(pdf) };
+    const [row] = (
+      (await (await w.grant(claimed.step.id, g, [entry])).json()) as {
+        deliverables: { attachmentId: string }[];
+      }
+    ).deliverables;
+    expect((await w.put(row!.attachmentId, pdf)).status).toBe(200);
+    const skipped = [{ name: 'chart.png', reason: 'unsupported' }];
+    const res = await w.done(claimed.step.id, {
+      status: 'success',
+      report: '# r',
+      generation: g,
+      deliverables: [{ name: entry.name, sha256: entry.sha256 }],
+      deliverablesSkipped: skipped,
+    });
+    expect(res.status).toBe(200);
+    const fetched = await call(w.s.app, 'GET', `/api/attachments/${row!.attachmentId}`);
+    expect(fetched.status).toBe(200);
+    expect(fetched.headers.get('content-disposition')).toBe('attachment');
+    const msg = w.s.db
+      .select()
+      .from(messageTable)
+      .where(eq(messageTable.id, `deliverables-${w.buildId}`))
+      .get()!;
+    const content = JSON.parse(String(msg.content)) as {
+      items: { attachmentToken: string }[];
+      skipped: unknown;
+    };
+    expect(content.skipped).toEqual(skipped);
+    expect(content.items[0]!.attachmentToken.startsWith(`![${row!.attachmentId}](`)).toBe(true);
+  });
+
+  test('a repeat PUT on a received row still checks the claim and the TTL', async () => {
+    const w = await world();
+    const claimed = await w.claim();
+    const g = claimed.deliverables!.generation;
+    const [row] = (
+      (await (await w.grant(claimed.step.id, g, [pageEntry])).json()) as {
+        deliverables: { attachmentId: string }[];
+      }
+    ).deliverables;
+    expect((await w.put(row!.attachmentId, PAGE)).status).toBe(200);
+    expect((await w.put(row!.attachmentId, PAGE)).status).toBe(200);
+    w.s.db
+      .update(stepTable)
+      .set({ claimedAt: g + 1 })
+      .where(eq(stepTable.id, claimed.step.id))
+      .run();
+    expect((await w.put(row!.attachmentId, PAGE)).status).toBe(409);
+    w.s.db.update(stepTable).set({ claimedAt: g }).where(eq(stepTable.id, claimed.step.id)).run();
+    w.s.db
+      .update(attachmentTable)
+      .set({ createdAt: Date.now() - 2 * DAY })
+      .where(eq(attachmentTable.id, row!.attachmentId))
+      .run();
+    expect((await w.put(row!.attachmentId, PAGE)).status).toBe(410);
+  });
+
+  test('a stop that fails midway rolls back the step and its row cleanup together', async () => {
+    const w = await world();
+    const claimed = await w.claim();
+    const g = claimed.deliverables!.generation;
+    const [row] = (
+      (await (await w.grant(claimed.step.id, g, [pageEntry])).json()) as {
+        deliverables: { attachmentId: string }[];
+      }
+    ).deliverables;
+    await w.put(row!.attachmentId, PAGE);
+    w.s.db.run(
+      sql`CREATE TRIGGER abort_fail_rows BEFORE UPDATE OF status ON attachment WHEN NEW.status = 'failed' BEGIN SELECT RAISE(ABORT, 'row write failed'); END`,
+    );
+    const crashed = await w.done(claimed.step.id, { status: 'stopped' });
+    w.s.db.run(sql`DROP TRIGGER abort_fail_rows`);
+    expect(crashed.status).toBe(500);
+    expect(
+      w.s.db.select().from(stepTable).where(eq(stepTable.id, claimed.step.id)).get()!.status,
+    ).toBe('claimed');
+    expect(w.rows().find((r) => r.id === row!.attachmentId)!.status).toBe('received');
+    expect((await w.done(claimed.step.id, { status: 'stopped' })).status).toBe(200);
+    expect(
+      w.s.db.select().from(stepTable).where(eq(stepTable.id, claimed.step.id)).get()!.status,
+    ).toBe('stopped');
+    expect(w.rows().find((r) => r.id === row!.attachmentId)!.status).toBe('failed');
+  });
+
+  test('a todo delete that fails midway keeps the published set', async () => {
+    const w = await world();
+    const claimed = await w.claim();
+    const g = claimed.deliverables!.generation;
+    const [row] = (
+      (await (await w.grant(claimed.step.id, g, [pageEntry])).json()) as {
+        deliverables: { attachmentId: string }[];
+      }
+    ).deliverables;
+    await w.put(row!.attachmentId, PAGE);
+    await w.done(claimed.step.id, {
+      status: 'success',
+      report: '# r',
+      generation: g,
+      deliverables: [{ name: pageEntry.name, sha256: pageEntry.sha256 }],
+    });
+    w.s.db.run(
+      sql`CREATE TRIGGER abort_todo_delete BEFORE DELETE ON todo BEGIN SELECT RAISE(ABORT, 'delete failed'); END`,
+    );
+    expect(() =>
+      deleteTodo({ db: w.s.db, hub: w.s.hub, user: w.s.user } as never, w.todoId),
+    ).toThrow();
+    w.s.db.run(sql`DROP TRIGGER abort_todo_delete`);
+    expect(w.rows().find((r) => r.id === row!.attachmentId)!.status).toBe('ready');
+    expect(
+      w.s.db
+        .select()
+        .from(messageTable)
+        .where(eq(messageTable.id, `deliverables-${w.buildId}`))
+        .get(),
+    ).toBeDefined();
+  });
+
+  test('a done body over the limit is refused before parsing', async () => {
+    const w = await world();
+    const claimed = await w.claim();
+    const res = await w.done(claimed.step.id, {
+      status: 'stopped',
+      pad: 'x'.repeat(17 * 1024 * 1024),
+    });
+    expect(res.status).toBe(413);
+    expect(
+      w.s.db.select().from(stepTable).where(eq(stepTable.id, claimed.step.id)).get()!.status,
+    ).toBe('claimed');
+  });
+});
+
+describe('deliverable upload gate', () => {
+  test('one team cannot hold every server slot', () => {
+    const gate = new DeliverableUploadGate();
+    for (const [i, machineId] of ['m1', 'm1', 'm2', 'm2'].entries()) {
+      gate.enter(`a${i}`, machineId, 'team-a');
+    }
+    expect(() => gate.enter('a4', 'm3', 'team-a')).toThrow(/too many/);
+    const release = gate.enter('b0', 'm4', 'team-b');
+    release();
+    release();
+    expect(() => gate.enter('b1', 'm4', 'team-b')).not.toThrow();
   });
 });
 

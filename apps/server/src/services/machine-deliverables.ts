@@ -35,13 +35,15 @@ const UNSAFE_NAME = /[\p{Cc}\p{Cf}\p{Cs}/\\]/u;
 const PDF_MAGIC = Buffer.from('%PDF-', 'latin1');
 const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 const MACHINE_ACTIVE_UPLOADS = 2;
-const SERVER_ACTIVE_UPLOADS = 8;
+const TEAM_ACTIVE_UPLOADS = 4;
+const SERVER_ACTIVE_UPLOADS = 16;
 
 export const DELIVERABLES_MESSAGE_PREFIX = 'deliverables-';
 
 export interface DeliverableManifest {
   generation: number;
   files: { name: string; sha256: string }[];
+  skipped: { name: string; reason: string }[];
 }
 
 export function deliverableGrantId(stepId: string, generation: number): string {
@@ -52,6 +54,30 @@ function parseGrantId(grantId: string): { stepId: string; generation: number } |
   const match = /^deliverable:([^:]+):(\d+)$/.exec(grantId);
   if (match === null) return null;
   return { stepId: match[1] ?? '', generation: Number(match[2]) };
+}
+
+export function hasDeliverableRows(db: Db, stepId: string, generation: number): boolean {
+  return (
+    db
+      .select({ id: attachment.id })
+      .from(attachment)
+      .where(eq(attachment.grantId, deliverableGrantId(stepId, generation)))
+      .get() !== undefined
+  );
+}
+
+function failRows(db: Db, rows: { id: string; status: string }[]): void {
+  const pending = rows.filter((r) => r.status === 'pending').map((r) => r.id);
+  const received = rows.filter((r) => r.status !== 'pending').map((r) => r.id);
+  if (pending.length > 0) {
+    db.update(attachment)
+      .set({ status: 'failed', sizeBytes: 0 })
+      .where(inArray(attachment.id, pending))
+      .run();
+  }
+  if (received.length > 0) {
+    db.update(attachment).set({ status: 'failed' }).where(inArray(attachment.id, received)).run();
+  }
 }
 
 export function deliverableCapability(
@@ -195,12 +221,11 @@ export function grantDeliverables(
     if (teamAttachmentBytes(db, todoRow.teamId) + freshBytes > TEAM_ATTACHMENTS_QUOTA_BYTES) {
       throw new HttpError(413, 'team attachment quota exceeded');
     }
-    if (retired.size > 0) {
-      db.update(attachment)
-        .set({ status: 'failed' })
-        .where(inArray(attachment.id, [...retired]))
-        .run();
-    }
+    if (retired.size > 0)
+      failRows(
+        db,
+        rows.filter((r) => retired.has(r.id)),
+      );
     for (const entry of fresh) {
       const id = newRecordId();
       const row = {
@@ -239,25 +264,37 @@ export function grantDeliverables(
 export class DeliverableUploadGate {
   private readonly active = new Set<string>();
   private readonly perMachine = new Map<string, number>();
+  private readonly perTeam = new Map<string, number>();
 
-  enter(attachmentId: string, machineId: string): () => void {
+  enter(attachmentId: string, machineId: string, teamId: string): () => void {
     if (this.active.has(attachmentId)) throw new HttpError(409, 'deliverable upload busy');
     const machineCount = this.perMachine.get(machineId) ?? 0;
-    if (machineCount >= MACHINE_ACTIVE_UPLOADS || this.active.size >= SERVER_ACTIVE_UPLOADS) {
+    const teamCount = this.perTeam.get(teamId) ?? 0;
+    if (
+      machineCount >= MACHINE_ACTIVE_UPLOADS ||
+      teamCount >= TEAM_ACTIVE_UPLOADS ||
+      this.active.size >= SERVER_ACTIVE_UPLOADS
+    ) {
       throw new HttpError(429, 'too many deliverable uploads in progress');
     }
     this.active.add(attachmentId);
     this.perMachine.set(machineId, machineCount + 1);
+    this.perTeam.set(teamId, teamCount + 1);
     let released = false;
     return () => {
       if (released) return;
       released = true;
       this.active.delete(attachmentId);
-      const left = (this.perMachine.get(machineId) ?? 1) - 1;
-      if (left <= 0) this.perMachine.delete(machineId);
-      else this.perMachine.set(machineId, left);
+      decrement(this.perMachine, machineId);
+      decrement(this.perTeam, teamId);
     };
   }
+}
+
+function decrement(counts: Map<string, number>, key: string): void {
+  const left = (counts.get(key) ?? 1) - 1;
+  if (left <= 0) counts.delete(key);
+  else counts.set(key, left);
 }
 
 interface ContentCheck {
@@ -362,21 +399,21 @@ export async function receiveDeliverable(
   if (!row || claim === null || !stepRow || stepRow.machineId !== input.machineId) {
     throw new HttpError(404, 'deliverable upload not found');
   }
-  if (row.status === 'received') {
-    await input.body?.cancel().catch(() => undefined);
-    return;
-  }
-  if (row.status !== 'pending') throw new HttpError(409, 'deliverable upload is not pending');
   if (nowMs() - row.createdAt > ATTACHMENT_PENDING_TTL_MS) {
     throw new HttpError(410, 'deliverable upload expired');
   }
   if (stepRow.status !== 'claimed' || stepRow.claimedAt !== claim.generation) {
     throw new HttpError(409, 'deliverable upload belongs to an earlier claim');
   }
+  if (row.status === 'received') {
+    await input.body?.cancel().catch(() => undefined);
+    return;
+  }
+  if (row.status !== 'pending') throw new HttpError(409, 'deliverable upload is not pending');
   if (input.contentLength !== undefined && Number(input.contentLength) > row.sizeBytes) {
     throw new HttpError(413, 'deliverable body is larger than its grant');
   }
-  const release = gate.enter(row.id, input.machineId);
+  const release = gate.enter(row.id, input.machineId, row.teamId);
   try {
     const finalPath = containedAttachmentPath(deps.attachmentsDir, row.storageKey);
     const partPath = `${finalPath}.part-${randomBytes(8).toString('hex')}`;
@@ -482,8 +519,9 @@ export function publishDeliverables(
       kind: deliverableKindOf(r.fileName),
       name: r.fileName,
       sizeBytes: r.sizeBytes,
-      attachmentToken: `![${r.fileName}](attachment:${r.storageKey})`,
+      attachmentToken: `![${r.id}](attachment:${r.storageKey})`,
     })),
+    skipped: input.manifest.skipped,
   };
   const createdAt = nowMs();
   db.insert(message)
@@ -502,28 +540,36 @@ export function publishDeliverables(
 }
 
 export function failUnpublishedDeliverables(db: Db, stepId: string, generation: number): void {
-  db.update(attachment)
-    .set({ status: 'failed' })
-    .where(
-      and(
-        eq(attachment.grantId, deliverableGrantId(stepId, generation)),
-        inArray(attachment.status, ['pending', 'received']),
-      ),
-    )
-    .run();
+  failRows(
+    db,
+    db
+      .select({ id: attachment.id, status: attachment.status })
+      .from(attachment)
+      .where(
+        and(
+          eq(attachment.grantId, deliverableGrantId(stepId, generation)),
+          inArray(attachment.status, ['pending', 'received']),
+        ),
+      )
+      .all(),
+  );
 }
 
 export function failEarlierClaimDeliverables(db: Db, stepId: string): void {
   const prefix = `deliverable:${stepId}:`;
-  db.update(attachment)
-    .set({ status: 'failed' })
-    .where(
-      and(
-        sql`substr(${attachment.grantId}, 1, ${prefix.length}) = ${prefix}`,
-        inArray(attachment.status, ['pending', 'received']),
-      ),
-    )
-    .run();
+  failRows(
+    db,
+    db
+      .select({ id: attachment.id, status: attachment.status })
+      .from(attachment)
+      .where(
+        and(
+          sql`substr(${attachment.grantId}, 1, ${prefix.length}) = ${prefix}`,
+          inArray(attachment.status, ['pending', 'received']),
+        ),
+      )
+      .all(),
+  );
 }
 
 export function retireTodoDeliverables(db: Db, todoIds: string[]): void {

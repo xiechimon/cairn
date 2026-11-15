@@ -22,6 +22,7 @@ export const deliverablesMessageSchema = z.object({
       attachmentToken: z.string(),
     }),
   ),
+  skipped: z.array(z.object({ name: z.string(), reason: z.string() })),
 });
 
 export type DeliverablesMessage = z.infer<typeof deliverablesMessageSchema>;

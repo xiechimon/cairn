@@ -514,7 +514,8 @@ async function tryClaim(
       );
       if (brake.autonomyPaused || brake.dailyCapReached) continue;
     }
-    const claimedAt = nowMs();
+    const claimedAt = Math.max(nowMs(), (cand.stepRow.claimedAt ?? 0) + 1);
+    const deliverables = deliverableCapability(cand.stepRow.kind, cand.todoRow.output, claimedAt);
     let won = false;
     try {
       won = db.transaction((tx) => {
@@ -542,7 +543,7 @@ async function tryClaim(
           )
           .run();
         if (res.changes === 0) return false;
-        failEarlierClaimDeliverables(db, cand.stepRow.id);
+        if (deliverables !== undefined) failEarlierClaimDeliverables(db, cand.stepRow.id);
         if (
           cand.stepRow.kind !== 'review' &&
           cand.todoRow.sourceKind !== 'research-citation-check'
@@ -639,7 +640,6 @@ async function tryClaim(
           .map((answer) => answer.requestId)
           .filter((requestId) => decided.has(requestId))
       : [];
-    const deliverables = deliverableCapability(cand.stepRow.kind, cand.todoRow.output, claimedAt);
     return {
       step: {
         id: cand.stepRow.id,

@@ -59,7 +59,11 @@ import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTod
 import { githubReadToken } from './github-autonomous-token.js';
 import { applyLocalMergeReport } from './local-merge.js';
 import { stopStepComputer } from './machine-computer.js';
-import { failUnpublishedDeliverables, withEventsAfterCommit } from './machine-deliverables.js';
+import {
+  failUnpublishedDeliverables,
+  hasDeliverableRows,
+  withEventsAfterCommit,
+} from './machine-deliverables.js';
 import {
   isChiefConversation,
   type MachineDeps,
@@ -200,14 +204,17 @@ export async function finishStep(
   stepId: string,
   body: MachineDoneBody,
 ): Promise<void> {
+  if (
+    body.generation === undefined &&
+    (body.deliverables !== undefined || body.deliverablesSkipped !== undefined)
+  ) {
+    throw new HttpError(400, 'deliverables need the claim generation');
+  }
   const claimed = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (body.generation !== undefined && claimed?.claimedAt !== body.generation) {
     throw conflict(`step ${stepId} was claimed again after generation ${body.generation}`);
   }
   await finishStepReport(deps, machineId, stepId, body);
-  if (claimed?.status === 'claimed' && claimed.machineId === machineId && claimed.claimedAt) {
-    failUnpublishedDeliverables(deps.db, stepId, claimed.claimedAt);
-  }
   stopStepComputer(deps, stepId);
   const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (row && !isChiefConversation(row.buildId)) await drainTaskMessageQueue(deps, row.buildId);
@@ -228,6 +235,9 @@ async function finishStepReport(
         db.select({ teamId: machine.teamId }).from(machine).where(eq(machine.id, machineId)).get()
           ?.teamId;
     if (found.machineId === machineId || released) {
+      if (found.machineId === machineId && found.claimedAt !== null) {
+        failUnpublishedDeliverables(db, stepId, found.claimedAt);
+      }
       revokeStepGitCredential(deps, stepId);
       if (body.status === 'failed') {
         noteDeliveredPlanResidual(
@@ -312,6 +322,53 @@ async function finishStepReport(
     if (landing === MERGE_LANDING_SKIPPED) landingSkipped = true;
     else landingError = landing;
   }
+  const report: StepReport = {
+    machineId,
+    stepId,
+    stepRow,
+    body,
+    changeFiles,
+    priorMerged,
+    landingSkipped,
+    landingError,
+  };
+  const grantGeneration = stepRow.claimedAt;
+  if (
+    grantGeneration !== null &&
+    (body.generation !== undefined || hasDeliverableRows(db, stepId, grantGeneration))
+  ) {
+    withEventsAfterCommit(deps, (settleDeps) => {
+      applyStepReport(settleDeps, report);
+      failUnpublishedDeliverables(settleDeps.db, stepId, grantGeneration);
+    });
+    return;
+  }
+  applyStepReport(deps, report);
+}
+
+interface StepReport {
+  machineId: string;
+  stepId: string;
+  stepRow: typeof step.$inferSelect;
+  body: MachineDoneBody;
+  changeFiles: DocumentDiffFile[] | undefined;
+  priorMerged: { prNumber: number; prUrl: string | null } | null;
+  landingSkipped: boolean;
+  landingError: string | null;
+}
+
+function applyStepReport(deps: MachineDeps, report: StepReport): void {
+  const { db } = deps;
+  const {
+    machineId,
+    stepId,
+    stepRow,
+    body,
+    changeFiles,
+    priorMerged,
+    landingSkipped,
+    landingError,
+  } = report;
   {
     const current = db.select().from(step).where(eq(step.id, stepId)).get();
     if (
@@ -577,7 +634,11 @@ async function finishStepReport(
   if (outcome.status === 'success') {
     const manifest =
       body.generation !== undefined
-        ? { generation: body.generation, files: body.deliverables ?? [] }
+        ? {
+            generation: body.generation,
+            files: body.deliverables ?? [],
+            skipped: body.deliverablesSkipped ?? [],
+          }
         : undefined;
     const complete = (completeDeps: MachineDeps) =>
       completeStep(completeDeps, stepId, {
@@ -595,8 +656,7 @@ async function finishStepReport(
         ...(manifest !== undefined ? { deliverables: manifest } : {}),
         verdictReport,
       });
-    if (manifest !== undefined) withEventsAfterCommit(deps, complete);
-    else complete(deps);
+    complete(deps);
     publishStepStatus(deps, stepId);
     emitRuntimeStepSpan(deps.db, stepId);
     return;

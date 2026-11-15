@@ -156,6 +156,7 @@ function unauthorized(): HttpError {
 
 const CLOSED_ORBS_MAX_BODY_BYTES = 64 * 1024;
 const COMPUTER_FRAMES_MAX_BODY_BYTES = 24 * 1024 * 1024;
+const DONE_MAX_BODY_BYTES = 16 * 1024 * 1024;
 
 async function jsonBody(c: Context): Promise<unknown> {
   return c.req.json().catch(() => null);
@@ -689,17 +690,24 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     return c.json(getStepSession(deps, row.id, c.req.param('stepId')));
   });
 
-  app.post('/api/machine/done/:stepId', async (c) => {
-    return executeMachineCommand(
-      c,
-      () => jsonBody(c),
-      async (row, decoded) => {
-        const body = parseWith(machineDoneBodySchema, decoded, 'body');
-        await finishStep(deps, row.id, c.req.param('stepId'), body);
-        return c.json({ ok: true as const });
-      },
-    );
-  });
+  app.post(
+    '/api/machine/done/:stepId',
+    bodyLimit({
+      maxSize: DONE_MAX_BODY_BYTES,
+      onError: (c) => c.json({ error: 'done body too large' }, 413),
+    }),
+    async (c) => {
+      return executeMachineCommand(
+        c,
+        () => jsonBody(c),
+        async (row, decoded) => {
+          const body = parseWith(machineDoneBodySchema, decoded, 'body');
+          await finishStep(deps, row.id, c.req.param('stepId'), body);
+          return c.json({ ok: true as const });
+        },
+      );
+    },
+  );
 
   app.post('/api/machine/sync-result/:syncId', async (c) => {
     return executeMachineCommand(

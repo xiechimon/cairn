@@ -904,22 +904,24 @@ export function deleteTodo(deps: TodoDeps, id: string): boolean {
   const { db } = deps;
   const row = getRow(deps, id);
   if (!row) return false;
-  const buildIds = db
-    .select({ id: build.id })
-    .from(build)
-    .where(eq(build.todoId, id))
-    .all()
-    .map((r) => r.id);
-  if (buildIds.length > 0) {
-    db.delete(stopPending).where(inArray(stopPending.conversationId, buildIds)).run();
-    db.delete(step).where(inArray(step.buildId, buildIds)).run();
-  }
-  if (row.sourceKind === 'github-issue-self' && row.sourceRef !== null) {
-    queueIssueClose(db, row.teamId, row.sourceRef, DELETED_TASK_ISSUE_COMMENT);
-  }
-  db.delete(schedule).where(eq(schedule.todoId, id)).run();
-  retireTodoDeliverables(db, [id]);
-  db.delete(todo).where(eq(todo.id, id)).run();
+  db.transaction(() => {
+    const buildIds = db
+      .select({ id: build.id })
+      .from(build)
+      .where(eq(build.todoId, id))
+      .all()
+      .map((r) => r.id);
+    if (buildIds.length > 0) {
+      db.delete(stopPending).where(inArray(stopPending.conversationId, buildIds)).run();
+      db.delete(step).where(inArray(step.buildId, buildIds)).run();
+    }
+    if (row.sourceKind === 'github-issue-self' && row.sourceRef !== null) {
+      queueIssueClose(db, row.teamId, row.sourceRef, DELETED_TASK_ISSUE_COMMENT);
+    }
+    db.delete(schedule).where(eq(schedule.todoId, id)).run();
+    retireTodoDeliverables(db, [id]);
+    db.delete(todo).where(eq(todo.id, id)).run();
+  });
   return true;
 }
 
