@@ -384,7 +384,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### first-run
 
-**First run** (shipped). The home checklist, connection banners and the first-PR card that take a new user to a first merged PR.
+**First run** (shipped). The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.
 
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](design/references/first-run)

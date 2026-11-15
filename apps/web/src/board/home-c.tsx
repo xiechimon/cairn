@@ -610,7 +610,7 @@ export function HomeC({
                     ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
                     : t('给 Coordinator 发消息')
                 }
-                composerTools={setupStep !== null && <ComposerSetupHint next={setupStep} />}
+                composerTools={setupStep !== null && <ComposerSetupHint step={setupStep} />}
                 composerRef={(node) => {
                   composerRef.current = node;
                 }}
