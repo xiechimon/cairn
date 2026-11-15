@@ -3,7 +3,6 @@ import { codexLoginAvailable, usesHostCodexLogin } from '../coordinator/codex-lo
 import type { Db } from '../db/client.js';
 import { provider, routingRule } from '../db/schema.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
-import { paidClaudeAllowed } from './model-routing.js';
 import { defaultCoordinatorRule, keylessEndpoint, resolveRuleProvider } from './routing-rules.js';
 
 const CLAUDE_CODE_PROVIDER = 'claude-code';
@@ -11,8 +10,7 @@ const CLAUDE_CODE_PROVIDER = 'claude-code';
 export type CoordinatorRouteRefusal =
   | 'no-api-key-provider'
   | 'rule-provider-missing'
-  | 'rule-provider-has-no-key'
-  | 'paid-claude-not-allowed';
+  | 'rule-provider-has-no-key';
 
 function coordinatorRule(db: Db, teamId: string) {
   const row = db
@@ -44,9 +42,6 @@ export function coordinatorRouteVerdict(
     keylessEndpoint(rule.provider) ||
     (usesHostCodexLogin(rule.provider, row.baseUrl) && codexLoginAvailable());
   if (!runnable) return { refusal: 'rule-provider-has-no-key', rule };
-  if (!paidClaudeAllowed(db, teamId, rule.provider, rule.modelId)) {
-    return { refusal: 'paid-claude-not-allowed', rule };
-  }
   return { rule };
 }
 

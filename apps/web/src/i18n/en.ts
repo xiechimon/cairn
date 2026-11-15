@@ -936,8 +936,6 @@ export const EN: Record<string, string> = {
     'Queued: Claude is rate limited on the Runner; this continues once the limit lifts ({ahead} ahead)',
   '排队中：执行机上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）':
     'Queued: Claude Code is not logged in on the Runner. Run claude on that machine to log in ({ahead} ahead)',
-  '排队中：团队只用 Claude 订阅，执行机上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）':
-    'Queued: this team uses Claude subscriptions only and Claude Code on the Runner is not logged in with one. Log in with a subscription there, or allow pay as you go in Usage & connections ({ahead} ahead)',
   '排队中：{machine} 的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）':
     'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks. The Runner page shows why and how to fix it ({ahead} ahead)',
   '任务沙箱没就绪：后台服务没有作为自己的 systemd user unit 运行。在这台机器上运行 `{command} restart`，它会自己起一个；还不行的话，检查 `systemd-run --user` 能不能用。':

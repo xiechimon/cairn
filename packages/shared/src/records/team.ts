@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { claudeUsageSchema } from '../model-routing.js';
 import { agentRecordSchema } from './agent.js';
 import { epochMs, recordId } from './common.js';
 import { firstPrReportPromptSchema } from './first-pr-report.js';
@@ -35,7 +34,6 @@ export const teamRecordSchema = z.object({
   name: z.string(),
   createdAt: epochMs,
   plan: teamPlanSchema,
-  claudeUsage: claudeUsageSchema.optional(),
   avatarStyle: z.string().nullable(),
   autonomyPaused: z.boolean().optional(),
   autonomyPauses: z.array(autonomyPauseEntrySchema).optional(),

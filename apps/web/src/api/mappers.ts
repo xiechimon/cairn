@@ -127,8 +127,6 @@ const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], st
   'claude-rate-limited': '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
   'claude-logged-out':
     '排队中：执行机上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
-  'claude-usage-refused':
-    '排队中：团队只用 Claude 订阅，执行机上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）',
 };
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {

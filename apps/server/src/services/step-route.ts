@@ -14,7 +14,6 @@ import { eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { machine, step, stepRoute, type todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
-import { claudeUsageGatePasses } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import {
   homeMachineRejectReason,
@@ -105,10 +104,6 @@ export function capabilityCandidates(
     const claudeUsable =
       claudeInstalled &&
       row.online &&
-      claudeUsageGatePasses({ db }, row, {
-        provider: 'claude-code',
-        modelId: 'claude-sonnet-5-5',
-      }) &&
       claudeRateBlock(row.claudeRateLimits ?? [], now) === null &&
       (hasActiveClaudeSubscription({ db }, teamId) ||
         (report?.auth?.state !== 'not-logged-in' && !claudeLoginBlocksClaim(report?.login, now)));

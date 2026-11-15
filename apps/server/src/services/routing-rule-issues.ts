@@ -10,7 +10,6 @@ import {
   runtimeGatePasses,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
-import { paidClaudeAllowed } from './model-routing.js';
 import {
   CODEX_LOGIN_PRESENT,
   defaultCoordinatorChoice,
@@ -29,7 +28,6 @@ const COORDINATOR_REFUSAL_REASON: Record<CoordinatorRouteRefusal, RuleIssueReaso
   'no-api-key-provider': 'provider-missing',
   'rule-provider-missing': 'provider-missing',
   'rule-provider-has-no-key': 'provider-no-key',
-  'paid-claude-not-allowed': 'paid-claude',
 };
 
 function providerProblem(
@@ -53,9 +51,6 @@ function providerProblem(
     keylessEndpoint(rule.provider) ||
     usesHostCodexLogin(rule.provider, row.baseUrl);
   if (!runnable) return { reason: 'provider-no-key', provider: rule.provider };
-  if (!paidClaudeAllowed(db, rule.teamId, rule.provider, rule.modelId)) {
-    return { reason: 'paid-claude', provider: rule.provider };
-  }
   return null;
 }
 
@@ -106,12 +101,6 @@ function ruleFix(db: Pick<Db, 'select'>, rule: RoutingRuleRow): RuleFix | null {
         ? defaultCoordinatorChoice(db, rule.teamId)
         : null;
   if (choice === null) return null;
-  if (
-    stepRuntimeFor(choice.provider) === 'pi' &&
-    !paidClaudeAllowed(db, rule.teamId, choice.provider, choice.modelId)
-  ) {
-    return null;
-  }
   return {
     provider: choice.provider,
     modelId: choice.modelId,

@@ -3,7 +3,6 @@ import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { routingRule } from '../db/schema.js';
 import { coordinatorRoute } from '../services/coordinator-route.js';
-import { paidClaudeAllowed } from '../services/model-routing.js';
 import { openProviderKey } from '../services/providers.js';
 import { resolveRuleProvider } from '../services/routing-rules.js';
 import { readCodexLogin, usesHostCodexLogin } from './codex-login.js';
@@ -69,8 +68,7 @@ export function coordinatorProviders(
       ? undefined
       : resolveRuleProvider(deps.db, storedCompaction, true);
   const compactionRoute =
-    compaction !== undefined &&
-    paidClaudeAllowed(deps.db, teamId, compaction.provider, compaction.modelId)
+    compaction !== undefined
       ? routeOf(
           deps,
           teamId,

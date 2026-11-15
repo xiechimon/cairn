@@ -168,7 +168,6 @@ describe('harvest replay context closure', () => {
   it.each([
     ['name', 'Custom team'],
     ['plan', 'pro'],
-    ['claudeUsage', 'api'],
     ['avatarStyle', 'other'],
     ['coAuthorTrailer', false],
     ['requestInstructorReview', true],

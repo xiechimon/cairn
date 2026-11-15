@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 import {
   claudeSubscription,
   machine as machineTable,
+  provider as providerTable,
   routingRule,
   step as stepTable,
 } from '../src/db/schema.js';
@@ -175,9 +176,10 @@ describe('resolveStepCredentials (per-step dispatch interface surface)', () => {
     s.dispose();
   });
 
-  test('no session routing rule = provider null + empty access surface; unknown step 404', async () => {
+  test('no session routing rule and no provider = provider null + empty access surface; unknown step 404', async () => {
     const s = await withRoutedStack();
     s.db.delete(routingRule).where(eq(routingRule.teamId, s.team.id)).run();
+    s.db.delete(providerTable).where(eq(providerTable.teamId, s.team.id)).run();
     const second = (await (
       await req(s.app, 'POST', `/api/projects/${s.projectId}/todos`, { title: '裸跑', spec: '' })
     ).json()) as { id: string };

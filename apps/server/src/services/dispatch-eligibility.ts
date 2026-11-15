@@ -198,18 +198,11 @@ export interface EligibilityInput {
   localProject: boolean;
   claudeRateBlocked: boolean;
   claudeLoginBlocked: boolean;
-  claudeUsageRefused: boolean;
 }
 
 export type MachineIneligibility =
   | {
-      kind:
-        | 'confinement'
-        | 'runtime'
-        | 'local-path'
-        | 'claude-blocked'
-        | 'claude-login'
-        | 'claude-usage';
+      kind: 'confinement' | 'runtime' | 'local-path' | 'claude-blocked' | 'claude-login';
     }
   | { kind: 'model'; reason: string }
   | { kind: 'capability'; missing: string[] };
@@ -232,7 +225,6 @@ export function machineEligibility(input: EligibilityInput): MachineIneligibilit
   }
   if (runtime === 'claude-code' && input.claudeRateBlocked) return { kind: 'claude-blocked' };
   if (runtime === 'claude-code' && input.claudeLoginBlocked) return { kind: 'claude-login' };
-  if (input.claudeUsageRefused) return { kind: 'claude-usage' };
   if (!confinementDispatchReady(machineRow.capabilities)) return { kind: 'confinement' };
   return null;
 }

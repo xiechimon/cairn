@@ -30,7 +30,6 @@ function input(over: {
     localProject: false,
     claudeRateBlocked: false,
     claudeLoginBlocked: false,
-    claudeUsageRefused: false,
     ...over.rest,
   };
 }
@@ -180,12 +179,6 @@ describe('D71 machineEligibility: hard constraints for a worker step on a machin
   test('a machine whose Claude login is blocked does not take a claude-code step', () => {
     expect(machineEligibility(input({ rest: { claudeLoginBlocked: true } }))?.kind).toBe(
       'claude-login',
-    );
-  });
-
-  test('a machine where the team usage policy refuses this Claude model', () => {
-    expect(machineEligibility(input({ rest: { claudeUsageRefused: true } }))?.kind).toBe(
-      'claude-usage',
     );
   });
 });
