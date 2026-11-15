@@ -13,7 +13,7 @@ import { mapMcpServers } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { NoticeBanner } from '../components/notice-banner.js';
-import { QueryBoundary } from '../components/query-state.js';
+import { mergeQueries, QueryBoundary } from '../components/query-state.js';
 import { SettingsFlat, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
@@ -252,8 +252,9 @@ export function McpServersPage() {
       fixture={fixture}
     >
       <QueryBoundary
-        query={live ? connectorsQ : undefined}
+        query={live ? mergeQueries(connectorsQ, mcpQ) : undefined}
         isEmpty={false}
+        errorWins
         loadingLabel={t('正在加载 MCP 服务器')}
         errorTitle={t('MCP 服务器没能加载')}
         className="mt-6"
