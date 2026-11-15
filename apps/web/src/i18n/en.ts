@@ -21,6 +21,8 @@
 import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js';
 
 export const EN: Record<string, string> = {
+  有新版本: 'A new version is available',
+  点此刷新: 'Refresh',
   订阅账户没能加载: 'Subscriptions could not be loaded',
   '路由对所有 Runner 生效，{name} 沿用所有 Runner 的设置。':
     'Routing applies to all Runners, including {name}.',
