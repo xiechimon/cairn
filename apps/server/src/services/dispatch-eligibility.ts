@@ -82,8 +82,10 @@ export function declaredMcpGaps(
 }
 
 export function unassignedStepReason(kind: StepKind): string {
-  const use = kind === 'review' ? 'review' : 'session';
-  return `${kind} step has no ${use} routing rule: add a \`${use}\` routing rule in routing settings, then rerun the task.`;
+  if (kind === 'review') {
+    return 'review step has no review routing rule: add a `review` routing rule in routing settings, then rerun the task.';
+  }
+  return `${kind} step has nothing to run it: add a model provider, or a Runner with Claude Code, in settings, then rerun the task.`;
 }
 
 export function machineRunningCount(db: Db, machineId: string): number {

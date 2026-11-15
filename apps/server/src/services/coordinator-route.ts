@@ -1,10 +1,11 @@
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { codexLoginAvailable, usesHostCodexLogin } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
-import { provider, routingRule, team } from '../db/schema.js';
+import { provider, routingRule } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
-import { isClaudeModel } from './model-routing.js';
+import { paidClaudeAllowed } from './model-routing.js';
+import { keylessEndpoint, resolveRuleProvider } from './routing-rules.js';
 
 export type CoordinatorRouteFallback =
   | 'no-api-key-provider'
@@ -82,53 +83,29 @@ function seedCoordinatorRule(db: Db, teamId: string) {
 }
 
 function coordinatorRule(db: Db, teamId: string) {
-  return db
+  const row = db
     .select()
     .from(routingRule)
     .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, 'coordinator')))
     .get();
-}
-
-export function paidClaudeAllowed(
-  db: Db,
-  teamId: string,
-  providerId: string,
-  modelId: string,
-): boolean {
-  if (!isClaudeModel(providerId, modelId)) return true;
-  const usage = db
-    .select({ claudeUsage: team.claudeUsage })
-    .from(team)
-    .where(eq(team.id, teamId))
-    .get();
-  return usage?.claudeUsage === 'allow-paid';
+  return row === undefined ? undefined : resolveRuleProvider(db, row, true);
 }
 
 export function coordinatorRoute(db: Db, teamId: string) {
   if (!coordinatorRunsOnPi()) return null;
   const rule = coordinatorRule(db, teamId) ?? seedCoordinatorRule(db, teamId);
   if (rule === undefined) return fallback(teamId, 'no-api-key-provider');
-  const keyed = db
-    .select({ id: provider.id })
+  const row = db
+    .select({ baseUrl: provider.baseUrl, keyed: sql<number>`${provider.apiKeyCipher} is not null` })
     .from(provider)
-    .where(
-      and(
-        eq(provider.teamId, teamId),
-        eq(provider.providerId, rule.provider),
-        isNotNull(provider.apiKeyCipher),
-      ),
-    )
+    .where(and(eq(provider.teamId, teamId), eq(provider.providerId, rule.provider)))
     .get();
-  if (keyed === undefined) {
-    const row = db
-      .select({ baseUrl: provider.baseUrl })
-      .from(provider)
-      .where(and(eq(provider.teamId, teamId), eq(provider.providerId, rule.provider)))
-      .get();
-    const subscription =
-      row !== undefined && usesHostCodexLogin(rule.provider, row.baseUrl) && codexLoginAvailable();
-    return subscription ? rule : fallback(teamId, 'rule-provider-has-no-key');
-  }
+  const runnable =
+    row !== undefined &&
+    (row.keyed === 1 ||
+      keylessEndpoint(rule.provider) ||
+      (usesHostCodexLogin(rule.provider, row.baseUrl) && codexLoginAvailable()));
+  if (!runnable) return fallback(teamId, 'rule-provider-has-no-key');
   if (!paidClaudeAllowed(db, teamId, rule.provider, rule.modelId)) {
     return fallback(teamId, 'paid-claude-not-allowed');
   }
