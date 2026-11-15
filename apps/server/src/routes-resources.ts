@@ -86,7 +86,12 @@ import {
 } from './services/schedules.js';
 import { search } from './services/search.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './services/secrets.js';
-import { importSkill, refreshSkill, type SkillImportOpts } from './services/skill-import.js';
+import {
+  importSkill,
+  listImportCandidates,
+  refreshSkill,
+  type SkillImportOpts,
+} from './services/skill-import.js';
 import {
   createLocalSkill,
   listSkillFiles,
@@ -327,6 +332,11 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         }),
       ),
     );
+  });
+
+  app.get('/api/teams/:id/skills/import-candidates', (c) => {
+    requireTeam(ctx, c.req.param('id'));
+    return c.json(listImportCandidates(ctx.skillsDir));
   });
 
   app.post('/api/skills', async (c) => {

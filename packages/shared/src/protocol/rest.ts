@@ -87,6 +87,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/teams/{id}/stream', note: 'SSE，见 protocol/sse.ts' },
   {
     method: 'GET',
+    path: '/api/teams/{id}/skills/import-candidates',
+    note: 'read-only scan of ~/.agents/skills and ~/.claude/skills for the import picker; skills already in the Cairn skills directory are left out',
+  },
+  {
+    method: 'GET',
     path: '/api/teams/{id}/skills/{sid}',
     note: 'spec 13 #367：本地目录现扫投影（sid = frontmatter name 回落目录名）',
   },
