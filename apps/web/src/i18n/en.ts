@@ -1151,6 +1151,10 @@ export const EN: Record<string, string> = {
   确认授权: 'Authorize',
   '正在授权…': 'Authorizing…',
   '授权完成，Runner 已注册。': 'Authorized — the Runner is registered.',
+  '授权完成，{name} 已注册为 Runner。': 'Authorized — {name} is registered as a Runner.',
+  机器名: 'Machine name',
+  '这个名字由发起方自报。只有你刚在这台机器上运行了 `cairn start`，且终端里显示的名字与这里一致，才确认授权。':
+    'The requester reports this name itself. Confirm only if you just ran `cairn start` on this machine and its terminal shows the same name.',
   '授权链接已失效，请在 Runner 上重新发起。':
     'This authorization link has expired — restart enrollment on the executor Runner.',
   '浏览器授权注册 →': 'Browser authorization →',

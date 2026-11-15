@@ -50,3 +50,42 @@ test('?enroll=<id> + poll=authorized → done face (copy + machineId meta)', asy
   await expect(page.getByText('授权完成，Runner 已注册。')).toBeVisible();
   await expect(page.getByText('machineId: e2e-machine-id')).toBeVisible();
 });
+test('pending with a name → name row, self-report warning, done copy names the machine', async ({ page }) => {
+  let authorized = false;
+  await page.route(POLL, (route) =>
+    route.fulfill({
+      status: 200,
+      json: authorized
+        ? {
+            status: 'authorized',
+            machine: {
+              machineId: 'e2e-machine-id',
+              token: 'e2e-token',
+              teamId: 'e2e-team',
+              serverUrl: 'http://127.0.0.1:1',
+            },
+          }
+        : { status: 'pending', name: 'omarchy' },
+    }),
+  );
+  await page.route('**/api/machine/enroll/confirm', (route) => {
+    authorized = true;
+    return route.fulfill({
+      status: 200,
+      json: {
+        machine: {
+          machineId: 'e2e-machine-id',
+          token: 'e2e-token',
+          teamId: 'e2e-team',
+          serverUrl: 'http://127.0.0.1:1',
+        },
+      },
+    });
+  });
+  await page.goto(`${AUTHORIZE}?enroll=e2e-enroll`);
+  await expect(card(page).getByText('机器名')).toBeVisible();
+  await expect(card(page).getByText('omarchy')).toBeVisible();
+  await expect(card(page)).toContainText('这个名字由发起方自报');
+  await page.getByRole('button', { name: '确认授权' }).click();
+  await expect(page.getByText('授权完成，omarchy 已注册为 Runner。')).toBeVisible();
+});

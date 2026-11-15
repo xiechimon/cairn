@@ -1,4 +1,5 @@
 import { writeFileSync } from 'node:fs';
+import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { ENV_VARS } from '@cairn/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -53,7 +54,7 @@ describe('cairn restart --server', () => {
       runnerArgv: ['start', '--foreground', '--server', 'http://10.0.0.5:8787/'],
     });
     expect(out.join('')).toContain(
-      'Approve this machine in a browser: http://10.0.0.5:8787/enroll/e1',
+      `Approve this machine in a browser: http://10.0.0.5:8787/enroll/e1 (machine name: ${hostname()})`,
     );
   });
 });
