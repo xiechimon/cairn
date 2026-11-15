@@ -47,7 +47,7 @@ test('the base branch select loads project branches and persists across reload',
       },
     });
   });
-  await page.goto('/app/project/base-branch-project/settings');
+  await page.goto('/app/project/base-branch-project/settings?tab=repo');
   const control = page.getByTestId('project-base-branch');
   await expect(control).toBeEnabled();
   await expect(control).toHaveAttribute('data-slot', 'select-trigger');

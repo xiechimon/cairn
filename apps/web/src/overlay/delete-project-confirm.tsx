@@ -35,7 +35,7 @@ export function DeleteProjectConfirm({
           confirmLabel={t('删除')}
           onCancel={onClose}
           onConfirm={onConfirm}
-          confirmDisabled={typed !== projectName}
+          confirmDisabled={projectName === '' || typed !== projectName}
         />
       }
     >
