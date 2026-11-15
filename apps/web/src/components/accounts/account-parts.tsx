@@ -7,7 +7,6 @@ import type {
   MachineProvider,
   MachineWithProviders,
   ProviderRuntime,
-  StickyThread,
 } from '../../api/claude-accounts.js';
 import { relativeTime } from '../../board/rel-time.js';
 import { useI18n } from '../../i18n/provider.js';
@@ -86,21 +85,6 @@ export function AccountStepRow({ step, now }: { step: AccountStep; now: number }
       title={step.title ?? t('{kind} 步骤', { kind })}
       subtitle={kind}
       trailing={relativeTime(step.startedAt, now, t)}
-    />
-  );
-}
-
-export function StickyThreadRow({ thread, now }: { thread: StickyThread; now: number }) {
-  const { t } = useI18n();
-  return (
-    <ListRow
-      className="hover:bg-transparent"
-      title={thread.title}
-      trailing={
-        relativeTime(thread.since, now, t) === ''
-          ? undefined
-          : t('固定于 {ago}', { ago: relativeTime(thread.since, now, t) })
-      }
     />
   );
 }

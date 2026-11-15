@@ -17,7 +17,6 @@ test('fixture: subscriptions sit in the provider list and the routing page lists
   await page.locator('[data-instance-id^="subscription:"]', { hasText: 'Personal' }).first().click();
   const detail = page.getByTestId('subscription-detail');
   await expect(detail).toContainText('Fix flaky merge-gate test');
-  await expect(detail).toContainText('Daemon claim loop rework');
   await expect(detail.locator('[data-window]')).toHaveCount(0);
   await expect(detail.getByRole('progressbar')).toHaveCount(2);
 
@@ -100,7 +99,6 @@ test('live: rename, verify and remove hit the agreed routes', async ({
   await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
     const method = route.request().method();
     if (path === '/api/teams/t1/claude-subscriptions') return json(subscriptions);
-    if (path === '/api/teams/t1/claude-subscriptions/stickiness') return json({ error: 'nf' }, 404);
     if (path.endsWith('/steps')) return json({ error: 'nf' }, 404);
     if (path === '/api/teams/t1/claude-subscriptions/s1' && method === 'PATCH') {
       calls.push(`PATCH s1 ${route.request().postDataJSON().label}`);

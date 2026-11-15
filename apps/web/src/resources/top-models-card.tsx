@@ -69,7 +69,7 @@ export const topModelKey = (model: Pick<TopModel, 'provider' | 'modelId'>) =>
 
 const levelLabel = (level: string) => level.charAt(0).toUpperCase() + level.slice(1);
 
-function vendorMark(modelId: string): Mark {
+export function vendorMark(modelId: string): Mark {
   if (modelId.startsWith('claude')) return ClaudeMark;
   if (/^(gpt|o\d|codex)/.test(modelId)) return OpenAIMark;
   if (modelId.startsWith('gemini')) return GeminiMark;
@@ -121,7 +121,7 @@ function TopModelRow({
         transition,
       }}
       className={cn(
-        'relative flex min-h-12 items-center gap-x-3 border-t border-border bg-card px-4 py-1.5 max-sm:flex-wrap max-sm:gap-x-2.5 max-sm:gap-y-0.5 max-sm:px-3 max-sm:py-1.5',
+        'relative flex min-h-12 items-center gap-x-3 border-t border-border bg-card px-4 py-1.5 max-sm:flex-wrap max-sm:gap-x-2.5 max-sm:gap-y-0.5 max-sm:py-1.5 max-sm:pr-4 max-sm:pl-10',
         isDragging && 'z-10 shadow-(--e2)',
       )}
     >
@@ -130,7 +130,7 @@ function TopModelRow({
           variant="ghost"
           size="icon-xs"
           aria-label={t('拖动排序 {model}', { model: name })}
-          className="top-model-grip -mx-1 cursor-grab touch-none text-content-tertiary active:cursor-grabbing"
+          className="top-model-grip -mx-1 cursor-grab touch-none text-content-tertiary active:cursor-grabbing max-sm:absolute max-sm:top-1/2 max-sm:left-3 max-sm:mx-0 max-sm:-translate-y-1/2"
           {...attributes}
           {...listeners}
         >
@@ -147,7 +147,7 @@ function TopModelRow({
             {name}
           </span>
           {model.modelId === PICKED && (
-            <span className="flex-none rounded-sm bg-secondary px-1.5 text-caption text-content-secondary max-sm:hidden">
+            <span className="flex-none rounded-sm bg-secondary px-1.5 text-caption text-content-secondary">
               {t('推荐')}
             </span>
           )}
@@ -158,10 +158,10 @@ function TopModelRow({
           )}
         </span>
       </span>
-      <span className="flex flex-none items-center gap-1 max-sm:basis-full max-sm:pl-6">
+      <span className="flex flex-none items-center gap-1 max-sm:basis-full max-sm:pl-7">
         <span
           data-testid="top-model-provider"
-          className="inline-flex h-6 max-sm:h-5 max-w-36 flex-none items-center gap-1 rounded-full bg-secondary px-2 text-caption text-content-secondary max-sm:mr-auto max-sm:max-w-40"
+          className="inline-flex h-6 max-sm:h-5 max-w-36 flex-none items-center gap-1 rounded-full bg-secondary px-2 text-caption text-content-secondary max-sm:mr-auto max-sm:max-w-40 max-sm:min-w-0 max-sm:shrink"
         >
           {option === undefined ? (
             t('不可用')
@@ -180,9 +180,9 @@ function TopModelRow({
         >
           <SelectTrigger
             aria-label={t('{model} 的思考强度', { model: name })}
-            className="top-model-level ml-2 w-28 flex-none max-sm:ml-1 max-sm:h-7 max-sm:w-24 max-sm:text-meta border-transparent bg-transparent shadow-none hover:bg-muted"
+            className="top-model-level ml-2 w-auto min-w-25 flex-none max-sm:min-w-0 border-transparent bg-transparent shadow-none hover:bg-muted dark:bg-transparent dark:hover:bg-muted max-sm:ml-1 max-sm:h-7 max-sm:text-meta"
           >
-            <SelectValue>{levelLabel(level)}</SelectValue>
+            <SelectValue className="justify-end">{levelLabel(level)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {THINKING_LEVELS.map((value) => (
@@ -238,7 +238,7 @@ export function TopModelsCard({
       data-testid="top-models"
       className="overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)"
     >
-      <div className="flex items-center justify-between gap-3 px-4 py-3 max-sm:px-3 max-sm:py-2.5">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 max-sm:py-2.5">
         <div className="flex min-w-0 flex-col">
           <h2 className="m-0 truncate text-card-title font-semibold text-foreground max-sm:text-ui">
             {t('常用模型')}
@@ -317,7 +317,7 @@ export function TopModelsCard({
           </SortableContext>
         </DndContext>
       )}
-      <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 max-sm:px-3 max-sm:py-2.5">
+      <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 max-sm:py-2.5">
         <span className="text-meta text-content-tertiary">{t('恢复成推荐的模型和顺序。')}</span>
         <Button variant="outline" size="sm" data-testid="top-models-reset" onClick={onReset}>
           {t('恢复推荐')}

@@ -1,3 +1,4 @@
+import type { TeamRoutingSettings } from '@cairn/shared';
 import { accountsDefault, accountsEmpty } from './accounts.js';
 import { activityFixture, activityManyFixture } from './activity.js';
 import { chiefBubbleRuns } from './chief-bubble-runs.js';
@@ -125,6 +126,67 @@ import { sidebarArchived } from './sidebar-archived.js';
 
 export const SCENARIO_PARAM = 'scenario';
 
+const ROUTING_SETTINGS: TeamRoutingSettings = {
+  rules: [
+    {
+      id: 'rule-session',
+      teamId: 't1',
+      use: 'session',
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5',
+      thinkingLevel: 'high',
+      fallbackModels: null,
+      machineId: null,
+      requiredCapabilities: null,
+      seededFromAgentId: 'agent-impl',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: 'rule-review',
+      teamId: 't1',
+      use: 'review',
+      provider: 'pi',
+      modelId: 'gpt-5.2',
+      thinkingLevel: 'medium',
+      fallbackModels: null,
+      machineId: null,
+      requiredCapabilities: null,
+      seededFromAgentId: 'agent-review',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+  ],
+  policies: [
+    {
+      id: 'policy-session',
+      teamId: 't1',
+      use: 'session',
+      tools: ['推送分支'],
+      mcpServers: ['github'],
+      skillsAllowlist: null,
+      defaultSkill: null,
+      secrets: ['OPENAI_API_KEY'],
+      seededFromAgentId: 'agent-impl',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: 'policy-review',
+      teamId: 't1',
+      use: 'review',
+      tools: [],
+      mcpServers: [],
+      skillsAllowlist: null,
+      defaultSkill: null,
+      secrets: [],
+      seededFromAgentId: 'agent-review',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+  ],
+};
+
 const routingSettingsFixture: FixtureSet = {
   ...resourcesDefault,
   resources: {
@@ -134,66 +196,7 @@ const routingSettingsFixture: FixtureSet = {
       { provider: 'pi', modelId: 'gpt-5.2', thinkingLevel: 'medium' },
       { provider: 'gone-proxy', modelId: 'glm-5.3', thinkingLevel: 'max' },
     ],
-    routingSettings: {
-      rules: [
-        {
-          id: 'rule-session',
-          teamId: 't1',
-          use: 'session',
-          provider: 'claude-code',
-          modelId: 'claude-sonnet-5',
-          thinkingLevel: 'high',
-          fallbackModels: null,
-          machineId: null,
-          requiredCapabilities: null,
-          seededFromAgentId: 'agent-impl',
-          createdAt: 1,
-          updatedAt: 1,
-        },
-        {
-          id: 'rule-review',
-          teamId: 't1',
-          use: 'review',
-          provider: 'pi',
-          modelId: 'gpt-5.2',
-          thinkingLevel: 'medium',
-          fallbackModels: null,
-          machineId: null,
-          requiredCapabilities: null,
-          seededFromAgentId: 'agent-review',
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      ],
-      policies: [
-        {
-          id: 'policy-session',
-          teamId: 't1',
-          use: 'session',
-          tools: ['推送分支'],
-          mcpServers: ['github'],
-          skillsAllowlist: null,
-          defaultSkill: null,
-          secrets: ['OPENAI_API_KEY'],
-          seededFromAgentId: 'agent-impl',
-          createdAt: 1,
-          updatedAt: 1,
-        },
-        {
-          id: 'policy-review',
-          teamId: 't1',
-          use: 'review',
-          tools: [],
-          mcpServers: [],
-          skillsAllowlist: null,
-          defaultSkill: null,
-          secrets: [],
-          seededFromAgentId: 'agent-review',
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      ],
-    },
+    routingSettings: ROUTING_SETTINGS,
   },
 };
 
@@ -383,6 +386,41 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
         resources: {
           ...routingSettingsFixture.resources,
           machines: RESOURCES.machines.map((machine) => ({ ...machine, enabledRuntimes: ['pi'] })),
+        },
+      },
+      'routing-rule-issues': {
+        ...routingSettingsFixture,
+        resources: {
+          ...routingSettingsFixture.resources,
+          machines: RESOURCES.machines.map((machine) => ({ ...machine, enabledRuntimes: ['pi'] })),
+          routingSettings: {
+            ...ROUTING_SETTINGS,
+            rules: ROUTING_SETTINGS.rules.map((rule) =>
+              rule.use === 'session'
+                ? { ...rule, machineId: RESOURCES.machines[0]?.id ?? null }
+                : rule,
+            ),
+            ruleIssues: [
+              {
+                use: 'session',
+                reason: 'runtime-disabled',
+                runtime: 'claude-code',
+                suggested: {
+                  provider: 'pi',
+                  modelId: 'gpt-5.2',
+                  machineId: null,
+                  thinkingLevel: null,
+                  expectedUpdatedAt: 1,
+                },
+              },
+              {
+                use: 'review',
+                reason: 'provider-no-key',
+                provider: 'pi',
+                suggested: null,
+              },
+            ],
+          },
         },
       },
       'r8-78': boardR8Overlay,

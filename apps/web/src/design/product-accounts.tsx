@@ -21,12 +21,7 @@ import { SettingsNav } from '../components/settings/settings-nav.js';
 import { SettingsSearch } from '../components/settings/settings-search.js';
 import { SettingsCard } from '../components/settings-list.js';
 import { SettingsScopeSentence, TEAM_SCOPE } from '../components/settings-scope.js';
-import {
-  ACCOUNT_STEPS,
-  ACCOUNT_STICKINESS,
-  ACCOUNT_SUBSCRIPTIONS,
-  PROVIDER_MACHINES,
-} from '../fixtures/accounts.js';
+import { ACCOUNT_STEPS, ACCOUNT_SUBSCRIPTIONS, PROVIDER_MACHINES } from '../fixtures/accounts.js';
 import { r7 } from '../fixtures/core.js';
 import { useI18n } from '../i18n/provider.js';
 import { OnlineStatus } from '../resources/parts.js';
@@ -142,9 +137,6 @@ function SubscriptionPanelSpecimen() {
           view={current.view}
           verifying={current.verification?.phase === 'verifying'}
           steps={ACCOUNT_STEPS[current.account.id]}
-          sticky={ACCOUNT_STICKINESS.filter(
-            (thread) => thread.subscriptionId === current.account.id,
-          )}
           actions={{
             onVerify: () => undefined,
             onRename: () => undefined,
@@ -169,7 +161,6 @@ function SubscriptionDetailSpecimen({ state }: { state: 'ok' }) {
         view={view}
         verifying={false}
         steps={ACCOUNT_STEPS[account.id]}
-        sticky={ACCOUNT_STICKINESS.filter((thread) => thread.subscriptionId === account.id)}
         actions={{
           onVerify: () => undefined,
           onRename: () => undefined,
@@ -297,9 +288,9 @@ export function AccountsSection() {
       <Specimen
         id="subscription-detail-quota"
         title="Subscription detail with quota"
-        note="status, last use and 24 hour steps, then one bar per quota window, the steps this account ran and its sticky threads"
+        note="status, last use and 24 hour steps, then one bar per quota window, and the steps this account ran"
         stage="sheet"
-        code={`<SubscriptionDetail account={account} now={now} view={view} verifying={false} steps={steps} sticky={sticky} actions={actions} />`}
+        code={`<SubscriptionDetail account={account} now={now} view={view} verifying={false} steps={steps} actions={actions} />`}
       >
         <div className="flex w-full max-w-160 flex-col gap-6">
           <SubscriptionDetailSpecimen state="ok" />

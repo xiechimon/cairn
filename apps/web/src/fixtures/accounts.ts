@@ -4,7 +4,6 @@ import type {
   AccountStep,
   ClaudeSubscriptionWire,
   MachineWithProviders,
-  StickyThread,
   SubscriptionAccount,
 } from '../api/claude-accounts.js';
 import type { ModelRouting } from '../api/model-routing.js';
@@ -16,7 +15,6 @@ export interface AccountsContent {
   subscriptions: ClaudeSubscriptionWire[];
   otherAccounts: SubscriptionAccount[];
   stepsByAccount: Record<string, AccountStep[]>;
-  stickiness: StickyThread[];
   machines: AccountMachine[];
   providers: { id: string; label: string }[];
   routing: ModelRouting;
@@ -199,21 +197,6 @@ export const ACCOUNT_STEPS: Record<string, AccountStep[]> = {
   [ACCOUNT_EXPIRED_ID]: [],
 };
 
-export const ACCOUNT_STICKINESS: StickyThread[] = [
-  {
-    threadId: 'th-1',
-    title: 'Daemon claim loop rework',
-    subscriptionId: ACCOUNT_OK_ID,
-    since: NOW - 114 * MINUTE,
-  },
-  {
-    threadId: 'th-4',
-    title: 'Account management page',
-    subscriptionId: ACCOUNT_COOLING_ID,
-    since: NOW - 3 * HOUR - 16 * MINUTE,
-  },
-];
-
 export const ACCOUNT_MACHINES: AccountMachine[] = [
   { id: MACHINE_REMOTE_ID, name: MACHINE_REMOTE_NAME },
   { id: MACHINE_ID, name: MACHINE_NAME },
@@ -370,7 +353,6 @@ export const ACCOUNTS: AccountsContent = {
   subscriptions: ACCOUNT_SUBSCRIPTIONS,
   otherAccounts: OTHER_ACCOUNTS,
   stepsByAccount: ACCOUNT_STEPS,
-  stickiness: ACCOUNT_STICKINESS,
   machines: ACCOUNT_MACHINES,
   providers: [
     { id: 'codex-main', label: 'ChatGPT · Personal' },
@@ -435,7 +417,6 @@ export const accountsEmpty: FixtureSet = {
       subscriptions: [],
       otherAccounts: [],
       stepsByAccount: {},
-      stickiness: [],
       machines: [],
       providers: [],
       routing: {
