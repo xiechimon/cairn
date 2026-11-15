@@ -1,9 +1,11 @@
+import { createHash } from 'node:crypto';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import type { ComputerPresence, MachinePresenceBody } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { HOST_DESKTOP_PROGRAMS } from '../src/computer/host-desktop.js';
 import { ComputerPresenceReporter } from '../src/computer/presence.js';
 import { loadDaemonConfig } from '../src/config.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -92,22 +94,24 @@ describe('computer presence machine wiring', () => {
     }
   });
 
-  test('a daemon with the Orb computer reports what machinectl shows running, not only while a call is open', async () => {
-    const home = makeTestTempDir('computer-presence-orb-');
+  test('a Linux daemon reports its running host desktops under the server computer name', async () => {
+    const home = makeTestTempDir('computer-presence-desktop-');
     const bin = join(home, 'bin');
     mkdirSync(bin);
     const scopeKey = 'chief:one';
     const name = computerMachineName(scopeKey);
-    writeFileSync(
-      join(bin, 'machinectl'),
-      `#!/bin/sh\nif [ "$1" = list ]; then echo "${name} container systemd-nspawn - - 10.0.0.2"; fi\n`,
+    for (const program of HOST_DESKTOP_PROGRAMS) {
+      writeFileSync(join(bin, program), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    }
+    writeFileSync(join(bin, 'systemctl'), '#!/bin/sh\necho active\n');
+    chmodSync(join(bin, 'systemctl'), 0o755);
+    const desktop = join(
+      home,
+      'desktops',
+      createHash('sha256').update(scopeKey).digest('hex').slice(0, 16),
     );
-    chmodSync(join(bin, 'machinectl'), 0o755);
-    mkdirSync(join(home, 'orb-state'), { recursive: true });
-    writeFileSync(
-      join(home, 'orb-state', 'computers.json'),
-      JSON.stringify([{ scopeKey, name, lastUsedAt: Date.now(), holdUntil: 0 }]),
-    );
+    mkdirSync(desktop, { recursive: true });
+    writeFileSync(join(desktop, 'scope'), scopeKey);
     vi.stubEnv('PATH', `${bin}:${process.env.PATH ?? ''}`);
     const api = new FakeMachineApi();
     const logger = Object.fromEntries(
@@ -140,7 +144,11 @@ describe('computer presence machine wiring', () => {
       capabilitiesProbe: () => ({ mcpServers: [], skills: [] }),
       idleSleepPrevention: false,
       proxyEnv: {},
-      capEnv: { CAIRN_COMPUTER: 'orb' },
+      capEnv: { PATH: bin },
+      confinementPlatform: 'linux',
+      confinementPreflight: async () => {
+        throw new Error('no confinement in this test');
+      },
       otel: null,
     });
     try {
