@@ -5,6 +5,7 @@ import { _electron as electron } from '@playwright/test';
 const LAUNCH_TIMEOUT_MS = 120_000;
 const GATE_SETTLE_MS = 5_000;
 const PAIRING_INPUT = '#cairn-pair-input';
+const UPDATE_BUTTON = '[data-testid="desktop-update"]';
 
 const [appPath, screenshotPath] = process.argv.slice(2);
 if (appPath === undefined || screenshotPath === undefined) {
@@ -34,6 +35,18 @@ try {
 
   await window.waitForTimeout(GATE_SETTLE_MS);
   assert.equal(await window.locator(PAIRING_INPUT).count(), 0, 'the pairing gate is showing');
+
+  await window.locator(UPDATE_BUTTON).waitFor({ timeout: GATE_SETTLE_MS });
+  const update = await window.evaluate(async () => {
+    const bridge = window.cairnDesktop.update;
+    await bridge.check();
+    return bridge.state();
+  });
+  assert.ok(
+    ['current', 'available', 'error'].includes(update?.status),
+    `the update check ended in ${JSON.stringify(update)}`,
+  );
+  console.log(`update check: ${JSON.stringify(update)}`);
 
   await window.screenshot({ path: screenshotPath });
   const origin = new URL(window.url()).origin;

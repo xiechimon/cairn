@@ -23,3 +23,7 @@ The `electron` package's install script is disabled in `pnpm-workspace.yaml`, so
 ## Releases
 
 `desktop-release` publishes `desktop-v0.1.<run number>` to GitHub Releases with arm64 and x64 DMG and zip files named `Cairn-<version>-<arch>.<ext>`. It runs nightly at 18:17 UTC when `main` has moved since the last `desktop-v*` tag, and on demand from the Actions tab (`workflow_dispatch`). The version is stamped into the packaged `package.json` with `-c.extraMetadata.version`, so `app.getVersion()` reports it; the arm64 build passes `pnpm smoke` before anything is published.
+
+## Updates
+
+The packaged app checks `desktop-v*` GitHub Releases 10 seconds after launch and every 6 hours. `newestDesktopUpdate` in `@cairn/shared` picks the highest version above `app.getVersion()` whose `Cairn-<version>-<arch>.zip` asset carries a `sha256:` digest. The sidebar's bottom-left button (desktop only, through the `cairnDesktop` preload bridge) shows the state; clicking "Update to …" downloads the zip next to the running bundle, checks its digest, unpacks it with `ditto`, swaps the bundle and relaunches. Electron's `autoUpdater` and `electron-updater` are not used because Squirrel.Mac only installs a build signed with the same Developer ID, and these builds are ad-hoc signed. Updating needs Cairn in a writable folder such as `/Applications`; run from the DMG or a translocated path, the button says so instead.
