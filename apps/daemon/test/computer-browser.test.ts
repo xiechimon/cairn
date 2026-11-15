@@ -1057,8 +1057,17 @@ describe('Cairn pages', () => {
   const CAIRN = ['http://127.0.0.1:8787'];
   const none = async () => [] as string[];
 
-  function pageAt(log: string[], pages: string[], blockExit = 0): ComputerProvider {
+  const tabsJson = (targetId: string) =>
+    `${JSON.stringify({ success: true, data: { tabs: [{ active: true, targetId }] } })}\n`;
+
+  function pageAt(
+    log: string[],
+    pages: string[],
+    blockExit = 0,
+    tabs: string[] = ['T1'],
+  ): ComputerProvider {
     let current = pages[0] ?? 'about:blank';
+    let tabReads = 0;
     return {
       async execute(request) {
         const line = request.argv.join(' ');
@@ -1067,6 +1076,13 @@ describe('Cairn pages', () => {
           if (line.includes(' batch --bail ')) {
             yield { kind: 'stdout' as const, text: 'ok\n' };
             yield { kind: 'exit' as const, code: blockExit };
+            return;
+          }
+          if (line.endsWith(' --json tab list')) {
+            const tab = tabs[Math.min(tabReads, tabs.length - 1)] ?? 'T1';
+            tabReads += 1;
+            yield { kind: 'stdout' as const, text: tabsJson(tab) };
+            yield { kind: 'exit' as const, code: 0 };
             return;
           }
           if (line.endsWith(' --json get url')) {
@@ -1261,7 +1277,11 @@ describe('Cairn pages', () => {
         return (async function* () {
           yield {
             kind: 'stdout' as const,
-            text: request.argv.includes('url') ? 'webmcp: tools changed\n' : 'ok\n',
+            text: request.argv.includes('url')
+              ? 'webmcp: tools changed\n'
+              : request.argv.includes('tab')
+                ? tabsJson('T1')
+                : 'ok\n',
           };
           yield { kind: 'exit' as const, code: 0 };
         })();
@@ -1270,5 +1290,33 @@ describe('Cairn pages', () => {
     await expect(runBrowserTool(unreadable, 'browser_snapshot', {}, run)).rejects.toThrow(
       /address could not be read/,
     );
+  });
+
+  test('a tab that becomes active between the address check and the click gets no click', async () => {
+    const log: string[] = [];
+    await expect(
+      runBrowserTool(
+        pageAt(log, ['https://example.com/'], 0, ['T1', 'T2']),
+        'browser_act',
+        { actions: [{ kind: 'press', text: 'Enter' }] },
+        run,
+      ),
+    ).rejects.toThrow(/another tab became active/);
+    expect(log.some((line) => line.endsWith(' press Enter'))).toBe(false);
+  });
+
+  test('the block is renewed on the bound tab right before each action runs', async () => {
+    const log: string[] = [];
+    await runBrowserTool(
+      pageAt(log, ['https://example.com/']),
+      'browser_act',
+      { actions: [{ kind: 'press', text: 'Enter' }] },
+      run,
+    );
+    const press = log.findIndex((line) => line.endsWith(' press Enter'));
+    const lastBlock = log.findLastIndex((line) => line.includes(' batch --bail '));
+    expect(lastBlock).toBeGreaterThan(0);
+    expect(lastBlock).toBeLessThan(press);
+    expect(log[lastBlock]).toContain('network unroute http://127.0.0.1:8787/*');
   });
 });

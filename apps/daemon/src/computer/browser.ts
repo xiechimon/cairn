@@ -530,20 +530,55 @@ export async function runBrowserTool(
       refuse(`${what} refused: ${url} ${CAIRN_PAGE_REFUSAL}`, started);
   };
   const blocks = cairnBlockPatterns(cairnOrigins);
-  if (blocks.length > 0) {
+  const blockCairn = async (what: string): Promise<void> => {
+    if (blocks.length === 0) return;
     const blocked = await read([
       ...prefix,
       'batch',
       '--bail',
-      ...blocks.map((pattern) => `network route ${pattern} --abort`),
+      ...blocks.flatMap((pattern) => [
+        `network unroute ${pattern}`,
+        `network route ${pattern} --abort`,
+      ]),
     ]);
     if (blocked.code !== 0) {
       refuse(
-        `${tool} refused: Cairn's addresses could not be blocked in the agent browser`,
+        `${what} refused: Cairn's addresses could not be blocked in the agent browser`,
         started,
       );
     }
+  };
+  const activeTab = async (): Promise<string | null> => {
+    const answer = await read([...prefix, '--json', 'tab', 'list']);
+    if (answer.code !== 0) return null;
+    try {
+      const tabs = (
+        JSON.parse(answer.text.trim().split('\n').at(-1) ?? '') as {
+          data?: { tabs?: { active?: unknown; targetId?: unknown }[] };
+        }
+      ).data?.tabs;
+      const active = tabs?.find((tab) => tab.active === true)?.targetId;
+      return typeof active === 'string' ? active : null;
+    } catch {
+      return null;
+    }
+  };
+  await blockCairn(tool);
+  const boundTab = cairnOrigins.length === 0 ? null : await activeTab();
+  if (cairnOrigins.length > 0 && boundTab === null) {
+    refuse(`${tool} refused: the active tab could not be read`, started);
   }
+  const refuseOffBoundTab = async (what: string): Promise<void> => {
+    if (cairnOrigins.length === 0) return;
+    await blockCairn(what);
+    if ((await activeTab()) !== boundTab) {
+      refuse(
+        `${what} refused: another tab became active during this call; call again to act on it`,
+        started,
+      );
+    }
+    await refuseOnCairn(what);
+  };
 
   if (tool === 'browser_navigate') {
     const parsed = navigateParams.safeParse(params);
@@ -552,7 +587,12 @@ export async function runBrowserTool(
     }
     let address: URL | null = null;
     try {
-      address = /[\x00-\x20\x7f]/.test(parsed.data.url) ? null : new URL(parsed.data.url);
+      const raw = parsed.data.url.trim();
+      const spaced = [...raw].some((char) => {
+        const code = char.charCodeAt(0);
+        return code <= 0x20 || code === 0x7f;
+      });
+      address = spaced ? null : new URL(raw);
     } catch {}
     if (address === null || (address.protocol !== 'http:' && address.protocol !== 'https:')) {
       refuse(
@@ -630,6 +670,7 @@ export async function runBrowserTool(
       if (error instanceof ComputerRefusal) refuse(error.message, started);
       throw error;
     }
+    await refuseOffBoundTab(`browser_act ${action.kind}`);
     const result =
       (action.kind === 'fill' || action.kind === 'type') &&
       action.ref !== undefined &&
