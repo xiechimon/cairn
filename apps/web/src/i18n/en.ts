@@ -476,6 +476,13 @@ export const EN: Record<string, string> = {
   每天运行: 'Runs daily',
   每周运行: 'Runs weekly',
   运行一次: 'Runs once',
+  '任务已归档，定时随之停用': 'The task was archived, so the schedule stopped',
+  '执行任务的 agent 暂停了它': 'The agent working on the task paused it',
+  '连续 10 次定时运行都没人回复，已自动暂停':
+    'Paused after 10 scheduled runs with no reply from a person',
+  '提交代码时被仓库检查拦下，这一轮没能完成': "The repository's commit check stopped this run",
+  '运行出错，已停用': 'The run failed, so the schedule stopped',
+  已结束: 'Ended',
   '{mo}月{d}日': '{monthShort} {d}',
   '下次 {day} {time}': 'Next {day} {time}',
   自动: 'Auto',

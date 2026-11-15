@@ -4,7 +4,7 @@ import { mapSchedules } from '../src/api/mappers.js';
 import type { ScheduleRecord as DisplaySchedule } from '../src/fixtures/records.js';
 import { type TFunc, translate } from '../src/i18n/translate.js';
 import { scheduleSummary } from '../src/pages/schedule-summary.js';
-import { scheduleBody, scheduleDraft, scheduleTime, scheduleViewState } from '../src/schedules/schedule-model.js';
+import { scheduleBody, scheduleDraft, scheduleEnded, schedulePauseReason, scheduleTime, scheduleViewState } from '../src/schedules/schedule-model.js';
 
 const NOW = Date.UTC(2026, 10, 4, 12);
 const t: TFunc = (source, vars) => translate('zh', {}, source, vars);
@@ -68,6 +68,19 @@ describe('schedule editor wire values', () => {
     expect(scheduleViewState({ ...record, kind: 'once', nextRunAt: null })).toBe('finished');
     expect(scheduleViewState({ ...record, enabled: false })).toBe('paused');
     expect(scheduleViewState({ ...record, enabled: false, pausedReason: 'Host removed' })).toBe('disabled');
+  });
+  test('only one-time schedules that are off or have no next run count as ended', () => {
+    expect(scheduleEnded({ kind: 'once', enabled: true, nextRunAt: NOW })).toBe(false);
+    expect(scheduleEnded({ kind: 'once', enabled: false, nextRunAt: NOW })).toBe(true);
+    expect(scheduleEnded({ kind: 'once', enabled: true, nextRunAt: null })).toBe(true);
+    expect(scheduleEnded({ kind: 'daily', enabled: false, nextRunAt: null })).toBe(false);
+  });
+  test('pause reasons read as plain Chinese and an agent-written reason is kept', () => {
+    const t = ((key: string) => key) as TFunc;
+    expect(schedulePauseReason('Task archived', t)).toBe('任务已归档，定时随之停用');
+    expect(schedulePauseReason('git commit failed (1): pnpm-lock.yaml is staged\nhusky - pre-commit script failed (code 1)', t)).toBe('提交代码时被仓库检查拦下，这一轮没能完成');
+    expect(schedulePauseReason('Invalid cron expression: error at field 2', t)).toBe('运行出错，已停用');
+    expect(schedulePauseReason('等 PR 合并后再继续', t)).toBe('等 PR 合并后再继续');
   });
   test('a completed once row paused during its run stays finished when it has no pause reason', () => {
     const finished = { ...record, kind: 'once' as const, nextRunAt: null, enabled: false };

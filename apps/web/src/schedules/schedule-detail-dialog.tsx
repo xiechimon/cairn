@@ -15,7 +15,12 @@ import type { ScheduleRecord as DisplaySchedule } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { ScheduleFields } from './schedule-fields.js';
-import { scheduleBody, scheduleDraft, scheduleViewState } from './schedule-model.js';
+import {
+  scheduleBody,
+  scheduleDraft,
+  schedulePauseReason,
+  scheduleViewState,
+} from './schedule-model.js';
 
 export function ScheduleDetailController({
   schedule,
@@ -229,8 +234,11 @@ export function ScheduleDetailDialog({
           </div>
           {schedule.pausedReason !== null && (
             <div className="flex flex-wrap items-center gap-2">
-              <p className="m-0 min-w-0 flex-1 break-words text-meta text-content-secondary">
-                {schedule.pausedReason}
+              <p
+                className="m-0 min-w-0 flex-1 break-words text-meta text-content-secondary"
+                title={schedule.pausedReason}
+              >
+                {schedulePauseReason(schedule.pausedReason, t)}
               </p>
               {state === 'disabled' && (
                 <Button
@@ -276,7 +284,9 @@ export function ScheduleDetailDialog({
             </div>
           </dl>
           {schedule.lastRunError != null && (
-            <p className="m-0 break-words text-meta text-destructive">{schedule.lastRunError}</p>
+            <p className="m-0 break-words text-meta text-destructive" title={schedule.lastRunError}>
+              {schedulePauseReason(schedule.lastRunError, t)}
+            </p>
           )}
           <ScheduleFields value={draft} onChange={setDraft} tz={schedule.tz} disabled={busy} />
           <p className="m-0 text-caption text-content-tertiary">
