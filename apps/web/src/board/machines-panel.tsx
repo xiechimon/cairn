@@ -1,6 +1,6 @@
 import type { ComputerRecord } from '@cairn/shared';
 import { cn } from 'cn';
-import { Laptop, MonitorSmartphone, Plus, Server } from 'lucide-react';
+import { Laptop, Plus, Server } from 'lucide-react';
 import { type ReactElement, type ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useAuth } from '../api/auth.js';
@@ -64,14 +64,6 @@ function MachineGlyph({ machine }: { machine: MachineRow }) {
 }
 
 const COMPUTERS_PANEL_REFRESH_MS = 5_000;
-
-function screenLiveOf(
-  machine: MachineRow,
-  computer: ComputerRecord | null,
-  teamId: string | undefined,
-): boolean {
-  return computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
-}
 
 function machineMeta(machine: MachineRow, now: number, t: TFunc): string {
   if (machine.online !== true) {
@@ -193,7 +185,8 @@ function MachineCard({
   const [fullscreen, setFullscreen] = useState(false);
   const [screenRequested, setScreenRequested] = useState(openScreen);
   const control = useComputerControl({ teamId, computer });
-  const screenLive = screenLiveOf(machine, computer, teamId);
+  const screenLive =
+    computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
 
   useEffect(() => {
     if (!screenLive) setFullscreen(false);
@@ -240,7 +233,7 @@ function MachineCard({
           </Button>
         )}
       </div>
-      {screenLive && computer !== null && teamId !== undefined && (
+      {screenLive && (
         <>
           <MachineScreenSurface
             teamId={teamId}
@@ -297,9 +290,6 @@ export function MachinesPanel({
   const [checkedAt, setCheckedAt] = useState(() => Date.now());
   const [checking, setChecking] = useState(false);
   const keyOf = (machine: MachineRow) => machine.id ?? machine.name;
-  const screenOff = ordered.some(
-    (machine) => machine.online === true && !screenLiveOf(machine, computerFor(machine), teamId),
-  );
 
   const recheck = () => {
     setChecking(true);
@@ -333,15 +323,6 @@ export function MachinesPanel({
                 openScreen={linkedMachine !== null && keyOf(machine) === linkedMachine}
               />
             ))}
-            {screenOff && (
-              <p
-                data-testid="machine-screen-hint"
-                className="m-0 flex items-center gap-2 py-2.5 pr-4 pl-5 text-meta text-content-tertiary"
-              >
-                <MonitorSmartphone aria-hidden="true" className="size-4 flex-none" />
-                {t('未开启桌面控制，开启后屏幕显示在电脑下方')}
-              </p>
-            )}
           </ListCard>
         </QueryBoundary>
         <div className="flex h-11 flex-none items-center justify-between pr-2 pl-2.5 text-meta text-content-tertiary">

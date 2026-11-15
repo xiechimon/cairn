@@ -144,8 +144,6 @@ export const EN: Record<string, string> = {
   '在线 · 空闲': 'Online · idle',
   '{n} 在跑': '{n} running',
   已安装: 'Installed',
-  '未开启桌面控制，开启后屏幕显示在电脑下方':
-    'Desktop control is off; each screen shows under its computer once it is on',
   '桌面控制已上线，屏幕显示在这里': 'Desktop control is online; the screen shows here',
   正在连接屏幕: 'Connecting to the screen',
   屏幕暂时连不上: 'The screen could not connect',
@@ -1640,7 +1638,7 @@ export const EN: Record<string, string> = {
   对话加载失败: 'Could not load the conversation',
   '对话记录还在，重试一下。': 'Your conversation is still there. Try again.',
   待你决定: 'Needs you',
-  '跟 Coordinator 说（在 {name} 里）…': 'Talk to the Coordinator (in {name})…',
+  '在 {name} 里发消息': 'Message in {name}',
   '{name}，你想在 {project} 里做什么？': '{name}, what would you like to do in {project}?',
   首页: 'Home',
   'Claude 登录需要处理': 'Claude sign-in needs attention',
