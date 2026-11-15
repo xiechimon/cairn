@@ -922,8 +922,8 @@ export const EN: Record<string, string> = {
     'The task sandbox is not ready: the FUSE mount `{mountPoint}` in your home folder blocks it, usually left by an AppImage app started with TMPDIR inside home. Close that app, or start it with TMPDIR outside home; the Runner checks again every minute.',
   '任务沙箱没就绪：沙箱没法覆盖你的家目录，常见原因是家目录里有 FUSE 挂载（比如 AppImage 程序）。用 `findmnt -l | grep fuse` 找到它并关掉对应程序，Runner 每分钟会自己再检查一次。':
     'The task sandbox is not ready: it cannot overlay your home folder, usually because of a FUSE mount there (such as an AppImage app). Find it with `findmnt -l | grep fuse` and close that app; the Runner checks again every minute.',
-  '排队中：{machine} 没开 {runtime}——到 Runner 页打开（前面 {ahead} 个）':
-    'Queued: {machine} has {runtime} turned off. Turn it on in the Runner page ({ahead} ahead)',
+  '排队中：{machine} 上没有检测到 {runtime}，装好后重启 Runner（前面 {ahead} 个）':
+    'Queued: {machine} has not detected {runtime}. Install it, then restart the Runner ({ahead} ahead)',
   '排队中：{machine} 用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）':
     'Queued: {machine} cannot use the model for this step. Pick another model in work routing ({ahead} ahead)',
   '排队中：本地项目只在它所在的 Runner 上跑，{machine} 跑不了（前面 {ahead} 个）':
@@ -1572,9 +1572,13 @@ export const EN: Record<string, string> = {
   首页: 'Home',
   'Claude 登录需要处理': 'Claude sign-in needs attention',
   '{kind} 步骤': '{kind} step',
-  '{name} 接任务': 'Run steps on {name}',
   '{time} 重置': 'resets {time}',
   '冷却至 {time}': 'Cooling until {time}',
+  已检测到: 'Detected',
+  '没有检测到，装好后重启 Runner': 'Not detected. Install it, then restart the Runner',
+  接入命令闸前不能用: 'Unavailable until it uses the command gate',
+  '这台 Runner 上检测到的执行器。检测到就能接任务，不用开关。':
+    'Runtimes detected on this Runner. Anything detected takes tasks; there is nothing to switch on.',
   可用: 'Available',
   '固定于 {ago}': 'pinned {ago}',
   '固定账户的 thread': 'Sticky threads',
@@ -1590,7 +1594,6 @@ export const EN: Record<string, string> = {
   评审: 'Review',
   账户: 'Accounts',
   还没有额度读数: 'No quota reading yet',
-  '这台 Runner 还不能单独开关 {name}': '{name} cannot be switched on this Runner yet',
   '这台 Runner 还没有上报 provider 状态': 'This Runner has not reported its providers yet',
   重命名: 'Rename',
   重命名分组: 'Rename group',
@@ -1649,7 +1652,6 @@ export const EN: Record<string, string> = {
   发送中: 'Sending',
   '回复这个任务…': 'Reply to this task…',
   回复这个任务: 'Reply to this task',
-  '启用 {name}': 'Enable {name}',
   添加服务商: 'Add provider',
   '移除 {name}': 'Remove {name}',
   '加密保存，保存后不能再查看': 'Encrypted; cannot be viewed after saving',
@@ -1692,7 +1694,6 @@ export const EN: Record<string, string> = {
   '添加 API key、订阅或自定义端点后，它们的模型会出现在这里。':
     'Add an API key, subscription or custom endpoint and its models show up here.',
   还没上报: 'Not reported yet',
-  接入命令闸前不能开启: 'Locked until it uses the command gate',
   模型列表: 'Models',
   '已安装，登录状态未知': 'Installed, sign-in unknown',
   '{online}/{total} 台电脑在线': '{online} of {total#1 computer|# computers} online',
@@ -1937,8 +1938,6 @@ export const EN: Record<string, string> = {
   显示更多: 'Show more',
   'PR 状态加载失败，稍后会自动重试。': 'Could not load the PR status; retrying shortly.',
   '这台 Runner 在 Coordinator 里的角色': "This Runner's role for the Coordinator",
-  '这台 Runner 上能接任务的执行器，以及它们的登录状态。':
-    'The runtimes that can take tasks on this Runner, and their sign-in state.',
   能力: 'Capabilities',
   '这台 Runner 上报的 MCP 与技能清单': 'The MCP servers and skills this Runner reports',
   管理: 'Manage',
@@ -1947,7 +1946,6 @@ export const EN: Record<string, string> = {
   '已接入的 Runner': 'Connected Runners',
   '已检查 {ago}': 'Checked {ago}',
   用途与连接: 'Uses and connections',
-  接任务中: 'Taking tasks',
   '连接断开，正在重连…': 'Connection lost, reconnecting…',
   '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
   设置作用于: 'Settings apply to',
@@ -2019,7 +2017,6 @@ export const EN: Record<string, string> = {
   '更新 Cairn 后才能接有平台要求的任务': 'Update Cairn to take tasks that need a platform',
   '任务沙箱没就绪，暂时接不了任务——展开看怎么修':
     'Task sandbox not ready, so this Runner cannot take tasks. Expand to see how to fix it',
-  '选择这台 Runner 接哪些运行时': 'Choose which runtimes this Runner takes work for',
   '重新连接 {name} 后才能修改它的设置。': 'Reconnect {name} to change its settings.',
   '在这台 Runner 上确认它已联网、没有休眠，然后运行 `{command}` 重新启动。上线后这里会自动变回在线。':
     'On this Runner, make sure it is online and awake, then run `{command}` to start it again. It turns online here by itself.',

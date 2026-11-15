@@ -15,7 +15,6 @@ import {
   SettingsRow,
   SettingsSection,
 } from '../components/settings-list.js';
-import { ExplainDisabledToggle, ToggleSwitch } from '../components/toggle-switch.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { MachineAgentAccess } from './machine-agent-access.js';
@@ -99,43 +98,31 @@ export function TextWithCode({ text }: { text: string }) {
   );
 }
 
-function RuntimeRow({
-  machine,
-  runtime,
-  frozen,
-  blockedReason,
-  onToggle,
-}: {
-  machine: MachineRow;
-  runtime: string;
-  frozen: boolean;
-  blockedReason: string | undefined;
-  onToggle: (runtime: MachineRuntime, next: boolean) => void;
-}) {
+function runtimeAvailability(machine: MachineRow, runtime: string): string {
+  if (runtime === 'gemini') return '接入命令闸前不能用';
+  if (!isMachineRuntime(runtime)) return '已检测到';
+  return (machine.enabledRuntimes ?? []).includes(runtime)
+    ? '可用'
+    : '没有检测到，装好后重启 Runner';
+}
+
+function RuntimeRow({ machine, runtime }: { machine: MachineRow; runtime: string }) {
   const { t } = useI18n();
   const provider = machine.providers?.find((p) => p.runtime === runtime);
-  const toggleable = isMachineRuntime(runtime);
-  const enabled = toggleable
-    ? (machine.enabledRuntimes ?? []).includes(runtime)
-    : (provider?.enabled ?? false);
+  const availability = runtimeAvailability(machine, runtime);
+  const available = availability === '可用' || availability === '已检测到';
   const name = RUNTIME_NAMES[runtime] ?? runtime;
   const meta =
     provider === undefined
       ? []
       : [provider.plan, provider.version].filter((part): part is string => part !== null);
   const login = provider === undefined ? null : LOGIN_STATE[provider.login];
-  const switchDisabled = !toggleable || frozen;
-  const reason = !toggleable
-    ? t('这台 Runner 还不能单独开关 {name}', { name })
-    : frozen
-      ? blockedReason
-      : undefined;
   return (
     <div
       data-testid="provider-row"
       data-runtime={runtime}
       data-login={provider?.login}
-      data-enabled={enabled}
+      data-available={available}
       className={cn(SETTINGS_ROW_CLS, 'flex-wrap gap-y-1')}
     >
       <span className="flex min-w-0 flex-col">
@@ -156,36 +143,29 @@ function RuntimeRow({
               </span>
             </span>
           )}
-          {provider === undefined && <span>{enabled ? t('接任务中') : t('未开启')}</span>}
         </span>
       </span>
-      <ExplainDisabledToggle disabled={switchDisabled} reason={reason}>
-        <ToggleSwitch
-          data-testid="provider-toggle"
-          aria-label={t('{name} 接任务', { name })}
-          checked={enabled}
-          disabled={switchDisabled}
-          title={reason}
-          onCheckedChange={(next) => {
-            if (toggleable) onToggle(runtime, next);
-          }}
+      <span
+        data-testid="provider-availability"
+        className={cn(
+          'inline-flex items-center gap-1.5 text-meta',
+          available ? 'text-running-text' : 'text-content-tertiary',
+        )}
+      >
+        <span
+          aria-hidden
+          className={cn(
+            'size-1.5 flex-none rounded-full',
+            available ? 'bg-running' : 'bg-content-dim',
+          )}
         />
-      </ExplainDisabledToggle>
+        {t(availability)}
+      </span>
     </div>
   );
 }
 
-export function MachineDetailPane({
-  machine,
-  chief,
-  pending,
-  onToggleRuntime,
-}: {
-  machine: MachineRow;
-  chief: ChiefState;
-  pending: boolean;
-  onToggleRuntime: (runtime: MachineRuntime, next: boolean) => void;
-}) {
+export function MachineDetailPane({ machine, chief }: { machine: MachineRow; chief: ChiefState }) {
   const { t } = useI18n();
   const online = machine.online !== false;
 
@@ -307,27 +287,11 @@ export function MachineDetailPane({
       <SettingsSection
         testId="machine-runtimes"
         title={t('运行时')}
-        description={t('这台 Runner 上能接任务的执行器，以及它们的登录状态。')}
+        description={t('这台 Runner 上检测到的执行器。检测到就能接任务，不用开关。')}
       >
-        {online && !(machine.enabledRuntimes ?? []).some(isMachineRuntime) && (
-          <p data-testid="machine-pick-runtimes" className="m-0 text-meta text-content-secondary">
-            {t('选择这台 Runner 接哪些运行时')}
-          </p>
-        )}
         <SettingsCard>
           {runtimes.map((runtime) => (
-            <RuntimeRow
-              key={runtime}
-              machine={machine}
-              runtime={runtime}
-              frozen={pending || !online}
-              blockedReason={
-                online
-                  ? undefined
-                  : t('重新连接 {name} 后才能修改它的设置。', { name: machine.name })
-              }
-              onToggle={onToggleRuntime}
-            />
+            <RuntimeRow key={runtime} machine={machine} runtime={runtime} />
           ))}
         </SettingsCard>
       </SettingsSection>

@@ -43,6 +43,7 @@ import {
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
+import { machineRuntimeAvailable } from './dispatch-eligibility.js';
 import { paidClaudeAllowed } from './model-routing.js';
 import { DEFAULT_SESSION_MODEL, DEFAULT_SESSION_PROVIDER } from './routing-migration.js';
 import { capabilityCandidates, decideStepRoute } from './step-route.js';
@@ -193,20 +194,17 @@ function sessionHarness(
 ): 'claude-code' | 'codex-login' | null {
   const rows = db
     .select({
-      report: machine.claudeCodeReport,
-      enabled: machine.enabledRuntimes,
+      claudeCodeReport: machine.claudeCodeReport,
       capabilities: machine.capabilities,
     })
     .from(machine)
     .where(eq(machine.teamId, teamId))
     .all();
-  if (rows.some((row) => row.report?.installed === true && row.enabled.includes('claude-code'))) {
+  if (rows.some((row) => machineRuntimeAvailable(row, 'claude-code'))) {
     return 'claude-code';
   }
-  const codex = rows.some(
-    (row) =>
-      CODEX_LOGIN_PRESENT.has(row.capabilities?.codexLogin?.state ?? 'absent') &&
-      row.enabled.includes('pi'),
+  const codex = rows.some((row) =>
+    CODEX_LOGIN_PRESENT.has(row.capabilities?.codexLogin?.state ?? 'absent'),
   );
   return codex ? 'codex-login' : null;
 }

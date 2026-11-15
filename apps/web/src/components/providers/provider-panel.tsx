@@ -3,19 +3,12 @@ import { X } from 'lucide-react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { SettingsPanel, SettingsSection } from '../settings-list.js';
-import { ToggleSwitch } from '../toggle-switch.js';
 import { Badge } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
 
 export type ProviderMark = ComponentType<SVGProps<SVGSVGElement>>;
 
 export type ProviderTone = 'ok' | 'warn' | 'fail' | 'off';
-
-export interface ProviderSwitch {
-  checked: boolean;
-  disabled?: boolean;
-  onChange?: (next: boolean) => void;
-}
 
 export interface ProviderItem {
   id: string;
@@ -24,7 +17,6 @@ export interface ProviderItem {
   version?: string | null;
   status: string;
   tone: ProviderTone;
-  toggle?: ProviderSwitch;
 }
 
 const MONO_MARK_CLS = '[&_path]:fill-current';
@@ -53,7 +45,6 @@ export function ProviderInstanceRow({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const { t } = useI18n();
   return (
     <div
       data-testid="provider-instance"
@@ -93,14 +84,6 @@ export function ProviderInstanceRow({
           </span>
         </span>
       </Button>
-      {item.toggle !== undefined && (
-        <ToggleSwitch
-          aria-label={t('启用 {name}', { name: item.name })}
-          checked={item.toggle.checked}
-          disabled={item.toggle.disabled}
-          onCheckedChange={(next) => item.toggle?.onChange?.(next)}
-        />
-      )}
     </div>
   );
 }

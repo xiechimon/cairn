@@ -41,7 +41,7 @@ import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta } from './attachments.js';
 import { NotFoundError } from './builds.js';
 import { ackChiefSteer, takeChiefSteer } from './chief-turns.js';
-import { recommendMachineConcurrency } from './dispatch-eligibility.js';
+import { availableRuntimes, recommendMachineConcurrency } from './dispatch-eligibility.js';
 import type { ConversationStreamHub } from './events.js';
 import { applyComputerPresence } from './machine-computer-presence.js';
 import {
@@ -183,7 +183,7 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     lastSeenAt: row.lastSeenAt,
     latestCliVersion: row.latestCliVersion,
     kind: row.kind,
-    enabledRuntimes: row.enabledRuntimes,
+    enabledRuntimes: availableRuntimes(row),
     maxConcurrent: row.maxConcurrent,
     maxConcurrentOverridden: row.maxConcurrentOverridden,
     recommendedConcurrent: recommendation.value,
