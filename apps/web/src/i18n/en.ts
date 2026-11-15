@@ -44,9 +44,18 @@ export const EN: Record<string, string> = {
   Archive: 'Archive',
   'Could not unarchive task.': 'Could not unarchive task.',
   'Could not archive task.': 'Could not archive task.',
-  '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.':
+  'Claude 订阅': 'Claude subscription',
+  '添加 Claude 订阅': 'Add Claude subscription',
+  '在你的电脑上运行 `claude setup-token`，把输出的 token 粘贴到下面。':
+    'Run `claude setup-token` on your machine, then paste the token below.',
+  'Claude Code 步骤会使用最近添加且未过期的订阅。Token 加密保存，保存后无法再查看。':
+    'Claude Code steps use the most recently added unexpired connection. Tokens are encrypted and cannot be viewed after saving.',
+  '到期日（可选）': 'Expires on (optional)',
+  '保存失败，请检查填写内容后重试。':
+    'Could not save the connection. Check the fields and try again.',
+  '{name}：Claude 订阅的 token 已过期。运行 `claude setup-token`，再添加一个新的订阅。':
     '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.',
-  '{name}: Claude subscription token expires in {days} days. Run `claude setup-token` and add a new connection.':
+  '{name}：Claude 订阅的 token 将在 {days} 天后过期。运行 `claude setup-token`，再添加一个新的订阅。':
     '{name}: Claude subscription token expires in {days## day|# days}. Run `claude setup-token` and add a new connection.',
   Archived: 'Archived',
   Agent: 'Agent',
