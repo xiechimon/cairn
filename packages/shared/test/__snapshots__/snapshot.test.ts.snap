@@ -10576,6 +10576,29 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                 },
               ],
             },
+            "confinementCause": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "not-own-unit",
+                    "bwrap-missing",
+                    "home-overlay-failed",
+                  ],
+                  "type": "string",
+                },
+                "mountPoint": {
+                  "format": "starts_with",
+                  "maxLength": 4096,
+                  "pattern": "^\\/.*",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "kind",
+              ],
+              "type": "object",
+            },
             "executor": {
               "enum": [
                 "orb",

@@ -2,6 +2,7 @@ import {
   type AgentTodoItem,
   type ChiefReportContent,
   type ClaudeLogin,
+  type ConfinementCause,
   type ConfinementReport,
   type GithubRepoSummary,
   type MachineExecutor,
@@ -294,6 +295,7 @@ export interface MachineRow {
     executor?: MachineExecutor;
     osPlatform?: MachineOsPlatform;
     confinement?: ConfinementReport;
+    confinementCause?: ConfinementCause;
     computer?: true;
     ownComputer?: true;
     browser?: true;
