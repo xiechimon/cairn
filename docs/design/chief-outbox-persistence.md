@@ -26,6 +26,7 @@ IndexedDB database `cairn-chief-outbox`, store `entries` keyed by `key`, through
 | 7 | `settle` | drops `sent` entries | nothing |
 | 8 | live surface mounts with a scope (`resume`, queued first on the dispatch chain) | once per scope per page: rows of this scope, not already in memory, whose owner lock is not held; `returned` rows older than 10 minutes are deleted; the rest, by `createdAt`: `sending` appended and sent under their key before any later send, `failed` appended (row 6 returns them), `returned` join the returned list | put each taken row with this page as owner |
 | 9 | reload from PR #4854 (background tab, new deploy), plain reload, closed tab, renderer crash | lost with the page | rows survive; row 8 on the next load |
+| 9a | PR #4854 deploy check while an entry is `sending` | `busy()` is true, so it shows the `有新版本` prompt instead of reloading | — |
 | 10 | render (`unlandedItems`) | a `null`-thread entry shows in the global thread's view | — |
 
 ## Failures
