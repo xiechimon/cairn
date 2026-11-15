@@ -17,18 +17,13 @@ test('no avatar surface reaches a third-party avatar host', async ({ page }) => 
   expect(hits).toEqual([]);
 });
 
-test('search drops agent rows; project task rows stay seeded', async ({ page }) => {
+test('search drops agent rows', async ({ page }) => {
   await page.goto('/app?scenario=01');
   await expect(page.locator('[data-slot="sidebar-nav-row"]').first()).toBeVisible();
   const searchPanel = page.getByRole('dialog', { name: '搜索' });
   await pressAndExpect(page, 'Meta+k', searchPanel);
   await page.keyboard.type('r3-builder');
   await expect(searchPanel.locator('[data-row-kind="agent"]')).toHaveCount(0);
-
-  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks');
-  const rowAvatar = page.locator('.prj-task-avatar').locator(INITIAL).first();
-  await expect(rowAvatar).toHaveText('X');
-  await expect(rowAvatar).toHaveAttribute('style', new RegExp(avatarTint(USER_NAME)));
 });
 
 test('conversation transcript: replies carry no avatar column, user rows are flat sand bubbles', async ({
@@ -42,7 +37,7 @@ test('conversation transcript: replies carry no avatar column, user rows are fla
   await expect(page.getByTestId('user-bubble').first()).toHaveCSS('border-top-left-radius', '18px');
 });
 
-test('account head shows the initial on the same tint as the task rows', async ({ page }) => {
+test('account head shows the initial on the seeded tint', async ({ page }) => {
   await page.goto('/app/account?scenario=13');
   const head = page.locator('.account-avatar').locator(INITIAL);
   await expect(head).toHaveText('X');

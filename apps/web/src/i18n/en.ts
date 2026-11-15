@@ -615,27 +615,18 @@ export const EN: Record<string, string> = {
   '1 次运行': '1 run',
   '{n} 次运行': '{n## run|# runs}',
   根目录: 'Root',
-  '搜索任务…': 'Search todos…',
   搜索任务: 'Search todos',
   筛选: 'Filter',
-  列表视图: 'List view',
-  网格视图: 'Grid view',
-  暂无内容: 'Nothing yet',
-  '创建第一个任务以开始使用。': 'Create your first todo to get started.',
   // #446（ADR 0005 读向）项目页「从 GitHub issue 建任务」入口 + 选择弹层
   // （状态过滤 / 分页 / 三态行）。
-  '从 GitHub issue 建任务': 'New task from GitHub issue',
   打开: 'Open',
   已关闭: 'Closed',
   '运行失败了，先重跑才能完成': 'The run failed; rerun it before marking it done',
   '已归档，不能标记完成': 'Archived, so it cannot be marked done',
   'Coordinator 在问你，到对话里回答':
     'A question from the Coordinator; answer it in the conversation',
-  'issue 列表加载失败': 'Failed to load issues',
-  '这个状态下没有 issue': 'No issues in this state',
   上一页: 'Previous page',
   下一页: 'Next page',
-  '第 {page} 页': 'Page {page}',
   // #452（ADR 0006 写向）详情页来源 issue 行：未建成 + 重试入口 / 回显
   // （号 + 状态 + 上游现值标题）/ 不一致中性提示（只提示不覆盖）。
   'GitHub issue 未建成': 'GitHub issue not created',
@@ -957,7 +948,6 @@ export const EN: Record<string, string> = {
   '远程（HTTP）': 'Remote (HTTP)',
   '2 天前': '2d ago',
   // —— overlay dialogs (issues #66 / #68) ——
-  新建任务: 'New task',
   删除任务: 'Delete todo',
   '确定删除该任务？此操作不可撤销。': 'Delete this todo? This cannot be undone.',
   // #306 sched-card 菜单删除确认（DeleteConfirm 家族泛化随加）。
@@ -970,7 +960,6 @@ export const EN: Record<string, string> = {
   撤销: 'Undo',
   完成任务: 'Complete task',
   负责人: 'Owner',
-  'issue 状态': 'Issue state',
   'Coordinator 用的模型额度已用完': "The Coordinator's model is out of quota",
   'Coordinator 用的模型暂时过载': "The Coordinator's model is overloaded",
   将改动合并到默认分支: 'Merge the changes into the default branch',
@@ -1067,12 +1056,9 @@ export const EN: Record<string, string> = {
   粘贴密钥的值: 'Paste the secret value',
   '值将加密存储，保存后无法再次查看。':
     'The value is stored encrypted and cannot be viewed again after saving.',
-  // wayfinder #178 project tasks toolbar (filter/sort menus, match-empty line)
   全部: 'All',
   进行中: 'In progress',
-  最近更新: 'Recently updated',
   标题: 'Title',
-  没有匹配的任务: 'No matching tasks',
   // wayfinder #175 add-provider dialog family (field authority = shared
   // createProviderBodySchema / r3 §2; protocol tab labels stay English
   // verbatim, never translated)

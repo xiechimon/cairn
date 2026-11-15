@@ -4,7 +4,6 @@ import {
   FIXED_TAGS,
   type FsListResult,
   type GithubIssueEcho,
-  type GithubIssuesResponse,
   type ProjectRecord,
   type TodoRecord as SharedTodoRecord,
 } from '@cairn/shared';
@@ -456,26 +455,6 @@ export const AUTONOMY: AutonomyRecord = {
       lastBlockedReason: 'budget',
       lastEvaluatedAt: NOW - 2 * MIN,
     },
-  ],
-};
-
-export const GITHUB_ISSUES: GithubIssuesResponse = {
-  page: 1,
-  hasMore: true,
-  issues: [
-    {
-      number: 1182,
-      title: 'Branch badge shows a stale name after a rerun',
-      state: 'open',
-      labels: [{ name: 'bug', color: TAGS[0]?.color ?? '' }],
-    },
-    {
-      number: 1176,
-      title: 'Let schedules run on a specific machine',
-      state: 'open',
-      labels: [{ name: 'feature', color: TAGS[1]?.color ?? '' }],
-    },
-    { number: 1170, title: 'Docs: explain the merge gate blockers', state: 'open', labels: [] },
   ],
 };
 

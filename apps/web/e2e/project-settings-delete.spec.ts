@@ -1,7 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
 const SETTINGS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c';
-const PROJECT_PAGE = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=r2-24c';
 const PROJECT_NAME = 'r3-lifecycle';
 
 const PROJECT_ROW = `aside [data-slot="sidebar-project-row"]:has-text("${PROJECT_NAME}")`;
@@ -13,13 +12,6 @@ async function openConfirm(page: Page) {
   await expect(dialog).toBeVisible();
   return dialog;
 }
-
-test('project topbar gear reaches the settings danger zone (#1174 entry)', async ({ page }) => {
-  await page.goto(PROJECT_PAGE);
-  await page.getByTestId('page-topbar').getByRole('link', { name: '设置', exact: true }).click();
-  await expect(page).toHaveURL(SETTINGS);
-  await expect(page.getByText('危险操作')).toHaveText('危险操作');
-});
 
 test('danger card renders and opens the project delete confirm', async ({ page }) => {
   await page.goto(SETTINGS);
