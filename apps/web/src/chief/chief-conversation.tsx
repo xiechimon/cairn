@@ -660,9 +660,8 @@ export function ChiefConversation({
                 </TodoGlanceContext.Provider>
               </MessageScrollerContent>
             </FadeScrollerViewport>
-            <JumpToLatestButton>
+            <JumpToLatestButton label={t('滚动到最新')}>
               <ArrowDown width={20} height={20} />
-              <span className="sr-only">{t('滚动到最新')}</span>
             </JumpToLatestButton>
             {earlier != null && (
               <EarlierLoader

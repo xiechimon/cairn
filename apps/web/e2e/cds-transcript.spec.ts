@@ -67,6 +67,8 @@ test('CDS transcript: jump-to-latest appears past 120px and restores end', async
     col.scrollTop = Math.max(0, col.scrollHeight - col.clientHeight - endSpace - 200);
   });
   await expect(jump).toHaveAttribute('data-active', 'true', { timeout: 3000 });
+  await jump.hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('滚动到最新');
 
   await jump.click();
   await expect(jump).toHaveAttribute('data-active', 'false', { timeout: 3000 });
