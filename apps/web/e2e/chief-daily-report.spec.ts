@@ -64,135 +64,126 @@ const reportRow = (overrides: Record<string, unknown> = {}): Row => ({
   createdAt: 30,
 });
 
-test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
-  test.use({ viewport: { width: 1280, height: 1500 } });
+const ZONE = 'Asia/Shanghai';
+const TODAY = new Intl.DateTimeFormat('en-CA', { timeZone: ZONE }).format(Date.now());
 
-  test('shows yesterday, needs-you count, and draft retro proposals that ian decides', async ({
+test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
+  test.use({ viewport: { width: 1280, height: 1500 }, timezoneId: ZONE });
+
+  test('the chat shows one sentence and a document card; the document holds the numbered suggestions', async ({
     page,
   }) => {
     const decisions: string[] = [];
-    await mockLive(page, { threads: [THREAD], messages: [...HISTORY, reportRow()] }, (p, route, json) => {
-      const match = /^\/api\/teams\/t1\/chief\/retro-proposals\/([^/]+)\/(accept|dismiss)$/.exec(p);
-      if (match === null || route.request().method() !== 'POST') return undefined;
-      decisions.push(`${match[1]}:${match[2]}`);
-      return json({
-        ...proposal(match[1] ?? '', 'x'),
-        status: match[2] === 'accept' ? 'accepted' : 'dismissed',
-        todoId: match[2] === 'accept' ? 'todo-new' : null,
-      });
+    page.on('request', (request) => {
+      if (request.url().includes('/retro-proposals/')) decisions.push(request.url());
     });
+    await mockLive(page, { threads: [THREAD], messages: [...HISTORY, reportRow()] });
     await page.goto('/app');
-    const card = page.getByTestId('home-c').getByTestId('chief-report');
-    await expect(card).toContainText('今天的日报 · 昨天（2026-10-26）');
-    await expect(card.getByTestId('chief-report-yesterday')).toContainText(
+    const row = page.getByTestId('home-c').getByTestId('chief-report');
+    await expect(row.getByTestId('chief-report-sentence')).toHaveText(
+      '2026-10-27 的日报写好了：完成 1 · 合并 1 · 失败 1，有 2 条建议等你决定',
+    );
+    await expect(row.getByRole('button')).toHaveCount(1);
+    const card = row.getByTestId('research-report-card');
+    await expect(card).toHaveText('日报2026-10-27');
+    await expect(card).not.toHaveAttribute('data-stage');
+    await row.scrollIntoViewIfNeeded();
+    await evidencePanelShot(page, 'daily-report.png', row);
+    await card.click();
+    const doc = page.getByTestId('research-report-doc');
+    await expect(page.getByTestId('research-report-meta')).toHaveText(/^日报/);
+    await expect(page.getByTestId('research-report-meta')).not.toContainText('定稿');
+    await expect(doc).toContainText('昨天（2026-10-26）的进展');
+    await expect(doc).toContainText(
       '完成 1 · 合并 1 · 失败 1 · 重跑 2 · 等额度 0 · 审查通过 3 / 拦下 1',
     );
-    await expect(card.getByRole('link', { name: /PR 77/ })).toHaveAttribute(
+    await expect(doc.getByRole('link', { name: 'PR 77 · 修复看板拖拽后计数不刷新' })).toHaveAttribute(
       'href',
       'https://github.com/o/r/pull/77',
     );
-    await expect(card.getByTestId('chief-report-needs-you')).toContainText('2 件等你，去处理');
-    await expect(card).toContainText('这些来源太长，只读了后面的部分：#12 大线程。');
-    const proposals = card.getByTestId('chief-report-proposal');
-    await expect(proposals).toHaveCount(2);
-    await expect(proposals.first()).toContainText('防护：加一个 e2e 断言计数与服务端一致');
-    await card.scrollIntoViewIfNeeded();
-    await evidencePanelShot(page, 'daily-report.png', card);
-    await proposals.first().getByRole('button', { name: '建成线程' }).click();
-    await expect(proposals.first()).toHaveAttribute('data-status', 'accepted');
-    await expect(proposals.first().getByRole('link', { name: '已建成线程' })).toHaveAttribute(
+    await expect(doc).toContainText('写日报时有 2 件等你，现在的情况看任务面板。');
+    const items = doc.getByTestId('md-list-ordered').locator(':scope > li');
+    await expect(items).toHaveCount(2);
+    await expect(items.first()).toContainText('看板计数加回归测试 · 待你决定');
+    await expect(items.first()).toContainText('防护：加一个 e2e 断言计数与服务端一致');
+    await expect(items.first().getByRole('link', { name: '#9 修复看板拖拽后计数不刷新' })).toHaveAttribute(
       'href',
-      '/app?thread=todo-new',
+      '/app?thread=todo-1',
     );
-    await proposals.nth(1).getByRole('button', { name: '不用了' }).click();
-    await expect(proposals.nth(1)).toHaveAttribute('data-status', 'dismissed');
-    expect(decisions).toEqual(['rp-1:accept', 'rp-2:dismiss']);
-    await card.scrollIntoViewIfNeeded();
-    await evidencePanelShot(page, 'daily-report-decided.png', card);
+    await expect(items.nth(1)).toContainText('协调者先查状态再答 · 待你决定');
+    await expect(doc).toContainText('比如「2026-10-27 日报第 1 条建线程」');
+    await expect(doc).toContainText('这些来源太长，只读了后面的部分：#12 大线程。');
+    await expect(doc.getByRole('button', { name: '建成线程' })).toHaveCount(0);
+    await evidencePanelShot(page, 'daily-report-document.png', page.getByRole('dialog'));
+    expect(decisions).toEqual([]);
   });
 
-  test('outside developments render under the retro section and are decided like retro items', async ({
-    page,
-  }) => {
-    const decisions: string[] = [];
-    await mockLive(
-      page,
-      {
-        threads: [THREAD],
-        messages: [
-          ...HISTORY,
-          reportRow({
-            intake: [
-              intakeItem('in-1', 'accepted', 'todo-in-1'),
-              intakeItem('in-2', 'dismissed'),
-              intakeItem('in-3', 'draft'),
-            ],
-          }),
-        ],
-      },
-      (p, route, json) => {
-        const match = /^\/api\/teams\/t1\/chief\/retro-proposals\/([^/]+)\/(accept|dismiss)$/.exec(p);
-        if (match === null || route.request().method() !== 'POST') return undefined;
-        decisions.push(`${match[1]}:${match[2]}`);
-        return json({
-          ...intakeItem(match[1] ?? '', match[2] === 'accept' ? 'accepted' : 'dismissed'),
-          todoId: match[2] === 'accept' ? 'todo-in-3' : null,
-        });
-      },
-    );
+  test('outside developments continue the numbering and show each decision', async ({ page }) => {
+    const retro = [1, 2, 3, 4, 5].map((n) => proposal(`rp-${n}`, `复盘 ${n}`));
+    await mockLive(page, {
+      threads: [THREAD],
+      messages: [
+        ...HISTORY,
+        reportRow({
+          retro,
+          intake: [
+            intakeItem('in-1', 'accepted', 'todo-in-1'),
+            intakeItem('in-2', 'dismissed'),
+            intakeItem('in-3', 'draft'),
+            intakeItem('in-4', 'draft'),
+            intakeItem('in-5', 'draft'),
+          ],
+        }),
+      ],
+    });
     await page.goto('/app');
-    const card = page.getByTestId('home-c').getByTestId('chief-report');
-    const section = card.getByTestId('chief-report-intake');
-    await expect(section).toContainText('外部动态');
-    const items = section.getByTestId('chief-report-intake-item');
-    await expect(items).toHaveCount(3);
-    await expect(items.first()).toHaveAttribute('data-status', 'accepted');
-    await expect(items.nth(1)).toHaveAttribute('data-status', 'dismissed');
-    await expect(items.nth(2)).toHaveAttribute('data-status', 'draft');
-    const link = items.nth(2).getByRole('link', { name: 'example.com' });
-    await expect(link).toHaveAttribute('href', 'https://example.com/posts/in-3');
-    await expect(link).toHaveAttribute('target', '_blank');
-    await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-    await expect(items.nth(2)).toContainText('对应：#9 修复看板拖拽后计数不刷新');
-    await expect(items.nth(2)).toContainText('建议动作：在评审步骤里试一次并行评审');
-    await expect(items.first().getByRole('link', { name: '已建成线程' })).toHaveAttribute(
+    const row = page.getByTestId('home-c').getByTestId('chief-report');
+    await expect(row.getByTestId('chief-report-sentence')).toContainText('有 8 条建议等你决定');
+    await row.getByTestId('research-report-card').click();
+    const doc = page.getByTestId('research-report-doc');
+    const lists = doc.getByTestId('md-list-ordered');
+    await expect(lists).toHaveCount(2);
+    await expect(lists.nth(1)).toHaveAttribute('start', '6');
+    const intake = lists.nth(1).locator(':scope > li');
+    await expect(intake).toHaveCount(5);
+    await expect(intake.first()).toContainText('外部动态 in-1：新的并行评审做法 · 已建成线程');
+    await expect(intake.first().getByRole('link', { name: '已建成线程' })).toHaveAttribute(
       'href',
       '/app?thread=todo-in-1',
     );
-    await card.scrollIntoViewIfNeeded();
-    await evidencePanelShot(page, 'daily-report-intake.png', card);
-    await items.nth(2).getByRole('button', { name: '建成线程' }).click();
-    await expect(items.nth(2)).toHaveAttribute('data-status', 'accepted');
-    await expect(items.nth(2).getByRole('link', { name: '已建成线程' })).toHaveAttribute(
+    await expect(intake.nth(1)).toContainText('· 已忽略');
+    await expect(intake.nth(2)).toContainText('· 待你决定');
+    await expect(intake.nth(2)).toContainText('对应：#9 修复看板拖拽后计数不刷新');
+    await expect(intake.nth(2)).toContainText('建议动作：在评审步骤里试一次并行评审');
+    await expect(intake.nth(4).getByRole('link', { name: 'example.com' })).toHaveAttribute(
       'href',
-      '/app?thread=todo-in-3',
+      'https://example.com/posts/in-5',
     );
-    expect(decisions).toEqual(['in-3:accept']);
+    await evidencePanelShot(page, 'daily-report-intake.png', page.getByRole('dialog'));
   });
 
-  test('a report without intake has no outside-developments section', async ({ page }) => {
-    await mockLive(page, { threads: [THREAD], messages: [...HISTORY, reportRow()] });
-    await page.goto('/app');
-    const card = page.getByTestId('home-c').getByTestId('chief-report');
-    await expect(card).toBeVisible();
-    await expect(card.getByTestId('chief-report-intake')).toHaveCount(0);
-  });
-
-  test('a failed run shows the notice with the raw numbers and no retro', async ({ page }) => {
+  test('a failed run says so in the chat line and the document has the raw numbers only', async ({
+    page,
+  }) => {
     await mockLive(page, {
       threads: [THREAD],
       messages: [...HISTORY, reportRow({ status: 'retrying', retro: [], retroRan: false, truncated: [] })],
     });
     await page.goto('/app');
-    const card = page.getByTestId('home-c').getByTestId('chief-report');
-    await expect(card.getByTestId('chief-report-notice')).toContainText('日报没写成');
-    await expect(card.getByTestId('chief-report-yesterday')).toContainText('完成 1');
-    await expect(card.getByTestId('chief-report-retro')).toHaveCount(0);
-    await card.scrollIntoViewIfNeeded();
-    await evidencePanelShot(page, 'daily-report-notice.png', card);
+    const row = page.getByTestId('home-c').getByTestId('chief-report');
+    await expect(row.getByTestId('chief-report-sentence')).toHaveText(
+      '日报没写成，先看昨天的数字：完成 1 · 合并 1 · 失败 1',
+    );
+    await row.getByTestId('research-report-card').click();
+    const doc = page.getByTestId('research-report-doc');
+    await expect(doc).toContainText('日报没写成，过一会儿再试一次；先看昨天的数字。');
+    await expect(doc).toContainText('完成 1');
+    await expect(doc).not.toContainText('复盘建议');
   });
 
-  test('a quiet yesterday is one line', async ({ page }) => {
+  test('a quiet day says today only for today’s report, and names the day of an older one', async ({
+    page,
+  }) => {
     const quiet = {
       finished: [],
       finishedCount: 0,
@@ -204,21 +195,24 @@ test.describe('daily 08:00 report in the Coordinator chat (#2592)', () => {
       quotaWaits: 0,
       verdicts: { pass: 0, block: 0 },
     };
+    const sentence = page
+      .getByTestId('home-c')
+      .getByTestId('chief-report')
+      .getByTestId('chief-report-sentence');
     await mockLive(page, {
       threads: [THREAD],
       messages: [
         ...HISTORY,
-        reportRow({
-          yesterday: quiet,
-          needsYou: { count: 1, todos: [], questions: 1 },
-          retro: [],
-          truncated: [],
-        }),
+        reportRow({ day: TODAY, yesterday: quiet, retro: [], truncated: [] }),
       ],
     });
     await page.goto('/app');
-    const line = page.getByTestId('home-c').getByTestId('chief-report');
-    await expect(line).toHaveAttribute('data-variant', 'one-line');
-    await expect(line).toHaveText('今天的日报：昨天没有新进展。1 件等你');
+    await expect(sentence).toHaveText('今天的日报写好了：昨天没有新进展');
+    await mockLive(page, {
+      threads: [THREAD],
+      messages: [...HISTORY, reportRow({ yesterday: quiet, retro: [], truncated: [] })],
+    });
+    await page.goto('/app');
+    await expect(sentence).toHaveText('2026-10-27 的日报写好了：2026-10-26 没有新进展');
   });
 });

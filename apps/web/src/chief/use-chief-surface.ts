@@ -22,6 +22,7 @@ import {
   useMachines,
   useNotifications,
   useProjects,
+  useSession,
   useWarmConversationMessages,
 } from '../api/hooks.js';
 import { liveTextStore } from '../api/live-text.js';
@@ -106,6 +107,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   const chiefThreadsQ = useChiefThreads(teamId, live);
   const projectsQ = useProjects(teamId, live);
   const notificationsQ = useNotifications(teamId, live);
+  const userId = useSession(live).data?.id;
   const mutations = useApiMutations(teamId);
 
   const chief = fixture.chief;
@@ -261,16 +263,17 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     activity,
   ]);
   const outbox = useSyncExternalStore(chiefOutbox.subscribe, chiefOutbox.entries);
+  const globalThreadId = live ? (globalCoordinatorThread(liveThreads)?.id ?? null) : null;
   useEffect(() => {
     if (live) chiefOutbox.settle(activeThreadId, knownChiefIds);
   }, [live, outbox, activeThreadId, knownChiefIds]);
   const liveChiefWithUnsent = useMemo(() => {
     if (liveChief === null) return null;
-    const unlanded = unlandedItems(outbox, activeThreadId, knownChiefIds);
+    const unlanded = unlandedItems(outbox, activeThreadId, knownChiefIds, globalThreadId);
     return unlanded.length === 0
       ? liveChief
       : { ...liveChief, stream: [...(liveChief.stream ?? []), ...unlanded] };
-  }, [liveChief, outbox, activeThreadId, knownChiefIds]);
+  }, [liveChief, outbox, activeThreadId, knownChiefIds, globalThreadId]);
   const { fetchNextPage, isFetchingNextPage, isFetchNextPageError } = chiefMessagesQ;
   const loadEarlier = useCallback(() => {
     void fetchNextPage();
@@ -415,6 +418,13 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
           throw error;
         },
       );
+  const outboxScope = userId !== undefined && teamId !== undefined ? `${userId}/${teamId}` : null;
+  const deliverRef = useRef(deliver);
+  deliverRef.current = deliver;
+  useEffect(() => {
+    if (live && outboxScope !== null)
+      void chiefOutbox.resume(outboxScope, (entry) => deliverRef.current(entry));
+  }, [live, outboxScope]);
   const unsent = useMemo<UnsentSends | undefined>(
     () =>
       live
@@ -438,7 +448,16 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
           });
           return Promise.reject(new Error('Name a machine first'));
         }
-        chiefOutbox.enqueue({ threadId: activeThread?.id ?? null, projectId, text }, deliver);
+        chiefOutbox.enqueue(
+          {
+            scope: outboxScope,
+            threadId: activeThread?.id ?? null,
+            globalThreadId,
+            projectId,
+            text,
+          },
+          deliver,
+        );
         return Promise.resolve();
       }
     : DEMO_MODE

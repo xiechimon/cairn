@@ -1,6 +1,23 @@
 import { expect, type Page, test } from '@playwright/test';
 
 const SKILLS = '/app/resources/skills';
+const SHARED = '/home/you/.agents/skills/';
+
+function candidate(id: string, extra: { alreadyImported?: boolean; problem?: string | null } = {}) {
+  return {
+    id,
+    description: `${id} 的说明`,
+    sourcePath: `${SHARED}${id}`,
+    alreadyImported: extra.alreadyImported ?? false,
+    problem: extra.problem ?? null,
+  };
+}
+
+async function stubCandidates(page: Page, candidates: ReturnType<typeof candidate>[]) {
+  await page.route('**/api/teams/*/skills/import-candidates', (route) =>
+    route.fulfill({ json: { candidates, skippedSources: [] } }),
+  );
+}
 
 async function stubBoot(page: Page) {
   await page.route('**/api/**', (route, request) => {
@@ -29,6 +46,7 @@ async function stubImport(page: Page, seed: SkillRow[] = []) {
   const importCalls: { url: string; body?: unknown }[] = [];
   let importStatus = 201;
   let importError = 'skill directory deploy already exists';
+  const failures = new Map<string, { status: number; error: string }>();
   await page.route('**/api/skills*', (route, request) => {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ json: store });
@@ -36,9 +54,18 @@ async function stubImport(page: Page, seed: SkillRow[] = []) {
 
   await page.route('**/api/teams/*/skills/import', (route, request) => {
     importCalls.push({ url: request.url(), body: request.postDataJSON() });
+    const body = request.postDataJSON() as { localPath?: string; url?: string };
+    const failing = failures.get(body.localPath ?? '');
+    if (failing !== undefined) {
+      return route.fulfill({ status: failing.status, json: { error: failing.error } });
+    }
     if (importStatus === 201) {
-      const body = request.postDataJSON() as { localPath?: string; url?: string };
-      const name = body.localPath !== undefined ? 'from-path' : 'from-url';
+      const name =
+        body.localPath?.startsWith(SHARED) === true
+          ? body.localPath.slice(SHARED.length)
+          : body.localPath !== undefined
+            ? 'from-path'
+            : 'from-url';
       const rec: SkillRow = {
         id: name,
         teamId: 'team-1',
@@ -57,6 +84,8 @@ async function stubImport(page: Page, seed: SkillRow[] = []) {
       importStatus = status;
       importError = error;
     },
+    failFor: (localPath: string, status: number, error: string) =>
+      failures.set(localPath, { status, error }),
   };
 }
 
@@ -66,6 +95,7 @@ test('fixture import dialog: field set + xor submit gate + accept-law submit clo
   await page.getByTestId('resource-import').click();
   const dialog = page.getByRole('dialog', { name: '导入技能' });
   await expect(dialog).toHaveAccessibleName('导入技能');
+  await dialog.getByTestId('skill-import-tab-source').click();
   await expect(dialog.locator('#dlg-skill-import-path')).toBeVisible();
   await expect(dialog.locator('#dlg-skill-import-url')).toBeVisible();
 
@@ -90,6 +120,7 @@ test('live import: dialog closes after 201, list appears immediately, request bo
   await expect(page.getByTestId('resource-empty')).toBeVisible();
   await page.getByTestId('resource-import').click();
   const dialog = page.getByRole('dialog', { name: '导入技能' });
+  await dialog.getByTestId('skill-import-tab-source').click();
   await dialog.locator('#dlg-skill-import-path').fill('  /Users/you/skills/deploy-to-prod  ');
   await dialog.getByRole('button', { name: '导入', exact: true }).click();
 
@@ -109,6 +140,7 @@ test('live import 400: dialog stays open, error row headline + server verbatim d
   await page.goto(SKILLS);
   await page.getByTestId('resource-import').click();
   const dialog = page.getByRole('dialog', { name: '导入技能' });
+  await dialog.getByTestId('skill-import-tab-source').click();
   await dialog.locator('#dlg-skill-import-path').fill('/Users/you/skills/broken');
   await dialog.getByRole('button', { name: '导入', exact: true }).click();
 
@@ -126,6 +158,7 @@ test('live import 409 same name: headline translated readably', async ({ page })
   await page.goto(SKILLS);
   await page.getByTestId('resource-import').click();
   const dialog = page.getByRole('dialog', { name: '导入技能' });
+  await dialog.getByTestId('skill-import-tab-source').click();
   await dialog.locator('#dlg-skill-import-url').fill('https://github.com/acme/repo');
   await dialog.getByRole('button', { name: '导入', exact: true }).click();
 
@@ -133,4 +166,72 @@ test('live import 409 same name: headline translated readably', async ({ page })
   const error = dialog.getByRole('alert');
   await expect(error).toContainText('同名技能已存在');
   await expect(error.locator('span')).toContainText('already exists');
+});
+
+test('pick from this machine: imported and unimportable rows are disabled, two picks with one id are not allowed', async ({ page }) => {
+  await stubBoot(page);
+  await stubImport(page, [{ id: 'review', teamId: 'team-1', name: 'review', description: '评审' }]);
+  await stubCandidates(page, [
+    candidate('deploy'),
+    { ...candidate('deploy'), sourcePath: '/home/you/.claude/skills/deploy' },
+    candidate('review', { alreadyImported: true }),
+    candidate('nodesc', { problem: 'missing-description' }),
+  ]);
+  await page.goto(SKILLS);
+  await page.getByTestId('resource-import').click();
+  const dialog = page.getByRole('dialog', { name: '导入技能' });
+  const rows = dialog.getByTestId('skill-candidate');
+  await expect(rows).toHaveCount(4);
+  await expect(rows.filter({ hasText: 'review' }).getByRole('checkbox')).toBeDisabled();
+  await expect(rows.filter({ hasText: '已导入' })).toHaveCount(1);
+  await expect(rows.filter({ hasText: 'nodesc' }).getByRole('checkbox')).toBeDisabled();
+  await expect(rows.filter({ hasText: 'SKILL.md 缺少描述' })).toHaveCount(1);
+
+  const submit = dialog.getByRole('button', { name: /^导入/ });
+  await expect(submit).toBeDisabled();
+  await rows.nth(0).getByRole('checkbox').click();
+  await expect(rows.nth(1).getByRole('checkbox')).toBeDisabled();
+  await expect(rows.nth(1)).toContainText('已勾选另一个同名技能');
+  await expect(submit).toHaveText('导入 1 个');
+
+  await expect(rows.first()).not.toContainText(SHARED);
+
+  const all = dialog.getByTestId('skill-candidate-all');
+  await expect(all).toBeChecked();
+  await all.click();
+  await expect(submit).toHaveText('导入');
+  await all.click();
+  await expect(rows.nth(0).getByRole('checkbox')).toBeChecked();
+  await expect(rows.nth(1).getByRole('checkbox')).not.toBeChecked();
+  await expect(rows.filter({ hasText: 'review' }).getByRole('checkbox')).not.toBeChecked();
+  await expect(submit).toHaveText('导入 1 个');
+
+  await dialog.getByRole('textbox', { name: '搜索技能' }).fill('nodesc');
+  await expect(rows).toHaveCount(1);
+});
+
+test('pick from this machine: three picks with one failure keep the two that worked and name the one that failed', async ({ page }) => {
+  await stubBoot(page);
+  const { importCalls, failFor } = await stubImport(page);
+  await stubCandidates(page, [candidate('alpha'), candidate('beta'), candidate('gamma')]);
+  failFor(`${SHARED}beta`, 400, 'skill file is not valid UTF-8 text: logo.png');
+  await page.goto(SKILLS);
+  await page.getByTestId('resource-import').click();
+  const dialog = page.getByRole('dialog', { name: '导入技能' });
+  const rows = dialog.getByTestId('skill-candidate');
+  for (const id of ['alpha', 'beta', 'gamma']) {
+    await rows.filter({ hasText: id }).getByRole('checkbox').click();
+  }
+  await dialog.getByRole('button', { name: '导入 3 个' }).click();
+
+  await expect(rows.filter({ hasText: 'beta' }).getByRole('alert')).toContainText('来源未通过校验');
+  await expect(rows.filter({ hasText: 'beta' }).getByRole('alert')).toContainText('logo.png');
+  await expect(dialog.getByRole('button', { name: '导入 1 个' })).toBeVisible();
+  expect(importCalls.map((c) => c.body)).toEqual([
+    { localPath: `${SHARED}alpha` },
+    { localPath: `${SHARED}beta` },
+    { localPath: `${SHARED}gamma` },
+  ]);
+  await dialog.getByRole('button', { name: '取消' }).click();
+  await expect(page.getByTestId('resource-row')).toHaveCount(2);
 });

@@ -105,7 +105,7 @@ import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
 
 const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
   'sandbox-unavailable':
-    '排队中：{machine} 的任务沙箱没就绪，接不了任务——在那台机器上运行 cairn restart，原因见 Runner 页（前面 {ahead} 个）',
+    '排队中：{machine} 的任务沙箱没就绪，接不了任务——原因和修法见 Runner 页（前面 {ahead} 个）',
   'runtime-disabled': '排队中：{machine} 没开 {runtime}——到 Runner 页打开（前面 {ahead} 个）',
   'model-unavailable':
     '排队中：{machine} 用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）',

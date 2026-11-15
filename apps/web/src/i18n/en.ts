@@ -44,9 +44,18 @@ export const EN: Record<string, string> = {
   Archive: 'Archive',
   'Could not unarchive task.': 'Could not unarchive task.',
   'Could not archive task.': 'Could not archive task.',
-  '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.':
+  'Claude 订阅': 'Claude subscription',
+  '添加 Claude 订阅': 'Add Claude subscription',
+  '在你的电脑上运行 `claude setup-token`，把输出的 token 粘贴到下面。':
+    'Run `claude setup-token` on your machine, then paste the token below.',
+  'Claude Code 步骤会使用最近添加且未过期的订阅。Token 加密保存，保存后无法再查看。':
+    'Claude Code steps use the most recently added unexpired connection. Tokens are encrypted and cannot be viewed after saving.',
+  '到期日（可选）': 'Expires on (optional)',
+  '保存失败，请检查填写内容后重试。':
+    'Could not save the connection. Check the fields and try again.',
+  '{name}：Claude 订阅的 token 已过期。运行 `claude setup-token`，再添加一个新的订阅。':
     '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.',
-  '{name}: Claude subscription token expires in {days} days. Run `claude setup-token` and add a new connection.':
+  '{name}：Claude 订阅的 token 将在 {days} 天后过期。运行 `claude setup-token`，再添加一个新的订阅。':
     '{name}: Claude subscription token expires in {days## day|# days}. Run `claude setup-token` and add a new connection.',
   Archived: 'Archived',
   Agent: 'Agent',
@@ -476,6 +485,13 @@ export const EN: Record<string, string> = {
   每天运行: 'Runs daily',
   每周运行: 'Runs weekly',
   运行一次: 'Runs once',
+  '任务已归档，定时随之停用': 'The task was archived, so the schedule stopped',
+  '执行任务的 agent 暂停了它': 'The agent working on the task paused it',
+  '连续 10 次定时运行都没人回复，已自动暂停':
+    'Paused after 10 scheduled runs with no reply from a person',
+  '提交代码时被仓库检查拦下，这一轮没能完成': "The repository's commit check stopped this run",
+  '运行出错，已停用': 'The run failed, so the schedule stopped',
+  已结束: 'Ended',
   '{mo}月{d}日': '{monthShort} {d}',
   '下次 {day} {time}': 'Next {day} {time}',
   自动: 'Auto',
@@ -594,6 +610,21 @@ export const EN: Record<string, string> = {
   '来源未通过校验。': 'The source failed validation.',
   '拉取来源失败——稍后重试。': 'Fetching the source failed — try again later.',
   '导入失败，请重试。': 'Import failed, please retry.',
+  从本机选择: 'From this machine',
+  全选: 'Select all',
+  '路径或 GitHub': 'Path or GitHub',
+  搜索技能: 'Search skills',
+  '导入 {count} 个': 'Import {count}',
+  已导入: 'Imported',
+  已勾选另一个同名技能: 'Another skill with this name is selected',
+  'SKILL.md 缺少名称': 'SKILL.md has no name',
+  名称不能用作目录名: 'The name cannot be used as a directory name',
+  'SKILL.md 缺少描述': 'SKILL.md has no description',
+  '本机 ~/.agents/skills 和 ~/.claude/skills 里没有技能。':
+    'No skills in ~/.agents/skills or ~/.claude/skills on this machine.',
+  '没有匹配的技能。': 'No matching skills.',
+  '导入会把技能复制到 Cairn 自己的目录，原目录不会被改动。':
+    'Importing copies the skill into Cairn’s own directory; the original is left unchanged.',
   '尚无 MCP 服务器': 'No MCP servers yet',
   // spec 13/#368 本地 config 只读制：空态文案 = 配置指引（无添加钮）。
   '读取 server 本机 ~/.claude.json 的 mcpServers 段：在该文件添加配置并刷新，即出现在这里。MCP 服务器为 Agent 提供额外工具；授权在每个 Agent 的页面上单独进行。':
@@ -881,8 +912,16 @@ export const EN: Record<string, string> = {
     "This machine's system does not support the task sandbox, so it cannot take tasks.",
   '任务沙箱没就绪，这台 Runner 接不了任务。Linux 上 daemon 要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。':
     'The task sandbox is not ready, so this Runner cannot take tasks. On Linux the daemon must run as its own systemd user unit with bubblewrap (`bwrap`) installed: update the CLI, then run `{command} restart` on this machine.',
-  '排队中：{machine} 的任务沙箱没就绪，接不了任务——在那台机器上运行 cairn restart，原因见 Runner 页（前面 {ahead} 个）':
-    'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks. Run cairn restart on that machine; the Runner page shows why ({ahead} ahead)',
+  '排队中：{machine} 的任务沙箱没就绪，接不了任务——原因和修法见 Runner 页（前面 {ahead} 个）':
+    'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks. The Runner page shows why and how to fix it ({ahead} ahead)',
+  '任务沙箱没就绪：daemon 没有作为自己的 systemd user unit 运行。在这台机器上运行 `{command} restart`，它会自己起一个；还不行的话，检查 `systemd-run --user` 能不能用。':
+    'The task sandbox is not ready: the daemon is not running as its own systemd user unit. Run `{command} restart` on this machine, which starts one; if that does not help, check that `systemd-run --user` works.',
+  '任务沙箱没就绪：这台机器没装 bubblewrap（`bwrap`）。装好后（如 `sudo pacman -S bubblewrap` 或 `sudo apt install bubblewrap`），Runner 每分钟会自己再检查一次。':
+    'The task sandbox is not ready: bubblewrap (`bwrap`) is not installed on this machine. Install it (for example `sudo pacman -S bubblewrap` or `sudo apt install bubblewrap`); the Runner checks again every minute.',
+  '任务沙箱没就绪：家目录里的 FUSE 挂载 `{mountPoint}` 挡住了沙箱，通常是某个 AppImage 程序在 TMPDIR 指向家目录时留下的。关掉那个程序，或让它的 TMPDIR 指向家目录以外，Runner 每分钟会自己再检查一次。':
+    'The task sandbox is not ready: the FUSE mount `{mountPoint}` in your home folder blocks it, usually left by an AppImage app started with TMPDIR inside home. Close that app, or start it with TMPDIR outside home; the Runner checks again every minute.',
+  '任务沙箱没就绪：沙箱没法覆盖你的家目录，常见原因是家目录里有 FUSE 挂载（比如 AppImage 程序）。用 `findmnt -l | grep fuse` 找到它并关掉对应程序，Runner 每分钟会自己再检查一次。':
+    'The task sandbox is not ready: it cannot overlay your home folder, usually because of a FUSE mount there (such as an AppImage app). Find it with `findmnt -l | grep fuse` and close that app; the Runner checks again every minute.',
   '排队中：{machine} 没开 {runtime}——到 Runner 页打开（前面 {ahead} 个）':
     'Queued: {machine} has {runtime} turned off. Turn it on in the Runner page ({ahead} ahead)',
   '排队中：{machine} 用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）':
@@ -1124,6 +1163,8 @@ export const EN: Record<string, string> = {
   // command strings themselves stay untranslated — brand slots via BRAND)
   '有条件时优先使用云主机：笔记本会休眠或断网，云主机常在线，构建更稳定。':
     'Prefer a cloud host when you can: laptops sleep or drop off the network, while cloud hosts stay online and build more reliably.',
+  '当前地址只适用于这台电脑。添加另一台电脑前，请用 Tailscale 地址打开 Cairn，再复制命令。':
+    'This address only works on this computer. To add another computer, open Cairn at its Tailscale address before copying the command.',
   '在待接入的 Runner 上执行以下命令。浏览器将打开登录页，授权团队 {team} 后 Runner 即可上线。此后它在后台常驻运行，无需保持终端开启。':
     'Run the following commands on the Runner you want to connect. Your browser will open a sign-in page; once you authorize the team {team}, the Runner comes online. It then keeps running in the background — no need to keep the terminal open.',
   '安装 CLI': 'Install the CLI',
@@ -1151,6 +1192,10 @@ export const EN: Record<string, string> = {
   确认授权: 'Authorize',
   '正在授权…': 'Authorizing…',
   '授权完成，Runner 已注册。': 'Authorized — the Runner is registered.',
+  '授权完成，{name} 已注册为 Runner。': 'Authorized — {name} is registered as a Runner.',
+  机器名: 'Machine name',
+  '这个名字由发起方自报。只有你刚在这台机器上运行了 `cairn start`，且终端里显示的名字与这里一致，才确认授权。':
+    'The requester reports this name itself. Confirm only if you just ran `cairn start` on this machine and its terminal shows the same name.',
   '授权链接已失效，请在 Runner 上重新发起。':
     'This authorization link has expired — restart enrollment on the executor Runner.',
   '浏览器授权注册 →': 'Browser authorization →',
@@ -1454,25 +1499,19 @@ export const EN: Record<string, string> = {
   '取消提问失败，请重试。': 'Could not dismiss the question. Try again.',
   备用模型: 'Fallback models',
   选择运行时: 'Choose runtime',
-  '没能更新这条建议，请重试。': "Couldn't update this suggestion. Try again.",
   建议回复: 'Suggested replies',
   '为什么没拦住：{why}': 'Why it slipped through: {why}',
   '防护：{safeguard}': 'Safeguard: {safeguard}',
   '出处：': 'Source: ',
   协调者对话: 'Coordinator chat',
-  建成线程: 'Make it a thread',
-  不用了: 'Dismiss',
   已建成线程: 'Made into a thread',
   已忽略: 'Dismissed',
-  '今天的日报：昨天没有新进展。': "Today's report: nothing new yesterday. ",
   '{n} 件等你': '{n## item|# items} waiting on you',
   今天的日报: "Today's report",
-  '今天的日报 · 昨天（{day}）': "Today's report · yesterday ({day})",
   '日报没写成，过一会儿再试一次；先看昨天的数字。':
     "The report couldn't be written; it will try once more shortly. Here are yesterday's numbers.",
   '日报两次都没写成；下面是昨天的原始数字。':
     "The report failed twice; here are yesterday's raw numbers.",
-  昨天的进展: 'Yesterday',
   '完成 {done} · 合并 {merged} · 失败 {failed} · 重跑 {retries} · 等额度 {quota} · 审查通过 {pass} / 拦下 {block}':
     'Done {done} · merged {merged} · failed {failed} · reruns {retries} · quota waits {quota} · reviews passed {pass} / blocked {block}',
   '失败：': 'Failed: ',
@@ -1480,17 +1519,30 @@ export const EN: Record<string, string> = {
   '合并：': 'Merged: ',
   等你的事: 'Needs you',
   没有等你的事: 'Nothing is waiting on you',
-  '{n} 件等你，去处理': '{n## item|# items} waiting on you, open the inbox',
   复盘: 'Retro',
   外部动态: 'Outside developments',
+  复盘建议: 'Retro suggestions',
+  日报: 'Daily report',
+  '昨天（{day}）的进展': 'Yesterday ({day})',
+  '今天的日报写好了：昨天没有新进展': "Today's report is ready: nothing new yesterday",
+  '{day} 的日报写好了：{covers} 没有新进展': 'The {day} report is ready: nothing new on {covers}',
+  '{day} 的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}':
+    'The {day} report is ready: done {done} · merged {merged} · failed {failed}',
+  '今天的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}':
+    "Today's report is ready: done {done} · merged {merged} · failed {failed}",
+  '，有 {k} 条建议等你决定': ', {k## suggestion needs|# suggestions need} your decision',
+  '日报没写成，先看昨天的数字：完成 {done} · 合并 {merged} · 失败 {failed}':
+    "The report couldn't be written. Yesterday's numbers: done {done} · merged {merged} · failed {failed}",
+  '写日报时有 {n} 件等你，现在的情况看任务面板。':
+    '{n## item was|# items were} waiting on you when the report was written; the Tasks panel shows the current state.',
+  '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 2 条不用了」。':
+    'To act on a suggestion, tell the Coordinator in the chat, for example "make #1 of the {day} report a thread" or "dismiss #2".',
   '来源：': 'Source: ',
   '对应：{matches}': 'Matches: {matches}',
   '建议动作：{action}': 'Suggested action: {action}',
   昨天的对话里没找到值得改的地方: "Nothing in yesterday's conversations needs a safeguard",
   '这些来源太长，只读了后面的部分：{sources}。':
     'These sources were too long, so only their latest part was read: {sources}. ',
-  '复盘建议只是草稿：点「建成线程」才会建线程，建好后也要你自己开始。':
-    'Retro suggestions are drafts: a thread is created only when you choose "Make it a thread", and you still start it yourself.',
   执行: 'Build',
   合并: 'Merge',
   运行中: 'Running',

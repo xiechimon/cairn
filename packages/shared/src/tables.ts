@@ -84,6 +84,7 @@ export const DB_TABLES = [
   'mail_account',
   'mail_event',
   'mail_rule',
+  'mcp_connector',
   'team_top_models',
 ] as const;
 
@@ -112,6 +113,7 @@ export const INTERNAL_ONLY_TABLES = [
   'queued_message',
   'attachment',
   'github_connection',
+  'mcp_connector',
   'claude_subscription',
   'schedule_report',
   'skill_audit',

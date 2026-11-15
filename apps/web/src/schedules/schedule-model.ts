@@ -1,4 +1,5 @@
 import type { CreateScheduleBody, ScheduleRecord } from '@cairn/shared';
+import type { TFunc } from '../i18n/translate.js';
 
 export type ScheduleTrigger = 'once' | 'hourly' | 'daily' | 'weekdays' | 'weekly' | 'custom';
 export interface ScheduleDraft {
@@ -140,4 +141,26 @@ export function scheduleViewState(
     return 'finished';
   if (!schedule.enabled) return schedule.pausedReason === null ? 'paused' : 'disabled';
   return 'active';
+}
+
+const PAUSE_REASONS: Record<string, string> = {
+  'Task archived': '任务已归档，定时随之停用',
+  'Paused by worker': '执行任务的 agent 暂停了它',
+  'Paused after 10 consecutive scheduled runs without a human message':
+    '连续 10 次定时运行都没人回复，已自动暂停',
+};
+
+export function schedulePauseReason(reason: string, t: TFunc): string {
+  const known = PAUSE_REASONS[reason];
+  if (known !== undefined) return t(known);
+  if (reason.startsWith('git commit failed')) return t('提交代码时被仓库检查拦下，这一轮没能完成');
+  return /\n|error|failed|exit/i.test(reason) ? t('运行出错，已停用') : reason;
+}
+
+export function scheduleEnded(schedule: {
+  kind: string;
+  enabled?: boolean;
+  nextRunAt: number | null;
+}): boolean {
+  return schedule.kind === 'once' && (schedule.enabled === false || schedule.nextRunAt === null);
 }

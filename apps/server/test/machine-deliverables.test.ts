@@ -1,13 +1,14 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { type ClaimedStep, machineEnrollResponseSchema } from '@cairn/shared';
+import { type ClaimedStep, machineEnrollResponseSchema, todoRecordSchema } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   attachment as attachmentTable,
+  build as buildTable,
   message as messageTable,
   provider as providerTable,
   step as stepTable,
@@ -101,7 +102,9 @@ async function world(output: 'info' | 'code' = 'info') {
   const done = (stepId: string, body: Record<string, unknown>) =>
     call(s.app, 'POST', `/api/machine/done/${stepId}`, { cred, body });
   const rows = () => s.db.select().from(attachmentTable).all();
-  return { s, cred, todoId, buildId, claim, grant, put, done, rows };
+  const record = async () =>
+    todoRecordSchema.parse(await (await call(s.app, 'GET', `/api/todos/${todoId}`)).json());
+  return { s, cred, todoId, buildId, claim, grant, put, done, rows, record };
 }
 
 const PAGE = Buffer.from('<h1>结论</h1><p>Findings</p>', 'utf8');
@@ -151,6 +154,23 @@ describe('Made deliverables over the machine wire', () => {
       .get()!;
     const content = JSON.parse(String(msg.content)) as { items: { kind: string }[] };
     expect(content.items.map((i) => i.kind)).toEqual(['page', 'slides']);
+    expect((await w.record()).deliverables).toEqual({
+      items: [
+        {
+          attachmentId: granted[1]!.attachmentId,
+          kind: 'slides',
+          name: 'deck.pptx',
+          sizeBytes: DECK.length,
+        },
+        {
+          attachmentId: granted[0]!.attachmentId,
+          kind: 'page',
+          name: 'summary.html',
+          sizeBytes: PAGE.length,
+        },
+      ],
+      skipped: [],
+    });
     const fetched = await call(w.s.app, 'GET', `/api/attachments/${granted[0]!.attachmentId}`);
     expect(fetched.status).toBe(200);
     expect(fetched.headers.get('content-disposition')).toBe('attachment');
@@ -367,6 +387,38 @@ describe('Made deliverables over the machine wire', () => {
       w.s.db.select().from(stepTable).where(eq(stepTable.id, claimed.step.id)).get()!.status,
     ).toBe('claimed');
     expect(w.rows().find((r) => r.id === row!.attachmentId)!.status).toBe('received');
+  });
+
+  test('a set of only skipped files has no items, and a newer build hides it', async () => {
+    const w = await world();
+    const claimed = await w.claim();
+    const skipped = [{ name: 'chart.png', reason: 'unsupported-kind' }];
+    const res = await w.done(claimed.step.id, {
+      status: 'success',
+      report: '# r',
+      generation: claimed.deliverables!.generation,
+      deliverables: [],
+      deliverablesSkipped: skipped,
+    });
+    expect(res.status).toBe(200);
+    expect((await w.record()).deliverables).toEqual({ items: [], skipped });
+
+    w.s.db
+      .insert(buildTable)
+      .values({
+        id: 'build-rerun',
+        todoId: w.todoId,
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: Date.now(),
+      })
+      .run();
+    w.s.db
+      .update(todoTable)
+      .set({ latestBuildId: 'build-rerun' })
+      .where(eq(todoTable.id, w.todoId))
+      .run();
+    expect((await w.record()).deliverables).toBeUndefined();
   });
 
   test('a published PDF downloads and the skipped list reaches the message', async () => {

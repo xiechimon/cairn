@@ -42,11 +42,11 @@ export function subscriptionLoginWarning(
     return null;
   if (connection.expiresAt <= now)
     return t(
-      '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.',
+      '{name}：Claude 订阅的 token 已过期。运行 `claude setup-token`，再添加一个新的订阅。',
       { name: connection.label },
     );
   return t(
-    '{name}: Claude subscription token expires in {days} days. Run `claude setup-token` and add a new connection.',
+    '{name}：Claude 订阅的 token 将在 {days} 天后过期。运行 `claude setup-token`，再添加一个新的订阅。',
     {
       name: connection.label,
       days: Math.ceil((connection.expiresAt - now) / (24 * 60 * 60 * 1000)),

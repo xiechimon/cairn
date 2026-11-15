@@ -43,7 +43,7 @@ export function openReadOnlyView(): ReadOnlyView {
 }
 
 export interface ComputerScreenProviderOptions {
-  ensureComputer?: (scopeKey: string) => Promise<string>;
+  holdComputer?: (scopeKey: string) => Promise<() => void>;
   socketPath?: (scopeKey: string, kind: 'view' | 'control') => string;
   socketWaitMs?: number;
   connect?: (path: string) => Socket;
@@ -135,12 +135,26 @@ export function createComputerScreenProvider(
         throw new Error('a live control lease is required');
       }
       if (!options.socketPath) throw new Error('This machine has no computer screen');
-      if (options.ensureComputer) await options.ensureComputer(request.scopeKey);
-      return openUnixScreen(options.socketPath(request.scopeKey, request.kind), request.signal, {
-        socketWaitMs,
-        connect: connectSocket,
-        now,
-      });
+      const release = options.holdComputer
+        ? await options.holdComputer(request.scopeKey)
+        : () => {};
+      try {
+        const connection = await openUnixScreen(
+          options.socketPath(request.scopeKey, request.kind),
+          request.signal,
+          { socketWaitMs, connect: connectSocket, now },
+        );
+        return {
+          stream: connection.stream,
+          close: () => {
+            release();
+            return connection.close();
+          },
+        };
+      } catch (error) {
+        release();
+        throw error;
+      }
     },
   };
 }

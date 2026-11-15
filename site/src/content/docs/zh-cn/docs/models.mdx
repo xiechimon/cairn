@@ -64,15 +64,19 @@ key 加密存在你的服务端，保存后不能再查看。`测试连接` 会�
 列表里也有 OpenAI Codex 的订阅登录，标着 `暂未开通`；现在请改用 Runner 上的 Codex CLI。GitHub Copilot 登录只有在服务端配了你自己的 GitHub OAuth App（`CAIRN_GITHUB_OAUTH_CLIENT_ID` 和 `CAIRN_GITHUB_OAUTH_CLIENT_SECRET`）时才能用。Gemini CLI 会出现在 Runner 上，但在接入命令闸之前不能开启。
 </Aside>
 
-## 告诉 Coordinator 用哪个模型
+## Coordinator 用哪个模型
 
-光有模型来源，Coordinator 还不会回话：没有规则时它拒绝对话。首页最后一步设置 `打开工作路由` 会打开 `设置` → `规则与策略`。在 `Coordinator` 这张卡片上：
+不用专门给 Coordinator 选模型。它没有自己的规则时会用默认的：团队有 Anthropic API key 就用它，否则用你最早添加、它能直接用的服务商（比如带 API key 的）。`设置` → `规则与策略` 的 `Coordinator` 卡片上会写明，比如 `当前默认：{model} · {provider}（因为这是最早添加、Coordinator 能直接用的服务商）`。
+
+想换一个模型，就在这张卡片上建一条规则：
 
 1. `运行时`：选 `内置 (pi)`，用你添加的服务商的模型；
 2. `模型`：选一个你添加过的模型；
 3. 点 `创建`。
 
-规则保存后，首页的设置提示就消失了。同一页的 `会话` 卡片会显示新的活默认用什么、为什么，比如 `当前默认：Claude Code（因为有 Runner 装了 Claude Code）`。
+如果卡片上写着 `当前没有可用的默认：添加一个有 API key 的服务商，或在这里创建规则`，说明 Coordinator 没有能用的模型，比如你只在 Runner 上登录了 Claude Code。只有这种情况，首页才会多出第三步设置 `打开工作路由`，点它就到这张卡片。
+
+同一页的 `会话` 卡片会显示新的活默认用什么、为什么，比如 `当前默认：Claude Code（因为有 Runner 装了 Claude Code）`。
 
 ## 凭证放在哪
 

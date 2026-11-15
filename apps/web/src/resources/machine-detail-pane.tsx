@@ -51,10 +51,23 @@ export function sandboxNotice(capabilities: MachineRow['capabilities']): string 
       return null;
     case 'checking':
       return '正在检查任务沙箱，检查完才接任务。';
-    case 'unavailable':
-      return report.reason === 'unsupported-platform'
-        ? '这台机器的系统不支持任务沙箱，接不了任务。'
-        : '任务沙箱没就绪，这台 Runner 接不了任务。Linux 上 daemon 要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。';
+    case 'unavailable': {
+      if (report.reason === 'unsupported-platform')
+        return '这台机器的系统不支持任务沙箱，接不了任务。';
+      const cause = report.reason === 'startup-failed' ? capabilities.confinementCause : undefined;
+      switch (cause?.kind) {
+        case 'not-own-unit':
+          return '任务沙箱没就绪：daemon 没有作为自己的 systemd user unit 运行。在这台机器上运行 `{command} restart`，它会自己起一个；还不行的话，检查 `systemd-run --user` 能不能用。';
+        case 'bwrap-missing':
+          return '任务沙箱没就绪：这台机器没装 bubblewrap（`bwrap`）。装好后（如 `sudo pacman -S bubblewrap` 或 `sudo apt install bubblewrap`），Runner 每分钟会自己再检查一次。';
+        case 'home-overlay-failed':
+          return cause.mountPoint === undefined
+            ? '任务沙箱没就绪：沙箱没法覆盖你的家目录，常见原因是家目录里有 FUSE 挂载（比如 AppImage 程序）。用 `findmnt -l | grep fuse` 找到它并关掉对应程序，Runner 每分钟会自己再检查一次。'
+            : '任务沙箱没就绪：家目录里的 FUSE 挂载 `{mountPoint}` 挡住了沙箱，通常是某个 AppImage 程序在 TMPDIR 指向家目录时留下的。关掉那个程序，或让它的 TMPDIR 指向家目录以外，Runner 每分钟会自己再检查一次。';
+        default:
+          return '任务沙箱没就绪，这台 Runner 接不了任务。Linux 上 daemon 要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。';
+      }
+    }
   }
 }
 
@@ -188,7 +201,12 @@ export function MachineDetailPane({
   const loginWarning = notice === null ? null : formatClaudeLoginWarning(notice, machine.name, t);
   const sandboxKey = online ? sandboxNotice(machine.capabilities) : null;
   const sandbox =
-    sandboxKey === null ? null : t(sandboxKey, { command: PUBLISHED_PACKAGES.cli.command });
+    sandboxKey === null
+      ? null
+      : t(sandboxKey, {
+          command: PUBLISHED_PACKAGES.cli.command,
+          mountPoint: machine.capabilities?.confinementCause?.mountPoint ?? '',
+        });
 
   const runtimes: string[] = [
     ...MACHINE_RUNTIMES,

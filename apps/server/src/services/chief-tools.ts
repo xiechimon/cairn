@@ -12,6 +12,7 @@ import {
   coordinatorUpdateTodoParamsSchema,
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
+  fenceReportText,
   IN_PROGRESS_PHASES,
   isChiefConversationId,
   isWaitingPhase,
@@ -36,6 +37,7 @@ import {
 import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { proposalCardId } from './action-proposals.js';
 import { executeAction } from './action-registry.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta, resolveToolAttachmentId } from './attachments.js';
@@ -48,6 +50,7 @@ import {
 import {
   addChiefWatch,
   clearChiefWake,
+  insertChiefMessageOnce,
   parseChiefTrigger,
   removeChiefWatches,
   requireTurnProvenance,
@@ -55,7 +58,12 @@ import {
   upsertChiefMessage,
 } from './chief.js';
 import { channelMessages, readHistory, searchHistory } from './chief-history.js';
-import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
+import {
+  APPROVAL_CARD_ID_PREFIX,
+  announceQuestion,
+  askUserQuestionsOfParams,
+  createOrGetQuestion,
+} from './chief-questions.js';
 import { suggestQuickReplies } from './chief-quick-replies.js';
 import { assertToolNotRemoved, executeRouterTool, isRouterTool } from './chief-router-tools.js';
 import { readConversationPage } from './conversation-page.js';
@@ -65,7 +73,6 @@ import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
 import { readFillableProfile } from './job-applications.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { refuseMailTurnTool } from './mail.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
 import { executeMemoryDocumentTool } from './memory-documents.js';
 import { notifyChiefMessage } from './notifications.js';
@@ -73,6 +80,14 @@ import type { OAuthClientConfig } from './oauth.js';
 import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
 import { getModelSources } from './providers.js';
 import type { VapidKeys } from './push.js';
+import {
+  acceptReport,
+  refuseRestrictedTurnTool,
+  reportAcknowledged,
+  reportNoticeId,
+  reportRefOfPrompt,
+  requireCurrentReportTurn,
+} from './report-turn.js';
 import { assertPlatformChangeAllowed, setTodoPlatform } from './routing-rules.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
@@ -80,7 +95,7 @@ import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js
 import { snoozeTodo } from './snooze.js';
 import { listBuildStepRoutes } from './step-route.js';
 import { startThreadBuild } from './thread-message.js';
-import { deleteTodo, getTodo, listTodos, setTodoPhase } from './todos.js';
+import { getTodo, listTodos, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement } from './transcript.js';
 
 export interface ChiefToolDeps {
@@ -284,8 +299,9 @@ export async function executeChiefTool(
   name: string,
   params: Params,
 ): Promise<string> {
-  refuseMailTurnTool(ctx.turnPrompt ?? null, name);
+  refuseRestrictedTurnTool(ctx.turnPrompt ?? null, name, params);
   const { db } = deps;
+  requireCurrentReportTurn(db, ctx.turnPrompt ?? null, name);
   const svc = {
     db,
     hub: deps.hub,
@@ -308,20 +324,24 @@ export async function executeChiefTool(
   if (name === SUGGEST_REPLIES_TOOL_NAME) return suggestQuickReplies(deps, ctx, params);
   const action = actionByToolName(name);
   if (action?.surfaces.includes('coordinator') === true) {
-    return json(
-      executeAction(
-        { db, reposDir: deps.reposDir },
-        {
-          id: action.id,
-          input: params,
-          actor: 'coordinator',
-          surface: 'coordinator',
-          teamId: ctx.teamId,
-          threadId: ctx.threadId,
-          scopeProjectId: ctx.turnScopeProjectId ?? null,
-        },
-      ),
+    const result = executeAction(
+      { db, reposDir: deps.reposDir },
+      {
+        id: action.id,
+        input: params,
+        actor: 'coordinator',
+        surface: 'coordinator',
+        teamId: ctx.teamId,
+        threadId: ctx.threadId,
+        scopeProjectId: ctx.turnScopeProjectId ?? null,
+      },
     );
+    if (result.status !== 'pending') return json(result);
+    if (result.created) announceQuestion(deps, ctx.threadId, proposalCardId(result.proposalId));
+    return json({
+      ...result,
+      note: '没有执行任何改动。审批卡已发给用户；只有用户在卡片上批准后服务端才会执行。告诉用户在等批准，然后结束本轮。',
+    });
   }
   switch (name) {
     case 'projects': {
@@ -561,7 +581,22 @@ export async function executeChiefTool(
       return json(await executeGithubReadTool(deps, ctx.teamId, name, params));
     case 'attachment': {
       const attachmentId = resolveToolAttachmentId(db, ctx.teamId, str(params, 'attachmentId'));
-      return json(readAttachmentMeta(deps, ctx.teamId, attachmentId));
+      const meta = readAttachmentMeta(deps, ctx.teamId, attachmentId);
+      const reportOf = db
+        .select({ seqNum: todo.seqNum })
+        .from(build)
+        .innerJoin(todo, eq(todo.id, build.todoId))
+        .where(and(eq(build.reportAttachmentId, attachmentId), eq(todo.teamId, ctx.teamId)))
+        .get();
+      return json(
+        reportOf === undefined || meta.encoding !== 'utf8'
+          ? meta
+          : {
+              ...meta,
+              trust: 'untrusted-report',
+              content: fenceReportText(`#${reportOf.seqNum}`, meta.content),
+            },
+      );
     }
     case 'conversation': {
       const conversationId = str(params, 'conversationId');
@@ -627,12 +662,6 @@ export async function executeChiefTool(
       svc.machineHub?.wake(ctx.teamId);
       return json({ ...record, ...getTodo(svc, body.todoId) });
     }
-    case 'delete_todos': {
-      const ids = strArr(params, 'todoIds');
-      for (const id of ids) requireTeamTodo(db, id, ctx.teamId);
-      const deleted = ids.filter((id) => deleteTodo(svc, id));
-      return json({ deleted });
-    }
     case 'close_todos': {
       const supersededBy = optStr(params, 'supersededBy');
       return json(
@@ -667,8 +696,21 @@ export async function executeChiefTool(
         ...(Object.keys(notStarted).length > 0 ? { notStarted } : {}),
       });
     }
-    case 'complete_todos':
-      return json(transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'done', chiefActor));
+    case 'complete_todos': {
+      const complete = () =>
+        transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'done', chiefActor);
+      const report = reportRefOfPrompt(ctx.turnPrompt ?? null);
+      if (report === null) return json(complete());
+      const { result, ack } = acceptReport(
+        db,
+        ctx.threadId,
+        report,
+        params.silent === true,
+        complete,
+      );
+      if (ack !== null) deps.convHub?.publishMessage(ctx.threadId, ack);
+      return json(result);
+    }
     case 'create_project': {
       const name = str(params, 'name');
       const repoKind = optStr(params, 'repoKind');
@@ -869,6 +911,12 @@ export async function executeChiefTool(
       );
       const questions = askUserQuestionsOfParams(params);
       const requestId = optStr(params, 'requestId') ?? `ask-${newRecordId()}`;
+      if (requestId.startsWith(APPROVAL_CARD_ID_PREFIX)) {
+        throw new HttpError(
+          400,
+          'invalid params.requestId: approval cards are written by the server',
+        );
+      }
       const { content } = createOrGetQuestion(
         {
           db,
@@ -897,19 +945,32 @@ export async function executeChiefTool(
         params.provenance,
         'notify_user',
       );
-      const text = str(params, 'message');
+      const report = reportRefOfPrompt(ctx.turnPrompt ?? null);
+      if (report !== null && reportAcknowledged(db, ctx.threadId, report)) {
+        return json({ notified: false, reason: 'already-acknowledged' });
+      }
+      const text =
+        report === null
+          ? str(params, 'message')
+          : str(params, 'message').replaceAll(report.attachmentId, '报告');
       const notice = {
-        id: newRecordId(),
+        id: report === null ? newRecordId() : reportNoticeId(ctx.threadId, report),
         threadId: ctx.threadId,
         role: 'system' as const,
         content: JSON.stringify({
           kind: CHIEF_NOTICE_KIND,
           message: text,
           provenance,
+          ...(report !== null
+            ? { report: { todoId: report.todoId, buildId: report.buildId } }
+            : {}),
         } satisfies ChiefNoticeContent),
         createdAt: nowMs(),
       };
-      deps.convHub?.publishMessage(ctx.threadId, upsertChiefMessage(db, notice));
+      const stored =
+        report === null ? upsertChiefMessage(db, notice) : insertChiefMessageOnce(db, notice);
+      if (stored === null) return json({ notified: true, duplicate: true });
+      deps.convHub?.publishMessage(ctx.threadId, stored);
       notifyChiefMessage(
         { db, hub: deps.hub, user: deps.user },
         {

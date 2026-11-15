@@ -37,7 +37,7 @@ PATH=/opt/homebrew/opt/rsync/bin:$PATH node --test scripts/ops/backup-server-db.
 
 ## Live setup on omarchy
 
-The server runs on omarchy as user `ian`, with data in `/mnt/fast/cairn/server` (`server.db`, `attachments/`, `secretbox.key`). Local backups go to the HDD under `~/backups/cairn-server/` (mode 700): `db/` and `attachments/`.
+The server runs on omarchy as user `ian` with no `CAIRN_HOME`, so its data is in `~/.cairn/server` (`server.db`, `attachments/`, `coordinator/`, `secretbox.key`) and its skills are in `~/.cairn/skills`. The wrapper `~/.cairn/tools/backup/db-backup.sh` (mirrored in `scripts/ops/host/tools/backup/db-backup.sh`) derives both paths from `CAIRN_HOME` the way the server does. Local backups go to the HDD under `~/backups/cairn-server/` (mode 700): `db/`, `attachments/`, `coordinator/` and `skills/`.
 
 `~/.config/systemd/user/cairn-db-backup.service`:
 
@@ -52,7 +52,9 @@ UMask=0077
 Nice=10
 StandardOutput=append:%h/.local/state/cairn-db-backup.log
 StandardError=append:%h/.local/state/cairn-db-backup.log
-ExecStart=%h/Code/AgentProjects/cairn/scripts/ops/backup-server-db.sh --db /mnt/fast/cairn/server/server.db --out %h/backups/cairn-server/db --attachments /mnt/fast/cairn/server/attachments --attachments-out %h/backups/cairn-server/attachments --remote dmit-backup: --keep 48
+Environment=CAIRN_BACKUP_REMOTE=dmit-backup:
+ExecStart=%h/.cairn/tools/backup/db-backup.sh
+ExecStopPost=%h/.cairn/tools/backup/record-backup-status.sh --status %h/.cairn/server/backup-status.json
 TimeoutStartSec=30min
 ```
 
@@ -137,10 +139,11 @@ The omarchy push key is write-only, so a restore never uses it. Take the newest 
 
 1. Stop writes: `systemctl --user stop cairn-server.service` and `systemctl --user stop cairn-db-backup.timer`.
 2. `gunzip` the copy and check it: `sqlite3 server.db 'PRAGMA integrity_check;'` must print `ok`.
-3. Rename the old `/mnt/fast/cairn/server/server.db` (and its `-wal` / `-shm` files) aside as a record, then move the restored file into place.
-4. Restore attachments: `rsync -a --exclude=step-sessions <backup>/attachments/ /mnt/fast/cairn/server/attachments/` from `~/backups/cairn-server/attachments/`, or as root from `/home/cairnbak/cairn-backups/attachments/` on dmit. For each step in `<backup>/attachments/step-sessions/`, copy its newest version (highest `<mtime>`; on a tie, the longer transcript) back to `step-sessions/<step>.jsonl`. Files without a version in the name come from before #2163 and are the oldest.
-5. If `secretbox.key` is gone too, put back ian's own copy (mode 600). Without the matching key, stored secrets cannot be decrypted.
-6. `systemctl --user start cairn-server.service`, open the web UI and check that recent todos are there, check that the daemons reconnect, then start the backup timer again.
+3. Rename the old `~/.cairn/server/server.db` (and its `-wal` / `-shm` files) aside as a record, then move the restored file into place.
+4. Restore attachments: `rsync -a --exclude=step-sessions <backup>/attachments/ ~/.cairn/server/attachments/` from `~/backups/cairn-server/attachments/`, or as root from `/home/cairnbak/cairn-backups/attachments/` on dmit. For each step in `<backup>/attachments/step-sessions/`, copy its newest version (highest `<mtime>`; on a tie, the longer transcript) back to `step-sessions/<step>.jsonl`. Files without a version in the name come from before #2163 and are the oldest.
+5. Restore skills: unpack the newest `skills/skills-<UTC timestamp>.tar.gz` into an empty `~/.cairn/skills` with `tar -xzf <archive> -C ~/.cairn/skills`.
+6. If `secretbox.key` is gone too, put back ian's own copy (mode 600). Without the matching key, stored secrets cannot be decrypted.
+7. `systemctl --user start cairn-server.service`, open the web UI and check that recent todos are there, check that the daemons reconnect, then start the backup timer again.
 
 ## Drill discipline
 

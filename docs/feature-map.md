@@ -21,7 +21,7 @@
 | status planned | 3 |
 | research, frontend design and backend design all present or not applicable | 25 |
 | Research gaps | 12 |
-| Frontend design gaps | 19 |
+| Frontend design gaps | 18 |
 | Backend design gaps | 19 |
 | notes cited but not on main | 21 |
 
@@ -33,7 +33,7 @@
 | [Coordinator chat](#coordinator-chat) | 1 | shipped | yes | yes | yes |  |
 | [Coordinator context and compaction](#coordinator-context) | 1 | shipped | yes | n/a | yes |  |
 | [Coordinator dispatch](#coordinator-dispatch) | 1 | shipped | yes | n/a | yes |  |
-| [Daily report and retro](#daily-report) | 1 | shipped | yes | gap | gap | B2 |
+| [Daily report and retro](#daily-report) | 1 | shipped | yes | yes | gap | B2 |
 | [Engine run in a task thread](#engine-view) | 1 | partial | yes | yes | yes |  |
 | [Eval-gated harness changes](#eval-gated-harness) | 1 | partial | yes | n/a | yes |  |
 | [Harness dispatch](#harness-dispatch) | 1 | shipped | yes | n/a | yes |  |
@@ -95,7 +95,7 @@ The attention surfaces of the phase 1 graduation criteria: the needs-you tray, q
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Daily report and retro](#daily-report) | 1 | Frontend design: the report row and retro proposal card have no design<br>Backend design: no design for report content, timing, quiet rules and retro proposal storage |
+| [Daily report and retro](#daily-report) | 1 | Backend design: no design for report content, timing, quiet rules and retro proposal storage |
 | [Task references and needs-you](#needs-you) | 1 | Backend design: no design for which records enter the tray, their order and when they leave |
 | [Phone push](#push-notifications) | 1 | Frontend design: the notify banner, device switch and push copy have no design<br>Backend design: no design for subscriptions, presence suppression, receipts and the three push states |
 | [Question cards](#questions) | 1 | Research: the Codex CLI and t3code question patterns were never written up<br>Backend design: no design for the question lifecycle: parking, late answers, cancel and resume |
@@ -232,10 +232,10 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### daily-report
 
-**Daily report and retro** (shipped). The Coordinator posts an 08:00 report in the conversation and proposes retro changes the user accepts or rejects.
+**Daily report and retro** (shipped). The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro and intake suggestions by telling the Coordinator.
 
 - Research: [docs/research/duet-proactive-coordinator.md](research/duet-proactive-coordinator.md)
-- Frontend design: **gap**: the report row and retro proposal card have no design
+- Frontend design: [apps/web/DESIGN-RULES.md](../apps/web/DESIGN-RULES.md)
 - Backend design: **gap**: no design for report content, timing, quiet rules and retro proposal storage
 
 ### engine-view

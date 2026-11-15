@@ -6,12 +6,14 @@ import {
   readFileSync,
   readSync,
   rmdirSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, vi } from 'vitest';
 import {
   assertConfinementCleanup,
+  ConfinementExitedError,
   confinementGate,
   launchConfined,
 } from '../src/backend/confine.js';
@@ -231,6 +233,49 @@ process.exit(spawnSync('/usr/bin/systemctl', args, {stdio:'inherit'}).status ?? 
       handle.process.stdin.end();
       await stopping;
       await handle.completed;
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+    }
+  },
+);
+
+test.runIf(live)(
+  'real systemd: a missing bwrap rejects with its stderr and still cleans up the reservation',
+  async () => {
+    const directory = testTempDir('confine-no-bwrap-');
+    for (const tool of ['systemd-run', 'systemctl'])
+      symlinkSync(
+        spawnSync('which', [tool], { encoding: 'utf8' }).stdout.trim(),
+        join(directory, tool),
+      );
+    const released = vi.fn();
+    const previousPath = process.env.PATH;
+    process.env.PATH = directory;
+    try {
+      const root = testTempDir('confine-no-bwrap-root-');
+      for (const path of ['home', 'daemon', 'work', 'temp']) mkdirSync(join(root, path));
+      const launching = launchConfined({
+        policy: {
+          home: join(root, 'home'),
+          daemonHome: join(root, 'daemon'),
+          workspace: join(root, 'work'),
+          taskTemp: join(root, 'temp'),
+          state: [],
+          caches: [],
+          gitDirectories: [],
+        },
+        owner: process.env.CAIRN_CONFINE_TEST_OWNER ?? '',
+        command: [process.execPath, '-e', 'process.exit(0)'],
+        environment: {},
+        released,
+      });
+      await expect(launching).rejects.toBeInstanceOf(ConfinementExitedError);
+      const error = await launching.catch((caught: unknown) => caught);
+      expect((error as ConfinementExitedError).stderrTail).toMatch(
+        /^Failed to find executable bwrap\b/m,
+      );
+      expect(released).toHaveBeenCalledOnce();
     } finally {
       if (previousPath === undefined) delete process.env.PATH;
       else process.env.PATH = previousPath;

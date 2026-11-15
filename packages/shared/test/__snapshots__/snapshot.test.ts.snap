@@ -7154,6 +7154,68 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
               },
               "type": "array",
             },
+            "deliverables": {
+              "additionalProperties": false,
+              "properties": {
+                "items": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "attachmentId": {
+                        "type": "string",
+                      },
+                      "kind": {
+                        "enum": [
+                          "page",
+                          "slides",
+                        ],
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "sizeBytes": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                    },
+                    "required": [
+                      "attachmentId",
+                      "kind",
+                      "name",
+                      "sizeBytes",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "skipped": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                      },
+                      "reason": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "name",
+                      "reason",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "items",
+                "skipped",
+              ],
+              "type": "object",
+            },
             "githubLabelIds": {
               "items": {
                 "type": "string",
@@ -9117,6 +9179,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "mail_account",
   "mail_event",
   "mail_rule",
+  "mcp_connector",
   "team_top_models",
 ]
 `;
@@ -9264,6 +9327,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "GET",
     "note": "SSE，见 protocol/sse.ts",
     "path": "/api/teams/{id}/stream",
+  },
+  {
+    "method": "GET",
+    "note": "read-only scan of ~/.agents/skills and ~/.claude/skills for the import picker; skills already in the Cairn skills directory are left out",
+    "path": "/api/teams/{id}/skills/import-candidates",
   },
   {
     "method": "GET",
@@ -10591,6 +10659,29 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                   "type": "object",
                 },
               ],
+            },
+            "confinementCause": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "not-own-unit",
+                    "bwrap-missing",
+                    "home-overlay-failed",
+                  ],
+                  "type": "string",
+                },
+                "mountPoint": {
+                  "format": "starts_with",
+                  "maxLength": 4096,
+                  "pattern": "^\\/.*",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "kind",
+              ],
+              "type": "object",
             },
             "executor": {
               "enum": [
@@ -11979,6 +12070,68 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         "type": "object",
       },
       "type": "array",
+    },
+    "deliverables": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "attachmentId": {
+                "type": "string",
+              },
+              "kind": {
+                "enum": [
+                  "page",
+                  "slides",
+                ],
+                "type": "string",
+              },
+              "name": {
+                "type": "string",
+              },
+              "sizeBytes": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+            },
+            "required": [
+              "attachmentId",
+              "kind",
+              "name",
+              "sizeBytes",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "skipped": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+              },
+              "reason": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "name",
+              "reason",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+      },
+      "required": [
+        "items",
+        "skipped",
+      ],
+      "type": "object",
     },
     "githubLabelIds": {
       "items": {

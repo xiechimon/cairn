@@ -3,6 +3,7 @@ import { categoryFreeTaskInputSchema } from '../task-input.js';
 import { CHIEF_THREAD_ID_PREFIX } from './chief.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
 import { parseGithubRepoRef } from './project.js';
+import { deliverablesMessageSchema } from './report.js';
 import { routeOverrideSchema } from './routing-rule.js';
 import { snoozeModeSchema } from './snooze.js';
 import { quotaWaitSchema } from './step.js';
@@ -82,6 +83,12 @@ export type TaskDecision = z.infer<typeof taskDecisionSchema>;
 
 export const THREAD_OWNERS = ['owner', 'coordinator'] as const;
 
+export const todoDeliverablesSchema = z.object({
+  items: z.array(deliverablesMessageSchema.shape.items.element.omit({ attachmentToken: true })),
+  skipped: deliverablesMessageSchema.shape.skipped,
+});
+export type TodoDeliverables = z.infer<typeof todoDeliverablesSchema>;
+
 export const todoSectionSchema = z.enum([
   'needs_input',
   'ready_for_review',
@@ -130,6 +137,7 @@ export const todoRecordSchema = z.object({
     .optional(),
   quotaWait: quotaWaitSchema.nullable().optional(),
   usageCost: usageCostSchema.optional(),
+  deliverables: todoDeliverablesSchema.optional(),
   verified: z.boolean().optional(),
   decisions: z.array(taskDecisionSchema).optional(),
   routeOverride: routeOverrideSchema.nullable().optional(),

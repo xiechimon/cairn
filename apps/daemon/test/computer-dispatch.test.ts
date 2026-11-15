@@ -120,7 +120,7 @@ const CHILD_HANG_GUARD_MS = 30_000;
 const KILL_GUARD_MS = 20_000;
 
 vi.setConfig({ testTimeout: CHILD_HANG_GUARD_MS + 10_000 });
-const FAST = { flushMs: 20, heartbeatMs: 5_000, retryBaseMs: 5, retryMaxMs: 20 };
+const FAST = { flushMs: 20, heartbeatMs: 5_000, retryBaseMs: 5, retryMaxMs: 20, cairnOrigins: [] };
 
 function expectContiguous(frames: ComputerFrame[]) {
   expect(frames.map((f) => f.seq)).toEqual(frames.map((_, i) => i + 1));

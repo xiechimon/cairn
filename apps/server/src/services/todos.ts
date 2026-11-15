@@ -5,6 +5,7 @@ import type {
   RouteOverride,
   SecretBox,
   TaskRequest,
+  TodoDeliverables,
   TodoOutputKind,
   TodoRecord,
   TodoSection,
@@ -15,6 +16,7 @@ import {
   canMoveTodoProject,
   categoryFreeTaskInputSchema,
   DONE_ANNOUNCEMENT,
+  deliverablesMessageSchema,
   derivePlaceholderTitle,
   githubIssueSourceRef,
   IN_PROGRESS_PHASES,
@@ -60,7 +62,7 @@ import {
   correctionFromGithubLabels,
   todoGithubLabelIds,
 } from './github-labels.js';
-import { retireTodoDeliverables } from './machine-deliverables.js';
+import { DELIVERABLES_MESSAGE_PREFIX, retireTodoDeliverables } from './machine-deliverables.js';
 import { priorSessionOf, soleOnlineMachineId, teamDefaultMachineId } from './machine-routing.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodo } from './notifications.js';
@@ -126,6 +128,33 @@ function groupBy<T, K>(items: readonly T[], keyOf: (item: T) => K): Map<K, T[]> 
     else group.push(item);
   }
   return groups;
+}
+
+const DELIVERABLE_KIND_ORDER = { slides: 0, page: 1 } as const;
+
+function todoDeliverablesOf(content: unknown): TodoDeliverables | null {
+  let raw = content;
+  if (typeof raw === 'string') {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  const parsed = deliverablesMessageSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  const { items, skipped } = parsed.data;
+  if (items.length === 0 && skipped.length === 0) return null;
+  return {
+    items: items
+      .map(({ attachmentId, kind, name, sizeBytes }) => ({ attachmentId, kind, name, sizeBytes }))
+      .sort(
+        (a, b) =>
+          DELIVERABLE_KIND_ORDER[a.kind] - DELIVERABLE_KIND_ORDER[b.kind] ||
+          a.name.localeCompare(b.name),
+      ),
+    skipped,
+  };
 }
 
 function todoRelations(db: Db, rows: readonly TodoRow[]) {
@@ -201,7 +230,26 @@ function todoRelations(db: Db, rows: readonly TodoRow[]) {
       .all()
       .map(({ todoId, ...sums }) => [todoId, sums]),
   );
+  const deliverables = new Map(
+    latestBuildIds.length === 0
+      ? []
+      : db
+          .select({ id: message.id, content: message.content })
+          .from(message)
+          .where(
+            inArray(
+              message.id,
+              latestBuildIds.map((id) => `${DELIVERABLES_MESSAGE_PREFIX}${id}`),
+            ),
+          )
+          .all()
+          .flatMap((m): [string, TodoDeliverables][] => {
+            const set = todoDeliverablesOf(m.content);
+            return set === null ? [] : [[m.id.slice(DELIVERABLES_MESSAGE_PREFIX.length), set]];
+          }),
+  );
   return (row: TodoRow) => ({
+    deliverables: row.latestBuildId === null ? undefined : deliverables.get(row.latestBuildId),
     tagIds: (tags.get(row.id) ?? []).map((r) => r.tagId),
     githubLabelIds: (labels.get(row.id) ?? []).map((r) => r.labelId),
     history: (history.get(row.id) ?? []).map(({ buildId, createdAt }) => ({ buildId, createdAt })),
@@ -232,6 +280,7 @@ function todoRecordOf(
   deps: Pick<TodoDeps, 'db'>,
   row: TodoRow,
   {
+    deliverables,
     tagIds,
     githubLabelIds,
     history,
@@ -288,6 +337,7 @@ function todoRecordOf(
           },
         }
       : {}),
+    ...(deliverables !== undefined ? { deliverables } : {}),
     ...(row.routeOverride != null ? { routeOverride: row.routeOverride } : {}),
     ...(row.request != null ? { request: row.request } : {}),
   };

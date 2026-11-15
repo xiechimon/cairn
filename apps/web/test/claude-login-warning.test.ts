@@ -47,7 +47,7 @@ describe('subscription brief warning', () => {
   test('warns within 30 days, including the boundary, with setup-token instructions', () => {
     expect(subscriptionLoginWarning(subscription, NOW, t)).toContain('30');
     expect(subscriptionLoginWarning({ ...subscription, expiresAt: NOW + DAY }, NOW, t)).toContain('claude setup-token');
-    expect(subscriptionLoginWarning({ ...subscription, expiresAt: NOW - DAY }, NOW, t)).toContain('expired');
+    expect(subscriptionLoginWarning({ ...subscription, expiresAt: NOW - DAY }, NOW, t)).toContain('已过期');
   });
   test('does not warn beyond 30 days or without a known expiry', () => {
     expect(subscriptionLoginWarning({ ...subscription, expiresAt: NOW + 30 * DAY + 1 }, NOW, t)).toBeNull();

@@ -746,14 +746,22 @@ test('the composer has no in-progress pill above it', async ({ page }) => {
   await expect(page.getByTestId('in-progress-pill')).toHaveCount(0);
 });
 
-test('Schedules is a footer icon in the sidebar, not a tree row', async ({ page }) => {
+test('Schedules is a labelled row pinned above 新建项目, not a tree row or a footer icon', async ({ page }) => {
   await page.goto(HOME);
   const aside = page.locator('.board-sidebar');
-  await expect(aside.getByRole('button', { name: '定时' })).toHaveCount(0);
   await expect(aside.locator('nav').getByRole('link', { name: '定时' })).toHaveCount(0);
-  await page.getByTestId('sidebar-footer').getByRole('link', { name: '定时' }).click();
+  await expect(page.getByTestId('sidebar-footer').getByRole('link', { name: '定时' })).toHaveCount(0);
+  const pinned = page.getByTestId('sidebar-pinned');
+  const schedules = pinned.getByRole('link', { name: '定时', exact: true });
+  await expect(schedules).toHaveText('定时');
+  const rowTop = await schedules.evaluate((el) => el.getBoundingClientRect().top);
+  const newTop = await pinned.locator('[data-slot="sidebar-new-project"]').evaluate((el) => el.getBoundingClientRect().top);
+  expect(rowTop).toBeLessThan(newTop);
+  await expect(schedules).not.toHaveAttribute('aria-current');
+  await schedules.click();
   await expect(page).toHaveURL(/\/app\/schedules/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('定时');
+  await expect(schedules).toHaveAttribute('aria-current', 'page');
 });
 
 test('at phone width the panel overlays without horizontal overflow', async ({ page }) => {
