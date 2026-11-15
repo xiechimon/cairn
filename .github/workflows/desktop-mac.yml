@@ -43,7 +43,7 @@ jobs:
           node apps/server/scripts/stage-web.mjs
 
       - name: Stage the server into the desktop app
-        run: pnpm --filter @cairn/desktop stage
+        run: pnpm --filter @cairn/desktop stage-server
 
       - name: Package the arm64 DMG
         env:

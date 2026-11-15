@@ -15,7 +15,7 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "stage": "node scripts/stage-server.mjs",
+    "stage-server": "node scripts/stage-server.mjs",
     "build": "node build.mjs",
     "start": "node build.mjs && electron .",
     "dist:mac": "node build.mjs && electron-builder --mac",

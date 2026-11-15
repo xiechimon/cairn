@@ -10,11 +10,11 @@ Only the macOS package is maintained. The research behind the stack is `docs/res
 pnpm --filter @cairn/web build
 pnpm --filter @xiechimon/cairn build
 node apps/server/scripts/stage-web.mjs
-pnpm --filter @cairn/desktop stage
+pnpm --filter @cairn/desktop stage-server
 pnpm --filter @cairn/desktop dist:mac
 ```
 
-`stage` copies the server's `dist`, `web`, `drizzle` and the `better-sqlite3` runtime (its Node-API prebuilds load under Electron unchanged) into `apps/desktop/server`. `dist:mac` writes arm64 and x64 DMG and zip files to `apps/desktop/release`. Builds are ad-hoc signed (`identity: '-'`, no hardened runtime) until a Developer ID is set up, so Gatekeeper asks before the first launch; the DMG must be built on macOS.
+`stage-server` copies the server's `dist`, `web`, `drizzle` and the `better-sqlite3` runtime (its Node-API prebuilds load under Electron unchanged) into `apps/desktop/server`. `dist:mac` writes arm64 and x64 DMG and zip files to `apps/desktop/release`. Builds are ad-hoc signed (`identity: '-'`, no hardened runtime) until a Developer ID is set up, so Gatekeeper asks before the first launch; the DMG must be built on macOS.
 
 `pnpm --filter @cairn/desktop smoke` launches `release/mac-arm64/Cairn.app` with Playwright, checks that the window is on the loopback server, that `/api/teams` answers 200 without a pairing step, and that no pairing gate shows, then saves `release/smoke.png`. The `desktop-mac` workflow runs the same steps on a macOS runner for changes under `apps/desktop` and uploads the DMG and screenshot as the `cairn-mac-arm64` artifact.
 
