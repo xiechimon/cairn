@@ -1,4 +1,5 @@
 import { at, TEAM_ID } from './core.js';
+import { SERVER_SECTION } from './home-c.js';
 import type {
   ChangesContent,
   ChiefStreamItem,
@@ -53,6 +54,7 @@ function demoFixtureOf(): FixtureSet {
       buildHistory: input.buildHistory ?? [],
       sourceTodo: null,
       v: 3,
+      ...SERVER_SECTION[input.phase],
     };
   }
 

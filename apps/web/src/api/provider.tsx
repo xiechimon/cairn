@@ -80,7 +80,7 @@ export function LiveDataBridge() {
       {DEMO_MODE ? (
         <div className="flex h-full flex-col">
           <DemoBanner />
-          <div className="min-h-0 flex-1">
+          <div data-slot="demo-body" className="relative min-h-0 flex-1 contain-layout">
             <Outlet />
           </div>
         </div>
