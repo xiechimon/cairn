@@ -78,7 +78,8 @@ test('sched freq: the chosen radio reads against the track, hover keeps the rest
   const active = group.getByRole('radio', { checked: true });
   const weekly = group.getByRole('radio', { name: '每周' });
 
-  expect(await bg(active)).toBe(CARD_DARK);
+  expect(await bg(active)).not.toBe(CARD_DARK);
+  expect(await bg(active)).not.toBe(await bg(group));
   expect(await bg(group)).not.toBe(CARD_DARK);
   await expectSharedInk(weekly, active);
 

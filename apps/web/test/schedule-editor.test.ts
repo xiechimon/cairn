@@ -4,7 +4,7 @@ import { mapSchedules } from '../src/api/mappers.js';
 import type { ScheduleRecord as DisplaySchedule } from '../src/fixtures/records.js';
 import { EN } from '../src/i18n/en.js';
 import { type TFunc, translate } from '../src/i18n/translate.js';
-import { scheduleSummary } from '../src/pages/schedule-summary.js';
+import { scheduleSummary, scheduleUnnamedCron } from '../src/pages/schedule-summary.js';
 import { scheduleBody, scheduleDraft, scheduleEnded, schedulePauseReason, scheduleTime, scheduleViewState } from '../src/schedules/schedule-model.js';
 
 const NOW = Date.UTC(2026, 10, 4, 12);
@@ -31,6 +31,16 @@ describe('schedule editor wire values', () => {
     expect(scheduleSummary({ ...schedule, tz: 'America/New_York' }, NOW, t)).toBe('每周四 15:15 · 下次 11月5日 15:15');
     const en: TFunc = (source, vars) => translate('en', EN, source, vars);
     expect(scheduleSummary({ ...schedule, tz: 'Asia/Shanghai' }, NOW, en)).toBe('Fri weekly at 04:15 · Next Nov 6 04:15');
+  });
+  test('cron rows read common expressions in words and keep any other expression verbatim', () => {
+    const at = Date.UTC(2026, 10, 4, 22, 15);
+    const cron = (expr: string): DisplaySchedule => ({ ...record, kind: 'cron', cron: expr, at, nextRunAt: at });
+    expect(scheduleSummary(cron('15 */6 * * *'), NOW, t)).toBe('每 6 小时 · 下次 11月5日 06:15');
+    expect(scheduleSummary(cron('30 8 * * 1-5'), NOW, t)).toBe('工作日 08:30 · 下次 11月5日 06:15');
+    expect(scheduleSummary(cron('5 7 * * *'), NOW, t)).toBe('每天 07:05 · 下次 11月5日 06:15');
+    expect(scheduleUnnamedCron(cron('15 */6 * * *'), t)).toBeNull();
+    expect(scheduleUnnamedCron(cron('0 9 1 * *'), t)).toBe('0 9 1 * *');
+    expect(scheduleUnnamedCron({ ...cron('0 9 1 * *'), kind: 'daily' }, t)).toBeNull();
   });
   test('Today follows the saved timezone across midnight rather than the fixed UTC+8 date', () => {
     const nextRunAt = Date.UTC(2026, 10, 5, 6, 15);
@@ -60,7 +70,7 @@ describe('schedule editor wire values', () => {
   test('custom cron is trimmed and sent without a made-up client parser', () => {
     const body = scheduleBody({ ...scheduleDraft(record, NOW), trigger: 'custom', cron: '  */20 8-17 * * MON-FRI  ' }, record, NOW);
     expect(body).toMatchObject({ kind: 'cron', cron: '*/20 8-17 * * MON-FRI' });
-    expect(() => scheduleBody({ ...scheduleDraft(record, NOW), trigger: 'custom', cron: '* *' }, record, NOW)).toThrow('cron 需要 5 段');
+    expect(() => scheduleBody({ ...scheduleDraft(record, NOW), trigger: 'custom', cron: '* *' }, record, NOW)).toThrow('Cron 需要 5 段');
   });
   test('named timezone converts its wall clock rather than the browser timezone', () => {
     expect(scheduleTime('2026-11-05', '09', '15', 'Asia/Shanghai')).toBe(Date.UTC(2026, 10, 5, 1, 15));

@@ -930,3 +930,52 @@ test('the scheduled tab opens from the URL, creates and edits schedules in the s
   await expect(editor).toHaveCount(0);
   expect(posted[1]).toMatchObject({ todoId: 'todo-1', kind: 'daily', tz: 'Asia/Shanghai', enabled: true });
 });
+
+test('the schedule editor keeps Save off while a custom cron has the wrong number of fields', async ({ page }) => {
+  await page.goto(`${HOME}&pane=tasks`);
+  await panel(page).getByRole('tab', { name: '定时' }).click();
+  await panel(page).locator('[data-slot="schedule-row"]').first().click();
+  const editor = page.getByTestId('schedule-popover');
+  const save = editor.getByRole('button', { name: '保存' });
+  await expect(save).toBeEnabled();
+  await editor.getByRole('radio', { name: '自定义' }).click();
+  const cron = editor.getByRole('textbox', { name: 'Cron 表达式' });
+  await cron.fill('0 9 * *');
+  await expect(editor.getByText('Cron 需要 5 段：分 时 日 月 周。')).toBeVisible();
+  await expect(save).toBeDisabled();
+  await cron.fill('0 9 * * 1');
+  await expect(save).toBeEnabled();
+});
+
+test('a schedule deleted while its editor is open says so and cannot be saved', async ({ page }) => {
+  const embed = { seqNum: 9, title: 'Nightly release checks', phase: 'done', projectName: 'cairn', ownerId: 'u1' };
+  const nightly = {
+    id: 's-daily', teamId: 't1', projectId: 'proj-1', todoId: 'todo-1', kind: 'daily', at: Date.now(),
+    cron: null, prompt: '', tz: 'Asia/Shanghai', enabled: true, nextRunAt: Date.now() + 3_600_000,
+    lastRunAt: null, lastRunStatus: null, lastRunError: null, pausedReason: null, createdBy: 'u1', todo: embed,
+  };
+  let rows: unknown[] = [nightly];
+  const posted: unknown[] = [];
+  await mockLive(page, { threads: [THREAD], messages: [] }, (path, route, json) => {
+    if (!path.startsWith('/api/schedules')) return undefined;
+    if (route.request().method() === 'GET') return json(rows);
+    posted.push(route.request().postDataJSON());
+    return json(nightly);
+  });
+  await page.goto('/app?pane=tasks&tab=scheduled');
+  await panel(page).locator('[data-slot="schedule-row"]').first().click();
+  const editor = page.getByTestId('schedule-popover');
+  await expect(editor).toContainText('Nightly release checks');
+  await expect(editor.getByRole('button', { name: '保存' })).toBeEnabled();
+  rows = [];
+  await page.waitForFunction(() => window.__es.some((entry) => entry.url.includes('/api/teams/t1/stream')));
+  await page.evaluate(() => {
+    window.__es.find((entry) => entry.url.includes('/api/teams/t1/stream'))?.emit({ type: 'todo', doc: { id: 'todo-1' } });
+  });
+  await expect(editor.getByRole('status')).toHaveText('这条定时已被删除');
+  await expect(editor.getByRole('button', { name: '保存' })).toHaveCount(0);
+  expect(posted).toHaveLength(0);
+  await editor.getByRole('button', { name: '关闭' }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(panel(page).locator('[data-slot="schedule-row"]')).toHaveCount(0);
+});
