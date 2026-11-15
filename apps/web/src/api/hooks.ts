@@ -415,10 +415,17 @@ export const useSchedules = (enabled: boolean) =>
     enabled,
   });
 
+export function registeredMachines(machines: MachineRecord[]): MachineRecord[] {
+  return machines.filter(
+    (machine) => machine.kind !== 'local' || machine.online || machine.lastSeenAt != null,
+  );
+}
+
 export const useMachines = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['machines', teamId],
     queryFn: () => api.get<MachineRecord[]>(`/api/teams/${teamId}/machines`),
+    select: registeredMachines,
     enabled: enabled && teamId !== undefined,
   });
 
