@@ -1085,7 +1085,11 @@ export const EN: Record<string, string> = {
     'Send the API key as an Authorization: Bearer header',
   '密钥将加密存储，保存后无法再次查看。':
     'The key is stored encrypted and cannot be viewed again after saving.',
-  '模型（可选）': 'Models (optional)',
+  '模型（至少一个）': 'Models (at least one)',
+  '至少添加一个模型：点「添加模型」，输入端点支持的模型 ID，比如 gpt-4o-mini。':
+    'Add at least one model: click Add model and type a model ID the endpoint serves, such as gpt-4o-mini.',
+  '输入模型 ID，按回车添加': 'Type a model ID and press Enter to add it',
+  '先在下面的模型列表里添加一个模型，才能测试': 'Add a model in the list below before testing',
   添加模型: 'Add model',
   移除模型: 'Remove model',
   连接设置: 'Connection',
