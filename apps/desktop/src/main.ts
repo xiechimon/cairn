@@ -6,8 +6,11 @@ import {
   app,
   BrowserWindow,
   dialog,
+  Menu,
+  nativeImage,
   session,
   shell,
+  Tray,
   type UtilityProcess,
   utilityProcess,
 } from 'electron';
@@ -24,6 +27,7 @@ interface RunningServer {
 }
 
 let server: RunningServer | null = null;
+let tray: Tray | null = null;
 let quitting = false;
 
 function serverRoot(): string {
@@ -131,6 +135,11 @@ function openWindow(origin: string): BrowserWindow {
     webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
   window.once('ready-to-show', () => window.show());
+  window.on('close', (event) => {
+    if (quitting) return;
+    event.preventDefault();
+    window.hide();
+  });
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (isWebUrl(url)) void shell.openExternal(url);
     return { action: 'deny' };
@@ -151,7 +160,25 @@ function focusWindow(): void {
     return;
   }
   if (window.isMinimized()) window.restore();
+  window.show();
   window.focus();
+}
+
+function showTray(origin: string): Tray {
+  const icon = nativeImage.createFromPath(join(app.getAppPath(), 'assets', 'trayTemplate.png'));
+  icon.setTemplateImage(true);
+  const created = new Tray(icon);
+  created.setToolTip('Cairn');
+  created.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: `Running at ${new URL(origin).host}`, enabled: false },
+      { type: 'separator' },
+      { label: 'Open Cairn', click: focusWindow },
+      { type: 'separator' },
+      { label: 'Quit Cairn', accelerator: 'CommandOrControl+Q', click: () => app.quit() },
+    ]),
+  );
+  return created;
 }
 
 async function boot(): Promise<void> {
@@ -159,6 +186,7 @@ async function boot(): Promise<void> {
     server = startServer(await freeLoopbackPort());
     await waitUntilServing(server);
     signOwnPagesIn(server.origin, readOwnerToken());
+    tray = showTray(server.origin);
     openWindow(server.origin);
   } catch (error) {
     quitting = true;
@@ -188,12 +216,14 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', focusWindow);
   app.on('activate', focusWindow);
-  app.on('window-all-closed', () => app.quit());
   app.on('before-quit', (event) => {
     if (quitting || server === null) return;
     quitting = true;
     event.preventDefault();
-    void stopServer(server).then(() => app.quit());
+    void stopServer(server).then(() => {
+      tray?.destroy();
+      app.quit();
+    });
   });
   void app.whenReady().then(boot);
 }

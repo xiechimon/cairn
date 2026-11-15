@@ -4,6 +4,8 @@ directories:
   output: release
 files:
   - dist/main.mjs
+  - assets/trayTemplate.png
+  - assets/trayTemplate@2x.png
   - package.json
 extraResources:
   - from: server
