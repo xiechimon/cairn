@@ -81,27 +81,49 @@ test('view connects to the x11vnc view.sock and carries raw RFB bytes', async ()
   connection.close();
 });
 
-test('control connects to vnc.sock after ensureComputer starts the desktop', async () => {
+test('control holds the desktop while connected and releases it on close', async () => {
   dir = makeTestTempDir('s');
   runtimeRoot = shortRuntimeRoot(dir);
   const scopeKey = 'chief:control';
   const root = runtimeRoot;
   const path = join(root, 'vnc.sock');
-  let ensured = 0;
+  let held = 0;
   const provider = createComputerScreenProvider({
     socketPath: (_scope, kind) => join(root, kind === 'view' ? 'view.sock' : 'vnc.sock'),
     socketWaitMs: 2_000,
-    ensureComputer: async () => {
-      ensured += 1;
+    holdComputer: async () => {
+      held += 1;
       await listen(path);
-      return ':90';
+      return () => {
+        held -= 1;
+      };
     },
   });
   const connection = await provider.connectScreen(request('control', scopeKey));
-  expect(ensured).toBe(1);
+  expect(held).toBe(1);
   const greeting = once(connection.stream, 'data');
   expect((await greeting)[0].toString()).toBe('RFB 003.008\n');
-  connection.close();
+  await connection.close();
+  expect(held).toBe(0);
+});
+
+test('a screen that never connects releases its hold', async () => {
+  dir = makeTestTempDir('s');
+  runtimeRoot = shortRuntimeRoot(dir);
+  const root = runtimeRoot;
+  let held = 0;
+  const provider = createComputerScreenProvider({
+    socketPath: () => join(root, 'view.sock'),
+    socketWaitMs: 80,
+    holdComputer: async () => {
+      held += 1;
+      return () => {
+        held -= 1;
+      };
+    },
+  });
+  await expect(provider.connectScreen(request('view'))).rejects.toThrow();
+  expect(held).toBe(0);
 });
 
 test('a missing screen socket times out instead of hanging', async () => {

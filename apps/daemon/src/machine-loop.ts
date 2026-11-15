@@ -368,7 +368,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     provider: createComputerScreenProvider(
       hostDesktops
         ? {
-            ensureComputer: (scopeKey) => hostDesktops.ensure(scopeKey),
+            holdComputer: (scopeKey) => hostDesktops.hold(scopeKey),
             socketPath: (scopeKey, kind) => hostDesktops.socketPath(scopeKey, kind),
           }
         : {},
@@ -600,6 +600,14 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   closedOrbTimer.unref?.();
   const orbTimer = setInterval(sweepOrbs, 1_000);
   orbTimer.unref?.();
+  const desktopSweepTimer = hostDesktops
+    ? setInterval(() => {
+        void hostDesktops
+          .sweep()
+          .catch((error: unknown) => logger.machine(`desktop idle stop failed: ${String(error)}`));
+      }, 60_000)
+    : undefined;
+  desktopSweepTimer?.unref?.();
 
   let recoveryPending = true;
   const recover = async () => {
@@ -897,6 +905,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     orbCleanupStopped = true;
     clearInterval(closedOrbTimer);
     clearInterval(orbTimer);
+    clearInterval(desktopSweepTimer);
     clearInterval(stepScratchTimer);
     streamCtrl.abort();
     claimCtrl.abort();
