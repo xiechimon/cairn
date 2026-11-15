@@ -28,7 +28,7 @@ Tell one Coordinator what you want, from code to your own affairs. It opens a th
 
 ## What you get
 
-- **Your own subscriptions.** Claude Code, Codex, Gemini, or an API key from any provider. Cairn never resells compute.
+- **Your own subscriptions.** Claude Code, Codex, or an API key from any provider, Google's Gemini included. Cairn never resells compute.
 - **Research, then build.** A thread reads how strong open-source projects solved the problem before it changes anything, and decides the details itself.
 - **Only what needs you.** The home page pins the decisions waiting on you, and a push goes out only when you must act.
 - **Results you can trust.** Before an agent merges, the gate counts only review verdicts bound to the current patch. Anything that cannot be undone waits for your yes.
@@ -90,7 +90,7 @@ npm i -g @xiechimon/cairn-cli
 cairn start --api-key <cairn_...> --team <teamId>
 ```
 
-Connect a model in the web UI: a Claude Code or Gemini CLI subscription, an API key, OAuth for GitHub Copilot or OpenAI Codex, or a custom endpoint. To follow along from your phone, see [private access over Tailscale](./docs/deploy/tailscale-mobile.md). Docker and building from source are in [getting started](./docs/getting-started.md).
+Then connect a model: sign in to Claude Code or the Codex CLI on a machine that runs the daemon, or add a provider in the web UI with a Claude token from `claude setup-token`, an API key, or a custom endpoint. Not available yet: OpenAI Codex sign-in in the provider list (it is marked as such) and Gemini CLI. GitHub Copilot sign-in needs your own GitHub OAuth App (`CAIRN_GITHUB_OAUTH_CLIENT_ID`, `CAIRN_GITHUB_OAUTH_CLIENT_SECRET`). To follow along from your phone, see [private access over Tailscale](./docs/deploy/tailscale-mobile.md). Docker and building from source are in [getting started](./docs/getting-started.md).
 
 ## "Wait, what are you selling?"
 
@@ -104,7 +104,7 @@ It fits you if you:
 
 - write code, or work alongside code, and want agents to do the work in the background while you only make the calls;
 - have a machine that can stay on (a desktop, a home server or a VPS), and ideally a laptop or a phone to follow along from;
-- already pay for Claude Code, Codex or Gemini, or have an API key, and want to keep using them rather than buy compute again;
+- already pay for Claude Code or Codex, or have an API key, and want to keep using them rather than buy compute again;
 - want your code, mail and credentials to stay on your own machines.
 
 It is not the right fit if you want:

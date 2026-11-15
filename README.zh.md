@@ -28,7 +28,7 @@
 
 ## 你会得到什么
 
-- **用你自己的订阅。** Claude Code、Codex、Gemini，或任意服务商的 API key。Cairn 不转售算力。
+- **用你自己的订阅。** Claude Code、Codex，或任意服务商的 API key（包括 Google 的 Gemini）。Cairn 不转售算力。
 - **先研究，再动手。** thread 改东西之前，先看几个强的开源项目是怎么解决的，细节自己定。
 - **只在需要你时打扰。** 首页只置顶等你拍板的事，推送也只发需要你动手的事。
 - **结果可信。** agent 合并前，合并闸只认绑定当前补丁的审核结论。撤不回的动作都等你点头。
@@ -90,7 +90,7 @@ npm i -g @xiechimon/cairn-cli
 cairn start --api-key <cairn_...> --team <teamId>
 ```
 
-在网页里接上模型：Claude Code 或 Gemini CLI 订阅、API key、GitHub Copilot 或 OpenAI Codex 的 OAuth，或自定义端点。想在手机上跟进，看[用 Tailscale 私网访问](./docs/deploy/tailscale-mobile.md)。Docker 和从源码构建见[上手指南](./docs/getting-started.md)。
+然后接上模型：在跑守护进程的机器上登录 Claude Code 或 Codex CLI；或者在网页里添加服务商，用 `claude setup-token` 得到的 Claude 令牌、API key 或自定义端点。还不能用的：服务商列表里的 OpenAI Codex 登录（标着“暂未开通”）和 Gemini CLI。GitHub Copilot 登录要先配好你自己的 GitHub OAuth App（`CAIRN_GITHUB_OAUTH_CLIENT_ID`、`CAIRN_GITHUB_OAUTH_CLIENT_SECRET`）。想在手机上跟进，看[用 Tailscale 私网访问](./docs/deploy/tailscale-mobile.md)。Docker 和从源码构建见[上手指南](./docs/getting-started.md)。
 
 ## 「等等，你们卖什么？」
 
@@ -104,7 +104,7 @@ Cairn 是给一个人用的，不是给团队用的：你装一份自己用，�
 
 - 写代码，或者工作离不开代码，想让 agent 在后台干活，自己只拍板；
 - 有一台能一直开着的机器（台式机、家里的服务器或 VPS），最好还有笔记本或手机随时跟进；
-- 已经在付 Claude Code、Codex 或 Gemini 的订阅，或者有 API key，想接着用，不想再买一份算力；
+- 已经在付 Claude Code 或 Codex 的订阅，或者有 API key，想接着用，不想再买一份算力；
 - 希望代码、邮件和凭据都留在自己的机器上。
 
 不太适合你，如果你想要：
