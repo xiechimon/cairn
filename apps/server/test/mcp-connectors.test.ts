@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { mcpConnectorRecordSchema } from '@cairn/shared';
@@ -11,6 +12,8 @@ import {
   checkMcpConnector,
   createMcpConnector,
   type McpConnectorDeps,
+  publicOAuthFetch,
+  refreshMcpConnectorToken,
   updateMcpConnector,
 } from '../src/services/mcp-servers.js';
 import { bootServer, req } from './helpers.js';
@@ -56,7 +59,14 @@ function boot(fetch: typeof globalThis.fetch, claudeJson?: unknown) {
   const s = bootServer({ mcpFetch: fetch, mcpConfigPath });
   onTestFinished(() => s.dispose());
   const base = `/api/teams/${s.team.id}/mcp-connectors`;
-  const deps: McpConnectorDeps = { db: s.db, box: s.secretBox, mcpConfigPath, fetch };
+  const deps: McpConnectorDeps = {
+    db: s.db,
+    box: s.secretBox,
+    mcpConfigPath,
+    fetch,
+    oauthFetch: fetch,
+    oauthState: s.mcpOAuthState,
+  };
   return { s, base, deps };
 }
 
@@ -283,6 +293,344 @@ describe('MCP connectors', () => {
     expect(isOwnerOnlyRoute('PATCH', `${path}/c1`)).toBe(true);
     expect(isOwnerOnlyRoute('DELETE', `${path}/c1`)).toBe(true);
     expect(isOwnerOnlyRoute('POST', `${path}/c1/check`)).toBe(true);
+    expect(isOwnerOnlyRoute('POST', `${path}/oauth/start`)).toBe(true);
     expect(isOwnerOnlyRoute('GET', path)).toBe(false);
+  });
+});
+
+const ORIGIN = 'http://127.0.0.1:8787';
+const AS = 'https://auth.vendor.test';
+const LINEAR = 'https://mcp.linear.app/mcp';
+
+interface AuthWorldOptions {
+  metadata?: Record<string, unknown>;
+  resource?: string;
+  authServer?: string;
+  refresh?: 'ok' | 'invalid_grant';
+  refreshGate?: Promise<void>;
+}
+
+function authWorld(opts: AuthWorldOptions = {}) {
+  const seen: { url: string; method: string; body: string }[] = [];
+  const registrations: Record<string, unknown>[] = [];
+  const tokenRequests: URLSearchParams[] = [];
+  let generation = 0;
+  let accessToken = 'none';
+  const mcp = () => fakeMcp({ token: accessToken });
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    });
+  const issue = () => {
+    generation += 1;
+    accessToken = `at-${generation}`;
+    return json({
+      access_token: accessToken,
+      refresh_token: `rt-${generation}`,
+      token_type: 'Bearer',
+      expires_in: 3600,
+    });
+  };
+  const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const request = new Request(input, init);
+    const url = new URL(request.url);
+    const body = request.method === 'POST' ? await request.clone().text() : '';
+    seen.push({ url: url.href, method: request.method, body });
+    if (url.pathname === '/.well-known/oauth-protected-resource/mcp')
+      return json({
+        resource: opts.resource ?? LINEAR,
+        authorization_servers: [opts.authServer ?? AS],
+        scopes_supported: ['read'],
+      });
+    if (url.origin === AS && url.pathname === '/.well-known/oauth-authorization-server')
+      return json({
+        issuer: AS,
+        authorization_endpoint: `${AS}/authorize`,
+        token_endpoint: `${AS}/token`,
+        registration_endpoint: `${AS}/register`,
+        response_types_supported: ['code'],
+        code_challenge_methods_supported: ['S256'],
+        token_endpoint_auth_methods_supported: ['none'],
+        ...opts.metadata,
+      });
+    if (url.origin === AS && url.pathname === '/register') {
+      registrations.push(JSON.parse(body) as Record<string, unknown>);
+      return json({ client_id: `client-${registrations.length}`, redirect_uris: [] }, 201);
+    }
+    if (url.origin === AS && url.pathname === '/token') {
+      const params = new URLSearchParams(body);
+      tokenRequests.push(params);
+      if (params.get('grant_type') === 'authorization_code')
+        return params.get('code') === 'code-ok' ? issue() : json({ error: 'invalid_grant' }, 400);
+      await opts.refreshGate;
+      if (opts.refresh === 'invalid_grant') return json({ error: 'invalid_grant' }, 400);
+      return issue();
+    }
+    if (url.href === LINEAR) return mcp().fetch(request);
+    return new Response('not found', { status: 404 });
+  }) as typeof globalThis.fetch;
+  return { fetch, seen, registrations, tokenRequests, current: () => accessToken };
+}
+
+function bootOAuth(opts: AuthWorldOptions = {}) {
+  const world = authWorld(opts);
+  const booted = boot(world.fetch);
+  const start = async (body: unknown, origin = ORIGIN) => {
+    const res = await booted.s.app.request(`${booted.base}/oauth/start`, {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = (await res.json()) as { authorizationUrl?: string; error?: string };
+    const url = json.authorizationUrl === undefined ? null : new URL(json.authorizationUrl);
+    return { res, json, url, state: url?.searchParams.get('state') ?? '' };
+  };
+  const callback = async (query: Record<string, string>) => {
+    const res = await booted.s.app.request(`/api/oauth/callback?${new URLSearchParams(query)}`, {
+      redirect: 'manual',
+    });
+    return res.headers.get('location') ?? '';
+  };
+  const row = () => booted.s.db.select().from(mcpConnector).get();
+  const expire = () => {
+    const current = row();
+    const sealed = JSON.parse(booted.s.secretBox.open(current?.oauthCipher ?? '')) as object;
+    booted.s.db
+      .update(mcpConnector)
+      .set({ oauthCipher: booted.s.secretBox.seal(JSON.stringify({ ...sealed, expiresAt: 1 })) })
+      .run();
+  };
+  return { ...booted, world, start, callback, row, expire };
+}
+
+const linearStart = { kind: 'catalog', catalogId: 'linear', slug: 'linear' };
+
+describe('MCP connector OAuth', () => {
+  test('start, callback and check: tokens sealed, resource and PKCE sent, landing names the row', async () => {
+    const t = bootOAuth();
+    const started = await t.start(linearStart);
+    expect(started.res.status).toBe(200);
+    const auth = started.url;
+    expect(auth?.origin + (auth?.pathname ?? '')).toBe(`${AS}/authorize`);
+    expect(Object.fromEntries(auth?.searchParams ?? [])).toMatchObject({
+      client_id: 'client-1',
+      response_type: 'code',
+      code_challenge_method: 'S256',
+      redirect_uri: `${ORIGIN}/api/oauth/callback`,
+      resource: LINEAR,
+      scope: 'read',
+    });
+    expect(t.world.registrations[0]).toMatchObject({
+      application_type: 'native',
+      token_endpoint_auth_method: 'none',
+      redirect_uris: [`${ORIGIN}/api/oauth/callback`],
+    });
+    expect(t.row()).toBeUndefined();
+    const location = await t.callback({ code: 'code-ok', state: started.state, iss: AS });
+    const row = t.row();
+    expect(location).toBe(
+      `${ORIGIN}/app/resources/mcp-servers?oauth=connected&connector=${row?.id}`,
+    );
+    expect(row).toMatchObject({
+      authKind: 'oauth',
+      status: 'connected',
+      toolCount: 2,
+      authRevision: 1,
+      tokenGeneration: 1,
+    });
+    const exchange = t.world.tokenRequests[0];
+    expect(exchange?.get('resource')).toBe(LINEAR);
+    const verifier = exchange?.get('code_verifier') ?? '';
+    expect(createHash('sha256').update(verifier).digest('base64url')).toBe(
+      auth?.searchParams.get('code_challenge'),
+    );
+    const listed = await (await req(t.s.app, 'GET', t.base)).text();
+    for (const text of [listed, row?.oauthCipher ?? '', JSON.stringify(row?.oauthMeta)]) {
+      expect(text).not.toContain('at-1');
+      expect(text).not.toContain('rt-1');
+    }
+    expect(JSON.parse(listed)[0]).toMatchObject({ authKind: 'oauth', status: 'connected' });
+    const replay = await t.callback({ code: 'code-ok', state: started.state, iss: AS });
+    expect(replay).toContain('oauth=error&reason=state');
+    expect(t.s.db.select().from(mcpConnector).all()).toHaveLength(1);
+  });
+
+  test('a wrong or missing issuer, a denied consent and a failed exchange create nothing', async () => {
+    const t = bootOAuth({ metadata: { authorization_response_iss_parameter_supported: true } });
+    const landing = `${ORIGIN}/app/resources/mcp-servers?oauth=error&reason=`;
+    const wrong = await t.start(linearStart);
+    expect(
+      await t.callback({ code: 'code-ok', state: wrong.state, iss: 'https://evil.test' }),
+    ).toBe(`${landing}exchange`);
+    const missing = await t.start(linearStart);
+    expect(await t.callback({ code: 'code-ok', state: missing.state })).toBe(`${landing}exchange`);
+    expect(t.world.tokenRequests).toHaveLength(0);
+    const denied = await t.start(linearStart);
+    expect(await t.callback({ error: 'access_denied', state: denied.state })).toBe(
+      `${landing}denied`,
+    );
+    const bad = await t.start(linearStart);
+    expect(await t.callback({ code: 'code-bad', state: bad.state, iss: AS })).toBe(
+      `${landing}exchange`,
+    );
+    expect(t.row()).toBeUndefined();
+    expect(t.world.registrations).toHaveLength(1);
+  });
+
+  test('start refuses servers and origins it cannot sign in with safely', async () => {
+    const cases: [AuthWorldOptions, string?][] = [
+      [{ metadata: { code_challenge_methods_supported: undefined } }],
+      [{ metadata: { code_challenge_methods_supported: ['plain'] } }],
+      [{ metadata: { registration_endpoint: undefined } }],
+      [{ metadata: { issuer: 'https://other.test' } }],
+      [{ resource: 'https://mcp.linear.app/other' }],
+      [{ authServer: 'http://169.254.169.254' }],
+      [{ authServer: 'https://10.0.0.7' }],
+      [{}, 'http://100.64.0.5:8787'],
+    ];
+    for (const [opts, origin] of cases) {
+      const t = bootOAuth(opts);
+      const started = await t.start(linearStart, origin);
+      expect(started.res.status).toBe(400);
+      expect(t.world.registrations).toHaveLength(0);
+      expect(t.world.seen.every((r) => !/169\.254|10\.0\.0\.7/.test(r.url))).toBe(true);
+    }
+    const t = bootOAuth();
+    expect((await t.start({ kind: 'catalog', catalogId: 'github', slug: 'gh' })).res.status).toBe(
+      400,
+    );
+    const https = await t.start(linearStart, 'https://cairn.example.test');
+    expect(t.world.registrations.at(-1)).toMatchObject({ application_type: 'web' });
+    expect(https.url?.searchParams.get('redirect_uri')).toBe(
+      'https://cairn.example.test/api/oauth/callback',
+    );
+  });
+
+  test('a slug taken while the browser was away lands on conflict and keeps the other row', async () => {
+    const t = bootOAuth();
+    const started = await t.start(linearStart);
+    await req(t.s.app, 'POST', t.base, {
+      kind: 'custom',
+      slug: 'linear',
+      label: 'Mine',
+      url: 'https://mcp.acme.test/mcp',
+    });
+    expect(await t.callback({ code: 'code-ok', state: started.state, iss: AS })).toContain(
+      'reason=conflict',
+    );
+    expect(t.s.db.select().from(mcpConnector).all()).toMatchObject([{ label: 'Mine' }]);
+  });
+
+  test('reconnect replaces tokens on the same row and a stale reconnect is refused', async () => {
+    const t = bootOAuth();
+    const first = await t.start(linearStart);
+    await t.callback({ code: 'code-ok', state: first.state, iss: AS });
+    const id = t.row()?.id ?? '';
+    const a = await t.start({ kind: 'reconnect', connectorId: id });
+    const b = await t.start({ kind: 'reconnect', connectorId: id });
+    expect(t.world.registrations).toHaveLength(1);
+    expect(await t.callback({ code: 'code-ok', state: a.state, iss: AS })).toContain(
+      `connector=${id}`,
+    );
+    expect(t.row()).toMatchObject({ authRevision: 2, tokenGeneration: 2, status: 'connected' });
+    expect(await t.callback({ code: 'code-ok', state: b.state, iss: AS })).toContain(
+      'reason=conflict',
+    );
+    expect(t.row()).toMatchObject({ authRevision: 2, tokenGeneration: 2 });
+    expect(t.world.seen.at(-1)?.url).toBe(`${AS}/token`);
+    const custom = await req(t.s.app, 'POST', t.base, {
+      kind: 'custom',
+      slug: 'acme',
+      label: 'Acme',
+      url: 'https://mcp.acme.test/mcp',
+    });
+    const staticId = ((await custom.json()) as { id: string }).id;
+    expect((await t.start({ kind: 'reconnect', connectorId: staticId })).res.status).toBe(400);
+  });
+
+  test('an expired token is refreshed once for concurrent checks and the pair rotates', async () => {
+    let release = () => {};
+    const refreshGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const t = bootOAuth({ refreshGate });
+    const started = await t.start(linearStart);
+    await t.callback({ code: 'code-ok', state: started.state, iss: AS });
+    t.expire();
+    const id = t.row()?.id ?? '';
+    const checks = [
+      checkMcpConnector(t.deps, t.s.team.id, id),
+      checkMcpConnector(t.deps, t.s.team.id, id),
+    ];
+    release();
+    const results = await Promise.all(checks);
+    const refreshes = t.world.tokenRequests.filter((p) => p.get('grant_type') === 'refresh_token');
+    expect(refreshes.map((p) => p.get('refresh_token'))).toEqual(['rt-1']);
+    expect(refreshes[0]?.get('resource')).toBe(LINEAR);
+    expect(t.row()?.tokenGeneration).toBe(2);
+    expect(results.map((r) => r.status)).toEqual(['connected', 'connected']);
+    expect(t.world.current()).toBe('at-2');
+  });
+
+  test('a refresh that finishes after a reconnect does not overwrite the new tokens', async () => {
+    let release = () => {};
+    const refreshGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const t = bootOAuth({ refreshGate });
+    const first = await t.start(linearStart);
+    await t.callback({ code: 'code-ok', state: first.state, iss: AS });
+    const id = t.row()?.id ?? '';
+    const refresh = refreshMcpConnectorToken(t.deps, t.s.team.id, id);
+    const again = await t.start({ kind: 'reconnect', connectorId: id });
+    await t.callback({ code: 'code-ok', state: again.state, iss: AS });
+    const cipher = t.row()?.oauthCipher;
+    release();
+    await refresh;
+    expect(t.world.current()).toBe('at-3');
+    expect(t.row()).toMatchObject({
+      oauthCipher: cipher,
+      authRevision: 2,
+      tokenGeneration: 2,
+      status: 'connected',
+    });
+  });
+
+  test('a rejected refresh asks for reconnect without probing the server', async () => {
+    const t = bootOAuth({ refresh: 'invalid_grant' });
+    const started = await t.start(linearStart);
+    await t.callback({ code: 'code-ok', state: started.state, iss: AS });
+    t.expire();
+    const probes = t.world.seen.filter((r) => r.url === LINEAR).length;
+    const record = await checkMcpConnector(t.deps, t.s.team.id, t.row()?.id ?? '');
+    expect(record).toMatchObject({ status: 'needs_auth', statusReason: 'refresh_rejected' });
+    expect(t.world.seen.filter((r) => r.url === LINEAR)).toHaveLength(probes);
+  });
+
+  test('edits: an OAuth row refuses tokens and drops its tokens when its origin moves', async () => {
+    const t = bootOAuth();
+    const started = await t.start({
+      kind: 'custom',
+      slug: 'lin',
+      label: 'Lin',
+      url: LINEAR,
+    });
+    await t.callback({ code: 'code-ok', state: started.state, iss: AS });
+    const id = t.row()?.id ?? '';
+    expect((await req(t.s.app, 'PATCH', `${t.base}/${id}`, { headers: { A: 'b' } })).status).toBe(
+      400,
+    );
+    const moved = await req(t.s.app, 'PATCH', `${t.base}/${id}`, {
+      url: 'https://mcp.elsewhere.test/mcp',
+    });
+    expect(await moved.json()).toMatchObject({ status: 'needs_auth', statusReason: 'reconnect' });
+    expect(t.row()).toMatchObject({ oauthCipher: null, oauthMeta: null, authRevision: 2 });
+    expect(t.world.seen.some((r) => r.url.startsWith('https://mcp.elsewhere.test'))).toBe(false);
+  });
+
+  test('the production OAuth fetch refuses a host that resolves to a private address', async () => {
+    const failure = await publicOAuthFetch('https://localhost/x').catch((err: unknown) => err);
+    expect(String((failure as Error & { cause?: unknown }).cause)).toContain('non-public address');
   });
 });

@@ -423,6 +423,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
+      undici:
+        specifier: 8.12.4
+        version: 8.12.4
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.10.0)(@types/node@26.6.2)(vite@8.3.8(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
@@ -13513,7 +13516,7 @@ snapshots:
       css-tree: 3.2.1
       fnv1a-64: 0.1.2
       std-env: 4.2.0
-      undici: 8.10.2
+      undici: 8.12.4
 
   unist-util-is@6.0.1:
     dependencies:
