@@ -263,7 +263,7 @@ export function ProjectSettingsPage() {
               {live && wireProject !== undefined && (
                 <SettingsRow
                   label={t('并发与优先级')}
-                  hint={t('本项目同时运行的 thread 上限。你发的消息会插队，并可多用一个位置。')}
+                  hint={t('本项目同时运行的对话上限。你发的消息会插队，并可多用一个位置。')}
                 >
                   <ProjectConcurrencySelect project={wireProject} />
                 </SettingsRow>
