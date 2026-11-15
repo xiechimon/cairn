@@ -4,17 +4,24 @@ import { afterEach, expect, test } from 'vitest';
 import { build, todo } from '../src/db/schema.js';
 import { seedDefaultRouting } from '../src/services/routing-migration.js';
 import { profileForStep } from '../src/services/routing-rules.js';
-import { bootServer, postProject, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  insertMachine,
+  postProject,
+  subscriptionClaudeReport,
+  type TestServer,
+} from './helpers.js';
 
 const servers: TestServer[] = [];
 afterEach(() => {
   for (const s of servers.splice(0)) s.dispose();
 });
 
-test('a fresh install matches origin/main: the session merges without setup and gets only the default tools', async () => {
+test('a fresh install with a Claude Code Runner: the session merges without setup and gets only the default tools', async () => {
   const s = bootServer();
   servers.push(s);
   seedDefaultRouting(s.db);
+  insertMachine(s, { claudeCodeReport: subscriptionClaudeReport });
   const projectId = await postProject(s.app);
   const todoRes = await s.app.request(`/api/projects/${projectId}/todos`, {
     method: 'POST',

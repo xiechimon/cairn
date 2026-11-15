@@ -89,10 +89,10 @@ import { mergedCatalogModels } from './model-liveness.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import {
   chiefRemoteTools,
+  coordinatorProfile,
   memoryOpsAreTeamScoped,
   memoryOwnerOf,
   type RouteProfile,
-  routeProfile,
 } from './routing-rules.js';
 import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
@@ -153,7 +153,7 @@ function claimCandidates(deps: MachineDeps, _machineId: string, teamId: string):
 
 function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: string) {
   return deps.db
-    .select({ stepRow: step, threadRow: chiefThread, chiefRow: chief, ruleRow: routingRule })
+    .select({ stepRow: step, threadRow: chiefThread, chiefRow: chief })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
     .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
@@ -171,7 +171,10 @@ function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: str
     )
     .orderBy(asc(step.createdAt))
     .all()
-    .map((row) => ({ ...row, agentRow: routeProfile(row.ruleRow) }))
+    .flatMap((row) => {
+      const agentRow = coordinatorProfile(deps.db, teamId);
+      return agentRow === null ? [] : [{ ...row, agentRow }];
+    })
     .filter((row) => !serverTakesTurn(deps.db, teamId, row.stepRow));
 }
 
