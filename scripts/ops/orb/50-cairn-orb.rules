@@ -1,5 +1,5 @@
 polkit.addRule(function(action, subject) {
-    if (subject.user !== 'ian') return polkit.Result.NOT_HANDLED;
+    if (subject.user !== '@OWNER@') return polkit.Result.NOT_HANDLED;
     function orb(name) {
         return typeof name === 'string' && /^cairn-orb-[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(name);
     }

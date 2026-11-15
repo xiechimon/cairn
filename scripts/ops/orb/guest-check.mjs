@@ -11,6 +11,7 @@ import {
 } from 'node:fs';
 import { isIPv4 } from 'node:net';
 import { join, resolve } from 'node:path';
+import { validOwnerName } from './owner.mjs';
 
 export function validatePorts(ports) {
   if (
@@ -72,7 +73,8 @@ export function runGuestCheck({
   if (
     request.version !== 1 ||
     typeof request.requestId !== 'string' ||
-    !/^[a-zA-Z0-9-]{1,64}$/.test(request.requestId)
+    !/^[a-zA-Z0-9-]{1,64}$/.test(request.requestId) ||
+    !validOwnerName(request.owner)
   )
     throw new Error('Invalid check request');
   validatePorts(request.blockedPorts);
@@ -126,7 +128,7 @@ export function runGuestCheck({
       port,
       status: run('timeout', ['3', 'bash', '-c', `exec 3<>/dev/tcp/10.203.0.1/${port}`]).status,
     })),
-    homeExit: run('test', ['!', '-e', '/home/ian']).status,
+    homeExit: run('test', ['!', '-e', `/home/${request.owner}`]).status,
   };
   const temp = join(directory, `check-result-${request.requestId}.tmp`);
   writeFileSync(temp, `${JSON.stringify(result)}\n`, { mode: 0o600, flag: 'wx' });

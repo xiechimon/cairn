@@ -1,6 +1,6 @@
 # Orb host provisioning
 
-Run these steps as `ian` from the same Linux checkout used by
+Run these steps as the owner account (the user recorded in `/etc/cairn-orb/owner`; see below) from the same Linux checkout used by
 `cairn-daemon.service`. Inspect its working directory and exact Node executable:
 
 ```sh
@@ -17,8 +17,21 @@ sudo bash scripts/ops/orb/install-host.sh
 sudo bash scripts/ops/orb/install-host.sh
 ```
 
+The installer chooses the owner from `--owner <user>`, else from an existing
+valid `/etc/cairn-orb/owner`, else from `SUDO_USER`, so a later `sudo` run by
+another account never moves the owner silently. It refuses `root`, an invalid
+name or an account that does not exist. It writes
+the name to the root-owned `/etc/cairn-orb/owner` (mode 0644); every root-run
+script reads the owner only from that file and stops when it is missing or
+invalid, and the user-run checks compare the current user with it. The polkit
+rule is rendered from `50-cairn-orb.rules` with that one name. To install for a
+different account, run `sudo bash scripts/ops/orb/install-host.sh --owner <user>`.
+`cairn-ops-run` clears the environment, so `SUDO_USER` never reaches the
+installer there; the first install on a host must run directly through `sudo`
+or with `--owner`, and later runs reuse the owner file.
+
 The second successful install must print `0 changes`. The image builder reads
-`claude --version` and `codex --version` from `ian`'s login shell (currently
+`claude --version` and `codex --version` from the owner's login shell (currently
 Claude Code 2.1.302 and codex-cli 0.163.0). It reads the Node major by running
 `--version` on the daemon service's ExecStart binary. If service discovery is
 unavailable, supply the major verified above explicitly to each command:
@@ -34,9 +47,9 @@ The guest's Arch `nodejs` package must have that same major and satisfy Node
 provide a compatible guest package before retrying. There is no daemon npm
 package/version override or fallback.
 
-The installer only creates the `ian`-owned `dist` directory inside its root-owned
+The installer only creates the owner-owned `dist` directory inside its root-owned
 parent; the host daemon owns release publication. After the matching checkout
-has been built by the normal daemon deployment, restart its service as `ian`
+has been built by the normal daemon deployment, restart its service as the owner
 to use the daemon-side release publisher, then inspect the published contract:
 
 ```sh
@@ -92,7 +105,7 @@ polkit object, and stateful fake host commands. The owner must still verify
 actual systemd, polkit, package installation, and proxy behavior on the host.
 
 The host needs `nft`, `ip`, `nmcli`, systemd, and a Node executable available
-through root's PATH or `ian`'s login shell. The installer copies that executable
+through root's PATH or the owner's login shell. The installer copies that executable
 to `/usr/local/lib/cairn-orb/node` for the relay, so a home-based Node install
 works with the user unit's `ProtectHome=yes`. Binary content and mode converge
 on reruns. Existing networkd-managed host links or earlier network configuration
@@ -197,8 +210,8 @@ machines receive no Orb binds:
 The installer prints and installs `/etc/tmpfiles.d/cairn-orb.conf`, which
 recreates `/run/cairn-orb` at boot. Both `/run/cairn-orb` and
 `/var/lib/cairn-orb` are `root:root`, mode `0755`. The installer creates `dist`
-and `seed` inside the latter, owned by `ian`, mode `0755`. Nspawn binds those
-directories themselves, read-only. Their parent cannot be modified by `ian`,
+and `seed` inside the latter, owned by the owner, mode `0755`. Nspawn binds those
+directories themselves, read-only. Their parent cannot be modified by the owner,
 so changing their contents cannot replace a bind source. Symlinks inside the
 exported directories resolve in the guest namespace and cannot redirect a bind
 to another host path.
@@ -209,7 +222,7 @@ symlinks and directories without its root-owned device/inode record in
 `/run/systemd/nspawn/<machine>.runtime`. It creates a missing directory with
 `mkdir`, opens it with `O_DIRECTORY|O_NOFOLLOW`, and immediately mounts a dedicated
 tmpfs through the inherited fd before nspawn binds it. The mount uses
-`size=64M,nr_inodes=4096,mode=0700,uid=<ian>,gid=<ian>,nosuid,nodev,noexec`.
+`size=64M,nr_inodes=4096,mode=0700,uid=<owner>,gid=<owner>,nosuid,nodev,noexec`.
 The helper reopens the mounted directory without following symlinks, sets its
 ownership and mode through that fd, and records both the tmpfs and underlying
 directory identities. Repeated preparation recognizes the recorded mount.
@@ -224,24 +237,24 @@ boundaries. The daemon never creates or removes the bind source: after `machinec
 the prepared directory, then creates `relay.sock` and `outbox/` inside it.
 
 `norbind` prevents nested mounts from propagating. `PrivateUsers=pick` is retained,
-and the image pins `agent` to host `ian`'s numeric UID. Per
+and the image pins `agent` to the host owner's numeric UID. Per
 [systemd's idmap contract](https://www.freedesktop.org/software/systemd/man/latest/systemd-nspawn.html#--bind=),
-identity `idmap` maps guest root to host UID 0 and guest `agent` to host `ian`'s
-UID on these mounts only; it is not a root-to-ian mapping. Outside these binds,
+identity `idmap` maps guest root to host UID 0 and guest `agent` to the host owner's
+UID on these mounts only; it is not a root-to-owner mapping. Outside these binds,
 the private user namespace retains its allocated UID range. Host root-owned
 parents are never mounted, `dist` and `seed` are read-only, and the only writable
 export is the newly prepared disposable runtime directory. Guest-created UID-0
 files may exist there, but unrelated host root-owned files are not exposed.
-The preparation hook requires `fs.protected_hardlinks=1`, preventing `ian` from
+The preparation hook requires `fs.protected_hardlinks=1`, preventing the owner from
 introducing hardlinks to files it neither owns nor can already read and write
 ([kernel contract](https://docs.kernel.org/admin-guide/sysctl/fs.html#protected-hardlinks)).
 The runtime filesystem must have `nosuid,nodev`; unsupported protection fails
 startup. Together these controls close source swaps, external symlink traversal
-and hardlink import of host root files that `ian` cannot already modify.
+and hardlink import of host root files that the owner cannot already modify.
 
 Mode `0700` initially prevents other host users, including `cairn-runner`, from
 traversing the runtime directory. Compromised guest code running as `agent` has
-the same UID as `ian` on the idmapped mount and can chmod its own runtime
+the same UID as the owner on the idmapped mount and can chmod its own runtime
 directory and socket. Filesystem modes alone therefore do not keep other host
 users out after guest compromise: the per-step relay token is the authentication
 boundary. Another container has its own user namespace and only its exact runtime
@@ -278,7 +291,7 @@ The guest resolves imports through the entry's real path inside the release,
 so its dependencies resolve from
 `/opt/cairn/daemon/releases/<key>/node_modules`. No image-provided daemon
 dependencies are needed.
-Put Project seeds at `/var/lib/cairn-orb/seed/<projectId>/repo`, as `ian`.
+Put Project seeds at `/var/lib/cairn-orb/seed/<projectId>/repo`, as the owner.
 The image uses one `daemon_entry` variable, `/opt/cairn/daemon/cli.mjs`. The enabled
 `cairn-orb-worker.service` runs as `agent`, waits for `/run/cairn/relay.sock`,
 and runs exactly `/usr/bin/node /opt/cairn/daemon/cli.mjs orb-step --socket /run/cairn/relay.sock`
@@ -405,8 +418,8 @@ The polkit transient-unit protection relies on the installed
 `systemd-nspawn@.service` template existing: systemd must load that template
 instead of allowing a caller to supply an arbitrary transient unit definition.
 The Orb rule grants only scoped clone/remove, start, kill and terminate actions.
-As reported by the owner for this host, `ian` is also in `docker` and `wheel`;
-polkit scoping is not a real boundary against a compromised `ian` process today.
+As reported for the original host, its owner is also in `docker` and `wheel`;
+polkit scoping is not a real boundary against a compromised owner process today.
 Clones may use the base as a source; they cannot replace, remove or start it.
 The fixed idmapped binds require kernel/filesystem support; unsupported mounts
 fail startup instead of falling back to permissive modes. Image UID changes
@@ -415,7 +428,7 @@ root-owned under `/run/lock/cairn-orb`, separate from private relay directories.
 
 transport decided by ian 2026-10-31 (option 1). The mount-source swap finding
 is addressed by root-owned bind-source parents, root preparation and stop hooks,
-and fd-based runtime ownership changes. `ian` retains ownership of the source
+and fd-based runtime ownership changes. The owner retains ownership of the source
 contents without permission to rename or replace a source inode. Identity idmap
 is retained with the read-only exports, private runtime and hardlink gate above.
 This records the fix within option 1; it does not claim a new independent review
@@ -490,7 +503,7 @@ Local fake tests do not establish Linux enrollment or Orb execution.
 
 ## Secret isolation canary (#2277)
 
-From the normally built, matching Linux checkout on omarchy, as `ian` without
+From the normally built, matching Linux checkout on omarchy, as the owner account without
 sudo, run this single command:
 
 ```sh
@@ -704,7 +717,7 @@ a Chromium managed policy (no password manager, autofill or sync) and the
 `cairn-computer-desktop.service` unit, which runs Xvfb `:1`, fluxbox and two
 x11vnc servers on Unix sockets only: `/run/cairn-computer/vnc.sock` and the
 view-only `/run/cairn-computer/view.sock`. That guest path is a bind of the
-host `$RUN/cairn-orb/<machine>/computer` directory (created 0700 for `ian`),
+host `$RUN/cairn-orb/<machine>/computer` directory (created 0700 for the owner),
 so the daemon can connect without inbound ports and bridge raw RFB over its
 outbound websocket to the sealed noVNC gateway. Chromium keeps its own sandbox
 inside the Orb (measured in spike S1), so it runs without `--no-sandbox`.
@@ -716,12 +729,12 @@ next to it; the agent authenticates with the token and its release key. The
 inherited `cairn-orb-worker.service` is disabled, because a computer never
 runs worker steps.
 
-Polkit treats `cairn-orb-computer` as a template, like `cairn-orb-base`: `ian`
+Polkit treats `cairn-orb-computer` as a template, like `cairn-orb-base`: the owner
 cannot remove, rename or start it. Only the template may be cloned to a
 `cairn-orb-computer-*` name, and the template may only be cloned to such a
 name. For `cairn-orb-computer-*` machines, `prepare-machine.sh` runs
 `computer-home.mjs` as root. It creates `/var/lib/cairn-computer/<machine>`
-(`ian:ian 0700`, refusing links and foreign owners) and binds it to
+(`<owner>:<owner> 0700`, refusing links and foreign owners) and binds it to
 `/home/agent` with an idmap. The image is disposable and the home persists.
 The idmap maps guest root to host root on that bind, so the installer mounts
 `/var/lib/cairn-computer` on itself with `nosuid,nodev`

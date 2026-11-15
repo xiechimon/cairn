@@ -3,13 +3,27 @@ set -euo pipefail
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 dry_run=false
-if [[ $# == 1 && $1 == --dry-run ]]; then dry_run=true; elif [[ $# != 0 ]]; then printf 'Usage: build-image.sh [--dry-run]\n' >&2; exit 2; fi
+planned_owner=
+if [[ $# == 1 && $1 == --dry-run ]]; then dry_run=true
+elif [[ $# == 3 && $1 == --dry-run && $2 == --owner ]]; then dry_run=true; planned_owner=$3
+elif [[ $# != 0 ]]; then printf 'Usage: build-image.sh [--dry-run [--owner NAME]]\n' >&2; exit 2; fi
 if ! $dry_run && [[ $(id -u) != 0 ]]; then printf 'Run build-image.sh as root\n' >&2; exit 1; fi
 host_root=${CAIRN_ORB_ROOT:-}
 [[ -z $host_root || $host_root == /* ]] || { printf 'CAIRN_ORB_ROOT must be absolute\n' >&2; exit 2; }
 daemon_entry=/opt/cairn/daemon/cli.mjs
-agent_uid=$(id -u ian)
-[[ $agent_uid =~ ^[0-9]+$ && $agent_uid -gt 0 && $agent_uid -lt 65534 ]] || { printf 'Cannot map ian to guest agent UID\n' >&2; exit 1; }
+owner_pattern='^[a-z_][a-z0-9_-]{0,31}$'
+owner_file=$host_root/etc/cairn-orb/owner
+if [[ -f $owner_file && ! -L $owner_file ]]; then
+  owner=$(<"$owner_file")
+elif $dry_run && [[ -n $planned_owner ]]; then
+  owner=$planned_owner
+else
+  printf 'Cannot read the orb owner file %s; run install-host.sh as root first\n' "$owner_file" >&2
+  exit 1
+fi
+[[ $owner =~ $owner_pattern ]] || { printf 'Invalid orb owner in %s\n' "$owner_file" >&2; exit 1; }
+agent_uid=$(id -u "$owner" 2>/dev/null) || agent_uid=
+[[ $agent_uid =~ ^[0-9]+$ && $agent_uid -gt 0 && $agent_uid -lt 65534 ]] || { printf 'Cannot map %s to guest agent UID\n' "$owner" >&2; exit 1; }
 machines_dir=$host_root/var/lib/machines
 image=$machines_dir/cairn-orb-base
 filesystem_path=$machines_dir
@@ -37,10 +51,10 @@ if ! $dry_run; then
   flock -n 9 || { printf 'Another image build holds the lock\n' >&2; exit 1; }
 fi
 host_version() {
-  if [[ $(id -un) == ian ]]; then
+  if [[ $(id -un) == "$owner" ]]; then
     bash -lc "$1 --version"
   else
-    runuser -u ian -- bash -lc "$1 --version"
+    runuser -u "$owner" -- bash -lc "$1 --version"
   fi
 }
 claude_version=$(host_version claude | awk 'NR == 1 {print $1}')
@@ -49,13 +63,13 @@ codex_version=$(host_version codex | awk 'NR == 1 {print $NF}')
 pnpm_version=$(cat "$script_dir/pnpm.version")
 [[ $pnpm_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'Cannot pin pnpm from %s/pnpm.version\n' "$script_dir" >&2; exit 1; }
 daemon_args=(bash -lc 'export XDG_RUNTIME_DIR=/run/user/$(id -u); node "$1" "$2"' cairn-orb "$script_dir/daemon-package.mjs" "${CAIRN_ORB_NODE_MAJOR:-}")
-if [[ $(id -un) == ian ]]; then
+if [[ $(id -un) == "$owner" ]]; then
   node_major=$("${daemon_args[@]}")
 else
-  node_major=$(runuser -u ian -- "${daemon_args[@]}")
+  node_major=$(runuser -u "$owner" -- "${daemon_args[@]}")
 fi
 [[ $node_major =~ ^[1-9][0-9]*$ && $node_major -ge 22 ]] || { printf 'Cannot pin host daemon Node major; set CAIRN_ORB_NODE_MAJOR\n' >&2; exit 1; }
-recipe=$(cat "$script_dir/build-image.sh" "$script_dir/guest-check.mjs" "$script_dir/daemon-package.mjs" | sha256sum | awk '{print $1}')
+recipe=$(cat "$script_dir/build-image.sh" "$script_dir/guest-check.mjs" "$script_dir/owner.mjs" "$script_dir/daemon-package.mjs" | sha256sum | awk '{print $1}')
 expected=$(printf 'recipe=%s\nclaude=%s\ncodex=%s\npnpm=%s\nnode_major=%s\nagent_uid=%s' "$recipe" "$claude_version" "$codex_version" "$pnpm_version" "$node_major" "$agent_uid")
 previous_marker=
 if [[ -d $image ]]; then
@@ -103,7 +117,7 @@ printf '%s\n' \
   'lock root login and mask SSH server units' \
   'enable guest systemd-networkd' \
   'install and enable cairn-orb-worker.service, cairn-orb-check.service and cairn-orb-check.path' \
-  'map host ian UID to guest agent for private fixed idmapped binds' \
+  'map the host owner UID to guest agent for private fixed idmapped binds' \
   'write /etc/systemd/system.conf.d/20-cairn-orb-proxy.conf' \
   'write /etc/environment and /etc/profile.d/cairn-orb-proxy.sh' \
   'remove guest package caches and SSH host keys; clear /etc/machine-id' \
@@ -229,6 +243,7 @@ rm -rf /root/.npm /root/.cache /etc/ssh/ssh_host_*
 : > /etc/machine-id
 GUEST
 install -D -m 644 "$script_dir/guest-check.mjs" "$stage/usr/local/lib/cairn-orb/guest-check.mjs"
+install -D -m 644 "$script_dir/owner.mjs" "$stage/usr/local/lib/cairn-orb/owner.mjs"
 printf '%s\n' "$expected" > "$stage/etc/cairn-orb-image"
 unmounted
 backup=
