@@ -134,7 +134,7 @@ export function ProviderRow({ provider }: { provider: MachineProvider }) {
         {meta.length > 0 && <span className="truncate font-mono">{meta.join(' · ')}</span>}
         {provider.login === 'logged-out' && provider.loginCommand !== null && (
           <span className="truncate">
-            {t('在这台 Runner 上运行')}{' '}
+            {t('在这台执行机上运行')}{' '}
             <code
               data-testid="provider-login-command"
               className="rounded-sm bg-secondary px-1.5 py-0.5 font-mono text-code text-foreground"
@@ -170,7 +170,7 @@ export function MachineProvidersCard({
       <SettingsCard>
         {providers.length === 0 ? (
           <div className={cn(SETTINGS_ROW_CLS, 'text-meta text-content-tertiary')}>
-            {t('这台 Runner 还没有上报 provider 状态')}
+            {t('这台执行机还没有上报模型服务状态')}
           </div>
         ) : (
           providers.map((provider) => <ProviderRow key={provider.runtime} provider={provider} />)

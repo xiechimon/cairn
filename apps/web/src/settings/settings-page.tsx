@@ -149,9 +149,9 @@ const GROUPS: Group[] = [
     sections: [
       {
         id: 'machines',
-        label: 'Runner',
+        label: '执行机',
         Icon: Server,
-        keywords: ['机器', 'machine', 'computer'],
+        keywords: ['机器', 'runner', 'machine', 'computer'],
         element: () => <MachinesPage />,
       },
       { id: 'skills', label: '技能', Icon: Puzzle, element: () => <SkillsPage /> },

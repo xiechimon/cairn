@@ -217,7 +217,7 @@ export function homeMachineRejectReason(
 ): string | null {
   const runtime = stepRuntimeFor(agentRow.provider);
   if (!machineRow.enabledRuntimes.includes(runtime)) {
-    return `机器 ${machineRow.name} 未启用 ${runtime} runtime（在机器页开启后再试）。`;
+    return `机器 ${machineRow.name} 未启用 ${runtime} 运行时（在机器页开启后再试）。`;
   }
   if (runtime === 'claude-code' && agentRow.modelId != null && agentRow.modelId !== '') {
     const report = machineRow.claudeCodeReport;
@@ -229,7 +229,7 @@ export function homeMachineRejectReason(
       return null;
     }
     if (report == null) {
-      return `机器 ${machineRow.name} 尚未上报模型清单（daemon 版本过旧或未上线），无法校验模型 ${agentRow.modelId}。`;
+      return `机器 ${machineRow.name} 尚未上报模型清单（后台服务版本过旧或未上线），无法校验模型 ${agentRow.modelId}。`;
     }
     if (!report.installed || !report.models.some((m) => m.id === agentRow.modelId)) {
       return `机器 ${machineRow.name} 未配置模型 ${agentRow.modelId}（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。`;

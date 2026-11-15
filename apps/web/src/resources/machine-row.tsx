@@ -127,7 +127,7 @@ export function MachineRowView({
     }
     mutations.patchMachine.mutate(
       { id: machineId, body: { isDefault: true } },
-      { onError: (error) => toastError(t('设为默认 Runner 失败，请重试。'), error) },
+      { onError: (error) => toastError(t('设为默认执行机失败，请重试。'), error) },
     );
   };
 
@@ -144,7 +144,7 @@ export function MachineRowView({
       void queryClient.invalidateQueries({ queryKey: ['members', teamId] });
       onClosed();
     } catch (error) {
-      toastError(t('删除 Runner 失败，请重试。'), error);
+      toastError(t('删除执行机失败，请重试。'), error);
     } finally {
       setDeleting(false);
     }
@@ -317,7 +317,7 @@ export function MachineRowView({
               disabled={isDefault || machine.id == null || mutations.patchMachine.isPending}
               onClick={makeDefault}
             >
-              {isDefault ? t('已是默认 Runner') : t('设为默认 Runner')}
+              {isDefault ? t('已是默认执行机') : t('设为默认执行机')}
             </KeyedMenuItem>
             <KeyedMenuItem
               shortcut="M"
@@ -332,10 +332,10 @@ export function MachineRowView({
               confirms
               data-testid="machine-menu-delete"
               disabled={deleting}
-              title={t('删除后，这台 Runner 要重新注册才能再接任务')}
+              title={t('删除后，这台执行机要重新注册才能再接任务')}
               onClick={() => setConfirmOpen(true)}
             >
-              {t('删除 Runner')}
+              {t('删除执行机')}
             </KeyedMenuItem>
           </KeyedMenuContent>
         </DropdownMenu>
@@ -347,7 +347,7 @@ export function MachineRowView({
       )}
       <AlertDialogShell
         title={t('整机迁移')}
-        subtitle={t('把固定在这台 Runner 上的路由规则一起迁到另一台 Runner。')}
+        subtitle={t('把固定在这台执行机上的路由规则一起迁到另一台执行机。')}
         ariaLabel={t('整机迁移')}
         open={evacuateOpen}
         onClose={() => setEvacuateOpen(false)}
@@ -393,9 +393,9 @@ export function MachineRowView({
       </AlertDialogShell>
       <DeleteConfirm
         open={confirmOpen}
-        title={t('确定删除这台 Runner？此操作不可撤销。')}
+        title={t('确定删除这台执行机？此操作不可撤销。')}
         summary={machine.name}
-        ariaLabel={t('删除 Runner')}
+        ariaLabel={t('删除执行机')}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => void remove()}
       />

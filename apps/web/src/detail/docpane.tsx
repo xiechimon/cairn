@@ -302,7 +302,7 @@ function VersionMenu({
       </KeyedMenuItem>
       {diffOpen && (
         <KeyedMenuItem shortcut="B" onClick={onBase}>
-          <span>{t('回到与 base 对比')}</span>
+          <span>{t('回到与基准版本对比')}</span>
         </KeyedMenuItem>
       )}
     </KeyedMenuContent>

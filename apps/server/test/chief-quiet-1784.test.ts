@@ -173,8 +173,8 @@ function notices(w: World) {
 
 const QUESTION = {
   header: '下一步',
-  question: '重试还是换 Runner？',
-  options: [{ label: '重试' }, { label: '换 Runner' }],
+  question: '重试还是换执行机？',
+  options: [{ label: '重试' }, { label: '换执行机' }],
 };
 
 describe('quiet by default for event-triggered Coordinator turns (#1784)', () => {
@@ -235,15 +235,15 @@ describe('quiet by default for event-triggered Coordinator turns (#1784)', () =>
     w.wake(watchProvenance('todo-a'));
     const wake = await w.claim();
     const res = await w.tool(wake.step.id, 'notify_user', {
-      message: '#1 失败两次，需要你给它换台 Runner',
+      message: '#1 失败两次，需要你给它换台执行机',
       provenance: watchProvenance('todo-a'),
     });
     expect(res.status).toBe(200);
-    expect(chiefNotif(w)?.snippet).toBe('#1 失败两次，需要你给它换台 Runner');
+    expect(chiefNotif(w)?.snippet).toBe('#1 失败两次，需要你给它换台执行机');
     expect(notices(w)).toEqual([
       {
         kind: CHIEF_NOTICE_KIND,
-        message: '#1 失败两次，需要你给它换台 Runner',
+        message: '#1 失败两次，需要你给它换台执行机',
         provenance: watchProvenance('todo-a'),
       },
     ]);
@@ -300,7 +300,7 @@ describe('quiet by default for event-triggered Coordinator turns (#1784)', () =>
       questions: [
         {
           ...QUESTION,
-          options: [{ label: '重试' }, { label: '换 Runner', recommended: true }],
+          options: [{ label: '重试' }, { label: '换执行机', recommended: true }],
         },
       ],
       provenance: watchProvenance('todo-a'),
@@ -312,7 +312,7 @@ describe('quiet by default for event-triggered Coordinator turns (#1784)', () =>
       .where(eq(chiefMessage.id, 'ask-00000000-0003'))
       .get();
     const parked = { ...JSON.parse(String(card?.content)), parkedAt: Date.now() };
-    expect(parked.questions[0].options[1]).toEqual({ label: '换 Runner', recommended: true });
+    expect(parked.questions[0].options[1]).toEqual({ label: '换执行机', recommended: true });
     w.s.db
       .update(chiefMessage)
       .set({ content: JSON.stringify(parked) })
@@ -325,7 +325,7 @@ describe('quiet by default for event-triggered Coordinator turns (#1784)', () =>
       w.s.app,
       'POST',
       `/api/teams/${w.teamId}/chief/threads/${w.threadId}/questions/ask-00000000-0003/answer`,
-      { body: { answers: [{ header: '下一步', choices: ['换 Runner'] }] } },
+      { body: { answers: [{ header: '下一步', choices: ['换执行机'] }] } },
     );
     expect(answer.status).toBe(200);
     const resumed = w.s.db
@@ -335,7 +335,7 @@ describe('quiet by default for event-triggered Coordinator turns (#1784)', () =>
       .all();
     expect(resumed).toHaveLength(1);
     expect(resumed[0]?.prompt ?? '').not.toMatch(/^\[wake:/);
-    expect(resumed[0]?.prompt).toContain('换 Runner');
+    expect(resumed[0]?.prompt).toContain('换执行机');
     expect(send).not.toHaveBeenCalled();
     expect(w.s.db.select().from(notificationTable).all()).toEqual(notificationsBefore);
     send.mockRestore();

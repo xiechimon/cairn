@@ -50,12 +50,12 @@ export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowM
     const runnerName = queue.waitingFor?.name ?? preferredName;
     const snippet =
       queue.blocked.kind === 'capability-missing'
-        ? `没有在线 Runner 满足要求（缺 ${queue.blocked.missing.join('、')}），步骤已等 ${minutes} 分钟`
+        ? `没有在线执行机满足要求（缺 ${queue.blocked.missing.join('、')}），步骤已等 ${minutes} 分钟`
         : queue.blocked.kind === 'sandbox-unavailable' && runnerName !== null
-          ? `${runnerName} 的任务沙箱没就绪，接不了任务（原因和修法见 Runner 页），步骤已等 ${minutes} 分钟`
+          ? `${runnerName} 的任务沙箱没就绪，接不了任务（原因和修法见执行机页），步骤已等 ${minutes} 分钟`
           : preferredName !== null
-            ? `${preferredName} 不能跑这一步，不会改派到其他 Runner，步骤已等 ${minutes} 分钟`
-            : `没有在线 Runner 能跑这一步，步骤已等 ${minutes} 分钟`;
+            ? `${preferredName} 不能跑这一步，不会改派到其他执行机，步骤已等 ${minutes} 分钟`
+            : `没有在线执行机能跑这一步，步骤已等 ${minutes} 分钟`;
     notifyNoMachine(deps, todoRow, snippet);
     raised += 1;
   }
