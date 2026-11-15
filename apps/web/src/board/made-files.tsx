@@ -55,7 +55,16 @@ export function usePageHtml(item: Deliverable | undefined, enabled = true) {
   });
 }
 
-const ACTIVE_TAGS = new Set(['script', 'iframe', 'frame', 'object', 'embed', 'applet', 'portal']);
+const ACTIVE_TAGS = new Set([
+  'script',
+  'noscript',
+  'iframe',
+  'frame',
+  'object',
+  'embed',
+  'applet',
+  'portal',
+]);
 
 const SCRIPT_URL = /(?:java|vb)script:/;
 

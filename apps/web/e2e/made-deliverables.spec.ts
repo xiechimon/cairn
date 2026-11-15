@@ -7,6 +7,7 @@ const SCRIPTED_HTML = '<html><body><h1>Live board</h1><script>document.title="ra
 const HIDDEN_SCRIPTS: Record<string, string> = {
   'att-handler': '<h1>Chart</h1><svg onload="document.title=1"></svg>',
   'att-jsurl': '<h1>Links</h1><a href="java&#x73;cript&colon;void(document.title=1)">go</a>',
+  'att-noscript': '<noscript><p title="</noscript><img src=x onerror=document.title=1>">',
 };
 const DECK_BYTES = 3_250_586;
 
@@ -57,6 +58,10 @@ const RESULTS = [
     items: [{ attachmentId: 'att-jsurl', kind: 'page', name: 'links.html', sizeBytes: 600 }],
     skipped: [],
   }),
+  research('noscript', 17, 'Fallback note page', {
+    items: [{ attachmentId: 'att-noscript', kind: 'page', name: 'fallback.html', sizeBytes: 600 }],
+    skipped: [],
+  }),
   research('large', 14, 'Large export table', {
     items: [{ attachmentId: 'att-large', kind: 'page', name: 'table.html', sizeBytes: 300 * 1024 }],
     skipped: [],
@@ -97,7 +102,7 @@ test('Made groups pages and decks, previews a script-free page and never a scrip
   page,
 }) => {
   const { made, tracker, fetched } = await openMade(page);
-  await expect(made.getByTestId('made-group').locator('h3')).toHaveText(['文档1', '网页5', 'PPT1']);
+  await expect(made.getByTestId('made-group').locator('h3')).toHaveText(['文档1', '网页6', 'PPT1']);
 
   const pageCard = made.getByTestId('made-card').filter({ hasText: 'Export benchmark page' });
   const thumb = pageCard.getByTestId('made-page-frame');
@@ -146,23 +151,6 @@ test('the dialog lists each file with a download above the report and explains s
   expect(filesBox!.y + filesBox!.height).toBeLessThan(docBox!.y);
   await page.keyboard.press('Escape');
 
-  await made.getByRole('button', { name: 'Live export board' }).click();
-  const scripted = page.getByRole('dialog', { name: 'Live export board' }).getByTestId('made-files');
-  await expect(scripted.getByTestId('made-file')).toContainText('含脚本，下载后打开');
-  await expect(scripted.getByTestId('made-page-frame')).toHaveCount(0);
-  await page.keyboard.press('Escape');
-
-  for (const title of ['Handler chart page', 'Link list page']) {
-    const card = made.getByTestId('made-card').filter({ hasText: title });
-    await card.scrollIntoViewIfNeeded();
-    await made.getByRole('button', { name: title }).click();
-    const files = page.getByRole('dialog', { name: title }).getByTestId('made-files');
-    await expect(files.getByTestId('made-file')).toContainText('含脚本，下载后打开');
-    await expect(files.getByTestId('made-page-frame')).toHaveCount(0);
-    await page.keyboard.press('Escape');
-    await expect(card.getByTestId('made-page-frame')).toHaveCount(0);
-  }
-
   await made.getByRole('button', { name: 'Export review deck' }).click();
   const deckDialog = page.getByRole('dialog', { name: 'Export review deck' });
   await expect(deckDialog.getByTestId('research-report-meta')).toHaveText(/^PPT\s*·\s*定稿/);
@@ -174,4 +162,21 @@ test('the dialog lists each file with a download above the report and explains s
   await expect(deck.getByTestId('made-page-frame')).toHaveCount(1);
   await expect(deck.getByTestId('made-skipped')).toHaveCount(0);
   expect(tracker).toEqual([]);
+});
+
+test('a page with a script tag, handler, script URL or noscript gets no preview on its card or in its dialog', async ({
+  page,
+}) => {
+  const { made } = await openMade(page);
+
+  for (const title of ['Live export board', 'Handler chart page', 'Link list page', 'Fallback note page']) {
+    const card = made.getByTestId('made-card').filter({ hasText: title });
+    await card.scrollIntoViewIfNeeded();
+    await made.getByRole('button', { name: title }).click();
+    const files = page.getByRole('dialog', { name: title }).getByTestId('made-files');
+    await expect(files.getByTestId('made-file')).toContainText('含脚本，下载后打开');
+    await expect(files.getByTestId('made-page-frame')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(card.getByTestId('made-page-frame')).toHaveCount(0);
+  }
 });
