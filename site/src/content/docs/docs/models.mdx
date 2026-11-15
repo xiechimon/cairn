@@ -64,15 +64,19 @@ Save, open the provider and press `Test` next to `Test connection` to check it.
 The provider list also shows OpenAI Codex sign-in, marked `Not yet available`; use the Codex CLI on a Runner instead. GitHub Copilot sign-in works only when the server is started with your own GitHub OAuth App (`CAIRN_GITHUB_OAUTH_CLIENT_ID` and `CAIRN_GITHUB_OAUTH_CLIENT_SECRET`). Gemini CLI appears on a Runner but is locked until it goes through the command gate.
 </Aside>
 
-## Tell the Coordinator which model to use
+## Which model the Coordinator uses
 
-A model source alone does not make the Coordinator answer: until it has a rule, chat is refused. The home page's last setup step, `Open work routing`, opens `Settings` → `Rules & policies`. On the `Coordinator` card:
+You do not have to set a model for the Coordinator. Without a rule of its own it uses a default: the team's Anthropic API key if there is one, otherwise the first provider you added that it can run on, such as one with an API key. `Settings` → `Rules & policies` shows the default on the `Coordinator` card, for example `Current default: {model} · {provider} (the first provider you added that the Coordinator can use)`.
+
+To use a different model, create a rule on that card:
 
 1. `Runtime`: `Built-in (pi)`, which runs your providers' models;
 2. `Model`: one of the models you added;
 3. press `Create`.
 
-The setup hint disappears once the rule is saved. The `Session` card on the same page shows which default new work uses and why, for example `Current default: Claude Code (a Runner has Claude Code installed)`.
+If the card says `No default yet: add a provider with an API key, or create the rule here`, the Coordinator has nothing to run on, for example when your only model source is Claude Code on a Runner. Only then does the home page show a third setup step, `Open work routing`, which leads to this card.
+
+The `Session` card on the same page shows which default new work uses and why, for example `Current default: Claude Code (a Runner has Claude Code installed)`.
 
 ## Where credentials live
 
