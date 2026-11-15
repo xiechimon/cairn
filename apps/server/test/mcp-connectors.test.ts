@@ -531,6 +531,26 @@ describe('MCP connector OAuth', () => {
     expect(again.url?.searchParams.get('scope')).toBe(
       'organizations:read projects:read database:read analytics:read',
     );
+    await req(t.s.app, 'PATCH', `${t.base}/${t.row()?.id}`, { options: { project: 'abc' } });
+    expect(t.row()?.url).toBe('https://mcp.supabase.com/mcp?read_only=true&project_ref=abc');
+  });
+
+  test('a custom server must name its issuer, so a code relayed from another vendor is refused', async () => {
+    const acme = { kind: 'custom', slug: 'acme', label: 'Acme', url: LINEAR };
+    const silent = bootOAuth();
+    expect((await silent.start(acme)).res.status).toBe(400);
+    expect(silent.world.registrations).toHaveLength(0);
+    const t = bootOAuth({ metadata: { authorization_response_iss_parameter_supported: true } });
+    const relayed = await t.start(acme);
+    expect(relayed.res.status).toBe(200);
+    expect(await t.callback({ code: 'code-ok', state: relayed.state })).toContain(
+      'reason=exchange',
+    );
+    expect(t.world.tokenRequests).toHaveLength(0);
+    const honest = await t.start(acme);
+    expect(await t.callback({ code: 'code-ok', state: honest.state, iss: AS })).toContain(
+      'oauth=connected',
+    );
   });
 
   test('start refuses servers and origins it cannot sign in with safely', async () => {
@@ -678,7 +698,7 @@ describe('MCP connector OAuth', () => {
   });
 
   test('edits: an OAuth row refuses tokens and drops its tokens when its origin moves', async () => {
-    const t = bootOAuth();
+    const t = bootOAuth({ metadata: { authorization_response_iss_parameter_supported: true } });
     const started = await t.start({
       kind: 'custom',
       slug: 'lin',

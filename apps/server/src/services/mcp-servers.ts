@@ -337,10 +337,11 @@ export function updateMcpConnector(
       );
     if (patch.token !== undefined || patch.options !== undefined) {
       const current = catalogState(entry, row, openHeaders(deps, row));
+      const options = patch.options ?? current.options;
       target = catalogTarget(
         entry,
         patch.token ?? current.token,
-        patch.options ?? current.options,
+        oauth ? { ...entry.oauthOptions, ...options } : options,
         oauth,
       );
     }
@@ -603,7 +604,7 @@ function oauthTarget(
   deps: McpConnectorDeps,
   teamId: string,
   body: StartMcpConnectorOAuthBody,
-): { target: McpOAuthTarget; url: string; scope?: string } {
+): { target: McpOAuthTarget; url: string; custom: boolean; scope?: string } {
   if (body.kind === 'reconnect') {
     const row = connectorRow(deps, teamId, body.connectorId);
     if (row.authKind !== 'oauth')
@@ -612,6 +613,7 @@ function oauthTarget(
     return {
       target: { kind: 'reconnect', connectorId: row.id, authRevision: row.authRevision },
       url: row.url,
+      custom: row.catalogId === null,
       ...(scope === undefined ? {} : { scope }),
     };
   }
@@ -627,6 +629,7 @@ function oauthTarget(
         headers: {},
       },
       url: body.url,
+      custom: true,
     };
   const entry = mcpCatalogEntry(body.catalogId);
   if (!entry) throw notFound(`catalog entry ${body.catalogId}`);
@@ -641,6 +644,7 @@ function oauthTarget(
       headers: built.headers,
     },
     url: built.url,
+    custom: false,
     ...(entry.oauthScope === undefined ? {} : { scope: entry.oauthScope }),
   };
 }
@@ -737,7 +741,7 @@ export async function prepareMcpConnectorOAuth(
   teamId: string,
   input: { body: StartMcpConnectorOAuthBody; origin: string; state: string },
 ): Promise<{ authorizationUrl: string; pending: McpOAuthPending }> {
-  const { target, url, scope: catalogScope } = oauthTarget(deps, teamId, input.body);
+  const { target, url, custom, scope: catalogScope } = oauthTarget(deps, teamId, input.body);
   const { redirectUri, applicationType } = redirectFor(input.origin);
   const fetchFn = guardedOAuthFetch(deps);
   const discovered = await discoverAuthServer(fetchFn, url);
@@ -778,6 +782,11 @@ export async function prepareMcpConnectorOAuth(
     new URL(metadata.authorization_endpoint).protocol !== 'https:'
   )
     throw new HttpError(400, 'the authorization endpoint must be https');
+  if (custom && !issAdvertised)
+    throw new HttpError(
+      400,
+      'a custom server must name its issuer on the sign-in answer (RFC 9207); use headers',
+    );
   const client = await oauthClient(deps, fetchFn, {
     asUrl,
     metadata,
