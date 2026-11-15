@@ -101,7 +101,7 @@ function StepGlyph({ n, state }: { n: number; state: 'done' | 'now' | 'open' }) 
         aria-label={t('已完成')}
         className="grid size-5 flex-none place-items-center rounded-full bg-content-tertiary text-background"
       >
-        <Check className="size-3" />
+        <Check className="size-4" />
       </span>
     );
   }
