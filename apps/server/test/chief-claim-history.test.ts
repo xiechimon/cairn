@@ -245,6 +245,30 @@ describe('the earlier conversation carried to a Runner claim', () => {
     expect(history).toMatch(/> 用户：line 58|> Coordinator：line 59/);
   });
 
+  test('a secret that straddles the per-line cut is redacted whole, not cut into a surviving fragment', async () => {
+    const { s, machineId } = world();
+    const key = `sk-ant-oat01-${'Zq9XvB2m'.repeat(8)}`;
+    const lead = 'a'.repeat(CHIEF_HISTORY_LINE_MAX_CHARS - 3 - 16);
+    message(s, 'm1', 'user', `${lead}${key} tail ${'z'.repeat(500)}`, 10);
+    chiefStep(s, 's1', 21);
+    const { history } = await historyOf(s, machineId);
+    expect(history).toContain('[cut:');
+    expect(history).not.toContain('sk-ant');
+  });
+
+  test('a row that is not valid JSON is skipped and never fails the claim', async () => {
+    const { s, machineId } = world();
+    s.db.run(
+      sql`insert into chief_message (id, threadId, role, content, createdAt) values ('raw1', 't1', 'user', 'not json at all', 10)`,
+    );
+    message(s, 'm2', 'assistant', 'fine', 11);
+    chiefStep(s, 's1', 21);
+    const { claimed, history } = await historyOf(s, machineId);
+    expect(claimed?.step.id).toBe('s1');
+    expect(history).toContain('fine');
+    expect(history).not.toContain('not json');
+  });
+
   test('no history field for an empty thread, a digest step or a mail turn; the system prompt does not change with history', async () => {
     const empty = world();
     chiefStep(empty.s, 's1', 21);

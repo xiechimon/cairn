@@ -174,7 +174,7 @@ describe('a thread that ran on the in-server runtime keeps its earlier conversat
     expect(text).not.toContain('projects');
     expect(text).not.toContain(TOKEN);
     expect(text.indexOf('> 用户：remember')).toBeLessThan(text.indexOf('when is the launch?'));
-    expect(text.endsWith('when is the launch?') || text.includes('when is the launch?')).toBe(true);
+    expect(text.endsWith('when is the launch?')).toBe(true);
 
     const rows = server.db
       .select()

@@ -39,7 +39,7 @@ export function chiefHistoryFor(
         not(like(chiefMessage.id, `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}%`)),
         lt(chiefMessage.createdAt, stepRow.createdAt),
         ownerMessageIds.length > 0 ? notInArray(chiefMessage.id, ownerMessageIds) : undefined,
-        sql`json_type(${chiefMessage.content}) != 'object'`,
+        sql`CASE WHEN json_valid(${chiefMessage.content}) THEN json_type(${chiefMessage.content}) != 'object' ELSE 0 END`,
       ),
     )
     .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
@@ -49,11 +49,11 @@ export function chiefHistoryFor(
   let budget = CHIEF_HISTORY_MAX_CHARS - summary.length;
   const kept: string[] = [];
   for (const line of chiefTranscriptLines(rows).reverse()) {
-    const text = redacted(
-      line.text.length > CHIEF_HISTORY_LINE_MAX_CHARS
-        ? `${line.text.slice(0, CHIEF_HISTORY_LINE_MAX_CHARS)}\n[cut: ${line.text.length} characters in all]`
-        : line.text,
-    );
+    const whole = redacted(line.text);
+    const text =
+      whole.length > CHIEF_HISTORY_LINE_MAX_CHARS
+        ? `${whole.slice(0, CHIEF_HISTORY_LINE_MAX_CHARS)}\n[cut: ${whole.length} characters in all]`
+        : whole;
     if (text.length + 1 > budget) break;
     budget -= text.length + 1;
     kept.unshift(text);

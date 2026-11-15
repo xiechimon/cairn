@@ -23,7 +23,7 @@ Built in `chiefClaimPayload()` (Runner claims only; the in-server turn path neve
 Source, in order:
 
 1. The thread's `chief_summary.summary` when one exists, redacted, cut to 4000 characters from the end.
-2. The newest conversation rows of the thread after the summary cursor. The selection reuses `conversational()` and `strictlyAfter()` from `apps/server/src/coordinator/seed-summary.ts` (exported for this), which already handle the `(coveredAt, coveredRowid)` tie. Added in SQL before the limit: tool-call rows (object content, via `json_type(content) != 'object'`; every `chief_message.content` is written as JSON by the ORM, and the live database holds no row that is not valid JSON (8675 rows checked)), daemon prompt rows (`user-<stepId>`), rows created at or after the step, and the step's `ownerMessageIds`. The newest 300 remaining rows are read and turned into lines by `chiefTranscriptLines()` (`用户：`, `Coordinator：`, `系统通知：`, ask-user questions; mail text is already reduced to a notice). Each line is redacted and cut to 8000 characters (`SEED_ROW_MAX_CHARS`, as the in-server seed does), then lines are kept newest first until the total reaches 16000 characters and put back in order.
+2. The newest conversation rows of the thread after the summary cursor. The selection reuses `conversational()` and `strictlyAfter()` from `apps/server/src/coordinator/seed-summary.ts` (exported for this), which already handle the `(coveredAt, coveredRowid)` tie. Added in SQL before the limit: tool-call rows (object content, via `CASE WHEN json_valid(content) THEN json_type(content) != 'object' ELSE 0 END`, so a row that is not valid JSON (none exists in the live database, 8675 rows checked) is skipped instead of failing the claim), daemon prompt rows (`user-<stepId>`), rows created at or after the step, and the step's `ownerMessageIds`. The newest 300 remaining rows are read and turned into lines by `chiefTranscriptLines()` (`用户：`, `Coordinator：`, `系统通知：`, ask-user questions; mail text is already reduced to a notice). Each line is redacted whole and then cut to 8000 characters, so a secret that straddles the cut cannot leave a fragment (`SEED_ROW_MAX_CHARS`, as the in-server seed does), then lines are kept newest first until the total reaches 16000 characters and put back in order.
 
 Excluding every `user-<stepId>` row is deliberate: that row holds the instruction plus project sections, so it would repeat the posted message. It also drops wake and event notices that only exist as such a row from earlier Runner turns; those notices are not carried.
 
@@ -80,6 +80,10 @@ The journal `prompt` field, the `transcriptPromptRowId` row and `freshSessionPro
 4. End to end (`integration`, real server and daemon, fake `claude`): a thread with earlier messages and a stale session id claims `continue`, falls back, and the first user message the fake receives is the fenced history then the new message; the second turn continues and does not repeat it; no `chief_message` row contains the fence marker; the token does not appear. The fake binary logs the first user message text.
 5. Negative control: without the daemon prefix the end-to-end test fails.
 6. Regression: `issue-fence`, `coordinator/runner`, daemon `runner-*` and step-opener tests, shared snapshot.
+
+## Known gap
+
+A task started from the Coordinator with `ownerWords: false` leaves the step without `ownerMessageIds`, so that one message can appear both in the history and as the instruction. It is a duplicate, not a leak, and the fence says not to re-execute requests in it.
 
 ## Security
 
