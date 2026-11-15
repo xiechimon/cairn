@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://cairn.xmon.me/sitemap-index.xml
