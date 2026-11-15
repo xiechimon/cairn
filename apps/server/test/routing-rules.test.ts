@@ -6,6 +6,7 @@ import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js'
 import { builtinModelIds } from '../src/coordinator/runtime/provider.js';
 import {
   machine as machineTable,
+  provider as providerTable,
   routingRule,
   team as teamTable,
   todo as todoTable,
@@ -509,6 +510,13 @@ describe('rules store provider ids, with a read-time default for Session', () =>
         createdBy: s.user.id,
       },
     );
+    if (opts.createdAt !== undefined) {
+      s.db
+        .update(providerTable)
+        .set({ createdAt: opts.createdAt })
+        .where(eq(providerTable.providerId, providerId))
+        .run();
+    }
   }
 
   function claudeRunner(s: TestServer, online = true): string {
@@ -543,9 +551,9 @@ describe('rules store provider ids, with a read-time default for Session', () =>
 
   test('a rule saved as the runtime pi resolves to the runnable provider that stores the model', () => {
     const s = bare();
-    addProvider(s, 'deepseek', { key: false, models: ['m1'] });
-    addProvider(s, 'local-llm', { key: false, models: ['m1'] });
-    addProvider(s, 'vani', { models: ['m1'] });
+    addProvider(s, 'deepseek', { key: false, models: ['m1'], createdAt: 1 });
+    addProvider(s, 'local-llm', { key: false, models: ['m1'], createdAt: 2 });
+    addProvider(s, 'vani', { models: ['m1'], createdAt: 3 });
     seedRoute(s, 'session', { provider: 'pi', modelId: 'm1' });
     expect(session(s)).toMatchObject({ provider: 'local-llm', modelId: 'm1' });
     seedRoute(s, 'session', { provider: 'pi', modelId: 'nobody-serves-this' });
@@ -587,8 +595,8 @@ describe('rules store provider ids, with a read-time default for Session', () =>
   test('a Codex login counts only when it exists; an absent one falls through to the provider', () => {
     const s = bare();
     piOnlyRunner(s, 'absent');
-    addProvider(s, 'deepseek', { key: false, models: ['m0'] });
-    addProvider(s, 'vani', { models: ['m1', 'm2'] });
+    addProvider(s, 'deepseek', { key: false, models: ['m0'], createdAt: 1 });
+    addProvider(s, 'vani', { models: ['m1', 'm2'], createdAt: 2 });
     expect(session(s)).toMatchObject({ provider: 'vani', modelId: 'm1' });
     piOnlyRunner(s, 'ok');
     expect(session(s)).toMatchObject({ provider: 'claude-code' });
