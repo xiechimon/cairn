@@ -1,0 +1,55 @@
+import {
+  CHIEF_DIGEST_ROW_ID_PREFIX,
+  CHIEF_REPORT_ROW_ID_PREFIX,
+  redactSecrets,
+  TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
+} from '@cairn/shared';
+import { and, asc, desc, eq, isNotNull, like, lt, not, sql } from 'drizzle-orm';
+import type { Db } from '../db/client.js';
+import { chiefMessage, step } from '../db/schema.js';
+import { chiefTranscriptLines } from './chief-digest.js';
+
+export const CHIEF_REPLAY_MAX_CHARS = 6000;
+const CHIEF_REPLAY_MAX_ROWS = 80;
+
+export function chiefReplaySection(db: Db, threadId: string): string | null {
+  const firstRunnerStep = db
+    .select({ createdAt: step.createdAt, ownerMessageIds: step.ownerMessageIds })
+    .from(step)
+    .where(and(eq(step.buildId, threadId), eq(step.kind, 'chief'), isNotNull(step.machineId)))
+    .orderBy(asc(step.createdAt), sql`rowid`)
+    .get();
+  if (firstRunnerStep === undefined) return null;
+  const current = new Set(firstRunnerStep.ownerMessageIds ?? []);
+  const rows = db
+    .select()
+    .from(chiefMessage)
+    .where(
+      and(
+        eq(chiefMessage.threadId, threadId),
+        lt(chiefMessage.createdAt, firstRunnerStep.createdAt),
+        not(like(chiefMessage.id, `${CHIEF_DIGEST_ROW_ID_PREFIX}%`)),
+        not(like(chiefMessage.id, `${CHIEF_REPORT_ROW_ID_PREFIX}%`)),
+        not(like(chiefMessage.id, `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}%`)),
+      ),
+    )
+    .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
+    .limit(CHIEF_REPLAY_MAX_ROWS)
+    .all()
+    .reverse()
+    .filter(
+      (row) =>
+        row.role !== 'system' &&
+        !current.has(row.id) &&
+        (typeof row.content !== 'object' || row.content === null || Array.isArray(row.content)),
+    );
+  const text = chiefTranscriptLines(rows)
+    .map((line) => line.text)
+    .join('\n');
+  if (text === '') return null;
+  const redacted = redactSecrets(text).value as string;
+  const tailStart = redacted.length - CHIEF_REPLAY_MAX_CHARS;
+  const lineStart = tailStart <= 0 ? 0 : redacted.indexOf('\n', tailStart) + 1;
+  const capped = redacted.slice(lineStart === 0 && tailStart > 0 ? tailStart : lineStart);
+  return `## 此前的对话（本线程改用 Claude Code 之前，只读背景）\n${capped}`;
+}
