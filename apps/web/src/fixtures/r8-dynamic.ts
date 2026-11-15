@@ -162,7 +162,7 @@ function transcript12(stamp: string): TranscriptItem[] {
       footer: { seconds: 28 },
     },
     { kind: 'note', text: '18:18' },
-    { kind: 'note', text: 'Xmon Dai 发起了合并' },
+    { kind: 'note', text: '{name} 发起了合并', vars: { name: 'Xmon Dai' } },
     {
       kind: 'fail',
       title: '运行该任务的 Runner 已离线',
@@ -413,7 +413,7 @@ const RUN1_TO_V2: TranscriptItem[] = [
     ],
   },
   { kind: 'plan', title: '方案 · v1', preview: R8_PLAN_PREVIEW, seconds: 31 },
-  { kind: 'note', text: 'Xmon Dai 发起了 AI 审核' },
+  { kind: 'note', text: '{name} 发起了 AI 审核', vars: { name: 'Xmon Dai' } },
   REVIEW_MESSAGE,
   ADJUST_V2_MESSAGE,
   { kind: 'plan', title: '方案 · v2', preview: R8_PLAN_PREVIEW, seconds: 29 },
@@ -480,7 +480,7 @@ const RUN1_FAILED: TranscriptItem[] = [
     ],
     footer: { seconds: 29 },
   },
-  { kind: 'note', text: 'Xmon Dai 发起了合并' },
+  { kind: 'note', text: '{name} 发起了合并', vars: { name: 'Xmon Dai' } },
   {
     kind: 'fail',
     title: '运行该任务的 Runner 已离线',
