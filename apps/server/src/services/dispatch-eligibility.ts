@@ -1,10 +1,14 @@
 import {
   type ClaudeCodeReport,
   capabilityMissingLabels,
+  claudeLoginBlocksClaim,
   confinementDispatchReady,
   isBackendRuntimeId,
+  MACHINE_RUNTIMES,
   type MachineCapabilities,
   type MachineHardware,
+  type MachineRuntime,
+  MODEL_SOURCE_RUNTIME_LABELS,
   type RequiredCapabilities,
   type RunnerOs,
   runnerOsOf,
@@ -21,11 +25,46 @@ export function stepRuntimeFor(
   return isBackendRuntimeId(agentProvider) ? 'claude-code' : 'pi';
 }
 
+export interface MachineRuntimeFacts {
+  claudeCodeReport: Pick<ClaudeCodeReport, 'installed'> | null;
+  capabilities: Pick<MachineCapabilities, 'executor'> | null;
+}
+
+export function machineRuntimeAvailable(
+  machineRow: MachineRuntimeFacts,
+  runtime: 'pi' | 'claude-code' | 'gemini',
+): boolean {
+  if (runtime === 'pi') return true;
+  if (runtime === 'gemini') return false;
+  return (
+    machineRow.claudeCodeReport?.installed === true || machineRow.capabilities?.executor === 'orb'
+  );
+}
+
+export function availableRuntimes(machineRow: MachineRuntimeFacts): MachineRuntime[] {
+  return MACHINE_RUNTIMES.filter((runtime) => machineRuntimeAvailable(machineRow, runtime));
+}
+
 export function runtimeGatePasses(
-  machineRow: { enabledRuntimes: readonly string[] },
+  machineRow: MachineRuntimeFacts,
   agentProvider: string | null | undefined,
 ): boolean {
-  return machineRow.enabledRuntimes.includes(stepRuntimeFor(agentProvider));
+  return machineRuntimeAvailable(machineRow, stepRuntimeFor(agentProvider));
+}
+
+export function claudeCodeLoginBlocked(
+  report: Pick<ClaudeCodeReport, 'auth' | 'login'> | null | undefined,
+  hasSubscription: boolean,
+  now: number,
+): boolean {
+  if (hasSubscription) return false;
+  return report?.auth?.state === 'not-logged-in' || claudeLoginBlocksClaim(report?.login, now);
+}
+
+function runtimeMissingReason(name: string, runtime: 'pi' | 'claude-code' | 'gemini'): string {
+  return runtime === 'gemini'
+    ? `执行机 ${name} 不能运行 Gemini：它的权限请求还没接入命令闸。`
+    : `执行机 ${name} 上没有检测到 ${MODEL_SOURCE_RUNTIME_LABELS[runtime]}：装好后重启执行机。`;
 }
 
 export interface MachineCapabilityFacts {
@@ -109,17 +148,22 @@ export function projectRunningCount(db: Pick<Db, 'select'>, projectId: string): 
 export function homeMachineRejectReason(
   machineRow: {
     name: string;
-    enabledRuntimes: string[];
     claudeCodeReport: ClaudeCodeReport | null;
+    capabilities: MachineCapabilities | null;
   },
   agentRow: { provider: string | null | undefined; modelId: string | null | undefined },
   catalog?: ReadonlyArray<{ id: string; liveness?: 'alive' | 'dead' | 'unknown' }>,
 ): string | null {
   const runtime = stepRuntimeFor(agentRow.provider);
-  if (!machineRow.enabledRuntimes.includes(runtime)) {
-    return `执行机 ${machineRow.name} 未启用 ${runtime} 运行时（在执行机页开启后再试）。`;
+  if (!machineRuntimeAvailable(machineRow, runtime)) {
+    return runtimeMissingReason(machineRow.name, runtime);
   }
-  if (runtime === 'claude-code' && agentRow.modelId != null && agentRow.modelId !== '') {
+  if (
+    runtime === 'claude-code' &&
+    machineRow.capabilities?.executor !== 'orb' &&
+    agentRow.modelId != null &&
+    agentRow.modelId !== ''
+  ) {
     const report = machineRow.claudeCodeReport;
     const catalogEntry = catalog?.find((m) => m.id === agentRow.modelId);
     if (catalogEntry !== undefined && catalogEntry.liveness === 'dead') {
@@ -142,7 +186,6 @@ export interface EligibilityInput {
   machine: {
     id: string;
     name: string;
-    enabledRuntimes: string[];
     claudeCodeReport: ClaudeCodeReport | null;
     capabilities: MachineCapabilities | null;
   };
@@ -174,7 +217,7 @@ export type MachineIneligibility =
 export function machineEligibility(input: EligibilityInput): MachineIneligibility | null {
   const { machine: machineRow, agent: agentRow, model } = input;
   const runtime = stepRuntimeFor(model.provider);
-  if (!machineRow.enabledRuntimes.includes(runtime)) return { kind: 'runtime' };
+  if (!machineRuntimeAvailable(machineRow, runtime)) return { kind: 'runtime' };
   const modelReject =
     agentRow.machineId === machineRow.id
       ? null

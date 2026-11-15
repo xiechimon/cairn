@@ -15,7 +15,6 @@ import { ClaudeMark, GrokMark, OpenAIMark, PiMark } from '../brand-marks.js';
 import { ListRow } from '../list-card.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../settings-list.js';
 import { type GlyphKind, StatusGlyph } from '../status-glyph.js';
-import { ToggleSwitch } from '../toggle-switch.js';
 import { StatusChip, type StatusTone } from '../ui/status-chip.js';
 
 const DAY = 86_400_000;
@@ -112,17 +111,7 @@ const LOGIN_CHIP: Record<MachineProvider['login'], { tone: StatusTone; label: st
   unknown: { tone: 'idle', label: '状态未知' },
 };
 
-export function ProviderRow({
-  provider,
-  toggleable,
-  pending = false,
-  onToggle,
-}: {
-  provider: MachineProvider;
-  toggleable: boolean;
-  pending?: boolean;
-  onToggle: (next: boolean) => void;
-}) {
+export function ProviderRow({ provider }: { provider: MachineProvider }) {
   const { t } = useI18n();
   const chip = LOGIN_CHIP[provider.login];
   const { label: name, Mark } = PROVIDERS[provider.runtime];
@@ -155,30 +144,15 @@ export function ProviderRow({
           </span>
         )}
       </span>
-      <ToggleSwitch
-        className="ml-auto"
-        data-testid="provider-toggle"
-        aria-label={t('{name} 接任务', { name })}
-        checked={provider.enabled}
-        disabled={!toggleable || pending}
-        title={toggleable ? undefined : t('这台执行机还不能单独开关 {name}', { name })}
-        onCheckedChange={(next) => onToggle(next)}
-      />
     </div>
   );
 }
 
 export function MachineProvidersCard({
   machine,
-  toggleable,
-  pendingRuntime,
-  onToggle,
   online,
 }: {
   machine: MachineWithProviders;
-  toggleable: (runtime: ProviderRuntime) => boolean;
-  pendingRuntime?: ProviderRuntime | null;
-  onToggle: (runtime: ProviderRuntime, next: boolean) => void;
   online: ReactNode;
 }) {
   const { t } = useI18n();
@@ -199,15 +173,7 @@ export function MachineProvidersCard({
             {t('这台执行机还没有上报模型服务状态')}
           </div>
         ) : (
-          providers.map((provider) => (
-            <ProviderRow
-              key={provider.runtime}
-              provider={provider}
-              toggleable={toggleable(provider.runtime)}
-              pending={pendingRuntime === provider.runtime}
-              onToggle={(next) => onToggle(provider.runtime, next)}
-            />
-          ))
+          providers.map((provider) => <ProviderRow key={provider.runtime} provider={provider} />)
         )}
       </SettingsCard>
     </section>

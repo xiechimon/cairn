@@ -172,8 +172,8 @@ test('Run now schedules the actual run endpoint and reports queued status', asyn
   expect(probe.calls).toContainEqual({ method: 'POST', path: '/api/schedules/schedule-1/run', body: {} });
 });
 
-test('the Tasks panel lists schedules in the Schedules tab only, and a row menu opens the schedules page', async ({ page }) => {
-  await setup(page, { kind: 'once', nextRunAt: null });
+test('the Tasks panel lists schedules in the Schedules tab only, and the row menu edits in the small editor', async ({ page }) => {
+  await setup(page);
   await page.goto('/app?pane=tasks');
   const panel = page.getByRole('complementary', { name: 'Tasks', exact: true });
   await expect(panel.locator('[data-slot="schedule-row"]')).toHaveCount(0);
@@ -183,12 +183,12 @@ test('the Tasks panel lists schedules in the Schedules tab only, and a row menu 
   const frame = panel.locator('[data-slot="schedule-row-frame"]').first();
   await frame.hover();
   await frame.getByTestId('schedule-row-menu-button').click();
-  await page.getByRole('menuitem', { name: /Manage schedules/ }).click();
-  await expect(page).toHaveURL(/\/app\/schedules$/);
+  await page.getByRole('menuitem', { name: /Edit/ }).click();
+  await expect(page.getByTestId('schedule-popover')).toContainText('Nightly release checks');
 });
 
 test('the Schedules tab lists schedules while the tasks request has failed', async ({ page }) => {
-  await setup(page, { kind: 'once', nextRunAt: null });
+  await setup(page);
   await page.route('**/api/tasks?*', (route) => route.fulfill({ status: 500, body: '{}' }));
   await page.goto('/app?pane=tasks');
   const panel = page.getByRole('complementary', { name: 'Tasks', exact: true });
@@ -224,7 +224,7 @@ for (const surface of ['global', 'project'] as const) {
   test(`${surface} summary preserves missing-next data through its actual consumer`, async ({ page }) => {
     await setup(page, { kind: 'once', nextRunAt: null });
     await visit(page);
-    if (surface === 'global') await expandEnded(page);
+    await expandEnded(page);
     await expect(summary(page)).toContainText('No upcoming runs');
     await expect(summary(page)).not.toContainText('Jan 1');
   });

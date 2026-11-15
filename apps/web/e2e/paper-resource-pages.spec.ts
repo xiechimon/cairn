@@ -52,7 +52,7 @@ test('machines: `添加执行机` is the plus beside the list heading, no dashed
   await expect(page.locator('button.border-dashed')).toHaveCount(0);
   const local = page.getByTestId('machine-item').first();
   await expect(local.getByTestId('machine-item-status')).toHaveText('在线');
-  await expect(local.getByTestId('machine-accept-toggle')).toBeVisible();
+  await expect(local.getByTestId('machine-menu')).toBeVisible();
 });
 
 for (const [name, url, open, submit] of [

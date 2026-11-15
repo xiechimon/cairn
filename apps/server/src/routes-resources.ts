@@ -221,16 +221,15 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       if (!c.get('ownerIdentity')) throw new HttpError(403, 'owner session required');
       if (row.tokenHash === null) throw new HttpError(409, 'machine is not enrolled');
     }
-    if (body.enabledRuntimes?.includes('gemini') && !row.enabledRuntimes.includes('gemini')) {
+    if (body.enabledRuntimes !== undefined) {
       throw new HttpError(
         409,
-        'Gemini cannot be turned on until its permission requests go through the command gate (#1612)',
+        'runtimes follow what the Runner detects; there is no runtime switch to change',
       );
     }
     const patch = {
       ...(body.browserOverride !== undefined ? { browserOverride: body.browserOverride } : {}),
       ...(body.desktopOverride !== undefined ? { desktopOverride: body.desktopOverride } : {}),
-      ...(body.enabledRuntimes !== undefined ? { enabledRuntimes: body.enabledRuntimes } : {}),
       ...(body.maxConcurrent !== undefined ? machineConcurrencyPatch(row, body.maxConcurrent) : {}),
     };
     if (Object.keys(patch).length > 0) {

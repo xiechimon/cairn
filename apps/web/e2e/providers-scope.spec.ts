@@ -86,7 +86,7 @@ test('unknown scope and item fall back to the team tab and its first row', async
   );
 });
 
-test('machine tab: Claude Code reports version, sign-in state and slots; runtimes follow enabledRuntimes', async ({
+test('machine tab: Claude Code reports version, sign-in state and slots, with no runtime switch', async ({
   page,
 }) => {
   await page.goto(FLEET);
@@ -97,8 +97,7 @@ test('machine tab: Claude Code reports version, sign-in state and slots; runtime
   await expect(cc).toContainText('v2.1.316');
   await expect(cc).toContainText('未登录');
   await expect(cc).toHaveAttribute('data-tone', 'warn');
-  await expect(cc.getByRole('switch')).toBeChecked();
-  await expect(instance(page, 'pi').getByRole('switch')).not.toBeChecked();
+  await expect(page.getByTestId('provider-list').getByRole('switch')).toHaveCount(0);
   await expect(editor(page)).toContainText('/home/u/.local/bin/claude');
   const slots = editor(page).getByTestId('provider-model');
   await expect(slots).toHaveCount(2);
@@ -112,7 +111,6 @@ test('offline machine keeps its last report and says it is offline', async ({ pa
   await expect(cc).toContainText('离线');
   await expect(cc).toHaveAttribute('data-tone', 'warn');
   await expect(editor(page)).toContainText('glm-5.3');
-  await expect(cc.getByRole('switch')).toBeDisabled();
 });
 
 test('machine without a Claude Code report says so instead of guessing', async ({ page }) => {
@@ -120,7 +118,7 @@ test('machine without a Claude Code report says so instead of guessing', async (
   const cc = instance(page, 'claude-code');
   await expect(cc).toContainText('还没上报');
   await expect(cc).toHaveAttribute('data-tone', 'off');
-  await expect(instance(page, 'pi').getByRole('switch')).toBeChecked();
+  await expect(instance(page, 'pi')).toHaveAttribute('data-tone', 'ok');
 });
 
 test('empty team: the list offers to add a provider and opens the picker', async ({ page }) => {
@@ -147,7 +145,7 @@ test('phone width: the list sits above the editor and nothing overflows sideways
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
-test('live: edits and runtime switches send the agreed requests', async ({ page }) => {
+test('live: provider edits send the agreed requests and the Runner scope writes nothing', async ({ page }) => {
   const calls: string[] = [];
   let provider = {
     kind: 'custom',
@@ -230,10 +228,9 @@ test('live: edits and runtime switches send the agreed requests', async ({ page 
   await expect.poll(() => calls).toContain('DELETE p1');
 
   await pickScope(page, 'box');
-  await instance(page, 'claude-code').getByRole('switch').click();
-  await expect
-    .poll(() => calls)
-    .toContain('PATCH m1 {"enabledRuntimes":["pi","claude-code"]}');
+  await expect(instance(page, 'claude-code')).toBeVisible();
+  await expect(page.getByTestId('provider-list').getByRole('switch')).toHaveCount(0);
+  expect(calls.filter((call) => call.startsWith('PATCH m1'))).toEqual([]);
 });
 
 const REMOTE = 'Kd8fG2hJ4mN9pQ1rStUvWx3';

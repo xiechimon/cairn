@@ -13,7 +13,7 @@ test.each([
 ])('home gate rejects unavailable selected Claude model with report %j', (report) => {
   const home = {
     name: 'test',
-    enabledRuntimes: ['claude-code'],
+    capabilities: null,
     claudeCodeReport: report,
   };
   expect(homeMachineRejectReason(home, selectedModel)).not.toBeNull();
@@ -46,7 +46,7 @@ test('home gate follows the model catalog liveness decision', () => {
   const catalog = [{ id: 'selected', liveness: 'dead' as const }];
   const home = {
     name: 'test',
-    enabledRuntimes: ['claude-code'],
+    capabilities: null,
     claudeCodeReport: {
       installed: true,
       hostname: 'test',
@@ -59,7 +59,7 @@ test('home gate follows the model catalog liveness decision', () => {
 test('an available selected Claude model passes the home gate', () => {
   const home = {
     name: 'test',
-    enabledRuntimes: ['claude-code'],
+    capabilities: null,
     claudeCodeReport: {
       installed: true,
       hostname: 'test',

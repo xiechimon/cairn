@@ -1131,6 +1131,7 @@
           "/api/teams/:id/model-routing",
           "/api/teams/:id/routing-rules/:use",
           "/api/teams/:id/routing-settings",
+          "/api/teams/:id/top-models",
           "/api/teams/:id/work-policies/:use",
           "/api/capabilities"
         ]
