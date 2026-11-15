@@ -4,6 +4,7 @@ import { replyQuoteText } from '../reply-quote.js';
 import { agentRecordSchema } from './agent.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
 import { stepQueueBlockedSchema } from './machine-capabilities.js';
+import { workerBriefTextSchema } from './worker-brief-text.js';
 
 export const chiefIdFormat = (userId: string, teamId: string) => `chief-${userId}-${teamId}`;
 
@@ -170,7 +171,7 @@ export const patchChiefBodySchema = z
         agentId: recordId,
       })
       .nullish(),
-    charter: z.string().nullish(),
+    charter: workerBriefTextSchema.nullish(),
   })
   .refine((b) => b.agent !== undefined || b.charter !== undefined, {
     message: 'expected agent and/or charter',
