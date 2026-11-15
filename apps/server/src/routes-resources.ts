@@ -15,6 +15,7 @@ import {
   patchProviderBodySchema,
   patchScheduleBodySchema,
   redactSecrets,
+  renameClaudeSubscriptionSchema,
   SKILL_ENTRY_FILE,
   setSecretBodySchema,
   skillRecordSchema,
@@ -44,7 +45,11 @@ import { createApiKey, listApiKeys } from './services/api-keys.js';
 import {
   createClaudeSubscription,
   deleteClaudeSubscription,
+  disableClaudeSubscription,
+  enableClaudeSubscription,
   listClaudeSubscriptions,
+  listSubscriptionSteps,
+  renameClaudeSubscription,
   verifySubscriptionConnection,
 } from './services/claude-subscriptions.js';
 import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
@@ -450,6 +455,35 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       throw notFound('Claude subscription connection');
     }
     return c.body(null, 204);
+  });
+
+  app.patch('/api/teams/:id/claude-subscriptions/:cid', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    const body = parseWith(renameClaudeSubscriptionSchema, await jsonBody(c), 'body');
+    return c.json(renameClaudeSubscription(keysvc, teamId, c.req.param('cid'), body.label));
+  });
+
+  app.post('/api/teams/:id/claude-subscriptions/:cid/enable', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(await enableClaudeSubscription(keysvc, teamId, c.req.param('cid')));
+  });
+
+  app.post('/api/teams/:id/claude-subscriptions/:cid/disable', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(disableClaudeSubscription(keysvc, teamId, c.req.param('cid')));
+  });
+
+  app.get('/api/teams/:id/claude-subscriptions/:cid/steps', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 20) || 20, 1), 100);
+    return c.json(listSubscriptionSteps(keysvc, teamId, c.req.param('cid'), limit));
   });
 
   app.post('/api/teams/:id/claude-subscriptions/:cid/verify', async (c) => {

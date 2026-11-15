@@ -589,6 +589,7 @@ test('team-scoped revocation removes future credentials and restores the machine
   );
   expect((await req(s.app, 'DELETE', `${path}/missing`)).status).toBe(404);
   expect(hasActiveClaudeSubscription({ db: s.db }, s.team.id)).toBe(true);
+  s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, firstStep)).run();
   expect((await req(s.app, 'DELETE', `${path}/${id}`)).status).toBe(204);
   expect((await req(s.app, 'DELETE', `${path}/${id}`)).status).toBe(404);
   expect(hasActiveClaudeSubscription({ db: s.db }, s.team.id)).toBe(false);
