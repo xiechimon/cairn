@@ -16,18 +16,21 @@ interface FormFieldProps {
   htmlFor: string;
   help?: string;
   className?: string;
+  disabled?: boolean;
   children: ReactNode;
 }
 
-export function FormField({ label, htmlFor, help, className, children }: FormFieldProps) {
+export function FormField({ label, htmlFor, help, className, disabled, children }: FormFieldProps) {
   return (
-    <Field className={className}>
+    <Field className={className} data-disabled={disabled === true ? 'true' : undefined}>
       <FieldLabel htmlFor={htmlFor} className="text-ui font-medium text-foreground">
         {label}
       </FieldLabel>
       {children}
       {help != null && (
-        <FieldDescription className="text-meta text-content-tertiary">{help}</FieldDescription>
+        <FieldDescription className="text-meta text-content-tertiary group-data-[disabled=true]/field:opacity-50">
+          {help}
+        </FieldDescription>
       )}
     </Field>
   );

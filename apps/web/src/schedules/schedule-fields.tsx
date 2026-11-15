@@ -65,7 +65,9 @@ export function ScheduleFields({
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div className="flex flex-col gap-2">
-        <span className="text-ui font-medium text-foreground">{t('频率')}</span>
+        <span className={`text-ui font-medium text-foreground ${disabled ? 'opacity-50' : ''}`}>
+          {t('频率')}
+        </span>
         <SegmentedRadio
           label={t('频率')}
           value={value.trigger}
@@ -80,7 +82,8 @@ export function ScheduleFields({
         <FormField
           label={t('Cron 表达式')}
           htmlFor={`${id}-cron`}
-          help={cronValid ? t('服务器按 {timezone} 计算 Cron。', { timezone: zone }) : undefined}
+          disabled={disabled}
+          help={cronValid ? t('服务器按{timezone}计算 Cron。', { timezone: zone }) : undefined}
         >
           <Input
             id={`${id}-cron`}
@@ -104,6 +107,7 @@ export function ScheduleFields({
             <FormField
               label={t(value.trigger === 'weekly' ? '从哪天开始每周重复' : '日期')}
               htmlFor={`${id}-date`}
+              disabled={disabled}
             >
               <Input
                 type="date"
@@ -160,7 +164,10 @@ export function ScheduleFields({
                   ))}
                 </SelectContent>
               </Select>
-              <span className="min-w-0 break-words text-meta text-content-tertiary" title={tz}>
+              <span
+                className={`min-w-0 break-words text-meta text-content-tertiary ${disabled ? 'opacity-50' : ''}`}
+                title={tz}
+              >
                 {zone}
               </span>
             </div>
@@ -169,7 +176,12 @@ export function ScheduleFields({
         </>
       )}
       {value.trigger === 'custom' && lateHint}
-      <FormField label={t('提示词')} htmlFor={`${id}-prompt`} help={t('留空就按任务描述运行。')}>
+      <FormField
+        label={t('提示词')}
+        htmlFor={`${id}-prompt`}
+        help={t('留空就按任务描述运行。')}
+        disabled={disabled}
+      >
         <Textarea
           id={`${id}-prompt`}
           value={value.prompt}

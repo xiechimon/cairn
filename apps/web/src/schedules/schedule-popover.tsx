@@ -76,16 +76,22 @@ export function SchedulePopover({
               side: 'bottom' as const,
               align: 'start' as const,
               sideOffset: ({ anchor }: { anchor: { height: number } }) => -anchor.height,
-              collisionPadding: { top: 72, bottom: 96, left: 8, right: 8 },
+              collisionPadding: {
+                top: anchor?.current?.getBoundingClientRect().top ?? 72,
+                bottom: 96,
+                left: 8,
+                right: 8,
+              },
               collisionAvoidance: { side: 'shift' as const, align: 'shift' as const },
               className:
-                'max-h-(--available-height) w-(--anchor-width) min-w-80 gap-3 overflow-y-auto p-3 pb-0',
+                'h-(--available-height) w-(--anchor-width) min-w-80 gap-3 overflow-y-auto p-3 pb-0',
             }
           : {
               side: 'left' as const,
               align: 'start' as const,
               sideOffset: 16,
               collisionPadding: { top: 60, right: 8, left: 8, bottom: 104 },
+              collisionAvoidance: { side: 'flip' as const, align: 'shift' as const },
               className: 'max-h-(--available-height) w-80 gap-3 overflow-y-auto p-3 pb-0',
             })}
       >
@@ -249,7 +255,7 @@ function ScheduleEditor({
           {error}
         </p>
       )}
-      <div className="sticky bottom-px mb-px flex items-center gap-2 bg-popover pt-1 pb-3">
+      <div className="sticky bottom-px mt-auto mb-px flex items-center gap-2 bg-popover pt-1 pb-3">
         {schedule !== null && (
           <Button
             variant="ghost"

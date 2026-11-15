@@ -45,6 +45,9 @@ function cronCadence(cron: string, t: TFunc): string | null {
   if (weekdays !== null) return t('工作日 {time}', { time: clock(weekdays[2], weekdays[1]) });
   const daily = /^(\d{1,2}) (\d{1,2}) \* \* \*$/.exec(cron);
   if (daily !== null) return t('每天 {time}', { time: clock(daily[2], daily[1]) });
+  const monthly = /^(\d{1,2}) (\d{1,2}) (\d{1,2}) \* \*$/.exec(cron);
+  if (monthly !== null)
+    return t('每月 {d} 日 {time}', { d: Number(monthly[3]), time: clock(monthly[2], monthly[1]) });
   const everyHours = /^\d{1,2} \*\/(\d{1,2}) \* \* \*$/.exec(cron);
   if (everyHours !== null) return t('每 {n} 小时', { n: Number(everyHours[1]) });
   if (/^\d{1,2} \* \* \* \*$/.test(cron)) return t('每小时运行');
