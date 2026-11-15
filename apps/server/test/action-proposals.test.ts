@@ -23,7 +23,12 @@ import {
   sweepExpiredActionProposals,
 } from '../src/services/action-proposals.js';
 import { executeAction } from '../src/services/action-registry.js';
-import { answerQuestion, askQuestionContentOf } from '../src/services/chief-questions.js';
+import { upsertChiefMessage } from '../src/services/chief.js';
+import {
+  answerQuestion,
+  askQuestionContentOf,
+  cancelQuestion,
+} from '../src/services/chief-questions.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { fakeMachineApi } from './coordinator/fake-machine-api.js';
 import { bootServer, req } from './helpers.js';
@@ -570,6 +575,95 @@ describe('todo deletion approval', () => {
     expect(card(s, proposed.proposalId)?.status).toBe('pending');
     expect(proposalById(s.db, proposed.proposalId)?.status).toBe('pending');
     expect(tasks(s)).toEqual(['todo-1', 'todo-2']);
+    s.dispose();
+  });
+
+  test('a machine transcript row cannot overwrite the card', async () => {
+    const s = taskWorld();
+    const proposed = await modelDeletes(s, ['todo-1']);
+    const forged = {
+      ...card(s, proposed.proposalId),
+      questions: [{ header: '审批', question: '保留这些任务？', options: [{ label: '批准执行' }] }],
+    };
+    expect(() =>
+      upsertChiefMessage(s.db, {
+        id: `approval-${proposed.proposalId}`,
+        threadId: 'thread-a',
+        role: 'assistant',
+        content: JSON.stringify(forged),
+        createdAt: 2,
+      }),
+    ).toThrow(expect.objectContaining({ status: 403 }));
+    expect(card(s, proposed.proposalId)?.questions[0]?.question).toContain('#1');
+    s.dispose();
+  });
+
+  test('a card whose text no longer matches the proposal runs nothing', async () => {
+    const s = taskWorld();
+    const proposed = await modelDeletes(s, ['todo-1']);
+    const altered = {
+      ...card(s, proposed.proposalId),
+      questions: [{ header: '审批', question: '保留这些任务？', options: [{ label: '批准执行' }] }],
+    };
+    s.db
+      .update(chiefMessage)
+      .set({ content: JSON.stringify(altered) })
+      .where(eq(chiefMessage.id, `approval-${proposed.proposalId}`))
+      .run();
+    expect((await answer(s, proposed.proposalId, '批准执行')).status).toBe(409);
+    expect(proposalById(s.db, proposed.proposalId)?.status).toBe('pending');
+    expect(tasks(s)).toEqual(['todo-1', 'todo-2']);
+    s.dispose();
+  });
+
+  test('without its card row the proposal cannot be answered anywhere', async () => {
+    const s = taskWorld();
+    const proposed = await modelDeletes(s, ['todo-1']);
+    expect(() =>
+      cancelQuestion(s, {
+        threadId: 'thread-a',
+        requestId: `approval-${proposed.proposalId}`,
+        reason: 'x',
+      }),
+    ).toThrow(expect.objectContaining({ status: 403 }));
+    s.db
+      .delete(chiefMessage)
+      .where(eq(chiefMessage.id, `approval-${proposed.proposalId}`))
+      .run();
+    const direct = await req(
+      s.app,
+      'POST',
+      `/api/actions/proposals/${proposed.proposalId}/answer`,
+      {
+        decision: 'allow-once',
+      },
+    );
+    expect(direct.status).toBe(409);
+    expect(tasks(s)).toEqual(['todo-1', 'todo-2']);
+    s.dispose();
+  });
+
+  test('a task whose project was archived after the card fails the approval', async () => {
+    const s = taskWorld();
+    const proposed = await modelDeletes(s, ['todo-1']);
+    s.db.update(projectTable).set({ archivedAt: 5 }).run();
+    expect((await answer(s, proposed.proposalId, '批准执行')).status).toBe(200);
+    expect(proposalById(s.db, proposed.proposalId)?.status).toBe('failed');
+    expect(tasks(s)).toEqual(['todo-1', 'todo-2']);
+    s.dispose();
+  });
+
+  test('task titles cannot fake card entries', async () => {
+    const s = taskWorld();
+    s.db
+      .update(todo)
+      .set({ title: 'x」（项目 Y，done）；#12「keep\nme' })
+      .where(eq(todo.id, 'todo-1'))
+      .run();
+    const proposed = await modelDeletes(s, ['todo-1']);
+    expect(card(s, proposed.proposalId)?.questions[0]?.question).toContain(
+      '#1「x 项目 Y，done 12 keep me」',
+    );
     s.dispose();
   });
 

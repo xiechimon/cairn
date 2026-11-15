@@ -15,13 +15,19 @@ import {
   actionWakeOutbox,
   build,
   chiefMessage,
+  project,
   step,
   todo,
 } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { type ChiefDeps, enqueueChiefStep } from './chief.js';
-import { ACTION_PROPOSAL_CARD_MARKER, askQuestionContentOf } from './chief-questions.js';
+import {
+  ACTION_PROPOSAL_CARD_MARKER,
+  APPROVAL_CARD_ID_PREFIX,
+  askQuestionContentOf,
+  proposalIdOfCard,
+} from './chief-questions.js';
 import type { TeamStreamHub } from './events.js';
 import { dispatchHostedCleanup } from './hosted-cleanup.js';
 import { deleteProject, type ProjectTx } from './projects.js';
@@ -61,7 +67,27 @@ export interface AnswerDeps {
   user: UserRecord;
 }
 
-export const proposalCardId = (proposalId: string) => `approval-${proposalId}`;
+export const proposalCardId = (proposalId: string) => `${APPROVAL_CARD_ID_PREFIX}${proposalId}`;
+
+const cardDigest = (questions: readonly AskUserQuestion[]) => hashInput(questions);
+
+function storedCardDigest(row: ProposalRow): string | null {
+  const stored = JSON.parse(row.inputJson) as { cardDigest?: unknown };
+  return typeof stored.cardDigest === 'string' ? stored.cardDigest : null;
+}
+
+function requireIntactCard(tx: ProjectTx, row: ProposalRow, digest: string) {
+  const card = cardRow(tx, row.id);
+  const content = card === undefined ? null : askQuestionContentOf(card.content);
+  if (
+    content === null ||
+    content.status !== 'pending' ||
+    proposalIdOfCard(content) !== row.id ||
+    cardDigest(content.questions) !== digest
+  ) {
+    throw new HttpError(409, `approval card for proposal ${row.id} does not match it`);
+  }
+}
 
 const CARD_ENDINGS: Record<ProposalStatus, string> = {
   pending: '',
@@ -265,7 +291,11 @@ export function proposeAction(
   input: ProposeInput,
 ): { proposalId: string; created: boolean } {
   const now = input.now ?? nowMs();
-  const inputHash = hashInput(input.input);
+  const stored =
+    input.card === undefined
+      ? input.input
+      : { ...(input.input as Record<string, unknown>), cardDigest: cardDigest(input.card) };
+  const inputHash = hashInput(stored);
   return db.transaction(
     (tx) => {
       const pending = pendingFor(tx, input.teamId, input.actionId, input.targetId);
@@ -281,7 +311,7 @@ export function proposeAction(
           teamId: input.teamId,
           actionId: input.actionId,
           targetId: input.targetId,
-          inputJson: JSON.stringify(input.input),
+          inputJson: JSON.stringify(stored),
           inputHash,
           status: 'pending',
           decision: null,
@@ -307,13 +337,17 @@ function runTodoDelete(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: n
     versions: Record<string, number>;
   };
   const present = tx
-    .select({ id: todo.id, v: todo.v })
+    .select({ id: todo.id, v: todo.v, archivedAt: project.archivedAt })
     .from(todo)
+    .innerJoin(project, eq(project.id, todo.projectId))
     .where(and(inArray(todo.id, bound.todoIds), eq(todo.teamId, row.teamId)))
     .all();
   for (const current of present) {
     if (bound.versions[current.id] !== current.v) {
       throw new HttpError(409, `todo ${current.id} changed after the approval was asked`);
+    }
+    if (current.archivedAt !== null) {
+      throw new HttpError(409, `todo ${current.id} is in an archived project`);
     }
   }
   const running = tx
@@ -371,9 +405,11 @@ export function answerProposal(deps: AnswerDeps, input: AnswerInput): { status: 
       if (row?.status !== 'pending') {
         throw new HttpError(409, `proposal ${input.proposalId} is not pending`);
       }
-      if (input.viaCard !== true && cardRow(tx, row.id) !== undefined) {
+      const digest = storedCardDigest(row);
+      if (digest !== null && input.viaCard !== true) {
         throw new HttpError(409, `proposal ${input.proposalId} is answered on its card`);
       }
+      if (digest !== null) requireIntactCard(tx, row, digest);
       outcome.actionId = row.actionId;
       if (row.expiresAt <= now) {
         closeProposal(tx, row, 'expired', null, null, now);

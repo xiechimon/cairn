@@ -44,6 +44,16 @@ export type ExecuteActionResult =
   | { status: 'pending'; proposalId: string; created: boolean };
 
 const CARD_TITLE_MAX_CHARS = 80;
+const CARD_PROJECT_MAX_CHARS = 40;
+
+function cardText(raw: string, max: number): string {
+  const plain = raw
+    .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
+    .replace(/[「」（）();；#]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return plain.length > max ? `${plain.slice(0, max)}…` : plain;
+}
 
 interface BoundProposal {
   input: unknown;
@@ -68,13 +78,10 @@ function bindTodoDelete(db: Db, input: TodoDeleteInput, teamId: string): BoundPr
   if (missing !== undefined) throw notFound(`todo ${missing}`);
   const lines = rows
     .sort((a, b) => a.seqNum - b.seqNum)
-    .map((row) => {
-      const title =
-        row.title.length > CARD_TITLE_MAX_CHARS
-          ? `${row.title.slice(0, CARD_TITLE_MAX_CHARS)}…`
-          : row.title;
-      return `#${row.seqNum}「${title}」（项目 ${row.projectName}，${row.phase}）`;
-    });
+    .map(
+      (row) =>
+        `#${row.seqNum}「${cardText(row.title, CARD_TITLE_MAX_CHARS)}」（项目 ${cardText(row.projectName, CARD_PROJECT_MAX_CHARS)}，${row.phase}）`,
+    );
   return {
     input: {
       todoIds: input.todoIds,

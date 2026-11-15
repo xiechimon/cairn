@@ -40,6 +40,8 @@ const ASK_POLL_MS = 400;
 
 export const ACTION_PROPOSAL_CARD_MARKER = 'action-proposal:';
 
+export const APPROVAL_CARD_ID_PREFIX = 'approval-';
+
 export function proposalIdOfCard(content: AskUserQuestionContent): string | null {
   const marker = content.askedFor?.find((entry) => entry.startsWith(ACTION_PROPOSAL_CARD_MARKER));
   return marker === undefined ? null : marker.slice(ACTION_PROPOSAL_CARD_MARKER.length);
@@ -337,6 +339,9 @@ export function cancelQuestion(
   input: { threadId: string; requestId: string; reason: string },
 ): void {
   const content = readQuestion(deps.db, input.threadId, input.requestId);
+  if (content !== null && proposalIdOfCard(content) !== null) {
+    throw new HttpError(403, 'an approval card is answered only on its card in Cairn');
+  }
   if (content === null || content.status !== 'pending') return;
   const next: AskUserQuestionContent = {
     ...content,

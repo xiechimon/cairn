@@ -57,6 +57,7 @@ import {
 } from './chief.js';
 import { channelMessages, readHistory, searchHistory } from './chief-history.js';
 import {
+  APPROVAL_CARD_ID_PREFIX,
   announceQuestion,
   askUserQuestionsOfParams,
   createOrGetQuestion,
@@ -872,7 +873,7 @@ export async function executeChiefTool(
       );
       const questions = askUserQuestionsOfParams(params);
       const requestId = optStr(params, 'requestId') ?? `ask-${newRecordId()}`;
-      if (requestId.startsWith(proposalCardId(''))) {
+      if (requestId.startsWith(APPROVAL_CARD_ID_PREFIX)) {
         throw new HttpError(
           400,
           'invalid params.requestId: approval cards are written by the server',

@@ -73,7 +73,11 @@ import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
 import { deadEndBlocker } from './blockers.js';
-import { answerQuestion, askQuestionContentOf } from './chief-questions.js';
+import {
+  APPROVAL_CARD_ID_PREFIX,
+  answerQuestion,
+  askQuestionContentOf,
+} from './chief-questions.js';
 import {
   addTurnOwnerMessage,
   CHIEF_ABANDONED_STEP_MS,
@@ -1810,6 +1814,9 @@ export function upsertChiefMessage(
     projectId?: string | null;
   },
 ) {
+  if (row.id.startsWith(APPROVAL_CARD_ID_PREFIX)) {
+    throw new HttpError(403, 'approval cards are written only by the server');
+  }
   const stored = {
     ...row,
     content: scrubMailFenceContent(row.content),
