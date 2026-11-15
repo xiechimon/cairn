@@ -56,8 +56,6 @@ export const EN: Record<string, string> = {
   '跑了 {n} 条命令': 'Ran {n#1 command|# commands}',
   '改了 {n} 个文件': 'Edited {n#1 file|# files}',
   测试通过: 'Tests pass',
-  改完测试通过: 'Edited, tests pass',
-  改完测试未通过: 'Edited, tests fail',
   测试未通过: 'Tests fail',
   '改了 {files}': 'Edited {files}',
   '改了 {files}，测试通过': 'Edited {files}, tests pass',
@@ -254,8 +252,11 @@ export const EN: Record<string, string> = {
   '添加模型服务商，或在 Runner 上登录 Claude Code':
     'Add a provider, or sign in to Claude Code on a Runner',
   '连接一台 Runner': 'Connect a Runner',
-  运行: 'Run',
-  '连接这台 Runner': 'to connect this Runner',
+  '在要干活的电脑上运行 `{command}`': 'Run `{command}` on the computer that should do the work',
+  '{name} 离线': '{name} is offline',
+  '在 {name} 上运行 `{command}` 让它重新上线': 'Run `{command}` on {name} to bring it back',
+  '{n} 台 Runner 都离线': '{n#1 Runner is|# Runners are} offline',
+  '在其中一台上运行 `{command}` 让它重新上线': 'Run `{command}` on one of them to bring it back',
   'Coordinator 还不能回答': 'The Coordinator cannot answer yet',
   '点输入框下方的按钮，把模型来源、Runner 和 Coordinator 接上，再发一次。':
     'Use the button below the box to connect a model source, a Runner and the Coordinator, then send again.',
@@ -1625,7 +1626,6 @@ export const EN: Record<string, string> = {
   'Gemini CLI 还不上报版本和模型；打开后，这台 Runner 会接 Gemini 步骤。':
     'Gemini CLI does not report its version or models yet; when on, this Runner takes Gemini steps.',
   '{n} 个模型': '{n#1 model|# models}',
-  '· {n} 步': '· {n#1 step|# steps}',
   '{n} 个已下架': '{n} retired',
   '使用所有 Runner 的服务商': 'Uses providers for all Runners',
   范围: 'Scope',

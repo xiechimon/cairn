@@ -1,11 +1,12 @@
 import { PUBLISHED_PACKAGES } from '@cairn/shared';
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useChief, useMachines, useProviders } from '../api/hooks.js';
 import { useModelRouting } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
+import type { TFunc } from '../i18n/translate.js';
 import { Key, Monitor, Settings } from '../icons/index.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/routing-settings-page.js';
 import { settingsHref } from '../settings/settings-href.js';
@@ -39,8 +40,51 @@ export function useComposerSetupStep(): FirstRunStepId | null {
   return live ? nextOpenStep(steps) : null;
 }
 
+function withCode(text: string): ReactNode {
+  let offset = 0;
+  return text.split('`').map((part, order) => {
+    const key = offset;
+    offset += part.length + 1;
+    return order % 2 === 1 ? (
+      <code key={key} className={CODE_CLS}>
+        {part}
+      </code>
+    ) : (
+      <Fragment key={key}>{part}</Fragment>
+    );
+  });
+}
+
+function runnerStep(
+  machines: readonly { name: string; online?: boolean }[] | undefined,
+  command: string,
+  t: TFunc,
+): { label: string; hint: ReactNode } {
+  const offline = (machines ?? []).filter((machine) => machine.online === false);
+  const [only] = offline;
+  if (only === undefined) {
+    return {
+      label: t('连接一台 Runner'),
+      hint: withCode(t('在要干活的电脑上运行 `{command}`', { command })),
+    };
+  }
+  if (offline.length === 1) {
+    return {
+      label: t('{name} 离线', { name: only.name }),
+      hint: withCode(t('在 {name} 上运行 `{command}` 让它重新上线', { name: only.name, command })),
+    };
+  }
+  return {
+    label: t('{n} 台 Runner 都离线', { n: offline.length }),
+    hint: withCode(t('在其中一台上运行 `{command}` 让它重新上线', { command })),
+  };
+}
+
 export function ComposerSetupHint({ next }: { next: FirstRunStepId }) {
   const { t } = useI18n();
+  const { live, teamId } = useLiveData();
+  const machinesQ = useMachines(teamId, live);
+  const runner = runnerStep(machinesQ.data, `${PUBLISHED_PACKAGES.cli.command} start`, t);
   const copy: Record<FirstRunStepId, { icon: ReactNode; label: string; hint: ReactNode }> = {
     'model-source': {
       icon: <Key width={16} height={16} />,
@@ -49,13 +93,7 @@ export function ComposerSetupHint({ next }: { next: FirstRunStepId }) {
     },
     machine: {
       icon: <Monitor width={16} height={16} />,
-      label: t('连接一台 Runner'),
-      hint: (
-        <>
-          {t('运行')} <code className={CODE_CLS}>{`${PUBLISHED_PACKAGES.cli.command} start`}</code>{' '}
-          {t('连接这台 Runner')}
-        </>
-      ),
+      ...runner,
     },
     coordinator: {
       icon: <Settings width={16} height={16} />,
