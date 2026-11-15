@@ -906,12 +906,15 @@ export const EN: Record<string, string> = {
     'Queued: Claude Code is not logged in on {machine}. Run claude on that machine to log in ({ahead} ahead)',
   '排队中：团队只用 Claude 订阅，{machine} 上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）':
     'Queued: this team uses Claude subscriptions only and Claude Code on {machine} is not logged in with one. Log in with a subscription there, or allow pay as you go in Usage & connections ({ahead} ahead)',
-  'Coordinator 规则用的服务商「{name}」不存在——到「服务商」里添加它，或到工作路由改 Coordinator 规则':
-    'The Coordinator rule uses the provider "{name}", which does not exist. Add it in Providers, or change the Coordinator rule in work routing',
-  'Coordinator 规则用的服务商「{name}」没有 API key——到「服务商」给它填上 key，或到工作路由换一个能用的模型':
-    'The Coordinator rule uses the provider "{name}", which has no API key. Add the key in Providers, or pick a model that works in work routing',
-  'Coordinator 规则用的是付费 Claude（{name}），团队只允许用订阅——在「用量与连接」里允许按量付费，或到工作路由换模型':
-    'The Coordinator rule uses paid Claude ({name}) and this team allows subscriptions only. Allow pay as you go in Usage & connections, or pick another model in work routing',
+  'Coordinator 规则用的服务商「{name}」还没添加':
+    'The Coordinator rule uses the provider "{name}", which has not been added',
+  'Coordinator 规则用的服务商「{name}」没有 API key':
+    'The Coordinator rule uses the provider "{name}", which has no API key',
+  'Coordinator 规则用的是付费 Claude（{name}），但团队只允许用订阅':
+    'The Coordinator rule uses paid Claude ({name}), but this team allows subscriptions only',
+  '改 Coordinator 规则': 'Change the Coordinator rule',
+  '填写 API key': 'Add the API key',
+  '换 Coordinator 模型': 'Pick another Coordinator model',
   运行平台: 'Platform',
   '不限时用默认 Runner': 'Any uses the default Runner',
   '需要 {platform}': 'needs {platform}',

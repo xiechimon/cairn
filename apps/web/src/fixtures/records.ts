@@ -23,6 +23,7 @@ import {
   type SecretRecord,
   type SkillFact,
   type StepPromptOrigin,
+  type StepQueueBlocked,
   type TagRecord,
   type TaskRequest,
   type ThreadMessageContent,
@@ -651,6 +652,7 @@ export type ChiefStreamItem =
       signalAt?: number;
       waiting?: boolean;
       blocked?: true;
+      blockedKind?: StepQueueBlocked['kind'];
     };
 
 export interface ChiefToolRow {
