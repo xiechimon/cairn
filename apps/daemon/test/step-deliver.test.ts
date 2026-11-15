@@ -1,11 +1,14 @@
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ClaimedStep, MachineDoneBody } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { EMPTY_SECRET_VAULT, type StepCredentials } from '../src/credentials.js';
 import { StepJournal, TranscriptBuffer } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
-import type { MachineApi } from '../src/machine-client.js';
+import { type MachineApi, MachineApiError } from '../src/machine-client.js';
 import { deliverStepOutcome, type StepDeliveryInput } from '../src/step-deliver.js';
+import { deliverablesOutboxOf } from '../src/step-deliverables.js';
 import { testTempDir } from './test-temp-dir.js';
 
 const STEP_ID = 's1';
@@ -59,6 +62,7 @@ function harness(options: { uploadFails?: boolean; stopped?: boolean; lastError?
     prompt: 'do it',
   });
   const doneBodies: MachineDoneBody[] = [];
+  const puts: string[] = [];
   const client = {
     uploadUrls: async (_stepId: string, files: { name: string }[]) => {
       if (options.uploadFails === true) throw new Error('storage down');
@@ -72,6 +76,9 @@ function harness(options: { uploadFails?: boolean; stopped?: boolean; lastError?
       };
     },
     putUpload: async () => {},
+    putDeliverable: async (url: string) => {
+      puts.push(url);
+    },
     done: async (_stepId: string, body: MachineDoneBody) => {
       doneBodies.push(body);
     },
@@ -120,7 +127,7 @@ function harness(options: { uploadFails?: boolean; stopped?: boolean; lastError?
     },
     running: 1,
   };
-  return { input, journal, doneBodies, creds, lines };
+  return { input, journal, doneBodies, creds, lines, puts, root, client };
 }
 
 describe('deliverStepOutcome', () => {
@@ -149,5 +156,86 @@ describe('deliverStepOutcome', () => {
     const h = harness({ stopped: true, lastError: 'interrupted' });
     await deliverStepOutcome(h.input);
     expect(h.doneBodies.map((body) => body.status)).toEqual(['stopped']);
+  });
+
+  test('an info step with the capability uploads its deck and names it in done', async () => {
+    const h = harness({});
+    const deck = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.from('deck')]);
+    const reportFile = join(h.root, 'reports', 'conv-1', 'report.md');
+    mkdirSync(join(h.root, 'reports', 'conv-1', 'deliverables', 'slides'), { recursive: true });
+    writeFileSync(reportFile, '# Findings');
+    writeFileSync(join(h.root, 'reports', 'conv-1', 'deliverables', 'slides', 'deck.pptx'), deck);
+    const generation = 1700000000123;
+    const limits = { maxFiles: 5, maxTotalBytes: 1024, maxPageBytes: 1024, maxSlidesBytes: 1024 };
+    const grants: unknown[] = [];
+    const client = h.client as unknown as Record<string, unknown>;
+    const plain = client.uploadUrls as (...args: unknown[]) => Promise<unknown>;
+    client.uploadUrls = async (stepId: string, files: unknown[], deliverables?: unknown) => {
+      if (deliverables === undefined) return plain(stepId, files);
+      grants.push(deliverables);
+      return {
+        uploads: [],
+        deliverables: [
+          {
+            name: 'deck.pptx',
+            attachmentId: 'a1',
+            received: false,
+            url: '/api/machine/deliverable/a1',
+            method: 'PUT',
+            headers: {},
+          },
+        ],
+      };
+    };
+    h.input.claimed = {
+      ...h.input.claimed,
+      todo: { ...h.input.claimed.todo!, output: 'info' },
+      deliverables: { generation, limits },
+    } as ClaimedStep;
+    h.input.infoReportFile = reportFile;
+    await deliverStepOutcome(h.input);
+    const sha256 = createHash('sha256').update(deck).digest('hex');
+    expect(grants).toEqual([
+      { generation, entries: [{ kind: 'slides', name: 'deck.pptx', size: deck.length, sha256 }] },
+    ]);
+    expect(h.puts).toEqual(['/api/machine/deliverable/a1']);
+    expect(h.doneBodies[0]).toMatchObject({
+      status: 'success',
+      report: '# Findings',
+      generation,
+      deliverables: [{ name: 'deck.pptx', sha256 }],
+      deliverablesSkipped: [],
+    });
+    expect(h.journal.get(STEP_ID)).toBeNull();
+    expect(existsSync(deliverablesOutboxOf(h.input.outboxDir, STEP_ID))).toBe(false);
+  });
+
+  test('a grant the server cannot take now keeps the snapshot in the journal', async () => {
+    const h = harness({});
+    const reportFile = join(h.root, 'reports', 'conv-1', 'report.md');
+    mkdirSync(join(h.root, 'reports', 'conv-1', 'deliverables', 'pages'), { recursive: true });
+    writeFileSync(reportFile, '# Findings');
+    writeFileSync(join(h.root, 'reports', 'conv-1', 'deliverables', 'pages', 'a.html'), '<p>x</p>');
+    const client = h.client as unknown as Record<string, unknown>;
+    const plain = client.uploadUrls as (...args: unknown[]) => Promise<unknown>;
+    client.uploadUrls = async (stepId: string, files: unknown[], deliverables?: unknown) => {
+      if (deliverables === undefined) return plain(stepId, files);
+      throw new MachineApiError(503, 'busy server');
+    };
+    h.input.claimed = {
+      ...h.input.claimed,
+      todo: { ...h.input.claimed.todo!, output: 'info' },
+      deliverables: {
+        generation: 7,
+        limits: { maxFiles: 5, maxTotalBytes: 1024, maxPageBytes: 1024, maxSlidesBytes: 1024 },
+      },
+    } as ClaimedStep;
+    h.input.infoReportFile = reportFile;
+    await deliverStepOutcome(h.input);
+    expect(h.doneBodies).toEqual([]);
+    const entry = h.journal.get(STEP_ID);
+    expect(entry?.doneBody?.report).toBe('# Findings');
+    expect(entry?.deliverables?.files.map((f) => f.name)).toEqual(['a.html']);
+    expect(existsSync(entry!.deliverables!.files[0]!.path)).toBe(true);
   });
 });
