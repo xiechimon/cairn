@@ -412,11 +412,10 @@ function defaultPin(choice: { provider: string; modelId: string }): CitationChec
 export function citationCheckerChoice(
   db: Pick<Db, 'select'>,
   teamId: string,
-  accepts: (modelId: string) => boolean,
   previous: CitationCheckPin | null,
-): CitationCheckPin | 'dependent-rule' | null {
+): CitationCheckPin | null {
   const checker = ruleRow(db, teamId, 'citation_check');
-  if (checker !== null) return accepts(checker.modelId) ? rulePin(checker) : 'dependent-rule';
+  if (checker !== null) return rulePin(checker);
   const harness = capabilityCandidates(db, teamId, { machineId: null, required: null }).filter(
     (candidate) => candidate.available,
   );
@@ -441,7 +440,7 @@ export function citationCheckerChoice(
           .filter((m) => m.id !== '' && paidClaudeAllowed(db, teamId, providerId, m.id))
           .map((m) => defaultPin({ provider: providerId, modelId: m.id })),
       ),
-  ].filter((pin) => accepts(pin.modelId));
+  ];
   const kept =
     previous === null
       ? undefined

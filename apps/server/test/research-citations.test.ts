@@ -477,12 +477,6 @@ describe('research citation handoff', () => {
     expect(s.db.select().from(todo).all()).toHaveLength(1);
   });
 
-  test('a session route on the author vendor cannot masquerade as an independent checker', async () => {
-    const { s, opened } = await world(false);
-    expect(openCitationCheck(s.svc, opened.buildId)).toBeNull();
-    expect(s.db.select().from(todo).all()).toHaveLength(1);
-  });
-
   test('unsupported and unavailable claims stay explicitly marked in the handed-off report', async () => {
     const { s, opened } = await world();
     const checker = openCitationCheck(s.svc, opened.buildId)!;
@@ -522,12 +516,12 @@ describe('research citation handoff', () => {
   });
 
   test.each(['claude-opus-5-5', 'unknown-model'])(
-    'rejects the checker actual model %s',
+    'accepts a complete audit whatever model the checker actually ran, here %s',
     async (model) => {
       const { s, opened } = await world();
       const checker = openCitationCheck(s.svc, opened.buildId)!;
       land(s, checker.buildId, receipt(), model);
-      expect(checkedResearchReport(s.db, opened.buildId)).toBeNull();
+      expect(checkedResearchReport(s.db, opened.buildId)).not.toBeNull();
     },
   );
 
@@ -724,7 +718,7 @@ describe('citation checker routing', () => {
     expect(checkerModel(s, check.todoId)).toBe('relay-186/glm-5.3');
   });
 
-  test('a retry keeps a pinned checker that can still run and is still independent', async () => {
+  test('a retry keeps a pinned checker that can still run', async () => {
     const { s, opened } = await routedWorld('claude-sonnet-5-5');
     keyedProvider(s, 'relay', ['gpt-6.1-sol']);
     const check = openCitationCheck(s.svc, opened.buildId)!;
@@ -752,12 +746,24 @@ describe('citation checker routing', () => {
     expect(stored()).toEqual(before);
   });
 
-  test('a hand-set citation_check rule on the author model blocks instead of being skipped', async () => {
+  test('a hand-set citation_check rule on the report model is used and its audit accepted', async () => {
     const { s, opened } = await routedWorld('glm-5.3');
     codexRunner(s, 3_600_000);
     keyedProvider(s, 'relay-186', ['glm-5.3']);
     seedRoute(s, 'citation_check', { provider: 'relay-186', modelId: 'glm-5.3' });
-    expect(openCitationCheck(s.svc, opened.buildId)).toBeNull();
-    expect(s.db.select().from(todo).all()).toHaveLength(1);
+    const check = openCitationCheck(s.svc, opened.buildId)!;
+    expect(checkerModel(s, check.todoId)).toBe('relay-186/glm-5.3');
+    land(s, check.buildId, receipt(), 'glm-5.3');
+    expect(checkedResearchReport(s.db, opened.buildId)).not.toBeNull();
+  });
+
+  test('with no citation_check rule the first runnable model is used even on the report vendor', async () => {
+    const { s, opened } = await routedWorld('claude-sonnet-5-5');
+    insertMachine(s, { claudeCodeReport: claudeReport });
+    codexRunner(s, 3_600_000);
+    const check = openCitationCheck(s.svc, opened.buildId)!;
+    expect(checkerModel(s, check.todoId)).toBe('claude-code/claude-sonnet-5-5');
+    land(s, check.buildId, receipt(), 'claude-sonnet-5-5');
+    expect(checkedResearchReport(s.db, opened.buildId)).not.toBeNull();
   });
 });

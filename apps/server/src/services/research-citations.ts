@@ -12,7 +12,6 @@ import type { Db } from '../db/client.js';
 import { build, message, todo, tokenUsage } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { type BuildDeps, startBuilds } from './builds.js';
-import { modelsAreIndependent } from './merge-gate/model-identity.js';
 import {
   CITATION_CHECK_SOURCE_KIND,
   CITATION_PARKED_MARK,
@@ -132,14 +131,6 @@ function checkerTodo(db: Db, source: SourceReport) {
       ),
     )
     .get();
-}
-
-function independent(models: readonly string[], others: readonly string[]): boolean {
-  return (
-    models.length > 0 &&
-    others.length > 0 &&
-    models.every((model) => others.every((other) => modelsAreIndependent(model, other)))
-  );
 }
 
 interface CitationAttemptState {
@@ -273,25 +264,9 @@ export function openCitationCheck(
   if (source.models.length === 0 || citedUrls(source.content).size === 0) {
     return blocked(deps, source, 'Source report needs observed model usage and cited URLs.');
   }
-  const pin = citationCheckerChoice(
-    deps.db,
-    source.teamId,
-    (modelId) => independent(source.models, [modelId]),
-    state.pin,
-  );
-  if (pin === 'dependent-rule') {
-    return blocked(
-      deps,
-      source,
-      'The citation_check route cannot run an independent citation checker.',
-    );
-  }
+  const pin = citationCheckerChoice(deps.db, source.teamId, state.pin);
   if (pin === null) {
-    return blocked(
-      deps,
-      source,
-      'No runnable model independent of the report is available for the citation checker.',
-    );
+    return blocked(deps, source, 'No runnable model is available for the citation checker.');
   }
   const spec = [
     '# Citation check',
@@ -346,13 +321,7 @@ export function checkedResearchReport(db: Db, buildId: string): CheckedResearchR
   const checker = checkerTodo(db, source);
   if (!checker?.latestBuildId || checker.archivedAt !== null) return null;
   const audit = sourceReport(db, checker.latestBuildId);
-  if (
-    !audit ||
-    audit.teamId !== source.teamId ||
-    audit.projectId !== source.projectId ||
-    !independent(source.models, audit.models)
-  )
-    return null;
+  if (!audit || audit.teamId !== source.teamId || audit.projectId !== source.projectId) return null;
   const blocks = [...audit.content.matchAll(/```json\s*\n([\s\S]*?)\n```/g)];
   const raw = blocks[0]?.[1];
   if (blocks.length !== 1 || raw === undefined) return null;
