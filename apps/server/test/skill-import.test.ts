@@ -246,6 +246,24 @@ describe('POST /api/teams/{id}/skills/import (localPath)', () => {
     }
   });
 
+  test('LP4b: a source that contains the skills root -> 400, nothing written', async () => {
+    const parent = makeRoot();
+    const skillsDir = join(parent, 'home', 'skills');
+    mkdirSync(skillsDir, { recursive: true });
+    writeFileSync(join(parent, 'SKILL.md'), skillMd('parent', 'd'));
+    const s = bootServer({ skillsDir, skillSourcesPath: join(makeRoot(), 's.json') });
+    try {
+      const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
+        localPath: parent,
+      });
+      expect(res.status).toBe(400);
+      expect(await errorText(res)).toContain('contains the cairn skills directory');
+      expect(readdirSync(skillsDir)).toEqual([]);
+    } finally {
+      s.dispose();
+    }
+  });
+
   test('LP5: one file exceeds MAX_SKILL_FILE_BYTES -> 400 naming the file and the cap', async () => {
     const s = bootServer({ skillsDir: makeRoot(), skillSourcesPath: join(makeRoot(), 's.json') });
     try {

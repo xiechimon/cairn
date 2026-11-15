@@ -19,16 +19,14 @@ test('legacy import route unreachable — catch-all redirects back to /app (#149
   await expect(page.locator('[data-route="/app/resources/skills/import"]')).toHaveCount(0);
 });
 
-test('empty state double entry — directory guide copy + `新建技能` primary button, no chief hint row', async ({ page }) => {
+test('empty state points at Import and New, names no directory, and offers `新建技能`', async ({ page }) => {
   await page.goto(`${SKILLS}?scenario=01`);
   const empty = page.getByTestId('resource-empty');
   await expect(empty).toBeVisible();
   await expect(empty.getByRole('heading')).toHaveText('尚无技能');
 
   const desc = empty.locator('p');
-  await expect(desc).toContainText('~/.agents/skills');
-  await expect(desc).toContainText('SKILL.md');
-  await expect(desc).toContainText('新建一个技能');
+  await expect(desc).toHaveText('用「导入」或「新建」添加技能。');
   await expect(empty.getByRole('button', { name: '新建技能' })).toHaveText('新建技能');
 
   await expect(desc).toHaveCount(1);

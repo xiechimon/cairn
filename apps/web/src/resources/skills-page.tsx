@@ -1,4 +1,4 @@
-import { SKILL_PAGE_COPY, SKILLS_DIR_DEFAULT } from '@cairn/shared';
+import { SKILL_PAGE_COPY } from '@cairn/shared';
 import { Puzzle } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -86,7 +86,7 @@ export function SkillsPage() {
             className="mt-6"
             icon={Puzzle}
             title={t(SKILL_PAGE_COPY.empty)}
-            description={t(SKILL_PAGE_COPY.directoryHint, { dir: SKILLS_DIR_DEFAULT })}
+            description={t(SKILL_PAGE_COPY.hint)}
             action={{ label: t('新建技能'), onClick: openCreate }}
           />
         }

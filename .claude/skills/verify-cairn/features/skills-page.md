@@ -6,7 +6,7 @@ Users drop a subdirectory containing a `SKILL.md` into the skill directory on th
 
 - `live-scan` the skill list = the directory live-scanned on every `GET /api/skills?teamId=` (no cache, not in the DB): drop a directory -> it appears on refresh, delete the directory -> it vanishes on refresh.
 - `identity` the row identity id = the `SKILL.md` frontmatter `name`, falling back to the directory name when there is no frontmatter / no name (contract revision 2026-09-29, aligned with spec 14); `name`/`description` also come from the frontmatter, defaulting to the directory name / null.
-- `write-entries` the create entry is in place (restored at XMON-114, pinned by skills-page.spec.ts at count 1): the topbar `新建` = role=button with the exact copy `新建` (CSS carrier `[data-testid="resource-new"]`), the empty-state primary button `新建技能` opens the SkillDialog; no import route (`/app/resources/skills/import` redirects back to `/app`); the empty-state copy points at the skill directory (the `~/.agents/skills` default display) + the UI's dual create entries.
+- `write-entries` the create entry is in place (restored at XMON-114, pinned by skills-page.spec.ts at count 1): the topbar `新建` = role=button with the exact copy `新建` (CSS carrier `[data-testid="resource-new"]`), the empty-state primary button `新建技能` opens the SkillDialog; no import route (`/app/resources/skills/import` redirects back to `/app`); the empty-state copy names no directory and points at Import and New (`用「导入」或「新建」添加技能。`).
 - `agent-grant` the Agent row's `skills[]` only accepts live-scan-known ids: an old id whose directory was deleted is silently filtered, no error.
 
 ## How to get to it (user POV)
@@ -26,7 +26,7 @@ Preconditions: `launch.mjs` stack up (the scratch skill directory is empty); rea
 - The API truth as the second pair of eyes:
   `curl -s <api>/api/skills?teamId=<teamId>` -> `[{id:"deployer",name:"deployer",description:"部署流程手册",teamId:<teamId>}]`.
 - Delete the directory -> it vanishes on refresh:
-  `rm -rf <skillsDir>/deploy` -> reload -> `[data-testid="resource-row"]` count 0, the empty-state `[data-testid="resource-empty"]` is visible and the copy contains the `~/.agents/skills` wording while **the actually configured directory is not displayed** (the empty state's {dir} is the default-constant display slot, see Gotchas).
+  `rm -rf <skillsDir>/deploy` -> reload -> `[data-testid="resource-row"]` count 0, the empty-state `[data-testid="resource-empty"]` is visible with the copy `用「导入」或「新建」添加技能。`. On a live server the built-in `cairn-research` row stays, so the empty state needs the built-in install to be absent.
 - Write-surface / import-surface pins:
   On `/app/resources/skills` the `新建` entry count is 1 (role=button with the exact copy `新建` / `[data-testid="resource-new"]`; restored at XMON-114 — the old "no create button, count 0" wording is void); goto `/app/resources/skills/import` -> the URL lands at `/app`.
 - No-frontmatter fallback:
@@ -36,7 +36,7 @@ Preconditions: `launch.mjs` stack up (the scratch skill directory is empty); rea
 
 ## Gotchas
 
-- **The empty-state copy shows the default path constant `~/.agents/skills`, not the server's actually configured directory** — the verification stack's scratch directory is overridden via `CAIRN_SKILLS_DIR`, yet the empty state still shows the default value (the web-side {dir} = the shared SKILLS_DIR_DEFAULT single source; the env override only takes effect on the server). Do not judge this as a bug, just note it in the evidence.
+- Without `CAIRN_SKILLS_DIR` the server uses `<CAIRN_HOME>/skills`; on a database that already has a team and no `skills-home-v1` row in `data_migration`, the first start copies `~/.agents/skills` there once. Writes into `~/.agents/skills` or `~/.claude/skills` answer 409.
 - Case-sensitive: `skill.md` (lowercase) does not count as a skill (the canon name `SKILL.md` matches exactly, forced exact even on a case-insensitive filesystem).
 - Only first-level subdirectories are scanned: a `<skillsDir>/a/b/SKILL.md` will not have its b discovered; only an a that carries its own SKILL.md is collected.
 - Symlinked directories are collected and deduplicated by realpath (two entries of the same real directory yield one row); two directories declaring the same name in their frontmatter = the lexicographically-first directory name wins.

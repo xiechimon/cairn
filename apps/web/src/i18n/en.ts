@@ -558,10 +558,7 @@ export const EN: Record<string, string> = {
   '搜索技能...': 'Search skills...',
   排序: 'Sort',
   尚无技能: 'No skills yet',
-  // spec 13 + XMON-109（spec 13 回摆）技能面：双入口口径——本地目录或页面
-  // 新建都会出现在这里（{dir} = SKILLS_DIR_DEFAULT）。
-  '把包含 SKILL.md 的技能目录放进 {dir}，或新建一个技能，即会出现在这里。':
-    'Drop a skill folder containing SKILL.md into {dir}, or create a new skill here, and it will show up in this list.',
+  '用「导入」或「新建」添加技能。': 'Add skills with Import or New.',
   // XMON-114（spec 13 回摆）技能写面：新建/编辑弹窗与错误态。
   新建技能: 'New skill',
   编辑技能: 'Edit skill',
