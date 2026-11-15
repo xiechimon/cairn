@@ -7,7 +7,7 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, onTestFinished, test } from 'vitest';
-import { machine as machineTable, routingRule, team as teamTable } from '../src/db/schema.js';
+import { machine as machineTable, routingRule } from '../src/db/schema.js';
 import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
 import { createProvider } from '../src/services/providers.js';
 import {
@@ -317,26 +317,6 @@ describe('routing rule issues and the one-click fix', () => {
     expect((await settings(s)).ruleIssues).toMatchObject([
       { use: 'review', reason: 'provider-missing', provider: 'openai-codex' },
     ]);
-  });
-
-  test('paid-claude: a keyed Claude rule is flagged until the team allows paid Claude', async () => {
-    const s = bootServer();
-    insertMachine(s);
-    addProvider(s, 'anthropic', {
-      baseUrl: 'https://api.anthropic.com',
-      api: 'anthropic-messages',
-      models: ['claude-haiku-5-5'],
-    });
-    seedRoute(s, 'session', { provider: 'anthropic', modelId: 'claude-haiku-5-5' });
-    expect((await settings(s)).ruleIssues).toMatchObject([
-      { use: 'session', reason: 'paid-claude', provider: 'anthropic', suggested: null },
-    ]);
-    s.db
-      .update(teamTable)
-      .set({ claudeUsage: 'allow-paid' })
-      .where(eq(teamTable.id, s.team.id))
-      .run();
-    expect((await settings(s)).ruleIssues).toEqual([]);
   });
 
   test('coordinator in-server: the issue comes from the route verdict and the fix is the Coordinator default', async () => {

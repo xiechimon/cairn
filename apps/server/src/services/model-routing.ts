@@ -7,7 +7,7 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { claudeSubscription, machine, provider, team } from '../db/schema.js';
+import { claudeSubscription, machine, provider } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { machineRuntimeAvailable } from './dispatch-eligibility.js';
 
@@ -19,24 +19,8 @@ export function isClaudeModel(providerId: string | null, modelId: string | null)
   );
 }
 
-export function paidClaudeAllowed(
-  db: Pick<Db, 'select'>,
-  teamId: string,
-  providerId: string,
-  modelId: string,
-): boolean {
-  if (!isClaudeModel(providerId, modelId)) return true;
-  const usage = db
-    .select({ claudeUsage: team.claudeUsage })
-    .from(team)
-    .where(eq(team.id, teamId))
-    .get();
-  return usage?.claudeUsage === 'allow-paid';
-}
-
 export function getModelRouting(db: Db, teamId: string) {
   const now = nowMs();
-  const settings = db.select().from(team).where(eq(team.id, teamId)).get();
   const connections: RoutingConnection[] = [];
   const quota: RoutingQuota[] = [];
   for (const row of db
@@ -119,17 +103,14 @@ export function getModelRouting(db: Db, teamId: string) {
     }
     if (windows.length > 0) quota.push({ connectionId: id, windows });
   }
-  const routingSettings = { claudeUsage: settings?.claudeUsage ?? ('subscription-only' as const) };
   return {
     ...resolveRouting(
       ROUTING_USES.map((use) => ({ use })),
       connections,
       quota,
-      routingSettings,
     ),
     connections,
     quota,
-    settings: routingSettings,
   };
 }
 

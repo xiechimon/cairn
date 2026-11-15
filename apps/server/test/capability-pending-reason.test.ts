@@ -9,7 +9,6 @@ import {
   machine as machineTable,
   project as projectTable,
   step as stepTable,
-  team as teamTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import {
@@ -318,7 +317,6 @@ describe('#1251 queue projection blocked bit (worker steps)', () => {
 
   test('a Claude Code step on a Runner whose Claude Code is logged out waits as logged out', () => {
     const w = makeWorld();
-    w.s.db.update(teamTable).set({ claudeUsage: 'allow-paid' }).run();
     seedRoute(w.s, 'session', { provider: 'claude-code', modelId: 'claude-sonnet-5-5' });
     insertMachine(w, {
       id: 'm-r9',
@@ -441,19 +439,13 @@ describe('in-server Coordinator turns', () => {
       undefined,
       { kind: 'coordinator-provider-no-key', missing: ['deepseek'] },
     ],
-    [
-      'a keyed Claude model on a subscription-only team',
-      'claude-gateway',
-      'gw-key',
-      { kind: 'coordinator-paid-claude', missing: ['claude-sonnet-5-5'] },
-    ],
   ] as const)(
     'the server refuses %s, with no Runner to fall back to -> that one reason, not machine-offline',
     (_name, providerId, apiKey, expected) => {
       setCoordinatorInServer(true);
       try {
         const w = makeWorld();
-        const modelId = providerId === 'claude-gateway' ? 'claude-sonnet-5-5' : 'deepseek-chat';
+        const modelId = 'deepseek-chat';
         if (providerId !== undefined) addProvider(w, providerId, modelId, apiKey);
         expect(
           blockedOf(w, providerId === undefined ? undefined : { provider: providerId, modelId }),

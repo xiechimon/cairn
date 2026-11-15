@@ -1,8 +1,4 @@
-import { z } from 'zod';
 import type { ThinkingLevel } from './agent-backend.js';
-
-export const claudeUsageSchema = z.enum(['subscription-only', 'allow-paid']);
-export type ClaudeUsage = z.infer<typeof claudeUsageSchema>;
 
 export const ROUTING_USES = [
   'coordinator',
@@ -49,10 +45,6 @@ export interface RoutingEdge {
   unavailable?: boolean;
 }
 
-export interface RoutingSettings {
-  claudeUsage?: ClaudeUsage;
-}
-
 const CLAUDE_MODELS = {
   coordinator: 'claude-opus-5-5',
   implementation: 'claude-sonnet-5-5',
@@ -66,7 +58,6 @@ export function resolveRouting(
   uses: readonly RoutingUseRequest[],
   connections: readonly RoutingConnection[],
   quota: readonly RoutingQuota[],
-  settings: RoutingSettings,
 ): { edges: RoutingEdge[] } {
   const codex = connections.find(
     (connection) =>
@@ -96,20 +87,14 @@ export function resolveRouting(
   const edges = uses.map((request): RoutingEdge => {
     if (request.inFlight) {
       const connection = connections.find((entry) => entry.id === request.inFlight?.connectionId);
-      const paidClaude =
-        connection?.vendor === 'anthropic' &&
-        connection.kind === 'api-key' &&
-        settings.claudeUsage !== 'allow-paid';
       return {
         use: request.use,
         ...request.inFlight,
-        ...(paidClaude
-          ? { unavailable: true, reason: 'subscription-only' }
-          : connection?.available === false ||
-              connection === undefined ||
-              !connection.models.includes(request.inFlight.modelId)
-            ? { unavailable: true, reason: 'no-connection' }
-            : {}),
+        ...(connection?.available === false ||
+        connection === undefined ||
+        !connection.models.includes(request.inFlight.modelId)
+          ? { unavailable: true, reason: 'no-connection' }
+          : {}),
       };
     }
     const vendor: RoutingVendor =
@@ -127,23 +112,14 @@ export function resolveRouting(
         connection.models.includes(modelId) &&
         connection.available !== false,
     );
-    const subscriptionOnly = vendor === 'anthropic' && settings.claudeUsage !== 'allow-paid';
-    const connection =
-      candidates.find((entry) => entry.kind === 'subscription') ??
-      (subscriptionOnly ? undefined : candidates[0]);
+    const connection = candidates.find((entry) => entry.kind === 'subscription') ?? candidates[0];
     return {
       use: request.use,
       modelId,
       effort: request.use === 'mechanical' || request.use === 'nightly-scan' ? 'low' : 'high',
       connectionId: connection?.id ?? null,
       ...(connection === undefined
-        ? {
-            unavailable: true,
-            reason:
-              subscriptionOnly && candidates.some((entry) => entry.kind === 'api-key')
-                ? 'subscription-only'
-                : 'no-connection',
-          }
+        ? { unavailable: true, reason: 'no-connection' }
         : request.use === 'implementation' && lowCodex
           ? { reason: 'codex-quota<=30%' }
           : {}),

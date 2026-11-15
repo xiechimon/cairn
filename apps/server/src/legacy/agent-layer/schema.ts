@@ -11,7 +11,6 @@ import type {
   ChiefWatch,
   ClaudeCodeReport,
   ClaudeRateLimitWindow,
-  ClaudeUsage,
   ComputerCallState,
   ComputerControlHolder,
   ComputerImage,
@@ -76,7 +75,10 @@ export const team = sqliteTable('team', {
   name: text('name').notNull(),
   createdAt: epochMs('createdAt').notNull(),
   plan: text('plan').notNull().default('free'),
-  claudeUsage: text('claudeUsage').$type<ClaudeUsage>().notNull().default('subscription-only'),
+  claudeUsage: text('claudeUsage')
+    .$type<'subscription-only' | 'allow-paid'>()
+    .notNull()
+    .default('subscription-only'),
   avatarStyle: text('avatarStyle'),
   autonomyPaused: bool('autonomyPaused').notNull().default(false),
   maxAutonomousMergesPerDay: integer('maxAutonomousMergesPerDay').notNull().default(10),

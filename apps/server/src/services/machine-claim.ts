@@ -50,7 +50,7 @@ import {
   isChiefDigestStep,
 } from './chief-digest.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
-import { claudeUsageGatePasses, refreshClaudeRateParks } from './claude-rate-limit.js';
+import { refreshClaudeRateParks } from './claude-rate-limit.js';
 import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { coordinatorRoute } from './coordinator-route.js';
@@ -251,7 +251,6 @@ function buildChiefClaim(
   if (!agentRow.modelId) return null;
   const model = effectiveModel(agentRow, stepRow);
   if (!machineRow || !runtimeGatePasses(machineRow, model.provider)) return null;
-  if (!claudeUsageGatePasses(deps, machineRow, model)) return null;
   if (claudeCodeLoginBlocks(deps, machineRow, model.provider)) return null;
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
   const bindTeamId = stepRuntimeFor(model.provider) === 'claude-code' ? threadRow.teamId : null;

@@ -1163,6 +1163,13 @@
       "when": 1794757934772,
       "tag": "0170_claude_subscription_enabled",
       "breakpoints": true
+    },
+    {
+      "idx": 171,
+      "version": "6",
+      "when": 1794760486981,
+      "tag": "0171_drop_team_claude_usage",
+      "breakpoints": true
     }
   ]
 }
