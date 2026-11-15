@@ -206,6 +206,7 @@ test('an eligible plan is confirmed by the first sweep after a restart, exactly 
   expect(w.phase()).toBe('building');
   sweepPlanAutoConfirm(w.deps);
   expect(w.db.select().from(step).all()).toHaveLength(1);
+  expect(w.db.select().from(step).all()[0]?.byPerson).toBe(false);
   expect((await w.plans())[0]?.autoApproveAt).toBeNull();
 });
 
@@ -229,6 +230,7 @@ test('pause is idempotent, persists across restart, and manual approval still wo
     202,
   );
   expect(w.phase()).toBe('building');
+  expect(w.db.select().from(step).all()[0]?.byPerson).toBe(true);
 });
 
 test('pause only targets the current plan of the current build at confirmation', async () => {

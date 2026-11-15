@@ -154,8 +154,11 @@ export function finishCoordinatorTurn(
     const teamId = stepTeamId(deps, stepRow);
     if (teamId !== null) sealCoordinatorTurnSnapshot(db, stepRow, teamId, outcome.status, nowMs());
   } catch {}
+  const reportedSessionId =
+    turnProvenance(stepRow.prompt)?.startsWith('mail:') === true ? undefined : outcome.sessionId;
   db.update(step)
     .set({
+      ...(reportedSessionId !== undefined ? { sessionId: reportedSessionId } : {}),
       status:
         outcome.status === 'success' ? 'done' : outcome.status === 'stopped' ? 'stopped' : 'failed',
       ...(outcome.status === 'stopped' ? { finishedAt: nowMs() } : {}),
@@ -174,13 +177,7 @@ export function finishCoordinatorTurn(
     stepRow.buildId,
     '回合已结束',
   );
-  finishChiefTurn(
-    deps,
-    stepRow.buildId,
-    turnProvenance(stepRow.prompt)?.startsWith('mail:') === true
-      ? { ...outcome, sessionId: undefined }
-      : outcome,
-  );
+  finishChiefTurn(deps, stepRow.buildId, { ...outcome, sessionId: reportedSessionId });
   if (outcome.status === 'success')
     notifyChiefTurn(
       deps,

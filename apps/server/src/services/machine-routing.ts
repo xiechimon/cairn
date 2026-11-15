@@ -63,16 +63,26 @@ export function targetUnavailable(
 }
 
 export function priorSessionOf(
-  db: Db,
-  stepRow: Pick<typeof step.$inferSelect, 'buildId' | 'kind' | 'fallback' | 'freshSession'>,
+  db: Pick<Db, 'select'>,
+  stepRow: Pick<
+    typeof step.$inferSelect,
+    'buildId' | 'kind' | 'fallback' | 'freshSession' | 'byPerson'
+  >,
   buildRow: Pick<typeof build.$inferSelect, 'prevPhase' | 'withPlan' | 'planDocId'>,
+  enabledSubscriptionId: string | null,
 ): {
   priorSessionId: string | null;
   priorMachineId: string | null;
+  priorSubscriptionId: string | null;
   freshSession: boolean;
 } {
   const prior = db
-    .select({ sessionId: step.sessionId, machineId: step.machineId, fallback: step.fallback })
+    .select({
+      sessionId: step.sessionId,
+      machineId: step.machineId,
+      fallback: step.fallback,
+      subscriptionId: step.claudeSubscriptionId,
+    })
     .from(step)
     .where(
       and(
@@ -96,10 +106,17 @@ export function priorSessionOf(
       : null;
   const planHandoffMissing =
     stepRow.kind === 'build' && buildRow.withPlan && buildRow.planDocId === null;
+  const priorSubscriptionId = priorRow?.subscriptionId ?? null;
+  const startsNewRun =
+    (stepRow.byPerson || stepRow.kind === 'merge') &&
+    priorSubscriptionId !== null &&
+    priorSubscriptionId !== enabledSubscriptionId;
   return {
-    priorSessionId: priorRow?.sessionId ?? null,
-    priorMachineId: priorRow?.machineId ?? null,
+    priorSessionId: startsNewRun ? null : (priorRow?.sessionId ?? null),
+    priorMachineId: startsNewRun ? null : (priorRow?.machineId ?? null),
+    priorSubscriptionId,
     freshSession:
+      startsNewRun ||
       planHandoffMissing ||
       stepRow.kind === 'review' ||
       stepRow.kind === 'verify' ||

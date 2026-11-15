@@ -182,6 +182,7 @@ export const stepQueueBlockedSchema = z.object({
     'local-path',
     'claude-rate-limited',
     'claude-logged-out',
+    'account-switched',
     'coordinator-provider-missing',
     'coordinator-provider-no-key',
   ]),

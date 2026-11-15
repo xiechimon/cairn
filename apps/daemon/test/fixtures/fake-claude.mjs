@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import { join } from 'node:path';
@@ -39,7 +39,16 @@ if (args.includes('-p')) {
   process.exit(0);
 }
 const emit = (message) => process.stdout.write(`${JSON.stringify(message)}\n`);
-const sessionId = '00000000-0000-4000-8000-000000000001';
+const argAfter = (flag) => {
+  const joined = args.find((arg) => arg.startsWith(`${flag}=`));
+  if (joined !== undefined) return joined.slice(flag.length + 1);
+  const at = args.indexOf(flag);
+  return at === -1 ? undefined : args[at + 1];
+};
+const sessionId =
+  process.env.FAKE_CLAUDE_HONOR_SESSION_ID === '1'
+    ? (argAfter('--resume') ?? argAfter('--session-id') ?? '00000000-0000-4000-8000-000000000001')
+    : '00000000-0000-4000-8000-000000000001';
 let handled = false;
 
 createInterface({ input: process.stdin }).on('line', (line) => {
@@ -73,6 +82,16 @@ createInterface({ input: process.stdin }).on('line', (line) => {
         : '';
   if (process.env.FAKE_CLAUDE_PROMPT_LOG) {
     appendFileSync(process.env.FAKE_CLAUDE_PROMPT_LOG, `${JSON.stringify({ firstUserText })}\n`);
+  }
+  if (process.env.FAKE_CLAUDE_TRANSCRIPT_DIR) {
+    mkdirSync(process.env.FAKE_CLAUDE_TRANSCRIPT_DIR, { recursive: true });
+    writeFileSync(join(process.env.FAKE_CLAUDE_TRANSCRIPT_DIR, `${sessionId}.jsonl`), '{}\n');
+  }
+  if (process.env.FAKE_CLAUDE_RUN_LOG) {
+    appendFileSync(
+      process.env.FAKE_CLAUDE_RUN_LOG,
+      `${JSON.stringify({ resume: argAfter('--resume') ?? null, newSession: argAfter('--session-id') ?? null, sessionId, tokenSha: sha(token) })}\n`,
+    );
   }
   const marker = join(process.cwd(), 'fake-claude-edit.txt');
   writeFileSync(

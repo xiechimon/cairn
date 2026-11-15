@@ -8,7 +8,12 @@ import { assertSplitProposalExecutable } from './split-proposal.js';
 import { childrenOfTodo, getTodo, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement } from './transcript.js';
 
-export function applyBuildConfirm(deps: BuildDeps, buildId: string, actorName: string): void {
+export function applyBuildConfirm(
+  deps: BuildDeps,
+  buildId: string,
+  actorName: string,
+  byPerson: boolean,
+): void {
   const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (!row) throw new NotFoundError(`build ${buildId}`);
   assertSplitProposalExecutable(row.errorMessage);
@@ -25,12 +30,12 @@ export function applyBuildConfirm(deps: BuildDeps, buildId: string, actorName: s
     return;
   }
   setTodoPhase(deps, todoRecord.id, 'building');
-  enqueueStep(deps, buildId, 'build', todoRecord.teamId);
+  enqueueStep(deps, buildId, 'build', todoRecord.teamId, undefined, false, byPerson);
 }
 
 export function confirmPlanAutomatically(deps: BuildDeps, buildId: string): void {
   try {
-    applyBuildConfirm(deps, buildId, 'server');
+    applyBuildConfirm(deps, buildId, 'server', false);
   } catch (error) {
     if (
       !(
