@@ -40,10 +40,15 @@ test('while the turn runs the pane says the Coordinator is arranging it', () => 
 });
 
 test('a blocked turn shows the queue reason, not a spinner', () => {
-  const blocked: ChiefThread = { ...thread, turnQueue: { position: 1, waitingFor: null, blocked: { kind: 'coordinator-unroutable', missing: [] } } };
+  const blocked: ChiefThread = { ...thread, turnQueue: { position: 1, waitingFor: null, blocked: { kind: 'coordinator-provider-no-key', missing: ['deepseek'] } } };
   const items = mapOrchestrationFeedback(todo, blocked, [request('m1', 150)]);
-  expect(items[1]).toMatchObject({ kind: 'streaming', blocked: true });
-  expect((items[1] as { label: string }).label).toContain('Coordinator 用不了它的模型');
+  expect(items[1]).toMatchObject({
+    kind: 'streaming',
+    blocked: true,
+    blockedKind: 'coordinator-provider-no-key',
+    label: 'Coordinator 规则用的服务商「{name}」没有 API key',
+    labelVars: { name: 'deepseek' },
+  });
 });
 
 test('a finished turn that did not dispatch shows the reply and says it was not dispatched', () => {

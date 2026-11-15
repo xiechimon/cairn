@@ -906,8 +906,15 @@ export const EN: Record<string, string> = {
     'Queued: Claude Code is not logged in on {machine}. Run claude on that machine to log in ({ahead} ahead)',
   '排队中：团队只用 Claude 订阅，{machine} 上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）':
     'Queued: this team uses Claude subscriptions only and Claude Code on {machine} is not logged in with one. Log in with a subscription there, or allow pay as you go in Usage & connections ({ahead} ahead)',
-  'Coordinator 用不了它的模型：规则里的连接没有 API key，或要走付费 Claude——到工作路由改 Coordinator 规则':
-    'The Coordinator cannot use its model: the connection in its rule has no API key, or it needs paid Claude. Change the Coordinator rule in work routing',
+  'Coordinator 规则用的服务商「{name}」还没添加':
+    'The Coordinator rule uses the provider "{name}", which has not been added',
+  'Coordinator 规则用的服务商「{name}」没有 API key':
+    'The Coordinator rule uses the provider "{name}", which has no API key',
+  'Coordinator 规则用的是付费 Claude（{name}），但团队只允许用订阅':
+    'The Coordinator rule uses paid Claude ({name}), but this team allows subscriptions only',
+  '改 Coordinator 规则': 'Change the Coordinator rule',
+  '填写 API key': 'Add the API key',
+  '换 Coordinator 模型': 'Pick another Coordinator model',
   运行平台: 'Platform',
   '不限时用默认 Runner': 'Any uses the default Runner',
   '需要 {platform}': 'needs {platform}',
@@ -1078,7 +1085,11 @@ export const EN: Record<string, string> = {
     'Send the API key as an Authorization: Bearer header',
   '密钥将加密存储，保存后无法再次查看。':
     'The key is stored encrypted and cannot be viewed again after saving.',
-  '模型（可选）': 'Models (optional)',
+  '模型（至少一个）': 'Models (at least one)',
+  '至少添加一个模型：点「添加模型」，输入端点支持的模型 ID，比如 gpt-4o-mini。':
+    'Add at least one model: click Add model and type a model ID the endpoint serves, such as gpt-4o-mini.',
+  '输入模型 ID，按回车添加': 'Type a model ID and press Enter to add it',
+  '先在下面的模型列表里添加一个模型，才能测试': 'Add a model in the list below before testing',
   添加模型: 'Add model',
   移除模型: 'Remove model',
   连接设置: 'Connection',
@@ -1691,6 +1702,14 @@ export const EN: Record<string, string> = {
   '首选 Runner': 'Preferred Runner',
   不固定: 'Any machine',
   '跟随默认 Runner': 'Follow the default Runner',
+  '当前默认：Claude Code（因为有 Runner 装了 Claude Code）':
+    'Current default: Claude Code (a Runner has Claude Code installed)',
+  '当前默认：Codex（因为有 Runner 登录了 Codex）':
+    'Current default: Codex (a Runner is signed in to Codex)',
+  '当前默认：{model} · {provider}（因为还没有 Runner 装 Claude Code，用最早添加的服务商）':
+    'Current default: {model} · {provider} (no Runner has Claude Code, so the first provider you added is used)',
+  '当前没有可用的默认：添加服务商，或在 Runner 上装 Claude Code':
+    'No default yet: add a provider, or install Claude Code on a Runner',
   '设为默认 Runner': 'Make default Runner',
   '已是默认 Runner': 'Default Runner',
   '设为默认 Runner 失败，请重试。': 'Could not change the default Runner. Try again.',

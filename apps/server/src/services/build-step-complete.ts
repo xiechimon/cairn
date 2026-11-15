@@ -36,6 +36,11 @@ import {
   settleParkedStep,
 } from './builds.js';
 import { storeInfoReport } from './info-handoff.js';
+import {
+  type DeliverableManifest,
+  deliverableManifestFailure,
+  publishDeliverables,
+} from './machine-deliverables.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { planAutoConfirmation, planContractOfStep } from './plan-auto-confirm.js';
 import { finishScheduledStep } from './schedules.js';
@@ -53,6 +58,7 @@ function stepArtifactGate(
     workBranchDrift?: { expected: string; actual: string };
     report?: string;
     output?: TodoOutputKind;
+    deliverables?: DeliverableManifest;
   },
   planContract: PlanContractCheck | null,
 ): string | null {
@@ -83,7 +89,10 @@ function stepArtifactGate(
   if (isBuildStepKind(stepRow.kind)) {
     if (blockingWorkerQuestions(deps.db, stepRow.buildId).length > 0) return null;
     if (outcome.output === 'info') {
-      return outcome.report === undefined ? '信息卡未产出报告' : null;
+      if (outcome.report === undefined) return '信息卡未产出报告';
+      return outcome.deliverables !== undefined
+        ? deliverableManifestFailure(deps.db, stepRow.id, outcome.deliverables)
+        : null;
     }
     const drift = outcome.workBranchDrift;
     if (drift !== undefined) {
@@ -115,6 +124,7 @@ export interface CompleteStepOutcome {
   verifyVerdictError?: string;
   report?: string;
   verdictReport?: VerdictReport;
+  deliverables?: DeliverableManifest;
 }
 
 export function completeStep(
@@ -283,6 +293,13 @@ export function completeStep(
   }
   if (isBuildStepKind(stepRow.kind) && todoRow.output === 'info') {
     keepInfoReport();
+    if (outcome.deliverables !== undefined) {
+      publishDeliverables(deps.db, {
+        stepId,
+        buildId: stepRow.buildId,
+        manifest: outcome.deliverables,
+      });
+    }
     setTodoPhase(deps, todoRow.id, 'review', { hasChanges: false });
     return;
   }

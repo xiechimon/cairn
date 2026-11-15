@@ -49,6 +49,7 @@ export interface TurnDeps {
   volatile?: VolatileContext;
   volatileText?: string | null;
   onModel?: (ref: ModelRef) => void;
+  suggestionYield?: AbortSignal;
 }
 
 function turnUsage(answer: AssistantMessage, entries: readonly EntryRecord[]): ModelUsage {
@@ -106,6 +107,10 @@ export async function runCoordinatorTurn(
   let rootKey: string | null = null;
   let watch: Awaited<ReturnType<Conversation['watch']>> | undefined;
   const suggestionAbort = new AbortController();
+  const suggestionSignal =
+    deps.suggestionYield === undefined
+      ? suggestionAbort.signal
+      : AbortSignal.any([suggestionAbort.signal, deps.suggestionYield]);
   try {
     const mailTurn = isMailWakeText(claimed.instruction ?? '');
     const root = await activeConversation(harness, deps.conversationId, context);
@@ -316,6 +321,7 @@ export async function runCoordinatorTurn(
     const suggesting =
       claimed.chief.trigger === 'user' &&
       stopping === null &&
+      !suggestionSignal.aborted &&
       answer?.role === 'assistant' &&
       answer.stopReason === 'stop' &&
       answer.content.some((block) => block.type === 'text' && block.text.trim() !== '')
@@ -328,7 +334,7 @@ export async function runCoordinatorTurn(
                     { provider, modelId },
                     context,
                     { threadId, stepId },
-                    suggestionAbort.signal,
+                    suggestionSignal,
                   )
                 : null,
             )
@@ -403,7 +409,7 @@ export async function runCoordinatorTurn(
       usage.output += suggestion.usage.output;
       usage.cacheRead += suggestion.usage.cacheRead;
       usage.cacheWrite += suggestion.usage.cacheWrite;
-      if (suggestion.replies.length > 0 && !suggestionAbort.signal.aborted)
+      if (suggestion.replies.length > 0 && !suggestionSignal.aborted)
         await api.suggestReplies?.(stepId, suggestion.replies).catch(() => {});
     }
     if (stopping !== null) {

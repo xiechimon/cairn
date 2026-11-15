@@ -16,6 +16,7 @@ import {
   type RoutingRuleRecord,
   type RunnerOs,
   runnerOsOf,
+  type SessionDefault,
   type StepKind,
   type TeamRoutingSettings,
   type TodoSourceKind,
@@ -153,8 +154,11 @@ function ruleRow(db: Pick<Db, 'select'>, teamId: string, use: RouteUse): Routing
   return row === null ? null : resolveRuleProvider(db, row);
 }
 
-function sessionHarnessPresent(db: Pick<Db, 'select'>, teamId: string): boolean {
-  return db
+function sessionHarness(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+): 'claude-code' | 'codex-login' | null {
+  const rows = db
     .select({
       report: machine.claudeCodeReport,
       enabled: machine.enabledRuntimes,
@@ -162,13 +166,16 @@ function sessionHarnessPresent(db: Pick<Db, 'select'>, teamId: string): boolean 
     })
     .from(machine)
     .where(eq(machine.teamId, teamId))
-    .all()
-    .some(
-      (row) =>
-        (row.report?.installed === true && row.enabled.includes('claude-code')) ||
-        (CODEX_LOGIN_PRESENT.has(row.capabilities?.codexLogin?.state ?? 'absent') &&
-          row.enabled.includes('pi')),
-    );
+    .all();
+  if (rows.some((row) => row.report?.installed === true && row.enabled.includes('claude-code'))) {
+    return 'claude-code';
+  }
+  const codex = rows.some(
+    (row) =>
+      CODEX_LOGIN_PRESENT.has(row.capabilities?.codexLogin?.state ?? 'absent') &&
+      row.enabled.includes('pi'),
+  );
+  return codex ? 'codex-login' : null;
 }
 
 function providerSessionChoice(
@@ -194,10 +201,13 @@ function providerSessionChoice(
 function defaultSessionChoice(
   db: Pick<Db, 'select'>,
   teamId: string,
-): { provider: string; modelId: string } | null {
-  return sessionHarnessPresent(db, teamId)
-    ? { provider: DEFAULT_SESSION_PROVIDER, modelId: DEFAULT_SESSION_MODEL }
-    : providerSessionChoice(db, teamId);
+): (SessionDefault & { provider: string; modelId: string }) | null {
+  const harness = sessionHarness(db, teamId);
+  if (harness !== null) {
+    return { reason: harness, provider: DEFAULT_SESSION_PROVIDER, modelId: DEFAULT_SESSION_MODEL };
+  }
+  const choice = providerSessionChoice(db, teamId);
+  return choice === null ? null : { reason: 'provider', ...choice };
 }
 
 function defaultSessionRule(db: Pick<Db, 'select'>, teamId: string): RoutingRuleRow | null {
@@ -400,7 +410,7 @@ export function profileForStep(
     const stockSeed =
       base.provider === DEFAULT_SESSION_PROVIDER && base.modelId === DEFAULT_SESSION_MODEL;
     const choice =
-      stockSeed && !sessionHarnessPresent(db, todoRow.teamId)
+      stockSeed && sessionHarness(db, todoRow.teamId) === null
         ? providerSessionChoice(db, todoRow.teamId)
         : null;
     return choice === null ? base : { ...base, ...choice };
@@ -490,7 +500,13 @@ export function listRoutingSettings(db: Db, teamId: string): TeamRoutingSettings
     .all()
     .map(toWorkPolicyRecord)
     .sort((a, b) => a.use.localeCompare(b.use));
-  return { rules, policies };
+  if (rules.some((rule) => rule.use === 'session')) return { rules, policies };
+  const choice = defaultSessionChoice(db, teamId);
+  return {
+    rules,
+    policies,
+    sessionDefault: choice ?? { reason: 'none', provider: null, modelId: null },
+  };
 }
 
 function requireTeamMachine(db: Db, teamId: string, machineId: string): void {

@@ -7,29 +7,11 @@ import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { paidClaudeAllowed } from './model-routing.js';
 import { keylessEndpoint, resolveRuleProvider } from './routing-rules.js';
 
-export type CoordinatorRouteFallback =
+export type CoordinatorRouteRefusal =
   | 'no-api-key-provider'
+  | 'rule-provider-missing'
   | 'rule-provider-has-no-key'
   | 'paid-claude-not-allowed';
-
-type FallbackLog = (teamId: string, reason: CoordinatorRouteFallback) => void;
-
-let logFallback: FallbackLog = () => {};
-const logged = new Set<string>();
-
-export function setCoordinatorRouteLog(log: FallbackLog): void {
-  logFallback = log;
-  logged.clear();
-}
-
-function fallback(teamId: string, reason: CoordinatorRouteFallback): null {
-  const key = `${teamId}:${reason}`;
-  if (!logged.has(key)) {
-    logged.add(key);
-    logFallback(teamId, reason);
-  }
-  return null;
-}
 
 const MODEL_PREFERENCE = [/haiku/i, /sonnet/i];
 
@@ -91,23 +73,33 @@ function coordinatorRule(db: Db, teamId: string) {
   return row === undefined ? undefined : resolveRuleProvider(db, row, true);
 }
 
-export function coordinatorRoute(db: Db, teamId: string) {
+type CoordinatorRule = NonNullable<ReturnType<typeof coordinatorRule>>;
+
+export function coordinatorRouteVerdict(
+  db: Db,
+  teamId: string,
+): { rule: CoordinatorRule } | { refusal: CoordinatorRouteRefusal; rule?: CoordinatorRule } | null {
   if (!coordinatorRunsOnPi()) return null;
   const rule = coordinatorRule(db, teamId) ?? seedCoordinatorRule(db, teamId);
-  if (rule === undefined) return fallback(teamId, 'no-api-key-provider');
+  if (rule === undefined) return { refusal: 'no-api-key-provider' };
   const row = db
     .select({ baseUrl: provider.baseUrl, keyed: sql<number>`${provider.apiKeyCipher} is not null` })
     .from(provider)
     .where(and(eq(provider.teamId, teamId), eq(provider.providerId, rule.provider)))
     .get();
+  if (row === undefined) return { refusal: 'rule-provider-missing', rule };
   const runnable =
-    row !== undefined &&
-    (row.keyed === 1 ||
-      keylessEndpoint(rule.provider) ||
-      (usesHostCodexLogin(rule.provider, row.baseUrl) && codexLoginAvailable()));
-  if (!runnable) return fallback(teamId, 'rule-provider-has-no-key');
+    row.keyed === 1 ||
+    keylessEndpoint(rule.provider) ||
+    (usesHostCodexLogin(rule.provider, row.baseUrl) && codexLoginAvailable());
+  if (!runnable) return { refusal: 'rule-provider-has-no-key', rule };
   if (!paidClaudeAllowed(db, teamId, rule.provider, rule.modelId)) {
-    return fallback(teamId, 'paid-claude-not-allowed');
+    return { refusal: 'paid-claude-not-allowed', rule };
   }
-  return rule;
+  return { rule };
+}
+
+export function coordinatorRoute(db: Db, teamId: string): CoordinatorRule | null {
+  const verdict = coordinatorRouteVerdict(db, teamId);
+  return verdict === null || 'refusal' in verdict ? null : verdict.rule;
 }

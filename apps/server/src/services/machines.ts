@@ -482,11 +482,12 @@ export function markPresence(
   deps: MachineDeps,
   machineId: string,
   body: MachinePresenceBody,
+  admitOnline = true,
 ): void {
   const { db, hub } = deps;
   const row = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!row) throw new NotFoundError(`machine ${machineId}`);
-  const becameOnline = !row.online;
+  const becameOnline = admitOnline && !row.online;
   const previousLogin = row.claudeCodeReport?.login;
   const reportedLogin = body.claudeCode?.login;
   const loginChanged =
@@ -498,7 +499,7 @@ export function markPresence(
     (row.capabilities?.confinement ? { ...row.capabilities, confinement: undefined } : undefined);
   db.update(machine)
     .set({
-      online: true,
+      ...(admitOnline ? { online: true } : {}),
       lastSeenAt: nowMs(),
       ...(body.cliVersion !== undefined ? { latestCliVersion: body.cliVersion } : {}),
       ...(body.claudeCode !== undefined ? { claudeCodeReport: body.claudeCode } : {}),
@@ -508,6 +509,20 @@ export function markPresence(
     .run();
   const computerChanged = applyComputerPresence(db, machineId, row.teamId, body.computers, nowMs());
   if (becameOnline || loginChanged || computerChanged) {
+    const online = admitOnline || row.online;
+    hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online }));
+  }
+}
+
+export function markConnected(deps: Pick<MachineDeps, 'db' | 'hub'>, machineId: string): void {
+  const { db, hub } = deps;
+  const row = db.select().from(machine).where(eq(machine.id, machineId)).get();
+  if (!row) return;
+  db.update(machine)
+    .set({ online: true, lastSeenAt: nowMs() })
+    .where(eq(machine.id, machineId))
+    .run();
+  if (!row.online) {
     hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online: true }));
   }
 }
@@ -523,7 +538,7 @@ export function markOffline(deps: Pick<MachineDeps, 'db' | 'hub'>, machineId: st
 export const MACHINE_STALE_OFFLINE_MS = 150_000;
 
 export function sweepStaleMachines(
-  deps: Pick<MachineDeps, 'db' | 'hub'>,
+  deps: Pick<MachineDeps, 'db' | 'hub'> & { machineHub?: MachineWakeHub | undefined },
   now: number = nowMs(),
 ): void {
   const { db } = deps;
@@ -539,6 +554,7 @@ export function sweepStaleMachines(
     )
     .all();
   for (const row of stale) {
+    deps.machineHub?.cancelGrace(row.id);
     markOffline(deps, row.id);
   }
 }

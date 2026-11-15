@@ -63,6 +63,7 @@ export function bootServer(
   opts: {
     db?: Db;
     pingIntervalMs?: number;
+    offlineGraceMs?: number;
     claimHoldMs?: number;
     reposDir?: string;
     attachmentsDir?: string;
@@ -92,7 +93,7 @@ export function bootServer(
   const db = opts.db ?? openMemoryDb();
   const { user, team } = seed(db);
   const hub = new TeamStreamHub();
-  const machineHub = new MachineWakeHub();
+  const machineHub = new MachineWakeHub(opts.offlineGraceMs);
   const convHub = new ConversationStreamHub();
   const secretBox = createEphemeralSecretBox();
   const generatedVapidKeys = webpush.generateVAPIDKeys();

@@ -67,6 +67,7 @@ import {
 import { projectOfTodo, projectRepoRef } from './git.js';
 import { listProjectGithubLabelVocab } from './github-labels.js';
 import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
+import { deliverableCapability, failEarlierClaimDeliverables } from './machine-deliverables.js';
 import {
   type MachineDeps,
   profileForStep,
@@ -513,7 +514,8 @@ async function tryClaim(
       );
       if (brake.autonomyPaused || brake.dailyCapReached) continue;
     }
-    const claimedAt = nowMs();
+    const claimedAt = Math.max(nowMs(), (cand.stepRow.claimedAt ?? 0) + 1);
+    const deliverables = deliverableCapability(cand.stepRow.kind, cand.todoRow.output, claimedAt);
     let won = false;
     try {
       won = db.transaction((tx) => {
@@ -541,6 +543,7 @@ async function tryClaim(
           )
           .run();
         if (res.changes === 0) return false;
+        if (deliverables !== undefined) failEarlierClaimDeliverables(db, cand.stepRow.id);
         if (
           cand.stepRow.kind !== 'review' &&
           cand.todoRow.sourceKind !== 'research-citation-check'
@@ -697,6 +700,7 @@ async function tryClaim(
       remoteTools: workerRemoteTools(cand.stepRow.kind, isGithubProject, namesTask),
       localTools: claimLocalTools(agentRow.tools),
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
+      ...(deliverables !== undefined ? { deliverables } : {}),
     };
   }
   return claimChiefTurn(deps, machineId, teamId, maxWorkers, Number.POSITIVE_INFINITY);

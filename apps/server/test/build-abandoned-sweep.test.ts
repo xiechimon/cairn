@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, onTestFinished, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
@@ -419,6 +419,67 @@ describe('#862 T1 release of lost-contact claimed steps (sweepAbandonedBuildStep
     scheduler.tick(w.base);
     expect(stepRowOf(w).status).toBe('pending');
     scheduler.stop();
+  });
+});
+
+describe('Runner offline grace keeps baseline recovery (docs/design/runner-offline-grace.md)', () => {
+  test.each([
+    ['no presence', 'pending'],
+    ['presence on the grace id', 'claimed'],
+    ['presence without a connectionId field', 'claimed'],
+  ] as const)(
+    'progressed step 122 s silent, stream dropped, %s since the drop: %s',
+    (presence, status) => {
+      const w = makeWorld({
+        status: 'claimed',
+        createdAgo: 600_000,
+        heartbeatAgo: 122_000,
+        machineOnline: true,
+      });
+      const hub = w.s.machineHub;
+      hub.subscribeMachine(w.teamId, w.machineId, () => {});
+      const connectionId = hub.connectionId(w.machineId)!;
+      hub.dropConnection(w.machineId, connectionId, () => {});
+      onTestFinished(() => hub.cancelGrace(w.machineId));
+      if (presence === 'presence on the grace id') hub.admitPresence(w.machineId, connectionId);
+      if (presence === 'presence without a connectionId field') {
+        hub.admitPresence(w.machineId, undefined);
+      }
+
+      sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+      expect(stepRowOf(w).status).toBe(status);
+    },
+  );
+
+  test('after the grace expires a stale progressed step is released even if the old connection still reports', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const w = makeWorld({
+      status: 'claimed',
+      createdAgo: 600_000,
+      heartbeatAgo: 122_000,
+      machineOnline: true,
+    });
+    const hub = w.s.machineHub;
+    hub.subscribeMachine(w.teamId, w.machineId, () => {});
+    const connectionId = hub.connectionId(w.machineId)!;
+    hub.dropConnection(w.machineId, connectionId, () =>
+      w.s.db
+        .update(machineTable)
+        .set({ online: false })
+        .where(eq(machineTable.id, w.machineId))
+        .run(),
+    );
+    hub.admitPresence(w.machineId, connectionId);
+    vi.advanceTimersByTime(45_000);
+    expect(hub.admitPresence(w.machineId, connectionId)).toBe('ignore');
+
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+    expect(stepRowOf(w).status).toBe('pending');
   });
 });
 

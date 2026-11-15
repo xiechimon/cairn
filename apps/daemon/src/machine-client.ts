@@ -14,6 +14,8 @@ import {
   type MachineDoneBody,
   type MachineEnrollResponse,
   type MachineHeartbeatBody,
+  type MachineOfflineBody,
+  type MachineOfflineResponse,
   type MachinePresenceBody,
   type MachineRecord,
   type MachineRecoverResponse,
@@ -32,6 +34,7 @@ import {
   machineEnrollPollResponseSchema,
   machineEnrollResponseSchema,
   machineEnrollStartResponseSchema,
+  machineOfflineResponseSchema,
   machineOkResponseSchema,
   machineRecordSchema,
   machineRecoverResponseSchema,
@@ -93,6 +96,7 @@ export interface MachineApi {
   }): Promise<MachineEnrollResponse>;
   me(): Promise<MachineRecord>;
   presence(body: MachinePresenceBody, signal?: AbortSignal): Promise<void>;
+  offline?(body: MachineOfflineBody, signal?: AbortSignal): Promise<MachineOfflineResponse>;
   recover(): Promise<MachineRecoverResponse>;
   closedOrbConversations?(
     conversationIds: MachineClosedOrbsBody['conversationIds'],
@@ -244,6 +248,14 @@ export class MachineClient implements MachineApi {
       body,
       signal,
       parse: (raw) => machineOkResponseSchema.parse(raw),
+    });
+  }
+
+  async offline(body: MachineOfflineBody, signal?: AbortSignal): Promise<MachineOfflineResponse> {
+    return this.request('POST', '/api/machine/offline', {
+      body,
+      signal,
+      parse: (raw) => machineOfflineResponseSchema.parse(raw),
     });
   }
 

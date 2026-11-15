@@ -140,7 +140,13 @@ export interface ProviderEditActions {
   remove?: () => void;
 }
 
-function TestRow({ onTest }: { onTest: () => Promise<ProviderTestResult> }) {
+function TestRow({
+  onTest,
+  hasModels,
+}: {
+  onTest: () => Promise<ProviderTestResult>;
+  hasModels: boolean;
+}) {
   const { t } = useI18n();
   const [pending, setPending] = useState(false);
   const [outcome, setOutcome] = useState<ProviderTestResult | 'unavailable' | null>(null);
@@ -158,7 +164,11 @@ function TestRow({ onTest }: { onTest: () => Promise<ProviderTestResult> }) {
   return (
     <SettingsRow
       label={t('测试连接')}
-      hint={t('发一个最小请求，不会显示密钥')}
+      hint={
+        hasModels
+          ? t('发一个最小请求，不会显示密钥')
+          : t('先在下面的模型列表里添加一个模型，才能测试')
+      }
       className="flex-wrap gap-y-2 py-3"
     >
       <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
@@ -181,7 +191,12 @@ function TestRow({ onTest }: { onTest: () => Promise<ProviderTestResult> }) {
             )}
           </div>
         )}
-        <Button variant="outline" size="sm" disabled={pending} onClick={() => void run()}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={pending || !hasModels}
+          onClick={() => void run()}
+        >
           {pending ? t('测试中…') : t('测试')}
         </Button>
       </div>
@@ -255,7 +270,11 @@ export function TeamProviderEditor({
         </SettingsRow>
         {!oauth && <KeyRow onReplace={(apiKey) => fire({ apiKey })} />}
         {!oauth && actions.test !== undefined && (
-          <TestRow key={JSON.stringify(record)} onTest={actions.test} />
+          <TestRow
+            key={JSON.stringify(record)}
+            onTest={actions.test}
+            hasModels={record.models.length > 0}
+          />
         )}
       </SettingsCard>
       <ProviderSection title={t('模型列表')} hint={t('这里的模型会出现在模型选择器里')}>
