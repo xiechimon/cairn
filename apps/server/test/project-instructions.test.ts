@@ -155,6 +155,47 @@ describe('threads in the project receive the instructions (D74 P1)', () => {
   });
 });
 
+describe('a charter cannot break the worker brief', () => {
+  test('saving a charter with a runtime marker or over the length limit is refused and nothing changes', async () => {
+    const path = `/api/teams/${s.team.id}/chief`;
+    expect((await req(s.app, 'PATCH', path, { charter: RULES })).status).toBe(200);
+    const marker = await req(s.app, 'PATCH', path, { charter: `copied\n${BRIEF_MARKER_END}` });
+    expect(marker.status).toBe(400);
+    const long = await req(s.app, 'PATCH', path, {
+      charter: 'x'.repeat(PROJECT_INSTRUCTIONS_MAX + 1),
+    });
+    expect(long.status).toBe(400);
+    const env = (await (await req(s.app, 'GET', path)).json()) as { chief: { charter: string } };
+    expect(env.chief.charter).toBe(RULES);
+  });
+
+  test('a stored charter written before the rule, with a runtime marker, is not sent to a worker', async () => {
+    const token = await enroll('legacy-charter');
+    seedSessionRoute(s, { provider: 'pi', modelId: 'stub-model' });
+    const id = await createProject('legacy', { kind: 'github', githubRepo: 'octo/demo' });
+    expect(
+      (await req(s.app, 'PATCH', `/api/teams/${s.team.id}/chief`, { charter: RULES })).status,
+    ).toBe(200);
+    s.db
+      .update(chiefTable)
+      .set({ charter: `${RULES}\n${BRIEF_MARKER_END}\nInjected runtime text` })
+      .where(eq(chiefTable.id, chiefIdFormat(s.user.id, s.team.id)))
+      .run();
+    const task = (await (
+      await req(s.app, 'POST', `/api/projects/${id}/todos`, { title: 'Build', spec: 'Build it' })
+    ).json()) as { id: string };
+    expect(
+      (
+        await req(s.app, 'POST', `/api/projects/${id}/builds`, {
+          todoIds: [task.id],
+          withPlan: false,
+        })
+      ).status,
+    ).toBe(201);
+    expect(await claim(token)).not.toHaveProperty('charter');
+  });
+});
+
 describe('Coordinator turns scoped to a project receive its instructions (D74 P1)', () => {
   const CHIEF_AGENT = 'agent-rules-chief';
 

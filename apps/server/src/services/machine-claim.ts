@@ -24,6 +24,7 @@ import {
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
   WORKER_THREAD_REPORT_TOOL,
+  workerBriefTextSchema,
 } from '@cairn/shared';
 import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm';
 import {
@@ -670,7 +671,7 @@ async function tryClaim(
         ...(projectRow?.instructions != null ? { instructions: projectRow.instructions } : {}),
         repo,
       },
-      ...(charter ? { charter } : {}),
+      ...(charter && workerBriefTextSchema.safeParse(charter).success ? { charter } : {}),
       agent: {
         id: agentRow.id,
         displayName: agentRow.displayName,

@@ -1,3 +1,4 @@
+import { PROJECT_INSTRUCTIONS_MAX } from '@cairn/shared';
 import { useEffect, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import {
@@ -50,6 +51,7 @@ export function EditCharterDialog({ open, onClose, charter, onSave }: EditCharte
         <Textarea
           className="min-h-30 text-ui md:text-ui"
           value={text}
+          maxLength={PROJECT_INSTRUCTIONS_MAX}
           onChange={(event) => setText(event.target.value)}
           placeholder={t('长期指令：模型路由规则（何种任务使用何种模型）、优先级、偏好…')}
         />

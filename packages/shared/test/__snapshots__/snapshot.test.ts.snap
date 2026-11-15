@@ -5755,9 +5755,14 @@ exports[`body/envelope schema snapshots > patchChiefBody > patchChiefBody.json 1
       ],
     },
     "charter": {
-      "type": [
-        "string",
-        "null",
+      "anyOf": [
+        {
+          "maxLength": 16000,
+          "type": "string",
+        },
+        {
+          "type": "null",
+        },
       ],
     },
   },

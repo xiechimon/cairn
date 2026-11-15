@@ -30,6 +30,7 @@ test('charter edit opens the DialogShell editor with the r5 captured fields', as
     'placeholder',
     '长期指令：模型路由规则（何种任务使用何种模型）、优先级、偏好…',
   );
+  await expect(dialog.getByRole('textbox')).toHaveAttribute('maxlength', '16000');
   await expect(dialog.getByRole('button', { name: '取消' })).toHaveText('取消');
   await expect(dialog.getByRole('button', { name: '保存章程' })).toHaveText('保存章程');
 });
