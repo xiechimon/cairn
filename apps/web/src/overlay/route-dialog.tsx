@@ -1,5 +1,12 @@
 import { cn } from 'cn';
-import { createContext, type ReactNode, useCallback, useContext, useRef } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useContext,
+  useRef,
+} from 'react';
 import { Button } from '../components/ui/button.js';
 import { DialogClose, DialogTitle } from '../components/ui/dialog.js';
 import { DialogShell, dialogWidth } from '../components/ui/dialog-shell.js';
@@ -22,12 +29,14 @@ export function RouteDialog({
   size,
   actions,
   bleed = false,
+  initialFocus,
   children,
 }: {
   title: string;
   size: 'form' | 'page';
   actions?: ReactNode;
   bleed?: boolean;
+  initialFocus?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
   const { t } = useI18n();
@@ -46,7 +55,7 @@ export function RouteDialog({
       onClose={onClose}
       zIndex="calc(var(--z-narrow-chrome) + 2)"
       onBackdropClick={ignoreBackdropClick}
-      initialFocus={size === 'page' ? bodyRef : undefined}
+      initialFocus={initialFocus ?? (size === 'page' ? bodyRef : undefined)}
       width={size === 'page' ? 'var(--settings-w)' : dialogWidth('m')}
       className={size === 'page' ? 'h-(--settings-h)' : undefined}
     >
