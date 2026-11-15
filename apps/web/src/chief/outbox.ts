@@ -137,9 +137,9 @@ export function indexedDbOutboxStore(): OutboxStore {
 const OWNER_LOCK = 'cairn-chief-outbox:';
 
 export function pageLockOwner(): OutboxOwner {
-  const id = crypto.randomUUID();
   const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
-  if (locks === undefined) return { id, live: () => Promise.resolve(new Set()) };
+  if (locks === undefined) return solitary;
+  const id = crypto.randomUUID();
   void locks.request(`${OWNER_LOCK}${id}`, () => new Promise<never>(() => {})).catch(() => {});
   return {
     id,
