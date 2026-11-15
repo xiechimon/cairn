@@ -7,6 +7,7 @@ import { seed } from '../../apps/server/src/db/seed.js';
 import { createEphemeralSecretBox } from '../../apps/server/src/lib/secret-box.js';
 import { ConversationStreamHub, TeamStreamHub } from '../../apps/server/src/services/events.js';
 import { MachineWakeHub } from '../../apps/server/src/services/machine-wake-hub.js';
+import { newMcpOAuthState } from '../../apps/server/src/services/mcp-servers.js';
 
 console.error('api helper started');
 
@@ -28,6 +29,7 @@ const app = createApp({
   enrollments: new Map(),
   oauthStates: new Map(),
   xaiDeviceStates: new Map(),
+  mcpOAuthState: newMcpOAuthState(),
   oauthClient: null,
   authToken: null,
   reposDir: join(dataDir, 'repos'),

@@ -43,6 +43,7 @@ import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
+import { newMcpOAuthState } from './services/mcp-servers.js';
 import { seedOwnerCheckpoints } from './services/owner.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
 import { seedDefaultRouting } from './services/routing-migration.js';
@@ -173,6 +174,7 @@ const app = createApp(
     enrollments: new Map(),
     oauthStates: new Map(),
     xaiDeviceStates: new Map(),
+    mcpOAuthState: newMcpOAuthState(),
     oauthClient: config.githubOauth,
     githubAppTokenSocket: config.githubAppTokenSocket,
     githubAppIdentity: config.githubAppIdentity,

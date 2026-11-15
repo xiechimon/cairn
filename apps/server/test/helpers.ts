@@ -37,6 +37,7 @@ import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js'
 import { teamAutonomyPaused } from '../src/services/github-autonomy-brake.js';
 import { productionHarnessEvalConfig } from '../src/services/harness-eval-production.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
+import { newMcpOAuthState } from '../src/services/mcp-servers.js';
 import type { VapidKeys } from '../src/services/push.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import { rejectingGithubFetch } from './network-guard.js';
@@ -125,6 +126,7 @@ export function bootServer(
   };
   const oauthStates: AppContext['oauthStates'] = new Map();
   const xaiDeviceStates: AppContext['xaiDeviceStates'] = new Map();
+  const mcpOAuthState = newMcpOAuthState();
   try {
     const appContext: AppContext = {
       remote: {
@@ -151,6 +153,7 @@ export function bootServer(
       enrollments: new Map(),
       oauthStates,
       xaiDeviceStates,
+      mcpOAuthState,
       oauthClient: opts.oauthClient ?? null,
       ...(opts.oauthFetch !== undefined ? { oauthFetch: opts.oauthFetch } : {}),
       ...(opts.providerTestTimeoutMs === undefined
@@ -220,6 +223,7 @@ export function bootServer(
       skillSourcesPath,
       oauthStates,
       xaiDeviceStates,
+      mcpOAuthState,
       svc: {
         db,
         hub,

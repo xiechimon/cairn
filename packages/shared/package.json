@@ -17,7 +17,8 @@
     "./otel": "./src/otel.ts",
     "./repo-cache": "./src/repo-cache.ts",
     "./commit-identity": "./src/commit-identity.ts",
-    "./langfuse": "./src/langfuse.ts"
+    "./langfuse": "./src/langfuse.ts",
+    "./private-address": "./src/node/private-address.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
