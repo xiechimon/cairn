@@ -653,6 +653,34 @@ describe('todo deletion approval', () => {
     s.dispose();
   });
 
+  test('a proposal whose card row is gone is replaced by a fresh card on the next call', async () => {
+    const s = taskWorld();
+    const first = await modelDeletes(s, ['todo-1']);
+    s.db
+      .delete(chiefMessage)
+      .where(eq(chiefMessage.id, `approval-${first.proposalId}`))
+      .run();
+    const again = await modelDeletes(s, ['todo-1']);
+    expect(again.proposalId).not.toBe(first.proposalId);
+    expect(proposalById(s.db, first.proposalId)?.status).toBe('superseded');
+    expect(card(s, again.proposalId)?.status).toBe('pending');
+    s.dispose();
+  });
+
+  test('lookalike punctuation in a title cannot fake card entries', async () => {
+    const s = taskWorld();
+    s.db
+      .update(todo)
+      .set({ title: 'x｣﹙项目 Y，done﹚﹔＃１２｢保留' })
+      .where(eq(todo.id, 'todo-1'))
+      .run();
+    const proposed = await modelDeletes(s, ['todo-1']);
+    expect(card(s, proposed.proposalId)?.questions[0]?.question).toContain(
+      '#1「x 项目 Y,done 12 保留」',
+    );
+    s.dispose();
+  });
+
   test('task titles cannot fake card entries', async () => {
     const s = taskWorld();
     s.db
@@ -662,7 +690,7 @@ describe('todo deletion approval', () => {
       .run();
     const proposed = await modelDeletes(s, ['todo-1']);
     expect(card(s, proposed.proposalId)?.questions[0]?.question).toContain(
-      '#1「x 项目 Y，done 12 keep me」',
+      '#1「x 项目 Y,done 12 keep me」',
     );
     s.dispose();
   });

@@ -48,6 +48,7 @@ const CARD_PROJECT_MAX_CHARS = 40;
 
 function cardText(raw: string, max: number): string {
   const plain = raw
+    .normalize('NFKC')
     .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
     .replace(/[「」（）();；#]/g, ' ')
     .replace(/\s+/g, ' ')

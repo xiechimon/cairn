@@ -299,7 +299,9 @@ export function proposeAction(
   return db.transaction(
     (tx) => {
       const pending = pendingFor(tx, input.teamId, input.actionId, input.targetId);
-      if (pending && pending.inputHash === inputHash) {
+      const cardLost =
+        pending !== undefined && input.card !== undefined && cardRow(tx, pending.id) === undefined;
+      if (pending && pending.inputHash === inputHash && !cardLost) {
         addSubscriber(tx, pending.id, input.threadId, input.scopeProjectId);
         return { proposalId: pending.id, created: false };
       }
