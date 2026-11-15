@@ -217,6 +217,7 @@ export async function resumePendingUpload(
     const failedBody: MachineDoneBody = {
       status: 'failed',
       errorMessage: `Orb completion rejected with HTTP ${err.status}: ${err.body}`,
+      ...(generation !== undefined ? { generation } : {}),
     };
     journal.update(stepId, { doneBody: failedBody });
     try {
