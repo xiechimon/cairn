@@ -1,6 +1,15 @@
 import { PanelLeft } from 'lucide-react';
-import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from 'react';
+import {
+  type FocusEvent,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Button } from '../components/ui/button.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { useI18n } from '../i18n/provider.js';
 
 const OPEN_DELAY_MS = 250;
@@ -25,7 +34,6 @@ export function SidebarPeek({
   const timer = useRef<number | undefined>(undefined);
   const hovered = useRef(false);
   const armed = useRef(startArmed);
-  const focusPanel = useRef(false);
   const focusTrigger = useRef(false);
   const quietFocus = useRef(false);
   const opening = useRef(false);
@@ -33,10 +41,6 @@ export function SidebarPeek({
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
   useEffect(() => {
-    if (open && focusPanel.current) {
-      focusPanel.current = false;
-      panelRef.current?.querySelector<HTMLElement>('.sidebar-team-collapse')?.focus();
-    }
     if (!open && focusTrigger.current) {
       focusTrigger.current = false;
       quietFocus.current = true;
@@ -52,6 +56,7 @@ export function SidebarPeek({
     if (
       hovered.current ||
       menuOpen() ||
+      triggerRef.current?.matches(':focus-visible') === true ||
       panelRef.current?.querySelector(':focus-visible') != null
     ) {
       return;
@@ -73,43 +78,63 @@ export function SidebarPeek({
     opening.current = false;
     window.clearTimeout(timer.current);
   };
-  const overPanel = (event: PointerEvent) =>
-    event.clientX >= 0 &&
-    event.clientX < (panelRef.current?.offsetWidth ?? 0) &&
-    event.clientY >= 0 &&
-    event.clientY < window.innerHeight;
   const leave = (event: PointerEvent) => {
     armed.current = true;
     opening.current = false;
-    if (event.pointerType === 'touch' || (open && overPanel(event))) return;
+    if (event.pointerType === 'touch') return;
     hovered.current = false;
     schedule(closeUnlessHeld, CLOSE_DELAY_MS);
   };
 
+  const closeOnEscape = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || menuOpen()) return;
+    hovered.current = false;
+    focusTrigger.current = true;
+    window.clearTimeout(timer.current);
+    setOpen(false);
+  };
+  const closeOnBlurOutside = (event: FocusEvent) => {
+    const next = event.relatedTarget;
+    if (next instanceof Node && (panelRef.current?.contains(next) || triggerRef.current === next)) {
+      return;
+    }
+    schedule(closeUnlessHeld, 0);
+  };
+
   return (
     <>
-      <Button
-        ref={triggerRef}
-        variant="ghost"
-        data-testid="sidebar-reopen"
-        className={`fixed top-2.5 left-2.5 z-(--z-floating) size-7 text-content-tertiary ${open ? 'invisible' : ''}`}
-        aria-label={t('展开侧边栏')}
-        onClick={onExpand}
-        onPointerMove={moveOnTrigger}
-        onPointerLeave={leave}
-        onFocus={(event) => {
-          if (quietFocus.current) {
-            quietFocus.current = false;
-            return;
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              ref={triggerRef}
+              variant="ghost"
+              data-testid="sidebar-reopen"
+              className="fixed top-2.5 left-2.5 z-(--z-backdrop-low) size-7 text-content-tertiary"
+              aria-label={t('展开侧边栏')}
+              onClick={onExpand}
+              onPointerMove={moveOnTrigger}
+              onPointerLeave={leave}
+              onKeyDown={closeOnEscape}
+              onBlur={closeOnBlurOutside}
+              onFocus={(event) => {
+                if (quietFocus.current) {
+                  quietFocus.current = false;
+                  return;
+                }
+                if (!event.currentTarget.matches(':focus-visible')) return;
+                window.clearTimeout(timer.current);
+                setOpen(true);
+              }}
+            />
           }
-          if (!event.currentTarget.matches(':focus-visible')) return;
-          focusPanel.current = true;
-          window.clearTimeout(timer.current);
-          setOpen(true);
-        }}
-      >
-        <PanelLeft className="size-5.5" strokeWidth={1.75} />
-      </Button>
+        >
+          <PanelLeft className="size-5.5" strokeWidth={1.75} />
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>
+          {t('展开侧边栏')}
+        </TooltipContent>
+      </Tooltip>
       <div
         aria-hidden
         data-testid="sidebar-peek-edge"
@@ -123,25 +148,11 @@ export function SidebarPeek({
         data-testid="sidebar-peek"
         data-open={open ? '' : undefined}
         inert={!open}
-        className="invisible fixed inset-y-0 left-0 z-(--z-floating) flex -translate-x-full opacity-0 shadow-(--e3) transition-[translate,opacity,visibility] duration-(--dur-fast) ease-(--ease-standard) motion-reduce:transition-none data-open:visible data-open:translate-x-0 data-open:opacity-100 data-open:transition-[translate,opacity]"
+        className="invisible fixed inset-y-0 left-0 z-(--z-floating) flex [&_.sidebar-team-collapse]:invisible -translate-x-full opacity-0 shadow-(--e3) transition-[translate,opacity,visibility] duration-(--dur-fast) ease-(--ease-standard) motion-reduce:transition-none data-open:visible data-open:translate-x-0 data-open:opacity-100 data-open:transition-[translate,opacity]"
         onPointerEnter={enterPanel}
         onPointerLeave={leave}
-        onBlur={(event) => {
-          if (
-            event.relatedTarget instanceof Node &&
-            event.currentTarget.contains(event.relatedTarget)
-          ) {
-            return;
-          }
-          schedule(closeUnlessHeld, 0);
-        }}
-        onKeyDownCapture={(event) => {
-          if (event.key !== 'Escape' || menuOpen()) return;
-          hovered.current = false;
-          focusTrigger.current = true;
-          window.clearTimeout(timer.current);
-          setOpen(false);
-        }}
+        onBlur={closeOnBlurOutside}
+        onKeyDownCapture={closeOnEscape}
       >
         {children}
       </section>

@@ -138,6 +138,6 @@ test('collapsed leaves only the expand toggle; the peek opens `Coordinator` and 
   await page.mouse.move(700, 400);
   await page.getByTestId('sidebar-reopen').hover();
   await expect(home).toHaveAttribute('aria-current', 'page');
-  await peek.getByRole('button', { name: '展开侧边栏' }).click();
+  await page.getByTestId('sidebar-reopen').click();
   expect(await sidebar(page).evaluate((el) => el.getBoundingClientRect().width)).toBe(220);
 });

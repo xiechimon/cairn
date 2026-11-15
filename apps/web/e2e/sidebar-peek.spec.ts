@@ -135,7 +135,7 @@ test.describe('wide screens', () => {
     await page.keyboard.press('Shift');
     await reopen(page).focus();
     await expect(peek(page)).toHaveAttribute('data-open', '');
-    await expect(peek(page).getByRole('button', { name: '展开侧边栏' })).toBeFocused();
+    await expect(reopen(page)).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(peek(page).getByRole('button', { name: '搜索' })).toBeFocused();
     await page.keyboard.press('Escape');
@@ -171,13 +171,18 @@ test.describe('wide screens', () => {
     await expectCollapsed(page);
   });
 
-  test('the toggle has an accessible name and a tooltip', async ({ page }) => {
+  test('the toggle keeps its tooltip and stays on top while the peek is open', async ({ page }) => {
     await page.goto(`${HOME}&pane=tasks`);
     await expect(reopen(page)).toHaveAttribute('aria-label', '展开侧边栏');
     await reopen(page).hover();
+    await expect(peek(page)).toHaveAttribute('data-open', '');
+    await page.waitForTimeout(600);
     await expect(
       page.locator('[data-slot="tooltip-content"]').filter({ hasText: '展开侧边栏' }),
     ).toBeVisible();
+    await expect(peek(page).getByRole('button', { name: '展开侧边栏' })).toBeHidden();
+    await reopen(page).click();
+    await expectFull(page);
   });
 
   test('expanding while a panel is open sticks, also after the panel closes', async ({ page }) => {

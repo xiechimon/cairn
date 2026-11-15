@@ -257,7 +257,6 @@ export const EN: Record<string, string> = {
   '无法撤销归档。': 'Could not undo the archive.',
   '无法移动项目。': 'Could not move the project.',
   有任务在等你: 'A task is waiting on you',
-  '{name}：有任务在等你': '{name}: A task is waiting on you',
   移到分组: 'Move to group',
   新建分组: 'New group',
   移出分组: 'Remove from group',
