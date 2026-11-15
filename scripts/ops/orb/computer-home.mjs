@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { join, resolve } from 'node:path';
+import { readOrbOwner } from './owner.mjs';
 
 export const COMPUTER_HOME_ROOT = 'var/lib/cairn-computer';
 
@@ -60,8 +61,11 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   const dryRun = args[0] === '--dry-run';
   if (dryRun) args.shift();
   if (args.length !== 1) throw new Error('Usage: computer-home.mjs [--dry-run] MACHINE');
+  const owner = readOrbOwner({
+    path: join(process.env.CAIRN_ORB_ROOT ?? '/', 'etc/cairn-orb/owner'),
+  });
   const ids = ['-u', '-g'].map((flag) => {
-    const result = spawnSync('/usr/bin/id', [flag, 'ian'], { encoding: 'utf8' });
+    const result = spawnSync('/usr/bin/id', [flag, owner], { encoding: 'utf8' });
     if (result.status !== 0) throw new Error('Cannot resolve computer home owner');
     return Number(result.stdout.trim());
   });
