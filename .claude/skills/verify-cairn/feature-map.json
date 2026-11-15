@@ -2031,7 +2031,10 @@
           "settings:mcp"
         ],
         "server": [
-          "/api/teams/:id/mcp-servers"
+          "/api/teams/:id/mcp-servers",
+          "/api/teams/:id/mcp-connectors",
+          "/api/teams/:id/mcp-connectors/:cid",
+          "/api/teams/:id/mcp-connectors/:cid/check"
         ]
       },
       "reach": [
