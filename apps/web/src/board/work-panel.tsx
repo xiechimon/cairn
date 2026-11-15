@@ -119,7 +119,7 @@ export function WorkPanel({
       matchesMadeQuery(todo.title, projectOf(todo), query, t(MADE_GROUP_LABEL[group]))
     );
   });
-  const groups = groupMade(made);
+  const groups = groupMade(made, now);
   const activeQuery: QueryLike | undefined =
     tab === 'archived' && connected ? archivedQ : todosQuery;
 

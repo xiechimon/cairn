@@ -1,6 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
+import { DEFAULT_CLAUDE_CODE_MODELS } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import { readClaudeCodeReport } from '../src/claude-code-models.js';
 import { testTempDir } from './test-temp-dir.js';
@@ -46,6 +47,48 @@ describe('readClaudeCodeReport', () => {
         { id: 'claude-opus-4-1', name: 'claude-opus-4-1', slot: 'opus' },
       ],
     });
+  });
+
+  test('claude binary found but no settings.json → installed with the built-in models', () => {
+    const report = readClaudeCodeReport(tmpHome(), {
+      bin: { path: '/usr/bin/claude', version: '2.1.0' },
+    });
+    expect(report.installed).toBe(true);
+    expect(report.models).toEqual(DEFAULT_CLAUDE_CODE_MODELS);
+    expect(report.bin).toEqual({ path: '/usr/bin/claude', version: '2.1.0' });
+  });
+
+  test('claude binary found with settings.json that lists no model → built-in models', () => {
+    const report = readClaudeCodeReport(tmpHome('{}'), {
+      bin: { path: '/usr/bin/claude', version: null },
+    });
+    expect(report.installed).toBe(true);
+    expect(report.models).toEqual(DEFAULT_CLAUDE_CODE_MODELS);
+  });
+
+  test('settings.json models win over the built-in list, with or without the binary', () => {
+    const settings = JSON.stringify({ model: 'claude-opus-4-5' });
+    const withBin = readClaudeCodeReport(tmpHome(settings), {
+      bin: { path: '/usr/bin/claude', version: null },
+    });
+    expect(withBin.models).toEqual([
+      { id: 'claude-opus-4-5', name: 'claude-opus-4-5', slot: 'default' },
+    ]);
+    expect(readClaudeCodeReport(tmpHome(settings)).models).toEqual(withBin.models);
+  });
+
+  test('no binary and no settings.json stays not installed, and a missing bin probe is not a found binary', () => {
+    expect(readClaudeCodeReport(tmpHome(), { bin: null }).installed).toBe(false);
+    expect(readClaudeCodeReport(tmpHome(), { bin: null }).models).toEqual([]);
+  });
+
+  test('a logged-out machine keeps its auth state next to the built-in models', () => {
+    const report = readClaudeCodeReport(tmpHome(), {
+      bin: { path: '/usr/bin/claude', version: null },
+      auth: { state: 'not-logged-in', provider: 'firstParty' },
+    });
+    expect(report.installed).toBe(true);
+    expect(report.auth).toEqual({ state: 'not-logged-in', provider: 'firstParty' });
   });
 
   test('invalid JSON → installed:false (no throw)', () => {

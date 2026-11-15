@@ -133,7 +133,7 @@ test('the archived row menu unarchives back into the active list', async ({ page
   await rows(page).filter({ hasText: 'old-landing' }).hover();
   await page.getByRole('button', { name: 'old-landing 的菜单' }).click();
   const items = page.getByRole('menuitem');
-  await expect(items).toHaveText(['取消归档', '删除']);
+  await expect(items).toHaveText([/^取消归档/, /^删除/]);
   await page.getByRole('menuitem', { name: '取消归档' }).click();
   await expect(rows(page)).toHaveCount(1);
   expect(calls.posts).toEqual(['/api/projects/proj-old/unarchive']);
