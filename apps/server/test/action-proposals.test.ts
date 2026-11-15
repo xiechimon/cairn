@@ -671,12 +671,12 @@ describe('todo deletion approval', () => {
     const s = taskWorld();
     s.db
       .update(todo)
-      .set({ title: 'x｣﹙项目 Y，done﹚﹔＃１２｢保留' })
+      .set({ title: 'x｣﹙项目 Y，done﹚﹔＃１２｢保留♯3⸢k⸥⟮项目 Z⁏done⟯' })
       .where(eq(todo.id, 'todo-1'))
       .run();
     const proposed = await modelDeletes(s, ['todo-1']);
     expect(card(s, proposed.proposalId)?.questions[0]?.question).toContain(
-      '#1「x 项目 Y,done 12 保留」',
+      '#1「x 项目 Y,done 12 保留 3 k 项目 Z done」',
     );
     s.dispose();
   });

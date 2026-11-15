@@ -50,7 +50,7 @@ function cardText(raw: string, max: number): string {
   const plain = raw
     .normalize('NFKC')
     .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
-    .replace(/[「」（）();；#]/g, ' ')
+    .replace(/[^\p{L}\p{M}\p{N}\s\-_.,:/@]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   return plain.length > max ? `${plain.slice(0, max)}…` : plain;
