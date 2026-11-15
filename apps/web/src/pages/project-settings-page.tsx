@@ -14,6 +14,7 @@ import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { ProfileHeader } from '../components/profile-card.js';
 import {
   SETTINGS_HINT_CLS,
+  SETTINGS_SELECT_TRIGGER_CLS,
   SettingsCard,
   SettingsDangerZone,
   SettingsRow,
@@ -28,6 +29,7 @@ import { isDeleted, markDeleted } from '../fixtures/deletions.js';
 import type { ProjectContent } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { ChevronDown } from '../icons/index.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
 import { RouteDialog } from '../overlay/route-dialog.js';
 import { ProjectAutonomyCard } from './project-autonomy-card.js';
@@ -235,8 +237,11 @@ export function ProjectSettingsPage() {
                 {live && wireProject?.repoKind !== undefined ? (
                   <ProjectBaseBranchSelect project={wireProject} />
                 ) : (
-                  <span className="prj-set-branch inline-flex h-8 items-center font-mono">
+                  <span
+                    className={`prj-set-branch inline-flex w-32 items-center justify-between border px-2.5 font-mono ${SETTINGS_SELECT_TRIGGER_CLS}`}
+                  >
                     {project?.defaultBranch ?? 'main'}
+                    <ChevronDown width={16} height={16} className="text-content-tertiary" />
                   </span>
                 )}
               </SettingsRow>

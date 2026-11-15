@@ -7,6 +7,6 @@ test('settings: target branch is a static chip, not a button', async ({ page }) 
   const chip = page.getByText('main', { exact: true });
   await expect(chip).toBeVisible();
 
-  await expect(chip.locator('svg')).toHaveCount(0);
+  await expect(chip.locator('svg')).toHaveCount(1);
   await expect(page.getByRole('button', { name: /main/ })).toHaveCount(0);
 });
