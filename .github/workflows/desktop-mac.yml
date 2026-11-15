@@ -57,13 +57,20 @@ jobs:
         working-directory: apps/desktop
         run: pnpm smoke
 
-      - name: Upload the DMG and the smoke screenshot
+      - name: Upload the DMG unzipped
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: cairn-mac-arm64
-          path: |
-            apps/desktop/release/*.dmg
-            apps/desktop/release/smoke.png
+          path: apps/desktop/release/*.dmg
+          archive: false
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload the smoke screenshot
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: apps/desktop/release/smoke.png
+          archive: false
           if-no-files-found: ignore
           retention-days: 7
