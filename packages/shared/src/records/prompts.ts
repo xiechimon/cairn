@@ -242,6 +242,17 @@ export const SESSION_BRIEF = [
   'Before you finish or ask a question, call thread_report with one line (at most 200 characters, your own words) saying where the thread stands.',
 ].join('\n');
 
+export const QUICK_SESSION_BRIEF = [
+  "This is a small task: the owner's words name the project and the outcome.",
+  "If the change only adds, edits or removes data or copy whose content the owner's words fix: read the files it touches; if the outcome is already there or the change would overwrite something the owner did not mention (for example a file that already exists), ask with ask_user instead of guessing; make the change, commit on the work branch and push as your instructions say; run the checks named in the task and the project instructions and quote the commands and their results in your final message. Such a change needs no new tests.",
+  'Otherwise, including any behavior change or when you cannot tell, follow these steps in full:',
+  SESSION_BRIEF,
+].join('\n');
+
+export function sessionBriefFor(request: TaskRequest | null | undefined): string {
+  return request?.lane === 'quick' ? QUICK_SESSION_BRIEF : SESSION_BRIEF;
+}
+
 export const SESSION_REWORK_BRIEF =
   'Rework request on this same session: keep the plan, tests and branch you already have, address the feedback below, rerun the self-check and quote the new evidence, then call thread_report.';
 
@@ -690,6 +701,8 @@ function matchesSyntheticTemplates(text: string): boolean {
     SYNTHETIC_EXACT.has(text) ||
     text === SESSION_BRIEF ||
     text.startsWith(`${SESSION_BRIEF}\n\n`) ||
+    text === QUICK_SESSION_BRIEF ||
+    text.startsWith(`${QUICK_SESSION_BRIEF}\n\n`) ||
     text.startsWith(SESSION_REWORK_BRIEF) ||
     wrappedBy(text, REPLAN_HEAD, REPLAN_TAIL) ||
     wrappedBy(text, REVIEW_REJECT_HEAD, REVIEW_REJECT_TAIL) ||
