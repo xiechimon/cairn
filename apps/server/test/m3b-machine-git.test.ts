@@ -319,7 +319,7 @@ describe('merge 202 delegated -> merge step lands (02 section 4.2/A6; r3 section
     });
     dropQueuedVerify(w.s, buildId);
     const todoNow = () => w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
-    expect(todoNow().phase).toBe('review');
+    expect(todoNow().phase).toBe('done');
 
     const mergeRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} });
     expect(mergeRes.status).toBe(202);
@@ -350,7 +350,7 @@ describe('merge 202 delegated -> merge step lands (02 section 4.2/A6; r3 section
     expect(msgs.some((m) => m.content === '🎉 任务已完成')).toBe(true);
   });
 
-  test('not fast-forward (main advanced during the merge window) -> step failed + todo failed (failure only human rerun, 02/A6)', async () => {
+  test('a non-fast-forward merge fails without undoing delivery or moving main', async () => {
     const w = await setupGitWorld();
     const buildId = w.startBuild();
     const planStep = await w.claim();
@@ -363,7 +363,7 @@ describe('merge 202 delegated -> merge step lands (02 section 4.2/A6; r3 section
     dropQueuedVerify(w.s, buildId);
     await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} });
     const mergeStep = await w.claim();
-    await fakePushConvBranch(w.repoDir, 'main');
+    const mainAdvanced = await fakePushConvBranch(w.repoDir, 'main');
     await w.done(mergeStep.step.id, { status: 'success', sessionId: 'pi-1', commit: convSha });
 
     const stepRow = w.s.db
@@ -373,13 +373,14 @@ describe('merge 202 delegated -> merge step lands (02 section 4.2/A6; r3 section
       .get()!;
     expect(stepRow.status).toBe('failed');
     const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
-    expect(todoRow.phase).toBe('failed');
+    expect(todoRow.phase).toBe('done');
+    expect(await systemGitOps.resolveCommit(w.repoDir, 'refs/heads/main')).toBe(mainAdvanced);
     const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
     expect(buildRow.errorMessage).toContain('non-fast-forward');
   });
 });
 
-describe('#1487 merge step in flight when the card leaves review: success report not landed; repeated merge request 409', () => {
+describe('#1487 legacy review cancellation and duplicate explicit merges', () => {
   async function mergeInFlight() {
     const w = await setupGitWorld();
     const buildId = w.startBuild();
@@ -396,6 +397,9 @@ describe('#1487 merge step in flight when the card leaves review: success report
       commit: convSha,
     });
     dropQueuedVerify(w.s, buildId);
+    const delivered = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
+    expect(delivered.phase).toBe('done');
+    w.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, w.todoId)).run();
     const mainBefore = await systemGitOps.resolveCommit(w.repoDir, 'refs/heads/main');
     expect((await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} })).status).toBe(
       202,
@@ -411,6 +415,7 @@ describe('#1487 merge step in flight when the card leaves review: success report
 
   test('failure mode 1: closed while the merge step is in flight -> success report does not fast-forward main, card still closed, timeline explanation', async () => {
     const { w, buildId, convSha, mergeStepId, mainBefore } = await mergeInFlight();
+    const completionNotices = timeline(w, buildId).filter((m) => m.content === '🎉 任务已完成');
     expect(
       (await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { body: { phase: 'closed' } }))
         .status,
@@ -419,7 +424,9 @@ describe('#1487 merge step in flight when the card leaves review: success report
     expect(await systemGitOps.resolveCommit(w.repoDir, 'refs/heads/main')).toBe(mainBefore);
     expect(phaseOf(w)).toBe('closed');
     expect(timeline(w, buildId).some((m) => m.content === MERGE_NOT_LANDED_NOTE)).toBe(true);
-    expect(timeline(w, buildId).some((m) => m.content === '🎉 任务已完成')).toBe(false);
+    expect(timeline(w, buildId).filter((m) => m.content === '🎉 任务已完成')).toEqual(
+      completionNotices,
+    );
   });
 
   test('failure mode 1b: report arrives while card still in review, closed during the landing git check -> still not fast-forwarded', async () => {

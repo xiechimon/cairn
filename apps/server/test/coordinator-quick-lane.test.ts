@@ -297,6 +297,12 @@ describe('quick lane re-checks the destination at claim and merge (L4, L5)', () 
 
   test('L5: a merge request on a quick task whose message was rewound is refused', async () => {
     const { words, created } = await quickTaskOnMachine();
+    H.s.db
+      .update(step)
+      .set({ status: 'done', checkpointCommit: 'ab'.repeat(20) })
+      .where(eq(step.buildId, created.buildId))
+      .run();
+    H.s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable.id, created.id)).run();
     H.s.db.delete(chiefMessage).where(eq(chiefMessage.id, words)).run();
     const error = await requestMerge(toolDeps(), created.buildId).catch((e: unknown) => e);
     expect(statusOf(error)).toBe(409);
