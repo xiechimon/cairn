@@ -9,17 +9,60 @@ interface World {
   rules: { use: string; provider: string; modelId: string }[];
   patches: { use: string; body: unknown }[];
   machines?: unknown[];
+  local?: { providerId: string; state: string }[];
+  existing?: string[];
+  created?: { providerId: string; apiKey?: string }[];
 }
 
 const MACHINE = { id: 'm1', name: 'mac', online: true, enabledRuntimes: ['pi', 'claude-code'] };
 
+const LOCAL_PROVIDER = {
+  source: 'pi',
+  label: 'Relay',
+  api: 'openai-completions',
+  baseUrl: 'https://relay.example.com/v1',
+  authHeader: false,
+  models: [{ id: 'claude-opus-5-5', name: 'Claude Opus 5.5' }],
+};
+
 async function open(page: Page, world: World, path = '/app') {
+  if (world.local !== undefined) {
+    await page.addInitScript(
+      ({ rows, base }) => {
+        const found = rows.map((row) => ({ ...base, ...row, label: row.providerId }));
+        Object.assign(window, {
+          cairnDesktop: {
+            localProviders: {
+              scan: async () => found,
+              read: async (ids: string[]) =>
+                found
+                  .filter((row) => row.state === 'ready' && ids.includes(row.providerId))
+                  .map((row) => ({ ...row, apiKey: `test-key-${row.providerId}` })),
+            },
+          },
+        });
+      },
+      { rows: world.local, base: LOCAL_PROVIDER },
+    );
+  }
   await mockLive(
     page,
     { threads: [], messages: [], projects: world.projects, todos: [] },
     (p, route, json) => {
+      if (p === '/api/teams/t1/providers' && route.request().method() === 'POST') {
+        const body = route.request().postDataJSON() as { providerId: string; apiKey?: string };
+        world.created = [...(world.created ?? []), body];
+        world.bound = true;
+        return json({ id: `p-${body.providerId}`, ...body }, 201);
+      }
       if (p === '/api/teams/t1/providers') {
-        return json({ presets: [], providers: world.bound ? [{ id: 'p1', label: 'Claude token' }] : [] });
+        return json({
+          presets: [],
+          providers: [
+            ...(world.bound ? [{ id: 'p1', providerId: 'p1', label: 'Claude token' }] : []),
+            ...(world.existing ?? []).map((id) => ({ id, providerId: id, label: id })),
+          ],
+        });
       }
       if (p === '/api/teams/t1/model-routing') {
         return json({
@@ -89,8 +132,9 @@ test('a team with no projects lands on the setup page, and confirming saves both
   await expect(setup).toBeVisible();
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'done');
   await expect(page.getByTestId('first-run-step-2')).toHaveAttribute('data-state', 'now');
-  await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('最早添加');
-  await expect(page.getByTestId('first-run-pick-session')).toContainText('Claude 订阅');
+  await expect(page.getByTestId('first-run-pick-coordinator')).toHaveText(/Claude Opus 5\.5/);
+  await expect(page.getByTestId('first-run-pick-session')).toHaveText(/Claude Sonnet 5\.5/);
+  await expect(setup).not.toContainText('因为');
   await page.getByTestId('first-run-confirm').click();
   await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
   expect(world.patches[0]?.body).toEqual({ provider: 'p1', modelId: 'claude-opus-5-5' });
@@ -105,7 +149,6 @@ test('the change control opens the model picker, and confirming saves the model 
   await coordinator.getByRole('combobox').click();
   await page.getByRole('option', { name: 'Claude Sonnet 5.5' }).click();
   await expect(coordinator).toContainText('Claude Sonnet 5.5');
-  await expect(coordinator).toContainText('你换的，原本推荐 Claude Opus 5.5');
   expect(world.patches).toEqual([]);
   await page.getByTestId('first-run-confirm').click();
   await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
@@ -117,6 +160,7 @@ test('without a provider, step 1 lists the providers on the page, and Claude Pro
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
   await expect(page.getByTestId('first-run-setup')).not.toContainText('本机 Claude Code');
   await expect(page.getByTestId('first-run-setup').getByRole('switch')).toHaveCount(0);
+  await expect(page.getByTestId('local-provider-import')).toHaveCount(0);
   const picker = page.getByTestId('first-run-add-provider');
   await expect(picker.getByRole('textbox', { name: '搜索服务商...' })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -206,12 +250,11 @@ test('skipping goes to the Coordinator home; a team with projects never sees the
   await expect(other.getByTestId('first-run-setup')).toHaveCount(0);
 });
 
-test('a saved Claude subscription with Claude Code found is the Coordinator pick, and says so', async ({ page }) => {
+test('a saved Claude subscription with Claude Code found is the Coordinator pick', async ({ page }) => {
   const world: World = { ...fresh(), bound: false, subscription: true, claudeCodeFound: true };
   await open(page, world);
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'done');
   await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('Claude Sonnet 5.5');
-  await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('因为你添加了 Claude 订阅');
   await page.getByTestId('first-run-confirm').click();
   await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
   expect(world.patches[0]?.body).toEqual({ provider: 'claude-code', modelId: 'claude-sonnet-5-5' });
@@ -221,4 +264,58 @@ test('a saved subscription without Claude Code on this computer says what is mis
   await open(page, { ...fresh(), bound: false, subscription: true });
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
   await expect(page.getByTestId('first-run-setup')).toContainText('现在先添加一个服务商，Coordinator 就能开始工作');
+});
+
+test('on the Mac app, Import all adds every ready provider found in Pi and opens step 2', async ({ page }) => {
+  const world: World = {
+    ...fresh(),
+    bound: false,
+    local: [
+      { providerId: 'relay', state: 'ready' },
+      { providerId: 'gateway', state: 'ready' },
+      { providerId: 'anthropic', state: 'needs-login' },
+    ],
+  };
+  await open(page, world);
+  const card = page.getByTestId('local-provider-import');
+  await expect(card).toContainText('在这台 Mac 上找到 2 个服务商');
+  await card.getByRole('button', { name: '全部导入' }).click();
+  await expect.poll(() => world.created?.map((c) => [c.providerId, c.apiKey])).toEqual([
+    ['relay', 'test-key-relay'],
+    ['gateway', 'test-key-gateway'],
+  ]);
+  await expect(page.getByTestId('first-run-step-2')).toHaveAttribute('data-state', 'now');
+});
+
+test('Choose lists what was found; sign-in and already-added providers cannot be picked', async ({ page }) => {
+  const world: World = {
+    ...fresh(),
+    bound: false,
+    existing: ['gateway'],
+    local: [
+      { providerId: 'relay', state: 'ready' },
+      { providerId: 'other', state: 'ready' },
+      { providerId: 'gateway', state: 'ready' },
+      { providerId: 'anthropic', state: 'needs-login' },
+    ],
+  };
+  await open(page, world);
+  const card = page.getByTestId('local-provider-import');
+  await card.getByRole('button', { name: '选择' }).click();
+  await expect(card.getByRole('checkbox', { name: 'anthropic' })).toBeDisabled();
+  await expect(card).toContainText('要在 Cairn 里登录');
+  await expect(card.getByRole('checkbox', { name: 'gateway' })).toBeDisabled();
+  await expect(card).toContainText('已添加');
+  await card.getByRole('checkbox', { name: 'other' }).click();
+  await card.getByRole('button', { name: '导入 1 个' }).click();
+  await expect.poll(() => world.created?.map((c) => c.providerId)).toEqual(['relay']);
+});
+
+test('the change menu groups models by provider name without a generic heading', async ({ page }) => {
+  await open(page, fresh());
+  await page.getByTestId('first-run-pick-coordinator').getByRole('combobox').click();
+  const menu = page.locator('.routing-rule-model-menu:visible');
+  await expect(menu.getByRole('option', { name: 'Claude Opus 5.5' })).toBeVisible();
+  await expect(menu).not.toContainText('服务商');
+  await expect(menu).not.toContainText('Claude token');
 });

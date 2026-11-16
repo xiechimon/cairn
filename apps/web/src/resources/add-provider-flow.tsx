@@ -1,6 +1,6 @@
 import type { ClaudeSubscription } from '@cairn/shared';
 import { type UseMutationResult, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useCreateClaudeSubscription } from '../api/claude-subscriptions.js';
 import { useApiMutations, useCapabilities } from '../api/hooks.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
@@ -97,6 +97,7 @@ export function AddProviderFlow({
   onSubscriptionCreated,
   inline = false,
   testId,
+  lead,
 }: {
   teamId: string | undefined;
   live: boolean;
@@ -107,6 +108,7 @@ export function AddProviderFlow({
   onSubscriptionCreated?: (created: ClaudeSubscription) => void;
   inline?: boolean;
   testId?: string;
+  lead?: ReactNode;
 }) {
   const { t } = useI18n();
   const mutations = useApiMutations(teamId);
@@ -157,6 +159,7 @@ export function AddProviderFlow({
           open={pickerOpen}
           inline={inline}
           testId={testId}
+          lead={lead}
           onClose={() => {
             onViewChange('closed');
             onConnectError(null);

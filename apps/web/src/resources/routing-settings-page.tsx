@@ -147,15 +147,25 @@ export function ModelPicker({
   const shownId = picked?.modelId ?? rule?.modelId ?? '';
   const Vendor = vendorMark(shownId);
   const byKey = new Map(options.map((o) => [modelKey(o), o]));
-  const runtimes = [...new Set(options.map((o) => o.runtime))];
   const coordinatorCannot = (runtime: string) => use === 'coordinator' && runtime !== 'pi';
   const runtimeOff = (runtime: string) =>
     coordinatorCannot(runtime) ||
     (enabledRuntimes !== null && runtime !== 'pi' && !enabledRuntimes.has(runtime));
-  const runtimeLabel = (runtime: string) =>
-    runtime === 'pi'
-      ? t('服务商')
-      : (MODEL_SOURCE_RUNTIME_LABELS[runtime as ModelSourceRuntime] ?? runtime);
+  const groupKey = (o: ModelOption) => (o.runtime === 'pi' ? `pi/${o.provider}` : o.runtime);
+  const groups = [...new Map(options.map((o) => [groupKey(o), o])).entries()]
+    .map(([key, first]) => {
+      const name =
+        first.runtime === 'pi'
+          ? first.providerLabel
+          : (MODEL_SOURCE_RUNTIME_LABELS[first.runtime as ModelSourceRuntime] ?? first.runtime);
+      const label = coordinatorCannot(first.runtime)
+        ? t('{runtime}（Coordinator 用不了）', { runtime: name })
+        : runtimeOff(first.runtime)
+          ? t('{runtime}（没有执行机启用）', { runtime: name })
+          : name;
+      return { key, label, off: runtimeOff(first.runtime) };
+    })
+    .sort((a, b) => Number(a.off) - Number(b.off));
   return (
     <Select
       value={picked === undefined ? null : modelKey(picked)}
@@ -200,28 +210,19 @@ export function ModelPicker({
         alignItemWithTrigger={false}
         {...(trigger === undefined ? {} : { align: 'end' as const })}
       >
-        {runtimes.map((runtime) => (
-          <SelectGroup key={runtime}>
-            <SelectLabel>
-              {coordinatorCannot(runtime)
-                ? t('{runtime}（Coordinator 用不了）', { runtime: runtimeLabel(runtime) })
-                : runtimeOff(runtime)
-                  ? t('{runtime}（没有执行机启用）', { runtime: runtimeLabel(runtime) })
-                  : runtimeLabel(runtime)}
-            </SelectLabel>
+        {groups.map((group) => (
+          <SelectGroup key={group.key}>
+            {(groups.length > 1 || group.off) && <SelectLabel>{group.label}</SelectLabel>}
             {options
-              .filter((o) => o.runtime === runtime)
+              .filter((o) => groupKey(o) === group.key)
               .map((o) => (
                 <SelectItem
                   key={`${o.machineId ?? ''}/${modelKey(o)}`}
                   className="routing-rule-model-row pointer-coarse:min-h-11"
                   value={modelKey(o)}
-                  disabled={o.liveness === 'dead' || runtimeOff(runtime)}
+                  disabled={o.liveness === 'dead' || group.off}
                 >
                   {o.liveness === 'dead' ? `${o.modelName}（${t('已下架')}）` : o.modelName}
-                  {o.provider !== o.runtime && (
-                    <span className="text-meta text-content-tertiary">{o.providerLabel}</span>
-                  )}
                 </SelectItem>
               ))}
           </SelectGroup>

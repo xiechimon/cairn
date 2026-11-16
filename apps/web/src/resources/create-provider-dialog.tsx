@@ -8,7 +8,7 @@ import {
   type ProviderModel,
 } from '@cairn/shared';
 import { Claude } from '@lobehub/icons';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
@@ -169,6 +169,7 @@ interface CreateProviderDialogProps {
   open?: boolean;
   inline?: boolean;
   testId?: string;
+  lead?: ReactNode;
   onClose: () => void;
   pending?: boolean;
   onCreate?: (body: {
@@ -199,6 +200,7 @@ export function CreateProviderDialog({
   open,
   inline = false,
   testId,
+  lead,
   onClose,
   pending,
   onCreate,
@@ -308,6 +310,7 @@ export function CreateProviderDialog({
   const body =
     view === 'picker' ? (
       <div className="flex flex-col gap-3">
+        {lead}
         <InputGroup className="h-8.5 rounded-md border-border bg-card shadow-xs dark:bg-input/30">
           <InputGroupAddon>
             <Search />
@@ -343,7 +346,7 @@ export function CreateProviderDialog({
             if (groupRows.length === 0 && !claudeRow) return null;
             return (
               <fieldset key={group} className={PICKER_GROUP_CLS}>
-                <legend className={PICKER_GROUP_HEAD_CLS}>{t(group)}</legend>
+                <legend className={inline ? 'sr-only' : PICKER_GROUP_HEAD_CLS}>{t(group)}</legend>
                 {claudeRow && (
                   <Button
                     variant="ghost"
@@ -381,7 +384,7 @@ export function CreateProviderDialog({
             );
           })}
           <fieldset className={PICKER_GROUP_CLS}>
-            <legend className={PICKER_GROUP_HEAD_CLS}>{t('其他')}</legend>
+            <legend className={inline ? 'sr-only' : PICKER_GROUP_HEAD_CLS}>{t('其他')}</legend>
             <Button variant="ghost" className={PICKER_ROW_CLS} onClick={() => enterForm(null)}>
               <span aria-hidden className={PICKER_TILE_CLS}>
                 <PlusSmall />

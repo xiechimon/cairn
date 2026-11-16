@@ -1,12 +1,6 @@
-import {
-  type CoordinatorDefault,
-  MODEL_SOURCE_RUNTIME_LABELS,
-  type ModelSourceRuntime,
-  type RoutingRuleRecord,
-  type SessionDefault,
-} from '@cairn/shared';
+import type { RoutingRuleRecord } from '@cairn/shared';
 import { cn } from 'cn';
-import { Check, KeyRound, MessageSquare } from 'lucide-react';
+import { Check, KeyRound } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useChief, useMachines, useModelSources, useProjects, useProviders } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
@@ -23,7 +17,6 @@ import { toastError } from '../components/ui/toaster.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
-import type { TFunc } from '../i18n/translate.js';
 import { AddProviderFlow, type AddProviderView } from '../resources/add-provider-flow.js';
 import { ModelPicker } from '../resources/routing-settings-page.js';
 import { safeLocalStorage, safeSessionStorage } from '../safe-storage.js';
@@ -36,6 +29,7 @@ import {
   type SetupStepId,
   setupOpenStep,
 } from './first-run-checklist-model.js';
+import { LocalProviderImportCard } from './local-provider-import.js';
 
 export const SETUP_PARAM = 'setup';
 export const SETUP_HREF = `/app?${SETUP_PARAM}=1`;
@@ -223,6 +217,7 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
         onViewChange={setAddView}
         connectError={connectError}
         onConnectError={setConnectError}
+        lead={<LocalProviderImportCard teamId={setup.teamId} live={live} />}
       />
     </>
   );
@@ -233,81 +228,46 @@ interface Pick {
   provider: string;
   modelId: string;
   stored: boolean;
-  why: string;
-}
-
-function coordinatorWhy(reason: CoordinatorDefault['reason'], t: TFunc): string {
-  return reason === 'anthropic-key'
-    ? t('因为你添加了 Anthropic API key')
-    : reason === 'claude-code'
-      ? t('因为你添加了 Claude 订阅，Coordinator 直接用它')
-      : t('因为这是最早添加、Coordinator 能直接用的服务商');
-}
-
-function sessionWhy(reason: SessionDefault['reason'], t: TFunc): string {
-  return reason === 'claude-code'
-    ? t('因为你添加了 Claude 订阅，任务直接用订阅额度')
-    : t('因为还没有 Claude 订阅，用最早添加的服务商');
 }
 
 function pickOf(
   use: Pick['use'],
   rules: readonly RoutingRuleRecord[],
   fallback: { provider: string | null; modelId: string | null } | undefined,
-  why: string,
-  t: TFunc,
 ): Pick | null {
   const rule = rules.find((r) => r.use === use);
   if (rule !== undefined) {
-    return { use, provider: rule.provider, modelId: rule.modelId, stored: true, why: t('已保存') };
+    return { use, provider: rule.provider, modelId: rule.modelId, stored: true };
   }
   if (fallback?.provider == null || fallback.modelId == null) return null;
-  return { use, provider: fallback.provider, modelId: fallback.modelId, stored: false, why };
+  return { use, provider: fallback.provider, modelId: fallback.modelId, stored: false };
 }
 
-function picksOf(setup: Setup, t: TFunc): (Pick | null)[] {
+function picksOf(setup: Setup): (Pick | null)[] {
   const rules = setup.settings?.rules ?? [];
-  const coordinator = setup.settings?.coordinatorDefault;
-  const session = setup.settings?.sessionDefault;
   return [
-    pickOf(
-      'coordinator',
-      rules,
-      coordinator,
-      coordinator ? coordinatorWhy(coordinator.reason, t) : '',
-      t,
-    ),
-    pickOf('session', rules, session, session ? sessionWhy(session.reason, t) : '', t),
+    pickOf('coordinator', rules, setup.settings?.coordinatorDefault),
+    pickOf('session', rules, setup.settings?.sessionDefault),
   ];
 }
 
-function modelLabel(pick: Pick, options: readonly ModelOption[]): [string, string] {
+function modelName(pick: Pick, options: readonly ModelOption[]): string {
   const row =
     options.find((o) => o.provider === pick.provider && o.modelId === pick.modelId) ??
     options.find((o) => o.modelId === pick.modelId);
-  const runtimeLabel = MODEL_SOURCE_RUNTIME_LABELS[pick.provider as ModelSourceRuntime];
-  return [row?.modelName ?? pick.modelId, runtimeLabel ?? row?.providerLabel ?? pick.provider];
+  return row?.modelName ?? pick.modelId;
 }
 
 function ConfirmBody({ setup }: { setup: Setup }) {
   const { t } = useI18n();
   const { patchRule } = useRoutingSettingsMutations(setup.teamId);
   const [changed, setChanged] = useState<Partial<Record<Pick['use'], ModelOption>>>({});
-  const suggested = picksOf(setup, t);
-  const picks = suggested.map((pick, i) => {
+  const suggested = picksOf(setup);
+  const picks = suggested.map((pick, i): Pick | null => {
     const use: Pick['use'] = i === 0 ? 'coordinator' : 'session';
     const option = changed[use];
     if (option === undefined) return pick;
-    return {
-      use,
-      provider: option.provider,
-      modelId: option.modelId,
-      stored: false,
-      why:
-        pick == null
-          ? t('你换的')
-          : t('你换的，原本推荐 {model}', { model: modelLabel(pick, setup.options)[0] }),
-    };
+    return { use, provider: option.provider, modelId: option.modelId, stored: false };
   });
   const pickFor = (use: Pick['use'], index: number) => (option: ModelOption) => {
     const original = suggested[index];
@@ -325,18 +285,8 @@ function ConfirmBody({ setup }: { setup: Setup }) {
       ? null
       : new Set(setup.machines.flatMap((machine) => machine.enabledRuntimes ?? []));
   const rows = [
-    {
-      use: 'coordinator' as const,
-      who: t('Coordinator'),
-      what: t('和你对话、拆任务、派活'),
-      pick: picks[0],
-    },
-    {
-      use: 'session' as const,
-      who: t('新任务'),
-      what: t('写代码和做调研的 Agent 默认用它'),
-      pick: picks[1],
-    },
+    { use: 'coordinator' as const, who: t('Coordinator'), pick: picks[0] },
+    { use: 'session' as const, who: t('新任务'), pick: picks[1] },
   ];
   const ready = picks.every((p) => p != null);
   const confirm = async () => {
@@ -355,53 +305,39 @@ function ConfirmBody({ setup }: { setup: Setup }) {
   };
   return (
     <>
-      <p className="m-0 mt-2 text-pretty break-keep text-content-secondary">
-        {t('Cairn 按你接入的模型挑了这两个。确认后才会保存，以后可以在设置里改。')}
-      </p>
-      <SettingsCard className="mt-5">
-        {rows.map(({ use, who, what, pick }, index) => {
-          const [model, provider] = pick == null ? [null, null] : modelLabel(pick, setup.options);
-          return (
-            <div key={who} data-testid={`first-run-pick-${use}`} className="px-5 py-4">
-              <div className="text-pretty break-keep">
-                <span className="text-foreground">{who}</span>
-                <span className="mx-1 text-meta text-content-tertiary">·</span>
-                <span className="text-meta text-content-tertiary">{what}</span>
-              </div>
-              <div className="mt-1 flex min-h-6 flex-wrap items-center gap-x-2">
-                {pick == null ? (
-                  <span className="text-meta text-destructive">{t('还没有能用的模型')}</span>
-                ) : (
-                  <>
-                    <span className="text-card-title font-title text-foreground">{model}</span>
-                    <span className="text-meta text-content-secondary">{provider}</span>
-                  </>
-                )}
-                <span className="ml-auto">
-                  <ModelPicker
-                    use={use}
-                    rule={pick ?? null}
-                    options={setup.options}
-                    enabledRuntimes={enabledRuntimes}
-                    onPick={pickFor(use, index)}
-                    trigger={{
-                      label: t('换一个'),
-                      className:
-                        'h-6 gap-1 rounded-sm border-0 bg-transparent p-0 text-ui text-foreground underline decoration-content-tertiary underline-offset-4 hover:decoration-current data-[size=default]:h-6 dark:bg-transparent dark:hover:bg-transparent pointer-coarse:-my-2.5 pointer-coarse:h-11 pointer-coarse:data-[size=default]:h-11',
-                    }}
-                  />
-                </span>
-              </div>
-              {pick != null && (
-                <div className="mt-1 text-pretty break-keep text-meta text-content-tertiary">
-                  {pick.why}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </SettingsCard>
-      <div className="mt-5">
+      <ul className="m-0 list-none divide-y divide-border border-y border-border p-0">
+        {rows.map(({ use, who, pick }, index) => (
+          <li
+            key={use}
+            data-testid={`first-run-pick-${use}`}
+            className="flex min-h-13 flex-wrap items-center gap-x-4 py-2"
+          >
+            <span className="w-28 flex-none font-title text-foreground">{who}</span>
+            {pick == null ? (
+              <span className="text-meta text-destructive">{t('还没有能用的模型')}</span>
+            ) : (
+              <span className="min-w-0 truncate text-foreground">
+                {modelName(pick, setup.options)}
+              </span>
+            )}
+            <span className="ml-auto">
+              <ModelPicker
+                use={use}
+                rule={pick ?? null}
+                options={setup.options}
+                enabledRuntimes={enabledRuntimes}
+                onPick={pickFor(use, index)}
+                trigger={{
+                  label: t('换一个'),
+                  className:
+                    'h-6 gap-1 rounded-sm border-0 bg-transparent p-0 text-ui text-foreground underline decoration-content-tertiary underline-offset-4 hover:decoration-current data-[size=default]:h-6 dark:bg-transparent dark:hover:bg-transparent pointer-coarse:-my-2.5 pointer-coarse:h-11 pointer-coarse:data-[size=default]:h-11',
+                }}
+              />
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-6">
         <Button
           data-testid="first-run-confirm"
           size="lg"
@@ -438,21 +374,19 @@ function LanguageSwitch() {
 function SkipLine({ onSkip, className }: { onSkip: () => void; className?: string }) {
   const { t } = useI18n();
   return (
-    <p className={cn('m-0 text-pretty break-keep text-meta text-content-tertiary', className)}>
-      {t('不急的话可以')}
+    <div className={cn('m-0', className)}>
       <Button
         variant="link"
         data-testid="first-run-skip"
-        className="inline-flex h-auto min-h-6 p-0 align-baseline text-meta font-normal text-foreground underline decoration-content-tertiary underline-offset-4 pointer-coarse:-my-3 pointer-coarse:py-3"
+        className="h-auto min-h-6 p-0 text-meta font-normal text-content-tertiary hover:text-foreground pointer-coarse:-my-3 pointer-coarse:py-3"
         onClick={() => {
           skipSetup();
           onSkip();
         }}
       >
-        {t('先跳过，去主页看看')}
+        {t('稍后再说')}
       </Button>
-      {t('，下次打开 Cairn 时这页还在。')}
-    </p>
+    </div>
   );
 }
 
@@ -463,22 +397,12 @@ function stateOf(step: SetupStepId, open: SetupStepId): StepState {
 function Rail({ open }: { open: SetupStepId }) {
   const { t } = useI18n();
   const steps = [
-    {
-      n: 1,
-      id: 'models' as const,
-      title: t('接入模型'),
-      sub: open === 'models' ? t('接一个服务商就够') : t('Coordinator 和任务都有模型'),
-    },
-    {
-      n: 2,
-      id: 'confirm' as const,
-      title: t('确认模型'),
-      sub: t('选 Coordinator 和新任务用哪个模型'),
-    },
+    { n: 1, id: 'models' as const, title: t('接入模型') },
+    { n: 2, id: 'confirm' as const, title: t('确认模型') },
   ];
   return (
-    <ol className="m-0 mt-12 list-none p-0 max-lg:hidden">
-      {steps.map(({ n, id, title, sub }) => {
+    <ol className="m-0 mt-10 list-none p-0 max-lg:hidden">
+      {steps.map(({ n, id, title }) => {
         const state = stateOf(id, open);
         return (
           <li
@@ -486,34 +410,20 @@ function Rail({ open }: { open: SetupStepId }) {
             data-testid={`first-run-step-${n}`}
             data-state={state}
             aria-current={state === 'now' ? 'step' : undefined}
-            className="relative grid grid-cols-[1.5rem_1fr] gap-x-4 pb-7 before:absolute before:top-7 before:bottom-1 before:left-3 before:w-px before:bg-(--tree-line) before:content-[''] data-[state=done]:before:bg-content-tertiary"
+            className="flex items-center gap-4 py-2"
           >
             <StepMark n={n} state={state} />
-            <div className="min-w-0 text-pretty">
-              <div
-                className={cn(
-                  'text-card-title font-title',
-                  state === 'open' ? 'text-content-secondary' : 'text-foreground',
-                )}
-              >
-                {title}
-              </div>
-              <div className="text-meta text-content-tertiary">{sub}</div>
-            </div>
+            <span
+              className={cn(
+                'text-card-title font-title',
+                state === 'open' ? 'text-content-secondary' : 'text-foreground',
+              )}
+            >
+              {title}
+            </span>
           </li>
         );
       })}
-      <li className="grid grid-cols-[1.5rem_1fr] gap-x-4">
-        <span className="grid size-6 place-items-center rounded-full border border-dashed border-content-dim text-content-tertiary">
-          <MessageSquare className="size-4" />
-        </span>
-        <div className="min-w-0 text-pretty">
-          <div className="text-card-title font-title text-content-secondary">
-            {t('开始和 Coordinator 对话')}
-          </div>
-          <div className="text-meta text-content-tertiary">{t('两步做完就直接进入对话')}</div>
-        </div>
-      </li>
     </ol>
   );
 }
@@ -574,9 +484,6 @@ export function FirstRunSetup({ setup, onSkip }: { setup: Setup; onSkip: () => v
           <h1 className="m-0 mt-8 voice-greeting text-greeting text-balance lg:mt-0">
             {t('欢迎使用 Cairn')}
           </h1>
-          <p className="m-0 mt-3 max-w-105 text-balance break-keep text-content-secondary">
-            {t('Cairn 在这台电脑上跑 Agent，用你自己的模型。配好模型就能开始对话。')}
-          </p>
           <Rail open={open} />
           <Segments open={open} />
           <InkSpiral
