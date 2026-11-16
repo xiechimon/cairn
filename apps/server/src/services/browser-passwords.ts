@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { actionProposal, machine, mailAccount, secret } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
+import { isOwner } from './instance-owner.js';
 
 export const BROWSER_PASSWORD_ACTION = 'browser.secret.authorize';
 
@@ -58,12 +59,12 @@ export function requireBrowserPassword(db: Pick<Db, 'select'>, teamId: string, i
 }
 
 export function hasBrowserPasswordGrant(
-  db: Pick<Db, 'select'>,
+  db: Db,
   teamId: string,
   binding: z.infer<typeof browserPasswordBindingSchema>,
 ): boolean {
   return db
-    .select({ inputJson: actionProposal.inputJson })
+    .select({ inputJson: actionProposal.inputJson, decidedBy: actionProposal.decidedBy })
     .from(actionProposal)
     .where(
       and(
@@ -77,6 +78,7 @@ export function hasBrowserPasswordGrant(
     )
     .all()
     .some((row) => {
+      if (row.decidedBy === null || !isOwner(db, row.decidedBy)) return false;
       const saved = browserPasswordBindingSchema.parse(JSON.parse(row.inputJson));
       return (
         saved.secretId === binding.secretId &&

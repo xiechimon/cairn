@@ -11,12 +11,14 @@ import {
   computerCall as computerCallTable,
   computer as computerTable,
   machine as machineTable,
+  pairedDevice,
   pushDelivery,
   pushSubscription,
   secret,
   step as stepTable,
 } from '../src/db/schema.js';
 import { proposalCardId, sweepExpiredActionProposals } from '../src/services/action-proposals.js';
+import { issueBrowserSession } from '../src/services/browser-session.js';
 import { askQuestionContentOf } from '../src/services/chief-questions.js';
 import {
   acquireComputerControl,
@@ -56,8 +58,8 @@ afterEach(() => {
   server = null;
 });
 
-function boot() {
-  const s = bootServer();
+function boot(authToken: string | null = null) {
+  const s = bootServer({ authToken });
   server = s;
   const chiefId = `chief-${s.svc.user.id}-${s.team.id}`;
   for (const id of ['sidecar', 'omarchy']) {
@@ -302,6 +304,81 @@ describe('login handoff gate', () => {
     expect(s.db.select().from(actionProposal).all()).toHaveLength(1);
     expect(JSON.stringify(s.db.select().from(computerCallTable).all())).not.toContain(value);
     expect(JSON.stringify(s.db.select().from(actionProposal).all())).not.toContain(value);
+  });
+
+  test.each(['bearer', 'session'] as const)(
+    'a paired %s cannot approve a password website, but the owner can',
+    async (kind) => {
+      const ownerToken = 'synthetic-owner-token';
+      const deviceToken = 'cairn_dev_synthetic-device-token';
+      const { s, deps, calls } = boot(ownerToken);
+      s.db
+        .insert(pairedDevice)
+        .values({
+          id: 'paired-phone',
+          teamId: s.team.id,
+          name: 'phone',
+          tokenHash: createHash('sha256').update(deviceToken).digest('hex'),
+          masked: 'synthetic-device',
+          createdAt: Date.now(),
+        })
+        .run();
+      createSecret(deps, { teamId: s.team.id, name: 'LOGIN', value: 'synthetic-password' });
+      await forwardComputerCall(deps, 'sidecar', 'step-a', fill());
+      const pending = pendingApproval(s);
+      const path = `/api/teams/${s.team.id}/chief/threads/${THREAD}/questions/${proposalCardId(pending.id)}/answer`;
+      const post = (headers: Record<string, string>) =>
+        s.app.request(path, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', ...headers },
+          body: JSON.stringify({ answers: [{ header: '网站授权', choices: ['批准执行'] }] }),
+        });
+      const headers: Record<string, string> =
+        kind === 'bearer'
+          ? { authorization: `Bearer ${deviceToken}` }
+          : {
+              cookie: `cairn_auth=${issueBrowserSession(s.db, 'device', 'paired-phone').token}`,
+              'sec-fetch-site': 'same-origin',
+            };
+      expect((await post(headers)).status).toBe(403);
+      expect(pendingApproval(s).id).toBe(pending.id);
+      expect(calls).toHaveLength(0);
+      const ownerHeaders: Record<string, string> =
+        kind === 'bearer'
+          ? { authorization: `Bearer ${ownerToken}` }
+          : {
+              cookie: `cairn_auth=${issueBrowserSession(s.db, 'owner').token}`,
+              'sec-fetch-site': 'same-origin',
+            };
+      expect((await post(ownerHeaders)).status).toBe(200);
+      expect(
+        s.db.select().from(actionProposal).where(eq(actionProposal.id, pending.id)).get(),
+      ).toMatchObject({ status: 'executed', decidedBy: s.user.id });
+      const filled = forwardComputerCall(deps, 'sidecar', 'step-a', fill('owner-approved'));
+      expect(calls).toHaveLength(1);
+      receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1)], s.secretBox);
+      await filled;
+    },
+  );
+
+  test('a historical device-approved password grant cannot be reused', async () => {
+    const { s, deps, calls } = boot();
+    createSecret(deps, { teamId: s.team.id, name: 'LOGIN', value: 'synthetic-password' });
+    await forwardComputerCall(deps, 'sidecar', 'step-a', fill());
+    const pending = pendingApproval(s);
+    await answer(s, pending.id);
+    s.db
+      .update(actionProposal)
+      .set({ decidedBy: 'device:paired-phone' })
+      .where(eq(actionProposal.id, pending.id))
+      .run();
+    const result = forwardComputerCall(deps, 'sidecar', 'step-a', fill('historical-grant'));
+    if (calls.length > 0) {
+      receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1)], s.secretBox);
+    }
+    expect((await result).text).toContain('尚未代填');
+    expect(calls).toHaveLength(0);
+    expect(pendingApproval(s).id).not.toBe(pending.id);
   });
 
   test('another website or machine and a rotated or deleted secret cannot reuse approval', async () => {

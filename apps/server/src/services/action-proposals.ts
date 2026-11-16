@@ -31,6 +31,7 @@ import {
 } from './chief-questions.js';
 import type { TeamStreamHub } from './events.js';
 import { dispatchHostedCleanup } from './hosted-cleanup.js';
+import { isOwner } from './instance-owner.js';
 import { deleteProject, type ProjectTx } from './projects.js';
 import { deleteTodo } from './todos.js';
 
@@ -412,6 +413,9 @@ export function answerProposal(deps: AnswerDeps, input: AnswerInput): { status: 
         .get();
       if (row?.status !== 'pending') {
         throw new HttpError(409, `proposal ${input.proposalId} is not pending`);
+      }
+      if (row.actionId === BROWSER_PASSWORD_ACTION && !isOwner(deps.db, input.decidedBy)) {
+        throw new HttpError(403, 'only the owner can authorize a browser password website');
       }
       const digest = storedCardDigest(row);
       if (digest !== null && input.viaCard !== true) {
