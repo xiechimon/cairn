@@ -101,10 +101,11 @@ test('the change control opens the model picker, and confirming saves the model 
   expect(world.patches[0]?.body).toEqual({ provider: 'p1', modelId: 'claude-sonnet-5-5' });
 });
 
-test('a Claude Code login alone leaves step 1 open and says the Coordinator still needs a provider', async ({ page }) => {
+test('without a provider, step 1 offers only Add provider, which opens the picker in place', async ({ page }) => {
   await open(page, { ...fresh(), bound: false });
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
-  await expect(page.getByTestId('first-run-setup')).toContainText('Coordinator 用不了 Claude Code 登录');
+  await expect(page.getByTestId('first-run-setup')).not.toContainText('本机 Claude Code');
+  await expect(page.getByTestId('first-run-setup').getByRole('switch')).toHaveCount(0);
   await expect(page.getByTestId('first-run-setup')).toContainText('还差第 1 步');
   await page.getByTestId('first-run-add-provider').click();
   const picker = page.getByRole('dialog', { name: '添加模型服务' });
@@ -131,16 +132,4 @@ test('skipping goes to the Coordinator home; a team with projects never sees the
   await open(other, { ...fresh(), projects: [PROJECT] });
   await expect(other.getByTestId('home-c')).toBeVisible();
   await expect(other.getByTestId('first-run-setup')).toHaveCount(0);
-});
-
-test('without a desktop Runner, step 1 says how to bring a Runner online and which Runner lacks Claude Code', async ({ page }) => {
-  await open(page, { ...fresh(), bound: false, machines: [] });
-  const claude = page.getByTestId('first-run-setup');
-  await expect(claude).toContainText('还没有在线的执行机');
-  await expect(claude).not.toContainText('正在启动');
-  await expect(claude.getByRole('link', { name: '添加执行机' })).toHaveAttribute('href', '/app/settings/machines');
-
-  const other = await page.context().newPage();
-  await open(other, { ...fresh(), bound: false, machines: [{ ...MACHINE, id: 'm2', name: 'newbox', enabledRuntimes: ['pi'] }] });
-  await expect(other.getByTestId('first-run-setup')).toContainText('newbox 上没有检测到 Claude Code');
 });

@@ -1,6 +1,6 @@
 import type { CoordinatorDefault, RoutingRuleRecord, SessionDefault } from '@cairn/shared';
 import { cn } from 'cn';
-import { Check, KeyRound, Plus, SquareTerminal } from 'lucide-react';
+import { Check, KeyRound, Plus } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
 import { useChief, useMachines, useModelSources, useProjects, useProviders } from '../api/hooks.js';
@@ -8,7 +8,6 @@ import { toModelOptions } from '../api/mappers.js';
 import { useModelRouting } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
-import { withCodeSpans } from '../components/notice-banner.js';
 import { SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { Spinner } from '../components/ui/spinner.js';
@@ -181,60 +180,10 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
   const { live } = useLiveData();
   const [addView, setAddView] = useState<AddProviderView>('closed');
   const [connectError, setConnectError] = useState<string | null>(null);
-  const online = setup.machines.find((machine) => machine.online);
-  const login = setup.connections.some(
-    (c) => online !== undefined && c.id === `machine:${online.id}` && c.available !== false,
-  );
-  const desktop = 'cairnDesktop' in window;
-  const ccStatus =
-    online === undefined ? (
-      !desktop ? (
-        withCodeSpans(
-          t('还没有在线的执行机。在要跑任务的电脑上装好 CLI，运行 `cairn start` 并批准它。'),
-        )
-      ) : setup.machines.length === 0 ? (
-        <span className="flex items-start gap-2">
-          <Spinner className="mt-0.5 size-3.5 flex-none" aria-label={t('启动中')} />
-          {t('本机执行机正在启动，启动后会检查这台电脑上的 Claude Code')}
-        </span>
-      ) : (
-        t('本机执行机没有启动，查不到 Claude Code。退出 Cairn 再打开一次。')
-      )
-    ) : login ? (
-      t('已在这台电脑上登录')
-    ) : (online.enabledRuntimes ?? []).includes('claude-code') ? (
-      withCodeSpans(t('没找到已登录的 Claude Code。在终端运行 `claude` 登录后，这里会自己更新。'))
-    ) : (
-      withCodeSpans(
-        t('{machine} 上没有检测到 Claude Code。装好后运行 `cairn restart`，这里会自己更新。', {
-          machine: online.name,
-        }),
-      )
-    );
   const hasProvider = progress.models.coordinator;
   return (
     <>
       <div className="divide-y divide-border">
-        <SourceRow
-          icon={<SquareTerminal className="size-5" />}
-          title={t('本机 Claude Code')}
-          status={ccStatus}
-          usedBy={t('只给任务用')}
-          action={
-            online === undefined && !desktop ? (
-              <div className="flex min-h-8 items-center max-[640px]:w-full max-[640px]:pl-11">
-                <Button
-                  variant="secondary"
-                  className="pointer-coarse:h-11"
-                  render={<Link to={settingsHref('machines')} />}
-                >
-                  <Plus />
-                  {t('添加执行机')}
-                </Button>
-              </div>
-            ) : undefined
-          }
-        />
         <SourceRow
           icon={<KeyRound className="size-5" />}
           title={t('服务商')}
@@ -258,12 +207,6 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
           }
         />
       </div>
-      {progress.models.tasks && !progress.models.coordinator && (
-        <p className="m-0 mt-1 flex items-start gap-2 text-pretty text-meta text-content-secondary">
-          <span className="mt-1.5 size-1.5 flex-none rounded-full bg-(--card-button)" />
-          {t('任务已经能跑了。Coordinator 用不了 Claude Code 登录，还需要一个服务商。')}
-        </p>
-      )}
       <AddProviderFlow
         teamId={setup.teamId}
         live={live}
