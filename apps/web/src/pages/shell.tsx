@@ -29,7 +29,6 @@ export function TabGroup({
   const { t } = useI18n();
   return (
     <SegmentedTabs
-      className="page-tabs-group"
       optionHandle="page-tab"
       value={tab}
       onChange={(next) => onTab?.(next)}

@@ -408,7 +408,6 @@
       "evidence": [
         "apps/web/e2e/chief-home-needs-you.spec.ts",
         "apps/web/e2e/chief-home-tray.spec.ts",
-        "apps/web/e2e/chief-home-task-cards.spec.ts",
         "apps/server/test/needs-you.test.ts"
       ],
       "batch": "B2"

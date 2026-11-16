@@ -33,7 +33,7 @@
       "upstreamItem": "badge",
       "status": "deviated",
       "hash": "8197b13728e28f09a68f332e81990beb016fd7f1b0e1b65da3fdfa467f91e397",
-      "reason": "Leading and trailing icon insets: has-data-[icon=inline-start] / inline-end padding is 0.75 spacing (3px) instead of upstream 1.5, so a 12px icon in the 20px pill with its 1px border sits 4px from the start edge, equal to its top and bottom gap. Checked by e2e/chip-icon-trace-guide-geometry.spec.ts."
+      "reason": "Leading and trailing icon insets: has-data-[icon=inline-start] / inline-end padding is 0.75 spacing (3px) instead of upstream 1.5, so a 12px icon in the 20px pill with its 1px border sits 4px from the start edge, equal to its top and bottom gap."
     },
     "bubble.tsx": {
       "kind": "registry",
@@ -227,7 +227,7 @@
       "upstreamItem": "trace",
       "status": "deviated",
       "hash": "a2617284c8c5afc9efa3525cd4903efe9f3b91c5455cf576587c56164ada8091",
-      "reason": "Collapsible guide offset: the content border sits at --spacing(2) minus half its 1px width instead of minus the full width, so the guide runs through the centre of the 16px row icon (upstream lands 0.5px left of it). Checked by e2e/chip-icon-trace-guide-geometry.spec.ts."
+      "reason": "Collapsible guide offset: the content border sits at --spacing(2) minus half its 1px width instead of minus the full width, so the guide runs through the centre of the 16px row icon (upstream lands 0.5px left of it)."
     }
   }
 }

@@ -393,7 +393,7 @@ export function ProjectNewPage() {
     <RouteDialog title={t('新建项目')} size="form" initialFocus={nameRef}>
       <FormStack>
         <div className="flex items-center gap-4">
-          <span className="prj-new-avatar flex size-14 flex-none overflow-hidden rounded-full bg-card text-content-tertiary ring-1 ring-border">
+          <span className="flex size-14 flex-none overflow-hidden rounded-full bg-card text-content-tertiary ring-1 ring-border">
             <ProjectIconPicker
               icon={icon}
               color={null}

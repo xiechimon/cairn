@@ -237,7 +237,7 @@ Reach:
 - Research: [docs/research/link-roundup-2026-11-01.md](../../../docs/research/link-roundup-2026-11-01.md), [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main), [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md)
 - Frontend design: [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md)
 - Backend design: **gap**: no design for which records enter the tray, their order and when they leave
-- Evidence: `apps/web/e2e/chief-home-needs-you.spec.ts`, `apps/web/e2e/chief-home-tray.spec.ts`, `apps/web/e2e/chief-home-task-cards.spec.ts`, `apps/server/test/needs-you.test.ts`
+- Evidence: `apps/web/e2e/chief-home-needs-you.spec.ts`, `apps/web/e2e/chief-home-tray.spec.ts`, `apps/server/test/needs-you.test.ts`
 
 ### orb-isolation
 
@@ -486,7 +486,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`, `first-run-add-provider`, `first-run-confirm`, `first-run-pick-*`, `first-run-setup`, `first-run-skip`, `first-run-step-*`
+- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`, `first-run-add-provider`, `first-run-confirm`, `first-run-frame`, `first-run-pick-*`, `first-run-setup`, `first-run-skip`, `first-run-step-*`
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](../../../docs/design/references/first-run)
 - Backend design: **gap**: no design for checklist state and the 10-minute path

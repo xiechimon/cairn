@@ -199,7 +199,7 @@ export function SettingsRow({
           id={labelId}
           data-testid={labelTestId}
           className={cn(
-            'settings-label-text text-ui text-foreground',
+            'text-ui text-foreground',
             matched && 'underline decoration-(--card-button) decoration-wavy underline-offset-4',
             labelClassName,
           )}

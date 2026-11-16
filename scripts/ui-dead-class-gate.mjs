@@ -129,7 +129,7 @@ const EXEMPTIONS = [
   {
     name: 'chat-text',
     reason:
-      'e2e body-text anchor kept by #1034: chat-type-measure.spec.ts documents the probe migration off the `.chat-text` rule text; the name stays as the transcript body hook, skin lives on inline utilities.',
+      'body-text anchor kept by #1034: the name stays as the transcript body hook, skin lives on inline utilities.',
   },
   {
     name: 'doc-code',

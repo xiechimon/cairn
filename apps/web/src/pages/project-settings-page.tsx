@@ -424,7 +424,6 @@ export function ProjectSettingsPage() {
                 {t('危险操作')}
               </h3>
               <SettingsDangerZone
-                className="prj-set-danger"
                 label={t('删除项目')}
                 description={t(
                   '删除项目将级联删除其下所有任务、构建历史、定时任务、标签与托管仓库文件，此操作不可恢复。',

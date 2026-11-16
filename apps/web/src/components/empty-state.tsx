@@ -29,7 +29,7 @@ export function EmptyState({
 }: EmptyStateProps) {
   const HintIcon = hint?.icon;
   return (
-    <Empty data-testid={testId} className={cn('empty-state', className)}>
+    <Empty data-testid={testId} className={className}>
       <EmptyHeader className="gap-1">
         <EmptyMedia className="mb-3 text-icon">{media ?? <Icon className="size-8" />}</EmptyMedia>
         <h2 className="m-0 font-heading text-heading font-title text-balance text-foreground">
