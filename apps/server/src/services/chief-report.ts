@@ -1046,7 +1046,7 @@ export function decideRetroProposal(
     try {
       parsed = JSON.parse(String(reportRow.content));
     } catch {}
-    const content = chiefReportContentSchema.safeParse(parsed);
+    const content = chiefReportContentSchema.loose().safeParse(parsed);
     if (content.success) {
       const effects: Effects = [];
       writeReportRow(deps, rec, { ...content.data, retro: proposalsOf(db, rec.id) }, effects);

@@ -53,7 +53,7 @@ The screenshots and recordings that the remaining notes embed (493 `png`, `jpg` 
 | [migration-surface.md](migration-surface.md) | none | #409 migration inventory (appendices A and B list the selectors of 46+3 specs file by file); the ledger behind spec 16 acceptance |
 | [xmon48-filter-panel-closure.md](xmon48-filter-panel-closure.md) | none | XMON-48 board filter interaction research, wrap-up and decision material |
 | [r15-agent-responsibility-default.md](r15-agent-responsibility-default.md) | none | Default responsibility text for the first agent: evidence from seven ecosystems' sources and the trade-off (t-0198; shares a number with r15-multica-run-rendering but is a different ticket) |
-| [research-loop-plan.md](research-loop-plan.md) | none | Design plan for agents that research outward (D63, on D60's thread model): research threads before a stuck build's last retry and before new mechanisms, a search tool for pi, sourced expiring memory, daily intake; spikes, cost and open decisions |
+| [research-loop-plan.md](research-loop-plan.md) | none | Design plan for agents that research outward (D63, on D60's thread model): research threads before a stuck build's last retry and before new mechanisms, a search tool for pi, sourced expiring memory; spikes, cost and open decisions |
 | [review-gate-prior-art-2026-11-11.md](review-gate-prior-art-2026-11-11.md) | none | Why `review-gate` exists, how other teams gate on AI review, and what the 13 PRs on the night of 2026-11-11 actually cost. Recommendation only |
 
 ### Recovered research (2026-11-06 to 2026-11-09)
