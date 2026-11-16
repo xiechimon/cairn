@@ -48,6 +48,16 @@ jobs:
           pnpm --filter @cairn/desktop stage-server
           pnpm --filter @cairn/desktop stage-runner
 
+      - name: Check the signature checker
+        run: node --test apps/desktop/scripts/check-signature.test.mjs
+
+      - name: Import a throwaway signing certificate
+        run: |
+          apps/desktop/scripts/new-signing-certificate.sh "$RUNNER_TEMP/throwaway" "Cairn CI Throwaway" 2
+          apps/desktop/scripts/import-signing-identity.sh "$RUNNER_TEMP/throwaway/signing.p12" \
+            "$RUNNER_TEMP/throwaway/p12-password" "$RUNNER_TEMP/throwaway/signing.cert.pem"
+          echo "SIGNING_CERT=$RUNNER_TEMP/throwaway/signing.cert.pem" >> "$GITHUB_ENV"
+
       - name: Package the arm64 DMG
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -55,6 +65,10 @@ jobs:
         run: |
           node build.mjs
           pnpm exec electron-builder --mac dmg --arm64
+
+      - name: Check that the app is signed by the certificate, not ad-hoc
+        working-directory: apps/desktop
+        run: node scripts/check-signature.mjs "$SIGNING_CERT" release/mac-arm64/Cairn.app
 
       - name: Launch the packaged app and check the owner sign-in
         working-directory: apps/desktop
