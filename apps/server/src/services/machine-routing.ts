@@ -10,12 +10,13 @@ import {
   machineRunningCount,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
+import { connectorSlugs } from './mcp-servers.js';
 import type { RouteProfile } from './routing-rules.js';
 
 type MachineRow = typeof machine.$inferSelect;
 
 export interface WorkerStepFacts {
-  agentRow: Pick<RouteProfile, 'machineId' | 'requiredCapabilities'>;
+  agentRow: Pick<RouteProfile, 'machineId' | 'requiredCapabilities' | 'mcpServers'>;
   model: Pick<RouteProfile, 'provider' | 'modelId'>;
   localProject: boolean;
   localMerge: boolean;
@@ -29,7 +30,7 @@ export function workerIneligibility(
   now: number,
 ): MachineIneligibility | null {
   const claudeCode = stepRuntimeFor(facts.model.provider) === 'claude-code';
-  return machineEligibility({
+  const ineligible = machineEligibility({
     machine: machineRow,
     agent: facts.agentRow,
     model: facts.model,
@@ -44,7 +45,16 @@ export function workerIneligibility(
         now,
       ),
   });
+  if (ineligible !== null) return ineligible;
+  if (machineRow.capabilities?.mcpConnectors === true || facts.agentRow.mcpServers.length === 0)
+    return null;
+  const connectors = connectorSlugs(db, machineRow.teamId);
+  return facts.agentRow.mcpServers.some((slug) => connectors.has(slug.toLowerCase()))
+    ? { kind: 'capability', missing: [MCP_CONNECTOR_SUPPORT_LABEL] }
+    : null;
 }
+
+export const MCP_CONNECTOR_SUPPORT_LABEL = 'MCP connector support (update cairn on the Runner)';
 
 export function targetUnavailable(
   db: Db,
