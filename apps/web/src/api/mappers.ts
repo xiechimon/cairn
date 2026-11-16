@@ -1583,6 +1583,8 @@ function collectChiefStream(
         id: m.id,
         markdown: text,
         pending: pendingState,
+        at: clockTime(m.createdAt),
+        createdAt: m.createdAt,
         ...rowProject(m),
       });
       continue;
