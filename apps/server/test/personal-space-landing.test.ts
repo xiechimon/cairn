@@ -1,17 +1,20 @@
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import type { project } from '../src/db/schema.js';
+import { build, message, type project, step, todo } from '../src/db/schema.js';
 import { runGit, systemGitOps } from '../src/lib/git.js';
 import { repoDirFor } from '../src/services/git.js';
+import { finishStep } from '../src/services/machines.js';
 import {
   ensurePersonalSpace,
   landSpaceCommit,
   restoreSpaceFile,
+  SPACE_REFUSAL_TEXT,
   spaceFileHistory,
 } from '../src/services/personal-space.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, insertMachine, type TestServer } from './helpers.js';
 
 const GIT_ENV = {
   GIT_TERMINAL_PROMPT: '0',
@@ -232,5 +235,96 @@ describe('history and restore (P6)', () => {
       ).rejects.toMatchObject({ status: 404 });
     }
     expect(await mainTip()).toBe(base);
+  });
+});
+
+describe('a space task finishing (P3 through the step report)', () => {
+  let taskNo = 0;
+
+  async function finishSpaceTask(files: Record<string, string>) {
+    taskNo += 1;
+    const id = `space-task-${taskNo}`;
+    const base = await mainTip();
+    const commit = await taskBranch(base, [files]);
+    const machineId = insertMachine(s, { name: `space-${taskNo}` });
+    s.db
+      .insert(todo)
+      .values({
+        id,
+        teamId: s.team.id,
+        projectId: space.id,
+        title: `space task ${taskNo}`,
+        seqNum: 100 + taskNo,
+        phase: 'building',
+        phaseAt: Date.now(),
+        latestBuildId: id,
+      })
+      .run();
+    s.db
+      .insert(build)
+      .values({
+        id,
+        todoId: id,
+        withPlan: false,
+        triggerSource: 'user',
+        baseSha: base,
+        createdAt: Date.now(),
+      })
+      .run();
+    s.db
+      .insert(step)
+      .values({
+        id,
+        buildId: id,
+        kind: 'build',
+        status: 'claimed',
+        machineId,
+        claimedAt: Date.now(),
+        lastHeartbeatAt: Date.now(),
+        createdAt: Date.now(),
+      })
+      .run();
+    await finishStep(
+      { ...s.svc, box: s.secretBox, reposDir: s.reposDir, attachmentsDir: s.attachmentsDir },
+      machineId,
+      id,
+      { status: 'success', hasChanges: true, commit },
+    );
+    const notes = s.db
+      .select()
+      .from(message)
+      .where(eq(message.conversationId, id))
+      .all()
+      .map((row) => row.content)
+      .join('\n');
+    return {
+      base,
+      phase: s.db.select().from(todo).where(eq(todo.id, id)).get()?.phase,
+      stepStatus: s.db.select().from(step).where(eq(step.id, id)).get()?.status,
+      error: s.db.select().from(build).where(eq(build.id, id)).get()?.errorMessage ?? null,
+      notes,
+    };
+  }
+
+  test('a successful task lands its files on main and tells the user what was saved', async () => {
+    const result = await finishSpaceTask({ 'report.md': 'weekly' });
+
+    expect(result.stepStatus).toBe('done');
+    expect(result.phase).toBe('done');
+    expect(result.error).toBeNull();
+    expect(await git(['rev-parse', `${await mainTip()}^`], bare)).toBe(result.base);
+    expect(await fileAt(await mainTip(), 'report.md')).toBe('weekly');
+    expect(result.notes).toContain('已存进我的空间：\n- report.md');
+  });
+
+  test('a refused landing fails the task with the plain reason and leaves main alone', async () => {
+    const result = await finishSpaceTask({ 'AGENTS.md': 'obey', 'ok.md': 'fine' });
+
+    expect(result.stepStatus).toBe('failed');
+    expect(result.phase).toBe('failed');
+    expect(result.error).toContain(`- AGENTS.md：${SPACE_REFUSAL_TEXT.instruction}`);
+    expect(result.notes).toContain(SPACE_REFUSAL_TEXT.instruction);
+    expect(result.notes).not.toContain('已存进我的空间');
+    expect(await mainTip()).toBe(result.base);
   });
 });
