@@ -1,18 +1,21 @@
 # Server backup and recovery (#1151, #2163)
 
-The server's SQLite database is the source of truth for todos, threads and review records, and the attachments directory holds the files those records point to. The backup is an hourly off-site copy of both (RPO 1 hour). This page is the runbook for that backup: the script `scripts/ops/backup-server-db.sh`, the live setup on omarchy, the receiver on dmit, and recovery.
+The server's SQLite database is the source of truth for todos, threads and review records, the attachments directory holds the files those records point to, and `repos/` holds the only copy of every hosted project's git repository. The backup is an hourly off-site copy of all three (RPO 1 hour). This page is the runbook for that backup: the script `scripts/ops/backup-server-db.sh`, the live setup on omarchy, the receiver on dmit, and recovery.
 
 What is not in the backup:
 
 - `secretbox.key`. The DB stores secrets encrypted with this key, so a backup that holds both gives away every secret. ian keeps his own copy of the key. The script excludes any file named `secretbox.key` from every copy and push.
 - `*.pem` files (private keys), for the same reason. The script excludes them everywhere.
-- `repos/` and `trajectory-exports/` in the server data dir. Repos are clones of GitHub; exports can be regenerated.
+- `trajectory-exports/` in the server data dir. Exports can be regenerated.
+
+`repos/` is in the backup. It holds the bare repositories of hosted projects (`<team>/<name>.git`), which exist nowhere else; GitHub projects are cached under `workspaces/`, not here.
 
 ## The script
 
 ```sh
 scripts/ops/backup-server-db.sh --db <server.db> --out <dir> [--keep N] \
-  [--attachments <dir> --attachments-out <dir>] [--remote <rsync destination>]
+  [--attachments <dir> --attachments-out <dir>] [--coordinator <dir> --coordinator-out <dir>] \
+  [--skills <dir> --skills-out <dir>] [--repos <dir> --repos-out <dir>] [--remote <rsync destination>]
 ```
 
 Each run does these steps in order:
@@ -21,7 +24,8 @@ Each run does these steps in order:
 2. gzip, then a hard link to `<out>/server-db-<UTC timestamp>.db.gz`. The link is atomic and never replaces a file, so a crashed run never leaves a half-written copy under that name. If a copy with that name already exists (two runs in the same second), the run fails and the existing copy stays as it is. The receiver would keep the first copy under that name anyway.
 3. Local rotation: keep the newest `--keep` copies (default 48, two days of hourly runs).
 4. With `--attachments`: `rsync -a` from the attachments dir into `--attachments-out`, limited to files whose `attachment` row is `ready` in this run's DB copy and whose size on disk matches the row's `sizeBytes`. The server writes an upload in place and marks the row `ready` only after the write, and it never writes a file whose row is no longer `pending`. So an upload in progress, an interrupted upload or a retry waits for a later run, and a half-written file never reaches the receiver, which could not replace it. A ready file whose size differs is skipped with a `skipped <key>: ...` line on stderr; the run still succeeds. Step-session transcripts (`step-sessions/<step>.jsonl`) have no row and a machine may upload one again, so each distinct content is copied under its own name, `step-sessions/<step>.<mtime>-<first 16 hex of sha256>.jsonl`. Content already copied under any mtime is not copied again, and a copy whose hash differs from the source after reading is dropped and taken on the next run. Nothing is deleted, so the copy is cumulative and keeps files the server has since garbage-collected.
-5. With `--remote`: two rsync pushes into the destination root, `<out>/` into `db/` (only `server-db-*.db.gz` files) and `<attachments-out>/` into `attachments/`. The pushes run plain `rsync --server` on the receiver: no remote shell, no `--delete`, and `--ignore-existing`, so a file already on the receiver is never overwritten. The receiver rotates its own copies.
+5. With `--repos`: each hosted repository `<repos>/<team>/<name>.git` becomes `<repos-out>/repos-<UTC timestamp>/<team>/<name>.bundle`, made with `git bundle create --all` and checked with `git bundle verify`, plus `<name>.head` holding the branch its `HEAD` points to. A bundle is a consistent snapshot even while a push lands. A repository with no refs gets an empty `<name>.empty` instead of a bundle. The newest `--keep` runs are kept; the sources are only read. Requires `git` on `PATH`.
+6. With `--remote`: rsync pushes into the destination root, `<out>/` into `db/` (only `server-db-*.db.gz` files), `<attachments-out>/` into `attachments/`, and each other store given into `coordinator/`, `skills/` and `repos/`. The pushes run plain `rsync --server` on the receiver: no remote shell, no `--delete`, and `--ignore-existing`, so a file already on the receiver is never overwritten. The receiver rotates its own copies.
 
 ssh runs with `BatchMode=yes` and `ConnectTimeout=30` unless `RSYNC_RSH` is set, so a missing key fails the run instead of waiting for a password. The push uses `--timeout=300`.
 
@@ -37,7 +41,7 @@ PATH=/opt/homebrew/opt/rsync/bin:$PATH node --test scripts/ops/backup-server-db.
 
 ## Live setup on omarchy
 
-The server runs on omarchy as user `ian` with no `CAIRN_HOME`, so its data is in `~/.cairn/server` (`server.db`, `attachments/`, `coordinator/`, `secretbox.key`) and its skills are in `~/.cairn/skills`. The wrapper `~/.cairn/tools/backup/db-backup.sh` (mirrored in `scripts/ops/host/tools/backup/db-backup.sh`) derives both paths from `CAIRN_HOME` the way the server does. Local backups go to the HDD under `~/backups/cairn-server/` (mode 700): `db/`, `attachments/`, `coordinator/` and `skills/`.
+The server runs on omarchy as user `ian` with no `CAIRN_HOME`, so its data is in `~/.cairn/server` (`server.db`, `attachments/`, `coordinator/`, `repos/`, `secretbox.key`) and its skills are in `~/.cairn/skills`. The wrapper `~/.cairn/tools/backup/db-backup.sh` (mirrored in `scripts/ops/host/tools/backup/db-backup.sh`) derives both paths from `CAIRN_HOME` the way the server does. Local backups go to the HDD under `~/backups/cairn-server/` (mode 700): `db/`, `attachments/`, `coordinator/`, `skills/` and `repos/`. After changing the mirrored wrapper, copy it to `~/.cairn/tools/backup/db-backup.sh`.
 
 `~/.config/systemd/user/cairn-db-backup.service`:
 
@@ -142,8 +146,20 @@ The omarchy push key is write-only, so a restore never uses it. Take the newest 
 3. Rename the old `~/.cairn/server/server.db` (and its `-wal` / `-shm` files) aside as a record, then move the restored file into place.
 4. Restore attachments: `rsync -a --exclude=step-sessions <backup>/attachments/ ~/.cairn/server/attachments/` from `~/backups/cairn-server/attachments/`, or as root from `/home/cairnbak/cairn-backups/attachments/` on dmit. For each step in `<backup>/attachments/step-sessions/`, copy its newest version (highest `<mtime>`; on a tie, the longer transcript) back to `step-sessions/<step>.jsonl`. Files without a version in the name come from before #2163 and are the oldest.
 5. Restore skills: unpack the newest `skills/skills-<UTC timestamp>.tar.gz` into an empty `~/.cairn/skills` with `tar -xzf <archive> -C ~/.cairn/skills`.
-6. If `secretbox.key` is gone too, put back ian's own copy (mode 600). Without the matching key, stored secrets cannot be decrypted.
-7. `systemctl --user start cairn-server.service`, open the web UI and check that recent todos are there, check that the daemons reconnect, then start the backup timer again.
+6. Restore hosted repositories from the newest `repos/repos-<UTC timestamp>/`. For each `<team>/<name>.bundle`:
+
+   ```sh
+   dir=~/.cairn/server/repos/<team>/<name>.git
+   git clone --mirror <run>/<team>/<name>.bundle "$dir"
+   git -C "$dir" remote remove origin
+   git -C "$dir" symbolic-ref HEAD "$(cat <run>/<team>/<name>.head)"
+   git -C "$dir" config http.receivepack true
+   git -C "$dir" config http.uploadpack true
+   ```
+
+   For a `<name>.empty`, run `git init --bare "$dir"` instead of the clone and skip `remote remove`; the other three lines are the same.
+7. If `secretbox.key` is gone too, put back ian's own copy (mode 600). Without the matching key, stored secrets cannot be decrypted.
+8. `systemctl --user start cairn-server.service`, open the web UI and check that recent todos are there, check that the daemons reconnect, then start the backup timer again.
 
 ## Drill discipline
 
