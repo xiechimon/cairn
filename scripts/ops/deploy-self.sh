@@ -504,7 +504,10 @@ assert_deployable() {
   paused="$(gh issue list -R "$REPO" --label autonomy-paused --state open --json number --jq length)"
   [ "$paused" = 0 ] || refuse "an autonomy-paused issue is open"
 
-  local checks name
+  local ci checks name
+  ci="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$TARGET&branch=main&event=push&per_page=1" --jq '.workflow_runs[0] | select(.status == "completed") | .conclusion')" ||
+    refuse "cannot read main CI for $TARGET"
+  [ "$ci" = success ] || refuse "main CI is not green on $TARGET (${ci:-missing or pending})"
   checks="$(gh api "repos/$REPO/commits/$TARGET/check-runs?per_page=100" --jq '.check_runs[] | "\(.name)\t\(.conclusion)"')"
   for name in $REQUIRED_CHECKS; do
     grep -qxF "$name"$'\t'success <<<"$checks" || refuse "required check $name is not green on $TARGET"

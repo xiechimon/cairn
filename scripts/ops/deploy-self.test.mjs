@@ -156,6 +156,11 @@ exec env GH_TOKEN=fixture-scoped-app-token "$@"`,
 [ "\${GH_TOKEN-}" != fixture-scoped-app-token ] || echo authenticated >> "${fake}/gh-auth.log"
 case "$1 $2" in
   "api repos/"*)
+    if [[ "$2" == *actions/workflows/ci.yml/runs* ]]; then
+      sha=$(echo "$2" | sed -E 's/.*head_sha=([0-9a-f]+).*/\\1/')
+      if [ -f "${fake}/ci-$sha" ]; then cat "${fake}/ci-$sha"; else echo success; fi
+      exit 0
+    fi
     sha=$(echo "$2" | sed -E 's#.*/commits/([0-9a-f]+)/check-runs.*#\\1#')
     if [ -f "${fake}/checks-$sha" ]; then cat "${fake}/checks-$sha"; else printf 'check\\tsuccess\\npack-smoke\\tsuccess\\ne2e-gate\\tsuccess\\n'; fi ;;
   "issue list")
@@ -360,6 +365,20 @@ test('refuses a SHA whose required checks are not all green', () => {
     const result = f.run(DEPLOY, [target]);
     assert.equal(result.status, 2, result.stderr);
     assert.match(result.stderr, /required check (pack-smoke|e2e-gate) is not green/);
+    assert.equal(f.log('systemctl.log'), '');
+  }
+});
+
+test('deployment and watch refuse a non-green main CI even when individual checks are green', () => {
+  for (const conclusion of ['failure', 'cancelled', 'null', '']) {
+    const f = fixture();
+    const target = pushTarget(f);
+    writeFileSync(join(f.fake, `ci-${target}`), conclusion);
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /main CI is not green/);
+    assert.equal(f.run(WATCH, [], { CAIRN_DEPLOY_SCRIPT: DEPLOY }).status, 0);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.previous);
     assert.equal(f.log('systemctl.log'), '');
   }
 });

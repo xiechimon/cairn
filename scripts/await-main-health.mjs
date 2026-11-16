@@ -1,39 +1,19 @@
 import { pathToFileURL } from 'node:url';
 
-export const REQUIRED_CHECKS = ['check', 'e2e-gate'];
-const ACTIONS_APP_SLUG = 'github-actions';
 export const DEFAULT_TIMEOUT_MS = 60 * 60 * 1000;
 export const DEFAULT_INTERVAL_MS = 30 * 1000;
 
-export function latestRunByName(checkRuns, name) {
-  const matching = checkRuns.filter(
-    (run) => run.name === name && run.app?.slug === ACTIONS_APP_SLUG,
-  );
-  if (matching.length === 0) return null;
-  return matching.reduce((latest, run) => (run.id > latest.id ? run : latest));
-}
-
-export function decideMainHealth(checkRuns, required = REQUIRED_CHECKS) {
-  const red = [];
-  const pending = [];
-  const missing = [];
-  for (const name of required) {
-    const run = latestRunByName(checkRuns, name);
-    if (run === null) missing.push(name);
-    else if (run.status !== 'completed') pending.push(name);
-    else if (run.conclusion !== 'success') red.push(`${name}=${run.conclusion}`);
-  }
-  if (red.length > 0) return { verdict: 'red', detail: red.join(', ') };
-  if (missing.length > 0) return { verdict: 'missing', detail: missing.join(', ') };
-  if (pending.length > 0) return { verdict: 'pending', detail: pending.join(', ') };
-  return { verdict: 'success', detail: required.join(', ') };
+export function decideMainHealth(run) {
+  if (!run) return { verdict: 'missing', detail: 'main push CI' };
+  if (run.status !== 'completed') return { verdict: 'pending', detail: run.status };
+  if (run.conclusion !== 'success') return { verdict: 'red', detail: run.conclusion };
+  return { verdict: 'success', detail: 'main push CI' };
 }
 
 export async function awaitMainHealth({
-  fetchCheckRuns,
+  fetchRun,
   sleep,
   now = Date.now,
-  required = REQUIRED_CHECKS,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   intervalMs = DEFAULT_INTERVAL_MS,
   log = () => {},
@@ -42,7 +22,7 @@ export async function awaitMainHealth({
   for (;;) {
     let decision;
     try {
-      decision = decideMainHealth(await fetchCheckRuns(), required);
+      decision = decideMainHealth(await fetchRun());
     } catch (error) {
       decision = { verdict: 'error', detail: error.message };
     }
@@ -56,24 +36,23 @@ export async function awaitMainHealth({
   }
 }
 
-export function githubCheckRunsFetcher({ repo, sha, token, required = REQUIRED_CHECKS }) {
+export function githubMainRunFetcher({ repo, sha, token }) {
   return async () => {
-    const runs = [];
-    for (const name of required) {
-      const url = `https://api.github.com/repos/${repo}/commits/${sha}/check-runs?check_name=${encodeURIComponent(name)}&per_page=100`;
-      const response = await fetch(url, {
-        headers: {
-          authorization: `Bearer ${token}`,
-          accept: 'application/vnd.github+json',
-          'x-github-api-version': '2022-11-28',
-        },
-      });
-      if (!response.ok) {
-        throw new Error(`check-runs request for ${name} failed: ${response.status}`);
-      }
-      runs.push(...(await response.json()).check_runs);
+    const url = `https://api.github.com/repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${sha}&branch=main&event=push&per_page=1`;
+    const response = await fetch(url, {
+      headers: {
+        authorization: `Bearer ${token}`,
+        accept: 'application/vnd.github+json',
+        'x-github-api-version': '2022-11-28',
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`main CI request failed: ${response.status}`);
     }
-    return runs;
+    const run = (await response.json()).workflow_runs[0];
+    if (!run || run.head_sha !== sha || run.head_branch !== 'main' || run.event !== 'push')
+      return null;
+    return run;
   };
 }
 
@@ -93,7 +72,7 @@ async function main() {
   const timeoutMs = Number(option('timeout-ms') ?? DEFAULT_TIMEOUT_MS);
   const intervalMs = Number(option('interval-ms') ?? DEFAULT_INTERVAL_MS);
   const result = await awaitMainHealth({
-    fetchCheckRuns: githubCheckRunsFetcher({ repo, sha, token }),
+    fetchRun: githubMainRunFetcher({ repo, sha, token }),
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     timeoutMs,
     intervalMs,

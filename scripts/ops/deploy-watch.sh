@@ -36,7 +36,9 @@ trap 'rm -f "$0"' EXIT
 log() { echo "$(date -u +%FT%TZ) $*"; }
 
 green() {
-  local checks name
+  local ci checks name
+  ci="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$1&branch=main&event=push&per_page=1" --jq '.workflow_runs[0] | select(.status == "completed") | .conclusion')" || return 1
+  [ "$ci" = success ] || return 1
   checks="$(gh api "repos/$REPO/commits/$1/check-runs?per_page=100" --jq '.check_runs[] | "\(.name)\t\(.conclusion)"')" || return 1
   for name in $REQUIRED_CHECKS; do
     grep -qxF "$name"$'\t'success <<<"$checks" || return 1

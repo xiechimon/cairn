@@ -87,10 +87,14 @@ on:
     paths:
       - '.changeset/**'
       - '.github/workflows/release.yml'
+      - '.github/workflows/site-deploy.yml'
+      - '.github/workflows/desktop-release.yml'
       - '**/package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'scripts/release-config.test.mjs'
+      - 'scripts/await-main-health.mjs'
+      - 'scripts/await-main-health.test.mjs'
 
 concurrency:
   group: release-\${{ github.ref }}
@@ -112,7 +116,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Release config invariant
-        run: node --test scripts/release-config.test.mjs
+        run: node --test scripts/release-config.test.mjs scripts/await-main-health.test.mjs
 
   pack:
     if: github.event_name == 'push'
@@ -160,7 +164,7 @@ jobs:
     environment: npm
     timeout-minutes: 75
     permissions:
-      checks: read
+      actions: read
       contents: write
       id-token: write
     steps:
