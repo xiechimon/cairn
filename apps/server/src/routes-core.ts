@@ -4,6 +4,7 @@ import {
   patchUserBodySchema,
   patchWorkPolicyBodySchema,
   policyUseSchema,
+  putTopModelsBodySchema,
   routeUseSchema,
   type TeamMember,
 } from '@cairn/shared';
@@ -43,12 +44,14 @@ import {
   markNotificationUnread,
 } from './services/notifications.js';
 import { deviceStreams, pairedDeviceExists } from './services/paired-devices.js';
+import { routingRuleIssues } from './services/routing-rule-issues.js';
 import {
   listRoutingSettings,
   upsertRoutingRule,
   upsertWorkPolicy,
 } from './services/routing-rules.js';
 import { filterKnownSkillIds } from './services/skills.js';
+import { readTopModels, resetTopModels, writeTopModels } from './services/top-models.js';
 
 const ACCESS_REFUSALS = {
   invalid: { status: 401, error: 'Unauthorized' },
@@ -150,7 +153,29 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/routing-settings', (c) => {
     const id = c.req.param('id');
     requireTeam(ctx, id);
-    return c.json(listRoutingSettings(ctx.db, id, coordinatorRunsOnPi()));
+    return c.json({
+      ...listRoutingSettings(ctx.db, id, coordinatorRunsOnPi()),
+      ruleIssues: routingRuleIssues(ctx.db, id),
+    });
+  });
+
+  app.get('/api/teams/:id/top-models', (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    return c.json(readTopModels(ctx.db, id, ctx.logger));
+  });
+
+  app.put('/api/teams/:id/top-models', async (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    const body = parseWith(putTopModelsBodySchema, await jsonBody(c), 'body');
+    return c.json(writeTopModels(ctx.db, id, body.models));
+  });
+
+  app.delete('/api/teams/:id/top-models', (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    return c.json(resetTopModels(ctx.db, id));
   });
 
   app.patch('/api/teams/:id/routing-rules/:use', async (c) => {
@@ -180,9 +205,6 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const id = c.req.param('id');
     requireTeam(ctx, id);
     const body = parseWith(patchTeamBodySchema, await jsonBody(c), 'body');
-    if (body.claudeUsage !== undefined) {
-      ctx.db.update(team).set({ claudeUsage: body.claudeUsage }).where(eq(team.id, id)).run();
-    }
     if (body.coAuthorTrailer !== undefined) {
       ctx.db
         .update(team)

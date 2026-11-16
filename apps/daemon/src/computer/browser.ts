@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { LOGIN_SIGNALS, type LoginForm, type LoginSignal } from '@cairn/shared';
 import { z } from 'zod';
+import { cairnBlockPatterns, isCairnPage } from './host-screen-self.js';
 import type { ComputerProcessEvent, ComputerProvider } from './provider.js';
 import { ComputerRefusal } from './provider.js';
 
@@ -214,7 +215,12 @@ export interface BrowserRunOptions {
   deadlineAt?: number;
   timeoutMs?: number;
   now?: () => number;
+  cairnOrigins: readonly string[];
+  isCairnPage?: (url: string, cairnOrigins: readonly string[]) => Promise<boolean>;
 }
+
+const CAIRN_PAGE_REFUSAL =
+  'is Cairn itself; the agent browser never opens or operates Cairn, so approvals stay with the owner';
 
 export function browserSessionName(scopeKey: string | undefined): string {
   if (scopeKey === undefined || scopeKey.length === 0) return AGENT_BROWSER_SESSION;
@@ -223,7 +229,7 @@ export function browserSessionName(scopeKey: string | undefined): string {
 }
 
 function sessionFlag(session: string): string[] {
-  return ['--session', session, '--restore'];
+  return ['--session', session];
 }
 
 function headedFlags(): string[] {
@@ -383,10 +389,12 @@ export async function runBrowserTool(
       [...prefix, 'focus', ref],
     ];
     for (const step of steps) {
+      await refuseOffBoundTab(`browser_act ${kind}`);
       const prepared = await execute(step);
       if (prepared.code !== 0 && prepared.code !== null) return prepared;
     }
     for (const burst of bursts) {
+      await refuseOffBoundTab(`browser_act ${kind}`);
       const typed = await execute([...prefix, 'keyboard', 'type', burst]);
       if (typed.code !== 0 && typed.code !== null) return typed;
       await sleep(TYPING_PAUSE_MS, undefined, { signal: options.signal }).catch(() => {});
@@ -501,27 +509,133 @@ export async function runBrowserTool(
     };
   };
 
+  const cairnOrigins = options.cairnOrigins;
+  const cairnPage = options.isCairnPage ?? isCairnPage;
+  const currentUrl = async (): Promise<string | null> => {
+    const answer = await read([...prefix, '--json', 'get', 'url']);
+    if (answer.code !== 0) return null;
+    try {
+      const url = (
+        JSON.parse(answer.text.trim().split('\n').at(-1) ?? '') as { data?: { url?: unknown } }
+      ).data?.url;
+      return typeof url === 'string' ? url : null;
+    } catch {
+      return null;
+    }
+  };
+  const refuseOnCairn = async (what: string): Promise<void> => {
+    if (cairnOrigins.length === 0) return;
+    const url = await currentUrl();
+    if (url === null)
+      refuse(`${what} refused: the current page address could not be read`, started);
+    if (await cairnPage(url, cairnOrigins))
+      refuse(`${what} refused: ${url} ${CAIRN_PAGE_REFUSAL}`, started);
+  };
+  const blocks = cairnBlockPatterns(cairnOrigins);
+  const blockCairn = async (what: string): Promise<void> => {
+    if (blocks.length === 0) return;
+    const blocked = await read([
+      ...prefix,
+      'batch',
+      '--bail',
+      ...blocks.flatMap((pattern) => [
+        `network unroute ${pattern}`,
+        `network route ${pattern} --abort`,
+      ]),
+    ]);
+    if (blocked.code !== 0) {
+      refuse(
+        `${what} refused: Cairn's addresses could not be blocked in the agent browser`,
+        started,
+      );
+    }
+  };
+  const activeTab = async (): Promise<string | null> => {
+    const answer = await read([...prefix, '--json', 'tab', 'list']);
+    if (answer.code !== 0) return null;
+    try {
+      const tabs = (
+        JSON.parse(answer.text.trim().split('\n').at(-1) ?? '') as {
+          data?: { tabs?: { active?: unknown; targetId?: unknown }[] };
+        }
+      ).data?.tabs;
+      const active = tabs?.find((tab) => tab.active === true)?.targetId;
+      return typeof active === 'string' ? active : null;
+    } catch {
+      return null;
+    }
+  };
+  await blockCairn(tool);
+  const boundTab = cairnOrigins.length === 0 ? null : await activeTab();
+  if (cairnOrigins.length > 0 && boundTab === null) {
+    refuse(`${tool} refused: the active tab could not be read`, started);
+  }
+  const refuseOffBoundTab = async (what: string): Promise<void> => {
+    if (cairnOrigins.length === 0) return;
+    await blockCairn(what);
+    if ((await activeTab()) !== boundTab) {
+      refuse(
+        `${what} refused: another tab became active during this call; call again to act on it`,
+        started,
+      );
+    }
+    await refuseOnCairn(what);
+  };
+
   if (tool === 'browser_navigate') {
     const parsed = navigateParams.safeParse(params);
     if (!parsed.success) {
       refuse('browser_navigate needs a non-empty url string', started);
     }
-    const url = parsed.data.url;
-    if (!/^https?:\/\//i.test(url)) {
-      refuse('browser_navigate only accepts http(s) URLs', started);
+    let address: URL | null = null;
+    try {
+      const raw = parsed.data.url.trim();
+      const spaced = [...raw].some((char) => {
+        const code = char.charCodeAt(0);
+        return code <= 0x20 || code === 0x7f;
+      });
+      address = spaced ? null : new URL(raw);
+    } catch {}
+    if (address === null || (address.protocol !== 'http:' && address.protocol !== 'https:')) {
+      refuse(
+        'browser_navigate only accepts well-formed http(s) URLs without spaces or control characters',
+        started,
+      );
+    }
+    const url = address.href;
+    if (await cairnPage(url, cairnOrigins)) {
+      refuse(`browser_navigate refused: ${url} ${CAIRN_PAGE_REFUSAL}`, started);
     }
     const result = (await navigateByAddressBar(url)) ?? (await execute([...prefix, 'open', url]));
     if (result.code !== 0 && result.code !== null) {
       refuse(result.text || `agent-browser open failed with exit code ${result.code}`, started);
     }
+    if (cairnOrigins.length > 0 && (await activeTab()) !== boundTab) {
+      refuse(
+        'browser_navigate refused: another tab became active while opening; call again to act on it',
+        started,
+      );
+    }
+    const landed = cairnOrigins.length === 0 ? url : await currentUrl();
+    if (landed === null || (await cairnPage(landed, cairnOrigins))) {
+      await execute([...prefix, 'open', 'about:blank']);
+      refuse(
+        landed === null
+          ? 'browser_navigate refused: the page address could not be read after opening'
+          : `browser_navigate refused: ${landed} ${CAIRN_PAGE_REFUSAL}`,
+        started,
+      );
+    }
     return withDetection(result.text || `opened ${url}`);
   }
 
   if (tool === 'browser_snapshot') {
+    await refuseOnCairn('browser_snapshot');
     const result = await execute([...prefix, 'snapshot', '-i']);
     if (result.code !== 0 && result.code !== null) {
       refuse(result.text || `agent-browser snapshot failed with exit code ${result.code}`, started);
     }
+    await refuseOffBoundTab('browser_snapshot');
     return withDetection(result.text || '(empty snapshot)');
   }
 
@@ -531,6 +645,7 @@ export async function runBrowserTool(
   }
   const lines: string[] = [];
   for (const action of parsed.data.actions) {
+    await refuseOnCairn(`browser_act ${action.kind}`);
     if (action.ref !== undefined) {
       const snap = await read([...prefix, 'snapshot', '-i']);
       if (snap.code !== 0 && snap.code !== null) {
@@ -564,6 +679,7 @@ export async function runBrowserTool(
       if (error instanceof ComputerRefusal) refuse(error.message, started);
       throw error;
     }
+    await refuseOffBoundTab(`browser_act ${action.kind}`);
     const result =
       (action.kind === 'fill' || action.kind === 'type') &&
       action.ref !== undefined &&

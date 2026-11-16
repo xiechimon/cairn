@@ -8,9 +8,9 @@ import {
   Palette,
   Plug,
   Puzzle,
-  Route,
   Server,
   ShieldEllipsis,
+  SlidersHorizontal,
   Smartphone,
   Sun,
   User,
@@ -93,7 +93,7 @@ function AppearanceSection() {
           <SettingsSegmented
             label={t('外观')}
             value={theme}
-            className="h-7 [&_[data-segmented=option]]:size-6 [&_[data-segmented=option]]:px-0"
+            className="h-7 pointer-coarse:h-12 [&_[data-segmented=option]]:size-6 [&_[data-segmented=option]]:px-0 pointer-coarse:[&_[data-segmented=option]]:size-11"
             onChange={(next) => {
               applyTheme(next);
               setTheme(next);
@@ -135,12 +135,19 @@ const GROUPS: Group[] = [
     heading: '模型',
     sections: [
       { id: 'providers', label: '模型服务', Icon: Layers, element: () => <ProvidersPage /> },
-      { id: 'routing', label: '用量与连接', Icon: Route, element: () => <ModelRoutingPage /> },
       {
         id: 'work-routing',
-        label: '规则与策略',
-        Icon: Waypoints,
+        label: '模型选择',
+        Icon: SlidersHorizontal,
+        keywords: ['model', 'coordinator', '思考强度', 'effort'],
         element: () => <RoutingSettingsPage />,
+      },
+      {
+        id: 'routing',
+        label: '模型路由',
+        Icon: Waypoints,
+        keywords: ['routing', '订阅', 'subscription', '用量', 'quota'],
+        element: () => <ModelRoutingPage />,
       },
     ],
   },
@@ -149,9 +156,9 @@ const GROUPS: Group[] = [
     sections: [
       {
         id: 'machines',
-        label: 'Runner',
+        label: '执行机',
         Icon: Server,
-        keywords: ['机器', 'machine', 'computer'],
+        keywords: ['机器', 'runner', 'machine', 'computer'],
         element: () => <MachinesPage />,
       },
       { id: 'skills', label: '技能', Icon: Puzzle, element: () => <SkillsPage /> },
@@ -339,7 +346,13 @@ export function SettingsDialog({
           <h1 id={titleId} className="m-0 text-card-title font-semibold text-foreground">
             {t('设置')}
           </h1>
-          <Button variant="ghost" size="icon-sm" aria-label={t('关闭设置')} onClick={onClose}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="pointer-coarse:-mr-2 pointer-coarse:size-11"
+            aria-label={t('关闭设置')}
+            onClick={onClose}
+          >
             <X />
           </Button>
         </header>

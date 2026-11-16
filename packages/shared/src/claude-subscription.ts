@@ -5,6 +5,8 @@ export const claudeSubscriptionSchema = z.object({
   kind: z.literal('claude-subscription'),
   label: z.string(),
   expiresAt: z.number().int().nullable(),
+  enabled: z.boolean().optional(),
+  enabledAt: z.number().int().nullable().optional(),
   createdAt: z.number().int(),
 });
 
@@ -22,6 +24,10 @@ export const createClaudeSubscriptionSchema = z.object({
 });
 
 export type CreateClaudeSubscription = z.infer<typeof createClaudeSubscriptionSchema>;
+
+export const renameClaudeSubscriptionSchema = z.object({
+  label: z.string().trim().min(1).max(100),
+});
 
 export const claudeSubscriptionVerifyResultSchema = z.object({
   ok: z.boolean(),

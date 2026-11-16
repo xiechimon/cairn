@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import {
   useApiMutations,
@@ -18,6 +18,13 @@ import type { ArchivedProjectState } from '../board/archived-project-bar.js';
 import { BackupBanner } from '../board/backup-banner.js';
 import { ClaudeLoginBanner, useClaudeLoginWarnings } from '../board/claude-login-banner.js';
 import { FirstPrCard, firstPrCardInfo } from '../board/first-pr-card.js';
+import { setupShown } from '../board/first-run-checklist-model.js';
+import {
+  FirstRunSetup,
+  SETUP_PARAM,
+  setupSkipped,
+  useFirstRunSetup,
+} from '../board/first-run-setup.js';
 import { type HomeBannerKind, pickHomeBanners } from '../board/home-banners.js';
 import { HomeC } from '../board/home-c.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
@@ -45,7 +52,7 @@ import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';
 
 export function BoardPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { live, teamId } = useLiveData();
   const fixture = resolveScenario(searchParams);
   const { t } = useI18n();
@@ -193,7 +200,20 @@ export function BoardPage() {
     picked.length === 0 ? undefined : (
       <div className="flex flex-col gap-2">{picked.map((entry) => entry.node)}</div>
     );
+  const setup = useFirstRunSetup();
+  const [skipped, setSkipped] = useState(setupSkipped);
+  const showSetup =
+    live &&
+    homeProjectId === null &&
+    threadId === null &&
+    setupShown({
+      projects: setup.projects,
+      progress: setup.progress,
+      skipped,
+      requested: searchParams.get(SETUP_PARAM) === '1',
+    }) === true;
   const homeShown =
+    !showSetup &&
     chiefView !== 'settings' &&
     projectLookup !== 'loading' &&
     projectLookup !== 'failed' &&
@@ -243,6 +263,16 @@ export function BoardPage() {
                 }}
               />
             </div>
+          ) : showSetup ? (
+            <FirstRunSetup
+              setup={setup}
+              onSkip={() => {
+                setSkipped(true);
+                const params = new URLSearchParams(searchParams);
+                params.delete(SETUP_PARAM);
+                setSearchParams(params, { replace: true });
+              }}
+            />
           ) : (
             <HomeC
               surface={chief}

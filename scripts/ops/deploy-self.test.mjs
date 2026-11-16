@@ -8,6 +8,7 @@ import {
   readFileSync,
   renameSync,
   statSync,
+  symlinkSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -178,6 +179,7 @@ echo "pnpm $* @ $(git -C "${checkout}" rev-parse HEAD 2>/dev/null)" >> "${fake}/
     `for variable in GH_TOKEN GITHUB_TOKEN GIT_CONFIG_VALUE_0; do
   [ -z "\${!variable-}" ] || echo "$variable" >> "${fake}/artifact-credential-names"
 done
+[ "$1" = --input-type=module ] && exec "${process.execPath}" "$@"
 echo "node $*" >> "${fake}/node.log"
 [ -f "${fake}/migrate-fail" ] && exit 1
 db="\${@: -1}"
@@ -288,6 +290,7 @@ else printf 000; fi`,
 
   const env = {
     PATH: `${bin}:${SYSTEM_PATH}`,
+    NODE_PATH: join(import.meta.dirname, '../../node_modules'),
     HOME: dir,
     GIT_CONFIG_NOSYSTEM: '1',
     CAIRN_CHECKOUT: checkout,
@@ -376,6 +379,66 @@ test('refuses a target that changes install-script permissions or hooks', () => 
   assert.equal(f.log('pnpm.log'), '');
 });
 
+function fixtureWithWorkspace(workspace) {
+  const f = fixture();
+  const base = pushTarget(f, 'base', { files: { 'pnpm-workspace.yaml': workspace } });
+  git(f.checkout, 'fetch', '-q', 'origin', 'main');
+  git(f.checkout, 'checkout', '-q', base);
+  return f;
+}
+
+const workspace = (allowBuilds, extra = '') =>
+  `packages:\n  - apps/*\n\nallowBuilds:\n  ${allowBuilds}\n${extra}`;
+
+test('deploys an allowBuilds change that permits no new install script', () => {
+  for (const [previous, next] of [
+    ['esbuild: true', 'esbuild: true\n  electron: false\n  electron-winstaller: false'],
+    ['esbuild: true', 'esbuild: true\n  electron: false # reviewed'],
+    ['esbuild: true\n  sharp: true', 'esbuild: true\n  sharp: false'],
+    ['esbuild: true\n  sharp: true', 'esbuild: true'],
+  ]) {
+    const f = fixtureWithWorkspace(workspace(previous));
+    const target = pushTarget(f, 'target', { files: { 'pnpm-workspace.yaml': workspace(next) } });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 0, `${previous} -> ${next}\n${result.stderr}`);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), target);
+  }
+});
+
+test('refuses a pnpm-workspace.yaml change that may permit a new install script', () => {
+  const base = workspace('esbuild: true\n  sharp: false');
+  for (const [next, reason] of [
+    [workspace('esbuild: true\n  sharp: false\n  evil: true'), /allowBuilds permits evil/],
+    [workspace('esbuild: true\n  sharp: true'), /allowBuilds permits sharp/],
+    [workspace('esbuild: true\n  sharp:\n    true'), /allowBuilds permits sharp/],
+    [workspace('esbuild: true'), /allowBuilds stops denying sharp/],
+    [workspace('esbuild: true\n  sharp: "no"'), /allowBuilds changed and is not a map of booleans/],
+    [
+      'packages:\n  - apps/*\n"allow\\u0042uilds": {esbuild: true, sharp: false, evil: true}\n',
+      /allowBuilds permits evil/,
+    ],
+    [
+      workspace('esbuild: true\n  sharp: false\n  evil: true').replace(/^/gm, ' '),
+      /allowBuilds permits evil/,
+    ],
+    [`${base}allowBuilds:\n  evil: true\n`, /does not parse cleanly/],
+    [`${base}"dangerouslyAllowAll\\u0042uilds": true\n`, /dangerouslyAllowAllBuilds changed/],
+    [`${base}pnpmfile: ./hooks.cjs\n`, /pnpmfile changed/],
+    [`x: &a\n  evil: true\n${base}  <<: *a\n`, /merge key/],
+    [workspace('esbuild: true\n  sharp: false\n  evil: !custom true'), /does not parse cleanly/],
+  ]) {
+    const f = fixtureWithWorkspace(base);
+    const before = git(f.checkout, 'rev-parse', 'HEAD');
+    const target = pushTarget(f, 'target', { files: { 'pnpm-workspace.yaml': next } });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 2, `${next}\n${result.stderr}`);
+    assert.match(result.stderr, /pnpm-workspace.yaml may permit new install scripts/);
+    assert.match(result.stderr, reason, next);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), before);
+    assert.equal(f.log('pnpm.log'), '');
+  }
+});
+
 test('refuses the same postinstall added to two manifests', () => {
   const f = fixture();
   for (const rel of ['package.json', 'apps/a/package.json']) {
@@ -386,6 +449,93 @@ test('refuses the same postinstall added to two manifests', () => {
   const result = f.run(DEPLOY, [target]);
   assert.equal(result.status, 2, result.stderr);
   assert.match(result.stderr, /install hooks/);
+});
+
+function fixtureWithManifest(manifest) {
+  const f = fixture();
+  const base = pushTarget(f, 'base', { files: { 'package.json': manifest } });
+  git(f.checkout, 'fetch', '-q', 'origin', 'main');
+  git(f.checkout, 'checkout', '-q', base);
+  return f;
+}
+
+const manifest = (scripts, extra = {}) => `${JSON.stringify({ scripts, ...extra }, null, 2)}\n`;
+
+test('refuses a package.json change that may add or change an install hook', () => {
+  const scripts = { prepare: 'husky', build: 'tsc' };
+  for (const [next, reason] of [
+    [manifest({ ...scripts, 'pnpm:devPreinstall': 'node x.cjs' }), /pnpm:devPreinstall/],
+    [
+      manifest({ ...scripts, postinstall: 'node x.cjs' }).replace(
+        '"postinstall"',
+        '"post\\u0069nstall"',
+      ),
+      /postinstall/,
+    ],
+    [manifest({ ...scripts, prepare: 'husky && node x.cjs' }), /prepare/],
+    [manifest({ ...scripts, preinstall: 'node x.cjs' }), /preinstall/],
+    [manifest({ ...scripts, prepublish: 'node x.cjs' }), /prepublish/],
+    [manifest(scripts, { pnpm: { onlyBuiltDependencies: ['evil'] } }), /pnpm settings changed/],
+    [manifest(scripts).replace('"tsc"', '"tsc",'), /does not parse/],
+    [manifest('node x.cjs'), /scripts changed and is not an object/],
+  ]) {
+    const f = fixtureWithManifest(manifest(scripts));
+    const before = git(f.checkout, 'rev-parse', 'HEAD');
+    const target = pushTarget(f, 'target', { files: { 'package.json': next } });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 2, `${next}\n${result.stderr}`);
+    assert.match(result.stderr, /install hooks in package.json may be added or changed/);
+    assert.match(result.stderr, reason, next);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), before);
+    assert.equal(f.log('pnpm.log'), '');
+  }
+});
+
+test('refuses a hook in a manifest pnpm reads that the JSON guard cannot see', () => {
+  for (const [files, reason] of [
+    [{ 'apps/evil\n/package.json': manifest({ postinstall: 'node x.cjs' }) }, /apps\/evil/],
+    [{ 'apps/evil/package.yaml': 'scripts:\n  postinstall: node x.cjs\n' }, /package.yaml/],
+    [{ 'apps/evil/binding.gyp': '{}\n' }, /binding.gyp/],
+  ]) {
+    const f = fixture();
+    const before = git(f.checkout, 'rev-parse', 'HEAD');
+    const target = pushTarget(f, 'target', { files });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 2, `${Object.keys(files)}\n${result.stderr}`);
+    assert.match(result.stderr, reason);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), before);
+    assert.equal(f.log('pnpm.log'), '');
+  }
+});
+
+test('refuses a package.json that is a symlink', () => {
+  const f = fixture();
+  const before = git(f.checkout, 'rev-parse', 'HEAD');
+  writeFileSync(join(f.work, 'real.json'), manifest({ postinstall: 'node x.cjs' }));
+  mkdirSync(join(f.work, 'apps/evil'), { recursive: true });
+  symlinkSync('../../real.json', join(f.work, 'apps/evil/package.json'));
+  git(f.work, 'add', 'real.json', 'apps/evil/package.json');
+  const target = pushTarget(f);
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(result.stderr, /apps\/evil\/package.json is not a regular file/);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), before);
+});
+
+test('deploys a package.json change that adds or changes no install hook', () => {
+  const base =
+    '{\n  "scripts": {\n    "prepare": "husky",\n    "postinstall": "node x.cjs"\n  }\n}\n';
+  for (const next of [
+    '{"scripts":{"postinstall":"node x.cjs","prepare":"husky","build":"tsc"},"version":"2.0.0"}\n',
+    '{"scripts":{"prepare":"husky"}}\n',
+    '{"scripts":{}}\n',
+  ]) {
+    const f = fixtureWithManifest(base);
+    const target = pushTarget(f, 'target', { files: { 'package.json': next } });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 0, `${next}\n${result.stderr}`);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), target);
+  }
 });
 
 test('ignores a trailing comma added after an unchanged prepare hook', () => {
@@ -1026,6 +1176,40 @@ test('server-only deploys under continuous active work without stopping either d
   assert.ok(Date.now() - started < 10_000);
   assert.doesNotMatch(f.log('systemctl.log'), /(?:stop|start) cairn-daemon/);
   assert.equal(sqlite(f.db, "select status from step where id='s0'"), 'claimed');
+});
+
+test('iOS, docs, integration and CI changes deploy without restarting the daemon', () => {
+  const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
+  writeFileSync(join(f.fake, 'lease-unsupported'), '');
+  const target = pushTarget(f, 'surfaces that never reach the daemon', {
+    files: {
+      'apps/ios/Cairn/App/CairnApp.swift': '// swift\n',
+      'README.md': '# Cairn\n',
+      'README.zh.md': '# Cairn\n',
+      'AGENTS.md': '# rules\n',
+      'integration/eval/coordinator-routing/upload.mts': 'export {};\n',
+      '.github/workflows/ci.yml': 'name: ci\n',
+      'marker.txt': 'previous\n',
+    },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(f.log('systemctl.log'), /(?:stop|start) cairn-daemon/);
+  assert.equal(sqlite(f.db, "select status from step where id='s0'"), 'claimed');
+});
+
+test('a daemon source change alongside an allowlisted path still restarts the daemon', () => {
+  const f = fixture();
+  const target = pushTarget(f, 'ios plus daemon', {
+    files: {
+      'apps/ios/Cairn/App/CairnApp.swift': '// swift\n',
+      'apps/daemon/src/machine-loop.ts': 'export {};\n',
+    },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(f.log('systemctl.log'), /stop cairn-daemon/);
+  assert.match(f.log('systemctl.log'), /start cairn-daemon/);
 });
 
 test('a Coordinator computer call in flight holds the deploy instead of being cut', () => {

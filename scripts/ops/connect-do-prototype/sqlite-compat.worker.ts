@@ -1,6 +1,11 @@
 import { DurableObject } from 'cloudflare:workers';
 import { and, eq, isNull, lte, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
+import {
+  acquireLease,
+  type Lease,
+  LeaseHeldError,
+} from '../../../apps/server/src/coordinator/lease.js';
 import * as schema from '../../../apps/server/src/db/schema.js';
 
 interface Input {
@@ -17,6 +22,8 @@ interface Environment {
 
 export class SqliteCompatibility extends DurableObject<Environment> {
   private db;
+  private leases = new Map<string, Lease>();
+  private leaseNow = 0;
 
   constructor(ctx: DurableObjectState, env: Environment) {
     super(ctx, env);
@@ -33,6 +40,38 @@ export class SqliteCompatibility extends DurableObject<Environment> {
   async fetch(request: Request): Promise<Response> {
     const input = (await request.json()) as Input;
     const db = this.db;
+    if (input.operation.startsWith('lease-')) {
+      this.leaseNow = input.now;
+      const key = JSON.stringify([input.id, input.machineId]);
+      if (input.operation === 'lease-acquire') {
+        try {
+          const lease = acquireLease(db, input.id, input.machineId, {
+            now: () => this.leaseNow,
+          });
+          this.leases.set(key, lease);
+          return Response.json({ acquired: true });
+        } catch (error) {
+          if (!(error instanceof LeaseHeldError)) throw error;
+          return Response.json({ acquired: false });
+        }
+      }
+      if (input.operation === 'lease-read') {
+        return Response.json(
+          db
+            .select()
+            .from(schema.coordinatorLease)
+            .where(eq(schema.coordinatorLease.storeKey, input.id))
+            .get() ?? null,
+        );
+      }
+      const lease = this.leases.get(key);
+      if (lease === undefined) return new Response(null, { status: 404 });
+      if (input.operation === 'lease-heartbeat') return Response.json({ owned: lease.heartbeat() });
+      if (input.operation === 'lease-release') {
+        lease.release();
+        return Response.json({ released: true });
+      }
+    }
     if (input.operation === 'seed') {
       db.insert(schema.team).values({ id: 'owner', name: 'Personal', createdAt: 1 }).run();
       db.insert(schema.machine)

@@ -250,7 +250,7 @@ export function SettingsSection({
         <div className="flex min-w-0 flex-col">
           <h2 className="m-0 truncate text-card-title font-semibold text-foreground">{title}</h2>
           {description != null && (
-            <p className="m-0 text-meta text-content-tertiary">{description}</p>
+            <p className="m-0 text-meta text-balance text-content-tertiary">{description}</p>
           )}
         </div>
         {action}
@@ -279,7 +279,12 @@ export function SettingsDangerZone({
 }: SettingsDangerZoneProps) {
   return (
     <SettingsCard className={className}>
-      <SettingsRow label={label} hint={description}>
+      <SettingsRow
+        label={label}
+        hint={description}
+        className="[&>span:first-child]:max-w-none"
+        hintClassName="break-keep text-balance"
+      >
         <Button
           variant="destructive"
           className={DIALOG_PRIMARY_BUTTON}

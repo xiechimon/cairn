@@ -173,7 +173,7 @@ test('View all advertises only the live hits Activity can display and retains ar
   await expect(page).toHaveURL(/\/app\/activity\?.*q=match/);
   await expect(page.locator('[data-slot="thread-row"]')).toHaveCount(1);
   await expect(page.locator('[data-slot="thread-row"]')).toContainText('Active match');
-  await expect(page.getByTestId('activity-summary')).toContainText('1 thread ·');
+  await expect(page.getByTestId('activity-summary')).toContainText('1 thread');
 });
 
 test('an archived-only live search remains openable without advertising an empty Activity list', async ({

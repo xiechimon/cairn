@@ -10,6 +10,7 @@ import type {
   ComputerCommandsResponse,
   ComputerRecord,
   ConversationMessagesResponse,
+  CreateMcpConnectorBody,
   CreateProjectBody,
   CreateProviderBody,
   CreateScheduleBody,
@@ -24,6 +25,7 @@ import type {
   GithubReposResponse,
   ImportSkillBody,
   MachineRecord,
+  McpConnectorRecord,
   McpServerRecord,
   MemoryRecord,
   MergeReadiness,
@@ -36,6 +38,7 @@ import type {
   PatchAutonomyBody,
   PatchChiefBody,
   PatchMachineBody,
+  PatchMcpConnectorBody,
   PatchProjectBody,
   PatchProviderBody,
   PatchScheduleBody,
@@ -49,13 +52,14 @@ import type {
   ProviderTestResult,
   PrPanelRow,
   RemoteRoutesResponse,
-  RetroProposal,
   RouteOverride,
   ScheduleRecord,
   SearchResponse,
   SecretRecord,
   SetSecretBody,
+  SkillImportCandidatesResponse,
   SkillRecord,
+  StartMcpConnectorOAuthBody,
   StepJournalRow,
   TeamMember,
   TeamRecord,
@@ -606,11 +610,27 @@ export const useMcpServers = (teamId: string | undefined, enabled: boolean) =>
     enabled: enabled && teamId !== undefined,
   });
 
+export const useMcpConnectors = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['mcpConnectors', teamId],
+    queryFn: () => api.get<McpConnectorRecord[]>(`/api/teams/${teamId}/mcp-connectors`),
+    enabled: enabled && teamId !== undefined,
+  });
+
 export const useSkills = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['skills', teamId],
     queryFn: () => api.get<SkillRecord[]>(`/api/skills?teamId=${teamId}`),
     enabled: enabled && teamId !== undefined,
+  });
+
+export const useSkillImportCandidates = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['skillImportCandidates', teamId],
+    queryFn: () =>
+      api.get<SkillImportCandidatesResponse>(`/api/teams/${teamId}/skills/import-candidates`),
+    enabled: enabled && teamId !== undefined,
+    retry: false,
   });
 
 export const useSkillFile = (
@@ -1070,6 +1090,35 @@ export function useApiMutations(teamId: string | undefined) {
         api.patch<ProviderRecord>(`/api/teams/${teamId}/providers/${input.id}`, input.body),
       onSuccess: invalidateAll,
     }),
+    createMcpConnector: useMutation({
+      mutationFn: (body: CreateMcpConnectorBody) =>
+        api.post<McpConnectorRecord>(`/api/teams/${teamId}/mcp-connectors`, body),
+      onSuccess: invalidateAll,
+    }),
+    patchMcpConnector: useMutation({
+      mutationFn: (input: { id: string; body: PatchMcpConnectorBody }) =>
+        api.patch<McpConnectorRecord>(
+          `/api/teams/${teamId}/mcp-connectors/${input.id}`,
+          input.body,
+        ),
+      onSuccess: invalidateAll,
+    }),
+    startMcpConnectorOAuth: useMutation({
+      mutationFn: (body: StartMcpConnectorOAuthBody) =>
+        api.post<{ authorizationUrl: string }>(
+          `/api/teams/${teamId}/mcp-connectors/oauth/start`,
+          body,
+        ),
+    }),
+    checkMcpConnector: useMutation({
+      mutationFn: (id: string) =>
+        api.post<McpConnectorRecord>(`/api/teams/${teamId}/mcp-connectors/${id}/check`, {}),
+      onSuccess: invalidateAll,
+    }),
+    deleteMcpConnector: useMutation({
+      mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/mcp-connectors/${id}`),
+      onSuccess: invalidateAll,
+    }),
     createSecret: useMutation({
       mutationFn: (body: SetSecretBody) =>
         api.post<SecretRecord>(`/api/teams/${teamId}/secrets`, body),
@@ -1105,14 +1154,6 @@ export function useApiMutations(teamId: string | undefined) {
     importSkill: useMutation({
       mutationFn: (body: ImportSkillBody) =>
         api.post<SkillRecord>(`/api/teams/${teamId}/skills/import`, body),
-      onSuccess: invalidateAll,
-    }),
-    decideRetroProposal: useMutation({
-      mutationFn: (input: { proposalId: string; decision: 'accept' | 'dismiss' }) =>
-        api.post<RetroProposal>(
-          `/api/teams/${teamId}/chief/retro-proposals/${input.proposalId}/${input.decision}`,
-          {},
-        ),
       onSuccess: invalidateAll,
     }),
     deleteMemory: useMutation({

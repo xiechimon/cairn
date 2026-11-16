@@ -1,11 +1,12 @@
-import { claudeLoginNotice } from '@cairn/shared';
+import { claudeLoginNotice, type ModelSource } from '@cairn/shared';
 import { Monitor, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useChief, useMachines, useTeams } from '../api/hooks.js';
+import { useChief, useMachines, useModelSources, useTeams } from '../api/hooks.js';
 import { mapMachines } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { SettingsPanel } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
@@ -20,13 +21,46 @@ import { MachineRowView, type RowSection, rowStatus } from './machine-row.js';
 
 export const MACHINES_HREF = '/app/resources/machines';
 
+const CLAUDE_LOGIN = {
+  'logged-in': 'logged-in',
+  'not-logged-in': 'logged-out',
+  unknown: 'unknown',
+} as const;
+
+function withClaudeLogin(machine: MachineRow, sources: readonly ModelSource[]): MachineRow {
+  const source = sources.find(
+    (s) =>
+      s.runtime === 'claude-code' &&
+      (s.machineId === undefined ? s.hostname === machine.name : s.machineId === machine.id),
+  );
+  if (machine.providers !== undefined || source?.auth === undefined) return machine;
+  const login = CLAUDE_LOGIN[source.auth.state];
+  return {
+    ...machine,
+    providers: [
+      {
+        runtime: 'claude-code',
+        login,
+        plan: null,
+        version: source.bin?.version ?? null,
+        loginCommand: login === 'logged-out' ? 'claude /login' : null,
+        enabled: true,
+        observedAt: 0,
+      },
+    ],
+  };
+}
+
 export function MachinesPage() {
   const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
   const { live, teamId } = useLiveData();
   const machinesQ = useMachines(teamId, live);
-  const machines = live ? mapMachines(machinesQ.data ?? []) : (fixture.resources?.machines ?? []);
+  const sourcesQ = useModelSources(teamId, live);
+  const machines = live
+    ? mapMachines(machinesQ.data ?? []).map((m) => withClaudeLogin(m, sourcesQ.data?.sources ?? []))
+    : (fixture.resources?.machines ?? []);
   const chiefQ = useChief(teamId, live);
   const orchestration = live ? chiefQ.data?.orchestration : undefined;
   const activityOf = (machineId?: string) =>
@@ -76,28 +110,28 @@ export function MachinesPage() {
       testId="resource-empty"
       className="mt-6"
       icon={Monitor}
-      title={t('尚无 Runner')}
-      description={t('在要执行任务的 Runner 上运行注册命令，它就会出现在这里。')}
-      action={{ label: t('添加 Runner'), onClick: () => setAddOpen(true) }}
+      title={t('尚无执行机')}
+      description={t('在要执行任务的执行机上运行注册命令，它就会出现在这里。')}
+      action={{ label: t('添加执行机'), onClick: () => setAddOpen(true) }}
     />
   );
   return (
     <PageShell
       route={MACHINES_HREF}
-      title={t('Runner')}
+      title={t('执行机')}
       selected={MACHINES_HREF}
       fixture={fixture}
       bleed
     >
       <div
         data-testid="machines-scroll"
-        className="flex w-full min-w-0 flex-col gap-3 px-4 py-4 md:px-6"
+        className="flex w-full min-w-0 flex-col gap-3 px-4 pt-1 pb-6"
       >
         <QueryBoundary
           query={live ? machinesQ : undefined}
           isEmpty={machines.length === 0}
-          loadingLabel={t('正在加载 Runner')}
-          errorTitle={t('Runner 没能加载')}
+          loadingLabel={t('正在加载执行机')}
+          errorTitle={t('执行机没能加载')}
           className="mt-6"
           empty={noMachines}
         >
@@ -105,17 +139,21 @@ export function MachinesPage() {
             header={
               <div className="flex items-center gap-1">
                 <h2 className="m-0 text-card-title font-semibold text-foreground">
-                  {t('已接入的 Runner')}
+                  {t('已接入的执行机')}
                 </h2>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('添加 Runner')}
-                  title={t('添加 Runner')}
-                  onClick={() => setAddOpen(true)}
+                <IconTooltip
+                  label={t('添加执行机')}
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="pointer-coarse:-ml-2 pointer-coarse:size-11"
+                      onClick={() => setAddOpen(true)}
+                    />
+                  }
                 >
                   <Plus aria-hidden strokeWidth={1.75} />
-                </Button>
+                </IconTooltip>
               </div>
             }
           >

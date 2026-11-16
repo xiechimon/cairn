@@ -2,6 +2,7 @@ import type { PrPanelRow } from '@cairn/shared';
 import { cn } from 'cn';
 import { CircleCheck, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -40,13 +41,14 @@ import {
 } from './tasks-sections.js';
 import { usePrefetchThread } from './thread-link.js';
 import { canMarkDone, useMarkDone } from './use-mark-done.js';
+import { TASKS_TAB_PARAM } from './work-panel.js';
 
 export type TasksTab = 'active' | 'next' | 'scheduled' | 'resolved';
 
 export type TaskAddOutcome = 'saved' | 'sent';
 
 export const PANEL_HEAD = 'gap-0.5 pr-4 pl-4';
-export const PANEL_HEAD_BUTTON = 'size-9 text-foreground [&_svg]:size-5.5';
+export const PANEL_HEAD_BUTTON = 'size-9 text-foreground pointer-coarse:size-11 [&_svg]:size-5.5';
 export const PANEL_TITLE = 'text-heading font-normal';
 const PANEL_TABS = 'h-7.5 gap-0.5 group-data-horizontal/tabs:h-7.5';
 const PANEL_TAB =
@@ -224,6 +226,8 @@ export function TasksPanel({
   query,
 }: TasksPanelProps) {
   const { t } = useI18n();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedToScheduled = searchParams.get(TASKS_TAB_PARAM) === 'scheduled';
   const [chosenTab, setTab] = useState<TasksTab | null>(null);
   const [adding, setAdding] = useState(false);
   const groups = bySection(entries);
@@ -312,7 +316,7 @@ export function TasksPanel({
   useEffect(() => {
     if (chosenTab === null && loaded) setTab(openingTab);
   }, [chosenTab, loaded, openingTab]);
-  const tab = chosenTab ?? openingTab;
+  const tab = linkedToScheduled ? 'scheduled' : (chosenTab ?? openingTab);
   const quiet = (text: string) => (
     <p data-testid="tasks-quiet" className="m-0 px-2.5 py-2 text-ui text-content-tertiary">
       {text}
@@ -393,6 +397,14 @@ export function TasksPanel({
           onChange={(next) => {
             setTab(next);
             clearPicked();
+            if (linkedToScheduled)
+              setSearchParams(
+                (params) => {
+                  params.delete(TASKS_TAB_PARAM);
+                  return params;
+                },
+                { replace: true },
+              );
           }}
           options={[
             { value: 'active', label: t('进行中') },
@@ -413,7 +425,13 @@ export function TasksPanel({
       )}
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pt-2 pb-4">
         {tab === 'scheduled' ? (
-          <TasksScheduleList projectId={projectId} now={now} />
+          <TasksScheduleList
+            projectId={projectId}
+            now={now}
+            candidates={entries
+              .filter((entry) => entry.todo.archivedAt == null)
+              .map(({ todo }) => ({ id: todo.id, title: todo.title, projectId: todo.projectId }))}
+          />
         ) : (
           <QueryBoundary
             query={query}

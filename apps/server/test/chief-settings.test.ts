@@ -246,6 +246,9 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect(prompt).toContain('唯一的例外是用户要你直接操作电脑');
     expect(prompt).toContain('同一回合最多重试 3 次');
     expect(prompt).toContain('用 request_takeover 请用户接管');
+    expect(prompt).toContain(
+      '不要再重试，也不要设法绕过拦截：直接用 request_takeover 请用户自己操作',
+    );
     expect(prompt).toContain('执行前先用 ask_user 问用户');
   });
 

@@ -29,7 +29,7 @@ import { dateTimeFormat } from '../lib/date-format.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/routing-settings-page.js';
 import { settingsHref } from '../settings/settings-href.js';
-import { ChiefReportRow } from './chief-report-row.js';
+import { ChiefReportMessage } from './chief-report-row.js';
 import { TaskRefRow } from './chief-task-ref-row.js';
 import { childRefsOf, type TaskRef } from './chief-task-refs.js';
 import { isLiveNotice } from './live-notice.js';
@@ -435,10 +435,6 @@ const COORDINATOR_FIXES: Partial<
     { label: '填写 API key', href: settingsHref('providers') },
     { label: '换 Coordinator 模型', href: COORDINATOR_ROUTING_HREF },
   ],
-  'coordinator-paid-claude': [
-    { label: '允许按量付费', href: settingsHref('routing') },
-    { label: '换 Coordinator 模型', href: COORDINATOR_ROUTING_HREF },
-  ],
 };
 
 export function CoordinatorFixLinks({ kind }: { kind: StepQueueBlocked['kind'] | undefined }) {
@@ -487,7 +483,7 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
           ? t('{name} 已恢复，{n} 个任务已开工。', { name, n: count('started') })
           : t('{name} 已恢复。', { name })}
         {queued > 0 && t('还有 {n} 个在排队。', { n: queued })}
-        {moved > 0 && t('{n} 个已改到其他 Runner。', { n: moved })}
+        {moved > 0 && t('{n} 个已改到其他执行机。', { n: moved })}
       </CoordinatorSaid>
     );
   }
@@ -520,7 +516,7 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
             : t('{name} 还没连上过。', { name })}
           {waiting > 0
             ? t('{n} 个任务在等它。', { n: waiting })
-            : t('等它的任务都已改到其他 Runner。')}
+            : t('等它的任务都已改到其他执行机。')}
         </span>
         {notice.lastSeenAt > 0 &&
           t('最后在线 {ago}。', { ago: relativeTime(notice.lastSeenAt, now, t) })}
@@ -533,7 +529,7 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
                 {todo.title}
               </ThreadLink>
               {todo.state === 'moved' && (
-                <span className="text-content-tertiary"> · {t('已改到其他 Runner')}</span>
+                <span className="text-content-tertiary"> · {t('已改到其他执行机')}</span>
               )}
             </li>
           ))}
@@ -577,7 +573,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       : {};
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
   if (item.kind === 'thread-activity') return <SubThreadRow activity={item} />;
-  if (item.kind === 'thread-report' || item.kind === 'thread-message') return null;
+  if (item.kind === 'thread-report' || item.kind === 'thread-message' || item.kind === 'report-ack')
+    return null;
   if (item.kind === 'error')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
@@ -602,7 +599,12 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'takeover') return <TakeoverCard item={item} />;
   if (item.kind === 'task-card')
     return <TaskStartedRow todoId={item.todoId} seq={item.seq} title={item.title} />;
-  if (item.kind === 'daily-report') return <ChiefReportRow report={item.report} />;
+  if (item.kind === 'daily-report')
+    return (
+      <CoordinatorSaid testId="chief-report">
+        <ChiefReportMessage report={item.report} />
+      </CoordinatorSaid>
+    );
   if (item.kind === 'runner-offline') return <RunnerOfflineRow notice={item.notice} />;
   if (item.kind === 'note')
     return (
@@ -614,7 +616,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               <span className="underline decoration-current/40 underline-offset-3">
                 {item.machineName}
               </span>
-              {t('上')}
+              {t(' 上')}
             </>
           )}
         </StatusLine>

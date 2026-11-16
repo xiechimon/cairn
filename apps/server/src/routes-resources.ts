@@ -1,6 +1,7 @@
 import {
   capabilitiesResponseSchema,
   createClaudeSubscriptionSchema,
+  createMcpConnectorBodySchema,
   createProviderBodySchema,
   createScheduleBodySchema,
   createSkillBodySchema,
@@ -10,12 +11,15 @@ import {
   type MachineRunningThread,
   PHASE_VALUES,
   patchMachineBodySchema,
+  patchMcpConnectorBodySchema,
   patchProviderBodySchema,
   patchScheduleBodySchema,
   redactSecrets,
+  renameClaudeSubscriptionSchema,
   SKILL_ENTRY_FILE,
   setSecretBodySchema,
   skillRecordSchema,
+  startMcpConnectorOAuthBodySchema,
   THINKING_LEVELS,
   testProviderBodySchema,
 } from '@cairn/shared';
@@ -26,6 +30,7 @@ import type { Db } from './db/client.js';
 import { build, machine, provider, routingRule, step, team, todo } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubUserRepos } from './lib/github.js';
+import { nowMs } from './lib/ids.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import {
   createApiKeyBodySchema,
@@ -40,7 +45,11 @@ import { createApiKey, listApiKeys } from './services/api-keys.js';
 import {
   createClaudeSubscription,
   deleteClaudeSubscription,
+  disableClaudeSubscription,
+  enableClaudeSubscription,
   listClaudeSubscriptions,
+  listSubscriptionSteps,
+  renameClaudeSubscription,
   verifySubscriptionConnection,
 } from './services/claude-subscriptions.js';
 import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
@@ -58,7 +67,16 @@ import {
   machineRunningCount,
   toMachineRecord,
 } from './services/machines.js';
-import { listMcpServers } from './services/mcp-servers.js';
+import {
+  checkMcpConnector,
+  createMcpConnector,
+  deleteMcpConnector,
+  listMcpConnectors,
+  listMcpServers,
+  type McpConnectorDeps,
+  publicOAuthFetch,
+  updateMcpConnector,
+} from './services/mcp-servers.js';
 import { mergedCatalogModels, refreshAllRelayCatalogs } from './services/model-liveness.js';
 import {
   abortOAuthCallback,
@@ -67,6 +85,7 @@ import {
   OAuthFlowError,
   type OAuthStateKind,
   startGithubConnectionAuthorize,
+  startMcpConnectorAuthorize,
   startOAuthAuthorize,
 } from './services/oauth.js';
 import { ProviderTestLimiter, testProviderConnection } from './services/provider-test.js';
@@ -86,7 +105,12 @@ import {
 } from './services/schedules.js';
 import { search } from './services/search.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './services/secrets.js';
-import { importSkill, refreshSkill, type SkillImportOpts } from './services/skill-import.js';
+import {
+  importSkill,
+  listImportCandidates,
+  refreshSkill,
+  type SkillImportOpts,
+} from './services/skill-import.js';
 import {
   createLocalSkill,
   listSkillFiles,
@@ -206,16 +230,15 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       if (!c.get('ownerIdentity')) throw new HttpError(403, 'owner session required');
       if (row.tokenHash === null) throw new HttpError(409, 'machine is not enrolled');
     }
-    if (body.enabledRuntimes?.includes('gemini') && !row.enabledRuntimes.includes('gemini')) {
+    if (body.enabledRuntimes !== undefined) {
       throw new HttpError(
         409,
-        'Gemini cannot be turned on until its permission requests go through the command gate (#1612)',
+        'runtimes follow what the Runner detects; there is no runtime switch to change',
       );
     }
     const patch = {
       ...(body.browserOverride !== undefined ? { browserOverride: body.browserOverride } : {}),
       ...(body.desktopOverride !== undefined ? { desktopOverride: body.desktopOverride } : {}),
-      ...(body.enabledRuntimes !== undefined ? { enabledRuntimes: body.enabledRuntimes } : {}),
       ...(body.maxConcurrent !== undefined ? machineConcurrencyPatch(row, body.maxConcurrent) : {}),
     };
     if (Object.keys(patch).length > 0) {
@@ -235,7 +258,11 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const row = ctx.db.select().from(machine).where(eq(machine.id, id)).get();
     if (!row) throw notFound(`machine ${id}`);
     requireTeam(ctx, row.teamId);
-    ctx.db.update(routingRule).set({ machineId: null }).where(eq(routingRule.machineId, id)).run();
+    ctx.db
+      .update(routingRule)
+      .set({ machineId: null, updatedAt: nowMs() })
+      .where(eq(routingRule.machineId, id))
+      .run();
     ctx.db.update(team).set({ defaultMachineId: null }).where(eq(team.defaultMachineId, id)).run();
     const releasePendingOutput = pendingComputerOutputRelease(ctx.db, id);
     ctx.db.delete(machine).where(eq(machine.id, id)).run();
@@ -260,7 +287,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, src.teamId);
     const body = parseWith(evacuateMachineBodySchema, await jsonBody(c), 'body');
     if (body.targetMachineId === id) {
-      throw new HttpError(400, '源 Runner 与目标 Runner 相同——无操作不是迁移。');
+      throw new HttpError(400, '源执行机与目标执行机相同——无操作不是迁移。');
     }
     const dst = ctx.db
       .select()
@@ -279,7 +306,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       }
       ctx.db
         .update(routingRule)
-        .set({ machineId: dst.id })
+        .set({ machineId: dst.id, updatedAt: nowMs() })
         .where(eq(routingRule.id, rule.id))
         .run();
       moved.push(rule.id);
@@ -327,6 +354,11 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         }),
       ),
     );
+  });
+
+  app.get('/api/teams/:id/skills/import-candidates', (c) => {
+    requireTeam(ctx, c.req.param('id'));
+    return c.json(listImportCandidates(ctx.skillsDir));
   });
 
   app.post('/api/skills', async (c) => {
@@ -425,6 +457,35 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     return c.body(null, 204);
   });
 
+  app.patch('/api/teams/:id/claude-subscriptions/:cid', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    const body = parseWith(renameClaudeSubscriptionSchema, await jsonBody(c), 'body');
+    return c.json(renameClaudeSubscription(keysvc, teamId, c.req.param('cid'), body.label));
+  });
+
+  app.post('/api/teams/:id/claude-subscriptions/:cid/enable', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(await enableClaudeSubscription(keysvc, teamId, c.req.param('cid')));
+  });
+
+  app.post('/api/teams/:id/claude-subscriptions/:cid/disable', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    return c.json(disableClaudeSubscription(keysvc, teamId, c.req.param('cid')));
+  });
+
+  app.get('/api/teams/:id/claude-subscriptions/:cid/steps', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const limit = Math.min(Math.max(Math.trunc(Number(c.req.query('limit') ?? 20)) || 20, 1), 100);
+    return c.json(listSubscriptionSteps(keysvc, teamId, c.req.param('cid'), limit));
+  });
+
   app.post('/api/teams/:id/claude-subscriptions/:cid/verify', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
@@ -499,12 +560,22 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     return c.body(null, 204);
   });
 
+  const mcpDeps = (): McpConnectorDeps => ({
+    db: ctx.db,
+    box: ctx.secretBox,
+    mcpConfigPath: ctx.mcpConfigPath,
+    fetch: ctx.mcpFetch ?? globalThis.fetch,
+    oauthFetch: ctx.mcpFetch ?? publicOAuthFetch,
+    oauthState: ctx.mcpOAuthState,
+  });
+
   const oauthDeps = (): OAuthDeps => ({
     db: ctx.db,
     box: ctx.secretBox,
     states: ctx.oauthStates,
     fetch: ctx.oauthFetch ?? globalThis.fetch,
     client: ctx.oauthClient,
+    mcp: mcpDeps(),
   });
 
   const xaiDeviceDeps = () => ({
@@ -560,7 +631,9 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const landingFor = (kind: OAuthStateKind | undefined) =>
       kind === 'github-connection'
         ? { path: '/app/project/new', flag: '&github=connection' }
-        : { path: '/app/resources/providers', flag: '' };
+        : kind === 'mcp-connector'
+          ? { path: '/app/resources/mcp-servers', flag: '' }
+          : { path: '/app/resources/providers', flag: '' };
     const landing = (
       origin: string | undefined,
       kind: OAuthStateKind | undefined,
@@ -586,17 +659,23 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       const outcome = await completeOAuthCallback(oauthDeps(), {
         code,
         state,
+        iss: c.req.query('iss'),
         createdBy: ctx.user.id,
       });
       const result =
         outcome.kind === 'provider'
           ? `oauth=connected&provider=${outcome.presetId}`
-          : 'oauth=connected';
+          : outcome.kind === 'mcp-connector'
+            ? `oauth=connected&connector=${outcome.connectorId}`
+            : 'oauth=connected';
       return landing(outcome.origin, outcome.kind, result);
     } catch (err) {
       if (err instanceof OAuthFlowError) {
         if (err.reason === 'exchange-failed' && err.origin !== undefined) {
           return landing(err.origin, err.kind, 'oauth=error&reason=exchange');
+        }
+        if (err.reason === 'conflict' && err.origin !== undefined) {
+          return landing(err.origin, err.kind, 'oauth=error&reason=conflict');
         }
         if (err.reason === 'bad-state') return badStateLanding(err);
       }
@@ -664,6 +743,60 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         })),
       }),
     );
+  });
+
+  app.get('/api/teams/:id/mcp-connectors', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(listMcpConnectors(mcpDeps(), teamId));
+  });
+
+  app.post('/api/teams/:id/mcp-connectors', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = parseWith(createMcpConnectorBodySchema, await jsonBody(c), 'body');
+    const created = createMcpConnector(mcpDeps(), teamId, body);
+    return c.json(await checkMcpConnector(mcpDeps(), teamId, created.id), 201);
+  });
+
+  app.patch('/api/teams/:id/mcp-connectors/:cid', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = parseWith(patchMcpConnectorBodySchema, await jsonBody(c), 'body');
+    const { record, targetChanged } = updateMcpConnector(
+      mcpDeps(),
+      teamId,
+      c.req.param('cid'),
+      body,
+    );
+    return c.json(targetChanged ? await checkMcpConnector(mcpDeps(), teamId, record.id) : record);
+  });
+
+  app.delete('/api/teams/:id/mcp-connectors/:cid', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    if (!deleteMcpConnector(mcpDeps(), teamId, c.req.param('cid')))
+      throw notFound(`mcp connector ${c.req.param('cid')}`);
+    return c.body(null, 204);
+  });
+
+  app.post('/api/teams/:id/mcp-connectors/oauth/start', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = parseWith(startMcpConnectorOAuthBodySchema, await jsonBody(c), 'body');
+    return c.json(
+      await startMcpConnectorAuthorize(oauthDeps(), {
+        teamId,
+        origin: c.req.header('origin') ?? requestOrigin(c),
+        body,
+      }),
+    );
+  });
+
+  app.post('/api/teams/:id/mcp-connectors/:cid/check', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(await checkMcpConnector(mcpDeps(), teamId, c.req.param('cid')));
   });
 
   app.get('/api/teams/:id/secrets', (c) => {

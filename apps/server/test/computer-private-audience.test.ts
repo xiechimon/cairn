@@ -18,6 +18,7 @@ import {
   forwardComputerCall,
   receiveComputerFrames,
 } from '../src/services/machine-computer.js';
+import { newMcpOAuthState } from '../src/services/mcp-servers.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 const AUTH = 'private-audience-test-token';
@@ -58,6 +59,7 @@ function principalApp(s: TestServer, principal: UserRecord) {
     enrollments: new Map(),
     oauthStates: new Map(),
     xaiDeviceStates: new Map(),
+    mcpOAuthState: newMcpOAuthState(),
     oauthClient: null,
     authToken: AUTH,
     mcpConfigPath: '/tmp/private-audience-absent.json',

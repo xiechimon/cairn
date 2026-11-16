@@ -279,6 +279,7 @@ export async function boot(opts: {
   orbComputer?: ScopedComputerProviders;
   confinementPlatform?: string;
   confinementPreflight?: import('../src/machine-loop.js').MachineLoopOpts['confinementPreflight'];
+  confinementRecheckMs?: number;
   otel?: import('../src/backend/otel.js').DaemonOtel | null;
 }) {
   const home = makeTestTempDir('loop-');
@@ -313,6 +314,9 @@ export async function boot(opts: {
       client: api,
       confinementPlatform: opts.confinementPlatform ?? 'darwin',
       confinementPreflight: opts.confinementPreflight,
+      ...(opts.confinementRecheckMs !== undefined
+        ? { confinementRecheckMs: opts.confinementRecheckMs }
+        : {}),
       ...(opts.useDefaultBackend ? {} : { backend: opts.backend ?? fakeBackend([]).backend }),
       claudeCodeBackend: opts.claudeCodeBackend,
       claudeCodeAuthProbe:

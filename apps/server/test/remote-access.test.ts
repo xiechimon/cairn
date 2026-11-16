@@ -540,6 +540,7 @@ describe('paired devices can approve Runner enrollment', () => {
       ).toBe(200);
       expect(await (await call(s, 'POST', '/api/machine/enroll/poll', { body })).json()).toEqual({
         status: 'pending',
+        name: hostname(),
       });
     },
   );
@@ -579,6 +580,7 @@ describe('paired devices can approve Runner enrollment', () => {
         }
         expect(await (await call(s, 'POST', '/api/machine/enroll/poll', { body })).json()).toEqual({
           status: 'pending',
+          name: 'phone-approved',
         });
       }
       const confirmed = await call(s, 'POST', '/api/machine/enroll/confirm', { headers, body });
@@ -617,7 +619,7 @@ describe('paired devices can approve Runner enrollment', () => {
       ).toBe(401);
       expect(
         await (await call(s, 'POST', '/api/machine/enroll/poll', { body: pending })).json(),
-      ).toEqual({ status: 'pending' });
+      ).toEqual({ status: 'pending', name: 'after-revoke' });
     },
   );
 });
@@ -975,6 +977,7 @@ describe('F-R3 a request that outlives its device cannot create state', () => {
     expect(res.status).toBe(401);
     expect(await (await call(s, 'POST', '/api/machine/enroll/poll', { body })).json()).toEqual({
       status: 'pending',
+      name: 'late Runner',
     });
   });
 });

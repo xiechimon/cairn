@@ -13,10 +13,13 @@ import {
   workPolicy,
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
+import { chiefBinding } from '../src/services/chief.js';
 import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
 import { coordinatorRoute } from '../src/services/coordinator-route.js';
 import { createProvider } from '../src/services/providers.js';
 import {
+  anthropicCoordinatorChoice,
+  coordinatorMemoryOwner,
   coordinatorProfile,
   listRoutingSettings,
   memoryOwnerOf,
@@ -603,17 +606,11 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     expect(session(s)).toMatchObject({ provider: 'claude-code' });
   });
 
-  test('the provider default skips Claude models the team does not pay for, and nothing runnable means no rule', () => {
+  test('the provider default takes a Claude model on a provider, and nothing runnable means no rule', () => {
     const s = bare();
     piOnlyRunner(s);
     expect(session(s)).toBeNull();
     addProvider(s, 'claude-proxy', { key: false, models: ['claude-sonnet-5-5'] });
-    expect(session(s)).toBeNull();
-    s.db
-      .update(teamTable)
-      .set({ claudeUsage: 'allow-paid' })
-      .where(eq(teamTable.id, s.team.id))
-      .run();
     expect(session(s)).toMatchObject({ provider: 'claude-proxy', modelId: 'claude-sonnet-5-5' });
   });
 
@@ -658,8 +655,8 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     setCoordinatorServerContextEnabled(true);
     try {
       expect(coordinatorRoute(s.db, s.team.id)).toMatchObject({ provider: 'vani', modelId: 'm1' });
-      expect(coordinatorProfile(s.db, s.team.id, true)).toMatchObject({ provider: 'vani' });
-      expect(coordinatorProfile(s.db, s.team.id)).toBeNull();
+      expect(coordinatorProfile(s.db, s.team.id)).toMatchObject({ provider: 'vani' });
+      expect(coordinatorMemoryOwner(s.db, s.team.id)).toBeUndefined();
       expect(listRoutingSettings(s.db, s.team.id, true).coordinatorDefault).toEqual({
         reason: 'provider',
         provider: 'vani',
@@ -671,6 +668,49 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     }
     expect(coordinatorRoute(s.db, s.team.id)).toBeNull();
     expect(listRoutingSettings(s.db, s.team.id).coordinatorDefault).toBeUndefined();
+  });
+
+  test('every Coordinator routing reader sees the default, while memory and identity wait for a stored rule', () => {
+    const s = bare();
+    addProvider(s, 'vani', { models: ['m1'] });
+    expect(chiefBinding(s.svc, s.team.id)).toEqual({ agentId: null, canOrchestrate: false });
+    setCoordinatorServerContextEnabled(true);
+    try {
+      expect(chiefBinding(s.svc, s.team.id)).toEqual({ agentId: null, canOrchestrate: true });
+      expect(coordinatorMemoryOwner(s.db, s.team.id)).toBeUndefined();
+      const ruleId = seedRoute(s, 'coordinator', { provider: 'vani', modelId: 'm1' });
+      expect(chiefBinding(s.svc, s.team.id)).toEqual({ agentId: ruleId, canOrchestrate: true });
+      expect(coordinatorMemoryOwner(s.db, s.team.id)).toBe(ruleId);
+    } finally {
+      setCoordinatorServerContextEnabled(false);
+    }
+  });
+
+  test('of two Anthropic keys the Coordinator default takes the one added first', () => {
+    const s = bare();
+    for (const providerId of ['anthropic-b', 'anthropic-a']) {
+      createProvider(
+        { db: s.db, box: s.secretBox },
+        {
+          teamId: s.team.id,
+          body: {
+            providerId,
+            label: providerId,
+            baseUrl: 'https://api.anthropic.com',
+            api: 'anthropic-messages',
+            apiKey: `${providerId}-key`,
+            models: [{ id: 'claude-haiku-5-5', name: 'Haiku' }],
+          },
+          createdBy: s.user.id,
+        },
+      );
+    }
+    s.db
+      .update(providerTable)
+      .set({ createdAt: 1 })
+      .where(eq(providerTable.providerId, 'anthropic-a'))
+      .run();
+    expect(anthropicCoordinatorChoice(s.db, s.team.id)?.provider).toBe('anthropic-a');
   });
 
   test('the Coordinator default prefers an Anthropic key, says when nothing can run it, and yields to a stored rule', () => {

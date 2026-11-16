@@ -33,12 +33,14 @@ test(`connects, verifies and deletes a subscription on the providers page (${loc
 
   await page.getByTestId('resource-new').click();
   await page.locator('[data-preset-id="claude-subscription"]').click();
-  const dialog = page.getByRole('dialog', { name: 'Add Claude subscription' });
+  const dialog = page.getByRole('dialog', {
+    name: locale === 'zh' ? '添加 Claude 订阅' : 'Add Claude subscription',
+  });
   await expect(dialog).toContainText('claude setup-token');
   await dialog.getByTestId('subscription-label').fill('Personal Claude');
   await expect(dialog.getByTestId('subscription-token')).toHaveAttribute('type', 'password');
   await dialog.getByTestId('subscription-token').fill(TOKEN);
-  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await dialog.getByRole('button', { name: locale === 'zh' ? '保存' : 'Save', exact: true }).click();
   await expect(dialog).not.toBeVisible();
   const row = page.locator('[data-instance-id="subscription:subscription-1"]');
   await expect(row).toContainText('Personal Claude');

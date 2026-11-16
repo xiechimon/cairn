@@ -57,10 +57,17 @@ export const machineEnrollStartResponseSchema = z.object({
 
 export const machineEnrollPollBodySchema = z.object({ enrollId: z.string() });
 export const machineEnrollPollResponseSchema = z.union([
-  z.object({ status: z.literal('pending') }),
+  z.object({ status: z.literal('pending'), name: z.string().optional() }),
   z.object({ status: z.literal('authorized'), machine: machineJsonSchema }),
   z.object({ status: z.literal('expired') }),
 ]);
+export type MachineEnrollPollResponse = z.infer<typeof machineEnrollPollResponseSchema>;
+
+export function enrollDisplayName(name: string | undefined): string | undefined {
+  if (name === undefined || name.trim() === '' || name.length > 253 || /\p{C}/u.test(name))
+    return undefined;
+  return name;
+}
 
 export const machineEnrollConfirmBodySchema = z.object({ enrollId: z.string() });
 
@@ -260,6 +267,7 @@ export const claimedStepSchema = z.object({
       threadId: recordId,
       systemPrompt: z.string(),
       trigger: z.enum(['user', 'gate', 'settle', 'failed', 'wake']),
+      history: z.string().optional(),
     })
     .optional(),
   remoteTools: z.array(remoteToolDefSchema).optional(),

@@ -2,8 +2,9 @@ import type { ScheduleRecord } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { mapSchedules } from '../src/api/mappers.js';
 import type { ScheduleRecord as DisplaySchedule } from '../src/fixtures/records.js';
+import { EN } from '../src/i18n/en.js';
 import { type TFunc, translate } from '../src/i18n/translate.js';
-import { scheduleSummary } from '../src/pages/schedule-summary.js';
+import { scheduleSummary, scheduleUnnamedCron } from '../src/pages/schedule-summary.js';
 import { scheduleBody, scheduleDraft, scheduleEnded, schedulePauseReason, scheduleTime, scheduleViewState } from '../src/schedules/schedule-model.js';
 
 const NOW = Date.UTC(2026, 10, 4, 12);
@@ -20,14 +21,33 @@ describe('schedule editor wire values', () => {
   test('schedule summaries use the saved timezone for the same raw anchor and next run', () => {
     const schedule: DisplaySchedule = { ...record, at: Date.UTC(2026, 10, 5, 14, 15), nextRunAt: Date.UTC(2026, 10, 5, 14, 15) };
     const now = Date.UTC(2026, 10, 5, 13);
-    expect(scheduleSummary({ ...schedule, tz: 'America/New_York' }, now, t)).toBe('11月5日 09:15 每天运行 · 下次 今天 09:15');
-    expect(scheduleSummary({ ...schedule, tz: 'Asia/Shanghai' }, now, t)).toBe('11月5日 22:15 每天运行 · 下次 今天 22:15');
+    expect(scheduleSummary({ ...schedule, tz: 'America/New_York' }, now, t)).toBe('每天 09:15 · 下次 今天 09:15');
+    expect(scheduleSummary({ ...schedule, tz: 'Asia/Shanghai' }, now, t)).toBe('每天 22:15 · 下次 今天 22:15');
+  });
+  test('weekly summaries name the weekday in the saved timezone', () => {
+    const at = Date.UTC(2026, 10, 5, 20, 15);
+    const schedule: DisplaySchedule = { ...record, kind: 'weekly', at, nextRunAt: at };
+    expect(scheduleSummary({ ...schedule, tz: 'Asia/Shanghai' }, NOW, t)).toBe('每周五 04:15 · 下次 11月6日 04:15');
+    expect(scheduleSummary({ ...schedule, tz: 'America/New_York' }, NOW, t)).toBe('每周四 15:15 · 下次 11月5日 15:15');
+    const en: TFunc = (source, vars) => translate('en', EN, source, vars);
+    expect(scheduleSummary({ ...schedule, tz: 'Asia/Shanghai' }, NOW, en)).toBe('Fri weekly at 04:15 · Next Nov 6 04:15');
+  });
+  test('cron rows read common expressions in words and keep any other expression verbatim', () => {
+    const at = Date.UTC(2026, 10, 4, 22, 15);
+    const cron = (expr: string): DisplaySchedule => ({ ...record, kind: 'cron', cron: expr, at, nextRunAt: at });
+    expect(scheduleSummary(cron('15 */6 * * *'), NOW, t)).toBe('每 6 小时 · 下次 11月5日 06:15');
+    expect(scheduleSummary(cron('30 8 * * 1-5'), NOW, t)).toBe('工作日 08:30 · 下次 11月5日 06:15');
+    expect(scheduleSummary(cron('5 7 * * *'), NOW, t)).toBe('每天 07:05 · 下次 11月5日 06:15');
+    expect(scheduleSummary(cron('0 9 1 * *'), NOW, t)).toBe('每月 1 日 09:00 · 下次 11月5日 06:15');
+    expect(scheduleUnnamedCron(cron('15 */6 * * *'), t)).toBeNull();
+    expect(scheduleUnnamedCron(cron('0 9 1,15 * *'), t)).toBe('0 9 1,15 * *');
+    expect(scheduleUnnamedCron({ ...cron('0 9 1,15 * *'), kind: 'daily' }, t)).toBeNull();
   });
   test('Today follows the saved timezone across midnight rather than the fixed UTC+8 date', () => {
     const nextRunAt = Date.UTC(2026, 10, 5, 6, 15);
     const schedule: DisplaySchedule = { ...record, at: nextRunAt, nextRunAt, tz: 'America/New_York' };
-    expect(scheduleSummary(schedule, Date.UTC(2026, 10, 5, 4, 30), t)).toBe('11月5日 01:15 每天运行 · 下次 11月5日 01:15');
-    expect(scheduleSummary(schedule, Date.UTC(2026, 10, 5, 5, 30), t)).toBe('11月5日 01:15 每天运行 · 下次 今天 01:15');
+    expect(scheduleSummary(schedule, Date.UTC(2026, 10, 5, 4, 30), t)).toBe('每天 01:15 · 下次 11月5日 01:15');
+    expect(scheduleSummary(schedule, Date.UTC(2026, 10, 5, 5, 30), t)).toBe('每天 01:15 · 下次 今天 01:15');
   });
   test('actual mapped missing-next rows never show an epoch date in shared summaries', () => {
     const [schedule] = mapSchedules([{ ...record, kind: 'once', nextRunAt: null }]);
@@ -51,7 +71,7 @@ describe('schedule editor wire values', () => {
   test('custom cron is trimmed and sent without a made-up client parser', () => {
     const body = scheduleBody({ ...scheduleDraft(record, NOW), trigger: 'custom', cron: '  */20 8-17 * * MON-FRI  ' }, record, NOW);
     expect(body).toMatchObject({ kind: 'cron', cron: '*/20 8-17 * * MON-FRI' });
-    expect(() => scheduleBody({ ...scheduleDraft(record, NOW), trigger: 'custom', cron: '* *' }, record, NOW)).toThrow('Use five cron fields');
+    expect(() => scheduleBody({ ...scheduleDraft(record, NOW), trigger: 'custom', cron: '* *' }, record, NOW)).toThrow('Cron 需要 5 段');
   });
   test('named timezone converts its wall clock rather than the browser timezone', () => {
     expect(scheduleTime('2026-11-05', '09', '15', 'Asia/Shanghai')).toBe(Date.UTC(2026, 10, 5, 1, 15));
@@ -62,7 +82,7 @@ describe('schedule editor wire values', () => {
     expect(scheduleTime('2026-03-08', '02', '30', 'America/New_York')).toBeNull();
   });
   test('past one-time values are rejected without silently changing the chosen date', () => {
-    expect(() => scheduleBody({ ...scheduleDraft(record, NOW), trigger: 'once', date: '2026-11-04', hour: '09', minute: '00' }, record, NOW)).toThrow('Choose a future time');
+    expect(() => scheduleBody({ ...scheduleDraft(record, NOW), trigger: 'once', date: '2026-11-04', hour: '09', minute: '00' }, record, NOW)).toThrow('单次定时要选一个将来的时间');
   });
   test('a finished once row is distinct from a paused or auto-disabled row', () => {
     expect(scheduleViewState({ ...record, kind: 'once', nextRunAt: null })).toBe('finished');

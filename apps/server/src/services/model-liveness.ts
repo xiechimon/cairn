@@ -47,7 +47,8 @@ export async function refreshRelayCatalog(
   const baseUrl = providerRow?.baseUrl;
   if (!baseUrl) return;
 
-  const url = `${baseUrl.replace(/\/+$/, '')}/v1/models`;
+  const root = baseUrl.replace(/\/+$/, '');
+  const url = /\/v\d+$/.test(root) ? `${root}/models` : `${root}/v1/models`;
   try {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${apiKey}` },

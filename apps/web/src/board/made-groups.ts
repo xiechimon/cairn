@@ -5,7 +5,14 @@ type MadeKindGroup = Exclude<MadeKind, 'code'> | 'other';
 
 export type MadeGroupKey = MadeKindGroup | 'earlier';
 
-const GROUP_ORDER: readonly MadeGroupKey[] = ['document', 'design', 'page', 'other', 'earlier'];
+const GROUP_ORDER: readonly MadeGroupKey[] = [
+  'document',
+  'design',
+  'page',
+  'slides',
+  'other',
+  'earlier',
+];
 
 export const MADE_EARLIER_DAYS = 7;
 
@@ -13,6 +20,7 @@ export const MADE_GROUP_LABEL: Record<MadeGroupKey, string> = {
   document: '文档',
   design: '设计',
   page: '网页',
+  slides: 'PPT',
   other: '其他',
   earlier: '更早',
 };

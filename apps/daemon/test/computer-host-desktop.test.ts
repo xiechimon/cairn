@@ -43,6 +43,10 @@ function fakeSystemd(display: string, onStop: () => void = () => {}) {
     calls.push([...argv]);
     if (argv[0] === 'systemd-run') {
       const unit = argv.find((arg) => arg.startsWith('--unit='))?.slice('--unit='.length) ?? '';
+      if (unit.endsWith('-browser.service')) {
+        active.add(unit);
+        return { code: 0, stdout: '' };
+      }
       const directory = argv.at(-2) as string;
       for (const server of servers.get(directory) ?? []) server.close();
       for (const name of ['view.sock', 'vnc.sock'])
@@ -72,6 +76,18 @@ function fakeSystemd(display: string, onStop: () => void = () => {}) {
 }
 
 const PROGRAMS = [...HOST_DESKTOP_PROGRAMS];
+
+function fakeAgentBrowser(bin: string, log: string, script = '') {
+  writeFileSync(
+    join(bin, 'agent-browser'),
+    `#!/bin/sh\necho "$AGENT_BROWSER_PROFILE|$*" >> '${log}'\n${script}`,
+  );
+  chmodSync(join(bin, 'agent-browser'), 0o755);
+}
+
+function scopeHome(root: string, scopeKey: string): string {
+  return join(root, createHash('sha256').update(scopeKey).digest('hex').slice(0, 16), 'home');
+}
 
 describe('HostDesktops', () => {
   test('a missing program refuses before any unit starts and names the program', async () => {
@@ -173,9 +189,7 @@ describe('HostDesktops', () => {
     expect(systemd.active.size).toBe(0);
     expect(closedBeforeStop).toEqual([true]);
     const [line] = readFileSync(log, 'utf8').trim().split('\n');
-    expect(line).toMatch(
-      new RegExp(`^${root}/[0-9a-f]{16}/home --session chief_a --restore close$`),
-    );
+    expect(line).toMatch(new RegExp(`^${root}/[0-9a-f]{16}/home --session chief_a close$`));
     expect((await desktops.presence())[0]?.state).toBe('stopped');
 
     expect(await desktops.forScope('chief:a').readFile('note.txt')).toBe('x');
@@ -201,5 +215,164 @@ describe('HostDesktops', () => {
     now = 1_000;
     await later.sweep();
     expect(systemd.active.size).toBe(0);
+  });
+  test('taking control swaps the agent browser for a plain Chromium on the same profile until every controller hands back', async () => {
+    const { root, env } = workspace([...PROGRAMS, 'chromium']);
+    const log = join(root, 'agent-browser.log');
+    fakeAgentBrowser(
+      env.PATH,
+      log,
+      `case "$*" in
+  "--json session list") echo '{"success":true,"data":{"sessions":["chief_a"]}}' ;;
+  *"get url") echo 'https://www.zhipin.com/web/geek/job' ;;
+esac
+`,
+    );
+    const systemd = fakeSystemd('96');
+    const lines = () => readFileSync(log, 'utf8').trim().split('\n');
+    let agentLogAtOwnerStart: string[] = [];
+    const run: CommandRunner = async (argv) => {
+      if (argv[0] === 'systemd-run' && argv.some((arg) => arg.endsWith('-browser.service')))
+        agentLogAtOwnerStart = lines();
+      return systemd.run(argv);
+    };
+    const desktops = new HostDesktops({
+      root,
+      toolsRoot: root,
+      env: { ...env, HTTPS_PROXY: 'http://127.0.0.1:7890' },
+      run,
+    });
+    const profile = join(scopeHome(root, 'chief:a'), '.cairn', 'browser-profile');
+    const owner = `cairn-desktop-${createHash('sha256').update('chief:a').digest('hex').slice(0, 16)}-browser.service`;
+
+    const first = await desktops.hold('chief:a', 'control');
+    expect(agentLogAtOwnerStart).toEqual([
+      `${profile}|--json session list`,
+      `${profile}|--session chief_a get url`,
+      `${profile}|--session chief_a close`,
+    ]);
+    const started = systemd.calls.find((argv) => argv.includes(`--unit=${owner}`)) ?? [];
+    expect(started).toContain('--setenv=DISPLAY=:96');
+    expect(started).toContain(
+      `--property=BindsTo=${owner.replace('-browser.service', '.service')}`,
+    );
+    expect(started.slice(started.indexOf('--'))).toEqual([
+      '--',
+      'env',
+      '-u',
+      'WAYLAND_DISPLAY',
+      '-u',
+      'WAYLAND_SOCKET',
+      join(env.PATH, 'chromium'),
+      `--user-data-dir=${profile}`,
+      '--ozone-platform=x11',
+      '--password-store=basic',
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--hide-crash-restore-bubble',
+      '--proxy-server=http://127.0.0.1:7890',
+      'https://www.zhipin.com/web/geek/job',
+    ]);
+    expect(systemd.active.has(owner)).toBe(true);
+
+    const browser = desktops.forScope('chief:a');
+    const request = {
+      argv: ['agent-browser', 'snapshot'],
+      timeoutMs: 5_000,
+      signal: new AbortController().signal,
+    };
+    await expect(browser.execute(request)).rejects.toThrow('taken over');
+
+    const second = await desktops.hold('chief:a', 'control');
+    first();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(systemd.active.has(owner)).toBe(true);
+    await expect(browser.execute(request)).rejects.toThrow('taken over');
+    second();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(systemd.active.has(owner)).toBe(true);
+
+    const reconnected = await desktops.hold('chief:a', 'control');
+    reconnected();
+    expect(systemd.calls.filter((argv) => argv.includes(`--unit=${owner}`))).toHaveLength(1);
+    expect(systemd.active.has(owner)).toBe(true);
+
+    const events = await browser.execute(request);
+    const ownerActiveAtSnapshot = systemd.active.has(owner);
+    for await (const _event of events);
+    expect(ownerActiveAtSnapshot).toBe(false);
+    expect(lines().at(-1)).toBe(`${profile}|snapshot`);
+    expect(systemd.calls.filter((argv) => argv.includes(`--unit=${owner}`))).toHaveLength(1);
+  });
+
+  test('taking control with no agent page restores the owner browser last session', async () => {
+    const { root, env } = workspace([...PROGRAMS, 'chromium']);
+    fakeAgentBrowser(
+      env.PATH,
+      join(root, 'agent-browser.log'),
+      `echo '{"success":true,"data":{"sessions":[]}}'\n`,
+    );
+    const systemd = fakeSystemd('98');
+    const desktops = new HostDesktops({ root, toolsRoot: root, env, run: systemd.run });
+    (await desktops.hold('chief:a', 'control'))();
+    const started =
+      systemd.calls.find(
+        (argv) => argv[0] === 'systemd-run' && argv.some((arg) => arg.endsWith('-browser.service')),
+      ) ?? [];
+    expect(started.at(-1)).toBe('--restore-last-session');
+  });
+
+  test('a desktop imports the old saved login into the browser profile once', async () => {
+    const { root, env } = workspace(PROGRAMS);
+    const log = join(root, 'agent-browser.log');
+    fakeAgentBrowser(env.PATH, log);
+    const sessions = join(scopeHome(root, 'chief:a'), '.agent-browser', 'sessions');
+    mkdirSync(sessions, { recursive: true });
+    const saved = join(sessions, 'chief_a-chief_a.json');
+    writeFileSync(
+      saved,
+      JSON.stringify({
+        cookies: [
+          {
+            name: 'wt2',
+            value: 'a b',
+            domain: '.zhipin.com',
+            path: '/',
+            expires: 1829275006.7,
+            httpOnly: true,
+            secure: true,
+            sameSite: 'Lax',
+            size: 3,
+            session: false,
+          },
+          {
+            name: 'XFI',
+            value: 'x',
+            domain: 'wappass.baidu.com',
+            path: '/static',
+            expires: -1,
+            httpOnly: false,
+            secure: false,
+            session: true,
+          },
+          { name: '', value: 'y', domain: 'wappass.baidu.com', path: '/static', expires: -1 },
+        ],
+        origins: [{ origin: 'https://www.zhaopin.com', localStorage: [] }],
+      }),
+    );
+    const systemd = fakeSystemd('97');
+    await new HostDesktops({ root, toolsRoot: root, env, run: systemd.run }).ensure('chief:a');
+    const profile = join(scopeHome(root, 'chief:a'), '.cairn', 'browser-profile');
+    expect(readFileSync(log, 'utf8').trim().split('\n')).toEqual([
+      `${profile}|--session chief_a cookies set wt2 a b --domain .zhipin.com --path / --http-only --secure --same-site Lax --expires 1829275006`,
+      `${profile}|--session chief_a cookies set XFI x --domain wappass.baidu.com --path /static`,
+      `${profile}|--session chief_a close`,
+    ]);
+    expect(existsSync(saved)).toBe(false);
+    expect(existsSync(`${saved}.imported`)).toBe(true);
+
+    systemd.active.clear();
+    await new HostDesktops({ root, toolsRoot: root, env, run: systemd.run }).ensure('chief:a');
+    expect(readFileSync(log, 'utf8').trim().split('\n')).toHaveLength(3);
   });
 });

@@ -128,9 +128,11 @@ export function createApp(ctx: AppContext, logger?: Logger): Hono {
   app.onError((err, c) => {
     if (err instanceof HttpError) {
       return c.json(
-        err.reason !== undefined
-          ? { error: err.message, reason: err.reason }
-          : { error: err.message },
+        {
+          error: err.message,
+          ...(err.reason !== undefined ? { reason: err.reason } : {}),
+          ...err.fields,
+        },
         err.status as 400,
       );
     }

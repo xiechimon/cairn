@@ -27,6 +27,7 @@ const BOARD = [
   'accent-typo',
   'empty-review-closeout',
   'info-card-report',
+  'made-',
   'live-project-name',
   'shadcn-primitives',
   'storage-unavailable',

@@ -62,7 +62,7 @@ test('secret: static-form face submit stays in the viewport', async ({ page }) =
 
 test('machine: disclosure expanded (tallest content state) bottom link stays in the viewport', async ({ page }) => {
   await page.goto('/app/resources/machines?scenario=06');
-  await page.getByRole('button', { name: '添加 Runner' }).click();
+  await page.getByRole('button', { name: '添加执行机' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: '在云服务器上运行？改用 API key 注册' }).click();
@@ -94,30 +94,24 @@ test('accept(34): `取消`/done stay in the viewport', async ({ page }) => {
   await expect(dialog.getByRole('button', { name: '完成' })).toBeInViewport();
 });
 
-test('schedules `新建定时` (900×420): capped, body scrolls inside, `取消`/save/X always in the viewport (#1037)', async ({
+test('schedules `新建定时` editor (900×420): capped to the viewport, its body scrolls inside to reach `取消`/save (#1037)', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 900, height: 420 });
-  await page.goto('/app/schedules?scenario=r3-92b');
-  const dialog = page.getByRole('dialog', { name: '新建定时' });
-  await expect(dialog).toBeVisible();
-  await expectBodyOverflows(dialog);
-  const box = await dialog.boundingBox();
+  await page.goto('/app?scenario=home-c&pane=tasks&tab=scheduled');
+  await page.getByTestId('schedule-new').click();
+  const popover = page.getByTestId('schedule-popover');
+  await expect(popover).toBeVisible();
+  await popover.getByRole('radio', { name: '单次' }).click();
+  const box = await popover.boundingBox();
   expect(box).not.toBeNull();
   if (box == null) return;
-  expect(box.height).toBeLessThanOrEqual(420 - 48 + 0.5);
   expect(box.y).toBeGreaterThanOrEqual(0);
   expect(box.y + box.height).toBeLessThanOrEqual(420.5);
-  const save = dialog.getByRole('button', { name: '保存' });
-  await expect(save).toBeInViewport();
-  await expect(dialog.getByRole('button', { name: '取消' })).toBeInViewport();
-  await expect(dialog.getByRole('button', { name: '关闭' })).toBeInViewport();
-
-  const before = await save.boundingBox();
-  await dialog.getByTestId('dialog-body').evaluate((el) => {
+  expect(await popover.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  await popover.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
-  const after = await save.boundingBox();
-  expect(after).toEqual(before);
-  await expect(save).toBeInViewport();
+  await expect(popover.getByRole('button', { name: '保存' })).toBeInViewport();
+  await expect(popover.getByRole('button', { name: '取消' })).toBeInViewport();
 });

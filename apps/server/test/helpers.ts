@@ -37,6 +37,7 @@ import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js'
 import { teamAutonomyPaused } from '../src/services/github-autonomy-brake.js';
 import { productionHarnessEvalConfig } from '../src/services/harness-eval-production.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
+import { newMcpOAuthState } from '../src/services/mcp-servers.js';
 import type { VapidKeys } from '../src/services/push.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import { rejectingGithubFetch } from './network-guard.js';
@@ -85,6 +86,7 @@ export function bootServer(
     webOrigin?: string;
     pushEndpointHosts?: ReadonlySet<string>;
     mcpConfigPath?: string;
+    mcpFetch?: AppContext['mcpFetch'];
     backupStatusPath?: string;
     deployRecordPath?: string;
     remote?: Partial<NonNullable<AppContext['remote']>>;
@@ -124,6 +126,7 @@ export function bootServer(
   };
   const oauthStates: AppContext['oauthStates'] = new Map();
   const xaiDeviceStates: AppContext['xaiDeviceStates'] = new Map();
+  const mcpOAuthState = newMcpOAuthState();
   try {
     const appContext: AppContext = {
       remote: {
@@ -150,6 +153,7 @@ export function bootServer(
       enrollments: new Map(),
       oauthStates,
       xaiDeviceStates,
+      mcpOAuthState,
       oauthClient: opts.oauthClient ?? null,
       ...(opts.oauthFetch !== undefined ? { oauthFetch: opts.oauthFetch } : {}),
       ...(opts.providerTestTimeoutMs === undefined
@@ -175,6 +179,7 @@ export function bootServer(
       loopbackOwner: opts.loopbackOwner ?? null,
       accessVerifier: opts.accessVerifier ?? null,
       mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
+      ...(opts.mcpFetch !== undefined ? { mcpFetch: opts.mcpFetch } : {}),
     };
     const app = createApp(appContext, opts.logger);
     const rawRequest = app.request.bind(app);
@@ -218,6 +223,7 @@ export function bootServer(
       skillSourcesPath,
       oauthStates,
       xaiDeviceStates,
+      mcpOAuthState,
       svc: {
         db,
         hub,

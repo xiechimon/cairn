@@ -123,7 +123,7 @@ export const copy = {
         },
         {
           title: '接入模型，说第一件事',
-          body: '添加模型服务，或在 Runner 上登录 Claude Code；在 规则与策略 里给 Coordinator 选好模型，就能在首页说第一件事了。',
+          body: '添加模型服务，或在 Runner 上登录 Claude Code。Coordinator 默认用你添加的服务商，想换再去 规则与策略 里选；然后就能在首页说第一件事了。',
           code: null,
         },
       ],
@@ -251,7 +251,7 @@ export const copy = {
         },
         {
           title: 'Connect a model, say the first thing',
-          body: 'Add a provider, or sign in to Claude Code on the Runner. Pick the Coordinator a model in Rules & policies, then tell it on the home page what you want.',
+          body: 'Add a provider, or sign in to Claude Code on the Runner. The Coordinator uses your provider by default (change it in Rules & policies), so just tell it on the home page what you want.',
           code: null,
         },
       ],

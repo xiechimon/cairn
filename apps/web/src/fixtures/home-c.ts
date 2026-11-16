@@ -9,7 +9,7 @@ import { scheduleOnce } from './schedules.js';
 
 export const HOME_C_CRED = 'home-c-cred';
 
-const SERVER_SECTION: Record<TodoRecord['phase'], Pick<TodoRecord, 'section' | 'owner'>> = {
+export const SERVER_SECTION: Record<TodoRecord['phase'], Pick<TodoRecord, 'section' | 'owner'>> = {
   todo: { section: 'up_next', owner: null },
   queued: { section: 'working', owner: null },
   planning: { section: 'working', owner: null },

@@ -5,7 +5,7 @@ import type { Db } from '../db/client.js';
 import { mailAccount, mailEvent, mailRule, pushDelivery, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
-import { coordinatorThreadRow, enqueueChiefStep, ensureChief, turnProvenance } from './chief.js';
+import { coordinatorThreadRow, enqueueChiefStep, ensureChief } from './chief.js';
 import type { TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyChiefMessage } from './notifications.js';
@@ -186,12 +186,6 @@ export function deliverMailEvent(
       .run();
   }
   return { status, pushId: pending.push?.msg.tag ?? null };
-}
-
-export function refuseMailTurnTool(prompt: string | null, tool: string): void {
-  const provenance = turnProvenance(prompt);
-  if (provenance?.startsWith('mail:') !== true) return;
-  throw new HttpError(403, `mail turn cannot call ${tool}`);
 }
 
 export function linkedMailSecretIds(db: Db, teamId: string): Set<string> {

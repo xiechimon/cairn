@@ -1,6 +1,8 @@
+import type { MachineEnrollPollResponse } from '@cairn/shared';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { api } from '../api/client.js';
+import { withCodeSpans } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { useI18n } from '../i18n/provider.js';
@@ -25,6 +27,8 @@ export function MachineAuthorizePage() {
   const [phase, setPhase] = useState<Phase>(enrollId !== null ? 'pending' : 'idle');
   const [machine, setMachine] = useState<MachineJson | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState<string | null>(null);
+  const [polled, setPolled] = useState(false);
   const stopped = useRef(false);
   useEffect(() => {
     stopped.current = false;
@@ -37,12 +41,15 @@ export function MachineAuthorizePage() {
     if (enrollId === null || phase !== 'pending') return;
     const tick = async () => {
       try {
-        const res = await api.post<{ status: string; machine?: MachineJson }>(
-          '/api/machine/enroll/poll',
-          { enrollId },
-        );
+        const res = await api.post<MachineEnrollPollResponse>('/api/machine/enroll/poll', {
+          enrollId,
+        });
         if (stopped.current) return;
-        if (res.status === 'authorized' && res.machine) {
+        if (res.status === 'pending') {
+          setPolled(true);
+          if (res.name) setName(res.name);
+        }
+        if (res.status === 'authorized') {
           setMachine(res.machine);
           setPhase('authorized');
         } else if (res.status === 'expired') {
@@ -86,13 +93,13 @@ export function MachineAuthorizePage() {
     <div className="authorize-backdrop fixed inset-0 flex items-center justify-center bg-background">
       <Card
         role="region"
-        aria-label={t('授权 Runner')}
+        aria-label={t('授权执行机')}
         className="w-[360px] max-w-[calc(100vw-48px)] gap-3 p-6"
       >
-        <h1 className="text-base font-semibold text-foreground">{t('授权 Runner')}</h1>
+        <h1 className="text-base font-semibold text-foreground">{t('授权执行机')}</h1>
         {phase === 'idle' && (
           <>
-            <p className={DESC_CLASS}>{t('生成授权链接，在 Runner 上完成注册发起。')}</p>
+            <p className={DESC_CLASS}>{t('生成授权链接，在执行机上完成注册发起。')}</p>
             <Button className="w-full" onClick={() => void startEnrollment()}>
               {t('生成授权链接')}
             </Button>
@@ -101,9 +108,24 @@ export function MachineAuthorizePage() {
         {phase === 'pending' && (
           <>
             <p className={DESC_CLASS}>
-              {t('一台 Runner 请求加入你的团队。确认后它将以自己的凭据连接。')}
+              {t('一台执行机请求加入你的团队。确认后它将以自己的凭据连接。')}
             </p>
-            <Button className="w-full" onClick={() => void confirm()}>
+            {name !== null && (
+              <>
+                <div className="flex items-baseline justify-between gap-3 rounded-md border border-border px-3 py-2 text-meta">
+                  <span className="text-content-secondary">{t('机器名')}</span>
+                  <span className="font-mono text-foreground break-all">{name}</span>
+                </div>
+                <p className={DESC_CLASS}>
+                  {withCodeSpans(
+                    t(
+                      '这个名字由发起方自报。只有你刚在这台机器上运行了 `cairn start`，且终端里显示的名字与这里一致，才确认授权。',
+                    ),
+                  )}
+                </p>
+              </>
+            )}
+            <Button className="w-full" disabled={!polled} onClick={() => void confirm()}>
               {t('确认授权')}
             </Button>
           </>
@@ -111,14 +133,18 @@ export function MachineAuthorizePage() {
         {phase === 'authorizing' && <p className={DESC_CLASS}>{t('正在授权…')}</p>}
         {phase === 'authorized' && machine !== null && (
           <>
-            <p className={DESC_CLASS}>{t('授权完成，Runner 已注册。')}</p>
+            <p className={DESC_CLASS}>
+              {name !== null
+                ? t('授权完成，{name} 已注册为执行机。', { name })
+                : t('授权完成，执行机已注册。')}
+            </p>
             <p className="text-xs break-all text-content-tertiary">
               machineId: {machine.machineId}
             </p>
           </>
         )}
         {phase === 'expired' && (
-          <p className={DESC_CLASS}>{t('授权链接已失效，请在 Runner 上重新发起。')}</p>
+          <p className={DESC_CLASS}>{t('授权链接已失效，请在执行机上重新发起。')}</p>
         )}
         {error !== null && phase !== 'authorized' && (
           <p className="text-xs text-destructive" role="alert">

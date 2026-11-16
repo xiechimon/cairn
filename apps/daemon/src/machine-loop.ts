@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
+import { setTimeout as waitTimeout } from 'node:timers/promises';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -104,6 +105,7 @@ export interface MachineLoopOpts {
   otel?: DaemonOtel | null;
   confinementPlatform?: string;
   confinementPreflight?: ConstructorParameters<typeof ConfinementAvailability>[0]['launch'];
+  confinementRecheckMs?: number;
 }
 
 export interface MachineHandle {
@@ -114,6 +116,8 @@ export interface MachineHandle {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const CONFINEMENT_RECHECK_MS = 60_000;
+const CONFINEMENT_STOP_WAIT_MS = 15_000;
 
 export function nextBackoffMs(current: number, cap = CLAIM_BACKOFF_CAP_MS): number {
   return Math.min(current * 2, cap);
@@ -240,6 +244,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ...capabilitiesProbe(),
       osPlatform: osPlatformOf(platform),
       confinement: availability?.observation(),
+      ...(availability?.cause !== undefined && availability.report?.state === 'unavailable'
+        ? { confinementCause: availability.cause }
+        : {}),
       codexLogin: readCodexLogin(paths.agentRuntimeDir),
       executor: orbProvider.kind,
       ...(orbComputer ? { computer: true as const } : {}),
@@ -368,11 +375,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     provider: createComputerScreenProvider(
       hostDesktops
         ? {
-            holdComputer: (scopeKey) => hostDesktops.hold(scopeKey),
+            holdComputer: (scopeKey, kind) => hostDesktops.hold(scopeKey, kind),
             socketPath: (scopeKey, kind) => hostDesktops.socketPath(scopeKey, kind),
           }
         : {},
     ),
+    log: (msg) => logger.machine(msg),
   });
 
   let networkFailures = 0;
@@ -746,6 +754,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     ...(hostComputer ? { host: hostComputer } : {}),
     ...(hostScreen ? { screen: hostScreen } : {}),
     ...(orbComputer ? { orb: orbComputer } : {}),
+    cairnOrigins: [
+      config.serverUrl,
+      ...(capEnv.CAIRN_WEB_ORIGINS ?? '').split(',').filter((origin) => origin.trim() !== ''),
+    ],
   });
   const deliverSync = async (cmd: import('@cairn/shared').MachineSyncCommand): Promise<void> => {
     await performSync({ client, logger }, cmd);
@@ -798,6 +810,22 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       });
   }, opts.presenceIntervalMs ?? 30_000);
   presenceTimer.unref?.();
+
+  const recheckConfinement = async () => {
+    await availability.recheck();
+    await probeHarnesses();
+    await recover();
+    resumeClaims?.();
+  };
+  const confinementTimer = setInterval(() => {
+    if (stopping || availability.ready || !availability.recoverable) return;
+    void recheckConfinement().catch((err: unknown) => {
+      logger.machine(
+        `confinement recheck failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    });
+  }, opts.confinementRecheckMs ?? CONFINEMENT_RECHECK_MS);
+  confinementTimer.unref?.();
 
   let resumeClaims: (() => void) | undefined;
   let stopping = false;
@@ -901,6 +929,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     resumeClaims?.();
     logger.machine(`Shutting down…${cause ? ` (${cause})` : ''}`);
     clearInterval(presenceTimer);
+    clearInterval(confinementTimer);
     clearInterval(orphanTimer);
     orbCleanupStopped = true;
     clearInterval(closedOrbTimer);
@@ -911,6 +940,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     claimCtrl.abort();
     void screens.close();
     caffeinate?.kill();
+    await Promise.race([
+      availability?.settled(),
+      waitTimeout(CONFINEMENT_STOP_WAIT_MS, undefined, { ref: false }),
+    ]);
     await presenceReporter.close();
     if (connectionId !== null && client.offline) {
       await client
@@ -927,11 +960,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     machineId,
     stop,
     done,
-    async recheckConfinement() {
-      await availability.recheck();
-      await probeHarnesses();
-      await recover();
-      resumeClaims?.();
-    },
+    recheckConfinement,
   };
 }

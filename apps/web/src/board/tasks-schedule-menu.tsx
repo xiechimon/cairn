@@ -1,7 +1,5 @@
-import type { ScheduleRecord as WireSchedule } from '@cairn/shared';
-import { CalendarClock, Ellipsis, History, Pause, Play, RotateCw } from 'lucide-react';
+import { Ellipsis, Pause, Pencil, Play, RotateCw } from 'lucide-react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
@@ -18,36 +16,22 @@ import type { ScheduleRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Trash2 } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
-import { scheduleViewState } from '../schedules/schedule-model.js';
-
-function viewState(schedule: ScheduleRecord) {
-  const record: WireSchedule = {
-    ...schedule,
-    cron: schedule.cron ?? null,
-    prompt: schedule.prompt ?? '',
-    enabled: schedule.enabled ?? true,
-    pausedReason: schedule.pausedReason ?? null,
-    lastRunAt: schedule.lastRunAt ?? null,
-    lastRunStatus: schedule.lastRunStatus ?? null,
-  };
-  return scheduleViewState(record);
-}
+import { scheduleViewState, toWireSchedule } from '../schedules/schedule-model.js';
 
 export function ScheduleRowMenu({
   schedule,
   now,
-  onOpenDetail,
+  onEdit,
 }: {
   schedule: ScheduleRecord;
   now: number;
-  onOpenDetail: () => void;
+  onEdit: () => void;
 }) {
   const { t } = useI18n();
-  const navigate = useNavigate();
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const state = viewState(schedule);
+  const state = scheduleViewState(toWireSchedule(schedule));
   const enabled = schedule.enabled ?? true;
   const running = ['queued', 'planning', 'building'].includes(schedule.todo.phase);
   const queued = enabled && schedule.nextRunAt != null && schedule.nextRunAt <= now;
@@ -127,17 +111,9 @@ export function ScheduleRowMenu({
               {enabled ? t('暂停定时') : t('恢复定时')}
             </KeyedMenuItem>
           )}
-          <KeyedMenuItem shortcut="H" data-action="detail" onClick={onOpenDetail}>
-            <History />
-            {t('查看详情')}
-          </KeyedMenuItem>
-          <KeyedMenuItem
-            shortcut="M"
-            data-action="manage"
-            onClick={() => navigate('/app/schedules')}
-          >
-            <CalendarClock />
-            {t('管理定时')}
+          <KeyedMenuItem shortcut="E" data-action="edit" onClick={onEdit}>
+            <Pencil />
+            {t('编辑')}
           </KeyedMenuItem>
           <DropdownMenuSeparator />
           <KeyedMenuItem

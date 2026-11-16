@@ -202,6 +202,22 @@ export const chiefReportContentSchema = z.object({
 });
 export type ChiefReportContent = z.infer<typeof chiefReportContentSchema>;
 
+export type ChiefReportSuggestion =
+  | { n: number; kind: 'retro'; item: RetroProposal }
+  | { n: number; kind: 'intake'; item: IntakeItem };
+
+export function chiefReportSuggestions(
+  report: Pick<ChiefReportContent, 'retro' | 'intake'>,
+): ChiefReportSuggestion[] {
+  const retro = report.retro.map((item, i) => ({ n: i + 1, kind: 'retro' as const, item }));
+  const intake = (report.intake ?? []).map((item, i) => ({
+    n: retro.length + i + 1,
+    kind: 'intake' as const,
+    item,
+  }));
+  return [...retro, ...intake];
+}
+
 export const CHIEF_TURN_STOPPED_KIND = 'chief_turn_stopped';
 export const chiefTurnStoppedContentSchema = z.object({
   kind: z.literal(CHIEF_TURN_STOPPED_KIND),
@@ -226,6 +242,7 @@ export const threadReportContentSchema = z.object({
   phase: z.enum(['done', 'failed', 'review', 'needs-you']),
   seqNum: z.number().int().positive(),
   title: z.string(),
+  buildId: recordId.optional(),
   wakeStepId: recordId.optional(),
   verified: z.boolean().optional(),
   line: z.string().max(THREAD_REPORT_LINE_MAX).optional(),
@@ -267,12 +284,23 @@ export type ThreadMessageResult = z.infer<typeof threadMessageResultSchema>;
 export const CHIEF_NOTICE_KIND = 'chief_notice';
 export const PROVENANCE_MAX_LENGTH = 200;
 export const provenanceSchema = z.string().min(1).max(PROVENANCE_MAX_LENGTH);
+const reportRefSchema = z.strictObject({ todoId: recordId, buildId: recordId });
 export const chiefNoticeContentSchema = z.object({
   kind: z.literal(CHIEF_NOTICE_KIND),
   message: z.string(),
   provenance: provenanceSchema,
+  report: reportRefSchema.optional(),
 });
 export type ChiefNoticeContent = z.infer<typeof chiefNoticeContentSchema>;
+
+export const REPORT_ACK_KIND = 'report_ack';
+export const reportAckContentSchema = z.object({
+  kind: z.literal(REPORT_ACK_KIND),
+  mode: z.literal('silent'),
+  todoId: recordId,
+  buildId: recordId,
+});
+export type ReportAckContent = z.infer<typeof reportAckContentSchema>;
 
 export const RUNNER_OFFLINE_KIND = 'runner_offline';
 export const runnerOfflineContentSchema = z.object({

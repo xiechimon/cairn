@@ -95,6 +95,7 @@ export interface ComputerDispatcherOptions {
   outputCapChars?: number;
   retryBaseMs?: number;
   retryMaxMs?: number;
+  cairnOrigins: readonly string[];
 }
 
 export interface ComputerDispatcher {
@@ -426,6 +427,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
         now,
         signal: controller.signal,
         session: call.scopeKey,
+        cairnOrigins: options.cairnOrigins,
       });
     } catch (error) {
       await poster.finish(

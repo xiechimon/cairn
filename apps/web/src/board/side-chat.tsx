@@ -35,6 +35,7 @@ import { EngineQuestion, EngineRawView, TakeOverDialog } from './engine-run-view
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { STATUS_WORDS } from './status-words.js';
+import { isWaiting, SECTION_LABEL } from './tasks-sections.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
 import type { ThreadChanges } from './thread-changes.js';
@@ -59,12 +60,12 @@ import {
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
 import { useThreadMentions } from './use-thread-mentions.js';
 import { useThreadUsage } from './use-thread-usage.js';
-import { PANE_PARAM } from './work-panel.js';
+import { PANE_PARAM, TASKS_TAB_PARAM } from './work-panel.js';
 
 const OVERLAY_QUERY = '(max-width: 1100px)';
 
 export const THREAD_HEAD_BUTTON =
-  'size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-5.5 max-[640px]:size-8';
+  'size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-5.5 max-[640px]:size-8 pointer-coarse:size-11';
 
 const OPEN_SURFACE = '.overlay, [role="dialog"], [role="menu"], [role="listbox"]';
 
@@ -120,12 +121,14 @@ function StatusLine({
         {platformWait !== null
           ? platformWait.machine !== null
             ? t('等 {machine} 上线', { machine: platformWait.machine })
-            : t('还没有 {platform} Runner', { platform: RUNNER_OS_LABELS[platformWait.platform] })
+            : t('还没有 {platform} 执行机', { platform: RUNNER_OS_LABELS[platformWait.platform] })
           : todo.quotaWait != null
             ? t('等额度')
             : waitingOnChecks
               ? t(STATUS_WORDS.waitingChecks)
-              : t(threadCopy(todo).state)}
+              : needsYou && todo.section != null && isWaiting(todo.section)
+                ? t(SECTION_LABEL[todo.section])
+                : t(threadCopy(todo).state)}
       </span>
       {meta !== '' && (
         <>
@@ -137,7 +140,7 @@ function StatusLine({
         <>
           <span aria-hidden="true">·</span>
           <Link to={MACHINES_HREF} className="flex-none text-(--chat-link) hover:underline">
-            {t('添加 Runner')}
+            {t('添加执行机')}
           </Link>
         </>
       )}
@@ -453,6 +456,7 @@ export function SideChat({
         params.delete(THREAD_PARAM);
         params.delete(VIEW_PARAM);
         params.delete(PANE_PARAM);
+        params.delete(TASKS_TAB_PARAM);
         return params;
       },
       { replace: true },

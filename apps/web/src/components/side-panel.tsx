@@ -200,7 +200,10 @@ export function SidePanelHead({
         variant="ghost"
         size="icon-sm"
         data-panel-close=""
-        className={cn('text-content-secondary hover:text-foreground', closeClassName)}
+        className={cn(
+          'text-content-secondary hover:text-foreground pointer-coarse:size-11',
+          closeClassName,
+        )}
         aria-label={closeLabel}
         onClick={onClose}
       >

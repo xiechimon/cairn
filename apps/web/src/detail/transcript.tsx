@@ -1,4 +1,5 @@
 import type { StepPromptOrigin } from '@cairn/shared';
+import { CircleAlert } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { CoordinatorFixLinks } from '../chief/chief-message-rows.js';
 import { MessageToolbar } from '../chief/message-toolbar.js';
@@ -46,7 +47,8 @@ function formatElapsed(seconds: number, t: TFunc): string {
 const ROW_BASE = 'flex items-start';
 const AGENT_ROW = 'chat-row--agent group/message flex flex-col items-start';
 const USER_ROW = 'chat-row--user group/message flex flex-col items-end';
-const TOOLS_ROW = '-mx-4 overflow-x-clip px-4';
+const TOOLS_ROW =
+  '-ml-4 -mr-[calc(1rem-var(--scrollbar-gutter,0px))] overflow-x-clip pl-4 pr-[calc(1rem-var(--scrollbar-gutter,0px))]';
 
 const SCROLLER_ITEM_STYLE = { contentVisibility: 'visible' } as const;
 
@@ -63,6 +65,7 @@ function rowMargin(item: TranscriptItem, prev: TranscriptItem | undefined): stri
     case 'fail':
     case 'streaming':
     case 'review':
+    case 'verify':
     case 'report':
       return endsWithAgentRow(prev) ? 'mt-1' : 'mt-5';
     case 'chief':
@@ -76,6 +79,11 @@ function rowMargin(item: TranscriptItem, prev: TranscriptItem | undefined): stri
 
 const PARA = 'chat-para m-0';
 const PARA_GAP = 'mt-2';
+const FINDING_SEVERITY_LABEL = {
+  blocking: '必须修改',
+  suggestion: '可改进',
+  info: '备注',
+} as const;
 
 function ActionRow({
   seconds,
@@ -396,7 +404,7 @@ function Row({
                 </span>
                 {liveStep.machine != null && (
                   <span className="[overflow-wrap:anywhere]">
-                    {t('Runner：{n}', { n: liveStep.machine })}
+                    {t('执行机：{n}', { n: liveStep.machine })}
                   </span>
                 )}
                 {(item.skills ?? []).map((s) => (
@@ -406,8 +414,8 @@ function Row({
                     data-testid="skill-line"
                   >
                     {s.denied
-                      ? t('✕ skill: {n}（已挡下）', { n: s.name })
-                      : t('skill: {n}', { n: s.name })}
+                      ? t('✕ 技能：{n}（已挡下）', { n: s.name })
+                      : t('读取技能：{n}', { n: s.name })}
                   </span>
                 ))}
                 <LiveSignal at={item.signalAt} className="[overflow-wrap:anywhere]" />
@@ -472,10 +480,10 @@ function Row({
             >
               <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
                 <span
-                  className={`chat-review-tag flex-shrink-0 rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px text-caption leading-[1.5] font-semibold text-content-secondary${
+                  className={`chat-review-tag flex-shrink-0 rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px text-caption leading-[1.5] font-semibold ${
                     item.extractionError !== undefined
-                      ? ' chat-review-tag--error bg-(--danger-soft) text-destructive'
-                      : ''
+                      ? 'chat-review-tag--error text-destructive'
+                      : 'text-content-secondary'
                   }`}
                 >
                   {t(item.extractionError !== undefined ? '判定提取失败' : '审核结论')}
@@ -486,36 +494,20 @@ function Row({
                 />
               </p>
               {item.findings.map((f) => (
-                <div
-                  key={f.id}
-                  className={`chat-review-finding chat-review-finding--${f.severity} mt-1 mb-2 border-l-[3px] pl-2.5 ${
-                    f.severity === 'blocking'
-                      ? '[border-left-color:var(--destructive)]'
-                      : f.severity === 'suggestion'
-                        ? '[border-left-color:var(--badge-attention)]'
-                        : '[border-left-color:var(--border)]'
-                  }`}
-                >
-                  <p
-                    className={`${PARA} relative pl-5`}
-                    data-ordinal={Number.parseInt(f.id, 10) || 0}
-                  >
-                    <span className="absolute left-0">{f.id}.</span>
+                <div key={f.id} className="chat-review-finding mt-3 pl-5">
+                  <p className={`${PARA} relative`} data-ordinal={Number.parseInt(f.id, 10) || 0}>
+                    <span className="absolute -left-5">{f.id}.</span>
                     <span
-                      className={`ml-1.5 inline-block text-caption font-semibold ${
-                        f.severity === 'blocking'
-                          ? 'text-destructive'
-                          : f.severity === 'suggestion'
-                            ? 'text-(--badge-attention)'
-                            : 'text-(--text-secondary)'
+                      className={`mr-1.5 font-semibold ${
+                        f.severity === 'blocking' ? 'text-destructive' : 'text-content-secondary'
                       }`}
                     >
-                      {t(`(${f.severity})` as '(blocking)' | '(suggestion)' | '(info)')}
+                      {t(FINDING_SEVERITY_LABEL[f.severity])}
                     </span>
                     <Segments segments={inlineSegments(f.summary)} codeClassName="chat-code" />
                   </p>
                   {f.description !== undefined && f.description !== '' && (
-                    <p className={`${PARA} ${PARA_GAP}`}>
+                    <p className={`${PARA} mt-1`}>
                       <Segments
                         segments={inlineSegments(f.description)}
                         codeClassName="chat-code"
@@ -523,21 +515,17 @@ function Row({
                     </p>
                   )}
                   {(f.file !== undefined || f.line !== undefined) && (
-                    <p
-                      className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 text-meta [background-clip:content-box] text-foreground`}
-                    >
+                    <p className={`${PARA} mt-1 text-meta text-content-secondary`}>
                       <Segments
                         segments={inlineSegments(
-                          `${f.file ?? ''}${f.line !== undefined ? `:${f.line}` : ''}`,
+                          `\`${f.file ?? ''}${f.line !== undefined ? `:${f.line}` : ''}\``,
                         )}
                         codeClassName="chat-code"
                       />
                     </p>
                   )}
                   {f.suggestion !== undefined && f.suggestion !== '' && (
-                    <p
-                      className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 text-meta [background-clip:content-box] text-foreground`}
-                    >
+                    <p className={`${PARA} mt-1 text-content-secondary`}>
                       <Segments
                         segments={inlineSegments(t('建议：{body}', { body: f.suggestion }))}
                         codeClassName="chat-code"
@@ -563,12 +551,10 @@ function Row({
             >
               <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
                 <span
-                  className={`chat-review-tag flex-shrink-0 rounded-(--cds-radius-sm) px-1.5 py-px text-caption leading-[1.5] font-semibold ${
-                    item.extractionError !== undefined
-                      ? 'bg-(--danger-soft) text-destructive'
-                      : item.passed
-                        ? 'bg-secondary text-content-secondary'
-                        : 'bg-(--danger-soft) text-destructive'
+                  className={`chat-review-tag flex-shrink-0 rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px text-caption leading-[1.5] font-semibold ${
+                    item.passed && item.extractionError === undefined
+                      ? 'text-content-secondary'
+                      : 'text-destructive'
                   }`}
                 >
                   {t(
@@ -587,12 +573,12 @@ function Row({
               {item.evidence.map((e) => (
                 <p
                   key={e.path}
-                  className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-4 text-meta [background-clip:content-box] text-foreground`}
+                  className={`${PARA} mt-1 text-meta text-content-secondary`}
                   data-testid="verify-evidence"
                 >
                   <Segments
                     segments={inlineSegments(
-                      e.note !== undefined ? `${e.path} — ${e.note}` : e.path,
+                      e.note !== undefined ? `\`${e.path}\` ${e.note}` : `\`${e.path}\``,
                     )}
                     codeClassName="chat-code"
                   />
@@ -631,37 +617,42 @@ function FailRow({
         ]
           .filter((part): part is string => part !== null)
           .join(' · ');
+  const copy = [title, item.body === '' ? '' : t(item.body), facts]
+    .filter((part) => part !== '')
+    .join('\n');
   return (
-    <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
-      <span
-        className="chat-text -mt-px agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
-        data-testid="agent-text"
-      >
-        <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{title}</p>
-        {item.body !== '' && (
-          <p className={`${PARA} ${PARA_GAP} text-foreground`}>{t(item.body)}</p>
-        )}
-        {item.title !== '' && (
-          <p
-            className={`${PARA} ${PARA_GAP} flex flex-wrap gap-3 text-meta text-(--text-tertiary)`}
-          >
-            {facts !== '' && <span>{facts}</span>}
-            <Button
-              variant="ghost"
-              className="h-auto cursor-pointer justify-start rounded-none border-none bg-transparent p-0 text-meta font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary)"
-              onClick={() => setRawOpen(true)}
-            >
-              {t('查看原始错误')}
-            </Button>
+    <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
+      <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
+        <span
+          className="chat-text -mt-px agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
+          data-testid="agent-text"
+        >
+          <p className={`${PARA} chat-para--fail flex items-start gap-1.5 text-(--fail-fg)`}>
+            <CircleAlert aria-hidden="true" className="mt-0.75 size-4 flex-none" />
+            {title}
           </p>
-        )}
-      </span>
-      <ActionRow
-        copy={[title, item.body === '' ? '' : t(item.body), facts]
-          .filter((part) => part !== '')
-          .join('\n')}
-        t={t}
-      />
+          {item.body !== '' && (
+            <p className={`${PARA} ${PARA_GAP} text-foreground`}>{t(item.body)}</p>
+          )}
+          {item.title !== '' && (
+            <p
+              className={`${PARA} ${PARA_GAP} flex flex-wrap items-center gap-3 text-meta text-(--text-tertiary)`}
+            >
+              {facts !== '' && <span>{facts}</span>}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-2 h-6 px-2 text-meta font-normal text-foreground pointer-coarse:h-11"
+                onClick={() => setRawOpen(true)}
+              >
+                {t('查看原始错误')}
+              </Button>
+            </p>
+          )}
+        </span>
+        <RowTools placement="right" copy={copy} />
+      </div>
+      <RowTools placement="below-start" copy={copy} />
       <RawTextDialog
         title={t('原始错误')}
         text={item.raw ?? item.title}
@@ -810,7 +801,8 @@ export function Transcript({
   const resultAt =
     transcript.at(-1)?.kind === 'streaming' ? transcript.length - 1 : transcript.length;
   const rows = transcript.map((item, index) => {
-    const id = 'id' in item ? item.id : undefined;
+    const id =
+      ('id' in item ? item.id : undefined) ?? (item.kind === 'user' ? `user-${index}` : undefined);
     return (
       <MessageScrollerItem key={id ?? index} messageId={id} style={SCROLLER_ITEM_STYLE}>
         <Row

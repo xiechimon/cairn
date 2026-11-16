@@ -9,7 +9,7 @@ const scope = (page: Page) => settings(page).getByRole('combobox', { name: '设�
 test('model services open with a scope sentence and keep the scope in the URL', async ({ page }) => {
   await page.goto('/app/settings/providers?scenario=providers-fleet');
   await expect(settings(page).getByTestId('settings-scope')).toContainText('设置作用于');
-  await expect(scope(page)).toContainText('所有 Runner');
+  await expect(scope(page)).toContainText('所有执行机');
   await scope(page).click();
   await page.getByRole('option', { name: /build-box/ }).first().click();
   await expect(page).toHaveURL(/scope=/);
@@ -17,24 +17,12 @@ test('model services open with a scope sentence and keep the scope in the URL', 
   await expect(scope(page).locator('svg.lucide-monitor')).toBeVisible();
   await expect(settings(page).getByTestId('settings-checked')).toContainText('已检查');
   await scope(page).click();
-  await page.getByRole('option', { name: '所有 Runner', exact: true }).click();
+  await page.getByRole('option', { name: '所有执行机', exact: true }).click();
   expect(new URL(page.url()).searchParams.has('scope')).toBe(false);
   await expect(scope(page).locator('svg.lucide-server')).toBeVisible();
 });
 
-test('routing carries the same sentence and says routing applies to all machines', async ({
-  page,
-}) => {
-  await page.goto('/app/settings/routing?scenario=providers-fleet');
-  await expect(settings(page).getByTestId('settings-scope')).toContainText('设置作用于');
-  await expect(settings(page).getByTestId('settings-scope-note')).toHaveCount(0);
-  await scope(page).click();
-  await page.getByRole('option', { name: /build-box/ }).first().click();
-  await expect(page).toHaveURL(/scope=/);
-  await expect(settings(page).getByTestId('settings-scope-note')).toContainText('对所有 Runner 生效');
-});
-
-test('English scope copy names all machines and keeps rules and policies in the nav', async ({
+test('English scope copy names all machines and keeps the model selector in the nav', async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
@@ -44,7 +32,7 @@ test('English scope copy names all machines and keeps rules and policies in the 
   await selector.click();
   await expect(page.getByRole('option', { name: 'All Runners', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('link', { name: 'Rules & policies', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Model selector', exact: true })).toBeVisible();
 });
 
 test('gallery scope preserves duplicate suffixes and offline markers with icons', async ({ page }) => {
@@ -95,119 +83,6 @@ test('an offline machine says when it was last online', async ({ page }) => {
   await expect(row.getByTestId('machine-last-seen')).toHaveText('最后在线 12 分钟前');
 });
 
-test('the accept switch is derived: off clears runtimes, on opens runtimes with a toast and saves nothing', async ({
-  page,
-}) => {
-  const patches: unknown[] = [];
-  let enabledRuntimes = ['pi'];
-  await page.route('**/api/**', (route, request) => {
-    if (request.method() !== 'GET') return route.fallback();
-    return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
-  });
-  await page.route('**/api/teams', (route) =>
-    route.fulfill({
-      json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
-    }),
-  );
-  await page.route('**/api/user/me', (route) =>
-    route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } }),
-  );
-  await page.route('**/api/teams/team-1/members', (route) => route.fulfill({ json: [] }));
-  await page.route('**/api/teams/team-1/machines', (route) =>
-    route.fulfill({
-      json: [
-        {
-          id: 'm-1',
-          name: 'alpha',
-          teamId: 'team-1',
-          online: true,
-          latestCliVersion: null,
-          kind: 'remote',
-          enabledRuntimes,
-        },
-      ],
-    }),
-  );
-  await page.route('**/api/machines/m-1', (route, request) => {
-    if (request.method() !== 'PATCH') return route.fallback();
-    const body = request.postDataJSON() as { enabledRuntimes: string[] };
-    patches.push(body);
-    enabledRuntimes = body.enabledRuntimes;
-    return route.fulfill({ json: {} });
-  });
-  await page.goto('/app/settings/machines');
-  const toggle = settings(page).getByTestId('machine-accept-toggle');
-  await expect(toggle).toBeChecked();
-  await toggle.click();
-  await expect.poll(() => patches.length).toBe(1);
-  expect(patches[0]).toEqual({ enabledRuntimes: [] });
-  await expect(toggle).not.toBeChecked();
-
-  await toggle.click();
-  await expect(settings(page).getByTestId('machine-pick-runtimes')).toHaveText(
-    '选择这台 Runner 接哪些运行时',
-  );
-  await expect(page.locator('[data-sonner-toast]')).toContainText('选择这台 Runner 接哪些运行时');
-  await expect(settings(page).getByTestId('machine-item')).toHaveAttribute(
-    'data-expanded',
-    'true',
-  );
-  await expect(settings(page).getByTestId('provider-toggle').first()).toBeFocused();
-  expect(patches).toHaveLength(1);
-  await expect(toggle).not.toBeChecked();
-
-  await settings(page).getByTestId('provider-toggle').first().click();
-  await expect.poll(() => patches.length).toBe(2);
-  expect(patches[1]).toEqual({ enabledRuntimes: ['pi'] });
-});
-
-test('an offline accept switch stays disabled and explains why on click', async ({ page }) => {
-  await page.route('**/api/**', (route, request) => {
-    if (request.method() !== 'GET') return route.fallback();
-    return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
-  });
-  await page.route('**/api/teams', (route) =>
-    route.fulfill({
-      json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
-    }),
-  );
-  await page.route('**/api/user/me', (route) =>
-    route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } }),
-  );
-  await page.route('**/api/teams/team-1/members', (route) => route.fulfill({ json: [] }));
-  await page.route('**/api/teams/team-1/machines', (route) =>
-    route.fulfill({
-      json: [
-        {
-          id: 'm-offline',
-          name: 'omarchy',
-          teamId: 'team-1',
-          online: false,
-          latestCliVersion: null,
-          kind: 'remote',
-          enabledRuntimes: [],
-        },
-      ],
-    }),
-  );
-  await page.goto('/app/settings/machines');
-  const toggle = settings(page).getByTestId('machine-accept-toggle');
-  await expect(toggle).toBeDisabled();
-  const reason = '重新连接 omarchy 后才能修改它的设置。';
-  const explain = settings(page).getByRole('button', { name: reason });
-  const box = await explain.boundingBox();
-  expect(box).not.toBeNull();
-  expect(box!.width).toBeGreaterThanOrEqual(36);
-  expect(box!.height).toBeGreaterThanOrEqual(24);
-  const toggleBox = await toggle.boundingBox();
-  expect(toggleBox).not.toBeNull();
-  await page.mouse.click(toggleBox!.x + 2, toggleBox!.y + toggleBox!.height / 2);
-  await expect(page.locator('[data-sonner-toast]', { hasText: reason })).toBeVisible();
-  await explain.focus();
-  await page.keyboard.press('Enter');
-  await expect(page.locator('[data-sonner-toast]', { hasText: reason }).first()).toBeVisible();
-});
-
 test('scope menu wraps long machine names without clipping or overlapping adjacent options inside a phone viewport', async ({
   page,
 }, testInfo) => {
@@ -241,7 +116,7 @@ test('scope menu wraps long machine names without clipping or overlapping adjace
   const selected = page.getByRole('option', { name: new RegExp(machineName), selected: true });
   const itemBox = await selected.boundingBox();
   const textBox = await selected.locator('> :first-child').boundingBox();
-  const previousBox = await page.getByRole('option', { name: '所有 Runner', exact: true }).boundingBox();
+  const previousBox = await page.getByRole('option', { name: '所有执行机', exact: true }).boundingBox();
   const nextBox = await page.getByRole('option', { name: 'next-machine', exact: true }).boundingBox();
   expect(itemBox).not.toBeNull();
   expect(textBox).not.toBeNull();

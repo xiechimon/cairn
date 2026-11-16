@@ -21,7 +21,6 @@ import {
 import { IdentitySection, StreamSection, StructureSection } from './components-more.js';
 import { DialogSection, MenuSection, ToastSection } from './components-overlays.js';
 import { PanelSection } from './components-panel.js';
-import { ScheduleDetailSection } from './components-schedule-detail.js';
 import {
   CoordinatorStreamSection,
   ProjectsSection,
@@ -244,7 +243,6 @@ function GallerySections({ theme }: { theme: GalleryTheme }) {
       <PrListSection />
       <TaskRowSection />
       <ScheduledSection />
-      <ScheduleDetailSection />
       <AutomationSection />
       <SidebarSection />
       <ProjectsSection />

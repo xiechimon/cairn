@@ -7,7 +7,6 @@ import type {
   MachineProvider,
   MachineWithProviders,
   ProviderRuntime,
-  StickyThread,
 } from '../../api/claude-accounts.js';
 import { relativeTime } from '../../board/rel-time.js';
 import { useI18n } from '../../i18n/provider.js';
@@ -15,7 +14,6 @@ import { ClaudeMark, GrokMark, OpenAIMark, PiMark } from '../brand-marks.js';
 import { ListRow } from '../list-card.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../settings-list.js';
 import { type GlyphKind, StatusGlyph } from '../status-glyph.js';
-import { ToggleSwitch } from '../toggle-switch.js';
 import { StatusChip, type StatusTone } from '../ui/status-chip.js';
 
 const DAY = 86_400_000;
@@ -91,38 +89,13 @@ export function AccountStepRow({ step, now }: { step: AccountStep; now: number }
   );
 }
 
-export function StickyThreadRow({ thread, now }: { thread: StickyThread; now: number }) {
-  const { t } = useI18n();
-  return (
-    <ListRow
-      className="hover:bg-transparent"
-      title={thread.title}
-      trailing={
-        relativeTime(thread.since, now, t) === ''
-          ? undefined
-          : t('固定于 {ago}', { ago: relativeTime(thread.since, now, t) })
-      }
-    />
-  );
-}
-
 const LOGIN_CHIP: Record<MachineProvider['login'], { tone: StatusTone; label: string }> = {
   'logged-in': { tone: 'done', label: '已登录' },
   'logged-out': { tone: 'confirm', label: '未登录' },
   unknown: { tone: 'idle', label: '状态未知' },
 };
 
-export function ProviderRow({
-  provider,
-  toggleable,
-  pending = false,
-  onToggle,
-}: {
-  provider: MachineProvider;
-  toggleable: boolean;
-  pending?: boolean;
-  onToggle: (next: boolean) => void;
-}) {
+export function ProviderRow({ provider }: { provider: MachineProvider }) {
   const { t } = useI18n();
   const chip = LOGIN_CHIP[provider.login];
   const { label: name, Mark } = PROVIDERS[provider.runtime];
@@ -145,7 +118,7 @@ export function ProviderRow({
         {meta.length > 0 && <span className="truncate font-mono">{meta.join(' · ')}</span>}
         {provider.login === 'logged-out' && provider.loginCommand !== null && (
           <span className="truncate">
-            {t('在这台 Runner 上运行')}{' '}
+            {t('在这台执行机上运行')}{' '}
             <code
               data-testid="provider-login-command"
               className="rounded-sm bg-secondary px-1.5 py-0.5 font-mono text-code text-foreground"
@@ -155,30 +128,15 @@ export function ProviderRow({
           </span>
         )}
       </span>
-      <ToggleSwitch
-        className="ml-auto"
-        data-testid="provider-toggle"
-        aria-label={t('{name} 接任务', { name })}
-        checked={provider.enabled}
-        disabled={!toggleable || pending}
-        title={toggleable ? undefined : t('这台 Runner 还不能单独开关 {name}', { name })}
-        onCheckedChange={(next) => onToggle(next)}
-      />
     </div>
   );
 }
 
 export function MachineProvidersCard({
   machine,
-  toggleable,
-  pendingRuntime,
-  onToggle,
   online,
 }: {
   machine: MachineWithProviders;
-  toggleable: (runtime: ProviderRuntime) => boolean;
-  pendingRuntime?: ProviderRuntime | null;
-  onToggle: (runtime: ProviderRuntime, next: boolean) => void;
   online: ReactNode;
 }) {
   const { t } = useI18n();
@@ -196,18 +154,10 @@ export function MachineProvidersCard({
       <SettingsCard>
         {providers.length === 0 ? (
           <div className={cn(SETTINGS_ROW_CLS, 'text-meta text-content-tertiary')}>
-            {t('这台 Runner 还没有上报 provider 状态')}
+            {t('这台执行机还没有上报模型服务状态')}
           </div>
         ) : (
-          providers.map((provider) => (
-            <ProviderRow
-              key={provider.runtime}
-              provider={provider}
-              toggleable={toggleable(provider.runtime)}
-              pending={pendingRuntime === provider.runtime}
-              onToggle={(next) => onToggle(provider.runtime, next)}
-            />
-          ))
+          providers.map((provider) => <ProviderRow key={provider.runtime} provider={provider} />)
         )}
       </SettingsCard>
     </section>

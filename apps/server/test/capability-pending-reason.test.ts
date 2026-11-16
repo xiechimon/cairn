@@ -290,18 +290,17 @@ describe('#1251 queue projection blocked bit (worker steps)', () => {
     });
   });
 
-  test('failure mode 6: runtime gate block names the disabled runtime, not a capability', () => {
+  test('failure mode 6: a stored all-off runtime list no longer blocks; the real gap is named', () => {
     const w = makeWorld();
     insertRule(w, 'session', { mcpServers: ['figma'] });
     insertMachine(w, { id: 'm-r6', runtimes: [], capabilities: { mcpServers: [], skills: [] } });
     const target = insertPendingWorkerStep(w, { homeMachineId: 'm-r6' });
-    expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toEqual({
-      kind: 'runtime-disabled',
-      missing: ['pi'],
-    });
+    expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked?.kind).toBe(
+      'capability-missing',
+    );
   });
 
-  test('a Claude Code step on a machine that only has pi enabled names the runtime to turn on', () => {
+  test('a Claude Code step on a machine that has not reported Claude Code names the missing runtime', () => {
     const w = makeWorld();
     seedRoute(w.s, 'session', { provider: 'claude-code', modelId: 'claude-sonnet-5-5' });
     insertMachine(w, {
@@ -314,6 +313,32 @@ describe('#1251 queue projection blocked bit (worker steps)', () => {
       kind: 'runtime-disabled',
       missing: ['Claude Code'],
     });
+  });
+
+  test('a Claude Code step on a Runner whose Claude Code is logged out waits as logged out', () => {
+    const w = makeWorld();
+    seedRoute(w.s, 'session', { provider: 'claude-code', modelId: 'claude-sonnet-5-5' });
+    insertMachine(w, {
+      id: 'm-r9',
+      capabilities: { mcpServers: [], skills: [] },
+      claudeModels: ['claude-sonnet-5-5'],
+    });
+    w.s.db
+      .update(machineTable)
+      .set({
+        claudeCodeReport: {
+          installed: true,
+          hostname: 'm-r9',
+          models: [{ id: 'claude-sonnet-5-5', name: 'claude-sonnet-5-5' }],
+          auth: { state: 'not-logged-in' },
+        },
+      })
+      .where(eq(machineTable.id, 'm-r9'))
+      .run();
+    const target = insertPendingWorkerStep(w, { homeMachineId: 'm-r9' });
+    expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked?.kind).toBe(
+      'claude-logged-out',
+    );
   });
 
   test('an online Linux Runner whose task sandbox is not ready -> sandbox-unavailable, not a plain wait', () => {
@@ -414,19 +439,13 @@ describe('in-server Coordinator turns', () => {
       undefined,
       { kind: 'coordinator-provider-no-key', missing: ['deepseek'] },
     ],
-    [
-      'a keyed Claude model on a subscription-only team',
-      'claude-gateway',
-      'gw-key',
-      { kind: 'coordinator-paid-claude', missing: ['claude-sonnet-5-5'] },
-    ],
   ] as const)(
     'the server refuses %s, with no Runner to fall back to -> that one reason, not machine-offline',
     (_name, providerId, apiKey, expected) => {
       setCoordinatorInServer(true);
       try {
         const w = makeWorld();
-        const modelId = providerId === 'claude-gateway' ? 'claude-sonnet-5-5' : 'deepseek-chat';
+        const modelId = 'deepseek-chat';
         if (providerId !== undefined) addProvider(w, providerId, modelId, apiKey);
         expect(
           blockedOf(w, providerId === undefined ? undefined : { provider: providerId, modelId }),
@@ -436,6 +455,19 @@ describe('in-server Coordinator turns', () => {
       }
     },
   );
+
+  test('a Claude Code rule with no Runner to run it is a machine reason, not a missing provider', () => {
+    setCoordinatorInServer(true);
+    try {
+      const w = makeWorld();
+      expect(blockedOf(w, { provider: 'claude-code', modelId: 'sonnet' })).toEqual({
+        kind: 'machine-offline',
+        missing: [],
+      });
+    } finally {
+      setCoordinatorInServer(false);
+    }
+  });
 
   test('a routable rule leaves the turn to the server with no blocked reason', () => {
     setCoordinatorInServer(true);

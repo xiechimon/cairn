@@ -2,7 +2,13 @@ import { createHash } from 'node:crypto';
 import type { GitIdentity } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { machine as machineTable, routingRule, step as stepTable } from '../src/db/schema.js';
+import {
+  claudeSubscription,
+  machine as machineTable,
+  provider as providerTable,
+  routingRule,
+  step as stepTable,
+} from '../src/db/schema.js';
 import { createEphemeralSecretBox, SecretBoxError } from '../src/lib/secret-box.js';
 import { startBuilds } from '../src/services/builds.js';
 import { resolveStepCredentials } from '../src/services/credentials.js';
@@ -170,9 +176,10 @@ describe('resolveStepCredentials (per-step dispatch interface surface)', () => {
     s.dispose();
   });
 
-  test('no session routing rule = provider null + empty access surface; unknown step 404', async () => {
+  test('no session routing rule and no provider = provider null + empty access surface; unknown step 404', async () => {
     const s = await withRoutedStack();
     s.db.delete(routingRule).where(eq(routingRule.teamId, s.team.id)).run();
+    s.db.delete(providerTable).where(eq(providerTable.teamId, s.team.id)).run();
     const second = (await (
       await req(s.app, 'POST', `/api/projects/${s.projectId}/todos`, { title: '裸跑', spec: '' })
     ).json()) as { id: string };
@@ -204,7 +211,7 @@ describe('resolveStepCredentials (per-step dispatch interface surface)', () => {
 });
 
 describe('subscription credential dispatch', () => {
-  test('only Claude Code steps receive the newest unexpired team subscription', async () => {
+  test('only Claude Code steps receive the subscription they were claimed with', async () => {
     const s = await withRoutedStack();
     const path = `/api/teams/${s.team.id}/claude-subscriptions`;
     const token =
@@ -212,6 +219,11 @@ describe('subscription credential dispatch', () => {
     const saved = await req(s.app, 'POST', path, { label: 'Personal', token });
     expect(saved.status).toBe(201);
     const buildStep = addStep(s, s.buildId, 'build');
+    s.db
+      .update(stepTable)
+      .set({ claudeSubscriptionId: s.db.select().from(claudeSubscription).get()?.id ?? null })
+      .where(eq(stepTable.id, buildStep))
+      .run();
     expect(resolveStepCredentials(s.keysvc, buildStep).claudeSubscriptionToken).toBeUndefined();
     setSessionProvider(s, 'claude-code');
     expect(resolveStepCredentials(s.keysvc, buildStep).claudeSubscriptionToken).toBe(token);
@@ -230,9 +242,7 @@ describe('subscription credential dispatch', () => {
       token:
         'sk-ant-oat01-replacement-token-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
     });
-    expect(resolveStepCredentials(s.keysvc, buildStep).claudeSubscriptionToken).toBe(
-      'sk-ant-oat01-replacement-token-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
-    );
+    expect(resolveStepCredentials(s.keysvc, buildStep).claudeSubscriptionToken).toBe(token);
   });
 });
 
@@ -245,6 +255,8 @@ test('a review route on a pi provider cannot receive the session subscription', 
   });
   setSessionProvider(s, 'claude-code');
   seedRoute(s, 'review', { provider: 'r3-gw', modelId: 'stub-model' });
+  const enabledId = s.db.select().from(claudeSubscription).get()?.id ?? null;
+  s.db.update(stepTable).set({ claudeSubscriptionId: enabledId }).run();
   expect(resolveStepCredentials(s.keysvc, s.stepId).claudeSubscriptionToken).toBeDefined();
   const reviewStep = addStep(s, s.buildId, 'review');
   expect(resolveStepCredentials(s.keysvc, reviewStep).claudeSubscriptionToken).toBeUndefined();

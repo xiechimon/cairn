@@ -6,6 +6,7 @@ import {
   chiefMessage,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
+  claudeSubscription,
   machine as machineTable,
   step as stepTable,
   todo as todoTable,
@@ -226,15 +227,50 @@ describe('#1260 route re-source: chief step destination = the coordinator rule h
     expect(home?.step.machineId).toBe(w.machineAId);
   });
 
-  test('failure mode 2: home machine runtime gate off -> home machine also comes up empty (same worker gate)', async () => {
+  test('failure mode 2: home machine without Claude Code -> home machine also comes up empty (same worker gate)', async () => {
+    const w = await setupWorld({ provider: 'claude-code' });
+    w.s.db
+      .update(machineTable)
+      .set({ claudeCodeReport: { ...subscriptionClaudeReport, installed: false } })
+      .where(eq(machineTable.id, w.machineAId))
+      .run();
+    expect(await claimOn(w, w.machineAId)).toBeNull();
+    expect(stepRowOf(w).status).toBe('pending');
+  });
+
+  test('a home machine stored as pi-only claims the Claude Code Coordinator step once it reports Claude Code', async () => {
     const w = await setupWorld({ provider: 'claude-code' });
     w.s.db
       .update(machineTable)
       .set({ enabledRuntimes: ['pi'], claudeCodeReport: subscriptionClaudeReport })
       .where(eq(machineTable.id, w.machineAId))
       .run();
+    expect((await claimOn(w, w.machineAId))?.step.kind).toBe('chief');
+  });
+
+  test('a home machine whose Claude Code is logged out waits until the team has a subscription', async () => {
+    const w = await setupWorld({ provider: 'claude-code' });
+    w.s.db
+      .update(machineTable)
+      .set({
+        claudeCodeReport: { ...subscriptionClaudeReport, auth: { state: 'not-logged-in' } },
+      })
+      .where(eq(machineTable.id, w.machineAId))
+      .run();
     expect(await claimOn(w, w.machineAId)).toBeNull();
-    expect(stepRowOf(w).status).toBe('pending');
+    w.s.db
+      .insert(claudeSubscription)
+      .values({
+        id: 'sub-1',
+        teamId: w.s.team.id,
+        label: 'team',
+        tokenCipher: 'cipher',
+        expiresAt: null,
+        enabledAt: 1,
+        createdAt: 1,
+      })
+      .run();
+    expect((await claimOn(w, w.machineAId))?.step.kind).toBe('chief');
   });
 
   test('failure mode 5: payload model/thinking level = the coordinator rule own config (no override slot)', async () => {

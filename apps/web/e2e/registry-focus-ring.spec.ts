@@ -3,11 +3,11 @@ import { settleTransitions } from './helpers.js';
 
 const SKILLS = '/app/resources/skills?scenario=01';
 const LISTED_SKILLS = '/app/resources/skills?scenario=06';
-const ROUTING_POLICIES = '/app/settings/work-routing?scenario=routing-settings';
+const ACCOUNT = '/app/account?scenario=13';
 const ACCEPT = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34';
 
 const BADGES = '/design.html';
-const SCHEDULES = '/app/schedules?scenario=r3-92';
+const SCHEDULES = '/app?scenario=home-c&pane=tasks&tab=scheduled';
 
 interface FocusInfo {
   focusVisible: boolean;
@@ -179,7 +179,7 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
     expectGlobalOutline(unchecked);
     expect(unchecked.borderTopColor).toBe(hexToRgb(unchecked.inputColor));
 
-    await themed(page, 'dark', ROUTING_POLICIES);
+    await themed(page, 'dark', ACCOUNT);
     const sw = page.locator('[data-slot="switch"]').first();
     await expect(sw).toBeVisible();
     await focusKeyboard(sw);
@@ -197,7 +197,7 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
 
   test('input-group draws the field ring on the shell, not the control', async ({ page }) => {
     await themed(page, 'dark', LISTED_SKILLS);
-    const control = page.getByRole('textbox', { name: '搜索技能...' });
+    const control = page.getByRole('textbox', { name: '搜索技能' });
     await expect(control).toBeVisible();
     await focusKeyboard(control);
     const controlInfo = await readFocus(control);
@@ -210,6 +210,7 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
 
   test('a segmented option draws the focus ring inset', async ({ page }) => {
     await themed(page, 'dark', SCHEDULES);
+    await page.getByTestId('schedule-new').click();
     const option = page.getByRole('radiogroup', { name: '频率' }).getByRole('radio', { checked: true });
     await expect(option).toBeVisible();
     await focusKeyboard(option);
@@ -223,7 +224,7 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
   });
 
   test('the sidebar settings link uses the global outline', async ({ page }) => {
-    await themed(page, 'dark', '/app/schedules?scenario=01');
+    await themed(page, 'dark', '/app?scenario=01');
     const user = page.getByTestId('sidebar-settings');
     await expect(user).toBeVisible();
     await focusKeyboard(user);

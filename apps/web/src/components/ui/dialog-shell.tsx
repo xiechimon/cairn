@@ -47,7 +47,7 @@ export function DialogFootRow({ hint, children }: { hint?: ReactNode; children?:
   return (
     <div data-testid="dialog-foot" className={DIALOG_FOOT_CLS}>
       {hint != null && <div className={DIALOG_HINT_CLS}>{hint}</div>}
-      <div className="ml-auto flex items-center gap-2">{children}</div>
+      <div className="ml-auto flex flex-1 items-center justify-end gap-2">{children}</div>
     </div>
   );
 }
@@ -67,7 +67,7 @@ interface DialogShellProps {
   headerCenter?: ReactNode;
   headerAction?: ReactNode;
   open?: boolean;
-  onClose: () => void;
+  onClose: (details?: { reason?: string; event?: Event }) => void;
   children: ReactNode;
   footer?: ReactNode;
   hint?: ReactNode;
@@ -133,7 +133,7 @@ export function DialogShell({
   const { t } = useI18n();
   const { restore } = useReturnFocus(open);
 
-  const handleOpenChange = (next: boolean, details?: { reason?: string }) => {
+  const handleOpenChange = (next: boolean, details?: { reason?: string; event?: Event }) => {
     if (next) return;
     if (details?.reason === 'escape-key' && onEscapeWhileNested != null) {
       onEscapeWhileNested();
@@ -142,7 +142,7 @@ export function DialogShell({
     if (onEscapeWhileNested != null && details?.reason === 'outside-press') {
       return;
     }
-    onClose();
+    onClose(details);
   };
 
   if (viewportRoot || bare) {
@@ -157,7 +157,7 @@ export function DialogShell({
             data-slot="dialog-overlay"
             style={{ zIndex: backdropZ }}
             className={backdropClass}
-            onClick={onBackdropClick ?? onClose}
+            onClick={onBackdropClick ?? (() => onClose())}
           />
           <DialogPrimitive.Popup
             data-slot="dialog-content"

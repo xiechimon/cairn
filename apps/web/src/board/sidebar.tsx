@@ -58,10 +58,10 @@ import {
   type ProjectStatus,
   sidebarProjects,
 } from './sidebar-projects.js';
+import { PANE_PARAM, TASKS_TAB_PARAM } from './work-panel.js';
 
 export type SidebarSelected =
   | 'board'
-  | 'schedules'
   | 'none'
   | '/app/resources/skills'
   | '/app/resources/mcp-servers'
@@ -369,8 +369,14 @@ export function BoardSidebar({
   const { search, pathname } = useLocation();
   const baseParams = new URLSearchParams(search);
   const projectParam = pathname === '/app' ? baseParams.get('project') : null;
+  const schedulesActive =
+    pathname === '/app' &&
+    projectParam === null &&
+    baseParams.get(PANE_PARAM) === 'tasks' &&
+    baseParams.get(TASKS_TAB_PARAM) === 'scheduled';
   baseParams.delete('project');
   baseParams.delete('chat');
+  baseParams.delete(TASKS_TAB_PARAM);
   const plain = `?${baseParams}`;
   const newProjectTarget = { pathname: '/app/project/new', search: plain };
   const coordinatorTarget = { pathname: '/app', search: coordinatorSearch(search) };
@@ -439,7 +445,10 @@ export function BoardSidebar({
   }, []);
   const navRef = useRef<HTMLElement | null>(null);
   useScrollFade(navRef);
-  const coordinatorActive = selected === 'board' && activeProject === null;
+  const coordinatorActive = selected === 'board' && activeProject === null && !schedulesActive;
+  const schedulesParams = new URLSearchParams(baseParams);
+  schedulesParams.set(PANE_PARAM, 'tasks');
+  schedulesParams.set(TASKS_TAB_PARAM, 'scheduled');
 
   const settingsTarget = { pathname: SETTINGS_HREF, search: plain };
   const activityTarget = { pathname: ACTIVITY_PATH, search: plain };
@@ -599,6 +608,18 @@ export function BoardSidebar({
       </nav>
 
       <div data-testid="sidebar-pinned" className="flex flex-none flex-col gap-0.5 px-2 pb-2">
+        <Link
+          data-testid="sidebar-schedules"
+          aria-current={schedulesActive ? 'page' : undefined}
+          className={cn(
+            SIDEBAR_FOOT_ROW,
+            schedulesActive && 'bg-(--sidebar-active) text-foreground hover:bg-(--sidebar-active)',
+          )}
+          to={{ pathname: '/app', search: `?${schedulesParams}` }}
+        >
+          <Clock className={ICON} strokeWidth={STROKE} />
+          {t('定时')}
+        </Link>
         {archivedPage ? (
           <Button
             variant="ghost"
@@ -646,13 +667,6 @@ export function BoardSidebar({
           </FooterIcon>
         )}
         <div className="flex flex-none items-center gap-0.5">
-          <FooterIcon
-            label={t('定时')}
-            testId="sidebar-schedules"
-            to={{ pathname: '/app/schedules', search: plain }}
-          >
-            <Clock className={ICON} strokeWidth={STROKE} />
-          </FooterIcon>
           <FooterIcon label={t('活动')} testId="sidebar-activity" to={activityTarget}>
             <Activity className={ICON} strokeWidth={STROKE} />
           </FooterIcon>

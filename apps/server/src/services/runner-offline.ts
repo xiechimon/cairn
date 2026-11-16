@@ -280,12 +280,12 @@ export function runnerOverrideFor(
     .where(and(eq(build.todoId, todoRow.id), eq(step.status, 'pending')))
     .all();
   const first = pending[0];
-  if (first === undefined) throw conflict('这个任务已经开工，换 Runner 请新开任务');
+  if (first === undefined) throw conflict('这个任务已经开工，换执行机请新开任务');
   if (projectOfTodo(db, first.todoRow)?.repoKind === 'local') {
-    throw conflict('项目代码只在一台 Runner 上，不能改到别的 Runner');
+    throw conflict('项目代码只在一台执行机上，不能改到别的执行机');
   }
   if (pending.some((row) => sessionStarted(db, row))) {
-    throw conflict('这个任务已经开过会话，换 Runner 请新开任务');
+    throw conflict('这个任务已经开过会话，换执行机请新开任务');
   }
   const now = nowMs();
   if (!pending.every((row) => canRunOn(db, row, target, now))) {

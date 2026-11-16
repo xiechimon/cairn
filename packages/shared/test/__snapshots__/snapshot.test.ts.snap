@@ -119,6 +119,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     "chief": {
       "additionalProperties": false,
       "properties": {
+        "history": {
+          "type": "string",
+        },
         "systemPrompt": {
           "type": "string",
         },
@@ -1172,6 +1175,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "chief": {
               "additionalProperties": false,
               "properties": {
+                "history": {
+                  "type": "string",
+                },
                 "systemPrompt": {
                   "type": "string",
                 },
@@ -5245,10 +5251,8 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                         "local-path",
                         "claude-rate-limited",
                         "claude-logged-out",
-                        "claude-usage-refused",
                         "coordinator-provider-missing",
                         "coordinator-provider-no-key",
-                        "coordinator-paid-claude",
                       ],
                       "type": "string",
                     },
@@ -6762,10 +6766,8 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
                 "local-path",
                 "claude-rate-limited",
                 "claude-logged-out",
-                "claude-usage-refused",
                 "coordinator-provider-missing",
                 "coordinator-provider-no-key",
-                "coordinator-paid-claude",
               ],
               "type": "string",
             },
@@ -7153,6 +7155,68 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "type": "object",
               },
               "type": "array",
+            },
+            "deliverables": {
+              "additionalProperties": false,
+              "properties": {
+                "items": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "attachmentId": {
+                        "type": "string",
+                      },
+                      "kind": {
+                        "enum": [
+                          "page",
+                          "slides",
+                        ],
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "sizeBytes": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                    },
+                    "required": [
+                      "attachmentId",
+                      "kind",
+                      "name",
+                      "sizeBytes",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "skipped": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                      },
+                      "reason": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "name",
+                      "reason",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "items",
+                "skipped",
+              ],
+              "type": "object",
             },
             "githubLabelIds": {
               "items": {
@@ -9117,6 +9181,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "mail_account",
   "mail_event",
   "mail_rule",
+  "mcp_connector",
+  "team_top_models",
 ]
 `;
 
@@ -9226,6 +9292,21 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "path": "/api/teams/{id}/routing-settings/seed",
   },
   {
+    "method": "GET",
+    "note": "team Top Models list or null",
+    "path": "/api/teams/{id}/top-models",
+  },
+  {
+    "method": "PUT",
+    "note": "replace the Top Models list",
+    "path": "/api/teams/{id}/top-models",
+  },
+  {
+    "method": "DELETE",
+    "note": "reset to the suggested list",
+    "path": "/api/teams/{id}/top-models",
+  },
+  {
     "method": "PATCH",
     "note": "D60 PR8: upsert a routing_rule by use",
     "path": "/api/teams/{id}/routing-rules/{use}",
@@ -9248,6 +9329,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "GET",
     "note": "SSE，见 protocol/sse.ts",
     "path": "/api/teams/{id}/stream",
+  },
+  {
+    "method": "GET",
+    "note": "read-only scan of ~/.agents/skills and ~/.claude/skills for the import picker; skills already in the Cairn skills directory are left out",
+    "path": "/api/teams/{id}/skills/import-candidates",
   },
   {
     "method": "GET",
@@ -10260,10 +10346,8 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
                     "local-path",
                     "claude-rate-limited",
                     "claude-logged-out",
-                    "claude-usage-refused",
                     "coordinator-provider-missing",
                     "coordinator-provider-no-key",
-                    "coordinator-paid-claude",
                   ],
                   "type": "string",
                 },
@@ -10575,6 +10659,29 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                   "type": "object",
                 },
               ],
+            },
+            "confinementCause": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "not-own-unit",
+                    "bwrap-missing",
+                    "home-overlay-failed",
+                  ],
+                  "type": "string",
+                },
+                "mountPoint": {
+                  "format": "starts_with",
+                  "maxLength": 4096,
+                  "pattern": "^\\/.*",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "kind",
+              ],
+              "type": "object",
             },
             "executor": {
               "enum": [
@@ -11761,13 +11868,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
         "null",
       ],
     },
-    "claudeUsage": {
-      "enum": [
-        "subscription-only",
-        "allow-paid",
-      ],
-      "type": "string",
-    },
     "coAuthorTrailer": {
       "default": true,
       "type": "boolean",
@@ -11963,6 +12063,68 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         "type": "object",
       },
       "type": "array",
+    },
+    "deliverables": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "attachmentId": {
+                "type": "string",
+              },
+              "kind": {
+                "enum": [
+                  "page",
+                  "slides",
+                ],
+                "type": "string",
+              },
+              "name": {
+                "type": "string",
+              },
+              "sizeBytes": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+            },
+            "required": [
+              "attachmentId",
+              "kind",
+              "name",
+              "sizeBytes",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "skipped": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+              },
+              "reason": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "name",
+              "reason",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+      },
+      "required": [
+        "items",
+        "skipped",
+      ],
+      "type": "object",
     },
     "githubLabelIds": {
       "items": {

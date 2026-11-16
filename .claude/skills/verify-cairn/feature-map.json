@@ -413,17 +413,19 @@
     {
       "id": "daily-report",
       "name": "Daily report and retro",
-      "summary": "The Coordinator posts an 08:00 report in the conversation and proposes retro changes the user accepts or rejects.",
-      "states": "A report row in the conversation with yesterday, needs-you and intake sections, and retro proposals that can be accepted or rejected.",
+      "summary": "The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro and intake suggestions by telling the Coordinator.",
+      "states": "A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro and intake suggestions and each one's state.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/chief/chief-report-row.tsx"
+          "apps/web/src/chief/chief-report-row.tsx",
+          "apps/web/src/chief/research-report.tsx"
         ],
         "server": [
           "apps/server/src/services/chief-report.ts",
-          "apps/server/src/services/chief-digest.ts"
+          "apps/server/src/services/chief-digest.ts",
+          "apps/server/src/services/chief-router-tools.ts"
         ]
       },
       "routes": {
@@ -433,21 +435,22 @@
       },
       "reach": [
         "open /app",
-        "click testid:chief-report"
+        "click testid:research-report-card"
       ],
       "research": [
         "docs/research/duet-proactive-coordinator.md"
       ],
-      "frontendDesign": {
-        "gap": "the report row and retro proposal card have no design"
-      },
+      "frontendDesign": [
+        "apps/web/DESIGN-RULES.md"
+      ],
       "backendDesign": {
         "gap": "no design for report content, timing, quiet rules and retro proposal storage"
       },
       "evidence": [
         "apps/web/e2e/chief-daily-report.spec.ts",
         "apps/server/test/chief-report.test.ts",
-        "apps/server/test/chief-digest.test.ts"
+        "apps/server/test/chief-digest.test.ts",
+        "apps/server/test/chief-router-tools.test.ts"
       ],
       "batch": "B2"
     },
@@ -1024,7 +1027,6 @@
         ],
         "daemon": [
           "apps/daemon/src/computer",
-          "apps/daemon/src/orb/computer.ts",
           "apps/daemon/src/machine-loop.ts"
         ]
       },
@@ -1061,7 +1063,7 @@
         "apps/daemon/test/computer-guard.test.ts",
         "apps/daemon/test/computer-browser.test.ts",
         "apps/daemon/test/machine-boot.test.ts",
-        "apps/daemon/test/orb-computer.test.ts"
+        "apps/daemon/test/computer-host-desktop.test.ts"
       ],
       "batch": "B4"
     },
@@ -1100,8 +1102,8 @@
     {
       "id": "routing",
       "name": "Model and work routing",
-      "summary": "Which model and machine each kind of work uses: model routing, work routing rules and policies, capabilities and a per-thread override.",
-      "states": "A routing graph from kinds of work to models, an empty state, rules per use, and a per-thread override dialog.",
+      "summary": "Which model each kind of work uses: the Model selector page (default model for new tasks, the Coordinator and other agents with model and thinking level), the Model routing page (providers with quota, Claude billing, and a graph wiring each rule to its provider), capabilities and a per-thread override.",
+      "states": "A graph from each use to its provider with dashed wires for unavailable providers, an empty state, one picker row per use with runtimes no Runner enabled greyed out, and a per-thread override dialog.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -1129,6 +1131,7 @@
           "/api/teams/:id/model-routing",
           "/api/teams/:id/routing-rules/:use",
           "/api/teams/:id/routing-settings",
+          "/api/teams/:id/top-models",
           "/api/teams/:id/work-policies/:use",
           "/api/capabilities"
         ]
@@ -1502,13 +1505,14 @@
     {
       "id": "first-run",
       "name": "First run",
-      "summary": "The home checklist, connection banners and the first-PR card that take a new user to a first merged PR.",
-      "states": "A checklist on the home page until a machine, a model and a project are set, a setup hint on the composer, then a first-PR card.",
+      "summary": "The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.",
+      "states": "A team with no projects lands on a two-step setup page (connect models for the Coordinator and tasks, confirm both models) that can be skipped; the first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.",
       "centrality": 2,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/board/first-run-checklist-model.ts",
+          "apps/web/src/board/first-run-setup.tsx",
           "apps/web/src/board/first-pr-card.tsx",
           "apps/web/src/board/home-banners.ts",
           "apps/web/src/board/composer-setup-hint.tsx"
@@ -1519,6 +1523,7 @@
       },
       "reach": [
         "open /app",
+        "click testid:first-run-confirm",
         "click testid:composer-setup-chip"
       ],
       "research": [
@@ -1531,6 +1536,7 @@
         "gap": "no design for checklist state, first-PR detection and the 10-minute path"
       },
       "evidence": [
+        "apps/web/e2e/first-run-setup.spec.ts",
         "apps/web/e2e/first-run-checklist.spec.ts",
         "apps/web/e2e/first-pr-report.spec.ts",
         "apps/server/test/first-pr-report.test.ts"
@@ -1696,12 +1702,13 @@
       "id": "schedules",
       "name": "Scheduled tasks",
       "summary": "Recurring work that starts or continues threads on a schedule, with run-now and a project schedule.",
-      "states": "Loading, empty, a list of schedules with cadence, a detail dialog with run now, and an error state.",
+      "states": "Loading, empty, a list of schedules with cadence in the Tasks panel Schedules tab, a small popover editor with run now, a collapsed ended group, and an error state.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/pages/schedules-page.tsx",
+          "apps/web/src/board/tasks-schedule-list.tsx",
+          "apps/web/src/board/tasks-schedule-menu.tsx",
           "apps/web/src/schedules"
         ],
         "server": [
@@ -1720,14 +1727,15 @@
         ]
       },
       "reach": [
-        "open /app/schedules",
-        "click testid:schedule-detail-body"
+        "open /app",
+        "click testid:sidebar-schedules",
+        "click testid:schedule-new"
       ],
       "research": {
         "gap": "no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model "
       },
       "frontendDesign": {
-        "gap": "the schedules page and detail dialog have no design"
+        "gap": "the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md"
       },
       "backendDesign": {
         "gap": "no design for due events, missed runs and continue-thread schedules"
@@ -1957,7 +1965,7 @@
       "id": "skills",
       "name": "Skills",
       "summary": "Skills read from each machine and team skills imported and injected into threads.",
-      "states": "An empty list, skills per machine, an import dialog, and a skill injected into a thread shown in the transcript.",
+      "states": "An empty list, skills per machine, an import dialog with a pick-from-this-machine tab (imported and unimportable skills disabled, one error per failed pick) and a path or GitHub tab, and a skill injected into a thread shown in the transcript.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2005,6 +2013,7 @@
       "evidence": [
         "apps/web/e2e/skills-page.spec.ts",
         "apps/web/e2e/skill-import.spec.ts",
+        "apps/server/test/skill-import.test.ts",
         "apps/daemon/test/skills-catalog.test.ts"
       ],
       "batch": "B9"
@@ -2030,7 +2039,11 @@
           "settings:mcp"
         ],
         "server": [
-          "/api/teams/:id/mcp-servers"
+          "/api/teams/:id/mcp-servers",
+          "/api/teams/:id/mcp-connectors",
+          "/api/teams/:id/mcp-connectors/:cid",
+          "/api/teams/:id/mcp-connectors/:cid/check",
+          "/api/teams/:id/mcp-connectors/oauth/start"
         ]
       },
       "reach": [

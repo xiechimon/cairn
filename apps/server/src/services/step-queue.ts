@@ -57,8 +57,6 @@ function ineligibleBlocked(gap: MachineIneligibility, runtime: string): StepQueu
       return { kind: 'claude-rate-limited', missing: [] };
     case 'claude-login':
       return { kind: 'claude-logged-out', missing: [] };
-    case 'claude-usage':
-      return { kind: 'claude-usage-refused', missing: [] };
   }
 }
 
@@ -78,8 +76,6 @@ function coordinatorRefusalBlocked(
         kind: 'coordinator-provider-no-key',
         missing: rule === undefined ? [] : [rule.provider],
       };
-    case 'paid-claude-not-allowed':
-      return { kind: 'coordinator-paid-claude', missing: rule === undefined ? [] : [rule.modelId] };
   }
 }
 
@@ -240,7 +236,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
       coordinatorInServerEnabled() &&
       !isChiefDigestThreadId(row.threadId)
     ) {
-      serverRoute ??= coordinatorRouteVerdict(db, teamId);
+      if (serverRoute === undefined) serverRoute = coordinatorRouteVerdict(db, teamId);
       if (serverRoute !== null) {
         if (!('refusal' in serverRoute)) return undefined;
         if (target.homeMachineId === null) {

@@ -14,9 +14,9 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `appearance` | `设置` (Settings) › `外观` (Appearance) | [Appearance and visual system](#appearance) |
 | `projects` | `设置` (Settings) › `项目` | [Projects](#projects) |
 | `providers` | `设置` (Settings) › `模型` (Model) › `模型服务` (Providers) | [Model providers and subscriptions](#providers) |
-| `routing` | `设置` (Settings) › `模型` (Model) › `用量与连接` (Usage & connections) | [Model and work routing](#routing) |
-| `work-routing` | `设置` (Settings) › `模型` (Model) › `规则与策略` (Rules & policies) | [Model and work routing](#routing) |
-| `machines` | `设置` (Settings) › `执行环境` (Execution) › `Runner` (Runners) | [Machines](#machines) |
+| `work-routing` | `设置` (Settings) › `模型` (Model) › `模型选择` (Model selector) | [Model and work routing](#routing) |
+| `routing` | `设置` (Settings) › `模型` (Model) › `模型路由` (Model routing) | [Model and work routing](#routing) |
+| `machines` | `设置` (Settings) › `执行环境` (Execution) › `执行机` (Runners) | [Machines](#machines) |
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
 | `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
 | `secrets` | `设置` (Settings) › `安全` (Security) › `密钥` (Secrets) | [Secrets](#secrets) |
@@ -40,11 +40,11 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `chief-takeover`, `chief-takeover-failed`, `chief-takeover-give-back`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-take`, `chief-takeover-time-left`, `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-control-bar`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-card`, `machine-edit`, `machine-list-row`, `machine-screen`, `machine-screen-chrome`, `machine-screen-enlarged`, `machine-screen-exit`, `machine-screen-expand`, `machine-screen-hint`, `machine-status-dot`, `machines-add`, `machines-button`, `machines-recheck`
+- Test ids in its code: `chief-takeover`, `chief-takeover-failed`, `chief-takeover-give-back`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-take`, `chief-takeover-time-left`, `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-control-bar`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-card`, `machine-edit`, `machine-list-row`, `machine-screen`, `machine-screen-chrome`, `machine-screen-enlarged`, `machine-screen-exit`, `machine-screen-expand`, `machine-status-dot`, `machines-add`, `machines-button`, `machines-recheck`
 - Research: [docs/research/coordinator-computer.md](../../../docs/research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](../../../docs/research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](../../../docs/research/user-computer-model-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the computer feed, screen view, browser toggle and control handover have no design
 - Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
-- Evidence: `apps/web/e2e/machines-computer-feed.spec.ts`, `apps/web/test/machine-capabilities.test.ts`, `apps/server/test/computer-screen-routes.test.ts`, `apps/server/test/computer-feed-routes.test.ts`, `apps/daemon/test/computer-guard.test.ts`, `apps/daemon/test/computer-browser.test.ts`, `apps/daemon/test/machine-boot.test.ts`, `apps/daemon/test/orb-computer.test.ts`
+- Evidence: `apps/web/e2e/machines-computer-feed.spec.ts`, `apps/web/test/machine-capabilities.test.ts`, `apps/server/test/computer-screen-routes.test.ts`, `apps/server/test/computer-feed-routes.test.ts`, `apps/daemon/test/computer-guard.test.ts`, `apps/daemon/test/computer-browser.test.ts`, `apps/daemon/test/machine-boot.test.ts`, `apps/daemon/test/computer-host-desktop.test.ts`
 
 ### coordinator-chat
 
@@ -60,7 +60,7 @@ Reach:
 
 - Web routes: `/app`
 - Keyboard shortcuts in its code: `A`, `C`, `D`, `R`
-- Test ids in its code: `chief-body`, `chief-bubble`, `chief-composer-block`, `chief-composer-input`, `chief-composer-placeholder`, `chief-default-rule`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-home-scroll`, `chief-msg`, `chief-msg-block-tools`, `chief-msg-col`, `chief-msg-copy`, `chief-msg-foot`, `chief-msg-more`, `chief-msg-reply`, `chief-msg-sending`, `chief-msg-stamp`, `chief-msg-tools-touch`, `chief-note`, `chief-outage`, `chief-question`, `chief-question-asked`, `chief-question-chips`, `chief-question-dismiss`, `chief-question-error`, `chief-question-input-*`, `chief-question-line`, `chief-question-option-*`, `chief-question-submit`, `chief-question-text`, `chief-question-tools`, `chief-question-tools-touch`, `chief-quick-replies`, `chief-quick-reply`, `chief-reply`, `chief-reply-bubble`, `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`, `chief-routing-row`, `chief-runner-offline`, `chief-sent-attachment`, `chief-sent-attachments`, `chief-settings-col`, `chief-settings-topbar`, `chief-status-live`, `chief-status-mark`, `chief-status-pill`, `chief-stopped`, `chief-stream`, `chief-sub-thread`, `chief-takeover`, `chief-takeover-failed`, `chief-takeover-give-back`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-take`, `chief-takeover-time-left`, `chief-task-created`, `chief-task-ref`, `chief-task-ref-hover`, `chief-task-refs`, `chief-task-started`, `chief-time-divider`, `chief-turn-error`, `chief-turn-retry`, `chief-virtual-rows`, `composer-context-meter`, `composer-plus`, `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `home-c`, `home-c-error`, `home-c-pane-buttons`, `memory-list`, `panel-error`, `project-instructions-input`, `queue-blocked-fix`, `reply-quote`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`, `tasks-badge`, `tasks-toggle`
+- Test ids in its code: `chief-body`, `chief-bubble`, `chief-composer-block`, `chief-composer-input`, `chief-composer-placeholder`, `chief-default-rule`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-home-scroll`, `chief-msg`, `chief-msg-block-tools`, `chief-msg-col`, `chief-msg-copy`, `chief-msg-foot`, `chief-msg-more`, `chief-msg-reply`, `chief-msg-sending`, `chief-msg-stamp`, `chief-msg-tools-touch`, `chief-note`, `chief-outage`, `chief-question`, `chief-question-asked`, `chief-question-chips`, `chief-question-dismiss`, `chief-question-error`, `chief-question-input-*`, `chief-question-line`, `chief-question-option-*`, `chief-question-submit`, `chief-question-text`, `chief-question-tools`, `chief-question-tools-touch`, `chief-quick-replies`, `chief-quick-reply`, `chief-reply`, `chief-reply-bubble`, `chief-report`, `chief-report-sentence`, `chief-routing-row`, `chief-runner-offline`, `chief-sent-attachment`, `chief-sent-attachments`, `chief-settings-col`, `chief-settings-topbar`, `chief-status-live`, `chief-status-mark`, `chief-status-pill`, `chief-stopped`, `chief-stream`, `chief-sub-thread`, `chief-takeover`, `chief-takeover-failed`, `chief-takeover-give-back`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-take`, `chief-takeover-time-left`, `chief-task-created`, `chief-task-ref`, `chief-task-ref-hover`, `chief-task-refs`, `chief-task-started`, `chief-time-divider`, `chief-turn-error`, `chief-turn-retry`, `chief-virtual-rows`, `composer-context-meter`, `composer-plus`, `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `home-c`, `home-c-error`, `home-c-pane-buttons`, `memory-list`, `panel-error`, `project-instructions-input`, `queue-blocked-fix`, `reply-quote`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`, `tasks-badge`, `tasks-toggle`
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-segments.md](features/chief-segments.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md)
 - Research: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/research/dsh-sig-walk-2026-11.md](../../../docs/research/dsh-sig-walk-2026-11.md), [docs/research/pi-durable-spike.md](../../../docs/research/pi-durable-spike.md) (not on main), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
@@ -109,22 +109,22 @@ Reach:
 
 ### daily-report
 
-**Daily report and retro** (shipped, centrality 1). The Coordinator posts an 08:00 report in the conversation and proposes retro changes the user accepts or rejects.
+**Daily report and retro** (shipped, centrality 1). The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro and intake suggestions by telling the Coordinator.
 
-States: A report row in the conversation with yesterday, needs-you and intake sections, and retro proposals that can be accepted or rejected.
+States: A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro and intake suggestions and each one's state.
 
 Reach:
 
 1. `open /app`
-2. `click testid:chief-report`
+2. `click testid:research-report-card`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `chief-report`, `chief-report-intake`, `chief-report-intake-item`, `chief-report-needs-you`, `chief-report-notice`, `chief-report-proposal`, `chief-report-retro`, `chief-report-yesterday`
+- Test ids in its code: `chief-report-sentence`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`
 - Research: [docs/research/duet-proactive-coordinator.md](../../../docs/research/duet-proactive-coordinator.md)
-- Frontend design: **gap**: the report row and retro proposal card have no design
+- Frontend design: [apps/web/DESIGN-RULES.md](../../../apps/web/DESIGN-RULES.md)
 - Backend design: **gap**: no design for report content, timing, quiet rules and retro proposal storage
-- Evidence: `apps/web/e2e/chief-daily-report.spec.ts`, `apps/server/test/chief-report.test.ts`, `apps/server/test/chief-digest.test.ts`
+- Evidence: `apps/web/e2e/chief-daily-report.spec.ts`, `apps/server/test/chief-report.test.ts`, `apps/server/test/chief-digest.test.ts`, `apps/server/test/chief-router-tools.test.ts`
 
 ### engine-view
 
@@ -322,9 +322,9 @@ Reach:
 
 ### routing
 
-**Model and work routing** (shipped, centrality 1). Which model and machine each kind of work uses: model routing, work routing rules and policies, capabilities and a per-thread override.
+**Model and work routing** (shipped, centrality 1). Which model each kind of work uses: the Model selector page (default model for new tasks, the Coordinator and other agents with model and thinking level), the Model routing page (providers with quota, Claude billing, and a graph wiring each rule to its provider), capabilities and a per-thread override.
 
-States: A routing graph from kinds of work to models, an empty state, rules per use, and a per-thread override dialog.
+States: A graph from each use to its provider with dashed wires for unavailable providers, an empty state, one picker row per use with runtimes no Runner enabled greyed out, and a per-thread override dialog.
 
 Reach:
 
@@ -333,9 +333,9 @@ Reach:
 3. `settings work-routing`
 
 - Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`, `/app/settings/team`, `/app/team`
-- Settings: `设置` (Settings) › `模型` (Model) › `用量与连接` (Usage & connections); `设置` (Settings) › `模型` (Model) › `规则与策略` (Rules & policies)
+- Settings: `设置` (Settings) › `模型` (Model) › `模型选择` (Model selector); `设置` (Settings) › `模型` (Model) › `模型路由` (Model routing)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `claude-usage-hint`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-platform`, `route-override-save`, `routing-coordinator-default`, `routing-empty`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-session-default`, `routing-settings-empty`, `settings-scope-note`, `work-policy-*`
+- Test ids in its code: `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-platform`, `route-override-save`, `routing-add-provider`, `routing-agents`, `routing-coordinator-default`, `routing-empty`, `routing-provider-row`, `routing-providers`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`, `routing-session-default`
 - Research: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](../../../docs/research/agent-machine-routing.md) (not on main)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md)
@@ -478,22 +478,23 @@ Reach:
 
 ### first-run
 
-**First run** (shipped, centrality 2). The home checklist, connection banners and the first-PR card that take a new user to a first merged PR.
+**First run** (shipped, centrality 2). The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.
 
-States: A checklist on the home page until a machine, a model and a project are set, a setup hint on the composer, then a first-PR card.
+States: A team with no projects lands on a two-step setup page (connect models for the Coordinator and tasks, confirm both models) that can be skipped; the first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.
 
 Reach:
 
 1. `open /app`
-2. `click testid:composer-setup-chip`
+2. `click testid:first-run-confirm`
+3. `click testid:composer-setup-chip`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`
+- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`, `first-run-confirm`, `first-run-pick-*`, `first-run-setup`, `first-run-step-*`
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](../../../docs/design/references/first-run)
 - Backend design: **gap**: no design for checklist state, first-PR detection and the 10-minute path
-- Evidence: `apps/web/e2e/first-run-checklist.spec.ts`, `apps/web/e2e/first-pr-report.spec.ts`, `apps/server/test/first-pr-report.test.ts`
+- Evidence: `apps/web/e2e/first-run-setup.spec.ts`, `apps/web/e2e/first-run-checklist.spec.ts`, `apps/web/e2e/first-pr-report.spec.ts`, `apps/server/test/first-pr-report.test.ts`
 
 ### machine-enrollment
 
@@ -525,7 +526,7 @@ Reach:
 2. `click testid:machine-item`
 
 - Web routes: `/app/resources/machines`, `/app/resources/machines/:id`
-- Settings: `设置` (Settings) › `执行环境` (Execution) › `Runner` (Runners)
+- Settings: `设置` (Settings) › `执行环境` (Execution) › `执行机` (Runners)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `machine-list`, `machines-scroll`, `resource-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/machines-local-row.md](features/machines-local-row.md)
@@ -842,7 +843,7 @@ Reach:
 - Web routes: `/app/resources/mcp-servers`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `MCP`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `resource-empty`
+- Test ids in its code: `mcp-add-server`, `mcp-catalog`, `mcp-connected`, `mcp-local`, `mcp-oauth-error`
 - Verify recipes: [.claude/skills/verify-cairn/features/mcp-servers.md](features/mcp-servers.md)
 - Research: [docs/research/mcp-connectors-2026-11-15.md](../../../docs/research/mcp-connectors-2026-11-15.md)
 - Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](../../../docs/design/mcp-connectors.md)
@@ -866,7 +867,7 @@ Reach:
 - Web routes: `/app/project/:id`, `/app/project/:id/settings`, `/app/project/:id/tasks`, `/app/project/new`
 - Settings: `设置` (Settings) › `项目`
 - Keyboard shortcuts in its code: `G`, `L`
-- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`
+- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`, `project-new-blocked`, `project-settings-missing`
 - Verify recipes: [.claude/skills/verify-cairn/features/project-new-form.md](features/project-new-form.md), [.claude/skills/verify-cairn/features/github-oauth-picker.md](features/github-oauth-picker.md), [.claude/skills/verify-cairn/features/local-repo-api.md](features/local-repo-api.md)
 - Research: [docs/research/project-coordinators.md](../../../docs/research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
@@ -914,18 +915,19 @@ Reach:
 
 **Scheduled tasks** (shipped, centrality 3). Recurring work that starts or continues threads on a schedule, with run-now and a project schedule.
 
-States: Loading, empty, a list of schedules with cadence, a detail dialog with run now, and an error state.
+States: Loading, empty, a list of schedules with cadence in the Tasks panel Schedules tab, a small popover editor with run now, a collapsed ended group, and an error state.
 
 Reach:
 
-1. `open /app/schedules`
-2. `click testid:schedule-detail-body`
+1. `open /app`
+2. `click testid:sidebar-schedules`
+3. `click testid:schedule-new`
 
 - Web routes: `/app/schedules`
-- Keyboard shortcuts in its code: `D`
-- Test ids in its code: `schedule-detail-body`, `schedules-ended`, `schedules-error`, `schedules-loading`
+- Keyboard shortcuts in its code: `D`, `E`, `N`, `P`
+- Test ids in its code: `schedule-new`, `schedule-popover`, `schedule-popover-runs`, `schedule-row-menu-button`, `schedules-ended`, `tasks-schedules-empty`, `tasks-section`
 - Research: **gap**: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model
-- Frontend design: **gap**: the schedules page and detail dialog have no design
+- Frontend design: **gap**: the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md
 - Backend design: **gap**: no design for due events, missed runs and continue-thread schedules
 - Evidence: `apps/web/e2e/schedules-live.spec.ts`, `apps/server/test/schedules.test.ts`, `apps/server/test/due-events.test.ts`
 
@@ -1017,7 +1019,7 @@ Reach:
 
 **Skills** (shipped, centrality 3). Skills read from each machine and team skills imported and injected into threads.
 
-States: An empty list, skills per machine, an import dialog, and a skill injected into a thread shown in the transcript.
+States: An empty list, skills per machine, an import dialog with a pick-from-this-machine tab (imported and unimportable skills disabled, one error per failed pick) and a path or GitHub tab, and a skill injected into a thread shown in the transcript.
 
 Reach:
 
@@ -1027,12 +1029,12 @@ Reach:
 - Web routes: `/app/resources/skills`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `resource-empty`, `resource-import`
+- Test ids in its code: `resource-empty`, `resource-import`, `skill-candidate`, `skill-candidate-all`, `skill-candidates`, `skill-candidates-empty`, `skill-search-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/skills-page.md](features/skills-page.md), [.claude/skills/verify-cairn/features/skill-import.md](features/skill-import.md), [.claude/skills/verify-cairn/features/skills-injection.md](features/skills-injection.md)
 - Research: **gap**: no current note on how Amp, t3code and Claude Code manage skills across machines
 - Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md)
 - Backend design: [docs/spec/14-skills-execution-surface-injection.md](../../../docs/spec/14-skills-execution-surface-injection.md)
-- Evidence: `apps/web/e2e/skills-page.spec.ts`, `apps/web/e2e/skill-import.spec.ts`, `apps/daemon/test/skills-catalog.test.ts`
+- Evidence: `apps/web/e2e/skills-page.spec.ts`, `apps/web/e2e/skill-import.spec.ts`, `apps/server/test/skill-import.test.ts`, `apps/daemon/test/skills-catalog.test.ts`
 
 ### git-release-tags
 

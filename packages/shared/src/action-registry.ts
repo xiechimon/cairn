@@ -30,7 +30,7 @@ export interface ActionEntry<TInput = unknown, TOutput = unknown> {
   standingGrant: boolean;
   inverse: string | null;
   surfaces: readonly ActionSurface[];
-  targetOf: (input: TInput) => string;
+  targetOf(input: TInput): string;
 }
 
 const projectTargetInput = z.object({ projectId: z.string().min(1) }).strict();
@@ -86,10 +86,30 @@ export const projectDeleteAction = projectAction({
   targetOf: (input) => input.projectId,
 });
 
+const todoDeleteInput = z
+  .object({ todoIds: z.array(z.string().min(1)).min(1).max(50) })
+  .strict()
+  .transform((input) => ({ todoIds: [...new Set(input.todoIds)].sort() }));
+export type TodoDeleteInput = z.infer<typeof todoDeleteInput>;
+
+export const todoDeleteAction: ActionEntry<TodoDeleteInput, unknown> = {
+  id: 'todo.delete',
+  toolName: 'delete_todos',
+  inputSchema: todoDeleteInput,
+  outputSchema: z.object({ deleted: z.array(z.string()), missing: z.array(z.string()) }).strict(),
+  scope: 'team',
+  class: 'confirm-once',
+  standingGrant: false,
+  inverse: null,
+  surfaces: ['coordinator'],
+  targetOf: (input) => input.todoIds.join(','),
+};
+
 export const SLICE1_ACTIONS = [
   projectArchiveAction,
   projectUnarchiveAction,
   projectDeleteAction,
+  todoDeleteAction,
 ] as const;
 
 export function actionById(id: string): (typeof SLICE1_ACTIONS)[number] | undefined {

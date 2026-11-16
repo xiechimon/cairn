@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { routingRule, team, workPolicy } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { listClaudeCodeSources } from './providers.js';
 
 export const DEFAULT_SESSION_PROVIDER = 'claude-code';
@@ -83,7 +84,7 @@ function seedCoordinatorRule(db: Db, teamId: string): number {
 export function seedDefaultRouting(db: Db): DefaultRoutingReport {
   const report: DefaultRoutingReport = { sessionRules: 0, coordinatorRules: 0, policies: 0 };
   for (const { id: teamId } of db.select({ id: team.id }).from(team).all()) {
-    report.coordinatorRules += seedCoordinatorRule(db, teamId);
+    if (!coordinatorRunsOnPi()) report.coordinatorRules += seedCoordinatorRule(db, teamId);
     if (!policyExists(db, teamId, 'session')) {
       report.policies += insertPolicy(db, teamId, 'session', [...AGENT_TOOL_DEFAULTS]);
     }

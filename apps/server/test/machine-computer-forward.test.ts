@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import type { ComputerCall, ComputerFrame, ComputerTool, MachineStreamEvent } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { computerMachineName as daemonComputerMachineName } from '../../daemon/src/orb/computer.js';
+import { computerMachineName as daemonComputerMachineName } from '../../daemon/src/computer/host-desktop.js';
 import { createCoordinatorServerApi } from '../src/coordinator/server-api.js';
 import {
   chief as chiefTable,

@@ -321,7 +321,7 @@ classify_runtime() {
   while IFS= read -r path; do
     case "$path" in
       *package.json | pnpm-lock.yaml | pnpm-workspace.yaml) RUNTIME=daemon ;;
-      apps/server/* | apps/web/* | integration/test/* | docs/* | packages/shared/src/tables.ts | packages/shared/test/vocabulary.test.ts | packages/shared/test/__snapshots__/snapshot.test.ts.snap | .claude/skills/verify-cairn/feature-map.json | .claude/skills/verify-cairn/feature-map.md | scripts/ops/deploy-self.sh | scripts/ops/deploy-watch.sh | scripts/ops/deploy-self.test.mjs | scripts/ops/bootstrap-deploy.sh) ;;
+      apps/server/* | apps/web/* | apps/ios/* | integration/* | docs/* | .github/* | README.md | README.zh.md | AGENTS.md | CLAUDE.md | CONTEXT.md | packages/shared/src/tables.ts | packages/shared/test/vocabulary.test.ts | packages/shared/test/__snapshots__/snapshot.test.ts.snap | .claude/skills/verify-cairn/feature-map.json | .claude/skills/verify-cairn/feature-map.md | scripts/ops/deploy-self.sh | scripts/ops/deploy-watch.sh | scripts/ops/deploy-self.test.mjs | scripts/ops/bootstrap-deploy.sh) ;;
       *) RUNTIME=daemon ;;
     esac
   done < <(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET")
@@ -373,25 +373,103 @@ drain_steps() {
   wait_for_steps
 }
 
-allow_builds_block() {
-  git -C "$CHECKOUT" show "$1:pnpm-workspace.yaml" 2>/dev/null |
-    awk '/^allowBuilds:/{inside=1; print; next} inside && /^[^[:space:]#]/{inside=0} inside{print}'
+WORKSPACE_BUILD_GUARD='
+import { createRequire } from "node:module";
+const { parseDocument } = createRequire(process.argv[1])("yaml");
+const reasons = [];
+const read = (text, label) => {
+  const document = parseDocument(text, { uniqueKeys: true });
+  const problems = [...document.errors, ...document.warnings];
+  if (problems.length > 0) {
+    reasons.push(`${label} pnpm-workspace.yaml does not parse cleanly: ${String(problems[0].message).split("\n")[0]}`);
+    return {};
+  }
+  return document.toJS() ?? {};
+};
+const plain = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+const hasMergeKey = (value) =>
+  Array.isArray(value)
+    ? value.some(hasMergeKey)
+    : plain(value) && Object.entries(value).some(([key, child]) => key === "<<" || hasMergeKey(child));
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const booleans = (map) => plain(map) && Object.values(map).every((value) => typeof value === "boolean");
+const previous = read(process.argv[2], "previous");
+const target = read(process.argv[3], "target");
+if (!plain(previous) || !plain(target)) {
+  reasons.push("pnpm-workspace.yaml is not a mapping");
+} else {
+  if (hasMergeKey(target)) reasons.push("target pnpm-workspace.yaml uses a merge key");
+  for (const key of new Set([...Object.keys(previous), ...Object.keys(target)])) {
+    if (key !== "allowBuilds" && /build|script|pnpmfile|hook|config.?dependenc/i.test(key) && !same(previous[key], target[key])) {
+      reasons.push(`${key} changed`);
+    }
+  }
+  const before = previous.allowBuilds ?? {};
+  const after = target.allowBuilds ?? {};
+  if (!booleans(before) || !booleans(after)) {
+    if (!same(before, after)) reasons.push("allowBuilds changed and is not a map of booleans");
+  } else {
+    for (const [name, allowed] of Object.entries(after)) {
+      if (allowed && before[name] !== true) reasons.push(`allowBuilds permits ${name}`);
+    }
+    for (const [name, allowed] of Object.entries(before)) {
+      if (!allowed && after[name] !== false) reasons.push(`allowBuilds stops denying ${name}`);
+    }
+  }
 }
+if (reasons.length > 0) {
+  console.log(reasons.join("; "));
+  process.exit(1);
+}
+'
 
-hook_lines() {
-  { git -C "$CHECKOUT" show "$1:$2" 2>/dev/null || true; } |
-    { grep -E '"(pre|post)?(install|prepare)"[[:space:]]*:' || true; } |
-    sed -E 's/^[[:space:]]*//; s/,[[:space:]]*$//'
+MANIFEST_HOOK_GUARD='
+import { execFileSync } from "node:child_process";
+const [checkout, previous, target, ...manifests] = process.argv.slice(1);
+const installHook = /install|prepare|prepublish|^pnpm:/i;
+const reasons = [];
+const plain = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const read = (sha, path) => {
+  const listed = execFileSync("git", ["-C", checkout, "ls-tree", "-z", sha, "--", path], { encoding: "utf8" });
+  if (listed === "") return {};
+  if (!/^100(644|755) blob /.test(listed)) {
+    reasons.push(`${path} is not a regular file at ${sha.slice(0, 12)}`);
+    return {};
+  }
+  const text = execFileSync("git", ["-C", checkout, "show", `${sha}:${path}`], { encoding: "utf8" });
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    reasons.push(`${path} does not parse at ${sha.slice(0, 12)}: ${error.message}`);
+    return {};
+  }
+};
+for (const path of manifests) {
+  const before = read(previous, path);
+  const after = read(target, path);
+  if (!plain(before) || !plain(after)) {
+    reasons.push(`${path} is not a JSON object`);
+    continue;
+  }
+  if (!same(before.pnpm, after.pnpm)) reasons.push(`${path}: pnpm settings changed`);
+  const beforeScripts = before.scripts ?? {};
+  const afterScripts = after.scripts ?? {};
+  if (!plain(beforeScripts) || !plain(afterScripts)) {
+    if (!same(beforeScripts, afterScripts)) reasons.push(`${path}: scripts changed and is not an object`);
+    continue;
+  }
+  for (const [name, command] of Object.entries(afterScripts)) {
+    if (installHook.test(name) && (!Object.hasOwn(beforeScripts, name) || !same(beforeScripts[name], command))) {
+      reasons.push(`${path}: ${name}`);
+    }
+  }
 }
-
-install_hooks_changed() {
-  local manifest
-  while IFS= read -r manifest; do
-    [ "$(hook_lines "$PREVIOUS" "$manifest")" = "$(hook_lines "$TARGET" "$manifest")" ] ||
-      echo "$manifest"
-  done < <(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET" -- '*package.json')
-  git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET" -- .pnpmfile.cjs .pnpmfile.mjs .npmrc '*/.npmrc'
+if (reasons.length > 0) {
+  console.log(reasons.join("; "));
+  process.exit(1);
 }
+'
 
 assert_deployable() {
   git -C "$CHECKOUT" fetch -q origin main
@@ -408,10 +486,30 @@ assert_deployable() {
     grep -qxF "$name"$'\t'success <<<"$checks" || refuse "required check $name is not green on $TARGET"
   done
 
-  [ "$(allow_builds_block "$PREVIOUS")" = "$(allow_builds_block "$TARGET")" ] ||
-    refuse "allowBuilds in pnpm-workspace.yaml changed; deploy by hand after reviewing install scripts"
-  local hooks
-  hooks="$(install_hooks_changed)"
+  local previous_workspace target_workspace build_changes
+  previous_workspace="$(git -C "$CHECKOUT" show "$PREVIOUS:pnpm-workspace.yaml")" ||
+    refuse "cannot read pnpm-workspace.yaml at $PREVIOUS"
+  target_workspace="$(git -C "$CHECKOUT" show "$TARGET:pnpm-workspace.yaml")" ||
+    refuse "cannot read pnpm-workspace.yaml at $TARGET"
+  build_changes="$(node --input-type=module -e "$WORKSPACE_BUILD_GUARD" "$CHECKOUT/package.json" \
+    "$previous_workspace" "$target_workspace" 2>&1)" ||
+    refuse "pnpm-workspace.yaml may permit new install scripts; deploy by hand after review: ${build_changes:-the build settings guard failed}"
+  local manifest_list hooks
+  local -a manifests=()
+  manifest_list="$(mktemp "$STATE/manifests.XXXXXX")"
+  git -C "$CHECKOUT" diff -z --name-only --no-renames "$PREVIOUS" "$TARGET" -- package.json ':(glob)**/package.json' >"$manifest_list" || {
+    rm -f "$manifest_list"
+    refuse "cannot list package.json changes between $PREVIOUS and $TARGET"
+  }
+  mapfile -d '' -t manifests <"$manifest_list"
+  rm -f "$manifest_list"
+  if [ "${#manifests[@]}" -gt 0 ]; then
+    hooks="$(node --input-type=module -e "$MANIFEST_HOOK_GUARD" "$CHECKOUT" "$PREVIOUS" "$TARGET" "${manifests[@]}" 2>&1)" ||
+      refuse "install hooks in package.json may be added or changed; deploy by hand after review: ${hooks:-the install hook guard failed}"
+  fi
+  hooks="$(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET" -- .pnpmfile.cjs .pnpmfile.mjs .npmrc '*/.npmrc' \
+    package.yaml package.json5 ':(glob)**/package.yaml' ':(glob)**/package.json5' binding.gyp ':(glob)**/binding.gyp')" ||
+    refuse "cannot list pnpm config changes between $PREVIOUS and $TARGET"
   [ -z "$hooks" ] || refuse "install hooks or pnpm config changed; deploy by hand after review: $hooks"
 }
 

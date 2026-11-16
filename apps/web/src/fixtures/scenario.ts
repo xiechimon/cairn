@@ -1,3 +1,4 @@
+import type { TeamRoutingSettings } from '@cairn/shared';
 import { accountsDefault, accountsEmpty } from './accounts.js';
 import { activityFixture, activityManyFixture } from './activity.js';
 import { chiefBubbleRuns } from './chief-bubble-runs.js';
@@ -80,14 +81,19 @@ import {
   resourcesCcMissing,
   resourcesCcNoConfig,
   resourcesDefault,
+  resourcesMcpAddServer,
+  resourcesMcpAuthorizing,
+  resourcesMcpConfirmHost,
+  resourcesMcpConnectGithub,
+  resourcesMcpConnectors,
+  resourcesMcpManageNeedsAuth,
+  resourcesMcpOAuthDenied,
   resourcesSkillsList,
   reusedBuilding,
   reusePanel15,
   revisionChain,
   revisionStreaming,
   schedulesEmpty,
-  schedulesFormDaily,
-  schedulesFormOnce,
   schedulesList,
   secretsList,
   sidebarGroups,
@@ -119,6 +125,80 @@ import { RESOURCES } from './resources.js';
 import { sidebarArchived } from './sidebar-archived.js';
 
 export const SCENARIO_PARAM = 'scenario';
+
+const ROUTING_SETTINGS: TeamRoutingSettings = {
+  rules: [
+    {
+      id: 'rule-session',
+      teamId: 't1',
+      use: 'session',
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5',
+      thinkingLevel: 'high',
+      fallbackModels: null,
+      machineId: null,
+      requiredCapabilities: null,
+      seededFromAgentId: 'agent-impl',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: 'rule-review',
+      teamId: 't1',
+      use: 'review',
+      provider: 'pi',
+      modelId: 'gpt-5.2',
+      thinkingLevel: 'medium',
+      fallbackModels: null,
+      machineId: null,
+      requiredCapabilities: null,
+      seededFromAgentId: 'agent-review',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+  ],
+  policies: [
+    {
+      id: 'policy-session',
+      teamId: 't1',
+      use: 'session',
+      tools: ['推送分支'],
+      mcpServers: ['github'],
+      skillsAllowlist: null,
+      defaultSkill: null,
+      secrets: ['OPENAI_API_KEY'],
+      seededFromAgentId: 'agent-impl',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: 'policy-review',
+      teamId: 't1',
+      use: 'review',
+      tools: [],
+      mcpServers: [],
+      skillsAllowlist: null,
+      defaultSkill: null,
+      secrets: [],
+      seededFromAgentId: 'agent-review',
+      createdAt: 1,
+      updatedAt: 1,
+    },
+  ],
+};
+
+const routingSettingsFixture: FixtureSet = {
+  ...resourcesDefault,
+  resources: {
+    ...RESOURCES,
+    topModels: [
+      { provider: 'claude-code', modelId: 'claude-sonnet-5', thinkingLevel: 'high' },
+      { provider: 'pi', modelId: 'gpt-5.2', thinkingLevel: 'medium' },
+      { provider: 'gone-proxy', modelId: 'glm-5.3', thinkingLevel: 'max' },
+    ],
+    routingSettings: ROUTING_SETTINGS,
+  },
+};
 
 export const SCENARIOS_ENABLED = import.meta.env.DEV || import.meta.env.MODE === 'fixture';
 
@@ -243,8 +323,6 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       '29': { ...detailReview({ userMenuOpen: false }), ui: { statusMenuOpen: true } },
       '11': schedulesEmpty,
       'r3-93': schedulesList,
-      'r3-92': schedulesFormDaily,
-      'r3-92b': schedulesFormOnce,
       '54': detailFailed12,
       '55': boardFailed,
       '56': rerunDialog12,
@@ -282,6 +360,13 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       '09': resourcesDefault,
       '10': resourcesDefault,
       'skills-list': resourcesSkillsList,
+      'mcp-connectors': resourcesMcpConnectors,
+      'mcp-connect-github': resourcesMcpConnectGithub,
+      'mcp-add-server': resourcesMcpAddServer,
+      'mcp-authorizing': resourcesMcpAuthorizing,
+      'mcp-manage-needs-auth': resourcesMcpManageNeedsAuth,
+      'mcp-confirm-host': resourcesMcpConfirmHost,
+      'mcp-oauth-denied': resourcesMcpOAuthDenied,
       '10-cc-missing': resourcesCcMissing,
       '10-cc-noconfig': resourcesCcNoConfig,
       '10-cc-loggedout': resourcesCcLoggedOut,
@@ -295,68 +380,44 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'providers-empty': providersEmpty,
       'model-routing': accountsDefault,
       'model-routing-empty': accountsEmpty,
-      'routing-settings': {
-        ...resourcesDefault,
+      'routing-settings': routingSettingsFixture,
+      'routing-settings-pi-only': {
+        ...routingSettingsFixture,
         resources: {
-          ...RESOURCES,
+          ...routingSettingsFixture.resources,
+          machines: RESOURCES.machines.map((machine) => ({ ...machine, enabledRuntimes: ['pi'] })),
+        },
+      },
+      'routing-rule-issues': {
+        ...routingSettingsFixture,
+        resources: {
+          ...routingSettingsFixture.resources,
+          machines: RESOURCES.machines.map((machine) => ({ ...machine, enabledRuntimes: ['pi'] })),
           routingSettings: {
-            enabled: false,
-            rules: [
+            ...ROUTING_SETTINGS,
+            rules: ROUTING_SETTINGS.rules.map((rule) =>
+              rule.use === 'session'
+                ? { ...rule, machineId: RESOURCES.machines[0]?.id ?? null }
+                : rule,
+            ),
+            ruleIssues: [
               {
-                id: 'rule-session',
-                teamId: 't1',
                 use: 'session',
-                provider: 'claude-code',
-                modelId: 'claude-sonnet-5',
-                thinkingLevel: 'high',
-                fallbackModels: null,
-                machineId: null,
-                requiredCapabilities: null,
-                seededFromAgentId: 'agent-impl',
-                createdAt: 1,
-                updatedAt: 1,
+                reason: 'runtime-disabled',
+                runtime: 'claude-code',
+                suggested: {
+                  provider: 'pi',
+                  modelId: 'gpt-5.2',
+                  machineId: null,
+                  thinkingLevel: null,
+                  expectedUpdatedAt: 1,
+                },
               },
               {
-                id: 'rule-review',
-                teamId: 't1',
                 use: 'review',
+                reason: 'provider-no-key',
                 provider: 'pi',
-                modelId: 'gpt-5.2',
-                thinkingLevel: 'medium',
-                fallbackModels: null,
-                machineId: null,
-                requiredCapabilities: null,
-                seededFromAgentId: 'agent-review',
-                createdAt: 1,
-                updatedAt: 1,
-              },
-            ],
-            policies: [
-              {
-                id: 'policy-session',
-                teamId: 't1',
-                use: 'session',
-                tools: ['推送分支'],
-                mcpServers: ['github'],
-                skillsAllowlist: null,
-                defaultSkill: null,
-                secrets: ['OPENAI_API_KEY'],
-                seededFromAgentId: 'agent-impl',
-                createdAt: 1,
-                updatedAt: 1,
-              },
-              {
-                id: 'policy-review',
-                teamId: 't1',
-                use: 'review',
-                tools: [],
-                mcpServers: [],
-                skillsAllowlist: null,
-                defaultSkill: null,
-                secrets: [],
-                seededFromAgentId: 'agent-review',
-                createdAt: 1,
-                updatedAt: 1,
+                suggested: null,
               },
             ],
           },

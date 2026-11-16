@@ -23,6 +23,7 @@ test('a fresh install creates the coordinator rule in the UI and the Coordinator
   const composer = () => page.getByTestId('home-c').getByTestId('chief-composer-input');
 
   await page.goto(`${server.base}/app`);
+  await page.getByTestId('first-run-setup').getByRole('button', { name: '先跳过，去主页看看' }).click();
   await composer().fill('first message before any rule');
   await composer().press('Enter');
   await expect.poll(() => sendStatuses).toEqual([409]);
@@ -51,13 +52,10 @@ test('a fresh install creates the coordinator rule in the UI and the Coordinator
   await expect(settings.getByTestId('routing-coordinator-default')).toContainText(
     '当前默认：e2e-model · e2e relay',
   );
-  await expect(creator.getByRole('button', { name: '创建' })).toBeDisabled();
+  await expect(creator.locator('.routing-rule-level-select')).toBeDisabled();
 
-  await creator.locator('.routing-rule-runtime-select').click();
-  await page.locator('.routing-rule-runtime-menu .routing-rule-runtime-row', { hasText: 'pi' }).first().click();
   await creator.locator('.routing-rule-model-select').click();
   await page.locator('.routing-rule-model-menu .routing-rule-model-row', { hasText: 'e2e-model' }).click();
-  await creator.getByRole('button', { name: '创建' }).click();
 
   await expect(settings.getByTestId('routing-rule-coordinator')).toBeVisible();
   await expect(settings.getByTestId('routing-rule-new-coordinator')).toHaveCount(0);

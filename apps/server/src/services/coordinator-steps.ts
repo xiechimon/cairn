@@ -8,6 +8,7 @@ import { and, eq, notInArray, sql } from 'drizzle-orm';
 import {
   type chiefThread,
   chiefTurnUsage,
+  claudeSubscription,
   coordinatorInput,
   step,
   tokenUsage,
@@ -47,6 +48,7 @@ export function claimPendingChiefStep(
   db: MachineDeps['db'],
   stepRow: StepRow,
   machineId: string | null,
+  bindTeamId: string | null = null,
 ): boolean {
   const claimedAt = nowMs();
   const res = db
@@ -54,6 +56,12 @@ export function claimPendingChiefStep(
     .set({
       status: 'claimed',
       machineId,
+      claudeSubscriptionId:
+        bindTeamId === null
+          ? null
+          : sql<
+              string | null
+            >`(select ${claudeSubscription.id} from ${claudeSubscription} where ${claudeSubscription.teamId} = ${bindTeamId} and ${claudeSubscription.enabledAt} is not null and (${claudeSubscription.expiresAt} is null or ${claudeSubscription.expiresAt} > ${claimedAt}))`,
       claimedAt,
       lastHeartbeatAt: claimedAt,
       holdReason: null,
@@ -81,7 +89,7 @@ export function chiefTurnContext(
   deps: MachineDeps,
   stepRow: StepRow,
   threadRow: ThreadRow,
-  agentId: string,
+  agentId: string | null,
 ) {
   const digest = isChiefDigestStep(stepRow);
   const ctx = digest ? null : chiefClaimContext(deps, threadRow.id);
@@ -99,13 +107,16 @@ export function chiefTurnContext(
     );
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
-  const injected = injectMemoryDocuments(deps.db, {
-    agentId,
-    teamId: threadRow.teamId,
-    threadId: threadRow.id,
-    projectId: null,
-    recordUse: !digest,
-  });
+  const injected =
+    agentId === null
+      ? { memories: [], omitted: 0, fileCount: 0 }
+      : injectMemoryDocuments(deps.db, {
+          agentId,
+          teamId: threadRow.teamId,
+          threadId: threadRow.id,
+          projectId: null,
+          recordUse: !digest,
+        });
   const memories = [
     ...injected.memories.map(({ title, content }) => ({ title, content })),
     { title: '记忆文件', content: `${injected.fileCount} 个；用 memories 按需读取。` },

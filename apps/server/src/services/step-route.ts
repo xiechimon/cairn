@@ -14,9 +14,12 @@ import { eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { machine, step, stepRoute, type todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
-import { claudeUsageGatePasses } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
-import { homeMachineRejectReason, missingCapabilityItems } from './dispatch-eligibility.js';
+import {
+  homeMachineRejectReason,
+  machineRuntimeAvailable,
+  missingCapabilityItems,
+} from './dispatch-eligibility.js';
 import { mergedCatalogModels } from './model-liveness.js';
 
 type StepRouteRow = typeof stepRoute.$inferSelect;
@@ -59,7 +62,7 @@ export interface RouteConstraints {
   required: RequiredCapabilities | null;
 }
 
-function machineSatisfies(
+export function machineSatisfies(
   row: typeof machine.$inferSelect,
   constraints: RouteConstraints,
 ): boolean {
@@ -97,15 +100,10 @@ export function capabilityCandidates(
   for (const row of db.select().from(machine).where(eq(machine.teamId, teamId)).all()) {
     if (!machineSatisfies(row, constraints)) continue;
     const report = row.claudeCodeReport;
-    const claudeInstalled =
-      report?.installed === true && row.enabledRuntimes.includes('claude-code');
+    const claudeInstalled = machineRuntimeAvailable(row, 'claude-code');
     const claudeUsable =
       claudeInstalled &&
       row.online &&
-      claudeUsageGatePasses({ db }, row, {
-        provider: 'claude-code',
-        modelId: 'claude-sonnet-5-5',
-      }) &&
       claudeRateBlock(row.claudeRateLimits ?? [], now) === null &&
       (hasActiveClaudeSubscription({ db }, teamId) ||
         (report?.auth?.state !== 'not-logged-in' && !claudeLoginBlocksClaim(report?.login, now)));
@@ -124,19 +122,16 @@ export function capabilityCandidates(
     }
     const codexLogin = row.capabilities?.codexLogin;
     if (codexLogin === undefined) continue;
-    const piEnabled = row.enabledRuntimes.includes('pi');
     candidates.push({
       harness: 'pi',
       provider: CODEX_MODEL.provider,
       modelId: CODEX_MODEL.modelId,
       machineId: row.id,
       available:
-        piEnabled &&
         row.online &&
         codexLogin.state === 'ok' &&
         codexLogin.expiresAt !== undefined &&
         codexLogin.expiresAt > now,
-      ...(piEnabled ? {} : { unavailableWhy: 'harness-missing' as const }),
       weeklyUsedPercent: null,
     });
   }

@@ -1,10 +1,15 @@
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import pino from 'pino';
 import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { bootServer, req } from './helpers.js';
+import {
+  claudeSubscription,
+  machine as machineTable,
+  step as stepTable,
+} from '../src/db/schema.js';
+import { bootServer, insertMachine, req, type TestServer } from './helpers.js';
 
 const TOKEN =
   'sk-ant-oat01-subscription-test-private-token-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz';
@@ -243,5 +248,304 @@ describe('the setup token is stored only for the owner session', () => {
     expect(await saved.text()).not.toContain(TOKEN);
     const list = await s.app.request(path, { headers });
     expect(await list.text()).not.toContain(TOKEN);
+  });
+});
+
+describe('switching the enabled Claude subscription', () => {
+  const tokenOf = (letter: string) => `sk-ant-oat01-${letter.repeat(64)}`;
+
+  function fakeClaude(body: string): string {
+    const dir = makeTestTempDir('claude-switch-');
+    fixtureDirs.push(dir);
+    const binary = join(dir, 'claude');
+    writeFileSync(binary, `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+    vi.stubEnv('CLAUDE_BIN', binary);
+    return binary;
+  }
+
+  async function twoAccounts() {
+    const s = bootServer();
+    const path = `/api/teams/${s.team.id}/claude-subscriptions`;
+    const ids: string[] = [];
+    for (const [label, letter] of [
+      ['First', 'a'],
+      ['Second', 'b'],
+    ] as const) {
+      const response = await req(s.app, 'POST', path, { label, token: tokenOf(letter) });
+      expect(response.status).toBe(201);
+      ids.push(((await response.json()) as { id: string }).id);
+    }
+    return { s, path, first: ids[0] as string, second: ids[1] as string };
+  }
+
+  const enabledIds = (s: TestServer) =>
+    s.db
+      .select()
+      .from(claudeSubscription)
+      .all()
+      .filter((row) => row.enabledAt !== null)
+      .map((row) => row.id);
+
+  function runningStep(s: TestServer, subscriptionId: string, id = 'run-1') {
+    s.db
+      .insert(stepTable)
+      .values({
+        id,
+        buildId: `b-${id}`,
+        kind: 'build',
+        status: 'claimed',
+        claimedAt: 5,
+        createdAt: 4,
+        claudeSubscriptionId: subscriptionId,
+      })
+      .run();
+  }
+
+  test('a verified account becomes the only enabled one, the list shows it and no response carries a token', async () => {
+    fakeClaude('exit 0');
+    const { s, path, first, second } = await twoAccounts();
+    expect(enabledIds(s)).toEqual([first]);
+    const response = await req(s.app, 'POST', `${path}/${second}/enable`);
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(JSON.parse(body)).toMatchObject({ id: second, enabled: true });
+    expect(enabledIds(s)).toEqual([second]);
+    const list = await (await req(s.app, 'GET', path)).text();
+    expect(
+      JSON.parse(list).map((row: { id: string; enabled: boolean }) => [row.id, row.enabled]),
+    ).toEqual(
+      expect.arrayContaining([
+        [first, false],
+        [second, true],
+      ]),
+    );
+    for (const text of [body, list]) {
+      expect(text).not.toContain(tokenOf('a'));
+      expect(text).not.toContain(tokenOf('b'));
+    }
+    const again = await req(s.app, 'POST', `${path}/${second}/enable`);
+    expect(again.status).toBe(200);
+    expect(enabledIds(s)).toEqual([second]);
+  });
+
+  test.each([
+    ['a rejected token', 'echo "401 invalid" >&2\nexit 1', 'auth'],
+    ['a server without claude', null, 'unavailable'],
+  ])('%s fails the precheck and the old account stays enabled', async (_name, script, reason) => {
+    if (script === null) vi.stubEnv('CLAUDE_BIN', '/nonexistent/claude');
+    else fakeClaude(script);
+    const { s, path, first, second } = await twoAccounts();
+    const response = await req(s.app, 'POST', `${path}/${second}/enable`);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: 'precheck-failed',
+      reason,
+      error: expect.any(String),
+    });
+    expect(enabledIds(s)).toEqual([first]);
+  });
+
+  test('a running task on the enabled account blocks the switch, disable and delete and changes nothing', async () => {
+    fakeClaude('exit 0');
+    const { s, path, first, second } = await twoAccounts();
+    runningStep(s, first);
+    runningStep(s, first, 'run-2');
+    for (const [method, url] of [
+      ['POST', `${path}/${second}/enable`],
+      ['POST', `${path}/${first}/disable`],
+      ['DELETE', `${path}/${first}`],
+    ] as const) {
+      const response = await req(s.app, method, url);
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ code: 'running-tasks', running: 2 });
+    }
+    expect(enabledIds(s)).toEqual([first]);
+    expect(s.db.select().from(claudeSubscription).all()).toHaveLength(2);
+    s.db.update(stepTable).set({ status: 'done' }).run();
+    expect((await req(s.app, 'POST', `${path}/${second}/enable`)).status).toBe(200);
+    expect(enabledIds(s)).toEqual([second]);
+  });
+
+  test('a running task bound to a disabled account does not block enabling it or another account', async () => {
+    fakeClaude('exit 0');
+    const { s, path, first, second } = await twoAccounts();
+    runningStep(s, second);
+    runningStep(s, 'someone-else', 'run-other');
+    const response = await req(s.app, 'POST', `${path}/${second}/enable`);
+    expect(response.status).toBe(200);
+    expect(enabledIds(s)).toEqual([second]);
+    expect(first).not.toBe(second);
+  });
+
+  test('an expired target is refused and an unknown or foreign id is 404', async () => {
+    fakeClaude('exit 0');
+    const { s, path, second } = await twoAccounts();
+    s.db
+      .update(claudeSubscription)
+      .set({ expiresAt: 1 })
+      .where(eq(claudeSubscription.id, second))
+      .run();
+    const response = await req(s.app, 'POST', `${path}/${second}/enable`);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'expired' });
+    expect((await req(s.app, 'POST', `${path}/missing/enable`)).status).toBe(404);
+    expect(
+      (await req(s.app, 'POST', `/api/teams/other/claude-subscriptions/${second}/enable`)).status,
+    ).toBe(404);
+  });
+
+  test('two switches racing during verification leave one enabled account and one conflict', async () => {
+    fakeClaude('sleep 0.3\nexit 0');
+    const { s, path, first, second } = await twoAccounts();
+    const third = (
+      (await (await req(s.app, 'POST', path, { label: 'Third', token: tokenOf('c') })).json()) as {
+        id: string;
+      }
+    ).id;
+    const results = await Promise.all([
+      req(s.app, 'POST', `${path}/${second}/enable`),
+      req(s.app, 'POST', `${path}/${third}/enable`),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    const loser = results.find((r) => r.status === 409);
+    expect(await loser?.json()).toMatchObject({ code: 'conflict' });
+    expect(enabledIds(s)).toHaveLength(1);
+    expect(enabledIds(s)).not.toContain(first);
+  });
+
+  test('disable turns everything off, delete of the enabled account leaves none enabled', async () => {
+    const { s, path, first, second } = await twoAccounts();
+    const disabled = await req(s.app, 'POST', `${path}/${first}/disable`);
+    expect(await disabled.json()).toMatchObject({ id: first, enabled: false });
+    expect(enabledIds(s)).toEqual([]);
+    expect((await req(s.app, 'POST', `${path}/${first}/disable`)).status).toBe(200);
+    fakeClaude('exit 0');
+    expect((await req(s.app, 'POST', `${path}/${second}/enable`)).status).toBe(200);
+    expect((await req(s.app, 'DELETE', `${path}/${second}`)).status).toBe(204);
+    expect(enabledIds(s)).toEqual([]);
+    expect((await req(s.app, 'DELETE', `${path}/${first}`)).status).toBe(204);
+  });
+
+  test('a switch clears the rate-limit rejection recorded for the old account', async () => {
+    fakeClaude('exit 0');
+    const { s, path, second } = await twoAccounts();
+    const machineId = insertMachine(s, { name: 'limited' });
+    s.db
+      .update(machineTable)
+      .set({
+        claudeRateLimits: [
+          {
+            subscription: 'five_hour',
+            status: 'rejected',
+            utilization: 1,
+            resetsAt: Date.now() + 3_600_000,
+            reportedAt: Date.now(),
+          },
+        ],
+      })
+      .where(eq(machineTable.id, machineId))
+      .run();
+    expect((await req(s.app, 'POST', `${path}/${second}/enable`)).status).toBe(200);
+    expect(
+      s.db.select().from(machineTable).where(eq(machineTable.id, machineId)).get()
+        ?.claudeRateLimits,
+    ).toBeNull();
+  });
+
+  test('rename keeps the token out of the label', async () => {
+    const { s, path, first } = await twoAccounts();
+    const renamed = await req(s.app, 'PATCH', `${path}/${first}`, { label: 'Work account' });
+    expect(await renamed.json()).toMatchObject({ id: first, label: 'Work account' });
+    const refused = await req(s.app, 'PATCH', `${path}/${first}`, { label: `x ${tokenOf('a')}` });
+    expect(refused.status).toBe(400);
+    expect(await refused.text()).not.toContain(tokenOf('a'));
+    expect((await req(s.app, 'PATCH', `${path}/${first}`, { label: ' ' })).status).toBe(400);
+  });
+
+  test('the steps list shows what ran on the account, newest first, with a running outcome and paging', async () => {
+    const { s, path, first, second } = await twoAccounts();
+    s.db
+      .insert(stepTable)
+      .values([
+        {
+          id: 's-old',
+          buildId: 'b1',
+          kind: 'build',
+          status: 'done',
+          claimedAt: 10,
+          createdAt: 9,
+          claudeSubscriptionId: first,
+        },
+        {
+          id: 's-fail',
+          buildId: 'b2',
+          kind: 'verify',
+          status: 'failed',
+          claimedAt: 20,
+          createdAt: 19,
+          claudeSubscriptionId: first,
+        },
+        {
+          id: 's-run',
+          buildId: 'b3',
+          kind: 'chief',
+          status: 'claimed',
+          claimedAt: 30,
+          createdAt: 29,
+          claudeSubscriptionId: first,
+        },
+        {
+          id: 's-queued',
+          buildId: 'b4',
+          kind: 'build',
+          status: 'pending',
+          claimedAt: 40,
+          createdAt: 39,
+          claudeSubscriptionId: first,
+        },
+        {
+          id: 's-other',
+          buildId: 'b5',
+          kind: 'build',
+          status: 'done',
+          claimedAt: 50,
+          createdAt: 49,
+          claudeSubscriptionId: second,
+        },
+      ])
+      .run();
+    const page = (await (await req(s.app, 'GET', `${path}/${first}/steps?limit=2`)).json()) as {
+      steps: { stepId: string; outcome: string; kind: string; threadId: string }[];
+      hasEarlier: boolean;
+    };
+    expect(page.steps.map((row) => [row.stepId, row.outcome, row.kind])).toEqual([
+      ['s-run', 'running', 'chief'],
+      ['s-fail', 'failed', 'build'],
+    ]);
+    expect(page.hasEarlier).toBe(true);
+    const all = (await (await req(s.app, 'GET', `${path}/${first}/steps`)).json()) as {
+      steps: { stepId: string }[];
+      hasEarlier: boolean;
+    };
+    expect(all.steps.map((row) => row.stepId)).toEqual(['s-run', 's-fail', 's-old']);
+    expect(all.hasEarlier).toBe(false);
+    expect((await req(s.app, 'GET', `${path}/missing/steps`)).status).toBe(404);
+  });
+
+  test('switching is refused for callers that are not the owner session', async () => {
+    const s = bootServer({ authToken: 'owner-secret-0123456789abcdef' });
+    const path = `/api/teams/${s.team.id}/claude-subscriptions`;
+    for (const [method, url] of [
+      ['POST', `${path}/x/enable`],
+      ['POST', `${path}/x/disable`],
+      ['PATCH', `${path}/x`],
+    ] as const) {
+      const response = await s.app.request(url, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      });
+      expect([401, 403]).toContain(response.status);
+    }
   });
 });

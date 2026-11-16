@@ -27,7 +27,6 @@ async function expectOwnsCenter(
 for (const [route, scenario] of [
   ['/app/account', '13'],
   ['/app/api-keys', 'api-keys'],
-  ['/app/schedules', '11'],
   ['/app/resources/skills', '06'],
   ['/app/resources/mcp-servers', '07'],
   ['/app/resources/secrets', '08'],

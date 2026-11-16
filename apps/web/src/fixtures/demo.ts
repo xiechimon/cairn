@@ -1,4 +1,5 @@
 import { at, TEAM_ID } from './core.js';
+import { SERVER_SECTION } from './home-c.js';
 import type {
   ChangesContent,
   ChiefStreamItem,
@@ -51,8 +52,10 @@ function demoFixtureOf(): FixtureSet {
       hasChanges: input.hasChanges ?? false,
       hasPlan: input.hasPlan ?? false,
       buildHistory: input.buildHistory ?? [],
+      output: 'code',
       sourceTodo: null,
       v: 3,
+      ...SERVER_SECTION[input.phase],
     };
   }
 
@@ -166,7 +169,7 @@ function demoFixtureOf(): FixtureSet {
     bullet('登录成功事件触发合并，后台任务异步执行，不阻塞跳转。'),
     bullet('按 SKU 合并数量；两边都有的行取最新加入时间那条的单价。'),
     bullet(
-      'v1 被 AI 审核以 blocking 驳回（合并会覆盖促销价），v2 改为保留低价，v3 补幂等键防重复合并。',
+      'v1 被 AI 审核以「必须修改」驳回（合并会覆盖促销价），v2 改为保留低价，v3 补幂等键防重复合并。',
     ),
     bullet('合并结果写审计行，购物车 icon 角标实时刷新。'),
   ];
@@ -208,7 +211,7 @@ function demoFixtureOf(): FixtureSet {
             id: '1',
             severity: 'blocking',
             summary: '合并覆盖了促销价',
-            description: 'mergeGuestCart 直接以 guest 行的 updatedAt 取价，会把闪购价顶掉。',
+            description: '`mergeGuestCart` 直接以 guest 行的 `updatedAt` 取价，会把闪购价顶掉。',
             file: 'src/cart/merge.ts',
             line: 42,
             suggestion: '两边都有的 SKU 保留低价那行。',
@@ -228,7 +231,7 @@ function demoFixtureOf(): FixtureSet {
         paragraphs: [
           [
             {
-              text: 'AI 审核的 blocking 项已修：合并改为保留低价，并加了幂等键，这是 v3，麻烦确认。',
+              text: 'AI 审核标为必须修改的那项已修好：合并改为保留低价，并加了幂等键，这是 v3，麻烦确认。',
             },
           ],
         ],
@@ -353,13 +356,13 @@ function demoFixtureOf(): FixtureSet {
       {
         kind: 'verify',
         passed: true,
-        conclusion: 'auth 套件 41 条全绿，限流窗口与提示文案均有覆盖。',
+        conclusion: '单测：auth 套件 41 条全绿，限流窗口与提示文案均有覆盖。',
         evidence: [{ path: 'src/auth/rate-limit.test.ts', note: '新增 9 条' }],
       },
       {
         kind: 'verify',
         passed: false,
-        conclusion: 'e2e 登录流有 2 条用例失败，疑似新 429 响应未进用例断言。',
+        conclusion: 'e2e：登录流有 2 条用例失败，疑似新 429 响应未进用例断言。',
         evidence: [
           { path: 'e2e/auth/login.spec.ts' },
           { path: 'test-results/auth-e2e.log', note: '第 3/41 条' },
@@ -420,8 +423,8 @@ function demoFixtureOf(): FixtureSet {
             label: 'bash',
             command: 'pnpm migrate:dry',
             seconds: 18,
-            output: null,
-            error: false,
+            output: 'orders before 2019: 1284 rows missing currency, aborting',
+            error: true,
             running: false,
             unfinished: false,
           },
@@ -431,6 +434,7 @@ function demoFixtureOf(): FixtureSet {
         kind: 'fail',
         title: '执行失败',
         body: 'dry-run 发现 2019 年前的订单缺 currency 字段，回填默认值与账务对不上，已停止迁移。',
+        raw: 'pnpm migrate:dry\norders before 2019: 1284 rows missing currency, aborting\nexit code 1',
       },
     ],
   };
@@ -522,11 +526,11 @@ function demoFixtureOf(): FixtureSet {
     {
       kind: 'robot',
       paragraphs: [
-        [{ text: '收到，拆成三张票并派下去了：' }],
+        [{ text: '收到，拆成三个任务派下去了：' }],
         [{ text: '1. 登录后合并游客购物车 → demo-builder（方案确认中，v3 待你拍板）' }],
         [{ text: '2. 优惠券结算页自动选最优券 → demo-builder（已完成，等你验收）' }],
         [{ text: '3. 补齐结算页埋点 → 排在购物车合并之后，有依赖。' }],
-        [{ text: '订单库迁移那张失败的卡我没有自动重试，等你决定是修脚本还是先回滚。' }],
+        [{ text: '订单库迁移的 dry-run 失败了，我在查原因，查清楚再告诉你怎么处理。' }],
       ],
       seconds: '38',
       tools: [{ label: 'git status' }, { label: 'gh issue list' }],
@@ -546,6 +550,14 @@ function demoFixtureOf(): FixtureSet {
     },
     usageNav: true,
     projectNames: { [PROJECT_ID_DEMO]: PROJECT },
+    project: {
+      name: PROJECT,
+      repoName: 'cairn-demo/demo-shop',
+      hosted: false,
+      repoKind: 'github',
+      defaultBranch: 'main',
+      description: '演示用的网店：商品、购物车和结算。',
+    },
     team: {
       members: 4,
       agents: [
@@ -573,7 +585,7 @@ function demoFixtureOf(): FixtureSet {
           model: 'gpt-5.2',
           isDefault: false,
           machineId: 'demo-machine-build-box',
-          role: '审阅每个合并请求，blocking 问题一律打回。',
+          role: '审阅每个合并请求，必须修改的问题一律打回。',
           provider: 'openai',
         },
         {
@@ -598,6 +610,7 @@ function demoFixtureOf(): FixtureSet {
       threadTitle: '把购物车相关的事排一下…',
       agent: { id: BUILDER.id, displayName: BUILDER.displayName, avatarUrl: null },
       stream: DEMO_CHIEF_STREAM,
+      context: { tokens: 38_000, contextWindow: 200_000 },
     },
     schedules: [
       {
