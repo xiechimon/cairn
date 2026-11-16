@@ -552,6 +552,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         {
           ...keysvc,
           fetch: ctx.providerTestFetch ?? globalThis.fetch,
+          tokenFetch: ctx.oauthFetch ?? globalThis.fetch,
           ...(ctx.providerTestTimeoutMs === undefined
             ? {}
             : { timeoutMs: ctx.providerTestTimeoutMs }),

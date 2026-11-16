@@ -2,6 +2,7 @@ import type { ModelSourceModel, SecretBox } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { provider } from '../db/schema.js';
+import { providerAccessToken } from './provider-access-token.js';
 
 interface CachedModel {
   at: number;
@@ -31,8 +32,10 @@ export async function refreshRelayCatalog(
   let apiKey: string | null = null;
   try {
     const { openProviderKey } = await import('./providers.js');
-    const result = openProviderKey(deps, teamId, providerId);
-    apiKey = result?.apiKey ?? null;
+    apiKey =
+      openProviderKey(deps, teamId, providerId)?.apiKey == null
+        ? null
+        : await providerAccessToken({ ...deps, fetch: globalThis.fetch }, teamId, providerId);
   } catch {
     return;
   }
