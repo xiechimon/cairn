@@ -435,7 +435,7 @@ describe('#1150 (1) scan-surface discipline: batch scan + conditional requests (
       checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
     });
     await w.poller.sweep();
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe('done');
     w.s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, w.todoId)).run();
 
     await w.poller.sweep();
@@ -444,7 +444,7 @@ describe('#1150 (1) scan-surface discipline: batch scan + conditional requests (
     const req2 = w.mock.requests[1];
     if (req2 === undefined) throw new Error('second sweep made no request');
     expect(req2.headers['if-none-match']).toBe('"etag-1"');
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe('done');
   });
 
   test('batch reconcile: 3 candidates in one round = 3 conditional GETs, red/green/pending three states each landed + reconcile row logged', async () => {
@@ -489,7 +489,7 @@ describe('#1150 (1) scan-surface discipline: batch scan + conditional requests (
       'building',
     );
     expect(s.db.select().from(todoTable).where(eq(todoTable.id, green.todoId)).get()!.phase).toBe(
-      'review',
+      'done',
     );
     const pendingTodo = s.db
       .select()
@@ -719,7 +719,7 @@ describe('#1150 (2) pending checks not misjudged red (three-state machine)', () 
     await w.poller.sweep(w.base + CI_EMPTY_CHECKS_GRACE_MS - 1_000);
     expect(w.todoRow().phase).toBe('building');
     await w.poller.sweep(w.base + CI_EMPTY_CHECKS_GRACE_MS + 1_000);
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe('done');
   });
 });
 
@@ -1122,8 +1122,8 @@ describe('#1150 (4) poller does not write back when a build was manually advance
   );
 });
 
-describe('#1150 green push-through / completeStep holds building / scheduler wiring', () => {
-  test('green -> phase advances to the review gate (no fix step dispatched); hasChanges carried without loss', async () => {
+describe('#1150 green delivery / delivery questions / scheduler wiring', () => {
+  test('green -> delivery completes (no fix step dispatched); hasChanges carried without loss', async () => {
     const w = makePrWorld({
       checks: [
         { name: 'lint', status: 'completed', conclusion: 'success' },
@@ -1132,7 +1132,7 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
     });
     w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
     await w.poller.sweep();
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe('done');
     expect(w.fixRoundSteps()).toHaveLength(0);
     expect(w.todoRow().hasChanges).toBe(true);
   });
@@ -1162,7 +1162,7 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
     await w.poller.sweep();
     const gates = () =>
       w.allSteps().filter((row) => row.kind === 'verify' || row.kind === 'review');
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe('done');
     expect(gates()).toHaveLength(0);
     w.s.db
       .insert(stepTable)
@@ -1182,7 +1182,7 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
       { githubFetch: w.mock.fetch },
     );
     await restarted.sweep();
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe('done');
     expect(gates()).toHaveLength(0);
   });
 
@@ -1201,10 +1201,10 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
       })
       .run();
     await w.poller.sweep();
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe('done');
   });
 
-  test('after green the candidate leaves the grind-green set: another sweep no longer reads checks (moves to the #1403 reconcile surface)', async () => {
+  test('after green the completed delivery leaves the grind: another sweep no longer reads checks', async () => {
     const w = makePrWorld({
       checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
     });
@@ -1215,7 +1215,7 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
     expect(checksReads()).toBe(before);
   });
 
-  test('completeStep: a delivered PR goes to user review; a missing PR still asks the delivery question', () => {
+  test('completeStep: a delivered PR completes; a missing PR still asks the delivery question', () => {
     const withPr = makePrWorld({ checks: [] });
     const stepId = `step-run-${Math.random().toString(36).slice(2, 8)}`;
     withPr.s.db
@@ -1230,7 +1230,7 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
       })
       .run();
     completeStep(withPr.s.svc, stepId, { hasChanges: true });
-    expect(withPr.todoRow().phase).toBe('review');
+    expect(withPr.todoRow().phase).toBe('done');
     expect(withPr.todoRow().hasChanges).toBe(true);
 
     const noPr = makePrWorld({ checks: [] });
@@ -1273,7 +1273,7 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
       })
       .run();
     completeStep(hosted.s.svc, stepId3, { hasChanges: true });
-    expect(hosted.todoRow().phase).toBe('review');
+    expect(hosted.todoRow().phase).toBe('done');
   });
 
   test('scheduler wiring: start() scans immediately + 60s self-loop; stop() stops; tick() does not go outbound (sync contract)', async () => {
@@ -1288,7 +1288,7 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
     expect(w.mock.requests).toHaveLength(0);
     scheduler.start();
     await vi.waitFor(() => {
-      expect(w.todoRow().phase).toBe('review');
+      expect(w.todoRow().phase).toBe('done');
     });
     expect(w.mock.requests.length).toBeGreaterThanOrEqual(1);
     scheduler.stop();
@@ -1330,14 +1330,14 @@ describe('#1533 ci-fix turns green reconciliation ticket', () => {
       expect(created[0]?.body).toContain('待归因');
       expect(created[0]?.body).toContain('负对照');
       expect(created[0]?.body).toContain('cairn-dedupe: ci-fix:lint');
-      expect(w.todoRow().phase).toBe('review');
+      expect(w.todoRow().phase).toBe('done');
       w.s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, w.todoId)).run();
       await poller.sweep();
       expect(created).toHaveLength(1);
     }
   });
 
-  test('ticket-creation failure does not block the review, compensated after restart; another build of the same kind dedupes, a different kind opens separately', async () => {
+  test('ticket-creation failure does not block delivery, compensated after restart; another build of the same kind dedupes, a different kind opens separately', async () => {
     const w = makePrWorld({
       fixRounds: 1,
       checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
@@ -1383,11 +1383,11 @@ describe('#1533 ci-fix turns green reconciliation ticket', () => {
       return w.mock.fetch(input, init);
     };
     await createCiPoller({ ...w.s.svc, box: w.s.secretBox, githubFetch }, { githubFetch }).sweep();
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe('done');
     available = true;
     await createCiPoller({ ...w.s.svc, box: w.s.secretBox, githubFetch }, { githubFetch }).sweep();
     expect(writes).toBe(1);
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.todoRow().phase).toBe('done');
     w.s.db
       .insert(stepTable)
       .values({
@@ -1558,7 +1558,7 @@ describe('#1829 closing push and agent-opened PR recovery', () => {
       expect(
         w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()?.prUrl,
       ).toBe(`https://github.com/octo/demo/pull/${w.prNumber}`);
-      expect(w.todoRow().phase).toBe('review');
+      expect(w.todoRow().phase).toBe('done');
       await createCiPoller(
         { ...w.s.svc, box: w.s.secretBox, githubFetch },
         { githubFetch },
