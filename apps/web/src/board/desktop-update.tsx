@@ -27,6 +27,8 @@ const BLOCKER_HINTS: Record<DesktopUpdateBlocker, string> = {
 const ARROW = ['M12 8v8', 'm8 12 4 4 4-4'];
 const FILL_TOP = 2;
 const FILL_SPAN = 20;
+const WATERLINE =
+  'fill-(--mask-keep) transition-transform duration-200 ease-out motion-reduce:transition-none';
 
 type UpdateMark = 'waiting' | 'failed' | null;
 
@@ -65,13 +67,12 @@ function UpdateGlyph({
             y={FILL_TOP}
             width="24"
             height="24"
-            fill="white"
             stroke="none"
             style={{ transform: `translateY(${sink}px)` }}
-            className="transition-transform duration-200 ease-out motion-reduce:transition-none"
+            className={WATERLINE}
           />
           {ARROW.map((d) => (
-            <path key={d} d={d} stroke="black" />
+            <path key={d} d={d} className="stroke-(--mask-cut)" />
           ))}
         </mask>
         <mask id={`${id}dry`}>
@@ -80,16 +81,15 @@ function UpdateGlyph({
             y={FILL_TOP - 24}
             width="24"
             height="24"
-            fill="white"
             stroke="none"
             style={{ transform: `translateY(${sink}px)` }}
-            className="transition-transform duration-200 ease-out motion-reduce:transition-none"
+            className={WATERLINE}
           />
         </mask>
         {mark !== null && (
           <mask id={`${id}mark`}>
-            <rect width="24" height="24" fill="white" stroke="none" />
-            <circle cx="19.6" cy="4.4" r="3.9" fill="black" stroke="none" />
+            <rect width="24" height="24" stroke="none" className="fill-(--mask-keep)" />
+            <circle cx="19.6" cy="4.4" r="3.9" stroke="none" className="fill-(--mask-cut)" />
           </mask>
         )}
       </defs>
