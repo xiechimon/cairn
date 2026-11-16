@@ -96,6 +96,7 @@ import {
   getProvidersEnvelope,
   updateProvider,
 } from './services/providers.js';
+import { seedClaudeCodeRules } from './services/routing-rules.js';
 import { runScheduleNow } from './services/schedule-run.js';
 import {
   createSchedule,
@@ -450,7 +451,9 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
     const body = parseWith(createClaudeSubscriptionSchema, await jsonBody(c), 'body');
-    return c.json(createClaudeSubscription(keysvc, teamId, body), 201);
+    const created = createClaudeSubscription(keysvc, teamId, body);
+    if (created.enabled) seedClaudeCodeRules(ctx.db, teamId);
+    return c.json(created, 201);
   });
 
   app.delete('/api/teams/:id/claude-subscriptions/:cid', (c) => {

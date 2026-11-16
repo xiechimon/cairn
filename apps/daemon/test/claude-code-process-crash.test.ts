@@ -57,16 +57,15 @@ test.each([true, false])(
     expect(failure.error.message).not.toContain(token);
     expect(failure.error.retryable).toBe(false);
     if (teamSubscriptionToken) {
-      expect(failure.error.message).toContain('团队 Claude 订阅');
-      expect(failure.error.message).toContain('设置 → 订阅');
+      expect(failure.error.message).toContain('你的 Claude 订阅登录已失效');
+      expect(failure.error.message).toContain('设置 → 模型服务');
       expect(failure.error.message).toContain('claude setup-token');
-      expect(failure.error.message).toContain('验证');
       expect(failure.error.message).not.toContain('claude auth status');
     } else {
       expect(failure.error.message).toContain('daemon-test');
       expect(failure.error.message).toContain('claude auth status');
       expect(failure.error.message).toContain('/login');
-      expect(failure.error.message).not.toContain('团队 Claude 订阅');
+      expect(failure.error.message).not.toContain('你的 Claude 订阅登录已失效');
     }
   },
 );
