@@ -9498,6 +9498,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "routing_rule",
   "work_policy",
   "chief_turn_usage",
+  "step_usage",
   "chief_summary",
   "computer",
   "computer_call",
@@ -9629,6 +9630,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "POST",
     "note": "D60 PR8: seed missing session/review rules and policies from agents",
     "path": "/api/teams/{id}/routing-settings/seed",
+  },
+  {
+    "method": "GET",
+    "note": "tokens per local day, Coordinator and tasks apart (?days=1..371&tz=IANA)",
+    "path": "/api/teams/{id}/usage/daily",
   },
   {
     "method": "GET",
