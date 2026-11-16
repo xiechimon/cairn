@@ -2,6 +2,12 @@
 
 Cairn is one server you browse plus a daemon on every machine that runs builds. The server alone is enough to look around; a daemon is what lets agents work on your own machines.
 
+## Cairn for Mac
+
+On a Mac, the desktop app is the whole install. Download it from the [latest release](https://github.com/xiechimon/cairn/releases/latest) (`-arm64.dmg` for Apple silicon, `-x64.dmg` for Intel), drag it to Applications and open it. The app is not notarized yet, so macOS blocks the first launch: open System Settings, then Privacy & Security, and click **Open Anyway** next to Cairn; on macOS 14 and earlier, right-click Cairn in Applications and choose Open instead.
+
+The app runs the server and a Runner on this Mac, approves that Runner and signs you in as the owner. Tasks run with Claude Code: install it and run `claude` once in Terminal to sign in. The app finds `claude` on your `PATH` or in its usual install folders. The rest of this page is for Linux, Windows and extra Runners.
+
 ## Run the server
 
 Requirements: Node.js 22 or 24 (LTS lines ship prebuilt `better-sqlite3` binaries; other versions may fall back to source compilation and need a build toolchain).
@@ -26,11 +32,12 @@ The UI is fully usable without a daemon; register a machine when you want agents
 
 ```sh
 npm i -g @xiechimon/cairn-cli
-# One-time enrollment: create an API key in the web UI (/app/api-keys, plaintext shown once), then
-cairn start --api-key <cairn_...> --team <teamId>
-# Daily use (credentials persisted in ~/.cairn/machine.json):
-cairn start        # also: stop / restart / logs -f / status
+cairn start --server http://127.0.0.1:8787
 ```
+
+The first start prints a link. Open it in the browser where you use Cairn and approve the machine; the daemon then connects by itself and keeps its credentials in `~/.cairn/machine.json`. When the Runner is on another machine, use the address that reaches your server instead. Later, `cairn start` alone is enough; there are also `cairn stop`, `restart`, `logs -f` and `status`.
+
+On a machine without a browser, create an API key in the web UI (API keys in Settings; the key is shown once) and enroll with `cairn start --api-key <cairn_...> --team <teamId>` instead.
 
 Both packages install a `cairn` bin: installing both globally on the same machine means whichever came last wins the name. The clean split is running the server where you browse and `cairn-cli` where agents build.
 
