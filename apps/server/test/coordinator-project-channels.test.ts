@@ -14,6 +14,7 @@ import {
 import { getTodo } from '../src/services/todos.js';
 import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { postProject, req } from './helpers.js';
+import { ownerTodoParams } from './owner-message.js';
 
 registerChiefHarness();
 
@@ -174,28 +175,29 @@ describe('Coordinator project channels (docs/design/coordinator-project-channels
     expect(composeChiefSystemPrompt(toolDeps(), H.teamId, H.threadId)).not.toContain('## 频道');
   });
 
-  test('a report for a channel task lands in the channel and mirrors one line to the main channel', async () => {
+  test('a task created in a project channel reports there; the main channel mirrors only needs-you and done', async () => {
     const channel = await openChannel();
-    const created = await req(H.s.app, 'POST', `/api/projects/${H.projectId}/todos`, {
-      title: 'Export the board',
-      spec: 'Add an export.',
-    });
-    const todoId = ((await created.json()) as { id: string }).id;
-    const record = getTodo(deps(), todoId)!;
-    addChiefWatch(deps(), {
-      teamId: H.teamId,
-      todo: record,
-      projectName: 'demo',
-      threadId: channel.body.id,
-    });
+    const created = (await relay(
+      'create_todo',
+      ownerTodoParams(H.s.db, channel.body.id, H.projectId, 'Export the board as CSV'),
+      { threadId: channel.body.id, conversationId: channel.body.id },
+    )) as { id: string };
+    const record = getTodo(deps(), created.id)!;
     postThreadReport(deps(), record, 'needs-you', 'Which format?');
+    postThreadReport(deps(), record, 'review');
+    postThreadReport(deps(), record, 'done');
     const reportOf = (threadId: string) =>
-      rowsOf(threadId).map((r) => threadReportContentSchema.parse(JSON.parse(String(r.content))));
-    expect(reportOf(channel.body.id).map((r) => [r.todoId, r.phase, r.line])).toEqual([
-      [todoId, 'needs-you', 'Which format?'],
+      rowsOf(threadId)
+        .filter((r) => r.role === 'system' && String(r.content).includes('"thread-report"'))
+        .map((r) => threadReportContentSchema.parse(JSON.parse(String(r.content))));
+    expect(reportOf(channel.body.id).map((r) => [r.todoId, r.phase, r.fromThreadId])).toEqual([
+      [created.id, 'needs-you', undefined],
+      [created.id, 'review', undefined],
+      [created.id, 'done', undefined],
     ]);
-    expect(reportOf(H.threadId).map((r) => [r.todoId, r.phase, r.line])).toEqual([
-      [todoId, 'needs-you', 'Which format?'],
+    expect(reportOf(H.threadId).map((r) => [r.todoId, r.phase, r.fromThreadId])).toEqual([
+      [created.id, 'needs-you', channel.body.id],
+      [created.id, 'done', channel.body.id],
     ]);
   });
 
