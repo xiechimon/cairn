@@ -33,12 +33,10 @@ import { ProviderPresetIcon } from './provider-preset-icon.js';
 const FIELD_TITLE_CLS = 'text-ui font-medium text-foreground';
 
 const PICKER_ROW_CLS =
-  'h-10 w-full justify-start gap-2.5 rounded-md px-2.5 text-left text-ui font-normal text-foreground hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) disabled:text-content-tertiary disabled:opacity-100';
+  'h-10 pointer-coarse:h-11 w-full justify-start gap-2.5 rounded-md px-2.5 text-left text-ui font-normal text-foreground hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) disabled:text-content-tertiary disabled:opacity-100';
 
 const PICKER_TILE_CLS =
   'flex size-5.5 flex-none items-center justify-center rounded-(--radius-control) bg-card text-caption font-semibold text-content-secondary ring-1 ring-border';
-
-const PICKER_TAG_CLS = 'ml-auto text-caption font-normal text-content-tertiary';
 
 const PICKER_GROUP_CLS = 'm-0 flex min-w-0 flex-col border-0 p-0';
 
@@ -344,7 +342,7 @@ export function CreateProviderDialog({
               const claudeRow =
                 group === '订阅登录' &&
                 onPickClaudeSubscription !== undefined &&
-                matchesQuery('claude', query);
+                matchesQuery(t('Claude 订阅').toLowerCase(), query);
               if (groupRows.length === 0 && !claudeRow) return null;
               return (
                 <fieldset key={group} className={PICKER_GROUP_CLS}>
@@ -359,7 +357,7 @@ export function CreateProviderDialog({
                       <span aria-hidden className={PICKER_TILE_CLS}>
                         <Claude size={14} />
                       </span>
-                      <span className="min-w-0 truncate">Claude Pro / Max</span>
+                      <span className="min-w-0 truncate">{t('Claude 订阅')}</span>
                     </Button>
                   )}
                   {groupRows.map((row) => (
@@ -368,7 +366,8 @@ export function CreateProviderDialog({
                       variant="ghost"
                       data-preset-id={row.id}
                       className={PICKER_ROW_CLS}
-                      disabled={row.oauth && (connectPending === true || codexSignInPending === true)}
+                      disabled={
+                        row.oauth && (connectPending === true || codexSignInPending === true)
                       }
                       onClick={() => {
                         if (!row.oauth) enterForm({ id: row.id, label: row.label });
@@ -381,7 +380,6 @@ export function CreateProviderDialog({
                         <ProviderPresetIcon id={row.id} />
                       </span>
                       <span className="min-w-0 truncate">{row.label}</span>
-                      {row.oauth && <span className={PICKER_TAG_CLS}>OAuth</span>}
                     </Button>
                   ))}
                 </fieldset>

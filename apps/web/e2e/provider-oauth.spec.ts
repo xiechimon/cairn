@@ -10,17 +10,14 @@ async function openDialog(page: Page) {
   return dialog;
 }
 
-test('OAuth badge rides the wired rows (GitHub Copilot, OpenAI Codex device login); xai has no badge', async ({
+test('the wired sign-ins (GitHub Copilot, OpenAI Codex device login) are offered without a badge', async ({
   page,
 }) => {
   const dialog = await openDialog(page);
-  await expect(dialog.getByText('OAuth', { exact: true })).toHaveCount(2);
-  await expect(
-    dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' }).getByText('OAuth', { exact: true }),
-  ).toHaveCount(1);
+  await expect(dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' })).toHaveCount(1);
+  await expect(dialog.getByText('OAuth', { exact: true })).toHaveCount(0);
 
   const codex = dialog.locator('[data-preset-id]', { hasText: 'OpenAI Codex' });
-  await expect(codex.getByText('OAuth', { exact: true })).toHaveCount(1);
   await expect(codex).toBeEnabled();
   await expect(dialog.getByText('暂未开通')).toHaveCount(0);
 
@@ -30,12 +27,12 @@ test('OAuth badge rides the wired rows (GitHub Copilot, OpenAI Codex device logi
   await expect(dialog.getByText('SuperGrok')).toHaveCount(0);
 });
 
-test('fixture face clicking a wired-badge row = accept law (closes); reopening still lists it', async ({ page }) => {
+test('fixture face clicking a wired sign-in row = accept law (closes); reopening still lists it', async ({ page }) => {
   const dialog = await openDialog(page);
   await dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' }).click();
   await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeHidden();
   const again = await openDialog(page);
-  await expect(again.getByText('OAuth', { exact: true })).toHaveCount(2);
+  await expect(again.locator('[data-preset-id]', { hasText: 'GitHub Copilot' })).toHaveCount(1);
   await expect(again.getByRole('alert')).toHaveCount(0);
 });
 

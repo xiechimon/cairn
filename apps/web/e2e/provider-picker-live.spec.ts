@@ -44,7 +44,7 @@ test.describe('a server with a GitHub OAuth client', () => {
 
   test('the picker offers GitHub Copilot alongside the Codex device sign-in', async ({ page }) => {
     const picker = await openPicker(page, server);
-    await expect(picker.locator('[data-preset-id="github-copilot"]')).toContainText('OAuth');
+    await expect(picker.locator('[data-preset-id="github-copilot"]')).toHaveText('GitHub Copilot');
     await expect(picker.locator('[data-preset-id="openai-codex"]')).toBeVisible();
   });
 });
