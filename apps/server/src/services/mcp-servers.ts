@@ -65,7 +65,10 @@ export function defaultMcpConfigPath(): string {
 }
 
 export interface ClaudeMcpRead {
-  records: Omit<McpServerRecord, 'teamId' | 'id' | 'createdBy' | 'createdAt' | 'updatedAt'>[];
+  records: Omit<
+    McpServerRecord,
+    'teamId' | 'id' | 'createdBy' | 'createdAt' | 'updatedAt' | 'source' | 'status'
+  >[];
   mtimeMs: number;
 }
 
@@ -111,16 +114,38 @@ export function readClaudeMcpServers(path: string): ClaudeMcpRead {
   return { records, mtimeMs };
 }
 
-export function listMcpServers(deps: McpServerDeps, teamId: string): McpServerRecord[] {
+export function listMcpServers(
+  deps: McpServerDeps & Pick<McpConnectorDeps, 'db'>,
+  teamId: string,
+): McpServerRecord[] {
   const { records, mtimeMs } = readClaudeMcpServers(deps.mcpConfigPath);
-  return records.map((r) => ({
-    ...r,
-    teamId,
-    id: r.slug,
-    createdBy: '',
-    createdAt: mtimeMs,
-    updatedAt: mtimeMs,
-  }));
+  return [
+    ...records.map((r) => ({
+      ...r,
+      teamId,
+      id: r.slug,
+      createdBy: '',
+      createdAt: mtimeMs,
+      updatedAt: mtimeMs,
+      source: 'local' as const,
+      status: null,
+    })),
+    ...listMcpConnectors(deps, teamId).map((c) => ({
+      teamId,
+      id: c.id,
+      label: c.label,
+      slug: c.slug,
+      transport: 'http' as const,
+      url: c.url,
+      hasCredential: c.authKind !== 'none',
+      credentialKeys: c.headerNames,
+      createdBy: '',
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+      source: 'connector' as const,
+      status: c.status,
+    })),
+  ];
 }
 
 const CHECK_TIMEOUT_MS = 10_000;

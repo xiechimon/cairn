@@ -147,7 +147,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/mcp-servers', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    return c.json(listMcpServers({ mcpConfigPath: ctx.mcpConfigPath }, teamId));
+    return c.json(listMcpServers({ mcpConfigPath: ctx.mcpConfigPath, db: ctx.db }, teamId));
   });
 
   app.get('/api/documents/:id/diff', (c) => {

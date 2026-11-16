@@ -73,7 +73,7 @@ import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
 import { readFillableProfile } from './job-applications.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { defaultMcpConfigPath, listMcpConnectors, listMcpServers } from './mcp-servers.js';
+import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
 import { executeMemoryDocumentTool } from './memory-documents.js';
 import { notifyChiefMessage } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -436,29 +436,20 @@ export async function executeChiefTool(
       return json(listSecrets(keysvc, ctx.teamId));
     }
     case 'mcp_servers': {
-      const rows = listMcpServers(
-        { mcpConfigPath: deps.mcpConfigPath ?? defaultMcpConfigPath() },
-        ctx.teamId,
-      );
-      return json([
-        ...rows.map((m) => ({
+      return json(
+        listMcpServers(
+          { mcpConfigPath: deps.mcpConfigPath ?? defaultMcpConfigPath(), db },
+          ctx.teamId,
+        ).map((m) => ({
           id: m.id,
           label: m.label,
           slug: m.slug,
           transport: m.transport,
           url: m.url,
-          source: 'local',
+          source: m.source,
+          ...(m.status !== null ? { status: m.status } : {}),
         })),
-        ...listMcpConnectors({ db }, ctx.teamId).map((c) => ({
-          id: c.id,
-          label: c.label,
-          slug: c.slug,
-          transport: 'http',
-          url: c.url,
-          source: 'connector',
-          status: c.status,
-        })),
-      ]);
+      );
     }
     case 'schedules': {
       return json(listSchedules({ db, hub: deps.hub }, ctx.teamId));

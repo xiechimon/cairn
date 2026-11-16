@@ -133,7 +133,10 @@ export function McpServersPage() {
   const mcpQ = useMcpServers(teamId, live);
   const connectorsQ = useMcpConnectors(teamId, live);
   const local = live
-    ? mapMcpServers(mcpQ.data ?? [], Date.now())
+    ? mapMcpServers(
+        (mcpQ.data ?? []).filter((row) => row.source === 'local'),
+        Date.now(),
+      )
     : (fixture.resources?.mcpServers ?? []);
   const connectors = live ? (connectorsQ.data ?? []) : (fixture.resources?.mcpConnectors ?? []);
   const fixtureDialog = fixture.ui?.mcpDialog;

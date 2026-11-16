@@ -57,10 +57,21 @@ async function stubLiveRouteOverride(page: Page, initialModels?: string[]): Prom
     url: 'https://example.invalid/mcp',
     hasCredential: false,
     credentialKeys: [],
+    source: 'local',
+    status: null,
     createdBy: 'user-1',
     id: MCP_UUID,
     createdAt: 0,
     updatedAt: 0,
+  };
+  const connector = {
+    ...mcpServer,
+    label: 'Linear',
+    slug: 'linear',
+    url: 'https://mcp.linear.app/mcp',
+    id: 'conn-linear',
+    source: 'connector',
+    status: 'connected',
   };
   const routingSettings = { enabled: true, rules: [], policies: [] };
   const responses: Record<string, unknown> = {
@@ -70,7 +81,7 @@ async function stubLiveRouteOverride(page: Page, initialModels?: string[]): Prom
     '/api/todos': [todo],
     [`/api/todos/${THREAD_ID}`]: todo,
     [`/api/teams/${TEAM_ID}/machines`]: [],
-    [`/api/teams/${TEAM_ID}/mcp-servers`]: [mcpServer],
+    [`/api/teams/${TEAM_ID}/mcp-servers`]: [mcpServer, connector],
     [`/api/teams/${TEAM_ID}/routing-settings`]: routingSettings,
     [`/api/teams/${TEAM_ID}/chief`]: {
       chief: { id: 'chief-1', teamId: TEAM_ID, agent: null },
@@ -129,6 +140,7 @@ test('live MCP requirements save the slug used by machine capability dispatch', 
   await expect(dialog).toBeVisible();
   const mcpSwitch = dialog.getByTestId(`route-override-mcp-${MCP_SLUG}`);
   await expect(mcpSwitch).toBeVisible();
+  await expect(dialog.getByTestId('route-override-mcp-linear')).toHaveCount(0);
   await mcpSwitch.click();
   await expect(mcpSwitch).toBeChecked();
 
