@@ -1,6 +1,7 @@
 import { createECDH, randomBytes } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
+import { hostname } from 'node:os';
 import {
   DEVICE_TOKEN_PREFIX,
   PAIRED_DEVICE_CAP,
@@ -18,6 +19,7 @@ import { pairedDevice, pairingGrant, pushSubscription } from '../src/db/schema.j
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from '../src/lib/environment-id.js';
 import { listenOnTailnetSocket } from '../src/lib/tailnet-listener.js';
 import type { SidecarStatus } from '../src/lib/tsnet-sidecar.js';
+import { seedLocalMachine } from '../src/services/machines.js';
 import { createPairingBook, pairFromGrant } from '../src/services/paired-devices.js';
 import { bootServer, type TestServer } from './helpers.js';
 
@@ -461,7 +463,7 @@ describe('F-P1 pairing: code to per-device token', () => {
 });
 
 describe('F-P2 pairing authority stays with the owner token', () => {
-  test('a device token can see paired devices but cannot mint codes, revoke devices or confirm machine enrollment', async () => {
+  test('a device token can see paired devices but cannot mint codes or revoke devices', async () => {
     const s = bootServer({ authToken: OWNER });
     const paired = await pairDevice(s);
     const device = { authorization: `Bearer ${paired.token}` };
@@ -474,11 +476,6 @@ describe('F-P2 pairing authority stays with the owner token', () => {
       (await call(s, 'DELETE', `/api/remote/devices/${paired.deviceId}`, { headers: device }))
         .status,
     ).toBe(403);
-    const confirm = await call(s, 'POST', '/api/machine/enroll/confirm', {
-      headers: device,
-      body: { enrollId: 'x' },
-    });
-    expect(confirm.status).toBe(403);
   });
 
   test('no token and forged tailnet identity cannot mint codes or list devices', async () => {
@@ -499,6 +496,132 @@ describe('F-P2 pairing authority stays with the owner token', () => {
     });
     expect(res.status).toBe(401);
   });
+});
+
+describe('paired devices can approve Runner enrollment', () => {
+  test.each(['bearer', 'cookie'] as const)(
+    '%s approval cannot replace an existing local Runner credential',
+    async (kind) => {
+      const s = bootServer({ authToken: OWNER });
+      seedLocalMachine(s.db, s.team.id);
+      const first = await call(s, 'POST', '/api/machine/enroll/start', {
+        body: { name: hostname() },
+      });
+      const claimed = await call(s, 'POST', '/api/machine/enroll/confirm', {
+        headers: ownerHeaders,
+        body: await first.json(),
+      });
+      expect(claimed.status).toBe(200);
+      const { machine } = (await claimed.json()) as { machine: { token: string } };
+      const pairedResponse = await call(s, 'POST', '/api/remote/pair', {
+        body: { code: await issueCode(s), name: 'phone' },
+      });
+      const paired = (await pairedResponse.json()) as PairResponse;
+      const headers: Record<string, string> =
+        kind === 'bearer'
+          ? { authorization: `Bearer ${paired.token}` }
+          : {
+              cookie: pairedResponse.headers.get('set-cookie')?.split(';')[0] ?? '',
+              'sec-fetch-site': 'same-origin',
+            };
+      const started = await call(s, 'POST', '/api/machine/enroll/start', {
+        body: { name: hostname() },
+      });
+      const body = (await started.json()) as { enrollId: string };
+      expect((await call(s, 'POST', '/api/machine/enroll/confirm', { headers, body })).status).toBe(
+        403,
+      );
+      expect(
+        (
+          await call(s, 'GET', '/api/machine/me', {
+            headers: { authorization: `Bearer ${machine.token}` },
+          })
+        ).status,
+      ).toBe(200);
+      expect(await (await call(s, 'POST', '/api/machine/enroll/poll', { body })).json()).toEqual({
+        status: 'pending',
+        name: hostname(),
+      });
+    },
+  );
+
+  test.each(['bearer', 'cookie'] as const)(
+    '%s approval is single-use and stops after revocation',
+    async (kind) => {
+      const s = bootServer({ authToken: OWNER });
+      const pairedResponse = await call(s, 'POST', '/api/remote/pair', {
+        body: { code: await issueCode(s), name: 'phone' },
+      });
+      expect(pairedResponse.status).toBe(201);
+      const paired = (await pairedResponse.json()) as PairResponse;
+      const cookie = pairedResponse.headers.get('set-cookie')?.split(';')[0];
+      expect(cookie).toBeTruthy();
+      const headers: Record<string, string> =
+        kind === 'bearer'
+          ? { authorization: `Bearer ${paired.token}` }
+          : { cookie: cookie ?? '', 'sec-fetch-site': 'same-origin' };
+      const started = await call(s, 'POST', '/api/machine/enroll/start', {
+        body: { name: 'phone-approved', teamId: s.team.id },
+      });
+      expect(started.status).toBe(200);
+      const body = (await started.json()) as { enrollId: string };
+      if (kind === 'cookie') {
+        const deniedRequests: Record<string, string>[] = [
+          { cookie: cookie ?? '' },
+          { cookie: cookie ?? '', 'sec-fetch-site': 'cross-site' },
+          { cookie: cookie ?? '', origin: 'https://evil.example' },
+        ];
+        for (const deniedHeaders of deniedRequests) {
+          const denied = await call(s, 'POST', '/api/machine/enroll/confirm', {
+            headers: deniedHeaders,
+            body,
+          });
+          expect(denied.status).toBe(403);
+        }
+        expect(await (await call(s, 'POST', '/api/machine/enroll/poll', { body })).json()).toEqual({
+          status: 'pending',
+          name: 'phone-approved',
+        });
+      }
+      const confirmed = await call(s, 'POST', '/api/machine/enroll/confirm', { headers, body });
+      expect(confirmed.status).toBe(200);
+      const { machine } = (await confirmed.json()) as {
+        machine: { token: string; teamId: string };
+      };
+      expect(machine.teamId).toBe(s.team.id);
+      expect(await (await call(s, 'POST', '/api/machine/enroll/poll', { body })).json()).toEqual({
+        status: 'authorized',
+        machine,
+      });
+      expect(
+        (
+          await call(s, 'GET', '/api/machine/me', {
+            headers: { authorization: `Bearer ${machine.token}` },
+          })
+        ).status,
+      ).toBe(200);
+      expect((await call(s, 'POST', '/api/machine/enroll/confirm', { headers, body })).status).toBe(
+        409,
+      );
+      const next = await call(s, 'POST', '/api/machine/enroll/start', {
+        body: { name: 'after-revoke' },
+      });
+      const pending = (await next.json()) as { enrollId: string };
+      expect(
+        (
+          await call(s, 'DELETE', `/api/remote/devices/${paired.deviceId}`, {
+            headers: ownerHeaders,
+          })
+        ).status,
+      ).toBe(204);
+      expect(
+        (await call(s, 'POST', '/api/machine/enroll/confirm', { headers, body: pending })).status,
+      ).toBe(401);
+      expect(
+        await (await call(s, 'POST', '/api/machine/enroll/poll', { body: pending })).json(),
+      ).toEqual({ status: 'pending', name: 'after-revoke' });
+    },
+  );
 });
 
 describe('F-A1 auth off: no tokens are ever issued', () => {
@@ -843,6 +966,20 @@ describe('F-R3 a request that outlives its device cannot create state', () => {
     const res = await revokedBetweenAuthAndBody(s, '/api/projects', { name: 'late project' });
     expect(res.status).toBe(401);
   });
+
+  test('a Runner is not approved if the device is revoked while its request body arrives', async () => {
+    const s = bootServer({ authToken: OWNER });
+    const started = await call(s, 'POST', '/api/machine/enroll/start', {
+      body: { name: 'late Runner' },
+    });
+    const body = (await started.json()) as { enrollId: string };
+    const res = await revokedBetweenAuthAndBody(s, '/api/machine/enroll/confirm', body);
+    expect(res.status).toBe(401);
+    expect(await (await call(s, 'POST', '/api/machine/enroll/poll', { body })).json()).toEqual({
+      status: 'pending',
+      name: 'late Runner',
+    });
+  });
 });
 
 describe('F-C1 credentials and grants are owner-only', () => {
@@ -888,7 +1025,7 @@ describe('F-C1 credentials and grants are owner-only', () => {
     },
   );
 
-  test('a device cannot mint a machine-enrolling key, so it cannot enroll a machine', async () => {
+  test('a device cannot mint a machine-enrolling API key', async () => {
     const s = bootServer({ authToken: OWNER });
     const paired = await pairDevice(s);
     const res = await call(s, 'POST', `/api/teams/${s.team.id}/api-keys`, {
@@ -896,11 +1033,6 @@ describe('F-C1 credentials and grants are owner-only', () => {
       body: { name: 'enroller', machineAccess: true },
     });
     expect(res.status).toBe(403);
-    const confirm = await call(s, 'POST', '/api/machine/enroll/confirm', {
-      headers: { authorization: `Bearer ${paired.token}` },
-      body: { enrollId: 'x' },
-    });
-    expect([401, 403]).toContain(confirm.status);
   });
 
   test('a device still reads and writes ordinary app state', async () => {
