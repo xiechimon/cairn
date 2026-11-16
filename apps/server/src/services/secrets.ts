@@ -56,7 +56,7 @@ function sealValue(deps: SecretDeps, value: string, kind: SecretKind) {
   return { valueCipher, envSeal: kind === 'env' ? sha256Hex(valueCipher) : null };
 }
 
-function assertStorable(kind: SecretKind, delivery: SecretDelivery, value: string | null): void {
+function assertStorable(kind: SecretKind, delivery: SecretDelivery, value: string): void {
   if (kind === 'env' && delivery === 'http')
     throw new HttpError(400, 'an environment variable cannot use http delivery');
   if (kind === 'secret' && value === '') throw new HttpError(400, 'a secret value cannot be empty');
@@ -225,17 +225,13 @@ export function updateSecret(
       400,
       'changing the target of an http secret, or making it plaintext, needs a new value',
     );
-  const converting = wasEnv && kind === 'secret';
-  assertStorable(
-    kind,
-    policy.delivery,
-    patch.value ?? (converting && row.valueCipher !== null ? deps.box.open(row.valueCipher) : null),
-  );
+  const resultingValue =
+    patch.value ?? (row.valueCipher === null ? '' : deps.box.open(row.valueCipher));
+  assertStorable(kind, policy.delivery, resultingValue);
   if (policy.delivery === 'http') {
     if (linked.has(row.id))
       throw new HttpError(400, 'a secret linked to a mail account cannot use http delivery');
-    const value = patch.value ?? (row.valueCipher === null ? '' : deps.box.open(row.valueCipher));
-    assertHttpDeliverable(patch.name ?? row.name, value);
+    assertHttpDeliverable(patch.name ?? row.name, resultingValue);
   }
   deps.db
     .update(secret)

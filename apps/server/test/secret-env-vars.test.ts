@@ -147,6 +147,19 @@ describe('environment variables next to secrets', () => {
     expect((await list())[0]).not.toHaveProperty('value');
   });
 
+  test('a row that ends up a secret with an empty stored value is refused, whatever the patch', async () => {
+    const env = createSecret(deps(), { teamId: s.team.id, name: 'E', value: '', kind: 'env' });
+    simulateOldBinaryValueWrite(env.id, '');
+    expect((await list())[0]).toMatchObject({ kind: 'secret' });
+    expect((await req(s.app, 'PATCH', path(`/${env.id}`), { kind: 'secret' })).status).toBe(400);
+    expect((await req(s.app, 'PATCH', path(`/${env.id}`), { description: 'd' })).status).toBe(400);
+    expect((await req(s.app, 'PATCH', path(`/${env.id}`), { value: 'filled' })).status).toBe(200);
+    const stillEnv = createSecret(deps(), { teamId: s.team.id, name: 'F', value: '', kind: 'env' });
+    expect((await req(s.app, 'PATCH', path(`/${stillEnv.id}`), { description: 'd' })).status).toBe(
+      200,
+    );
+  });
+
   test('an old-binary switch to http delivery hides the value', async () => {
     const env = createSecret(deps(), {
       teamId: s.team.id,
