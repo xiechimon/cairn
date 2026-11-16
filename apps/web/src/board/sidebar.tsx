@@ -44,6 +44,7 @@ import { DeleteArchivedProjectsConfirm } from '../overlay/delete-archived-projec
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF } from '../settings/settings-href.js';
+import { DesktopUpdateButton } from './desktop-update.js';
 import { coordinatorSearch } from './open-composer.js';
 import { isArchivedProject } from './project-archive.js';
 import {
@@ -150,7 +151,7 @@ const SIDEBAR_FOOT_ROW = `flex h-8.5 flex-none items-center justify-start gap-3 
 const SEARCH_OPEN_DIM_CURRENT =
   '[html[data-search-open]_&_[aria-current=page]]:bg-transparent [html[data-search-open]_&_[aria-current=page]]:text-content-secondary';
 
-const ICON_BTN = `size-7 flex-none cursor-pointer rounded-(--cds-radius-md) border-none bg-transparent p-0 text-sidebar-ink hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover active:bg-sidebar-hover dark:active:bg-sidebar-hover aria-expanded:bg-transparent ${FOCUS}`;
+const ICON_BTN = `size-7 flex-none pointer-coarse:size-11 cursor-pointer rounded-(--cds-radius-md) border-none bg-transparent p-0 text-sidebar-ink hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover active:bg-sidebar-hover dark:active:bg-sidebar-hover aria-expanded:bg-transparent ${FOCUS}`;
 
 function SidebarTip({
   label,
@@ -467,7 +468,11 @@ export function BoardSidebar({
         <SidebarTip label={toggleLabel} side="bottom">
           <Button
             variant="ghost"
-            className={cn('sidebar-team-collapse', ICON_BTN, 'text-content-tertiary')}
+            className={cn(
+              'sidebar-team-collapse',
+              ICON_BTN,
+              'text-content-tertiary pointer-coarse:-ml-2',
+            )}
             aria-label={toggleLabel}
             onClick={onToggle}
           >
@@ -526,7 +531,7 @@ export function BoardSidebar({
                 <ProjectFilterMenu
                   filter={filter}
                   onFilter={chooseFilter}
-                  className="size-7 bg-transparent [&_svg:not([class*=size-])]:size-5"
+                  className="size-7 bg-transparent pointer-coarse:-mr-2 [&_svg:not([class*=size-])]:size-5"
                 />
               </div>
             </div>
@@ -544,7 +549,7 @@ export function BoardSidebar({
             {archivedCount === 0 && (
               <p
                 data-testid="sidebar-archived-empty"
-                className="m-0 flex-none py-1 pr-2 pl-3.5 text-meta text-content-secondary"
+                className="m-0 flex-none px-2 py-1 text-meta text-content-secondary"
               >
                 {t('没有已归档的项目')}
               </p>
@@ -660,7 +665,9 @@ export function BoardSidebar({
         data-testid="sidebar-footer"
         className="flex h-14 flex-none items-center gap-1 border-t border-border pr-2 pl-1"
       >
-        <span className="flex-1" />
+        <div className="flex min-w-0 flex-1 items-center">
+          <DesktopUpdateButton iconClassName={ICON} idleClassName={ICON_BTN} />
+        </div>
         {usageNav && (
           <FooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
             <ChartColumn className={ICON} strokeWidth={STROKE} />

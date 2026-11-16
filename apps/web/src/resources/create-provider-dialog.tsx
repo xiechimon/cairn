@@ -6,6 +6,7 @@ import {
   type ProviderApi,
   type ProviderModel,
 } from '@cairn/shared';
+import { Claude } from '@lobehub/icons';
 import { useEffect, useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
@@ -333,9 +334,9 @@ export function CreateProviderDialog({
                       onClick={onPickClaudeSubscription}
                     >
                       <span aria-hidden className={PICKER_TILE_CLS}>
-                        C
+                        <Claude size={14} />
                       </span>
-                      <span className="min-w-0 truncate">Claude</span>
+                      <span className="min-w-0 truncate">Claude Pro / Max</span>
                       <span className={PICKER_TAG_CLS}>{t('订阅')}</span>
                     </Button>
                   )}

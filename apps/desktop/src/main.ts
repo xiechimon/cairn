@@ -11,6 +11,8 @@ import {
   app,
   BrowserWindow,
   dialog,
+  type IpcMainInvokeEvent,
+  ipcMain,
   Menu,
   nativeImage,
   session,
@@ -19,11 +21,16 @@ import {
   type UtilityProcess,
   utilityProcess,
 } from 'electron';
+import { type LocalRunner, startLocalRunner } from './runner.js';
+import { createUpdater, removeLeftoverUpdates } from './updater.js';
 
 const LOOPBACK = '127.0.0.1';
 const READY_TIMEOUT_MS = 60_000;
 const READY_POLL_MS = 250;
 const STOP_TIMEOUT_MS = 10_000;
+const UPDATE_FIRST_CHECK_MS = 10_000;
+const UPDATE_CHECK_EVERY_MS = 60 * 60 * 1000;
+const UPDATE_CHECK_ON_FOCUS_AFTER_MS = 10 * 60 * 1000;
 
 interface RunningServer {
   process: UtilityProcess;
@@ -33,14 +40,15 @@ interface RunningServer {
 
 let server: RunningServer | null = null;
 let tray: Tray | null = null;
+let runner: LocalRunner | null = null;
 let quitting = false;
-
-function serverRoot(): string {
-  return app.isPackaged ? join(process.resourcesPath, 'server') : join(app.getAppPath(), 'server');
-}
 
 function cairnHome(): string {
   return join(app.getPath('userData'), 'home');
+}
+
+function bundledRoot(name: string): string {
+  return app.isPackaged ? join(process.resourcesPath, name) : join(app.getAppPath(), name);
 }
 
 function freeLoopbackPort(): Promise<number> {
@@ -64,7 +72,7 @@ function startServer(port: number): RunningServer {
   };
   delete env[ENV_VARS.token];
   delete env[ENV_VARS.auth];
-  const child = utilityProcess.fork(join(serverRoot(), 'dist', 'index.mjs'), [], {
+  const child = utilityProcess.fork(join(bundledRoot('server'), 'dist', 'index.mjs'), [], {
     serviceName: 'Cairn server',
     stdio: 'inherit',
     env,
@@ -141,7 +149,12 @@ function openWindow(origin: string): BrowserWindow {
     title: 'Cairn',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 18, y: 18 },
-    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
+    webPreferences: {
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      preload: join(app.getAppPath(), 'dist', 'preload.cjs'),
+    },
   });
   window.webContents.setUserAgent(
     `${window.webContents.getUserAgent()} ${DESKTOP_SHELL_USER_AGENT}`,
@@ -193,12 +206,53 @@ function showTray(origin: string): Tray {
   return created;
 }
 
+function serveUpdates(origin: string): void {
+  const updater = createUpdater((state) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send('desktop-update:state', state);
+    }
+  });
+  let lastCheckedAt = 0;
+  const check = (): Promise<void> => {
+    lastCheckedAt = Date.now();
+    return updater.check();
+  };
+  const fromOwnPage = (event: IpcMainInvokeEvent): boolean => event.senderFrame?.origin === origin;
+  ipcMain.handle('desktop-update:state', (event) => (fromOwnPage(event) ? updater.state() : null));
+  ipcMain.handle('desktop-update:check', (event) => (fromOwnPage(event) ? check() : undefined));
+  ipcMain.handle('desktop-update:install', (event) =>
+    fromOwnPage(event) ? updater.install() : undefined,
+  );
+  setTimeout(() => void check(), UPDATE_FIRST_CHECK_MS);
+  setInterval(() => void check(), UPDATE_CHECK_EVERY_MS);
+  app.on('browser-window-focus', () => {
+    if (lastCheckedAt !== 0 && Date.now() - lastCheckedAt >= UPDATE_CHECK_ON_FOCUS_AFTER_MS) {
+      void check();
+    }
+  });
+}
+
 async function boot(): Promise<void> {
   try {
     server = startServer(await freeLoopbackPort());
     await waitUntilServing(server);
-    signOwnPagesIn(server.origin, readOwnerToken());
+    const ownerToken = readOwnerToken();
+    signOwnPagesIn(server.origin, ownerToken);
     tray = showTray(server.origin);
+    void startLocalRunner({
+      root: bundledRoot('runner'),
+      home: join(app.getPath('userData'), 'runner'),
+      origin: server.origin,
+      ownerToken,
+      isQuitting: () => quitting,
+    }).then(
+      (started) => {
+        runner = started;
+      },
+      (error: unknown) => console.error('Cairn Runner did not start:', error),
+    );
+    void removeLeftoverUpdates();
+    serveUpdates(server.origin);
     openWindow(server.origin);
   } catch (error) {
     quitting = true;
@@ -232,10 +286,13 @@ if (!app.requestSingleInstanceLock()) {
     if (quitting || server === null) return;
     quitting = true;
     event.preventDefault();
-    void stopServer(server).then(() => {
-      tray?.destroy();
-      app.quit();
-    });
+    const running = server;
+    void (runner?.stop() ?? Promise.resolve())
+      .then(() => stopServer(running))
+      .then(() => {
+        tray?.destroy();
+        app.quit();
+      });
   });
   void app.whenReady().then(boot);
 }

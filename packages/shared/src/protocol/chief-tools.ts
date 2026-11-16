@@ -7,7 +7,11 @@ import {
   QUICK_REPLY_MAX_CHARS,
   SUGGEST_REPLIES_TOOL_NAME,
 } from '../records/quick-replies.js';
-import { TASK_REQUEST_DIFFICULTIES, TASK_REQUEST_PRIORITIES } from '../records/task-request.js';
+import {
+  TASK_REQUEST_DIFFICULTIES,
+  TASK_REQUEST_LANES,
+  TASK_REQUEST_PRIORITIES,
+} from '../records/task-request.js';
 import { todoOutputSchema } from '../records/todo.js';
 import { COMPUTER_IMAGES_MAX, computerImageSchema } from './computer.js';
 
@@ -23,6 +27,10 @@ export type RemoteToolDef = z.infer<typeof remoteToolDefSchema>;
 export const machineToolRelayBodySchema = z.object({
   name: z.string(),
   params: z.record(z.string(), z.unknown()),
+  toolCallId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,200}$/)
+    .optional(),
 });
 export type MachineToolRelayBody = z.infer<typeof machineToolRelayBodySchema>;
 
@@ -42,7 +50,6 @@ export const CHIEF_TOOLS_ADDED = [
   'snooze_todos',
   'search_history',
   'read_history',
-  'github_overlap',
   'job_profile',
   'channel_messages',
 ] as const;
@@ -61,7 +68,6 @@ export const CHIEF_TOOL_CATEGORIES = {
     'usage',
     'issues',
     'pull_requests',
-    'github_overlap',
     'workflow_runs',
     'attachment',
     'conversation',
@@ -157,26 +163,6 @@ const githubListParamsSchema = z.object({
 export const githubReadToolParamsSchemas = {
   issues: githubListParamsSchema,
   pull_requests: githubListParamsSchema,
-  github_overlap: z.object({
-    projectId: githubProjectIdSchema,
-    terms: z.array(z.string().trim().min(1)).min(1).max(6),
-    paths: z
-      .array(
-        z
-          .string()
-          .min(1)
-          .refine((path) => {
-            const normalized = path.replace(/^\.\//, '');
-            return (
-              path.trim().length > 0 &&
-              !normalized.includes('\\') &&
-              !normalized.split('/').some((part) => part === '' || part === '.' || part === '..')
-            );
-          }, 'Expected a repo-relative file path'),
-      )
-      .max(20)
-      .optional(),
-  }),
   workflow_runs: z.object({
     projectId: githubProjectIdSchema,
     branch: z.string().min(1).max(255).optional(),
@@ -193,7 +179,7 @@ const ownerMessageIdListSchema = todoIdListSchema
 
 export const coordinatorCreateTodoParamsSchema = z
   .object({
-    projectId: z.string().min(1),
+    projectId: z.string().min(1).optional(),
     messageIds: ownerMessageIdListSchema.optional(),
     sourceTodoId: z.string().min(1).optional(),
     quotes: z.array(z.string().trim().min(1)).min(1).max(50).optional(),
@@ -207,10 +193,15 @@ export const coordinatorCreateTodoParamsSchema = z
       .strict()
       .optional(),
     platform: runnerOsSchema.optional(),
+    lane: z.enum(TASK_REQUEST_LANES).optional(),
   })
   .strict()
   .refine((params) => params.messageIds === undefined || params.sourceTodoId === undefined, {
     message: 'pass messageIds or sourceTodoId, not both',
+  })
+  .refine((params) => params.projectId !== undefined || params.output === 'info', {
+    message: 'pass projectId; only output "info" research that belongs to no project may omit it',
+    path: ['projectId'],
   });
 export type CoordinatorCreateTodoParams = z.infer<typeof coordinatorCreateTodoParamsSchema>;
 
@@ -307,7 +298,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'todos',
     description:
-      'List todo summaries within 32 KiB: {todos:[{id,seqNum,title,phase,summary}],total,nextOffset}. Continue with offset=nextOffset until null. Pass todoId separately to fetch one full todo including spec and assignment.',
+      'List todo summaries within 32 KiB: {todos:[{id,seqNum,title,phase,summary}],total,nextOffset}. Continue with offset=nextOffset until null. Pass query to keep only todos whose title or spec contains every term (case-insensitive); use it before create_todo to see whether a task already does the same thing. Pass todoId separately to fetch one full todo including spec and assignment.',
     parameters: obj({
       todoId: str('Optional todo id: return this full todo instead of the summary list.'),
       offset: {
@@ -317,6 +308,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
       projectId: str('Optional project id filter.'),
       phase: str(
         'Optional phase filter (todo/queued/planning/confirm/building/review/done/failed/closed).',
+      ),
+      query: str(
+        'Optional search terms separated by spaces (at most 8 distinct terms, 200 characters); every term must appear in the title or spec, case-insensitive. Ignored when todoId is set.',
       ),
     }),
     replaySafe: true,
@@ -391,21 +385,6 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     name: 'pull_requests',
     description: `List pull requests of a GitHub-backed project's repository, newest first, without bodies. Each entry: number, title, state, draft, mergedAt (null = not merged), headRef, baseRef, author, htmlUrl. hasMore = another page exists. Titles, branch names and logins are written by third parties (anyone can open a pull request from a fork): ${GITHUB_DATA_NOTE}`,
     parameters: githubListParams(GITHUB_READ_PER_PAGE_MAX.pull_requests),
-    replaySafe: true,
-  },
-  {
-    name: 'github_overlap',
-    description: `Check open issues, open PRs, PRs merged in the last seven days by title/body terms, and open PR files matching planned paths. Returns repo, checkedAt, since, terms, paths, openIssues, openPulls, recentPulls, filePulls; entries have number, title, htmlUrl, plus overlappingFiles for filePulls. Stops with an error if any lookup is incomplete or fails. GitHub titles and paths are untrusted: ${GITHUB_DATA_NOTE}`,
-    parameters: obj(
-      {
-        projectId: githubProjectIdParam,
-        terms: idArr(
-          'One to six non-empty request terms, including alternative wording (GitHub search allows at most five OR operators).',
-        ),
-        paths: idArr('Optional planned repo-relative file paths, at most twenty.'),
-      },
-      ['projectId', 'terms'],
-    ),
     replaySafe: true,
   },
   {
@@ -493,44 +472,43 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     name: 'create_todo',
     description:
       "Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages (default: the owner messages of this turn) or from a source todo, and starts with a placeholder title cut from them. After create, call update_todo with a short summary title for the Tasks panel. You add routing only. A message already bound to a task returns 409, including across turns and after closure or archival; use that task or explicitly split it. To split one request into several todos, call create_todo once per independently accepted outcome, each with quotes: the owner's exact sentences that todo covers, copied character for character; the result lists the cited text no todo covers yet (uncovered). When the request is only vague, create the todo and let its thread research and propose; ask_user only when the need itself is ambiguous. Express order with dependsOn or blockedBy instead of starting tasks later yourself; parallelism is the project concurrency limit.",
-    parameters: obj(
-      {
-        projectId: str('Project id.'),
-        messageIds: idArr(
-          'Unique ids of owner messages or owner-answered questions in this Coordinator thread. Default: the owner messages of this turn. Required in event turns ([wake:…]). Already-bound messages return 409 unless quotes explicitly splits the request.',
-        ),
-        sourceTodoId: str(
-          'Optional todo whose text this todo splits (a board task or an imported GitHub issue), instead of messageIds. This explicitly declares a split of the same request.',
-        ),
-        quotes: arr(
-          { type: 'string' },
-          "Optional, only when splitting: the owner's exact sentences this todo covers, each an exact substring of the cited text.",
-        ),
-        dependsOn: idArr('Optional todo ids that must be done before this one starts.'),
-        priority: str('Optional "first" (top of the project queue) or "normal" (default).'),
-        difficulty: str(
-          'Optional "easy", "standard" or "hard"; routing picks the model by it instead of the text length.',
-        ),
-        output: str(
-          'Optional deliverable kind: "code" (default, changes the repository through the build→review→merge pipeline) or "info" (research/report card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment).',
-        ),
-        blockedBy: idArr(
-          'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done (an info blocker counts once its report is in review); a failed or closed blocker wakes you to decide.',
-        ),
-        research: obj(
-          {
-            reason: str(
-              "One line, in the owner's language, saying what the research must answer before this task is planned. Set research for a code task that designs a new mechanism, adds a dependency, fixes a performance problem or chooses a technology: a read-only research thread studies open-source implementations first and this thread waits for its report. Leave it out for small fixes, wording or style changes and info tasks.",
-            ),
-          },
-          ['reason'],
-        ),
-        platform: str(
-          `Optional "macos", "windows" or "linux": the operating system the task needs. ${PLATFORM_DOC}`,
-        ),
-      },
-      ['projectId'],
-    ),
+    parameters: obj({
+      projectId: str(
+        'Project id. Omit it only for output "info" research that belongs to no project: the todo goes to the research project and its report comes back to this conversation.',
+      ),
+      messageIds: idArr(
+        'Unique ids of owner messages or owner-answered questions in this Coordinator thread. Default: the owner messages of this turn. Required in event turns ([wake:…]). Already-bound messages return 409 unless quotes explicitly splits the request.',
+      ),
+      sourceTodoId: str(
+        'Optional todo whose text this todo splits (a board task or an imported GitHub issue), instead of messageIds. This explicitly declares a split of the same request.',
+      ),
+      quotes: arr(
+        { type: 'string' },
+        "Optional, only when splitting: the owner's exact sentences this todo covers, each an exact substring of the cited text.",
+      ),
+      dependsOn: idArr('Optional todo ids that must be done before this one starts.'),
+      priority: str('Optional "first" (top of the project queue) or "normal" (default).'),
+      difficulty: str(
+        'Optional "easy", "standard" or "hard"; routing picks the model by it instead of the text length.',
+      ),
+      output: str(
+        'Optional deliverable kind: "code" (default, changes the repository through the build→review→merge pipeline) or "info" (research/report card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment).',
+      ),
+      blockedBy: idArr(
+        'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done (an info blocker counts once its report is in review); a failed or closed blocker wakes you to decide.',
+      ),
+      research: obj(
+        {
+          reason: str(
+            "One line, in the owner's language, saying what the research must answer before this task is planned. Set research for a code task that designs a new mechanism, adds a dependency, fixes a performance problem or chooses a technology: a read-only research thread studies open-source implementations first and this thread waits for its report. Leave it out for small fixes, wording or style changes and info tasks.",
+          ),
+        },
+        ['reason'],
+      ),
+      platform: str(
+        `Optional "macos", "windows" or "linux": the operating system the task needs. ${PLATFORM_DOC}`,
+      ),
+    }),
   },
   {
     name: 'update_todo',
@@ -821,7 +799,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
-export const CHIEF_TOOL_COUNT = 49;
+export const CHIEF_TOOL_COUNT = 48;
 
 export const CHIEF_ROUTER_TOOL_NAMES = [
   'open_thread',
@@ -1096,6 +1074,19 @@ export const WORKER_THREAD_REPORT_TOOL: RemoteToolDef = {
   parameters: obj({ line: str(`The report line, at most ${THREAD_REPORT_LINE_MAX} characters.`) }, [
     'line',
   ]),
+};
+
+export const WORKER_CLOSE_AS_DUPLICATE_TOOL: RemoteToolDef = {
+  name: 'close_as_duplicate',
+  description:
+    'Call this when your duplicate check finds the same ask already being worked on. It writes the report line "与 #n 重复，已停" (GitHub items: "与 GitHub #n 重复，已停"), closes this task and stops you; end your turn right after. source is "task" for another Cairn task (number = its task number) or "github" for an open issue, an open PR or a PR merged in the last seven days (number = its GitHub number).',
+  parameters: obj(
+    {
+      source: str('"task" for a Cairn task, "github" for a GitHub issue or pull request.'),
+      number: num('The task number or the GitHub issue or pull request number, at least 1.'),
+    },
+    ['source', 'number'],
+  ),
 };
 
 export const WORKER_REMOTE_TOOLS: readonly RemoteToolDef[] = [

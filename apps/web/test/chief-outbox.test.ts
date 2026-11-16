@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'vitest';
+import { chiefStreamRowKey } from '../src/chief/chief-message-rows.js';
 import {
   createOutbox,
   type Deliver,
+  keepSentKeys,
   type OutboxEntry,
   type OutboxStore,
   RETURNED_KEY_TTL_MS,
@@ -62,6 +64,26 @@ describe('chief outbox', () => {
     expect(box.entries()).toHaveLength(1);
     box.settle('t1', new Set(['m9']));
     expect(box.entries()).toEqual([]);
+  });
+
+  test('a delivered message keeps the row key it had while sending, so its bubble is not remounted', async () => {
+    const box = outbox();
+    const { calls, deliver } = gate();
+    box.enqueue({ scope: 'u/team', globalThreadId: null, threadId: 't1', projectId: null, text: 'hello' }, deliver);
+    const [sending] = unlandedItems(box.entries(), 't1', new Set());
+    await flush();
+    calls[0]?.resolve({ threadId: 't1', messageId: 'm9' });
+    await flush();
+    box.settle('t1', new Set(['m9']));
+    const [stored, other] = keepSentKeys(
+      [
+        { kind: 'user', id: 'm9', text: 'hello' },
+        { kind: 'user', id: 'm8', text: 'older' },
+      ],
+      box,
+    );
+    expect(sending && stored && chiefStreamRowKey(stored, 0)).toBe(sending && chiefStreamRowKey(sending, 0));
+    expect(other && chiefStreamRowKey(other, 1)).toBe('m8');
   });
 
   test('a message the stream reports stored lands before its send call answers and stays sent', async () => {

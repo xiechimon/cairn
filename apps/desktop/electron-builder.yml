@@ -4,12 +4,15 @@ directories:
   output: release
 files:
   - dist/main.mjs
+  - dist/preload.cjs
   - assets/trayTemplate.png
   - assets/trayTemplate@2x.png
   - package.json
 extraResources:
   - from: server
     to: server
+  - from: runner
+    to: runner
 afterPack: scripts/after-pack.cjs
 npmRebuild: false
 publish: null

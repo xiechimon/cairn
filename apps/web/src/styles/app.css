@@ -737,7 +737,7 @@ html:not(.light)
 }
 
 :is([data-slot="message-scroller"], [data-trace-card], [data-slot="trace"], .chat-interactions)
-  :is(button, a, [role="button"]),
+  :is(button, a, [role="button"]):not(.mention-chip--todo),
 .chat-interaction {
   box-shadow: none;
   transition-duration: 0s;
@@ -756,8 +756,12 @@ body:has([data-testid="chief-body"]),
 }
 
 :root[data-shell="mac-desktop"] .sidebar-team-row {
-  padding-left: 70px;
+  padding-left: 82px;
   -webkit-app-region: drag;
+}
+
+:root[data-shell="mac-desktop"] .sidebar-team-name {
+  visibility: hidden;
 }
 
 :root[data-shell="mac-desktop"] .sidebar-team-row :is(button, a) {
@@ -765,7 +769,7 @@ body:has([data-testid="chief-body"]),
 }
 
 :root[data-shell="mac-desktop"] .sidebar-peek-trigger {
-  left: 78px;
+  left: 90px;
 }
 
 .desktop-drag-strip {

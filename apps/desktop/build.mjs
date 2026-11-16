@@ -1,13 +1,18 @@
 import { build } from 'esbuild';
 
-await build({
-  entryPoints: ['src/main.ts'],
-  outfile: 'dist/main.mjs',
+const shared = {
   bundle: true,
   platform: 'node',
   target: 'node22',
-  format: 'esm',
   external: ['electron'],
   sourcemap: true,
   logLevel: 'info',
+};
+
+await build({ ...shared, entryPoints: ['src/main.ts'], outfile: 'dist/main.mjs', format: 'esm' });
+await build({
+  ...shared,
+  entryPoints: ['src/preload.ts'],
+  outfile: 'dist/preload.cjs',
+  format: 'cjs',
 });

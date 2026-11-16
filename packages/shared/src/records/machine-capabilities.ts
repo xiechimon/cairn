@@ -40,7 +40,13 @@ export type ConfinementReport = z.infer<typeof confinementReportSchema>;
 
 export const confinementCauseSchema = z
   .object({
-    kind: z.enum(['not-own-unit', 'bwrap-missing', 'home-overlay-failed']),
+    kind: z.enum([
+      'not-own-unit',
+      'bwrap-missing',
+      'bwrap-too-old',
+      'userns-denied',
+      'home-overlay-failed',
+    ]),
     mountPoint: z.string().startsWith('/').max(4096).optional(),
   })
   .strict();
@@ -107,9 +113,10 @@ export const machineCapabilitiesSchema = z.object({
   ownComputer: z.literal(true).optional(),
   browser: z.literal(true).optional(),
   secretGateway: z.literal(true).optional(),
+  mcpConnectors: z.literal(true).optional(),
   codexLogin: codexLoginSchema.optional(),
   confinement: confinementReportSchema.optional(),
-  confinementCause: confinementCauseSchema.optional(),
+  confinementCause: confinementCauseSchema.optional().catch(undefined),
   agentReach: agentReachReportSchema.optional(),
   hostPermissions: hostPermissionsSchema.optional(),
 });
@@ -147,6 +154,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(rec.ownComputer === true ? { ownComputer: true as const } : {}),
     ...(rec.browser === true ? { browser: true as const } : {}),
     ...(rec.secretGateway === true ? { secretGateway: true as const } : {}),
+    ...(rec.mcpConnectors === true ? { mcpConnectors: true as const } : {}),
   };
 }
 

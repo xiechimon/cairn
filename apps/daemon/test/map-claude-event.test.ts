@@ -225,6 +225,33 @@ describe('mapClaudeMessage (spec 17 event mapping table, vocabulary locked by 01
     });
   });
 
+  test('a host tool reports its Cairn name, as the pi backend does; another MCP server keeps its prefix', () => {
+    const hostCall = {
+      type: 'assistant',
+      message: {
+        id: 'msg_3',
+        role: 'assistant',
+        content: [
+          { type: 'tool_use', id: 'toolu_2', name: 'mcp__cairn__create_todo', input: {} },
+          { type: 'tool_use', id: 'toolu_3', name: 'mcp__github__search', input: {} },
+        ],
+        model: 'claude-sonnet-4-5',
+        stop_reason: 'tool_use',
+      },
+    } as SDKMessage;
+    const hostResult = {
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'toolu_2', content: '{}', is_error: false }],
+      },
+    } as SDKMessage;
+    const names = feed([hostCall, hostResult])
+      .events.filter((e) => e.type === 'toolcall_end')
+      .map((e) => (e as Extract<StepEvent, { type: 'toolcall_end' }>).call.name);
+    expect(names).toEqual(['create_todo', 'mcp__github__search', 'create_todo']);
+  });
+
   test('failure mode 5: assistant frame ends → message_end role/content projected verbatim', () => {
     const { events } = feed([ASSISTANT_TEXT]);
     const ev = events.find((e) => e.type === 'message_end');
@@ -250,6 +277,44 @@ describe('mapClaudeMessage (spec 17 event mapping table, vocabulary locked by 01
     };
     expect(done).toEqual({ type: 'done', usage: [row] });
     expect(state.usage).toEqual([row]);
+  });
+
+  test('the usage row carries the last top-level request as contextTokens, so the composer context ring has data', () => {
+    const call = (
+      id: string,
+      usage: Record<string, number>,
+      parent: string | null = null,
+    ): SDKMessage =>
+      ({
+        type: 'assistant',
+        parent_tool_use_id: parent,
+        message: {
+          id,
+          role: 'assistant',
+          model: 'claude-sonnet-4-5',
+          content: [{ type: 'text', text: id }],
+          usage,
+        },
+      }) as unknown as SDKMessage;
+    const { events } = feed([
+      call('first', { input_tokens: 4, cache_creation_input_tokens: 50_819, output_tokens: 79 }),
+      call('subagent', { input_tokens: 900_000, output_tokens: 1 }, 'toolu_task'),
+      call('last', {
+        input_tokens: 2,
+        cache_read_input_tokens: 50_819,
+        cache_creation_input_tokens: 2_178,
+        output_tokens: 351,
+      }),
+      RESULT_SUCCESS,
+    ]);
+    const done = events.find((e) => e.type === 'done');
+    expect(done?.type === 'done' && done.usage).toEqual([
+      expect.objectContaining({
+        model: 'claude-code/claude-sonnet-4-5',
+        input: 10,
+        contextTokens: 2 + 50_819 + 2_178 + 351,
+      }),
+    ]);
   });
 
   test('failure mode 6c: costBasis unknown drops costUSD; a list price is kept on total only', () => {

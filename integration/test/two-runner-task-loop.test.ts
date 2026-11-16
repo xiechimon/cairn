@@ -52,7 +52,7 @@ test('two real runners keep named tasks, workspaces and results isolated across 
     let apiKey: string | undefined;
     if (loadMachineJson(paths) === null) {
       const key = await api(server.url, 'POST', `/api/teams/${server.teamId}/api-keys`, {
-        name: `runner-${name}`,
+        name: `RUNNER_${name.toUpperCase()}`,
         machineAccess: true,
         gitAccess: false,
         mcpAccess: false,

@@ -1,5 +1,7 @@
 # User-owned Cloudflare control plane
 
+Paused, 2026-11-15: ship the existing Tailscale mode first. PRs #4920 and #4943 may merge after required CI passes; no further Durable Object migration slices or cloud deployment are planned while paused. The design below is retained for reference, not an active delivery plan.
+
 Status: architecture boundary with offline storage gate verified, 2026-11-15; cloud product and deployment remain unimplemented. The owner selected three modes: local-only, a local server reached over Tailscale, and a user-deployed Cloudflare control plane with multiple registered runners. This replaces the single-host relay as the third-mode target; it does not remove local or Tailscale support. Research: [platform and cost feasibility](../research/cf-control-plane-feasibility-2026-11-15.md), [prior enrollment/security research](../research/connect-do-enrollment-2026-11-15.md). Platform feasibility is established by documentation and bounded local workerd checks, not by a deployed Cairn trial.
 
 ## Architecture and ownership

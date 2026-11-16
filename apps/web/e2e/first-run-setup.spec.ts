@@ -6,6 +6,7 @@ interface World {
   bound: boolean;
   rules: { use: string; provider: string; modelId: string }[];
   patches: { use: string; body: unknown }[];
+  machines?: unknown[];
 }
 
 const MACHINE = { id: 'm1', name: 'mac', online: true, enabledRuntimes: ['pi', 'claude-code'] };
@@ -26,7 +27,7 @@ async function open(page: Page, world: World, path = '/app') {
           settings: {},
         });
       }
-      if (p === '/api/teams/t1/machines') return json([MACHINE]);
+      if (p === '/api/teams/t1/machines') return json(world.machines ?? [MACHINE]);
       if (p === '/api/teams/t1/model-sources') {
         return json({
           sources: [
@@ -100,12 +101,18 @@ test('the change control opens the model picker, and confirming saves the model 
   expect(world.patches[0]?.body).toEqual({ provider: 'p1', modelId: 'claude-sonnet-5-5' });
 });
 
-test('a Claude Code login alone leaves step 1 open and says the Coordinator still needs a provider', async ({ page }) => {
+test('without a provider, step 1 offers only Add provider, which opens the picker in place', async ({ page }) => {
   await open(page, { ...fresh(), bound: false });
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
-  await expect(page.getByTestId('first-run-setup')).toContainText('Coordinator 用不了 Claude Code 登录');
-  await expect(page.getByTestId('first-run-setup').getByRole('link', { name: '添加服务商' })).toBeVisible();
+  await expect(page.getByTestId('first-run-setup')).not.toContainText('本机 Claude Code');
+  await expect(page.getByTestId('first-run-setup').getByRole('switch')).toHaveCount(0);
   await expect(page.getByTestId('first-run-setup')).toContainText('还差第 1 步');
+  await page.getByTestId('first-run-add-provider').click();
+  const picker = page.getByRole('dialog', { name: '添加模型服务' });
+  await expect(picker).toBeVisible();
+  await expect(page).toHaveURL(/\/app(\?|$)/);
+  await picker.locator('[data-preset-id="claude-subscription"]').click();
+  await expect(page.getByRole('dialog', { name: '添加 Claude 订阅' })).toBeVisible();
 });
 
 test('the new-project dialog says which step is missing until setup is done', async ({ page }) => {

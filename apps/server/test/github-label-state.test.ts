@@ -85,7 +85,7 @@ describe('dedicated GitHub-label state', () => {
   test('MCP generic updates preserve dedicated labels and their completion guard', async () => {
     const { s, taskId } = await labelWorld();
     const keyResponse = await req(s.app, 'POST', `/api/teams/${s.team.id}/api-keys`, {
-      name: 'Label isolation',
+      name: 'LABEL_ISOLATION',
       gitAccess: false,
       mcpAccess: true,
       toolGrants: { read: ['Todos'], write: ['Update Todo'] },

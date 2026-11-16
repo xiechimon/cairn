@@ -11,7 +11,7 @@ import type {
   WorkspaceHookNoteData,
   WorktreeOps,
 } from '@cairn/shared';
-import { isBuildStepKind, PLAN_FILE_NAME } from '@cairn/shared';
+import { isBuildStepKind, mcpConnectorSecretValues, PLAN_FILE_NAME } from '@cairn/shared';
 import { AskChannel } from './ask-channel.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
@@ -227,7 +227,11 @@ async function runClaimedStep(
   const tokenRes = await client.token(stepId);
   const creds = pushCredential(tokenRes, claimed.project?.repo?.cloneUrl ?? null);
   stepCleanups.push(() => clearCredentials(creds));
-  const credentialValues = [creds.claudeSubscriptionToken, creds.git?.password];
+  const credentialValues = [
+    creds.claudeSubscriptionToken,
+    creds.git?.password,
+    ...(tokenRes.mcpConnectors ?? []).flatMap((c) => mcpConnectorSecretValues(c.headers)),
+  ];
   const redactors = [credentialRedactor(...credentialValues)];
   const redact = <T>(value: T): T => redactors.reduce((result, next) => next(result), value);
   const appCredential =
@@ -348,7 +352,15 @@ async function runClaimedStep(
         });
   const remoteTools = claimed.remoteTools;
   const claimedMcp = claimed.mcpServers;
-  const mcpEndpoints = stepMcpEndpoints(deps.mcpConfigPath, claimedMcp, (line) => logger.mcp(line));
+  const mcpEndpoints = stepMcpEndpoints(
+    deps.mcpConfigPath,
+    claimedMcp,
+    (line) => logger.mcp(line),
+    {
+      connectors: tokenRes.mcpConnectors,
+      withheld: tokenRes.withheldMcp,
+    },
+  );
   const isPi = backend.brief?.backendId === 'pi';
   const appIdentity: CommitIdentity | null = tokenRes.commitIdentity ?? null;
   const tooling = await prepareStepTooling({

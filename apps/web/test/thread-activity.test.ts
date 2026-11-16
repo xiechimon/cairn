@@ -97,6 +97,27 @@ describe('groupThreadEvents', () => {
   });
 });
 
+describe('a report mirrored from a project channel', () => {
+  test('stands as its own line each time and never takes the thread\'s row', () => {
+    const first = { ...report('other', 'needs-you'), fromThreadId: 'chief-cairn' };
+    const own = report('other');
+    const done = { ...report('other'), fromThreadId: 'chief-cairn' };
+    const rows = [first, own, done].map((item, i) => ({ item, i }));
+    const kept = subThreadRowIds(
+      rows.map((row) => row.item),
+      glances,
+    );
+    expect([...kept]).toEqual([own.id]);
+    expect(
+      groupThreadEvents(rows, kept).map(({ item }) => [item.kind, 'id' in item ? item.id : null]),
+    ).toEqual([
+      ['channel-mirror', first.id],
+      ['thread-activity', own.id],
+      ['channel-mirror', done.id],
+    ]);
+  });
+});
+
 describe('todoGlanceOf', () => {
   test('only research opened before planning names a parent', () => {
     expect(glances.get('research')?.parentId).toBe('code');
@@ -170,5 +191,25 @@ describe('a research report the Coordinator delivered shows once, inside its not
   test('the notice carries the report line only while its build is still the delivered one', () => {
     expect(reports.get(bubble('n-told')!)).toEqual(['told']);
     expect(reports.has(bubble('n-reworked')!)).toBe(false);
+  });
+
+  test('a report asked for in this conversation shows under its conclusion, not under the reply that dispatched it', () => {
+    const [dispatch, conclusion] = mapChiefStream([
+      {
+        id: 'a-asked',
+        role: 'assistant',
+        content: JSON.stringify([{ type: 'text', text: 'Dispatched [#1](todo:asked).' }]),
+        createdAt: 90,
+      },
+      notice('n-asked', 'asked', 'b-asked'),
+    ]);
+    const placed = placeReportCards(
+      [dispatch!, conclusion!].map((item, i) => ({ item, i })),
+      new Map([[dispatch!, ['asked']]]),
+      new Map([['asked', research('b-asked')]]),
+      new Set(),
+    );
+    expect(placed.get(conclusion!)).toEqual(['asked']);
+    expect(placed.has(dispatch!)).toBe(false);
   });
 });

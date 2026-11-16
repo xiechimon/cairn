@@ -342,3 +342,78 @@ test('steer is delivered immediately when no tool is running', async () => {
     await collected;
   }
 });
+
+function finalText(text: string): SDKMessage {
+  return {
+    type: 'assistant',
+    message: { role: 'assistant', content: [{ type: 'text', text }] },
+  } as SDKMessage;
+}
+
+const RESULT = { type: 'result', subtype: 'success', is_error: false } as SDKMessage;
+
+async function cliSession(
+  turn: (input: AsyncIterator<SDKUserMessage>) => AsyncGenerator<SDKMessage, void>,
+) {
+  vi.mocked(query).mockImplementation(({ prompt }) => {
+    if (typeof prompt === 'string') throw new Error('Expected streaming input');
+    return Object.assign(turn(prompt[Symbol.asyncIterator]()), {
+      interrupt: vi.fn(async () => {}),
+    }) as unknown as Query;
+  });
+  const handle = await createClaudeCodeBackend({}).createSession({
+    provider: { kind: 'http', providerId: 'fake-claude' },
+    modelId: 'fake-model',
+    cwd: '/tmp',
+    prompt: 'Open the browser.',
+  });
+  const events: StepEvent[] = [];
+  const collected = (async () => {
+    for await (const event of handle.events) events.push(event);
+  })();
+  return { handle, events, collected };
+}
+
+const replies = (events: StepEvent[]) =>
+  events.flatMap((event) =>
+    event.type === 'message_end' && Array.isArray(event.message.content)
+      ? event.message.content.flatMap((block) =>
+          (block as { type?: string }).type === 'text' ? [(block as { text: string }).text] : [],
+        )
+      : [],
+  );
+
+test('a steer that lands after the final reply but before the result gets its own turn', async () => {
+  const steered = defer();
+  const { handle, events, collected } = await cliSession(async function* (input) {
+    await input.next();
+    yield finalText('Browser is open on example.com.');
+    await steered.promise;
+    yield RESULT;
+    for (let next = await input.next(); !next.done; next = await input.next()) {
+      yield finalText(`Opening ${String(next.value.message.content)}`);
+      yield RESULT;
+    }
+  });
+  await waitFor(() => replies(events).length === 1);
+  await handle.steer('zhipin.com');
+  steered.resolve();
+  await collected;
+  expect(replies(events)).toEqual(['Browser is open on example.com.', 'Opening zhipin.com']);
+  expect(events.map((event) => event.type).filter((type) => type === 'done')).toEqual(['done']);
+  expect(events.at(-1)?.type).toBe('done');
+  await expect(handle.steer('too late')).rejects.toThrow('closed before steer delivery');
+});
+
+test('a successful turn stays successful when the CLI fails while exiting after its result', async () => {
+  const { events, collected } = await cliSession(async function* (input) {
+    await input.next();
+    yield finalText('Done.');
+    yield RESULT;
+    await input.next();
+    throw new Error('Claude Code process exited with code 1');
+  });
+  await collected;
+  expect(events.at(-1)?.type).toBe('done');
+  expect(events.some((event) => event.type === 'error')).toBe(false);
+});

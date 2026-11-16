@@ -43,6 +43,14 @@ export function confinementCauseOf(
   if (!(error instanceof ConfinementExitedError)) return undefined;
   if (/^Failed to find executable bwrap\b/m.test(error.stderrTail))
     return { kind: 'bwrap-missing' };
+  if (/^bwrap: Unknown option --(overlay-src|tmp-overlay)\b/m.test(error.stderrTail))
+    return { kind: 'bwrap-too-old' };
+  if (
+    /^bwrap: (setting up uid map: Permission denied|No permissions to creat(ing|e a) new namespace)/m.test(
+      error.stderrTail,
+    )
+  )
+    return { kind: 'userns-denied' };
   if (!/^bwrap: Can't make overlay mount\b/m.test(error.stderrTail)) return undefined;
   let mountPoint: string | undefined;
   try {

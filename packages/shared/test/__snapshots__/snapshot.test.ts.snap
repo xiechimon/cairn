@@ -687,6 +687,95 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 },
               ],
             },
+            "lane": {
+              "enum": [
+                "quick",
+              ],
+              "type": "string",
+            },
+            "projectBasis": {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "channel",
+                      "type": "string",
+                    },
+                    "threadId": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "threadId",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "composer",
+                      "type": "string",
+                    },
+                    "messageId": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "messageId",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "owner-named",
+                      "type": "string",
+                    },
+                    "name": {
+                      "minLength": 2,
+                      "type": "string",
+                    },
+                    "segment": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "segment",
+                    "name",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "owner-answer",
+                      "type": "string",
+                    },
+                    "segment": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "segment",
+                  ],
+                  "type": "object",
+                },
+              ],
+            },
             "research": {
               "additionalProperties": false,
               "properties": {
@@ -1743,6 +1832,95 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                         },
                       ],
                     },
+                    "lane": {
+                      "enum": [
+                        "quick",
+                      ],
+                      "type": "string",
+                    },
+                    "projectBasis": {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "channel",
+                              "type": "string",
+                            },
+                            "threadId": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "threadId",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "composer",
+                              "type": "string",
+                            },
+                            "messageId": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "messageId",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "owner-named",
+                              "type": "string",
+                            },
+                            "name": {
+                              "minLength": 2,
+                              "type": "string",
+                            },
+                            "segment": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "segment",
+                            "name",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "owner-answer",
+                              "type": "string",
+                            },
+                            "segment": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "segment",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
                     "research": {
                       "additionalProperties": false,
                       "properties": {
@@ -2432,9 +2610,19 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "minimum": -9007199254740991,
             "type": "integer",
           },
+          "compactAt": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer",
+          },
           "contextTokens": {
             "maximum": 9007199254740991,
             "minimum": 0,
+            "type": "integer",
+          },
+          "contextWindow": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
             "type": "integer",
           },
           "cost": {
@@ -3425,6 +3613,39 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       },
       "type": "array",
     },
+    "mcpConnectors": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "headers": {
+            "additionalProperties": {
+              "type": "string",
+            },
+            "propertyNames": {
+              "type": "string",
+            },
+            "type": "object",
+          },
+          "slug": {
+            "type": "string",
+          },
+          "transport": {
+            "const": "http",
+            "type": "string",
+          },
+          "url": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "slug",
+          "transport",
+          "url",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "provider": {
       "anyOf": [
         {
@@ -3569,6 +3790,12 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       },
       "type": "object",
     },
+    "withheldMcp": {
+      "items": {
+        "type": "string",
+      },
+      "type": "array",
+    },
     "withheldSecrets": {
       "items": {
         "type": "string",
@@ -3658,6 +3885,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "type": "string",
           },
           "type": "object",
+        },
+        "toolCallId": {
+          "pattern": "^[A-Za-z0-9_-]{1,200}$",
+          "type": "string",
         },
       },
       "required": [
@@ -4396,9 +4627,19 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "minimum": -9007199254740991,
                 "type": "integer",
               },
+              "compactAt": {
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991,
+                "type": "integer",
+              },
               "contextTokens": {
                 "maximum": 9007199254740991,
                 "minimum": 0,
+                "type": "integer",
+              },
+              "contextWindow": {
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991,
                 "type": "integer",
               },
               "cost": {
@@ -7378,6 +7619,95 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                         },
                         {
                           "type": "null",
+                        },
+                      ],
+                    },
+                    "lane": {
+                      "enum": [
+                        "quick",
+                      ],
+                      "type": "string",
+                    },
+                    "projectBasis": {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "channel",
+                              "type": "string",
+                            },
+                            "threadId": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "threadId",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "composer",
+                              "type": "string",
+                            },
+                            "messageId": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "messageId",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "owner-named",
+                              "type": "string",
+                            },
+                            "name": {
+                              "minLength": 2,
+                              "type": "string",
+                            },
+                            "segment": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "segment",
+                            "name",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "owner-answer",
+                              "type": "string",
+                            },
+                            "segment": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "segment",
+                          ],
+                          "type": "object",
                         },
                       ],
                     },
@@ -10670,6 +11000,8 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                   "enum": [
                     "not-own-unit",
                     "bwrap-missing",
+                    "bwrap-too-old",
+                    "userns-denied",
                     "home-overlay-failed",
                   ],
                   "type": "string",
@@ -10766,6 +11098,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                 "screenRecording",
               ],
               "type": "object",
+            },
+            "mcpConnectors": {
+              "const": true,
+              "type": "boolean",
             },
             "mcpServers": {
               "items": {
@@ -12287,6 +12623,95 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
                 },
                 {
                   "type": "null",
+                },
+              ],
+            },
+            "lane": {
+              "enum": [
+                "quick",
+              ],
+              "type": "string",
+            },
+            "projectBasis": {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "channel",
+                      "type": "string",
+                    },
+                    "threadId": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "threadId",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "composer",
+                      "type": "string",
+                    },
+                    "messageId": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "messageId",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "owner-named",
+                      "type": "string",
+                    },
+                    "name": {
+                      "minLength": 2,
+                      "type": "string",
+                    },
+                    "segment": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "segment",
+                    "name",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "owner-answer",
+                      "type": "string",
+                    },
+                    "segment": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "segment",
+                  ],
+                  "type": "object",
                 },
               ],
             },

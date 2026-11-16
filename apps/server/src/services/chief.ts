@@ -34,6 +34,7 @@ import {
   mailSharedTranscript,
   newChiefThreadId,
   orchestratedTodoIdOf,
+  parseOrchestrationSourceRef,
   REPORT_FENCE_OPEN,
   redactSecrets,
   SUGGEST_REPLIES_TOOL_NAME,
@@ -101,8 +102,10 @@ import { injectMemoryDocuments } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import { ownershipOf, rescheduleOwnershipHandoff } from './owner.js';
 import { PICKED_PROJECT_OPEN, stepScopeProjectId } from './picked-project.js';
+import { researchProjectId } from './projects.js';
 import {
   type ReportRef,
+  reportAnsweredIn,
   reportLine,
   reportProvenance,
   reportRefCurrent,
@@ -1072,7 +1075,33 @@ export function addChiefWatch(
     reason?: string;
   },
 ): void {
-  const chiefRow = ensureChief(deps, input.teamId);
+  appendChiefWatch(deps, ensureChief(deps, input.teamId), input);
+}
+
+export function rewatchCreatingThread(deps: ChiefDeps, record: TodoRecord): void {
+  if (record.sourceKind !== 'orchestration' || record.sourceRef === null) return;
+  const threadId = parseOrchestrationSourceRef(record.sourceRef)?.threadId;
+  const threadRow = threadId === undefined ? undefined : getChiefThread(deps, threadId);
+  if (threadId === undefined || threadRow === undefined || threadRow.archivedAt !== null) return;
+  const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
+  const projectRow = deps.db
+    .select({ name: project.name })
+    .from(project)
+    .where(eq(project.id, record.projectId))
+    .get();
+  if (chiefRow === undefined || projectRow === undefined) return;
+  appendChiefWatch(deps, chiefRow, {
+    todo: record,
+    projectName: projectRow.name,
+    threadId,
+  });
+}
+
+function appendChiefWatch(
+  deps: ChiefDeps,
+  chiefRow: ChiefRow,
+  input: { todo: TodoRecord; projectName: string; threadId: string; reason?: string },
+): void {
   if (chiefRow.watches.some((w) => w.todoId === input.todo.id)) return;
   const threadRow = getChiefThread(deps, input.threadId);
   const watch: ChiefWatch = {
@@ -1112,6 +1141,11 @@ function reportLineOf(deps: ChiefDeps, todoRecord: TodoRecord): string | null {
   return line === undefined || line === null || line === '' ? null : line;
 }
 
+const MIRRORED_REPORT_PHASES: ReadonlySet<ThreadReportContent['phase']> = new Set([
+  'needs-you',
+  'done',
+]);
+
 function insertThreadReport(
   deps: ChiefDeps,
   threadId: string,
@@ -1143,10 +1177,12 @@ function insertThreadReport(
   });
   const watching = getChiefThread(deps, threadId);
   const reports = [reportIn(threadId, content)];
-  if (watching?.projectId != null) {
+  if (watching?.projectId != null && MIRRORED_REPORT_PHASES.has(phase)) {
     const chiefRow = deps.db.select().from(chief).where(eq(chief.id, watching.chiefId)).get();
     if (chiefRow !== undefined) {
-      reports.push(reportIn(coordinatorThreadRow(deps, chiefRow).id, mirror));
+      reports.push(
+        reportIn(coordinatorThreadRow(deps, chiefRow).id, { ...mirror, fromThreadId: threadId }),
+      );
     }
   }
   deps.db.transaction(() => {
@@ -1159,6 +1195,26 @@ function isWatched(chiefs: ChiefRow[], todoId: string): boolean {
   return chiefs.some((chiefRow) => chiefRow.watches.some((w) => w.todoId === todoId));
 }
 
+function researchAsker(record: TodoRecord): string | null {
+  if (
+    record.projectId !== researchProjectId(record.teamId) ||
+    record.sourceKind !== 'orchestration' ||
+    record.sourceRef === null
+  )
+    return null;
+  return parseOrchestrationSourceRef(record.sourceRef)?.threadId ?? null;
+}
+
+function isLiveThread(deps: ChiefDeps, threadId: string): boolean {
+  return getChiefThread(deps, threadId)?.archivedAt === null;
+}
+
+function unwatchedReportThread(deps: ChiefDeps, record: TodoRecord): string | null {
+  const asker = researchAsker(record);
+  if (asker === null) return coordinatorThreadRow(deps, ensureChief(deps, record.teamId)).id;
+  return isLiveThread(deps, asker) ? asker : null;
+}
+
 export function postThreadReport(
   deps: ChiefDeps,
   todoRecord: TodoRecord,
@@ -1168,8 +1224,8 @@ export function postThreadReport(
   const options = line !== undefined ? { line } : {};
   const chiefs = deps.db.select().from(chief).where(eq(chief.teamId, todoRecord.teamId)).all();
   if (!isWatched(chiefs, todoRecord.id)) {
-    const coordinator = coordinatorThreadRow(deps, ensureChief(deps, todoRecord.teamId));
-    insertThreadReport(deps, coordinator.id, todoRecord, phase, options);
+    const target = unwatchedReportThread(deps, todoRecord);
+    if (target !== null) insertThreadReport(deps, target, todoRecord, phase, options);
     return;
   }
   for (const chiefRow of chiefs) {
@@ -1190,13 +1246,17 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
   }
   const chiefs = deps.db.select().from(chief).where(eq(chief.teamId, todoRecord.teamId)).all();
   if (!isWatched(chiefs, todoRecord.id)) {
-    const coordinator = coordinatorThreadRow(deps, ensureChief(deps, todoRecord.teamId));
-    insertThreadReport(deps, coordinator.id, todoRecord, to);
+    const target = unwatchedReportThread(deps, todoRecord);
+    if (target !== null) insertThreadReport(deps, target, todoRecord, to);
     return;
   }
   for (const chiefRow of chiefs) {
     for (const watch of chiefRow.watches.filter((w) => w.todoId === todoRecord.id)) {
       if (!getChiefThread(deps, watch.threadId)) continue;
+      if (reportAnsweredIn(deps.db, watch.threadId, todoRecord)) {
+        insertThreadReport(deps, watch.threadId, todoRecord, to);
+        continue;
+      }
       const wakeStepId = newRecordId();
       insertThreadReport(deps, watch.threadId, todoRecord, to, { wakeStepId });
       enqueueChiefStep(deps, watch.threadId, {
@@ -1240,11 +1300,10 @@ function reportRefOfTodo(deps: ChiefDeps, record: TodoRecord): ReportRef | 'orig
     .all()
     .flatMap((chiefRow) => chiefRow.watches.filter((w) => w.todoId === record.id))
     .map((w) => w.threadId);
-  const origin = watched.find((id) => {
-    const thread = getChiefThread(deps, id);
-    return thread?.archivedAt === null;
-  });
-  if (origin === undefined && watched.length > 0) return 'origin-gone';
+  const asker = researchAsker(record);
+  const asked = asker === null || watched.includes(asker) ? watched : [...watched, asker];
+  const origin = asked.find((id) => isLiveThread(deps, id));
+  if (origin === undefined && asked.length > 0) return 'origin-gone';
   return {
     todoId: record.id,
     buildId: record.latestBuildId,
@@ -1624,8 +1683,7 @@ export function buildChiefSystemPrompt(
     '',
     '### 路由',
     '- 原话：你不写任务正文。服务端从引用的用户消息（默认本回合消息）或 sourceTodoId 指定的来源任务逐字拷贝正文。create_todo 后立刻用 update_todo 的 title 写成不超过 50 字的摘要标题；不复述、不总结、不扩写、不翻译正文，也不替用户加要求或步骤。什么时候问用户见下面的「决策边界」。',
-    '- 先找已有的：create_todo 前用 threads 看同一件事是不是已经在做；在做就用 message_thread 把新的话转给那条 thread，不再建任务。只是提问、没要求改动时只回答，不建任务。',
-    '- 查重：在 GitHub 项目里 create_todo 前，用 github_overlap 传 projectId、请求的关键词（包括同一件事的其他说法），知道要改的路径时也传上。按意图比较，不只比字面；同一件事就续在已有条目上，不另建。带编号的查重结果（包括「没有重复」）写在给用户的回复里。只有 github_overlap 报错时才不建，并说明哪一项查询失败。',
+    '- 先找已有的：create_todo 前用 todos 的 query 按关键词（同一件事的几种说法各试一次）搜标题和正文，再用 threads 看同一件事是不是已经在做（已关闭的任务不算在做）；在做就用 message_thread 把新的话转给那条 thread，不再建任务。只是提问、没要求改动时只回答，不建任务。',
     '- 拆分：按可独立验收的成果拆，不按执行步骤拆；同类小事合成一张卡。每张卡调用一次 create_todo，quotes 填这张卡覆盖的用户原句，逐字照抄；结果的 uncovered 是尚未覆盖的原文。兄弟任务的编号和彼此关系写在给用户的回复里，spec 不添加路由说明；先后顺序用 dependsOn 表达。',
     '- 派活：create_todo 自动启动 thread，不需要 open_thread。用 priority 和 difficulty 路由，并行数由项目并发限制决定。thread 需要用户、做完或失败时会在对话里写一行「任务 #n …」，你不用等待、轮询或睡眠。',
     '- 跟进：threads 列出你开的 thread 和各自一行汇报，needs_you 列出谁在等人。',
@@ -1638,7 +1696,7 @@ export function buildChiefSystemPrompt(
     '',
     '### 项目归属',
     '- 运行平台：只有活必须在某个系统上构建或运行时才给 create_todo 传 platform：iOS/macOS App、Xcode、SwiftUI 传 macos，Windows 原生程序或安装包传 windows。其余不传，任务在默认执行机上跑。传了以后任务只在那个系统的执行机上跑，没有就等着，不会换到别的系统。',
-    '- create_todo 前先定 projectId。',
+    '- create_todo 前先定 projectId。只查资料、不改代码、也不属于任何项目的事（比如「帮我查一下 X 怎么用」），不传 projectId、传 output:"info"：任务进「调研」项目，报告回到这个对话；回复一句「已派人去查，查完把结论贴在这里」。要改代码的活一定要定项目，按下面几条来。',
     '- 用户消息以「【输入框选定项目：X（id: …）】」开头时，本回合新建的任务都放 X，不再调查也不问，回复里说「放在 X（你选的）」。',
     '- 用户点名项目就用它。没点名时先查再定：对照下面项目列表的名称和说明，必要时用 docs 读候选项目的文件、用 todos 看各项目已有的任务，按证据选一个，回复里说「放在 X，因为 Y」。',
     '- 查完仍然分不出时才 ask_user：问题里只列仍然分不出的候选，不列已排除的项目，选项最后加一个「都不是」，本回合不建任务。',
@@ -1650,7 +1708,7 @@ export function buildChiefSystemPrompt(
     '- 回答进度、合并或运行状态前，先用 todos、pull_requests、workflow_runs 或 machines 查当前状态，不凭记忆回答。',
     '- 「之前对话的摘要」只记对话，任务状态以工具查到的为准，两者对不上时信任务状态。用户问起以前的决定时，先从摘要里找，再用 todos 查任务现状，只回答，不建任务。',
     '- 插话：你回复途中用户补充的话会直接送进本回合。照插话调整，插话和原请求冲突时以插话为准，并在这次回复里用一句话说明因为插话改了什么。',
-    '- 提到任务时写成链接：[#n](todo:<id>)，界面会把它显示成任务标题。写不了链接的地方（比如 ask_user 的标题和选项）直接写任务标题，不写「#n」这样的编号。',
+    '- 提到任务时只写链接 [#n](todo:<id>)，界面会把它显示成带状态的任务标题，所以链接前后不再写一遍标题。本回合 create_todo 建的任务会显示在你这条回复的上方，回复里不用再说「已建任务 …」，直接讲放在哪、接下来会怎样。写不了链接的地方（比如 ask_user 的标题和选项）直接写任务标题，不写「#n」这样的编号。',
     '- 建议回复：回合结束后服务端会另问一次，预测用户接下来最可能发的 1–3 句短话，有几个自然方向就给几句，不凑数。你自己不必调用 suggest_replies，除非这是新频道的问候、或你已经知道用户此刻最可能发的原话。删除、合并、关闭等不可撤销的确认一律用 ask_user，不用建议回复。',
     '- 合并：项目默认自动合并（autonomous），但只有通过合并前检查才会合并，受保护的改动还要另一个模型对当前提交做独立评审。你不能合并；项目设成人工合并时，由用户在网页上合并。',
     '',

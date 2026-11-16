@@ -1170,6 +1170,13 @@
       "when": 1794760486981,
       "tag": "0171_drop_team_claude_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 172,
+      "version": "6",
+      "when": 1794799241362,
+      "tag": "0172_chief_turn_usage_context_limits",
+      "breakpoints": true
     }
   ]
 }

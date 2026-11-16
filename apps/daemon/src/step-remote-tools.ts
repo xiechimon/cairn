@@ -1,10 +1,17 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
-import type { RemoteToolDef } from '@cairn/shared';
+import {
+  COMPUTER_HANDOFF_TIMEOUT_MS,
+  isComputerBrowserTool,
+  type RemoteToolDef,
+} from '@cairn/shared';
 import { z } from 'zod';
 import type { AskChannel } from './ask-channel.js';
 import { prepareFileAttachment } from './attach-file.js';
 import type { MachineApi } from './machine-client.js';
+
+export const COMPUTER_TOOL_RELAY_TIMEOUT_MS = 11 * 60_000;
+export const TAKEOVER_RELAY_TIMEOUT_MS = COMPUTER_HANDOFF_TIMEOUT_MS + 60_000;
 
 export interface VerifyEvidenceUploads {
   directory: string | undefined;
@@ -38,8 +45,18 @@ export function stepRemoteToolExecutor(input: {
       });
     }
     const def = remoteTools.find((t) => t.name === name);
+    const computerCall = isComputerBrowserTool(name) || name === 'request_takeover';
     return client.relayTool(stepId, name, params, {
       ...(def?.replaySafe ? { replaySafe: true } : {}),
+      ...(computerCall
+        ? {
+            toolCallId: randomUUID(),
+            timeoutMs:
+              name === 'request_takeover'
+                ? TAKEOVER_RELAY_TIMEOUT_MS
+                : COMPUTER_TOOL_RELAY_TIMEOUT_MS,
+          }
+        : {}),
     });
   };
 }

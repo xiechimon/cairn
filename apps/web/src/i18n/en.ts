@@ -21,6 +21,17 @@
 import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js';
 
 export const EN: Record<string, string> = {
+  这里: 'this channel',
+  主频道: 'the main channel',
+  '{channel} 频道': '{channel} channel',
+  '结果回到{place}': 'reports to {place}',
+  结果回到: 'Reports to',
+  去看: 'Open',
+  '去{channel}': 'Open {channel}',
+  进度: 'Progress',
+  改代码: 'Code',
+  调研: 'Research',
+  交报告: 'Report',
   有新版本: 'A new version is available',
   点此刷新: 'Refresh',
   订阅账户没能加载: 'Subscriptions could not be loaded',
@@ -48,7 +59,6 @@ export const EN: Record<string, string> = {
     'Run `claude setup-token` on your machine, then paste the token below.',
   'Claude Code 步骤会使用最近添加且未过期的订阅。Token 加密保存，保存后无法再查看。':
     'Claude Code steps use the most recently added unexpired connection. Tokens are encrypted and cannot be viewed after saving.',
-  '到期日（可选）': 'Expires on (optional)',
   '保存失败，请检查填写内容后重试。':
     'Could not save the connection. Check the fields and try again.',
   '{name}：Claude 订阅的 token 已过期。运行 `claude setup-token`，再添加一个新的订阅。':
@@ -192,23 +202,6 @@ export const EN: Record<string, string> = {
   还没有连上电脑: 'No computer connected yet',
   '你在控制 · 还剩 {n} 分钟': 'You are in control · {n} min left',
   浏览器: 'Browser',
-  '让 Agent 打开网页、点击和填表。': 'Lets agents open pages, click and fill forms.',
-  辅助功能未授予: 'Accessibility not granted',
-  '在 系统设置 → 隐私与安全性 → 辅助功能 中允许 Cairn，否则 Agent 无法读取和操作桌面。':
-    'Allow Cairn under System Settings → Privacy & Security → Accessibility, or agents cannot read and drive the desktop.',
-  桌面辅助通道不可用: 'Desktop accessibility bus unavailable',
-  'AT-SPI 辅助总线不可用，Agent 将无法读取和操作桌面。请安装并启用 at-spi（如 orca）后重试。':
-    'The AT-SPI accessibility bus is unavailable, so agents cannot read and drive the desktop. Install and enable at-spi (for example orca) and retry.',
-  屏幕录制未授予: 'Screen recording not granted',
-  '在 系统设置 → 隐私与安全性 → 屏幕录制 中允许 Cairn，否则 Agent 无法截取屏幕。':
-    'Allow Cairn under System Settings → Privacy & Security → Screen Recording, or agents cannot capture the screen.',
-  屏幕截取不可用: 'Screen capture unavailable',
-  '当前环境无法截取屏幕，Agent 的屏幕读取将被拒绝。':
-    'This environment cannot capture the screen; agents will be refused screen reads.',
-  '这台执行机还不支持浏览器。': 'This Runner does not support the browser yet.',
-  '这台执行机已不再报告浏览器能力；可关闭已保存的偏好。':
-    'This Runner no longer reports browser capability; you can turn off the saved preference.',
-  '浏览器偏好已绑定到另一台执行机。': 'The browser preference is already bound to another Runner.',
   '没有其他电脑时，任务都在 Coordinator 这台电脑上跑。':
     'With no other computer, work runs on the Coordinator’s computer.',
   添加电脑: 'Add computer',
@@ -249,22 +242,9 @@ export const EN: Record<string, string> = {
     'Add a provider; the Coordinator cannot use a Claude Code sign-in',
   '还差第 1 步：接入模型': 'Step 1 is still open: connect models',
   '还差第 2 步：确认模型': 'Step 2 is still open: confirm models',
-  启动中: 'Starting',
-  '本机执行机正在启动，启动后会检查这台电脑上的 Claude Code':
-    'The local Runner is starting; it checks Claude Code on this computer once it is up',
-  '本机执行机没有启动，查不到 Claude Code。退出 Cairn 再打开一次。':
-    'The local Runner did not start, so Claude Code cannot be checked. Quit Cairn and open it again.',
-  已在这台电脑上登录: 'Signed in on this computer',
   '{role}：{model}': '{role}: {model}',
-  '没找到已登录的 Claude Code。在终端运行 `claude` 登录后，这里会自己更新。':
-    'No signed-in Claude Code found. Run `claude` in a terminal and sign in; this updates by itself.',
-  '本机 Claude Code': 'Claude Code on this computer',
-  只给任务用: 'Tasks only',
-  '让任务用这台电脑上的 Claude Code': 'Let tasks use Claude Code on this computer',
   '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
   'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
-  '任务已经能跑了。Coordinator 用不了 Claude Code 登录，还需要一个服务商。':
-    'Tasks can run now. The Coordinator cannot use a Claude Code sign-in and still needs a provider.',
   '因为你添加了 Anthropic API key': 'Because you added an Anthropic API key',
   '因为这是最早添加、Coordinator 能直接用的服务商':
     'Because it is the earliest added provider the Coordinator can use',
@@ -626,7 +606,7 @@ export const EN: Record<string, string> = {
   '尚无 API 密钥': 'No API keys yet',
   'API 密钥用于从命令行接入执行机，也让 MCP 客户端能访问你的工作台。':
     'API keys connect Runners from the command line and let MCP clients reach your workbench.',
-  新建密钥: 'New key',
+  '新建 API 密钥': 'New API key',
   复制: 'Copy',
   展开: 'Expand',
   '回复：{quote}': 'Replying to: {quote}',
@@ -636,7 +616,8 @@ export const EN: Record<string, string> = {
   思考: 'Thinking',
   展开思考: 'Expand thinking',
   收起思考: 'Collapse thinking',
-  '请立即复制密钥，它仅显示一次。': 'Copy the key now — it is shown only once.',
+  '请立即复制 API 密钥，它仅显示一次。': 'Copy the API key now — it is shown only once.',
+  '没能复制，请手动选中 API 密钥复制。': 'Could not copy; select the API key and copy it by hand.',
 
   // —— resources routes (r7 06–10, r2 §6) ——
   新建: 'New',
@@ -976,16 +957,8 @@ export const EN: Record<string, string> = {
     'Queued: no {platform} Runner yet · needs {platform}',
   '排队中：等 {machine} 上线 · 需要 {platform}（前面 {ahead} 个）':
     'Queued: waiting for {machine} to come online · needs {platform} ({ahead} ahead)',
-  '这台执行机没上报任务沙箱状态，接不了任务。更新 CLI 后在这台机器上运行 `{command} restart`。':
-    'This Runner has not reported its task sandbox, so it cannot take tasks. Update the CLI, then run `{command} restart` on this machine.',
-  '正在检查任务沙箱，检查完才接任务。':
-    'Checking the task sandbox; this Runner takes tasks once the check passes.',
-  '这台机器的系统不支持任务沙箱，接不了任务。':
-    "This machine's system does not support the task sandbox, so it cannot take tasks.",
-  '任务沙箱没就绪，这台执行机接不了任务。Linux 上后台服务要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。':
-    'The task sandbox is not ready, so this Runner cannot take tasks. On Linux the daemon must run as its own systemd user unit with bubblewrap (`bwrap`) installed: update the CLI, then run `{command} restart` on this machine.',
-  '排队中：执行机的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）':
-    'Queued: the task sandbox on the Runner is not ready, so it cannot take tasks. The Runner page shows why and how to fix it ({ahead} ahead)',
+  '排队中：执行机的任务沙箱没就绪，接不了任务（前面 {ahead} 个）':
+    'Queued: the task sandbox on the Runner is not ready, so it cannot take tasks ({ahead} ahead)',
   '排队中：执行机上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）':
     'Queued: the Runner has not detected {runtime}. Install it, then restart the Runner ({ahead} ahead)',
   '排队中：执行机用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）':
@@ -996,16 +969,8 @@ export const EN: Record<string, string> = {
     'Queued: Claude is rate limited on the Runner; this continues once the limit lifts ({ahead} ahead)',
   '排队中：执行机上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）':
     'Queued: Claude Code is not logged in on the Runner. Run claude on that machine to log in ({ahead} ahead)',
-  '排队中：{machine} 的任务沙箱没就绪，接不了任务——原因和修法见执行机页（前面 {ahead} 个）':
-    'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks. The Runner page shows why and how to fix it ({ahead} ahead)',
-  '任务沙箱没就绪：后台服务没有作为自己的 systemd user unit 运行。在这台机器上运行 `{command} restart`，它会自己起一个；还不行的话，检查 `systemd-run --user` 能不能用。':
-    'The task sandbox is not ready: the daemon is not running as its own systemd user unit. Run `{command} restart` on this machine, which starts one; if that does not help, check that `systemd-run --user` works.',
-  '任务沙箱没就绪：这台机器没装 bubblewrap（`bwrap`）。装好后（如 `sudo pacman -S bubblewrap` 或 `sudo apt install bubblewrap`），执行机每分钟会自己再检查一次。':
-    'The task sandbox is not ready: bubblewrap (`bwrap`) is not installed on this machine. Install it (for example `sudo pacman -S bubblewrap` or `sudo apt install bubblewrap`); the Runner checks again every minute.',
-  '任务沙箱没就绪：家目录里的 FUSE 挂载 `{mountPoint}` 挡住了沙箱，通常是某个 AppImage 程序在 TMPDIR 指向家目录时留下的。关掉那个程序，或让它的 TMPDIR 指向家目录以外，执行机每分钟会自己再检查一次。':
-    'The task sandbox is not ready: the FUSE mount `{mountPoint}` in your home folder blocks it, usually left by an AppImage app started with TMPDIR inside home. Close that app, or start it with TMPDIR outside home; the Runner checks again every minute.',
-  '任务沙箱没就绪：沙箱没法覆盖你的家目录，常见原因是家目录里有 FUSE 挂载（比如 AppImage 程序）。用 `findmnt -l | grep fuse` 找到它并关掉对应程序，执行机每分钟会自己再检查一次。':
-    'The task sandbox is not ready: it cannot overlay your home folder, usually because of a FUSE mount there (such as an AppImage app). Find it with `findmnt -l | grep fuse` and close that app; the Runner checks again every minute.',
+  '排队中：{machine} 的任务沙箱没就绪，接不了任务（前面 {ahead} 个）':
+    'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks ({ahead} ahead)',
   '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）':
     'Queued: {machine} has not detected {runtime}. Install it, then restart the Runner ({ahead} ahead)',
   '排队中：{machine} 用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）':
@@ -1032,9 +997,6 @@ export const EN: Record<string, string> = {
   '不限（默认执行机）': 'Any (default Runner)',
   '运行中不能改，换平台请新开任务':
     'Locked once the task has run. Start a new task to change the platform.',
-  // #1251 machines page capability annotation (daemon-reported inventory).
-  能力清单未上报: 'Capabilities not reported',
-  'MCP {n} · 本机技能 {m}': 'MCP {n} · local skills {m}',
   手动: 'Manual',
   推荐: 'Recommended',
   // #905 activity phases (live row labels) + the freshness disclosure line.
@@ -1155,18 +1117,8 @@ export const EN: Record<string, string> = {
   // #170 create-agent dialog family
   创建: 'Create',
   // W4 #287 API key 新建表单弹窗（r3 §6 权限位 [推断]）
-  '名称（可选）': 'Name (optional)',
-  '如：笔记本、CI 机器': 'e.g. laptop, CI runner',
-  'Git 读写（托管仓库 push/pull）': 'Git read/write (hosted repo push/pull)',
-  'MCP 访问（MCP 客户端接入）': 'MCP access (MCP client connections)',
-  '注册执行机（命令行接入）': 'Runner enrollment (CLI executor registration)',
-  工具权限位: 'Tool grants',
-  // #636 起 zh「全选」归筛选面板的全选行（en 'Select all'）；本面快捷键换
-  // 「授予全部」避开同形碰撞——zh 源串即 key，两个语义域必须分叉。
-  授予全部: 'Grant all',
-  清空: 'Clear all',
-  读: 'Read',
-  写: 'Write',
+  '只能用大写字母、数字和下划线，不能以数字开头。':
+    'Capital letters, digits and _ only; no leading digit.',
   // wayfinder #173 add-secret dialog family (r2 §242 verbatim fields)
   '名称（环境变量名）': 'Name (environment variable name)',
   '描述（可选）': 'Description (optional)',
@@ -1266,20 +1218,25 @@ export const EN: Record<string, string> = {
   进入: 'Continue',
   // W4 #285 浏览器授权页（02 §5.2 路径一；/app/machines/authorize）
   授权执行机: 'Authorize Runner',
-  '生成授权链接，在执行机上完成注册发起。':
-    'Generate an authorization link and start enrollment on the executor Runner.',
-  生成授权链接: 'Generate authorization link',
-  '一台执行机请求加入你的团队。确认后它将以自己的凭据连接。':
-    'An executor Runner is requesting to join your team. Once authorized it connects with its own credentials.',
+  '在要接入的电脑上依次运行这两条命令。终端会给出授权链接，打开它就能确认。':
+    'Run these two commands, in order, on the computer you are adding. The terminal prints an authorization link; open it to confirm.',
+  '连不上服务器，正在重试。请检查网络。': 'Cannot reach the server; retrying. Check the network.',
+  '有一台执行机请求加入你的团队。': 'A Runner is asking to join your team.',
+  '正在连接执行机…': 'Connecting to the Runner…',
+  '← 返回执行机': '← Back to Runners',
+  '授权没成功，请再试一次。还不行就在执行机上重新运行 `cairn start`。':
+    'Authorization failed. Try again; if it still fails, run `cairn start` on the Runner again.',
   确认授权: 'Authorize',
   '正在授权…': 'Authorizing…',
-  '授权完成，执行机已注册。': 'Authorized — the Runner is registered.',
-  '授权完成，{name} 已注册为执行机。': 'Authorized — {name} is registered as a Runner.',
+  '授权完成，执行机已注册。终端那边会自己连上，这一页可以关掉。':
+    'Authorized — the Runner is registered. The terminal connects by itself; you can close this page.',
+  '授权完成，{name} 已注册为执行机。终端那边会自己连上，这一页可以关掉。':
+    'Authorized — {name} is registered as a Runner. The terminal connects by itself; you can close this page.',
   机器名: 'Machine name',
-  '这个名字由发起方自报。只有你刚在这台机器上运行了 `cairn start`，且终端里显示的名字与这里一致，才确认授权。':
-    'The requester reports this name itself. Confirm only if you just ran `cairn start` on this machine and its terminal shows the same name.',
-  '授权链接已失效，请在执行机上重新发起。':
-    'This authorization link has expired — restart enrollment on the executor Runner.',
+  '名字是那台电脑自己报的。和终端里显示的一样才确认。':
+    'That computer reports this name itself. Confirm only if its terminal shows the same name.',
+  '授权链接过期了。在执行机上重新运行 `cairn start` 拿新链接。':
+    'This authorization link has expired. Run `cairn start` on the Runner again for a new one.',
   '浏览器授权注册 →': 'Browser authorization →',
   // W2 #318 桩群校准：新建任务未保存闸（r9 §3.4）。#310 附件：dirty 位由
   // spec 非空承载（附件 token 注入后归 spec）,标签 add 仍为桩（本票不动）。
@@ -1336,12 +1293,6 @@ export const EN: Record<string, string> = {
     'The latest server database backup run on {host} failed ({detail}); the last successful backup was less than an hour ago. On that machine run `systemctl --user status cairn-db-backup.service` to see why.',
   '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在 {hours} 小时前。在该机器上运行 `systemctl --user status cairn-db-backup.service` 查看原因。':
     'The latest server database backup run on {host} failed ({detail}); the last successful backup was {hours## hour|# hours} ago. On that machine run `systemctl --user status cairn-db-backup.service` to see why.',
-  // #895 机器页三态读标注（spec 21 A8；orchestration 块 join 行集）+ chief
-  // 设置 Agent tab「机器」槽的描述（A6）。徽标/状态 = 机器与总管编排的
-  // 关系面，非机器自身状态。
-  'Coordinator 主机': 'Coordinator host',
-  'Coordinator 回合进行中': 'Coordinator turn in progress',
-  'Coordinator 等待执行机': 'Coordinator waiting for Runner',
   '暂无 MCP 服务器。': 'No MCP servers yet.',
   团队密钥: 'Team secrets',
   // #1169 授权技能段（权限 tab）：不限制（null）与限制后全不勾（[] = 显式
@@ -1524,13 +1475,12 @@ export const EN: Record<string, string> = {
   已归档项目: 'Archived projects',
   筛选项目: 'Filter projects',
   '筛选项目：{value}': 'Filter projects: {value}',
-  '已归档的项目和它们的对话会一直保留，直到你删除。':
-    'Archived projects and their conversations are kept until you delete them.',
+  '已归档的项目和它们的对话会一直保留，直到你删除。': 'Kept until you delete them.',
   '这个项目已归档。取消归档后才能发消息。':
     'This project is archived. Unarchive it to send messages.',
   '这个项目已归档。取消归档后才能修改。': 'This project is archived. Unarchive it to make changes.',
   没有已归档的项目: 'No archived projects',
-  已归档的项目: 'Archived projects',
+  已归档的项目: 'Archived',
   全部删除: 'Delete all',
   没有可删除的已归档项目: 'No archived projects to delete',
   '删除 {n} 个已归档的项目？': 'Delete {n#1 archived project|# archived projects}?',
@@ -1654,11 +1604,7 @@ export const EN: Record<string, string> = {
   '{kind} 步骤': '{kind} step',
   '{time} 重置': 'resets {time}',
   '冷却至 {time}': 'Cooling until {time}',
-  已检测到: 'Detected',
-  '没有检测到，装好后重启执行机': 'Not detected. Install it, then restart the Runner',
   暂不支持: 'Not supported yet',
-  '这台执行机上检测到的执行器。检测到就能接任务，不用开关。':
-    'Runtimes detected on this Runner. Anything detected takes tasks; there is nothing to switch on.',
   可用: 'Available',
   在这台执行机上运行: 'Run on this Runner:',
   已登录: 'Signed in',
@@ -2001,12 +1947,9 @@ export const EN: Record<string, string> = {
   已复制链接: 'Link copied',
   显示更多: 'Show more',
   'PR 状态加载失败，稍后会自动重试。': 'Could not load the PR status; retrying shortly.',
-  '这台执行机在 Coordinator 里的角色': "This Runner's role for the Coordinator",
   能力: 'Capabilities',
-  '这台执行机上报的 MCP 与技能清单': 'The MCP servers and skills this Runner reports',
   管理: 'Manage',
   登录已过期: 'Sign-in expired',
-  登录将过期: 'Sign-in expiring',
   已接入的执行机: 'Connected Runners',
   '已检查 {ago}': 'Checked {ago}',
   '连接断开，正在重连…': 'Connection lost, reconnecting…',
@@ -2077,14 +2020,7 @@ export const EN: Record<string, string> = {
   '撤销设备失败，请重试。': 'Could not revoke the device. Try again.',
   等你审阅: 'Ready for review',
   '选择 {title}': 'Select {title}',
-  '最后在线 {time}': 'Last seen {time}',
   系统未知: 'Unknown OS',
-  '更新 Cairn 后才能接有平台要求的任务': 'Update Cairn to take tasks that need a platform',
-  '任务沙箱没就绪，暂时接不了任务——展开看怎么修':
-    'Task sandbox not ready, so this Runner cannot take tasks. Expand to see how to fix it',
-  '重新连接 {name} 后才能修改它的设置。': 'Reconnect {name} to change its settings.',
-  '在这台执行机上确认它已联网、没有休眠，然后运行 `{command}` 重新启动。上线后这里会自动变回在线。':
-    'On this Runner, make sure it is online and awake, then run `{command}` to start it again. It turns online here by itself.',
   '额度空了，等额度恢复后自动续跑。': 'Out of quota. It resumes by itself when quota returns.',
   '被限流，等恢复后自动续跑。': 'Rate limited. It resumes by itself when the limit lifts.',
   '第一支 PR 当天就合并了。可以在 GitHub Discussions 发一条帖子':
@@ -2176,7 +2112,6 @@ export const EN: Record<string, string> = {
   在主对话中查看: 'View in the main chat',
   主对话里没有加载这条消息: 'That message is not loaded in the main chat.',
   有新动态: 'New activity',
-  'Agent 的权限': 'Agent access',
   仅自己可见: 'Only you can see this',
   文档: 'Documents',
   设计: 'Designs',
@@ -2335,4 +2270,17 @@ export const EN: Record<string, string> = {
     'No top models yet. Use Add model to pick from your connected providers.',
   '恢复成推荐的模型和顺序。': 'Go back to the suggested models and their order.',
   恢复推荐: 'Reset to suggested',
+  检查更新: 'Check for updates',
+  '正在检查更新…': 'Checking for updates…',
+  '已是最新版本 {version}': 'Up to date ({version})',
+  '更新到 {version}': 'Update to {version}',
+  '正在更新 {percent}%': 'Updating {percent}%',
+  '正在安装…': 'Installing…',
+  '正在重启…': 'Restarting…',
+  '更新失败：{message}': 'Update failed: {message}',
+  开发版不检查更新: 'Development builds do not check for updates',
+  '把 Cairn 移到「应用程序」后才能自动更新':
+    'Move Cairn to Applications to update it automatically',
+  'Cairn 所在的文件夹不可写，无法自动更新':
+    "Cairn's folder is read-only, so it cannot update itself",
 };

@@ -1,11 +1,13 @@
 const { cpSync } = require('node:fs');
 const { join } = require('node:path');
 
-exports.default = async function copyServerModules(context) {
+exports.default = async function copyBundledModules(context) {
   const resources = context.packager.getResourcesDir(context.appOutDir);
-  cpSync(
-    join(context.packager.info.appDir, 'server', 'node_modules'),
-    join(resources, 'server', 'node_modules'),
-    { recursive: true },
-  );
+  for (const bundle of ['server', 'runner']) {
+    cpSync(
+      join(context.packager.info.appDir, bundle, 'node_modules'),
+      join(resources, bundle, 'node_modules'),
+      { recursive: true },
+    );
+  }
 };
