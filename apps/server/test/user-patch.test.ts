@@ -1,12 +1,92 @@
-import { describe, expect, test } from 'vitest';
+import * as os from 'node:os';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { user as userTable } from '../src/db/schema.js';
+import { seed } from '../src/db/seed.js';
 import { bootServer, req } from './helpers.js';
+
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return { ...actual, userInfo: vi.fn(actual.userInfo) };
+});
 
 async function patchName(s: ReturnType<typeof bootServer>, body: unknown) {
   return req(s.app, 'PATCH', '/api/user/me', body);
 }
 
 describe('PATCH /api/user/me (the #1031 rename round trip)', () => {
+  afterEach(() => vi.resetAllMocks());
+
+  test.each([
+    ['linux-owner', 'linux-owner'],
+    ['  mac-owner  ', 'mac-owner'],
+    ['Windows Owner', 'Windows Owner'],
+  ])('fresh owner uses OS username %s', async (username, expected) => {
+    vi.mocked(os.userInfo).mockReturnValue({ ...os.userInfo(), username });
+    const s = bootServer();
+    try {
+      const response = await req(s.app, 'GET', '/api/auth/session');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ displayName: expected });
+      expect(s.db.select().from(userTable).get()?.displayName).toBe(expected);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test.each(['empty', 'unavailable'])('OS username %s falls back to Owner', async (failure) => {
+    const actual = os.userInfo();
+    vi.mocked(os.userInfo).mockImplementation(() => {
+      if (failure === 'unavailable') throw new Error('OS identity unavailable');
+      return { ...actual, username: '   ' };
+    });
+    const s = bootServer();
+    try {
+      expect(await (await req(s.app, 'GET', '/api/user/me')).json()).toMatchObject({
+        displayName: 'Owner',
+      });
+      vi.mocked(os.userInfo).mockReturnValue({ ...actual, username: 'recovered-owner' });
+      expect(seed(s.db).user.displayName).toBe('recovered-owner');
+      expect(s.db.select().from(userTable).get()?.displayName).toBe('recovered-owner');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('startup replaces only the legacy default Owner and preserves its avatar', async () => {
+    const s = bootServer();
+    try {
+      s.db
+        .update(userTable)
+        .set({ displayName: 'Owner', avatarUrl: 'https://example.com/avatar.png' })
+        .run();
+      vi.mocked(os.userInfo).mockReturnValue({ ...os.userInfo(), username: 'upgraded-owner' });
+      expect(seed(s.db).user).toMatchObject({
+        displayName: 'upgraded-owner',
+        avatarUrl: 'https://example.com/avatar.png',
+      });
+      vi.mocked(os.userInfo).mockReturnValue({ ...os.userInfo(), username: 'different-host' });
+      expect(seed(s.db).user.displayName).toBe('upgraded-owner');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test.each(['owner', ' Owner ', 'Owner-custom'])(
+    'startup preserves nondefault name %s',
+    (displayName) => {
+      const s = bootServer();
+      try {
+        s.db.update(userTable).set({ displayName }).run();
+        vi.mocked(os.userInfo).mockImplementation(() => {
+          throw new Error('OS identity must not replace an existing name');
+        });
+        expect(seed(s.db).user.displayName).toBe(displayName);
+      } finally {
+        s.dispose();
+      }
+    },
+  );
+
   test('renaming -> a 200 full-shape receipt + the DB row stored + the three read surfaces show the new name', async () => {
     const s = bootServer();
     try {
@@ -32,6 +112,19 @@ describe('PATCH /api/user/me (the #1031 rename round trip)', () => {
         await req(s.app, 'GET', `/api/teams/${s.team.id}/members`)
       ).json()) as { actor: { displayName: string } }[];
       expect(members[0]?.actor.displayName).toBe('新名字');
+
+      vi.mocked(os.userInfo).mockImplementation(() => {
+        throw new Error('OS identity must not replace an existing name');
+      });
+      expect(seed(s.db).user.displayName).toBe('新名字');
+      const restarted = bootServer({ db: s.db });
+      try {
+        expect(await (await req(restarted.app, 'GET', '/api/auth/session')).json()).toMatchObject({
+          displayName: '新名字',
+        });
+      } finally {
+        restarted.dispose();
+      }
     } finally {
       s.dispose();
     }

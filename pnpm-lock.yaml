@@ -332,6 +332,9 @@ importers:
       '@cairn/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@electron/osx-sign':
+        specifier: 1.3.3
+        version: 1.3.3(supports-color@10.2.2)
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.63.0

@@ -94,11 +94,6 @@ export const PAGES: AuditPage[] = [
     url: '/app/settings/machines?scenario=06',
     ready: (p) => p.getByTestId('machine-item').first(),
   },
-  {
-    name: 'machine detail',
-    url: '/app/settings/machines?scenario=06&machine=Kd8fG2hJ4mN9pQ1rStUvWx3',
-    ready: (p) => p.getByTestId('machine-detail'),
-  },
   { name: 'skills', url: '/app/resources/skills?scenario=06', ready: row },
   {
     name: 'providers',

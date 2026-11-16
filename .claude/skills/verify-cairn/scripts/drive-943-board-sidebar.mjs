@@ -325,7 +325,8 @@ for (const theme of ['dark', 'light']) {
     await page.waitForTimeout(150);
     check(await page.getByRole('link', { name: '新建项目' }).isVisible(), 'C4c 展开后行回场');
 
-    await page.getByRole('button', { name: 'Owner' }).click();
+    const session = await api('GET', '/api/auth/session');
+    await page.getByRole('button', { name: session.body.displayName, exact: true }).click();
     await page.waitForTimeout(300);
     check(
       await page.getByRole('dialog', { name: '用户菜单' }).isVisible(),

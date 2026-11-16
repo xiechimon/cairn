@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e0a60c0a-1f4c-472d-a064-9a5f61cb57de",
+  "id": "fe346979-02f1-40ea-8b5d-dd5c48fd5205",
   "prevId": "f6658e2d-7a9f-4aa5-a60d-6f449998ffcf",
   "tables": {
     "action_journal": {
@@ -5464,14 +5464,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'device'"
-        },
         "relayScope": {
           "name": "relayScope",
           "type": "text",
@@ -6811,6 +6803,20 @@
           "notNull": true,
           "autoincrement": false,
           "default": 1
+        },
+        "envSeal": {
+          "name": "envSeal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {},

@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
@@ -146,6 +147,51 @@ describe('runCoordinatorTurn', () => {
     expect(api.suggestions).toEqual([]);
     expect(usage?.cacheRead).toBe(0);
     await harness.close(ctx);
+  });
+
+  it('reports no context size when an OpenAI-compatible model streams without usage', async () => {
+    const server = createServer((_request, response) => {
+      const chunk = (delta: object, finish: string | null) =>
+        `data: ${JSON.stringify({
+          id: 'chatcmpl-test',
+          object: 'chat.completion.chunk',
+          model: 'test-model',
+          choices: [{ index: 0, delta, finish_reason: finish }],
+        })}\n\n`;
+      response.writeHead(200, { 'content-type': 'text/event-stream' });
+      response.end(
+        `${chunk({ role: 'assistant', content: 'ok' }, null)}${chunk({}, 'stop')}data: [DONE]\n\n`,
+      );
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const address = server.address();
+      if (address === null || typeof address === 'string') throw new Error('No test server port');
+      const models = createCoordinatorModels();
+      models.useStepProvider({
+        kind: 'http',
+        providerId: 'custom',
+        baseUrl: `http://127.0.0.1:${address.port}`,
+        api: 'openai-completions',
+        models: [{ id: 'test-model', name: 'test-model' }],
+      });
+      await models.setApiKey('custom', 'unused');
+      const harness = await openCoordinatorHarness(storagePath(), models.models, ctx);
+      const api = fakeMachineApi();
+      await runCoordinatorTurn(
+        { harness, models, api, context: ctx, heartbeatMs: 1000, now: () => 1 },
+        chiefStep('step-no-usage', 'hello', undefined, 'test-model', 'custom'),
+      );
+      expect(api.dones[0]?.body.status).toBe('success');
+      const usage = api.dones[0]?.body.usage?.[0];
+      expect(usage?.model).toBe('custom/test-model');
+      expect(usage?.contextTokens).toBeUndefined();
+      await harness.close(ctx);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error === undefined ? resolve() : reject(error))),
+      );
+    }
   });
 
   it('predicts after cold and warm ordinary replies but skips every event trigger', async () => {

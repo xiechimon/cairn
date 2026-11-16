@@ -33,7 +33,6 @@ import { shutdownRuntimeOtel } from './runtime-otel.js';
 import { runServerCommand } from './server-command.js';
 import { loadApnsConfig } from './services/apns.js';
 import { hasOwnerBrowserSession } from './services/browser-session.js';
-import { installBuiltinSkills } from './services/builtin-skills.js';
 import { sweepComputerHandoffs } from './services/computer-handoff.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import {
@@ -98,11 +97,6 @@ if (refusal !== null) {
 }
 const config = ensureAccessToken(loadedConfig);
 logSecrets.push(config.authToken ?? '');
-try {
-  installBuiltinSkills(join(config.dataDir, 'builtin-skills'));
-} catch (error) {
-  logger.warn({ err: error }, 'built-in skills were not installed; running without them');
-}
 
 const opened = (() => {
   try {
