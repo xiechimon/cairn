@@ -58,6 +58,7 @@ import {
   type SystemRow,
   stripAnsiEscapes,
   stripSkillRouteSection,
+  stripTurnContext,
   systemRowOf,
   TAKEOVER_HANDED_BACK,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
@@ -1462,7 +1463,7 @@ export function askQuestionOfContent(content: unknown): {
 const WAKE_MARKER_PREFIX_RE = /^\[wake:\w+\]\s*/;
 
 function chiefUserText(raw: string): string {
-  return stripSkillRouteSection(raw.replace(WAKE_MARKER_PREFIX_RE, '')).trim();
+  return stripTurnContext(stripSkillRouteSection(raw.replace(WAKE_MARKER_PREFIX_RE, ''))).trim();
 }
 
 function takeoverItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {
