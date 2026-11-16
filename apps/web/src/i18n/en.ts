@@ -1690,8 +1690,8 @@ export const EN: Record<string, string> = {
   新任务用这个模型和思考强度开始: 'New tasks start with this model and thinking level',
   每日报告和对话摘要: 'Daily reports and conversation summaries',
   上下文快满时压缩对话: 'Compacts a conversation when the context is nearly full',
-  '在这里改常用模型，以及新任务和 Coordinator 用哪个模型、思考多深，改动马上生效。其他后台用途（评审、引文检查等）用哪个模型，在模型路由的图里能看到。':
-    'Edit your top models, and which model new tasks and the Coordinator use and how hard they think; changes apply right away. See which model other background uses (review, citation check and so on) use in the Model routing graph.',
+  '在这里改常用模型，以及新任务和 Coordinator 用哪个模型、思考多深，改动马上生效。评审等其他用途的模型，在模型路由的图里能看到。':
+    'Edit your top models, and which model new tasks and the Coordinator use and how hard they think; changes apply right away. See models for review and other uses in the Model routing graph.',
   '先给 Coordinator 选模型，它才能回答你的消息。':
     'Pick a model for the Coordinator so it can answer your messages.',
   '「{name}」验证通过': '{name} verified',
@@ -1792,7 +1792,6 @@ export const EN: Record<string, string> = {
     '{n#1 routing rule|# routing rules} failed validation and stayed put',
   '把固定在这台执行机上的路由规则一起迁到另一台执行机。':
     'Move the routing rules pinned to this Runner to another Runner.',
-  引文检查: 'Citation check',
   首选执行机: 'Preferred Runner',
   不固定: 'Any machine',
   '当前默认：Claude Code（因为有执行机装了 Claude Code）':

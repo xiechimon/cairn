@@ -4,7 +4,6 @@ import { and, eq } from 'drizzle-orm';
 import { todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { type BuildDeps, startBuilds } from './builds.js';
-import { recordResearchTier } from './research-citations.js';
 import { routeForStep } from './routing-rules.js';
 import { createAutonomousTodo } from './todos.js';
 
@@ -41,7 +40,6 @@ export function openResearchThread(
           )
           .get();
   if (existing?.latestBuildId != null) {
-    recordResearchTier(deps, existing.latestBuildId, input.tier);
     return {
       todoId: existing.id,
       buildId: existing.latestBuildId,
@@ -71,6 +69,5 @@ export function openResearchThread(
     triggerSource: 'chief',
   });
   if (started === undefined) throw new Error('research build was not created');
-  recordResearchTier(deps, started.id, input.tier);
   return { todoId, buildId: started.id };
 }

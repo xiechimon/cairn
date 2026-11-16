@@ -396,7 +396,6 @@ export const accountsDefault: FixtureSet = {
         routingRule('coordinator', 'claude-code', 'claude-sonnet-5', 'high'),
         routingRule('session', 'r3-gateway', 'gpt-5.2', 'medium'),
         routingRule('review', 'r3-gateway', 'claude-opus-4-5', 'high'),
-        routingRule('citation_check', 'github-copilot', 'gpt-4o', null),
       ],
       policies: [],
     },

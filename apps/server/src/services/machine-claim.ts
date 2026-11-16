@@ -145,6 +145,7 @@ function claimCandidates(deps: MachineDeps, _machineId: string, teamId: string):
         eq(step.status, 'pending'),
         eq(todo.teamId, teamId),
         isNull(todo.archivedAt),
+        sql`coalesce(${todo.sourceKind}, '') NOT IN ('research-intake', 'research-citation-check')`,
         or(isNull(step.holdUntil), lte(step.holdUntil, sql`${nowMs()}`)),
       ),
     )
@@ -583,10 +584,7 @@ async function tryClaim(
           .run();
         if (res.changes === 0) return false;
         if (deliverables !== undefined) failEarlierClaimDeliverables(db, cand.stepRow.id);
-        if (
-          cand.stepRow.kind !== 'review' &&
-          cand.todoRow.sourceKind !== 'research-citation-check'
-        ) {
+        if (cand.stepRow.kind !== 'review') {
           recordStepRoute(tx, cand.stepRow, cand.todoRow, machineId, agentRow);
         }
         if (skillInjection.hits.length > 0) {

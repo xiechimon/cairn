@@ -105,6 +105,14 @@ export function sweepQuotaWaitSteps(deps: QuotaWaitDeps, now: number = nowMs()):
   for (const row of rows) {
     if (row.quotaBlock?.source === 'subscription_policy') continue;
     if ((row.quotaBlock?.probeAt ?? 0) > now) continue;
+    const task = deps.db
+      .select({ sourceKind: todo.sourceKind })
+      .from(build)
+      .innerJoin(todo, eq(todo.id, build.todoId))
+      .where(eq(build.id, row.buildId))
+      .get();
+    if (task?.sourceKind === 'research-intake' || task?.sourceKind === 'research-citation-check')
+      continue;
     deps.db
       .update(step)
       .set({ status: 'pending', machineId: null })

@@ -275,7 +275,7 @@ async function claim(s: ReturnType<typeof bootServer>) {
 }
 
 describe('removing the agent table from a seeded legacy install', () => {
-  test('failure mode: the Coordinator and the citation checker lose their agent binding', () => {
+  test('the Coordinator keeps its binding without recreating the retired citation checker', () => {
     const { sqlite } = migratedWorld();
     expect(rows(sqlite, "SELECT name FROM sqlite_master WHERE name = 'agent'")).toEqual([]);
     expect(
@@ -294,13 +294,7 @@ describe('removing the agent table from a seeded legacy install', () => {
       seededFromAgentId: CHIEF_AGENT,
     });
     const checker = rows(sqlite, "SELECT * FROM routing_rule WHERE use = 'citation_check'");
-    expect(checker).toHaveLength(1);
-    expect(checker[0]).toMatchObject({
-      provider: 'relay-186',
-      modelId: 'glm-5.3',
-      machineId: 'm-box',
-      seededFromAgentId: HARBOR_AGENT,
-    });
+    expect(checker).toEqual([]);
   });
 
   test('the existing session rule and policy are kept and the review policy stays read-only', () => {
@@ -465,15 +459,17 @@ describe('removing the agent table from a seeded legacy install', () => {
     opened.close();
   });
 
-  test('the citation checker step routes to its own rule, not the session rule', async () => {
+  test('a retired citation checker step is stopped and cannot be claimed after upgrading', async () => {
     const world = migratedWorld();
     world.sqlite.close();
     const { s, opened } = serverOn(world);
     const first = await claim(s);
     expect(first?.step.id).toBe('step-pending');
     const second = await claim(s);
-    expect(second?.step.id).toBe('step-citation');
-    expect(second?.agent).toMatchObject({ provider: 'relay-186', modelId: 'glm-5.3' });
+    expect(second).toBeNull();
+    expect(
+      s.db.select().from(schema.step).where(eq(schema.step.id, 'step-citation')).get()?.status,
+    ).toBe('stopped');
     opened.close();
   });
 

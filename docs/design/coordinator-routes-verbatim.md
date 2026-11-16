@@ -168,7 +168,7 @@ Each test is written first and is red on `origin/main` (or on #3558's revision-1
 | W7 | REST `POST /api/projects/:id/todos`, `PATCH /api/todos/:id` | owner-typed `spec` | POST and PATCH of a task without `request` are unchanged, and `request` stays null; PATCH `spec` on a task with `request` replaces its segments with one owner `edit` segment, the claim prompt shows the edit, and a following `addMessageIds` keeps it |
 | W8 | GitHub issue import (`github-issues.ts`) | issue body, `sourceKind` | unchanged; `request` stays null and the task-wide fence remains |
 | W9 | MCP face `create_todo`, `update_todo` | caller's own text | `create_todo` unchanged (`request` null); `update_todo` with `title` or `spec` on a task with `request` returns 409 and leaves segments and `spec` untouched; tags still update |
-| W10 | research threads, citation checks, retro proposals | server templates | unchanged |
+| W10 | research threads | server templates | unchanged; automatic citation checks and retro proposals are retired |
 | W11 | worker `set_task_meta` | title | step 1: refused for a task with `request` (`titleFinal`); step 3: sets `titleSource: 'worker'`, after which every prompt labels the title as the worker's and does not fence it as the issue author's |
 | R1 | claim payload, daemon `buildTaskPrompt` (`machine-claim.ts`, `runner.ts`) | segments | the claim carries `request` to a daemon at or above `TASK_SEGMENTS_MIN_CLI_VERSION`; the prompt fences exactly the third-party segments and a third-party title; `classifyUserText` still reads it as `task-prompt`; an older daemon receives the server-fenced title and the rendered spec, and its prompt shows no third-party text unfenced |
 | R2 | verify step prompt (`builds.ts`) | segments | same rendering as R1 |

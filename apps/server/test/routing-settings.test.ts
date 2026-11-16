@@ -5,7 +5,7 @@ import {
   type TeamRoutingSettings,
   type WorkPolicyRecord,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { describe, expect, onTestFinished, test } from 'vitest';
 import { machine as machineTable, routingRule } from '../src/db/schema.js';
 import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
@@ -155,7 +155,7 @@ async function settings(s: TestServer): Promise<TeamRoutingSettings> {
   ).json()) as TeamRoutingSettings;
 }
 
-function ruleRow(s: TestServer, use: 'session' | 'coordinator' | 'citation_check') {
+function ruleRow(s: TestServer, use: 'session' | 'coordinator') {
   return s.db.select().from(routingRule).where(eq(routingRule.use, use)).get();
 }
 
@@ -354,13 +354,21 @@ describe('routing rule issues and the one-click fix', () => {
     expect((await settings(s)).ruleIssues).toEqual([]);
   });
 
-  test('a healthy citation_check rule on a relay provider is not flagged and reads back byte-identical', async () => {
+  test('a retired citation route is hidden and cannot be edited, while its stored data survives', async () => {
     const s = bootServer();
     insertMachine(s);
     addProvider(s, 'relay-186');
-    seedRoute(s, 'citation_check', { provider: 'relay-186', modelId: 'glm-5.3' });
-    const before = ruleRow(s, 'citation_check')!;
-    expect((await settings(s)).ruleIssues).toEqual([]);
-    expect(ruleRow(s, 'citation_check')).toEqual(before);
+    s.db.run(sql`INSERT INTO routing_rule
+      (id, teamId, use, provider, modelId, createdAt, updatedAt)
+      VALUES ('retired-citation', ${s.team.id}, 'citation_check', 'missing-retired-provider', 'glm-5.3', 1, 1)`);
+    const before = s.db.select().from(routingRule).all();
+    const result = await settings(s);
+    expect(result.rules).toEqual([]);
+    expect(result.ruleIssues).toEqual([]);
+    const edit = await req(s.app, 'PATCH', `/api/teams/${s.team.id}/routing-rules/citation_check`, {
+      modelId: 'another-model',
+    });
+    expect(edit.status).toBe(400);
+    expect(s.db.select().from(routingRule).all()).toEqual(before);
   });
 });

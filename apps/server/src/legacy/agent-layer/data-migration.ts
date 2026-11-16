@@ -19,7 +19,6 @@ export const AGENT_LAYER_MIGRATION_ID = 'drop-agents';
 
 const DEFAULT_SESSION_MODEL = 'claude-sonnet-5-5';
 const REVIEWER_PERSONAS = ['code_reviewer', 'security_auditor', 'test_engineer'];
-const CITATION_SOURCE_KIND = 'research-citation-check';
 const REVIEWER_DENIED_TOOLS: readonly string[] = [
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
@@ -105,8 +104,7 @@ function insertRule(db: Db, use: RuleUse, source: AgentRow, id?: string): void {
       thinkingLevel: source.thinkingLevel,
       fallbackModels: source.fallbackModels,
       machineId: source.machineId,
-      requiredCapabilities:
-        use === 'coordinator' || use === 'citation_check' ? executorRequirement(db, source) : null,
+      requiredCapabilities: use === 'coordinator' ? executorRequirement(db, source) : null,
       mcpServers: use === 'coordinator' ? source.mcpServers : null,
       seededFromAgentId: source.id,
       createdAt: now,
@@ -137,11 +135,8 @@ function countRows(db: Db, teamId: string): { rules: number; policies: number } 
 
 function preseedRules(db: Db, teamId: string): void {
   const agents = db.select().from(schema.agent).where(eq(schema.agent.teamId, teamId)).all();
-  const todos = db.select().from(schema.todo).where(eq(schema.todo.teamId, teamId)).all();
   const chiefRow = db.select().from(schema.chief).where(eq(schema.chief.teamId, teamId)).get();
   const chiefAgentId = chiefRow?.agentId ?? null;
-  const sessionModel = ruleOf(db, teamId, 'session')?.modelId ?? DEFAULT_SESSION_MODEL;
-  const nonChief = agents.filter((row) => row.id !== chiefAgentId && usable(row));
 
   const chiefAgent = agents.find((row) => row.id === chiefAgentId);
   if (chiefAgent !== undefined && usable(chiefAgent)) {
@@ -163,29 +158,6 @@ function preseedRules(db: Db, teamId: string): void {
           .run();
       }
     }
-  }
-
-  const citationTodos = todos.filter((row) => row.sourceKind === CITATION_SOURCE_KIND);
-  if (citationTodos.length > 0 && ruleOf(db, teamId, 'citation_check') === undefined) {
-    const counts = new Map<string, number>();
-    for (const row of citationTodos) {
-      const id = row.assignment?.build?.agentId;
-      if (id != null) counts.set(id, (counts.get(id) ?? 0) + 1);
-    }
-    const independentOfSession = nonChief.filter((row) =>
-      modelsAreIndependent(sessionModel, row.modelId ?? ''),
-    );
-    const assigned = mostAssigned(counts, independentOfSession);
-    const independent = independentOfSession
-      .filter((row) => row.status === 'active' && row.persona === null)
-      .sort(
-        (a, b) =>
-          Number(b.displayName === 'eval-harbor') - Number(a.displayName === 'eval-harbor') ||
-          a.id.localeCompare(b.id),
-      )
-      .at(0);
-    const checker = assigned ?? independent;
-    if (checker !== undefined) insertRule(db, 'citation_check', checker);
   }
 }
 

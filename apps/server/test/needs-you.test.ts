@@ -133,6 +133,26 @@ function agePhase(w: World, phaseAt: number): void {
 }
 
 describe('needs you (#1800)', () => {
+  test.each(['research-intake', 'research-citation-check'] as const)(
+    'the generic retry sweep leaves an old failed %s task stopped',
+    async (sourceKind) => {
+      const w = openWorld();
+      const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
+      applyStepFailure(w.deps, row, 'connection reset by peer');
+      w.s.db.update(todoTable).set({ sourceKind }).where(eq(todoTable.id, w.todoId)).run();
+      const before = w.s.db.select().from(stepTable).where(eq(stepTable.buildId, w.buildId)).all();
+
+      await sweepFailedRetries(w.deps);
+      await sweepFailedRetries(w.deps);
+
+      expect(phaseOf(w)).toBe('failed');
+      expect(buildCount(w)).toBe(1);
+      expect(w.s.db.select().from(stepTable).where(eq(stepTable.buildId, w.buildId)).all()).toEqual(
+        before,
+      );
+    },
+  );
+
   test('a missing model parks on its first failure across sweep, dispatch and continuation', async () => {
     const w = openWorld();
     const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;

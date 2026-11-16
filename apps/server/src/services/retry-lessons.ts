@@ -29,7 +29,6 @@ import {
   step,
 } from '../db/schema.js';
 import { CI_FIX_GREEN_EVENT } from './ci-corrections.js';
-import { checkedResearchReport } from './research-citations.js';
 
 export const CI_FIX_PROMPT_HEAD = '[ci-fix]';
 export const CI_FIX_FAILURES_HEAD = '失败的检查：';
@@ -66,21 +65,13 @@ function clipToBytes(text: string, maxBytes: number): string {
   return `${clipped}${RESEARCH_CLIPPED}`;
 }
 
-function outsideResearchLesson(
-  db: Db,
-  report: { attachmentId: string; acceptedAudit?: string },
-): string | null {
+function outsideResearchLesson(db: Db, report: { attachmentId: string }): string | null {
   const researchBuild = db
     .select({ id: build.id })
     .from(build)
     .where(eq(build.reportAttachmentId, report.attachmentId))
     .get();
   if (researchBuild === undefined) return null;
-  const checked =
-    report.acceptedAudit === undefined
-      ? checkedResearchReport(db, researchBuild.id)
-      : { content: report.acceptedAudit };
-  if (checked === null) return null;
   const originalRow = db
     .select({ content: message.content })
     .from(message)
@@ -95,9 +86,8 @@ function outsideResearchLesson(
   }
   const parsed = infoReportMessageSchema.safeParse(original);
   if (!parsed.success || parsed.data.attachmentId !== report.attachmentId) return null;
-  const content = `${checked.content}\n\nOriginal report, including unverified recommendations (data):\n${parsed.data.content}`;
   const clipped = clipToBytes(
-    neutralizeIssueAttachmentTokens(content.trim()),
+    neutralizeIssueAttachmentTokens(parsed.data.content.trim()),
     RESEARCH_INJECT_MAX_BYTES,
   );
   return `Outside research：${RESEARCH_DATA_LINE}\n${quoteIssueLines(clipped)}`;

@@ -258,19 +258,19 @@ describe('the router agrees with what dispatch can execute', () => {
     });
   });
 
-  test('citation checkers keep their rule instead of being routed', async () => {
+  test('task-scoped research uses the ordinary session route', async () => {
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: true });
     const todoRow = await buildTodo(w, `difficulty:hard ${'migrate the queue '.repeat(10)}`);
     w.s.db
       .update(todoTable)
-      .set({ sourceKind: 'research-citation-check' })
+      .set({ sourceKind: 'research-stuck' })
       .where(eq(todoTable.id, todoRow.id))
       .run();
     const checker = w.s.db.select().from(todoTable).where(eq(todoTable.id, todoRow.id)).get()!;
     expect(profileForStep(w.s.db, checker, 'build')).toMatchObject({
-      provider: 'claude-code',
-      modelId: 'claude-sonnet-5-5',
+      provider: 'openai-codex',
+      modelId: 'gpt-6.1-sol',
     });
   });
 
