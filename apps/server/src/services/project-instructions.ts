@@ -1,3 +1,4 @@
+import { PROJECT_INSTRUCTIONS_HEADING, PROJECT_MEMORY_HEADING } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { project } from '../db/schema.js';
@@ -44,9 +45,13 @@ export function projectTurnContextTraced(
         });
   const memories = injected.memories;
   const sections = [
-    ...(row.instructions != null ? [`## 项目说明（${name}）\n${row.instructions}`] : []),
+    ...(row.instructions != null
+      ? [`${PROJECT_INSTRUCTIONS_HEADING}${name}）\n${row.instructions}`]
+      : []),
     ...(memories.length > 0 || injected.omitted > 0
-      ? [`## 项目记忆（${name}）\n${memories.map((m) => `- ${m.title}：${m.content}`).join('\n')}`]
+      ? [
+          `${PROJECT_MEMORY_HEADING}${name}）\n${memories.map((m) => `- ${m.title}：${m.content}`).join('\n')}`,
+        ]
       : []),
   ];
   return sections.length > 0
