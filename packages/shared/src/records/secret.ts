@@ -7,6 +7,14 @@ export const SECRET_DELIVERIES = ['plaintext', 'http', 'browser'] as const;
 export const secretDeliverySchema = z.enum(SECRET_DELIVERIES);
 export type SecretDelivery = z.infer<typeof secretDeliverySchema>;
 
+export const SECRET_KINDS = ['secret', 'env'] as const;
+export const secretKindSchema = z.enum(SECRET_KINDS);
+export type SecretKind = z.infer<typeof secretKindSchema>;
+
+export const SECRET_NAME_PATTERN = /^[A-Z_][A-Z0-9_]*$/;
+export const SECRET_NAME_RULE =
+  'name must use capital letters, digits and _, not starting with a digit';
+
 export const SECRET_TEMPLATE_SLOT = '{secret}';
 
 const HTTP_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
@@ -105,13 +113,19 @@ export const secretRecordSchema = z.object({
   browserOrigin: z.string().nullable().optional(),
   browserMachineId: recordId.nullable().optional(),
   policyRevision: z.number().int().positive().optional(),
+  kind: secretKindSchema.optional(),
+  updatedAt: z.number().int().nullish(),
 });
 export type SecretRecord = z.infer<typeof secretRecordSchema>;
 
+export const secretListEntrySchema = secretRecordSchema.extend({ value: z.string().optional() });
+export type SecretListEntry = z.infer<typeof secretListEntrySchema>;
+
 export const setSecretBodySchema = z.object({
-  name: z.string(),
+  name: z.string().regex(SECRET_NAME_PATTERN, SECRET_NAME_RULE),
   description: z.string().nullish(),
   value: z.string(),
+  kind: secretKindSchema.optional(),
   projectId: recordId.nullish(),
   delivery: secretDeliverySchema.optional(),
   http: secretHttpPolicySchema.optional(),

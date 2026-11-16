@@ -5,6 +5,7 @@ import { relativeTime } from '../board/rel-time.js';
 import { AccountStepRow, useClock } from '../components/accounts/account-parts.js';
 import { ClaudeMark } from '../components/brand-marks.js';
 import { ListCard } from '../components/list-card.js';
+import { withCodeSpans } from '../components/notice-banner.js';
 import {
   ProviderEditorHead,
   type ProviderTone,
@@ -33,7 +34,7 @@ const WINDOW_LABELS: Record<string, string> = {
 const WINDOW_ORDER = ['five_hour', 'seven_day', 'billing_period'];
 
 const FAILURE_COPY: Record<VerifyFailure, string> = {
-  auth: '登录已失效，请重新生成令牌后再添加',
+  auth: '这个订阅的登录已失效。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。',
   timeout: '验证超时，请重试',
   unavailable: '服务器上找不到 claude 命令',
   failed: '验证没有通过，请重试',
@@ -90,7 +91,13 @@ export function subscriptionStatusView(
             : null,
       };
     case 'expired':
-      return { tone: 'warn', label: t('已过期'), reason: t('令牌已过期，请重新添加') };
+      return {
+        tone: 'warn',
+        label: t('已过期'),
+        reason: t(
+          '这个订阅已过期。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。',
+        ),
+      };
   }
 }
 
@@ -232,7 +239,7 @@ export function SubscriptionDetail({
               data-testid="subscription-reason"
               className={cn(SETTINGS_ROW_CLS, 'min-h-0 py-2 text-meta text-content-tertiary')}
             >
-              {view.reason}
+              <span>{withCodeSpans(view.reason)}</span>
             </div>
           )}
           {actions.onRename !== undefined && (

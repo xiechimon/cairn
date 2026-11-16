@@ -24,10 +24,21 @@ class ReviewPreflightTests(unittest.TestCase):
         self.assertIn('Review must finish before merge', errors)
         self.assertIn('Review must use the canonical pd2 digest', errors)
 
-    def test_same_model_family_does_not_count_as_independent(self):
+    def test_separate_review_may_use_the_authors_model(self):
+        for family, model in [('GPT', 'gpt-6.1-sol'), ('Anthropic', 'claude-sonnet-5-5')]:
+            with self.subTest(family=family):
+                record = copy.deepcopy(POSITIVE)
+                record['binding']['writerModelFamily'] = family
+                record['completion']['model'] = record['review']['reviewerModel'] = model
+                self.assertEqual(MODULE.review_errors(record, HEAD, DIGEST, family), [])
+
+    def test_review_model_must_match_the_completed_run(self):
         record = copy.deepcopy(POSITIVE)
-        record['completion']['model'] = record['review']['reviewerModel'] = 'gpt-6.1-sol'
-        self.assertIn('Reviewer must use an approved different model family', MODULE.review_errors(record, HEAD, DIGEST, 'GPT'))
+        record['completion']['model'] = 'gpt-6.1-sol'
+        self.assertIn('Reviewer model differs from the completed run', MODULE.review_errors(record, HEAD, DIGEST, 'GPT'))
+
+    def test_writer_provenance_must_match_the_binding(self):
+        self.assertIn('Writer family differs from the review binding', MODULE.review_errors(POSITIVE, HEAD, DIGEST, 'Anthropic'))
 
     def test_stale_head_and_digest_are_both_rejected(self):
         errors = MODULE.review_errors(POSITIVE, '0' * 40, 'pd2:' + '0' * 64, 'GPT')

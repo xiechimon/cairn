@@ -146,7 +146,7 @@ async function seedReview(title, changesDiff) {
 
 
 const session = await getJson(SERVER + '/api/auth/session');
-check('session Owner', session.status === 200 && session.body.displayName === 'Owner', session.body?.displayName);
+check('named owner session', session.status === 200 && typeof session.body?.displayName === 'string' && session.body.displayName.trim().length > 0, session.body?.displayName);
 const teams0 = await getJson(SERVER + '/api/teams');
 const TEAM_ID = teams0.body[0].id;
 

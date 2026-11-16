@@ -32,7 +32,6 @@ import { localWorkspaceRoot } from './lib/workspace-root.js';
 import { shutdownRuntimeOtel } from './runtime-otel.js';
 import { runServerCommand } from './server-command.js';
 import { loadApnsConfig } from './services/apns.js';
-import { installBuiltinSkills } from './services/builtin-skills.js';
 import { sweepComputerHandoffs } from './services/computer-handoff.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import {
@@ -59,6 +58,7 @@ import {
 } from './services/scheduler.js';
 import { sharedAgentSkillRoots } from './services/skills.js';
 import { prepareSkillsHome } from './services/skills-home.js';
+import { fillSystemAvatar } from './services/system-avatar.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 import { startTsnetRemote, type TsnetRemote } from './services/tsnet-remote.js';
 import { createHttpDrain } from './shutdown-http.js';
@@ -96,11 +96,6 @@ if (refusal !== null) {
 }
 const config = ensureAccessToken(loadedConfig);
 logSecrets.push(config.authToken ?? '');
-try {
-  installBuiltinSkills(join(config.dataDir, 'builtin-skills'));
-} catch (error) {
-  logger.warn({ err: error }, 'built-in skills were not installed; running without them');
-}
 
 const opened = (() => {
   try {
@@ -144,6 +139,7 @@ const vapidKeys = {
   apns: loadApnsConfig(config.apns),
 };
 const seeded = seed(db);
+await fillSystemAvatar(seeded.user);
 seedLocalMachine(db, seeded.team.id);
 setCoordinatorServerContextEnabled(config.coordinatorServerContext || config.coordinatorInServer);
 setCoordinatorInServer(config.coordinatorInServer);
@@ -163,6 +159,11 @@ const convHub = new ConversationStreamHub();
 const machineHub = new MachineWakeHub();
 const reposDir = reposDirOf(config);
 mkdirSync(reposDir, { recursive: true });
+const workspacesDirOf = () =>
+  localWorkspaceRoot(
+    config.homeDir,
+    resolve(process.env[ENV_VARS.workspacesDir] ?? join(config.homeDir, 'workspaces')),
+  );
 const attachmentsDir = attachmentsDirOf(config);
 mkdirSync(attachmentsDir, { recursive: true });
 const githubFetch = refreshingGithubFetch(
@@ -198,6 +199,9 @@ const app = createApp(
     githubAppIdentity: config.githubAppIdentity,
     githubFetch,
     reposDir,
+    get workspacesDir() {
+      return workspacesDirOf();
+    },
     attachmentsDir,
     backupStatusPath: backupStatusPathOf(config),
     deployRecordPath: deployRecordPathOf(config),
@@ -276,10 +280,7 @@ const coordinator = config.coordinatorInServer
         vapidKeys,
         reposDir,
         get workspacesDir() {
-          return localWorkspaceRoot(
-            config.homeDir,
-            resolve(process.env[ENV_VARS.workspacesDir] ?? join(config.homeDir, 'workspaces')),
-          );
+          return workspacesDirOf();
         },
         attachmentsDir,
         skillsDir: config.skillsDir,

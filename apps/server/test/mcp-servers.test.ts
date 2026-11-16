@@ -19,7 +19,6 @@ import {
   bootServer,
   issueApiKey,
   postProject,
-  seedPolicy,
   seedSessionRoute,
   type TestServer,
 } from './helpers.js';
@@ -229,27 +228,20 @@ describe('REST surface: GET re-sourced, management write surface deleted (spec 1
   });
 });
 
-describe('work policy grant surface: mcpServers[] = config key names, unknown keys silently tolerated', () => {
-  test('PATCH unknown key = 200 stored as-is (DB existence check already deleted with the management surface)', async () => {
+describe('work policies carry no MCP grant', () => {
+  test('a PATCH that only names mcpServers is refused and no policy reports a grant', async () => {
     const s = bootServer();
     const patch = await call(s.app, 'PATCH', `/api/teams/${s.team.id}/work-policies/session`, {
       body: { mcpServers: ['ghost', 'demo'] },
     });
-    expect(patch.status).toBe(200);
-    expect(((await patch.json()) as { mcpServers: string[] }).mcpServers).toEqual([
-      'ghost',
-      'demo',
-    ]);
-
+    expect(patch.status).toBe(400);
+    await call(s.app, 'PATCH', `/api/teams/${s.team.id}/work-policies/session`, {
+      body: { tools: [] },
+    });
     const get = await call(s.app, 'GET', `/api/teams/${s.team.id}/routing-settings`);
-    expect(get.status).toBe(200);
-    const settings = (await get.json()) as {
-      policies: { use: string; mcpServers: string[] }[];
-    };
-    expect(settings.policies.find((p) => p.use === 'session')?.mcpServers).toEqual([
-      'ghost',
-      'demo',
-    ]);
+    const settings = (await get.json()) as { policies: Record<string, unknown>[] };
+    expect(settings.policies.length).toBeGreaterThan(0);
+    for (const policy of settings.policies) expect(policy).not.toHaveProperty('mcpServers');
     s.dispose();
   });
 });
@@ -260,7 +252,12 @@ describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (ma
     const plain = await issueApiKey(s);
     const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
       cred: plain,
-      body: readyMachine({ teamId: s.team.id, name: 'm4b-mbp', cliVersion }),
+      body: readyMachine({
+        teamId: s.team.id,
+        name: 'm4b-mbp',
+        cliVersion,
+        capabilities: { mcpServers: opts.slugs ?? ['demo'], skills: [] },
+      }),
     });
     const { token } = (await enroll.json()) as { token: string };
     seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model' });
@@ -273,7 +270,6 @@ describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (ma
     await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
       body: { todoIds: [todoId] },
     });
-    seedPolicy(s, 'session', { mcpServers: opts.slugs ?? ['demo'] });
     const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
       cred: token,
       body: {},
@@ -282,7 +278,7 @@ describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (ma
     return { s, step: body.step ? claimedStepSchema.parse(body.step) : null };
   }
 
-  test('version gate met = carries the checked slugs verbatim (no endpoint parse, no filter -- parsing is the daemon responsibility)', async () => {
+  test('version gate met = carries the local servers the Runner reports (parsing stays with the daemon)', async () => {
     const { s, step } = await world(MCP_MIN_CLI_VERSION, { slugs: ['demo', 'ghost'] });
     expect(step).not.toBeNull();
     expect(step!.mcpServers).toEqual(['demo', 'ghost']);

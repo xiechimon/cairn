@@ -16,6 +16,7 @@ import {
   searchMemoryEntries,
   validateMemoryText,
 } from './memory.js';
+import { listedProjects } from './personal-space.js';
 
 export { memoryDocumentVersion } from './memory.js';
 
@@ -36,7 +37,7 @@ function namespace(db: Db | Tx, owner: MemoryDocumentOwner, scope: string, write
     const row = db
       .select()
       .from(project)
-      .where(and(eq(project.id, projectId), eq(project.teamId, owner.teamId)))
+      .where(and(eq(project.id, projectId), listedProjects(owner.teamId)))
       .get();
     if (!row) throw new HttpError(404, `project ${projectId}`);
     if (write && row.archivedAt !== null)

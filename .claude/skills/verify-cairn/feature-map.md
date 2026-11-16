@@ -19,7 +19,7 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `machines` | `设置` (Settings) › `执行环境` (Execution) › `执行机` (Runners) | [Machines](#machines) |
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
 | `mcp` | `设置` (Settings) › `执行环境` (Execution) › `MCP` | [MCP servers](#mcp-servers) |
-| `secrets` | `设置` (Settings) › `安全` (Security) › `密钥` (Secrets) | [Secrets](#secrets) |
+| `secrets` | `设置` (Settings) › `安全` (Security) › `密钥与环境变量` (Secrets & env vars) | [Secrets](#secrets) |
 | `api-keys` | `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys) | [API keys](#api-keys) |
 | `remote` | `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access) | [Remote access over the tailnet](#remote-access) |
 
@@ -27,7 +27,7 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 
 ### agent-computer
 
-**The agent's computer** (partial, centrality 1). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed, desktop control, and a browser preference toggle in the web app.
+**The agent's computer** (partial, centrality 1). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.
 
 States: No computer; command feed empty, streaming, or settled; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere.
 
@@ -35,14 +35,13 @@ Reach:
 
 1. `open /app`
 2. `click testid:machines-button`
-3. `click label:浏览器`
-4. `click testid:machine-screen-expand`
+3. `click testid:machine-screen-expand`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `chief-takeover`, `chief-takeover-failed`, `chief-takeover-give-back`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-take`, `chief-takeover-time-left`, `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-control-bar`, `computer-feed`, `computer-feed-empty`, `computer-none`, `computer-state`, `machine-card`, `machine-edit`, `machine-list-row`, `machine-screen`, `machine-screen-chrome`, `machine-screen-enlarged`, `machine-screen-exit`, `machine-screen-expand`, `machine-status-dot`, `machines-add`, `machines-button`, `machines-recheck`
 - Research: [docs/research/coordinator-computer.md](../../../docs/research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](../../../docs/research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](../../../docs/research/user-computer-model-2026-11-08.md) (not on main)
-- Frontend design: **gap**: the computer feed, screen view, browser toggle and control handover have no design
+- Frontend design: **gap**: the computer feed, screen view and control handover have no design
 - Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
 - Evidence: `apps/web/e2e/machines-computer-feed.spec.ts`, `apps/web/test/machine-capabilities.test.ts`, `apps/server/test/computer-screen-routes.test.ts`, `apps/server/test/computer-feed-routes.test.ts`, `apps/daemon/test/computer-guard.test.ts`, `apps/daemon/test/computer-browser.test.ts`, `apps/daemon/test/machine-boot.test.ts`, `apps/daemon/test/computer-host-desktop.test.ts`
 
@@ -516,14 +515,14 @@ Reach:
 
 ### machines
 
-**Machines** (shipped, centrality 2). The machines page and machine detail: online state, capabilities, revoke and evacuate.
+**Machines** (shipped, centrality 2). A compact machine list with names, default marker, system, online state and a menu for default, delete and evacuate.
 
-States: An empty state, online and offline machines with last seen, a machine detail with runtimes and capabilities.
+States: Empty, loading and error states; online and offline rows; default machine; long names; row menu and confirmation dialogs. No expandable details or capability controls.
 
 Reach:
 
 1. `settings machines`
-2. `click testid:machine-item`
+2. `click testid:machine-menu`
 
 - Web routes: `/app/resources/machines`, `/app/resources/machines/:id`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `执行机` (Runners)
@@ -831,9 +830,9 @@ Reach:
 
 ### mcp-servers
 
-**MCP servers** (shipped, centrality 3). The read-only list of MCP servers configured on each machine.
+**MCP servers** (shipped, centrality 3). Connect remote MCP servers from a catalog or by URL and see the local servers each machine configures; every task and review uses what is connected.
 
-States: An empty state or a read-only list of servers per machine.
+States: Catalog cards connected, needing sign-in, or failing; add-server dialog; manage dialog; local servers per machine, or empty.
 
 Reach:
 
@@ -955,20 +954,21 @@ Reach:
 
 ### secrets
 
-**Secrets** (shipped, centrality 3). Encrypted team and project secrets, with exact-origin browser-only password filling.
+**Secrets** (shipped, centrality 3). Encrypted team and project secrets and readable environment variables, with exact-origin browser-only password filling.
 
-States: Empty and scoped lists; add plaintext or a masked browser-only password; loopback requires the owner's running browser and displays its automatic machine binding.
+States: Empty and scoped lists; env values beside hidden secrets; filter, bulk add, edit and one-way conversion; browser-only checkbox reveals the login origin and automatic loopback machine binding.
 
 Reach:
 
 1. `settings secrets`
 2. `click testid:resource-new`
-3. `click label:只给浏览器`
+3. `click label:机密`
+4. `click label:只给浏览器用`
 
 - Web routes: `/app/resources/secrets`
-- Settings: `设置` (Settings) › `安全` (Security) › `密钥` (Secrets)
-- Keyboard shortcuts in its code: none
-- Test ids in its code: `resource-empty`, `secret-scope`
+- Settings: `设置` (Settings) › `安全` (Security) › `密钥与环境变量` (Secrets & env vars)
+- Keyboard shortcuts in its code: `D`, `E`, `S`
+- Test ids in its code: `resource-empty`, `secret-bulk`, `secret-convert-confirm`, `secret-kind`, `secret-menu`, `secret-menu-convert`, `secret-menu-delete`, `secret-menu-edit`, `secret-scope`, `secret-value`
 - Research: [docs/research/1775-gateway-prior-art.md](../../../docs/research/1775-gateway-prior-art.md), [docs/research/browser-secret-fill-2026-11-16.md](../../../docs/research/browser-secret-fill-2026-11-16.md)
 - Frontend design: [docs/design/browser-secret-fill.md](../../../docs/design/browser-secret-fill.md)
 - Backend design: [docs/research/1775-secret-gateway-design.md](../../../docs/research/1775-secret-gateway-design.md), [docs/design/browser-secret-fill.md](../../../docs/design/browser-secret-fill.md)

@@ -319,7 +319,6 @@ describe('agent record (r3 §4 measured verbatim)', () => {
     secrets: [],
     defaultSkill: null,
     skillsAllowlist: null,
-    mcpServers: [],
   };
 
   it('parses the observed record', () => {
@@ -395,7 +394,6 @@ describe('agent permission-toggle vocabulary', () => {
       secrets: [],
       defaultSkill: null,
       skillsAllowlist: null,
-      mcpServers: [],
     };
     expect(agentRecordSchema.parse(row).tools).toEqual(['远程 shell']);
   });
@@ -609,7 +607,6 @@ describe('team record (r2 §1.5 teams-v1 cache measured values)', () => {
         secrets: [],
         defaultSkill: null,
         skillsAllowlist: null,
-        mcpServers: [],
         activeTaskCount: 1,
       },
     };

@@ -2,6 +2,8 @@ import { expect, type Page, test } from '@playwright/test';
 import { mockLive, PROJECT } from './chief-home-mock';
 
 interface World {
+  subscription?: boolean;
+  claudeCodeFound?: boolean;
   projects: unknown[];
   bound: boolean;
   rules: { use: string; provider: string; modelId: string }[];
@@ -22,7 +24,12 @@ async function open(page: Page, world: World, path = '/app') {
       if (p === '/api/teams/t1/model-routing') {
         return json({
           edges: [],
-          connections: [{ id: 'machine:m1', vendor: 'anthropic', kind: 'subscription', models: [], available: true }],
+          connections: [
+            { id: 'machine:m1', vendor: 'anthropic', kind: 'subscription', models: [], available: true },
+            ...(world.subscription
+              ? [{ id: 's1', vendor: 'anthropic', kind: 'subscription', models: [], available: true }]
+              : []),
+          ],
           quota: [],
           settings: {},
         });
@@ -31,6 +38,9 @@ async function open(page: Page, world: World, path = '/app') {
       if (p === '/api/teams/t1/model-sources') {
         return json({
           sources: [
+            ...(world.claudeCodeFound
+              ? [{ runtime: 'claude-code', installed: true, hostname: 'mac', models: [{ id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' }] }]
+              : []),
             {
               runtime: 'pi',
               provider: 'p1',
@@ -50,7 +60,9 @@ async function open(page: Page, world: World, path = '/app') {
           sessionDefault: { reason: 'claude-code', provider: 'claude-code', modelId: 'claude-sonnet-5-5' },
           coordinatorDefault: world.bound
             ? { reason: 'provider', provider: 'p1', modelId: 'claude-opus-5-5' }
-            : { reason: 'none', provider: null, modelId: null },
+            : world.subscription && world.claudeCodeFound
+              ? { reason: 'claude-code', provider: 'claude-code', modelId: 'claude-sonnet-5-5' }
+              : { reason: 'none', provider: null, modelId: null },
         });
       }
       const patch = /^\/api\/teams\/t1\/routing-rules\/(\w+)$/.exec(p);
@@ -60,7 +72,7 @@ async function open(page: Page, world: World, path = '/app') {
         world.rules.push({ use: patch[1], ...body });
         return json({ id: `r-${patch[1]}`, use: patch[1], ...body });
       }
-      if (p === '/api/teams/t1/chief' && !world.bound) {
+      if (p === '/api/teams/t1/chief' && !world.bound && !(world.subscription && world.claudeCodeFound)) {
         return json({ chief: { id: 'c', userId: 'u1', teamId: 't1', agent: null }, agentActor: null, context: null, watches: [], wakes: [] });
       }
       return undefined;
@@ -132,4 +144,21 @@ test('skipping goes to the Coordinator home; a team with projects never sees the
   await open(other, { ...fresh(), projects: [PROJECT] });
   await expect(other.getByTestId('home-c')).toBeVisible();
   await expect(other.getByTestId('first-run-setup')).toHaveCount(0);
+});
+
+test('a saved Claude subscription with Claude Code found is the Coordinator pick, and says so', async ({ page }) => {
+  const world: World = { ...fresh(), bound: false, subscription: true, claudeCodeFound: true };
+  await open(page, world);
+  await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'done');
+  await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('Claude Sonnet 5.5');
+  await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('因为你登录了 Claude 订阅');
+  await page.getByTestId('first-run-confirm').click();
+  await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
+  expect(world.patches[0]?.body).toEqual({ provider: 'claude-code', modelId: 'claude-sonnet-5-5' });
+});
+
+test('a saved subscription without Claude Code on this computer says what is missing', async ({ page }) => {
+  await open(page, { ...fresh(), bound: false, subscription: true });
+  await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
+  await expect(page.getByTestId('first-run-step-1')).toContainText('订阅已保存。这台电脑还没找到 Claude Code');
 });

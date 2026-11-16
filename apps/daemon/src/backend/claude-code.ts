@@ -517,11 +517,14 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   private readonly abort: AbortController;
   private readonly onClaudeRateLimit: ((notice: ClaudeRateLimitNotice) => void) | undefined;
   private readonly pendingSteers: {
-    message: SDKUserMessage;
+    message: SDKUserMessage & { uuid: string };
     text: string;
     resolve: () => void;
     reject: (error: Error) => void;
   }[] = [];
+  private readonly transmittedSteers = new Map<string, (typeof this.pendingSteers)[number]>();
+  private receiptSupport: boolean | null = null;
+  private admissionClosed = false;
   private closed = false;
   private stopping = false;
   private inputEnded = false;
@@ -560,6 +563,26 @@ class ClaudeSessionHandle implements AgentSessionHandle {
     try {
       for await (const msg of this.q) {
         if (msg.type === 'system' && msg.subtype === 'init') this.requestContextLimits();
+        if (this.receiptSupport === null && isMainAgentTurnFrame(msg)) {
+          this.receiptSupport =
+            typeof (msg as { user_message_uuid?: string }).user_message_uuid === 'string';
+          if (!this.receiptSupport) this.rejectPendingSteers();
+        }
+        if (msg.type === 'result') {
+          this.admissionClosed = true;
+          this.rejectPendingSteers();
+          const receipt = msg as { user_message_uuids?: string[]; user_message_uuid?: string };
+          const consumed =
+            receipt.user_message_uuids ??
+            (receipt.user_message_uuid ? [receipt.user_message_uuid] : []);
+          for (const uuid of consumed) {
+            const pending = this.transmittedSteers.get(uuid);
+            if (pending === undefined) continue;
+            this.transmittedSteers.delete(uuid);
+            this.queue.push({ type: 'steer', text: pending.text });
+            pending.resolve();
+          }
+        }
         this.background.note(msg);
         if (this.heldDone !== null && isMainAgentTurnFrame(msg)) {
           this.closeWait('A new turn started before the background subagents finished.');
@@ -585,7 +608,6 @@ class ClaudeSessionHandle implements AgentSessionHandle {
           if (ev.type === 'done') {
             if (this.holdForBackground(ev)) continue;
             finished = ev;
-            this.flushSteers();
             this.inputEnded = true;
             this.input.end();
             continue;
@@ -697,29 +719,46 @@ class ClaudeSessionHandle implements AgentSessionHandle {
     this.closed = true;
     if (this.waitTimer !== null) clearTimeout(this.waitTimer);
     this.waitTimer = null;
-    for (const pending of this.pendingSteers.splice(0)) {
-      pending.reject(new Error('claude-code session closed before steer delivery'));
-    }
+    this.rejectPendingSteers();
+    for (const pending of this.transmittedSteers.values())
+      pending.reject(new Error('claude-code session closed before steer consumption'));
+    this.transmittedSteers.clear();
     this.input.end();
     this.queue.end();
     if (!this.abort.signal.aborted) this.abort.abort();
   }
 
   async steer(text: string, images?: readonly DeliveredImage[]): Promise<void> {
-    if (this.closed || this.inputEnded)
+    if (this.closed || this.inputEnded || this.admissionClosed || this.receiptSupport === false)
       throw new Error('claude-code session closed before steer delivery');
     return new Promise<void>((resolve, reject) => {
-      this.pendingSteers.push({ message: buildUserMessage(text, images), text, resolve, reject });
+      this.pendingSteers.push({
+        message: { ...buildUserMessage(text, images), uuid: randomUUID() },
+        text,
+        resolve,
+        reject,
+      });
       this.flushSteers();
     });
   }
 
+  private rejectPendingSteers(): void {
+    for (const pending of this.pendingSteers.splice(0))
+      pending.reject(new Error('claude-code session closed before steer delivery'));
+  }
+
   private flushSteers(): void {
-    if (this.closed || this.inputEnded || this.state.runningTools.size > 0) return;
+    if (
+      this.closed ||
+      this.inputEnded ||
+      this.admissionClosed ||
+      this.receiptSupport !== true ||
+      this.state.runningTools.size > 0
+    )
+      return;
     for (const pending of this.pendingSteers.splice(0)) {
+      this.transmittedSteers.set(pending.message.uuid, pending);
       this.input.push(pending.message);
-      this.queue.push({ type: 'steer', text: pending.text });
-      pending.resolve();
     }
   }
 
@@ -1348,7 +1387,8 @@ export class ClaudeCodeBackend implements AgentBackend {
       teamSubscriptionToken: sessionEnv?.CLAUDE_CODE_OAUTH_TOKEN !== undefined,
     });
     const input = new AsyncQueue<SDKUserMessage>();
-    if (opts.prompt !== undefined) input.push(buildUserMessage(opts.prompt, opts.promptImages));
+    if (opts.prompt !== undefined)
+      input.push({ ...buildUserMessage(opts.prompt, opts.promptImages), uuid: randomUUID() });
     const q = query({ prompt: input.iterable(), options: sdkOptions });
     const spans =
       opts.telemetry !== undefined

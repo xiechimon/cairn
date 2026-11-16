@@ -1,11 +1,11 @@
 import { COORDINATOR_MEMORY_FLUSH_MAX, COORDINATOR_MEMORY_FLUSH_PROMPT_HEAD } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { project } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { ensureMemoryIndex, listStoredMemoryEntries, memoryIndexText } from '../services/memory.js';
 import { appendMemoryIndex, memoryDocumentVersion } from '../services/memory-documents.js';
+import { listedProjects } from '../services/personal-space.js';
 import { coordinatorMemoryOwner } from '../services/routing-rules.js';
 import type { MemoryFlush } from './runtime/compaction.js';
 
@@ -61,7 +61,7 @@ export function applyFlush(
     db
       .select({ id: project.id })
       .from(project)
-      .where(eq(project.teamId, scope.teamId))
+      .where(listedProjects(scope.teamId))
       .all()
       .map((row) => row.id),
   );
@@ -128,7 +128,7 @@ export function flushPrompt(
   const projects = db
     .select({ id: project.id, name: project.name })
     .from(project)
-    .where(eq(project.teamId, scope.teamId))
+    .where(listedProjects(scope.teamId))
     .all()
     .map((row) => `${row.id} | ${row.name.replace(/[\r\n]+/g, ' ')}`);
   return `${COORDINATOR_MEMORY_FLUSH_PROMPT_HEAD}\n\nExisting memories:\n${existingLines(db, scope)}\n\nProjects:\n${projects.length > 0 ? projects.join('\n') : '(none)'}\n\nMessages:\n${transcript}`;

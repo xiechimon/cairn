@@ -106,6 +106,8 @@ export interface MachineLoopOpts {
   confinementPlatform?: string;
   confinementPreflight?: ConstructorParameters<typeof ConfinementAvailability>[0]['launch'];
   confinementRecheckMs?: number;
+  strandedUploadReplayMs?: number;
+  strandedUploadMinAgeMs?: number;
 }
 
 export interface MachineHandle {
@@ -117,6 +119,9 @@ export interface MachineHandle {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const CONFINEMENT_RECHECK_MS = 60_000;
+const STRANDED_UPLOAD_REPLAY_MS = 30_000;
+const STRANDED_UPLOAD_MIN_AGE_MS = 30_000;
+const STRANDED_UPLOAD_MAX_ATTEMPTS = 40;
 const CONFINEMENT_STOP_WAIT_MS = 15_000;
 
 export function nextBackoffMs(current: number, cap = CLAIM_BACKOFF_CAP_MS): number {
@@ -501,6 +506,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   });
   await backfillRepositoryCaches(config.workspacesDir, (message) => logger.workspace(message));
   const sessionHandles = new Map<string, AgentSessionHandle>();
+  const steerAcks = new Map<string, Set<Promise<void>>>();
   const stepImageSupport = new Map<string, boolean | null>();
   const stepSteeringSupport = new Map<string, boolean>();
   const stepTranscripts = new Map<string, TranscriptBuffer>();
@@ -724,13 +730,25 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         logger.step(`steer dropped (no live session) step=${stepId}`);
         return;
       }
-      await live.steer(deliveryText, images);
-      await client.steerAck?.(
-        stepId,
-        answers.length > 0
-          ? { answerIds: answers.map((answer) => answer.requestId), via: 'steer' }
-          : undefined,
-      );
+      const delivery = live
+        .steer(deliveryText, images)
+        .then(() =>
+          client.steerAck?.(
+            stepId,
+            answers.length > 0
+              ? { answerIds: answers.map((answer) => answer.requestId), via: 'steer' }
+              : undefined,
+          ),
+        );
+      const pending = steerAcks.get(stepId) ?? new Set<Promise<void>>();
+      steerAcks.set(stepId, pending);
+      pending.add(delivery);
+      try {
+        await delivery;
+      } finally {
+        pending.delete(delivery);
+        if (pending.size === 0) steerAcks.delete(stepId);
+      }
       logger.step(`steer delivered step=${stepId}`);
     } catch (err) {
       logger.step(`steer delivery failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -848,6 +866,19 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       mcpConfigPath: config.mcpConfigPath,
       skillsDir: config.skillsDir,
       sessionHandles,
+      settleSteers: async (stepId: string) => {
+        const pending = steerAcks.get(stepId);
+        if (pending === undefined) return;
+        let settled = false;
+        await Promise.race([
+          Promise.allSettled([...pending]).then(() => {
+            settled = true;
+          }),
+          waitTimeout(5_000, undefined, { ref: false }),
+        ]);
+        if (!settled)
+          logger.step(`steer acknowledgment timed out step=${stepId}; unread input remains queued`);
+      },
       stepImageSupport,
       stepSteeringSupport,
       stepTranscripts,
@@ -862,6 +893,46 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }
 
   const inFlight = new Map<string, Promise<void>>();
+  const strandedMinAgeMs = opts.strandedUploadMinAgeMs ?? STRANDED_UPLOAD_MIN_AGE_MS;
+  const strandedAttempts = new Map<string, number>();
+  let replayingStranded = false;
+  const replayStrandedUploads = async () => {
+    if (replayingStranded || stopping || !availability?.ready) return;
+    replayingStranded = true;
+    try {
+      for (const entry of journal.pending()) {
+        if (
+          entry.state !== 'awaiting-upload' ||
+          entry.doneBody == null ||
+          inFlight.has(entry.stepId) ||
+          Date.now() - entry.updatedAt < strandedMinAgeMs
+        )
+          continue;
+        const attempts = (strandedAttempts.get(entry.stepId) ?? 0) + 1;
+        strandedAttempts.set(entry.stepId, attempts);
+        if (attempts > STRANDED_UPLOAD_MAX_ATTEMPTS) {
+          if (attempts === STRANDED_UPLOAD_MAX_ATTEMPTS + 1) {
+            logger.recover(`step ${entry.stepId} could not be re-delivered — leaving its journal`);
+          }
+          continue;
+        }
+        await resumePendingUpload(stepDeps(), entry, {
+          running: 1,
+          failOnRejectedDone: orbProvider.kind === 'orb' && entry.kind !== 'chief',
+        });
+      }
+    } finally {
+      replayingStranded = false;
+    }
+  };
+  const strandedTimer = setInterval(() => {
+    void replayStrandedUploads().catch((err: unknown) => {
+      logger.machine(
+        `re-delivering a finished step failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    });
+  }, opts.strandedUploadReplayMs ?? STRANDED_UPLOAD_REPLAY_MS);
+  strandedTimer.unref?.();
   const done = (async () => {
     const backoffBase = opts.claimBackoffBaseMs ?? 1_000;
     let backoff = backoffBase;
@@ -933,6 +1004,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     logger.machine(`Shutting down…${cause ? ` (${cause})` : ''}`);
     clearInterval(presenceTimer);
     clearInterval(confinementTimer);
+    clearInterval(strandedTimer);
     clearInterval(orphanTimer);
     orbCleanupStopped = true;
     clearInterval(closedOrbTimer);

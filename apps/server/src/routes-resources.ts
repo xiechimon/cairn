@@ -96,6 +96,7 @@ import {
   getProvidersEnvelope,
   updateProvider,
 } from './services/providers.js';
+import { seedClaudeCodeRules } from './services/routing-rules.js';
 import { runScheduleNow } from './services/schedule-run.js';
 import {
   createSchedule,
@@ -104,7 +105,13 @@ import {
   setScheduleEnabled,
 } from './services/schedules.js';
 import { search } from './services/search.js';
-import { createSecret, deleteSecret, listSecrets, updateSecret } from './services/secrets.js';
+import {
+  createSecret,
+  deleteSecret,
+  listSecrets,
+  listSecretsWithEnvValues,
+  updateSecret,
+} from './services/secrets.js';
 import {
   importSkill,
   listImportCandidates,
@@ -444,7 +451,9 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
     const body = parseWith(createClaudeSubscriptionSchema, await jsonBody(c), 'body');
-    return c.json(createClaudeSubscription(keysvc, teamId, body), 201);
+    const created = createClaudeSubscription(keysvc, teamId, body);
+    if (created.enabled) seedClaudeCodeRules(ctx.db, teamId);
+    return c.json(created, 201);
   });
 
   app.delete('/api/teams/:id/claude-subscriptions/:cid', (c) => {
@@ -802,7 +811,13 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/secrets', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    return c.json(listSecrets(keysvc, teamId));
+    const ownerCaller =
+      pairedDeviceIdOf(c) === null &&
+      (ctx.authToken === null || c.get('ownerIdentity') !== undefined);
+    c.header('Cache-Control', 'no-store');
+    return c.json(
+      ownerCaller ? listSecretsWithEnvValues(keysvc, teamId) : listSecrets(keysvc, teamId),
+    );
   });
 
   app.post('/api/teams/:id/secrets', async (c) => {
@@ -817,6 +832,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         description: body.description ?? null,
         value: body.value,
         projectId: body.projectId ?? null,
+        ...(body.kind !== undefined ? { kind: body.kind } : {}),
         ...(body.delivery !== undefined ? { delivery: body.delivery } : {}),
         ...(body.http !== undefined ? { http: body.http } : {}),
         ...(body.browserOrigin !== undefined ? { browserOrigin: body.browserOrigin } : {}),

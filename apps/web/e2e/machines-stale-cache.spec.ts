@@ -50,14 +50,14 @@ async function stubStack(page: Page) {
   return state;
 }
 
-test('deleting the open machine drops it from the mounted list and collapses the rows', async ({
+test('deleting a machine drops it from the mounted list without opening details', async ({
   page,
 }) => {
   await stubStack(page);
   await page.goto('/app/settings/machines?machine=m-1');
   const items = page.getByTestId('machine-item');
   await expect(items).toHaveCount(2);
-  await expect(items.first()).toHaveAttribute('data-expanded', 'true');
+  await expect(page.getByTestId('machine-detail')).toHaveCount(0);
 
   await items.first().getByTestId('machine-menu').click();
   await page.getByTestId('machine-menu-delete').click();
@@ -65,5 +65,6 @@ test('deleting the open machine drops it from the mounted list and collapses the
 
   await expect(items).toHaveCount(1);
   await expect(items.first()).toContainText('beta');
-  await expect(items.first()).toHaveAttribute('data-expanded', 'false');
+  await expect(items.first().getByTestId('machine-menu')).toBeEnabled();
+  await expect(page.getByTestId('machine-detail')).toHaveCount(0);
 });

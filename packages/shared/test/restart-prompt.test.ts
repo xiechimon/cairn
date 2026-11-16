@@ -7,6 +7,7 @@ import {
   CONTINUE_PROMPTS,
   classifyUserText,
   composeTaskPromptWithInstruction,
+  QUICK_SESSION_BRIEF,
   RESTART_FEEDBACK_MAX_CHARS,
   SESSION_BRIEF,
   SESSION_REWORK_BRIEF,
@@ -149,6 +150,8 @@ describe('session briefs are daemon-injected, not user bubbles', () => {
     const first = [SESSION_BRIEF, TASK_TEXT].join('\n\n');
     expect(classifyUserText(SESSION_BRIEF, task)).toBe('synthetic');
     expect(classifyUserText(first, task)).toBe('synthetic');
+    expect(classifyUserText(QUICK_SESSION_BRIEF, task)).toBe('synthetic');
+    expect(classifyUserText([QUICK_SESSION_BRIEF, TASK_TEXT].join('\n\n'), task)).toBe('synthetic');
     expect(classifyUserText(composeTaskPromptWithInstruction(TASK_TEXT, first), task)).toBe(
       'synthetic',
     );

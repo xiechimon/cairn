@@ -1,4 +1,11 @@
-import type { SecretBox, SecretDelivery, SecretHttpPolicy, SecretRecord } from '@cairn/shared';
+import type {
+  SecretBox,
+  SecretDelivery,
+  SecretHttpPolicy,
+  SecretKind,
+  SecretListEntry,
+  SecretRecord,
+} from '@cairn/shared';
 import {
   isBrowserLoopbackOrigin,
   isDaemonReadSecretName,
@@ -9,11 +16,13 @@ import {
 } from '@cairn/shared';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { computer, machine, project, secret } from '../db/schema.js';
+import { project, secret } from '../db/schema.js';
+import { sha256Hex } from '../lib/crypto.js';
 import { conflict, HttpError, notFound } from '../lib/errors.js';
-import { newRecordId } from '../lib/ids.js';
-import { privateComputerWhere } from './computer-access.js';
+import { newRecordId, nowMs } from '../lib/ids.js';
+import { listComputers } from './computer-feed.js';
 import { linkedMailSecretIds } from './mail.js';
+import { listedProjects } from './personal-space.js';
 
 export interface SecretDeps {
   db: Db;
@@ -24,7 +33,16 @@ export interface SecretDeps {
 
 type SecretRow = typeof secret.$inferSelect;
 
-export function toSecretRecord(row: SecretRow): SecretRecord {
+function isEnvRow(row: SecretRow, linked: ReadonlySet<string>): boolean {
+  return (
+    row.valueCipher !== null &&
+    row.delivery === 'plaintext' &&
+    row.envSeal === sha256Hex(row.valueCipher) &&
+    !linked.has(row.id)
+  );
+}
+
+function toSecretRecord(row: SecretRow, linked: ReadonlySet<string>): SecretRecord {
   return {
     id: row.id,
     teamId: row.teamId,
@@ -36,7 +54,20 @@ export function toSecretRecord(row: SecretRow): SecretRecord {
     browserOrigin: row.browserOrigin,
     browserMachineId: row.browserMachineId,
     policyRevision: row.policyRevision,
+    kind: isEnvRow(row, linked) ? 'env' : 'secret',
+    updatedAt: row.updatedAt,
   };
+}
+
+function sealValue(deps: SecretDeps, value: string, kind: SecretKind) {
+  const valueCipher = deps.box.seal(value);
+  return { valueCipher, envSeal: kind === 'env' ? sha256Hex(valueCipher) : null };
+}
+
+function assertStorable(kind: SecretKind, delivery: SecretDelivery, value: string): void {
+  if (kind === 'env' && delivery !== 'plaintext')
+    throw new HttpError(400, 'an environment variable must use plaintext delivery');
+  if (kind === 'secret' && value === '') throw new HttpError(400, 'a secret value cannot be empty');
 }
 
 function httpPolicyOf(row: SecretRow): SecretHttpPolicy | null {
@@ -95,25 +126,16 @@ function browserBinding(deps: SecretDeps, teamId: string, origin: string): strin
   const targets =
     deps.userId === undefined
       ? []
-      : deps.db
-          .select({ machineId: computer.machineId })
-          .from(computer)
-          .innerJoin(machine, eq(machine.id, computer.machineId))
-          .where(
-            and(
-              privateComputerWhere(teamId, deps.userId),
-              eq(computer.state, 'running'),
-              eq(computer.browserEnabled, true),
-              eq(machine.online, true),
-            ),
-          )
-          .all();
+      : listComputers(deps.db, teamId, deps.userId).filter(
+          (computer) =>
+            computer.state === 'running' && computer.browserEnabled && computer.machine.online,
+        );
   if (targets.length !== 1 || targets[0] === undefined)
     throw new HttpError(
       409,
       'Open your Coordinator browser on the login machine first, then save this password.',
     );
-  return targets[0].machineId;
+  return targets[0].machine.id;
 }
 
 function assertHttpDeliverable(name: string, value: string): void {
@@ -153,14 +175,27 @@ function assertNameFree(
   if (dup) throw conflict(`secret ${name} already exists`);
 }
 
-export function listSecrets(deps: SecretDeps, teamId: string): SecretRecord[] {
+function teamRows(deps: SecretDeps, teamId: string): SecretRow[] {
   return deps.db
     .select()
     .from(secret)
     .where(eq(secret.teamId, teamId))
     .orderBy(asc(secret.name))
-    .all()
-    .map(toSecretRecord);
+    .all();
+}
+
+export function listSecrets(deps: SecretDeps, teamId: string): SecretRecord[] {
+  const linked = linkedMailSecretIds(deps.db, teamId);
+  return teamRows(deps, teamId).map((row) => toSecretRecord(row, linked));
+}
+
+export function listSecretsWithEnvValues(deps: SecretDeps, teamId: string): SecretListEntry[] {
+  const linked = linkedMailSecretIds(deps.db, teamId);
+  return teamRows(deps, teamId).map((row) => {
+    const record = toSecretRecord(row, linked);
+    if (record.kind !== 'env' || row.valueCipher === null) return record;
+    return { ...record, value: deps.box.open(row.valueCipher) };
+  });
 }
 
 export function createSecret(
@@ -174,9 +209,12 @@ export function createSecret(
     delivery?: SecretDelivery;
     http?: SecretHttpPolicy;
     browserOrigin?: string;
+    kind?: SecretKind;
   },
 ): SecretRecord {
+  const kind = input.kind ?? 'secret';
   const policy = policyColumns(input.delivery ?? 'plaintext', input.http, input.browserOrigin);
+  assertStorable(kind, policy.delivery, input.value);
   if (policy.browserOrigin !== null) {
     if (input.projectId != null || isDaemonReadSecretName(input.name) || input.value === '')
       throw new HttpError(400, 'browser passwords need a nonempty value and workspace scope');
@@ -188,7 +226,7 @@ export function createSecret(
     const owned = deps.db
       .select({ id: project.id })
       .from(project)
-      .where(and(eq(project.id, projectId), eq(project.teamId, input.teamId)))
+      .where(and(eq(project.id, projectId), listedProjects(input.teamId)))
       .get();
     if (!owned) throw notFound(`project ${projectId}`);
   }
@@ -202,13 +240,14 @@ export function createSecret(
       projectId,
       name: input.name,
       description: input.description ?? null,
-      valueCipher: deps.box.seal(input.value),
+      ...sealValue(deps, input.value, kind),
       ...policy,
+      updatedAt: nowMs(),
     })
     .run();
   const row = getRow(deps, input.teamId, id);
   if (!row) throw new Error('secret missing after insert');
-  return toSecretRecord(row);
+  return toSecretRecord(row, linkedMailSecretIds(deps.db, input.teamId));
 }
 
 export function updateSecret(
@@ -222,10 +261,14 @@ export function updateSecret(
     delivery?: SecretDelivery;
     http?: SecretHttpPolicy;
     browserOrigin?: string;
+    kind?: 'secret';
   },
 ): SecretRecord {
   const row = getRow(deps, teamId, id);
   if (!row) throw notFound(`secret ${id}`);
+  const linked = linkedMailSecretIds(deps.db, teamId);
+  const wasEnv = isEnvRow(row, linked);
+  const kind: SecretKind = wasEnv && patch.kind === undefined ? 'env' : 'secret';
   if (patch.name !== undefined && patch.name !== row.name) {
     assertNameFree(deps, teamId, row.projectId, patch.name, id);
   }
@@ -263,19 +306,26 @@ export function updateSecret(
     patch.value === undefined
   )
     throw new HttpError(400, 'changing a protected secret policy needs a new value');
-  if (policy.delivery !== 'plaintext' && linkedMailSecretIds(deps.db, teamId).has(row.id))
+  const resultingValue =
+    patch.value ?? (row.valueCipher === null ? '' : deps.box.open(row.valueCipher));
+  assertStorable(kind, policy.delivery, resultingValue);
+  if (policy.delivery !== 'plaintext' && linked.has(row.id))
     throw new HttpError(400, 'a secret linked to a mail account must stay plaintext');
   if (policy.delivery === 'http') {
-    const value = patch.value ?? (row.valueCipher === null ? '' : deps.box.open(row.valueCipher));
-    assertHttpDeliverable(patch.name ?? row.name, value);
+    assertHttpDeliverable(patch.name ?? row.name, resultingValue);
   }
   deps.db
     .update(secret)
     .set({
       ...(patch.name !== undefined ? { name: patch.name } : {}),
       ...(patch.description !== undefined ? { description: patch.description } : {}),
-      ...(patch.value !== undefined ? { valueCipher: deps.box.seal(patch.value) } : {}),
+      ...(patch.value !== undefined
+        ? sealValue(deps, patch.value, kind)
+        : kind === 'secret'
+          ? { envSeal: null }
+          : {}),
       ...policy,
+      updatedAt: nowMs(),
       ...(policyChanged || patch.value !== undefined
         ? { policyRevision: row.policyRevision + 1 }
         : {}),
@@ -284,7 +334,7 @@ export function updateSecret(
     .run();
   const updated = getRow(deps, teamId, id);
   if (!updated) throw new Error('secret missing after update');
-  return toSecretRecord(updated);
+  return toSecretRecord(updated, linked);
 }
 
 export function deleteSecret(deps: SecretDeps, teamId: string, id: string): boolean {
@@ -349,7 +399,8 @@ export function openSecretGrants(
               inArray(secret.name, names),
             ),
           )
-          .all();
+          .all()
+          .filter((row) => !linked.has(row.id));
   const values: Record<string, string> = {};
   const http = new Map<string, HttpSecretRow>();
   for (const row of [

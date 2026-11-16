@@ -82,6 +82,23 @@ describe('mapChiefStream echo-row dedup (#667 F-C1..C7)', () => {
     expect(users[0]?.id).toBe('AbCdEfGhIjKlMnOpQrStU');
   });
 
+  test('a project channel echo carrying the picked project and the project context still dedups against the POST row', () => {
+    const items = mapChiefStream([
+      row('AbCdEfGhIjKlMnOpQrStU', 'user', '看一下readme是否有错别字', NOW),
+      row(
+        'user-AbCdEfGhIjKlMnOpQrStU',
+        'user',
+        '【输入框选定项目：cairn（id: _L-wtSVW5r2DDd_H2KLV8）】\n看一下readme是否有错别字\n\n## 项目说明（cairn）\n先跑测试\n\n## 项目记忆（cairn）\n- MEMORY.md：链路冒烟去 gh-probe',
+        NOW + 3000,
+      ),
+      row('msg-a1', 'assistant', '我去看看', NOW + 9000),
+    ]);
+    const users = userItems(items);
+    expect(users.map((u) => [u.id, u.text])).toEqual([
+      ['AbCdEfGhIjKlMnOpQrStU', '看一下readme是否有错别字'],
+    ]);
+  });
+
   test('F-C7 two non-user- same-text rows are not deduped (the discriminator is the id prefix, not content adjacency)', () => {
     const items = mapChiefStream([
       row('AbCdEfGhIjKlMnOpQrStU', 'user', '继续', NOW),

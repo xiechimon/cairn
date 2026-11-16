@@ -88,6 +88,7 @@ export function chiefStep(
   instruction: string,
   systemPrompt = 'You are the Coordinator.',
   modelId = 'm',
+  provider = 'stub',
 ): ClaimedStep {
   return {
     step: { id, buildId: 'chief-thread-1', kind: 'chief', machineId: 'sidecar', createdAt: 1 },
@@ -98,7 +99,7 @@ export function chiefStep(
       id: 'agent-1',
       displayName: 'Coordinator',
       description: '',
-      provider: 'stub',
+      provider,
       modelId,
       thinkingLevel: null,
       memories: [],

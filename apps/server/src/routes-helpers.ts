@@ -7,6 +7,8 @@ import {
   type MemoryRecord,
   phaseSchema,
   routeOverrideSchema,
+  SECRET_NAME_PATTERN,
+  SECRET_NAME_RULE,
   secretDeliverySchema,
   secretHttpPolicySchema,
 } from '@cairn/shared';
@@ -22,6 +24,7 @@ import { pairedDeviceIdOf } from './lib/token-auth.js';
 import type { GithubIssueFaceDeps } from './services/github-issues.js';
 import { productionHarnessEvalConfig } from './services/harness-eval-production.js';
 import { assertDeviceActive } from './services/paired-devices.js';
+import { isPersonalSpace } from './services/personal-space.js';
 
 export const SESSION_COOKIE = BRAND.sessionCookieName;
 
@@ -33,7 +36,7 @@ export function requireTeam(ctx: AppContext, id: string): void {
 
 export function requireProject(ctx: AppContext, id: string): typeof project.$inferSelect {
   const row = ctx.db.select().from(project).where(eq(project.id, id)).get();
-  if (!row) throw notFound(`project ${id}`);
+  if (!row || isPersonalSpace(row)) throw notFound(`project ${id}`);
   return row;
 }
 
@@ -50,7 +53,8 @@ export const patchTodoBodySchema = categoryFreeTaskInputSchema.pipe(
 );
 
 export const patchSecretBodySchema = z.object({
-  name: z.string().optional(),
+  name: z.string().regex(SECRET_NAME_PATTERN, SECRET_NAME_RULE).optional(),
+  kind: z.literal('secret').optional(),
   description: z.string().nullish(),
   value: z.string().optional(),
   delivery: secretDeliverySchema.optional(),

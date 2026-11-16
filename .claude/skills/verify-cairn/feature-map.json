@@ -1005,7 +1005,7 @@
     {
       "id": "agent-computer",
       "name": "The agent's computer",
-      "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed, desktop control, and a browser preference toggle in the web app.",
+      "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.",
       "states": "No computer; command feed empty, streaming, or settled; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere.",
       "centrality": 1,
       "status": "partial",
@@ -1041,7 +1041,6 @@
       "reach": [
         "open /app",
         "click testid:machines-button",
-        "click label:浏览器",
         "click testid:machine-screen-expand"
       ],
       "research": [
@@ -1050,7 +1049,7 @@
         "docs/research/user-computer-model-2026-11-08.md"
       ],
       "frontendDesign": {
-        "gap": "the computer feed, screen view, browser toggle and control handover have no design"
+        "gap": "the computer feed, screen view and control handover have no design"
       },
       "backendDesign": {
         "gap": "no design for computer access grants, the browser preference, the guard and the screen channel"
@@ -1292,8 +1291,8 @@
     {
       "id": "machines",
       "name": "Machines",
-      "summary": "The machines page and machine detail: online state, capabilities, revoke and evacuate.",
-      "states": "An empty state, online and offline machines with last seen, a machine detail with runtimes and capabilities.",
+      "summary": "A compact machine list with names, default marker, system, online state and a menu for default, delete and evacuate.",
+      "states": "Empty, loading and error states; online and offline rows; default machine; long names; row menu and confirmation dialogs. No expandable details or capability controls.",
       "centrality": 2,
       "status": "shipped",
       "code": {
@@ -1323,7 +1322,7 @@
       },
       "reach": [
         "settings machines",
-        "click testid:machine-item"
+        "click testid:machine-menu"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/machines-local-row.md"
@@ -2021,8 +2020,8 @@
     {
       "id": "mcp-servers",
       "name": "MCP servers",
-      "summary": "The read-only list of MCP servers configured on each machine.",
-      "states": "An empty state or a read-only list of servers per machine.",
+      "summary": "Connect remote MCP servers from a catalog or by URL and see the local servers each machine configures; every task and review uses what is connected.",
+      "states": "Catalog cards connected, needing sign-in, or failing; add-server dialog; manage dialog; local servers per machine, or empty.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2136,14 +2135,15 @@
     {
       "id": "secrets",
       "name": "Secrets",
-      "summary": "Encrypted team and project secrets, with exact-origin browser-only password filling.",
-      "states": "Empty and scoped lists; add plaintext or a masked browser-only password; loopback requires the owner's running browser and displays its automatic machine binding.",
+      "summary": "Encrypted team and project secrets and readable environment variables, with exact-origin browser-only password filling.",
+      "states": "Empty and scoped lists; env values beside hidden secrets; filter, bulk add, edit and one-way conversion; browser-only checkbox reveals the login origin and automatic loopback machine binding.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/resources/secrets-page.tsx",
-          "apps/web/src/resources/create-secret-dialog.tsx"
+          "apps/web/src/resources/secret-dialog.tsx",
+          "apps/web/src/resources/bulk-secret-dialog.tsx"
         ],
         "server": [
           "apps/server/src/services/secrets.ts"
@@ -2161,7 +2161,8 @@
       "reach": [
         "settings secrets",
         "click testid:resource-new",
-        "click label:只给浏览器"
+        "click label:机密",
+        "click label:只给浏览器用"
       ],
       "research": [
         "docs/research/1775-gateway-prior-art.md",

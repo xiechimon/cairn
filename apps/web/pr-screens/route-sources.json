@@ -46,9 +46,6 @@
     "apps/web/src/resources/machines-page.tsx",
     "apps/web/src/resources/create-machine-dialog.tsx"
   ],
-  "machine-detail": [
-    "apps/web/src/resources/machine-detail-page.tsx"
-  ],
   "skills": [
     "apps/web/src/resources/skills-page.tsx",
     "apps/web/src/resources/skill-dialog.tsx",
@@ -61,7 +58,8 @@
   ],
   "secrets": [
     "apps/web/src/resources/secrets-page.tsx",
-    "apps/web/src/resources/create-secret-dialog.tsx"
+    "apps/web/src/resources/secret-dialog.tsx",
+    "apps/web/src/resources/bulk-secret-dialog.tsx"
   ],
   "mcp-servers": [
     "apps/web/src/resources/mcp-servers-page.tsx"

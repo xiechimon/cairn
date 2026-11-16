@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e9198c98-711c-4159-a2ec-1cf3117f5eda",
+  "id": "fe346979-02f1-40ea-8b5d-dd5c48fd5205",
   "prevId": "f6658e2d-7a9f-4aa5-a60d-6f449998ffcf",
   "tables": {
     "action_journal": {
@@ -6796,20 +6796,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "browserOrigin": {
-          "name": "browserOrigin",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "browserMachineId": {
-          "name": "browserMachineId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "policyRevision": {
           "name": "policyRevision",
           "type": "integer",
@@ -6817,6 +6803,20 @@
           "notNull": true,
           "autoincrement": false,
           "default": 1
+        },
+        "envSeal": {
+          "name": "envSeal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {},
@@ -6853,7 +6853,7 @@
       "checkConstraints": {
         "secret_delivery_policy": {
           "name": "secret_delivery_policy",
-          "value": "(\"secret\".\"delivery\" = 'http' AND \"secret\".\"httpOrigin\" IS NOT NULL AND \"secret\".\"httpHeader\" IS NOT NULL AND \"secret\".\"httpTemplate\" IS NOT NULL AND \"secret\".\"browserOrigin\" IS NULL AND \"secret\".\"browserMachineId\" IS NULL) OR (\"secret\".\"delivery\" = 'plaintext' AND \"secret\".\"httpOrigin\" IS NULL AND \"secret\".\"httpHeader\" IS NULL AND \"secret\".\"httpTemplate\" IS NULL AND \"secret\".\"browserOrigin\" IS NULL AND \"secret\".\"browserMachineId\" IS NULL) OR (\"secret\".\"delivery\" = 'browser' AND \"secret\".\"browserOrigin\" IS NOT NULL AND \"secret\".\"projectId\" IS NULL AND \"secret\".\"httpOrigin\" IS NULL AND \"secret\".\"httpHeader\" IS NULL AND \"secret\".\"httpTemplate\" IS NULL AND ((\"secret\".\"browserOrigin\" GLOB 'http*://localhost' OR \"secret\".\"browserOrigin\" GLOB 'http*://localhost:*' OR \"secret\".\"browserOrigin\" GLOB 'http*://127.0.0.1' OR \"secret\".\"browserOrigin\" GLOB 'http*://127.0.0.1:*' OR \"secret\".\"browserOrigin\" LIKE 'http%://[::1]' OR \"secret\".\"browserOrigin\" LIKE 'http%://[::1]:%') = (\"secret\".\"browserMachineId\" IS NOT NULL)))"
+          "value": "(\"secret\".\"delivery\" = 'http' AND \"secret\".\"httpOrigin\" IS NOT NULL AND \"secret\".\"httpHeader\" IS NOT NULL AND \"secret\".\"httpTemplate\" IS NOT NULL) OR (\"secret\".\"delivery\" = 'plaintext' AND \"secret\".\"httpOrigin\" IS NULL AND \"secret\".\"httpHeader\" IS NULL AND \"secret\".\"httpTemplate\" IS NULL)"
         }
       }
     },

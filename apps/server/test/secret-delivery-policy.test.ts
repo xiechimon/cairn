@@ -102,9 +102,17 @@ describe('secret delivery policy', () => {
       .run();
     expect((await post(input)).status).toBe(409);
     s.db.update(computer).set({ browserEnabled: true }).run();
+    expect((await post(input)).status).toBe(409);
+    s.db.update(computer).set({ browserEnabled: false }).run();
+    s.db.update(machine).set({ browserOverride: true }).run();
     const res = await post(input);
     expect(res.status).toBe(201);
-    expect(await res.json()).toMatchObject({ browserMachineId: 'browser-host' });
+    const saved = (await res.json()) as { id: string };
+    expect(saved).toMatchObject({ browserMachineId: 'browser-host' });
+    s.db.update(machine).set({ browserOverride: false }).run();
+    s.db.update(computer).set({ browserEnabled: true }).run();
+    expect((await patch(saved.id, { value: 'replacement' })).status).toBe(409);
+    expect((await patch(saved.id, { name: 'RENAMED_LOGIN' })).status).toBe(200);
     expect(() => s.db.update(secret).set({ browserMachineId: null }).run()).toThrow();
   });
 
