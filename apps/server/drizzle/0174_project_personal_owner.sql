@@ -1,0 +1,1 @@
+ALTER TABLE `project` ADD `personalOwnerId` text REFERENCES user(id);

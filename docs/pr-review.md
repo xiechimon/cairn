@@ -4,6 +4,8 @@
 
 ## Five-step process (execute in order; skipping a step means reviewing blind)
 
+Independent review follows `AGENTS.md`, "Code Review Rules": another agent in a separate, read-only context, with no requirement to change models. The read-only boundary and current-head evidence still apply.
+
 1. **Claim the review**: say in chat which PR you are reviewing before you start, so two reviewers do not duplicate work.
 2. **Read everything**: the PR body, all comments, all commits, all changed files — not one missing before you start writing the review.
 3. **Read the linked issues**: the full text (including comments) of every issue referenced in the body / comments / commit messages / cross-links. Understand "what is being asked for" before judging "is what is given that thing".

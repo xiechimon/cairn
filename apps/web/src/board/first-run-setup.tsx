@@ -70,6 +70,9 @@ export function useFirstRunSetup() {
     machines: machinesQ.data ?? [],
     settings,
     options: toModelOptions(sourcesQ.data?.sources ?? []),
+    claudeCodeFound: (sourcesQ.data?.sources ?? []).some(
+      (source) => source.runtime === 'claude-code' && source.installed,
+    ),
   };
 }
 
@@ -181,15 +184,24 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
   const [addView, setAddView] = useState<AddProviderView>('closed');
   const [connectError, setConnectError] = useState<string | null>(null);
   const hasProvider = progress.models.coordinator;
+  const subscriptionSaved = setup.connections.some(
+    (connection) =>
+      connection.kind === 'subscription' &&
+      connection.available !== false &&
+      !connection.id.startsWith('machine:'),
+  );
+  const status = hasProvider
+    ? t('已添加，Coordinator 和任务都能用')
+    : subscriptionSaved && !setup.claudeCodeFound
+      ? t('订阅已保存。这台电脑还没找到 Claude Code，装好它之后会自动用上。')
+      : t('Claude 订阅、API key 或本地模型，任选一个');
   return (
     <>
       <div className="divide-y divide-border">
         <SourceRow
           icon={<KeyRound className="size-5" />}
           title={t('服务商')}
-          status={
-            hasProvider ? t('已添加，Coordinator 能用') : t('Claude 订阅、API key 或本地模型')
-          }
+          status={status}
           usedBy={t('Coordinator 和任务都能用')}
           action={
             hasProvider ? undefined : (
@@ -230,7 +242,9 @@ interface Pick {
 function coordinatorWhy(reason: CoordinatorDefault['reason'], t: TFunc): string {
   return reason === 'anthropic-key'
     ? t('因为你添加了 Anthropic API key')
-    : t('因为这是最早添加、Coordinator 能直接用的服务商');
+    : reason === 'claude-code'
+      ? t('因为你登录了 Claude 订阅，Coordinator 直接用它')
+      : t('因为这是最早添加、Coordinator 能直接用的服务商');
 }
 
 function sessionWhy(reason: SessionDefault['reason'], t: TFunc): string {

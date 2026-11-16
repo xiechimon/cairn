@@ -28,6 +28,7 @@ import type { ChiefToolDeps } from './chief-tools.js';
 import { steerChiefMessage, stopChiefTurn } from './chief-turns.js';
 import { readConversationPage } from './conversation-page.js';
 import { OWNED_CANDIDATE, ownerOf } from './owner.js';
+import { listedProjects } from './personal-space.js';
 import { assertProjectWritable } from './project-writable.js';
 import { containsLike, escapeLike } from './search.js';
 import { drainTaskMessageQueue, queueTaskMessage } from './task-message-queue.js';
@@ -91,7 +92,7 @@ function requireProject(db: Db, teamId: string, projectId: string) {
   const row = db
     .select({ id: project.id })
     .from(project)
-    .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
+    .where(and(eq(project.id, projectId), listedProjects(teamId)))
     .get();
   if (!row) throw new HttpError(404, `Project ${projectId}`);
 }

@@ -825,6 +825,16 @@ describe('router tools', () => {
       expect(text).not.toContain('带编号的查重结果');
     });
 
+    test('the prompt and the create_todo definition tell the Coordinator when and how to use the quick lane', () => {
+      const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
+      expect(text).toContain('lane:"quick"');
+      expect(text).toContain('快速通道的任务不调 update_todo 改标题');
+      const createTodo = CHIEF_REMOTE_TOOLS.find((tool) => tool.name === 'create_todo')!;
+      const properties = (createTodo.parameters as { properties: Record<string, unknown> })
+        .properties;
+      expect(properties.lane).toBeDefined();
+    });
+
     test('an empty team says so', () => {
       const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
       expect(text).toContain('- 没有在跑的任务');

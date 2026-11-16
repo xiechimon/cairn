@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d4807211-a201-45eb-bc2f-d80d19347df0",
-  "prevId": "fe346979-02f1-40ea-8b5d-dd5c48fd5205",
+  "id": "303ca2c5-2314-4d4c-bd1c-cbad46d46e51",
+  "prevId": "8875659f-5414-434a-ba9a-c586ffbefe35",
   "tables": {
     "action_journal": {
       "name": "action_journal",
@@ -5719,6 +5719,13 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "personalOwnerId": {
+          "name": "personalOwnerId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {},
@@ -5729,6 +5736,19 @@
           "tableTo": "team",
           "columnsFrom": [
             "teamId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "project_personalOwnerId_user_id_fk": {
+          "name": "project_personalOwnerId_user_id_fk",
+          "tableFrom": "project",
+          "tableTo": "user",
+          "columnsFrom": [
+            "personalOwnerId"
           ],
           "columnsTo": [
             "id"

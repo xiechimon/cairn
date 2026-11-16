@@ -143,6 +143,7 @@ export const project = sqliteTable('project', {
   autonomy: json<
     (AutonomySettings & Partial<ProjectMergeConfig> & { shipRoute?: ShipRoute }) | null
   >('autonomy'),
+  personalOwnerId: text('personalOwnerId').references(() => user.id),
 });
 
 export const todo = sqliteTable(

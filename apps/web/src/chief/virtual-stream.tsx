@@ -19,6 +19,7 @@ import {
   useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
 import { safeSessionStorage } from '../safe-storage.js';
+import { useReaderLeft } from './reader-follow.js';
 
 const ESTIMATED_ROW_HEIGHT = 120;
 const OVERSCAN = 4;
@@ -78,6 +79,7 @@ export function VirtualStream({
   const [scrollMargin, setScrollMargin] = useState(restored?.scrollMargin ?? 0);
   const { end } = useMessageScrollerScrollable();
   const { scrollToEnd } = useMessageScroller();
+  const readerLeft = useReaderLeft();
   const virtualizer = useVirtualizer({
     count: keys.length,
     getScrollElement: () => viewportRef.current,
@@ -101,7 +103,7 @@ export function VirtualStream({
     [virtualizer],
   );
   useLayoutEffect(() => {
-    if (!end) scrollToEnd();
+    if (!end && !readerLeft) scrollToEnd();
   });
   useLayoutEffect(() => {
     const list = listRef.current;
