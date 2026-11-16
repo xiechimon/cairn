@@ -65,6 +65,20 @@ const stepSize: Record<string, [number, number]> = {
     </script>
   </head>
   <body>
+    <svg class="defs" width="0" height="0" aria-hidden="true">
+      <filter id="ink-specks" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="1" seed="5" result="noise"></feTurbulence>
+        <feColorMatrix in="noise" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 10 -6.4" result="specks"></feColorMatrix>
+        <feComposite in="SourceGraphic" in2="specks" operator="in"></feComposite>
+      </filter>
+      <filter id="ink" x="-10%" y="-10%" width="120%" height="120%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="7" result="warp"></feTurbulence>
+        <feDisplacementMap in="SourceGraphic" in2="warp" scale="1.6" xChannelSelector="R" yChannelSelector="G" result="rough"></feDisplacementMap>
+        <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="1" seed="2" result="grain"></feTurbulence>
+        <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -3.2 2.55" result="holes"></feColorMatrix>
+        <feComposite in="rough" in2="holes" operator="in"></feComposite>
+      </filter>
+    </svg>
     <header class="nav wrap">
       <a class="brand" href={t.home}>
         <Mark size={24} />
@@ -105,15 +119,6 @@ const stepSize: Record<string, [number, number]> = {
         </div>
         <nav class="hero-spiral" aria-label={t.how.title}>
           <svg viewBox="-105 -105 210 210" aria-hidden="true">
-            <defs>
-              <filter id="ink" x="-10%" y="-10%" width="120%" height="120%">
-                <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="7" result="warp"></feTurbulence>
-                <feDisplacementMap in="SourceGraphic" in2="warp" scale="1.6" xChannelSelector="R" yChannelSelector="G" result="rough"></feDisplacementMap>
-                <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="1" seed="2" result="grain"></feTurbulence>
-                <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -3.2 2.55" result="holes"></feColorMatrix>
-                <feComposite in="rough" in2="holes" operator="in"></feComposite>
-              </filter>
-            </defs>
             <g filter="url(#ink)">
               <path class="spiral" pathLength="1" d="M-7 0 A7 7 0 0 1 7 0 A22 22 0 0 1 -37 0 A37 37 0 0 1 37 0 A52 52 0 0 1 -67 0 A67 67 0 0 1 67 0 A82 82 0 0 1 47.816 52.709"></path>
               <line class="leader" x1="-60.74" y1="40.21" x2="-71.59" y2="47.38"></line>
@@ -509,6 +514,20 @@ const stepSize: Record<string, [number, number]> = {
     background: var(--primary);
     color: var(--on-primary);
   }
+  .btn.primary {
+    position: relative;
+    isolation: isolate;
+  }
+  .btn.primary::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--sheet);
+    filter: url(#ink-specks);
+    pointer-events: none;
+  }
   .btn.primary:hover {
     opacity: 0.88;
   }
@@ -567,6 +586,11 @@ const stepSize: Record<string, [number, number]> = {
     color: var(--running);
   }
 
+  .defs {
+    position: absolute;
+    width: 0;
+    height: 0;
+  }
   .hero-spiral {
     display: none;
   }
