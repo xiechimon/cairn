@@ -2,7 +2,7 @@ import type { PrPanelRow } from '@cairn/shared';
 import { cn } from 'cn';
 import { CircleCheck, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useLocation, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { useApiMutations, useProjects, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -18,6 +18,7 @@ import { Button } from '../components/ui/button.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import { ACCENT_INK } from '../phase.js';
+import { newTaskRequest } from './open-composer.js';
 import { compactAge, relativeTime, shortDate } from './rel-time.js';
 import { StopAndDoneConfirm } from './stop-and-done-confirm.js';
 import { TaskRowMenu } from './task-row-menu.js';
@@ -233,6 +234,10 @@ export function TasksPanel({
   const linkedToScheduled = searchParams.get(TASKS_TAB_PARAM) === 'scheduled';
   const [chosenTab, setTab] = useState<TasksTab | null>(null);
   const [adding, setAdding] = useState(false);
+  const newTaskAt = newTaskRequest(useLocation().state);
+  useEffect(() => {
+    if (newTaskAt !== null) setAdding(true);
+  }, [newTaskAt]);
   const groups = bySection(entries);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const selectedTodos = entries

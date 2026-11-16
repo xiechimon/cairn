@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo } from 'react';
 import { type RouteObject, useLocation, useNavigate, useRoutes } from 'react-router';
 import { useLiveData } from '../api/provider.js';
-import { coordinatorSearch, useOpenComposer } from '../board/open-composer.js';
+import { coordinatorSearch, useOpenComposer, useOpenNewTask } from '../board/open-composer.js';
 import { useDesktopMenu } from '../desktop-shell.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { isEditableTarget } from '../overlay/hotkeys.js';
@@ -45,7 +45,7 @@ function useOpenCoordinatorKey(): void {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [openComposer]);
-  useDesktopMenu('compose', openComposer);
+  useDesktopMenu('new-task', useOpenNewTask());
 }
 
 function useOpenSettingsMenu(): void {

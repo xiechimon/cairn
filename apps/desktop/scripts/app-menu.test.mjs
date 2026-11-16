@@ -25,7 +25,7 @@ test('the menu bar carries the shortcuts a Mac user expects', () => {
   for (const key of ['CommandOrControl+,', 'CommandOrControl+N', 'CommandOrControl+F']) {
     byKey.get(key).click();
   }
-  assert.deepEqual(sent, ['settings', 'compose', 'search']);
+  assert.deepEqual(sent, ['settings', 'new-task', 'search']);
   byKey.get('CommandOrControl+[').click();
   byKey.get('CommandOrControl+]').click();
   assert.deepEqual(navigated, ['back', 'forward']);

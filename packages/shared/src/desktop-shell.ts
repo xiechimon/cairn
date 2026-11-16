@@ -7,7 +7,7 @@ export const DESKTOP_RELEASE_MANIFEST = 'desktop-latest.json';
 export const DESKTOP_RELEASES_BASE = 'https://github.com/xiechimon/cairn/releases';
 export const DESKTOP_MANIFEST_URL = `${DESKTOP_RELEASES_BASE}/latest/download/${DESKTOP_RELEASE_MANIFEST}`;
 
-export type DesktopMenuCommand = 'settings' | 'compose' | 'search';
+export type DesktopMenuCommand = 'settings' | 'new-task' | 'search';
 
 export type DesktopUpdateBlocker = 'development' | 'not-in-applications' | 'read-only';
 

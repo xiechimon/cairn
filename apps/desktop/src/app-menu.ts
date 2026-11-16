@@ -62,9 +62,9 @@ export function appMenuTemplate(
       label: 'File',
       submenu: [
         {
-          label: 'New Message',
+          label: 'New Task',
           accelerator: 'CommandOrControl+N',
-          click: () => page.send('compose'),
+          click: () => page.send('new-task'),
         },
         { type: 'separator' },
         { role: 'close' },

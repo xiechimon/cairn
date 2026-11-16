@@ -165,7 +165,7 @@ test.describe('⌘J leaves overlay routes for the Coordinator page', () => {
   });
 });
 
-test('the Mac app menu opens search, settings and the Coordinator composer', async ({ page }) => {
+test('the Mac app menu opens search, settings and a new task in the Tasks panel', async ({ page }) => {
   await page.addInitScript(() => {
     const listeners = new Set<(command: string) => void>();
     const shell = window as unknown as {
@@ -203,7 +203,14 @@ test('the Mac app menu opens search, settings and the Coordinator composer', asy
   await expect(settings).toBeVisible();
   await expect(page).toHaveURL(/\/app\/settings\?scenario=01$/);
 
-  await send('compose');
+  await send('new-task');
   await expect(settings).toBeHidden();
-  await expect(page.getByTestId('chief-composer-input')).toBeFocused();
+  await expect(tasksPanel(page)).toBeVisible();
+  await expect(page.getByTestId('tasks-new')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page).toHaveURL(/\/app\?scenario=01&pane=tasks$/);
+
+  await page.goto('/app?scenario=01');
+  await expect(tasksPanel(page)).toHaveCount(0);
+  await send('new-task');
+  await expect(page.getByTestId('tasks-new')).toHaveAttribute('aria-pressed', 'true');
 });

@@ -1,6 +1,9 @@
 import { useCallback } from 'react';
 import { matchPath, useLocation, useNavigate } from 'react-router';
 import { getGestureStore } from '../overlay/gesture-machine.js';
+import { FILE_NAME_PARAM, FILE_PARAM } from './file-pane.js';
+import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
+import { PANE_PARAM, TASKS_TAB_PARAM } from './work-panel.js';
 
 const KEPT_PARAMS = ['scenario'];
 
@@ -69,4 +72,30 @@ export function useOpenComposer(): (projectId?: string | null) => void {
     },
     [navigate, pathname, search],
   );
+}
+
+export interface NewTaskState {
+  newTask: number;
+}
+
+export function newTaskRequest(state: unknown): number | null {
+  return typeof state === 'object' && state !== null && 'newTask' in state
+    ? Number((state as NewTaskState).newTask)
+    : null;
+}
+
+export function useOpenNewTask(): () => void {
+  const navigate = useNavigate();
+  const { pathname, search } = useLocation();
+  return useCallback(() => {
+    const params =
+      pathname === '/app'
+        ? new URLSearchParams(search)
+        : new URLSearchParams(coordinatorSearch(search));
+    for (const key of [THREAD_PARAM, VIEW_PARAM, TASKS_TAB_PARAM, FILE_PARAM, FILE_NAME_PARAM])
+      params.delete(key);
+    params.set(PANE_PARAM, 'tasks');
+    const state: NewTaskState = { newTask: Date.now() };
+    navigate({ pathname: '/app', search: `?${params.toString()}` }, { state });
+  }, [navigate, pathname, search]);
 }
