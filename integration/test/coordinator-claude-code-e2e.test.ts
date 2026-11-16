@@ -143,6 +143,17 @@ describe('a Coordinator rule that selects Claude Code runs the turn on the Runne
     expect(log).not.toContain(TOKEN);
     expect(log).toContain(`for conv ${threadId}`);
 
+    const envelope = await api(
+      server.url,
+      'GET',
+      `/api/teams/${server.teamId}/chief?threadId=${encodeURIComponent(threadId)}`,
+    );
+    expect(envelope.status).toBe(200);
+    expect((envelope.body as { context: unknown }).context).toMatchObject({
+      tokens: 15,
+      contextWindow: expect.any(Number),
+    });
+
     const second = await api(server.url, 'POST', `/api/conversations/${threadId}/messages`, {
       content: 'and what changed since?',
     });
