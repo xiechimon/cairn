@@ -556,6 +556,16 @@ const MCP_CONNECTORS: McpConnectorRecord[] = [
     status: 'error',
     statusReason: 'timeout',
   }),
+  connector('mcp-sentry', {
+    slug: 'sentry',
+    label: 'Sentry',
+    catalogId: 'sentry',
+    url: 'https://mcp.sentry.dev/mcp',
+    headerNames: [],
+    authKind: 'oauth',
+    status: 'connected',
+    toolCount: 9,
+  }),
 ];
 
 const mcpPolicy = (use: PolicyUse, mcpServers: string[]): WorkPolicyRecord => ({

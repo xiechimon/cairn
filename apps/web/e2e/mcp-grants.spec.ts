@@ -106,7 +106,7 @@ async function stubGrants(page: Page, signedIn: string[] = []): Promise<GrantWor
   return { patches };
 }
 
-test('connecting a catalog server asks which work may use it and saves the grant', async ({
+test('connecting a catalog server lets tasks use it and asks about reviews', async ({
   page,
 }) => {
   const world = await stubGrants(page);
@@ -115,36 +115,41 @@ test('connecting a catalog server asks which work may use it and saves the grant
   await page.getByLabel('个人访问令牌').fill('ghp_example');
   await page.getByRole('dialog').getByRole('button', { name: '连接' }).click();
 
-  const sheet = page.getByRole('dialog', { name: '让哪些工作用 GitHub' });
+  const sheet = page.getByRole('dialog', { name: '哪些工作可以用 GitHub' });
   await expect(sheet).toBeVisible();
   await expect(sheet.getByTestId('mcp-grant-session')).toBeChecked();
   await expect(sheet.getByTestId('mcp-grant-review')).not.toBeChecked();
+  await expect
+    .poll(() => world.patches)
+    .toEqual([{ use: 'session', body: { mcpServers: ['context7', 'github'] } }]);
   await sheet.getByTestId('mcp-grant-review').click();
-  await sheet.getByRole('button', { name: '保存' }).click();
+  await expect.poll(() => world.patches.length).toBe(2);
+  expect(world.patches[1]).toEqual({ use: 'review', body: { mcpServers: ['github'] } });
+  await sheet.getByRole('button', { name: '完成' }).click();
 
   await expect(sheet).toBeHidden();
-  expect(world.patches.sort((a, b) => a.use.localeCompare(b.use))).toEqual([
-    { use: 'review', body: { mcpServers: ['github'] } },
-    { use: 'session', body: { mcpServers: ['context7', 'github'] } },
-  ]);
   await expect(
     page.locator('[data-connector-card="github"]').getByTestId('mcp-grant-summary'),
-  ).toHaveText('· 任务和评审可用');
+  ).toHaveText('任务和评审可用');
 });
 
-test('leaving the grant sheet saves nothing', async ({ page }) => {
+test('closing the sheet keeps what the card shows', async ({ page }) => {
   const world = await stubGrants(page);
   await page.goto('/app/resources/mcp-servers');
   await page.getByRole('button', { name: '接入 GitHub' }).click();
   await page.getByLabel('个人访问令牌').fill('ghp_example');
   await page.getByRole('dialog').getByRole('button', { name: '连接' }).click();
-  const sheet = page.getByRole('dialog', { name: '让哪些工作用 GitHub' });
-  await sheet.getByRole('button', { name: '稍后再说' }).click();
+  const sheet = page.getByRole('dialog', { name: '哪些工作可以用 GitHub' });
+  await expect(sheet.getByTestId('mcp-grant-session')).toBeChecked();
+  await expect.poll(() => world.patches.length).toBe(1);
+  await page.keyboard.press('Escape');
   await expect(sheet).toBeHidden();
-  expect(world.patches).toEqual([]);
   await expect(
     page.locator('[data-connector-card="github"]').getByTestId('mcp-grant-summary'),
-  ).toHaveText('· 任务和评审都还不能用');
+  ).toHaveText('任务可用');
+  expect(world.patches).toEqual([
+    { use: 'session', body: { mcpServers: ['context7', 'github'] } },
+  ]);
 });
 
 test('the manage dialog removes a connector from tasks and keeps other grants', async ({
@@ -153,7 +158,7 @@ test('the manage dialog removes a connector from tasks and keeps other grants', 
   const world = await stubGrants(page);
   await page.goto('/app/resources/mcp-servers');
   await page.getByRole('button', { name: '管理 Context7' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Context7' });
+  const dialog = page.getByRole('dialog', { name: 'Context7', exact: true });
   const tasks = dialog.getByTestId('mcp-grant-session');
   await expect(tasks).toBeChecked();
   await tasks.click();
@@ -166,6 +171,6 @@ test('returning from a browser sign-in opens the grant sheet for that connector'
 }) => {
   await stubGrants(page, ['linear']);
   await page.goto('/app/resources/mcp-servers?oauth=connected&connector=conn-linear');
-  await expect(page.getByRole('dialog', { name: '让哪些工作用 Linear' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '哪些工作可以用 Linear' })).toBeVisible();
   await expect(page).not.toHaveURL(/oauth=/);
 });

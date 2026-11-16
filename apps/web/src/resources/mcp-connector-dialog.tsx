@@ -17,11 +17,10 @@ import {
 } from '../components/ui/dialog-shell.js';
 import { Field } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
-import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import { Plus, X } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
-import { type GrantDraft, McpGrantRows, type McpGrants } from './mcp-grants.js';
+import { McpGrantSection, type McpGrants } from './mcp-grants.js';
 
 const PALE_DISABLED = 'disabled:bg-secondary/50 disabled:text-content-dim disabled:opacity-100';
 
@@ -523,22 +522,8 @@ function ManageConnectorDialog({
   const [current, setCurrent] = useState(connector);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [grant, setGrant] = useState<GrantDraft | null>(null);
-  const [grantSaving, setGrantSaving] = useState(false);
   const primaryRef = useRef<HTMLButtonElement>(null);
-  const shownGrant = grant ?? grants.uses(current.slug);
-  const changeGrant = (next: GrantDraft) => {
-    const before = shownGrant;
-    setGrant(next);
-    setGrantSaving(true);
-    grants
-      .save(current.slug, next)
-      .catch((error: unknown) => {
-        setGrant(before);
-        toastError(t('保存失败，请重试。'), error);
-      })
-      .finally(() => setGrantSaving(false));
-  };
+
   const oauth = current.authKind === 'oauth';
   const needsAuth = oauth && current.status === 'needs_auth';
   const pending =
@@ -600,6 +585,7 @@ function ManageConnectorDialog({
           primaryRef={primaryRef}
           primary={needsAuth ? reconnect : recheck}
           onCancel={onClose}
+          cancelLabel={t('关闭')}
           danger={{ label: t('删除'), onClick: () => setConfirmDelete(true), disabled: pending }}
           {...(oauth ? { secondary: needsAuth ? recheck : reconnect } : {})}
         />
@@ -610,15 +596,6 @@ function ManageConnectorDialog({
         <Field>
           <span className="text-ui font-medium text-foreground">{t('地址')}</span>
           <p className={VALUE_BOX_CLS}>{current.url}</p>
-        </Field>
-        <Field>
-          <span className="text-ui font-medium text-foreground">{t('谁可以用')}</span>
-          <McpGrantRows
-            name={current.label}
-            value={shownGrant}
-            disabled={!grants.ready || grantSaving}
-            onChange={changeGrant}
-          />
         </Field>
         {oauth && (
           <p className="m-0 text-meta text-content-tertiary">
@@ -645,21 +622,33 @@ function ManageConnectorDialog({
             required={current.authKind !== 'none'}
           />
         )}
+        <Field>
+          <span className="text-ui font-medium text-foreground">{t('哪些工作可以用')}</span>
+          <McpGrantSection slug={current.slug} name={current.label} grants={grants} />
+        </Field>
         <DialogError message={saveError} />
       </FormStack>
     </DialogShell>
   );
 }
 
-export function ConnectorStatus({ record }: { record: McpConnectorRecord }) {
+export function ConnectorStatus({ record, grant }: { record: McpConnectorRecord; grant?: string }) {
   const { t } = useI18n();
   if (record.status === 'connected')
     return (
       <span className="inline-flex items-center gap-1.5 text-meta text-content-secondary">
         <span aria-hidden className="size-1.5 flex-none rounded-full bg-running" />
-        {record.toolCount !== null
-          ? t('已连接 · {n} 个工具', { n: record.toolCount })
-          : t('已连接')}
+        <span>
+          {record.toolCount !== null
+            ? t('已连接 · {n} 个工具', { n: record.toolCount })
+            : t('已连接')}
+          {grant !== undefined && (
+            <>
+              {' · '}
+              <span data-testid="mcp-grant-summary">{grant}</span>
+            </>
+          )}
+        </span>
       </span>
     );
   if (record.status === 'needs_auth')
@@ -737,46 +726,22 @@ export function McpGrantSheet({
   onClose: () => void;
 }) {
   const { t } = useI18n();
-  const [draft, setDraft] = useState<GrantDraft | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
-  const current = grants.uses(connector.slug);
-  const shown = draft ?? { ...current, session: true };
-  const save = () => {
-    setSaving(true);
-    setProblem(null);
-    grants
-      .save(connector.slug, shown)
-      .then(onClose)
-      .catch(() => setProblem(t('没能保存，稍后重试。')))
-      .finally(() => setSaving(false));
-  };
   return (
     <DialogShell
-      title={t('让哪些工作用 {name}', { name: connector.label })}
+      title={t('哪些工作可以用 {name}', { name: connector.label })}
       subtitle={<ConnectorStatus record={connector} />}
       size="s"
       onClose={onClose}
       footer={
-        <DialogFoot
-          primary={{
-            label: saving ? t('正在保存…') : t('保存'),
-            onClick: save,
-            disabled: saving || !grants.ready,
-          }}
-          onCancel={onClose}
-          cancelLabel={t('稍后再说')}
-        />
+        <div className="flex w-full justify-end">
+          <Button className={DIALOG_PRIMARY_BUTTON} onClick={onClose}>
+            {t('完成')}
+          </Button>
+        </div>
       }
     >
       <FormStack className={DIALOG_FORM_CLS}>
-        <McpGrantRows
-          name={connector.label}
-          value={shown}
-          disabled={saving || !grants.ready}
-          onChange={setDraft}
-        />
-        <DialogError message={problem} />
+        <McpGrantSection slug={connector.slug} name={connector.label} grants={grants} grantTasks />
       </FormStack>
     </DialogShell>
   );

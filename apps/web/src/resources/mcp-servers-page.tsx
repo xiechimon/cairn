@@ -314,15 +314,10 @@ export function McpServersPage() {
                           entry !== undefined ? t(entry.description) : hostOf(record.url)
                         }
                         status={
-                          <span className="flex flex-wrap items-center gap-x-1.5">
-                            <ConnectorStatus record={record} />
-                            <span
-                              data-testid="mcp-grant-summary"
-                              className="text-meta text-content-tertiary"
-                            >
-                              · {grantSummary(t, grants.uses(record.slug))}
-                            </span>
-                          </span>
+                          <ConnectorStatus
+                            record={record}
+                            grant={grantSummary(t, grants.uses(record.slug))}
+                          />
                         }
                         action={
                           <Button
@@ -483,7 +478,7 @@ function ConnectorCard({
         {action}
       </div>
       <p className="m-0 line-clamp-2 text-meta text-content-secondary">{description}</p>
-      {status !== undefined && <div className="mt-auto">{status}</div>}
+      {status !== undefined && <div className="mt-auto flex">{status}</div>}
     </Card>
   );
 }

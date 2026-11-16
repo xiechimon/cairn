@@ -1,8 +1,9 @@
 import { POLICY_USES, type PolicyUse, type WorkPolicyRecord } from '@cairn/shared';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
 import { SETTINGS_HINT_CLS, SettingsCard, SettingsRow } from '../components/settings-list.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
+import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 
 export type GrantDraft = Record<PolicyUse, boolean>;
@@ -52,40 +53,61 @@ export function grantSummary(t: (text: string) => string, uses: GrantDraft): str
   if (uses.session && uses.review) return t('任务和评审可用');
   if (uses.session) return t('任务可用');
   if (uses.review) return t('评审可用');
-  return t('任务和评审都还不能用');
+  return t('任务和评审都不能用');
 }
 
-export function McpGrantRows({
+export function McpGrantSection({
+  slug,
   name,
-  value,
-  disabled,
-  onChange,
+  grants,
+  grantTasks = false,
 }: {
+  slug: string;
   name: string;
-  value: GrantDraft;
-  disabled: boolean;
-  onChange: (next: GrantDraft) => void;
+  grants: McpGrants;
+  grantTasks?: boolean;
 }) {
   const { t } = useI18n();
-  const row = (use: PolicyUse, label: string, hint: string, aria: string) => (
-    <SettingsRow label={label} hint={hint}>
+  const [shown, setShown] = useState<GrantDraft | null>(null);
+  const [saving, setSaving] = useState(false);
+  const value = shown ?? grants.uses(slug);
+  const change = (next: GrantDraft) => {
+    setShown(next);
+    setSaving(true);
+    grants
+      .save(slug, next)
+      .catch((error: unknown) => {
+        setShown(null);
+        toastError(t('保存失败，请重试。'), error);
+      })
+      .finally(() => setSaving(false));
+  };
+  const granted = useRef(false);
+  useEffect(() => {
+    if (!grantTasks || granted.current || !grants.ready) return;
+    granted.current = true;
+    const current = grants.uses(slug);
+    if (!current.session) change({ ...current, session: true });
+  });
+  const row = (use: PolicyUse, label: string, aria: string) => (
+    <SettingsRow label={label}>
       <ToggleSwitch
         className="pointer-coarse:after:-inset-y-3"
         data-testid={`mcp-grant-${use}`}
         aria-label={aria}
         checked={value[use]}
-        disabled={disabled}
-        onCheckedChange={(checked) => onChange({ ...value, [use]: checked })}
+        disabled={!grants.ready || saving}
+        onCheckedChange={(checked) => change({ ...value, [use]: checked })}
       />
     </SettingsRow>
   );
   return (
     <div className="flex flex-col gap-2">
       <SettingsCard>
-        {row('session', t('任务'), t('做任务时能调用它的工具'), t('让任务用 {name}', { name }))}
-        {row('review', t('评审'), t('评审改动时能调用它的工具'), t('让评审用 {name}', { name }))}
+        {row('session', t('任务'), t('让任务用 {name}', { name }))}
+        {row('review', t('评审'), t('让评审用 {name}', { name }))}
       </SettingsCard>
-      <p className={SETTINGS_HINT_CLS}>{t('Coordinator 还不能用连接器，只有任务和评审能用。')}</p>
+      <p className={SETTINGS_HINT_CLS}>{t('改动立即生效。Coordinator 用不了这里接入的服务器。')}</p>
     </div>
   );
 }
