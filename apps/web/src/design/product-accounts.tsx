@@ -1,3 +1,4 @@
+import type { ProviderRecord } from '@cairn/shared';
 import { Layers, Monitor, Palette, Server, User } from 'lucide-react';
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
@@ -9,22 +10,16 @@ import {
 } from '../api/claude-accounts.js';
 import { MachineProvidersCard, useClock } from '../components/accounts/account-parts.js';
 import { ClaudeMark } from '../components/brand-marks.js';
-import { CheckedButton } from '../components/checked-button.js';
 import { EmptyState } from '../components/empty-state.js';
-import {
-  type ProviderItem,
-  ProviderModelRow,
-  ProviderPanel,
-} from '../components/providers/provider-panel.js';
+import { type ProviderItem, ProviderPanel } from '../components/providers/provider-panel.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SettingsNav } from '../components/settings/settings-nav.js';
 import { SettingsSearch } from '../components/settings/settings-search.js';
-import { SettingsCard } from '../components/settings-list.js';
-import { SettingsScopeSentence, TEAM_SCOPE } from '../components/settings-scope.js';
 import { ACCOUNT_STEPS, ACCOUNT_SUBSCRIPTIONS, PROVIDER_MACHINES } from '../fixtures/accounts.js';
 import { r7 } from '../fixtures/core.js';
 import { useI18n } from '../i18n/provider.js';
 import { OnlineStatus } from '../resources/parts.js';
+import { TeamProviderEditor } from '../resources/provider-editors.js';
 import {
   SubscriptionDetail,
   subscriptionStatusView,
@@ -33,12 +28,6 @@ import {
 import { Section, Specimen } from './specimen.js';
 
 const NOW = r7(13, 14);
-
-const SCOPE_MACHINES = [
-  { id: 'scope-mac-a1b2', kind: 'local', name: 'studio', online: true },
-  { id: 'scope-mac-c3d4', kind: 'remote', name: 'build-box', online: true },
-  { id: 'scope-mac-e5f6', kind: 'remote', name: 'build-box', online: false },
-] as const;
 
 const settledQuery: QueryLike = {
   isPending: false,
@@ -171,6 +160,24 @@ function SubscriptionDetailSpecimen({ state }: { state: 'ok' }) {
   );
 }
 
+const SPECIMEN_PROVIDER: ProviderRecord = {
+  kind: 'custom',
+  id: 'prov-specimen',
+  providerId: 'gateway',
+  label: 'Gateway',
+  baseUrl: 'https://gateway.example.invalid/v1',
+  api: 'openai-completions',
+  authHeader: true,
+  compat: {},
+  models: [
+    { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' },
+    { id: 'claude-opus-4-5', name: 'Claude Opus 4.5' },
+  ],
+  createdBy: 'u1',
+  createdAt: NOW,
+  updatedAt: NOW,
+};
+
 function ProviderPanelSpecimen() {
   const [selected, setSelected] = useState('anthropic');
   const items: ProviderItem[] = [
@@ -204,15 +211,11 @@ function ProviderPanelSpecimen() {
       onSelect={setSelected}
       header={<h2 className="m-0 text-card-title font-semibold text-foreground">Providers</h2>}
     >
-      <SettingsCard>
-        <ProviderModelRow
-          name="Claude Haiku 5.5"
-          id="claude-haiku-5-5"
-          onRemove={() => undefined}
-        />
-        <ProviderModelRow name="claude-opus-4-5" id="claude-opus-4-5" dead />
-        <ProviderModelRow name="default-sonnet" id="claude-sonnet-5-5" />
-      </SettingsCard>
+      <TeamProviderEditor
+        record={SPECIMEN_PROVIDER}
+        deadModels={new Set(['claude-opus-4-5'])}
+        actions={{}}
+      />
     </ProviderPanel>
   );
 }
@@ -266,8 +269,6 @@ function SettingsNavSpecimen() {
 export function AccountsSection() {
   const { t } = useI18n();
   const machine: MachineWithProviders | undefined = PROVIDER_MACHINES[0];
-  const [scopeValue, setScopeValue] = useState(TEAM_SCOPE);
-  const [scopeCheckedAt] = useState(() => Date.now());
   return (
     <Section
       id="accounts"
@@ -305,22 +306,6 @@ export function AccountsSection() {
       >
         <div className="w-full">
           <ProviderPanelSpecimen />
-        </div>
-      </Specimen>
-      <Specimen
-        id="settings-scope"
-        title="Settings scope sentence"
-        note="Server-side settings pages: one sentence names what the page edits, the menu lists All machines with a server icon and each machine with a monitor icon, same-name machines get an id suffix, offline machines are marked; device and personal pages do not show it"
-        stage="sheet"
-        code={`<SettingsScopeSentence machines={machines} scope={scope} onChange={setScope} trailing={<CheckedButton updatedAt={at} fetching={false} />} />`}
-      >
-        <div className="w-full">
-          <SettingsScopeSentence
-            machines={[...SCOPE_MACHINES]}
-            scope={scopeValue}
-            onChange={setScopeValue}
-            trailing={<CheckedButton updatedAt={scopeCheckedAt} fetching={false} />}
-          />
         </div>
       </Specimen>
       <Specimen

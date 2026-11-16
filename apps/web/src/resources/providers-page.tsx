@@ -22,12 +22,10 @@ import { mapMachines } from '../api/mappers.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useClock } from '../components/accounts/account-parts.js';
-import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
-import { CheckedButton } from '../components/checked-button.js';
+import { ClaudeMark } from '../components/brand-marks.js';
 import { EmptyState } from '../components/empty-state.js';
 import { type ProviderItem, ProviderPanel } from '../components/providers/provider-panel.js';
 import { mergeQueries, QueryBoundary } from '../components/query-state.js';
-import { SettingsScopeSentence, useSettingsScope } from '../components/settings-scope.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
@@ -39,9 +37,8 @@ import type { TFunc } from '../i18n/translate.js';
 import { AddProviderFlow, type AddProviderView } from './add-provider-flow.js';
 import {
   ClaudeCodeEditor,
+  type ClaudeCodeMachine,
   claudeCodeStatus,
-  GeminiEditor,
-  PiEditor,
   type ProviderEditActions,
   providerKind,
   providerMark,
@@ -93,7 +90,7 @@ function teamEntries(
         name: record.label,
         Mark: providerMark(record),
         status: parts.join(' · '),
-        tone: retired > 0 ? 'warn' : 'ok',
+        tone: record.models.length === 0 || retired > 0 ? 'warn' : 'ok',
       },
       editor: (
         <TeamProviderEditor
@@ -152,59 +149,28 @@ function subscriptionEntries(
   });
 }
 
-function machineEntries(
-  machine: MachineRow,
-  source: ModelSource | undefined,
-  providerCount: number,
+function claudeCodeEntry(
+  machines: readonly MachineRow[],
+  sources: readonly ModelSource[],
   subscribed: boolean,
-  onShowTeam: () => void,
   t: TFunc,
-): Entry[] {
-  const enabled = new Set(machine.enabledRuntimes ?? []);
-  const online = machine.online !== false;
-  const claude = claudeCodeStatus(source, online, subscribed);
-  const bin = typeof source?.bin === 'object' && source.bin !== null ? source.bin : null;
-  return [
-    {
-      item: {
-        id: 'claude-code',
-        name: 'Claude Code',
-        Mark: ClaudeMark,
-        version: bin?.version ?? null,
-        status: t(claude.status),
-        tone: claude.tone === 'warn' || enabled.has('claude-code') ? claude.tone : 'off',
-      },
-      editor: (
-        <ClaudeCodeEditor source={source} machineName={machine.name} status={claude.status} />
-      ),
+): Entry | null {
+  const rows: ClaudeCodeMachine[] = machines.map((machine) => {
+    const source = sourceFor(machine, sources);
+    return { machine, source, ...claudeCodeStatus(source, machine.online !== false, subscribed) };
+  });
+  const installed = rows.filter((r) => typeof r.source?.bin === 'object' && r.source.bin !== null);
+  if (rows.every((r) => r.source === undefined)) return null;
+  return {
+    item: {
+      id: 'claude-code',
+      name: 'Claude Code',
+      Mark: ClaudeMark,
+      status: t('{installed}/{n} 台执行机已装', { installed: installed.length, n: rows.length }),
+      tone: rows.some((r) => r.tone === 'ok') ? 'ok' : installed.length > 0 ? 'warn' : 'off',
     },
-    {
-      item: {
-        id: 'pi',
-        name: 'pi',
-        Mark: PiMark,
-        status: online ? t('使用所有执行机的服务商') : t('离线'),
-        tone: online ? 'ok' : 'warn',
-      },
-      editor: (
-        <PiEditor
-          machineName={machine.name}
-          providerCount={providerCount}
-          onShowTeam={onShowTeam}
-        />
-      ),
-    },
-    {
-      item: {
-        id: 'gemini',
-        name: 'Gemini CLI',
-        Mark: GeminiMark,
-        status: t('暂不支持'),
-        tone: 'off',
-      },
-      editor: <GeminiEditor machineName={machine.name} />,
-    },
-  ];
+    editor: <ClaudeCodeEditor machines={rows} all={machines} />,
+  };
 }
 
 export function ProvidersSection() {
@@ -275,20 +241,6 @@ export function ProvidersSection() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const { scope, machine, setScope } = useSettingsScope(machines);
-  const [mountedAt] = useState(() => Date.now());
-  const checkedAt = Math.max(
-    sourcesQ.dataUpdatedAt,
-    providersQ.dataUpdatedAt,
-    subscriptionsQ.dataUpdatedAt,
-    mountedAt,
-  );
-  const refreshChecks = () => {
-    void sourcesQ.refetch();
-    void providersQ.refetch();
-    void subscriptionsQ.refetch();
-  };
-
   const setParams = (patch: Record<string, string | null>, replace = false) => {
     const params = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(patch)) {
@@ -307,7 +259,11 @@ export function ProvidersSection() {
               throw error;
             }),
           ...(providersQ.data?.canTestConnection === true
-            ? { test: () => mutations.testProvider.mutateAsync(record.id) }
+            ? {
+                test: (model: string) =>
+                  mutations.testProvider.mutateAsync({ id: record.id, model }),
+                listUpstream: () => mutations.upstreamModels.mutateAsync(record.id),
+              }
             : {}),
           remove: () =>
             mutations.deleteProvider.mutate(record.id, {
@@ -340,27 +296,24 @@ export function ProvidersSection() {
       : {}),
   });
 
-  const entries =
-    machine === undefined
-      ? [
-          ...subscriptionEntries(subscriptions, {
-            now,
-            steps: stepsByAccount,
-            verifications: verification.states,
-            actionsFor: subscriptionActionsFor,
-            t,
-            clock,
-          }),
-          ...teamEntries(providers, deadModelIds(sources), actionsFor, t),
-        ]
-      : machineEntries(
-          machine,
-          sourceFor(machine, sources),
-          providers.length,
-          !live || hasUsableClaudeSubscription(subscriptionsQ.data, now),
-          () => setParams({ scope: null, item: null }),
-          t,
-        );
+  const claudeCode = claudeCodeEntry(
+    machines,
+    sources,
+    !live || hasUsableClaudeSubscription(subscriptionsQ.data, now),
+    t,
+  );
+  const entries = [
+    ...subscriptionEntries(subscriptions, {
+      now,
+      steps: stepsByAccount,
+      verifications: verification.states,
+      actionsFor: subscriptionActionsFor,
+      t,
+      clock,
+    }),
+    ...teamEntries(providers, deadModelIds(sources), actionsFor, t),
+    ...(claudeCode === null ? [] : [claudeCode]),
+  ];
   const partialFailure = subscriptionsQ.isError
     ? 'subscriptions'
     : providersQ.isError
@@ -372,19 +325,7 @@ export function ProvidersSection() {
   return (
     <>
       <div className="flex min-w-0 flex-col gap-3">
-        <SettingsScopeSentence
-          machines={machines}
-          scope={scope}
-          onChange={(next) => setScope(next, { item: null })}
-          trailing={
-            <CheckedButton
-              updatedAt={checkedAt}
-              fetching={sourcesQ.isFetching || providersQ.isFetching || subscriptionsQ.isFetching}
-              onRefresh={live ? refreshChecks : undefined}
-            />
-          }
-        />
-        {live && machine === undefined && partialFailure !== null && entries.length > 0 && (
+        {live && partialFailure !== null && entries.length > 0 && (
           <p
             data-testid="providers-partial-error"
             role="alert"
@@ -408,13 +349,7 @@ export function ProvidersSection() {
           onSelect={(id) => setParams({ item: id })}
           empty={
             <QueryBoundary
-              query={
-                live
-                  ? machine === undefined
-                    ? mergeQueries(providersQ, subscriptionsQ)
-                    : sourcesQ
-                  : undefined
-              }
+              query={live ? mergeQueries(providersQ, subscriptionsQ) : undefined}
               isEmpty
               loadingLabel={t('正在加载模型服务')}
               errorTitle={t('模型服务没能加载')}

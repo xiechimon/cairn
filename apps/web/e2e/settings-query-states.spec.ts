@@ -152,7 +152,7 @@ test('providers: a team whose only data is a failed subscriptions fetch sees an 
   await expect(settings.getByTestId('providers-empty')).toHaveCount(0);
 });
 
-test('providers: a failed team providers fetch does not hide the machine scope editors', async ({
+test('providers: a failed team providers fetch keeps the Runner-reported Claude Code row', async ({
   page,
 }) => {
   const state = { fail: true, ok: { providers: [] } as unknown };
@@ -173,15 +173,27 @@ test('providers: a failed team providers fetch does not hide the machine scope e
     }),
   );
   await page.route('**/api/teams/team-1/model-sources', (route) =>
-    route.fulfill({ json: { sources: [] } }),
+    route.fulfill({
+      json: {
+        sources: [
+          {
+            runtime: 'claude-code',
+            installed: true,
+            hostname: 'alpha',
+            machineId: 'm-1',
+            models: [],
+            bin: { path: '/usr/local/bin/claude', version: '2.1.316' },
+          },
+        ],
+      },
+    }),
   );
   await page.goto('/app/settings/routing');
   const settings = page.getByRole('dialog', { name: '设置' });
-  await expect(settings.getByTestId('query-error')).toBeVisible();
-  await settings.getByRole('combobox', { name: '设置作用于' }).click();
-  await page.getByRole('option', { name: /alpha/ }).click();
-  await expect(settings.getByTestId('query-error')).toHaveCount(0);
-  await expect(settings.getByTestId('provider-instance').first()).toBeVisible();
+  await expect(
+    settings.locator('[data-testid="provider-instance"][data-instance-id="claude-code"]'),
+  ).toBeVisible();
+  await expect(settings.getByTestId('providers-partial-error')).toBeVisible();
 });
 
 for (const width of [768, 1024]) {

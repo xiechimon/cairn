@@ -3,31 +3,37 @@ import {
   PROVIDER_OAUTH_PRESET_IDS,
   PROVIDER_PRESET_IDS,
   type ProviderApi,
+  type ProviderFailure,
   type ProviderRecord,
   type ProviderTestResult,
+  type UpstreamModelsResult,
 } from '@cairn/shared';
 import { cn } from 'cn';
-import { Server } from 'lucide-react';
-import { useState } from 'react';
-import { ClaudeMark, GeminiMark, GrokMark, OpenAIMark, PiMark } from '../components/brand-marks.js';
+import { Download, Play, Server, X } from 'lucide-react';
+import { type ReactNode, useRef, useState } from 'react';
+import { ClaudeMark, GeminiMark, GrokMark, OpenAIMark } from '../components/brand-marks.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
+import { MachineName } from '../components/machine-label.js';
 import {
   ProviderEditorHead,
   type ProviderMark,
-  ProviderModelRow,
   ProviderSection,
+  TONE_DOT,
 } from '../components/providers/provider-panel.js';
 import {
   SETTINGS_HINT_CLS,
   SettingsCard,
   SettingsDangerZone,
-  SettingsRow,
   SettingsSection,
 } from '../components/settings-list.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
+import { Spinner } from '../components/ui/spinner.js';
+import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { UpstreamModelPicker } from './upstream-model-picker.js';
 
 const PROTOCOL_LABELS: Record<ProviderApi, string> = {
   'anthropic-messages': 'Anthropic Messages',
@@ -87,46 +93,60 @@ export function CommitInput({
   );
 }
 
-function KeyRow({ onReplace }: { onReplace?: (key: string) => void }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <span className="text-meta text-content-tertiary">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function KeyField({ onReplace }: { onReplace?: (key: string) => void }) {
   const { t } = useI18n();
   const [draft, setDraft] = useState<string | null>(null);
-  return (
-    <SettingsRow
-      label="API key"
-      hint={t('加密保存，保存后不能再查看')}
-      className="flex-wrap gap-y-2 py-2.5"
-    >
-      {draft === null ? (
-        <Button variant="outline" size="sm" onClick={() => setDraft('')}>
-          {t('更换 API key')}
+  if (draft === null) {
+    return (
+      <span className="flex h-8 min-w-0 items-center justify-between gap-2 rounded-md px-2.5 ring-1 ring-input ring-inset">
+        <span className="truncate text-meta text-content-tertiary">{t('已加密保存')}</span>
+        <Button variant="ghost" size="xs" onClick={() => setDraft('')}>
+          {t('更换')}
         </Button>
-      ) : (
-        <span className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-          <Input
-            aria-label={t('新的 API key')}
-            type="password"
-            autoComplete="off"
-            autoFocus
-            className={cn(FORM_CONTROL_CLS, 'w-full sm:w-48')}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-          <Button variant="ghost" size="sm" onClick={() => setDraft(null)}>
-            {t('取消')}
-          </Button>
-          <Button
-            size="sm"
-            disabled={draft.trim() === ''}
-            onClick={() => {
-              onReplace?.(draft.trim());
-              setDraft(null);
-            }}
-          >
-            {t('保存')}
-          </Button>
-        </span>
-      )}
-    </SettingsRow>
+      </span>
+    );
+  }
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <Input
+        aria-label={t('新的 API key')}
+        type="password"
+        autoComplete="off"
+        autoFocus
+        className={cn(FORM_CONTROL_CLS, 'min-w-0 flex-auto')}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setDraft(null);
+          if (event.key === 'Enter' && draft.trim() !== '') {
+            onReplace?.(draft.trim());
+            setDraft(null);
+          }
+        }}
+      />
+      <Button variant="ghost" size="sm" onClick={() => setDraft(null)}>
+        {t('取消')}
+      </Button>
+      <Button
+        size="sm"
+        disabled={draft.trim() === ''}
+        onClick={() => {
+          onReplace?.(draft.trim());
+          setDraft(null);
+        }}
+      >
+        {t('保存')}
+      </Button>
+    </span>
   );
 }
 
@@ -136,72 +156,155 @@ export interface ProviderEditActions {
       apiKey?: string;
     },
   ) => Promise<unknown>;
-  test?: () => Promise<ProviderTestResult>;
+  test?: (model: string) => Promise<ProviderTestResult>;
+  listUpstream?: () => Promise<UpstreamModelsResult>;
   remove?: () => void;
 }
 
-function TestRow({
+type ModelCheck =
+  | { phase: 'running' }
+  | { phase: 'done'; result: ProviderTestResult }
+  | { phase: 'unavailable' };
+
+const FAILURE_SHORT: Record<ProviderFailure, string> = {
+  auth: 'key 无效',
+  'not-found': '模型不存在',
+  'rate-limit': '限流',
+  timeout: '超时',
+  upstream: '上游出错',
+  invalid: '响应异常',
+  network: '连不上',
+  'no-model': '没有模型',
+};
+
+const FAILURE_SENTENCE: Record<ProviderFailure, string> = {
+  auth: 'API key 无效或没有这个模型的权限',
+  'not-found': '上游没有这个模型',
+  'rate-limit': '上游限流了，稍后再测',
+  timeout: '10 秒内没回',
+  upstream: '上游返回了错误',
+  invalid: '上游返回的内容不像模型回复',
+  network: '连不上上游，检查地址',
+  'no-model': '没有可测的模型',
+};
+
+const TEST_CONCURRENCY = 3;
+
+function failureOf(check: ModelCheck | undefined): ProviderFailure | 'unavailable' | null {
+  if (check?.phase === 'unavailable') return 'unavailable';
+  if (check?.phase === 'done' && check.result.status === 'failed') {
+    return check.result.failure ?? 'upstream';
+  }
+  return null;
+}
+
+function ModelChip({
+  id,
+  dead,
+  check,
+  busy,
   onTest,
-  hasModels,
+  onRemove,
 }: {
-  onTest: () => Promise<ProviderTestResult>;
-  hasModels: boolean;
+  id: string;
+  dead: boolean;
+  check: ModelCheck | undefined;
+  busy: boolean;
+  onTest?: () => void;
+  onRemove?: () => void;
 }) {
   const { t } = useI18n();
-  const [pending, setPending] = useState(false);
-  const [outcome, setOutcome] = useState<ProviderTestResult | 'unavailable' | null>(null);
-  const run = async () => {
-    setPending(true);
-    setOutcome(null);
-    try {
-      setOutcome(await onTest());
-    } catch {
-      setOutcome('unavailable');
-    } finally {
-      setPending(false);
-    }
-  };
+  const failure = failureOf(check);
+  const latency = check?.phase === 'done' ? check.result.latencyMs : null;
   return (
-    <SettingsRow
-      label={t('测试连接')}
-      hint={
-        hasModels
-          ? t('发一个最小请求，不会显示密钥')
-          : t('先在下面的模型列表里添加一个模型，才能测试')
+    <span
+      data-testid="provider-model"
+      data-model-id={id}
+      data-liveness={dead ? 'dead' : 'alive'}
+      data-check={
+        check === undefined
+          ? 'none'
+          : check.phase === 'running'
+            ? 'running'
+            : failure === null
+              ? 'ok'
+              : 'failed'
       }
-      className="flex-wrap gap-y-2 py-3"
+      className="inline-flex min-h-7 max-w-full items-center gap-1.5 rounded-md bg-secondary py-0.5 pr-0.5 pl-2.5 text-ui text-foreground ring-1 ring-border pointer-coarse:min-h-9"
     >
-      <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
-        {outcome !== null && (
-          <div className="min-w-0 max-w-full text-meta text-content-secondary">
-            <span role="status" data-testid="provider-test-result">
-              {outcome === 'unavailable'
-                ? t('测试没能跑完，请重试。')
-                : outcome.status === 'ok'
-                  ? t('连接正常')
-                  : t('连接失败，请检查连接设置后重试。')}
-            </span>
-            {outcome !== 'unavailable' && outcome.reason !== null && (
-              <details className="mt-1">
-                <summary className="cursor-pointer">{t('详情')}</summary>
-                <p data-testid="provider-test-reason" className="m-0 max-w-80 break-words">
-                  {outcome.reason}
-                </p>
-              </details>
-            )}
-          </div>
+      <span
+        className={cn(
+          'min-w-0 [overflow-wrap:anywhere]',
+          dead && 'text-content-tertiary line-through',
         )}
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={pending || !hasModels}
-          onClick={() => void run()}
+      >
+        {id}
+      </span>
+      {dead && <span className="flex-none text-meta text-content-tertiary">{t('已下架')}</span>}
+      {check?.phase === 'running' && (
+        <Spinner aria-label={t('测试中')} className="size-3.5 flex-none text-content-tertiary" />
+      )}
+      {check !== undefined && check.phase !== 'running' && (
+        <span
+          data-testid="provider-model-check"
+          className={cn(
+            'flex flex-none items-center gap-1 text-meta tabular-nums',
+            failure === null ? 'text-content-tertiary' : 'text-destructive',
+          )}
         >
-          {pending ? t('测试中…') : t('测试')}
-        </Button>
-      </div>
-    </SettingsRow>
+          <span
+            aria-hidden
+            className={cn(
+              'size-1.5 rounded-full',
+              failure === null ? 'bg-running' : 'bg-destructive',
+            )}
+          />
+          {failure === null
+            ? `${latency ?? 0} ms`
+            : failure === 'unavailable'
+              ? t('没测完')
+              : t(FAILURE_SHORT[failure])}
+        </span>
+      )}
+      {onTest !== undefined && (
+        <IconTooltip
+          label={t('测试 {name}', { name: id })}
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="text-content-tertiary"
+              disabled={check?.phase === 'running'}
+              onClick={onTest}
+            />
+          }
+        >
+          <Play aria-hidden />
+        </IconTooltip>
+      )}
+      {onRemove !== undefined && (
+        <IconTooltip
+          label={t('移除 {name}', { name: id })}
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="text-content-tertiary"
+              disabled={busy}
+              onClick={onRemove}
+            />
+          }
+        >
+          <X aria-hidden />
+        </IconTooltip>
+      )}
+    </span>
   );
+}
+
+function modelsEndpoint(record: ProviderRecord): string {
+  const root = record.baseUrl.replace(/\/+$/, '');
+  return `GET ${/\/v\d+$/.test(root) ? `${root}/models` : `${root}/v1/models`}`;
 }
 
 export function TeamProviderEditor({
@@ -214,35 +317,87 @@ export function TeamProviderEditor({
   actions: ProviderEditActions;
 }) {
   const { t } = useI18n();
-  const [adding, setAdding] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [models, setModels] = useState(record.models);
   const [savedModels, setSavedModels] = useState(record.models);
   const [savingModels, setSavingModels] = useState(false);
+  const [checks, setChecks] = useState<Record<string, ModelCheck>>({});
+  const generation = useRef(0);
+  const connection = `${record.api}|${record.baseUrl}|${record.authHeader}`;
+  const [checkedConnection, setCheckedConnection] = useState(connection);
+  if (checkedConnection !== connection) {
+    generation.current += 1;
+    setCheckedConnection(connection);
+    setChecks({});
+  }
   if (savedModels !== record.models && !savingModels) {
     setSavedModels(record.models);
     setModels(record.models);
   }
   const oauth = isOAuthPreset(record.providerId);
+  const test = oauth ? undefined : actions.test;
   const fire = (body: Parameters<NonNullable<ProviderEditActions['patch']>>[0]) => {
+    if (body.apiKey !== undefined || body.baseUrl !== undefined) {
+      generation.current += 1;
+      setChecks({});
+    }
     void actions.patch?.(body).catch(() => undefined);
   };
   const saveModels = (next: ProviderRecord['models']) => {
-    if (actions.patch === undefined) return;
+    if (actions.patch === undefined) return Promise.resolve(false);
     setModels(next);
     setSavingModels(true);
-    actions
+    return actions
       .patch({ models: next })
-      .catch(() => setModels(record.models))
+      .then(() => true)
+      .catch(() => {
+        setModels(record.models);
+        return false;
+      })
       .finally(() => setSavingModels(false));
   };
-  const addModel = () => {
-    const id = adding.trim();
-    if (id === '' || savingModels) return;
-    setAdding('');
-    if (models.some((m) => m.id === id)) return;
-    saveModels([...models, { id, name: id }]);
+  const runTests = async (ids: readonly string[]) => {
+    if (test === undefined || ids.length === 0) return;
+    const started = generation.current;
+    setChecks((prev) => ({
+      ...prev,
+      ...Object.fromEntries(ids.map((id) => [id, { phase: 'running' }])),
+    }));
+    const queue = [...ids];
+    const worker = async () => {
+      for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+        const model = id;
+        const outcome: ModelCheck = await test(model).then(
+          (result) => ({ phase: 'done', result }),
+          () => ({ phase: 'unavailable' }),
+        );
+        if (generation.current === started) setChecks((prev) => ({ ...prev, [model]: outcome }));
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(TEST_CONCURRENCY, ids.length) }, worker));
   };
+  const removeModel = (id: string) => {
+    void saveModels(models.filter((m) => m.id !== id));
+    setChecks(({ [id]: _, ...rest }) => rest);
+  };
+  const ids = models.map((m) => m.id);
+  const running = ids.filter((id) => checks[id]?.phase === 'running').length;
+  const tested = ids.filter((id) => checks[id] !== undefined && checks[id].phase !== 'running');
+  const failed = ids.filter((id) => failureOf(checks[id]) !== null);
+  const summary =
+    ids.length === 0
+      ? null
+      : running > 0
+        ? t('测试中 {done}/{n}', { done: ids.length - running, n: ids.length })
+        : tested.length > 0
+          ? failed.length > 0
+            ? t('{ok} 个可用 · {failed} 个失败', {
+                ok: tested.length - failed.length,
+                failed: failed.length,
+              })
+            : t('{ok} 个可用', { ok: tested.length })
+          : t('{n} 个', { n: ids.length });
   return (
     <>
       <ProviderEditorHead
@@ -250,61 +405,135 @@ export function TeamProviderEditor({
         name={record.label}
         kind={t(providerKind(record))}
       />
-      <SettingsCard>
-        <SettingsRow label={t('名称')} className="flex-wrap gap-y-2 py-2.5">
-          <CommitInput
-            key={`label:${record.label}`}
-            label={t('名称')}
-            value={record.label}
-            onCommit={(label) => fire({ label })}
-          />
-        </SettingsRow>
-        <SettingsRow label={t('协议')}>{PROTOCOL_LABELS[record.api]}</SettingsRow>
-        <SettingsRow label={t('地址')} className="flex-wrap gap-y-2 py-2.5">
-          <CommitInput
-            key={`base:${record.baseUrl}`}
-            label={t('地址')}
-            value={record.baseUrl}
-            onCommit={(baseUrl) => fire({ baseUrl })}
-          />
-        </SettingsRow>
-        {!oauth && <KeyRow onReplace={(apiKey) => fire({ apiKey })} />}
-        {!oauth && actions.test !== undefined && (
-          <TestRow
-            key={JSON.stringify(record)}
-            onTest={actions.test}
-            hasModels={record.models.length > 0}
-          />
-        )}
-      </SettingsCard>
-      <ProviderSection title={t('模型列表')} hint={t('这里的模型会出现在模型选择器里')}>
-        <SettingsCard>
-          {models.map((model) => (
-            <ProviderModelRow
-              key={model.id}
-              id={model.id}
-              name={model.name !== '' ? model.name : model.id}
-              dead={deadModels.has(model.id)}
-              busy={savingModels}
-              onRemove={() => saveModels(models.filter((m) => m.id !== model.id))}
+      <div className="@container">
+        <div
+          data-testid="provider-connection"
+          className="grid grid-cols-1 gap-3 @sm:grid-cols-2 @3xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)]"
+        >
+          <Field label={t('名称')}>
+            <CommitInput
+              key={`label:${record.label}`}
+              label={t('名称')}
+              value={record.label}
+              className="sm:w-full"
+              onCommit={(label) => fire({ label })}
             />
-          ))}
-          <div className="settings-flat-block flex min-h-11 items-center gap-2 px-4 py-1.5">
-            <Input
-              aria-label={t('添加模型')}
-              placeholder={t('添加模型 ID，回车保存')}
-              className={cn(FORM_CONTROL_CLS, 'w-full')}
-              value={adding}
-              aria-busy={savingModels}
-              readOnly={savingModels}
-              onChange={(event) => setAdding(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') addModel();
-              }}
+          </Field>
+          <Field label={t('协议')}>
+            <span className="flex h-8 items-center truncate text-ui text-foreground">
+              {PROTOCOL_LABELS[record.api]}
+            </span>
+          </Field>
+          <Field label={t('地址')}>
+            <CommitInput
+              key={`base:${record.baseUrl}`}
+              label={t('地址')}
+              value={record.baseUrl}
+              className="font-mono sm:w-full"
+              onCommit={(baseUrl) => fire({ baseUrl })}
             />
+          </Field>
+          {!oauth && (
+            <Field label="API key">
+              <KeyField onReplace={(apiKey) => fire({ apiKey })} />
+            </Field>
+          )}
+        </div>
+      </div>
+      <section data-testid="provider-models" className="flex min-w-0 flex-col gap-2.5">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+          <h3 className="m-0 text-ui font-semibold text-foreground">{t('模型')}</h3>
+          {summary !== null && (
+            <span data-testid="provider-models-summary" className="text-meta text-content-tertiary">
+              {summary}
+            </span>
+          )}
+          <span className="ml-auto flex items-center gap-2 max-sm:w-full max-sm:justify-end">
+            {actions.listUpstream !== undefined && ids.length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => setPicking(true)}>
+                <Download aria-hidden />
+                {t('从上游选择')}
+              </Button>
+            )}
+            {test !== undefined && ids.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="provider-test-all"
+                className="min-w-24"
+                disabled={running > 0}
+                onClick={() => void runTests(ids)}
+              >
+                {running > 0 ? <Spinner aria-hidden /> : <Play aria-hidden />}
+                {running > 0 ? t('测试中') : t('全部测试')}
+              </Button>
+            )}
+          </span>
+        </div>
+        {ids.length === 0 ? (
+          <div className="flex flex-col items-start gap-2.5 py-1">
+            <p className="m-0 text-ui text-content-secondary">
+              {t('还没选模型。从上游拉一份清单来勾选。')}
+            </p>
+            {actions.listUpstream !== undefined && (
+              <Button variant="outline" size="sm" onClick={() => setPicking(true)}>
+                <Download aria-hidden />
+                {t('获取上游模型')}
+              </Button>
+            )}
           </div>
-        </SettingsCard>
-      </ProviderSection>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {models.map((model) => (
+              <ModelChip
+                key={model.id}
+                id={model.id}
+                dead={deadModels.has(model.id)}
+                check={checks[model.id]}
+                busy={savingModels}
+                {...(test === undefined ? {} : { onTest: () => void runTests([model.id]) })}
+                {...(actions.patch === undefined ? {} : { onRemove: () => removeModel(model.id) })}
+              />
+            ))}
+          </div>
+        )}
+        {failed.length > 0 && (
+          <ul
+            data-testid="provider-model-failures"
+            className="m-0 flex list-none flex-col gap-1 p-0"
+          >
+            {failed.map((id) => {
+              const failure = failureOf(checks[id]);
+              const check = checks[id];
+              const status = check?.phase === 'done' ? check.result.httpStatus : null;
+              return (
+                <li key={id} className="flex flex-wrap items-baseline gap-x-2 text-meta">
+                  <code className="text-destructive">{id}</code>
+                  <span
+                    className="text-content-secondary"
+                    title={status === null ? undefined : `HTTP ${status}`}
+                  >
+                    {failure === 'unavailable' || failure === null
+                      ? t('测试没能跑完，请重试。')
+                      : t(FAILURE_SENTENCE[failure])}
+                  </span>
+                  {actions.patch !== undefined && (
+                    <Button
+                      variant="link"
+                      size="xs"
+                      className="h-auto p-0 text-meta"
+                      disabled={savingModels}
+                      onClick={() => removeModel(id)}
+                    >
+                      {t('移除')}
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
       <SettingsSection title={t('管理')}>
         <SettingsDangerZone
           label={t('移除服务商')}
@@ -313,6 +542,24 @@ export function TeamProviderEditor({
           onAction={() => setConfirming(true)}
         />
       </SettingsSection>
+      {actions.listUpstream !== undefined && picking && (
+        <UpstreamModelPicker
+          endpoint={modelsEndpoint(record)}
+          selected={ids}
+          load={actions.listUpstream}
+          onClose={() => setPicking(false)}
+          onSave={(next, names) => {
+            setPicking(false);
+            const byId = new Map(models.map((m) => [m.id, m]));
+            const added = next.filter((id) => !byId.has(id));
+            void saveModels(
+              next.map((id) => byId.get(id) ?? { id, name: names.get(id) ?? id }),
+            ).then((saved) => {
+              if (saved) void runTests(added);
+            });
+          }}
+        />
+      )}
       <AlertDialogShell
         title={t('移除「{name}」？', { name: record.label })}
         ariaLabel={t('移除服务商')}
@@ -349,105 +596,110 @@ export function claudeCodeStatus(
   return { status: '已安装，用团队的 Claude 订阅', tone: 'ok' };
 }
 
-export function ClaudeCodeEditor({
-  source,
-  machineName,
-  status,
-}: {
+export interface ClaudeCodeMachine {
+  machine: MachineRow;
   source: ModelSource | undefined;
-  machineName: string;
   status: string;
+  tone: 'ok' | 'warn' | 'off';
+}
+
+export function ClaudeCodeEditor({
+  machines,
+  all,
+}: {
+  machines: readonly ClaudeCodeMachine[];
+  all: readonly MachineRow[];
 }) {
   const { t } = useI18n();
-  const bin = typeof source?.bin === 'object' && source.bin !== null ? source.bin : null;
+  const installed = machines.filter(
+    (m) => typeof m.source?.bin === 'object' && m.source.bin !== null,
+  );
+  const slots = new Map<string, { slot: string; id: string }>();
+  for (const { source } of installed) {
+    for (const model of source?.models ?? []) {
+      const slot = model.slot ?? model.name;
+      if (!slots.has(`${slot}:${model.id}`))
+        slots.set(`${slot}:${model.id}`, { slot, id: model.id });
+    }
+  }
   return (
     <>
       <ProviderEditorHead
         Mark={ClaudeMark}
         name="Claude Code"
-        kind={t('{machine} 上的 CLI', { machine: machineName })}
-        version={bin?.version}
+        kind={t('执行机上的 CLI · 用团队的 Claude 订阅')}
       />
-      <SettingsCard>
-        <SettingsRow label={t('状态')}>{t(status)}</SettingsRow>
-        <SettingsRow label={t('程序')} valueClassName="min-w-0">
-          <code className="truncate text-meta text-content-secondary">
-            {bin?.path ?? t('未找到')}
-          </code>
-        </SettingsRow>
-        <SettingsRow label={t('配置')} hint={t('模型槽来自这台执行机的这个文件')}>
-          <code className="text-meta text-content-secondary">~/.claude/settings.json</code>
-        </SettingsRow>
-      </SettingsCard>
+      <ProviderSection
+        title={t('执行机')}
+        hint={t('{installed}/{n} 台已装', { installed: installed.length, n: machines.length })}
+      >
+        <SettingsCard>
+          {machines.map(({ machine, source, status, tone }) => {
+            const bin = typeof source?.bin === 'object' && source.bin !== null ? source.bin : null;
+            return (
+              <div
+                key={machine.id ?? machine.name}
+                data-testid="claude-code-machine"
+                data-machine-id={machine.id}
+                data-tone={tone}
+                className="settings-flat-block flex min-h-11 flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-1.5"
+              >
+                <span className="flex min-w-0 flex-auto items-center gap-2">
+                  <span
+                    aria-hidden
+                    className={cn('size-1.5 flex-none rounded-full', TONE_DOT[tone])}
+                  />
+                  <span className="min-w-0 truncate text-ui text-foreground">
+                    <MachineName machine={machine} all={all} compact />
+                  </span>
+                </span>
+                {bin?.version != null && (
+                  <code className="flex-none text-meta text-content-tertiary">v{bin.version}</code>
+                )}
+                <span
+                  className={cn(
+                    'text-meta max-sm:basis-full max-sm:pl-3.5',
+                    tone === 'warn' ? 'text-(--waiting-ink)' : 'text-content-secondary',
+                  )}
+                >
+                  {t(status)}
+                </span>
+              </div>
+            );
+          })}
+        </SettingsCard>
+      </ProviderSection>
       <ProviderSection title={t('模型槽')}>
-        {source === undefined || source.models.length === 0 ? (
+        {slots.size === 0 ? (
           <p className={cn(SETTINGS_HINT_CLS, 'm-0 px-1')}>
-            {source === undefined
-              ? t('这台执行机还没上报 Claude Code 信息。')
+            {installed.length === 0
+              ? t('还没有执行机上报装了 Claude Code。')
               : t(
-                  '在该执行机上写 ~/.claude/settings.json 的 env.ANTHROPIC_*_MODEL 槽后，此处自动展示其模型槽。',
+                  '在执行机上写 ~/.claude/settings.json 的 env.ANTHROPIC_*_MODEL 槽后，此处自动展示其模型槽。',
                 )}
           </p>
         ) : (
-          <SettingsCard>
-            {source.models.map((model) => (
-              <ProviderModelRow
-                key={`${model.slot ?? ''}:${model.id}`}
-                name={model.slot ?? model.name}
-                id={model.id}
-              />
+          <div className="flex flex-wrap gap-1.5">
+            {[...slots.values()].map(({ slot, id }) => (
+              <span
+                key={`${slot}:${id}`}
+                data-testid="claude-code-slot"
+                className="inline-flex h-7 max-w-full items-center gap-2 rounded-md bg-secondary px-2.5 text-ui text-foreground ring-1 ring-border"
+              >
+                <span className="truncate">{slot}</span>
+                {slot !== id && (
+                  <span aria-hidden className="text-content-tertiary">
+                    →
+                  </span>
+                )}
+                {slot !== id && (
+                  <code className="truncate text-meta text-content-tertiary">{id}</code>
+                )}
+              </span>
             ))}
-          </SettingsCard>
+          </div>
         )}
       </ProviderSection>
-    </>
-  );
-}
-
-export function PiEditor({
-  machineName,
-  providerCount,
-  onShowTeam,
-}: {
-  machineName: string;
-  providerCount: number;
-  onShowTeam: () => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <>
-      <ProviderEditorHead
-        Mark={PiMark}
-        name="pi"
-        kind={t('{machine} 上的运行时', { machine: machineName })}
-      />
-      <SettingsCard>
-        <SettingsRow
-          label={t('服务商')}
-          hint={t('pi 步骤用所有执行机的服务商，不读这台执行机的配置')}
-          className="flex-wrap gap-y-2 py-2.5"
-        >
-          <Button variant="outline" size="sm" onClick={onShowTeam}>
-            {t('所有执行机的 {n} 个服务商', { n: providerCount })}
-          </Button>
-        </SettingsRow>
-      </SettingsCard>
-    </>
-  );
-}
-
-export function GeminiEditor({ machineName }: { machineName: string }) {
-  const { t } = useI18n();
-  return (
-    <>
-      <ProviderEditorHead
-        Mark={GeminiMark}
-        name="Gemini CLI"
-        kind={t('{machine} 上的 CLI', { machine: machineName })}
-      />
-      <p className={cn(SETTINGS_HINT_CLS, 'm-0 px-1')}>
-        {t('Gemini CLI 还不上报版本和模型；打开后，这台执行机就会接 Gemini 步骤。')}
-      </p>
     </>
   );
 }

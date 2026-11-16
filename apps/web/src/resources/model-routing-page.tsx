@@ -101,6 +101,7 @@ function RoutingContent() {
       }
     >
       <div className="flex min-w-0 flex-col gap-8 pb-16">
+        <ProvidersSection />
         <QueryBoundary
           query={live ? routingQ : undefined}
           isEmpty={live && routingQ.data === undefined}
@@ -123,7 +124,6 @@ function RoutingContent() {
             </section>
           )}
         </QueryBoundary>
-        <ProvidersSection />
       </div>
     </PageShell>
   );

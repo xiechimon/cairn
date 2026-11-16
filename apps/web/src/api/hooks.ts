@@ -75,6 +75,7 @@ import type {
   TokenUsage,
   TranscriptRow,
   UpdateSkillBody,
+  UpstreamModelsResult,
   UserRecord,
   XaiDevicePollResponse,
   XaiDeviceStartResponse,
@@ -1153,8 +1154,14 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     testProvider: useMutation({
+      mutationFn: (input: { id: string; model: string }) =>
+        api.post<ProviderTestResult>(`/api/teams/${teamId}/providers/${input.id}/test`, {
+          model: input.model,
+        }),
+    }),
+    upstreamModels: useMutation({
       mutationFn: (id: string) =>
-        api.post<ProviderTestResult>(`/api/teams/${teamId}/providers/${id}/test`, {}),
+        api.get<UpstreamModelsResult>(`/api/teams/${teamId}/providers/${id}/upstream-models`),
     }),
     patchProvider: useMutation({
       mutationFn: (input: { id: string; body: PatchProviderBody }) =>

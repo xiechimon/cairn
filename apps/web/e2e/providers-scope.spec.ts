@@ -4,55 +4,24 @@ import { mockLive } from './chief-home-mock';
 const FLEET = '/app/resources/providers?scenario=providers-fleet';
 const NOW = Date.now();
 
-const scopeSelect = (page: Page) => page.getByRole('combobox', { name: '设置作用于' });
-const pickScope = async (page: Page, text: string) => {
-  await scopeSelect(page).click();
-  await page.getByRole('option').filter({ hasText: text }).first().click();
-};
 const instance = (page: Page, id: string) =>
   page.locator(`[data-testid="provider-instance"][data-instance-id="${id}"]`);
 const editor = (page: Page) => page.getByTestId('provider-editor');
 
-test('scope menu: all machines first, one option per machine, offline and Orb marked', async ({
-  page,
-}) => {
+test('one provider list for every Runner: no scope menu, no checked stamp', async ({ page }) => {
   await page.goto(FLEET);
-  await expect(scopeSelect(page)).toContainText('所有执行机');
-  await expect(scopeSelect(page).locator('svg.lucide-server')).toBeVisible();
-  await scopeSelect(page).click();
-  const names = [
-    '所有执行机',
-    'xmonsMac-3574.local',
-    'build-box',
-    'build-box-orb',
-    'old-laptop · 离线',
-    'new-box',
-  ];
-  const options = page.getByRole('option');
-  await expect(options).toHaveCount(names.length);
-  for (const [index, name] of names.entries()) {
-    await expect(options.nth(index)).toHaveAccessibleName(name);
-  }
-  await expect(page.getByRole('option').first().locator('svg.lucide-server')).toBeVisible();
-  const machineOptions = page
-    .getByRole('option')
-    .filter({ has: page.locator('[data-slot="machine-os-icon"]') });
-  await expect(machineOptions).toHaveCount(5);
-  for (const option of await machineOptions.all()) {
-    await expect(option.locator('[data-slot="machine-os-icon"]')).toBeVisible();
-    expect(await option.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
-  }
-  await page.keyboard.press('Escape');
-  await expect(scopeSelect(page)).toContainText('所有执行机');
-  await expect(page.getByText('DESKTOP-OLD')).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: '设置作用于' })).toHaveCount(0);
+  await expect(page.getByTestId('settings-scope')).toHaveCount(0);
+  await expect(page.getByTestId('settings-checked')).toHaveCount(0);
+  await expect(instance(page, 'claude-code')).toBeVisible();
 });
 
-test('team tab: provider rows open an editor; the selection lives in the URL and survives reload', async ({
+test('provider rows open an editor; the selection lives in the URL and survives reload', async ({
   page,
 }) => {
   await page.goto(FLEET);
   const rows = page.getByTestId('provider-instance');
-  await expect(rows).toHaveCount(3);
+  await expect(rows).toHaveCount(4);
   await expect(rows.first()).toHaveAttribute('aria-current', 'true');
   await instance(page, 'provider:prov-relay').getByRole('button').first().click();
   await expect(page).toHaveURL(/item=provider%3Aprov-relay/);
@@ -78,54 +47,41 @@ test('OAuth providers show no API key row; key providers show a write-only key r
 }) => {
   await page.goto(`${FLEET}&item=provider%3Aprov-copilot`);
   await expect(editor(page)).toContainText('OAuth');
-  await expect(editor(page).getByRole('button', { name: '更换 API key' })).toHaveCount(0);
+  await expect(editor(page).getByRole('button', { name: '更换', exact: true })).toHaveCount(0);
+  await expect(editor(page).getByTestId('provider-test-all')).toHaveCount(0);
   await page.goto(`${FLEET}&item=provider%3Aprov-anthropic`);
   await expect(editor(page)).toContainText('Anthropic Messages');
-  await expect(editor(page).getByRole('button', { name: '更换 API key' })).toBeVisible();
+  await expect(editor(page).getByRole('button', { name: '更换', exact: true })).toBeVisible();
 });
 
-test('unknown scope and item fall back to the team tab and its first row', async ({ page }) => {
+test('an unknown item and a leftover scope param fall back to the first row', async ({ page }) => {
   await page.goto(`${FLEET}&scope=gone-machine&item=provider%3Agone`);
-  await expect(scopeSelect(page)).toContainText('所有执行机');
   await expect(page.getByTestId('provider-instance').first()).toHaveAttribute(
     'aria-current',
     'true',
   );
 });
 
-test('machine tab: Claude Code reports version and slots, runs on the team subscription, with no runtime switch', async ({
+test('Claude Code is one row that lists every Runner with its version and state', async ({
   page,
 }) => {
-  await page.goto(FLEET);
-  await pickScope(page, 'build-box-orb');
-  await expect(page).toHaveURL(/scope=fleet-box-orb/);
-  await expect(scopeSelect(page).locator('[data-slot="machine-os-icon"]')).toBeVisible();
+  await page.goto(`${FLEET}&item=claude-code`);
   const cc = instance(page, 'claude-code');
-  await expect(cc).toContainText('v2.1.316');
-  await expect(cc).toContainText('用团队的 Claude 订阅');
-  await expect(cc).not.toContainText('未登录');
+  await expect(cc).toHaveAttribute('aria-current', 'true');
+  await expect(cc).toContainText(/\d+\/5 台执行机已装/);
+  const machines = editor(page).getByTestId('claude-code-machine');
+  await expect(machines).toHaveCount(5);
+  const orb = machines.filter({ hasText: 'build-box-orb' });
+  await expect(orb).toContainText('v2.1.316');
+  await expect(orb).toContainText('用团队的 Claude 订阅');
+  await expect(orb).toHaveAttribute('data-tone', 'ok');
+  const old = machines.filter({ hasText: 'old-laptop' });
+  await expect(old).toContainText('离线');
+  await expect(old).toHaveAttribute('data-tone', 'warn');
+  await expect(machines.filter({ hasText: 'new-box' })).toContainText('还没上报');
+  const slots = editor(page).getByTestId('claude-code-slot');
+  await expect(slots.filter({ hasText: 'default-sonnet' })).toContainText('claude-sonnet-5-5');
   await expect(page.getByTestId('provider-list').getByRole('switch')).toHaveCount(0);
-  await expect(editor(page)).toContainText('/home/u/.local/bin/claude');
-  const slots = editor(page).getByTestId('provider-model');
-  await expect(slots).toHaveCount(2);
-  await expect(slots.first()).toContainText('default-sonnet');
-  await expect(slots.first()).toContainText('claude-sonnet-5-5');
-});
-
-test('offline machine keeps its last report and says it is offline', async ({ page }) => {
-  await page.goto(`${FLEET}&scope=fleet-old`);
-  const cc = instance(page, 'claude-code');
-  await expect(cc).toContainText('离线');
-  await expect(cc).toHaveAttribute('data-tone', 'warn');
-  await expect(editor(page)).toContainText('glm-5.3');
-});
-
-test('machine without a Claude Code report says so instead of guessing', async ({ page }) => {
-  await page.goto(`${FLEET}&scope=fleet-new`);
-  const cc = instance(page, 'claude-code');
-  await expect(cc).toContainText('还没上报');
-  await expect(cc).toHaveAttribute('data-tone', 'off');
-  await expect(instance(page, 'pi')).toHaveAttribute('data-tone', 'ok');
 });
 
 test('empty team: the list offers to add a provider and opens the picker', async ({ page }) => {
@@ -153,7 +109,7 @@ test('phone width: the list sits above the editor and nothing overflows sideways
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
-test('live: provider edits send the agreed requests and the Runner scope writes nothing', async ({ page }) => {
+test('live: provider edits send the agreed requests and touch no Runner', async ({ page }) => {
   const calls: string[] = [];
   let provider = {
     kind: 'custom',
@@ -171,7 +127,8 @@ test('live: provider edits send the agreed requests and the Runner scope writes 
   };
   await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
     const method = route.request().method();
-    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [provider] });
+    if (path === '/api/teams/t1/providers')
+      return json({ presets: [], providers: [provider], canTestConnection: true });
     if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
     if (path === '/api/teams/t1/machines')
       return json([
@@ -190,6 +147,19 @@ test('live: provider edits send the agreed requests and the Runner scope writes 
       calls.push(`PATCH p1 ${JSON.stringify(body)}`);
       provider = { ...provider, ...body };
       return json(provider);
+    }
+    if (path === '/api/teams/t1/providers/p1/upstream-models') {
+      return json({
+        status: 'ok',
+        models: [
+          { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' },
+          { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+        ],
+      });
+    }
+    if (path === '/api/teams/t1/providers/p1/test') {
+      calls.push(`TEST p1 ${route.request().postDataJSON().model}`);
+      return json({ status: 'ok', reason: null, failure: null, httpStatus: null, latencyMs: 412 });
     }
     if (path === '/api/teams/t1/providers/p1' && method === 'DELETE') {
       calls.push('DELETE p1');
@@ -213,47 +183,48 @@ test('live: provider edits send the agreed requests and the Runner scope writes 
   await baseUrl.blur();
   await expect.poll(() => calls).toContain('PATCH p1 {"baseUrl":"https://proxy.example.invalid"}');
 
-  await editor(page).getByRole('button', { name: '更换 API key' }).click();
+  await editor(page).getByRole('button', { name: '更换', exact: true }).click();
   await editor(page).getByLabel('新的 API key').fill('sk-test-new');
   await editor(page).getByRole('button', { name: '保存', exact: true }).click();
   await expect.poll(() => calls).toContain('PATCH p1 {"apiKey":"sk-test-new"}');
 
-  await editor(page).getByLabel('添加模型').fill('claude-opus-5-5');
-  await editor(page).getByLabel('添加模型').press('Enter');
+  await editor(page).getByRole('button', { name: '从上游选择' }).click();
+  const picker = page.getByRole('dialog', { name: '从上游选择模型' });
+  await picker.getByRole('checkbox').nth(1).click();
+  await picker.getByTestId('upstream-save').click();
   await expect
     .poll(() => calls)
     .toContain(
-      'PATCH p1 {"models":[{"id":"claude-haiku-5-5","name":"Claude Haiku 5.5"},{"id":"claude-opus-5-5","name":"claude-opus-5-5"}]}',
+      'PATCH p1 {"models":[{"id":"claude-haiku-5-5","name":"Claude Haiku 5.5"},{"id":"claude-opus-5-5","name":"Claude Opus 5.5"}]}',
     );
+  await expect.poll(() => calls).toContain('TEST p1 claude-opus-5-5');
 
-  await editor(page).getByRole('button', { name: '移除 Claude Haiku 5.5' }).click();
+  await editor(page).getByRole('button', { name: '移除 claude-haiku-5-5' }).click();
   await expect
     .poll(() => calls)
-    .toContain('PATCH p1 {"models":[{"id":"claude-opus-5-5","name":"claude-opus-5-5"}]}');
+    .toContain('PATCH p1 {"models":[{"id":"claude-opus-5-5","name":"Claude Opus 5.5"}]}');
 
   await editor(page).getByRole('button', { name: '移除', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: '移除', exact: true }).click();
   await expect.poll(() => calls).toContain('DELETE p1');
 
-  await pickScope(page, 'box');
-  await expect(instance(page, 'claude-code')).toBeVisible();
-  await expect(page.getByTestId('provider-list').getByRole('switch')).toHaveCount(0);
   expect(calls.filter((call) => call.startsWith('PATCH m1'))).toEqual([]);
 });
 
 const REMOTE = 'Kd8fG2hJ4mN9pQ1rStUvWx3';
 const LOCAL = 'TlZ2sSD4EJCxjNJqVhdo_';
 
-for (const [scenario, scope, status] of [
+for (const [scenario, machine, status] of [
   ['10', REMOTE, '用团队的 Claude 订阅'],
   ['10-cc-loggedout', REMOTE, '用团队的 Claude 订阅'],
   ['10-cc-bin-gone', REMOTE, '未安装'],
-  ['10-cc-missing', LOCAL, '未安装'],
   ['10-cc-noconfig', LOCAL, '已安装，未配置模型槽'],
 ] as const) {
   test(`Claude Code state from the daemon report: ${scenario} reads ${status}`, async ({ page }) => {
-    await page.goto(`/app/resources/providers?scenario=${scenario}&scope=${scope}`);
-    await expect(instance(page, 'claude-code')).toContainText(status);
+    await page.goto(`/app/resources/providers?scenario=${scenario}&item=claude-code`);
+    await expect(
+      editor(page).locator(`[data-testid="claude-code-machine"][data-machine-id="${machine}"]`),
+    ).toContainText(status);
   });
 }
 
@@ -272,7 +243,11 @@ test('live: a second model edit waits for the first and keeps its result', async
     api: 'anthropic-messages',
     authHeader: true,
     compat: { supportsDeveloperRole: false },
-    models: [{ id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' }],
+    models: [
+      { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' },
+      { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+      { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
+    ],
     createdBy: 'u1',
     createdAt: NOW,
     updatedAt: NOW,
@@ -291,23 +266,16 @@ test('live: a second model edit waits for the first and keeps its result', async
   });
   await page.goto('/app/resources/providers');
 
-  const add = editor(page).getByLabel('添加模型');
-  await add.fill('claude-opus-5-5');
-  await add.press('Enter');
+  await editor(page).getByRole('button', { name: '移除 claude-opus-5-5' }).click();
   await expect.poll(() => bodies.length).toBe(1);
-  await expect(editor(page).getByRole('button', { name: '移除 Claude Haiku 5.5' })).toBeDisabled();
-  await expect(add).toHaveAttribute('readonly', '');
+  await expect(editor(page).getByRole('button', { name: '移除 claude-haiku-5-5' })).toBeDisabled();
 
   release();
-  await expect(editor(page).getByRole('button', { name: '移除 Claude Haiku 5.5' })).toBeEnabled();
-  await add.fill('claude-sonnet-5-5');
-  await add.press('Enter');
+  await expect(editor(page).getByRole('button', { name: '移除 claude-haiku-5-5' })).toBeEnabled();
+  await editor(page).getByRole('button', { name: '移除 claude-sonnet-5-5' }).click();
   await expect
     .poll(() => bodies)
-    .toEqual([
-      '["claude-haiku-5-5","claude-opus-5-5"]',
-      '["claude-haiku-5-5","claude-opus-5-5","claude-sonnet-5-5"]',
-    ]);
+    .toEqual(['["claude-haiku-5-5","claude-sonnet-5-5"]', '["claude-haiku-5-5"]']);
 });
 
 test('live: a finished save does not wipe a draft typed into another field', async ({ page }) => {

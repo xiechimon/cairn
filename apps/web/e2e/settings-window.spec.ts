@@ -72,8 +72,12 @@ test('section and scope changes keep the page settings will return to', async ({
   await page.mouse.move(700, 400);
   await page.getByTestId('sidebar-settings').click();
   await navItem(page, 'routing').click();
-  await settings(page).getByRole('combobox', { name: '设置作用于' }).click();
-  await page.getByRole('option', { name: /build-box-orb/ }).click();
+  await settings(page)
+    .locator('[data-testid="provider-instance"][data-instance-id="claude-code"]')
+    .getByRole('button')
+    .first()
+    .click();
+  await expect(page).toHaveURL(/item=claude-code/);
   await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/\/app\?scenario=providers-fleet&pane=tasks&tab=scheduled$/);
 });
@@ -85,7 +89,7 @@ test('sections switch in place, keep their own params, and close goes back to wh
   await page.getByTestId('sidebar-settings').click();
   await navItem(page, 'routing').click();
   await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=providers-fleet/);
-  await expect(settings(page).getByTestId('provider-instance')).toHaveCount(3);
+  await expect(settings(page).getByTestId('provider-instance')).toHaveCount(4);
   await navItem(page, 'machines').click();
   await expect(navItem(page, 'machines')).toHaveAttribute('aria-current', 'page');
   await expect(navItem(page, 'machines')).toHaveAttribute('aria-description', '4/5 台电脑在线');

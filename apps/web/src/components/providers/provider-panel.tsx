@@ -1,9 +1,6 @@
 import { cn } from 'cn';
-import { X } from 'lucide-react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
-import { useI18n } from '../../i18n/provider.js';
 import { SettingsPanel, SettingsSection } from '../settings-list.js';
-import { Badge } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
 
 export type ProviderMark = ComponentType<SVGProps<SVGSVGElement>>;
@@ -169,52 +166,5 @@ export function ProviderSection({
     <SettingsSection title={title} description={hint}>
       {children}
     </SettingsSection>
-  );
-}
-
-export function ProviderModelRow({
-  name,
-  id,
-  dead = false,
-  busy = false,
-  onRemove,
-}: {
-  name: string;
-  id: string;
-  dead?: boolean;
-  busy?: boolean;
-  onRemove?: () => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <div
-      data-testid="provider-model"
-      data-model-id={id}
-      data-liveness={dead ? 'dead' : 'alive'}
-      className={cn(
-        'settings-flat-block flex min-h-11 items-center gap-3 px-4 py-1.5',
-        dead && 'text-content-tertiary',
-      )}
-    >
-      <span className="flex min-w-0 flex-auto flex-wrap items-baseline gap-x-2">
-        <span className={cn('truncate text-ui', dead ? 'line-through' : 'text-foreground')}>
-          {name}
-        </span>
-        {name !== id && <code className="truncate text-meta text-content-tertiary">{id}</code>}
-      </span>
-      {dead && <Badge variant="outline">{t('已下架')}</Badge>}
-      {onRemove !== undefined && (
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="text-content-tertiary"
-          aria-label={t('移除 {name}', { name })}
-          disabled={busy}
-          onClick={onRemove}
-        >
-          <X />
-        </Button>
-      )}
-    </div>
   );
 }
