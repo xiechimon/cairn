@@ -564,6 +564,29 @@ describe('research citation handoff', () => {
     expect(checkedResearchReport(s.db, opened.buildId)).not.toBeNull();
   });
 
+  test('a cited URL ends at full-width punctuation in Chinese prose', async () => {
+    const first = 'https://example.com/a';
+    const second = 'https://example.com/b';
+    const { s, opened } = await world(
+      true,
+      `${claim} 搜索：${first}、${second}（仅搜索摘要，未抓全文）。`,
+    );
+    const checker = openCitationCheck(s.svc, opened.buildId)!;
+    land(
+      s,
+      checker.buildId,
+      receipt([
+        { ...supported, url: first },
+        { ...supported, url: second },
+      ]),
+      'gpt-6.1-sol',
+    );
+    expect(checkedResearchReport(s.db, opened.buildId)?.claims.map((c) => c.url)).toEqual([
+      first,
+      second,
+    ]);
+  });
+
   test('a replacement report cannot reuse the previous attachment audit', async () => {
     const { s, opened } = await world();
     const checker = openCitationCheck(s.svc, opened.buildId)!;
