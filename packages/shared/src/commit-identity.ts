@@ -24,7 +24,7 @@ export interface CommitFacts {
   parents: number;
 }
 
-const COMMIT_HELPER = '~/.cairn/tools/app-token/as-bot.sh git commit';
+const COMMIT_HELPER = 'git commit';
 const LOCAL_COMMIT_EMAIL = 'cairn@localhost';
 
 export function githubNoreplyEmail(account: GithubAccount): string {
@@ -106,7 +106,7 @@ export function commitIdentityViolation(
     isPlatformCommitter(policy, commit.committer)
   )
     return null;
-  return `${commit.sha} is authored by ${describe(commit.author)}; software commits are authored by ${bot.name} or a cloud session and only ${policy.owner.login}'s own commits carry his identity`;
+  return `${commit.sha} is authored by ${describe(commit.author)}; commits must use ${policy.owner.login}, a cloud session or the transitional ${bot.name} identity`;
 }
 
 export function isAgentEnvironment(
@@ -127,11 +127,12 @@ export function localCommitViolation(
     (identity) => identity.email.toLowerCase() === LOCAL_COMMIT_EMAIL,
   );
   if (local)
-    return `${describe(local)} is the identity of a cairn server without a GitHub App identity: set CAIRN_GITHUB_APP_SLUG and CAIRN_GITHUB_APP_BOT_ID on the server, or commit as ${bot.name} with ${COMMIT_HELPER}`;
+    return `${describe(local)} is an unpublished local Cairn identity: configure the product's GitHub user connection, or commit as ${policy.owner.login} with ${COMMIT_HELPER}`;
   if (isAgentEnvironment(policy, env)) {
+    if (isOwner(policy, author) && isOwner(policy, committer)) return null;
     if (sameIdentity(author, bot) && sameIdentity(committer, bot)) return null;
     if (isCloudAgent(policy, author) && isCloudAgent(policy, committer)) return null;
-    return `agent sessions commit as ${bot.name}, not ${describe(author)}: run ${COMMIT_HELPER} ...`;
+    return `agent sessions use the same allowed identity for author and committer: configure ${policy.owner.login}'s registered email and run ${COMMIT_HELPER}, or retain an existing cloud or transitional App identity`;
   }
   for (const identity of [author, committer])
     if (
@@ -139,21 +140,16 @@ export function localCommitViolation(
       !isOwner(policy, identity) &&
       !isCloudAgent(policy, identity)
     )
-      return `${describe(identity)} is not an allowed commit identity: commit as ${policy.owner.login} by hand, or as ${bot.name} with ${COMMIT_HELPER}`;
+      return `${describe(identity)} is not an allowed commit identity: configure ${policy.owner.login}'s registered email and run ${COMMIT_HELPER}`;
   return null;
 }
 
-export function pushViolation(
-  policy: CommitIdentityPolicy,
-  commits: CommitFacts[],
-  env: Record<string, string | undefined>,
-): string | null {
+export function pushViolation(policy: CommitIdentityPolicy, commits: CommitFacts[]): string | null {
   const bot = policyBotIdentity(policy);
-  const agent = isAgentEnvironment(policy, env);
   for (const commit of commits) {
     if (sameIdentity(commit.author, bot) || isCloudAgent(policy, commit.author)) continue;
-    if (!agent && isOwner(policy, commit.author)) continue;
-    return `${commit.sha} by ${describe(commit.author)} is not authored by ${bot.name}: commit with ${COMMIT_HELPER}`;
+    if (isOwner(policy, commit.author)) continue;
+    return `${commit.sha} by ${describe(commit.author)} is not an allowed author: commit as ${policy.owner.login} with ${COMMIT_HELPER}`;
   }
   return null;
 }

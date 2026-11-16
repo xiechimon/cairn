@@ -156,12 +156,11 @@ function installHook(r, name) {
   chmodSync(hook, 0o755);
 }
 
-test('pre-commit: source 3, an agent session committing with the global xiechimon config, is rejected', (t) => {
+test('pre-commit: an authorized agent commits as the owner with ordinary git', (t) => {
   const r = repo(t);
   installHook(r, 'pre-commit');
   const result = r.git(['commit', '-q', '--allow-empty', '-m', 'agent'], owner, owner, agentEnv);
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /as-bot\.sh git commit/);
+  assert.equal(result.status, 0, result.stderr);
 });
 
 test('pre-commit: an agent session committing as the App, and ian by hand, are accepted', (t) => {
@@ -209,7 +208,7 @@ for (const identity of [retiredUser, session])
     assert.equal(r.git(['commit', '-q', '--allow-empty', '-m', 'x'], identity).status, 1);
   });
 
-test('pre-push: an agent pushing a commit it made as ian is told to commit as the App', (t) => {
+test('pre-push: an agent can push both owner and old App commits without rewriting either', (t) => {
   const r = repo(t);
   const remote = makeTestTempDir('commit-identity-remote-');
   t.after(() => releaseTestTempDir(remote));
@@ -218,14 +217,15 @@ test('pre-push: an agent pushing a commit it made as ian is told to commit as th
   r.ok(['push', '-q', 'origin', 'main']);
   installHook(r, 'pre-push');
   r.ok(['commit', '-q', '--allow-empty', '-m', 'as ian'], owner);
-  const pushed = r.git(['push', '-q', 'origin', 'HEAD:refs/heads/feature'], bot, bot, agentEnv);
-  assert.equal(pushed.status, 1);
-  assert.match(pushed.stderr, /as-bot\.sh git commit/);
-  r.ok(['reset', '-q', '--hard', 'HEAD~1']);
   r.ok(['commit', '-q', '--allow-empty', '-m', 'as the App'], bot);
   assert.equal(
-    r.git(['push', '-q', 'origin', 'HEAD:refs/heads/feature'], bot, bot, agentEnv).status,
+    r.git(['push', '-q', 'origin', 'HEAD:refs/heads/feature'], owner, owner, agentEnv).status,
     0,
+  );
+  r.ok(['commit', '-q', '--allow-empty', '-m', 'unattributed'], session);
+  assert.equal(
+    r.git(['push', '-q', 'origin', 'HEAD:refs/heads/feature'], owner, owner, agentEnv).status,
+    1,
   );
 });
 

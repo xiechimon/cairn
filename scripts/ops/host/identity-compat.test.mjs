@@ -20,6 +20,10 @@ const bot = {
   name: 'cairnwright[bot]',
   email: '347615582+cairnwright[bot]@users.noreply.github.com',
 };
+const owner = {
+  name: 'xiechimon',
+  email: '157263579+xiechimon@users.noreply.github.com',
+};
 const retiredUser = {
   name: 'Cairnwright',
   email: '348051526+cairnwright@users.noreply.github.com',
@@ -96,24 +100,23 @@ function host(t) {
   return { home, bare, work, asBot, run, log };
 }
 
-test('as-bot.sh commits as the App for author and committer and adds the co-author trailer once', async (t) => {
+test('the legacy wrapper commits as the owner without adding a self co-author trailer', async (t) => {
   const h = host(t);
   const result = await h.asBot(['git', 'commit', '-q', '--allow-empty', '-m', 'fix: two']);
   assert.equal(result.status, 0, result.stderr);
   const [tip] = h.log('HEAD');
-  assert.ok(tip.startsWith(`${bot.name} <${bot.email}>|${bot.name} <${bot.email}>|fix: two`), tip);
-  assert.equal(tip.split(coAuthor).length, 2, tip);
+  assert.equal(tip, `${owner.name} <${owner.email}>|${owner.name} <${owner.email}>|fix: two`);
 });
 
-test('CAIRN_COAUTHOR set to empty commits autonomous work without a human trailer', async (t) => {
+test('an explicitly requested co-author trailer is retained', async (t) => {
   const h = host(t);
   const result = await h.asBot(['git', 'commit', '-q', '--allow-empty', '-m', 'chore: scheduled'], {
-    CAIRN_COAUTHOR: '',
+    CAIRN_COAUTHOR: coAuthor,
   });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(
     h.log('HEAD')[0],
-    `${bot.name} <${bot.email}>|${bot.name} <${bot.email}>|chore: scheduled`,
+    `${owner.name} <${owner.email}>|${owner.name} <${owner.email}>|chore: scheduled\n\n${coAuthor}`,
   );
 });
 
@@ -126,19 +129,18 @@ test('as-bot.sh git push is a plain push that leaves no temporary refs', async (
   assert.equal(sh(h.bare, ['for-each-ref', 'refs/cairn']), '');
 });
 
-test('sign-commits.sh rewrites every lane commit since main to the App with the trailer', async (t) => {
+test('the retired sign-commits entry point preserves unpublished commits and their authors', async (t) => {
   const h = host(t);
   sh(h.work, ['commit', '-q', '--allow-empty', '-m', 'session: one'], as(session));
   sh(h.work, ['commit', '-q', '--allow-empty', '-m', 'lane: work'], as(retiredUser, bot));
   sh(h.work, ['fetch', '-q', 'origin']);
+  const before = sh(h.work, ['rev-parse', 'HEAD']);
+  const commits = h.log('origin/main..HEAD');
   const result = await h.run('/bin/bash', [join(h.home, 'lanes/sign-commits.sh')]);
   assert.equal(result.status, 0, result.stderr);
-  const commits = h.log('origin/main..HEAD');
+  assert.equal(sh(h.work, ['rev-parse', 'HEAD']), before);
   assert.equal(commits.length, 2);
-  for (const commit of commits) {
-    assert.ok(commit.startsWith(`${bot.name} <${bot.email}>|${bot.name} <${bot.email}>|`), commit);
-    assert.equal(commit.split(coAuthor).length, 2, commit);
-  }
+  assert.deepEqual(h.log('origin/main..HEAD'), commits);
 });
 
 const listFiles = (dir) =>
