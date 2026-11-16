@@ -18,6 +18,7 @@ import { claimPendingChiefStep } from '../src/services/coordinator-steps.js';
 import { claimStep, markPresence } from '../src/services/machines.js';
 import {
   bootServer,
+  insertClaudeSubscription,
   insertMachine,
   issueApiKey,
   postProject,
@@ -62,9 +63,12 @@ function report(login?: {
   } as ClaudeCodeReport;
 }
 
-async function world(): Promise<{ s: TestServer; projectId: string }> {
+async function world(
+  opts: { subscription?: boolean } = {},
+): Promise<{ s: TestServer; projectId: string }> {
   const s = bootServer({ githubFetch: async () => new Response('[]') });
   disposables.push(() => s.dispose());
+  if (opts.subscription === true) insertClaudeSubscription(s);
   const projectId = await postProject(s.app, 'claude-login');
   return { s, projectId };
 }
@@ -214,7 +218,7 @@ describe('machine auth', () => {
   describe.each(['build', 'chief'] as const)('%s claim', (kind) => {
     describe.each(['owner', 'spare'] as const)('%s', (role) => {
       test.each(subscriptionAuthCases)('$name', async ({ auth, noReport }) => {
-        const { s, projectId } = await world();
+        const { s, projectId } = await world({ subscription: true });
         const ownerId = insertMachine(s, {
           name: 'auth-owner',
           claudeCodeReport: {
@@ -258,7 +262,7 @@ describe('machine auth', () => {
           expect(
             s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()?.machineId,
           ).toBe(null);
-        } else if (noReport || auth?.state === 'not-logged-in') {
+        } else if (noReport) {
           expect(claimed).toBeNull();
           expect(s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()).toMatchObject(
             { status: 'pending', machineId: null },
@@ -271,64 +275,37 @@ describe('machine auth', () => {
   });
 });
 
-describe('claimStep and Claude Code login expiry', () => {
-  test('an expired login is not given its pinned claude-code step; the step stays pending', async () => {
-    const { s, projectId } = await world();
-    const expiredId = insertMachine(s, {
-      name: 'expired-host',
-      claudeCodeReport: report({ state: 'expired', expiresAt: Date.now() - 3_600_000 }),
-    });
-    routeSession(s, { machineId: expiredId, provider: 'claude-code' });
-    const stepId = insertBuildStep(s, projectId);
-    expect(await claimAs(s, expiredId)).toBeNull();
-    expect(stepStatus(s, stepId)).toBe('pending');
-  });
+describe('claimStep and the Runner Claude login', () => {
+  const loginReports = () => [
+    report({ state: 'expired', expiresAt: Date.now() - 3_600_000 }),
+    report({ state: 'expiring', expiresAt: Date.now() - 1 }),
+    report({ state: 'unknown', expiresAt: Date.now() - 1 }),
+    report({ state: 'ok', expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 }),
+    report(),
+  ];
 
-  test('a healthy machine still claims the claude-code step pinned to it', async () => {
-    const { s, projectId } = await world();
-    insertMachine(s, {
-      name: 'expired-other',
-      claudeCodeReport: report({ state: 'expired', expiresAt: Date.now() - 3_600_000 }),
-    });
-    const healthyId = insertMachine(s, {
-      name: 'healthy-host',
-      claudeCodeReport: report({ state: 'ok', expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 }),
-    });
-    routeSession(s, { machineId: healthyId, provider: 'claude-code' });
-    const stepId = insertBuildStep(s, projectId);
-    const claimed = await claimAs(s, healthyId);
-    expect(claimed?.step.id).toBe(stepId);
-  });
-
-  test('unknown, missing, and still-valid expiring logins do not block claude-code claim', async () => {
-    const cases = [
-      report({ state: 'unknown', expiresAt: Date.now() - 1 }),
-      report(),
-      report({ state: 'expiring', expiresAt: Date.now() + 2 * 24 * 60 * 60 * 1000 }),
-    ];
-    for (const [index, claudeCodeReport] of cases.entries()) {
-      const { s, projectId } = await world();
-      const machineId = insertMachine(s, { name: `open-${index}`, claudeCodeReport });
+  test('with a team subscription, every Runner login state claims the claude-code step', async () => {
+    for (const [index, claudeCodeReport] of loginReports().entries()) {
+      const { s, projectId } = await world({ subscription: true });
+      const machineId = insertMachine(s, { name: `subscribed-${index}`, claudeCodeReport });
       routeSession(s, { machineId, provider: 'claude-code' });
       const stepId = insertBuildStep(s, projectId);
-      const claimed = await claimAs(s, machineId);
-      expect(claimed?.step.id).toBe(stepId);
+      expect((await claimAs(s, machineId))?.step.id).toBe(stepId);
     }
   });
 
-  test('a clock that has passed blocks even when the stored label is still expiring', async () => {
-    const { s, projectId } = await world();
-    const machineId = insertMachine(s, {
-      name: 'stale-expiring',
-      claudeCodeReport: report({ state: 'expiring', expiresAt: Date.now() - 1 }),
-    });
-    routeSession(s, { machineId, provider: 'claude-code' });
-    const stepId = insertBuildStep(s, projectId);
-    expect(await claimAs(s, machineId)).toBeNull();
-    expect(stepStatus(s, stepId)).toBe('pending');
+  test('without a team subscription, no Runner login state claims the claude-code step', async () => {
+    for (const [index, claudeCodeReport] of loginReports().entries()) {
+      const { s, projectId } = await world();
+      const machineId = insertMachine(s, { name: `unsubscribed-${index}`, claudeCodeReport });
+      routeSession(s, { machineId, provider: 'claude-code' });
+      const stepId = insertBuildStep(s, projectId);
+      expect(await claimAs(s, machineId)).toBeNull();
+      expect(stepStatus(s, stepId)).toBe('pending');
+    }
   });
 
-  test('pi steps on an expired claude-code machine are still claimed', async () => {
+  test('pi steps are claimed without a subscription whatever the Claude login', async () => {
     const { s, projectId } = await world();
     const machineId = insertMachine(s, {
       name: 'expired-pi',
@@ -340,26 +317,17 @@ describe('claimStep and Claude Code login expiry', () => {
     expect(claimed?.step.id).toBe(stepId);
   });
 
-  test('a chief claude-code step is not claimed by an expired login', async () => {
+  test('a chief claude-code step needs a subscription, not a Runner login', async () => {
     const { s } = await world();
     const machineId = insertMachine(s, {
-      name: 'expired-chief',
-      claudeCodeReport: report({ state: 'expired', expiresAt: Date.now() - 3_600_000 }),
+      name: 'signed-in-chief',
+      claudeCodeReport: report({ state: 'ok' }),
     });
     const stepId = insertChief(s, machineId, 'claude-code');
     expect(await claimAs(s, machineId)).toBeNull();
     expect(stepStatus(s, stepId)).toBe('pending');
-  });
-
-  test('a chief step with an unknown login is still claimed', async () => {
-    const { s } = await world();
-    const machineId = insertMachine(s, {
-      name: 'unknown-chief',
-      claudeCodeReport: report({ state: 'unknown', expiresAt: Date.now() - 1 }),
-    });
-    const stepId = insertChief(s, machineId, 'claude-code');
-    const claimed = await claimAs(s, machineId);
-    expect(claimed?.step.id).toBe(stepId);
+    insertClaudeSubscription(s);
+    expect((await claimAs(s, machineId))?.step.id).toBe(stepId);
   });
 });
 
@@ -521,7 +489,7 @@ describe('subscription login takes precedence over expired machine login', () =>
       expect(await piCredentials.text()).not.toContain(token);
     },
   );
-  test('an expired subscription does not bypass expired machine login', async () => {
+  test('an expired subscription does not let a claude-code step run', async () => {
     const { s, projectId } = await world();
     const machineId = insertMachine(s, {
       name: 'expired-both',
@@ -539,7 +507,7 @@ describe('subscription login takes precedence over expired machine login', () =>
   });
 });
 
-test('team-scoped revocation removes future credentials and restores the machine login gate', async () => {
+test('team-scoped revocation removes future credentials and stops claude-code claims', async () => {
   const { s, projectId } = await world();
   const machineId = insertMachine(s, {
     name: 'revoked-subscription',
@@ -698,7 +666,11 @@ describe('several stored subscriptions, one enabled', () => {
     const machineId = insertMachine(s, { name: 'unbound', claudeCodeReport: report() });
     routeSession(s, { machineId, provider: 'claude-code' });
     const stepId = insertBuildStep(s, projectId);
-    expect((await claimAs(s, machineId))?.step.id).toBe(stepId);
+    s.db
+      .update(stepTable)
+      .set({ machineId, status: 'claimed' })
+      .where(eq(stepTable.id, stepId))
+      .run();
     expect(stepRow(s, stepId)?.claudeSubscriptionId).toBeNull();
     await save(s, 'Late', 'a');
     const response = await credentialsOf(s, machineId, stepId);

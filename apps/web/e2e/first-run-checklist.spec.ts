@@ -59,8 +59,8 @@ const hint = (page: Page) => page.getByTestId('composer-setup-hint');
 
 const fresh = (): World => ({ providers: [], machines: [], bound: false, teamPaths: [] });
 const ONLINE = { id: 'm1', name: 'omarchy', online: true };
-const LOCAL_LOGIN = {
-  id: 'machine:m1',
+const SUBSCRIPTION = {
+  id: 'sub-1',
   vendor: 'anthropic',
   kind: 'subscription',
   models: ['claude-sonnet-5'],
@@ -73,7 +73,7 @@ test('a fresh install shows one chip for the first missing step and no card', as
   await expect(chip(page)).toHaveAttribute('data-step', 'models');
   await expect(chip(page)).toHaveText('接入模型来源');
   await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/providers/);
-  await expect(hint(page)).toContainText('Claude Code');
+  await expect(hint(page)).toContainText('Claude 订阅');
   await expect(page.getByTestId('first-run-checklist')).toHaveCount(0);
   await expect(page.getByTestId('chief-gate')).toHaveCount(0);
 });
@@ -94,7 +94,7 @@ test('a model source the Coordinator cannot use still asks for a provider', asyn
   await expect(chip(page)).toHaveAttribute('data-step', 'models');
   await expect(chip(page)).toHaveText('Coordinator 还缺模型');
   await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/providers/);
-  await expect(hint(page)).toContainText('Coordinator 用不了 Claude Code 登录');
+  await expect(hint(page)).toContainText('Coordinator 能用的服务商');
 });
 
 test('a machine coming back online clears the chip', async ({ page }) => {
@@ -183,18 +183,18 @@ test('sending before the Coordinator is ready shows an actionable translated mes
   await expect(page.locator('[data-sonner-toast]')).not.toContainText('chief agent not bound');
 });
 
-test('a machine-local Claude Code login alone leaves the Coordinator without a model', async ({
+test('a Claude subscription the Coordinator cannot run yet leaves it without a model', async ({
   page,
 }) => {
-  await open(page, { ...fresh(), connections: [LOCAL_LOGIN], machines: [ONLINE] });
+  await open(page, { ...fresh(), connections: [SUBSCRIPTION], machines: [ONLINE] });
   await expect(chip(page)).toHaveAttribute('data-step', 'models');
   await expect(chip(page)).toHaveText('Coordinator 还缺模型');
 });
 
-test('an unavailable local login does not count as a model source', async ({ page }) => {
+test('an expired subscription does not count as a model source', async ({ page }) => {
   await open(page, {
     ...fresh(),
-    connections: [{ ...LOCAL_LOGIN, available: false }],
+    connections: [{ ...SUBSCRIPTION, available: false }],
     machines: [ONLINE],
   });
   await expect(chip(page)).toHaveAttribute('data-step', 'models');

@@ -18,6 +18,7 @@ import { sendChiefMessage } from '../src/services/chief.js';
 import { providerHealth } from '../src/services/provider-health.js';
 import {
   bootServer,
+  insertClaudeSubscription,
   issueApiKey,
   seedRoute,
   subscriptionClaudeReport,
@@ -66,6 +67,7 @@ interface ThreadView {
 
 async function setupWorld(fallbackModels: { provider: string; modelId: string }[] | null = null) {
   const s: TestServer = bootServer({ claimHoldMs: 100, pingIntervalMs: 3_600_000 });
+  insertClaudeSubscription(s);
   disposables.push(() => s.dispose());
   const teamId = s.team.id;
   const key = await issueApiKey(s);

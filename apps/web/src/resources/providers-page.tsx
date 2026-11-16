@@ -10,6 +10,7 @@ import {
   toClaudeAccount,
 } from '../api/claude-accounts.js';
 import {
+  hasUsableClaudeSubscription,
   useClaudeSubscriptionSteps,
   useClaudeSubscriptions,
   useDeleteClaudeSubscription,
@@ -157,12 +158,13 @@ function machineEntries(
   machine: MachineRow,
   source: ModelSource | undefined,
   providerCount: number,
+  subscribed: boolean,
   onShowTeam: () => void,
   t: TFunc,
 ): Entry[] {
   const enabled = new Set(machine.enabledRuntimes ?? []);
   const online = machine.online !== false;
-  const claude = claudeCodeStatus(source, online);
+  const claude = claudeCodeStatus(source, online, subscribed);
   const bin = typeof source?.bin === 'object' && source.bin !== null ? source.bin : null;
   return [
     {
@@ -357,6 +359,7 @@ export function ProvidersPage() {
           machine,
           sourceFor(machine, sources),
           providers.length,
+          !live || hasUsableClaudeSubscription(subscriptionsQ.data, now),
           () => setParams({ scope: null, item: null }),
           t,
         );

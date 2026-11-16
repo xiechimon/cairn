@@ -41,23 +41,28 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
     await handle.done;
   });
 
-  test('failure mode 4: runtime step + no local claude credentials → fails before the step, wording names the local machine (#867 T6)', async () => {
+  test('failure mode 4: runtime step without a subscription token fails before the step, even with a local login', async () => {
     const api = new FakeMachineApi();
+    api.claudeSubscriptionToken = undefined;
     const { backend: pi, created: piCreated } = fakeBackend([]);
     const { backend: claude, created: claudeCreated } = fakeBackend([]);
     const { handle, lines } = await boot({
       api,
       backend: pi,
       claudeCodeBackend: claude,
-      claudeCodeAuthProbe: async () => ({ state: 'not-logged-in', provider: 'firstParty' }),
+      claudeCodeAuthProbe: async () => ({
+        state: 'logged-in',
+        method: 'claude.ai',
+        provider: 'firstParty',
+      }),
     });
     await waitFor(() => api.parked !== null);
     api.parked?.(claudeClaimed());
     await waitFor(() => api.doneBodies.length === 1);
     expect(api.doneBodies[0]?.body.status).toBe('failed');
     const msg = api.doneBodies[0]?.body.errorMessage ?? '';
-    expect(msg).toContain('test-mbp');
-    expect(msg).toContain('ANTHROPIC_API_KEY');
+    expect(msg).toContain('claude setup-token');
+    expect(msg).toContain('设置 → 模型服务');
     expect(claudeCreated).toHaveLength(0);
     expect(piCreated).toHaveLength(0);
     expect(lines.some((l) => l === 'Loading claude-code runtime…')).toBe(false);

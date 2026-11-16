@@ -15,6 +15,7 @@ import { claimStep, stepToken } from '../src/services/machines.js';
 import {
   bootServer,
   enrollConnectorRunner,
+  insertClaudeSubscription,
   insertMachine,
   postProject,
   queueConnectorStep,
@@ -25,6 +26,7 @@ import {
 
 async function world() {
   const s = bootServer({ claimHoldMs: 100 });
+  insertClaudeSubscription(s);
   onTestFinished(() => s.dispose());
   const projectId = await postProject(s.app, 'mcp-wire-proj');
   seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model' });
@@ -130,6 +132,7 @@ function coordinatorWorld(connectors: boolean) {
   setCoordinatorInServer(true);
   onTestFinished(() => setCoordinatorInServer(false));
   const s = bootServer({ githubFetch: async () => new Response('[]') });
+  insertClaudeSubscription(s);
   onTestFinished(() => s.dispose());
   const report = {
     installed: true,

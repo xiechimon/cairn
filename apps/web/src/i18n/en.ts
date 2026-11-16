@@ -233,21 +233,19 @@ export const EN: Record<string, string> = {
     'Research reports and other documents show up here once they finish.',
   新建项目: 'New project',
   接入模型来源: 'Connect a model source',
-  '添加模型服务商，或在执行机上登录 Claude Code':
-    'Add a provider, or sign in to Claude Code on a Runner',
+  '添加模型服务商，或添加 Claude 订阅': 'Add a provider, or add a Claude subscription',
   连接一台执行机: 'Connect a Runner',
   'Coordinator 还缺模型': 'The Coordinator needs a model',
-  '添加一个服务商，Coordinator 用不了 Claude Code 登录':
-    'Add a provider; the Coordinator cannot use a Claude Code sign-in',
+  '添加一个 Coordinator 能用的服务商，或 Claude 订阅加装好 Claude Code 的执行机':
+    'Add a provider the Coordinator can use, or a Claude subscription and a Runner with Claude Code',
   'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
   '因为你添加了 Anthropic API key': 'Because you added an Anthropic API key',
   '因为这是最早添加、Coordinator 能直接用的服务商':
     'Because it is the earliest added provider the Coordinator can use',
-  '因为这台电脑登录了 Claude Code，任务直接用订阅额度':
-    'Because this computer is signed in to Claude Code, tasks use your subscription',
-  '因为这台电脑登录了 Codex': 'Because this computer is signed in to Codex',
-  '因为还没有 Claude Code，用最早添加的服务商':
-    'Because there is no Claude Code yet, the earliest added provider is used',
+  '因为你添加了 Claude 订阅，任务直接用订阅额度':
+    'Because you added a Claude subscription, tasks use it',
+  '因为还没有 Claude 订阅，用最早添加的服务商':
+    'Because there is no Claude subscription yet, the earliest added provider is used',
   已保存: 'Saved',
   '和你对话、拆任务、派活': 'Talks with you, breaks work down and hands it out',
   '写代码和做调研的 Agent 默认用它': 'The default for agents that write code and do research',
@@ -259,8 +257,8 @@ export const EN: Record<string, string> = {
   '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
   '订阅已保存，这台电脑装好 Claude\u00a0Code 后会自动用上。现在先添加一个服务商，Coordinator 就能开始工作。':
     'Subscription saved. It will be used once Claude Code is installed on this computer. Add a provider now so the Coordinator can start.',
-  '因为你登录了 Claude 订阅，Coordinator 直接用它':
-    'Because you signed in with a Claude subscription, the Coordinator uses it directly',
+  '因为你添加了 Claude 订阅，Coordinator 直接用它':
+    'Because you added a Claude subscription, the Coordinator uses it directly',
   '先跳过，去主页看看': 'skip for now and look around',
   '欢迎使用 Cairn': 'Welcome to Cairn',
   'Cairn 在这台电脑上跑 Agent，用你自己的模型。配好模型就能开始对话。':
@@ -1011,8 +1009,8 @@ export const EN: Record<string, string> = {
     'Queued: a local project only runs on the Runner that holds it, so this Runner cannot run it ({ahead} ahead)',
   '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）':
     'Queued: Claude is rate limited on the Runner; this continues once the limit lifts ({ahead} ahead)',
-  '排队中：Claude 还没登录——添加 Claude 订阅（终端运行 claude setup-token），或在执行机上运行 claude 登录（前面 {ahead} 个）':
-    'Queued: Claude is not signed in. Add a Claude subscription (run claude setup-token in a terminal) or run claude on the Runner to sign in ({ahead} ahead)',
+  '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型服务（前面 {ahead} 个）':
+    'Queued: the team has no usable Claude subscription. Run claude setup-token in a terminal and add the token under Model services ({ahead} ahead)',
   '排队中：{machine} 的任务沙箱没就绪，接不了任务（前面 {ahead} 个）':
     'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks ({ahead} ahead)',
   '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）':
@@ -1023,8 +1021,6 @@ export const EN: Record<string, string> = {
     'Queued: a local project only runs on the Runner that holds it, so {machine} cannot run it ({ahead} ahead)',
   '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）':
     'Queued: Claude is rate limited on {machine}; this continues once the limit lifts ({ahead} ahead)',
-  '排队中：Claude 还没登录——添加 Claude 订阅（终端运行 claude setup-token），或在 {machine} 上运行 claude 登录（前面 {ahead} 个）':
-    'Queued: Claude is not signed in. Add a Claude subscription (run claude setup-token in a terminal) or run claude on {machine} to sign in ({ahead} ahead)',
   '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始（前面 {ahead} 个）':
     'Queued: the Claude account was switched and this step keeps the old account. Stop it, then continue, to start over on the new account ({ahead} ahead)',
   'Coordinator 规则用的服务商「{name}」还没添加':
@@ -1313,14 +1309,6 @@ export const EN: Record<string, string> = {
   // #1251 机器匹配段（权限 tab 第五组：执行要求写面 + 「哪些机器可跑它」读面）。
   '要求安装 {name}': 'Require {name} installed',
   离线: 'Offline',
-  '{name} 上的 Claude Code 登录将在 {days} 天后过期。在该执行机上运行 `claude auth login` 重新登录。':
-    'Claude Code login on {name} expires in {days## day|# days}. On that Runner run `claude auth login`.',
-  '{name} 上的 Claude Code 登录将在 1 天后过期。在该执行机上运行 `claude auth login` 重新登录。':
-    'Claude Code login on {name} expires in 1 day. On that Runner run `claude auth login`.',
-  '{name} 上的 Claude Code 登录将在不到 1 天内过期。在该执行机上运行 `claude auth login` 重新登录。':
-    'Claude Code login on {name} expires in less than a day. On that Runner run `claude auth login`.',
-  '{name} 上的 Claude Code 登录已过期。在该执行机上运行 `claude auth login` 重新登录。':
-    'Claude Code login on {name} has expired. On that Runner run `claude auth login`.',
   服务器数据库备份: 'Server database backup',
   数据库备份已停止: 'Database backup stopped',
   数据库备份失败: 'Database backup failed',
@@ -1753,7 +1741,8 @@ export const EN: Record<string, string> = {
     'Add an API key, subscription or custom endpoint and its models show up here.',
   还没上报: 'Not reported yet',
   模型列表: 'Models',
-  '已安装，登录状态未知': 'Installed, sign-in unknown',
+  '已安装，添加 Claude 订阅后才能用': 'Installed; add a Claude subscription to use it',
+  '已安装，用团队的 Claude 订阅': "Installed, runs on the team's Claude subscription",
   '{online}/{total} 台电脑在线': '{online} of {total#1 computer|# computers} online',
   '{online} 台在线 · {offline} 台离线（{names}）': '{online} online · {offline} offline ({names})',
   设置分区: 'Settings sections',
@@ -1791,14 +1780,12 @@ export const EN: Record<string, string> = {
     'Move the routing rules pinned to this Runner to another Runner.',
   首选执行机: 'Preferred Runner',
   不固定: 'Any machine',
-  '当前默认：Claude Code（因为有执行机装了 Claude Code）':
-    'Current default: Claude Code (a Runner has Claude Code installed)',
-  '当前默认：Codex（因为有执行机登录了 Codex）':
-    'Current default: Codex (a Runner is signed in to Codex)',
-  '当前默认：{model} · {provider}（因为还没有执行机装 Claude Code，用最早添加的服务商）':
-    'Current default: {model} · {provider} (no Runner has Claude Code, so the first provider you added is used)',
-  '当前没有可用的默认：添加服务商，或在执行机上装 Claude Code':
-    'No default yet: add a provider, or install Claude Code on a Runner',
+  '当前默认：Claude Code（因为团队有 Claude 订阅，执行机也装了 Claude Code）':
+    'Current default: Claude Code (the team has a Claude subscription and a Runner has Claude Code installed)',
+  '当前默认：{model} · {provider}（因为还没有 Claude 订阅或装了 Claude Code 的执行机，用最早添加的服务商）':
+    'Current default: {model} · {provider} (there is no Claude subscription or no Runner with Claude Code, so the first provider you added is used)',
+  '当前没有可用的默认：添加服务商，或添加 Claude 订阅并在执行机上装 Claude Code':
+    'No default yet: add a provider, or add a Claude subscription and install Claude Code on a Runner',
   '当前默认：{model} · {provider}（因为团队有 Anthropic API key）':
     'Current default: {model} · {provider} (the team has an Anthropic API key)',
   '当前默认：{model} · {provider}（因为这是最早添加、Coordinator 能直接用的服务商）':
@@ -2065,12 +2052,10 @@ export const EN: Record<string, string> = {
   '{count} 处 Claude 登录已过期': '{count} Claude logins have expired',
   '{count} 处 Claude 登录即将过期': '{count} Claude logins are about to expire',
   '{expired} 处已过期，{expiring} 处即将过期': '{expired} expired, {expiring} about to expire',
-  '到期前重新登录，任务才不会中断。':
-    'Sign in again before they expire so tasks are not interrupted.',
-  '重新登录前，这些执行机和订阅不会接新任务。':
-    'Until you sign in again, these Runners and subscriptions take no new tasks.',
-  查看执行机: 'View Runners',
-  查看订阅: 'View subscriptions',
+  '到期前换上新的 token，任务才不会中断。':
+    'Add a new token before they expire so tasks are not interrupted.',
+  '换上新的 token 之前，这些订阅不会接新任务。':
+    'Until you add a new token, these subscriptions take no new tasks.',
   待你审阅: 'Ready for review',
   待你回答: 'Needs input',
   已解决: 'Resolved',

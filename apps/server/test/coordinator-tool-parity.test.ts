@@ -9,7 +9,7 @@ import {
 import { CHIEF_DIGEST_REMOTE_TOOLS } from '../src/services/chief-digest.js';
 import { claimStep } from '../src/services/machines.js';
 import { fakeMachineApi } from './coordinator/fake-machine-api.js';
-import { bootServer, insertMachine, seedRoute } from './helpers.js';
+import { bootServer, insertClaudeSubscription, insertMachine, seedRoute } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterEach(() => {
@@ -19,6 +19,7 @@ afterEach(() => {
 describe('the Coordinator tool table is the same on the in-server runtime and on a Runner', () => {
   test('a Runner claim offers exactly the tools the in-server runtime registers, with the same descriptions and schemas', async () => {
     const s = bootServer({ githubFetch: async () => new Response('[]') });
+    insertClaudeSubscription(s);
     disposables.push(() => s.dispose());
     const machineId = insertMachine(s, {
       name: 'parity',

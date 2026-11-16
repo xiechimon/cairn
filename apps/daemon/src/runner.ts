@@ -16,7 +16,6 @@ import { AskChannel } from './ask-channel.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
 import { composeSessionBrief } from './brief-file.js';
-import type { ClaudeCodeAuthProbe } from './claude-code-auth.js';
 import { credentialRedactor, guardCredentialOutputs } from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
 import { type StepJournal, TranscriptBuffer } from './journal.js';
@@ -68,7 +67,6 @@ export interface RunStepDeps {
   heartbeatIntervalMs?: number;
   skillsDir?: string;
   machineName?: string;
-  claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
   otel?: DaemonOtel | null;
   now?: () => number;
 }
@@ -281,14 +279,11 @@ async function runClaimedStep(
     );
     return;
   }
-  const refusal = await agentStepRefusal({
+  const refusal = agentStepRefusal({
     stepKind: claimed.step.kind,
     agentTools: agent.tools,
     runtimeId,
     hasSubscriptionToken: creds.claudeSubscriptionToken !== undefined,
-    authProbe: deps.claudeCodeAuthProbe,
-    machineName: () => deps.machineName ?? hostname(),
-    log: (message) => logger.step(message),
   });
   if (refusal !== null) {
     clearCredentials(creds);

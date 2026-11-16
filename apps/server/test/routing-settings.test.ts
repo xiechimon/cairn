@@ -12,6 +12,7 @@ import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-
 import { createProvider } from '../src/services/providers.js';
 import {
   bootServer,
+  insertClaudeSubscription,
   insertMachine,
   req,
   seedRoute,
@@ -226,6 +227,7 @@ describe('routing rule issues and the one-click fix', () => {
 
   test('machine-unusable: a pin to a Runner without the runtime is flagged, and deleting the Runner makes an open fix stale', async () => {
     const s = bootServer();
+    insertClaudeSubscription(s);
     insertMachine(s, { name: 'cc', claudeCodeReport: subscriptionClaudeReport });
     const piOnly = insertMachine(s, { name: 'pi-only' });
     seedRoute(s, 'session', {
@@ -276,43 +278,45 @@ describe('routing rule issues and the one-click fix', () => {
     expect((await settings(s)).ruleIssues).toEqual([]);
   });
 
-  test('a Codex rule with no provider row runs on a Runner Codex login and is flagged only without one', async () => {
+  test('a Codex rule needs the openai-codex provider row; a Runner Codex login does not count', async () => {
     const s = bootServer();
     const machineId = insertMachine(s);
     seedRoute(s, 'session', { provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
+    const row = s.db.select().from(machineTable).where(eq(machineTable.id, machineId)).get()!;
+    s.db
+      .update(machineTable)
+      .set({ capabilities: { ...row.capabilities!, codexLogin: { state: 'ok' } } })
+      .where(eq(machineTable.id, machineId))
+      .run();
     expect((await settings(s)).ruleIssues).toMatchObject([
       { use: 'session', reason: 'runtime-disabled', runtime: 'pi' },
     ]);
-    const row = s.db.select().from(machineTable).where(eq(machineTable.id, machineId)).get()!;
-    s.db
-      .update(machineTable)
-      .set({ capabilities: { ...row.capabilities!, codexLogin: { state: 'ok' } } })
-      .where(eq(machineTable.id, machineId))
-      .run();
+    addProvider(s, 'openai-codex', {
+      baseUrl: 'https://chatgpt.com/backend-api',
+      models: ['gpt-6.1-sol'],
+    });
     expect((await settings(s)).ruleIssues).toEqual([]);
   });
 
-  test('a capability-routed Session rule is not flagged while the Runner can run Claude Code or Codex', async () => {
+  test('a capability-routed Session rule is not flagged while the Runner can run Claude Code or the team has Codex', async () => {
     const s = bootServer();
     const machineId = insertMachine(s);
-    const row = s.db.select().from(machineTable).where(eq(machineTable.id, machineId)).get()!;
-    s.db
-      .update(machineTable)
-      .set({ capabilities: { ...row.capabilities!, codexLogin: { state: 'ok' } } })
-      .where(eq(machineTable.id, machineId))
-      .run();
+    addProvider(s, 'openai-codex', {
+      baseUrl: 'https://chatgpt.com/backend-api',
+      models: ['gpt-6.1-sol'],
+    });
     seedRoute(s, 'session', { provider: 'claude-code', modelId: 'claude-sonnet-5-5', machineId });
     expect((await settings(s)).ruleIssues).toEqual([]);
     s.db
       .update(machineTable)
-      .set({ capabilities: row.capabilities, claudeCodeReport: subscriptionClaudeReport })
+      .set({ claudeCodeReport: subscriptionClaudeReport })
       .where(eq(machineTable.id, machineId))
       .run();
     seedRoute(s, 'session', { provider: 'openai-codex', modelId: 'gpt-6.1-sol', machineId });
     expect((await settings(s)).ruleIssues).toEqual([]);
-    seedRoute(s, 'review', { provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
+    seedRoute(s, 'review', { provider: 'gone-codex', modelId: 'gpt-6.1-sol' });
     expect((await settings(s)).ruleIssues).toMatchObject([
-      { use: 'review', reason: 'provider-missing', provider: 'openai-codex' },
+      { use: 'review', reason: 'provider-missing', provider: 'gone-codex' },
     ]);
   });
 

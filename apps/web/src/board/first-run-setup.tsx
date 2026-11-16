@@ -163,10 +163,7 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
   const [connectError, setConnectError] = useState<string | null>(null);
   const hasProvider = progress.models.coordinator;
   const subscriptionSaved = setup.connections.some(
-    (connection) =>
-      connection.kind === 'subscription' &&
-      connection.available !== false &&
-      !connection.id.startsWith('machine:'),
+    (connection) => connection.kind === 'subscription' && connection.available !== false,
   );
   const status = hasProvider
     ? t('已添加，Coordinator 能用')
@@ -224,16 +221,14 @@ function coordinatorWhy(reason: CoordinatorDefault['reason'], t: TFunc): string 
   return reason === 'anthropic-key'
     ? t('因为你添加了 Anthropic API key')
     : reason === 'claude-code'
-      ? t('因为你登录了 Claude 订阅，Coordinator 直接用它')
+      ? t('因为你添加了 Claude 订阅，Coordinator 直接用它')
       : t('因为这是最早添加、Coordinator 能直接用的服务商');
 }
 
 function sessionWhy(reason: SessionDefault['reason'], t: TFunc): string {
   return reason === 'claude-code'
-    ? t('因为这台电脑登录了 Claude Code，任务直接用订阅额度')
-    : reason === 'codex-login'
-      ? t('因为这台电脑登录了 Codex')
-      : t('因为还没有 Claude Code，用最早添加的服务商');
+    ? t('因为你添加了 Claude 订阅，任务直接用订阅额度')
+    : t('因为还没有 Claude 订阅，用最早添加的服务商');
 }
 
 function pickOf(

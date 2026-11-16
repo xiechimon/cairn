@@ -19,7 +19,7 @@ const subscriptions = Array.from({ length: 3 }, (_, i) => ({
   createdAt: 1,
 }));
 
-test('five expired machines and three expired subscriptions stay one banner and leave the composer and message area usable at 375x667', async ({
+test('three expired subscriptions stay one banner, expired Runner logins add nothing, and the composer and message area stay usable at 375x667', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 667 });
@@ -32,13 +32,9 @@ test('five expired machines and three expired subscriptions stay one banner and 
   await page.goto('/app');
   const home = page.getByTestId('home-c');
   const banner = home.getByTestId('claude-login-banner');
-  await expect(banner).toContainText('8 处 Claude 登录已过期');
+  await expect(banner).toContainText('3 处 Claude 登录已过期');
   await expect(banner.getByTestId('claude-login-warning')).toHaveCount(0);
-  await expect(banner.getByRole('link', { name: '查看执行机' })).toHaveAttribute(
-    'href',
-    '/app/resources/machines',
-  );
-  await expect(banner.getByRole('link', { name: '查看订阅' })).toHaveAttribute(
+  await expect(banner.getByRole('link', { name: '查看' })).toHaveAttribute(
     'href',
     '/app/resources/providers',
   );

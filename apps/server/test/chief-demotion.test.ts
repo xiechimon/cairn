@@ -15,6 +15,7 @@ import { sweepAbandonedChiefSteps } from '../src/services/chief.js';
 import { claimStep, type MachineDeps } from '../src/services/machines.js';
 import {
   bootServer,
+  insertClaudeSubscription,
   insertMachine,
   postProject,
   req,
@@ -52,6 +53,7 @@ async function setupWorld(
   opts: { homeMachineId?: string | null; bindRoute?: boolean; provider?: string } = {},
 ): Promise<World> {
   const s = bootServer();
+  insertClaudeSubscription(s);
   disposables.push(() => s.dispose());
   const machineAId = insertMachine(s, { name: 'demote-a' });
   const machineBId = insertMachine(s, { name: 'demote-b' });
@@ -248,8 +250,9 @@ describe('#1260 route re-source: chief step destination = the coordinator rule h
     expect((await claimOn(w, w.machineAId))?.step.kind).toBe('chief');
   });
 
-  test('a home machine whose Claude Code is logged out waits until the team has a subscription', async () => {
+  test('a home machine waits until the team has a subscription, whatever its own Claude login', async () => {
     const w = await setupWorld({ provider: 'claude-code' });
+    w.s.db.delete(claudeSubscription).run();
     w.s.db
       .update(machineTable)
       .set({

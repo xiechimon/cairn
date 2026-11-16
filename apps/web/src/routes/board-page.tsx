@@ -154,7 +154,7 @@ export function BoardPage() {
 
   const quotaInfos = quotaBannerInfo(todos);
   const backupWarning = backupQ.data ?? null;
-  const loginWarnings = useClaudeLoginWarnings(machines, now);
+  const loginWarnings = useClaudeLoginWarnings(now);
   const bannerCandidates: { kind: HomeBannerKind; node: ReactNode }[] = [
     ...(backupWarning != null
       ? [{ kind: 'backup' as const, node: <BackupBanner key="backup" notice={backupWarning} /> }]

@@ -23,6 +23,7 @@ import {
 } from '../src/db/schema.js';
 import {
   bootServer,
+  insertClaudeSubscription,
   insertLegacyUserAndTeam,
   issueApiKey,
   postProject,
@@ -98,6 +99,7 @@ interface World {
 
 async function setupWorld(): Promise<World> {
   const s = bootServer({ claimHoldMs: 200 });
+  insertClaudeSubscription(s);
   temps.push('');
   const tokenA = await enroll(s, 'home-mbp');
   const tokenB = await enroll(s, 'home-other');

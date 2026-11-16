@@ -53,8 +53,8 @@ test('the Coordinator needs a routing facade with a model to answer', () => {
 
 test('provider records and available connections are model sources; unavailable ones are not', () => {
   expect(modelSourceCount([{ id: 'p1' }], [])).toBe(1);
-  expect(modelSourceCount([], [{ id: 'machine:m1', available: true }])).toBe(1);
-  expect(modelSourceCount([], [{ id: 'machine:m1', available: false }])).toBe(0);
+  expect(modelSourceCount([], [{ id: 'sub-1', available: true }])).toBe(1);
+  expect(modelSourceCount([], [{ id: 'sub-1', available: false }])).toBe(0);
   expect(modelSourceCount([], [{ id: 'c1' }])).toBe(1);
   expect(modelSourceCount(undefined, [])).toBeUndefined();
 });

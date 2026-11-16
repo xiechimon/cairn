@@ -8,6 +8,7 @@ import { claimStep } from '../src/services/machine-claim.js';
 import { createProvider } from '../src/services/providers.js';
 import {
   bootServer,
+  insertClaudeSubscription,
   insertMachine,
   issueApiKey,
   req,
@@ -15,84 +16,53 @@ import {
   seedSessionRoute,
 } from './helpers.js';
 
-test.each([
-  { report: 'empty', models: [] },
-  { report: 'opus alias', models: [{ id: 'opus', name: 'Opus' }] },
-  { report: 'sonnet alias', models: [{ id: 'sonnet', name: 'Sonnet' }] },
-])(
-  'routing endpoint resolves Claude uses with $report, stored windows and no credentials',
-  async ({ models }) => {
-    const s = bootServer();
-    const path = `/api/teams/${s.team.id}/model-routing`;
-    const empty = await req(s.app, 'GET', path);
-    expect(empty.status).toBe(200);
-    const initial = (await empty.json()) as { edges: RoutingEdge[] };
-    expect(initial.edges.map((edge) => edge.use)).toEqual([
-      'coordinator',
-      'implementation',
-      'review',
-      'mechanical',
-      'eval',
-      'nightly-scan',
-    ]);
-    expect(initial.edges.every((edge) => edge.unavailable === true)).toBe(true);
-    const id = insertMachine(s, {
-      claudeCodeReport: {
-        installed: true,
-        hostname: 'test',
-        models,
-        auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
-      },
-    });
-    const unknownQuota = (await (await req(s.app, 'GET', path)).json()) as {
-      quota: RoutingQuota[];
-    };
-    expect(unknownQuota.quota).toEqual([]);
-    s.db
-      .update(machine)
-      .set({
-        claudeRateLimits: [
-          {
-            subscription: 'five_hour',
-            status: 'allowed',
-            utilization: 0.4,
-            resetsAt: Date.now() + 10000,
-            reportedAt: Date.now(),
-          },
-          {
-            subscription: 'seven_day',
-            status: 'allowed',
-            utilization: 0.6,
-            resetsAt: Date.now() + 100000,
-            reportedAt: Date.now(),
-          },
-        ],
-      })
-      .where(eq(machine.id, id))
-      .run();
-    const body = (await (await req(s.app, 'GET', path)).json()) as {
-      edges: RoutingEdge[];
-      connections: RoutingConnection[];
-      quota: RoutingQuota[];
-    };
-    expect(body.edges[0]).toMatchObject({ connectionId: `machine:${id}` });
-    for (const edge of body.edges.filter((entry) => entry.modelId.startsWith('claude-'))) {
-      expect(edge.connectionId).toBe(`machine:${id}`);
-      expect(edge.unavailable).toBeUndefined();
-    }
-    expect(body.quota).toMatchObject([
-      {
-        connectionId: `machine:${id}`,
-        windows: [
-          { window: '5h', usedPercent: 40 },
-          { window: 'week', usedPercent: 60 },
-        ],
-      },
-    ]);
-    expect(JSON.stringify(body)).not.toMatch(/Cipher|apiKey|tokenHash/);
-    expect((await req(s.app, 'GET', '/api/teams/other/model-routing')).status).toBe(404);
-  },
-);
+test('a Runner Claude login and its rate windows are no routing connection; a stored subscription is', async () => {
+  const s = bootServer();
+  const path = `/api/teams/${s.team.id}/model-routing`;
+  const id = insertMachine(s, {
+    claudeCodeReport: {
+      installed: true,
+      hostname: 'test',
+      models: [],
+      auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
+    },
+  });
+  s.db
+    .update(machine)
+    .set({
+      claudeRateLimits: [
+        {
+          subscription: 'five_hour',
+          status: 'allowed',
+          utilization: 0.4,
+          resetsAt: Date.now() + 10000,
+          reportedAt: Date.now(),
+        },
+      ],
+    })
+    .where(eq(machine.id, id))
+    .run();
+  const signedIn = (await (await req(s.app, 'GET', path)).json()) as {
+    edges: RoutingEdge[];
+    connections: RoutingConnection[];
+    quota: RoutingQuota[];
+  };
+  expect(signedIn.connections).toEqual([]);
+  expect(signedIn.quota).toEqual([]);
+  expect(signedIn.edges.every((edge) => edge.unavailable === true)).toBe(true);
+  const subscriptionId = insertClaudeSubscription(s);
+  const subscribed = (await (await req(s.app, 'GET', path)).json()) as {
+    edges: RoutingEdge[];
+    connections: RoutingConnection[];
+  };
+  expect(subscribed.connections.map((connection) => connection.id)).toEqual([subscriptionId]);
+  for (const edge of subscribed.edges.filter((entry) => entry.modelId.startsWith('claude-'))) {
+    expect(edge.connectionId).toBe(subscriptionId);
+    expect(edge.unavailable).toBeUndefined();
+  }
+  expect(JSON.stringify(subscribed)).not.toMatch(/Cipher|apiKey|tokenHash|test-subscription-token/);
+  expect((await req(s.app, 'GET', '/api/teams/other/model-routing')).status).toBe(404);
+});
 
 test('a non-Claude model using Anthropic messages stays runnable under subscription-only', async () => {
   const s = bootServer();
@@ -193,6 +163,7 @@ test.each([
   '$triggerSource $mode paid Claude step is claimed without a usage opt-in',
   async ({ triggerSource, mode }) => {
     const s = bootServer();
+    insertClaudeSubscription(s);
     const mid = insertMachine(
       s,
       mode === 'native' || mode === 'takeover'
@@ -362,83 +333,29 @@ test.each([
   },
 );
 
-test('known quota stays visible while a machine model report is missing', async () => {
+test.each([
+  { state: 'logged-in' as const, method: 'claude.ai', provider: 'firstParty' },
+  { state: 'logged-in' as const, method: 'oauth_token', provider: 'firstParty' },
+  { state: 'logged-in' as const, method: 'api_key', provider: 'firstParty' },
+  { state: 'not-logged-in' as const, provider: 'firstParty' },
+  { state: 'unknown' as const, reason: 'probe failed' },
+])('a Runner reporting Claude auth $state $method is no routing connection', async (auth) => {
   const s = bootServer();
-  const id = insertMachine(s);
-  s.db
-    .update(machine)
-    .set({
-      claudeRateLimits: [
-        {
-          subscription: 'five_hour',
-          status: 'rejected',
-          utilization: null,
-          resetsAt: null,
-          reportedAt: 1,
-        },
-      ],
-    })
-    .where(eq(machine.id, id))
-    .run();
+  insertMachine(s, { claudeCodeReport: { installed: true, hostname: 'test', models: [], auth } });
   const body = (await (
     await req(s.app, 'GET', `/api/teams/${s.team.id}/model-routing`)
-  ).json()) as { edges: RoutingEdge[]; quota: RoutingQuota[] };
-  expect(body.quota).toEqual([
-    {
-      connectionId: `machine:${id}`,
-      windows: [{ window: '5h', usedPercent: null, resetsAt: null, reportedAt: 1 }],
-    },
-  ]);
-  expect(body.edges.every((edge) => edge.unavailable === true)).toBe(true);
+  ).json()) as { connections: RoutingConnection[]; quota: RoutingQuota[] };
+  expect(body.connections).toEqual([]);
+  expect(body.quota).toEqual([]);
 });
 
 test.each([
-  {
-    auth: { state: 'logged-in' as const, method: 'claude.ai', provider: 'firstParty' },
-    kind: 'subscription',
-  },
-  {
-    auth: { state: 'logged-in' as const, method: 'oauth_token', provider: 'firstParty' },
-    kind: 'subscription',
-  },
-  {
-    auth: { state: 'logged-in' as const, method: 'claude.ai', provider: 'bedrock' },
-    kind: 'api-key',
-  },
-  {
-    auth: { state: 'logged-in' as const, method: 'unknown', provider: 'firstParty' },
-    kind: 'api-key',
-  },
-  { auth: { state: 'unknown' as const, reason: 'probe failed' }, kind: 'api-key' },
+  { state: 'ok', expiry: 'future', online: true },
+  { state: 'expired', expiry: 'past', online: true },
+  { state: 'ok', expiry: 'none', online: false },
 ])(
-  'the routing view labels machine $auth.method/$auth.provider auth as $kind like the claim gate',
-  async ({ auth, kind }) => {
-    const s = bootServer();
-    const id = insertMachine(s, {
-      claudeCodeReport: { installed: true, hostname: 'test', models: [], auth },
-    });
-    const body = (await (
-      await req(s.app, 'GET', `/api/teams/${s.team.id}/model-routing`)
-    ).json()) as {
-      connections: RoutingConnection[];
-    };
-    expect(body.connections.find((entry) => entry.id === `machine:${id}`)?.kind).toBe(kind);
-  },
-);
-
-test.each([
-  { state: 'ok', expiry: 'future', online: true, runtime: true, available: true },
-  { state: 'expired', expiry: 'past', online: true, runtime: true, available: false },
-  { state: 'ok', expiry: 'past', online: true, runtime: true, available: false },
-  { state: 'absent', expiry: 'none', online: true, runtime: true, available: false },
-  { state: 'unknown', expiry: 'none', online: true, runtime: true, available: false },
-  { state: 'missing', expiry: 'none', online: true, runtime: true, available: false },
-  { state: 'ok', expiry: 'none', online: true, runtime: true, available: false },
-  { state: 'ok', expiry: 'future', online: false, runtime: true, available: false },
-  { state: 'ok', expiry: 'future', online: true, runtime: false, available: true },
-])(
-  'machine Codex routing: $state/$expiry online=$online stored pi=$runtime',
-  async ({ state, expiry, online, runtime, available }) => {
+  'a Runner Codex login is no routing connection: $state/$expiry online=$online',
+  async ({ state, expiry, online }) => {
     const s = bootServer();
     const apiKey = await issueApiKey(s);
     const enrolled = await s.app.request('/api/machine/enroll', {
@@ -451,11 +368,6 @@ test.each([
       machineId: string;
       token: string;
     };
-    s.db
-      .update(machine)
-      .set({ enabledRuntimes: runtime ? ['pi'] : ['claude-code'] })
-      .where(eq(machine.id, id))
-      .run();
     const login = {
       state,
       ...(expiry === 'none'
@@ -465,33 +377,14 @@ test.each([
     const presence = await s.app.request('/api/machine/presence', {
       method: 'POST',
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        capabilities: {
-          mcpServers: [],
-          skills: [],
-          ...(state === 'missing' ? {} : { codexLogin: login }),
-        },
-      }),
+      body: JSON.stringify({ capabilities: { mcpServers: [], skills: [], codexLogin: login } }),
     });
     expect(presence.status).toBe(200);
     s.db.update(machine).set({ online }).where(eq(machine.id, id)).run();
     const body = (await (
       await req(s.app, 'GET', `/api/teams/${s.team.id}/model-routing`)
     ).json()) as { connections: RoutingConnection[]; edges: RoutingEdge[] };
-    expect(
-      body.connections.some((connection) => connection.vendor === 'openai' && connection.available),
-    ).toBe(available);
-    if (available) {
-      expect(body.connections).toContainEqual({
-        id: `machine:${id}:codex`,
-        vendor: 'openai',
-        kind: 'subscription',
-        models: ['gpt-6.1-sol'],
-        available: true,
-      });
-      expect(body.edges.find((edge) => edge.use === 'implementation')?.connectionId).toBe(
-        `machine:${id}:codex`,
-      );
-    }
+    expect(body.connections).toEqual([]);
+    expect(body.edges.find((edge) => edge.use === 'implementation')?.unavailable).toBe(true);
   },
 );

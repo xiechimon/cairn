@@ -315,7 +315,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       claudeBackend = createClaudeCodeBackend({
         skills: { skillsDir: config.skillsDir, cwd: config.home },
         onSkillsLog: (msg) => logger.skills(msg),
-        machineName: config.name,
         ...(claudeBin !== null ? { executablePath: claudeBin.path } : {}),
         teamSkillsCacheDir: paths.teamSkillsCacheDir,
         ...(claudeBin !== null ? { executableVersion: claudeBin.version } : {}),
@@ -882,7 +881,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       stepTranscripts,
       stops,
       machineName: config.name,
-      claudeCodeAuthProbe: probeAuthAndRemember,
       ...(daemonOtel !== null ? { otel: daemonOtel } : {}),
       ...(opts.heartbeatIntervalMs !== undefined
         ? { heartbeatIntervalMs: opts.heartbeatIntervalMs }

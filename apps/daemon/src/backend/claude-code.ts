@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, realpathSync } from 'node:fs';
-import { homedir, hostname } from 'node:os';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
   type CanUseTool,
@@ -40,10 +40,7 @@ import type {
 } from '@cairn/shared';
 import { AGENT_TODO_MAX_ITEMS, CLAUDE_TODO_STATUS_STATES, contextTokensOf } from '@cairn/shared';
 import { z } from 'zod';
-import {
-  claudeCodeAuthFailureMessage,
-  claudeCodeTeamSubscriptionAuthFailureMessage,
-} from '../claude-code-auth.js';
+import { claudeCodeTeamSubscriptionAuthFailureMessage } from '../claude-code-auth.js';
 import { credentialRedactor } from '../credential-output.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { BackgroundSubagents, type FinishedSubagent } from './claude-background-subagents.js';
@@ -108,15 +105,9 @@ export interface ClaudeMapState {
   rateLimits: ClaudeRateLimitNotice[];
   modelId?: string;
   authFailed?: boolean;
-  machineName?: string;
-  teamSubscriptionToken: boolean;
 }
 
-export function createClaudeMapState(opts?: {
-  modelId?: string;
-  machineName?: string;
-  teamSubscriptionToken?: boolean;
-}): ClaudeMapState {
+export function createClaudeMapState(opts?: { modelId?: string }): ClaudeMapState {
   return {
     calls: new Map(),
     runningTools: new Set(),
@@ -124,9 +115,7 @@ export function createClaudeMapState(opts?: {
     usage: [],
     sessionId: null,
     rateLimits: [],
-    teamSubscriptionToken: opts?.teamSubscriptionToken ?? false,
     ...(opts?.modelId !== undefined ? { modelId: opts.modelId } : {}),
-    ...(opts?.machineName !== undefined ? { machineName: opts.machineName } : {}),
   };
 }
 
@@ -377,9 +366,7 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
             ? resultText
             : (subtype ?? 'unknown error');
       const message = state.authFailed
-        ? state.teamSubscriptionToken
-          ? claudeCodeTeamSubscriptionAuthFailureMessage(cliMessage)
-          : claudeCodeAuthFailureMessage(state.machineName ?? hostname(), cliMessage)
+        ? claudeCodeTeamSubscriptionAuthFailureMessage(cliMessage)
         : cliMessage;
       if (state.interrupted) {
         return [
@@ -1285,7 +1272,6 @@ export interface ClaudeCodeBackendOpts {
   inOrb?: boolean;
   skills?: { skillsDir: string; cwd: string };
   onSkillsLog?: (msg: string) => void;
-  machineName?: string;
   executablePath?: string;
   teamSkillsCacheDir?: string;
   executableVersion?: string | null;
@@ -1384,11 +1370,7 @@ export class ClaudeCodeBackend implements AgentBackend {
         : {}),
       abortController: abort,
     });
-    const state = createClaudeMapState({
-      modelId: opts.modelId,
-      machineName: this.opts.machineName ?? hostname(),
-      teamSubscriptionToken: sessionEnv?.CLAUDE_CODE_OAUTH_TOKEN !== undefined,
-    });
+    const state = createClaudeMapState({ modelId: opts.modelId });
     const input = new AsyncQueue<SDKUserMessage>();
     if (opts.prompt !== undefined)
       input.push({ ...buildUserMessage(opts.prompt, opts.promptImages), uuid: randomUUID() });

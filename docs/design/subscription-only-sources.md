@@ -39,11 +39,13 @@ Codex: an `openai-codex` row is runnable only when it holds a key (the device-co
 | `coordinator/codex-login.ts` | `readCodexLogin`, `codexLoginAvailable`, `usesHostCodexLogin`, `codexAuthPath` | removed; keeps `CODEX_PROVIDER_ID`, `CODEX_BASE_URL`, `CODEX_API` |
 | `routing-rule-issues.ts` `providerProblem` / `runsRule` | a Runner Codex login satisfied a Codex rule; host login made a keyless row runnable | needs a keyed `openai-codex` row |
 | daemon `step-preflight.ts` `agentStepRefusal` | without a token, probed `claude auth status` and ran on the Runner login | refuses a Claude Code step with no subscription token |
+| daemon `backend/claude-code.ts` auth failure text | named the Runner and told it to `/login` when no token was delivered | always the stored-subscription remedy (a step without a token never starts) |
 | legacy `legacy/agent-layer/dispatch-eligibility.ts` | takes `claudeLoginBlocked` from its caller | unchanged: no production caller |
 | web `api/model-routing.ts` `routingTargets` | a "Claude Code" target from `machine:` connections | removed |
 | web `top-models-card.tsx` `suggestedTopModels` | suggested Claude Code models a Runner reported | suggests them only with a usable subscription |
 | web `first-run-checklist-model.ts` `modelSourceCount` | counted `machine:` connections | counts subscriptions and providers (server no longer sends Runner connections) |
 | web `first-run-setup.tsx`, `routing-settings-page.tsx` copy | "this computer is signed in to Claude Code / Codex" | reasons name the Claude subscription; `codex-login` copy removed |
+| web `composer-setup-hint.tsx` | "add a provider, or sign in to Claude Code on a Runner" | "add a provider, or add a Claude subscription" |
 | web providers page Runner scope `claudeCodeStatus` | showed signed in / signed out | shows install and model state; without a subscription says to add one |
 | web `claude-login-banner.tsx` / `claude-login-warning.ts` | warned about each Runner's login expiry | warns only about stored subscriptions |
 | web `mappers.ts` `claude-logged-out` queue label | "run claude login on the Runner, or add a subscription" | "add a Claude subscription" |

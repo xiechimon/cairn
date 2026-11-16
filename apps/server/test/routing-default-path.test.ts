@@ -5,7 +5,7 @@ import { build, machine, routingRule, step, todo, workPolicy } from '../src/db/s
 import { seedDefaultRouting } from '../src/services/routing-migration.js';
 import { routeForStep } from '../src/services/routing-rules.js';
 import { H, registerChiefHarness, relay } from './chief-harness.js';
-import { subscriptionClaudeReport } from './helpers.js';
+import { insertClaudeSubscription, subscriptionClaudeReport } from './helpers.js';
 
 registerChiefHarness();
 
@@ -35,6 +35,7 @@ function seedTodo(id: string) {
 describe('the default path after the migration', () => {
   test('a Coordinator turn opens a thread as one session step on the default rule', async () => {
     H.s.db.update(machine).set({ claudeCodeReport: subscriptionClaudeReport }).run();
+    insertClaudeSubscription(H.s);
     const id = seedTodo('open-me');
     const out = (await relay('open_thread', { todoId: id })) as { buildId: string };
     const steps = H.s.db.select().from(step).where(eq(step.buildId, out.buildId)).all();

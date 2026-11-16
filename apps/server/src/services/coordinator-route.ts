@@ -1,5 +1,4 @@
 import { and, eq, sql } from 'drizzle-orm';
-import { codexLoginAvailable, usesHostCodexLogin } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
 import { provider, routingRule } from '../db/schema.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
@@ -32,15 +31,12 @@ export function coordinatorRouteVerdict(
   if (rule === undefined) return { refusal: 'no-api-key-provider' };
   if (rule.provider === CLAUDE_CODE_PROVIDER) return null;
   const row = db
-    .select({ baseUrl: provider.baseUrl, keyed: sql<number>`${provider.apiKeyCipher} is not null` })
+    .select({ keyed: sql<number>`${provider.apiKeyCipher} is not null` })
     .from(provider)
     .where(and(eq(provider.teamId, teamId), eq(provider.providerId, rule.provider)))
     .get();
   if (row === undefined) return { refusal: 'rule-provider-missing', rule };
-  const runnable =
-    row.keyed === 1 ||
-    keylessEndpoint(rule.provider) ||
-    (usesHostCodexLogin(rule.provider, row.baseUrl) && codexLoginAvailable());
+  const runnable = row.keyed === 1 || keylessEndpoint(rule.provider);
   if (!runnable) return { refusal: 'rule-provider-has-no-key', rule };
   return { rule };
 }

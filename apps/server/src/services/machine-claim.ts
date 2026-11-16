@@ -61,7 +61,6 @@ import { coordinatorToolDefs } from './coordinator-tool-defs.js';
 import { readDeployLease } from './deploy-lease.js';
 import {
   capabilityGatePasses,
-  claudeCodeLoginBlocked,
   machineRunningCount,
   projectRunningCount,
   runtimeGatePasses,
@@ -235,16 +234,14 @@ function claimLocalTools(agentTools: readonly string[]): string[] {
   return tools;
 }
 
-function claudeCodeLoginBlocks(
+function claudeCodeSubscriptionMissing(
   deps: MachineDeps,
   machineRow: typeof machine.$inferSelect,
   provider: string | null | undefined,
 ): boolean {
-  if (stepRuntimeFor(provider) !== 'claude-code') return false;
-  return claudeCodeLoginBlocked(
-    machineRow.claudeCodeReport,
-    hasActiveClaudeSubscription(deps, machineRow.teamId),
-    nowMs(),
+  return (
+    stepRuntimeFor(provider) === 'claude-code' &&
+    !hasActiveClaudeSubscription(deps, machineRow.teamId)
   );
 }
 
@@ -259,7 +256,7 @@ function buildChiefClaim(
   if (!agentRow.modelId) return null;
   const model = effectiveModel(agentRow, stepRow);
   if (!machineRow || !runtimeGatePasses(machineRow, model.provider)) return null;
-  if (claudeCodeLoginBlocks(deps, machineRow, model.provider)) return null;
+  if (claudeCodeSubscriptionMissing(deps, machineRow, model.provider)) return null;
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
   const bindTeamId = stepRuntimeFor(model.provider) === 'claude-code' ? threadRow.teamId : null;
   if (!claimPendingChiefStep(deps.db, stepRow, machineId, bindTeamId)) return null;

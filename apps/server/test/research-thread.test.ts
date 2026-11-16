@@ -4,7 +4,13 @@ import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js'
 import { build, machine, step, todo } from '../src/db/schema.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { openResearchThread } from '../src/services/research-thread.js';
-import { bootServer, insertMachine, postProject, seedSessionRoute } from './helpers.js';
+import {
+  bootServer,
+  insertClaudeSubscription,
+  insertMachine,
+  postProject,
+  seedSessionRoute,
+} from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterEach(() => {
@@ -13,6 +19,7 @@ afterEach(() => {
 
 async function world() {
   const s = bootServer();
+  insertClaudeSubscription(s);
   insertMachine(s);
   disposables.push(() => s.dispose());
   const projectId = await postProject(s.app, 'research');
