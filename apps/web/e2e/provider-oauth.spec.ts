@@ -4,7 +4,7 @@ const PROVIDERS = '/app/resources/providers?scenario=01';
 
 async function openDialog(page: Page) {
   await page.goto(PROVIDERS);
-  await page.getByRole('button', { name: '添加服务商' }).click();
+  await page.getByTestId('resource-new').click();
   const dialog = page.getByRole('dialog', { name: '添加模型服务' });
   await expect(dialog).toBeVisible();
   return dialog;
