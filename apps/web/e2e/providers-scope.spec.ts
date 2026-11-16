@@ -27,12 +27,14 @@ test('scope menu: all machines first, one option per machine, offline and Orb ma
     'build-box-orb',
     'old-laptop · 离线',
     'new-box',
-  ]);
+  ], { useInnerText: true });
   await expect(page.getByRole('option').first().locator('svg.lucide-server')).toBeVisible();
-  const machineOptions = page.getByRole('option').filter({ has: page.locator('svg.lucide-monitor') });
+  const machineOptions = page
+    .getByRole('option')
+    .filter({ has: page.locator('[data-slot="machine-os-icon"]') });
   await expect(machineOptions).toHaveCount(5);
   for (const option of await machineOptions.all()) {
-    await expect(option.locator('svg.lucide-monitor')).toBeVisible();
+    await expect(option.locator('[data-slot="machine-os-icon"]')).toBeVisible();
     expect(await option.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   }
   await page.keyboard.press('Escape');
@@ -92,7 +94,7 @@ test('machine tab: Claude Code reports version, sign-in state and slots, with no
   await page.goto(FLEET);
   await pickScope(page, 'build-box-orb');
   await expect(page).toHaveURL(/scope=fleet-box-orb/);
-  await expect(scopeSelect(page).locator('svg.lucide-monitor')).toBeVisible();
+  await expect(scopeSelect(page).locator('[data-slot="machine-os-icon"]')).toBeVisible();
   const cc = instance(page, 'claude-code');
   await expect(cc).toContainText('v2.1.316');
   await expect(cc).toContainText('未登录');
