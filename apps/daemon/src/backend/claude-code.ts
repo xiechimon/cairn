@@ -101,6 +101,7 @@ export interface ClaudeMapState {
   interrupted: boolean;
   usage: AgentTokenUsage;
   lastContext?: { model: string; tokens: number };
+  contextLimits?: { model: string; window: number; compactAt?: number };
   sessionId: string | null;
   rateLimits: ClaudeRateLimitNotice[];
   modelId?: string;
@@ -125,6 +126,10 @@ export function createClaudeMapState(opts?: {
     ...(opts?.modelId !== undefined ? { modelId: opts.modelId } : {}),
     ...(opts?.machineName !== undefined ? { machineName: opts.machineName } : {}),
   };
+}
+
+function positiveInt(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
 function toUsageRows(
@@ -336,9 +341,24 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
           ? undefined
           : (usageRows.find((row) => row.model === `${USAGE_MODEL_PREFIX}/${context.model}`) ??
             (usageRows.length === 1 ? usageRows[0] : undefined));
+      const limits =
+        context !== undefined && state.contextLimits?.model === context.model
+          ? state.contextLimits
+          : undefined;
+      const reportedWindow = positiveInt(
+        (msg as { modelUsage?: Record<string, { contextWindow?: unknown }> }).modelUsage?.[
+          contextRow?.model.slice(USAGE_MODEL_PREFIX.length + 1) ?? ''
+        ]?.contextWindow,
+      );
+      const contextWindow = limits?.window ?? reportedWindow;
       const rows = usageRows.map((row) =>
         row === contextRow && context !== undefined
-          ? { ...row, contextTokens: context.tokens }
+          ? {
+              ...row,
+              contextTokens: context.tokens,
+              ...(contextWindow !== undefined ? { contextWindow } : {}),
+              ...(limits?.compactAt !== undefined ? { compactAt: limits.compactAt } : {}),
+            }
           : row,
       );
       state.usage = rows;
@@ -507,6 +527,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
     let turnAfterFinish = false;
     try {
       for await (const msg of this.q) {
+        if (msg.type === 'system' && msg.subtype === 'init') this.requestContextLimits();
         const before = this.state.rateLimits.length;
         const events = mapClaudeMessage(msg, this.state);
         for (const notice of this.state.rateLimits.slice(before)) {
@@ -550,6 +571,23 @@ class ClaudeSessionHandle implements AgentSessionHandle {
       this.finish();
       await this.spans?.flush();
     }
+  }
+
+  private requestContextLimits(): void {
+    this.q.getContextUsage({ detail: 'summary' }).then(
+      (reply) => {
+        const window = positiveInt(reply.rawMaxTokens);
+        if (window === undefined || typeof reply.model !== 'string') return;
+        const compactAt =
+          reply.isAutoCompactEnabled === true ? positiveInt(reply.autoCompactThreshold) : undefined;
+        this.state.contextLimits = {
+          model: reply.model,
+          window,
+          ...(compactAt !== undefined ? { compactAt } : {}),
+        };
+      },
+      () => {},
+    );
   }
 
   private finish(): void {

@@ -342,6 +342,69 @@ describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
     });
   });
 
+  test('a Claude Code turn shows the window and threshold Claude Code measured', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-cc');
+    await finishStep(deps(), machineId, 'turn-cc', {
+      status: 'success',
+      usage: [
+        usage('claude-code/claude-sonnet-5-5', 4, 50_819, {
+          contextTokens: 53_350,
+          contextWindow: 180_000,
+          compactAt: 150_000,
+        }),
+      ],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
+      tokens: 53_350,
+      contextWindow: 180_000,
+      compactAt: 150_000,
+    });
+  });
+
+  test('a Claude Code turn without measured limits shows no Cairn compaction threshold', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-cc');
+    await finishStep(deps(), machineId, 'turn-cc', {
+      status: 'success',
+      usage: [usage('claude-code/claude-sonnet-5-5', 4, 50_819, { contextTokens: 53_350 })],
+    });
+    const context = getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context;
+    expect(context).toMatchObject({ tokens: 53_350, contextWindow: DEFAULT_CONTEXT_WINDOW });
+    expect(context).not.toHaveProperty('compactAt');
+  });
+
+  test('a reclaimed step reporting again replaces tokens and limits together', async () => {
+    const machineId = insertMachine(H.s);
+    const cc = 'claude-code/claude-sonnet-5-5';
+    const limitsOf = () => turnRows().map((r) => [r.contextTokens, r.contextWindow, r.compactAt]);
+    claimedStep(machineId, 'turn-cc');
+    await finishStep(deps(), machineId, 'turn-cc', {
+      status: 'stopped',
+      usage: [
+        usage(cc, 10, 0, { contextTokens: 120_000, contextWindow: 200_000, compactAt: 167_000 }),
+      ],
+    });
+    reclaim(machineId, 'turn-cc');
+    await finishStep(deps(), machineId, 'turn-cc', {
+      status: 'stopped',
+      usage: [usage(cc, 10, 0)],
+    });
+    expect(limitsOf()).toEqual([[120_000, 200_000, 167_000]]);
+    reclaim(machineId, 'turn-cc');
+    await finishStep(deps(), machineId, 'turn-cc', {
+      status: 'stopped',
+      usage: [usage(cc, 10, 0, { contextTokens: 130_000, contextWindow: 200_000 })],
+    });
+    expect(limitsOf()).toEqual([[130_000, 200_000, null]]);
+    reclaim(machineId, 'turn-cc');
+    await finishStep(deps(), machineId, 'turn-cc', {
+      status: 'success',
+      usage: [usage(cc, 10, 0, { contextTokens: 140_000 })],
+    });
+    expect(limitsOf()).toEqual([[140_000, null, null]]);
+  });
+
   test('flag on: the meter shows the last turn context the provider reported, not the running sum', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-a');
