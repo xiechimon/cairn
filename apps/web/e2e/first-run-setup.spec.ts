@@ -90,7 +90,7 @@ test('a team with no projects lands on the setup page, and confirming saves both
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'done');
   await expect(page.getByTestId('first-run-step-2')).toHaveAttribute('data-state', 'now');
   await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('最早添加');
-  await expect(page.getByTestId('first-run-pick-session')).toContainText('Claude Code');
+  await expect(page.getByTestId('first-run-pick-session')).toContainText('Claude 订阅');
   await page.getByTestId('first-run-confirm').click();
   await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
   expect(world.patches[0]?.body).toEqual({ provider: 'p1', modelId: 'claude-opus-5-5' });
