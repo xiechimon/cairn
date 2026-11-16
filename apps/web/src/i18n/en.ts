@@ -1832,6 +1832,10 @@ export const EN: Record<string, string> = {
     'A newer xAI credential is already stored. This sign-in did not replace it.',
   '验证码已过期，请重试。': 'The code expired. Try again.',
   'xAI 登录失败，请重试。': 'xAI sign-in failed. Try again.',
+  'OpenAI Codex 登录被拒绝。': 'OpenAI Codex sign-in was denied.',
+  '已有更新的 OpenAI Codex 凭证，这次登录没有覆盖它。':
+    'A newer OpenAI Codex credential is already stored. This sign-in did not replace it.',
+  'OpenAI Codex 登录失败，请重试。': 'OpenAI Codex sign-in failed. Try again.',
   找不到这个项目: 'That project is not here',
   '它可能已被删除、改名，或你不在它所属的团队。':
     'It may have been deleted, renamed, or you may not be on its team.',

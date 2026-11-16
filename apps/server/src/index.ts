@@ -193,6 +193,7 @@ const app = createApp(
     enrollments: new Map(),
     oauthStates: new Map(),
     xaiDeviceStates: new Map(),
+    codexDeviceStates: new Map(),
     mcpOAuthState: newMcpOAuthState(),
     oauthClient: config.githubOauth,
     githubAppTokenSocket: config.githubAppTokenSocket,

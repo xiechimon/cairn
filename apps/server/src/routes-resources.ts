@@ -52,6 +52,7 @@ import {
   renameClaudeSubscription,
   verifySubscriptionConnection,
 } from './services/claude-subscriptions.js';
+import { pollCodexDeviceLogin, startCodexDeviceLogin } from './services/codex-device-login.js';
 import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
 import { planDocumentDiff } from './services/documents.js';
 import {
@@ -612,6 +613,33 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       throw new HttpError(400, 'state required');
     }
     return c.json(await pollXaiDeviceLogin(xaiDeviceDeps(), { teamId, state: body.state }));
+  });
+
+  const codexDeviceDeps = () => ({
+    db: ctx.db,
+    box: ctx.secretBox,
+    fetch: ctx.oauthFetch ?? globalThis.fetch,
+    states: ctx.codexDeviceStates,
+  });
+
+  app.post('/api/teams/:id/providers/oauth/openai-codex/device', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const started = await startCodexDeviceLogin(codexDeviceDeps(), {
+      teamId,
+      createdBy: ctx.user.id,
+    });
+    return c.json(started);
+  });
+
+  app.post('/api/teams/:id/providers/oauth/openai-codex/device/poll', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = (await jsonBody(c)) as { state?: unknown };
+    if (typeof body.state !== 'string' || body.state === '') {
+      throw new HttpError(400, 'state required');
+    }
+    return c.json(await pollCodexDeviceLogin(codexDeviceDeps(), { teamId, state: body.state }));
   });
 
   app.post('/api/teams/:id/providers/oauth/:preset/authorize', (c) => {
