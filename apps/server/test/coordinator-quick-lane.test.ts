@@ -1,10 +1,12 @@
 import { ASK_USER_QUESTION_KIND, encodeReplyQuote, type TaskRequest } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { chiefMessage, todo as todoTable } from '../src/db/schema.js';
+import { build, chiefMessage, todo as todoTable } from '../src/db/schema.js';
 import { newRecordId, nowMs } from '../src/lib/ids.js';
-import { H, registerChiefHarness, relay } from './chief-harness.js';
-import { postProject, req } from './helpers.js';
+import { requestMerge } from '../src/services/build-merge-request.js';
+import { claimStep } from '../src/services/machine-claim.js';
+import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
+import { insertMachine, postProject, req, seedSessionRoute } from './helpers.js';
 import { seedOwnerMessage } from './owner-message.js';
 
 registerChiefHarness();
@@ -219,5 +221,71 @@ describe('quick lane on create_todo (docs/design/quick-lane.md L1 to L3)', () =>
     const request = requestOf(created.id)!;
     expect(request.lane).toBeUndefined();
     expect(request.projectBasis).toBeUndefined();
+  });
+});
+
+describe('quick lane re-checks the destination at claim and merge (L4, L5)', () => {
+  async function quickTaskOnMachine(projectName?: string) {
+    const machineId = insertMachine(H.s);
+    seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
+    const projectId =
+      projectName === undefined ? H.projectId : await postProject(H.s.app, projectName);
+    const threadId = projectName === undefined ? await openChannel() : H.threadId;
+    const words = seedOwnerMessage(
+      H.s.db,
+      threadId,
+      `add a node.txt${projectName === undefined ? '' : ` to ${projectName}`} that says hello`,
+    );
+    const created = (await quick(threadId, projectId, words)) as { id: string; buildId: string };
+    return { machineId, projectId, words, created };
+  }
+
+  function claim(machineId: string) {
+    return claimStep(toolDeps(), machineId, H.teamId, 0, 'http://localhost');
+  }
+
+  function buildError(buildId: string): string | null {
+    return H.s.db.select().from(build).where(eq(build.id, buildId)).get()!.errorMessage;
+  }
+
+  test('L4: an intact quick task is claimed', async () => {
+    const { machineId, created } = await quickTaskOnMachine();
+    expect(await claim(machineId)).toMatchObject({ todo: { id: created.id } });
+  });
+
+  test('L4: a rewound owner message stops dispatch and fails the task with the reason', async () => {
+    const { machineId, words, created } = await quickTaskOnMachine();
+    H.s.db.delete(chiefMessage).where(eq(chiefMessage.id, words)).run();
+    expect(await claim(machineId)).toBeNull();
+    expect(H.s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get()!.phase).toBe(
+      'failed',
+    );
+    expect(buildError(created.buildId)).toContain('quick lane');
+  });
+
+  test('L4: renaming the project the owner named stops dispatch', async () => {
+    const { machineId, projectId, created } = await quickTaskOnMachine('site');
+    await req(H.s.app, 'PATCH', `/api/projects/${projectId}`, { name: 'web' });
+    expect(await claim(machineId)).toBeNull();
+    expect(buildError(created.buildId)).toContain('quick lane');
+  });
+
+  test('an owner edit of the task text makes it an ordinary task that still dispatches', async () => {
+    const { machineId, created } = await quickTaskOnMachine();
+    const res = await req(H.s.app, 'PATCH', `/api/todos/${created.id}`, {
+      spec: 'add a node.txt that says hi',
+    });
+    expect(res.status).toBe(200);
+    expect(requestOf(created.id)?.lane).toBeUndefined();
+    expect(requestOf(created.id)?.projectBasis).toBeUndefined();
+    expect(await claim(machineId)).toMatchObject({ todo: { id: created.id } });
+  });
+
+  test('L5: a merge request on a quick task whose message was rewound is refused', async () => {
+    const { words, created } = await quickTaskOnMachine();
+    H.s.db.delete(chiefMessage).where(eq(chiefMessage.id, words)).run();
+    const error = await requestMerge(toolDeps(), created.buildId).catch((e: unknown) => e);
+    expect(statusOf(error)).toBe(409);
+    expect(String((error as Error).message)).toContain('quick lane');
   });
 });

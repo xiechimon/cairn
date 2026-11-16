@@ -43,7 +43,7 @@ type TaskRequest = {
 };
 ```
 
-Both are written once by the request service at creation and never change. Moving the task to another project (`update_todo projectId`) clears `lane` and `projectBasis` in the same transaction, so a moved task runs as an ordinary task.
+Both are written once by the request service at creation and never change. Moving the task to another project (`update_todo projectId` or the board) clears `lane` and `projectBasis` in the same write, and so does an owner edit of the task text, which replaces the cited segments; a moved or edited task runs as an ordinary task.
 
 ## Paths that read or write the lane
 

@@ -55,6 +55,7 @@ import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.j
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
 import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
+import { quickLaneRefusal } from './coordinator-request.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
 import { coordinatorToolDefs } from './coordinator-tool-defs.js';
@@ -473,6 +474,11 @@ async function tryClaim(
     if (!stillAuthorized()) return null;
     if (shipRefusal !== null) {
       failStepWithEvents(deps, cand.stepRow, `Ship refused: ${shipRefusal}`);
+      continue;
+    }
+    const laneRefusal = quickLaneRefusal(db, cand.todoRow);
+    if (laneRefusal !== null) {
+      failStepWithEvents(deps, cand.stepRow, laneRefusal);
       continue;
     }
     const localMerge = parseLocalMergeInstruction(cand.stepRow.prompt);
