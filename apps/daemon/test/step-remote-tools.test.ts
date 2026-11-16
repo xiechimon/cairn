@@ -3,13 +3,18 @@ import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { RemoteToolDef } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { stepRemoteToolExecutor, type VerifyEvidenceUploads } from '../src/step-remote-tools.js';
+import {
+  COMPUTER_TOOL_RELAY_TIMEOUT_MS,
+  stepRemoteToolExecutor,
+  TAKEOVER_RELAY_TIMEOUT_MS,
+  type VerifyEvidenceUploads,
+} from '../src/step-remote-tools.js';
 import { testTempDir } from './test-temp-dir.js';
 
 interface Relayed {
   name: string;
   params: Record<string, unknown>;
-  opts: { replaySafe?: boolean } | undefined;
+  opts: { replaySafe?: boolean; toolCallId?: string; timeoutMs?: number } | undefined;
 }
 
 function harness(opts: {
@@ -67,6 +72,22 @@ describe('stepRemoteToolExecutor', () => {
     await h.execute('search_memory', { q: 'x' });
     await h.execute('send_message', { text: 'hi' });
     expect(h.relayed.map((r) => r.opts)).toEqual([{ replaySafe: true }, {}]);
+  });
+
+  test('browser tools and request_takeover carry a fresh call id and a timeout that outlasts a handoff', async () => {
+    const h = harness({});
+    await h.execute('browser_act', { actions: [{ kind: 'click', ref: '@e1' }] });
+    await h.execute('browser_act', { actions: [{ kind: 'click', ref: '@e1' }] });
+    await h.execute('request_takeover', { reason: 'captcha' });
+    const [first, second, handoff] = h.relayed.map((r) => r.opts);
+    expect(first?.toolCallId).toBeTruthy();
+    expect(second?.toolCallId).toBeTruthy();
+    expect(first?.toolCallId).not.toBe(second?.toolCallId);
+    expect(first?.timeoutMs).toBe(COMPUTER_TOOL_RELAY_TIMEOUT_MS);
+    expect(handoff?.timeoutMs).toBe(TAKEOVER_RELAY_TIMEOUT_MS);
+    expect(TAKEOVER_RELAY_TIMEOUT_MS).toBeGreaterThan(15 * 60_000);
+    await h.execute('send_message', { text: 'hi' });
+    expect(h.relayed.at(-1)?.opts).toEqual({});
   });
 
   test('attach_file uploads the file content when attachments are allowed', async () => {
