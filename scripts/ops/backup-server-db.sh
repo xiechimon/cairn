@@ -6,7 +6,7 @@ usage() {
   cat >&2 <<'EOF'
 usage: backup-server-db.sh --db <server.db> --out <dir> [--keep N]
          [--attachments <dir> --attachments-out <dir>] [--coordinator <dir> --coordinator-out <dir>]
-         [--skills <dir> --skills-out <dir>]
+         [--skills <dir> --skills-out <dir>] [--repos <dir> --repos-out <dir>]
          [--remote <rsync destination>]
 
   --db               live server DB, copied with sqlite3 .backup and checked with integrity_check
@@ -21,8 +21,12 @@ usage: backup-server-db.sh --db <server.db> --out <dir> [--keep N]
                      newer than the DB copy is a reconcile case at the next boot, never a restore failure
   --skills           Cairn skills directory (<CAIRN_HOME>/skills); written as --skills-out/skills-<UTC timestamp>.tar.gz,
                      keeping the newest --keep; the source is only read
+  --repos            hosted git repositories (<server data dir>/repos, laid out as <team>/<name>.git); each is
+                     written as a verified git bundle --repos-out/repos-<UTC timestamp>/<team>/<name>.bundle with
+                     its HEAD branch in <name>.head, keeping the newest --keep runs; the sources are only read
   --remote           existing rsync destination root (for example dmit-backup:); receives db/ and attachments/
-                     with no remote shell, no deletes and no overwrites; the receiver rotates its own copies
+                     and every other store given, with no remote shell, no deletes and no overwrites; the
+                     receiver rotates its own copies
 
 secretbox.key and *.pem are never copied or pushed. A copy name that already exists fails the run.
 A failed step exits non-zero and names the step.
@@ -38,12 +42,14 @@ COORDINATOR=""
 COORDINATOR_OUT=""
 SKILLS=""
 SKILLS_OUT=""
+REPOS=""
+REPOS_OUT=""
 REMOTE=""
 KEEP=48
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --db | --out | --attachments | --attachments-out | --coordinator | --coordinator-out | --skills | --skills-out | --remote | --keep)
+    --db | --out | --attachments | --attachments-out | --coordinator | --coordinator-out | --skills | --skills-out | --repos | --repos-out | --remote | --keep)
       [ $# -ge 2 ] && [[ "$2" != -* ]] || { echo "$1 requires a value" >&2; usage; }
       case "$1" in
         --db) DB="$2" ;;
@@ -54,6 +60,8 @@ while [ $# -gt 0 ]; do
         --coordinator-out) COORDINATOR_OUT="$2" ;;
         --skills) SKILLS="$2" ;;
         --skills-out) SKILLS_OUT="$2" ;;
+        --repos) REPOS="$2" ;;
+        --repos-out) REPOS_OUT="$2" ;;
         --remote) REMOTE="$2" ;;
         --keep) KEEP="$2" ;;
       esac
@@ -81,6 +89,11 @@ if [[ -n "$SKILLS" && -z "$SKILLS_OUT" || -z "$SKILLS" && -n "$SKILLS_OUT" ]]; t
   usage
 fi
 
+if [[ -n "$REPOS" && -z "$REPOS_OUT" || -z "$REPOS" && -n "$REPOS_OUT" ]]; then
+  echo "--repos and --repos-out go together" >&2
+  usage
+fi
+
 ts="$(date -u +%Y%m%dT%H%M%SZ)"
 
 fail() {
@@ -96,6 +109,9 @@ if [ -n "$ATTACHMENTS$REMOTE" ]; then
   command -v rsync >/dev/null || fail "rsync not on PATH"
 fi
 [ -z "$ATTACHMENTS" ] || [ -d "$ATTACHMENTS" ] || fail "attachments not found: $ATTACHMENTS"
+if [ -n "$REPOS" ]; then
+  command -v git >/dev/null || fail "git not on PATH"
+fi
 
 SECRETS=(--exclude=secretbox.key --exclude='*.pem')
 if command -v sha256sum >/dev/null; then SHA256=(sha256sum); else SHA256=(shasum -a 256); fi
@@ -157,6 +173,42 @@ if [ -n "$SKILLS" ]; then
       while IFS= read -r f; do rm -f -- "$f" || exit 1; done
   ) || fail "rotate $SKILLS_OUT"
   echo "[$ts] skills archived: $archive"
+fi
+
+if [ -n "$REPOS" ]; then
+  run_dir="$REPOS_OUT/repos-$ts"
+  [ ! -e "$run_dir" ] || fail "$run_dir already exists"
+  mkdir -p "$tmp/repos" || fail "create a scratch dir for hosted repos"
+  bundled=0
+  if [ -d "$REPOS" ]; then
+    for src in "$REPOS"/*/*.git; do
+      [ -d "$src" ] || continue
+      team="$(basename "$(dirname "$src")")"
+      repo="$(basename "$src" .git)"
+      copy="$tmp/repos/$team/$repo"
+      mkdir -p "$tmp/repos/$team" || fail "create $tmp/repos/$team"
+      git -C "$src" symbolic-ref -q HEAD > "$copy.head" || fail "read HEAD of hosted repo $team/$repo"
+      if [ -z "$(git -C "$src" for-each-ref --count=1 --format='%(refname)')" ]; then
+        : > "$copy.empty"
+      else
+        git -C "$src" bundle create "$copy.bundle" --all 2> "$tmp/bundle.err" ||
+          fail "bundle hosted repo $team/$repo: $(cat "$tmp/bundle.err")"
+        git -C "$src" bundle verify "$copy.bundle" > /dev/null 2> "$tmp/bundle.err" ||
+          fail "verify bundle of hosted repo $team/$repo: $(cat "$tmp/bundle.err")"
+      fi
+      bundled=$((bundled + 1))
+    done
+  else
+    echo "[$ts] no hosted repos yet: $REPOS"
+  fi
+  mkdir -p "$REPOS_OUT" || fail "create $REPOS_OUT"
+  mv "$tmp/repos" "$run_dir" || fail "write $run_dir"
+  (
+    cd "$REPOS_OUT" &&
+      { ls -1d repos-*/ 2>/dev/null || true; } | sort -r | tail -n +$((KEEP + 1)) |
+      while IFS= read -r d; do rm -rf -- "$d" || exit 1; done
+  ) || fail "rotate $REPOS_OUT"
+  echo "[$ts] hosted repos bundled: $bundled"
 fi
 
 if [ -n "$ATTACHMENTS" ]; then
@@ -230,6 +282,9 @@ if [ -n "$REMOTE" ]; then
   fi
   if [ -n "$SKILLS" ]; then
     "${push[@]}" "$SKILLS_OUT/" "${dest}skills/" || fail "push skills to ${dest}skills/"
+  fi
+  if [ -n "$REPOS" ]; then
+    "${push[@]}" "$REPOS_OUT/" "${dest}repos/" || fail "push hosted repos to ${dest}repos/"
   fi
   echo "[$ts] pushed to $dest"
 fi
