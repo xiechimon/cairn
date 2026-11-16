@@ -22,6 +22,7 @@ import { applyBuildStepAction, sweepPlanAutoConfirm } from '../src/services/buil
 import { confirmBuild } from '../src/services/chief-tools.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
+import { newMcpOAuthState } from '../src/services/mcp-servers.js';
 import { req } from './helpers.js';
 
 const cleanups: (() => void)[] = [];
@@ -54,6 +55,7 @@ function world() {
     enrollments: new Map(),
     oauthStates: new Map(),
     xaiDeviceStates: new Map(),
+    mcpOAuthState: newMcpOAuthState(),
     oauthClient: null,
     authToken: null,
     reposDir: dir,
@@ -204,6 +206,7 @@ test('an eligible plan is confirmed by the first sweep after a restart, exactly 
   expect(w.phase()).toBe('building');
   sweepPlanAutoConfirm(w.deps);
   expect(w.db.select().from(step).all()).toHaveLength(1);
+  expect(w.db.select().from(step).all()[0]?.byPerson).toBe(false);
   expect((await w.plans())[0]?.autoApproveAt).toBeNull();
 });
 
@@ -227,6 +230,7 @@ test('pause is idempotent, persists across restart, and manual approval still wo
     202,
   );
   expect(w.phase()).toBe('building');
+  expect(w.db.select().from(step).all()[0]?.byPerson).toBe(true);
 });
 
 test('pause only targets the current plan of the current build at confirmation', async () => {

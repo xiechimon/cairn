@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { afterEach, test } from 'node:test';
-import { checkSilentReverts } from './silent-revert-gate.mjs';
+import { checkSilentReverts, listMergedPulls } from './silent-revert-gate.mjs';
+import { makeTestTempDir } from './test-tmpdir.mjs';
+
+const GATE = new URL('./silent-revert-gate.mjs', import.meta.url).pathname;
 
 const roots = [];
 afterEach(() => {
@@ -258,4 +261,116 @@ test('a removed line beginning with two dashes is content, not a patch header', 
     }).some((failure) => failure.text === '--retry'),
     true,
   );
+});
+
+const FAKE_GH = `#!/usr/bin/env node
+const { appendFileSync, readFileSync } = require('node:fs');
+const args = process.argv.slice(2);
+const body = 'x'.repeat(30000);
+const pulls = JSON.parse(readFileSync(process.env.FAKE_GH_FIXTURE, 'utf8'));
+const full = (items) => items.map((pull) => ({ ...pull, title: 'closed pull request', body }));
+if (args.includes('--paginate')) {
+  process.stdout.write(JSON.stringify([full(pulls)]));
+} else {
+  const value = (name) => Number(args.find((arg) => arg.startsWith(name + '='))?.slice(name.length + 1));
+  const page = value('page');
+  const size = value('per_page');
+  appendFileSync(process.env.FAKE_GH_LOG, page + '\\n');
+  process.stdout.write(JSON.stringify(full(pulls.slice((page - 1) * size, page * size))));
+}
+`;
+
+function manyClosedPulls(h) {
+  const now = Date.now();
+  const pulls = Array.from({ length: 2500 }, (_, i) => ({
+    number: 10_000 + i,
+    merged_at: new Date(now - i * 60_000).toISOString(),
+    merge_commit_sha: 'f'.repeat(40),
+    updated_at: new Date(
+      i <= 150 ? now - i * 1000 : now - 3 * 86_400_000 - i * 60_000,
+    ).toISOString(),
+  }));
+  pulls[150] = { ...pulls[150], number: 1786, merge_commit_sha: h.merged };
+  const dir = makeTestTempDir('cairn-4883-');
+  roots.push(dir);
+  writeFileSync(join(dir, 'gh'), FAKE_GH);
+  chmodSync(join(dir, 'gh'), 0o755);
+  writeFileSync(join(dir, 'pulls.json'), JSON.stringify(pulls));
+  writeFileSync(join(dir, 'pages.log'), '');
+  writeFileSync(
+    join(dir, 'event.json'),
+    JSON.stringify({
+      pull_request: {
+        number: 4883,
+        body: '',
+        base: { sha: h.merged },
+        head: { sha: h.head },
+      },
+    }),
+  );
+  const env = {
+    ...process.env,
+    PATH: `${dir}${delimiter}${process.env.PATH}`,
+    FAKE_GH_FIXTURE: join(dir, 'pulls.json'),
+    FAKE_GH_LOG: join(dir, 'pages.log'),
+    GITHUB_EVENT_PATH: join(dir, 'event.json'),
+    GITHUB_REPOSITORY: 'owner/repo',
+  };
+  return { dir, env };
+}
+
+test('with thousands of closed pull requests the one-shot listing overflows its buffer', () => {
+  const { env } = manyClosedPulls(history());
+  assert.throws(
+    () =>
+      execFileSync('gh', ['api', '--paginate', '--slurp', 'repos/owner/repo/pulls'], {
+        env,
+        encoding: 'utf8',
+        maxBuffer: 64 * 1024 * 1024,
+      }),
+    { code: 'ENOBUFS' },
+  );
+});
+
+test('with thousands of closed pull requests the gate reads pages only back to the merge base', () => {
+  const h = history();
+  const { dir, env } = manyClosedPulls(h);
+  const run = spawnSync(process.execPath, [GATE], { cwd: h.cwd, env, encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, /0 unexplained removals/);
+  assert.deepEqual(readFileSync(join(dir, 'pages.log'), 'utf8').trim().split('\n'), ['1', '2']);
+});
+
+test('merged pull requests come from every page newer than the merge base, without the pull request itself', () => {
+  const since = Date.parse('2026-11-10T00:00:00Z');
+  const at = (day) => `2026-11-${day}T00:00:00Z`;
+  const pages = [
+    Array.from({ length: 100 }, (_, i) => ({
+      number: i + 1,
+      merged_at: i === 1 ? null : at(14),
+      updated_at: at(14),
+    })),
+    Array.from({ length: 100 }, (_, i) => ({
+      number: i + 101,
+      merged_at: at(12),
+      updated_at: i === 0 ? at(12) : at('05'),
+    })),
+    [{ number: 999, merged_at: at(11), updated_at: at(11) }],
+  ];
+  const fetched = [];
+  const pulls = listMergedPulls({
+    since,
+    exclude: 3,
+    fetchPage: (page) => {
+      fetched.push(page);
+      return pages[page - 1];
+    },
+  });
+  assert.deepEqual(fetched, [1, 2]);
+  assert.equal(pulls.length, 198);
+  assert.equal(
+    pulls.some((pull) => [2, 3, 999].includes(pull.number)),
+    false,
+  );
+  assert.equal(pulls.at(-1).number, 200);
 });

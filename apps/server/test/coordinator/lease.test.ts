@@ -25,7 +25,9 @@ describe('coordinator lease', () => {
     expect(() => acquireLease(b, 'thread-1', 'owner-b', { now })).toThrow(LeaseHeldError);
     clock += LEASE_STALE_MS - 1;
     expect(() => acquireLease(b, 'thread-1', 'owner-b', { now })).toThrow(LeaseHeldError);
-    clock += 2;
+    clock += 1;
+    expect(() => acquireLease(b, 'thread-1', 'owner-b', { now })).toThrow(LeaseHeldError);
+    clock += 1;
     const taken = acquireLease(b, 'thread-1', 'owner-b', { now });
     expect(taken.heartbeat()).toBe(true);
   });
@@ -48,7 +50,9 @@ describe('coordinator lease', () => {
     first.release();
     const second = acquireLease(b, 'thread-1', 'owner-b', { now });
     expect(first.heartbeat()).toBe(false);
+    first.release();
     expect(second.heartbeat()).toBe(true);
+    expect(() => acquireLease(a, 'thread-1', 'owner-a', { now })).toThrow(LeaseHeldError);
   });
 
   it('keys leases per store', () => {

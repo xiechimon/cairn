@@ -8,6 +8,7 @@ import { and, eq, notInArray, sql } from 'drizzle-orm';
 import {
   type chiefThread,
   chiefTurnUsage,
+  claudeSubscription,
   coordinatorInput,
   step,
   tokenUsage,
@@ -47,6 +48,7 @@ export function claimPendingChiefStep(
   db: MachineDeps['db'],
   stepRow: StepRow,
   machineId: string | null,
+  bindTeamId: string | null = null,
 ): boolean {
   const claimedAt = nowMs();
   const res = db
@@ -54,6 +56,12 @@ export function claimPendingChiefStep(
     .set({
       status: 'claimed',
       machineId,
+      claudeSubscriptionId:
+        bindTeamId === null
+          ? null
+          : sql<
+              string | null
+            >`(select ${claudeSubscription.id} from ${claudeSubscription} where ${claudeSubscription.teamId} = ${bindTeamId} and ${claudeSubscription.enabledAt} is not null and (${claudeSubscription.expiresAt} is null or ${claudeSubscription.expiresAt} > ${claimedAt}))`,
       claimedAt,
       lastHeartbeatAt: claimedAt,
       holdReason: null,
@@ -81,7 +89,7 @@ export function chiefTurnContext(
   deps: MachineDeps,
   stepRow: StepRow,
   threadRow: ThreadRow,
-  agentId: string,
+  agentId: string | null,
 ) {
   const digest = isChiefDigestStep(stepRow);
   const ctx = digest ? null : chiefClaimContext(deps, threadRow.id);
@@ -99,13 +107,16 @@ export function chiefTurnContext(
     );
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
-  const injected = injectMemoryDocuments(deps.db, {
-    agentId,
-    teamId: threadRow.teamId,
-    threadId: threadRow.id,
-    projectId: null,
-    recordUse: !digest,
-  });
+  const injected =
+    agentId === null
+      ? { memories: [], omitted: 0, fileCount: 0 }
+      : injectMemoryDocuments(deps.db, {
+          agentId,
+          teamId: threadRow.teamId,
+          threadId: threadRow.id,
+          projectId: null,
+          recordUse: !digest,
+        });
   const memories = [
     ...injected.memories.map(({ title, content }) => ({ title, content })),
     { title: '记忆文件', content: `${injected.fileCount} 个；用 memories 按需读取。` },
@@ -143,8 +154,11 @@ export function finishCoordinatorTurn(
     const teamId = stepTeamId(deps, stepRow);
     if (teamId !== null) sealCoordinatorTurnSnapshot(db, stepRow, teamId, outcome.status, nowMs());
   } catch {}
+  const reportedSessionId =
+    turnProvenance(stepRow.prompt)?.startsWith('mail:') === true ? undefined : outcome.sessionId;
   db.update(step)
     .set({
+      ...(reportedSessionId !== undefined ? { sessionId: reportedSessionId } : {}),
       status:
         outcome.status === 'success' ? 'done' : outcome.status === 'stopped' ? 'stopped' : 'failed',
       ...(outcome.status === 'stopped' ? { finishedAt: nowMs() } : {}),
@@ -163,13 +177,7 @@ export function finishCoordinatorTurn(
     stepRow.buildId,
     '回合已结束',
   );
-  finishChiefTurn(
-    deps,
-    stepRow.buildId,
-    turnProvenance(stepRow.prompt)?.startsWith('mail:') === true
-      ? { ...outcome, sessionId: undefined }
-      : outcome,
-  );
+  finishChiefTurn(deps, stepRow.buildId, { ...outcome, sessionId: reportedSessionId });
   if (outcome.status === 'success')
     notifyChiefTurn(
       deps,
@@ -260,6 +268,8 @@ export function recordStepUsage(
           cacheWrite: u.cacheWrite,
           ttftMs: u.ttftMs ?? null,
           contextTokens: u.contextTokens ?? null,
+          contextWindow: u.contextWindow ?? null,
+          compactAt: u.compactAt ?? null,
           createdAt: nowMs(),
         })
         .onConflictDoUpdate({
@@ -270,7 +280,13 @@ export function recordStepUsage(
             cacheRead: sql`${chiefTurnUsage.cacheRead} + ${u.cacheRead}`,
             cacheWrite: sql`${chiefTurnUsage.cacheWrite} + ${u.cacheWrite}`,
             ttftMs: sql`coalesce(${chiefTurnUsage.ttftMs}, ${u.ttftMs ?? null})`,
-            contextTokens: sql`coalesce(${u.contextTokens ?? null}, ${chiefTurnUsage.contextTokens})`,
+            ...(u.contextTokens !== undefined
+              ? {
+                  contextTokens: u.contextTokens,
+                  contextWindow: u.contextWindow ?? null,
+                  compactAt: u.compactAt ?? null,
+                }
+              : {}),
           },
         })
         .run();

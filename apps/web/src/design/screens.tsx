@@ -23,14 +23,9 @@ const SCREENS = [
     parts: 'Agent turns, tool activity rows, live row',
   },
   {
-    title: 'Project tasks',
-    url: '/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks',
-    parts: 'Project header, task list, filters and layout',
-  },
-  {
     title: 'Schedules',
-    url: '/app/schedules?scenario=r3-93',
-    parts: 'Schedule cards, frequency, next run',
+    url: '/app?scenario=r3-93&pane=tasks&tab=scheduled',
+    parts: 'Tasks panel schedule rows, frequency, next run',
   },
   {
     title: 'Work routing',

@@ -8,6 +8,7 @@ import {
   readFileSync,
   renameSync,
   statSync,
+  symlinkSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -178,6 +179,7 @@ echo "pnpm $* @ $(git -C "${checkout}" rev-parse HEAD 2>/dev/null)" >> "${fake}/
     `for variable in GH_TOKEN GITHUB_TOKEN GIT_CONFIG_VALUE_0; do
   [ -z "\${!variable-}" ] || echo "$variable" >> "${fake}/artifact-credential-names"
 done
+[ "$1" = --input-type=module ] && exec "${process.execPath}" "$@"
 echo "node $*" >> "${fake}/node.log"
 [ -f "${fake}/migrate-fail" ] && exit 1
 db="\${@: -1}"
@@ -228,7 +230,10 @@ if [ "$2 $3" = "start cairn-server.service" ]; then
     [ ! -s "${fake}/column-on-broken-start" ] || sqlite3 "${db}" "update step set note = '$(cat "${fake}/column-on-broken-start")'"
   else touch "${fake}/up"; sqlite3 "${db}" "update machine set lastSeenAt = (cast(strftime('%s','now') as integer) + 5) * 1000"; fi
 fi
-[ "$2 $3" = "stop cairn-server.service" ] && rm -f "${fake}/up"
+if [ "$2 $3" = "stop cairn-server.service" ]; then
+  rm -f "${fake}/up"
+  sqlite3 "${db}" "select (select count(*) from step where status='claimed') || ' claimed, lease ' || coalesce((select status from deploy_lease where id='server'), 'none')" >> "${fake}/server-stop.log"
+fi
 if [ "$2 $3" = "start cairn-daemon.service" ]; then
   sqlite3 "${db}" "update machine set lastSeenAt = (cast(strftime('%s','now') as integer) + 5) * 1000"
 fi
@@ -288,6 +293,7 @@ else printf 000; fi`,
 
   const env = {
     PATH: `${bin}:${SYSTEM_PATH}`,
+    NODE_PATH: join(import.meta.dirname, '../../node_modules'),
     HOME: dir,
     GIT_CONFIG_NOSYSTEM: '1',
     CAIRN_CHECKOUT: checkout,
@@ -301,12 +307,27 @@ else printf 000; fi`,
     CAIRN_HEALTH_TRIES: '3',
     CAIRN_HEALTH_INTERVAL: '0',
     CAIRN_DEPLOY_STEP_WAIT_SECONDS: '0',
+    CAIRN_DEPLOY_QUIET_SECONDS: '0',
   };
   const run = (script, args, extra = {}) =>
     spawnSync('/bin/bash', [script, ...args], { encoding: 'utf8', env: { ...env, ...extra } });
   const log = (name) =>
     existsSync(join(fake, name)) ? readFileSync(join(fake, name), 'utf8') : '';
-  return { dir, work, checkout, data, db, state, backups, fake, previous, run, log, tokenFile };
+  return {
+    dir,
+    work,
+    checkout,
+    data,
+    db,
+    state,
+    backups,
+    fake,
+    bin,
+    previous,
+    run,
+    log,
+    tokenFile,
+  };
 }
 
 function pushTarget(f, message = 'target', options) {
@@ -376,6 +397,66 @@ test('refuses a target that changes install-script permissions or hooks', () => 
   assert.equal(f.log('pnpm.log'), '');
 });
 
+function fixtureWithWorkspace(workspace) {
+  const f = fixture();
+  const base = pushTarget(f, 'base', { files: { 'pnpm-workspace.yaml': workspace } });
+  git(f.checkout, 'fetch', '-q', 'origin', 'main');
+  git(f.checkout, 'checkout', '-q', base);
+  return f;
+}
+
+const workspace = (allowBuilds, extra = '') =>
+  `packages:\n  - apps/*\n\nallowBuilds:\n  ${allowBuilds}\n${extra}`;
+
+test('deploys an allowBuilds change that permits no new install script', () => {
+  for (const [previous, next] of [
+    ['esbuild: true', 'esbuild: true\n  electron: false\n  electron-winstaller: false'],
+    ['esbuild: true', 'esbuild: true\n  electron: false # reviewed'],
+    ['esbuild: true\n  sharp: true', 'esbuild: true\n  sharp: false'],
+    ['esbuild: true\n  sharp: true', 'esbuild: true'],
+  ]) {
+    const f = fixtureWithWorkspace(workspace(previous));
+    const target = pushTarget(f, 'target', { files: { 'pnpm-workspace.yaml': workspace(next) } });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 0, `${previous} -> ${next}\n${result.stderr}`);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), target);
+  }
+});
+
+test('refuses a pnpm-workspace.yaml change that may permit a new install script', () => {
+  const base = workspace('esbuild: true\n  sharp: false');
+  for (const [next, reason] of [
+    [workspace('esbuild: true\n  sharp: false\n  evil: true'), /allowBuilds permits evil/],
+    [workspace('esbuild: true\n  sharp: true'), /allowBuilds permits sharp/],
+    [workspace('esbuild: true\n  sharp:\n    true'), /allowBuilds permits sharp/],
+    [workspace('esbuild: true'), /allowBuilds stops denying sharp/],
+    [workspace('esbuild: true\n  sharp: "no"'), /allowBuilds changed and is not a map of booleans/],
+    [
+      'packages:\n  - apps/*\n"allow\\u0042uilds": {esbuild: true, sharp: false, evil: true}\n',
+      /allowBuilds permits evil/,
+    ],
+    [
+      workspace('esbuild: true\n  sharp: false\n  evil: true').replace(/^/gm, ' '),
+      /allowBuilds permits evil/,
+    ],
+    [`${base}allowBuilds:\n  evil: true\n`, /does not parse cleanly/],
+    [`${base}"dangerouslyAllowAll\\u0042uilds": true\n`, /dangerouslyAllowAllBuilds changed/],
+    [`${base}pnpmfile: ./hooks.cjs\n`, /pnpmfile changed/],
+    [`x: &a\n  evil: true\n${base}  <<: *a\n`, /merge key/],
+    [workspace('esbuild: true\n  sharp: false\n  evil: !custom true'), /does not parse cleanly/],
+  ]) {
+    const f = fixtureWithWorkspace(base);
+    const before = git(f.checkout, 'rev-parse', 'HEAD');
+    const target = pushTarget(f, 'target', { files: { 'pnpm-workspace.yaml': next } });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 2, `${next}\n${result.stderr}`);
+    assert.match(result.stderr, /pnpm-workspace.yaml may permit new install scripts/);
+    assert.match(result.stderr, reason, next);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), before);
+    assert.equal(f.log('pnpm.log'), '');
+  }
+});
+
 test('refuses the same postinstall added to two manifests', () => {
   const f = fixture();
   for (const rel of ['package.json', 'apps/a/package.json']) {
@@ -386,6 +467,93 @@ test('refuses the same postinstall added to two manifests', () => {
   const result = f.run(DEPLOY, [target]);
   assert.equal(result.status, 2, result.stderr);
   assert.match(result.stderr, /install hooks/);
+});
+
+function fixtureWithManifest(manifest) {
+  const f = fixture();
+  const base = pushTarget(f, 'base', { files: { 'package.json': manifest } });
+  git(f.checkout, 'fetch', '-q', 'origin', 'main');
+  git(f.checkout, 'checkout', '-q', base);
+  return f;
+}
+
+const manifest = (scripts, extra = {}) => `${JSON.stringify({ scripts, ...extra }, null, 2)}\n`;
+
+test('refuses a package.json change that may add or change an install hook', () => {
+  const scripts = { prepare: 'husky', build: 'tsc' };
+  for (const [next, reason] of [
+    [manifest({ ...scripts, 'pnpm:devPreinstall': 'node x.cjs' }), /pnpm:devPreinstall/],
+    [
+      manifest({ ...scripts, postinstall: 'node x.cjs' }).replace(
+        '"postinstall"',
+        '"post\\u0069nstall"',
+      ),
+      /postinstall/,
+    ],
+    [manifest({ ...scripts, prepare: 'husky && node x.cjs' }), /prepare/],
+    [manifest({ ...scripts, preinstall: 'node x.cjs' }), /preinstall/],
+    [manifest({ ...scripts, prepublish: 'node x.cjs' }), /prepublish/],
+    [manifest(scripts, { pnpm: { onlyBuiltDependencies: ['evil'] } }), /pnpm settings changed/],
+    [manifest(scripts).replace('"tsc"', '"tsc",'), /does not parse/],
+    [manifest('node x.cjs'), /scripts changed and is not an object/],
+  ]) {
+    const f = fixtureWithManifest(manifest(scripts));
+    const before = git(f.checkout, 'rev-parse', 'HEAD');
+    const target = pushTarget(f, 'target', { files: { 'package.json': next } });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 2, `${next}\n${result.stderr}`);
+    assert.match(result.stderr, /install hooks in package.json may be added or changed/);
+    assert.match(result.stderr, reason, next);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), before);
+    assert.equal(f.log('pnpm.log'), '');
+  }
+});
+
+test('refuses a hook in a manifest pnpm reads that the JSON guard cannot see', () => {
+  for (const [files, reason] of [
+    [{ 'apps/evil\n/package.json': manifest({ postinstall: 'node x.cjs' }) }, /apps\/evil/],
+    [{ 'apps/evil/package.yaml': 'scripts:\n  postinstall: node x.cjs\n' }, /package.yaml/],
+    [{ 'apps/evil/binding.gyp': '{}\n' }, /binding.gyp/],
+  ]) {
+    const f = fixture();
+    const before = git(f.checkout, 'rev-parse', 'HEAD');
+    const target = pushTarget(f, 'target', { files });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 2, `${Object.keys(files)}\n${result.stderr}`);
+    assert.match(result.stderr, reason);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), before);
+    assert.equal(f.log('pnpm.log'), '');
+  }
+});
+
+test('refuses a package.json that is a symlink', () => {
+  const f = fixture();
+  const before = git(f.checkout, 'rev-parse', 'HEAD');
+  writeFileSync(join(f.work, 'real.json'), manifest({ postinstall: 'node x.cjs' }));
+  mkdirSync(join(f.work, 'apps/evil'), { recursive: true });
+  symlinkSync('../../real.json', join(f.work, 'apps/evil/package.json'));
+  git(f.work, 'add', 'real.json', 'apps/evil/package.json');
+  const target = pushTarget(f);
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(result.stderr, /apps\/evil\/package.json is not a regular file/);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), before);
+});
+
+test('deploys a package.json change that adds or changes no install hook', () => {
+  const base =
+    '{\n  "scripts": {\n    "prepare": "husky",\n    "postinstall": "node x.cjs"\n  }\n}\n';
+  for (const next of [
+    '{"scripts":{"postinstall":"node x.cjs","prepare":"husky","build":"tsc"},"version":"2.0.0"}\n',
+    '{"scripts":{"prepare":"husky"}}\n',
+    '{"scripts":{}}\n',
+  ]) {
+    const f = fixtureWithManifest(base);
+    const target = pushTarget(f, 'target', { files: { 'package.json': next } });
+    const result = f.run(DEPLOY, [target]);
+    assert.equal(result.status, 0, `${next}\n${result.stderr}`);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), target);
+  }
 });
 
 test('ignores a trailing comma added after an unchanged prepare hook', () => {
@@ -799,6 +967,64 @@ test('watch skips a newest main commit whose ci run was cancelled and deploys th
   assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), newest);
 });
 
+test('watch waits for main to settle and ships back-to-back merges as one deploy', () => {
+  const f = fixture();
+  const env = { CAIRN_DEPLOY_SCRIPT: DEPLOY, CAIRN_DEPLOY_QUIET_SECONDS: '240' };
+  pushTarget(f, 'first merge');
+  const first = f.run(WATCH, [], env);
+  assert.equal(first.status, 0, first.stderr);
+  assert.match(first.stdout, /waiting for main to settle/);
+  const second = pushTarget(f, 'second merge');
+  assert.equal(f.run(WATCH, [], env).status, 0);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.previous);
+  assert.equal(f.log('systemctl.log'), '');
+  const [head] = readFileSync(join(f.state, 'main-seen'), 'utf8').trim().split(' ');
+  assert.equal(head, second);
+  const settled = Math.floor(Date.now() / 1000) - 300;
+  writeFileSync(join(f.state, 'main-seen'), `${second} ${settled} ${settled}\n`);
+  const deployed = f.run(WATCH, [], env);
+  assert.equal(deployed.status, 0, deployed.stderr);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), second);
+  assert.equal(f.log('systemctl.log').match(/stop cairn-server/g).length, 1);
+  assert.equal(existsSync(join(f.state, 'main-seen')), false);
+});
+
+test('watch deploys a main that never settles once it has waited the maximum', () => {
+  const f = fixture();
+  const env = { CAIRN_DEPLOY_SCRIPT: DEPLOY, CAIRN_DEPLOY_QUIET_SECONDS: '240' };
+  pushTarget(f, 'older merge');
+  const behind = Math.floor(Date.now() / 1000) - 1900;
+  mkdirSync(f.state, { recursive: true });
+  writeFileSync(join(f.state, 'main-seen'), `${'0'.repeat(40)} ${behind} ${behind}\n`);
+  const newest = pushTarget(f, 'merge a moment ago');
+  const result = f.run(WATCH, [], env);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), newest);
+});
+
+test('watch resets a corrupt or future main-seen record instead of failing or waiting forever', () => {
+  for (const record of [
+    'garbage',
+    `${'0'.repeat(40)} 08 09`,
+    `${'0'.repeat(40)} 99999999999 99999999999`,
+  ]) {
+    const f = fixture();
+    const env = { CAIRN_DEPLOY_SCRIPT: DEPLOY, CAIRN_DEPLOY_QUIET_SECONDS: '240' };
+    const head = pushTarget(f, 'merge');
+    mkdirSync(f.state, { recursive: true });
+    writeFileSync(join(f.state, 'main-seen'), `${record}\n`);
+    const result = f.run(WATCH, [], env);
+    assert.equal(result.status, 0, `${record}\n${result.stderr}`);
+    assert.match(result.stdout, /waiting for main to settle: \S+ first seen 0s ago/);
+    const [seenHead, seenAt, behindAt] = readFileSync(join(f.state, 'main-seen'), 'utf8')
+      .trim()
+      .split(' ');
+    const now = Math.floor(Date.now() / 1000);
+    assert.equal(seenHead, head);
+    assert.ok(Math.abs(Number(seenAt) - now) < 30 && Math.abs(Number(behindAt) - now) < 30, record);
+  }
+});
+
 test('watch raises one lag alarm per main head after two hours and closes it once caught up', () => {
   const f = fixture();
   const old = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
@@ -1028,6 +1254,103 @@ test('server-only deploys under continuous active work without stopping either d
   assert.equal(sqlite(f.db, "select status from step where id='s0'"), 'claimed');
 });
 
+test('a server-only deploy pauses claims and waits for a claimed step or Coordinator turn before stopping the server', () => {
+  const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
+  fakeTool(
+    f.bin,
+    'sleep',
+    `sqlite3 "${f.db}" "select status from deploy_lease where id='server'" >> "${f.fake}/drain.log"
+sqlite3 "${f.db}" "update step set status='done' where id='s0'"`,
+  );
+  const target = pushTarget(f, 'server', {
+    files: { 'apps/server/src/probe.ts': 'export {};\n', 'marker.txt': 'previous\n' },
+  });
+  const result = f.run(DEPLOY, [target], { CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS: '60' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(f.log('drain.log'), /^draining\n/);
+  assert.equal(f.log('server-stop.log'), '0 claimed, lease draining\n');
+  assert.doesNotMatch(f.log('systemctl.log'), /(?:stop|start) cairn-daemon/);
+  assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), target);
+});
+
+test('a server-only deploy restarts the server once the drain deadline passes', () => {
+  const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
+  const target = pushTarget(f, 'server', {
+    files: { 'apps/server/src/probe.ts': 'export {};\n', 'marker.txt': 'previous\n' },
+  });
+  const result = f.run(DEPLOY, [target], { CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS: '0' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(
+    result.stdout,
+    /drain deadline passed after 0s; restarting the server with 1 claimed steps/,
+  );
+  assert.equal(f.log('server-stop.log'), '1 claimed, lease draining\n');
+  assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
+  assert.equal(sqlite(f.db, "select status from step where id='s0'"), 'claimed');
+});
+
+test('a server-only deploy to a server that does not answer the lease request restarts it without a drain', () => {
+  const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
+  writeFileSync(join(f.fake, 'lease-timeout'), '');
+  const target = pushTarget(f, 'server', {
+    files: { 'apps/server/src/probe.ts': 'export {};\n', 'marker.txt': 'previous\n' },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(
+    result.stdout,
+    /restarting the server without a drain: the deployment lease request answered 000/,
+  );
+  assert.equal(f.log('server-stop.log'), '1 claimed, lease none\n');
+});
+
+test('a server-only deploy refuses when the server rejects the owner token', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'lease-owner-token'), 'other-secret');
+  const target = pushTarget(f, 'server', {
+    files: { 'apps/server/src/probe.ts': 'export {};\n', 'marker.txt': 'previous\n' },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(result.stderr, /server rejected the deployment lease request \(HTTP 401\)/);
+  assert.equal(f.log('server-stop.log'), '');
+});
+
+test('iOS, docs, integration and CI changes deploy without restarting the daemon', () => {
+  const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
+  writeFileSync(join(f.fake, 'lease-unsupported'), '');
+  const target = pushTarget(f, 'surfaces that never reach the daemon', {
+    files: {
+      'apps/ios/Cairn/App/CairnApp.swift': '// swift\n',
+      'README.md': '# Cairn\n',
+      'README.zh.md': '# Cairn\n',
+      'AGENTS.md': '# rules\n',
+      'integration/eval/coordinator-routing/upload.mts': 'export {};\n',
+      '.github/workflows/ci.yml': 'name: ci\n',
+      'marker.txt': 'previous\n',
+    },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(f.log('systemctl.log'), /(?:stop|start) cairn-daemon/);
+  assert.equal(sqlite(f.db, "select status from step where id='s0'"), 'claimed');
+});
+
+test('a daemon source change alongside an allowlisted path still restarts the daemon', () => {
+  const f = fixture();
+  const target = pushTarget(f, 'ios plus daemon', {
+    files: {
+      'apps/ios/Cairn/App/CairnApp.swift': '// swift\n',
+      'apps/daemon/src/machine-loop.ts': 'export {};\n',
+    },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(f.log('systemctl.log'), /stop cairn-daemon/);
+  assert.match(f.log('systemctl.log'), /start cairn-daemon/);
+});
+
 test('a Coordinator computer call in flight holds the deploy instead of being cut', () => {
   const f = fixture({ openComputerCalls: ['browser_act'] });
   const target = pushTarget(f, 'server', { files: { 'apps/server/src/probe.ts': 'export {};\n' } });
@@ -1114,6 +1437,39 @@ test('every recovery tick drains again after the previous refusal resumed claims
     assert.ok(existsSync(join(f.state, 'in-progress')));
     assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
     assert.equal(existsSync(join(f.state, 'lease-owner')), false);
+  }
+});
+
+test('recovering a server-only deploy drains a running server first and skips the drain when it is down or has no lease table', () => {
+  for (const [up, legacy] of [
+    [true, false],
+    [false, false],
+    [true, true],
+  ]) {
+    const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
+    if (legacy) sqlite(f.db, 'drop table deploy_lease');
+    const target = pushTarget(f);
+    git(f.checkout, 'fetch', '-q', 'origin', 'main');
+    git(f.checkout, 'checkout', '-q', '--detach', target);
+    mkdirSync(f.state, { recursive: true });
+    mkdirSync(f.backups, { recursive: true });
+    const snapshot = join(f.backups, 'stopped-server.db');
+    sqlite(f.db, `vacuum into '${snapshot}'`);
+    if (up) writeFileSync(join(f.fake, 'up'), '');
+    fakeTool(f.bin, 'sleep', `sqlite3 "${f.db}" "update step set status='done' where id='s0'"`);
+    writeFileSync(
+      join(f.state, 'in-progress'),
+      `phase=restored\ntarget=${target}\nprevious=${f.previous}\nsnapshot=${snapshot}\nruntime=server\n`,
+    );
+    const result = f.run(DEPLOY, ['--recover'], { CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS: '60' });
+    assert.equal(result.status, 1, result.stderr);
+    assert.doesNotMatch(f.log('systemctl.log'), /(?:stop|start) cairn-daemon/);
+    if (legacy) continue;
+    assert.equal(
+      f.log('server-stop.log'),
+      up ? '0 claimed, lease draining\n' : '1 claimed, lease none\n',
+    );
+    assert.notEqual(sqlite(f.db, "select status from deploy_lease where id='server'"), 'draining');
   }
 });
 

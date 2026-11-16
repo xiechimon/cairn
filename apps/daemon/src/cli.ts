@@ -8,12 +8,11 @@ import {
   statSync,
 } from 'node:fs';
 import process from 'node:process';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { BRAND, PROVIDER_COMMAND_NOTICE } from '@cairn/shared';
+import { runTokenCommand } from '@cairn/shared/token-command';
 import { Command } from 'commander';
 import { shutdownDaemonOtel } from './backend/otel.js';
-import { HostComputerProvider } from './computer/host.js';
-import { runOrbComputerAgent } from './computer/orb-agent.js';
 import {
   type DaemonConfig,
   type DaemonConfigInput,
@@ -22,11 +21,11 @@ import {
 } from './config.js';
 import { realDoctorEnv, runDoctorCommand } from './doctor.js';
 import { createDaemonLogger } from './log.js';
-import { pendingEnrollmentUrl } from './machine-enroll.js';
+import { machineNameSuffix, pendingEnrollmentUrl } from './machine-enroll.js';
 import { runMachine } from './machine-loop.js';
-import { ORB_RELAY_TOKEN_ENV, orbReleaseFromEntry } from './orb/protocol.js';
+import { ORB_RELAY_TOKEN_ENV } from './orb/protocol.js';
 import { runOrbServicesEnsure } from './orb/services-runtime.js';
-import { orbAgentHome, runOrbWorker } from './orb/worker.js';
+import { runOrbWorker } from './orb/worker.js';
 import { forgetMachine, loadDaemonJson, loadMachineJson, statePaths } from './state.js';
 import {
   isAlive,
@@ -35,7 +34,6 @@ import {
   spawnSupervisor,
   stopSupervisor,
 } from './supervisor.js';
-import { runTokenCommand } from './token-command.js';
 import { DAEMON_VERSION } from './version.js';
 
 interface StartOptions {
@@ -156,7 +154,7 @@ export function buildProgram(): Command {
           runnerArgv: passthroughArgv(opts),
         }),
       );
-      await printEnrollmentUrl(config.home, config.serverUrl);
+      await printEnrollmentUrl(config.home, config.serverUrl, config.name);
     });
 
   program
@@ -194,7 +192,7 @@ export function buildProgram(): Command {
           runnerArgv: passthroughArgv(cmd.opts<StartOptions>()),
         }),
       );
-      await printEnrollmentUrl(config.home, config.serverUrl);
+      await printEnrollmentUrl(config.home, config.serverUrl, config.name);
     });
 
   program
@@ -318,19 +316,6 @@ export function buildProgram(): Command {
       await runOrbWorker({ socketPath: opts.socket });
     });
 
-  program
-    .command('orb-computer', { hidden: true })
-    .requiredOption('--socket <path>', 'Computer agent socket')
-    .action(async (opts: { socket: string }) => {
-      if (process.env.CAIRN_ORB !== '1') throw new Error('Orb computer agent requires CAIRN_ORB=1');
-      const exit = await runOrbComputerAgent({
-        socketPath: opts.socket,
-        release: orbReleaseFromEntry(realpathSync(fileURLToPath(import.meta.url))),
-        provider: new HostComputerProvider({ home: orbAgentHome() }),
-      });
-      process.exitCode = exit === 'stale-release' ? 75 : 1;
-    });
-
   const orb = program.command('orb').description('Orb host helpers');
   orb
     .command('services')
@@ -361,13 +346,15 @@ function isMainModule(): boolean {
 
 if (isMainModule()) void main();
 
-async function printEnrollmentUrl(home: string, serverUrl: string): Promise<void> {
+async function printEnrollmentUrl(home: string, serverUrl: string, name: string): Promise<void> {
   const url = await pendingEnrollmentUrl(
     statePaths(home),
     serverUrl,
     2_000,
     (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     () => Date.now(),
+    name,
   );
-  if (url !== null) process.stdout.write(`Approve this machine in a browser: ${url}\n`);
+  if (url !== null)
+    process.stdout.write(`Approve this machine in a browser: ${url}${machineNameSuffix(name)}\n`);
 }

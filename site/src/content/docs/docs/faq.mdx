@@ -1,0 +1,60 @@
+---
+title: FAQ
+description: Common questions, and what to check when something does not move.
+---
+
+## What does it cost?
+
+Nothing. All code is Apache-2.0 with no feature gating; only a private, rotating holdout subset of the eval task set stays unpublished. There is no hosted control plane and no resold compute. You pay only for the model subscriptions or API keys you already use.
+
+## Can my team share one Cairn?
+
+No. Cairn is for one person: you run your own copy, and someone else who wants it runs theirs. For a tool a team shares, with shared channels, roles and billing, look at [Amp Spaces](https://ampcode.com/docs/spaces) or [Multica](https://github.com/multica-ai/multica).
+
+## Is there a hosted version?
+
+No. Cairn runs on your machines. If you want nothing to install or keep running, it is not the right fit.
+
+## Where do my code and credentials go?
+
+They stay on your machines. Threads run on your Runners, each in its own git worktree under `~/.cairn/workspaces`. Provider keys you add are encrypted on your server. Model calls go from your machines straight to the provider you chose.
+
+## Can it handle mail, calendar and job search?
+
+Not yet. That is planned as a project with no repository, where agents read, sort and draft, and sending and submitting wait for you.
+
+## The Coordinator does not answer
+
+The home page shows the next setup step that is missing. Work through them in order:
+
+1. `Connect a model source`: add a provider, or sign in to Claude Code on a Runner. See [Connect a model](/docs/models/).
+2. `Connect a Runner`: at least one Runner must be online. See [Connect a Runner](/docs/runner/).
+3. `Open work routing`: this step shows only when the Coordinator has no model it can use by default. Add a provider with an API key, or on the `Coordinator` card in `Rules & policies` pick `Built-in (pi)` and a model, then `Create`. See [Which model the Coordinator uses](/docs/models/#which-model-the-coordinator-uses).
+
+## My Runner is online but tasks stay queued
+
+On Linux this means the task sandbox is not ready: bubblewrap (`bwrap`) is missing, or the daemon is not its own systemd user unit. The task says so after `Queued`. Install `bwrap`, look at the output of `cairn start` for a warning about `systemd-run --user`, and run the daemon as a user service: see [Keep it running on Linux](/docs/runner/#keep-it-running-on-linux). `cairn logs -f` shows what the daemon is doing.
+
+## My Runner went offline
+
+A Runner started with `cairn start` ends when you log out or reboot. Run `cairn start` again, or install the user unit so it comes back by itself. Credentials are kept in `~/.cairn/machine.json`, so it needs no new approval.
+
+## The enrollment link expired
+
+Nobody approved the machine within 10 minutes. Run `cairn start` again for a new link.
+
+## `cairn` runs the wrong program
+
+Both `@xiechimon/cairn` and `@xiechimon/cairn-cli` install a `cairn` command, and the one installed last wins. Run the server with `npx @xiechimon/cairn` and keep only the CLI installed globally.
+
+## Can I use it from my phone?
+
+Yes. Put Tailscale Serve in front of the server, then sign the phone in with a one-time pairing code from `Remote access` in settings. The server never needs a public address. Steps are in [the Tailscale guide](https://github.com/xiechimon/cairn/blob/main/docs/deploy/tailscale-mobile.md).
+
+## How do I back up or move Cairn?
+
+Copy the whole `~/.cairn` directory, or the `/data` volume in Docker. The database and `secretbox.key` must stay together: secrets are encrypted with that key.
+
+## Where do I get help?
+
+Ask in [GitHub Discussions](https://github.com/xiechimon/cairn/discussions) (Q&A). Report bugs in the [issue tracker](https://github.com/xiechimon/cairn/issues). Send security reports privately as described in [SECURITY.md](https://github.com/xiechimon/cairn/blob/main/SECURITY.md), not in either place.

@@ -4,7 +4,6 @@ import {
   AGENT_PERMISSION_COPY,
   AGENT_TOOL_COPY,
   AGENT_TOOL_SWITCHES,
-  CHIEF_DIGEST_GROUP_LABELS,
   CHIEF_INPUT_PLACEHOLDER,
   CHIEF_INPUT_PLACEHOLDER_QUEUED,
   CHIEF_INPUT_PLACEHOLDER_STEERING,
@@ -12,6 +11,7 @@ import {
   FS_PICK_ERROR_COPY,
   GATE_ANNOUNCEMENTS,
   LOCAL_ERROR_REASON_COPY,
+  MCP_CATALOG,
   MEMORY_UI_COPY,
   NOTIFICATION_BANNER_COPY,
   SKILL_PAGE_COPY,
@@ -41,16 +41,21 @@ const COMPUTED_KEYS = new Set<string>([
 
   CHIEF_REBIND_CONFIRM_COPY,
 
-  ...Object.values(CHIEF_DIGEST_GROUP_LABELS),
-
   CHIEF_INPUT_PLACEHOLDER,
   CHIEF_INPUT_PLACEHOLDER_QUEUED,
   CHIEF_INPUT_PLACEHOLDER_STEERING,
 
   SKILL_PAGE_COPY.empty,
-  SKILL_PAGE_COPY.directoryHint,
+  SKILL_PAGE_COPY.hint,
 
   ...Object.values(LOCAL_ERROR_REASON_COPY),
+
+  ...MCP_CATALOG.flatMap((entry) => [
+    entry.description,
+    ...(entry.tokenLabel === undefined ? [] : [entry.tokenLabel]),
+    ...(entry.tokenHelp === undefined ? [] : [entry.tokenHelp]),
+    ...entry.options.map((option) => option.label),
+  ]),
 
   ...Object.values(FS_PICK_ERROR_COPY),
 

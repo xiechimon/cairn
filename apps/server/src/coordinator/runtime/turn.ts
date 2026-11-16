@@ -49,6 +49,8 @@ export interface TurnDeps {
   volatile?: VolatileContext;
   volatileText?: string | null;
   onModel?: (ref: ModelRef) => void;
+  suggestionYield?: AbortSignal;
+  setupPhase?: (name: string) => void;
 }
 
 function turnUsage(answer: AssistantMessage, entries: readonly EntryRecord[]): ModelUsage {
@@ -97,6 +99,7 @@ export async function runCoordinatorTurn(
   const token = await api.token(stepId);
   if (token.provider !== null) deps.models.useStepProvider(token.provider);
   if (token.provider?.apiKey) await deps.models.setApiKey(provider, token.provider.apiKey);
+  deps.setupPhase?.('token');
 
   const heartbeat = setInterval(() => void api.heartbeat(stepId).catch(() => {}), deps.heartbeatMs);
   deps.gate?.set(stepId);
@@ -106,6 +109,10 @@ export async function runCoordinatorTurn(
   let rootKey: string | null = null;
   let watch: Awaited<ReturnType<Conversation['watch']>> | undefined;
   const suggestionAbort = new AbortController();
+  const suggestionSignal =
+    deps.suggestionYield === undefined
+      ? suggestionAbort.signal
+      : AbortSignal.any([suggestionAbort.signal, deps.suggestionYield]);
   try {
     const mailTurn = isMailWakeText(claimed.instruction ?? '');
     const root = await activeConversation(harness, deps.conversationId, context);
@@ -161,6 +168,7 @@ export async function runCoordinatorTurn(
         if (record !== undefined) admitted.add(input.id);
       }
     }
+    deps.setupPhase?.('conversation');
     const drainSteers = async () => {
       if (mailTurn) return;
       while (inFlight && stopping === null && api.steer !== undefined) {
@@ -239,6 +247,7 @@ export async function runCoordinatorTurn(
       reportLiveCompactionFailure({ threadId, stepId }, call.value.docs['pi.live']);
       await mirror.onView(call.value);
     });
+    deps.setupPhase?.('configure');
     if (stopping !== null) {
       await stopping;
       return done({ status: 'stopped' });
@@ -249,6 +258,7 @@ export async function runCoordinatorTurn(
         input.kind === 'initial' &&
         input.conversationId === conversationKey,
     );
+    deps.setupPhase?.('input list');
     const prior =
       api.inputs === undefined
         ? undefined
@@ -260,12 +270,14 @@ export async function runCoordinatorTurn(
               ),
             context,
           );
+    deps.setupPhase?.('prior lookup');
     const initial = await api.inputs?.prepare(
       stepId,
       conversationKey,
       storedInstruction ?? '',
       prior?.entry === undefined ? undefined : String(prior.entry),
     );
+    deps.setupPhase?.('input prepare');
     const submission = await root.submit(
       {
         type: 'input',
@@ -274,6 +286,7 @@ export async function runCoordinatorTurn(
       },
       context,
     );
+    deps.setupPhase?.('submit');
     inFlight = true;
     let settled = await submission.wait(context);
     const firstEntry = settled.entry;
@@ -316,6 +329,7 @@ export async function runCoordinatorTurn(
     const suggesting =
       claimed.chief.trigger === 'user' &&
       stopping === null &&
+      !suggestionSignal.aborted &&
       answer?.role === 'assistant' &&
       answer.stopReason === 'stop' &&
       answer.content.some((block) => block.type === 'text' && block.text.trim() !== '')
@@ -328,7 +342,7 @@ export async function runCoordinatorTurn(
                     { provider, modelId },
                     context,
                     { threadId, stepId },
-                    suggestionAbort.signal,
+                    suggestionSignal,
                   )
                 : null,
             )
@@ -403,7 +417,7 @@ export async function runCoordinatorTurn(
       usage.output += suggestion.usage.output;
       usage.cacheRead += suggestion.usage.cacheRead;
       usage.cacheWrite += suggestion.usage.cacheWrite;
-      if (suggestion.replies.length > 0 && !suggestionAbort.signal.aborted)
+      if (suggestion.replies.length > 0 && !suggestionSignal.aborted)
         await api.suggestReplies?.(stepId, suggestion.replies).catch(() => {});
     }
     if (stopping !== null) {

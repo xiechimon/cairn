@@ -1,5 +1,10 @@
 import type { LocalToolDef, RemoteToolDef } from '@cairn/shared';
-import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
+import {
+  CHIEF_REMOTE_TOOLS,
+  CHIEF_REPLY_TOOLS,
+  CHIEF_ROUTER_TOOLS,
+  COMPUTER_REMOTE_TOOLS,
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
 import { buildHostTools, mapMcpEndpoint, parametersToShape } from '../src/backend/claude-code.js';
@@ -72,6 +77,17 @@ describe('parametersToShape (failure modes 2/3)', () => {
   test('no-arg tool: parameters default = shape {}', () => {
     expect(parametersToShape(undefined, 'agents')).toEqual({});
     expect(parametersToShape(null, 'agents')).toEqual({});
+  });
+
+  test('every Coordinator tool schema is inside the vocabulary the Claude Code backend accepts', () => {
+    for (const tool of [
+      ...CHIEF_REMOTE_TOOLS,
+      ...CHIEF_ROUTER_TOOLS,
+      ...CHIEF_REPLY_TOOLS,
+      ...COMPUTER_REMOTE_TOOLS,
+    ]) {
+      expect(() => parametersToShape(tool.parameters, tool.name), tool.name).not.toThrow();
+    }
   });
 
   test('type outside the vocabulary (enum) fails closed', () => {

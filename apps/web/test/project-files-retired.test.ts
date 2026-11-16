@@ -9,11 +9,6 @@ test('project files has no route or navigation entry', () => {
   expect(source('board/home-c.tsx')).not.toMatch(/\/app\/project\/\$\{[^}]+\}\/files/);
 });
 
-test('the project file component is removed rather than hidden', () => {
-  expect(source('pages/project-page.tsx')).not.toMatch(/FilesPane|useProjectTree|useProjectFile\b|FileViewState/);
-  expect(source('pages/project-page.tsx')).toContain('export function ProjectTasksPage');
-});
-
 test('thread file mentions and build-scoped full-file reads remain available', () => {
   expect(source('api/hooks.ts')).toContain('export const useProjectFiles');
   expect(source('api/hooks.ts')).toContain('export const useBuildChangeFile');

@@ -10,23 +10,12 @@ import {
 } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
-import {
-  AUTONOMY,
-  BRANCHES,
-  FS_ROOT,
-  fsListing,
-  GITHUB_ISSUES,
-  ISSUE_ECHO,
-} from './product-fixtures.js';
+import { AUTONOMY, BRANCHES, FS_ROOT, fsListing, ISSUE_ECHO } from './product-fixtures.js';
 
 function fixtureFor(key: QueryKey): unknown {
   switch (key[0]) {
     case 'project-autonomy':
       return AUTONOMY;
-    case 'github-issues': {
-      const page = Number(key[3] ?? 1);
-      return { ...GITHUB_ISSUES, page, hasMore: page < 2 };
-    }
     case 'fs-list':
       return fsListing(typeof key[1] === 'string' ? key[1] : FS_ROOT);
     case 'memories':

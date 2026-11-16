@@ -250,11 +250,6 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
-    "path": "apps/web/e2e/project-tasks-toolbar.spec.ts",
-    "line": "  // the choice survives a reload (cairn.projectTasksLayout)",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
     "path": "apps/web/e2e/storage-unavailable.spec.ts",
     "line": "  // writes cairn.sidebar-collapsed on every click).",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
@@ -277,21 +272,6 @@
   {
     "path": "apps/web/src/overlay/token-gate.tsx",
     "line": "// 聚焦锚点仍是既有 htmlFor/id（cairn-token-input，开门聚焦）。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/pages/project-page.tsx",
-    "line": "// registered client-state key (cairn.projectTasksLayout, the",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/pages/project-page.tsx",
-    "line": " *  observed cairn.teamMembersLayout (registered in shared",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/pages/project-page.tsx",
-    "line": "  // github 项目 Files tab 诚实降级（#704 / B-C1）：cairn 不保存该形态的仓库",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {

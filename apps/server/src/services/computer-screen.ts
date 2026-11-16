@@ -127,7 +127,7 @@ export class ComputerScreenGateway {
     releaseComputerControl(this.deps.db, teamId, userId, computerId, leaseId);
     for (const channel of [...this.channels.values()]) {
       if (channel.request.computerId === computerId && channel.request.kind !== 'view')
-        this.revoke(channel);
+        this.revoke(channel, 'control released');
     }
   }
 
@@ -181,9 +181,11 @@ export class ComputerScreenGateway {
       unbindDevice: () => {},
     };
     this.channels.set(request.id, channel);
-    channel.unbindDevice = deviceStreams.bind(deviceId, () => this.revoke(channel));
+    channel.unbindDevice = deviceStreams.bind(deviceId, () =>
+      this.revoke(channel, 'device revoked'),
+    );
     if (!this.deps.machineHub.pushComputerScreen(row.machineId, request)) {
-      this.revoke(channel);
+      this.revoke(channel, 'machine not connected');
       throw new HttpError(409, 'the computer is not connected');
     }
     const token = Buffer.from(
@@ -214,16 +216,18 @@ export class ComputerScreenGateway {
       .where(eq(computer.id, computerId))
       .run();
     for (const channel of [...this.channels.values()])
-      if (channel.request.computerId === computerId) this.revoke(channel);
+      if (channel.request.computerId === computerId) this.revoke(channel, 'computer screen reset');
   }
 
   sweep(): void {
     for (const channel of [...this.channels.values()]) {
-      if (
-        !this.valid(channel) ||
-        ((!channel.machine || !channel.viewer) && Date.now() - channel.openedAt >= PAIR_TIMEOUT_MS)
+      const invalid = this.invalidReason(channel);
+      if (invalid) this.revoke(channel, invalid);
+      else if (
+        (!channel.machine || !channel.viewer) &&
+        Date.now() - channel.openedAt >= PAIR_TIMEOUT_MS
       )
-        this.revoke(channel);
+        this.revoke(channel, `${channel.machine ? 'viewer' : 'machine'} never connected`);
     }
     const expired = this.deps.db
       .select()
@@ -267,7 +271,8 @@ export class ComputerScreenGateway {
         return;
       }
       const channel = this.channels.get((viewer ?? machine)?.[1] ?? '');
-      let authorized = url.search === '' && channel !== undefined && this.valid(channel);
+      let authorized =
+        url.search === '' && channel !== undefined && this.invalidReason(channel) === undefined;
       if (authorized && channel) {
         if (viewer) {
           const protocols = (request.headers['sec-websocket-protocol'] ?? '')
@@ -297,14 +302,18 @@ export class ComputerScreenGateway {
       else channel.machineUsed = true;
       try {
         this.sockets.handleUpgrade(request, socket, head, (websocket) => {
-          if (!this.valid(channel)) {
+          const invalid = this.invalidReason(channel);
+          if (invalid) {
             websocket.terminate();
-            this.revoke(channel);
+            this.revoke(channel, invalid);
             return;
           }
+          const side = viewer ? 'viewer' : 'machine';
           const stream = createWebSocketStream(websocket);
           channel.streams.push(stream);
-          stream.once('error', () => this.revoke(channel));
+          stream.once('error', (error) =>
+            this.revoke(channel, `${side} stream failed (${error.message})`),
+          );
           if (viewer) {
             channel.viewer = websocket;
             channel.viewerStream = stream;
@@ -312,12 +321,19 @@ export class ComputerScreenGateway {
             channel.machine = websocket;
             channel.machineStream = stream;
           }
-          websocket.once('close', () => this.revoke(channel));
-          websocket.once('error', () => this.revoke(channel));
+          websocket.once('close', (code, reason) =>
+            this.revoke(
+              channel,
+              `${side} closed (code ${code}${reason.length > 0 ? `, ${reason.toString()}` : ''})`,
+            ),
+          );
+          websocket.once('error', (error) =>
+            this.revoke(channel, `${side} websocket failed (${error.message})`),
+          );
           this.pair(channel);
         });
       } catch {
-        this.revoke(channel);
+        this.revoke(channel, 'upgrade failed');
         socket.destroy();
       }
     };
@@ -330,7 +346,7 @@ export class ComputerScreenGateway {
     this.closed = true;
     clearInterval(this.timer);
     this.offDisconnect();
-    for (const channel of [...this.channels.values()]) this.revoke(channel);
+    for (const channel of [...this.channels.values()]) this.revoke(channel, 'server shutting down');
     for (const row of this.deps.db.select().from(computer).all()) {
       if (row.controlHolder === 'user') this.invalidateComputer(row.id);
     }
@@ -339,14 +355,11 @@ export class ComputerScreenGateway {
     this.sockets.close();
   }
 
-  private valid(channel: Channel): boolean {
-    if (
-      this.closed ||
-      !this.channels.has(channel.request.id) ||
-      channel.request.expiresAt <= Date.now() ||
-      !this.deps.machineHub.isConnected(channel.machineId)
-    )
-      return false;
+  private invalidReason(channel: Channel): string | undefined {
+    if (this.closed) return 'server shutting down';
+    if (!this.channels.has(channel.request.id)) return 'channel closed';
+    if (channel.request.expiresAt <= Date.now()) return 'channel expired';
+    if (!this.deps.machineHub.isConnected(channel.machineId)) return 'machine disconnected';
     if (channel.machineTokenHash !== undefined) {
       const owner = this.deps.db
         .select()
@@ -354,7 +367,7 @@ export class ComputerScreenGateway {
         .where(eq(machineTable.id, channel.machineId))
         .get();
       if (!owner || owner.teamId !== channel.teamId || owner.tokenHash !== channel.machineTokenHash)
-        return false;
+        return 'machine credentials changed';
     }
     const row = ownedPrivateComputer(
       this.deps.db,
@@ -362,16 +375,21 @@ export class ComputerScreenGateway {
       channel.userId,
       channel.request.computerId,
     );
-    return (
-      row !== undefined &&
-      row.teamId === channel.teamId &&
-      row.machineId === channel.machineId &&
-      row.scopeKey === channel.request.scopeKey &&
-      row.screenGeneration === channel.request.generation &&
-      (channel.request.kind === 'view' ||
-        (row.controlFence === channel.request.controlFence &&
-          hasComputerControl(row, channel.request.controlLeaseId ?? undefined)))
-    );
+    if (
+      row === undefined ||
+      row.teamId !== channel.teamId ||
+      row.machineId !== channel.machineId ||
+      row.scopeKey !== channel.request.scopeKey
+    )
+      return 'computer moved or removed';
+    if (row.screenGeneration !== channel.request.generation) return 'computer screen reset';
+    if (
+      channel.request.kind !== 'view' &&
+      (row.controlFence !== channel.request.controlFence ||
+        !hasComputerControl(row, channel.request.controlLeaseId ?? undefined))
+    )
+      return 'control lease lost';
+    return undefined;
   }
 
   private sameOrigin(request: IncomingMessage): boolean {
@@ -426,8 +444,19 @@ export class ComputerScreenGateway {
     channel.viewerStream.pipe(channel.machineStream).pipe(channel.viewerStream);
   }
 
-  private revoke(channel: Channel): void {
+  private revoke(channel: Channel, reason: string): void {
     if (!this.channels.delete(channel.request.id)) return;
+    console.info('computer screen closed', {
+      channel: channel.request.id.slice(0, 8),
+      computerId: channel.request.computerId,
+      kind: channel.request.kind,
+      reason,
+      openMs: Date.now() - channel.openedAt,
+      viewerBufferedBytes:
+        (channel.viewer?.bufferedAmount ?? 0) + (channel.viewerStream?.writableLength ?? 0),
+      machineBufferedBytes:
+        (channel.machine?.bufferedAmount ?? 0) + (channel.machineStream?.writableLength ?? 0),
+    });
     channel.unbindDevice();
     for (const stream of channel.streams) stream.destroy();
     channel.viewer?.terminate();

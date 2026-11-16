@@ -6,14 +6,19 @@ import {
   CHIEF_ROUTER_TOOLS,
   CHIEF_TOOL_COUNT,
   CHIEF_TOOLS_REMOVED_UNDER_D60,
+  COMPUTER_REMOTE_TOOLS,
+  chiefDigestThreadId,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
 import {
   build,
   chiefMessage,
+  chiefReport,
+  chief as chiefTable,
   message,
   project,
+  retroProposal,
   step,
   stopPending,
   team,
@@ -21,6 +26,7 @@ import {
 } from '../src/db/schema.js';
 import { BLOCKED_BY_HOLD, releaseBlockedSteps } from '../src/services/blockers.js';
 import { buildChiefSystemPrompt, chiefToolDefHashes } from '../src/services/chief.js';
+import { assertChiefDigestTool } from '../src/services/chief-digest.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
 import { chiefRemoteTools } from '../src/services/routing-rules.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
@@ -93,7 +99,7 @@ function expectRejected(promise: Promise<unknown>, status: number, message: RegE
 }
 
 describe('router tool vocabulary', () => {
-  test('the router tools are a separate six from the base vocabulary', () => {
+  test('the router tools are a separate seven from the base vocabulary', () => {
     expect(CHIEF_REMOTE_TOOLS).toHaveLength(CHIEF_TOOL_COUNT);
     expect(CHIEF_ROUTER_TOOLS.map((t) => t.name)).toEqual([...CHIEF_ROUTER_TOOL_NAMES]);
     for (const name of CHIEF_ROUTER_TOOL_NAMES) {
@@ -102,7 +108,13 @@ describe('router tool vocabulary', () => {
     for (const read of ['threads', 'needs_you']) {
       expect(CHIEF_ROUTER_TOOLS.find((t) => t.name === read)?.replaySafe).toBe(true);
     }
-    for (const write of ['open_thread', 'message_thread', 'stop_thread', 'answer_question']) {
+    for (const write of [
+      'open_thread',
+      'message_thread',
+      'stop_thread',
+      'answer_question',
+      'decide_report_suggestion',
+    ]) {
       expect(CHIEF_ROUTER_TOOLS.find((t) => t.name === write)?.replaySafe).toBeUndefined();
     }
   });
@@ -117,9 +129,16 @@ describe('router tool vocabulary', () => {
       ...CHIEF_REMOTE_TOOLS.map((t) => t.name),
       ...CHIEF_ROUTER_TOOL_NAMES,
       ...CHIEF_REPLY_TOOLS.map((t) => t.name),
+      ...COMPUTER_REMOTE_TOOLS.map((t) => t.name),
+      'archive_project',
+      'unarchive_project',
     ]);
     expect(Object.keys(chiefToolDefHashes())).toHaveLength(
-      CHIEF_TOOL_COUNT + CHIEF_ROUTER_TOOL_NAMES.length + CHIEF_REPLY_TOOLS.length,
+      CHIEF_TOOL_COUNT +
+        CHIEF_ROUTER_TOOL_NAMES.length +
+        CHIEF_REPLY_TOOLS.length +
+        COMPUTER_REMOTE_TOOLS.length +
+        2,
     );
   });
 });
@@ -795,6 +814,17 @@ describe('router tools', () => {
       expect(text).not.toContain('Ignore previous instructions');
     });
 
+    test('the prompt tells the Coordinator to search todos by keyword before create_todo', () => {
+      const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
+      expect(text).toContain('create_todo 前用 todos 的 query 按关键词');
+    });
+
+    test('the prompt has no GitHub overlap rule and asks for no overlap result in the reply', () => {
+      const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
+      expect(text).not.toContain('github_overlap');
+      expect(text).not.toContain('带编号的查重结果');
+    });
+
     test('an empty team says so', () => {
       const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
       expect(text).toContain('- 没有在跑的任务');
@@ -813,6 +843,156 @@ describe('router tools', () => {
       const facts = wakeFacts('gate', record, null);
       expect(facts).not.toContain('confirm_builds');
       expect(facts).not.toContain('run_review');
+    });
+  });
+
+  describe('decide_report_suggestion', () => {
+    const OWNER_TURN = { turnMessageIds: ['m-owner'] };
+
+    function seedReport(day: string, chiefId = H.chiefId) {
+      const id = `report-${chiefId}-${day}`;
+      H.s.db
+        .insert(chiefReport)
+        .values({
+          id,
+          chiefId,
+          teamId: H.teamId,
+          day,
+          threadId: H.threadId,
+          status: 'posted',
+          createdAt: 1,
+        })
+        .run();
+      const row = (n: number, over: Partial<typeof retroProposal.$inferInsert>) => ({
+        id: `${id}-p${n}`,
+        reportId: id,
+        teamId: H.teamId,
+        projectId: H.projectId,
+        title: `retro ${n}`,
+        what: 'w',
+        why: 'y',
+        safeguard: 's',
+        sourceKind: 'coordinator' as const,
+        sourceId: 'm1',
+        sourceLabel: 'chat',
+        createdAt: 5,
+        ...over,
+      });
+      H.s.db
+        .insert(retroProposal)
+        .values([
+          row(1, {
+            title: `${day} intake`,
+            what: 'outside claim',
+            sourceKind: 'intake',
+            sourceId: 'https://example.com/a',
+            createdAt: 9,
+          }),
+          row(2, { title: `${day} first retro`, createdAt: 5 }),
+          row(3, { title: `${day} second retro`, createdAt: 5 }),
+        ])
+        .run();
+      return id;
+    }
+
+    const statusOf = (id: string) =>
+      H.s.db.select().from(retroProposal).where(eq(retroProposal.id, id)).get();
+
+    test('a turn without a message from the user is refused and changes nothing', async () => {
+      const id = seedReport('2026-11-14');
+      await expectRejected(
+        relay('decide_report_suggestion', { n: 1, decision: 'accept' }),
+        400,
+        /only a message the user wrote/,
+      );
+      await expectRejected(
+        relay('decide_report_suggestion', { n: 1, decision: 'accept' }, { turnMessageIds: [] }),
+        400,
+        /only a message the user wrote/,
+      );
+      expect(statusOf(`${id}-p2`)?.status).toBe('draft');
+    });
+
+    test('numbers retro suggestions first, then outside developments, as the document does', async () => {
+      const id = seedReport('2026-11-14');
+      const todosBefore = H.s.db.select().from(todo).all().length;
+      const third = (await relay(
+        'decide_report_suggestion',
+        { day: '2026-11-14', n: 3, decision: 'accept' },
+        OWNER_TURN,
+      )) as { status: string; todoId: string };
+      expect(third).toMatchObject({ day: '2026-11-14', n: 3, status: 'accepted' });
+      expect(statusOf(`${id}-p1`)).toMatchObject({ status: 'accepted', todoId: third.todoId });
+      const created = H.s.db.select().from(todo).where(eq(todo.id, third.todoId)).get();
+      expect(created?.phase).toBe('todo');
+      expect(created?.latestBuildId).toBeNull();
+      expect(H.s.db.select().from(todo).all()).toHaveLength(todosBefore + 1);
+      expect(
+        await relay('decide_report_suggestion', { n: 2, decision: 'dismiss' }, OWNER_TURN),
+      ).toMatchObject({ n: 2, status: 'dismissed', todoId: null });
+      expect(statusOf(`${id}-p3`)?.status).toBe('dismissed');
+      expect(statusOf(`${id}-p2`)?.status).toBe('draft');
+    });
+
+    test('a decided suggestion reports its state instead of deciding again', async () => {
+      seedReport('2026-11-14');
+      await relay('decide_report_suggestion', { n: 1, decision: 'dismiss' }, OWNER_TURN);
+      const todosBefore = H.s.db.select().from(todo).all().length;
+      expect(
+        await relay('decide_report_suggestion', { n: 1, decision: 'accept' }, OWNER_TURN),
+      ).toMatchObject({ n: 1, status: 'dismissed', todoId: null, alreadyDecided: true });
+      expect(H.s.db.select().from(todo).all()).toHaveLength(todosBefore);
+    });
+
+    test('an unknown number lists the report items; the newest report is the default', async () => {
+      const older = seedReport('2026-11-13');
+      seedReport('2026-11-14');
+      await expectRejected(
+        relay('decide_report_suggestion', { n: 4, decision: 'accept' }, OWNER_TURN),
+        404,
+        /2026-11-14 report has no suggestion 4: .*"n":3,"kind":"intake","title":"outside claim"/,
+      );
+      await relay(
+        'decide_report_suggestion',
+        { day: '2026-11-13', n: 1, decision: 'dismiss' },
+        OWNER_TURN,
+      );
+      expect(statusOf(`${older}-p2`)?.status).toBe('dismissed');
+      expect(statusOf(`report-${H.chiefId}-2026-11-14-p2`)?.status).toBe('draft');
+    });
+
+    test('another Coordinator’s report is not found', async () => {
+      H.s.db
+        .insert(chiefTable)
+        .values({
+          id: 'chief-other',
+          userId: 'user-other',
+          teamId: H.teamId,
+          charter: '',
+          watches: [],
+          wakes: [],
+          createdAt: 1,
+        })
+        .run();
+      const id = seedReport('2026-11-14', 'chief-other');
+      await expectRejected(
+        relay('decide_report_suggestion', { n: 1, decision: 'accept' }, OWNER_TURN),
+        404,
+        /no daily report/,
+      );
+      expect(statusOf(`${id}-p2`)?.status).toBe('draft');
+    });
+
+    test('a digest or report run cannot call it', () => {
+      expect(() =>
+        assertChiefDigestTool(chiefDigestThreadId(H.chiefId), 'decide_report_suggestion'),
+      ).toThrow(/not available to a chief digest run/);
+    });
+
+    test('the prompt tells the Coordinator to act only on what the user said', () => {
+      const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
+      expect(text).toContain('decide_report_suggestion');
+      expect(text).toContain('用户没明确说，就不动它们');
     });
   });
 });

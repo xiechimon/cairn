@@ -80,7 +80,7 @@ export {
   PROBE_TOOL_PILLS,
   r8OverlayContent,
 } from './detail.js';
-export { projectFixture, projectLocalTasks, projectTasksEmpty } from './projects.js';
+export { projectFixture } from './projects.js';
 export {
   agentTodoLive,
   boardFailed,
@@ -112,8 +112,6 @@ export {
   detailR8Fresh,
 } from './r8-overlay.js';
 export {
-  machinesChiefState,
-  machinesClaudeLogin,
   machinesDuplicateNames,
   machinesMasterDetail,
   providersEmpty,
@@ -124,12 +122,14 @@ export {
   resourcesCcMissing,
   resourcesCcNoConfig,
   resourcesDefault,
+  resourcesMcpAddServer,
+  resourcesMcpAuthorizing,
+  resourcesMcpConfirmHost,
+  resourcesMcpConnectGithub,
+  resourcesMcpConnectors,
+  resourcesMcpManageNeedsAuth,
+  resourcesMcpOAuthDenied,
   resourcesSkillsList,
 } from './resources.js';
-export {
-  schedulesEmpty,
-  schedulesFormDaily,
-  schedulesFormOnce,
-  schedulesList,
-} from './schedules.js';
+export { schedulesEmpty, schedulesList } from './schedules.js';
 export { TEAM_R7, teamGrid } from './team.js';

@@ -24,6 +24,7 @@ import {
   type GcLogger,
   sweepAttachmentBatches,
   sweepStepSessions,
+  sweepUploadParts,
 } from './attachment-gc.js';
 import { releaseBlockedSteps } from './blockers.js';
 import { sweepAbandonedBuildSteps, sweepAbandonedShipSteps } from './build-abandoned-sweep.js';
@@ -565,6 +566,7 @@ export function createScheduler(
           { db: deps.db, attachmentsDir: gc.attachmentsDir, logger: gc.logger },
           now,
         );
+        sweepUploadParts({ attachmentsDir: gc.attachmentsDir, logger: gc.logger }, now);
       } catch (err) {
         gc.logger.info(
           { err: err instanceof Error ? err.message : String(err) },

@@ -1,10 +1,8 @@
 import {
   type AutonomyRecord,
-  type ChiefDigestItem,
   FIXED_TAGS,
   type FsListResult,
   type GithubIssueEcho,
-  type GithubIssuesResponse,
   type ProjectRecord,
   type TodoRecord as SharedTodoRecord,
 } from '@cairn/shared';
@@ -414,26 +412,6 @@ export const QUESTION_CANCELLED: ChiefQuestionItem = {
   status: 'cancelled',
 };
 
-export const DIGEST_ITEMS: ChiefDigestItem[] = [
-  {
-    group: 'decided',
-    text: 'Exports skip archived tasks.',
-    reason: 'You picked it in the export thread.',
-  },
-  { group: 'done', text: 'Merged **#1190**, the branch badge fix.', reason: '' },
-  {
-    group: 'open',
-    text: 'The schedules migration still fails on the remote machine.',
-    reason: 'Two retries left.',
-  },
-  {
-    group: 'remembered',
-    text: 'Prefer small PRs that touch one page.',
-    reason: 'Saved to the Coordinator memory.',
-    memory: { id: 'mem-1', agentId: 'chief' },
-  },
-];
-
 export const AUTONOMY: AutonomyRecord = {
   settings: { enabled: true, quietMinutes: 10, cooldownMinutes: 15, dailyBudgetUsd: 10 },
   spentTodayUsd: 3.42,
@@ -456,26 +434,6 @@ export const AUTONOMY: AutonomyRecord = {
       lastBlockedReason: 'budget',
       lastEvaluatedAt: NOW - 2 * MIN,
     },
-  ],
-};
-
-export const GITHUB_ISSUES: GithubIssuesResponse = {
-  page: 1,
-  hasMore: true,
-  issues: [
-    {
-      number: 1182,
-      title: 'Branch badge shows a stale name after a rerun',
-      state: 'open',
-      labels: [{ name: 'bug', color: TAGS[0]?.color ?? '' }],
-    },
-    {
-      number: 1176,
-      title: 'Let schedules run on a specific machine',
-      state: 'open',
-      labels: [{ name: 'feature', color: TAGS[1]?.color ?? '' }],
-    },
-    { number: 1170, title: 'Docs: explain the merge gate blockers', state: 'open', labels: [] },
   ],
 };
 

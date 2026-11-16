@@ -300,6 +300,98 @@ describe('in-server Coordinator telemetry', () => {
     expect(chats[0]?.attributes.some((a) => a.key === 'gen_ai.usage.input_tokens')).toBe(true);
   });
 
+  it('times each step before the first model request as contiguous content-free setup spans with event-loop delay', async () => {
+    vi.stubEnv('CAIRN_OTEL_ENDPOINT', endpoint);
+    const spans = captureSpans();
+    const w = await world('what is open?');
+    const faux = fauxProvider({ provider: 'stub', models: [{ id: 'm', contextWindow: 200_000 }] });
+    let requests = 0;
+    const coordinator = boot(w, faux, {
+      fixedProviders: [
+        {
+          ...faux.provider,
+          streamSimple(model, context, options) {
+            const suggestion = context.messages[0]?.content === SUGGEST_REPLIES_ASK;
+            if (!suggestion) requests += 1;
+            const toolRound = requests === 1;
+            const message = {
+              ...(toolRound
+                ? fauxAssistantMessage([fauxToolCall('todos', {})], { stopReason: 'toolUse' })
+                : fauxAssistantMessage('nothing open')),
+              api: model.api,
+              provider: model.provider,
+              model: model.id,
+              timestamp: Date.now(),
+            };
+            const stream = createAssistantMessageEventStream();
+            void (async () => {
+              await delay(60);
+              if (!suggestion) {
+                const blockedUntil = Date.now() + 80;
+                while (Date.now() < blockedUntil) {}
+                await options?.onPayload?.({}, model);
+              }
+              stream.push({ type: 'start', partial: message });
+              stream.push({
+                type: 'done',
+                reason: toolRound ? 'toolUse' : 'stop',
+                message,
+              });
+              stream.end(message);
+            })();
+            return stream;
+          },
+        } satisfies typeof faux.provider,
+      ],
+    });
+    coordinator.wake(w.threadId);
+    await coordinator.idle();
+    await flushRuntimeOtel();
+
+    const turn = spans.find((s) => s.name === 'coordinator turn')!;
+    const setup = spans
+      .filter((s) => s.name.startsWith('setup '))
+      .sort((a, b) => Number(BigInt(a.startTimeUnixNano) - BigInt(b.startTimeUnixNano)));
+    expect(requests).toBe(2);
+    expect(setup.map((s) => s.name)).toEqual([
+      'setup open store',
+      'setup token',
+      'setup conversation',
+      'setup configure',
+      'setup input list',
+      'setup prior lookup',
+      'setup input prepare',
+      'setup submit',
+      'setup generation prepare',
+      'setup input barrier',
+      'setup conversation check',
+      'setup request hooks',
+      'setup provider request',
+    ]);
+    for (const [i, span] of setup.entries()) {
+      expect(span.traceId).toBe(turn.traceId);
+      expect(span.parentSpanId).toBe(turn.spanId);
+      expect(span.attributes.map((a) => a.key).filter((key) => /input|output/.test(key))).toEqual(
+        [],
+      );
+      if (i > 0) expect(span.startTimeUnixNano).toBe(setup[i - 1]!.endTimeUnixNano);
+    }
+    const ms = (span: Span) =>
+      Number((BigInt(span.endTimeUnixNano) - BigInt(span.startTimeUnixNano)) / 1_000_000n);
+    expect(ms(setup.at(-1)!)).toBeGreaterThanOrEqual(135);
+    const loopDelay = (span: Span) =>
+      Number(
+        span.attributes.find((a) => a.key === 'cairn.event_loop.max_delay_ms')?.value.intValue,
+      );
+    for (const span of setup) expect(Number.isFinite(loopDelay(span))).toBe(true);
+    expect(loopDelay(setup.at(-1)!)).toBeGreaterThanOrEqual(50);
+    expect(loopDelay(setup.at(-1)!)).toBeLessThanOrEqual(ms(setup.at(-1)!));
+    const firstChat = spans.find((s) => s.name === 'chat m')!;
+    expect(BigInt(setup.at(-1)!.startTimeUnixNano)).toBeLessThanOrEqual(
+      BigInt(firstChat.startTimeUnixNano),
+    );
+  });
+
   it('exports nothing and does not fail the turn when no OTLP endpoint is set', async () => {
     const spans = captureSpans();
     const w = await world('hello');

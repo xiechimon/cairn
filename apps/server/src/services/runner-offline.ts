@@ -11,6 +11,7 @@ import { build, chiefMessage, machine, step, todo } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { type ChiefDeps, coordinatorThreadRow, ensureChief } from './chief.js';
+import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { projectOfTodo } from './git.js';
 import {
   priorSessionOf,
@@ -71,7 +72,12 @@ function waitingByMachine(db: Db): Map<string, Map<string, PendingRow>> {
 }
 
 function sessionStarted(db: Db, row: PendingRow): boolean {
-  const prior = priorSessionOf(db, row.stepRow, row.buildRow);
+  const prior = priorSessionOf(
+    db,
+    row.stepRow,
+    row.buildRow,
+    enabledSubscriptionId({ db }, row.todoRow.teamId),
+  );
   return !prior.freshSession && prior.priorSessionId !== null;
 }
 
@@ -280,12 +286,12 @@ export function runnerOverrideFor(
     .where(and(eq(build.todoId, todoRow.id), eq(step.status, 'pending')))
     .all();
   const first = pending[0];
-  if (first === undefined) throw conflict('这个任务已经开工，换 Runner 请新开任务');
+  if (first === undefined) throw conflict('这个任务已经开工，换执行机请新开任务');
   if (projectOfTodo(db, first.todoRow)?.repoKind === 'local') {
-    throw conflict('项目代码只在一台 Runner 上，不能改到别的 Runner');
+    throw conflict('项目代码只在一台执行机上，不能改到别的执行机');
   }
   if (pending.some((row) => sessionStarted(db, row))) {
-    throw conflict('这个任务已经开过会话，换 Runner 请新开任务');
+    throw conflict('这个任务已经开过会话，换执行机请新开任务');
   }
   const now = nowMs();
   if (!pending.every((row) => canRunOn(db, row, target, now))) {

@@ -95,9 +95,10 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
       id,
     );
     const bytes = readFileSync(absPath);
-    const inlineDisposition = isInlineAttachment(row.storageKey, row.mimeType)
-      ? 'inline'
-      : 'attachment';
+    const inlineDisposition =
+      row.scope !== 'deliverable' && isInlineAttachment(row.storageKey, row.mimeType)
+        ? 'inline'
+        : 'attachment';
     return new Response(bytes, {
       status: 200,
       headers: {

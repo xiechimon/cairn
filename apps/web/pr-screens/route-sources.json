@@ -27,19 +27,14 @@
     "apps/web/src/detail/"
   ],
   "schedules-list": [
+    "apps/web/src/board/tasks-schedule-list.tsx",
     "apps/web/src/schedules/",
-    "apps/web/src/pages/schedules-page.tsx",
     "apps/web/src/pages/schedule-summary.ts"
   ],
   "schedules-form": [
+    "apps/web/src/board/tasks-schedule-list.tsx",
     "apps/web/src/schedules/",
-    "apps/web/src/pages/schedules-page.tsx",
     "apps/web/src/pages/schedule-summary.ts"
-  ],
-  "project-tasks": [
-    "apps/web/src/pages/project-page.tsx",
-    "apps/web/src/pages/dir-browser.tsx",
-    "apps/web/src/board/"
   ],
   "project-settings": [
     "apps/web/src/pages/project-settings-page.tsx",
@@ -50,9 +45,6 @@
   "machines": [
     "apps/web/src/resources/machines-page.tsx",
     "apps/web/src/resources/create-machine-dialog.tsx"
-  ],
-  "machine-detail": [
-    "apps/web/src/resources/machine-detail-page.tsx"
   ],
   "skills": [
     "apps/web/src/resources/skills-page.tsx",

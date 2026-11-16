@@ -235,7 +235,7 @@ export function useThreadActions({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-5.5 max-[640px]:size-8"
+                    className="size-9 flex-none text-foreground hover:text-foreground [&_svg]:size-5.5 max-[640px]:size-8 pointer-coarse:size-11"
                   />
                 }
               />

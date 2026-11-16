@@ -14,8 +14,11 @@ import {
   MAX_SKILL_FILE_BYTES,
   MAX_SKILL_TOTAL_BYTES,
   parseSkillFrontmatter,
+  SKILL_DIR_NAME_RE,
   SKILL_ENTRY_FILE,
   type SkillFileBody,
+  type SkillImportCandidate,
+  type SkillImportCandidatesResponse,
   type SkillRecord,
 } from '@cairn/shared';
 import type { Db } from '../db/client.js';
@@ -28,6 +31,9 @@ import {
   resolveLocalSkill,
   rollbackLocalSkillCreate,
   type SkillAuditActor,
+  scanLocalSkills,
+  scanSkillsRoot,
+  sharedAgentSkillRoots,
   updateLocalSkill,
 } from './skills.js';
 
@@ -153,6 +159,12 @@ function collectFromLocalPath(rawPath: string, skillsDir: string): Collected {
     throw new HttpError(
       400,
       `localPath ${rawPath} resolves inside the cairn skills directory (${skillsDir}) — it is already visible to cairn; import from a directory outside it`,
+    );
+  }
+  if (rootReal.startsWith(real + sep)) {
+    throw new HttpError(
+      400,
+      `localPath ${rawPath} contains the cairn skills directory (${skillsDir}); import a single skill directory instead`,
     );
   }
   const files: SkillFileBody[] = [];
@@ -561,4 +573,51 @@ export async function refreshSkill(opts: SkillImportOpts, sid: string): Promise<
   );
   await writeSkillSource(opts.skillSourcesPath, { ...source, refreshedAt: nowMs() });
   return record;
+}
+
+function candidateProblem(dir: string): SkillImportCandidate['problem'] {
+  let fm: { name?: string; description?: string };
+  try {
+    fm = parseSkillFrontmatter(readFileSync(join(dir, SKILL_ENTRY_FILE), 'utf8'));
+  } catch {
+    return 'missing-name';
+  }
+  if (!fm.name) return 'missing-name';
+  if (!SKILL_DIR_NAME_RE.test(fm.name)) return 'invalid-name';
+  if (!fm.description) return 'missing-description';
+  return null;
+}
+
+export function listImportCandidates(skillsDir: string): SkillImportCandidatesResponse {
+  const taken = new Set(scanLocalSkills(skillsDir).map((s) => s.id));
+  const rootReal = skillsRootReal(skillsDir);
+  const seenReal = new Set<string>();
+  const out: SkillImportCandidatesResponse = { candidates: [], skippedSources: [] };
+  for (const root of sharedAgentSkillRoots()) {
+    try {
+      readdirSync(root);
+    } catch (err) {
+      const missing = (err as NodeJS.ErrnoException).code === 'ENOENT';
+      out.skippedSources.push({ root, reason: missing ? 'missing' : 'unreadable' });
+      continue;
+    }
+    for (const skill of scanSkillsRoot(root, false)) {
+      let real: string;
+      try {
+        real = realpathSync(skill.dir);
+      } catch {
+        continue;
+      }
+      if (seenReal.has(real) || real === rootReal || real.startsWith(rootReal + sep)) continue;
+      seenReal.add(real);
+      out.candidates.push({
+        id: skill.id,
+        description: skill.description,
+        sourcePath: skill.dir,
+        alreadyImported: taken.has(skill.id),
+        problem: candidateProblem(skill.dir),
+      });
+    }
+  }
+  return out;
 }

@@ -8,7 +8,6 @@ import { queryPhase, withTeamsFailure } from '../components/query-state.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
 import { toastError } from '../components/ui/toaster.js';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { markDeleted } from '../fixtures/deletions.js';
 import {
   fixtureProjects,
@@ -29,6 +28,7 @@ import {
   type SidebarProjectActions,
   type SidebarSelected,
 } from './sidebar.js';
+import { SidebarPeek } from './sidebar-peek.js';
 import { projectStatuses, waitingProjectIds } from './sidebar-projects.js';
 import { needsYouBadge } from './tasks-sections.js';
 import { THREAD_PARAM } from './thread-copy.js';
@@ -59,7 +59,6 @@ export interface AppSidebarProps {
   searchPanel?: boolean;
   onSearch?: () => void;
   menuTrigger?: boolean;
-  hiddenByPanel?: boolean;
 }
 
 const SWIPE_CLOSE_PX = 60;
@@ -101,7 +100,6 @@ export function AppSidebar({
   searchPanel = true,
   onSearch,
   menuTrigger = true,
-  hiddenByPanel = false,
 }: AppSidebarProps) {
   const { t } = useI18n();
   const { live, teamId, teamsQuery } = useLiveData();
@@ -154,11 +152,12 @@ export function AppSidebar({
     setFolded(panelOpen);
   }
   const railed = collapsed || folded;
-  const hidden = hiddenByPanel && panelOpen && railed;
+  const [collapsedByHand, setCollapsedByHand] = useState(false);
   const toggle = useCallback(() => {
     const next = !railed;
     setFolded(false);
     setCollapsed(next);
+    setCollapsedByHand(next);
     safeSetItem(SIDEBAR_STORAGE_KEY, next ? '1' : '0');
   }, [railed]);
   const resolvedTodos = useMemo(
@@ -338,27 +337,12 @@ export function AppSidebar({
             </DialogContent>
           </Dialog>
         </>
-      ) : hidden ? (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                data-testid="sidebar-reopen"
-                className="fixed top-2.5 left-2.5 z-(--z-floating) size-7 text-content-tertiary"
-                aria-label={t('展开侧边栏')}
-                onClick={toggle}
-              />
-            }
-          >
-            <PanelLeft className="size-5.5" strokeWidth={1.75} />
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={8}>
-            {t('展开侧边栏')}
-          </TooltipContent>
-        </Tooltip>
+      ) : railed ? (
+        <SidebarPeek armed={!collapsedByHand} onExpand={toggle}>
+          <BoardSidebar collapsed onToggle={toggle} {...sidebarProps} />
+        </SidebarPeek>
       ) : (
-        <BoardSidebar collapsed={railed} onToggle={toggle} {...sidebarProps} />
+        <BoardSidebar onToggle={toggle} {...sidebarProps} />
       )}
       {searchPanel && (
         <SearchPanel

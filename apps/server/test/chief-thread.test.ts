@@ -3,6 +3,8 @@ import { describe, expect, test } from 'vitest';
 import { chiefMessage, chiefThread, routingRule, step as stepTable } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { sendChiefMessage } from '../src/services/chief.js';
+import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
+import { createProvider } from '../src/services/providers.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 import { req } from './helpers.js';
 
@@ -59,5 +61,36 @@ describe('chief thread surface persistence (02 section 4.3 / r5 section 3.6)', (
         },
       ),
     ).toThrow(HttpError);
+  });
+
+  test('no coordinator routing rule but a provider the in-server Coordinator can run -> the message is accepted', () => {
+    H.s.db.delete(routingRule).where(eq(routingRule.use, 'coordinator')).run();
+    createProvider(
+      { db: H.s.db, box: H.s.secretBox },
+      {
+        teamId: H.teamId,
+        body: {
+          providerId: 'relay',
+          label: 'relay',
+          baseUrl: 'http://127.0.0.1:9/v1',
+          api: 'openai-completions',
+          models: [{ id: 'm1', name: 'm1' }],
+        },
+        createdBy: H.s.user.id,
+      },
+    );
+    const send = () =>
+      sendChiefMessage(
+        { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
+        H.teamId,
+        { threadId: H.threadId, content: 'x' },
+      );
+    expect(send).toThrow(HttpError);
+    setCoordinatorServerContextEnabled(true);
+    try {
+      expect(send).not.toThrow();
+    } finally {
+      setCoordinatorServerContextEnabled(false);
+    }
   });
 });

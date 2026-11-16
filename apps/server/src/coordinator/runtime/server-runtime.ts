@@ -29,6 +29,7 @@ import {
   createConversationGate,
 } from './tools.js';
 import { runCoordinatorTurn } from './turn.js';
+import { createSetupTiming } from './turn-spans.js';
 import {
   createVolatileContext,
   type VolatileContext,
@@ -91,6 +92,8 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
   const busy = new Map<string, number>();
   const lastUsed = new Map<string, number>();
   const closing = new Map<string, Promise<void>>();
+  const suggestionYields = new Map<string, AbortController>();
+  const setup = createSetupTiming();
 
   const stateOf = (threadId: string, forceReseed = false): ThreadState => {
     const existing = open.get(threadId);
@@ -118,9 +121,13 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
           : {
               storeId: inputs.storeId,
               beforeTool: async (signal?: AbortSignal, conversationId?: string) => {
+                setup.mark(threadId, 'generation prepare');
                 await inputs.barrier(signal);
-                if (conversationId !== undefined)
+                setup.mark(threadId, 'input barrier');
+                if (conversationId !== undefined) {
                   await api.inputs?.assertConversation(threadId, inputs.key(conversationId));
+                  setup.mark(threadId, 'conversation check');
+                }
               },
             }),
       }),
@@ -130,10 +137,16 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         () => config.memoryFlush?.(threadId) ?? null,
         threadId,
       ),
-      generationTelemetryExtension(async (conversationId) => ({
-        threadId,
-        stepId: await gate.stepFor(conversationId),
-      })),
+      generationTelemetryExtension(
+        async (conversationId) => ({
+          threadId,
+          stepId: await gate.stepFor(conversationId),
+        }),
+        {
+          mark: (name) => setup.mark(threadId, name),
+          end: () => setup.end(threadId),
+        },
+      ),
     ];
     const harness = openReconciledHarness(
       threadStorePath(config.storageDir, threadId),
@@ -208,9 +221,16 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     },
     closeThread,
     isOpen: (threadId: string) => open.has(threadId),
+    yieldSuggestions: (threadId: string) => suggestionYields.get(threadId)?.abort(),
     runTurn: async (turn: ServerTurn): Promise<MachineDoneBody> => {
       const { claimed } = turn;
       const threadId = claimed.chief?.threadId ?? '';
+      setup.begin({
+        threadId,
+        stepId: claimed.step.id,
+        provider: claimed.agent?.provider ?? '',
+        model: claimed.agent?.modelId ?? '',
+      });
       await settleClosing(threadId);
       const prepare = (target: ThreadState): ThreadState => {
         target.models.useProvider(turn.router.config, turn.router.resolveKey);
@@ -223,6 +243,8 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       };
       const state = prepare(stateOf(threadId));
       busy.set(threadId, (busy.get(threadId) ?? 0) + 1);
+      const suggestionYield = new AbortController();
+      suggestionYields.set(threadId, suggestionYield);
       try {
         let current = state;
         const synced = await syncToRewind(
@@ -237,6 +259,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         } else if (synced.action === 'forked') {
           config.recordConversation?.(threadId, synced.conversationId, synced.entryId);
         }
+        setup.mark(threadId, 'open store');
         const prior = config.factsFor(threadId);
         const mailTurn =
           config.setConversation !== undefined && isMailWakeText(turn.claimed.instruction ?? '');
@@ -271,11 +294,13 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
               conversationGate: current.gate,
               volatile: current.volatile,
               volatileText: turn.volatileText,
+              suggestionYield: suggestionYield.signal,
+              setupPhase: (name) => setup.mark(threadId, name),
             },
             turn.claimed,
           );
-        if (!mailTurn) return run(prior.conversationId);
-        return withRegisteredMailConversation(
+        if (!mailTurn) return await run(prior.conversationId);
+        return await withRegisteredMailConversation(
           await current.harness,
           context,
           prior.conversationId,
@@ -284,6 +309,8 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
           run,
         );
       } finally {
+        if (suggestionYields.get(threadId) === suggestionYield) suggestionYields.delete(threadId);
+        setup.end(threadId);
         const left = (busy.get(threadId) ?? 1) - 1;
         if (left <= 0) busy.delete(threadId);
         else busy.set(threadId, left);

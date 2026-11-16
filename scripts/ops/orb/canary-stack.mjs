@@ -191,7 +191,7 @@ export async function startStack({
   }
   const [team] = await api('GET', '/api/teams');
   const key = await api('POST', `/api/teams/${team.id}/api-keys`, {
-    name: 'Orb canary',
+    name: 'ORB_CANARY',
     gitAccess: false,
     mcpAccess: false,
     machineAccess: true,

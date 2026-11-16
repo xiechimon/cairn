@@ -5,6 +5,7 @@ import { basename, dirname, join } from 'node:path';
 import type { Duplex } from 'node:stream';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { WorkspaceHookNoteData } from '@cairn/shared';
+import { withoutPinnedEnv } from '../backend/pinned-env.js';
 import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
 import { defaultOrbDistSource, publishOrbDist } from './dist.js';
 import { assertOrbMachineName, orbMachineName } from './names.js';
@@ -138,7 +139,7 @@ export class HostOrbProvider implements OrbProvider {
     argv: readonly string[],
     options: OrbExecOptions,
   ): Promise<OrbExecResult> {
-    const env = { ...process.env, ...options.env };
+    const env = { ...withoutPinnedEnv(process.env), ...options.env };
     delete env.CAIRN_ORB;
     return this.runner(argv, { ...options, env });
   }
@@ -174,7 +175,6 @@ export class NspawnOrbProvider implements OrbProvider {
   private readonly runtimeDirectoryTimeoutMs: number;
   private publishing: Promise<void> = Promise.resolve();
   private readonly starting = new Set<Promise<void>>();
-  private readonly computerReleases = new Map<string, string>();
   private readonly retainDistReleases = process.env.CAIRN_ORB_RETAIN_RELEASES === '1';
 
   constructor(
@@ -260,27 +260,8 @@ export class NspawnOrbProvider implements OrbProvider {
             (key): key is string => key !== undefined,
           ),
         ),
-        ...this.computerReleases.values(),
       ]);
     });
-  }
-
-  async publishRelease(): Promise<string> {
-    const starting = [...this.starting];
-    let key = '';
-    const publish = this.publishing.then(async () => {
-      await Promise.allSettled(starting);
-      key = await this.publishDist();
-      this.computerReleases.set('published', key);
-    });
-    this.publishing = publish.catch(() => {});
-    await publish;
-    return key;
-  }
-
-  retainComputerRelease(name: string, release: string): void {
-    orbReleaseKeySchema.parse(release);
-    this.computerReleases.set(name, release);
   }
 
   async prepare(handle: OrbHandle, seed?: string): Promise<string> {

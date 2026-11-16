@@ -1,9 +1,9 @@
+import type { RoutingRuleRecord } from '@cairn/shared';
 import type {
   AccountMachine,
   AccountStep,
   ClaudeSubscriptionWire,
   MachineWithProviders,
-  StickyThread,
   SubscriptionAccount,
 } from '../api/claude-accounts.js';
 import type { ModelRouting } from '../api/model-routing.js';
@@ -15,7 +15,6 @@ export interface AccountsContent {
   subscriptions: ClaudeSubscriptionWire[];
   otherAccounts: SubscriptionAccount[];
   stepsByAccount: Record<string, AccountStep[]>;
-  stickiness: StickyThread[];
   machines: AccountMachine[];
   providers: { id: string; label: string }[];
   routing: ModelRouting;
@@ -198,21 +197,6 @@ export const ACCOUNT_STEPS: Record<string, AccountStep[]> = {
   [ACCOUNT_EXPIRED_ID]: [],
 };
 
-export const ACCOUNT_STICKINESS: StickyThread[] = [
-  {
-    threadId: 'th-1',
-    title: 'Daemon claim loop rework',
-    subscriptionId: ACCOUNT_OK_ID,
-    since: NOW - 114 * MINUTE,
-  },
-  {
-    threadId: 'th-4',
-    title: 'Account management page',
-    subscriptionId: ACCOUNT_COOLING_ID,
-    since: NOW - 3 * HOUR - 16 * MINUTE,
-  },
-];
-
 export const ACCOUNT_MACHINES: AccountMachine[] = [
   { id: MACHINE_REMOTE_ID, name: MACHINE_REMOTE_NAME },
   { id: MACHINE_ID, name: MACHINE_NAME },
@@ -325,6 +309,13 @@ export const ACCOUNT_ROUTING: ModelRouting = {
       available: true,
     },
     {
+      id: 'prov-copilot',
+      vendor: 'openai',
+      kind: 'api-key',
+      models: ['gpt-4o'],
+      available: false,
+    },
+    {
       id: REMOTE_CLAUDE,
       vendor: 'anthropic',
       kind: 'subscription',
@@ -356,14 +347,12 @@ export const ACCOUNT_ROUTING: ModelRouting = {
       unavailable: true,
     },
   ],
-  settings: { claudeUsage: 'subscription-only' },
 };
 
 export const ACCOUNTS: AccountsContent = {
   subscriptions: ACCOUNT_SUBSCRIPTIONS,
   otherAccounts: OTHER_ACCOUNTS,
   stepsByAccount: ACCOUNT_STEPS,
-  stickiness: ACCOUNT_STICKINESS,
   machines: ACCOUNT_MACHINES,
   providers: [
     { id: 'codex-main', label: 'ChatGPT · Personal' },
@@ -372,11 +361,45 @@ export const ACCOUNTS: AccountsContent = {
   routing: ACCOUNT_ROUTING,
 };
 
+const routingRule = (
+  use: RoutingRuleRecord['use'],
+  provider: string,
+  modelId: string,
+  thinkingLevel: string | null,
+): RoutingRuleRecord => ({
+  id: `rule-${use}`,
+  teamId: 't1',
+  use,
+  provider,
+  modelId,
+  thinkingLevel,
+  fallbackModels: null,
+  machineId: null,
+  requiredCapabilities: null,
+  seededFromAgentId: null,
+  createdAt: NOW - DAY,
+  updatedAt: NOW - DAY,
+});
+
 export const accountsDefault: FixtureSet = {
   ...resourcesDefault,
   now: NOW,
   resources: {
     ...RESOURCES,
+    providerSources: RESOURCES.providerSources.map((source) =>
+      source.runtime === 'pi'
+        ? { ...source, provider: 'r3-gateway', providerLabel: 'R3 网关' }
+        : source,
+    ),
+    routingSettings: {
+      rules: [
+        routingRule('coordinator', 'claude-code', 'claude-sonnet-5', 'high'),
+        routingRule('session', 'r3-gateway', 'gpt-5.2', 'medium'),
+        routingRule('review', 'r3-gateway', 'claude-opus-4-5', 'high'),
+        routingRule('citation_check', 'github-copilot', 'gpt-4o', null),
+      ],
+      policies: [],
+    },
     machines: RESOURCES.machines.map((machine) => {
       const providers = PROVIDER_MACHINES.find((m) => m.id === machine.id)?.providers;
       return providers === undefined ? machine : { ...machine, providers };
@@ -394,14 +417,12 @@ export const accountsEmpty: FixtureSet = {
       subscriptions: [],
       otherAccounts: [],
       stepsByAccount: {},
-      stickiness: [],
       machines: [],
       providers: [],
       routing: {
         connections: [],
         quota: [],
         edges: [],
-        settings: { claudeUsage: 'subscription-only' },
       },
     },
   },

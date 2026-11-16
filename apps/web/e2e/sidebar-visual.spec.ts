@@ -281,13 +281,8 @@ test('in English every row menu label stays on one line', async ({ page }) => {
   expect(overflow).toEqual(overflow.map(() => 0));
 });
 
-test('the footer and the collapsed rail carry no computers link', async ({ page }) => {
+test('the footer carries no computers link', async ({ page }) => {
   await page.goto(REF);
   await expect(page.getByTestId('sidebar-attention')).toHaveCount(0);
   await expect(page.locator('aside [data-slot="fleet-chip"]')).toHaveCount(0);
-  await page.evaluate(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.reload();
-  const rail = page.locator('aside.board-sidebar--collapsed');
-  await expect(rail.getByTestId('sidebar-activity')).toBeVisible();
-  await expect(rail.getByTestId('sidebar-attention')).toHaveCount(0);
 });

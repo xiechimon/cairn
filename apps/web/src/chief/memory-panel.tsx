@@ -151,7 +151,7 @@ export function MemoryPanel({
     );
   })();
 
-  const empty = memoriesQ.data !== undefined && injected.length + lookup.length === 0;
+  const empty = (!live || memoriesQ.data !== undefined) && injected.length + lookup.length === 0;
   const content = open === null ? null : splitMemoryContent(open.content);
   return (
     <div ref={listRef} data-testid="memory-list">
@@ -159,7 +159,7 @@ export function MemoryPanel({
         <div className="mt-6">
           <h3 className={HEAD_CLS}>{t('项目说明')}</h3>
           <p className={HINT_CLS}>
-            {t('像 AGENTS.md：本项目的每个 thread 和 Coordinator 都会读到并遵守。')}
+            {t('像 AGENTS.md：本项目的每个对话和 Coordinator 都会读到并遵守。')}
           </p>
           <div className="mt-3">
             <ProjectInstructionsField

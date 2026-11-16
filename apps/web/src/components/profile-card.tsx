@@ -40,7 +40,14 @@ export function ProfileHeader({
 }: ProfileHeaderProps) {
   const { t } = useI18n();
   const [draft, setDraft] = useState<string | null>(null);
-  const inputRef = useEditorFocus<HTMLInputElement>(draft !== null);
+  const editing = draft !== null;
+  const inputRef = useEditorFocus<HTMLInputElement>(editing);
+  const editRef = useRef<HTMLButtonElement>(null);
+  const wasEditing = useRef(false);
+  useEffect(() => {
+    if (wasEditing.current && !editing) editRef.current?.focus();
+    wasEditing.current = editing;
+  }, [editing]);
   const save = () => {
     const next = (draft ?? '').trim();
     if (next !== '' && next !== name) onRename(next);
@@ -56,12 +63,18 @@ export function ProfileHeader({
       sub={sub}
       action={
         <Button
+          ref={editRef}
           variant="outline"
-          className={cn('h-8 flex-none gap-1.5 px-3 text-ui', editClassName)}
+          aria-label={t('编辑名称')}
+          title={t('编辑名称')}
+          className={cn(
+            'h-8 flex-none gap-1.5 px-3 text-ui pointer-coarse:h-11 max-[640px]:size-11 max-[640px]:px-0',
+            editClassName,
+          )}
           onClick={() => setDraft(name)}
         >
           <SquarePen className="size-5" />
-          {t('编辑名称')}
+          <span className="max-[640px]:sr-only">{t('编辑名称')}</span>
         </Button>
       }
       editor={
@@ -71,11 +84,14 @@ export function ProfileHeader({
               id={inputId}
               ref={inputRef}
               aria-label={t('名称')}
-              className="h-8 min-w-0 flex-auto bg-card text-ui md:text-ui"
+              className="h-8 min-w-0 flex-auto bg-card text-ui pointer-coarse:h-11 md:text-ui"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') save();
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  save();
+                }
                 if (event.key === 'Escape') setDraft(null);
               }}
             />

@@ -90,6 +90,7 @@ export class RelayMachineServer {
       onStaleRelease?: (release: string) => void;
       machineId?: string;
       upstream: MachineApi;
+      withholdMcpConnectors?: boolean;
       localDelivery?: OrbLocalDelivery;
       input?: OrbStepInput | (() => OrbStepInput);
       onFrame?: (frame: OrbFrame) => void;
@@ -375,7 +376,11 @@ export class RelayMachineServer {
         report = result;
         this.reporting = result;
       }
-      const value: unknown = await result;
+      const answer: unknown = await result;
+      const value =
+        method === 'token' && this.options.withholdMcpConnectors
+          ? withoutMcpConnectors(answer as Awaited<ReturnType<MachineApi['token']>>)
+          : answer;
       if (method === 'done') {
         this.completed = true;
         this.options.onDone?.();
@@ -402,6 +407,14 @@ export class RelayMachineServer {
       this.requests.get(socket)?.delete(id);
     }
   }
+}
+
+function withoutMcpConnectors(
+  token: Awaited<ReturnType<MachineApi['token']>>,
+): Awaited<ReturnType<MachineApi['token']>> {
+  const { mcpConnectors, ...rest } = token;
+  const withheld = [...(rest.withheldMcp ?? []), ...(mcpConnectors ?? []).map((c) => c.slug)];
+  return withheld.length > 0 ? { ...rest, withheldMcp: withheld } : rest;
 }
 
 export class RelayMachineApi {

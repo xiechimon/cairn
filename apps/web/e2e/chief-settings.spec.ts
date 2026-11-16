@@ -116,11 +116,11 @@ test('watches empty-state card is centered and growth-proof (#772)', async ({ pa
   }
 });
 
-test('模型与 Runner tab is one work-routing row: no Agent or dispatch leftovers (#903+#1260)', async ({
+test('模型与执行机 tab is one work-routing row: no Agent or dispatch leftovers (#903+#1260)', async ({
   page,
 }) => {
   await page.goto(AGENT_TAB);
-  await expect(page.getByRole('tab', { name: '模型与 Runner' })).toHaveAttribute(
+  await expect(page.getByRole('tab', { name: '模型与执行机' })).toHaveAttribute(
     'aria-selected',
     'true',
   );
@@ -130,9 +130,9 @@ test('模型与 Runner tab is one work-routing row: no Agent or dispatch leftove
 
   const row = page.getByTestId('chief-routing-row');
   await expect(row).toBeVisible();
-  await expect(row).toContainText('模型与 Runner');
-  await expect(row).toContainText('跟随 coordinator 路由规则');
+  await expect(row).toContainText('模型与执行机');
+  await expect(row).toContainText('跟随 Coordinator 路由规则');
   await expect(page.getByRole('button', { name: '未设置' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '压缩模型' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Runner', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '执行机', exact: true })).toHaveCount(0);
 });

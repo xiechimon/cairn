@@ -1,8 +1,6 @@
 import {
-  CHIEF_REMOTE_TOOLS,
-  CHIEF_REPLY_TOOLS,
-  CHIEF_ROUTER_TOOLS,
   CODEX_MODEL,
+  type CoordinatorDefault,
   filterAgentTools,
   isSessionStepKind,
   type PatchRoutingRuleBody,
@@ -15,6 +13,7 @@ import {
   type RouteUse,
   type RoutingRuleRecord,
   type RunnerOs,
+  requiredCapabilitiesSchema,
   runnerOsOf,
   type SessionDefault,
   type StepKind,
@@ -24,15 +23,28 @@ import {
   withPlatform,
 } from '@cairn/shared';
 import { and, asc, eq, isNotNull, sql } from 'drizzle-orm';
-import { usesHostCodexLogin } from '../coordinator/codex-login.js';
+import { z } from 'zod';
+import { codexLoginAvailable, usesHostCodexLogin } from '../coordinator/codex-login.js';
 import { builtinModelIds, isBuiltinProvider } from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
-import { build, machine, provider, routingRule, step, todo, workPolicy } from '../db/schema.js';
+import {
+  build,
+  chief,
+  machine,
+  message,
+  provider,
+  routingRule,
+  step,
+  todo,
+  workPolicy,
+} from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { paidClaudeAllowed } from './model-routing.js';
+import { coordinatorRunsOnPi } from './coordinator-context.js';
+import { coordinatorToolDefs } from './coordinator-tool-defs.js';
+import { machineRuntimeAvailable } from './dispatch-eligibility.js';
 import { DEFAULT_SESSION_MODEL, DEFAULT_SESSION_PROVIDER } from './routing-migration.js';
-import { decideStepRoute } from './step-route.js';
+import { capabilityCandidates, decideStepRoute } from './step-route.js';
 
 type RoutingRuleRow = typeof routingRule.$inferSelect;
 type WorkPolicyRow = typeof workPolicy.$inferSelect;
@@ -59,8 +71,19 @@ export interface RouteProfile {
 export interface RoutedTodo {
   teamId: string;
   sourceKind?: TodoSourceKind | null;
+  sourceRef?: string | null;
   routeOverride?: RouteOverride | null;
 }
+
+export const citationCheckPinSchema = z.object({
+  ruleId: z.string().min(1),
+  provider: z.string().min(1),
+  modelId: z.string().min(1),
+  machineId: z.string().nullable(),
+  requiredCapabilities: requiredCapabilitiesSchema.nullable(),
+  thinkingLevel: z.string().nullable(),
+});
+export type CitationCheckPin = z.infer<typeof citationCheckPinSchema>;
 
 const USE_DISPLAY_NAMES: Record<RouteUse, string> = {
   coordinator: 'Coordinator',
@@ -72,12 +95,21 @@ const USE_DISPLAY_NAMES: Record<RouteUse, string> = {
 };
 
 export function chiefRemoteTools(): readonly RemoteToolDef[] {
-  return [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS, ...CHIEF_REPLY_TOOLS];
+  return coordinatorToolDefs();
 }
 
 const LEGACY_RUNTIME_PROVIDER = 'pi';
 const DEFAULT_SESSION_RULE_ID = 'default-session';
-const CODEX_LOGIN_PRESENT = new Set(['ok', 'expired']);
+const DEFAULT_COORDINATOR_RULE_ID = 'default-coordinator';
+const COORDINATOR_MODEL_PREFERENCE = [/haiku/i, /sonnet/i];
+const ANTHROPIC_API_HOST = 'api.anthropic.com';
+export const CODEX_LOGIN_PRESENT = new Set(['ok', 'expired']);
+const CITATION_CHECKER_RULE_ID = 'default-citation-check';
+const CITATION_HARNESS_MODELS = [
+  { provider: 'claude-code', modelId: 'claude-sonnet-5-5' },
+  { provider: 'claude-code', modelId: 'claude-haiku-5-5' },
+  CODEX_MODEL,
+];
 
 export function keylessEndpoint(providerId: string): boolean {
   const presets: readonly string[] = PROVIDER_PRESET_IDS;
@@ -160,20 +192,17 @@ function sessionHarness(
 ): 'claude-code' | 'codex-login' | null {
   const rows = db
     .select({
-      report: machine.claudeCodeReport,
-      enabled: machine.enabledRuntimes,
+      claudeCodeReport: machine.claudeCodeReport,
       capabilities: machine.capabilities,
     })
     .from(machine)
     .where(eq(machine.teamId, teamId))
     .all();
-  if (rows.some((row) => row.report?.installed === true && row.enabled.includes('claude-code'))) {
+  if (rows.some((row) => machineRuntimeAvailable(row, 'claude-code'))) {
     return 'claude-code';
   }
-  const codex = rows.some(
-    (row) =>
-      CODEX_LOGIN_PRESENT.has(row.capabilities?.codexLogin?.state ?? 'absent') &&
-      row.enabled.includes('pi'),
+  const codex = rows.some((row) =>
+    CODEX_LOGIN_PRESENT.has(row.capabilities?.codexLogin?.state ?? 'absent'),
   );
   return codex ? 'codex-login' : null;
 }
@@ -190,15 +219,13 @@ function providerSessionChoice(
   for (const { providerId, runnable } of servingProviders(db, teamId, null)) {
     if (!runnable) continue;
     const models = rows.find((row) => row.providerId === providerId)?.models ?? [];
-    const model = models.find(
-      (m) => m.id !== '' && paidClaudeAllowed(db, teamId, providerId, m.id),
-    );
+    const model = models.find((m) => m.id !== '');
     if (model !== undefined) return { provider: providerId, modelId: model.id };
   }
   return null;
 }
 
-function defaultSessionChoice(
+export function defaultSessionChoice(
   db: Pick<Db, 'select'>,
   teamId: string,
 ): (SessionDefault & { provider: string; modelId: string }) | null {
@@ -210,13 +237,93 @@ function defaultSessionChoice(
   return choice === null ? null : { reason: 'provider', ...choice };
 }
 
+function isAnthropicApi(baseUrl: string): boolean {
+  try {
+    return new URL(baseUrl).hostname === ANTHROPIC_API_HOST;
+  } catch {
+    return false;
+  }
+}
+
+export function anthropicCoordinatorChoice(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+): { provider: string; modelId: string } | null {
+  const source = db
+    .select({ providerId: provider.providerId, models: provider.models, baseUrl: provider.baseUrl })
+    .from(provider)
+    .where(
+      and(
+        eq(provider.teamId, teamId),
+        eq(provider.api, 'anthropic-messages'),
+        isNotNull(provider.apiKeyCipher),
+      ),
+    )
+    .orderBy(asc(provider.createdAt), asc(provider.id))
+    .all()
+    .find((row) => isAnthropicApi(row.baseUrl) && row.models.length > 0);
+  if (source === undefined) return null;
+  const ids = source.models.map((m) => m.id);
+  const modelId =
+    COORDINATOR_MODEL_PREFERENCE.map((re) => ids.find((id) => re.test(id))).find(
+      (id) => id !== undefined,
+    ) ?? ids[0];
+  return modelId === undefined ? null : { provider: source.providerId, modelId };
+}
+
+export function defaultCoordinatorChoice(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+): (CoordinatorDefault & { provider: string; modelId: string }) | null {
+  const anthropic = anthropicCoordinatorChoice(db, teamId);
+  if (anthropic !== null) return { reason: 'anthropic-key', ...anthropic };
+  const rows = db
+    .select({
+      providerId: provider.providerId,
+      baseUrl: provider.baseUrl,
+      models: provider.models,
+      keyed: sql<number>`${provider.apiKeyCipher} is not null`,
+    })
+    .from(provider)
+    .where(eq(provider.teamId, teamId))
+    .orderBy(asc(provider.createdAt), asc(provider.id))
+    .all();
+  for (const row of rows) {
+    const runnable =
+      row.keyed === 1 ||
+      keylessEndpoint(row.providerId) ||
+      (usesHostCodexLogin(row.providerId, row.baseUrl) && codexLoginAvailable());
+    if (!runnable) continue;
+    const model = row.models.find((m) => m.id !== '');
+    if (model !== undefined) {
+      return { reason: 'provider', provider: row.providerId, modelId: model.id };
+    }
+  }
+  return null;
+}
+
+export function defaultCoordinatorRule(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+): RoutingRuleRow | null {
+  const choice = defaultCoordinatorChoice(db, teamId);
+  return choice === null ? null : syntheticRule(teamId, 'coordinator', choice);
+}
+
 function defaultSessionRule(db: Pick<Db, 'select'>, teamId: string): RoutingRuleRow | null {
   const choice = defaultSessionChoice(db, teamId);
-  if (choice === null) return null;
+  return choice === null ? null : syntheticRule(teamId, 'session', choice);
+}
+
+function syntheticRule(
+  teamId: string,
+  use: 'session' | 'coordinator',
+  choice: { provider: string; modelId: string },
+): RoutingRuleRow {
   return {
-    id: DEFAULT_SESSION_RULE_ID,
+    id: use === 'session' ? DEFAULT_SESSION_RULE_ID : DEFAULT_COORDINATOR_RULE_ID,
     teamId,
-    use: 'session',
+    use,
     provider: choice.provider,
     modelId: choice.modelId,
     thinkingLevel: null,
@@ -234,6 +341,112 @@ function defaultSessionRule(db: Pick<Db, 'select'>, teamId: string): RoutingRule
   };
 }
 
+export function citationAttemptRecordId(buildId: string, attachmentId: string): string {
+  return `research-citation-attempt-${buildId}:${attachmentId}`;
+}
+
+export function parseCitationCheckPin(value: unknown): CitationCheckPin | null {
+  return citationCheckPinSchema.safeParse(value).data ?? null;
+}
+
+function citationCheckPin(
+  db: Pick<Db, 'select'>,
+  sourceRef: string | null | undefined,
+): CitationCheckPin | null {
+  const [buildId, attachmentId] = sourceRef?.split(':') ?? [];
+  if (!buildId || !attachmentId) return null;
+  const row = db
+    .select({ content: message.content })
+    .from(message)
+    .where(eq(message.id, citationAttemptRecordId(buildId, attachmentId)))
+    .get();
+  try {
+    const value: unknown =
+      typeof row?.content === 'string' ? JSON.parse(row.content) : row?.content;
+    return typeof value === 'object' && value !== null && 'pin' in value
+      ? parseCitationCheckPin(value.pin)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function pinnedCitationRule(teamId: string, pin: CitationCheckPin): RoutingRuleRow {
+  return {
+    ...syntheticRule(teamId, 'session', pin),
+    id: pin.ruleId,
+    use: 'citation_check',
+    machineId: pin.machineId,
+    requiredCapabilities: pin.requiredCapabilities,
+    thinkingLevel: pin.thinkingLevel,
+  };
+}
+
+function rulePin(rule: RoutingRuleRow): CitationCheckPin {
+  return {
+    ruleId: rule.id,
+    provider: rule.provider,
+    modelId: rule.modelId,
+    machineId: rule.machineId,
+    requiredCapabilities: rule.requiredCapabilities,
+    thinkingLevel: rule.thinkingLevel,
+  };
+}
+
+function defaultPin(choice: { provider: string; modelId: string }): CitationCheckPin {
+  return {
+    ruleId: CITATION_CHECKER_RULE_ID,
+    ...choice,
+    machineId: null,
+    requiredCapabilities: null,
+    thinkingLevel: null,
+  };
+}
+
+export function citationCheckerChoice(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+  previous: CitationCheckPin | null,
+): CitationCheckPin | null {
+  const checker = ruleRow(db, teamId, 'citation_check');
+  if (checker !== null) return rulePin(checker);
+  const harness = capabilityCandidates(db, teamId, { machineId: null, required: null }).filter(
+    (candidate) => candidate.available,
+  );
+  const runnable = (choice: { provider: string; modelId: string }) =>
+    harness.some((c) => c.provider === choice.provider && c.modelId === choice.modelId) ||
+    servingProviders(db, teamId, choice.modelId).some(
+      (served) => served.providerId === choice.provider && served.runnable,
+    );
+  const session = ruleRow(db, teamId, 'session');
+  const providerRows = db
+    .select({ providerId: provider.providerId, models: provider.models })
+    .from(provider)
+    .where(eq(provider.teamId, teamId))
+    .all();
+  const candidates = [
+    ...(session !== null && runnable(session) ? [rulePin(session)] : []),
+    ...CITATION_HARNESS_MODELS.filter(runnable).map(defaultPin),
+    ...servingProviders(db, teamId, null)
+      .filter((served) => served.runnable)
+      .flatMap(({ providerId }) =>
+        (providerRows.find((row) => row.providerId === providerId)?.models ?? [])
+          .filter((m) => m.id !== '')
+          .map((m) => defaultPin({ provider: providerId, modelId: m.id })),
+      ),
+  ];
+  const kept =
+    previous === null
+      ? undefined
+      : candidates.find(
+          (pin) =>
+            pin.provider === previous.provider &&
+            pin.modelId === previous.modelId &&
+            pin.machineId === previous.machineId,
+        );
+  return kept === undefined ? (candidates[0] ?? null) : previous;
+}
+
 function storedRouteForStep(
   db: Pick<Db, 'select'>,
   todoRow: RoutedTodo,
@@ -242,6 +455,8 @@ function storedRouteForStep(
   if (kind === 'review') return ruleRow(db, todoRow.teamId, 'review');
   if (!isSessionStepKind(kind) && kind !== 'merge') return null;
   if (todoRow.sourceKind === 'research-citation-check') {
+    const pin = citationCheckPin(db, todoRow.sourceRef);
+    if (pin !== null) return pinnedCitationRule(todoRow.teamId, pin);
     const checker = ruleRow(db, todoRow.teamId, 'citation_check');
     if (checker !== null) return checker;
   }
@@ -389,7 +604,7 @@ export function ruleProfileForStep(
     : { ...profile, machineId: null };
 }
 
-const ROUTED_PROVIDERS = ['claude-code', CODEX_MODEL.provider];
+export const ROUTED_PROVIDERS = ['claude-code', CODEX_MODEL.provider];
 
 export function profileForStep(
   db: Pick<Db, 'select'>,
@@ -424,8 +639,17 @@ export function profileForStep(
 }
 
 export function coordinatorProfile(db: Pick<Db, 'select'>, teamId: string): RouteProfile | null {
-  const route = ruleRow(db, teamId, 'coordinator');
+  const route =
+    ruleRow(db, teamId, 'coordinator') ??
+    (coordinatorRunsOnPi() ? defaultCoordinatorRule(db, teamId) : null);
   return route === null ? null : routeProfile(route);
+}
+
+export function coordinatorMemoryOwner(db: Pick<Db, 'select'>, teamId: string): string | undefined {
+  const stored = storedRuleRow(db, teamId, 'coordinator');
+  if (stored !== null) return stored.id;
+  if (!coordinatorRunsOnPi() || defaultCoordinatorRule(db, teamId) === null) return undefined;
+  return db.select({ id: chief.id }).from(chief).where(eq(chief.teamId, teamId)).get()?.id;
 }
 
 export const VERIFY_MEMORY_OWNER_SUFFIX = ':verify';
@@ -485,7 +709,11 @@ function requireWorkPolicy(db: Db, id: string): WorkPolicyRecord {
   return toWorkPolicyRecord(row);
 }
 
-export function listRoutingSettings(db: Db, teamId: string): TeamRoutingSettings {
+export function listRoutingSettings(
+  db: Db,
+  teamId: string,
+  coordinatorInServer = false,
+): TeamRoutingSettings {
   const rules = db
     .select()
     .from(routingRule)
@@ -500,12 +728,16 @@ export function listRoutingSettings(db: Db, teamId: string): TeamRoutingSettings
     .all()
     .map(toWorkPolicyRecord)
     .sort((a, b) => a.use.localeCompare(b.use));
-  if (rules.some((rule) => rule.use === 'session')) return { rules, policies };
-  const choice = defaultSessionChoice(db, teamId);
+  const none = { reason: 'none' as const, provider: null, modelId: null };
   return {
     rules,
     policies,
-    sessionDefault: choice ?? { reason: 'none', provider: null, modelId: null },
+    ...(rules.some((rule) => rule.use === 'session')
+      ? {}
+      : { sessionDefault: defaultSessionChoice(db, teamId) ?? none }),
+    ...(!coordinatorInServer || rules.some((rule) => rule.use === 'coordinator')
+      ? {}
+      : { coordinatorDefault: defaultCoordinatorChoice(db, teamId) ?? none }),
   };
 }
 
@@ -529,6 +761,9 @@ export function upsertRoutingRule(
     .from(routingRule)
     .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, use)))
     .get();
+  if (body.expectedUpdatedAt !== undefined && existing?.updatedAt !== body.expectedUpdatedAt) {
+    throw new HttpError(409, 'routing rule changed since it was read');
+  }
   if (body.machineId != null) requireTeamMachine(db, teamId, body.machineId);
   const now = nowMs();
   if (existing === undefined) {

@@ -16,7 +16,7 @@ const searchDialog = (page: Page) => page.getByRole('dialog', { name: '搜索' }
 export const PAGES: AuditPage[] = [
   {
     name: 'search',
-    url: '/app/schedules?scenario=01',
+    url: '/app?scenario=01&pane=tasks&tab=scheduled',
     open: async (page) => {
       await pressAndExpect(page, 'Meta+k', searchDialog(page));
       await page.keyboard.type('probe');
@@ -25,15 +25,23 @@ export const PAGES: AuditPage[] = [
   },
   {
     name: 'new task home composer',
-    url: '/app/schedules?scenario=01',
-    open: (page) =>
-      page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click(),
+    url: '/app?scenario=01&pane=tasks&tab=scheduled',
+    open: async (page) => {
+      await page.getByTestId('sidebar-reopen').click();
+      await page.mouse.move(700, 400);
+      await page
+        .getByRole('complementary')
+        .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' })
+        .click();
+    },
     ready: (p) => p.getByTestId('home-c').getByTestId('chief-composer-input'),
   },
   {
     name: 'new task home composer filled',
-    url: '/app/schedules?scenario=01',
+    url: '/app?scenario=01&pane=tasks&tab=scheduled',
     open: async (page) => {
+      await page.getByTestId('sidebar-reopen').click();
+      await page.mouse.move(700, 400);
       await page
         .getByRole('complementary')
         .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' })
@@ -65,12 +73,16 @@ export const PAGES: AuditPage[] = [
     },
     ready: (p) => p.getByTestId('work-call').first(),
   },
-  { name: 'schedules list', url: '/app/schedules?scenario=r3-93', ready: (p) => p.locator('.sched-card').first() },
-  { name: 'schedules form', url: '/app/schedules?scenario=r3-92', ready: (p) => p.getByRole('dialog', { name: '新建定时' }) },
   {
-    name: 'project tasks',
-    url: '/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks?scenario=prj-tasks',
-    ready: (p) => p.getByTestId('task-row').first(),
+    name: 'schedules list',
+    url: '/app?scenario=r3-93&pane=tasks&tab=scheduled',
+    ready: (p) => p.locator('[data-slot="schedule-row"]').first(),
+  },
+  {
+    name: 'schedules form',
+    url: '/app?scenario=r3-93&pane=tasks&tab=scheduled',
+    open: (page) => page.locator('[data-slot="schedule-row"]').first().click(),
+    ready: (p) => p.getByTestId('schedule-popover'),
   },
   {
     name: 'project settings',
@@ -81,11 +93,6 @@ export const PAGES: AuditPage[] = [
     name: 'machines',
     url: '/app/settings/machines?scenario=06',
     ready: (p) => p.getByTestId('machine-item').first(),
-  },
-  {
-    name: 'machine detail',
-    url: '/app/settings/machines?scenario=06&machine=Kd8fG2hJ4mN9pQ1rStUvWx3',
-    ready: (p) => p.getByTestId('machine-detail'),
   },
   { name: 'skills', url: '/app/resources/skills?scenario=06', ready: row },
   {

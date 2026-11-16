@@ -20,7 +20,6 @@ function eligibility(confinement: unknown, osPlatform = 'linux') {
     machine: {
       id: 'machine-one',
       name: 'machine-one',
-      enabledRuntimes: ['pi', 'claude-code', 'gemini'],
       claudeCodeReport: null,
       capabilities: capabilities ?? null,
     },
@@ -30,7 +29,6 @@ function eligibility(confinement: unknown, osPlatform = 'linux') {
     localProject: false,
     claudeRateBlocked: false,
     claudeLoginBlocked: false,
-    claudeUsageRefused: false,
   };
   return machineEligibility(input);
 }

@@ -87,9 +87,9 @@ describe('47-item vocabulary', () => {
     ...added,
   ].sort();
 
-  it('raw key set is exactly 49; live vocabulary = raw - removals - D60 removals + additions = 49', () => {
+  it('raw key set is exactly 49; live vocabulary = raw - removals - D60 removals + additions = 48', () => {
     expect(rawKeys).toHaveLength(49);
-    expect(CHIEF_TOOL_COUNT).toBe(49);
+    expect(CHIEF_TOOL_COUNT).toBe(48);
     expect(CHIEF_TOOL_COUNT).toBe(
       rawKeys.filter((name) => !removedUnderD60.includes(name)).length -
         removed.length +
@@ -102,7 +102,7 @@ describe('47-item vocabulary', () => {
     expect(CHIEF_REMOTE_TOOLS.map((t) => t.name).sort()).toEqual(expected);
   });
 
-  it('removal registry = delete_skills + set_remote_shell; addition registry = create_skill + update_skill + models + update_memory + snooze_todos + search_history + read_history + github_overlap + job_profile + channel_messages', () => {
+  it('removal registry = delete_skills + set_remote_shell; addition registry = create_skill + update_skill + models + update_memory + snooze_todos + search_history + read_history + job_profile + channel_messages', () => {
     expect(removed).toEqual(['delete_skills', 'set_remote_shell']);
     expect(added).toEqual([
       'create_skill',
@@ -112,7 +112,6 @@ describe('47-item vocabulary', () => {
       'snooze_todos',
       'search_history',
       'read_history',
-      'github_overlap',
       'job_profile',
       'channel_messages',
     ]);
@@ -126,8 +125,8 @@ describe('47-item vocabulary', () => {
     }
   });
 
-  it('groups = 20 read + 16 organize + 2 execute + 11 private', () => {
-    expect(CHIEF_TOOL_CATEGORIES.read).toHaveLength(20);
+  it('groups = 19 read + 16 organize + 2 execute + 11 private', () => {
+    expect(CHIEF_TOOL_CATEGORIES.read).toHaveLength(19);
     expect(CHIEF_TOOL_CATEGORIES.organize).toHaveLength(16);
     expect(CHIEF_TOOL_CATEGORIES.execute).toHaveLength(2);
     expect(CHIEF_TOOL_CATEGORIES.private).toHaveLength(11);
@@ -186,7 +185,7 @@ describe('Coordinator task text contract', () => {
 });
 
 describe('D60 router tools', () => {
-  it('are six tools outside the 49-item base vocabulary, so the base count stays 49', () => {
+  it('are seven tools outside the 48-item base vocabulary, so the base count stays 48', () => {
     expect(CHIEF_ROUTER_TOOL_NAMES).toEqual([
       'open_thread',
       'message_thread',
@@ -194,9 +193,10 @@ describe('D60 router tools', () => {
       'answer_question',
       'threads',
       'needs_you',
+      'decide_report_suggestion',
     ]);
     expect(CHIEF_ROUTER_TOOLS.map((t) => t.name)).toEqual([...CHIEF_ROUTER_TOOL_NAMES]);
-    expect(CHIEF_TOOL_COUNT).toBe(49);
+    expect(CHIEF_TOOL_COUNT).toBe(48);
     for (const name of CHIEF_ROUTER_TOOL_NAMES) expect(CHIEF_TOOL_NAMES).not.toContain(name);
   });
 
@@ -340,7 +340,7 @@ describe('settings-gear canon + id seam (r5 §2/§3.6, AC3 backend half)', () =>
 
   it('rebind second-confirmation notice = r5 §2 verbatim (memory does not migrate)', () => {
     expect(CHIEF_REBIND_CONFIRM_COPY).toBe(
-      '更换 Coordinator 的 agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。',
+      '更换 Coordinator 的 Agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。',
     );
     expect(CHIEF_REBIND_CONFIRM_COPY).toContain('当前记忆不会迁移');
   });

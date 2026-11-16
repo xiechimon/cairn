@@ -3,13 +3,13 @@ import { EN } from '../src/i18n/en.js';
 import { translate } from '../src/i18n/translate.js';
 
 const DAYS =
-  '{name} 上的 Claude Code 登录将在 {days} 天后过期。在该 Runner 上运行 `claude auth login` 重新登录。';
+  '{name} 上的 Claude Code 登录将在 {days} 天后过期。在该执行机上运行 `claude auth login` 重新登录。';
 const ONE_DAY =
-  '{name} 上的 Claude Code 登录将在 1 天后过期。在该 Runner 上运行 `claude auth login` 重新登录。';
+  '{name} 上的 Claude Code 登录将在 1 天后过期。在该执行机上运行 `claude auth login` 重新登录。';
 const SOON =
-  '{name} 上的 Claude Code 登录将在不到 1 天内过期。在该 Runner 上运行 `claude auth login` 重新登录。';
+  '{name} 上的 Claude Code 登录将在不到 1 天内过期。在该执行机上运行 `claude auth login` 重新登录。';
 const EXPIRED =
-  '{name} 上的 Claude Code 登录已过期。在该 Runner 上运行 `claude auth login` 重新登录。';
+  '{name} 上的 Claude Code 登录已过期。在该执行机上运行 `claude auth login` 重新登录。';
 
 describe('Claude Code login warning copy', () => {
   test('two days left names the machine and the re-login command', () => {

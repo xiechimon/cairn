@@ -1,21 +1,17 @@
-import type { MachineRuntime, ModelSource, ProviderRecord } from '@cairn/shared';
-import { MACHINE_RUNTIMES } from '@cairn/shared';
+import type { ModelSource, ProviderRecord } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Cpu, Plus } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { accountStatusOf, type Verification } from '../api/account-verification.js';
 import {
   type AccountStep,
-  type StickyThread,
   type SubscriptionAccount,
   toClaudeAccount,
 } from '../api/claude-accounts.js';
 import {
   useClaudeSubscriptionSteps,
-  useClaudeSubscriptionStickiness,
   useClaudeSubscriptions,
-  useCreateClaudeSubscription,
   useDeleteClaudeSubscription,
   useRenameClaudeSubscription,
   useSubscriptionVerification,
@@ -40,8 +36,7 @@ import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { PageShell } from '../pages/shell.js';
-import { AddClaudeSubscriptionDialog } from './claude-subscriptions.js';
-import type { CreateProviderDialog as CreateProviderDialogModule } from './create-provider-dialog.js';
+import { AddProviderFlow, type AddProviderView } from './add-provider-flow.js';
 import { PROVIDERS_HREF } from './hrefs.js';
 import {
   ClaudeCodeEditor,
@@ -66,9 +61,6 @@ interface Entry {
 }
 
 const CLAUDE_SUBSCRIPTION_ADD = 'claude-subscription';
-
-const isMachineRuntime = (value: string): value is MachineRuntime =>
-  (MACHINE_RUNTIMES as readonly string[]).includes(value);
 
 function sourceFor(machine: MachineRow, sources: readonly ModelSource[]): ModelSource | undefined {
   const claude = sources.filter((s) => s.runtime === 'claude-code');
@@ -119,7 +111,6 @@ function teamEntries(
 interface SubscriptionEntryDeps {
   now: number;
   steps: Record<string, AccountStep[]>;
-  sticky: StickyThread[];
   verifications: Record<string, Verification>;
   actionsFor: (account: SubscriptionAccount) => SubscriptionActions;
   t: TFunc;
@@ -155,7 +146,6 @@ function subscriptionEntries(
           view={view}
           verifying={verification?.phase === 'verifying'}
           steps={deps.steps[account.id]}
-          sticky={deps.sticky.filter((thread) => thread.subscriptionId === account.id)}
           actions={deps.actionsFor(account)}
         />
       ),
@@ -167,21 +157,13 @@ function machineEntries(
   machine: MachineRow,
   source: ModelSource | undefined,
   providerCount: number,
-  toggle: ((runtime: MachineRuntime, next: boolean) => void) | undefined,
   onShowTeam: () => void,
   t: TFunc,
 ): Entry[] {
   const enabled = new Set(machine.enabledRuntimes ?? []);
   const online = machine.online !== false;
-  const switchFor = (runtime: MachineRuntime) => ({
-    checked: enabled.has(runtime),
-    disabled: toggle === undefined || !online,
-    onChange: (next: boolean) => toggle?.(runtime, next),
-  });
   const claude = claudeCodeStatus(source, online);
   const bin = typeof source?.bin === 'object' && source.bin !== null ? source.bin : null;
-  const offTone = (runtime: MachineRuntime, tone: ProviderItem['tone']) =>
-    enabled.has(runtime) ? tone : 'off';
   return [
     {
       item: {
@@ -190,8 +172,7 @@ function machineEntries(
         Mark: ClaudeMark,
         version: bin?.version ?? null,
         status: t(claude.status),
-        tone: claude.tone === 'warn' ? 'warn' : offTone('claude-code', claude.tone),
-        toggle: switchFor('claude-code'),
+        tone: claude.tone === 'warn' || enabled.has('claude-code') ? claude.tone : 'off',
       },
       editor: (
         <ClaudeCodeEditor source={source} machineName={machine.name} status={claude.status} />
@@ -202,9 +183,8 @@ function machineEntries(
         id: 'pi',
         name: 'pi',
         Mark: PiMark,
-        status: online ? t('使用所有 Runner 的服务商') : t('离线'),
-        tone: online ? offTone('pi', 'ok') : 'warn',
-        toggle: switchFor('pi'),
+        status: online ? t('使用所有执行机的服务商') : t('离线'),
+        tone: online ? 'ok' : 'warn',
       },
       editor: (
         <PiEditor
@@ -219,11 +199,8 @@ function machineEntries(
         id: 'gemini',
         name: 'Gemini CLI',
         Mark: GeminiMark,
-        status: enabled.has('gemini') ? t('还没上报') : t('接入命令闸前不能开启'),
+        status: t('暂不支持'),
         tone: 'off',
-        toggle: enabled.has('gemini')
-          ? switchFor('gemini')
-          : { ...switchFor('gemini'), disabled: true },
       },
       editor: <GeminiEditor machineName={machine.name} />,
     },
@@ -242,37 +219,14 @@ export function ProvidersPage() {
   const client = useQueryClient();
   const clock = useClock();
   const subscriptionsQ = useClaudeSubscriptions(teamId, live);
-  const createSubscription = useCreateClaudeSubscription(teamId);
   const deleteSubscription = useDeleteClaudeSubscription(teamId);
   const renameSubscription = useRenameClaudeSubscription(teamId);
   const verification = useSubscriptionVerification(teamId);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [CreateProviderDialog, setCreateProviderDialog] = useState<
-    typeof CreateProviderDialogModule | null
-  >(null);
-  useEffect(() => {
-    let mounted = true;
-    void import('./create-provider-dialog.js').then((module) => {
-      if (mounted) setCreateProviderDialog(() => module.CreateProviderDialog);
-    });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-  const [addingSubscription, setAddingSubscription] = useState(false);
+  const [addView, setAddView] = useState<AddProviderView>('closed');
   const [removingSubscription, setRemovingSubscription] = useState<SubscriptionAccount | null>(
     null,
   );
   const [connectError, setConnectError] = useState<string | null>(null);
-  const [xaiDevice, setXaiDevice] = useState<{
-    state: string;
-    userCode: string;
-    verificationUri: string;
-    intervalSeconds: number;
-  } | null>(null);
-  const [xaiDeviceError, setXaiDeviceError] = useState<string | null>(null);
-  const pollXai = useRef(mutations.pollXaiDevice);
-  pollXai.current = mutations.pollXaiDevice;
 
   const sources = live
     ? (sourcesQ.data?.sources ?? [])
@@ -290,10 +244,6 @@ export function ProvidersPage() {
     ? (subscriptionsQ.data ?? []).filter((s) => s.state !== undefined).map((s) => s.id)
     : [];
   const stepsQ = useClaudeSubscriptionSteps(teamId, subscriptionApiIds, live);
-  const stickinessQ = useClaudeSubscriptionStickiness(
-    teamId,
-    live && subscriptionApiIds.length > 0,
-  );
   const stepsByAccount: Record<string, AccountStep[]> = live
     ? Object.fromEntries(
         subscriptionApiIds.flatMap((id, index) => {
@@ -302,16 +252,13 @@ export function ProvidersPage() {
         }),
       )
     : (fixtureAccounts?.stepsByAccount ?? {});
-  const stickiness: StickyThread[] = live
-    ? (stickinessQ.data?.threads ?? [])
-    : (fixtureAccounts?.stickiness ?? []);
 
   useEffect(() => {
     const oauth = searchParams.get('oauth');
     if (oauth === null) return;
     if (oauth === 'error') {
       setConnectError(oauthReasonCopy(searchParams.get('reason'), t));
-      setCreateOpen(true);
+      setAddView('picker');
     }
     const next = new URLSearchParams(searchParams);
     next.delete('oauth');
@@ -320,45 +267,9 @@ export function ProvidersPage() {
   }, [searchParams, setSearchParams, t]);
 
   useEffect(() => {
-    if (!createOpen || xaiDevice === null) return;
-    let stopped = false;
-    const timer = setInterval(() => {
-      void pollXai.current.mutateAsync(xaiDevice.state).then(
-        (result) => {
-          if (stopped) return;
-          if (result.status === 'complete') {
-            setXaiDevice(null);
-            setXaiDeviceError(null);
-            setCreateOpen(false);
-            return;
-          }
-          if (result.status === 'denied') {
-            setXaiDevice(null);
-            setXaiDeviceError(t('xAI 登录被拒绝。'));
-          } else if (result.status === 'superseded') {
-            setXaiDevice(null);
-            setXaiDeviceError(t('已有更新的 xAI 凭证，这次登录没有覆盖它。'));
-          } else if (result.status === 'expired') {
-            setXaiDevice(null);
-            setXaiDeviceError(t('验证码已过期，请重试。'));
-          }
-        },
-        () => {
-          if (!stopped) setXaiDeviceError(t('xAI 登录失败，请重试。'));
-        },
-      );
-    }, xaiDevice.intervalSeconds * 1000);
-    return () => {
-      stopped = true;
-      clearInterval(timer);
-    };
-  }, [createOpen, t, xaiDevice]);
-
-  useEffect(() => {
     const add = searchParams.get('add');
     if (add === null) return;
-    if (add === CLAUDE_SUBSCRIPTION_ADD) setAddingSubscription(true);
-    else setCreateOpen(true);
+    setAddView(add === CLAUDE_SUBSCRIPTION_ADD ? 'subscription' : 'picker');
     const next = new URLSearchParams(searchParams);
     next.delete('add');
     setSearchParams(next, { replace: true });
@@ -429,29 +340,12 @@ export function ProvidersPage() {
       : {}),
   });
 
-  const toggleRuntime = (target: MachineRow) =>
-    live && target.id !== undefined
-      ? (runtime: MachineRuntime, next: boolean) => {
-          const current = (target.enabledRuntimes ?? []).filter(isMachineRuntime);
-          const enabledRuntimes = next
-            ? [...new Set([...current, runtime])]
-            : current.filter((r) => r !== runtime);
-          const id = target.id;
-          if (id === undefined) return;
-          mutations.patchMachine.mutate(
-            { id, body: { enabledRuntimes } },
-            { onError: (error) => toastError(t('保存失败，请重试。'), error) },
-          );
-        }
-      : undefined;
-
   const entries =
     machine === undefined
       ? [
           ...subscriptionEntries(subscriptions, {
             now,
             steps: stepsByAccount,
-            sticky: stickiness,
             verifications: verification.states,
             actionsFor: subscriptionActionsFor,
             t,
@@ -463,7 +357,6 @@ export function ProvidersPage() {
           machine,
           sourceFor(machine, sources),
           providers.length,
-          toggleRuntime(machine),
           () => setParams({ scope: null, item: null }),
           t,
         );
@@ -524,7 +417,7 @@ export function ProvidersPage() {
                   aria-label={t('添加服务商')}
                   title={t('添加服务商')}
                   data-testid="resource-new"
-                  onClick={() => setCreateOpen(true)}
+                  onClick={() => setAddView('picker')}
                 >
                   <Plus aria-hidden strokeWidth={1.75} />
                 </Button>
@@ -553,7 +446,7 @@ export function ProvidersPage() {
                   title={t('尚未添加服务商')}
                   description={t('添加 API key、订阅或自定义端点后，它们的模型会出现在这里。')}
                   {...(machine === undefined
-                    ? { action: { label: t('添加服务商'), onClick: () => setCreateOpen(true) } }
+                    ? { action: { label: t('添加服务商'), onClick: () => setAddView('picker') } }
                     : {})}
                 />
               }
@@ -565,84 +458,18 @@ export function ProvidersPage() {
           {selected?.editor}
         </ProviderPanel>
       </div>
-      {CreateProviderDialog !== null ? (
-        <CreateProviderDialog
-          open={createOpen}
-          onClose={() => {
-            setCreateOpen(false);
-            setConnectError(null);
-            setXaiDevice(null);
-            setXaiDeviceError(null);
-          }}
-          onXaiSignIn={
-            live
-              ? () => {
-                  setXaiDeviceError(null);
-                  mutations.startXaiDevice.mutate(undefined, {
-                    onSuccess: (started) => setXaiDevice(started),
-                    onError: () => setXaiDeviceError(t('xAI 登录失败，请重试。')),
-                  });
-                }
-              : undefined
-          }
-          xaiSignInPending={mutations.startXaiDevice.isPending}
-          xaiDevice={xaiDevice}
-          xaiDeviceError={xaiDeviceError}
-          pending={mutations.createProvider.isPending}
-          onCreate={
-            live
-              ? (body) =>
-                  mutations.createProvider.mutate(body, {
-                    onSuccess: () => setCreateOpen(false),
-                    onError: (error) => toastError(t('添加模型服务失败，请重试。'), error),
-                  })
-              : undefined
-          }
-          onConnect={
-            live
-              ? (presetId) => {
-                  setConnectError(null);
-                  mutations.startProviderOAuth.mutate(presetId, {
-                    onSuccess: (data) => window.location.assign(data.authorizationUrl),
-                    onError: (err) => setConnectError(err.message),
-                  });
-                }
-              : undefined
-          }
-          connectPending={mutations.startProviderOAuth.isPending}
-          connectError={connectError}
-          onPickClaudeSubscription={
-            live
-              ? () => {
-                  setCreateOpen(false);
-                  createSubscription.reset();
-                  setAddingSubscription(true);
-                }
-              : undefined
-          }
-        />
-      ) : null}
-      {addingSubscription && (
-        <AddClaudeSubscriptionDialog
-          onClose={() => {
-            createSubscription.reset();
-            setAddingSubscription(false);
-          }}
-          onCreate={(body) =>
-            createSubscription.mutate(body, {
-              onSuccess: (created) => {
-                createSubscription.reset();
-                setAddingSubscription(false);
-                void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
-                setParams({ item: `subscription:${created.id}` }, true);
-                announceVerification(created.id, created.label);
-              },
-            })
-          }
-          pending={createSubscription.isPending}
-          error={createSubscription.isError}
-        />
-      )}
+      <AddProviderFlow
+        teamId={teamId}
+        live={live}
+        view={addView}
+        onViewChange={setAddView}
+        connectError={connectError}
+        onConnectError={setConnectError}
+        onSubscriptionCreated={(created) => {
+          setParams({ item: `subscription:${created.id}` }, true);
+          announceVerification(created.id, created.label);
+        }}
+      />
       <AlertDialogShell
         title={t('移除「{name}」？', { name: removingSubscription?.label ?? '' })}
         ariaLabel={t('移除订阅')}

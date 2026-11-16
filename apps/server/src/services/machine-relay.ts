@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { MachineAskBody, MachineAskResponse } from '@cairn/shared';
 import {
   AGENT_TOOL_SKILL_CREATE,
@@ -7,9 +7,10 @@ import {
   derivePlaceholderTitle,
   isBuildStepKind,
   isComputerBrowserTool,
+  parseGithubIssueSourceRef,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { build, chief, chiefThread, type step, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
@@ -23,7 +24,12 @@ import {
   createOrGetQuestion,
   holdForQuestion,
 } from './chief-questions.js';
-import { executeChiefTool, executeWorkerMemoryTool } from './chief-tools.js';
+import {
+  executeChiefTool,
+  executeWorkerMemoryTool,
+  type TransitionActor,
+  transitionTodos,
+} from './chief-tools.js';
 import { steeredMessageScopes } from './chief-turns.js';
 import {
   capturePreCallWorld,
@@ -35,10 +41,10 @@ import { projectOfTodo } from './git.js';
 import { resolveProjectGithubLabelIds } from './github-labels.js';
 import { forwardComputerCall } from './machine-computer.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
-import { refuseMailTurnTool } from './mail.js';
 import { stepScopeProjectId } from './picked-project.js';
+import { refuseRestrictedTurnTool } from './report-turn.js';
 import {
-  coordinatorProfile,
+  coordinatorMemoryOwner,
   memoryOpsAreTeamScoped,
   memoryOwnerOf,
   profileForStep,
@@ -58,7 +64,7 @@ export async function machineAsk(
   opts: { holdMs: number; signal?: AbortSignal } = { holdMs: ASK_HOLD_MS },
 ): Promise<MachineAskResponse> {
   const row = ownedStep(deps, machineId, stepId);
-  refuseMailTurnTool(row.prompt, 'ask_user');
+  refuseRestrictedTurnTool(row.prompt, 'ask_user');
   if (row.kind === 'session') {
     return askWorkerQuestion(deps, row, body, opts);
   }
@@ -108,8 +114,9 @@ export async function executeRelayToolCall(
   signal?: AbortSignal,
 ): Promise<string> {
   const row = ownedStep(deps, machineId, stepId);
-  refuseMailTurnTool(row.prompt, name);
+  refuseRestrictedTurnTool(row.prompt, name, params);
   if (isComputerBrowserTool(name) || name === 'request_takeover') {
+    assertChiefDigestTool(row.buildId, name);
     if (row.kind !== 'chief') {
       throw new HttpError(400, 'browser tools require a chief step');
     }
@@ -119,11 +126,7 @@ export async function executeRelayToolCall(
     if (row.status !== 'claimed') {
       throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
     }
-    const callId =
-      toolCallId ??
-      createHash('sha256')
-        .update(`${stepId}\0${name}\0${JSON.stringify(params)}`)
-        .digest('hex');
+    const callId = toolCallId ?? randomUUID();
     const result = await forwardComputerCall(
       deps,
       machineId,
@@ -190,7 +193,7 @@ export async function executeRelayToolCall(
         userId: threadRow.userId,
         chiefId: chiefRow.id,
         threadId,
-        chiefAgentId: coordinatorProfile(deps.db, threadRow.teamId)?.id ?? null,
+        chiefAgentId: coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
         conversationId: threadId,
         turnPrompt: row.prompt,
         turnMessageIds: row.ownerMessageIds ?? [],
@@ -216,6 +219,81 @@ export function steeredFromAnotherScope(deps: MachineDeps, row: typeof step.$inf
   return steeredMessageScopes(deps.db, row).some((projectId) => projectId !== scope);
 }
 
+const THREAD_ACTOR: TransitionActor = { kind: 'agent', name: 'Thread', stopActor: 'system' };
+
+function closeThreadAsDuplicate(
+  deps: MachineDeps,
+  row: typeof step.$inferSelect,
+  todoRow: typeof todo.$inferSelect,
+  params: Record<string, unknown>,
+): string {
+  const { source, number } = params;
+  if (projectOfTodo(deps.db, todoRow)?.repoKind !== 'github') {
+    throw new HttpError(409, 'close_as_duplicate is only available in GitHub projects');
+  }
+  if (source !== 'task' && source !== 'github') {
+    throw new HttpError(400, 'close_as_duplicate source must be "task" or "github"');
+  }
+  if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < 1) {
+    throw new HttpError(400, 'close_as_duplicate number must be a positive integer');
+  }
+  if (todoRow.phase === 'closed' || todoRow.phase === 'done') {
+    throw new HttpError(409, `close_as_duplicate: this task is already ${todoRow.phase}`);
+  }
+  let supersededBy: string | undefined;
+  if (source === 'task') {
+    const original = deps.db
+      .select({ id: todo.id, phase: todo.phase })
+      .from(todo)
+      .where(
+        and(
+          eq(todo.teamId, todoRow.teamId),
+          eq(todo.projectId, todoRow.projectId),
+          eq(todo.seqNum, number),
+        ),
+      )
+      .get();
+    if (!original)
+      throw new HttpError(400, `close_as_duplicate: no task #${number} in this project`);
+    if (original.id === todoRow.id) {
+      throw new HttpError(400, 'close_as_duplicate cannot name this task itself');
+    }
+    if (original.phase === 'closed') {
+      throw new HttpError(409, `close_as_duplicate: task #${number} is closed, not a duplicate`);
+    }
+    supersededBy = original.id;
+  } else {
+    const ownIssue =
+      todoRow.sourceRef !== null ? parseGithubIssueSourceRef(todoRow.sourceRef)?.issueNumber : null;
+    const ownPulls = deps.db
+      .select({ prNumber: build.prNumber })
+      .from(build)
+      .where(eq(build.todoId, todoRow.id))
+      .all()
+      .map((b) => b.prNumber);
+    if (number === ownIssue || ownPulls.includes(number)) {
+      throw new HttpError(
+        400,
+        `close_as_duplicate: #${number} is this task's own issue or pull request`,
+      );
+    }
+  }
+  const result = transitionTodos(
+    deps,
+    todoRow.teamId,
+    [todoRow.id],
+    'closed',
+    THREAD_ACTOR,
+    supersededBy !== undefined ? { supersededBy } : {},
+  );
+  if (!result.transitioned.includes(todoRow.id)) {
+    throw new HttpError(409, 'close_as_duplicate: the task could not be closed');
+  }
+  const label = `${source === 'github' ? 'GitHub ' : ''}#${number}`;
+  recordThreadReportLine(deps, row, `与 ${label} 重复，已停`);
+  return `closed as a duplicate of ${label}; end your turn now`;
+}
+
 async function executeWorkerMemoryToolCall(
   deps: MachineDeps,
   row: typeof step.$inferSelect,
@@ -233,7 +311,16 @@ async function executeWorkerMemoryToolCall(
     if (row.status !== 'claimed') {
       throw new HttpError(409, 'thread_report requires a currently claimed step');
     }
+    if (todoRow.phase === 'closed') {
+      throw new HttpError(409, 'thread_report: this task is closed');
+    }
     return recordThreadReportLine(deps, row, params.line);
+  }
+  if (name === 'close_as_duplicate' && row.kind === 'session') {
+    if (row.status !== 'claimed') {
+      throw new HttpError(409, 'close_as_duplicate requires a currently claimed step');
+    }
+    return closeThreadAsDuplicate(deps, row, todoRow, params);
   }
   if (name === 'attach_file') return attachWorkerFile(deps, row, todoRow, params);
   if (name === 'set_task_meta') {

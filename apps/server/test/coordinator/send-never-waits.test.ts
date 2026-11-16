@@ -1,9 +1,12 @@
-import { fauxAssistantMessage } from '@earendil-works/pi-ai';
+import { createAssistantMessageEventStream, fauxAssistantMessage } from '@earendil-works/pi-ai';
 import { and, desc, eq, like, ne, not, sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { SHORT_RETENTION_MS } from '../../src/coordinator/runtime/cold-slim.js';
+import { SUGGEST_REPLIES_ASK } from '../../src/coordinator/runtime/suggest-replies.js';
 import { SUMMARY_LAG_ROWS } from '../../src/coordinator/seed-summary.js';
 import { chiefMessage, chiefSummary, chiefTurnUsage, step } from '../../src/db/schema.js';
+import { setCoordinatorWake } from '../../src/services/coordinator-context.js';
+import { req } from '../helpers.js';
 import { boot, stub, world } from './runner-world.js';
 
 type World = Awaited<ReturnType<typeof world>>;
@@ -161,4 +164,85 @@ describe('a Coordinator send never waits on a summary', () => {
       w.s.db.select().from(chiefSummary).where(eq(chiefSummary.threadId, w.threadId)).get(),
     ).toBeUndefined();
   });
+
+  it('claims a new message at once while the previous reply is still predicting quick replies', async () => {
+    const w = await world('first');
+    const { faux } = stub('first answer');
+    let predicting = (): void => {};
+    const started = new Promise<void>((resolve) => {
+      predicting = resolve;
+    });
+    const coordinator = boot(w, faux, {
+      fixedProviders: [
+        {
+          ...faux.provider,
+          streamSimple(
+            model: Parameters<typeof faux.provider.streamSimple>[0],
+            context: Parameters<typeof faux.provider.streamSimple>[1],
+            options: Parameters<typeof faux.provider.streamSimple>[2],
+          ) {
+            if (context.messages[0]?.content !== SUGGEST_REPLIES_ASK)
+              return faux.provider.streamSimple(model, context, options);
+            predicting();
+            const stream = createAssistantMessageEventStream();
+            const finish = () => {
+              const message = {
+                ...fauxAssistantMessage('{"replies":["stale"]}', {
+                  stopReason: options?.signal?.aborted ? 'aborted' : 'stop',
+                }),
+                api: model.api,
+                provider: model.provider,
+                model: model.id,
+              };
+              stream.push({ type: 'done', reason: 'stop', message });
+              stream.end(message);
+            };
+            const timer = setTimeout(finish, 5_000);
+            options?.signal?.addEventListener(
+              'abort',
+              () => {
+                clearTimeout(timer);
+                finish();
+              },
+              { once: true },
+            );
+            return stream;
+          },
+        },
+      ],
+    });
+    setCoordinatorWake((threadId) => coordinator.wake(threadId));
+    coordinator.wake(w.threadId);
+    await started;
+
+    const sentAt = Date.now();
+    const sent = await req(w.s.app, 'POST', `/api/conversations/${w.threadId}/messages`, {
+      content: 'second',
+    });
+    expect(sent.status).toBe(201);
+    let claimedAt: number | null = null;
+    while (claimedAt === null && Date.now() - sentAt < 4_000) {
+      const second = w.s.db.select().from(step).where(ne(step.id, w.stepId)).get();
+      claimedAt = second?.claimedAt ?? null;
+      if (claimedAt === null) await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(claimedAt).not.toBeNull();
+    expect((claimedAt ?? 0) - sentAt).toBeLessThan(1_000);
+    await coordinator.idle();
+
+    expect(
+      w.s.db
+        .select()
+        .from(step)
+        .all()
+        .map((r) => r.status),
+    ).toEqual(['done', 'done']);
+    expect(
+      w.s.db
+        .select()
+        .from(chiefMessage)
+        .where(eq(chiefMessage.id, `quick-replies-${w.stepId}`))
+        .get(),
+    ).toBeUndefined();
+  }, 20_000);
 });

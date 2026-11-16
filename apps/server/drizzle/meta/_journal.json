@@ -1135,6 +1135,48 @@
       "when": 1794728199580,
       "tag": "0166_relay_session_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 167,
+      "version": "6",
+      "when": 1794738431035,
+      "tag": "0167_mcp_connector",
+      "breakpoints": true
+    },
+    {
+      "idx": 168,
+      "version": "6",
+      "when": 1794750403189,
+      "tag": "0168_colorful_mole_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 169,
+      "version": "6",
+      "when": 1794754115898,
+      "tag": "0169_mcp_connector_oauth",
+      "breakpoints": true
+    },
+    {
+      "idx": 170,
+      "version": "6",
+      "when": 1794757934772,
+      "tag": "0170_claude_subscription_enabled",
+      "breakpoints": true
+    },
+    {
+      "idx": 171,
+      "version": "6",
+      "when": 1794760486981,
+      "tag": "0171_drop_team_claude_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 172,
+      "version": "6",
+      "when": 1794799241362,
+      "tag": "0172_chief_turn_usage_context_limits",
+      "breakpoints": true
     }
   ]
 }

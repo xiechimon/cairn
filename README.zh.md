@@ -28,7 +28,7 @@
 
 ## 你会得到什么
 
-- **用你自己的订阅。** Claude Code、Codex、Gemini，或任意服务商的 API key。Cairn 不转售算力。
+- **用你自己的订阅。** Claude Code、Codex，或任意服务商的 API key（包括 Google 的 Gemini）。Cairn 不转售算力。
 - **先研究，再动手。** thread 改东西之前，先看几个强的开源项目是怎么解决的，细节自己定。
 - **只在需要你时打扰。** 首页只置顶等你拍板的事，推送也只发需要你动手的事。
 - **结果可信。** agent 合并前，合并闸只认绑定当前补丁的审核结论。撤不回的动作都等你点头。
@@ -75,22 +75,26 @@
 
 ## 安装
 
-环境要求：Node.js 22 或 24。
+**Mac 上**，从[最新发布](https://github.com/xiechimon/cairn/releases/latest)下载 Cairn for Mac：Apple 芯片选 `-arm64.dmg`，Intel 选 `-x64.dmg`。把 Cairn 拖进“应用程序”再打开。应用还没做公证，第一次打开会被 macOS 拦下：打开“系统设置”里的“隐私与安全性”，在 Cairn 旁边点**仍要打开**（macOS 14 及更早：在“应用程序”里右键 Cairn，选“打开”）。应用会在这台 Mac 上跑 Cairn 和一个执行机，并自动登录。
+
+任务用 Claude Code 跑。先装好它，在终端里运行一次 `claude` 登录；应用会在 `PATH` 或常见安装目录里找到它。
+
+**Linux、Windows，或者想在另一台机器上加执行机**，用 npm，环境要求 Node.js 22 或 24：
 
 ```sh
 npx @xiechimon/cairn
 ```
 
-一条命令下载并启动，地址是 **<http://127.0.0.1:8787/app>**。首次启动会在 `~/.cairn` 下建库。
-
-然后在每台要让 agent 干活的机器上，先在网页里建一个 API key，再启动 daemon：
+这会在 **<http://127.0.0.1:8787/app>** 提供 Cairn，并在 `~/.cairn` 下建库。然后在每台要让 agent 干活的机器上：
 
 ```sh
 npm i -g @xiechimon/cairn-cli
-cairn start --api-key <cairn_...> --team <teamId>
+cairn start --server http://127.0.0.1:8787
 ```
 
-在网页里接上模型：Claude Code 或 Gemini CLI 订阅、API key、GitHub Copilot 或 OpenAI Codex 的 OAuth，或自定义端点。想在手机上跟进，看[用 Tailscale 私网访问](./docs/deploy/tailscale-mobile.md)。Docker 和从源码构建见[上手指南](./docs/getting-started.md)。
+它会打印一个链接；在打开着 Cairn 的浏览器里打开它，批准这台机器。执行机在别的机器上时，换成你 server 的地址。Linux 执行机的任务沙箱还需要 bubblewrap，见[上手指南](./docs/getting-started.md#keep-the-daemon-running-on-linux)。在 macOS 和 Windows 上用 npm 跑 server 时，浏览器暂时不能批准这台机器、也不能添加服务商，这些要用 owner token 来做，见[上手指南](./docs/getting-started.md#run-the-server)。
+
+然后接上模型：在跑守护进程的机器上登录 Claude Code 或 Codex CLI；或者在网页里添加服务商，用 `claude setup-token` 得到的 Claude 令牌、API key 或自定义端点。还不能用的：服务商列表里的 OpenAI Codex 登录（标着“暂未开通”）和 Gemini CLI。GitHub Copilot 登录要先配好你自己的 GitHub OAuth App（`CAIRN_GITHUB_OAUTH_CLIENT_ID`、`CAIRN_GITHUB_OAUTH_CLIENT_SECRET`）。想在手机上跟进，看[用 Tailscale 私网访问](./docs/deploy/tailscale-mobile.md)。Docker 和从源码构建见[上手指南](./docs/getting-started.md)。
 
 ## 「等等，你们卖什么？」
 
@@ -104,7 +108,7 @@ Cairn 是给一个人用的，不是给团队用的：你装一份自己用，�
 
 - 写代码，或者工作离不开代码，想让 agent 在后台干活，自己只拍板；
 - 有一台能一直开着的机器（台式机、家里的服务器或 VPS），最好还有笔记本或手机随时跟进；
-- 已经在付 Claude Code、Codex 或 Gemini 的订阅，或者有 API key，想接着用，不想再买一份算力；
+- 已经在付 Claude Code 或 Codex 的订阅，或者有 API key，想接着用，不想再买一份算力；
 - 希望代码、邮件和凭据都留在自己的机器上。
 
 不太适合你，如果你想要：

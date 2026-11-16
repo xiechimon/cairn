@@ -10,6 +10,7 @@ import {
 } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
+import { withCodeSpans } from '../components/notice-banner.js';
 import { QrCode } from '../components/qr-code.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
@@ -159,11 +160,16 @@ export function RemoteAccessPage() {
           testId="remote-routes-empty"
           className="mt-6"
           icon={Smartphone}
-          title={t('这台电脑暂时没有手机可用的线路')}
+          title={t('手机还连不上这台电脑')}
           description={
             awaitingTailnetLogin && tailnet?.authUrl
               ? t('请先登录 Tailscale：{url}', { url: tailnet.authUrl })
-              : t('设置 CAIRN_TSNET=1 后重启，即可用 Tailscale 连接手机。')
+              : t('打开 Tailscale，手机在外面也能连上这台电脑。')
+          }
+          hint={
+            awaitingTailnetLogin && tailnet?.authUrl
+              ? undefined
+              : { text: withCodeSpans(t('打开方法：设置 `CAIRN_TSNET=1` 后重启 Cairn。')) }
           }
         />
       ) : (

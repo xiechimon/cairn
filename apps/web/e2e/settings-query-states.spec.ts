@@ -7,9 +7,9 @@ const PANES = [
     section: 'routing',
     endpoint: 'model-routing',
     empty: '[data-testid="routing-section"]',
-    ok: { edges: [], connections: [], quota: [], settings: { claudeUsage: 'subscription-only' } },
+    ok: { edges: [], connections: [], quota: [] },
   },
-  { section: 'mcp', endpoint: 'mcp-servers', empty: '[data-testid="resource-empty"]', ok: [] },
+  { section: 'mcp', endpoint: 'mcp-*', empty: '[data-testid="mcp-catalog"]', ok: [] },
   { section: 'secrets', endpoint: 'secrets', empty: '[data-testid="resource-empty"]', ok: [] },
   { section: 'api-keys', endpoint: 'api-keys', empty: '[data-testid="keys-empty"]', ok: [] },
 ] as const;
@@ -180,16 +180,16 @@ test('providers: a failed team providers fetch does not hide the machine scope e
 });
 
 for (const width of [768, 1024]) {
-  test(`machines: at ${width}px the expanded row keeps every value column inside it`, async ({
+  test(`machines: at ${width}px every row stays inside the panel`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/app/settings/machines?scenario=machines-master-detail&machine=md-omarchy');
     const settings = page.getByRole('dialog', { name: '设置' });
-    await expect(settings.getByTestId('machine-detail')).toBeVisible();
-    const clipped = await settings.getByTestId('machine-detail').evaluate((root) => {
+    await expect(settings.getByTestId('machine-list')).toBeVisible();
+    const clipped = await settings.getByTestId('machine-list').evaluate((root) => {
       const rootRight = root.getBoundingClientRect().right;
-      return [...root.querySelectorAll('.settings-row')]
+      return [...root.querySelectorAll('[data-testid="machine-item"]')]
         .filter((row) => {
           const box = row.getBoundingClientRect();
           return (
@@ -202,14 +202,3 @@ for (const width of [768, 1024]) {
     expect(clipped).toEqual([]);
   });
 }
-
-test('machines: a row spans the whole panel and its detail opens underneath it', async ({
-  page,
-}) => {
-  await page.goto('/app/settings/machines?scenario=machines-master-detail&machine=md-omarchy');
-  const settings = page.getByRole('dialog', { name: '设置' });
-  const row = await settings.getByTestId('machine-item').first().boundingBox();
-  const detail = await settings.getByTestId('machine-detail').boundingBox();
-  expect((detail?.y ?? 0) >= (row?.y ?? 0)).toBe(true);
-  expect(Math.abs((detail?.width ?? 0) - (row?.width ?? 1))).toBeLessThanOrEqual(1);
-});

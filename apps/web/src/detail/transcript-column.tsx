@@ -3,6 +3,7 @@ import {
   type ReactNode,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
@@ -23,7 +24,7 @@ import { openingAnchor } from './scroll-anchor.js';
 import { type LiveStep, Transcript } from './transcript.js';
 
 const ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
-const VIEWPORT_CLS = 'chat-col px-4 pt-3';
+const VIEWPORT_CLS = 'chat-col pt-3 pl-4 pr-[calc(1rem-var(--scrollbar-gutter,0px))]';
 const CONTENT_CLS =
   'mx-auto block w-full max-w-(--chat-max-w) min-w-0 gap-0 [overflow-wrap:anywhere]';
 
@@ -79,11 +80,18 @@ function TranscriptColumnInner({
   handleRef: React.ForwardedRef<TranscriptColumnHandle>;
 }) {
   const { t } = useI18n();
-  const { scrollToEnd } = useMessageScroller();
+  const { scrollToEnd, scrollToMessage } = useMessageScroller();
   useImperativeHandle(handleRef, () => ({ scrollToEnd: () => void scrollToEnd() }), [scrollToEnd]);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [rows, setRows] = useState<HTMLDivElement | null>(null);
   useTouchMessageTools(rows);
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (viewport == null) return;
+    const gutter = viewport.offsetWidth - viewport.clientWidth;
+    viewport.style.setProperty('--scrollbar-gutter', `${Math.min(gutter, 16)}px`);
+  }, []);
+  const compactEnd = shortEnd || running === false;
   const anchoredKey = useRef<string | undefined>(undefined);
   const [openedKey, setOpenedKey] = useState<string | undefined>(undefined);
   const anchor = running === undefined || !settled ? null : openingAnchor(running, transcript);
@@ -93,18 +101,30 @@ function TranscriptColumnInner({
     if (anchor === 'end') {
       scrollToEnd();
     } else {
-      const bubbles = viewportRef.current?.querySelectorAll('[data-testid="user-bubble"]');
-      bubbles?.item(bubbles.length - 1)?.scrollIntoView({ block: 'start' });
+      const viewport = viewportRef.current;
+      const bubbles = viewport?.querySelectorAll('[data-testid="user-bubble"]');
+      const messageId = bubbles?.item(bubbles.length - 1)?.closest<HTMLElement>('[data-message-id]')
+        ?.dataset.messageId;
+      if (viewport != null && messageId !== undefined) {
+        const opensAtTop = bubbles?.length === 1 && !hasEarlier;
+        const fade = Number.parseFloat(
+          getComputedStyle(viewport).getPropertyValue('--scroll-fade-size'),
+        );
+        scrollToMessage(messageId, {
+          align: 'start',
+          scrollMargin: opensAtTop ? viewport.scrollHeight : fade || 0,
+        });
+      }
     }
     setOpenedKey(threadKey);
-  }, [anchor, threadKey, scrollToEnd]);
+  }, [anchor, threadKey, hasEarlier, scrollToEnd, scrollToMessage]);
   return (
     <MessageScroller className={ROOT_CLS}>
       <FadeScrollerViewport
         ref={viewportRef}
-        reserveEnd={shortEnd}
+        reserveEnd={compactEnd}
         data-testid="transcript-col"
-        className={shortEnd ? VIEWPORT_CLS : `${VIEWPORT_CLS} pb-(--chat-extra-space)`}
+        className={compactEnd ? VIEWPORT_CLS : `${VIEWPORT_CLS} pb-(--chat-extra-space)`}
       >
         <MessageScrollerContent ref={setRows} className={CONTENT_CLS}>
           {lead}
@@ -118,9 +138,8 @@ function TranscriptColumnInner({
           />
         </MessageScrollerContent>
       </FadeScrollerViewport>
-      <JumpToLatestButton>
+      <JumpToLatestButton label={t('滚动到最新')}>
         <ArrowDown width={20} height={20} />
-        <span className="sr-only">{t('滚动到最新')}</span>
       </JumpToLatestButton>
       {earlier !== undefined && settled && (openedKey === threadKey || transcript.length === 0) && (
         <EarlierLoader

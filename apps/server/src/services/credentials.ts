@@ -113,6 +113,7 @@ export function resolveStepCredentials(
       deps,
       todoRow.teamId,
       stepRow.fallback?.model?.provider ?? agentRow?.provider,
+      stepRow.claudeSubscriptionId,
     ),
   };
 }
@@ -121,6 +122,7 @@ export function resolveChiefStepCredentials(
   deps: CredentialsDeps,
   threadId: string,
   providerId?: string | null,
+  boundSubscriptionId?: string | null,
 ): StepCredentialBundle {
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   if (!threadRow) throw notFound(`chief thread ${threadId}`);
@@ -156,6 +158,7 @@ export function resolveChiefStepCredentials(
       deps,
       threadRow.teamId,
       providerId === undefined ? agentRow.provider : providerId,
+      boundSubscriptionId,
     ),
   };
 }

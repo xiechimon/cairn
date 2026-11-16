@@ -12,6 +12,8 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, machine, routingRule, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { accountHeld } from './claude-account-hold.js';
+import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { type CoordinatorRouteRefusal, coordinatorRouteVerdict } from './coordinator-route.js';
 import {
@@ -57,8 +59,6 @@ function ineligibleBlocked(gap: MachineIneligibility, runtime: string): StepQueu
       return { kind: 'claude-rate-limited', missing: [] };
     case 'claude-login':
       return { kind: 'claude-logged-out', missing: [] };
-    case 'claude-usage':
-      return { kind: 'claude-usage-refused', missing: [] };
   }
 }
 
@@ -78,8 +78,6 @@ function coordinatorRefusalBlocked(
         kind: 'coordinator-provider-no-key',
         missing: rule === undefined ? [] : [rule.provider],
       };
-    case 'paid-claude-not-allowed':
-      return { kind: 'coordinator-paid-claude', missing: rule === undefined ? [] : [rule.modelId] };
   }
 }
 
@@ -101,6 +99,8 @@ export function stepQueueProjector(db: Db, teamId: string) {
       fallback: step.fallback,
       buildId: step.buildId,
       freshSession: step.freshSession,
+      byPerson: step.byPerson,
+      claudeSubscriptionId: step.claudeSubscriptionId,
       holdUntil: step.holdUntil,
       buildRow: build,
       todoRow: todo,
@@ -168,6 +168,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
   }
 
   const catalog = mergedCatalogModels();
+  const enabledId = enabledSubscriptionId({ db }, teamId);
 
   interface WorkerRouting {
     verdict: RouteVerdict;
@@ -189,7 +190,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
     };
     const unavailable = (id: string) =>
       targetUnavailable(db, machineRowOf(id), teamId, facts, catalog, now);
-    const prior = priorSessionOf(db, row, row.buildRow);
+    const prior = priorSessionOf(db, row, row.buildRow, enabledId);
     const need = agentRow.requiredCapabilities?.os;
     const sole = platformFallbackMachineId(db, teamMachines, defaultMachineId, need);
     const verdict = routeVerdict({
@@ -200,6 +201,12 @@ export function stepQueueProjector(db: Db, teamId: string) {
         sole,
       ),
     });
+    if (
+      stepRuntimeFor(facts.model.provider) === 'claude-code' &&
+      accountHeld(row, prior, enabledId)
+    ) {
+      return { verdict, blocked: { kind: 'account-switched', missing: [] } };
+    }
     if (verdict.claim) return { verdict, blocked: undefined };
     const named = verdict.waitingFor;
     const platform = need === undefined ? {} : { platform: need };
@@ -240,7 +247,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
       coordinatorInServerEnabled() &&
       !isChiefDigestThreadId(row.threadId)
     ) {
-      serverRoute ??= coordinatorRouteVerdict(db, teamId);
+      if (serverRoute === undefined) serverRoute = coordinatorRouteVerdict(db, teamId);
       if (serverRoute !== null) {
         if (!('refusal' in serverRoute)) return undefined;
         if (target.homeMachineId === null) {

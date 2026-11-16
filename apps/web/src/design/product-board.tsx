@@ -88,7 +88,7 @@ export function ProductBoardSection() {
       <Specimen
         id="project-avatar"
         title="Project avatar"
-        note="ProjectAvatar: a neutral folder glyph, or the chosen icon; never a letter or a hue"
+        note="ProjectAvatar: a neutral box glyph, or the chosen icon; never a letter or a hue"
       >
         <Cell label="default">
           <ProjectAvatar />

@@ -25,18 +25,19 @@ import {
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { blockedNow } from '../services/blockers.js';
+import { parseChiefTrigger } from '../services/chief.js';
 import { isChiefDigestStep } from '../services/chief-digest.js';
 import { hasEarlierLiveChiefStep } from '../services/chief-turns.js';
 import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
 import { migrateUnfetchedCoordinatorInputs } from '../services/coordinator-input-upgrade.js';
 import { coordinatorInputIsLive } from '../services/coordinator-inputs.js';
 import { chiefTurnContext, claimPendingChiefStep } from '../services/coordinator-steps.js';
+import { coordinatorToolDefs } from '../services/coordinator-tool-defs.js';
 import { captureClaimInputs } from '../services/coordinator-turn-capture.js';
 import { serverTakesTurn } from '../services/machine-claim.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
 import { ownershipOf } from '../services/owner.js';
 import { stepScopeProjectId } from '../services/picked-project.js';
-import { chiefRemoteTools } from '../services/routing-rules.js';
 import {
   type CoordinatorProviders,
   coordinatorApiKey,
@@ -537,7 +538,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           systemPrompt: context.systemPrompt,
           trigger: context.trigger,
         },
-        remoteTools: [...chiefRemoteTools()],
+        remoteTools: coordinatorToolDefs({ routerTools: options.routerTools ?? true }),
       },
       volatileText: volatileParts.length === 0 ? null : volatileParts.join('\n\n'),
     };
@@ -680,7 +681,18 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
   const wake = (threadId: string): void => {
     if (closing) return;
     dirty.add(threadId);
-    if (draining.has(threadId)) return;
+    if (draining.has(threadId)) {
+      if (
+        liveSteps(threadId).some(
+          (row) =>
+            row.status === 'pending' &&
+            !isChiefDigestStep(row) &&
+            parseChiefTrigger(row.prompt) === 'user',
+        )
+      )
+        runtime.yieldSuggestions(threadId);
+      return;
+    }
     queueMicrotask(() => startDrain(threadId));
   };
 

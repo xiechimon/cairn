@@ -6,12 +6,18 @@ import {
   isGithubRepoRef,
   LOCAL_ERROR_REASON_COPY,
   type LocalErrorReason,
+  type ProjectIcon,
 } from '@cairn/shared';
+import { cn } from 'cn';
 import { type KeyboardEvent, type Ref, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
 import { useApiMutations, useGithubConnection, useGithubRepos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { projectCreationBlocked, setupOpenStep } from '../board/first-run-checklist-model.js';
+import { SETUP_HREF, useFirstRunSetup } from '../board/first-run-setup.js';
+import { PROJECT_ICON_COMPONENTS } from '../board/project-icon-map.js';
+import { ProjectIconPicker } from '../board/project-icon-picker.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
 import { Button } from '../components/ui/button.js';
@@ -27,7 +33,7 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, ChevronRight, ImageFrame } from '../icons/index.js';
+import { ArrowUpDown, Check, ChevronDown } from '../icons/index.js';
 import { RouteDialog } from '../overlay/route-dialog.js';
 import { DirBrowser } from './dir-browser.js';
 
@@ -40,9 +46,9 @@ const FIELD_NOTE_CLS = 'text-meta';
 const PICKER_PLATE_CLS = 'w-[calc(var(--anchor-width)+40px)] min-w-[220px]';
 
 const GH_ROW_CLS =
-  'h-auto w-full cursor-pointer justify-start px-2 py-1.5 text-left font-normal whitespace-normal outline-hidden focus:bg-accent focus:text-accent-foreground focus-visible:border-transparent focus-visible:ring-0';
+  'h-auto w-full pointer-coarse:min-h-11 cursor-pointer justify-start px-2 py-1.5 text-left font-normal whitespace-normal outline-hidden focus:bg-accent focus:text-accent-foreground focus-visible:border-transparent focus-visible:ring-0';
 
-const GH_LINK_CLS = 'h-auto p-0 text-meta';
+const GH_LINK_CLS = 'h-6 p-0 text-meta pointer-coarse:h-11';
 
 type RepoSel = 'none' | 'github' | 'local';
 
@@ -67,12 +73,12 @@ function RepoSwapButton({
           ref={buttonRef}
           variant="outline"
           size="icon"
-          className={`${FORM_CONTROL_CLS} ml-2 shrink-0 text-content-tertiary`}
+          className={`${FORM_CONTROL_CLS} ml-2 shrink-0 text-content-tertiary pointer-coarse:size-11`}
           aria-label={label}
         />
       }
     >
-      <ChevronRight width={16} height={16} />
+      <ArrowUpDown width={16} height={16} />
     </DropdownMenuTrigger>
   );
 }
@@ -85,6 +91,7 @@ export function ProjectNewPage() {
   const navigate = useNavigate();
   const mutations = useApiMutations(teamId);
   const [name, setName] = useState('');
+  const [icon, setIcon] = useState<ProjectIcon | null>(null);
   const [repoSel, setRepoSel] = useState<RepoSel>('none');
   const [githubRepo, setGithubRepo] = useState('');
   const [localPath, setLocalPath] = useState('');
@@ -98,6 +105,7 @@ export function ProjectNewPage() {
   const [repoQuery, setRepoQuery] = useState('');
   const [fixtureAuth, setFixtureAuth] = useState<boolean | null>(null);
   const autoName = useRef('');
+  const nameRef = useRef<HTMLInputElement>(null);
   const repoFieldRef = useRef<HTMLDivElement>(null);
   const swapBtnRef = useRef<HTMLButtonElement>(null);
   const pendingSwapFocus = useRef(false);
@@ -158,7 +166,7 @@ export function ProjectNewPage() {
   };
 
   const browseFolder = () => {
-    if (pickBusy) return;
+    if (pickBusy || blockDemoWrite()) return;
     setPickBusy(true);
     setPickHint(null);
     mutations.pickLocalFolder.mutate(undefined, {
@@ -316,6 +324,11 @@ export function ProjectNewPage() {
     rows[next]?.focus();
   };
 
+  const setup = useFirstRunSetup();
+  const blockedStep =
+    setup.progress !== undefined && projectCreationBlocked(setup)
+      ? setupOpenStep(setup.progress)
+      : null;
   const [submittedPath, setSubmittedPath] = useState<string | null>(null);
   const createError = mutations.createProject.error;
   const localErrorCopy = (reason: string | undefined, message: string): string =>
@@ -341,7 +354,15 @@ export function ProjectNewPage() {
           : { name: name.trim() };
     if (repoSel === 'local') setSubmittedPath(localPath.trim());
     mutations.createProject.mutate(body, {
-      onSuccess: (p) => navigate(`/app/project/${p.id}`),
+      onSuccess: (p) => {
+        if (icon !== null) {
+          mutations.patchProject.mutate(
+            { id: p.id, body: { icon } },
+            { onError: (error) => toastError(t('图标没能保存，请在项目设置里重试。'), error) },
+          );
+        }
+        navigate(`/app/project/${p.id}`);
+      },
       onError: (error) => {
         const inlineHandled =
           repoSel === 'local' && error instanceof ApiError && error.status === 400;
@@ -350,23 +371,48 @@ export function ProjectNewPage() {
     });
   };
 
+  if (blockedStep !== null) {
+    return (
+      <RouteDialog title={t('新建项目')} size="form">
+        <FormStack>
+          <p
+            data-testid="project-new-blocked"
+            className="m-0 text-pretty text-ui text-content-secondary"
+          >
+            {blockedStep === 'models'
+              ? t('建项目前要先把模型配好，还差第 1 步：接入模型。')
+              : t('建项目前要先把模型配好，还差第 2 步：确认模型。')}
+          </p>
+          <FormActions primary={{ label: t('去完成设置'), onClick: () => navigate(SETUP_HREF) }} />
+        </FormStack>
+      </RouteDialog>
+    );
+  }
+
   return (
-    <RouteDialog title={t('新建项目')} size="form">
+    <RouteDialog title={t('新建项目')} size="form" initialFocus={nameRef}>
       <FormStack>
         <div className="flex items-center gap-4">
-          <span className="prj-new-avatar flex size-14 flex-none items-center justify-center rounded-full bg-card text-content-tertiary ring-1 ring-border">
-            <ImageFrame />
+          <span className="prj-new-avatar flex size-14 flex-none overflow-hidden rounded-full bg-card text-content-tertiary ring-1 ring-border">
+            <ProjectIconPicker
+              icon={icon}
+              color={null}
+              onChange={(patch) => setIcon(patch.icon ?? null)}
+              triggerClassName="grid place-items-center rounded-full"
+              trigger={<NewProjectIcon icon={icon} />}
+            />
           </span>
           <span className="text-meta text-content-tertiary">
-            {t('可选。未设置时以首字母代替。')}
+            {t('项目图标，可选。不选时显示方盒图标。')}
           </span>
         </div>
         <FormField label={t('项目名称')} htmlFor="prj-new-name">
           <Input
+            ref={nameRef}
             id="prj-new-name"
             type="text"
             className={FORM_CONTROL_CLS}
-            placeholder="My App"
+            placeholder={t('例如：我的应用')}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
@@ -403,7 +449,7 @@ export function ProjectNewPage() {
                         value={githubRepo}
                         onChange={(e) => onGithubRepoChange(e.target.value)}
                       />
-                      <RepoSwapButton label={t('选择仓库')} buttonRef={swapBtnRef} />
+                      <RepoSwapButton label={t('切换仓库来源')} buttonRef={swapBtnRef} />
                     </>
                   ) : connectionPending ? (
                     <>
@@ -415,7 +461,7 @@ export function ProjectNewPage() {
                       >
                         <span className="text-content-tertiary">{t('选择仓库')}</span>
                       </Button>
-                      <RepoSwapButton label={t('选择仓库')} buttonRef={swapBtnRef} />
+                      <RepoSwapButton label={t('切换仓库来源')} buttonRef={swapBtnRef} />
                     </>
                   ) : connected ? (
                     <>
@@ -433,9 +479,9 @@ export function ProjectNewPage() {
                         ) : (
                           <span>{githubRepo}</span>
                         )}
-                        <ChevronRight width={16} height={16} />
+                        <ChevronDown width={16} height={16} />
                       </PopoverTrigger>
-                      <RepoSwapButton label={t('选择仓库')} buttonRef={swapBtnRef} />
+                      <RepoSwapButton label={t('切换仓库来源')} buttonRef={swapBtnRef} />
                     </>
                   ) : (
                     <>
@@ -447,7 +493,7 @@ export function ProjectNewPage() {
                       >
                         {t('认证 GitHub')}
                       </Button>
-                      <RepoSwapButton label={t('选择仓库')} buttonRef={swapBtnRef} />
+                      <RepoSwapButton label={t('切换仓库来源')} buttonRef={swapBtnRef} />
                     </>
                   )
                 ) : repoSel === 'local' ? (
@@ -489,7 +535,7 @@ export function ProjectNewPage() {
                         />
                       )}
                     </Popover>
-                    <RepoSwapButton label={t('选择仓库')} buttonRef={swapBtnRef} />
+                    <RepoSwapButton label={t('切换仓库来源')} buttonRef={swapBtnRef} />
                   </>
                 ) : (
                   <DropdownMenuTrigger
@@ -498,7 +544,7 @@ export function ProjectNewPage() {
                     }
                   >
                     <span className="text-content-tertiary">{t('选择仓库')}</span>
-                    <ChevronRight width={16} height={16} />
+                    <ChevronDown width={16} height={16} />
                   </DropdownMenuTrigger>
                 )}
                 <KeyedMenuContent
@@ -632,12 +678,23 @@ export function ProjectNewPage() {
           {repoSel === 'local' && (
             <div className={`${FIELD_NOTE_CLS} text-content-tertiary`}>
               {t(
-                '单 Runner 形态：这台 Runner 损坏时进度随之丢失。需要在任意 Runner 上续跑，请用 GitHub 接入。',
+                '单执行机形态：这台执行机损坏时进度随之丢失。需要在任意执行机上续跑，请用 GitHub 接入。',
               )}
             </div>
           )}
         </FormField>
         <FormActions
+          hint={
+            !live
+              ? t('演示数据不能新建项目。')
+              : name.trim() === ''
+                ? t('填好项目名称后可以创建。')
+                : formOk
+                  ? undefined
+                  : repoSel === 'github'
+                    ? t('选好 GitHub 仓库后可以创建。')
+                    : t('填好本地文件夹路径后可以创建。')
+          }
           primary={{
             label: t('创建项目'),
             disabled: live ? name.trim() === '' || !formOk : true,
@@ -646,5 +703,12 @@ export function ProjectNewPage() {
         />
       </FormStack>
     </RouteDialog>
+  );
+}
+
+function NewProjectIcon({ icon }: { icon: ProjectIcon | null }) {
+  const Icon = PROJECT_ICON_COMPONENTS[icon ?? 'box'];
+  return (
+    <Icon className={cn('size-5', icon === null ? 'text-content-tertiary' : 'text-foreground')} />
   );
 }

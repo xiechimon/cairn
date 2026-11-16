@@ -7,7 +7,12 @@ const PROSE = /\.(md|mdx|ya?ml)$/;
 const CODE = /\.(ts|tsx|js|jsx|mjs|cjs|css|scss|py|sh)$/;
 export const RUNTIME_BLOCK_BEGIN = '<!-- BEGIN CAIRN-RUNTIME (auto-managed; do not edit) -->';
 export const RUNTIME_BLOCK_END = '<!-- END CAIRN-RUNTIME -->';
-const EXEMPT = [/^README\.zh\.md$/, /^apps\/web\/src\/i18n\//, /(^|\/)zh(-CN)?\.(md|ya?ml)$/];
+const EXEMPT = [
+  /^README\.zh\.md$/,
+  /^apps\/web\/src\/i18n\//,
+  /^site\/src\/content\/docs\/zh-cn\//,
+  /(^|\/)zh(-CN)?\.(md|ya?ml)$/,
+];
 
 function blankRuntimeBlocks(text) {
   let out = '';

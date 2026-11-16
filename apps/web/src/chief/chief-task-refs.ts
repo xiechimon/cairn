@@ -183,6 +183,13 @@ export function placeReportCards(
     todoId,
     ...childRefsOf(todoId, glances).map((child) => child.todoId),
   ];
+  const deliveredIn = (item: GroupedRow['item']) =>
+    item.kind === 'robot' &&
+    item.report !== undefined &&
+    glances.get(item.report.todoId)?.buildId === item.report.buildId
+      ? [item.report.todoId]
+      : [];
+  const noticed = new Set(rows.flatMap(({ item }) => deliveredIn(item)));
   const placed = new Map<GroupedRow['item'], readonly string[]>();
   for (const { item } of rows) {
     if (item.kind === 'thread-activity') {
@@ -190,7 +197,10 @@ export function placeReportCards(
       continue;
     }
     if (item.kind !== 'robot' || item.typing === true) continue;
-    const ids = [...new Set((startedBy.get(item) ?? []).flatMap(withChildren))].filter(
+    const started = (startedBy.get(item) ?? [])
+      .flatMap(withChildren)
+      .filter((id) => !noticed.has(id));
+    const ids = [...new Set([...deliveredIn(item), ...started])].filter(
       (id) => glances.get(id)?.report === true && !seen.has(id),
     );
     for (const id of ids) seen.add(id);

@@ -15,14 +15,13 @@ const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const OWNER_ONLY_PATTERNS = [
   /^\/api\/computers(?:\/[^/]+)?$/,
   /^\/api\/job-applications(?:\/|$)/,
-  /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions)(?:\/|$)/,
+  /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions|mcp-connectors)(?:\/|$)/,
   /^\/api\/teams\/[^/]+\/github\/(?:oauth|connection)(?:\/|$)/,
   /^\/api\/machines\/[^/]+(?:\/|$)/,
 ];
 
 export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
   if (
-    pathname === '/api/machine/enroll/confirm' ||
     pathname === '/api/remote/pairing' ||
     pathname.startsWith('/api/remote/pairing/') ||
     (pathname.startsWith('/api/remote/devices') && !READ_METHODS.has(method.toUpperCase()))

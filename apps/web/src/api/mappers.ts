@@ -42,12 +42,14 @@ import {
   infoReportMessageSchema,
   liveQuickReplies,
   MODEL_SOURCE_RUNTIME_LABELS,
+  orchestratedTodoIdOf,
   orchestratePromptHeadOf,
   PLACEHOLDER_TITLE_FALLBACK,
   PLAN_SECTIONS,
   REVIEW_VERDICT_KIND,
   RUNNER_OS_LABELS,
   replyQuoteText,
+  reportAckContentSchema,
   resolvedBuildPrNumber,
   reviewVerdictSchema,
   reworkNoteWithoutReason,
@@ -70,6 +72,7 @@ import {
 } from '@cairn/shared';
 import { relativeTime } from '../board/rel-time.js';
 import { STATUS_WORDS } from '../board/status-words.js';
+import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import type {
   BranchInfoContent,
   ChiefContent,
@@ -102,20 +105,29 @@ import type { MachineProvider } from './claude-accounts.js';
 import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
 
 const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
-  'sandbox-unavailable':
-    '排队中：{machine} 的任务沙箱没就绪，接不了任务——在那台机器上运行 cairn restart，原因见 Runner 页（前面 {ahead} 个）',
-  'runtime-disabled': '排队中：{machine} 没开 {runtime}——到 Runner 页打开（前面 {ahead} 个）',
+  'sandbox-unavailable': '排队中：{machine} 的任务沙箱没就绪，接不了任务（前面 {ahead} 个）',
+  'runtime-disabled':
+    '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）',
   'model-unavailable':
     '排队中：{machine} 用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）',
-  'local-path': '排队中：本地项目只在它所在的 Runner 上跑，{machine} 跑不了（前面 {ahead} 个）',
+  'local-path': '排队中：本地项目只在它所在的执行机上跑，{machine} 跑不了（前面 {ahead} 个）',
   'claude-rate-limited': '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
   'claude-logged-out':
     '排队中：{machine} 上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
-  'claude-usage-refused':
-    '排队中：团队只用 Claude 订阅，{machine} 上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）',
+  'account-switched':
+    '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始（前面 {ahead} 个）',
   'coordinator-provider-missing': 'Coordinator 规则用的服务商「{name}」还没添加',
   'coordinator-provider-no-key': 'Coordinator 规则用的服务商「{name}」没有 API key',
-  'coordinator-paid-claude': 'Coordinator 规则用的是付费 Claude（{name}），但团队只允许用订阅',
+};
+
+const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
+  'sandbox-unavailable': '排队中：执行机的任务沙箱没就绪，接不了任务（前面 {ahead} 个）',
+  'runtime-disabled': '排队中：执行机上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）',
+  'model-unavailable': '排队中：执行机用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）',
+  'local-path': '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了（前面 {ahead} 个）',
+  'claude-rate-limited': '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
+  'claude-logged-out':
+    '排队中：执行机上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）',
 };
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
@@ -136,7 +148,7 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
     queue.waitingFor == null
   ) {
     return {
-      label: '排队中：还没有 {platform} Runner · 需要 {platform}',
+      label: '排队中：还没有 {platform} 执行机 · 需要 {platform}',
       vars: { platform: RUNNER_OS_LABELS[platform] },
     };
   }
@@ -153,17 +165,21 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
   if (queue.blocked?.kind === 'capability-missing') {
     return {
       label:
-        '排队中：没有 Runner 满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）',
+        '排队中：没有执行机满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）',
       vars: { missing: queue.blocked.missing.join('、'), ahead },
     };
   }
+  const refusalLabels =
+    queue.waitingFor == null ? UNNAMED_RUNNER_REFUSAL_LABELS : RUNNER_REFUSAL_LABELS;
   const refusal =
-    queue.blocked === undefined ? undefined : RUNNER_REFUSAL_LABELS[queue.blocked.kind];
+    queue.blocked === undefined
+      ? undefined
+      : (refusalLabels[queue.blocked.kind] ?? RUNNER_REFUSAL_LABELS[queue.blocked.kind]);
   if (refusal !== undefined) {
     return {
       label: refusal,
       vars: {
-        machine: queue.waitingFor?.name ?? 'Runner',
+        machine: queue.waitingFor?.name ?? '',
         runtime: queue.blocked?.missing.join('、') ?? '',
         name: queue.blocked?.missing.join('、') ?? '',
         ahead,
@@ -176,7 +192,7 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
           label: '排队中：等 {machine} 上线（前面 {ahead} 个）',
           vars: { machine: queue.waitingFor.name, ahead },
         }
-      : { label: '排队中：等 Runner 上线（前面 {ahead} 个）', vars: { ahead } };
+      : { label: '排队中：等执行机上线（前面 {ahead} 个）', vars: { ahead } };
   }
   return queue.waitingFor != null
     ? {
@@ -188,7 +204,7 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
           ahead,
         },
       }
-    : { label: '排队中：等空闲 Runner（前面 {ahead} 个）', vars: { ahead } };
+    : { label: '排队中：等空闲执行机（前面 {ahead} 个）', vars: { ahead } };
 }
 
 function connectingLine(queue: NonNullable<StepRow['queue']>): {
@@ -291,6 +307,14 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     output: w.output,
     section: w.section ?? null,
     ...(w.verified !== undefined ? { verified: w.verified } : {}),
+    ...(w.deliverables !== undefined
+      ? {
+          deliverables: w.deliverables,
+          ...(w.deliverables.items[0] !== undefined
+            ? { madeKind: w.deliverables.items[0].kind }
+            : {}),
+        }
+      : {}),
     ...(w.routeOverride !== undefined ? { routeOverride: w.routeOverride } : {}),
   };
 }
@@ -1006,7 +1030,7 @@ const REWORK_REUSE_HEAD = '返工回到本分支继续';
 
 const CREDENTIAL_SOURCE_DETAIL = {
   integration: 'integration：每步下发的 token',
-  machine: 'machine：Runner 本机的 git 凭据',
+  machine: 'machine：执行机本机的 git 凭据',
 } as const;
 
 function systemRowItem(row: SystemRow, id: string, createdAt: number): TranscriptItem | ToolEntry {
@@ -1072,7 +1096,7 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
 function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string {
   switch (kind) {
     case 'network':
-      return '请将这台 Runner 重新上线。这一步不会改派到其他 Runner。';
+      return '请将这台执行机重新上线。这一步不会改派到其他执行机。';
     case 'quota':
       return '模型额度已用尽，请等待额度恢复后重试。';
     case 'capacity':
@@ -1557,6 +1581,8 @@ function collectChiefStream(
         id: m.id,
         markdown: text,
         pending: pendingState,
+        at: clockTime(m.createdAt),
+        createdAt: m.createdAt,
         ...rowProject(m),
       });
       continue;
@@ -1608,7 +1634,23 @@ function collectChiefStream(
       const notice = chiefNoticeContentSchema.safeParse(parsed);
       if (notice.success) {
         pendingTools = [];
-        items.push({ kind: 'robot', markdown: notice.data.message, seconds: '', id: m.id });
+        items.push({
+          kind: 'robot',
+          markdown: notice.data.message,
+          seconds: '',
+          id: m.id,
+          ...(notice.data.report !== undefined ? { report: notice.data.report } : {}),
+        });
+        continue;
+      }
+      const ack = reportAckContentSchema.safeParse(parsed);
+      if (ack.success) {
+        items.push({
+          kind: 'report-ack',
+          id: m.id,
+          todoId: ack.data.todoId,
+          buildId: ack.data.buildId,
+        });
         continue;
       }
       const runnerOffline = runnerOfflineContentSchema.safeParse(parsed);
@@ -1623,19 +1665,7 @@ function collectChiefStream(
         items.push({ kind: 'daily-report', id: m.id, report: dailyReport.data });
         continue;
       }
-      const digest = chiefDigestContentSchema.safeParse(parsed);
-      if (digest.success) {
-        if (digest.data.items.length === 0) continue;
-        pendingTools = [];
-        items.push({
-          kind: 'digest',
-          id: m.id,
-          reason: digest.data.reason,
-          madeAt: digest.data.madeAt,
-          items: digest.data.items,
-        });
-        continue;
-      }
+      if (chiefDigestContentSchema.safeParse(parsed).success) continue;
     }
     const call = toolCallOfContent(m.content);
     if (call?.name === SUGGEST_REPLIES_TOOL_NAME) continue;
@@ -1880,6 +1910,70 @@ export function mapChief(
     ...(active?.fallbackModel != null ? { fallbackModel: active.fallbackModel } : {}),
     ...(quickReplies.length > 0 ? { quickReplies } : {}),
   };
+}
+
+export function mapOrchestrationFeedback(
+  todo: Pick<WireTodo, 'id' | 'phase' | 'phaseAt'>,
+  thread: ChiefThread | null,
+  messages: readonly MessageRow[],
+): TranscriptItem[] {
+  if (thread === null || (todo.phase !== 'todo' && todo.phase !== 'failed')) return [];
+  const start = messages.findLastIndex(
+    (m) =>
+      m.role === 'user' &&
+      m.createdAt >= todo.phaseAt &&
+      orchestratedTodoIdOf(textOfContent(m.content)) === todo.id,
+  );
+  const request = messages[start];
+  if (request === undefined) return [];
+  const pending = new Set((thread.pending ?? []).map((p) => p.messageId));
+  const rest = messages.slice(start + 1);
+  const next = rest.findIndex((m) => m.role === 'user' && !pending.has(m.id));
+  const turn = next === -1 ? rest : rest.slice(0, next);
+  const items: TranscriptItem[] = [{ kind: 'note', text: '已交给 Coordinator 安排' }];
+  for (const m of turn) {
+    const error = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
+    if (error !== null) {
+      items.push({
+        kind: 'note',
+        text: 'Coordinator 没能安排这个任务：{reason}',
+        vars: { reason: error },
+        id: m.id,
+      });
+      return items;
+    }
+    const text = m.role === 'assistant' ? textOfContent(m.content).trim() : '';
+    if (text !== '')
+      items.push({ kind: 'robot', markdown: text, id: m.id, createdAt: m.createdAt });
+  }
+  const replied = items.length > 1;
+  if (next === -1 && threadTurnInFlight(thread)) {
+    if (thread.turnQueue != null) {
+      const queued = connectingLine(thread.turnQueue);
+      items.push({
+        kind: 'streaming',
+        ...(thread.turnQueue.blocked != null
+          ? { blocked: true as const, blockedKind: thread.turnQueue.blocked.kind }
+          : {}),
+        label: queued.label,
+        ...(queued.vars !== undefined ? { labelVars: queued.vars } : {}),
+      });
+    } else {
+      items.push({
+        kind: 'streaming',
+        label: 'Coordinator 正在安排这个任务...',
+        startedAt: request.createdAt,
+      });
+    }
+    return items;
+  }
+  items.push({
+    kind: 'note',
+    text: replied
+      ? 'Coordinator 没有派发这个任务，原因见上面的回复。点「开始」再试一次。'
+      : 'Coordinator 没有派发这个任务，也没有说明原因。点「开始」再试一次。',
+  });
+  return items;
 }
 
 export function mapPlanVersions(plans: PlanRow[]): PlanVersion[] {

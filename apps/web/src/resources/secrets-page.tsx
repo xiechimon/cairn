@@ -1,4 +1,4 @@
-import { KeyRound, Lightbulb } from 'lucide-react';
+import { Lightbulb, ShieldEllipsis } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useProjects, useSecrets } from '../api/hooks.js';
@@ -56,15 +56,13 @@ export function SecretsPage() {
           <EmptyState
             testId="resource-empty"
             className="mt-6"
-            icon={KeyRound}
+            icon={ShieldEllipsis}
             title={t('尚无密钥')}
-            description={t(
-              '团队密钥按 Agent 授权，在需要它的执行步中下发，不预置进任务 shell 环境。值只写不读：保存后只能覆盖或删除，无法再次查看。',
-            )}
+            description={t('密钥只交给你授权的 Agent，保存后无法查看。')}
             action={{ label: t('添加密钥'), onClick: () => setCreateOpen(true) }}
             hint={{
               icon: Lightbulb,
-              text: t('也可以让 Coordinator 添加：它会开一张安全输入卡填写值，值不会进入对话。'),
+              text: t('也可以让 Coordinator 添加，值不会进入对话。'),
             }}
           />
         }

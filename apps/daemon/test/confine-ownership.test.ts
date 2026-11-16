@@ -6,12 +6,14 @@ import {
   readFileSync,
   readSync,
   rmdirSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, vi } from 'vitest';
 import {
   assertConfinementCleanup,
+  ConfinementExitedError,
   confinementGate,
   launchConfined,
 } from '../src/backend/confine.js';
@@ -111,7 +113,13 @@ test.runIf(live)(
     const handle = await liveLaunch(['/bin/sh', '-c', 'printf "%s\\n" "$CONFINE_SENTINEL"; cat']);
     const metadata = spawnSync(
       'systemctl',
-      ['--user', 'show', handle.unit, '-p', 'ExecStart,BindsTo,KillMode,ExitType,Delegate'],
+      [
+        '--user',
+        'show',
+        handle.unit,
+        '-p',
+        'ExecStart,BindsTo,KillMode,ExitType,Delegate,ProtectControlGroups',
+      ],
       {
         encoding: 'utf8',
       },
@@ -121,6 +129,7 @@ test.runIf(live)(
     expect(metadata.stdout).toContain('KillMode=control-group');
     expect(metadata.stdout).toContain('ExitType=cgroup');
     expect(metadata.stdout).toContain('Delegate=no');
+    expect(metadata.stdout).toContain('ProtectControlGroups=no');
     const group = taskGroup(handle.unit);
     const path = `/sys/fs/cgroup${group}/cgroup.events`;
     const fd = openSync(path, 'r');
@@ -145,6 +154,27 @@ test.runIf(live)(
     }
   },
 );
+
+test.runIf(live)('real systemd: every cgroup mount the task sees is read-only', async () => {
+  const handle = await liveLaunch([
+    '/bin/sh',
+    '-c',
+    'group=/sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup); test -f "$group/cgroup.procs" && echo own-group-visible; mkdir "$group/child" 2>&1; echo +pids 2>&1 > "$group/cgroup.subtree_control"; while read -r id parent device root point options rest; do case "$rest" in *" - cgroup2 "* | *" - cgroup "*) echo "mount $point $options" ;; esac; done < /proc/self/mountinfo',
+  ]);
+  let output = '';
+  handle.process.stdout.on('data', (chunk) => {
+    output += chunk;
+  });
+  handle.process.stdout.resume();
+  handle.process.stdin.end();
+  await handle.completed;
+  const lines = output.trim().split('\n');
+  expect(lines[0]).toBe('own-group-visible');
+  expect(lines.filter((line) => line.endsWith('Read-only file system'))).toHaveLength(2);
+  const mounts = lines.filter((line) => line.startsWith('mount '));
+  expect(mounts.length).toBeGreaterThan(0);
+  for (const mount of mounts) expect(mount.split(' ')[2]?.split(',')).toContain('ro');
+});
 
 test.runIf(live)('real systemd: a process escaping into the unit blocks removal', async () => {
   const handle = await liveLaunch(['/bin/cat']);
@@ -231,6 +261,49 @@ process.exit(spawnSync('/usr/bin/systemctl', args, {stdio:'inherit'}).status ?? 
       handle.process.stdin.end();
       await stopping;
       await handle.completed;
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+    }
+  },
+);
+
+test.runIf(live)(
+  'real systemd: a missing bwrap rejects with its stderr and still cleans up the reservation',
+  async () => {
+    const directory = testTempDir('confine-no-bwrap-');
+    for (const tool of ['systemd-run', 'systemctl'])
+      symlinkSync(
+        spawnSync('which', [tool], { encoding: 'utf8' }).stdout.trim(),
+        join(directory, tool),
+      );
+    const released = vi.fn();
+    const previousPath = process.env.PATH;
+    process.env.PATH = directory;
+    try {
+      const root = testTempDir('confine-no-bwrap-root-');
+      for (const path of ['home', 'daemon', 'work', 'temp']) mkdirSync(join(root, path));
+      const launching = launchConfined({
+        policy: {
+          home: join(root, 'home'),
+          daemonHome: join(root, 'daemon'),
+          workspace: join(root, 'work'),
+          taskTemp: join(root, 'temp'),
+          state: [],
+          caches: [],
+          gitDirectories: [],
+        },
+        owner: process.env.CAIRN_CONFINE_TEST_OWNER ?? '',
+        command: [process.execPath, '-e', 'process.exit(0)'],
+        environment: {},
+        released,
+      });
+      await expect(launching).rejects.toBeInstanceOf(ConfinementExitedError);
+      const error = await launching.catch((caught: unknown) => caught);
+      expect((error as ConfinementExitedError).stderrTail).toMatch(
+        /^Failed to find executable bwrap\b/m,
+      );
+      expect(released).toHaveBeenCalledOnce();
     } finally {
       if (previousPath === undefined) delete process.env.PATH;
       else process.env.PATH = previousPath;

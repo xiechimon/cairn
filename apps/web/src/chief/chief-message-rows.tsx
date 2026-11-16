@@ -5,10 +5,11 @@ import { Link } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
+import { reportStatusWord } from '../board/status-words.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, TypingDots } from '../components/chat/live-row.js';
-import { STATUS_REF_CLS, StatusLine } from '../components/chat/status-line.js';
+import { StatusLine } from '../components/chat/status-line.js';
 import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
@@ -16,12 +17,7 @@ import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
-import {
-  TaskMentionAsLinkContext,
-  TaskMentionLink,
-  type TodoGlance,
-  TodoGlanceContext,
-} from '../detail/segments.js';
+import { Segments as DocSegments, type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefSegment, ChiefStreamItem } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
@@ -29,8 +25,7 @@ import { dateTimeFormat } from '../lib/date-format.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/routing-settings-page.js';
 import { settingsHref } from '../settings/settings-href.js';
-import { ChiefDigestRow } from './chief-digest-row.js';
-import { ChiefReportRow } from './chief-report-row.js';
+import { ChiefReportMessage } from './chief-report-row.js';
 import { TaskRefRow } from './chief-task-ref-row.js';
 import { childRefsOf, type TaskRef } from './chief-task-refs.js';
 import { isLiveNotice } from './live-notice.js';
@@ -45,10 +40,11 @@ import {
   type ReplyQuoteDraft,
   ReplySourceHighlightContext,
 } from './reply-source-highlight.js';
+import { channelHref, useChannelOf } from './report-route.js';
 import { ResearchReportLine, ResearchReportRow } from './research-report.js';
 import { SentAttachments } from './sent-attachments.js';
 import { TakeoverCard } from './takeover-card.js';
-import type { ThreadActivity } from './thread-activity.js';
+import type { ChannelMirror, ThreadActivity } from './thread-activity.js';
 import { messageStampLabel } from './time-dividers.js';
 
 const STAMP_CLS = 'text-caption whitespace-nowrap tabular-nums';
@@ -137,18 +133,25 @@ function TodoSegmentLink({ seq }: { seq: number }) {
   return known === undefined ? (
     <span>{t('任务')}</span>
   ) : (
-    <TaskMentionLink todoId={known[0]} phase={known[1].phase}>
-      {known[1].title ?? t('任务')}
-    </TaskMentionLink>
+    <TaskChip todoId={known[0]} label={`#${seq}`} />
+  );
+}
+
+function TaskChip({ todoId, label }: { todoId: string; label: string }) {
+  return (
+    <DocSegments
+      codeClassName="chat-code"
+      segments={[{ text: label, style: 'mention', mentionKind: 'todo', mentionId: todoId }]}
+    />
   );
 }
 
 function TaskRefRows({ refs }: { refs: readonly TaskRef[] }) {
   if (refs.length === 0) return null;
   return (
-    <div className="mt-1.5 flex flex-col" data-testid="chief-task-refs">
+    <div className="mb-1.5 flex flex-col" data-testid="chief-task-refs">
       {refs.map((ref, index) => (
-        <TaskRefWithChildren key={ref.todoId} taskRef={ref} last={index === refs.length - 1} />
+        <TaskRefWithChildren key={ref.todoId} taskRef={ref} first={index === 0} />
       ))}
     </div>
   );
@@ -168,16 +171,19 @@ function BubbleReports({ todoIds }: { todoIds: readonly string[] }) {
 const TOP_X = 18.75;
 const NESTED_X = 42.75;
 const ROW_MID = 14;
+const ROW_H = 28;
 const BEND = 6;
 
-function TreeGuideSvg({
-  rails,
-  branch,
-}: {
-  rails: readonly number[];
-  branch?: { x: number; last: boolean; to: number };
-}) {
-  const through = branch !== undefined && !branch.last ? [...rails, branch.x] : rails;
+interface GuideBranch {
+  x: number;
+  end: boolean;
+  to: number;
+  rise?: boolean;
+}
+
+function TreeGuideSvg({ rails, branch }: { rails: readonly number[]; branch?: GuideBranch }) {
+  const through = branch !== undefined && !branch.end ? [...rails, branch.x] : rails;
+  const into = branch?.rise === true ? ROW_MID + BEND : ROW_MID - BEND;
   return (
     <svg
       aria-hidden="true"
@@ -194,7 +200,7 @@ function TreeGuideSvg({
         <path
           data-slot="task-ref-elbow"
           strokeLinecap="round"
-          d={`${branch.last ? `M${branch.x} 0V${ROW_MID - BEND}` : `M${branch.x} ${ROW_MID - BEND}`}A${BEND} ${BEND} 0 0 0 ${branch.x + BEND} ${ROW_MID}H${branch.to}`}
+          d={`${branch.end ? `M${branch.x} ${branch.rise === true ? ROW_H : 0}V${into}` : `M${branch.x} ${into}`}A${BEND} ${BEND} 0 0 ${branch.rise === true ? 1 : 0} ${branch.x + BEND} ${ROW_MID}H${branch.to}`}
         />
       )}
     </svg>
@@ -207,7 +213,7 @@ function GuidedRow({
   children,
 }: {
   rails: readonly number[];
-  branch?: { x: number; last: boolean; to: number };
+  branch?: GuideBranch;
   children: ReactNode;
 }) {
   return (
@@ -223,20 +229,23 @@ function GuidedRow({
 function TaskRefWithChildren({
   taskRef,
   elbow = true,
-  last = true,
+  first = true,
   reportsBelow = false,
 }: {
   taskRef: TaskRef;
   elbow?: boolean;
-  last?: boolean;
+  first?: boolean;
   reportsBelow?: boolean;
 }) {
   const glances = useContext(TodoGlanceContext);
   const children = childRefsOf(taskRef.todoId, glances ?? NO_GLANCES);
-  const rails = elbow && !last ? [TOP_X] : [];
+  const rails = elbow ? [TOP_X] : [];
   return (
     <>
-      <GuidedRow rails={[]} {...(elbow ? { branch: { x: TOP_X, last, to: 28 } } : {})}>
+      <GuidedRow
+        rails={[]}
+        {...(elbow ? { branch: { x: TOP_X, end: first, to: 28, rise: true } } : {})}
+      >
         <TaskRefRow taskRef={taskRef} elbow={elbow} guide={false} />
       </GuidedRow>
       {reportsBelow && (
@@ -248,7 +257,7 @@ function TaskRefWithChildren({
         const lastChild = index === children.length - 1;
         return (
           <Fragment key={child.todoId}>
-            <GuidedRow rails={rails} branch={{ x: NESTED_X, last: lastChild, to: 52 }}>
+            <GuidedRow rails={rails} branch={{ x: NESTED_X, end: lastChild, to: 52 }}>
               <TaskRefRow taskRef={child} nested guide={false} />
             </GuidedRow>
             {reportsBelow && (
@@ -283,6 +292,46 @@ function SubThreadRow({ activity }: { activity: ThreadActivity }) {
           phase: glance.phase,
         }}
       />
+    </MessageScrollerItem>
+  );
+}
+
+const MIRROR_LINK_CLS = 'flex-none text-(--chat-link) no-underline hover:underline';
+
+function ChannelMirrorRow({ mirror }: { mirror: ChannelMirror }) {
+  const { t } = useI18n();
+  const channel = useChannelOf()(mirror.fromThreadId);
+  const name = t('{channel} 频道', { channel: channel?.name ?? t('项目') });
+  return (
+    <MessageScrollerItem
+      messageId={mirror.id}
+      style={SCROLLER_ITEM_STYLE}
+      className={EVENT_ROW_CLS}
+      data-testid="chief-channel-mirror"
+    >
+      <Marker variant="separator" className="gap-1.5 text-meta text-content-tertiary">
+        <span className="flex min-w-0 shrink items-center gap-1.5">
+          <span className="flex-none">{name}</span>
+          <span aria-hidden="true">·</span>
+          <span className="min-w-0 truncate text-content-secondary" title={mirror.title}>
+            {mirror.title}
+          </span>
+          <span className="flex-none">{t(reportStatusWord(mirror))}</span>
+          {channel?.projectId != null ? (
+            <Link
+              to={channelHref(channel.projectId)}
+              aria-label={t('去{channel}', { channel: name })}
+              className={MIRROR_LINK_CLS}
+            >
+              {t('去看')}
+            </Link>
+          ) : (
+            <ThreadLink todoId={mirror.todoId} className={MIRROR_LINK_CLS}>
+              {t('去看')}
+            </ThreadLink>
+          )}
+        </span>
+      </Marker>
     </MessageScrollerItem>
   );
 }
@@ -340,10 +389,7 @@ function TaskStartedRow({
   }
   return (
     <CoordinatorSaid testId="chief-task-created">
-      {t('已建任务')}{' '}
-      <ThreadLink todoId={todoId} className={STATUS_REF_CLS}>
-        {title ?? t('任务')}
-      </ThreadLink>
+      {t('已建任务')} <TaskChip todoId={todoId} label={title ?? t('任务')} />
     </CoordinatorSaid>
   );
 }
@@ -353,16 +399,13 @@ function HandoffRow({ todoId }: { todoId: string }) {
   const glance = useContext(TodoGlanceContext)?.get(todoId);
   return (
     <CoordinatorSaid testId="chief-handoff">
-      {t('已转给任务')}{' '}
-      <ThreadLink todoId={todoId} className={STATUS_REF_CLS} data-phase={glance?.phase}>
-        {glance?.title ?? t('任务')}
-      </ThreadLink>
+      {t('已转给任务')} <TaskChip todoId={todoId} label={glance?.title ?? t('任务')} />
     </CoordinatorSaid>
   );
 }
 
 export function chiefStreamRowKey(
-  item: ChiefStreamItem | ThreadActivity,
+  item: ChiefStreamItem | ThreadActivity | ChannelMirror,
   index: number,
 ): string | number {
   switch (item.kind) {
@@ -374,12 +417,12 @@ export function chiefStreamRowKey(
     case 'handoff':
     case 'takeover':
     case 'task-card':
-    case 'digest':
     case 'runner-offline':
     case 'stopped':
     case 'thread-report':
     case 'thread-message':
     case 'thread-activity':
+    case 'channel-mirror':
       return item.id ?? index;
     default:
       return index;
@@ -387,7 +430,7 @@ export function chiefStreamRowKey(
 }
 
 interface ChiefStreamRowProps {
-  item: ChiefStreamItem | ThreadActivity;
+  item: ChiefStreamItem | ThreadActivity | ChannelMirror;
   index: number;
   onCopy: (text: string) => void;
   onRewindRequest: (index: number, id: string | null) => void;
@@ -415,9 +458,7 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
           {todos.map((todo, n) => (
             <span key={todo.id}>
               {n === 0 ? ' ' : '、'}
-              <ThreadLink todoId={todo.id} className={STATUS_REF_CLS}>
-                {todo.title}
-              </ThreadLink>
+              <TaskChip todoId={todo.id} label={todo.title} />
             </span>
           ))}
         </>
@@ -437,13 +478,9 @@ const COORDINATOR_FIXES: Partial<
     { label: '填写 API key', href: settingsHref('providers') },
     { label: '换 Coordinator 模型', href: COORDINATOR_ROUTING_HREF },
   ],
-  'coordinator-paid-claude': [
-    { label: '允许按量付费', href: settingsHref('routing') },
-    { label: '换 Coordinator 模型', href: COORDINATOR_ROUTING_HREF },
-  ],
 };
 
-function CoordinatorFixLinks({ kind }: { kind: StepQueueBlocked['kind'] | undefined }) {
+export function CoordinatorFixLinks({ kind }: { kind: StepQueueBlocked['kind'] | undefined }) {
   const { t } = useI18n();
   const fixes = kind === undefined ? undefined : COORDINATOR_FIXES[kind];
   if (fixes === undefined) return null;
@@ -489,7 +526,7 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
           ? t('{name} 已恢复，{n} 个任务已开工。', { name, n: count('started') })
           : t('{name} 已恢复。', { name })}
         {queued > 0 && t('还有 {n} 个在排队。', { n: queued })}
-        {moved > 0 && t('{n} 个已改到其他 Runner。', { n: moved })}
+        {moved > 0 && t('{n} 个已改到其他执行机。', { n: moved })}
       </CoordinatorSaid>
     );
   }
@@ -522,7 +559,7 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
             : t('{name} 还没连上过。', { name })}
           {waiting > 0
             ? t('{n} 个任务在等它。', { n: waiting })
-            : t('等它的任务都已改到其他 Runner。')}
+            : t('等它的任务都已改到其他执行机。')}
         </span>
         {notice.lastSeenAt > 0 &&
           t('最后在线 {ago}。', { ago: relativeTime(notice.lastSeenAt, now, t) })}
@@ -531,11 +568,9 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
         <ul className="my-2 flex list-none flex-col gap-0.5 p-0">
           {shown.map((todo) => (
             <li key={todo.id}>
-              <ThreadLink todoId={todo.id} className={STATUS_REF_CLS}>
-                {todo.title}
-              </ThreadLink>
+              <TaskChip todoId={todo.id} label={todo.title} />
               {todo.state === 'moved' && (
-                <span className="text-content-tertiary"> · {t('已改到其他 Runner')}</span>
+                <span className="text-content-tertiary"> · {t('已改到其他执行机')}</span>
               )}
             </li>
           ))}
@@ -579,7 +614,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       : {};
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
   if (item.kind === 'thread-activity') return <SubThreadRow activity={item} />;
-  if (item.kind === 'thread-report' || item.kind === 'thread-message') return null;
+  if (item.kind === 'channel-mirror') return <ChannelMirrorRow mirror={item} />;
+  if (item.kind === 'thread-report' || item.kind === 'thread-message' || item.kind === 'report-ack')
+    return null;
   if (item.kind === 'error')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
@@ -604,9 +641,12 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'takeover') return <TakeoverCard item={item} />;
   if (item.kind === 'task-card')
     return <TaskStartedRow todoId={item.todoId} seq={item.seq} title={item.title} />;
-  if (item.kind === 'digest')
-    return <ChiefDigestRow reason={item.reason} madeAt={item.madeAt} items={item.items} />;
-  if (item.kind === 'daily-report') return <ChiefReportRow report={item.report} />;
+  if (item.kind === 'daily-report')
+    return (
+      <CoordinatorSaid testId="chief-report">
+        <ChiefReportMessage report={item.report} />
+      </CoordinatorSaid>
+    );
   if (item.kind === 'runner-offline') return <RunnerOfflineRow notice={item.notice} />;
   if (item.kind === 'note')
     return (
@@ -618,7 +658,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               <span className="underline decoration-current/40 underline-offset-3">
                 {item.machineName}
               </span>
-              {t('上')}
+              {t(' 上')}
             </>
           )}
         </StatusLine>
@@ -816,6 +856,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         data-run={runAttr(joinsPrev, joinsNext)}
       >
         <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
+          <TaskRefRows refs={taskRefs} />
           <div
             className={BUBBLE_WRAP_CLS}
             data-testid="chief-reply"
@@ -823,24 +864,22 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
           >
             {item.markdown != null ? (
-              <TaskMentionAsLinkContext.Provider value>
-                <ChatMarkdown
-                  text={item.markdown}
-                  bubbles
-                  bubbleFooter={<BubbleReports todoIds={reports} />}
-                  bubbleTools={(group, n) =>
-                    robotTools(
-                      'right',
-                      group.source,
-                      n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools',
-                    )
-                  }
-                  highlight={(group) =>
-                    sourceHighlighted &&
-                    (group.source.includes(quoted) || quoted.includes(group.source))
-                  }
-                />
-              </TaskMentionAsLinkContext.Provider>
+              <ChatMarkdown
+                text={item.markdown}
+                bubbles
+                bubbleFooter={<BubbleReports todoIds={reports} />}
+                bubbleTools={(group, n) =>
+                  robotTools(
+                    'right',
+                    group.source,
+                    n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools',
+                  )
+                }
+                highlight={(group) =>
+                  sourceHighlighted &&
+                  (group.source.includes(quoted) || quoted.includes(group.source))
+                }
+              />
             ) : (
               <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
                 <div
@@ -870,7 +909,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             )}
           </div>
           {item.typing === true && <TypingDots className="mt-1" />}
-          <TaskRefRows refs={taskRefs} />
           {robotTools('below-start', whole, 'chief-msg-tools-touch', false)}
         </MessageContent>
       </Message>

@@ -11,6 +11,13 @@ import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { migrateUpTo } from './migrate-helpers.js';
 
+const currentColumns = new Map(
+  Object.values(schema)
+    .filter((value) => is(value, SQLiteTable))
+    .map((table) => getTableConfig(table as SQLiteTable))
+    .map((table) => [table.name, new Set(table.columns.map((column) => column.name))]),
+);
+
 const journal = JSON.parse(readFileSync(join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8')) as {
   entries: { idx: number; tag: string }[];
 };
@@ -83,6 +90,7 @@ test.each(['fresh', 'empty upgrade', 'configured upgrade'])(
           .prepare(`PRAGMA table_info(${table})`)
           .all()
           .map((column) => (column as { name: string }).name)
+          .filter((name) => currentColumns.get(table)?.has(name))
           .join(', '),
       }));
       const before =

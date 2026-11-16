@@ -8,7 +8,7 @@ test('skills page create entry (topbar `新建` button) in place, fixture row se
 
   await expect(page.getByRole('button', { name: '新建', exact: true })).toHaveCount(1);
   await expect(page.getByTestId('resource-row')).toHaveCount(1);
-  await expect(page.getByTestId('resource-row').first()).toContainText('r3-probe-skill');
+  await expect(page.getByTestId('resource-row').first()).toContainText('code-review');
 });
 
 test('legacy import route unreachable — catch-all redirects back to /app (#149 feedback route same law)', async ({
@@ -19,16 +19,14 @@ test('legacy import route unreachable — catch-all redirects back to /app (#149
   await expect(page.locator('[data-route="/app/resources/skills/import"]')).toHaveCount(0);
 });
 
-test('empty state double entry — directory guide copy + `新建技能` primary button, no chief hint row', async ({ page }) => {
+test('empty state points at Import and New, names no directory, and offers `新建技能`', async ({ page }) => {
   await page.goto(`${SKILLS}?scenario=01`);
   const empty = page.getByTestId('resource-empty');
   await expect(empty).toBeVisible();
   await expect(empty.getByRole('heading')).toHaveText('尚无技能');
 
   const desc = empty.locator('p');
-  await expect(desc).toContainText('~/.agents/skills');
-  await expect(desc).toContainText('SKILL.md');
-  await expect(desc).toContainText('新建一个技能');
+  await expect(desc).toHaveText('用「导入」或「新建」添加技能。');
   await expect(empty.getByRole('button', { name: '新建技能' })).toHaveText('新建技能');
 
   await expect(desc).toHaveCount(1);
@@ -72,7 +70,7 @@ test('live list consumes GET /api/skills (wire shape unchanged after the server 
   expect(hits[0]).toContain('teamId=team-1');
 });
 
-test('regression #486/#494: skills list reachable by wheel, scrollbar hugs the panel right edge', async ({ page }) => {
+test('regression #486/#494: skills list reachable by wheel, scrollbar hugs the panel right edge, last row keeps a bottom gap, actions share the heading row', async ({ page }) => {
   await stubBoot(page);
 
   const rows = Array.from({ length: 20 }, (_, i) => ({
@@ -105,7 +103,7 @@ test('regression #486/#494: skills list reachable by wheel, scrollbar hugs the p
       const box = (el) => {
         if (el == null) return null;
         const r = el.getBoundingClientRect();
-        return { x: r.x, right: r.right, width: r.width };
+        return { x: r.x, right: r.right, width: r.width, bottom: r.bottom };
       };
       return { host: box(host), pane: box(pane), col: box(colEl) };
     }, shellSel);
@@ -131,10 +129,20 @@ test('regression #486/#494: skills list reachable by wheel, scrollbar hugs the p
   expect(box?.y).toBeGreaterThanOrEqual(0);
   expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(733);
 
+  const after = await readScrollLayer();
+  expect((after.host?.bottom ?? 0) - ((box?.y ?? 0) + (box?.height ?? 0))).toBeGreaterThanOrEqual(
+    24,
+  );
+
   expect((await col.boundingBox())?.width).toBe(widthBefore);
   const topbar = await page.getByTestId('page-toolbar').boundingBox();
   expect(topbar?.y).toBe(topbarBefore?.y);
-  expect(topbar?.height).toBe(36);
+  expect(topbar?.height).toBe(32);
+  const head = await page.getByTestId('settings-head').boundingBox();
+  expect((topbar?.y ?? 0) + (topbar?.height ?? 0) / 2).toBeCloseTo(
+    (head?.y ?? -1) + (head?.height ?? 0) / 2,
+    0,
+  );
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });
 
@@ -157,4 +165,21 @@ test('a clickable resource row answers hover with a fill that stays inside the c
     };
   });
   expect(corners.row).toEqual([corners.card, corners.card]);
+});
+
+test('search keeps the skills whose name or description matches, and says when none do', async ({
+  page,
+}) => {
+  await page.goto(`${SKILLS}?scenario=skills-list`);
+  const rows = page.getByTestId('resource-row');
+  await expect(rows).toHaveCount(3);
+  const search = page.getByRole('textbox', { name: '搜索技能' });
+  await search.fill('许可证');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('repo-audit');
+  await search.fill('zzzz');
+  await expect(rows).toHaveCount(0);
+  await expect(page.getByTestId('skill-search-empty')).toHaveText('没有匹配的技能。');
+  await search.fill('');
+  await expect(rows).toHaveCount(3);
 });

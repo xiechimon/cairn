@@ -27,7 +27,7 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContext } from './project-instructions.js';
 import { publishStepRow } from './quota-wait.js';
-import { coordinatorProfile } from './routing-rules.js';
+import { coordinatorMemoryOwner, coordinatorProfile } from './routing-rules.js';
 
 type StepRow = typeof step.$inferSelect;
 
@@ -247,7 +247,7 @@ export function steerChiefMessage(
     scope !== null && scope !== stepScopeProjectId(running)
       ? projectTurnContext(deps.db, {
           teamId: thread.teamId,
-          agentId: coordinatorProfile(deps.db, thread.teamId)?.id ?? null,
+          agentId: coordinatorMemoryOwner(deps.db, thread.teamId) ?? null,
           projectId: scope,
           threadId,
         })

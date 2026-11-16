@@ -19,6 +19,8 @@ Default `~/.cairn/server/` (`CAIRN_HOME` overrides the home directory; the direc
 | `server.db` | SQLite with 24+1 tables (the 01 §6 locked list; WAL) |
 | `secretbox.key` | SecretBox keyfile: 32 random bytes (base64), mode 0600, generated on first start (01 §4.2) |
 
+Skills live beside it in `~/.cairn/skills/` (`CAIRN_SKILLS_DIR` overrides); back them up with `backup-server-db.sh --skills <dir> --skills-out <dir>`.
+
 ## The three key layers
 
 - **At rest**: provider keys and team Secret values are uniformly encrypted with AES-256-GCM before persisting (envelope = `v1` version header + iv + ciphertext + authTag); the key source is the local keyfile, with no external KMS or passphrase derivation introduced (locked by Q5).

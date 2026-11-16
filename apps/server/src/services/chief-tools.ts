@@ -12,6 +12,7 @@ import {
   coordinatorUpdateTodoParamsSchema,
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
+  fenceReportText,
   IN_PROGRESS_PHASES,
   isChiefConversationId,
   isWaitingPhase,
@@ -36,6 +37,7 @@ import {
 import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { proposalCardId } from './action-proposals.js';
 import { executeAction } from './action-registry.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta, resolveToolAttachmentId } from './attachments.js';
@@ -48,6 +50,7 @@ import {
 import {
   addChiefWatch,
   clearChiefWake,
+  insertChiefMessageOnce,
   parseChiefTrigger,
   removeChiefWatches,
   requireTurnProvenance,
@@ -55,7 +58,12 @@ import {
   upsertChiefMessage,
 } from './chief.js';
 import { channelMessages, readHistory, searchHistory } from './chief-history.js';
-import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
+import {
+  APPROVAL_CARD_ID_PREFIX,
+  announceQuestion,
+  askUserQuestionsOfParams,
+  createOrGetQuestion,
+} from './chief-questions.js';
 import { suggestQuickReplies } from './chief-quick-replies.js';
 import { assertToolNotRemoved, executeRouterTool, isRouterTool } from './chief-router-tools.js';
 import { readConversationPage } from './conversation-page.js';
@@ -65,14 +73,22 @@ import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
 import { readFillableProfile } from './job-applications.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { refuseMailTurnTool } from './mail.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
 import { executeMemoryDocumentTool } from './memory-documents.js';
 import { notifyChiefMessage } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
+import { ensureResearchProject } from './projects.js';
 import { getModelSources } from './providers.js';
 import type { VapidKeys } from './push.js';
+import {
+  acceptReport,
+  refuseRestrictedTurnTool,
+  reportAcknowledged,
+  reportNoticeId,
+  reportRefOfPrompt,
+  requireCurrentReportTurn,
+} from './report-turn.js';
 import { assertPlatformChangeAllowed, setTodoPlatform } from './routing-rules.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
@@ -80,7 +96,7 @@ import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js
 import { snoozeTodo } from './snooze.js';
 import { listBuildStepRoutes } from './step-route.js';
 import { startThreadBuild } from './thread-message.js';
-import { deleteTodo, getTodo, listTodos, setTodoPhase } from './todos.js';
+import { getTodo, listTodos, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement } from './transcript.js';
 
 export interface ChiefToolDeps {
@@ -253,6 +269,8 @@ const DOCS_FILE_METADATA_RESERVE_BYTES = 2048;
 
 export const CHIEF_TASK_LIST_MAX_OUTPUT_BYTES = 32 * 1024;
 export const CHIEF_TASK_LIST_TITLE_MAX_CHARS = 160;
+const SEARCH_QUERY_MAX_CHARS = 200;
+const SEARCH_QUERY_MAX_TERMS = 8;
 export const CHIEF_TASK_LIST_SUMMARY_MAX_CHARS = 240;
 
 function requireTeamBuild(db: Db, buildId: string, teamId: string) {
@@ -284,8 +302,9 @@ export async function executeChiefTool(
   name: string,
   params: Params,
 ): Promise<string> {
-  refuseMailTurnTool(ctx.turnPrompt ?? null, name);
+  refuseRestrictedTurnTool(ctx.turnPrompt ?? null, name, params);
   const { db } = deps;
+  requireCurrentReportTurn(db, ctx.turnPrompt ?? null, name);
   const svc = {
     db,
     hub: deps.hub,
@@ -308,20 +327,24 @@ export async function executeChiefTool(
   if (name === SUGGEST_REPLIES_TOOL_NAME) return suggestQuickReplies(deps, ctx, params);
   const action = actionByToolName(name);
   if (action?.surfaces.includes('coordinator') === true) {
-    return json(
-      executeAction(
-        { db, reposDir: deps.reposDir },
-        {
-          id: action.id,
-          input: params,
-          actor: 'coordinator',
-          surface: 'coordinator',
-          teamId: ctx.teamId,
-          threadId: ctx.threadId,
-          scopeProjectId: ctx.turnScopeProjectId ?? null,
-        },
-      ),
+    const result = executeAction(
+      { db, reposDir: deps.reposDir },
+      {
+        id: action.id,
+        input: params,
+        actor: 'coordinator',
+        surface: 'coordinator',
+        teamId: ctx.teamId,
+        threadId: ctx.threadId,
+        scopeProjectId: ctx.turnScopeProjectId ?? null,
+      },
     );
+    if (result.status !== 'pending') return json(result);
+    if (result.created) announceQuestion(deps, ctx.threadId, proposalCardId(result.proposalId));
+    return json({
+      ...result,
+      note: '没有执行任何改动。审批卡已发给用户；只有用户在卡片上批准后服务端才会执行。告诉用户在等批准，然后结束本轮。',
+    });
   }
   switch (name) {
     case 'projects': {
@@ -349,8 +372,29 @@ export async function executeChiefTool(
       }
       const projectId = optStr(params, 'projectId');
       const phase = optStr(params, 'phase');
+      const query = optStr(params, 'query');
+      if (query !== undefined && query.length > SEARCH_QUERY_MAX_CHARS) {
+        throw new HttpError(
+          400,
+          `invalid params.query: at most ${SEARCH_QUERY_MAX_CHARS} characters`,
+        );
+      }
+      const terms =
+        query === undefined ? [] : [...new Set(query.toLowerCase().split(/\s+/).filter(Boolean))];
+      if (query !== undefined && (terms.length === 0 || terms.length > SEARCH_QUERY_MAX_TERMS)) {
+        throw new HttpError(
+          400,
+          `invalid params.query: expected 1 to ${SEARCH_QUERY_MAX_TERMS} distinct search terms`,
+        );
+      }
       let records = listTodos(svc, { teamId: ctx.teamId, ...(projectId ? { projectId } : {}) });
       if (phase) records = records.filter((t) => t.phase === phase);
+      if (terms.length > 0) {
+        records = records.filter((t) => {
+          const text = `${t.title}\n${t.spec}`.toLowerCase();
+          return terms.every((term) => text.includes(term));
+        });
+      }
       const todos: { id: string; seqNum: number; title: string; phase: string; summary: string }[] =
         [];
       const response = { todos, total: records.length, nextOffset: null as number | null };
@@ -415,17 +459,18 @@ export async function executeChiefTool(
       return json(listSecrets(keysvc, ctx.teamId));
     }
     case 'mcp_servers': {
-      const rows = listMcpServers(
-        { mcpConfigPath: deps.mcpConfigPath ?? defaultMcpConfigPath() },
-        ctx.teamId,
-      );
       return json(
-        rows.map((m) => ({
+        listMcpServers(
+          { mcpConfigPath: deps.mcpConfigPath ?? defaultMcpConfigPath(), db },
+          ctx.teamId,
+        ).map((m) => ({
           id: m.id,
           label: m.label,
           slug: m.slug,
           transport: m.transport,
           url: m.url,
+          source: m.source,
+          ...(m.status !== null ? { status: m.status } : {}),
         })),
       );
     }
@@ -556,12 +601,26 @@ export async function executeChiefTool(
     }
     case 'issues':
     case 'pull_requests':
-    case 'github_overlap':
     case 'workflow_runs':
       return json(await executeGithubReadTool(deps, ctx.teamId, name, params));
     case 'attachment': {
       const attachmentId = resolveToolAttachmentId(db, ctx.teamId, str(params, 'attachmentId'));
-      return json(readAttachmentMeta(deps, ctx.teamId, attachmentId));
+      const meta = readAttachmentMeta(deps, ctx.teamId, attachmentId);
+      const reportOf = db
+        .select({ seqNum: todo.seqNum })
+        .from(build)
+        .innerJoin(todo, eq(todo.id, build.todoId))
+        .where(and(eq(build.reportAttachmentId, attachmentId), eq(todo.teamId, ctx.teamId)))
+        .get();
+      return json(
+        reportOf === undefined || meta.encoding !== 'utf8'
+          ? meta
+          : {
+              ...meta,
+              trust: 'untrusted-report',
+              content: fenceReportText(`#${reportOf.seqNum}`, meta.content),
+            },
+      );
     }
     case 'conversation': {
       const conversationId = str(params, 'conversationId');
@@ -595,19 +654,36 @@ export async function executeChiefTool(
 
     case 'create_todo': {
       const body = parseWith(coordinatorCreateTodoParamsSchema, params, 'params');
-      requireProjectRow(db, body.projectId, ctx.teamId);
       assertNamedMachineForNewTask(svc, ctx.teamId);
-      const record = createRequestTodo(svc, ctx, body, {
-        createdBy:
-          ctx.turnPrompt !== undefined && parseChiefTrigger(ctx.turnPrompt) === 'user'
-            ? ctx.userId
-            : ctx.chiefAgentId,
-        ownerId: ctx.userId,
+      const record = db.transaction(() => {
+        const projectRow =
+          body.projectId === undefined
+            ? ensureResearchProject(db, ctx.teamId)
+            : requireProjectRow(db, body.projectId, ctx.teamId);
+        const created = createRequestTodo(
+          svc,
+          ctx,
+          { ...body, projectId: projectRow.id },
+          {
+            createdBy:
+              ctx.turnPrompt !== undefined && parseChiefTrigger(ctx.turnPrompt) === 'user'
+                ? ctx.userId
+                : ctx.chiefAgentId,
+            ownerId: ctx.userId,
+          },
+        );
+        db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, created.id)).run();
+        if (body.platform !== undefined) {
+          setTodoPlatform(db, requireTeamTodo(db, created.id, ctx.teamId), body.platform);
+        }
+        addChiefWatch(deps, {
+          teamId: ctx.teamId,
+          todo: created,
+          projectName: projectRow.name,
+          threadId: ctx.threadId,
+        });
+        return created;
       });
-      db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, record.id)).run();
-      if (body.platform !== undefined) {
-        setTodoPlatform(db, requireTeamTodo(db, record.id, ctx.teamId), body.platform);
-      }
       const buildId = startThreadBuild(svc, requireTeamTodo(db, record.id, ctx.teamId), {
         origin: 'coordinator',
         actor: 'Coordinator',
@@ -626,12 +702,6 @@ export async function executeChiefTool(
       setTodoPlatform(db, requireTeamTodo(db, body.todoId, ctx.teamId), os);
       svc.machineHub?.wake(ctx.teamId);
       return json({ ...record, ...getTodo(svc, body.todoId) });
-    }
-    case 'delete_todos': {
-      const ids = strArr(params, 'todoIds');
-      for (const id of ids) requireTeamTodo(db, id, ctx.teamId);
-      const deleted = ids.filter((id) => deleteTodo(svc, id));
-      return json({ deleted });
     }
     case 'close_todos': {
       const supersededBy = optStr(params, 'supersededBy');
@@ -667,8 +737,21 @@ export async function executeChiefTool(
         ...(Object.keys(notStarted).length > 0 ? { notStarted } : {}),
       });
     }
-    case 'complete_todos':
-      return json(transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'done', chiefActor));
+    case 'complete_todos': {
+      const complete = () =>
+        transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'done', chiefActor);
+      const report = reportRefOfPrompt(ctx.turnPrompt ?? null);
+      if (report === null) return json(complete());
+      const { result, ack } = acceptReport(
+        db,
+        ctx.threadId,
+        report,
+        params.silent === true,
+        complete,
+      );
+      if (ack !== null) deps.convHub?.publishMessage(ctx.threadId, ack);
+      return json(result);
+    }
     case 'create_project': {
       const name = str(params, 'name');
       const repoKind = optStr(params, 'repoKind');
@@ -869,6 +952,12 @@ export async function executeChiefTool(
       );
       const questions = askUserQuestionsOfParams(params);
       const requestId = optStr(params, 'requestId') ?? `ask-${newRecordId()}`;
+      if (requestId.startsWith(APPROVAL_CARD_ID_PREFIX)) {
+        throw new HttpError(
+          400,
+          'invalid params.requestId: approval cards are written by the server',
+        );
+      }
       const { content } = createOrGetQuestion(
         {
           db,
@@ -897,19 +986,32 @@ export async function executeChiefTool(
         params.provenance,
         'notify_user',
       );
-      const text = str(params, 'message');
+      const report = reportRefOfPrompt(ctx.turnPrompt ?? null);
+      if (report !== null && reportAcknowledged(db, ctx.threadId, report)) {
+        return json({ notified: false, reason: 'already-acknowledged' });
+      }
+      const text =
+        report === null
+          ? str(params, 'message')
+          : str(params, 'message').replaceAll(report.attachmentId, '报告');
       const notice = {
-        id: newRecordId(),
+        id: report === null ? newRecordId() : reportNoticeId(ctx.threadId, report),
         threadId: ctx.threadId,
         role: 'system' as const,
         content: JSON.stringify({
           kind: CHIEF_NOTICE_KIND,
           message: text,
           provenance,
+          ...(report !== null
+            ? { report: { todoId: report.todoId, buildId: report.buildId } }
+            : {}),
         } satisfies ChiefNoticeContent),
         createdAt: nowMs(),
       };
-      deps.convHub?.publishMessage(ctx.threadId, upsertChiefMessage(db, notice));
+      const stored =
+        report === null ? upsertChiefMessage(db, notice) : insertChiefMessageOnce(db, notice);
+      if (stored === null) return json({ notified: true, duplicate: true });
+      deps.convHub?.publishMessage(ctx.threadId, stored);
       notifyChiefMessage(
         { db, hub: deps.hub, user: deps.user },
         {

@@ -137,7 +137,11 @@ export function SettingsTabStrip({
         ref={scroller}
         data-testid="settings-tabs"
         onScroll={measure}
-        className="flex min-w-0 flex-auto items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className={cn(
+          'flex min-w-0 flex-auto items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          edges.start && 'mask-l-from-90%',
+          edges.end && 'mask-r-from-90%',
+        )}
       >
         {items.map((item) => (
           <Link

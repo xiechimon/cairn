@@ -7,7 +7,6 @@ import {
   type SubscriptionAccount,
   toClaudeAccount,
 } from '../api/claude-accounts.js';
-import { toRoutingGraph } from '../api/model-routing.js';
 import { MachineProvidersCard, useClock } from '../components/accounts/account-parts.js';
 import { ClaudeMark } from '../components/brand-marks.js';
 import { CheckedButton } from '../components/checked-button.js';
@@ -18,21 +17,11 @@ import {
   ProviderPanel,
 } from '../components/providers/provider-panel.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
-import { RoutingGraph } from '../components/settings/routing-graph.js';
 import { SettingsNav } from '../components/settings/settings-nav.js';
 import { SettingsSearch } from '../components/settings/settings-search.js';
 import { SettingsCard } from '../components/settings-list.js';
 import { SettingsScopeSentence, TEAM_SCOPE } from '../components/settings-scope.js';
-import {
-  ACCOUNT_MACHINES,
-  ACCOUNT_ROUTING,
-  ACCOUNT_STEPS,
-  ACCOUNT_STICKINESS,
-  ACCOUNT_SUBSCRIPTIONS,
-  ACCOUNTS,
-  OTHER_ACCOUNTS,
-  PROVIDER_MACHINES,
-} from '../fixtures/accounts.js';
+import { ACCOUNT_STEPS, ACCOUNT_SUBSCRIPTIONS, PROVIDER_MACHINES } from '../fixtures/accounts.js';
 import { r7 } from '../fixtures/core.js';
 import { useI18n } from '../i18n/provider.js';
 import { OnlineStatus } from '../resources/parts.js';
@@ -44,7 +33,6 @@ import {
 import { Section, Specimen } from './specimen.js';
 
 const NOW = r7(13, 14);
-const TOGGLEABLE: readonly string[] = ['pi', 'claude-code', 'gemini'];
 
 const SCOPE_MACHINES = [
   { id: 'scope-mac-a1b2', kind: 'local', name: 'studio', online: true },
@@ -64,11 +52,6 @@ const QUERY_PHASES = [
   { phase: 'error', query: { ...settledQuery, isError: true } },
   { phase: 'empty', query: settledQuery },
 ] as const;
-
-const ROUTING_ACCOUNTS: SubscriptionAccount[] = [
-  ...ACCOUNT_SUBSCRIPTIONS.map((wire) => toClaudeAccount(wire, NOW)),
-  ...OTHER_ACCOUNTS,
-];
 
 function fixtureAccount(label: string): SubscriptionAccount {
   const wire = ACCOUNT_SUBSCRIPTIONS.find((candidate) => candidate.label === label);
@@ -154,9 +137,6 @@ function SubscriptionPanelSpecimen() {
           view={current.view}
           verifying={current.verification?.phase === 'verifying'}
           steps={ACCOUNT_STEPS[current.account.id]}
-          sticky={ACCOUNT_STICKINESS.filter(
-            (thread) => thread.subscriptionId === current.account.id,
-          )}
           actions={{
             onVerify: () => undefined,
             onRename: () => undefined,
@@ -181,7 +161,6 @@ function SubscriptionDetailSpecimen({ state }: { state: 'ok' }) {
         view={view}
         verifying={false}
         steps={ACCOUNT_STEPS[account.id]}
-        sticky={ACCOUNT_STICKINESS.filter((thread) => thread.subscriptionId === account.id)}
         actions={{
           onVerify: () => undefined,
           onRename: () => undefined,
@@ -194,7 +173,6 @@ function SubscriptionDetailSpecimen({ state }: { state: 'ok' }) {
 
 function ProviderPanelSpecimen() {
   const [selected, setSelected] = useState('anthropic');
-  const [cli, setCli] = useState(true);
   const items: ProviderItem[] = [
     {
       id: 'anthropic',
@@ -216,8 +194,7 @@ function ProviderPanelSpecimen() {
       Mark: ClaudeMark,
       version: '2.1.316',
       status: 'Not signed in',
-      tone: cli ? 'warn' : 'off',
-      toggle: { checked: cli, onChange: setCli },
+      tone: 'warn',
     },
   ];
   return (
@@ -288,15 +265,9 @@ function SettingsNavSpecimen() {
 
 export function AccountsSection() {
   const { t } = useI18n();
-  const [machine, setMachine] = useState<MachineWithProviders | undefined>(PROVIDER_MACHINES[0]);
+  const machine: MachineWithProviders | undefined = PROVIDER_MACHINES[0];
   const [scopeValue, setScopeValue] = useState(TEAM_SCOPE);
   const [scopeCheckedAt] = useState(() => Date.now());
-  const graph = toRoutingGraph(ACCOUNT_ROUTING, {
-    accounts: ROUTING_ACCOUNTS,
-    providers: ACCOUNTS.providers,
-    machineNames: new Map(ACCOUNT_MACHINES.map((m) => [m.id, m.name])),
-    t,
-  });
   return (
     <Section
       id="accounts"
@@ -317,25 +288,12 @@ export function AccountsSection() {
       <Specimen
         id="subscription-detail-quota"
         title="Subscription detail with quota"
-        note="status, last use and 24 hour steps, then one bar per quota window, the steps this account ran and its sticky threads"
+        note="status, last use and 24 hour steps, then one bar per quota window, and the steps this account ran"
         stage="sheet"
-        code={`<SubscriptionDetail account={account} now={now} view={view} verifying={false} steps={steps} sticky={sticky} actions={actions} />`}
+        code={`<SubscriptionDetail account={account} now={now} view={view} verifying={false} steps={steps} actions={actions} />`}
       >
         <div className="flex w-full max-w-160 flex-col gap-6">
           <SubscriptionDetailSpecimen state="ok" />
-        </div>
-      </Specimen>
-      <Specimen
-        id="routing-from-the-api"
-        title="Routing from the API"
-        note="toRoutingGraph maps GET /model-routing onto the graph; nightly scan has no connection"
-        stage="sheet"
-        code={`<RoutingGraph {...toRoutingGraph(routing, { accounts, providers, machineNames, t })} />`}
-      >
-        <div className="w-full overflow-x-auto">
-          <div className="min-w-160">
-            <RoutingGraph jobs={graph.jobs} connections={graph.connections} />
-          </div>
         </div>
       </Specimen>
       <Specimen
@@ -387,15 +345,15 @@ export function AccountsSection() {
               key={phase}
               query={query}
               isEmpty
-              loadingLabel={t('正在加载 Runner')}
-              errorTitle={t('Runner 没能加载')}
+              loadingLabel={t('正在加载执行机')}
+              errorTitle={t('执行机没能加载')}
               skeletonRows={2}
               empty={
                 <EmptyState
                   testId="resource-empty"
                   icon={Monitor}
-                  title={t('尚无 Runner')}
-                  description={t('在要执行任务的 Runner 上运行注册命令，它就会出现在这里。')}
+                  title={t('尚无执行机')}
+                  description={t('在要执行任务的执行机上运行注册命令，它就会出现在这里。')}
                 />
               }
             >
@@ -409,23 +367,11 @@ export function AccountsSection() {
         title="Providers on one machine"
         note="shown on the machine detail page: signed in, signed out with its login command, unknown"
         stage="sheet"
-        code={`<MachineProvidersCard machine={machine} toggleable={canToggle} onToggle={toggle} online={<OnlineStatus on />} />`}
+        code={`<MachineProvidersCard machine={machine} online={<OnlineStatus on />} />`}
       >
         {machine !== undefined && (
           <div className="w-full">
-            <MachineProvidersCard
-              machine={machine}
-              toggleable={(runtime) => TOGGLEABLE.includes(runtime)}
-              online={<OnlineStatus on={machine.online} />}
-              onToggle={(runtime, next) =>
-                setMachine({
-                  ...machine,
-                  providers: machine.providers?.map((p) =>
-                    p.runtime === runtime ? { ...p, enabled: next } : p,
-                  ),
-                })
-              }
-            />
+            <MachineProvidersCard machine={machine} online={<OnlineStatus on={machine.online} />} />
           </div>
         )}
       </Specimen>

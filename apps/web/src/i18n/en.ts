@@ -21,9 +21,20 @@
 import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js';
 
 export const EN: Record<string, string> = {
+  这里: 'this channel',
+  主频道: 'the main channel',
+  '{channel} 频道': '{channel} channel',
+  '结果回到{place}': 'reports to {place}',
+  结果回到: 'Reports to',
+  去看: 'Open',
+  '去{channel}': 'Open {channel}',
+  进度: 'Progress',
+  改代码: 'Code',
+  调研: 'Research',
+  交报告: 'Report',
+  有新版本: 'A new version is available',
+  点此刷新: 'Refresh',
   订阅账户没能加载: 'Subscriptions could not be loaded',
-  '路由对所有 Runner 生效，{name} 沿用所有 Runner 的设置。':
-    'Routing applies to all Runners, including {name}.',
   移除订阅: 'Remove subscription',
   '移除后，后续步骤不再使用这个订阅。':
     'After removal, later steps no longer use this subscription.',
@@ -42,9 +53,17 @@ export const EN: Record<string, string> = {
   Archive: 'Archive',
   'Could not unarchive task.': 'Could not unarchive task.',
   'Could not archive task.': 'Could not archive task.',
-  '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.':
+  'Claude 订阅': 'Claude subscription',
+  '添加 Claude 订阅': 'Add Claude subscription',
+  '在你的电脑上运行 `claude setup-token`，把输出的 token 粘贴到下面。':
+    'Run `claude setup-token` on your machine, then paste the token below.',
+  'Claude Code 步骤会使用最近添加且未过期的订阅。Token 加密保存，保存后无法再查看。':
+    'Claude Code steps use the most recently added unexpired connection. Tokens are encrypted and cannot be viewed after saving.',
+  '保存失败，请检查填写内容后重试。':
+    'Could not save the connection. Check the fields and try again.',
+  '{name}：Claude 订阅的 token 已过期。运行 `claude setup-token`，再添加一个新的订阅。':
     '{name}: Claude subscription token expired. Run `claude setup-token` and add a new connection.',
-  '{name}: Claude subscription token expires in {days} days. Run `claude setup-token` and add a new connection.':
+  '{name}：Claude 订阅的 token 将在 {days} 天后过期。运行 `claude setup-token`，再添加一个新的订阅。':
     '{name}: Claude subscription token expires in {days## day|# days}. Run `claude setup-token` and add a new connection.',
   Archived: 'Archived',
   Agent: 'Agent',
@@ -105,7 +124,7 @@ export const EN: Record<string, string> = {
   '未开 PR': 'No PR',
   'git 凭据': 'git credentials',
   'integration：每步下发的 token': 'integration: a token issued for each step',
-  'machine：Runner 本机的 git 凭据': "machine: the Runner's own git credentials",
+  'machine：执行机本机的 git 凭据': "machine: the Runner's own git credentials",
   未完成: 'Not finished',
 
   // —— shared chrome / sidebar (r2 §1.1) ——
@@ -135,8 +154,6 @@ export const EN: Record<string, string> = {
   '在线 · 空闲': 'Online · idle',
   '{n} 在跑': '{n} running',
   已安装: 'Installed',
-  '未开启桌面控制，开启后这里显示屏幕':
-    'Desktop control is off; the screen shows here once it is on',
   '桌面控制已上线，屏幕显示在这里': 'Desktop control is online; the screen shows here',
   正在连接屏幕: 'Connecting to the screen',
   屏幕暂时连不上: 'The screen could not connect',
@@ -185,23 +202,6 @@ export const EN: Record<string, string> = {
   还没有连上电脑: 'No computer connected yet',
   '你在控制 · 还剩 {n} 分钟': 'You are in control · {n} min left',
   浏览器: 'Browser',
-  '让 agent 打开网页、点击和填表。': 'Lets agents open pages, click and fill forms.',
-  辅助功能未授予: 'Accessibility not granted',
-  '在 系统设置 → 隐私与安全性 → 辅助功能 中允许 Cairn，否则 agent 无法读取和操作桌面。':
-    'Allow Cairn under System Settings → Privacy & Security → Accessibility, or agents cannot read and drive the desktop.',
-  桌面辅助通道不可用: 'Desktop accessibility bus unavailable',
-  'AT-SPI 辅助总线不可用，agent 将无法读取和操作桌面。请安装并启用 at-spi（如 orca）后重试。':
-    'The AT-SPI accessibility bus is unavailable, so agents cannot read and drive the desktop. Install and enable at-spi (for example orca) and retry.',
-  屏幕录制未授予: 'Screen recording not granted',
-  '在 系统设置 → 隐私与安全性 → 屏幕录制 中允许 Cairn，否则 agent 无法截取屏幕。':
-    'Allow Cairn under System Settings → Privacy & Security → Screen Recording, or agents cannot capture the screen.',
-  屏幕截取不可用: 'Screen capture unavailable',
-  '当前环境无法截取屏幕，agent 的屏幕读取将被拒绝。':
-    'This environment cannot capture the screen; agents will be refused screen reads.',
-  '这台 Runner 还不支持浏览器。': 'This Runner does not support the browser yet.',
-  '这台 Runner 已不再报告浏览器能力；可关闭已保存的偏好。':
-    'This Runner no longer reports browser capability; you can turn off the saved preference.',
-  '浏览器偏好已绑定到另一台 Runner。': 'The browser preference is already bound to another Runner.',
   '没有其他电脑时，任务都在 Coordinator 这台电脑上跑。':
     'With no other computer, work runs on the Coordinator’s computer.',
   添加电脑: 'Add computer',
@@ -210,18 +210,17 @@ export const EN: Record<string, string> = {
   再检查一次: 'Check again',
   在进行: 'In progress',
   等你处理: 'Needs you',
-  管理定时: 'Manage schedules',
   接下来: 'Up next',
   已暂停: 'Paused',
   全团队: 'Whole team',
   '仅 {name}': 'Only {name}',
-  '项目密钥只发给该项目的 thread，同名时优先于团队密钥。':
+  '项目密钥只发给该项目的对话，同名时优先于团队密钥。':
     'Project secrets go only to threads in that project and override a team secret with the same name.',
   并发与优先级: 'Concurrency and priority',
-  '不限（跟随 Runner 上限）': 'No limit (Runner limits apply)',
+  '不限（跟随执行机上限）': 'No limit (Runner limits apply)',
   '串行，一次一个': 'Serial, one at a time',
   '最多 {n} 个': 'Up to {n}',
-  '本项目同时运行的 thread 上限。你发的消息会插队，并可多用一个位置。':
+  '本项目同时运行的对话上限。你发的消息会插队，并可多用一个位置。':
     'How many threads in this project run at once. Your own messages go first and may use one extra slot.',
   项目说明: 'Instructions',
   定时任务: 'Schedules',
@@ -235,16 +234,64 @@ export const EN: Record<string, string> = {
     'Research reports and other documents show up here once they finish.',
   新建项目: 'New project',
   接入模型来源: 'Connect a model source',
-  '添加模型服务商，或在 Runner 上登录 Claude Code':
+  '添加模型服务商，或在执行机上登录 Claude Code':
     'Add a provider, or sign in to Claude Code on a Runner',
-  '连接一台 Runner': 'Connect a Runner',
+  连接一台执行机: 'Connect a Runner',
+  'Coordinator 还缺模型': 'The Coordinator needs a model',
+  '添加一个服务商，Coordinator 用不了 Claude Code 登录':
+    'Add a provider; the Coordinator cannot use a Claude Code sign-in',
+  '还差第 1 步：接入模型': 'Step 1 is still open: connect models',
+  '还差第 2 步：确认模型': 'Step 2 is still open: confirm models',
+  '{role}：{model}': '{role}: {model}',
+  '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
+  'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
+  '因为你添加了 Anthropic API key': 'Because you added an Anthropic API key',
+  '因为这是最早添加、Coordinator 能直接用的服务商':
+    'Because it is the earliest added provider the Coordinator can use',
+  '因为这台电脑登录了 Claude Code，任务直接用订阅额度':
+    'Because this computer is signed in to Claude Code, tasks use your subscription',
+  '因为这台电脑登录了 Codex': 'Because this computer is signed in to Codex',
+  '因为还没有 Claude Code，用最早添加的服务商':
+    'Because there is no Claude Code yet, the earliest added provider is used',
+  已保存: 'Saved',
+  '和你对话、拆任务、派活': 'Talks with you, breaks work down and hands it out',
+  '写代码和做调研的 Agent 默认用它': 'The default for agents that write code and do research',
+  'Cairn 按你接入的模型挑了这两个。确认后才会保存，以后可以在设置里改。':
+    'Cairn picked these two from the models you connected. Nothing is saved until you confirm, and you can change them in Settings later.',
+  还没有能用的模型: 'No usable model yet',
+  换一个: 'Change',
+  确认这两个模型: 'Confirm both models',
+  先把模型配好: 'Set up your models first',
+  'Cairn 在这台电脑上跑 Agent，用你自己的模型。做完下面两步就能建第一个项目。':
+    'Cairn runs agents on this computer with your own models. Finish the two steps below to create your first project.',
+  模型配好了: 'Your models are set',
+  '现在可以建第一个项目了。模型以后可以在设置里改。':
+    'You can create your first project now. You can change the models in Settings later.',
+  'Claude 订阅、API key 或本地模型': 'A Claude subscription, an API key or a local model',
+  '先跳过，去主页看看': 'skip for now and look around',
+  '建项目前要先把模型配好，还差第 1 步：接入模型。':
+    'Set up your models before creating a project. Step 1 is still open: connect models.',
+  '建项目前要先把模型配好，还差第 2 步：确认模型。':
+    'Set up your models before creating a project. Step 2 is still open: confirm models.',
+  '保存中…': 'Saving…',
+  你换的: 'Your pick',
+  '{label}（{use} 的模型）': '{label} ({use} model)',
+  '你换的，原本推荐 {model}': 'Your pick; Cairn suggested {model}',
+  '{runtime}（Coordinator 用不了）': '{runtime} (the Coordinator cannot use it)',
+  接入模型: 'Connect models',
+  'Coordinator 和任务都有模型': 'The Coordinator and tasks both have models',
+  确认模型: 'Confirm models',
+  新建第一个项目: 'Create your first project',
+  不急的话可以: 'No rush: ',
+  '，下次打开 Cairn 时这页还在。': '; this page is here the next time you open Cairn.',
+  去完成设置: 'Finish setup',
   '在要干活的电脑上运行 `{command}`': 'Run `{command}` on the computer that should do the work',
   '{name} 离线': '{name} is offline',
   '在 {name} 上运行 `{command}` 让它重新上线': 'Run `{command}` on {name} to bring it back',
-  '{n} 台 Runner 都离线': '{n#1 Runner is|# Runners are} offline',
+  '{n} 台执行机都离线': '{n#1 Runner is|# Runners are} offline',
   '在其中一台上运行 `{command}` 让它重新上线': 'Run `{command}` on one of them to bring it back',
   'Coordinator 还不能回答': 'The Coordinator cannot answer yet',
-  '点输入框下方的按钮，把模型来源、Runner 和 Coordinator 接上，再发一次。':
+  '点输入框下方的按钮，把模型来源、执行机和 Coordinator 接上，再发一次。':
     'Use the button below the box to connect a model source, a Runner and the Coordinator, then send again.',
 
   '{n} 分': '{n}m',
@@ -257,7 +304,6 @@ export const EN: Record<string, string> = {
   '无法撤销归档。': 'Could not undo the archive.',
   '无法移动项目。': 'Could not move the project.',
   有任务在等你: 'A task is waiting on you',
-  '{name}：有任务在等你': '{name}: A task is waiting on you',
   移到分组: 'Move to group',
   新建分组: 'New group',
   移出分组: 'Remove from group',
@@ -267,7 +313,7 @@ export const EN: Record<string, string> = {
   看板: 'Board',
   技能: 'Skills',
   密钥: 'Secrets',
-  Runner: 'Runners',
+  执行机: 'Runners',
   机器: 'Machine',
   模型服务: 'Providers',
   用量: 'Usage',
@@ -385,12 +431,12 @@ export const EN: Record<string, string> = {
   '任务在你打开确认框后发生了变化，下面是最新状态，请重新确认。':
     'The task changed while this dialog was open — this is the latest state. Confirm again.',
   '以下内容将被清空，无法恢复：': 'The following will be cleared and cannot be recovered:',
-  '中断运行中的构建（在线的 Runner 即时中断；离线 Runner 的残留进程够不着）':
+  '中断运行中的构建（在线的执行机即时中断；离线执行机的残留进程够不着）':
     'Interrupt the running build (online executors stop immediately; offline leftovers are out of reach)',
   清空对话记录: 'Clear the conversation',
   清空方案版本: 'Clear the plan versions',
   清空改动记录: 'Clear the change records',
-  '保留：标题、需求说明、标签与人员指派。运行历史保留，可供审计。Runner 工作区文件不受影响。':
+  '保留：标题、需求说明、标签与人员指派。运行历史保留，可供审计。执行机工作区文件不受影响。':
     'Kept: title, spec, tags and assignment. Run history stays for audit. Executor workspace files are untouched.',
   '正在停止…': 'Stopping…',
   已取消: 'Canceled',
@@ -406,7 +452,7 @@ export const EN: Record<string, string> = {
   '行过长，已退回整行高亮': 'Line too long — whole-line highlight only',
   '完成 {elapsed}': 'Done in {elapsed}',
   运行在: 'Running on',
-  上: '', // tail of 运行在 <machine> 上 — the en template needs no tail
+  ' 上': '',
   由定时发起: 'Started by schedule',
   收起: 'Collapse',
   // #933: the collapsed tool group's identity label (transcript action row).
@@ -472,11 +518,37 @@ export const EN: Record<string, string> = {
   每周: 'Weekly',
   单次: 'Once',
   每小时运行: 'Runs hourly',
-  每天运行: 'Runs daily',
-  每周运行: 'Runs weekly',
+  '每天 {time}': 'Daily at {time}',
+  '每月 {d} 日 {time}': 'Monthly on day {d} at {time}',
+  '每{weekday} {time}': '{weekday} weekly at {time}',
+  周一: 'Mon',
+  周二: 'Tue',
+  周三: 'Wed',
+  周四: 'Thu',
+  周五: 'Fri',
+  周六: 'Sat',
+  周日: 'Sun',
   运行一次: 'Runs once',
+  '任务已归档，定时随之停用': 'The task was archived, so the schedule stopped',
+  '执行任务的 Agent 暂停了它': 'The agent working on the task paused it',
+  '连续 10 次定时运行都没人回复，已自动暂停':
+    'Paused after 10 scheduled runs with no reply from a person',
+  '提交代码时被仓库检查拦下，这一轮没能完成': "The repository's commit check stopped this run",
+  '运行出错，已停用': 'The run failed, so the schedule stopped',
+  已结束: 'Ended',
+  下次运行: 'Next run',
+  上次运行: 'Last run',
+  还没运行过: 'Not run yet',
+  没有下一次: 'No upcoming run',
+  选择任务: 'Choose a task',
+  成功: 'Succeeded',
+  跳过: 'Skipped',
+  '定时没能保存，请重试。': 'Could not save the schedule. Try again.',
+  这条定时已被删除: 'This schedule was deleted.',
+  '这里还没有可以定时的任务。先建一个任务，或者直接让 Coordinator 帮你建定时。':
+    'There is no task to schedule here yet. Add a task first, or ask the Coordinator to set up the schedule.',
   '{mo}月{d}日': '{monthShort} {d}',
-  '下次 {day} {time}': 'Next {day} {time}',
+  '下次 {when}': 'Next {when}',
   自动: 'Auto',
   新建定时: 'New schedule',
   日期: 'Date',
@@ -484,15 +556,13 @@ export const EN: Record<string, string> = {
   时: 'Hour',
   分: 'Minute',
   // #1037 fixture 模式自我声明 chip（api/provider.tsx）
-  '示例数据（scenario {id}）': 'Sample data (scenario {id})',
+  '示例数据（场景 {id}）': 'Sample data (scenario {id})',
   演示数据: 'Demo data',
   '只读演示，改动不会被保存。': 'Read-only demo — changes are not saved.',
   官网: 'Website',
   闭环录像: 'Closed-loop video',
   '这是演示数据，改动不会保存': 'Demo data: changes are not saved',
   还没有定时任务: 'No schedules yet',
-  '按周期或在指定时间自动重新运行任务。每一轮都会依据任务描述从头开始一次全新运行，到达确认或审核关口时暂停，交由负责人接手。':
-    'Automatically rerun a task on a cycle or at a chosen time. Every round starts a fresh run from the task description, pausing at the confirm or review gate for the owner to pick up.',
   '也可以直接告诉 Coordinator 某个任务要多久重跑一次，它会替你写好规则。':
     'You can also just tell the Coordinator how often a task should rerun, and it will write the rule for you.',
 
@@ -534,9 +604,9 @@ export const EN: Record<string, string> = {
 
   // —— api-keys route (r2 19, 02 §8 canon note) ——
   '尚无 API 密钥': 'No API keys yet',
-  'API 密钥用于从命令行接入 Runner，也让 MCP 客户端能访问你的工作台。':
+  'API 密钥用于从命令行接入执行机，也让 MCP 客户端能访问你的工作台。':
     'API keys connect Runners from the command line and let MCP clients reach your workbench.',
-  新建密钥: 'New key',
+  '新建 API 密钥': 'New API key',
   复制: 'Copy',
   展开: 'Expand',
   '回复：{quote}': 'Replying to: {quote}',
@@ -546,20 +616,18 @@ export const EN: Record<string, string> = {
   思考: 'Thinking',
   展开思考: 'Expand thinking',
   收起思考: 'Collapse thinking',
-  '请立即复制密钥，它仅显示一次。': 'Copy the key now — it is shown only once.',
+  '请立即复制 API 密钥，它仅显示一次。': 'Copy the API key now — it is shown only once.',
+  '没能复制，请手动选中 API 密钥复制。': 'Could not copy; select the API key and copy it by hand.',
 
   // —— resources routes (r7 06–10, r2 §6) ——
   新建: 'New',
   'MCP 服务器': 'MCP Servers',
-  '添加 Runner': 'Add Runner',
+  添加执行机: 'Add Runner',
   自定义: 'Custom',
-  '搜索技能...': 'Search skills...',
+  '排序：{option}': 'Sort: {option}',
   排序: 'Sort',
   尚无技能: 'No skills yet',
-  // spec 13 + XMON-109（spec 13 回摆）技能面：双入口口径——本地目录或页面
-  // 新建都会出现在这里（{dir} = SKILLS_DIR_DEFAULT）。
-  '把包含 SKILL.md 的技能目录放进 {dir}，或新建一个技能，即会出现在这里。':
-    'Drop a skill folder containing SKILL.md into {dir}, or create a new skill here, and it will show up in this list.',
+  '用「导入」或「新建」添加技能。': 'Add skills with Import or New.',
   // XMON-114（spec 13 回摆）技能写面：新建/编辑弹窗与错误态。
   新建技能: 'New skill',
   编辑技能: 'Edit skill',
@@ -585,9 +653,9 @@ export const EN: Record<string, string> = {
   导入技能: 'Import skill',
   本地路径: 'Local path',
   'GitHub 地址': 'GitHub URL',
-  'server 本机上的技能目录路径，目录里要有 SKILL.md。':
+  '服务器本机上的技能目录路径，目录里要有 SKILL.md。':
     'Path to a skill directory on the cairn server machine — it must contain a SKILL.md.',
-  'GitHub 公共仓库或其中子目录的地址；导入后可用 refresh 重新拉取。':
+  'GitHub 公共仓库或其中子目录的地址；导入后可刷新，重新拉取。':
     'Address of a public GitHub repository or a subdirectory of one; after importing you can refresh to re-pull it.',
   '两字段二选一：填其中一个，另一个留空。':
     'Fill in exactly one of the two fields and leave the other empty.',
@@ -596,16 +664,27 @@ export const EN: Record<string, string> = {
   '来源未通过校验。': 'The source failed validation.',
   '拉取来源失败——稍后重试。': 'Fetching the source failed — try again later.',
   '导入失败，请重试。': 'Import failed, please retry.',
-  '尚无 MCP 服务器': 'No MCP servers yet',
-  // spec 13/#368 本地 config 只读制：空态文案 = 配置指引（无添加钮）。
-  '读取 server 本机 ~/.claude.json 的 mcpServers 段：在该文件添加配置并刷新，即出现在这里。MCP 服务器为 Agent 提供额外工具；授权在每个 Agent 的页面上单独进行。':
-    'Reads the mcpServers section of ~/.claude.json on the cairn server machine — add entries there and refresh to see them here. MCP servers give Agents extra tools; authorization happens per Agent, on its own page.',
+  从本机选择: 'From this machine',
+  全选: 'Select all',
+  '路径或 GitHub': 'Path or GitHub',
+  搜索技能: 'Search skills',
+  '导入 {count} 个': 'Import {count}',
+  已导入: 'Imported',
+  已勾选另一个同名技能: 'Another skill with this name is selected',
+  'SKILL.md 缺少名称': 'SKILL.md has no name',
+  名称不能用作目录名: 'The name cannot be used as a directory name',
+  'SKILL.md 缺少描述': 'SKILL.md has no description',
+  '本机 ~/.agents/skills 和 ~/.claude/skills 里没有技能。':
+    'No skills in ~/.agents/skills or ~/.claude/skills on this machine.',
+  '没有匹配的技能。': 'No matching skills.',
+  '导入会把技能复制到 Cairn 自己的目录，原目录不会被改动。':
+    'Importing copies the skill into Cairn’s own directory; the original is left unchanged.',
   尚无密钥: 'No secrets yet',
-  '团队密钥按 Agent 授权，在需要它的执行步中下发，不预置进任务 shell 环境。值只写不读：保存后只能覆盖或删除，无法再次查看。':
-    'Team secrets are granted per Agent and released to the build steps that need them — never pre-set into the task shell environment. Values are write-only: once saved they can be overwritten or deleted, never viewed again.',
+  '密钥只交给你授权的 Agent，保存后无法查看。':
+    'Secrets go only to the Agents you allow and cannot be viewed once saved.',
   添加密钥: 'Add secret',
-  '也可以让 Coordinator 添加：它会开一张安全输入卡填写值，值不会进入对话。':
-    'The Coordinator can add them too: it opens a secure input card for the value, which never enters the conversation.',
+  '也可以让 Coordinator 添加，值不会进入对话。':
+    'The Coordinator can add them too; the value never enters the conversation.',
   个文件: 'file(s)',
   描述: 'Description',
 
@@ -615,27 +694,18 @@ export const EN: Record<string, string> = {
   '1 次运行': '1 run',
   '{n} 次运行': '{n## run|# runs}',
   根目录: 'Root',
-  '搜索任务…': 'Search todos…',
   搜索任务: 'Search todos',
   筛选: 'Filter',
-  列表视图: 'List view',
-  网格视图: 'Grid view',
-  暂无内容: 'Nothing yet',
-  '创建第一个任务以开始使用。': 'Create your first todo to get started.',
   // #446（ADR 0005 读向）项目页「从 GitHub issue 建任务」入口 + 选择弹层
   // （状态过滤 / 分页 / 三态行）。
-  '从 GitHub issue 建任务': 'New task from GitHub issue',
   打开: 'Open',
   已关闭: 'Closed',
   '运行失败了，先重跑才能完成': 'The run failed; rerun it before marking it done',
   '已归档，不能标记完成': 'Archived, so it cannot be marked done',
   'Coordinator 在问你，到对话里回答':
     'A question from the Coordinator; answer it in the conversation',
-  'issue 列表加载失败': 'Failed to load issues',
-  '这个状态下没有 issue': 'No issues in this state',
   上一页: 'Previous page',
   下一页: 'Next page',
-  '第 {page} 页': 'Page {page}',
   // #452（ADR 0006 写向）详情页来源 issue 行：未建成 + 重试入口 / 回显
   // （号 + 状态 + 上游现值标题）/ 不一致中性提示（只提示不覆盖）。
   'GitHub issue 未建成': 'GitHub issue not created',
@@ -645,21 +715,21 @@ export const EN: Record<string, string> = {
   // （机器复用侧栏键）+ 尾注引导句。#1259 机器行等待标注（归属机离线，
   // 步只等它上线不自动改派）。
   模型: 'Model',
-  '接入 Runner': 'Connect a Runner',
+  接入执行机: 'Connect a Runner',
   在线: 'Online',
   '迁移到…': 'Migrate to…',
   迁移到: 'Migrate to',
   整机迁移: 'Migrate all agents',
   状态: 'Status',
-  '删除 Runner': 'Delete Runner',
-  '删除后，这台 Runner 要重新注册才能再接任务':
+  删除执行机: 'Delete Runner',
+  '删除后，这台执行机要重新注册才能再接任务':
     'Once deleted, the Runner has to enroll again before it takes work',
-  '确定删除这台 Runner？此操作不可撤销。': 'Delete this Runner? This cannot be undone.',
-  '尚无 Runner': 'No Runners yet',
-  '在要执行任务的 Runner 上运行注册命令，它就会出现在这里。':
+  '确定删除这台执行机？此操作不可撤销。': 'Delete this Runner? This cannot be undone.',
+  尚无执行机: 'No Runners yet',
+  '在要执行任务的执行机上运行注册命令，它就会出现在这里。':
     'Run the enroll command on the Runner that should run tasks and it appears here.',
   '整机迁移失败，请重试。': 'Migration failed. Try again.',
-  '删除 Runner 失败，请重试。': 'Could not delete the Runner. Try again.',
+  '删除执行机失败，请重试。': 'Could not delete the Runner. Try again.',
   // 桌面通知标题（M5 SSE notification 事件面，02 §9.1 三事件；api/sse.ts
   // 纯函数位消费——非组件 t()，i18n-coverage 以本键位兑现 en 兜底）
   方案已就绪: 'Plan ready',
@@ -668,7 +738,7 @@ export const EN: Record<string, string> = {
   等额度: 'Waiting for quota',
   // #1493 降级链：桌面通知标题。
   已换备用模型: 'Switched to fallback model',
-  '没有 Runner 能跑': 'No Runner can run it',
+  没有执行机能跑: 'No Runner can run it',
   '等额度：{lane} {kind}，{probe} 自动探测续跑':
     'Waiting for quota: {lane} {kind}, auto-probe at {probe}',
   '{lane} {kind}，{count} 个任务挂起等额度':
@@ -685,7 +755,15 @@ export const EN: Record<string, string> = {
   '加载中…': 'Loading…',
   文件加载失败: 'Failed to load file',
   二进制文件暂不支持预览: 'Binary files cannot be previewed',
-  '可选。未设置时以首字母代替。': 'Optional. The initial is used when unset.',
+  '项目图标，可选。不选时显示方盒图标。':
+    'Project icon, optional. A box shows when none is picked.',
+  '例如：我的应用': 'e.g. My App',
+  切换仓库来源: 'Switch repository source',
+  '图标没能保存，请在项目设置里重试。': 'The icon was not saved. Try again in project settings.',
+  '演示数据不能新建项目。': 'Projects cannot be created in the demo.',
+  '填好项目名称后可以创建。': 'Enter a project name to create it.',
+  '选好 GitHub 仓库后可以创建。': 'Pick a GitHub repository to create it.',
+  '填好本地文件夹路径后可以创建。': 'Enter a local folder path to create it.',
   项目名称: 'Project name',
   仓库: 'Repo',
   选择仓库: 'Select repo',
@@ -710,7 +788,7 @@ export const EN: Record<string, string> = {
   浏览本地文件夹: 'Browse local folders',
   // #1152（ADR 0016）localPath 单机器形态常驻标注：真值在该机文件系统，
   // 不享受换机续跑；可丢性只属 githubRepo 形态。
-  '单 Runner 形态：这台 Runner 损坏时进度随之丢失。需要在任意 Runner 上续跑，请用 GitHub 接入。':
+  '单执行机形态：这台执行机损坏时进度随之丢失。需要在任意执行机上续跑，请用 GitHub 接入。':
     'Single-Runner: progress dies with this Runner. Use GitHub to resume from any Runner.',
   显示隐藏文件: 'Show hidden files',
   没有子目录: 'No subfolders',
@@ -729,7 +807,6 @@ export const EN: Record<string, string> = {
   本机加速路径: 'Local acceleration path',
   '绝对路径，留空即清除': 'Absolute path; empty to clear',
   // #1242 项目身份可变面：设置页名称/描述编辑 + local→github 转换卡。
-  保存名称: 'Save name',
   更换项目图标: 'Change project icon',
   搜索图标: 'Search icons',
   没有匹配的图标: 'No matching icons',
@@ -818,33 +895,29 @@ export const EN: Record<string, string> = {
   正在调用: 'Calling',
   // #1257 板面挂起态：等机器 / 等额度 chip + 等额度 tooltip（下次尝试时刻）。
   // 等额度 chip 词复用 #1261 的同名键（上面等额度族）。
-  '等 Runner': 'Waiting for a Runner',
+  等执行机: 'Waiting for a Runner',
   '下次尝试 {time}': 'Next attempt at {time}',
   '等额度：模型额度用尽，挂起等待恢复（下次尝试 {time}）':
     'Waiting for quota: model quota exhausted, suspended until it recovers (next attempt {time})',
   // #873 详情活行披露面：在跑步两行（步类 + 执行机器）；行开关 aria 复用
   // #822 的「展开/收起实时步骤」——同一手势两面同词。
   '本步：{n}': 'This step: {n}',
-  'Runner：{n}': 'Runner: {n}',
+  '执行机：{n}': 'Runner: {n}',
   // M7 #312 AI 审核模态文案（r8 §3.1 实测）：Agent 选择 + 关注点 textarea +
   // 提交按钮。dialog 选 Agent 走 dlg-form-* family 共用层,文案独立。
   // #1250（ADR 0018 层 1）review fan-out 三视角（ReviewDialog 勾选行）。
   // #509 审核选人独立性提示：默认值优先跨厂商；无跨厂商可选时出声。两档措辞
   // ——确证同源 vs 无法判定（未配置厂商 = 没有比对基准），都不静默。
-  // M7 #330 AI 审核消息渲染（r8 §3.1 真 findings 上线）：结论先行 + 编号 findings
-  // + 严重度后缀（(blocking)/(suggestion)/(info)）+ 方案引用块 + 修复建议。
-  // 服务端消息 kind = REVIEW_VERDICT_KIND（shared/message.ts 双端单源），
-  // findings 形态 = reviewVerdictSchema（shared/review.ts）。
   审核结论: 'Review conclusion',
   // #700：verdict 提取失败行——daemon findingsError 原因上浮，审核面以
   // danger 色 tag 与「审核未返回结论」兜底（旧 daemon 无信号）相区分。
   判定提取失败: 'Verdict extraction failed',
-  '(blocking)': '(blocking)',
-  '(suggestion)': '(suggestion)',
-  '(info)': '(info)',
+  必须修改: 'Must fix',
+  可改进: 'Could improve',
+  备注: 'Note',
   '建议：': 'Suggestion: ',
   '建议：{body}': 'Suggestion: {body}',
-  '更换 Coordinator 的 agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。':
+  '更换 Coordinator 的 Agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。':
     "Switch the Coordinator's Agent? The Coordinator's memory lives on the Agent it runs on. After switching to <agent>, the memory becomes <agent>'s — the current memory is not migrated.",
   编辑章程: 'Edit charter',
   保存章程: 'Save charter',
@@ -871,60 +944,59 @@ export const EN: Record<string, string> = {
   // concurrency face.
   '排队中：等 {machine}（{running}/{cap} 在跑，前面 {ahead} 个）':
     'Queued: waiting for {machine} ({running}/{cap} running, {ahead} ahead)',
-  '排队中：等空闲 Runner（前面 {ahead} 个）': 'Queued: waiting for a free Runner ({ahead} ahead)',
+  '排队中：等空闲执行机（前面 {ahead} 个）': 'Queued: waiting for a free Runner ({ahead} ahead)',
   // #1251 visible pending reasons (queue blocked face): missing capability =
   // the fix, offline = waiting.
-  '排队中：没有 Runner 满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）':
+  '排队中：没有执行机满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）':
     'Queued: no Runner meets the capability requirements (missing {missing}) — it runs on the next heartbeat once they are installed ({ahead} ahead)',
   '排队中：等 {machine} 上线（前面 {ahead} 个）':
     'Queued: waiting for {machine} to come online ({ahead} ahead)',
-  '排队中：等 Runner 上线（前面 {ahead} 个）':
+  '排队中：等执行机上线（前面 {ahead} 个）':
     'Queued: waiting for a Runner to come online ({ahead} ahead)',
-  '排队中：还没有 {platform} Runner · 需要 {platform}':
+  '排队中：还没有 {platform} 执行机 · 需要 {platform}':
     'Queued: no {platform} Runner yet · needs {platform}',
   '排队中：等 {machine} 上线 · 需要 {platform}（前面 {ahead} 个）':
     'Queued: waiting for {machine} to come online · needs {platform} ({ahead} ahead)',
-  '这台 Runner 没上报任务沙箱状态，接不了任务。更新 CLI 后在这台机器上运行 `{command} restart`。':
-    'This Runner has not reported its task sandbox, so it cannot take tasks. Update the CLI, then run `{command} restart` on this machine.',
-  '正在检查任务沙箱，检查完才接任务。':
-    'Checking the task sandbox; this Runner takes tasks once the check passes.',
-  '这台机器的系统不支持任务沙箱，接不了任务。':
-    "This machine's system does not support the task sandbox, so it cannot take tasks.",
-  '任务沙箱没就绪，这台 Runner 接不了任务。Linux 上 daemon 要作为自己的 systemd user unit 运行，并装好 bubblewrap（`bwrap`）：更新 CLI 后在这台机器上运行 `{command} restart`。':
-    'The task sandbox is not ready, so this Runner cannot take tasks. On Linux the daemon must run as its own systemd user unit with bubblewrap (`bwrap`) installed: update the CLI, then run `{command} restart` on this machine.',
-  '排队中：{machine} 的任务沙箱没就绪，接不了任务——在那台机器上运行 cairn restart，原因见 Runner 页（前面 {ahead} 个）':
-    'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks. Run cairn restart on that machine; the Runner page shows why ({ahead} ahead)',
-  '排队中：{machine} 没开 {runtime}——到 Runner 页打开（前面 {ahead} 个）':
-    'Queued: {machine} has {runtime} turned off. Turn it on in the Runner page ({ahead} ahead)',
+  '排队中：执行机的任务沙箱没就绪，接不了任务（前面 {ahead} 个）':
+    'Queued: the task sandbox on the Runner is not ready, so it cannot take tasks ({ahead} ahead)',
+  '排队中：执行机上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）':
+    'Queued: the Runner has not detected {runtime}. Install it, then restart the Runner ({ahead} ahead)',
+  '排队中：执行机用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）':
+    'Queued: the Runner cannot use the model for this step. Pick another model in work routing ({ahead} ahead)',
+  '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了（前面 {ahead} 个）':
+    'Queued: a local project only runs on the Runner that holds it, so this Runner cannot run it ({ahead} ahead)',
+  '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）':
+    'Queued: Claude is rate limited on the Runner; this continues once the limit lifts ({ahead} ahead)',
+  '排队中：执行机上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）':
+    'Queued: Claude Code is not logged in on the Runner. Run claude on that machine to log in ({ahead} ahead)',
+  '排队中：{machine} 的任务沙箱没就绪，接不了任务（前面 {ahead} 个）':
+    'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks ({ahead} ahead)',
+  '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）':
+    'Queued: {machine} has not detected {runtime}. Install it, then restart the Runner ({ahead} ahead)',
   '排队中：{machine} 用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）':
     'Queued: {machine} cannot use the model for this step. Pick another model in work routing ({ahead} ahead)',
-  '排队中：本地项目只在它所在的 Runner 上跑，{machine} 跑不了（前面 {ahead} 个）':
+  '排队中：本地项目只在它所在的执行机上跑，{machine} 跑不了（前面 {ahead} 个）':
     'Queued: a local project only runs on the Runner that holds it, so {machine} cannot run it ({ahead} ahead)',
   '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）':
     'Queued: Claude is rate limited on {machine}; this continues once the limit lifts ({ahead} ahead)',
   '排队中：{machine} 上的 Claude Code 没登录——在那台机器上运行 claude 登录（前面 {ahead} 个）':
     'Queued: Claude Code is not logged in on {machine}. Run claude on that machine to log in ({ahead} ahead)',
-  '排队中：团队只用 Claude 订阅，{machine} 上的 Claude Code 没有订阅登录——在那台机器上用订阅登录，或在「用量与连接」里允许按量付费（前面 {ahead} 个）':
-    'Queued: this team uses Claude subscriptions only and Claude Code on {machine} is not logged in with one. Log in with a subscription there, or allow pay as you go in Usage & connections ({ahead} ahead)',
+  '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始（前面 {ahead} 个）':
+    'Queued: the Claude account was switched and this step keeps the old account. Stop it, then continue, to start over on the new account ({ahead} ahead)',
   'Coordinator 规则用的服务商「{name}」还没添加':
     'The Coordinator rule uses the provider "{name}", which has not been added',
   'Coordinator 规则用的服务商「{name}」没有 API key':
     'The Coordinator rule uses the provider "{name}", which has no API key',
-  'Coordinator 规则用的是付费 Claude（{name}），但团队只允许用订阅':
-    'The Coordinator rule uses paid Claude ({name}), but this team allows subscriptions only',
   '改 Coordinator 规则': 'Change the Coordinator rule',
   '填写 API key': 'Add the API key',
   '换 Coordinator 模型': 'Pick another Coordinator model',
   运行平台: 'Platform',
-  '不限时用默认 Runner': 'Any uses the default Runner',
+  不限时用默认执行机: 'Any uses the default Runner',
   '需要 {platform}': 'needs {platform}',
-  '还没有 {platform} Runner': 'No {platform} Runner yet',
-  '不限（默认 Runner）': 'Any (default Runner)',
+  '还没有 {platform} 执行机': 'No {platform} Runner yet',
+  '不限（默认执行机）': 'Any (default Runner)',
   '运行中不能改，换平台请新开任务':
     'Locked once the task has run. Start a new task to change the platform.',
-  // #1251 machines page capability annotation (daemon-reported inventory).
-  能力清单未上报: 'Capabilities not reported',
-  'MCP {n} · 本机技能 {m}': 'MCP {n} · local skills {m}',
   手动: 'Manual',
   推荐: 'Recommended',
   // #905 activity phases (live row labels) + the freshness disclosure line.
@@ -937,8 +1009,8 @@ export const EN: Record<string, string> = {
   '等待模型响应...': 'Waiting for the model...',
   '最近信号：{n}s 前': 'Last signal {n}s ago',
   // #918 skill facts: live-panel entries (read / denied) + the detail summary.
-  'skill: {n}': 'skill: {n}',
-  '✕ skill: {n}（已挡下）': '✕ skill: {n} (blocked)',
+  '读取技能：{n}': 'skill: {n}',
+  '✕ 技能：{n}（已挡下）': '✕ skill: {n} (blocked)',
   '技能：{n}': 'Skills: {n}',
   '挡下：{n}': 'Blocked: {n}',
   // #1106 dispatch skill injection: detail-face lookup row (reasons ride as
@@ -957,7 +1029,6 @@ export const EN: Record<string, string> = {
   '远程（HTTP）': 'Remote (HTTP)',
   '2 天前': '2d ago',
   // —— overlay dialogs (issues #66 / #68) ——
-  新建任务: 'New task',
   删除任务: 'Delete todo',
   '确定删除该任务？此操作不可撤销。': 'Delete this todo? This cannot be undone.',
   // #306 sched-card 菜单删除确认（DeleteConfirm 家族泛化随加）。
@@ -970,7 +1041,6 @@ export const EN: Record<string, string> = {
   撤销: 'Undo',
   完成任务: 'Complete task',
   负责人: 'Owner',
-  'issue 状态': 'Issue state',
   'Coordinator 用的模型额度已用完': "The Coordinator's model is out of quota",
   'Coordinator 用的模型暂时过载': "The Coordinator's model is overloaded",
   将改动合并到默认分支: 'Merge the changes into the default branch',
@@ -1011,9 +1081,9 @@ export const EN: Record<string, string> = {
   '第 4 次运行': 'Run 4',
   '12 分钟前 · 38.3k tokens': '12m ago · 38.3k tokens',
   '6 小时前 · 66.1k tokens': '6h ago · 66.1k tokens',
-  '3 天前 · Cancelled': '3d ago · Cancelled',
+  '3 天前 · 已取消': '3d ago · Cancelled',
   '3 天前': '3d ago',
-  '4 天前 · Machine offline': '4d ago · Machine offline',
+  '4 天前 · 执行机离线': '4d ago · Machine offline',
   '2 天前 · 41.7k tokens': '2d ago · 41.7k tokens',
 
   // —— #75 deep dynamic states: reject loop / failed / reuse plan ——
@@ -1021,7 +1091,7 @@ export const EN: Record<string, string> = {
   '运行在 {m} 上': 'Running on {m}',
   上一版本: 'Previous version',
   '与其他版本对比…': 'Compare with other versions…',
-  '回到与 base 对比': 'Back to comparison with base',
+  回到与基准版本对比: 'Back to comparison with base',
   // #1258 失败行原始错误弹窗面
   查看原始错误: 'View raw error',
   原始错误: 'Raw error',
@@ -1036,7 +1106,7 @@ export const EN: Record<string, string> = {
   查看完整指令: 'View full instruction',
   完整指令: 'Full instruction',
   // #1285 失败行指引按分类分族
-  '请将这台 Runner 重新上线。这一步不会改派到其他 Runner。':
+  '请将这台执行机重新上线。这一步不会改派到其他执行机。':
     'Bring this Runner back online. This step is not reassigned.',
   '模型额度已用尽，请等待额度恢复后重试。':
     'Model quota exhausted — wait for it to recover, then retry.',
@@ -1047,18 +1117,8 @@ export const EN: Record<string, string> = {
   // #170 create-agent dialog family
   创建: 'Create',
   // W4 #287 API key 新建表单弹窗（r3 §6 权限位 [推断]）
-  '名称（可选）': 'Name (optional)',
-  '如：笔记本、CI 机器': 'e.g. laptop, CI runner',
-  'Git 读写（托管仓库 push/pull）': 'Git read/write (hosted repo push/pull)',
-  'MCP 访问（MCP 客户端接入）': 'MCP access (MCP client connections)',
-  '注册 Runner（命令行接入）': 'Runner enrollment (CLI executor registration)',
-  工具权限位: 'Tool grants',
-  // #636 起 zh「全选」归筛选面板的全选行（en 'Select all'）；本面快捷键换
-  // 「授予全部」避开同形碰撞——zh 源串即 key，两个语义域必须分叉。
-  授予全部: 'Grant all',
-  清空: 'Clear all',
-  读: 'Read',
-  写: 'Write',
+  '只能用大写字母、数字和下划线，不能以数字开头。':
+    'Capital letters, digits and _ only; no leading digit.',
   // wayfinder #173 add-secret dialog family (r2 §242 verbatim fields)
   '名称（环境变量名）': 'Name (environment variable name)',
   '描述（可选）': 'Description (optional)',
@@ -1067,12 +1127,9 @@ export const EN: Record<string, string> = {
   粘贴密钥的值: 'Paste the secret value',
   '值将加密存储，保存后无法再次查看。':
     'The value is stored encrypted and cannot be viewed again after saving.',
-  // wayfinder #178 project tasks toolbar (filter/sort menus, match-empty line)
   全部: 'All',
   进行中: 'In progress',
-  最近更新: 'Recently updated',
   标题: 'Title',
-  没有匹配的任务: 'No matching tasks',
   // wayfinder #175 add-provider dialog family (field authority = shared
   // createProviderBodySchema / r3 §2; protocol tab labels stay English
   // verbatim, never translated)
@@ -1085,7 +1142,11 @@ export const EN: Record<string, string> = {
     'Send the API key as an Authorization: Bearer header',
   '密钥将加密存储，保存后无法再次查看。':
     'The key is stored encrypted and cannot be viewed again after saving.',
-  '模型（可选）': 'Models (optional)',
+  '模型（至少一个）': 'Models (at least one)',
+  '至少添加一个模型：点「添加模型」，输入端点支持的模型 ID，比如 gpt-4o-mini。':
+    'Add at least one model: click Add model and type a model ID the endpoint serves, such as gpt-4o-mini.',
+  '输入模型 ID，按回车添加': 'Type a model ID and press Enter to add it',
+  '先在下面的模型列表里添加一个模型，才能测试': 'Add a model in the list below before testing',
   添加模型: 'Add model',
   移除模型: 'Remove model',
   连接设置: 'Connection',
@@ -1116,7 +1177,7 @@ export const EN: Record<string, string> = {
   未安装: 'Not installed',
   '已安装，未配置模型槽': 'Installed, no model slots configured',
   未登录: 'Not signed in',
-  '在该 Runner 上写 ~/.claude/settings.json 的 env.ANTHROPIC_*_MODEL 槽后，此处自动展示其模型槽。':
+  '在该执行机上写 ~/.claude/settings.json 的 env.ANTHROPIC_*_MODEL 槽后，此处自动展示其模型槽。':
     'Add ANTHROPIC_*_MODEL slots to env in ~/.claude/settings.json on that Runner and its model slots show up here.',
   尚未添加服务商: 'No providers yet',
   // #231/#243 OAuth 落地 reason 三译(providers-page 喂 connectError 行)
@@ -1136,10 +1197,12 @@ export const EN: Record<string, string> = {
   // command strings themselves stay untranslated — brand slots via BRAND)
   '有条件时优先使用云主机：笔记本会休眠或断网，云主机常在线，构建更稳定。':
     'Prefer a cloud host when you can: laptops sleep or drop off the network, while cloud hosts stay online and build more reliably.',
-  '在待接入的 Runner 上执行以下命令。浏览器将打开登录页，授权团队 {team} 后 Runner 即可上线。此后它在后台常驻运行，无需保持终端开启。':
+  '当前地址只适用于这台电脑。添加另一台电脑前，请用 Tailscale 地址打开 Cairn，再复制命令。':
+    'This address only works on this computer. To add another computer, open Cairn at its Tailscale address before copying the command.',
+  '在待接入的执行机上执行以下命令。浏览器将打开登录页，授权团队 {team} 后执行机即可上线。此后它在后台常驻运行，无需保持终端开启。':
     'Run the following commands on the Runner you want to connect. Your browser will open a sign-in page; once you authorize the team {team}, the Runner comes online. It then keeps running in the background — no need to keep the terminal open.',
   '安装 CLI': 'Install the CLI',
-  '在 Runner 上执行': 'Run on the Runner',
+  在执行机上运行: 'Run on the Runner',
   '在云服务器上运行？改用 API key 注册':
     'Running on a cloud server? Register with an API key instead',
   '获取 API key →': 'Get an API key →',
@@ -1154,17 +1217,26 @@ export const EN: Record<string, string> = {
   作废配对码: 'Revoke code',
   进入: 'Continue',
   // W4 #285 浏览器授权页（02 §5.2 路径一；/app/machines/authorize）
-  '授权 Runner': 'Authorize Runner',
-  '生成授权链接，在 Runner 上完成注册发起。':
-    'Generate an authorization link and start enrollment on the executor Runner.',
-  生成授权链接: 'Generate authorization link',
-  '一台 Runner 请求加入你的团队。确认后它将以自己的凭据连接。':
-    'An executor Runner is requesting to join your team. Once authorized it connects with its own credentials.',
+  授权执行机: 'Authorize Runner',
+  '在要接入的电脑上依次运行这两条命令。终端会给出授权链接，打开它就能确认。':
+    'Run these two commands, in order, on the computer you are adding. The terminal prints an authorization link; open it to confirm.',
+  '连不上服务器，正在重试。请检查网络。': 'Cannot reach the server; retrying. Check the network.',
+  '有一台执行机请求加入你的团队。': 'A Runner is asking to join your team.',
+  '正在连接执行机…': 'Connecting to the Runner…',
+  '← 返回执行机': '← Back to Runners',
+  '授权没成功，请再试一次。还不行就在执行机上重新运行 `cairn start`。':
+    'Authorization failed. Try again; if it still fails, run `cairn start` on the Runner again.',
   确认授权: 'Authorize',
   '正在授权…': 'Authorizing…',
-  '授权完成，Runner 已注册。': 'Authorized — the Runner is registered.',
-  '授权链接已失效，请在 Runner 上重新发起。':
-    'This authorization link has expired — restart enrollment on the executor Runner.',
+  '授权完成，执行机已注册。终端那边会自己连上，这一页可以关掉。':
+    'Authorized — the Runner is registered. The terminal connects by itself; you can close this page.',
+  '授权完成，{name} 已注册为执行机。终端那边会自己连上，这一页可以关掉。':
+    'Authorized — {name} is registered as a Runner. The terminal connects by itself; you can close this page.',
+  机器名: 'Machine name',
+  '名字是那台电脑自己报的。和终端里显示的一样才确认。':
+    'That computer reports this name itself. Confirm only if its terminal shows the same name.',
+  '授权链接过期了。在执行机上重新运行 `cairn start` 拿新链接。':
+    'This authorization link has expired. Run `cairn start` on the Runner again for a new one.',
   '浏览器授权注册 →': 'Browser authorization →',
   // W2 #318 桩群校准：新建任务未保存闸（r9 §3.4）。#310 附件：dirty 位由
   // spec 非空承载（附件 token 注入后归 spec）,标签 add 仍为桩（本票不动）。
@@ -1199,13 +1271,13 @@ export const EN: Record<string, string> = {
   // #1251 机器匹配段（权限 tab 第五组：执行要求写面 + 「哪些机器可跑它」读面）。
   '要求安装 {name}': 'Require {name} installed',
   离线: 'Offline',
-  '{name} 上的 Claude Code 登录将在 {days} 天后过期。在该 Runner 上运行 `claude auth login` 重新登录。':
+  '{name} 上的 Claude Code 登录将在 {days} 天后过期。在该执行机上运行 `claude auth login` 重新登录。':
     'Claude Code login on {name} expires in {days## day|# days}. On that Runner run `claude auth login`.',
-  '{name} 上的 Claude Code 登录将在 1 天后过期。在该 Runner 上运行 `claude auth login` 重新登录。':
+  '{name} 上的 Claude Code 登录将在 1 天后过期。在该执行机上运行 `claude auth login` 重新登录。':
     'Claude Code login on {name} expires in 1 day. On that Runner run `claude auth login`.',
-  '{name} 上的 Claude Code 登录将在不到 1 天内过期。在该 Runner 上运行 `claude auth login` 重新登录。':
+  '{name} 上的 Claude Code 登录将在不到 1 天内过期。在该执行机上运行 `claude auth login` 重新登录。':
     'Claude Code login on {name} expires in less than a day. On that Runner run `claude auth login`.',
-  '{name} 上的 Claude Code 登录已过期。在该 Runner 上运行 `claude auth login` 重新登录。':
+  '{name} 上的 Claude Code 登录已过期。在该执行机上运行 `claude auth login` 重新登录。':
     'Claude Code login on {name} has expired. On that Runner run `claude auth login`.',
   服务器数据库备份: 'Server database backup',
   数据库备份已停止: 'Database backup stopped',
@@ -1221,12 +1293,6 @@ export const EN: Record<string, string> = {
     'The latest server database backup run on {host} failed ({detail}); the last successful backup was less than an hour ago. On that machine run `systemctl --user status cairn-db-backup.service` to see why.',
   '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在 {hours} 小时前。在该机器上运行 `systemctl --user status cairn-db-backup.service` 查看原因。':
     'The latest server database backup run on {host} failed ({detail}); the last successful backup was {hours## hour|# hours} ago. On that machine run `systemctl --user status cairn-db-backup.service` to see why.',
-  // #895 机器页三态读标注（spec 21 A8；orchestration 块 join 行集）+ chief
-  // 设置 Agent tab「机器」槽的描述（A6）。徽标/状态 = 机器与总管编排的
-  // 关系面，非机器自身状态。
-  'Coordinator 主机': 'Coordinator host',
-  'Coordinator 回合进行中': 'Coordinator turn in progress',
-  'Coordinator 等待 Runner': 'Coordinator waiting for Runner',
   '暂无 MCP 服务器。': 'No MCP servers yet.',
   团队密钥: 'Team secrets',
   // #1169 授权技能段（权限 tab）：不限制（null）与限制后全不勾（[] = 显式
@@ -1254,7 +1320,7 @@ export const EN: Record<string, string> = {
     'Let this Agent add new skills to the team skill library.',
   '允许该 Agent 修改团队技能库中已有的技能。':
     'Let this Agent modify skills already in the team skill library.',
-  '任务执行时，该 Agent 可在需要密钥的执行步中按需取用团队密钥，每次取用都会留下记录；密钥不预置进 shell 环境。所在 Runner 需要 cairn CLI 0.1.28 及以上。':
+  '任务执行时，该 Agent 可在需要密钥的执行步中按需取用团队密钥，每次取用都会留下记录；密钥不预置进 shell 环境。所在执行机需要 cairn CLI 0.1.28 及以上。':
     'When running a task, this Agent can retrieve team secrets on demand in the execution steps that need them; every retrieval is recorded, and secrets are never preloaded into the shell environment. The Runner must have cairn CLI 0.1.28 or newer.',
   '该 Agent 执行任务时可使用的团队 MCP 服务器，其工具以 mcp__<服务器>__<工具> 的形式出现。':
     'Team MCP servers this Agent may use while running tasks; their tools appear as mcp__<server>__<tool>.',
@@ -1263,7 +1329,7 @@ export const EN: Record<string, string> = {
   '该 Agent 执行任何任务时自动携带的团队技能，无需在消息中 @ 引用。':
     'The team skill this Agent always carries, without an @ mention in the message.',
   'Coordinator 在所有项目里都会用到的笔记。': 'Notes the Coordinator uses across every project.',
-  '像 AGENTS.md：本项目的每个 thread 和 Coordinator 都会读到并遵守。':
+  '像 AGENTS.md：本项目的每个对话和 Coordinator 都会读到并遵守。':
     'Like an AGENTS.md: every thread and the Coordinator in this project read and follow it.',
   自动记忆: 'Auto memory',
   'Coordinator 在这个项目里工作时自己写下的笔记。':
@@ -1291,7 +1357,7 @@ export const EN: Record<string, string> = {
   '没有删除成功，记忆保持原样，请重试。': 'The memory was not deleted and is unchanged. Try again.',
   '离线中。记忆只能查看，重新连接后才能删除。':
     'Offline. Memories are read-only until you reconnect.',
-  '模型与 Runner': 'Model & Runner',
+  模型与执行机: 'Model & Runner',
 
   '搜索记忆…': 'Search memories…',
   // 排序第二档（[设计]，见 agent-detail-page.tsx 的 MEMORY_SORT_OPTIONS）。
@@ -1307,16 +1373,16 @@ export const EN: Record<string, string> = {
   '已停止。停之前已经建了任务': 'Stopped. A task was already created before the stop:',
   '{name} 已恢复，{n} 个任务已开工。': '{name} is back. {n#1 task|# tasks} started.',
   '还有 {n} 个在排队。': ' {n#1 task is|# tasks are} still queued.',
-  '{n} 个已改到其他 Runner。': ' {n#1 task|# tasks} moved to another Runner.',
+  '{n} 个已改到其他执行机。': ' {n#1 task|# tasks} moved to another Runner.',
   '已改在 {name} 上跑 {n} 个任务': 'Moved {n#1 task|# tasks} to {name}',
   '改到 {name} 失败': 'Could not move to {name}',
   '{name} 离线了。': '{name} is offline.',
   '{name} 还没连上过。': '{name} has never connected.',
   '{n} 个任务在等它。': ' {n#1 task is|# tasks are} waiting for it.',
-  '等它的任务都已改到其他 Runner。': ' Its waiting tasks moved to another Runner.',
+  '等它的任务都已改到其他执行机。': ' Its waiting tasks moved to another Runner.',
   '{name} 已恢复。': '{name} is back.',
   '最后在线 {ago}。': ' Last seen {ago}.',
-  '已改到其他 Runner': 'Moved to another Runner',
+  已改到其他执行机: 'Moved to another Runner',
   '请在 {name} 上按顺序检查：': 'On {name}, check in order:',
   '1. 电脑开着，没有休眠': '1. The computer is on and not asleep',
   '2. 能打开 Cairn 网页（网络和到服务器的线路正常）':
@@ -1367,16 +1433,23 @@ export const EN: Record<string, string> = {
     'The Coordinator plans first, then dispatches each piece to the right agent.',
   查看会话: 'View session',
   未能开始编排: 'Could not start orchestration',
-  '先选择 Runner': 'Choose a Runner first',
-  '选择 Runner': 'Choose a Runner',
-  '多台 Runner 在线时，开工前要在规则里点名一台。':
+  先选择执行机: 'Choose a Runner first',
+  选择执行机: 'Choose a Runner',
+  '多台执行机在线时，开工前要在规则里点名一台。':
     'Name a Runner in routing rules before starting, while several are online.',
   去选择: 'Choose',
   // —— #1216 在飞编排态（开始/重跑的可见反馈）与详情缺失三态 ——
   '等 {machine} 上线': 'waiting for {machine} to come online',
-  '等 Runner 上线': 'waiting for a Runner to come online',
+  等执行机上线: 'waiting for a Runner to come online',
   '缺 {missing}': 'missing {missing}',
   排队中: 'queued',
+  '已交给 Coordinator 安排': 'Handed to the Coordinator',
+  'Coordinator 正在安排这个任务...': 'The Coordinator is arranging this task...',
+  'Coordinator 没能安排这个任务：{reason}': 'The Coordinator could not arrange this task: {reason}',
+  'Coordinator 没有派发这个任务，原因见上面的回复。点「开始」再试一次。':
+    'The Coordinator did not dispatch this task; its reply above says why. Press Start to try again.',
+  'Coordinator 没有派发这个任务，也没有说明原因。点「开始」再试一次。':
+    'The Coordinator did not dispatch this task and gave no reason. Press Start to try again.',
   'Coordinator 正在编排这张任务，等这一轮结束再发起。':
     'The Coordinator is already orchestrating this task — wait for this round to finish.',
   '重复发起只会多排一轮编排，不会更快开始。':
@@ -1402,13 +1475,12 @@ export const EN: Record<string, string> = {
   已归档项目: 'Archived projects',
   筛选项目: 'Filter projects',
   '筛选项目：{value}': 'Filter projects: {value}',
-  '已归档的项目和它们的对话会一直保留，直到你删除。':
-    'Archived projects and their conversations are kept until you delete them.',
+  '已归档的项目和它们的对话会一直保留，直到你删除。': 'Kept until you delete them.',
   '这个项目已归档。取消归档后才能发消息。':
     'This project is archived. Unarchive it to send messages.',
   '这个项目已归档。取消归档后才能修改。': 'This project is archived. Unarchive it to make changes.',
   没有已归档的项目: 'No archived projects',
-  已归档的项目: 'Archived projects',
+  已归档的项目: 'Archived',
   全部删除: 'Delete all',
   没有可删除的已归档项目: 'No archived projects to delete',
   '删除 {n} 个已归档的项目？': 'Delete {n#1 archived project|# archived projects}?',
@@ -1428,14 +1500,12 @@ export const EN: Record<string, string> = {
   '关闭任务失败，请重试。': 'Could not close the task. Try again.',
   '删除任务失败，请重试。': 'Could not delete the task. Try again.',
   '重试失败，请稍后再试。': 'Retry failed. Try again later.',
-  '新建定时失败，请重试。': 'Could not create the schedule. Try again.',
   '删除定时失败，请重试。': 'Could not delete the schedule. Try again.',
   '删除项目失败，请重试。': 'Could not delete the project. Try again.',
   '断开连接失败，请重试。': 'Could not disconnect. Try again.',
   '添加模型服务失败，请重试。': 'Could not add the provider. Try again.',
   '添加密钥失败，请重试。': 'Could not add the secret. Try again.',
   '新建 API 密钥失败，请重试。': 'Could not create the API key. Try again.',
-  '删除记忆失败，请重试。': 'Could not delete the memory. Try again.',
   待回答的提问: 'Pending questions',
   '提交回答失败，草稿还在，请再试一次。':
     'Could not send your answer. Your draft is still here. Try Submit again.',
@@ -1459,31 +1529,19 @@ export const EN: Record<string, string> = {
   '提交回答失败，请重试。': 'Could not submit your answers. Try again.',
   '取消提问失败，请重试。': 'Could not dismiss the question. Try again.',
   备用模型: 'Fallback models',
-  选择运行时: 'Choose runtime',
-  已忘掉: 'Forgotten',
-  '让 Coordinator 忘掉这条': 'Make the Coordinator forget this',
-  决定: 'Decided',
-  还开着: 'Still open',
-  记住了: 'Remembered',
-  '没能更新这条建议，请重试。': "Couldn't update this suggestion. Try again.",
   建议回复: 'Suggested replies',
   '为什么没拦住：{why}': 'Why it slipped through: {why}',
   '防护：{safeguard}': 'Safeguard: {safeguard}',
   '出处：': 'Source: ',
   协调者对话: 'Coordinator chat',
-  建成线程: 'Make it a thread',
-  不用了: 'Dismiss',
   已建成线程: 'Made into a thread',
   已忽略: 'Dismissed',
-  '今天的日报：昨天没有新进展。': "Today's report: nothing new yesterday. ",
   '{n} 件等你': '{n## item|# items} waiting on you',
   今天的日报: "Today's report",
-  '今天的日报 · 昨天（{day}）': "Today's report · yesterday ({day})",
   '日报没写成，过一会儿再试一次；先看昨天的数字。':
     "The report couldn't be written; it will try once more shortly. Here are yesterday's numbers.",
   '日报两次都没写成；下面是昨天的原始数字。':
     "The report failed twice; here are yesterday's raw numbers.",
-  昨天的进展: 'Yesterday',
   '完成 {done} · 合并 {merged} · 失败 {failed} · 重跑 {retries} · 等额度 {quota} · 审查通过 {pass} / 拦下 {block}':
     'Done {done} · merged {merged} · failed {failed} · reruns {retries} · quota waits {quota} · reviews passed {pass} / blocked {block}',
   '失败：': 'Failed: ',
@@ -1491,32 +1549,36 @@ export const EN: Record<string, string> = {
   '合并：': 'Merged: ',
   等你的事: 'Needs you',
   没有等你的事: 'Nothing is waiting on you',
-  '{n} 件等你，去处理': '{n## item|# items} waiting on you, open the inbox',
   复盘: 'Retro',
   外部动态: 'Outside developments',
+  复盘建议: 'Retro suggestions',
+  日报: 'Daily report',
+  '昨天（{day}）的进展': 'Yesterday ({day})',
+  '今天的日报写好了：昨天没有新进展': "Today's report is ready: nothing new yesterday",
+  '{day} 的日报写好了：{covers} 没有新进展': 'The {day} report is ready: nothing new on {covers}',
+  '{day} 的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}':
+    'The {day} report is ready: done {done} · merged {merged} · failed {failed}',
+  '今天的日报写好了：完成 {done} · 合并 {merged} · 失败 {failed}':
+    "Today's report is ready: done {done} · merged {merged} · failed {failed}",
+  '，有 {k} 条建议等你决定': ', {k## suggestion needs|# suggestions need} your decision',
+  '日报没写成，先看昨天的数字：完成 {done} · 合并 {merged} · 失败 {failed}':
+    "The report couldn't be written. Yesterday's numbers: done {done} · merged {merged} · failed {failed}",
+  '写日报时有 {n} 件等你，现在的情况看任务面板。':
+    '{n## item was|# items were} waiting on you when the report was written; the Tasks panel shows the current state.',
+  '要处理某条建议，直接在对话里告诉 Coordinator，比如「{day} 日报第 1 条建线程」或「第 2 条不用了」。':
+    'To act on a suggestion, tell the Coordinator in the chat, for example "make #1 of the {day} report a thread" or "dismiss #2".',
   '来源：': 'Source: ',
   '对应：{matches}': 'Matches: {matches}',
   '建议动作：{action}': 'Suggested action: {action}',
   昨天的对话里没找到值得改的地方: "Nothing in yesterday's conversations needs a safeguard",
   '这些来源太长，只读了后面的部分：{sources}。':
     'These sources were too long, so only their latest part was read: {sources}. ',
-  '复盘建议只是草稿：点「建成线程」才会建线程，建好后也要你自己开始。':
-    'Retro suggestions are drafts: a thread is created only when you choose "Make it a thread", and you still start it yourself.',
-  'Coordinator 把昨天的对话整理成了 {n} 条摘要':
-    "The Coordinator summarized yesterday's chat into {n## item|# items}",
-  '对话太长了，Coordinator 把上面的内容整理成了 {n} 条摘要':
-    'The chat got long, so the Coordinator summarized everything above into {n## item|# items}',
-  '昨天的摘要 · {time} 整理': "Yesterday's summary · made at {time}",
-  '上面内容的摘要 · {time} 整理': 'Summary of the chat above · made at {time}',
-  '原文都还在，往上滑就能看到。Coordinator 接着聊时用的是这份摘要；任务的进度它会直接去任务里查，不靠记对话。摘要漏了或写错了，直接在下面告诉 Coordinator。':
-    'The original messages are still here; scroll up to see them. The Coordinator continues from this summary and checks task progress in the tasks themselves, not from memory of the chat. If something is missing or wrong, tell the Coordinator below.',
   执行: 'Build',
   合并: 'Merge',
   运行中: 'Running',
   等待检查: 'Waiting on checks',
   未配置: 'Not configured',
   空闲: 'Idle',
-  '{n} 个在跑': '{n} running',
   项目设置: 'Project settings',
   回答: 'Answer',
   看计划: 'Review plan',
@@ -1524,7 +1586,7 @@ export const EN: Record<string, string> = {
   '计划已就绪，批准后开工。': 'Plan ready. Approve to start.',
   '已就绪，等你审阅。': 'Ready for your review.',
   '失败了，打开它重试。': 'Failed. Open it to retry.',
-  '排队等 Runner。': 'Waiting for a Runner.',
+  '排队等执行机。': 'Waiting for a Runner.',
   '正在写计划。': 'Writing the plan.',
   '正在动手。': 'Working on it.',
   '还没开始。': 'Not started.',
@@ -1535,18 +1597,16 @@ export const EN: Record<string, string> = {
   对话加载失败: 'Could not load the conversation',
   '对话记录还在，重试一下。': 'Your conversation is still there. Try again.',
   待你决定: 'Needs you',
-  '跟 Coordinator 说（在 {name} 里）…': 'Talk to the Coordinator (in {name})…',
+  '在 {name} 里发消息': 'Message in {name}',
   '{name}，你想在 {project} 里做什么？': '{name}, what would you like to do in {project}?',
   首页: 'Home',
   'Claude 登录需要处理': 'Claude sign-in needs attention',
   '{kind} 步骤': '{kind} step',
-  '{name} 接任务': 'Run steps on {name}',
   '{time} 重置': 'resets {time}',
   '冷却至 {time}': 'Cooling until {time}',
+  暂不支持: 'Not supported yet',
   可用: 'Available',
-  '固定于 {ago}': 'pinned {ago}',
-  '固定账户的 thread': 'Sticky threads',
-  '在这台 Runner 上运行': 'Run on this Runner:',
+  在这台执行机上运行: 'Run on this Runner:',
   已登录: 'Signed in',
   已过期: 'Expired',
   '最近 24 小时': 'Last 24 hours',
@@ -1558,8 +1618,7 @@ export const EN: Record<string, string> = {
   评审: 'Review',
   账户: 'Accounts',
   还没有额度读数: 'No quota reading yet',
-  '这台 Runner 还不能单独开关 {name}': '{name} cannot be switched on this Runner yet',
-  '这台 Runner 还没有上报 provider 状态': 'This Runner has not reported its providers yet',
+  这台执行机还没有上报模型服务状态: 'This Runner has not reported its providers yet',
   重命名: 'Rename',
   重命名分组: 'Rename group',
   解散分组: 'Ungroup',
@@ -1577,38 +1636,41 @@ export const EN: Record<string, string> = {
   用途: 'Uses',
   连接: 'Connections',
   模型路由: 'Model routing',
-  用量与连接: 'Usage & connections',
-  正在加载用量与连接: 'Loading usage & connections',
-  用量与连接没能加载: 'Usage & connections did not load',
-  规则与策略: 'Rules & policies',
-  正在加载规则与策略: 'Loading rules & policies',
-  规则与策略没能加载: 'Rules & policies did not load',
-  打开工作路由: 'Open work routing',
+  正在加载模型路由: 'Loading model routing',
+  模型路由没能加载: 'Model routing did not load',
+  模型选择: 'Model selector',
+  正在加载模型选择: 'Loading model selector',
+  模型选择没能加载: 'Model selector did not load',
+  'Coordinator 和其他 Agent': 'Coordinator and other agents',
+  '所有 Claude 模型': 'All Claude models',
+  '{model} · 默认': '{model} · default',
+  执行机上的登录: 'Login on a Runner',
+  '还没有路由。添加服务商，再在「模型选择」里给 Coordinator 选模型，这里会画出它走哪个服务商。':
+    'No routing yet. Add a provider, then pick the Coordinator model in Model selector, and this shows which provider it runs on.',
+  '{runtime} · 不可用': '{runtime} · unavailable',
+  '{use} 的模型': '{use} model',
+  '{use} 的思考强度': '{use} thinking level',
+  '{runtime}（没有执行机启用）': '{runtime} (no Runner has it on)',
+  新任务默认用: 'New tasks start on',
+  '你对话的协调者，派活和汇报': 'The coordinator you talk to; it hands out work and reports back',
+  新任务用这个模型和思考强度开始: 'New tasks start with this model and thinking level',
+  每日报告和对话摘要: 'Daily reports and conversation summaries',
+  上下文快满时压缩对话: 'Compacts a conversation when the context is nearly full',
+  '在这里改常用模型，以及新任务和 Coordinator 用哪个模型、思考多深，改动马上生效。其他后台用途（评审、引文检查等）用哪个模型，在模型路由的图里能看到。':
+    'Edit your top models, and which model new tasks and the Coordinator use and how hard they think; changes apply right away. See which model other background uses (review, citation check and so on) use in the Model routing graph.',
+  '先给 Coordinator 选模型，它才能回答你的消息。':
+    'Pick a model for the Coordinator so it can answer your messages.',
   '「{name}」验证通过': '{name} verified',
   '验证中…': 'Verifying…',
   '重命名失败，请重试。': 'Could not rename. Try again.',
-  'Claude 用量': 'Claude usage',
-  付费方式: 'Billing',
-  '只用订阅，按 token 付费的 Claude 调用一律拦下，包括后台任务。':
-    'Subscriptions only: paid-per-token Claude calls are blocked, background tasks included.',
-  '订阅不够时，可以改用按 token 付费的 Claude API key。':
-    'When subscriptions run out, Claude may fall back to a paid-per-token API key.',
-  只用订阅: 'Subscriptions only',
-  允许按量付费: 'Allow pay as you go',
-  '每种用途用哪个模型、走哪个连接': 'Which model and connection each use runs on',
-  '正在读取路由…': 'Loading routing…',
   '移除「{name}」？': 'Remove {name}?',
   '移除失败，请重试。': 'Could not remove. Try again.',
   'API key': 'API key',
   订阅: 'Subscription',
   实现: 'Implementation',
-  机械活: 'Mechanical',
   评测: 'Eval',
-  每晚扫描: 'Nightly scan',
   周: 'Week',
   订阅账户: 'Subscription accounts',
-  '还没有路由，添加一个订阅账户后这里会画出每种用途走哪个连接。':
-    'No routing yet. Add a subscription account and this shows which connection each use runs on.',
   '直接发给这个任务，插进它这一轮。': 'Goes straight to this task, into its current turn.',
   '作为改计划的意见发给这个任务，不算批准。': 'Plan feedback for this task, not an approval.',
   '这个任务会带着这句话重跑。': 'Reruns this task with this note.',
@@ -1617,7 +1679,6 @@ export const EN: Record<string, string> = {
   发送中: 'Sending',
   '回复这个任务…': 'Reply to this task…',
   回复这个任务: 'Reply to this task',
-  '启用 {name}': 'Enable {name}',
   添加服务商: 'Add provider',
   '移除 {name}': 'Remove {name}',
   '加密保存，保存后不能再查看': 'Encrypted; cannot be viewed after saving',
@@ -1643,24 +1704,23 @@ export const EN: Record<string, string> = {
   程序: 'Binary',
   未找到: 'Not found',
   配置: 'Config',
-  '模型槽来自这台 Runner 的这个文件': 'Model slots come from this file on the Runner',
+  模型槽来自这台执行机的这个文件: 'Model slots come from this file on the Runner',
   模型槽: 'Model slots',
-  '这台 Runner 还没上报 Claude Code 信息。': 'This Runner has not reported Claude Code yet.',
+  '这台执行机还没上报 Claude Code 信息。': 'This Runner has not reported Claude Code yet.',
   '{machine} 上的运行时': 'Runtime on {machine}',
   服务商: 'Providers',
-  'pi 步骤用所有 Runner 的服务商，不读这台 Runner 的配置':
+  'pi 步骤用所有执行机的服务商，不读这台执行机的配置':
     "pi steps use the providers for all Runners, not this Runner's config",
-  '所有 Runner 的 {n} 个服务商': 'All Runners: {n#1 provider|# providers}',
-  'Gemini CLI 还不上报版本和模型；打开后，这台 Runner 会接 Gemini 步骤。':
+  '所有执行机的 {n} 个服务商': 'All Runners: {n#1 provider|# providers}',
+  'Gemini CLI 还不上报版本和模型；打开后，这台执行机就会接 Gemini 步骤。':
     'Gemini CLI does not report its version or models yet; when on, this Runner takes Gemini steps.',
   '{n} 个模型': '{n#1 model|# models}',
   '{n} 个已下架': '{n} retired',
-  '使用所有 Runner 的服务商': 'Uses providers for all Runners',
+  使用所有执行机的服务商: 'Uses providers for all Runners',
   范围: 'Scope',
   '添加 API key、订阅或自定义端点后，它们的模型会出现在这里。':
     'Add an API key, subscription or custom endpoint and its models show up here.',
   还没上报: 'Not reported yet',
-  接入命令闸前不能开启: 'Locked until it uses the command gate',
   模型列表: 'Models',
   '已安装，登录状态未知': 'Installed, sign-in unknown',
   '{online}/{total} 台电脑在线': '{online} of {total#1 computer|# computers} online',
@@ -1673,51 +1733,61 @@ export const EN: Record<string, string> = {
   向右滚动: 'Scroll right',
   '还有 {n} 项': '{n} more',
   路由规则: 'Routing rules',
-  工作策略: 'Work policies',
-  还没有路由规则: 'No routing rules yet',
-  '先创建 Coordinator 规则，它才能回答你的消息。':
-    'Create the Coordinator rule first so it can answer your messages.',
-  '这条路由还没有规则，选好运行时与模型后创建。':
-    'This route has no rule yet; pick a runtime and model, then create it.',
-  '不填则沿用规则的 Runner': 'Leave empty to keep the rule Runner',
-  '跟随 coordinator 路由规则，在路由设置里调整。':
+  需要处理的规则: 'Rules that need attention',
+  '{use}：{problem}': '{use}: {problem}',
+  '没有执行机启用 {runtime}': 'No Runner has {runtime} on',
+  没有执行机满足它的要求: 'No Runner meets its requirements',
+  '固定的执行机 {machine} 用不了': 'Its pinned Runner {machine} is unavailable',
+  '服务商 {provider} 已经不在了': 'Provider {provider} no longer exists',
+  '服务商 {provider} 没有 API key': 'Provider {provider} has no API key',
+  '修复后改用 {target}。': 'Fix switches it to {target}.',
+  '修复后改用 {target}，并清空{resets}。': 'Fix switches it to {target} and clears {resets}.',
+  '没有能自动换上的模型，在下面给它选一个能用的。':
+    'No model can replace it automatically; pick a working one below.',
+  '这个用途没有能自动换上的模型。': 'No model can replace this one automatically.',
+  执行机要求: 'Runner requirements',
+  修复: 'Fix',
+  '修复 {use}': 'Fix {use}',
+  '修复失败，请重试。': "Couldn't fix it. Try again.",
+  '这条规则刚被改过，已重新读取，请再看一眼。':
+    'This rule just changed and has been reloaded. Take another look.',
+  不填则沿用规则的执行机: 'Leave empty to keep the rule Runner',
+  '跟随 Coordinator 路由规则，在路由设置里调整。':
     'Follows the coordinator routing rules; adjust them in routing settings.',
   '{n} 条路由规则未过校验留在原机':
     '{n#1 routing rule|# routing rules} failed validation and stayed put',
-  '把固定在这台 Runner 上的路由规则一起迁到另一台 Runner。':
+  '把固定在这台执行机上的路由规则一起迁到另一台执行机。':
     'Move the routing rules pinned to this Runner to another Runner.',
   引文检查: 'Citation check',
-  '模型与首选 Runner': 'Model and preferred Runner',
-  '首选 Runner': 'Preferred Runner',
+  首选执行机: 'Preferred Runner',
   不固定: 'Any machine',
-  '跟随默认 Runner': 'Follow the default Runner',
-  '当前默认：Claude Code（因为有 Runner 装了 Claude Code）':
+  '当前默认：Claude Code（因为有执行机装了 Claude Code）':
     'Current default: Claude Code (a Runner has Claude Code installed)',
-  '当前默认：Codex（因为有 Runner 登录了 Codex）':
+  '当前默认：Codex（因为有执行机登录了 Codex）':
     'Current default: Codex (a Runner is signed in to Codex)',
-  '当前默认：{model} · {provider}（因为还没有 Runner 装 Claude Code，用最早添加的服务商）':
+  '当前默认：{model} · {provider}（因为还没有执行机装 Claude Code，用最早添加的服务商）':
     'Current default: {model} · {provider} (no Runner has Claude Code, so the first provider you added is used)',
-  '当前没有可用的默认：添加服务商，或在 Runner 上装 Claude Code':
+  '当前没有可用的默认：添加服务商，或在执行机上装 Claude Code':
     'No default yet: add a provider, or install Claude Code on a Runner',
-  '设为默认 Runner': 'Make default Runner',
-  '已是默认 Runner': 'Default Runner',
-  '设为默认 Runner 失败，请重试。': 'Could not change the default Runner. Try again.',
+  '当前默认：{model} · {provider}（因为团队有 Anthropic API key）':
+    'Current default: {model} · {provider} (the team has an Anthropic API key)',
+  '当前默认：{model} · {provider}（因为这是最早添加、Coordinator 能直接用的服务商）':
+    'Current default: {model} · {provider} (the first provider you added that the Coordinator can use)',
+  '当前没有可用的默认：添加一个有 API key 的服务商，或在这里创建规则':
+    'No default yet: add a provider with an API key, or create the rule here',
+  设为默认执行机: 'Make default Runner',
+  已是默认执行机: 'Default Runner',
+  '设为默认执行机失败，请重试。': 'Could not change the default Runner. Try again.',
   路由覆盖: 'Route override',
-  '本任务的 Runner 与执行要求；调度在规则开启后生效。':
+  '本任务的执行机与执行要求；调度在规则开启后生效。':
     'Per-task Runner and capability requirements; applied when routing rules are on.',
   '要求的 MCP': 'Required MCP',
-  '派发时要求 Runner 已安装这些 MCP 服务器': 'Dispatch requires these MCP servers on the executor',
+  '派发时要求执行机已安装这些 MCP 服务器': 'Dispatch requires these MCP servers on the executor',
   路由覆盖已保存: 'Route override saved',
   '保存路由覆盖失败，请重试。': 'Could not save the route override. Try again.',
   会话: 'Session',
   摘要: 'Digest',
   压缩: 'Compaction',
-  会话权限: 'Session policy',
-  评审权限: 'Review policy',
-  '声明可写工具；密钥与 MCP 只读展示': 'Writable tools; secrets and MCP are shown read-only',
-  有未保存的改动: 'Unsaved changes',
-  已与服务器一致: 'In sync with the server',
-  规则已保存: 'Saved',
   执行环境: 'Execution',
   安全: 'Security',
   关闭设置: 'Close settings',
@@ -1747,7 +1817,7 @@ export const EN: Record<string, string> = {
     'State: failed, waiting, review, running, done, snoozed',
   项目名: 'A project name',
   'PR 编号，或 any': 'A pull request number, or any',
-  '发起它的 agent 或成员': 'The agent or person who started it',
+  '发起它的 Agent 或成员': 'The agent or person who started it',
   '日期，或距今的时间段': 'A date or a span back from now',
   '花费，用 > 或 <': 'Spend, with > or <',
   这个筛选还没有值: 'This filter has no value yet',
@@ -1757,7 +1827,7 @@ export const EN: Record<string, string> = {
   '请写日期如 2026-11-01，或时间段如 7d': 'Use a date like 2026-11-01, or a span like 7d',
   '请写 > 或 < 加数字，如 >5': 'Use > or < with a number, like >5',
   没有这个名字的项目: 'No project has that name',
-  '没有这个名字的 agent 或成员': 'No agent or person has that name',
+  '没有这个名字的 Agent 或成员': 'No agent or person has that name',
   再加一个筛选或词: 'Add a filter or a word',
   没有同时满足这些筛选的任务: 'No threads match all of these filters',
   清除全部筛选: 'Clear all filters',
@@ -1771,6 +1841,7 @@ export const EN: Record<string, string> = {
   加词或筛选: 'Add words or a filter',
   快速筛选: 'Quick filters',
   '{n} 条 · {cost}': '{n#1 thread|# threads} · {cost}',
+  '{n} 条': '{n#1 thread|# threads}',
   '显示 {shown} / {total}': 'Showing {shown} of {total}',
   加载更多: 'Load more',
   正在加载活动: 'Loading activity',
@@ -1804,7 +1875,7 @@ export const EN: Record<string, string> = {
   '评审 head': 'Judged head',
   解决: 'Resolve',
   '在 GitHub 打开': 'Open on GitHub',
-  'thread 用量': 'Thread usage',
+  对话用量: 'Thread usage',
   '正在加载用量…': 'Loading usage…',
   用量加载失败: 'Usage could not load',
   'Token 数': 'Tokens',
@@ -1813,7 +1884,7 @@ export const EN: Record<string, string> = {
   '包含全部运行。': 'Across all runs.',
   引擎: 'Engine',
   时长: 'Duration',
-  '未知 Runner': 'Unknown Runner',
+  未知执行机: 'Unknown Runner',
   'Token 数：{tokens}': 'Tokens: {tokens}',
   用量暂不可用: 'Usage unavailable',
   'Auto-disabled': 'Auto-disabled',
@@ -1842,49 +1913,27 @@ export const EN: Record<string, string> = {
   'Schedule time unavailable': 'Schedule time unavailable',
   'Uses the thread description': 'Uses the thread description',
   '{n} {n#automation|automations}': '{n} {n#automation|automations}',
-  Weekdays: 'Weekdays',
-  'Custom cron': 'Custom cron',
-  'Cron expression': 'Cron expression',
-  'Cron is evaluated by the server in {timezone}.':
-    'Cron is evaluated by the server in {timezone}.',
-  'Use five cron fields: minute hour day month weekday.':
-    'Use five cron fields: minute hour day month weekday.',
-  'Day to repeat each week': 'Day to repeat each week',
-  'Runs on the hour may start a few minutes late.':
-    'Runs on the hour may start a few minutes late.',
-  'Saved prompt': 'Saved prompt',
-  'Leave empty to use the thread description.': 'Leave empty to use the thread description.',
-  'Loading scheduled task…': 'Loading scheduled task…',
-  'This scheduled task is no longer available.': 'This scheduled task is no longer available.',
-  'Schedule changes are unavailable in this preview.':
-    'Schedule changes are unavailable in this preview.',
+  工作日: 'Weekdays',
+  '工作日 {time}': 'Weekdays {time}',
+  '每 {n} 小时': 'Every {n} {n#hour|hours}',
+  '自定义 {cron}': 'Custom {cron}',
+  已运行: 'Ran',
+  停止前没有运行: 'Stopped before it ran',
+  已删除: 'Deleted',
+  'Cron 表达式': 'Cron expression',
+  '服务器按{timezone}计算 Cron。': 'Cron is evaluated by the server in {timezone}.',
+  'Cron 需要 5 段：分 时 日 月 周。': 'Use five cron fields: minute hour day month weekday.',
+  从哪天开始每周重复: 'Day to repeat each week',
+  '整点运行可能会晚几分钟开始。': 'Runs on the hour may start a few minutes late.',
+  提示词: 'Saved prompt',
+  '留空就按任务描述运行。': 'Leave empty to use the thread description.',
   Active: 'Active',
-  'Finished one-time schedule': 'Finished one-time schedule',
   'Next run': 'Next run',
   'Last run': 'Last run',
   'Next run unavailable': 'Next run unavailable',
-  'None while paused': 'None while paused',
-  'Run queued': 'Run queued',
-  'Not run yet': 'Not run yet',
-  'Scheduled task in {project}, #{number}': 'Scheduled task in {project}, #{number}',
-  'Saving replaces this schedule and resets its run history.':
-    'Saving replaces this schedule and resets its run history.',
   'Run now': 'Run now',
-  'Re-enable': 'Re-enable',
-  'Schedule update failed': 'Schedule update failed',
-  'Open schedule {title}': 'Open schedule {title}',
-  'Open thread': 'Open thread',
-  'Choose a valid date and time in this timezone.':
-    'Choose a valid date and time in this timezone.',
-  'Choose a future time for a one-time schedule.': 'Choose a future time for a one-time schedule.',
-  'The scheduled task could not be loaded.': 'The scheduled task could not be loaded.',
-  'Schedule setup could not be loaded.': 'Schedule setup could not be loaded.',
-  'Loading schedule setup…': 'Loading schedule setup…',
-  'No team is available for this schedule.': 'No team is available for this schedule.',
-  'Create a thread before scheduling it.': 'Create a thread before scheduling it.',
-  'The project for this thread is unavailable.': 'The project for this thread is unavailable.',
-  'Scheduled tasks could not be loaded': 'Scheduled tasks could not be loaded',
-  'Loading scheduled tasks…': 'Loading scheduled tasks…',
+  '请选择这个时区里有效的日期和时间。': 'Choose a valid date and time in this timezone.',
+  '单次定时要选一个将来的时间。': 'Choose a future time for a one-time schedule.',
   等待审核: 'Review pending',
   草稿: 'Draft',
   '落后于 main': 'Behind main',
@@ -1898,22 +1947,15 @@ export const EN: Record<string, string> = {
   已复制链接: 'Link copied',
   显示更多: 'Show more',
   'PR 状态加载失败，稍后会自动重试。': 'Could not load the PR status; retrying shortly.',
-  '这台 Runner 在 Coordinator 里的角色': "This Runner's role for the Coordinator",
-  '这台 Runner 上能接任务的执行器，以及它们的登录状态。':
-    'The runtimes that can take tasks on this Runner, and their sign-in state.',
   能力: 'Capabilities',
-  '这台 Runner 上报的 MCP 与技能清单': 'The MCP servers and skills this Runner reports',
   管理: 'Manage',
   登录已过期: 'Sign-in expired',
-  登录将过期: 'Sign-in expiring',
-  '已接入的 Runner': 'Connected Runners',
+  已接入的执行机: 'Connected Runners',
   '已检查 {ago}': 'Checked {ago}',
-  用途与连接: 'Uses and connections',
-  接任务中: 'Taking tasks',
   '连接断开，正在重连…': 'Connection lost, reconnecting…',
   '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
   设置作用于: 'Settings apply to',
-  '所有 Runner': 'All Runners',
+  所有执行机: 'All Runners',
   视图: 'View',
   '移除后，使用它的模型不再可选。': 'Once removed, its models can no longer be picked.',
   '{n} 分钟后恢复': 'Back in {n#1 minute|# minutes}',
@@ -1930,8 +1972,8 @@ export const EN: Record<string, string> = {
   密钥没能加载: 'Secrets did not load',
   '正在加载 API 密钥': 'Loading API keys',
   'API 密钥没能加载': 'API keys did not load',
-  '正在加载 Runner': 'Loading Runners',
-  'Runner 没能加载': 'Runners did not load',
+  正在加载执行机: 'Loading Runners',
+  执行机没能加载: 'Runners did not load',
   正在加载模型服务: 'Loading providers',
   模型服务没能加载: 'Providers did not load',
   正在加载命令记录: 'Loading command history',
@@ -1962,10 +2004,12 @@ export const EN: Record<string, string> = {
   配对二维码: 'Pairing QR code',
   '手机将连接到 {origin}': 'Your phone will connect to {origin}',
   '生成配对码失败，请重试。': 'Could not create a pairing code. Try again.',
-  这台电脑暂时没有手机可用的线路: 'This computer has no route your phone can use yet',
+  手机还连不上这台电脑: 'Your phone cannot reach this computer yet',
   '请先登录 Tailscale：{url}': 'Sign in to Tailscale first: {url}',
-  '设置 CAIRN_TSNET=1 后重启，即可用 Tailscale 连接手机。':
-    'Set CAIRN_TSNET=1 and restart to reach this computer from your phone over Tailscale.',
+  '打开 Tailscale，手机在外面也能连上这台电脑。':
+    'Turn on Tailscale and your phone can reach this computer from anywhere.',
+  '打开方法：设置 `CAIRN_TSNET=1` 后重启 Cairn。':
+    'To turn it on, set `CAIRN_TSNET=1` and restart Cairn.',
   Tailscale: 'Tailscale',
   局域网: 'Local network',
   '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请设置 CAIRN_TSNET=1 后重启，或用局域网或 Tailscale 地址打开本页。':
@@ -1976,15 +2020,7 @@ export const EN: Record<string, string> = {
   '撤销设备失败，请重试。': 'Could not revoke the device. Try again.',
   等你审阅: 'Ready for review',
   '选择 {title}': 'Select {title}',
-  '最后在线 {time}': 'Last seen {time}',
   系统未知: 'Unknown OS',
-  '更新 Cairn 后才能接有平台要求的任务': 'Update Cairn to take tasks that need a platform',
-  '任务沙箱没就绪，暂时接不了任务——展开看怎么修':
-    'Task sandbox not ready, so this Runner cannot take tasks. Expand to see how to fix it',
-  '选择这台 Runner 接哪些运行时': 'Choose which runtimes this Runner takes work for',
-  '重新连接 {name} 后才能修改它的设置。': 'Reconnect {name} to change its settings.',
-  '在这台 Runner 上确认它已联网、没有休眠，然后运行 `{command}` 重新启动。上线后这里会自动变回在线。':
-    'On this Runner, make sure it is online and awake, then run `{command}` to start it again. It turns online here by itself.',
   '额度空了，等额度恢复后自动续跑。': 'Out of quota. It resumes by itself when quota returns.',
   '被限流，等恢复后自动续跑。': 'Rate limited. It resumes by itself when the limit lifts.',
   '第一支 PR 当天就合并了。可以在 GitHub Discussions 发一条帖子':
@@ -1995,9 +2031,9 @@ export const EN: Record<string, string> = {
   '{expired} 处已过期，{expiring} 处即将过期': '{expired} expired, {expiring} about to expire',
   '到期前重新登录，任务才不会中断。':
     'Sign in again before they expire so tasks are not interrupted.',
-  '重新登录前，这些 Runner 和订阅不会接新任务。':
+  '重新登录前，这些执行机和订阅不会接新任务。':
     'Until you sign in again, these Runners and subscriptions take no new tasks.',
-  '查看 Runner': 'View Runners',
+  查看执行机: 'View Runners',
   查看订阅: 'View subscriptions',
   待你审阅: 'Ready for review',
   待你回答: 'Needs input',
@@ -2028,7 +2064,6 @@ export const EN: Record<string, string> = {
   正在加载定时: 'Loading schedules',
   '添加任务…': 'Add a task…',
   添加任务: 'Add a task',
-  查看详情: 'View details',
   添加: 'Add',
   '任务没有添加上，请重试。': 'The task was not added. Try again.',
   打开任务: 'Open task',
@@ -2077,11 +2112,22 @@ export const EN: Record<string, string> = {
   在主对话中查看: 'View in the main chat',
   主对话里没有加载这条消息: 'That message is not loaded in the main chat.',
   有新动态: 'New activity',
-  'Agent 的权限': 'Agent access',
   仅自己可见: 'Only you can see this',
   文档: 'Documents',
   设计: 'Designs',
   网页: 'Web pages',
+  PPT: 'Slides',
+  下载后打开: 'Open after download',
+  '含脚本，下载后打开': 'Has scripts; open after download',
+  预览不运行脚本: 'Preview runs no scripts',
+  '未收录 {n} 个文件：': '{n#1 file|# files} not included: ',
+  '不是网页或 PPT': 'Not a page or deck',
+  文件太大: 'Too large',
+  超出总大小上限: 'Over the total size limit',
+  超出文件数上限: 'Over the file count limit',
+  和另一个文件重名: 'Same name as another file',
+  上传没有成功: 'Upload failed',
+  没能读取: 'Could not be read',
   '之前的 {n} 步': '{n} earlier steps',
   '收起之前的 {n} 步': 'Hide {n} earlier steps',
   已允许这一次: 'Allowed once',
@@ -2102,4 +2148,139 @@ export const EN: Record<string, string> = {
   运行机器: 'Machine',
   目录: 'Folder',
   还没分配机器: 'No machine yet',
+  '{name} 拒绝了这个令牌。检查令牌是否填对、有没有过期，然后换一个新的。':
+    '{name} rejected this token. Check that it is correct and not expired, then use a new one.',
+  '令牌有效，但权限不够。给令牌加上需要的权限后重新检查。':
+    'The token works but lacks permissions. Grant the permissions it needs, then check again.',
+  '{name} 10 秒内没有响应。稍后重新检查。':
+    '{name} did not answer within 10 seconds. Check again later.',
+  '连不上这个地址。检查地址是否正确、服务器是否在线。':
+    "Can't reach this address. Check the URL and that the server is online.",
+  '{name} 的授权已失效，重新连接一次。': 'The sign-in for {name} is no longer valid. Reconnect it.',
+  '{name} 收回了这次授权，重新连接一次。': '{name} revoked this sign-in. Reconnect it.',
+  '刷新 {name} 的授权时出错，稍后重新检查。':
+    'Refreshing the sign-in for {name} failed. Check again later.',
+  '{name} 返回了错误。稍后重新检查。': '{name} returned an error. Check again later.',
+  '这个标识已经被占用了，换一个标识再试。': 'This ID is already taken. Choose another one.',
+  '没能保存，稍后重试。': "Couldn't save. Try again later.",
+  令牌: 'Token',
+  '{label}（可选）': '{label} (optional)',
+  '不填也能用；填了额度更高。': 'Works without one; a key raises your limits.',
+  '去 {name} 创建': 'Create one on {name}',
+  '连接 {name}': 'Connect {name}',
+  '正在连接…': 'Connecting…',
+  '添加 MCP 服务器': 'Add MCP server',
+  '任何支持远程 MCP 的服务器都可以加进来。': 'Add any server that speaks remote MCP.',
+  用浏览器登录: 'Sign in with browser',
+  团队知识库: 'Team wiki',
+  标识: 'ID',
+  '必须以 https:// 开头。': 'Must start with https://.',
+  '请求头（可选）': 'Headers (optional)',
+  请求头名称: 'Header name',
+  请求头的值: 'Header value',
+  删除这个请求头: 'Remove this header',
+  添加请求头: 'Add header',
+  保存并检查: 'Save and check',
+  重新检查: 'Check again',
+  重新连接: 'Reconnect',
+  '用浏览器登录连接。删除只移除本机保存的令牌，{name} 那边的授权要在它的设置里撤销。':
+    "Connected by browser sign-in. Deleting removes only the tokens stored here; revoke the grant in {name}'s settings.",
+  '换一个{label}': 'Replace {label}',
+  '已连接 · {n} 个工具': 'Connected · {n#1 tool|# tools}',
+  需要重新授权: 'Needs sign-in',
+  连不上: 'Unreachable',
+  还没检查: 'Not checked yet',
+  '前往 {host} 登录': 'Sign in at {host}',
+  前往登录: 'Continue to sign in',
+  改用令牌: 'Use a token instead',
+  '先确认这个网址属于 {name}，不认识就取消。':
+    "Make sure this address belongs to {name}. If you don't recognize it, cancel.",
+  知道了: 'Dismiss',
+  已接入: 'Connected',
+  '管理 {name}': 'Manage {name}',
+  可接入: 'Available',
+  '正在找到 {name} 的登录地址…': 'Finding the sign-in page for {name}…',
+  '接入 {name}': 'Connect {name}',
+  '正在准备…': 'Preparing…',
+  接入: 'Connect',
+  本机配置: 'Local config',
+  '来自服务器所在电脑的本机配置文件，在那里修改。':
+    "From ~/.claude.json on the server's computer. Edit it there.",
+  '仓库、议题、拉取请求与工作流': 'Repositories, issues, pull requests and workflows',
+  '边缘函数、域名解析与对象存储': 'Edge functions, DNS and object storage',
+  '议题、项目与迭代周期': 'Issues, projects and cycles',
+  页面与数据库: 'Pages and databases',
+  '错误与性能问题（测试版）': 'Errors and performance issues (beta)',
+  '数据库、函数与项目管理（测试版）': 'Databases, functions and project management (beta)',
+  '模型、数据集与演示应用': 'Models, datasets and demo apps',
+  个人访问令牌: 'Personal access token',
+  'API 令牌': 'API token',
+  访问令牌: 'Access token',
+  只读: 'Read-only',
+  工具集: 'Toolsets',
+  '项目 ref': 'Project ref',
+  '有字段格式不对。地址要以 https:// 开头，标识只能用小写字母、数字和连字符（-）。':
+    'A field is not valid. The URL must start with https://, and the identifier may use only lowercase letters, digits and hyphens (-).',
+  '例如：团队知识库': 'For example: Team wiki',
+  'Agent 用这个名字调用它。只能用小写字母、数字和连字符（-）。':
+    'Agents call it by this name. Use only lowercase letters, digits and hyphens (-).',
+  '例如：team-wiki': 'For example: team-wiki',
+  '必须以 https:// 开头。支持浏览器登录的服务器不用填请求头。':
+    'Must start with https://. A server that supports browser sign-in needs no headers.',
+  '例如：https://example.com/mcp': 'For example: https://example.com/mcp',
+  '值加密保存在本机，保存后看不到原文。':
+    'Values are encrypted on this machine and cannot be viewed after saving.',
+  删除连接: 'Delete connection',
+  '登录并授权后会自动回到这里。': 'After you sign in and approve, you come back here.',
+  '你取消了授权，这次什么都没有保存。': 'You cancelled the sign-in, so nothing was saved.',
+  '登录等得太久已经失效，重新接入一次。': 'The sign-in waited too long and expired. Connect again.',
+  '授权期间这个连接有了变动，这次授权没有保存。':
+    'The connection changed during sign-in, so this sign-in was not saved.',
+  '没能连上 {name}': 'Could not connect {name}',
+  '没能开始登录，稍后再试。': 'Could not start the sign-in. Try again later.',
+  '这个标识已经被占用，先删掉旧的连接或换个名字。':
+    'This identifier is taken. Delete the old connection or pick another name.',
+  '{name} 不支持浏览器登录，改用令牌或请求头连接。':
+    'Browser sign-in is not available for {name}. Connect with a token or headers instead.',
+  '{name} 的登录服务没有接受 Cairn 的注册，稍后再试。':
+    "{name}'s sign-in service did not accept Cairn's registration. Try again later.",
+  '最新的库文档与代码示例，也支持登录':
+    'Up-to-date library docs and code examples; sign-in also supported',
+  '登录没有完成，在下面重新接入一次。': 'The sign-in did not finish. Connect again below.',
+  没能完成登录: 'Could not finish the sign-in',
+  '{name}：删除后 Agent 不能再用它的工具。':
+    '{name}: Agents can no longer use its tools after deletion.',
+  '加密保存在本机，保存后看不到原文。':
+    'Encrypted on this machine; it cannot be viewed after saving.',
+  '确定删除这个连接？此操作不可撤销。': 'Delete this connection? This cannot be undone.',
+  '新建细粒度令牌，选好仓库，给 Contents、Issues、Pull\u00a0requests 读写权限。':
+    'Create a fine-grained token, pick the repositories, and give Contents, Issues and Pull requests read and write access.',
+  '拖动排序 {model}': 'Drag to reorder {model}',
+  '最强，适合复杂任务': 'Strongest, for hard tasks',
+  '快，能力强': 'Fast, capable',
+  '最快，适合机械活': 'Fastest, for mechanical work',
+  均衡: 'Balanced',
+  开源权重: 'Open weights',
+  长上下文: 'Long context',
+  '{model} 的思考强度': 'Thinking level for {model}',
+  '删除 {model}': 'Remove {model}',
+  常用模型: 'Top models',
+  '你常用的模型，最多 {max} 个。': 'Your models, up to {max}.',
+  '还没有常用模型。点「添加模型」从已连接的服务商里挑。':
+    'No top models yet. Use Add model to pick from your connected providers.',
+  '恢复成推荐的模型和顺序。': 'Go back to the suggested models and their order.',
+  恢复推荐: 'Reset to suggested',
+  检查更新: 'Check for updates',
+  '正在检查更新…': 'Checking for updates…',
+  '已是最新版本 {version}': 'Up to date ({version})',
+  '更新到 {version}': 'Update to {version}',
+  '正在更新 {percent}%': 'Updating {percent}%',
+  '正在安装…': 'Installing…',
+  '正在重启…': 'Restarting…',
+  '更新失败：{message}': 'Update failed: {message}',
+  开发版不检查更新: 'Development builds do not check for updates',
+  '把 Cairn 移到「应用程序」后才能自动更新':
+    'Move Cairn to Applications to update it automatically',
+  'Cairn 所在的文件夹不可写，无法自动更新':
+    "Cairn's folder is read-only, so it cannot update itself",
 };

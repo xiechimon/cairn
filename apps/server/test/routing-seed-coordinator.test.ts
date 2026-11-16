@@ -2,6 +2,10 @@ import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { routingRule } from '../src/db/schema.js';
 import {
+  setCoordinatorInServer,
+  setCoordinatorServerContextEnabled,
+} from '../src/services/coordinator-context.js';
+import {
   DEFAULT_SESSION_MODEL,
   DEFAULT_SESSION_PROVIDER,
   seedDefaultRouting,
@@ -74,5 +78,20 @@ describe('seedDefaultRouting coordinator rule', () => {
     seedDefaultRouting(s.db);
     expect(seedDefaultRouting(s.db)).toMatchObject({ coordinatorRules: 0 });
     expect(coordinatorRules(s)).toHaveLength(1);
+  });
+
+  test.each([
+    ['in-server Coordinator', setCoordinatorInServer],
+    ['server-context Coordinator', setCoordinatorServerContextEnabled],
+  ] as const)('the %s gets no Claude Code coordinator rule at startup', (_, enable) => {
+    const s = bootServer();
+    insertMachine(s, { claudeCodeReport: subscriptionClaudeReport });
+    enable(true);
+    try {
+      expect(seedDefaultRouting(s.db)).toMatchObject({ coordinatorRules: 0 });
+      expect(coordinatorRules(s).filter((rule) => rule.provider === 'claude-code')).toEqual([]);
+    } finally {
+      enable(false);
+    }
   });
 });

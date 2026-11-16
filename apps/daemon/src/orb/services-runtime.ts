@@ -12,6 +12,7 @@ import {
 import { createServer, Socket } from 'node:net';
 import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
+import { withoutPinnedEnv } from '../backend/pinned-env.js';
 import type { OrbEnsureDeps, OrbEnsureService } from './services-ensure.js';
 import { ensureOrbServices } from './services-ensure.js';
 import { loadEnsureServicesFile } from './services-yaml.js';
@@ -36,7 +37,7 @@ export function createNodeEnsureDeps(stateDir: string): OrbEnsureDeps {
     start: async (service, env) => {
       const child = spawn('/bin/bash', ['-lc', service.command], {
         cwd: service.cwd,
-        env: { ...process.env, ...env },
+        env: { ...withoutPinnedEnv(process.env), ...env },
         detached: true,
         stdio: 'ignore',
       });

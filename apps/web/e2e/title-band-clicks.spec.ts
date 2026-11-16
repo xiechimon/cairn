@@ -27,13 +27,11 @@ async function expectOwnsCenter(
 for (const [route, scenario] of [
   ['/app/account', '13'],
   ['/app/api-keys', 'api-keys'],
-  ['/app/schedules', '11'],
   ['/app/resources/skills', '06'],
   ['/app/resources/mcp-servers', '07'],
   ['/app/resources/secrets', '08'],
   ['/app/resources/machines', '09'],
   ['/app/resources/providers', '10'],
-  ['/app/project/ZAQczKCu0MOAzC1ZqcFlX/tasks', 'r2-24'],
 ] as const) {
   test(`sidebar destination renders no back arrow — ${route}`, async ({ page }) => {
     await page.goto(`${route}?scenario=${scenario}`);

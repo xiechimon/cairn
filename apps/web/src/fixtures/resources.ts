@@ -1,4 +1,4 @@
-import type { ModelSource, ProviderRecord } from '@cairn/shared';
+import type { McpConnectorRecord, ModelSource, ProviderRecord } from '@cairn/shared';
 import {
   legacyDone,
   legacyReview,
@@ -7,6 +7,7 @@ import {
   MACHINE_REMOTE_ID,
   MACHINE_REMOTE_NAME,
   r7,
+  TEAM_ID,
 } from './core.js';
 import type { FixtureSet, ResourcesContent } from './records.js';
 
@@ -81,7 +82,7 @@ const PROVIDERS: ProviderRecord[] = [
 ];
 
 export const RESOURCES: ResourcesContent = {
-  skills: [{ name: 'r3-probe-skill', description: 'R3 盘点测试技能' }],
+  skills: [{ name: 'code-review', description: '按团队规范审查改动并给出修改建议' }],
   mcpServers: [
     {
       name: 'r3-mcp',
@@ -125,7 +126,7 @@ export const resourcesSkillsList: FixtureSet = {
   resources: {
     ...RESOURCES,
     skills: [
-      { name: 'r3-probe-skill', description: 'R3 盘点测试技能' },
+      { name: 'code-review', description: '按团队规范审查改动并给出修改建议' },
       { name: 'release-notes', description: '按提交历史起草发布说明' },
       { name: 'repo-audit', description: '盘点仓库依赖与许可证' },
     ],
@@ -195,76 +196,6 @@ export const resourcesCcLoggedOut: FixtureSet = {
 
 const LOGIN_DAY_MS = 24 * 60 * 60 * 1000;
 
-export const machinesClaudeLogin: FixtureSet = {
-  ...resourcesDefault,
-  resources: {
-    ...RESOURCES,
-    machines: [
-      {
-        id: 'machine-omarchy',
-        kind: 'local',
-        name: 'omarchy',
-        online: true,
-        enabledRuntimes: ['pi', 'claude-code'],
-        claudeLogin: { state: 'expiring', expiresAt: Date.now() + 2 * LOGIN_DAY_MS },
-      },
-      {
-        id: 'machine-soon',
-        kind: 'remote',
-        name: 'soon-box',
-        online: true,
-        claudeLogin: { state: 'expiring', expiresAt: Date.now() + 12 * 60 * 60 * 1000 },
-      },
-      {
-        id: 'machine-ghost',
-        kind: 'remote',
-        name: 'ghost',
-        online: true,
-        claudeLogin: { state: 'expired', expiresAt: Date.now() - 60 * 60 * 1000 },
-      },
-      {
-        id: 'machine-steady',
-        kind: 'remote',
-        name: 'steady',
-        online: true,
-        claudeLogin: { state: 'ok', expiresAt: Date.now() + 30 * LOGIN_DAY_MS },
-      },
-      {
-        id: 'machine-mystery',
-        kind: 'remote',
-        name: 'mystery',
-        online: true,
-        claudeLogin: { state: 'unknown', expiresAt: Date.now() - 60 * 60 * 1000 },
-      },
-    ],
-  },
-};
-
-export const machinesChiefState: FixtureSet = {
-  ...resourcesDefault,
-  resources: {
-    ...RESOURCES,
-    machines: [
-      {
-        id: MACHINE_ID,
-        kind: 'local',
-        name: MACHINE_NAME,
-        online: true,
-        enabledRuntimes: ['pi'],
-        chiefHost: true,
-      },
-      { id: 'mea-wsl-online', kind: 'remote', name: 'mea-wsl', online: true, chiefRunning: true },
-      {
-        id: 'vps-relay-offline',
-        kind: 'remote',
-        name: 'vps-relay',
-        online: false,
-        chiefWaiting: true,
-      },
-    ],
-  },
-};
-
 export const machinesMasterDetail: FixtureSet = {
   ...resourcesDefault,
   resources: {
@@ -277,7 +208,6 @@ export const machinesMasterDetail: FixtureSet = {
         online: true,
         enabledRuntimes: ['pi', 'claude-code'],
         chiefHost: true,
-        chiefRunning: true,
         maxConcurrent: 3,
         runningSteps: 1,
         recommendedConcurrent: 4,
@@ -488,4 +418,103 @@ export const providersFleet: FixtureSet = {
 export const providersEmpty: FixtureSet = {
   ...resourcesDefault,
   resources: { ...RESOURCES, providers: [], providerSources: [PROVIDER_SOURCE_PI] },
+};
+
+const connector = (
+  id: string,
+  fields: Pick<
+    McpConnectorRecord,
+    'slug' | 'label' | 'catalogId' | 'url' | 'headerNames' | 'status' | 'authKind'
+  > &
+    Partial<McpConnectorRecord>,
+): McpConnectorRecord => ({
+  id,
+  teamId: TEAM_ID,
+  statusReason: null,
+  toolCount: null,
+  checkedAt: r7(13, 10),
+  createdAt: r7(9, 0),
+  updatedAt: r7(13, 10),
+  ...fields,
+});
+
+const MCP_CONNECTORS: McpConnectorRecord[] = [
+  connector('mcp-github', {
+    slug: 'github',
+    label: 'GitHub',
+    catalogId: 'github',
+    url: 'https://api.githubcopilot.com/mcp/',
+    headerNames: ['Authorization', 'X-MCP-Readonly'],
+    authKind: 'static',
+    status: 'connected',
+    toolCount: 41,
+  }),
+  connector('mcp-context7', {
+    slug: 'context7',
+    label: 'Context7',
+    catalogId: 'context7',
+    url: 'https://mcp.context7.com/mcp',
+    headerNames: [],
+    authKind: 'none',
+    status: 'connected',
+    toolCount: 2,
+  }),
+  connector('mcp-cloudflare', {
+    slug: 'cloudflare',
+    label: 'Cloudflare',
+    catalogId: 'cloudflare',
+    url: 'https://mcp.cloudflare.com/mcp',
+    headerNames: [],
+    authKind: 'oauth',
+    status: 'needs_auth',
+    statusReason: 'refresh_rejected',
+  }),
+  connector('mcp-wiki', {
+    slug: 'team-wiki',
+    label: '团队知识库',
+    catalogId: null,
+    url: 'https://wiki.example.com/mcp',
+    headerNames: ['Authorization'],
+    authKind: 'static',
+    status: 'error',
+    statusReason: 'timeout',
+  }),
+];
+
+export const resourcesMcpConnectors: FixtureSet = {
+  ...resourcesDefault,
+  resources: { ...RESOURCES, mcpConnectors: MCP_CONNECTORS },
+};
+
+export const resourcesMcpConnectGithub: FixtureSet = {
+  ...resourcesDefault,
+  resources: { ...RESOURCES, mcpConnectors: MCP_CONNECTORS.slice(1) },
+  ui: { mcpDialog: { kind: 'catalog', catalogId: 'github' } },
+};
+
+export const resourcesMcpAddServer: FixtureSet = {
+  ...resourcesMcpConnectors,
+  ui: { mcpDialog: { kind: 'custom' } },
+};
+
+export const resourcesMcpManageNeedsAuth: FixtureSet = {
+  ...resourcesMcpConnectors,
+  ui: { mcpDialog: { kind: 'manage', connectorId: 'mcp-cloudflare' } },
+};
+
+export const resourcesMcpAuthorizing: FixtureSet = {
+  ...resourcesMcpConnectors,
+  ui: { mcpDialog: { kind: 'authorizing', catalogId: 'notion' } },
+};
+
+export const resourcesMcpConfirmHost: FixtureSet = {
+  ...resourcesMcpConnectors,
+  ui: {
+    mcpDialog: { kind: 'confirm', name: '团队知识库', host: 'auth.wiki.example.com' },
+  },
+};
+
+export const resourcesMcpOAuthDenied: FixtureSet = {
+  ...resourcesMcpConnectors,
+  ui: { mcpDialog: { kind: 'landing', reason: 'denied', name: 'Linear' } },
 };

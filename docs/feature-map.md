@@ -19,9 +19,9 @@
 | status shipped | 44 |
 | status partial | 8 |
 | status planned | 3 |
-| research, frontend design and backend design all present or not applicable | 24 |
-| Research gaps | 13 |
-| Frontend design gaps | 19 |
+| research, frontend design and backend design all present or not applicable | 25 |
+| Research gaps | 12 |
+| Frontend design gaps | 18 |
 | Backend design gaps | 19 |
 | notes cited but not on main | 21 |
 
@@ -33,7 +33,7 @@
 | [Coordinator chat](#coordinator-chat) | 1 | shipped | yes | yes | yes |  |
 | [Coordinator context and compaction](#coordinator-context) | 1 | shipped | yes | n/a | yes |  |
 | [Coordinator dispatch](#coordinator-dispatch) | 1 | shipped | yes | n/a | yes |  |
-| [Daily report and retro](#daily-report) | 1 | shipped | yes | gap | gap | B2 |
+| [Daily report and retro](#daily-report) | 1 | shipped | yes | yes | gap | B2 |
 | [Engine run in a task thread](#engine-view) | 1 | partial | yes | yes | yes |  |
 | [Eval-gated harness changes](#eval-gated-harness) | 1 | partial | yes | n/a | yes |  |
 | [Harness dispatch](#harness-dispatch) | 1 | shipped | yes | n/a | yes |  |
@@ -70,7 +70,7 @@
 | [Built-in git hosting](#git-hosting) | 3 | shipped | gap | n/a | gap | B11 |
 | [GitHub connection and issues](#github) | 3 | shipped | yes | yes | yes |  |
 | [Harness profile](#harness-profile) | 3 | partial | yes (not on main) | gap | yes | B9 |
-| [MCP servers](#mcp-servers) | 3 | shipped | gap | yes | yes | B9 |
+| [MCP servers](#mcp-servers) | 3 | shipped | yes | yes | yes |  |
 | [Projects](#projects) | 3 | shipped | yes | yes | yes |  |
 | [Quota wait](#quota-wait) | 3 | shipped | yes | gap | gap | B9 |
 | [Research before retry and plan](#research-loop) | 3 | shipped | yes | n/a | yes |  |
@@ -95,7 +95,7 @@ The attention surfaces of the phase 1 graduation criteria: the needs-you tray, q
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Daily report and retro](#daily-report) | 1 | Frontend design: the report row and retro proposal card have no design<br>Backend design: no design for report content, timing, quiet rules and retro proposal storage |
+| [Daily report and retro](#daily-report) | 1 | Backend design: no design for report content, timing, quiet rules and retro proposal storage |
 | [Task references and needs-you](#needs-you) | 1 | Backend design: no design for which records enter the tray, their order and when they leave |
 | [Phone push](#push-notifications) | 1 | Frontend design: the notify banner, device switch and push copy have no design<br>Backend design: no design for subscriptions, presence suppression, receipts and the three push states |
 | [Question cards](#questions) | 1 | Research: the Codex CLI and t3code question patterns were never written up<br>Backend design: no design for the question lifecycle: parking, late answers, cancel and resume |
@@ -116,7 +116,7 @@ The per-task orb differentiator and the execution targets : how a user sees and 
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [The agent's computer](#agent-computer) | 1 | Frontend design: the computer feed, screen view, browser toggle and control handover have no design<br>Backend design: no design for computer access grants, the browser preference, the guard and the screen channel |
+| [The agent's computer](#agent-computer) | 1 | Frontend design: the computer feed, screen view and control handover have no design<br>Backend design: no design for computer access grants, the browser preference, the guard and the screen channel |
 | [Per-task orb isolation](#orb-isolation) | 1 | Frontend design: nothing shows whether a thread ran in an orb or how to turn orbs on for a machine |
 | [Own-key cloud sandboxes](#own-key-sandboxes) | 2 | Research: no note comparing E2B and Daytona against the dispatch contract<br>Frontend design: no design for adding a sandbox provider and its key<br>Backend design: no design for the E2B and Daytona providers, key injection and teardown |
 
@@ -146,7 +146,7 @@ Scheduled tasks, the search syntax with the activity view, and the sidebar with 
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Scheduled tasks](#schedules) | 3 | Research: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model<br>Frontend design: the schedules page and detail dialog have no design<br>Backend design: no design for due events, missed runs and continue-thread schedules |
+| [Scheduled tasks](#schedules) | 3 | Research: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model<br>Frontend design: the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md<br>Backend design: no design for due events, missed runs and continue-thread schedules |
 | [Search and activity](#search-and-activity) | 3 | Research: no note on Amp's search syntax and activity filters<br>Backend design: no design for the search syntax, index and ranking |
 | [Sidebar](#sidebar) | 3 | Backend design: no design for unread and read marks across devices |
 
@@ -165,7 +165,6 @@ Settings that change how harnesses run on each machine: skills, MCP servers, the
 | Feature | Centrality | Missing |
 |---|---|---|
 | [Harness profile](#harness-profile) | 3 | Frontend design: the settings section planned in plan §22.7 is not in the repository |
-| [MCP servers](#mcp-servers) | 3 | Research: no note on MCP configuration surfaces in t3code and Amp |
 | [Quota wait](#quota-wait) | 3 | Frontend design: the quota banner and waiting thread state have no design<br>Backend design: no design for rate-limit events, account cooldown and resume |
 | [Skills](#skills) | 3 | Research: no current note on how Amp, t3code and Claude Code manage skills across machines |
 
@@ -201,10 +200,10 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### agent-computer
 
-**The agent's computer** (partial). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed, desktop control, and a browser preference toggle in the web app.
+**The agent's computer** (partial). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.
 
 - Research: [docs/research/coordinator-computer.md](research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](research/user-computer-model-2026-11-08.md) (not on main)
-- Frontend design: **gap**: the computer feed, screen view, browser toggle and control handover have no design
+- Frontend design: **gap**: the computer feed, screen view and control handover have no design
 - Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
 
 ### coordinator-chat
@@ -233,10 +232,10 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### daily-report
 
-**Daily report and retro** (shipped). The Coordinator posts an 08:00 report in the conversation and proposes retro changes the user accepts or rejects.
+**Daily report and retro** (shipped). The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro and intake suggestions by telling the Coordinator.
 
 - Research: [docs/research/duet-proactive-coordinator.md](research/duet-proactive-coordinator.md)
-- Frontend design: **gap**: the report row and retro proposal card have no design
+- Frontend design: [apps/web/DESIGN-RULES.md](../apps/web/DESIGN-RULES.md)
 - Backend design: **gap**: no design for report content, timing, quiet rules and retro proposal storage
 
 ### engine-view
@@ -321,7 +320,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### routing
 
-**Model and work routing** (shipped). Which model and machine each kind of work uses: model routing, work routing rules and policies, capabilities and a per-thread override.
+**Model and work routing** (shipped). Which model each kind of work uses: the Model selector page (default model for new tasks, the Coordinator and other agents with model and thinking level), the Model routing page (providers with quota, Claude billing, and a graph wiring each rule to its provider), capabilities and a per-thread override.
 
 - Research: [docs/research/capability-routing-2026-11-06.md](research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](research/agent-machine-routing.md) (not on main)
 - Frontend design: [docs/design/references/settings](design/references/settings)
@@ -385,7 +384,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### first-run
 
-**First run** (shipped). The home checklist, connection banners and the first-PR card that take a new user to a first merged PR.
+**First run** (shipped). The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.
 
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](design/references/first-run)
@@ -401,7 +400,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### machines
 
-**Machines** (shipped). The machines page and machine detail: online state, capabilities, revoke and evacuate.
+**Machines** (shipped). A compact machine list with names, default marker, system, online state and a menu for default, delete and evacuate.
 
 - Research: [docs/research/machine-execution-plane.md](research/machine-execution-plane.md), [docs/research/t3code-devices-and-scope-2026-11-06.md](research/t3code-devices-and-scope-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/settings](design/references/settings), [docs/spec/11-model-service-and-machine-localization.md](spec/11-model-service-and-machine-localization.md)
@@ -513,7 +512,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### github
 
-**GitHub connection and issues** (shipped). Connecting GitHub, choosing repositories, importing issues as threads and writing results back to the issue.
+**GitHub connection and issues** (shipped). Connecting GitHub, choosing repositories, importing labeled issues as threads and writing results back to the issue.
 
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
@@ -531,9 +530,9 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 **MCP servers** (shipped). The read-only list of MCP servers configured on each machine.
 
-- Research: **gap**: no note on MCP configuration surfaces in t3code and Amp
-- Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md)
-- Backend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md)
+- Research: [docs/research/mcp-connectors-2026-11-15.md](research/mcp-connectors-2026-11-15.md)
+- Frontend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](design/mcp-connectors.md)
+- Backend design: [docs/spec/13-resources-view-localization.md](spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](design/mcp-connectors.md)
 
 ### projects
 
@@ -564,7 +563,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 **Scheduled tasks** (shipped). Recurring work that starts or continues threads on a schedule, with run-now and a project schedule.
 
 - Research: **gap**: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model
-- Frontend design: **gap**: the schedules page and detail dialog have no design
+- Frontend design: **gap**: the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md
 - Backend design: **gap**: no design for due events, missed runs and continue-thread schedules
 
 ### search-and-activity

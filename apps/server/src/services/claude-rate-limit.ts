@@ -9,14 +9,13 @@ import {
   CLAUDE_SUBSCRIPTION_PROVIDER_ID,
   claudeRateBlock,
   claudeRateProbeAt,
-  parseLocalMergeInstruction,
 } from '@cairn/shared';
 import { and, eq, or } from 'drizzle-orm';
-import type { Db } from '../db/client.js';
-import { build, chiefThread, machine, type QuotaWaitRow, step, team, todo } from '../db/schema.js';
+import { build, chiefThread, machine, type QuotaWaitRow, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { holdBlockedBuild } from './blockers.js';
-import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { accountHeld } from './claude-account-hold.js';
+import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { capabilityGatePasses, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
 import { isChiefConversation, type MachineDeps, stepTeamId } from './machine-deps.js';
 import {
@@ -26,7 +25,6 @@ import {
   teamDefaultMachineId,
 } from './machine-routing.js';
 import { effectiveModel } from './model-fallback.js';
-import { isClaudeModel, machineUsesClaudeSubscription } from './model-routing.js';
 import { notifyQuotaWait } from './notifications.js';
 import { publishStepRow } from './quota-wait.js';
 import { coordinatorProfile, profileForStep, type RouteProfile } from './routing-rules.js';
@@ -34,21 +32,6 @@ import { getTodo } from './todos.js';
 
 type StepRow = typeof step.$inferSelect;
 type AgentRow = RouteProfile;
-
-export function claudeUsageGatePasses(
-  deps: { db: Pick<Db, 'select'> },
-  machineRow: Pick<typeof machine.$inferSelect, 'teamId' | 'claudeCodeReport'>,
-  model: Pick<AgentRow, 'provider' | 'modelId'>,
-): boolean {
-  if (!isClaudeModel(model.provider, model.modelId)) return true;
-  const settings = deps.db.select().from(team).where(eq(team.id, machineRow.teamId)).get();
-  if (settings?.claudeUsage === 'allow-paid') return true;
-  if (stepRuntimeFor(model.provider) !== 'claude-code') return false;
-  return (
-    hasActiveClaudeSubscription(deps, machineRow.teamId) ||
-    machineUsesClaudeSubscription(machineRow.claudeCodeReport)
-  );
-}
 
 function usesClaudeCode(
   agentRow: Pick<AgentRow, 'provider' | 'modelId'>,
@@ -126,23 +109,24 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
   const now = nowMs();
   const machines = deps.db.select().from(machine).where(eq(machine.teamId, teamId)).all();
   const byId = new Map(machines.map((row) => [row.id, row]));
-  const subscriptionOnly =
-    deps.db.select().from(team).where(eq(team.id, teamId)).get()?.claudeUsage !== 'allow-paid';
   let changed = false;
   const defaultMachineId = teamDefaultMachineId(deps.db, teamId);
+  const enabledId = enabledSubscriptionId(deps, teamId);
   const consider = (
     stepRow: StepRow,
     agentRow: AgentRow,
     todoRow: typeof todo.$inferSelect | null,
     buildRow: Pick<typeof build.$inferSelect, 'prevPhase' | 'withPlan' | 'planDocId'> | null,
   ) => {
-    const localMerge =
-      stepRow.kind === 'merge' && parseLocalMergeInstruction(stepRow.prompt) !== null;
-    const model = effectiveModel(agentRow, stepRow);
     const prior =
       buildRow === null
-        ? { priorSessionId: null, priorMachineId: null, freshSession: true }
-        : priorSessionOf(deps.db, stepRow, buildRow);
+        ? {
+            priorSessionId: null,
+            priorMachineId: null,
+            priorSubscriptionId: null,
+            freshSession: true,
+          }
+        : priorSessionOf(deps.db, stepRow, buildRow, enabledId);
     const sessionId =
       !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineId : null;
     const namedId = routeTargets(sessionId, agentRow.machineId)[0]?.machineId ?? null;
@@ -154,66 +138,8 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
         defaultMachineId,
         agentRow.requiredCapabilities?.os,
       );
-    const policyOwner = namedId ? byId.get(namedId) : undefined;
     const owner = homeId ? byId.get(homeId) : undefined;
     const ownerBlock = owner ? claudeRateBlock(owner.claudeRateLimits ?? [], now) : null;
-    const policyBlock = policyOwner
-      ? claudeRateBlock(policyOwner.claudeRateLimits ?? [], now)
-      : null;
-    const claimants = machines.filter(
-      (row) =>
-        row.online &&
-        namedId !== null &&
-        row.id === namedId &&
-        runtimeGatePasses(row, model.provider) &&
-        capabilityGatePasses(row, agentRow) &&
-        claudeRateBlock(row.claudeRateLimits ?? [], now) === null,
-    );
-    const subscriptionClaimant = claimants.some((row) => claudeUsageGatePasses(deps, row, model));
-    const claude = isClaudeModel(model.provider, model.modelId);
-    const paid =
-      stepRuntimeFor(model.provider) !== 'claude-code' ||
-      (policyOwner !== undefined && !claudeUsageGatePasses(deps, policyOwner, model)) ||
-      claimants.some((row) => !claudeUsageGatePasses(deps, row, model));
-    const rateLimitedSubscriptionOwner =
-      policyBlock !== null &&
-      policyOwner !== undefined &&
-      claudeUsageGatePasses(deps, policyOwner, model);
-    if (
-      !localMerge &&
-      subscriptionOnly &&
-      claude &&
-      paid &&
-      !subscriptionClaimant &&
-      !rateLimitedSubscriptionOwner
-    ) {
-      if (stepRow.status !== 'pending' && stepRow.status !== 'waiting_quota') return;
-      if (
-        stepRow.quotaBlock?.source === 'subscription_policy' &&
-        stepRow.status === 'waiting_quota'
-      )
-        return;
-      const quota: QuotaWaitRow = {
-        kind: 'quota',
-        providerId: model.provider ?? CLAUDE_SUBSCRIPTION_PROVIDER_ID,
-        label: null,
-        reason: 'subscription-only',
-        retryAfterMs: null,
-        firstSeenAt: now,
-        lastAt: now,
-        attempts: 1,
-        probeAt: now + 7 * 24 * 60 * 60 * 1000,
-        source: 'subscription_policy',
-      };
-      if (
-        writeClaudeQuota(deps, stepRow.id, todoRow?.id ?? null, {
-          status: 'waiting_quota',
-          quotaBlock: quota,
-        })
-      )
-        changed = true;
-      return;
-    }
     if (
       stepRow.status === 'waiting_quota' &&
       stepRow.quotaBlock?.source === 'subscription_policy'
@@ -232,11 +158,11 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
       return;
     }
     if (stepRow.status !== 'pending' && stepRow.status !== 'waiting_quota') return;
+    if (buildRow !== null && accountHeld(stepRow, prior, enabledId)) return;
     const runnable =
       owner?.online === true &&
       runtimeGatePasses(owner, 'claude-code') &&
       capabilityGatePasses(owner, agentRow) &&
-      (localMerge || claudeUsageGatePasses(deps, owner, model)) &&
       claudeRateBlock(owner.claudeRateLimits ?? [], now) === null;
     const todoId = todoRow?.id ?? null;
     if (ownerBlock && !runnable) {

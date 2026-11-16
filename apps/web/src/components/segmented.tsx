@@ -26,18 +26,18 @@ interface SegmentedProps<T extends string> {
 }
 
 const TRACK_CLS =
-  'inline-flex h-8 w-fit items-center justify-center gap-0.5 rounded-md bg-secondary p-0.5 text-foreground group-data-horizontal/tabs:h-8';
+  'inline-flex h-8 w-fit items-center justify-center gap-0.5 rounded-md bg-secondary p-0.5 text-foreground group-data-horizontal/tabs:h-8 pointer-coarse:h-12 pointer-coarse:group-data-horizontal/tabs:h-12';
 
 const OPTION_CLS =
-  "relative inline-flex h-7 flex-none items-center justify-center gap-1.5 rounded-(--cds-radius-sm) border-0 px-3 py-0 text-ui font-normal whitespace-nowrap text-foreground transition-[color,background-color] duration-(--dur-fast) ease-out dark:text-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
+  "relative inline-flex h-7 flex-none pointer-coarse:h-11 items-center justify-center gap-1.5 rounded-(--cds-radius-sm) border-0 px-3 py-0 text-ui font-normal whitespace-nowrap text-foreground transition-[color,background-color] duration-(--dur-fast) ease-out dark:text-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
 
 const QUIET_TRACK_CLS =
-  'inline-flex h-7 w-fit items-center gap-1 bg-transparent p-0 text-foreground group-data-horizontal/tabs:h-7';
+  'inline-flex h-7 w-fit items-center gap-1 bg-transparent p-0 text-foreground group-data-horizontal/tabs:h-7 pointer-coarse:h-11 pointer-coarse:group-data-horizontal/tabs:h-11';
 
 const QUIET_OPTION_CLS =
   'rounded-(--cds-radius-md) px-2.5 text-meta data-active:bg-(--sidebar-active) dark:data-active:bg-(--sidebar-active) hover:bg-(--hover-1)';
 
-const OPTION_ICON_CLS = 'w-7 px-0';
+const OPTION_ICON_CLS = 'w-7 px-0 pointer-coarse:w-11';
 
 const RADIO_BUTTON_NEUTRAL_CLS = 'hover:bg-transparent dark:hover:bg-transparent';
 

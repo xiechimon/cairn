@@ -33,10 +33,10 @@ enum StatusMarkID: String, CaseIterable, Sendable {
         return .think
     }
 
-    private static let taskTools: Set = ["create_todo", "open_thread", "message_thread", "schedule_todo", "schedule_create"]
+    private static let taskTools: Set = ["create_todo", "open_thread", "message_thread", "schedule_todo", "schedule_create", "decide_report_suggestion"]
     private static let lookTools: Set = [
         "projects", "todos", "threads", "models", "machines", "skills", "docs", "issues", "pull_requests",
-        "github_overlap", "workflow_runs", "conversation", "memories", "needs_you", "usage", "get_schedule",
+        "workflow_runs", "conversation", "memories", "needs_you", "usage", "get_schedule",
         "wakes", "browser_snapshot",
     ]
 }

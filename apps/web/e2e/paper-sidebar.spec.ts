@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const sidebar = (page: Page) => page.getByRole('complementary');
+const sidebar = (page: Page) => page.getByRole('complementary').and(page.locator('.board-sidebar'));
 
 const top = (page: Page, selector: string) =>
   page.locator(selector).first().evaluate((el) => el.getBoundingClientRect().top);
@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('brand row, Coordinator, projects and footer stack top to bottom in a 220px sidebar', async ({ page }) => {
-  await page.goto('/app/schedules?scenario=01');
+  await page.goto('/app?scenario=01');
   const aside = sidebar(page);
   expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(220);
 
@@ -55,9 +55,12 @@ test('brand row, Coordinator, projects and footer stack top to bottom in a 220px
 });
 
 test('`Coordinator` opens the home view and keeps the scenario', async ({ page }) => {
-  await page.goto('/app/schedules?scenario=01');
+  await page.goto('/app?scenario=01&pane=tasks&tab=scheduled');
+  await expect(page.getByRole('complementary', { name: '任务' })).toBeVisible();
+  await page.getByTestId('sidebar-reopen').click();
+  await page.mouse.move(700, 400);
   const home = sidebar(page).locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' });
-  await expect(page.getByTestId('home-c')).toHaveCount(0);
+  await expect(home).not.toHaveAttribute('aria-current');
 
   await home.click();
   await expect(page).toHaveURL(/\/app\?scenario=01$/);
@@ -92,7 +95,7 @@ test('active row = sidebar-active fill, no ring', async ({ page }) => {
 });
 
 test('project rows carry a neutral glyph, no colored tile and no count', async ({ page }) => {
-  await page.goto('/app/schedules?scenario=board-repos');
+  await page.goto('/app?scenario=board-repos');
   const rows = page.locator('[data-slot="sidebar-project-row"]');
   await expect(rows).toHaveCount(3);
   const probe = await rows.evaluateAll((els) =>
@@ -107,7 +110,7 @@ test('project rows carry a neutral glyph, no colored tile and no count', async (
 });
 
 test('long project names truncate to one 34px line', async ({ page }) => {
-  await page.goto('/app/schedules?scenario=board-repos');
+  await page.goto('/app?scenario=board-repos');
   const m = await page
     .locator('[data-slot="sidebar-project-row"]')
     .first()
@@ -126,16 +129,19 @@ test('long project names truncate to one 34px line', async ({ page }) => {
   expect(m.rowHeight).toBe(34);
 });
 
-test('collapsed rail keeps `Coordinator` with its badge dot and the expand toggle', async ({ page }) => {
+test('collapsed leaves only the expand toggle; the peek opens `Coordinator` and expands', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.goto('/app/schedules?scenario=01');
-  const aside = sidebar(page);
-  expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(48);
-  const home = aside.getByRole('link', { name: /Coordinator/ });
-  await expect(home).toBeVisible();
+  await page.goto('/app?scenario=01&pane=tasks&tab=scheduled');
+  await expect(sidebar(page)).toHaveCount(0);
+  await page.getByTestId('sidebar-reopen').hover();
+  const peek = page.getByTestId('sidebar-peek');
+  const home = peek.locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' });
   await home.click();
+  await expect(page).toHaveURL(/\/app\?scenario=01$/);
   await expect(page.getByTestId('home-c')).toBeVisible();
+  await page.mouse.move(700, 400);
+  await page.getByTestId('sidebar-reopen').hover();
   await expect(home).toHaveAttribute('aria-current', 'page');
-  await aside.getByRole('button', { name: '展开侧边栏' }).click();
-  expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(220);
+  await page.getByTestId('sidebar-reopen').click();
+  expect(await sidebar(page).evaluate((el) => el.getBoundingClientRect().width)).toBe(220);
 });

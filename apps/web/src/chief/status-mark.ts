@@ -49,7 +49,7 @@ const CONNECTION_LOST_LABEL = '连接断开，正在重连…';
 const OUTAGE_LABEL = '等待恢复';
 const MACHINE_OFFLINE_KEYS = new Set([
   '排队中：等 {machine} 上线（前面 {ahead} 个）',
-  '排队中：等 Runner 上线（前面 {ahead} 个）',
+  '排队中：等执行机上线（前面 {ahead} 个）',
 ]);
 const RESPONDING_KEY = '模型输出中...';
 const QUOTA_WAIT_PREFIX = '等额度';
@@ -62,6 +62,7 @@ const TASK_TOOLS = new Set([
   'message_thread',
   'schedule_todo',
   'schedule_create',
+  'decide_report_suggestion',
 ]);
 const TASK_TOOL = /dispatch|todowrite|create_task|^task$/i;
 const LOOK_TOOLS = new Set([
@@ -74,7 +75,6 @@ const LOOK_TOOLS = new Set([
   'docs',
   'issues',
   'pull_requests',
-  'github_overlap',
   'workflow_runs',
   'conversation',
   'memories',

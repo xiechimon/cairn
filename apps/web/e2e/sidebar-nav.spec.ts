@@ -58,17 +58,18 @@ test('settings sections hop client-side', async ({ page }) => {
   await expect(page).toHaveURL('/app/settings/skills?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 
-  await settings.getByRole('link', { name: '规则与策略' }).click();
+  await settings.getByRole('link', { name: '模型选择' }).click();
   await expect(page).toHaveURL('/app/settings/work-routing?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 });
 
-test('rail rows hop client-side', async ({ page }) => {
+test('peek rows hop client-side', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=03');
   await plantCanary(page);
 
-  await page.getByRole('complementary').locator('.rail-row:has([data-slot="project-glyph"])').first().click();
+  await page.getByTestId('sidebar-reopen').hover();
+  await page.getByTestId('sidebar-peek').locator('[data-slot="sidebar-project-row"]').first().click();
   await expect(page).toHaveURL(/\/app\?scenario=03&project=/);
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 });
@@ -80,15 +81,6 @@ test('install-app entries are gone from both sidebar states', async ({ page }) =
   await expect(page.getByRole('button', { name: /安装/ })).toHaveCount(0);
   await expect(page.locator('a[href^="/zh/install"]')).toHaveCount(0);
   await expect(page.getByTestId('sidebar-settings')).toBeVisible();
-});
-
-test('collapsed rail carries no install icon', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.goto('/app?scenario=03');
-  await expect(page.getByRole('link', { name: /安装/ })).toHaveCount(0);
-  await expect(
-    page.getByRole('complementary').getByRole('link', { name: /^Coordinator/ }),
-  ).toBeVisible();
 });
 
 test('/zh/install redirects to /app (unmatched-path divergence, 01 §8)', async ({ page }) => {
@@ -115,16 +107,6 @@ test('hover tints the row — dark default + light theme', async ({ page }) => {
   await expect.poll(() => pillBg(lightRow)).toBe('rgba(0, 0, 0, 0.06)');
 });
 
-test('rail hover tints the row', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.goto('/app?scenario=03');
-  const row = page.getByRole('complementary').locator('.rail-row:has([data-slot="project-glyph"])').first();
-
-  expect(await pillBg(row)).toBe('rgba(0, 0, 0, 0)');
-  await row.hover();
-  await expect.poll(() => pillBg(row)).toBe('rgba(255, 255, 255, 0.075)');
-});
-
 test('selected row keeps its sheet fill under hover', async ({ page }) => {
   await page.goto('/app?scenario=01');
   const board = page
@@ -141,17 +123,26 @@ test('selected row keeps its sheet fill under hover', async ({ page }) => {
 });
 
 for (const locale of ['zh', 'en']) {
-  for (const layout of ['expanded', 'rail', 'phone']) {
+  for (const layout of ['expanded', 'peek', 'phone']) {
     test(`navigation names match page titles: ${locale} ${layout}`, async ({ page }) => {
       const home = 'Coordinator';
       await page.addInitScript(({ locale, layout }) => {
         localStorage.setItem('cairn.locale', locale);
-        localStorage.setItem('cairn.sidebar-collapsed', layout === 'rail' ? '1' : '0');
+        localStorage.setItem('cairn.sidebar-collapsed', layout === 'peek' ? '1' : '0');
       }, { locale, layout });
       if (layout === 'phone') await page.setViewportSize({ width: 390, height: 844 });
+      const reveal = async () => {
+        if (layout === 'phone') await page.getByRole('button', { name: locale === 'zh' ? '展开侧边栏' : 'Expand sidebar' }).click();
+        if (layout === 'peek') {
+          await page.mouse.move(700, 400);
+          await expect(page.getByTestId('sidebar-peek')).not.toHaveAttribute('data-open', '');
+          await page.getByTestId('sidebar-reopen').hover();
+          await expect(page.getByTestId('sidebar-peek')).toHaveAttribute('data-open', '');
+        }
+      };
       await page.goto('/app?scenario=01');
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(home);
-      if (layout === 'phone') await page.getByRole('button', { name: locale === 'zh' ? '展开侧边栏' : 'Expand sidebar' }).click();
+      await reveal();
       const sidebar = page.locator('.board-sidebar');
       await expect(sidebar.locator('[aria-current="page"]')).toHaveAccessibleName(new RegExp(home));
       await expect(sidebar.getByRole('link', {
@@ -159,14 +150,23 @@ for (const locale of ['zh', 'en']) {
         exact: true,
       })).toBeVisible();
       await expect(sidebar.getByRole('button', { name: locale === 'zh' ? '项目' : 'Project', exact: true })).toHaveCount(0);
-      await page.goto('/app/schedules?scenario=01');
-      await expect(page.getByRole('heading', { level: 1 })).toHaveText(locale === 'zh' ? '定时' : 'Schedules');
-      if (layout === 'phone') await page.getByRole('button', { name: locale === 'zh' ? '展开侧边栏' : 'Expand sidebar' }).click();
-      await expect(sidebar.locator('[aria-current="page"]')).toHaveCount(0);
-      if (layout === 'rail') await sidebar.getByRole('link', { name: new RegExp(home) }).click();
-      else await sidebar.locator('[data-slot="sidebar-nav-row"]').filter({ hasText: home }).click();
+      await sidebar.getByTestId('sidebar-schedules').click();
+      await expect(page).toHaveURL('/app?scenario=01&pane=tasks&tab=scheduled');
+      await expect(
+        page
+          .getByRole('complementary', { name: locale === 'zh' ? '任务' : 'Tasks', exact: true })
+          .getByRole('tab', { name: locale === 'zh' ? '定时' : 'Schedules' }),
+      ).toHaveAttribute('aria-selected', 'true');
+      if (layout === 'expanded') {
+        await page.getByTestId('sidebar-reopen').click();
+        await page.mouse.move(700, 400);
+      }
+      await reveal();
+      await expect(sidebar.locator('[aria-current="page"]')).toHaveCount(1);
+      await expect(sidebar.locator('[aria-current="page"]')).toHaveAccessibleName(locale === 'zh' ? '定时' : 'Schedules');
+      await sidebar.locator('[data-slot="sidebar-nav-row"]').filter({ hasText: home }).click();
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(home);
-      if (layout === 'phone') await page.getByRole('button', { name: locale === 'zh' ? '展开侧边栏' : 'Expand sidebar' }).click();
+      await reveal();
       await expect(sidebar.locator('[aria-current="page"]')).toHaveAccessibleName(new RegExp(home));
     });
   }

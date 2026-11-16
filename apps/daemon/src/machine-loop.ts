@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
+import { setTimeout as waitTimeout } from 'node:timers/promises';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -40,7 +41,6 @@ import { HostComputerProvider } from './computer/host.js';
 import { HostDesktops } from './computer/host-desktop.js';
 import { createHostScreenFromEnv, type HostScreen } from './computer/host-screen.js';
 import { ComputerInputFence } from './computer/input-fence.js';
-import { OrbComputerProvider } from './computer/orb.js';
 import { ComputerPresenceReporter, type ComputerPresenceSource } from './computer/presence.js';
 import type { ComputerProvider, ScopedComputerProviders } from './computer/provider.js';
 import { OutboundComputerScreens } from './computer/screen-channel.js';
@@ -52,14 +52,9 @@ import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
 import { type MachineApi, MachineApiError, MachineClient } from './machine-client.js';
 import { enrollThroughBrowser } from './machine-enroll.js';
-import { ComputerOrbs, computerImageOffersBrowser } from './orb/computer.js';
 import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
 import type { OrbProvider } from './orb/provider.js';
-import {
-  createComputerOrbProvider,
-  createOrbProvider,
-  hostDesktopRequested,
-} from './orb/select.js';
+import { createOrbProvider } from './orb/select.js';
 import { relayOrbStopped, runOrbStep } from './orb/step.js';
 import { ensurePrivateDir } from './private-fs.js';
 import { setupProxy } from './proxy.js';
@@ -110,6 +105,7 @@ export interface MachineLoopOpts {
   otel?: DaemonOtel | null;
   confinementPlatform?: string;
   confinementPreflight?: ConstructorParameters<typeof ConfinementAvailability>[0]['launch'];
+  confinementRecheckMs?: number;
 }
 
 export interface MachineHandle {
@@ -120,6 +116,8 @@ export interface MachineHandle {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const CONFINEMENT_RECHECK_MS = 60_000;
+const CONFINEMENT_STOP_WAIT_MS = 15_000;
 
 export function nextBackoffMs(current: number, cap = CLAIM_BACKOFF_CAP_MS): number {
   return Math.min(current * 2, cap);
@@ -224,17 +222,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     (capEnv.CAIRN_OWN_COMPUTER === '1' ? new HostComputerProvider() : undefined);
   const hostScreen = opts.hostScreen ?? createHostScreenFromEnv(capEnv);
   const enrolledIdentity = { machineId: '' };
-  const computerHost = createComputerOrbProvider(capEnv, orbProvider);
-  const computerOrbs =
-    opts.orbComputer === undefined && computerHost
-      ? new ComputerOrbs({
-          stateFile: join(paths.home, 'orb-state', 'computers.json'),
-          runtimeRoot: computerHost.runtimeRoot,
-        })
-      : undefined;
   const computerInputLocks = join(paths.home, 'computer-input');
-  const hostDesktops =
-    opts.orbComputer === undefined && hostDesktopRequested(capEnv)
+  const desktops =
+    opts.orbComputer === undefined && platform === 'linux'
       ? new HostDesktops({
           root: join(paths.home, 'desktops'),
           toolsRoot: join(paths.home, 'tools'),
@@ -242,22 +232,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           inputFence: new ComputerInputFence(computerInputLocks, () => enrolledIdentity.machineId),
         })
       : undefined;
-  if (computerOrbs || hostDesktops) ensurePrivateDir(computerInputLocks);
-  const orbComputer =
-    opts.orbComputer ??
-    (computerOrbs && computerHost
-      ? new OrbComputerProvider({
-          orbs: computerOrbs,
-          runtimeRoot: computerHost.runtimeRoot,
-          inputFence: new ComputerInputFence(computerInputLocks, () => enrolledIdentity.machineId),
-          release: {
-            publish: () => computerHost.publishRelease(),
-            authenticated: (machine, release) =>
-              computerHost.retainComputerRelease(machine, release),
-          },
-          onError: (message) => logger.machine(message),
-        })
-      : hostDesktops);
+  const hostDesktops = desktops?.missingPrograms().length === 0 ? desktops : undefined;
+  if (hostDesktops) ensurePrivateDir(computerInputLocks);
+  const orbComputer = opts.orbComputer ?? hostDesktops;
   const agentReach = new AgentReachProbe();
   const hostPermissionsProbe = opts.hostPermissionsProbe ?? new HostPermissionsProbe();
   const capabilitiesReport = (): MachineCapabilities => {
@@ -267,12 +244,14 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ...capabilitiesProbe(),
       osPlatform: osPlatformOf(platform),
       confinement: availability?.observation(),
+      ...(availability?.cause !== undefined && availability.report?.state === 'unavailable'
+        ? { confinementCause: availability.cause }
+        : {}),
       codexLogin: readCodexLogin(paths.agentRuntimeDir),
       executor: orbProvider.kind,
+      mcpConnectors: true,
       ...(orbComputer ? { computer: true as const } : {}),
-      ...((orbComputer && computerImageOffersBrowser()) || hostDesktops?.offersBrowser()
-        ? { browser: true as const }
-        : {}),
+      ...(hostDesktops?.offersBrowser() ? { browser: true as const } : {}),
       ...(hostComputer ? { ownComputer: true as const } : {}),
       ...(reach !== undefined ? { agentReach: reach } : {}),
       ...(hostPermissions !== undefined ? { hostPermissions } : {}),
@@ -394,22 +373,21 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const screens = new OutboundComputerScreens({
     serverUrl: config.serverUrl,
     getToken: () => inMemoryToken,
-    provider: createComputerScreenProvider({
-      runtimeRoot: computerHost ? () => computerHost.runtimeRoot : '/run/cairn-orb',
-      ...(computerOrbs ? { ensureComputer: (scopeKey) => computerOrbs.ensure(scopeKey) } : {}),
-      ...(hostDesktops
+    provider: createComputerScreenProvider(
+      hostDesktops
         ? {
-            ensureComputer: (scopeKey) => hostDesktops.ensure(scopeKey),
+            holdComputer: (scopeKey, kind) => hostDesktops.hold(scopeKey, kind),
             socketPath: (scopeKey, kind) => hostDesktops.socketPath(scopeKey, kind),
           }
-        : {}),
-    }),
+        : {},
+    ),
+    log: (msg) => logger.machine(msg),
   });
 
   let networkFailures = 0;
   let connectionId: string | null = null;
   const presenceReporter = new ComputerPresenceReporter({
-    source: opts.computerPresence ?? computerOrbs ?? hostDesktops,
+    source: opts.computerPresence ?? hostDesktops,
     body: () => ({
       connectionId,
       cliVersion: DAEMON_VERSION,
@@ -631,15 +609,14 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   closedOrbTimer.unref?.();
   const orbTimer = setInterval(sweepOrbs, 1_000);
   orbTimer.unref?.();
-  const computerSweepTimer = computerOrbs
+  const desktopSweepTimer = hostDesktops
     ? setInterval(() => {
-        if (computerOrbs.known().length === 0) return;
-        void computerOrbs
+        void hostDesktops
           .sweep()
-          .catch((error: unknown) => logger.workspace(`computer sweep failed: ${String(error)}`));
+          .catch((error: unknown) => logger.machine(`desktop idle stop failed: ${String(error)}`));
       }, 60_000)
     : undefined;
-  computerSweepTimer?.unref?.();
+  desktopSweepTimer?.unref?.();
 
   let recoveryPending = true;
   const recover = async () => {
@@ -778,6 +755,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     ...(hostComputer ? { host: hostComputer } : {}),
     ...(hostScreen ? { screen: hostScreen } : {}),
     ...(orbComputer ? { orb: orbComputer } : {}),
+    cairnOrigins: [
+      config.serverUrl,
+      ...(capEnv.CAIRN_WEB_ORIGINS ?? '').split(',').filter((origin) => origin.trim() !== ''),
+    ],
   });
   const deliverSync = async (cmd: import('@cairn/shared').MachineSyncCommand): Promise<void> => {
     await performSync({ client, logger }, cmd);
@@ -830,6 +811,22 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       });
   }, opts.presenceIntervalMs ?? 30_000);
   presenceTimer.unref?.();
+
+  const recheckConfinement = async () => {
+    await availability.recheck();
+    await probeHarnesses();
+    await recover();
+    resumeClaims?.();
+  };
+  const confinementTimer = setInterval(() => {
+    if (stopping || availability.ready || !availability.recoverable) return;
+    void recheckConfinement().catch((err: unknown) => {
+      logger.machine(
+        `confinement recheck failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    });
+  }, opts.confinementRecheckMs ?? CONFINEMENT_RECHECK_MS);
+  confinementTimer.unref?.();
 
   let resumeClaims: (() => void) | undefined;
   let stopping = false;
@@ -933,16 +930,21 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     resumeClaims?.();
     logger.machine(`Shutting down…${cause ? ` (${cause})` : ''}`);
     clearInterval(presenceTimer);
+    clearInterval(confinementTimer);
     clearInterval(orphanTimer);
     orbCleanupStopped = true;
     clearInterval(closedOrbTimer);
     clearInterval(orbTimer);
-    clearInterval(computerSweepTimer);
+    clearInterval(desktopSweepTimer);
     clearInterval(stepScratchTimer);
     streamCtrl.abort();
     claimCtrl.abort();
     void screens.close();
     caffeinate?.kill();
+    await Promise.race([
+      availability?.settled(),
+      waitTimeout(CONFINEMENT_STOP_WAIT_MS, undefined, { ref: false }),
+    ]);
     await presenceReporter.close();
     if (connectionId !== null && client.offline) {
       await client
@@ -952,7 +954,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         });
     }
     await computerDispatcher.close();
-    if (orbComputer instanceof OrbComputerProvider) await orbComputer.close();
     hostDesktops?.close();
   }
 
@@ -960,11 +961,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     machineId,
     stop,
     done,
-    async recheckConfinement() {
-      await availability.recheck();
-      await probeHarnesses();
-      await recover();
-      resumeClaims?.();
-    },
+    recheckConfinement,
   };
 }

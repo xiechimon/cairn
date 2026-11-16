@@ -75,7 +75,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     const resting = (await painted(item)).map((entry) => entry.index);
     const stops: string[] = [];
-    await item.getByTestId('machine-toggle').focus();
+    await item.getByTestId('machine-menu').focus();
     await page.keyboard.press('Shift+Tab');
     for (let i = 0; i < 8; i++) {
       await page.keyboard.press('Tab');
@@ -84,16 +84,15 @@ for (const theme of ['light', 'dark'] as const) {
       stops.push(await item.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? document.activeElement?.tagName ?? ''));
       expect(await shapes(item, resting), `focus-visible on ${stops.at(-1)}`).toEqual([]);
     }
-    expect(stops).toContain('machine-toggle');
     expect(stops).toContain('machine-menu');
 
-    const toggle = item.getByTestId('machine-toggle');
-    await toggle.focus();
+    const menu = item.getByTestId('machine-menu');
+    await menu.focus();
     await page.keyboard.press('Tab');
-    await toggle.focus();
-    expect((await fresh(item, resting)).filter((entry) => entry.outline), 'keyboard focus on the toggle must be painted').toHaveLength(1);
+    await menu.focus();
+    expect((await fresh(item, resting)).filter((entry) => entry.outline), 'keyboard focus on the menu must be painted').toHaveLength(1);
 
-    for (const testid of ['machine-toggle', 'machine-accept-toggle', 'machine-menu']) {
+    for (const testid of ['machine-menu']) {
       const target = item.getByTestId(testid);
       await target.hover();
       await page.mouse.down();
@@ -104,12 +103,10 @@ for (const theme of ['light', 'dark'] as const) {
     }
 
     await page.mouse.move(0, 0);
-    await item.getByTestId('machine-toggle').click();
+    await item.getByTestId('machine-item-name').click();
     await page.waitForTimeout(150);
     expect(await fresh(item, resting), 'a mouse click must not leave a focus ring').toEqual([]);
-    const expanded = await item.getAttribute('data-expanded');
-    await item.getByTestId('machine-item-status').click({ force: true });
-    await expect(item).not.toHaveAttribute('data-expanded', expanded ?? '');
+    await expect(item.getByRole('button')).toHaveCount(1);
   });
 }
 

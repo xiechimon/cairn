@@ -1,12 +1,12 @@
-import type { ClaimedStep, MachineClaimBody } from '@cairn/shared';
+import type { ChiefNoticeContent, ClaimedStep, MachineClaimBody } from '@cairn/shared';
 import {
   AGENT_TOOL_TAG,
   appendMergedPrGuard,
   buildMergedPrGuardInstruction,
   buildMergedPrGuardNote,
   buildTaskPromptText,
+  CHIEF_NOTICE_KIND,
   chiefIdFormat,
-  claudeLoginBlocksClaim,
   claudeRateBlock,
   confinementDispatchReady,
   fencedTitle,
@@ -21,6 +21,7 @@ import {
   type StepKind,
   selectSkillsForTask,
   WORKER_ASK_USER_TOOL,
+  WORKER_CLOSE_AS_DUPLICATE_TOOL,
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
   WORKER_THREAD_REPORT_TOOL,
@@ -43,21 +44,26 @@ import { autonomousMergePolicy } from './autonomous-merge.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { holdBlockedBuild } from './blockers.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
-import { turnProvenance } from './chief.js';
+import { insertChiefMessageOnce, turnProvenance } from './chief.js';
+import { chiefHistoryFor } from './chief-claim-history.js';
 import {
   CHIEF_DIGEST_MIN_CLI_VERSION,
   CHIEF_DIGEST_REMOTE_TOOLS,
   isChiefDigestStep,
 } from './chief-digest.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
-import { claudeUsageGatePasses, refreshClaudeRateParks } from './claude-rate-limit.js';
-import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.js';
+import { refreshClaudeRateParks } from './claude-rate-limit.js';
+import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
+import { quickLaneRefusal } from './coordinator-request.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
+import { coordinatorToolDefs } from './coordinator-tool-defs.js';
 import { readDeployLease } from './deploy-lease.js';
 import {
   capabilityGatePasses,
+  claudeCodeLoginBlocked,
   machineRunningCount,
   projectRunningCount,
   runtimeGatePasses,
@@ -67,6 +73,7 @@ import {
 import { projectOfTodo, projectRepoRef } from './git.js';
 import { listProjectGithubLabelVocab } from './github-labels.js';
 import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
+import { deliverableCapability, failEarlierClaimDeliverables } from './machine-deliverables.js';
 import {
   type MachineDeps,
   profileForStep,
@@ -83,12 +90,13 @@ import {
   type WorkerStepFacts,
   workerIneligibility,
 } from './machine-routing.js';
+import { connectorSlugs } from './mcp-servers.js';
 import { injectMemories } from './memory.js';
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import {
-  chiefRemoteTools,
+  coordinatorMemoryOwner,
   coordinatorProfile,
   memoryOpsAreTeamScoped,
   memoryOwnerOf,
@@ -208,12 +216,24 @@ function cliVersionAtLeast(latestCliVersion: string | null, min: string): boolea
   return true;
 }
 
-function claimMcpSlugs(
-  latestCliVersion: string | null,
-  agentSlugs: readonly string[],
-): string[] | undefined {
-  if (!meetsMcpVersionGate(latestCliVersion)) return undefined;
-  return [...agentSlugs];
+export function stepMcpGrant(
+  db: MachineDeps['db'],
+  machineRow: Pick<typeof machine.$inferSelect, 'teamId' | 'latestCliVersion' | 'capabilities'>,
+  profileSlugs: readonly string[],
+  locked = false,
+): { grant: string[] | undefined; unsupported: string[] } {
+  if (locked) return { grant: [], unsupported: [] };
+  if (!meetsMcpVersionGate(machineRow.latestCliVersion))
+    return { grant: undefined, unsupported: [] };
+  if (machineRow.capabilities?.mcpConnectors === true || profileSlugs.length === 0)
+    return { grant: [...profileSlugs], unsupported: [] };
+  const connectors = connectorSlugs(db, machineRow.teamId);
+  const unsupported = profileSlugs.filter((slug) => connectors.has(slug.toLowerCase()));
+  return { grant: profileSlugs.filter((slug) => !unsupported.includes(slug)), unsupported };
+}
+
+export function chiefTurnLocked(stepRow: typeof step.$inferSelect): boolean {
+  return isChiefDigestStep(stepRow) || turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
 }
 
 function claimLocalTools(agentTools: readonly string[]): string[] {
@@ -230,8 +250,11 @@ function claudeCodeLoginBlocks(
   provider: string | null | undefined,
 ): boolean {
   if (stepRuntimeFor(provider) !== 'claude-code') return false;
-  if (hasActiveClaudeSubscription(deps, machineRow.teamId)) return false;
-  return claudeLoginBlocksClaim(machineRow.claudeCodeReport?.login, nowMs());
+  return claudeCodeLoginBlocked(
+    machineRow.claudeCodeReport,
+    hasActiveClaudeSubscription(deps, machineRow.teamId),
+    nowMs(),
+  );
 }
 
 function buildChiefClaim(
@@ -245,10 +268,10 @@ function buildChiefClaim(
   if (!agentRow.modelId) return null;
   const model = effectiveModel(agentRow, stepRow);
   if (!machineRow || !runtimeGatePasses(machineRow, model.provider)) return null;
-  if (!claudeUsageGatePasses(deps, machineRow, model)) return null;
   if (claudeCodeLoginBlocks(deps, machineRow, model.provider)) return null;
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
-  if (!claimPendingChiefStep(deps.db, stepRow, machineId)) return null;
+  const bindTeamId = stepRuntimeFor(model.provider) === 'claude-code' ? threadRow.teamId : null;
+  if (!claimPendingChiefStep(deps.db, stepRow, machineId, bindTeamId)) return null;
   return chiefClaimPayload(deps, machineId, stepRow, threadRow, agentRow, machineRow);
 }
 
@@ -265,13 +288,29 @@ function chiefClaimPayload(
     deps,
     stepRow,
     threadRow,
-    agentRow.id,
+    coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
   );
+  const boundSubscriptionId =
+    stepRuntimeFor(model.provider) === 'claude-code'
+      ? (deps.db
+          .select({ id: step.claudeSubscriptionId })
+          .from(step)
+          .where(eq(step.id, stepRow.id))
+          .get()?.id ?? null)
+      : null;
+  const continuesSession =
+    !stepRow.freshSession &&
+    threadRow.sessionId !== '' &&
+    !chiefLastRanOnOtherAccount(deps.db, threadRow.id, stepRow.id, boundSubscriptionId);
   const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
   const locked = digest || mailTurn;
-  const chiefMcp = locked
-    ? []
-    : claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
+  const history = locked ? null : chiefHistoryFor(deps.db, threadRow, stepRow);
+  const mcp = machineRow
+    ? stepMcpGrant(deps.db, machineRow, agentRow.mcpServers, locked)
+    : { grant: locked ? [] : undefined, unsupported: [] };
+  if (mcp.unsupported.length > 0)
+    noteUnsupportedConnectors(deps, threadRow, stepRow, mcp.unsupported);
+  const chiefMcp = mcp.grant;
   return {
     step: {
       id: stepRow.id,
@@ -282,8 +321,8 @@ function chiefClaimPayload(
     },
     conversationId: stepRow.buildId,
     session: {
-      action: !stepRow.freshSession && threadRow.sessionId !== '' ? 'continue' : 'new',
-      sessionId: !stepRow.freshSession && threadRow.sessionId !== '' ? threadRow.sessionId : null,
+      action: continuesSession ? 'continue' : 'new',
+      sessionId: continuesSession ? threadRow.sessionId : null,
     },
     ...(instruction !== null
       ? {
@@ -303,11 +342,32 @@ function chiefClaimPayload(
       threadId: threadRow.id,
       systemPrompt,
       trigger,
+      ...(history !== null ? { history } : {}),
     },
-    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : mailTurn ? [] : chiefRemoteTools())],
+    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : mailTurn ? [] : coordinatorToolDefs())],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
     ...(locked ? { remoteToolsOnly: true as const } : {}),
   };
+}
+
+function noteUnsupportedConnectors(
+  deps: MachineDeps,
+  threadRow: typeof chiefThread.$inferSelect,
+  stepRow: typeof step.$inferSelect,
+  slugs: readonly string[],
+): void {
+  const stored = insertChiefMessageOnce(deps.db, {
+    id: `chief-mcp-unsupported-${stepRow.id}`,
+    threadId: threadRow.id,
+    role: 'system',
+    content: JSON.stringify({
+      kind: CHIEF_NOTICE_KIND,
+      message: `MCP connectors ${slugs.join(', ')} are unavailable this turn: the Runner needs a newer cairn.`,
+      provenance: `mcp-connectors:${stepRow.id}`,
+    } satisfies ChiefNoticeContent),
+    createdAt: nowMs(),
+  });
+  if (stored !== null) deps.convHub?.publishMessage(threadRow.id, stored);
 }
 
 function claudeBlockedReader(db: MachineDeps['db']): (id: string | null) => boolean {
@@ -417,6 +477,11 @@ async function tryClaim(
       failStepWithEvents(deps, cand.stepRow, `Ship refused: ${shipRefusal}`);
       continue;
     }
+    const laneRefusal = quickLaneRefusal(db, cand.todoRow);
+    if (laneRefusal !== null) {
+      failStepWithEvents(deps, cand.stepRow, laneRefusal);
+      continue;
+    }
     const localMerge = parseLocalMergeInstruction(cand.stepRow.prompt);
     if (localMerge !== null) {
       const project = projectOfTodo(db, cand.todoRow);
@@ -462,11 +527,11 @@ async function tryClaim(
       projectRunningCount(reader, cand.todoRow.projectId) >=
         projectCap + (cand.stepRow.byPerson ? 1 : 0);
     if (projectFull(db)) continue;
-    const { priorSessionId, priorMachineId, freshSession } = priorSessionOf(
-      db,
-      cand.stepRow,
-      cand.buildRow,
-    );
+    const claimRuntimeIsClaudeCode = stepRuntimeFor(model.provider) === 'claude-code';
+    const enabledId = enabledSubscriptionId({ db }, teamId);
+    const prior = priorSessionOf(db, cand.stepRow, cand.buildRow, enabledId);
+    const { priorSessionId, priorMachineId, freshSession } = prior;
+    if (claimRuntimeIsClaudeCode && accountHeld(cand.stepRow, prior, enabledId)) continue;
     const sessionOnOtherMachine =
       priorSessionId !== null && priorMachineId !== null && priorMachineId !== machineId;
     const sole = platformFallbackMachineId(
@@ -513,12 +578,21 @@ async function tryClaim(
       );
       if (brake.autonomyPaused || brake.dailyCapReached) continue;
     }
-    const claimedAt = nowMs();
+    const claimedAt = Math.max(nowMs(), (cand.stepRow.claimedAt ?? 0) + 1);
+    const deliverables = deliverableCapability(cand.stepRow.kind, cand.todoRow.output, claimedAt);
     let won = false;
     try {
       won = db.transaction((tx) => {
         if (!stillAuthorized()) return false;
         if (projectFull(tx)) return false;
+        const boundId = enabledSubscriptionId({ db: tx }, teamId);
+        if (claimRuntimeIsClaudeCode) {
+          if (boundId !== enabledId) return false;
+          const fresh = priorSessionOf(tx, cand.stepRow, cand.buildRow, boundId);
+          if (accountHeld(cand.stepRow, fresh, boundId)) return false;
+        }
+        const latestTodo = db.select().from(todo).where(eq(todo.id, cand.todoRow.id)).get();
+        if (latestTodo === undefined || quickLaneRefusal(db, latestTodo) !== null) return false;
         holdBlockedBuild(db, cand.stepRow.buildId);
         const res = tx
           .update(step)
@@ -529,6 +603,7 @@ async function tryClaim(
             lastHeartbeatAt: claimedAt,
             skillInjection,
             blockerHandoff,
+            claudeSubscriptionId: claimRuntimeIsClaudeCode ? boundId : null,
             holdReason: null,
             holdUntil: null,
           })
@@ -541,6 +616,7 @@ async function tryClaim(
           )
           .run();
         if (res.changes === 0) return false;
+        if (deliverables !== undefined) failEarlierClaimDeliverables(db, cand.stepRow.id);
         if (
           cand.stepRow.kind !== 'review' &&
           cand.todoRow.sourceKind !== 'research-citation-check'
@@ -607,7 +683,7 @@ async function tryClaim(
       repoRef?.kind === 'hosted' && mergeTarget !== null
         ? { ...repoRef, baseBranch: mergeTarget.baseBranch }
         : repoRef;
-    const workerMcp = claimMcpSlugs(machineRow.latestCliVersion, agentRow.mcpServers);
+    const workerMcp = stepMcpGrant(db, machineRow, agentRow.mcpServers).grant;
     const segmentsDaemon = cliVersionAtLeast(
       machineRow.latestCliVersion,
       TASK_SEGMENTS_MIN_CLI_VERSION,
@@ -697,6 +773,7 @@ async function tryClaim(
       remoteTools: workerRemoteTools(cand.stepRow.kind, isGithubProject, namesTask),
       localTools: claimLocalTools(agentRow.tools),
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
+      ...(deliverables !== undefined ? { deliverables } : {}),
     };
   }
   return claimChiefTurn(deps, machineId, teamId, maxWorkers, Number.POSITIVE_INFINITY);
@@ -712,9 +789,13 @@ export function workerRemoteTools(
       (kind === 'plan' || isBuildStepKind(kind) || !isThreadScheduleTool(tool.name)) &&
       (namesTask || tool.name !== 'set_task_meta'),
   );
-  return kind === 'session'
-    ? [...base, WORKER_ASK_USER_TOOL, WORKER_THREAD_REPORT_TOOL]
-    : [...base];
+  if (kind !== 'session') return [...base];
+  return [
+    ...base,
+    WORKER_ASK_USER_TOOL,
+    WORKER_THREAD_REPORT_TOOL,
+    ...(isGithubProject ? [WORKER_CLOSE_AS_DUPLICATE_TOOL] : []),
+  ];
 }
 
 export async function claimStep(

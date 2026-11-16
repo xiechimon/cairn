@@ -413,18 +413,19 @@
     {
       "id": "daily-report",
       "name": "Daily report and retro",
-      "summary": "The Coordinator posts an 08:00 report in the conversation and proposes retro changes the user accepts or rejects.",
-      "states": "A report row in the conversation with yesterday, needs-you and intake sections, and retro proposals that can be accepted or rejected.",
+      "summary": "The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro and intake suggestions by telling the Coordinator.",
+      "states": "A one-sentence report message (posted, quiet, failed) with a document card; the document lists yesterday, needs-you, numbered retro and intake suggestions and each one's state.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/chief/chief-report-row.tsx",
-          "apps/web/src/chief/chief-digest-row.tsx"
+          "apps/web/src/chief/research-report.tsx"
         ],
         "server": [
           "apps/server/src/services/chief-report.ts",
-          "apps/server/src/services/chief-digest.ts"
+          "apps/server/src/services/chief-digest.ts",
+          "apps/server/src/services/chief-router-tools.ts"
         ]
       },
       "routes": {
@@ -434,21 +435,22 @@
       },
       "reach": [
         "open /app",
-        "click testid:chief-report"
+        "click testid:research-report-card"
       ],
       "research": [
         "docs/research/duet-proactive-coordinator.md"
       ],
-      "frontendDesign": {
-        "gap": "the report row and retro proposal card have no design"
-      },
+      "frontendDesign": [
+        "apps/web/DESIGN-RULES.md"
+      ],
       "backendDesign": {
         "gap": "no design for report content, timing, quiet rules and retro proposal storage"
       },
       "evidence": [
         "apps/web/e2e/chief-daily-report.spec.ts",
         "apps/server/test/chief-report.test.ts",
-        "apps/server/test/chief-digest.test.ts"
+        "apps/server/test/chief-digest.test.ts",
+        "apps/server/test/chief-router-tools.test.ts"
       ],
       "batch": "B2"
     },
@@ -1003,7 +1005,7 @@
     {
       "id": "agent-computer",
       "name": "The agent's computer",
-      "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed, desktop control, and a browser preference toggle in the web app.",
+      "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.",
       "states": "No computer; command feed empty, streaming, or settled; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere.",
       "centrality": 1,
       "status": "partial",
@@ -1025,7 +1027,6 @@
         ],
         "daemon": [
           "apps/daemon/src/computer",
-          "apps/daemon/src/orb/computer.ts",
           "apps/daemon/src/machine-loop.ts"
         ]
       },
@@ -1040,7 +1041,6 @@
       "reach": [
         "open /app",
         "click testid:machines-button",
-        "click label:浏览器",
         "click testid:machine-screen-expand"
       ],
       "research": [
@@ -1049,7 +1049,7 @@
         "docs/research/user-computer-model-2026-11-08.md"
       ],
       "frontendDesign": {
-        "gap": "the computer feed, screen view, browser toggle and control handover have no design"
+        "gap": "the computer feed, screen view and control handover have no design"
       },
       "backendDesign": {
         "gap": "no design for computer access grants, the browser preference, the guard and the screen channel"
@@ -1062,7 +1062,7 @@
         "apps/daemon/test/computer-guard.test.ts",
         "apps/daemon/test/computer-browser.test.ts",
         "apps/daemon/test/machine-boot.test.ts",
-        "apps/daemon/test/orb-computer.test.ts"
+        "apps/daemon/test/computer-host-desktop.test.ts"
       ],
       "batch": "B4"
     },
@@ -1101,8 +1101,8 @@
     {
       "id": "routing",
       "name": "Model and work routing",
-      "summary": "Which model and machine each kind of work uses: model routing, work routing rules and policies, capabilities and a per-thread override.",
-      "states": "A routing graph from kinds of work to models, an empty state, rules per use, and a per-thread override dialog.",
+      "summary": "Which model each kind of work uses: the Model selector page (default model for new tasks, the Coordinator and other agents with model and thinking level), the Model routing page (providers with quota, Claude billing, and a graph wiring each rule to its provider), capabilities and a per-thread override.",
+      "states": "A graph from each use to its provider with dashed wires for unavailable providers, an empty state, one picker row per use with runtimes no Runner enabled greyed out, and a per-thread override dialog.",
       "centrality": 1,
       "status": "shipped",
       "code": {
@@ -1130,6 +1130,7 @@
           "/api/teams/:id/model-routing",
           "/api/teams/:id/routing-rules/:use",
           "/api/teams/:id/routing-settings",
+          "/api/teams/:id/top-models",
           "/api/teams/:id/work-policies/:use",
           "/api/capabilities"
         ]
@@ -1290,8 +1291,8 @@
     {
       "id": "machines",
       "name": "Machines",
-      "summary": "The machines page and machine detail: online state, capabilities, revoke and evacuate.",
-      "states": "An empty state, online and offline machines with last seen, a machine detail with runtimes and capabilities.",
+      "summary": "A compact machine list with names, default marker, system, online state and a menu for default, delete and evacuate.",
+      "states": "Empty, loading and error states; online and offline rows; default machine; long names; row menu and confirmation dialogs. No expandable details or capability controls.",
       "centrality": 2,
       "status": "shipped",
       "code": {
@@ -1321,7 +1322,7 @@
       },
       "reach": [
         "settings machines",
-        "click testid:machine-item"
+        "click testid:machine-menu"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/machines-local-row.md"
@@ -1503,13 +1504,14 @@
     {
       "id": "first-run",
       "name": "First run",
-      "summary": "The home checklist, connection banners and the first-PR card that take a new user to a first merged PR.",
-      "states": "A checklist on the home page until a machine, a model and a project are set, a setup hint on the composer, then a first-PR card.",
+      "summary": "The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.",
+      "states": "A team with no projects lands on a two-step setup page (connect models for the Coordinator and tasks, confirm both models) that can be skipped; the first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.",
       "centrality": 2,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/board/first-run-checklist-model.ts",
+          "apps/web/src/board/first-run-setup.tsx",
           "apps/web/src/board/first-pr-card.tsx",
           "apps/web/src/board/home-banners.ts",
           "apps/web/src/board/composer-setup-hint.tsx"
@@ -1520,6 +1522,7 @@
       },
       "reach": [
         "open /app",
+        "click testid:first-run-confirm",
         "click testid:composer-setup-chip"
       ],
       "research": [
@@ -1532,6 +1535,7 @@
         "gap": "no design for checklist state, first-PR detection and the 10-minute path"
       },
       "evidence": [
+        "apps/web/e2e/first-run-setup.spec.ts",
         "apps/web/e2e/first-run-checklist.spec.ts",
         "apps/web/e2e/first-pr-report.spec.ts",
         "apps/server/test/first-pr-report.test.ts"
@@ -1585,7 +1589,7 @@
       "code": {
         "web": [
           "apps/web/src/pages/project-new-page.tsx",
-          "apps/web/src/pages/project-page.tsx",
+          "apps/web/src/pages/project-redirect.tsx",
           "apps/web/src/pages/project-settings-page.tsx",
           "apps/web/src/settings/archived-projects-section.tsx"
         ],
@@ -1617,7 +1621,6 @@
       "reach": [
         "open /app/project/new",
         "click testid:github-picker",
-        "open /app/project/<id of a project listed by the projects API>/tasks",
         "open /app/project/<id of a project listed by the projects API>/settings",
         "click testid:project-instructions-input",
         "settings projects"
@@ -1650,13 +1653,12 @@
     {
       "id": "github",
       "name": "GitHub connection and issues",
-      "summary": "Connecting GitHub, choosing repositories, importing issues as threads and writing results back to the issue.",
+      "summary": "Connecting GitHub, choosing repositories, importing labeled issues as threads and writing results back to the issue.",
       "states": "Not connected, connected with a repository picker, an issue imported as a thread, and the write-back pending, done, drifted or failed with retry.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/pages/github-issues-dialog.tsx",
           "apps/web/src/detail/source-issue.tsx"
         ],
         "server": [
@@ -1668,12 +1670,11 @@
         "server": [
           "/api/teams/:id/github/**",
           "/api/github/repos",
-          "/api/projects/:id/github/issues**",
+          "/api/projects/:id/github/issues/import",
           "/api/todos/:id/github-issue**"
         ]
       },
       "reach": [
-        "open /app/project/<id of a project listed by the projects API>/tasks",
         "open /app/todo/<id of a thread listed by the todos API>",
         "click testid:source-issue-retry"
       ],
@@ -1691,8 +1692,8 @@
         "docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md"
       ],
       "evidence": [
-        "apps/web/e2e/project-github-issues.spec.ts",
         "apps/web/e2e/github-issue-writeback.spec.ts",
+        "apps/server/test/github-issues.test.ts",
         "apps/server/test/github-connection.test.ts"
       ]
     },
@@ -1700,12 +1701,13 @@
       "id": "schedules",
       "name": "Scheduled tasks",
       "summary": "Recurring work that starts or continues threads on a schedule, with run-now and a project schedule.",
-      "states": "Loading, empty, a list of schedules with cadence, a detail dialog with run now, and an error state.",
+      "states": "Loading, empty, a list of schedules with cadence in the Tasks panel Schedules tab, a small popover editor with run now, a collapsed ended group, and an error state.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/pages/schedules-page.tsx",
+          "apps/web/src/board/tasks-schedule-list.tsx",
+          "apps/web/src/board/tasks-schedule-menu.tsx",
           "apps/web/src/schedules"
         ],
         "server": [
@@ -1724,14 +1726,15 @@
         ]
       },
       "reach": [
-        "open /app/schedules",
-        "click testid:schedule-detail-body"
+        "open /app",
+        "click testid:sidebar-schedules",
+        "click testid:schedule-new"
       ],
       "research": {
         "gap": "no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model "
       },
       "frontendDesign": {
-        "gap": "the schedules page and detail dialog have no design"
+        "gap": "the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md"
       },
       "backendDesign": {
         "gap": "no design for due events, missed runs and continue-thread schedules"
@@ -1798,7 +1801,7 @@
       "id": "sidebar",
       "name": "Sidebar",
       "summary": "The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive, delete) and the machine-status footer.",
-      "states": "Projects under the Coordinator with no group, ungrouped projects then groups in name order, a folded group with its count, an ochre dot on a project with a task waiting on the owner, the open row menu, loading or error rows, the filter on archived (note, archived rows with their groups, back row) or empty archived, the filter on all with archived rows marked, an archived project opened read-only with the unarchive bar, and the 48px rail.",
+      "states": "Projects under the Coordinator with no group, ungrouped projects then groups in name order, a folded group with its count, an ochre dot on a project with a task waiting on the owner, the open row menu, loading or error rows, the filter on archived (note, archived rows with their groups, back row) or empty archived, the filter on all with archived rows marked, an archived project opened read-only with the unarchive bar, and collapsed with only the toggle, whose hover, edge or keyboard focus floats the whole sidebar as a peek.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -1961,7 +1964,7 @@
       "id": "skills",
       "name": "Skills",
       "summary": "Skills read from each machine and team skills imported and injected into threads.",
-      "states": "An empty list, skills per machine, an import dialog, and a skill injected into a thread shown in the transcript.",
+      "states": "An empty list, skills per machine, an import dialog with a pick-from-this-machine tab (imported and unimportable skills disabled, one error per failed pick) and a path or GitHub tab, and a skill injected into a thread shown in the transcript.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2009,6 +2012,7 @@
       "evidence": [
         "apps/web/e2e/skills-page.spec.ts",
         "apps/web/e2e/skill-import.spec.ts",
+        "apps/server/test/skill-import.test.ts",
         "apps/daemon/test/skills-catalog.test.ts"
       ],
       "batch": "B9"
@@ -2034,7 +2038,11 @@
           "settings:mcp"
         ],
         "server": [
-          "/api/teams/:id/mcp-servers"
+          "/api/teams/:id/mcp-servers",
+          "/api/teams/:id/mcp-connectors",
+          "/api/teams/:id/mcp-connectors/:cid",
+          "/api/teams/:id/mcp-connectors/:cid/check",
+          "/api/teams/:id/mcp-connectors/oauth/start"
         ]
       },
       "reach": [
@@ -2044,20 +2052,21 @@
       "verify": [
         ".claude/skills/verify-cairn/features/mcp-servers.md"
       ],
-      "research": {
-        "gap": "no note on MCP configuration surfaces in t3code and Amp"
-      },
+      "research": [
+        "docs/research/mcp-connectors-2026-11-15.md"
+      ],
       "frontendDesign": [
-        "docs/spec/13-resources-view-localization.md"
+        "docs/spec/13-resources-view-localization.md",
+        "docs/design/mcp-connectors.md"
       ],
       "backendDesign": [
-        "docs/spec/13-resources-view-localization.md"
+        "docs/spec/13-resources-view-localization.md",
+        "docs/design/mcp-connectors.md"
       ],
       "evidence": [
         "apps/server/test/mcp-servers.test.ts",
         "apps/daemon/test/mcp-config.test.ts"
-      ],
-      "batch": "B9"
+      ]
     },
     {
       "id": "harness-profile",

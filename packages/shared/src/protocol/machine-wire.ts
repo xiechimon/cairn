@@ -57,10 +57,17 @@ export const machineEnrollStartResponseSchema = z.object({
 
 export const machineEnrollPollBodySchema = z.object({ enrollId: z.string() });
 export const machineEnrollPollResponseSchema = z.union([
-  z.object({ status: z.literal('pending') }),
+  z.object({ status: z.literal('pending'), name: z.string().optional() }),
   z.object({ status: z.literal('authorized'), machine: machineJsonSchema }),
   z.object({ status: z.literal('expired') }),
 ]);
+export type MachineEnrollPollResponse = z.infer<typeof machineEnrollPollResponseSchema>;
+
+export function enrollDisplayName(name: string | undefined): string | undefined {
+  if (name === undefined || name.trim() === '' || name.length > 253 || /\p{C}/u.test(name))
+    return undefined;
+  return name;
+}
 
 export const machineEnrollConfirmBodySchema = z.object({ enrollId: z.string() });
 
@@ -160,6 +167,39 @@ export const localMergeReportSchema = z.object({
 });
 export type LocalMergeReport = z.infer<typeof localMergeReportSchema>;
 
+const MIB = 1024 * 1024;
+
+export const DELIVERABLE_LIMITS = {
+  maxFiles: 5,
+  maxTotalBytes: 50 * MIB,
+  maxPageBytes: 2 * MIB,
+  maxSlidesBytes: 20 * MIB,
+  maxRowsPerClaim: 10,
+  maxNameChars: 120,
+  maxSkipped: 20,
+} as const;
+
+export const DELIVERABLE_UPLOAD_IDLE_MS = 120_000;
+export const DELIVERABLE_UPLOAD_DEADLINE_MS = 10 * 60_000;
+export const DELIVERABLE_GRANT_MAX_BODY_BYTES = 64 * 1024;
+
+export const deliverableKindSchema = z.enum(['page', 'slides']);
+export type DeliverableKind = z.infer<typeof deliverableKindSchema>;
+
+const sha256Hex = z.string().regex(/^[0-9a-f]{64}$/);
+const deliverableName = z.string().min(1).max(DELIVERABLE_LIMITS.maxNameChars);
+
+export const deliverableCapabilitySchema = z.object({
+  generation: z.number().int(),
+  limits: z.object({
+    maxFiles: z.number().int(),
+    maxTotalBytes: z.number().int(),
+    maxPageBytes: z.number().int(),
+    maxSlidesBytes: z.number().int(),
+  }),
+});
+export type DeliverableCapability = z.infer<typeof deliverableCapabilitySchema>;
+
 export const claimedStepSchema = z.object({
   localMerge: localMergeCommandSchema.optional(),
   step: stepRecordSchema,
@@ -227,12 +267,14 @@ export const claimedStepSchema = z.object({
       threadId: recordId,
       systemPrompt: z.string(),
       trigger: z.enum(['user', 'gate', 'settle', 'failed', 'wake']),
+      history: z.string().optional(),
     })
     .optional(),
   remoteTools: z.array(remoteToolDefSchema).optional(),
   localTools: z.array(z.string()).optional(),
   mcpServers: z.array(z.string()).optional(),
   remoteToolsOnly: z.literal(true).optional(),
+  deliverables: deliverableCapabilitySchema.optional(),
 });
 export type ClaimedStep = z.infer<typeof claimedStepSchema>;
 
@@ -372,6 +414,14 @@ export const httpSecretGrantSchema = z.object({
 });
 export type HttpSecretGrant = z.infer<typeof httpSecretGrantSchema>;
 
+export const mcpConnectorEndpointSchema = z.object({
+  slug: z.string(),
+  transport: z.literal('http'),
+  url: z.string(),
+  headers: z.record(z.string(), z.string()).optional(),
+});
+export type McpConnectorEndpoint = z.infer<typeof mcpConnectorEndpointSchema>;
+
 export const machineTokenResponseSchema = z.object({
   commitIdentity: z.object({ name: z.string(), email: z.string() }).nullable().optional(),
   coAuthor: z
@@ -383,6 +433,8 @@ export const machineTokenResponseSchema = z.object({
   secrets: z.record(z.string(), z.string()),
   httpSecrets: z.array(httpSecretGrantSchema).optional(),
   withheldSecrets: z.array(z.string()).optional(),
+  mcpConnectors: z.array(mcpConnectorEndpointSchema).optional(),
+  withheldMcp: z.array(z.string()).optional(),
   git: z
     .object({
       username: z.string(),
@@ -395,12 +447,26 @@ export const machineTokenResponseSchema = z.object({
 export type MachineTokenResponse = z.infer<typeof machineTokenResponseSchema>;
 
 export const machineUploadUrlsBodySchema = z.object({
-  files: z.array(
-    z.object({
-      name: z.string(),
-      size: z.number().int().min(0).optional(),
-    }),
-  ),
+  files: z
+    .array(
+      z.object({
+        name: z.string().max(DELIVERABLE_LIMITS.maxNameChars),
+        size: z.number().int().min(0).optional(),
+      }),
+    )
+    .max(8),
+  generation: z.number().int().optional(),
+  deliverables: z
+    .array(
+      z.object({
+        kind: deliverableKindSchema,
+        name: deliverableName,
+        size: z.number().int().min(0).max(DELIVERABLE_LIMITS.maxSlidesBytes),
+        sha256: sha256Hex,
+      }),
+    )
+    .max(DELIVERABLE_LIMITS.maxFiles)
+    .optional(),
 });
 export const machineUploadUrlsResponseSchema = z.object({
   uploads: z.array(
@@ -411,7 +477,25 @@ export const machineUploadUrlsResponseSchema = z.object({
       headers: z.record(z.string(), z.string()),
     }),
   ),
+  deliverables: z
+    .array(
+      z.object({
+        name: z.string(),
+        attachmentId: recordId,
+        received: z.boolean(),
+        url: z.string(),
+        method: z.literal('PUT'),
+        headers: z.record(z.string(), z.string()),
+      }),
+    )
+    .optional(),
 });
+
+export const deliverableReceiptStateSchema = z.enum(['claimed', 'finished', 'superseded']);
+export const machineDeliverableReceiptResponseSchema = z.object({
+  state: deliverableReceiptStateSchema,
+});
+export type DeliverableReceiptState = z.infer<typeof deliverableReceiptStateSchema>;
 export type MachineUploadUrlsResponse = z.infer<typeof machineUploadUrlsResponseSchema>;
 
 export const transcriptUploadSchema = z.object({
@@ -472,6 +556,20 @@ export const machineDoneBodySchema = z.object({
   noOutput: z.literal(true).optional(),
   skillInjectionFacts: skillInjectionFactsSchema.optional(),
   report: z.string().max(INFO_REPORT_MAX_BYTES).optional(),
+  generation: z.number().int().optional(),
+  deliverables: z
+    .array(z.object({ name: deliverableName, sha256: sha256Hex }))
+    .max(DELIVERABLE_LIMITS.maxFiles)
+    .optional(),
+  deliverablesSkipped: z
+    .array(
+      z.object({
+        name: z.string().max(DELIVERABLE_LIMITS.maxNameChars),
+        reason: z.string().max(64),
+      }),
+    )
+    .max(DELIVERABLE_LIMITS.maxSkipped)
+    .optional(),
 });
 export type MachineDoneBody = z.infer<typeof machineDoneBodySchema>;
 export const machineDoneResponseSchema = machineOkResponseSchema;
@@ -568,6 +666,18 @@ export const MACHINE_WIRE_EXTENSIONS = [
     method: 'PUT',
     path: '/api/machine/upload/{uploadId}',
     reason: '[设计] upload-urls 预签名落地（self-host 无对象存储）；一次性 uploadId',
+  },
+  {
+    method: 'PUT',
+    path: '/api/machine/deliverable/{attachmentId}',
+    reason:
+      '[design] Made pages and slides: streamed binary body for a pending deliverable row granted to the current claim generation; size, hash and format checked while streaming',
+  },
+  {
+    method: 'GET',
+    path: '/api/machine/steps/{stepId}/receipt',
+    reason:
+      '[design] Made pages and slides: read-only completion receipt (?generation=) so a daemon recovering a journal knows whether the claim already finished, is still claimed or was superseded',
   },
   {
     method: 'GET',

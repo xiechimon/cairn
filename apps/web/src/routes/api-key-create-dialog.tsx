@@ -1,26 +1,27 @@
-import { MCP_TOOL_REGISTRY } from '@cairn/shared';
+import { KEY_NAME_PATTERN, MCP_TOOL_REGISTRY } from '@cairn/shared';
 import { useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
-import { Button } from '../components/ui/button.js';
-import { Checkbox } from '../components/ui/checkbox.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
 
-const READ_GRANTS: readonly string[] = MCP_TOOL_REGISTRY.filter((tool) => tool.kind === 'read').map(
-  (tool) => tool.grant,
-);
-const WRITE_GRANTS: readonly string[] = MCP_TOOL_REGISTRY.filter(
-  (tool) => tool.kind === 'write',
-).map((tool) => tool.grant);
-
 export interface ApiKeyCreateBody {
-  name: string | null;
+  name: string;
   gitAccess: boolean;
   mcpAccess: boolean;
   machineAccess: boolean;
   toolGrants: { read: string[]; write: string[] };
 }
+
+export const API_KEY_ACCESS: Omit<ApiKeyCreateBody, 'name'> = {
+  gitAccess: true,
+  mcpAccess: true,
+  machineAccess: true,
+  toolGrants: {
+    read: MCP_TOOL_REGISTRY.filter((tool) => tool.kind === 'read').map((tool) => tool.grant),
+    write: MCP_TOOL_REGISTRY.filter((tool) => tool.kind === 'write').map((tool) => tool.grant),
+  },
+};
 
 interface ApiKeyCreateDialogProps {
   open: boolean;
@@ -31,145 +32,64 @@ interface ApiKeyCreateDialogProps {
 export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDialogProps) {
   const { t } = useI18n();
   const [name, setName] = useState('');
-  const [gitAccess, setGitAccess] = useState(false);
-  const [mcpAccess, setMcpAccess] = useState(false);
-  const [machineAccess, setMachineAccess] = useState(true);
-  const [read, setRead] = useState<Set<string>>(new Set());
-  const [write, setWrite] = useState<Set<string>>(new Set());
-
-  const toggle = (set: Set<string>, tool: string): Set<string> => {
-    const next = new Set(set);
-    if (next.has(tool)) next.delete(tool);
-    else next.add(tool);
-    return next;
-  };
-  const grantAll = () => {
-    setRead(new Set(READ_GRANTS));
-    setWrite(new Set(WRITE_GRANTS));
-    setGitAccess(true);
-    setMcpAccess(true);
-    setMachineAccess(true);
-  };
-  const clearAll = () => {
-    setRead(new Set());
-    setWrite(new Set());
-    setGitAccess(false);
-    setMcpAccess(false);
-    setMachineAccess(false);
+  const trimmed = name.trim();
+  const badName = trimmed !== '' && !KEY_NAME_PATTERN.test(trimmed);
+  const ready = trimmed !== '' && !badName;
+  const close = () => {
+    setName('');
+    onClose();
   };
   const submit = () => {
-    onCreate({
-      name: name.trim() === '' ? null : name.trim(),
-      gitAccess,
-      mcpAccess,
-      machineAccess,
-      toolGrants: {
-        read: [...read].filter((grant) => READ_GRANTS.includes(grant)),
-        write: [...write].filter((grant) => WRITE_GRANTS.includes(grant)),
-      },
-    });
-    onClose();
+    if (!ready) return;
+    onCreate({ name: trimmed, ...API_KEY_ACCESS });
+    close();
   };
 
   return (
     <DialogShell
-      title={t('新建密钥')}
+      title={t('新建 API 密钥')}
       open={open}
-      onClose={onClose}
+      onClose={close}
       size="s"
       footer={
         <FormActions
           className="pt-0"
-          primary={{ label: t('创建'), onClick: submit }}
-          secondary={{ label: t('取消'), onClick: onClose }}
+          primary={{ label: t('创建'), onClick: submit, disabled: !ready }}
+          secondary={{ label: t('取消'), onClick: close }}
         />
       }
     >
       <FormStack className="max-w-none">
-        <FormField label={t('名称（可选）')} htmlFor="apikey-name-input">
+        <FormField
+          label={t('名称')}
+          htmlFor="apikey-name-input"
+          help={
+            <span
+              id="apikey-name-rule"
+              role={badName ? 'alert' : undefined}
+              className={badName ? 'text-destructive' : undefined}
+            >
+              {t('只能用大写字母、数字和下划线，不能以数字开头。')}
+            </span>
+          }
+        >
           <Input
             id="apikey-name-input"
-            className={FORM_CONTROL_CLS}
+            className={`${FORM_CONTROL_CLS} font-mono`}
             value={name}
+            aria-invalid={badName}
+            aria-describedby="apikey-name-rule"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
             onChange={(event) => setName(event.target.value)}
-            placeholder={t('如：笔记本、CI 机器')}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.nativeEvent.isComposing) submit();
+            }}
+            placeholder="MY_KEY"
           />
         </FormField>
-        <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor="apikey-git-access"
-            className="inline-flex cursor-pointer items-center gap-2 text-ui text-foreground"
-          >
-            <Checkbox
-              id="apikey-git-access"
-              checked={gitAccess}
-              onCheckedChange={setGitAccess}
-              aria-label={t('Git 读写（托管仓库 push/pull）')}
-            />
-            {t('Git 读写（托管仓库 push/pull）')}
-          </label>
-          <label
-            htmlFor="apikey-mcp-access"
-            className="inline-flex cursor-pointer items-center gap-2 text-ui text-foreground"
-          >
-            <Checkbox
-              id="apikey-mcp-access"
-              checked={mcpAccess}
-              onCheckedChange={setMcpAccess}
-              aria-label={t('MCP 访问（MCP 客户端接入）')}
-            />
-            {t('MCP 访问（MCP 客户端接入）')}
-          </label>
-          <div className="inline-flex items-center gap-2 text-ui text-foreground">
-            <Checkbox
-              checked={machineAccess}
-              onCheckedChange={setMachineAccess}
-              aria-label={t('注册 Runner（命令行接入）')}
-            />
-            <span>{t('注册 Runner（命令行接入）')}</span>
-          </div>
-        </div>
-        <div className="flex items-baseline justify-between">
-          <span className="text-ui font-medium text-foreground">{t('工具权限位')}</span>
-          <span className="flex gap-2">
-            <Button variant="ghost" size="xs" onClick={grantAll}>
-              {t('授予全部')}
-            </Button>
-            <Button variant="ghost" size="xs" onClick={clearAll}>
-              {t('清空')}
-            </Button>
-          </span>
-        </div>
-        <div className="max-h-66 scroll-py-2 overflow-y-auto rounded-md border border-border bg-card px-2 py-1 dark:bg-input/30">
-          <div className="flex items-center gap-2 py-1 text-meta text-content-tertiary">
-            <span className="flex-1" />
-            <span className="w-8 text-center">{t('读')}</span>
-            <span className="w-8 text-center">{t('写')}</span>
-          </div>
-          {MCP_TOOL_REGISTRY.map(({ grant: tool, kind }) => (
-            <div key={tool} className="flex items-center gap-2 py-1 text-meta">
-              <span className="flex-1 text-content-secondary">{tool}</span>
-              <span className="w-8 text-center text-content-tertiary">
-                {kind === 'read' && (
-                  <Checkbox
-                    checked={read.has(tool)}
-                    onCheckedChange={() => setRead((set) => toggle(set, tool))}
-                    aria-label={`${t('读')} ${tool}`}
-                  />
-                )}
-              </span>
-              <span className="w-8 text-center text-content-tertiary">
-                {kind === 'write' && (
-                  <Checkbox
-                    checked={write.has(tool)}
-                    onCheckedChange={() => setWrite((set) => toggle(set, tool))}
-                    aria-label={`${t('写')} ${tool}`}
-                  />
-                )}
-              </span>
-            </div>
-          ))}
-        </div>
       </FormStack>
     </DialogShell>
   );

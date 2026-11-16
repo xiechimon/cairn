@@ -11,7 +11,6 @@ import type {
   ChiefWatch,
   ClaudeCodeReport,
   ClaudeRateLimitWindow,
-  ClaudeUsage,
   ComputerCallState,
   ComputerControlHolder,
   ComputerImage,
@@ -24,6 +23,9 @@ import type {
   MailAccountStatus,
   MailEventStatus,
   MailRank,
+  McpConnectorAuthKind,
+  McpConnectorOAuthMeta,
+  McpConnectorStatus,
   MemoryCandidateStatus,
   MemoryLayer,
   ModelRef,
@@ -84,7 +86,6 @@ export const team = sqliteTable('team', {
   name: text('name').notNull(),
   createdAt: epochMs('createdAt').notNull(),
   plan: text('plan').notNull().default('free'),
-  claudeUsage: text('claudeUsage').$type<ClaudeUsage>().notNull().default('subscription-only'),
   avatarStyle: text('avatarStyle'),
   coAuthorTrailer: bool('coAuthorTrailer').notNull().default(true),
   requestInstructorReview: bool('requestInstructorReview').notNull().default(false),
@@ -321,6 +322,7 @@ export const step = sqliteTable(
     scopeProjectId: text('scopeProjectId'),
     ownerMessageIds: json<string[]>('ownerMessageIds'),
     byPerson: bool('byPerson').notNull().default(false),
+    claudeSubscriptionId: text('claudeSubscriptionId'),
     freshSession: bool('freshSession').notNull().default(false),
     skillInjection: json<SkillInjectionRecord>('skillInjection'),
     blockerHandoff: json<BlockerHandoffRecord>('blockerHandoff'),
@@ -1004,6 +1006,8 @@ export const chiefTurnUsage = sqliteTable(
     cacheWrite: integer('cacheWrite').notNull().default(0),
     ttftMs: integer('ttftMs'),
     contextTokens: integer('contextTokens'),
+    contextWindow: integer('contextWindow'),
+    compactAt: integer('compactAt'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [
@@ -1228,8 +1232,11 @@ export const attachment = sqliteTable('attachment', {
   sizeBytes: integer('sizeBytes').notNull(),
   storageKey: text('storageKey').notNull(),
   grantId: text('grantId').notNull(),
-  scope: text('scope').$type<'spec' | 'message'>().notNull(),
-  status: text('status').$type<'pending' | 'ready' | 'failed'>().notNull().default('pending'),
+  scope: text('scope').$type<'spec' | 'message' | 'deliverable'>().notNull(),
+  status: text('status')
+    .$type<'pending' | 'received' | 'ready' | 'failed'>()
+    .notNull()
+    .default('pending'),
   createdAt: epochMs('createdAt').notNull(),
 });
 
@@ -1422,16 +1429,60 @@ export const scheduleReport = sqliteTable(
   (t) => [index('schedule_report_project_idx').on(t.projectId, t.generatedAt)],
 );
 
-export const claudeSubscription = sqliteTable('claude_subscription', {
-  id: text('id').primaryKey(),
-  teamId: text('teamId')
-    .notNull()
-    .references(() => team.id, { onDelete: 'cascade' }),
-  label: text('label').notNull(),
-  tokenCipher: text('tokenCipher').notNull(),
-  expiresAt: epochMs('expiresAt'),
-  createdAt: epochMs('createdAt').notNull(),
-});
+export const claudeSubscription = sqliteTable(
+  'claude_subscription',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    label: text('label').notNull(),
+    tokenCipher: text('tokenCipher').notNull(),
+    expiresAt: epochMs('expiresAt'),
+    enabledAt: epochMs('enabledAt'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('claude_subscription_one_enabled')
+      .on(t.teamId)
+      .where(sql`${t.enabledAt} is not null`),
+  ],
+);
+
+export const mcpConnector = sqliteTable(
+  'mcp_connector',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    slug: text('slug').notNull(),
+    label: text('label').notNull(),
+    catalogId: text('catalogId'),
+    url: text('url').notNull(),
+    headerNames: json<string[]>('headerNames').notNull(),
+    valuesCipher: text('valuesCipher'),
+    authKind: text('authKind').$type<McpConnectorAuthKind>().notNull().default('none'),
+    oauthMeta: json<McpConnectorOAuthMeta>('oauthMeta'),
+    oauthCipher: text('oauthCipher'),
+    authRevision: integer('authRevision').notNull().default(0),
+    tokenGeneration: integer('tokenGeneration').notNull().default(0),
+    status: text('status').$type<McpConnectorStatus>().notNull(),
+    statusReason: text('statusReason'),
+    toolCount: integer('toolCount'),
+    checkedAt: epochMs('checkedAt'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('mcp_connector_team_slug_idx').on(t.teamId, t.slug),
+    check(
+      'mcp_connector_status',
+      sql`${t.status} in ('unchecked', 'connected', 'needs_auth', 'error')`,
+    ),
+    check('mcp_connector_auth_kind', sql`${t.authKind} in ('none', 'static', 'oauth')`),
+  ],
+);
 
 export const clientMessage = sqliteTable(
   'client_message',
@@ -1715,3 +1766,11 @@ export const mailRule = sqliteTable(
     check('mail_rule_pattern', sql`length(trim(${t.pattern})) > 0`),
   ],
 );
+
+export const teamTopModels = sqliteTable('team_top_models', {
+  teamId: text('teamId')
+    .primaryKey()
+    .references(() => team.id, { onDelete: 'cascade' }),
+  models: text('models').notNull(),
+  updatedAt: epochMs('updatedAt').notNull(),
+});

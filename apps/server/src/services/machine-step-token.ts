@@ -18,12 +18,19 @@ import {
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { autonomousToken, softwareCommitIdentity } from './github-autonomous-token.js';
 import { humanWorkIdentity } from './github-work-attribution.js';
+import { chiefTurnLocked, stepMcpGrant } from './machine-claim.js';
 import {
   isChiefConversation,
   type MachineDeps,
   ownedStep,
   profileForStep,
 } from './machine-deps.js';
+import {
+  defaultMcpConfigPath,
+  newMcpOAuthState,
+  publicOAuthFetch,
+  stepConnectorEndpoints,
+} from './mcp-servers.js';
 import { coordinatorProfile } from './routing-rules.js';
 import { readTeamAttributionSettings } from './team-attribution-settings.js';
 import { materializeXaiAccessToken } from './xai-device-login.js';
@@ -93,8 +100,52 @@ export async function stepToken(
     ...(owned.status === 'claimed' && bundle.claudeSubscriptionToken !== undefined
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
       : {}),
+    ...(owned.status === 'claimed' && todoRow && agentRow
+      ? await connectorFields(deps, owned, todoRow.teamId, agentRow.mcpServers)
+      : {}),
     git,
   };
+}
+
+type ClaimedStepRow = Pick<typeof step.$inferSelect, 'id' | 'machineId' | 'claimedAt'>;
+
+function stillClaimedBy(deps: MachineDeps, claimed: ClaimedStepRow): boolean {
+  const current = deps.db
+    .select({ status: step.status, machineId: step.machineId, claimedAt: step.claimedAt })
+    .from(step)
+    .where(eq(step.id, claimed.id))
+    .get();
+  return (
+    current?.status === 'claimed' &&
+    current.machineId === claimed.machineId &&
+    current.claimedAt === claimed.claimedAt
+  );
+}
+
+async function connectorFields(
+  deps: MachineDeps,
+  claimed: ClaimedStepRow,
+  teamId: string,
+  profileSlugs: readonly string[],
+  locked = false,
+): Promise<Pick<MachineTokenResponse, 'mcpConnectors' | 'withheldMcp'>> {
+  if (claimed.machineId === null) return {};
+  const machineRow = deps.db.select().from(machine).where(eq(machine.id, claimed.machineId)).get();
+  if (!machineRow) return {};
+  const { grant } = stepMcpGrant(deps.db, machineRow, profileSlugs, locked);
+  const fields = await stepConnectorEndpoints(
+    {
+      db: deps.db,
+      box: deps.box,
+      mcpConfigPath: deps.mcpConfigPath ?? defaultMcpConfigPath(),
+      fetch: deps.mcpFetch ?? globalThis.fetch,
+      oauthFetch: deps.mcpFetch ?? publicOAuthFetch,
+      oauthState: deps.mcpOAuthState ?? newMcpOAuthState(),
+    },
+    teamId,
+    grant ?? [],
+  );
+  return stillClaimedBy(deps, claimed) ? fields : {};
 }
 
 function gatewayMayReceive(
@@ -196,6 +247,7 @@ async function chiefStepToken(
     { db: deps.db, box: deps.box },
     threadId,
     stepRow?.fallback?.model?.provider,
+    stepRow?.claudeSubscriptionId,
   );
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   const agentRow = threadRow ? coordinatorProfile(deps.db, threadRow.teamId) : null;
@@ -204,6 +256,15 @@ async function chiefStepToken(
     secrets: bundle.secrets,
     ...(claimed && bundle.claudeSubscriptionToken !== undefined
       ? { claudeSubscriptionToken: bundle.claudeSubscriptionToken }
+      : {}),
+    ...(claimed && stepRow && threadRow && agentRow
+      ? await connectorFields(
+          deps,
+          stepRow,
+          threadRow.teamId,
+          agentRow.mcpServers,
+          chiefTurnLocked(stepRow),
+        )
       : {}),
     git: null,
     commitIdentity: softwareCommitIdentity(deps),

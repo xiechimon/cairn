@@ -169,44 +169,6 @@ test('all three long-content tabs of chief settings scroll to the bottom (#1032)
   );
 });
 
-function wireTodo(i: number) {
-  return {
-    id: `todo-${i}`,
-    teamId: 'team-1',
-    projectId: 'proj-1',
-    title: `滚动探针任务 ${i}`,
-    spec: `滚动探针任务 ${i}`,
-    phase: 'todo',
-    phaseAt: 0,
-    seqNum: i + 1,
-    orderIndex: i,
-    tagIds: [],
-    assignment: null,
-    agent: null,
-    latestBuildId: null,
-    lastRunAt: 0,
-    hasChanges: false,
-    hasPlan: false,
-    buildHistory: [],
-    sourceTodo: null,
-    v: 1,
-  };
-}
-
-test('project task list page scrolls to the bottom (#1032)', async ({ page }) => {
-  await stubLiveBoot(page);
-  await page.route('**/api/projects?*', (route) => route.fulfill({ json: [PROJECT] }));
-  await page.route('**/api/todos?*', (route) =>
-    route.fulfill({ json: Array.from({ length: 40 }, (_, i) => wireTodo(i)) }),
-  );
-  await page.goto('/app/project/proj-1/tasks');
-  const rows = page.getByTestId('task-row');
-  await expect(rows).toHaveCount(40);
-  const search = page.getByRole('textbox', { name: '搜索任务' });
-  await expect(search).toBeVisible();
-  await expectScrollerReachesBottom(page, search, rows.last());
-});
-
 function wireSchedule(i: number) {
   return {
     id: `sched-${i}`,
@@ -229,15 +191,17 @@ function wireSchedule(i: number) {
   };
 }
 
-test('schedules page scrolls to the bottom (#1032)', async ({ page }) => {
+test('the schedules tab scrolls to its last row and the new schedule button (#1032)', async ({ page }) => {
   await stubLiveBoot(page);
   await page.route('**/api/schedules*', (route) =>
     route.fulfill({ json: Array.from({ length: 30 }, (_, i) => wireSchedule(i)) }),
   );
-  await page.goto('/app/schedules');
-  const cards = page.locator('.sched-card');
-  await expect(cards).toHaveCount(30);
-  await expectScrollerReachesBottom(page, cards.first(), cards.last());
+  await page.goto('/app?pane=tasks&tab=scheduled');
+  const rows = page
+    .getByRole('complementary', { name: '任务' })
+    .locator('[data-slot="schedule-row"]');
+  await expect(rows).toHaveCount(30);
+  await expectScrollerReachesBottom(page, rows.first(), page.getByTestId('schedule-new'));
 });
 
 test('project settings page scrolls to the bottom (#1032)', async ({ page }) => {
@@ -261,7 +225,7 @@ test('new project page scrolls to the bottom (#1032)', async ({ page }) => {
   const heading = page.getByRole('button', { name: '创建项目' });
   await expect(heading).toBeAttached();
 
-  const hint = page.getByText('可选。未设置时以首字母代替。');
+  const hint = page.getByText('项目图标，可选。不选时显示方盒图标。');
   await expect(hint).toBeVisible();
   await expectScrollerReachesBottom(page, hint, heading);
 });

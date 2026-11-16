@@ -45,6 +45,8 @@ test('code checks comments only; UI strings and exempt paths pass', () => {
   assert.deepEqual(fileViolations('scripts/x.py', "x = '中'\n# 中文\n#!/bin/中"), [2]);
   assert.deepEqual(fileViolations('README.zh.md', '中文'), []);
   assert.deepEqual(fileViolations('apps/web/src/i18n/en.ts', '// 中文'), []);
+  assert.deepEqual(fileViolations('site/src/content/docs/zh-cn/docs/intro.mdx', '中文'), []);
+  assert.deepEqual(fileViolations('site/src/content/docs/docs/intro.mdx', '中文'), [1]);
   assert.deepEqual(fileViolations('assets/logo.svg', '中文'), []);
 });
 
