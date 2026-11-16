@@ -276,6 +276,7 @@ test('a started task cannot be moved to another project', async ({ page }) => {
   const row = panel(page).locator('[data-slot="task-row-frame"]').filter({ hasText: 'Orb canary round 7' });
   await row.hover();
   await row.getByTestId('task-row-menu-button').click();
+  await expect(page.getByRole('menuitem', { name: '打开任务' })).toBeVisible();
   await expect(page.getByRole('menuitem', { name: /移到项目/ })).toHaveCount(0);
 });
 
@@ -292,13 +293,13 @@ test('a scheduled row menu offers run, pause and delete; delete asks first', asy
   await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('更多');
   await rows.first().getByTestId('schedule-row-menu-button').click();
   const menu = page.getByRole('menu');
-  await expect(menu.locator('[data-slot="schedule-menu-facts"]')).toHaveCount(0);
   await expect(menu.getByRole('menuitem')).toHaveText([
     /立即运行/,
     /暂停定时/,
     /编辑/,
     /删除/,
   ]);
+  await expect(menu.locator('[data-slot="schedule-menu-facts"]')).toHaveCount(0);
   await menu.getByRole('menuitem', { name: /删除/ }).click();
   await expect(page.getByRole('alertdialog')).toBeVisible();
 });
@@ -323,6 +324,7 @@ test('the task row menu groups open, move, mark done and rename above a divider,
   await row.getByTestId('task-row-menu-button').hover();
   await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('更多');
   await row.getByTestId('task-row-menu-button').click();
+  await expect(page.getByRole('menuitem', { name: '打开任务' })).toBeVisible();
   const order = await page
     .getByRole('menu')
     .locator('[role="menuitem"], [role="separator"]')
@@ -439,8 +441,11 @@ test('the menu offers Mark done on open tasks only and follows the checkbox', as
     await frame(title).getByTestId('task-row-menu-button').click();
   };
   await openMenu('Rerun the relay probe');
-  await expect(page.getByRole('menuitem', { name: /标记完成/ })).toHaveCount(0);
+  const firstMenu = page.getByRole('menu', { name: 'Rerun the relay probe 的菜单' });
+  await expect(firstMenu.getByRole('menuitem', { name: '打开任务' })).toBeVisible();
+  await expect(firstMenu.getByRole('menuitem', { name: /标记完成/ })).toHaveCount(0);
   await page.keyboard.press('Escape');
+  await expect(firstMenu).toHaveCount(0);
   await openMenu('Serif greeting fix');
   await page.getByRole('menuitem', { name: /标记完成/ }).click();
   await expect(page.getByRole('alertdialog', { name: '停止并标记完成' })).toBeVisible();
