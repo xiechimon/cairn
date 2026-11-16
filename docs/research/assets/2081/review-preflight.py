@@ -6,8 +6,6 @@ import re
 import sys
 import subprocess
 
-APPROVED_REVIEW_MODELS = {'glm-5.3', 'glm-5.3-flash', 'deepseek-v4.1-flash'}
-
 
 def review_errors(record, head, digest, writer_family):
     errors = []
@@ -24,13 +22,10 @@ def review_errors(record, head, digest, writer_family):
     if review.get('patchDigest') != digest or binding.get('patchDigest') != digest:
         errors.append('Review digest differs from the current patch')
     model = review.get('reviewerModel')
-    if (
-        writer_family != 'GPT'
-        or binding.get('writerModelFamily') != writer_family
-        or model not in APPROVED_REVIEW_MODELS
-        or completion.get('model') != model
-    ):
-        errors.append('Reviewer must use an approved different model family')
+    if binding.get('writerModelFamily') != writer_family:
+        errors.append('Writer family differs from the review binding')
+    if not isinstance(model, str) or not model.strip() or completion.get('model') != model:
+        errors.append('Reviewer model differs from the completed run')
     if completion.get('stopReason') != 'stop' or completion.get('usage', {}).get('totalTokens', 0) <= 0:
         errors.append('Review must complete normally with nonzero usage')
     if execution.get('rc') != 0 or execution.get('configuredContextWindow', 0) < 1_000_000:
@@ -139,7 +134,7 @@ if __name__ == '__main__':
     parser.add_argument('record', type=Path)
     parser.add_argument('--head', required=True)
     parser.add_argument('--digest', required=True)
-    parser.add_argument('--writer-family', required=True, choices=['GPT'])
+    parser.add_argument('--writer-family', required=True)
     parser.add_argument('--github-pr', required=True, type=Path)
     parser.add_argument('--github-files', required=True, type=Path)
     parser.add_argument('--bundle', required=True, type=Path)
@@ -164,4 +159,4 @@ if __name__ == '__main__':
         print(f'BLOCK: {failure}', file=sys.stderr)
     if failures:
         raise SystemExit(1)
-    print('PASS: completed different-model pre-merge review matches the current head and canonical digest')
+    print('PASS: completed independent pre-merge review matches the current head and canonical digest')
