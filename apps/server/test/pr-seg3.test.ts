@@ -17,6 +17,7 @@ import {
   CI_MERGE_CONFLICT_ROUNDS_MAX,
   createCiPoller,
 } from '../src/services/ci-loop.js';
+import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { bootServer, type TestServer } from './helpers.js';
 
@@ -341,7 +342,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
       expect.stringContaining(`/repos/octo/demo/commits/${HEAD}/check-runs`),
     ]);
     expect(w.fake.reads(encodeURIComponent(w.fake.branch))).toEqual([]);
-    expect(w.phase()).toBe('review');
+    expect(w.phase()).toBe('done');
   });
 
   test('[s3-F2] a new head with no required run yet is pending, even when the old head was green', async () => {
@@ -401,7 +402,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     w.fake.protection = { contexts: ['check'], checks: [] };
     w.fake.runs[HEAD] = [{ name: 'check' }, { name: 'lint', conclusion: 'failure' }];
     await w.poller.sweep();
-    expect(w.phase()).toBe('review');
+    expect(w.phase()).toBe('done');
     expect(fixSteps(w)).toEqual([]);
   });
 
@@ -449,7 +450,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
       { name: 'c', conclusion: 'skipped' },
     ];
     await ok.poller.sweep();
-    expect(ok.phase()).toBe('review');
+    expect(ok.phase()).toBe('done');
     const blocked = makeWorld();
     blocked.fake.runs[HEAD] = [{ name: 'a' }, { name: 'b', conclusion: 'cancelled' }];
     await blocked.poller.sweep();
@@ -475,7 +476,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
       { name: 'check', conclusion: 'success' },
     ];
     await w.poller.sweep();
-    expect(w.phase()).toBe('review');
+    expect(w.phase()).toBe('done');
     expect(fixSteps(w)).toEqual([]);
   });
 
@@ -597,7 +598,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     expect(w.phase()).toBe('building');
     w.fake.runs[HEAD] = [{ name: 'a' }, { name: 'b' }, { name: 'c' }];
     await w.poller.sweep(t0 + 60_000);
-    expect(w.phase()).toBe('review');
+    expect(w.phase()).toBe('done');
   });
 
   test('[s3-F9b] classic protection with enforcement_level off: its contexts are not required', async () => {
@@ -606,7 +607,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     w.fake.enforcement = 'off';
     w.fake.runs[HEAD] = [{ name: 'check' }];
     await w.poller.sweep();
-    expect(w.phase()).toBe('review');
+    expect(w.phase()).toBe('done');
   });
 
   test('[s3-F9c] a default branch with a slash keeps the slash in the branch and rules paths', async () => {
@@ -828,7 +829,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
       { name: 'check', conclusion: 'success' },
     ];
     await req.poller.sweep();
-    expect(req.phase()).toBe('review');
+    expect(req.phase()).toBe('done');
     const none = makeWorld();
     none.fake.runs[HEAD] = [
       { name: 'ci', conclusion: 'skipped' },
@@ -836,7 +837,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
       { name: 'ci', conclusion: 'success' },
     ];
     await none.poller.sweep();
-    expect(none.phase()).toBe('review');
+    expect(none.phase()).toBe('done');
   });
 
   test.each([
@@ -850,7 +851,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
       w.fake.rulesMessage = message;
       w.fake.runs[HEAD] = [{ name: 'check' }];
       await w.poller.sweep();
-      expect(w.phase()).toBe('review');
+      expect(w.phase()).toBe('done');
     },
   );
 
@@ -899,7 +900,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     w.fake.protection = { contexts: ['check'], checks: [] };
     await w.poller.sweep(t0 + 600_001);
     expect(w.fake.reads('/check-runs')).toHaveLength(2);
-    expect(w.phase()).toBe('review');
+    expect(w.phase()).toBe('done');
   });
 
   test('[s3-F15] dirty with a step in flight: nothing', async () => {
@@ -955,8 +956,8 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     w.fake.mergeableState = 'behind';
     w.fake.runs[HEAD] = [{ name: 'check' }];
     await w.poller.sweep();
-    expect(w.phase()).toBe('review');
-    expect(w.systemRows()).toEqual([]);
+    expect(w.phase()).toBe('done');
+    expect(w.systemRows()).toEqual([DONE_ROW]);
   });
 
   test.each(['unknown', 'blocked', 'clean', 'unstable', 'has_hooks', 'draft', null])(
