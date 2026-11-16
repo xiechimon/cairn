@@ -244,7 +244,7 @@ export function bootServer(
 
 export async function issueApiKey(s: ReturnType<typeof bootServer>): Promise<string> {
   const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/api-keys`, {
-    name: 'machine-bootstrap',
+    name: 'MACHINE_BOOTSTRAP',
     gitAccess: false,
     mcpAccess: false,
     machineAccess: true,

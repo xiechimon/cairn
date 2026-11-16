@@ -667,7 +667,7 @@ Reach:
 - Web routes: `/app/api-keys`
 - Settings: `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `apikey-usage-hint`, `keys-empty`
+- Test ids in its code: `keys-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/api-keys.md](features/api-keys.md)
 - Research: **gap**: no note on API key and grant models in reference products
 - Frontend design: **gap**: the API keys page and grant picker have no design

@@ -2,7 +2,7 @@ import { MCP_TOOL_REGISTRY } from '@cairn/shared';
 import { expect, test } from '@playwright/test';
 import { stubLiveApiKeys } from './helpers.js';
 
-test('an MCP client key carries every tool, including Coordinator Thread entry, and shows its plaintext once', async ({
+test('a new key needs a MY_KEY name, gets every permission, and shows its plaintext once', async ({
   page,
 }) => {
   await page.route('**/api/**', (route, request) => {
@@ -22,56 +22,53 @@ test('an MCP client key carries every tool, including Coordinator Thread entry, 
   await page.goto('/app/api-keys');
   await page.getByRole('button', { name: '新建密钥', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '新建密钥' });
-  await dialog.getByRole('radio', { name: 'MCP 客户端', exact: true }).click();
-  await expect(dialog.getByTestId('apikey-usage-hint')).toHaveText(
-    '让 Claude Code、Cursor 等客户端查看和操作工作台。',
-  );
+  const name = dialog.getByLabel('名称', { exact: true });
+  const create = dialog.getByRole('button', { name: '创建', exact: true });
+  await expect(dialog.getByRole('radio')).toHaveCount(0);
+  await expect(dialog.getByRole('checkbox')).toHaveCount(0);
+  await expect(create).toBeDisabled();
+  for (const bad of ['laptop', '1KEY', 'MY-KEY']) {
+    await name.fill(bad);
+    await expect(dialog.getByRole('alert')).toHaveText(
+      '名称只能用大写字母、数字和下划线，不能以数字开头，如 MY_KEY。',
+    );
+    await expect(create).toBeDisabled();
+  }
+  await name.fill('  CI_RUNNER_2  ');
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
   const submitted = page.waitForRequest(
     (request) =>
       request.method() === 'POST' &&
       new URL(request.url()).pathname === '/api/teams/team-1/api-keys',
   );
-  await dialog.getByRole('button', { name: '创建', exact: true }).click();
-  const body = (await submitted).postDataJSON();
-  expect(body).toMatchObject({
+  await create.click();
+  expect((await submitted).postDataJSON()).toEqual({
+    name: 'CI_RUNNER_2',
     gitAccess: true,
     mcpAccess: true,
-    machineAccess: false,
+    machineAccess: true,
     toolGrants: {
       read: MCP_TOOL_REGISTRY.filter((tool) => tool.kind === 'read').map((tool) => tool.grant),
       write: MCP_TOOL_REGISTRY.filter((tool) => tool.kind === 'write').map((tool) => tool.grant),
     },
   });
-  expect(body.toolGrants.read).toEqual(
-    expect.arrayContaining(['Read Thread', 'Threads Waiting on Me', 'Thread Pull Requests']),
-  );
-  expect(body.toolGrants.write).toEqual(expect.arrayContaining(['Start Thread', 'Reply Thread']));
   await expect(dialog).not.toBeVisible();
   await expect(page.getByText('cairn_example', { exact: true })).toBeVisible();
 });
 
-test('a new key is a named runner key by default, with no permission to pick', async ({ page }) => {
+test('Enter in the name field creates the key once the name is valid', async ({ page }) => {
   await stubLiveApiKeys(page);
   await page.goto('/app/api-keys');
   await page.getByRole('button', { name: '新建密钥' }).first().click();
   const dialog = page.getByRole('dialog', { name: '新建密钥' });
-  await expect(dialog.getByRole('radio')).toHaveCount(2);
-  await expect(dialog.getByRole('radio', { name: '执行机', exact: true })).toBeChecked();
-  await expect(dialog.getByRole('checkbox')).toHaveCount(0);
-  await dialog.getByLabel('名称（可选）').fill('  笔记本  ');
-  const submitted = page.waitForRequest(
-    (request) =>
-      request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/api-keys'),
-  );
+  const name = dialog.getByLabel('名称', { exact: true });
+  await name.fill('bad');
+  await name.press('Enter');
+  await expect(dialog).toBeVisible();
   await page.route('**/api/teams/*/api-keys', (route) =>
     route.fulfill({ status: 201, json: { plaintext: 'cairn_example' } }),
   );
-  await dialog.getByRole('button', { name: '创建', exact: true }).click();
-  expect((await submitted).postDataJSON()).toEqual({
-    name: '笔记本',
-    gitAccess: false,
-    mcpAccess: false,
-    machineAccess: true,
-    toolGrants: { read: [], write: [] },
-  });
+  await name.fill('LAPTOP');
+  await name.press('Enter');
+  await expect(dialog).not.toBeVisible();
 });
