@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { BackupBanner } from '../board/backup-banner.js';
-import { FirstPrCard } from '../board/first-pr-card.js';
 import { NotificationBanner } from '../board/notify-banner.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
@@ -38,7 +37,6 @@ const AVATAR_ICONS = [
 
 export function ProductBoardSection() {
   const [_lastAction, setLastAction] = useState<string | null>(null);
-  const [firstPrShown, setFirstPrShown] = useState(true);
   return (
     <Section
       id="product-board"
@@ -71,18 +69,6 @@ export function ProductBoardSection() {
         </Labeled>
         <Labeled label="BackupBanner, unreadable">
           <BackupBanner notice={{ kind: 'unreadable' }} />
-        </Labeled>
-        <Labeled label="FirstPrCard">
-          {firstPrShown ? (
-            <FirstPrCard
-              info={{ href: 'https://github.com', title: '', body: '', daysToFirstPr: 3 }}
-              onDismiss={() => setFirstPrShown(false)}
-            />
-          ) : (
-            <span className="text-meta text-content-tertiary">
-              Dismissed. Reload to see it again.
-            </span>
-          )}
         </Labeled>
       </Specimen>
       <Specimen

@@ -535,20 +535,10 @@ test.each([null, 'app-token-unconfigured', 'repo-not-installed'] as const)(
         cred: w.token,
       });
       expect(response.status).toBe(200);
-      const result = machineTokenResponseSchema.parse(await response.json());
+      const payload = await response.json();
+      expect(payload).not.toHaveProperty('coAuthor');
+      const result = machineTokenResponseSchema.parse(payload);
       expect(result.git?.password === (reason === null ? app : 'identity-test-user')).toBe(true);
-      expect(result.coAuthor).toEqual({
-        name: 'Human',
-        login: 'human',
-        email: '12+human@users.noreply.github.com',
-      });
-      await call(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}`, {
-        body: { coAuthorTrailer: false },
-      });
-      const optedOut = await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, {
-        cred: w.token,
-      });
-      expect(machineTokenResponseSchema.parse(await optedOut.json()).coAuthor).toBeNull();
       expect(result.git?.kind).toBe(reason === null ? 'app' : 'unattributed');
       if (reason === null)
         expect((result.git?.expiresAt ?? 0) - Date.now()).toBeGreaterThan(50 * 60000);

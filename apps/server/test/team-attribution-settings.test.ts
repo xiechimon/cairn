@@ -1,54 +1,46 @@
+import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
-import { readTeamAttributionSettings } from '../src/services/team-attribution-settings.js';
+import { team } from '../src/db/schema.js';
 import { bootServer, req } from './helpers.js';
 
-test('absent team settings use attribution defaults', () => {
+test('retired team features stay absent even when their historical settings are enabled', async () => {
   const s = bootServer();
   try {
-    expect(readTeamAttributionSettings(s.db, 'absent')).toEqual({
-      coAuthorTrailer: true,
-      requestInstructorReview: false,
-    });
-  } finally {
-    s.dispose();
-  }
-});
-
-test('existing team defaults and persisted attribution opt-outs', async () => {
-  const s = bootServer();
-  try {
-    const teams = await (await req(s.app, 'GET', '/api/teams')).json();
-    expect(teams).toMatchObject([{ coAuthorTrailer: true, requestInstructorReview: false }]);
-    const response = await req(s.app, 'PATCH', `/api/teams/${s.team.id}`, {
-      coAuthorTrailer: false,
-      requestInstructorReview: true,
-    });
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      coAuthorTrailer: false,
-      requestInstructorReview: true,
-    });
-    const reread = await (await req(s.app, 'GET', '/api/teams')).json();
-    expect(reread).toMatchObject([{ coAuthorTrailer: false, requestInstructorReview: true }]);
-  } finally {
-    s.dispose();
-  }
-});
-
-test.each(['coAuthorTrailer', 'requestInstructorReview'])(
-  '%s rejects non-booleans',
-  async (key) => {
-    const s = bootServer();
-    try {
-      for (const value of ['false', 0, null, [], {}]) {
-        const response = await req(s.app, 'PATCH', `/api/teams/${s.team.id}`, {
-          autonomyPaused: false,
-          [key]: value,
-        });
-        expect(response.status).toBe(400);
-      }
-    } finally {
-      s.dispose();
+    s.db
+      .update(team)
+      .set({
+        coAuthorTrailer: true,
+        requestInstructorReview: true,
+        firstPrReportPromptEnabled: true,
+        firstPrReportPromptFirstPrAt: 42,
+        firstPrReportPromptFirstPrNumber: 7,
+      })
+      .where(eq(team.id, s.team.id))
+      .run();
+    const listed = (await (await req(s.app, 'GET', '/api/teams')).json()) as Record<
+      string,
+      unknown
+    >[];
+    const updated = (await (
+      await req(s.app, 'PATCH', `/api/teams/${s.team.id}`, {
+        maxAutonomousMergesPerDay: 3,
+      })
+    ).json()) as Record<string, unknown>;
+    expect(listed).toHaveLength(1);
+    for (const record of [...listed, updated]) {
+      expect(record).not.toHaveProperty('coAuthorTrailer');
+      expect(record).not.toHaveProperty('requestInstructorReview');
+      expect(record).not.toHaveProperty('firstPrReportPrompt');
+      expect(record.maxAutonomousMergesPerDay).toBeDefined();
     }
-  },
-);
+    for (const body of [
+      { coAuthorTrailer: false },
+      { requestInstructorReview: true },
+      { firstPrReportPrompt: { enabled: true } },
+    ]) {
+      expect((await req(s.app, 'PATCH', `/api/teams/${s.team.id}`, body)).status).toBe(400);
+    }
+  } finally {
+    s.dispose();
+  }
+});

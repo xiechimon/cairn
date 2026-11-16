@@ -6,7 +6,7 @@ const kinds = (list: { kind: string }[]) => list.map((item) => item.kind);
 describe('pickHomeBanners', () => {
   it('shows at most two banners', () => {
     const picked = pickHomeBanners([
-      { kind: 'first-pr' as const },
+      { kind: 'login' as const },
       { kind: 'quota' as const },
       { kind: 'backup' as const },
       { kind: 'notify' as const },
@@ -14,24 +14,9 @@ describe('pickHomeBanners', () => {
     expect(picked).toHaveLength(2);
   });
 
-  it('orders blocking before need-to-know before celebration', () => {
-    expect(
-      kinds(pickHomeBanners([{ kind: 'first-pr' as const }, { kind: 'quota' as const }])),
-    ).toEqual(['quota', 'first-pr']);
+  it('orders blocking before need-to-know', () => {
     expect(
       kinds(pickHomeBanners([{ kind: 'quota' as const }, { kind: 'backup' as const }])),
-    ).toEqual(['backup', 'quota']);
-  });
-
-  it('never lets the first-PR card push out a need-to-know banner', () => {
-    expect(
-      kinds(
-        pickHomeBanners([
-          { kind: 'first-pr' as const },
-          { kind: 'backup' as const },
-          { kind: 'quota' as const },
-        ]),
-      ),
     ).toEqual(['backup', 'quota']);
   });
 
@@ -48,19 +33,19 @@ describe('pickHomeBanners with the Claude login warning', () => {
     expect(
       kinds(
         pickHomeBanners([
-          { kind: 'first-pr' as const },
+          { kind: 'notify' as const },
           { kind: 'quota' as const },
           { kind: 'login' as const },
         ]),
       ),
-    ).toEqual(['login', 'quota']);
+    ).toEqual(['login', 'notify']);
   });
 });
 
-describe('pickHomeBanners with login, backup, quota and first-PR together', () => {
+describe('pickHomeBanners with login, backup, quota and notifications together', () => {
   it('shows exactly two and keeps the login warning', () => {
     const picked = pickHomeBanners([
-      { kind: 'first-pr' as const },
+      { kind: 'backup' as const },
       { kind: 'quota' as const },
       { kind: 'login' as const },
       { kind: 'notify' as const },

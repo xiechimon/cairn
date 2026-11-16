@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { agentRecordSchema } from './agent.js';
 import { epochMs, recordId } from './common.js';
-import { firstPrReportPromptSchema } from './first-pr-report.js';
 import { userRecordSchema } from './user.js';
 
 export const teamPlanSchema = z.string();
@@ -37,13 +36,21 @@ export const teamRecordSchema = z.object({
   avatarStyle: z.string().nullable(),
   autonomyPaused: z.boolean().optional(),
   autonomyPauses: z.array(autonomyPauseEntrySchema).optional(),
-  coAuthorTrailer: z.boolean().default(true),
-  requestInstructorReview: z.boolean().default(false),
   maxAutonomousMergesPerDay: z.number().int().nonnegative().optional(),
-  firstPrReportPrompt: firstPrReportPromptSchema.optional(),
   defaultMachineId: recordId.nullable().optional(),
 });
 export type TeamRecord = z.infer<typeof teamRecordSchema>;
+
+export const patchTeamBodySchema = z
+  .object({
+    autonomyPaused: z.boolean().optional(),
+    maxAutonomousMergesPerDay: z.number().int().nonnegative().optional(),
+  })
+  .refine(
+    (body) => body.autonomyPaused !== undefined || body.maxAutonomousMergesPerDay !== undefined,
+    { message: 'At least one team setting is required' },
+  );
+export type PatchTeamBody = z.infer<typeof patchTeamBodySchema>;
 
 export const memberTypeSchema = z.enum(['user', 'agent']);
 export const teamMemberSchema = z

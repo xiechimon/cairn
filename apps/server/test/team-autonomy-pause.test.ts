@@ -18,19 +18,19 @@ test('team autonomy pause persists, is readable after reseeding, and unpauses wi
     expect(await (await req(s.app, 'GET', '/api/teams')).json()).toMatchObject([
       { autonomyPaused: true },
     ]);
-    const prompt = await req(s.app, 'PATCH', `/api/teams/${s.team.id}`, {
-      firstPrReportPrompt: { enabled: true },
+    const limit = await req(s.app, 'PATCH', `/api/teams/${s.team.id}`, {
+      maxAutonomousMergesPerDay: 5,
     });
-    expect(await prompt.json()).toMatchObject({
+    expect(await limit.json()).toMatchObject({
       autonomyPaused: true,
-      firstPrReportPrompt: { enabled: true },
+      maxAutonomousMergesPerDay: 5,
     });
     const unpaused = await req(s.app, 'PATCH', `/api/teams/${s.team.id}`, {
       autonomyPaused: false,
     });
     expect(await unpaused.json()).toMatchObject({
       autonomyPaused: false,
-      firstPrReportPrompt: { enabled: true },
+      maxAutonomousMergesPerDay: 5,
     });
   } finally {
     s.dispose();

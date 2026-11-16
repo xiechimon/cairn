@@ -137,7 +137,7 @@ The phase 2 graduation path: a stranger installs the desktop app and gets a merg
 | Feature | Centrality | Missing |
 |---|---|---|
 | [Desktop app](#desktop-app) | 2 | Frontend design: no design for the tray, window and install flow<br>Backend design: no design for packaging, process supervision, updates and data location |
-| [First run](#first-run) | 2 | Backend design: no design for checklist state, first-PR detection and the 10-minute path |
+| [First run](#first-run) | 2 | Backend design: no design for checklist state and the 10-minute path |
 | [Mobile web and PWA](#mobile-web) | 2 | Research: no note on how Amp, t3code and Claude handle mobile web and PWA install |
 
 ### B7 · Recurring and finding work: schedules, search and activity, sidebar
@@ -174,7 +174,7 @@ Who can do what and with which credentials: the secrets page, API keys with gran
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Account and team](#account-and-team) | 3 | Backend design: no design for the single-user account, the team record and attribution settings |
+| [Account and team](#account-and-team) | 3 | Backend design: no design for the single-user account and team record |
 | [API keys](#api-keys) | 3 | Research: no note on API key and grant models in reference products<br>Frontend design: the API keys page and grant picker have no design<br>Backend design: no design for key scopes, grants and revocation |
 | [Secrets](#secrets) | 3 | Frontend design: the secrets page and project secrets have no design |
 
@@ -384,11 +384,11 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### first-run
 
-**First run** (shipped). The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.
+**First run** (shipped). The setup page before the first project and the composer setup hint that help a new user configure models.
 
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](design/references/first-run)
-- Backend design: **gap**: no design for checklist state, first-PR detection and the 10-minute path
+- Backend design: **gap**: no design for checklist state and the 10-minute path
 
 ### machine-enrollment
 
@@ -448,11 +448,11 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### account-and-team
 
-**Account and team** (shipped). The user's account, the team record and the PR attribution settings.
+**Account and team** (shipped). The user's account, language and device notification preferences.
 
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/design/references/settings](design/references/settings)
-- Backend design: **gap**: no design for the single-user account, the team record and attribution settings
+- Backend design: **gap**: no design for the single-user account and team record
 
 ### api-keys
 

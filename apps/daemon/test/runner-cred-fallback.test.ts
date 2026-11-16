@@ -349,7 +349,6 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
         manager.push(cwd, branch, cred, {
           base: null,
           identity: null,
-          coAuthor: null,
         });
       const pending = setup(
         claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),

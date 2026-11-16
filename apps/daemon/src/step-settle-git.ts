@@ -2,7 +2,6 @@ import type {
   BoundGitCredentials,
   ClaimedStep,
   CommitIdentity,
-  GitIdentity,
   PreparedWorkspace,
   WorktreeOps,
 } from '@cairn/shared';
@@ -16,7 +15,6 @@ export interface SettleStepGitInput {
   ws: PreparedWorkspace | null;
   claimed: ClaimedStep;
   stepId: string;
-  coAuthor: GitIdentity | null;
   appIdentity: CommitIdentity | null;
   identity: CommitIdentity;
   mergeCredential: BoundGitCredentials | null;
@@ -50,7 +48,6 @@ export async function settleStepGit(input: SettleStepGitInput): Promise<SettledS
       await gitOps.push(workspace.cwd, workspace.branch, credential, {
         base: input.headAtStart,
         identity: input.appIdentity,
-        coAuthor: input.coAuthor,
       });
     });
   const settled: SettledStepGit = {
@@ -69,7 +66,6 @@ export async function settleStepGit(input: SettleStepGitInput): Promise<SettledS
       ws,
       claimed,
       stepId: input.stepId,
-      coAuthor: input.coAuthor,
       identity: input.identity,
       mergeCredential: input.mergeCredential,
       headAtStart: input.headAtStart,

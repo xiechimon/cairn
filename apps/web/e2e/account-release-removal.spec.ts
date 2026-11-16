@@ -27,7 +27,9 @@ for (const theme of ['light', 'dark']) {
       await expect(page.getByRole('heading', { name: '新功能发布', exact: true })).toHaveCount(0);
       await expect(page.getByRole('textbox', { name: '功能标识', exact: true })).toHaveCount(0);
       await expect(page.getByRole('button', { name: '发布新功能', exact: true })).toHaveCount(0);
-      await expect(page.getByRole('switch', { name: '人工共同作者署名', exact: true })).toBeVisible();
+      for (const name of ['人工共同作者署名', '邀请任务发起人审阅', '首个 PR 社区提示']) {
+        await expect(page.getByRole('switch', { name, exact: true })).toHaveCount(0);
+      }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       const output = process.env.VERIFY_EVIDENCE_DIR;
       await page.screenshot({ path: output ? join(output, `account-${theme}-${width}.png`) : info.outputPath('account.png'), fullPage: true });
