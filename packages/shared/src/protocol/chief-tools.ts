@@ -23,6 +23,10 @@ export type RemoteToolDef = z.infer<typeof remoteToolDefSchema>;
 export const machineToolRelayBodySchema = z.object({
   name: z.string(),
   params: z.record(z.string(), z.unknown()),
+  toolCallId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,200}$/)
+    .optional(),
 });
 export type MachineToolRelayBody = z.infer<typeof machineToolRelayBodySchema>;
 

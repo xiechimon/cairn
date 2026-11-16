@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { MachineAskBody, MachineAskResponse } from '@cairn/shared';
 import {
   AGENT_TOOL_SKILL_CREATE,
@@ -110,6 +110,7 @@ export async function executeRelayToolCall(
   const row = ownedStep(deps, machineId, stepId);
   refuseRestrictedTurnTool(row.prompt, name, params);
   if (isComputerBrowserTool(name) || name === 'request_takeover') {
+    assertChiefDigestTool(row.buildId, name);
     if (row.kind !== 'chief') {
       throw new HttpError(400, 'browser tools require a chief step');
     }
@@ -119,11 +120,7 @@ export async function executeRelayToolCall(
     if (row.status !== 'claimed') {
       throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
     }
-    const callId =
-      toolCallId ??
-      createHash('sha256')
-        .update(`${stepId}\0${name}\0${JSON.stringify(params)}`)
-        .digest('hex');
+    const callId = toolCallId ?? randomUUID();
     const result = await forwardComputerCall(
       deps,
       machineId,

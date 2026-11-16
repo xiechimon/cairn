@@ -542,6 +542,8 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
             c.req.param('stepId'),
             relay.name,
             relay.params,
+            relay.toolCallId,
+            relay.toolCallId === undefined ? undefined : c.req.raw.signal,
           );
           return c.json({ text });
         }

@@ -47,6 +47,7 @@ import {
 import { credentialRedactor } from '../credential-output.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { SessionNotResumableError } from './errors.js';
+import { hostToolContent } from './host-tool-content.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 import { claudeCliEnv, claudeTelemetryEnv, PiStepSpanSink } from './otel.js';
 import { withoutPinnedEnv } from './pinned-env.js';
@@ -726,7 +727,7 @@ export function buildHostTools(sources: HostToolSources): HostMcpTool[] {
       tool(def.name, def.description, shape, async (params: Record<string, unknown>) => {
         try {
           const text = await sources.relay?.(def.name, params ?? {});
-          return { content: [{ type: 'text' as const, text: text ?? '' }] };
+          return { content: hostToolContent(def.name, text ?? '') };
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           return {

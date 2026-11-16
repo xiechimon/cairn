@@ -1,9 +1,5 @@
 import {
-  CHIEF_REMOTE_TOOLS,
-  CHIEF_REPLY_TOOLS,
-  CHIEF_ROUTER_TOOLS,
   CODEX_MODEL,
-  COMPUTER_REMOTE_TOOLS,
   type CoordinatorDefault,
   filterAgentTools,
   isSessionStepKind,
@@ -45,6 +41,7 @@ import {
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
+import { coordinatorToolDefs } from './coordinator-tool-defs.js';
 import { machineRuntimeAvailable } from './dispatch-eligibility.js';
 import { DEFAULT_SESSION_MODEL, DEFAULT_SESSION_PROVIDER } from './routing-migration.js';
 import { capabilityCandidates, decideStepRoute } from './step-route.js';
@@ -98,12 +95,7 @@ const USE_DISPLAY_NAMES: Record<RouteUse, string> = {
 };
 
 export function chiefRemoteTools(): readonly RemoteToolDef[] {
-  return [
-    ...CHIEF_REMOTE_TOOLS,
-    ...CHIEF_ROUTER_TOOLS,
-    ...CHIEF_REPLY_TOOLS,
-    ...COMPUTER_REMOTE_TOOLS,
-  ];
+  return coordinatorToolDefs();
 }
 
 const LEGACY_RUNTIME_PROVIDER = 'pi';
