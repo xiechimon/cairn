@@ -51,6 +51,7 @@ export const localOnly = [
   ['node', 'scripts/ui-registry-gate.mjs'],
   ['node', 'scripts/ui-consumer-shape-gate.mjs'],
   ['node', 'scripts/lint-warning-cap.mjs'],
+  ['node', 'scripts/generate-feature-map.mjs', '--check'],
 ];
 
 const SOURCE_TREES = /^(apps|packages|integration)\//;

@@ -581,7 +581,9 @@ test('local code checks retain fast checks and advisory dead-class', () => {
 test('every CI node scripts step also runs in local prepush or is listed as CI-only', () => {
   const local = prepushPlan(['apps/web/src/main.tsx']).map((args) => args.join(' '));
   const ciScripts = [
-    ...readFileSync('.github/workflows/ci.yml', 'utf8').matchAll(/node (scripts\/[\w-]+\.mjs)\n/g),
+    ...readFileSync('.github/workflows/ci.yml', 'utf8').matchAll(
+      /node (scripts\/[\w-]+\.mjs(?: --[\w-]+)*)\n/g,
+    ),
   ].map((match) => match[1]);
   assert.ok(ciScripts.includes('scripts/ui-registry-gate.mjs'));
   for (const script of ciScripts)
