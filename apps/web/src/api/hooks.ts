@@ -61,6 +61,7 @@ import type {
   SkillRecord,
   StartMcpConnectorOAuthBody,
   StepJournalRow,
+  TailscaleAccess,
   TeamMember,
   TeamRecord,
   ThreadMessageResult,
@@ -575,6 +576,27 @@ export const useRemoteDevices = (enabled: boolean) =>
     retry: false,
     refetchInterval: DEVICES_POLL_MS,
   });
+
+const TAILSCALE_READY_POLL_MS = 30_000;
+const TAILSCALE_SETUP_POLL_MS = 3_000;
+
+export const useTailscaleAccess = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['tailscaleAccess'],
+    queryFn: () => api.get<TailscaleAccess>('/api/remote/tailscale'),
+    enabled,
+    retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.state === 'ready' ? TAILSCALE_READY_POLL_MS : TAILSCALE_SETUP_POLL_MS,
+  });
+
+export function useEnableTailscaleAccess() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<TailscaleAccess>('/api/remote/tailscale', {}),
+    onSuccess: (access) => queryClient.setQueryData(['tailscaleAccess'], access),
+  });
+}
 
 export function useRemoteMutations() {
   const queryClient = useQueryClient();

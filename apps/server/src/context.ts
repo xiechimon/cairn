@@ -14,6 +14,7 @@ import type { McpOAuthState } from './services/mcp-servers.js';
 import type { OAuthClientConfig, OAuthStateEntry } from './services/oauth.js';
 import type { VapidKeys } from './services/push.js';
 import type { SkillImportFetch } from './services/skill-import.js';
+import type { TailscaleServe } from './services/tailscale-serve.js';
 import type { XaiDeviceState } from './services/xai-device-login.js';
 
 export interface RemoteAccessContext {
@@ -21,6 +22,7 @@ export interface RemoteAccessContext {
   listenHost: string;
   listenPort: number;
   tailnetStatus: () => SidecarStatus | null;
+  tailscale?: TailscaleServe;
   networkInterfaces?: () => NodeJS.Dict<NetworkInterfaceInfo[]>;
 }
 
