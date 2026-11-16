@@ -768,6 +768,10 @@ body:has([data-testid="chief-body"]),
   -webkit-app-region: no-drag;
 }
 
+:root[data-shell="mac-desktop"] .first-run-drag {
+  -webkit-app-region: drag;
+}
+
 :root[data-shell="mac-desktop"] .sidebar-peek-trigger {
   left: 90px;
 }

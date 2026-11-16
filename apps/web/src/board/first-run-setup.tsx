@@ -1,20 +1,23 @@
 import type { CoordinatorDefault, RoutingRuleRecord, SessionDefault } from '@cairn/shared';
 import { cn } from 'cn';
-import { Check, KeyRound, Plus } from 'lucide-react';
+import { Check, KeyRound, MessageSquare, Plus } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { Link } from 'react-router';
 import { useChief, useMachines, useModelSources, useProjects, useProviders } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import { useModelRouting } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
+import { BrandGlyph } from '../components/brand-glyph.js';
+import { SegmentedRadio } from '../components/segmented.js';
 import { SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { ModelOption } from '../fixtures/records.js';
+import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
+import { BRAND_GLYPH } from '../lib/brand-mark.js';
 import { AddProviderFlow, type AddProviderView } from '../resources/add-provider-flow.js';
 import { ModelPicker } from '../resources/routing-settings-page.js';
 import { safeSessionStorage } from '../safe-storage.js';
@@ -75,18 +78,19 @@ export function useFirstRunSetup() {
 
 type Setup = ReturnType<typeof useFirstRunSetup>;
 
-export function missingStepCopy(step: SetupStepId, t: TFunc): string {
-  return step === 'models' ? t('还差第 1 步：接入模型') : t('还差第 2 步：确认模型');
-}
+const LG_PAD = 'lg:pl-14';
 
-function StepGlyph({ n, state }: { n: number; state: 'done' | 'now' | 'open' }) {
+function StepMark({ n, state, className }: { n: number; state: StepState; className?: string }) {
   const { t } = useI18n();
   if (state === 'done') {
     return (
       <span
         role="img"
         aria-label={t('已完成')}
-        className="grid size-5 flex-none place-items-center rounded-full bg-foreground text-background"
+        className={cn(
+          'grid size-6 flex-none place-items-center rounded-full bg-content-tertiary text-background',
+          className,
+        )}
       >
         <Check className="size-4" />
       </span>
@@ -96,10 +100,11 @@ function StepGlyph({ n, state }: { n: number; state: 'done' | 'now' | 'open' }) 
     <span
       aria-hidden="true"
       className={cn(
-        'grid size-5 flex-none place-items-center rounded-full font-mono text-caption',
+        'grid size-6 flex-none place-items-center rounded-full bg-background font-mono text-meta',
         state === 'now'
-          ? 'border border-foreground text-foreground'
+          ? 'border border-(--card-button) text-foreground'
           : 'border border-dashed border-content-dim text-content-tertiary',
+        className,
       )}
     >
       {n}
@@ -107,43 +112,7 @@ function StepGlyph({ n, state }: { n: number; state: 'done' | 'now' | 'open' }) 
   );
 }
 
-function Step({
-  n,
-  title,
-  state,
-  summary,
-  children,
-}: {
-  n: number;
-  title: string;
-  state: 'done' | 'now' | 'open';
-  summary?: ReactNode;
-  children?: ReactNode;
-}) {
-  return (
-    <section data-testid={`first-run-step-${n}`} data-state={state} aria-label={title}>
-      <div className="flex min-h-13 items-center gap-3 px-4 py-2">
-        <StepGlyph n={n} state={state} />
-        <span
-          className={cn(
-            'text-card-title font-title',
-            state === 'open' ? 'text-content-secondary' : 'text-foreground',
-          )}
-        >
-          {title}
-        </span>
-        {summary !== undefined && (
-          <span className="ml-auto min-w-0 truncate text-right text-meta text-content-tertiary max-[640px]:whitespace-normal">
-            {summary}
-          </span>
-        )}
-      </div>
-      {state === 'now' && children !== undefined && (
-        <div className="px-4 pt-1 pb-4 pl-12 max-[640px]:pl-4">{children}</div>
-      )}
-    </section>
-  );
-}
+type StepState = 'done' | 'now' | 'open';
 
 function SourceRow({
   icon,
@@ -159,16 +128,19 @@ function SourceRow({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-start gap-x-3 gap-y-2 py-3">
-      <span className="grid size-8 flex-none place-items-center rounded-lg bg-background text-content-secondary ring-1 ring-border">
-        {icon}
-      </span>
-      <div className="min-w-48 flex-1 text-pretty">
-        <div className="text-foreground">
-          <span className="font-title">{title}</span>
-          <span className="text-meta whitespace-nowrap text-content-tertiary"> · {usedBy}</span>
+    <div className="p-5">
+      <div className="flex items-start gap-4">
+        <span className="grid size-10 flex-none place-items-center rounded-(--radius-tile) bg-background text-content-secondary ring-1 ring-border">
+          {icon}
+        </span>
+        <div className="min-w-0 flex-1 text-pretty">
+          <div className="break-keep text-foreground">
+            <span className="font-title">{title}</span>
+            <span className="mx-1 text-meta text-content-tertiary">·</span>
+            <span className="text-meta text-content-tertiary">{usedBy}</span>
+          </div>
+          <div className="break-keep text-meta text-content-secondary">{status}</div>
         </div>
-        <div className="text-meta text-content-secondary">{status}</div>
       </div>
       {action}
     </div>
@@ -183,7 +155,7 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
   const hasProvider = progress.models.coordinator;
   return (
     <>
-      <div className="divide-y divide-border">
+      <SettingsCard>
         <SourceRow
           icon={<KeyRound className="size-5" />}
           title={t('服务商')}
@@ -193,9 +165,10 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
           usedBy={t('Coordinator 和任务都能用')}
           action={
             hasProvider ? undefined : (
-              <div className="flex min-h-8 items-center max-[640px]:w-full max-[640px]:pl-11">
+              <div className={cn('mt-5', LG_PAD)}>
                 <Button
-                  className="pointer-coarse:h-11"
+                  size="lg"
+                  className="px-4 pointer-coarse:h-11 max-lg:h-11 max-lg:w-full"
                   data-testid="first-run-add-provider"
                   onClick={() => setAddView('picker')}
                 >
@@ -206,7 +179,7 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
             )
           }
         />
-      </div>
+      </SettingsCard>
       <AddProviderFlow
         teamId={setup.teamId}
         live={live}
@@ -343,24 +316,25 @@ function ConfirmBody({ setup }: { setup: Setup }) {
   };
   return (
     <>
-      <p className="m-0 mb-3 text-content-secondary">
+      <p className="m-0 mt-2 text-pretty break-keep text-content-secondary">
         {t('Cairn 按你接入的模型挑了这两个。确认后才会保存，以后可以在设置里改。')}
       </p>
-      <div className="divide-y divide-border">
+      <SettingsCard className="mt-5">
         {rows.map(({ use, who, what, pick }, index) => {
           const [model, provider] = pick == null ? [null, null] : modelLabel(pick, setup.options);
           return (
-            <div key={who} data-testid={`first-run-pick-${use}`} className="py-3">
-              <div className="text-pretty">
+            <div key={who} data-testid={`first-run-pick-${use}`} className="px-5 py-4">
+              <div className="text-pretty break-keep">
                 <span className="text-foreground">{who}</span>
-                <span className="text-meta text-content-tertiary"> · {what}</span>
+                <span className="mx-1 text-meta text-content-tertiary">·</span>
+                <span className="text-meta text-content-tertiary">{what}</span>
               </div>
               <div className="mt-1 flex min-h-6 flex-wrap items-center gap-x-2">
                 {pick == null ? (
                   <span className="text-meta text-destructive">{t('还没有能用的模型')}</span>
                 ) : (
                   <>
-                    <span className="font-title text-foreground">{model}</span>
+                    <span className="text-card-title font-title text-foreground">{model}</span>
                     <span className="text-meta text-content-secondary">{provider}</span>
                   </>
                 )}
@@ -380,24 +354,177 @@ function ConfirmBody({ setup }: { setup: Setup }) {
                 </span>
               </div>
               {pick != null && (
-                <div className="text-pretty text-meta text-content-tertiary">{pick.why}</div>
+                <div className="mt-1 text-pretty break-keep text-meta text-content-tertiary">
+                  {pick.why}
+                </div>
               )}
             </div>
           );
         })}
-      </div>
-      <div className="mt-3">
+      </SettingsCard>
+      <div className="mt-5">
         <Button
           data-testid="first-run-confirm"
-          className="pointer-coarse:h-11"
+          size="lg"
+          className="px-4 pointer-coarse:h-11 max-lg:h-11 max-lg:w-full"
           disabled={!ready || patchRule.isPending}
           onClick={() => void confirm()}
         >
-          {patchRule.isPending && <Spinner className="size-4" />}
-          {patchRule.isPending ? t('保存中…') : t('确认这两个模型')}
+          {patchRule.isPending && <Spinner className="size-5" />}
+          {patchRule.isPending ? t('保存中…') : t('确认并开始对话')}
         </Button>
       </div>
     </>
+  );
+}
+
+function Watermark() {
+  const { box, scale, offset, d } = BRAND_GLYPH.large;
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox={`0 0 ${box} ${box}`}
+      className="pointer-events-none absolute -top-50 -right-48 size-120 text-(--tree-line) max-lg:hidden"
+    >
+      <g
+        transform={`translate(${box / 2} ${box / 2}) scale(${scale}) translate(${offset[0]} ${offset[1]})`}
+      >
+        <path
+          d={d}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1}
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </g>
+    </svg>
+  );
+}
+
+function LanguageSwitch() {
+  const { locale, setLocale, t } = useI18n();
+  return (
+    <SegmentedRadio
+      label={t('语言')}
+      value={locale}
+      onChange={setLocale}
+      optionHandle="dark:data-active:bg-(--sidebar-active)"
+      options={LOCALES.map((code) => ({
+        value: code,
+        label: LOCALE_NAMES[code],
+        testId: `first-run-locale-${code}`,
+      }))}
+    />
+  );
+}
+
+function SkipLine({ onSkip, className }: { onSkip: () => void; className?: string }) {
+  const { t } = useI18n();
+  return (
+    <p className={cn('m-0 text-pretty break-keep text-meta text-content-tertiary', className)}>
+      {t('不急的话可以')}
+      <Button
+        variant="link"
+        className="inline-flex h-auto min-h-6 p-0 align-baseline text-meta font-normal text-foreground underline decoration-content-tertiary underline-offset-4 pointer-coarse:-my-3 pointer-coarse:py-3"
+        onClick={() => {
+          skipSetup();
+          onSkip();
+        }}
+      >
+        {t('先跳过，去主页看看')}
+      </Button>
+      {t('，下次打开 Cairn 时这页还在。')}
+    </p>
+  );
+}
+
+function stateOf(step: SetupStepId, open: SetupStepId): StepState {
+  return open === step ? 'now' : step === 'models' ? 'done' : 'open';
+}
+
+function Rail({ open }: { open: SetupStepId }) {
+  const { t } = useI18n();
+  const steps = [
+    {
+      n: 1,
+      id: 'models' as const,
+      title: t('接入模型'),
+      sub: open === 'models' ? t('接一个服务商就够') : t('Coordinator 和任务都有模型'),
+    },
+    {
+      n: 2,
+      id: 'confirm' as const,
+      title: t('确认模型'),
+      sub: t('选 Coordinator 和新任务用哪个模型'),
+    },
+  ];
+  return (
+    <ol className="m-0 mt-12 list-none p-0 max-lg:hidden">
+      {steps.map(({ n, id, title, sub }) => {
+        const state = stateOf(id, open);
+        return (
+          <li
+            key={id}
+            data-testid={`first-run-step-${n}`}
+            data-state={state}
+            aria-current={state === 'now' ? 'step' : undefined}
+            className="relative grid grid-cols-[1.5rem_1fr] gap-x-4 pb-7 before:absolute before:top-7 before:bottom-1 before:left-3 before:w-px before:bg-(--tree-line) before:content-[''] data-[state=done]:before:bg-content-tertiary"
+          >
+            <StepMark n={n} state={state} />
+            <div className="min-w-0 text-pretty">
+              <div
+                className={cn(
+                  'text-card-title font-title',
+                  state === 'open' ? 'text-content-secondary' : 'text-foreground',
+                )}
+              >
+                {title}
+              </div>
+              <div className="text-meta text-content-tertiary">{sub}</div>
+            </div>
+          </li>
+        );
+      })}
+      <li className="grid grid-cols-[1.5rem_1fr] gap-x-4">
+        <span className="grid size-6 place-items-center rounded-full border border-dashed border-content-dim text-content-tertiary">
+          <MessageSquare className="size-4" />
+        </span>
+        <div className="min-w-0 text-pretty">
+          <div className="text-card-title font-title text-content-secondary">
+            {t('开始和 Coordinator 对话')}
+          </div>
+          <div className="text-meta text-content-tertiary">{t('两步做完就直接进入对话')}</div>
+        </div>
+      </li>
+    </ol>
+  );
+}
+
+function Segments({ open }: { open: SetupStepId }) {
+  const { t } = useI18n();
+  return (
+    <ol className="m-0 mt-6 grid list-none grid-cols-2 gap-2 p-0 lg:hidden">
+      {(['models', 'confirm'] as const).map((id) => {
+        const state = stateOf(id, open);
+        return (
+          <li
+            key={id}
+            aria-current={state === 'now' ? 'step' : undefined}
+            className={cn(
+              'h-1 rounded-full',
+              state === 'done'
+                ? 'bg-content-tertiary'
+                : state === 'now'
+                  ? 'bg-(--card-button)'
+                  : 'bg-border',
+            )}
+          >
+            <span className="sr-only">{id === 'models' ? t('接入模型') : t('确认模型')}</span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -406,87 +533,57 @@ export function FirstRunSetup({ setup, onSkip }: { setup: Setup; onSkip: () => v
   const progress = setup.progress;
   if (progress === undefined) return null;
   const open = setupOpenStep(progress);
-  const stateOf = (step: SetupStepId): 'done' | 'now' | 'open' =>
-    open === step ? 'now' : step === 'models' || open === null ? 'done' : 'open';
-  const saved =
-    open === null
-      ? picksOf(setup, t).flatMap((pick, i) =>
-          pick == null
-            ? []
-            : [
-                i > 0 && (
-                  <span key="sep" className="max-[640px]:hidden">
-                    {' · '}
-                  </span>
-                ),
-                <span key={pick.use} className="max-[640px]:block">
-                  {t('{role}：{model}', {
-                    role: pick.use === 'coordinator' ? t('Coordinator') : t('任务'),
-                    model: modelLabel(pick, setup.options)[0],
-                  })}
-                </span>,
-              ],
-        )
-      : undefined;
+  if (open === null) return null;
   return (
     <main
       data-testid="first-run-setup"
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-background"
+      className="relative flex h-full min-h-0 w-full min-w-0 flex-col overflow-y-auto bg-background text-foreground lg:flex-row lg:overflow-hidden"
     >
-      <div className="mx-auto w-full max-w-160 px-6 pt-22 pb-12 max-[640px]:px-4 max-[640px]:pt-21">
-        <h1 className="m-0 voice-title text-page text-foreground">
-          {open === null ? t('模型配好了') : t('先把模型配好')}
-        </h1>
-        <p className="m-0 mt-2 mb-6 text-pretty text-content-secondary">
-          {open === null
-            ? t('现在可以建第一个项目了。模型以后可以在设置里改。')
-            : t('Cairn 在这台电脑上跑 Agent，用你自己的模型。做完下面两步就能建第一个项目。')}
-        </p>
-        <SettingsCard>
-          <Step
-            n={1}
-            title={t('接入模型')}
-            state={stateOf('models')}
-            summary={open === 'models' ? undefined : t('Coordinator 和任务都有模型')}
-          >
-            <ModelsBody setup={setup} progress={progress} />
-          </Step>
-          <Step n={2} title={t('确认模型')} state={stateOf('confirm')} summary={saved}>
-            <ConfirmBody setup={setup} />
-          </Step>
-        </SettingsCard>
-        <div className="mt-8 flex flex-wrap items-center gap-3">
-          {open === null ? (
-            <Button className="pointer-coarse:h-11" render={<Link to="/app/project/new" />}>
-              <Plus />
-              {t('新建第一个项目')}
-            </Button>
-          ) : (
-            <>
-              <Button className="pointer-coarse:h-11" disabled>
-                <Plus />
-                {t('新建第一个项目')}
-              </Button>
-              <span className="text-meta text-content-tertiary">{missingStepCopy(open, t)}</span>
-            </>
-          )}
+      <div aria-hidden="true" className="first-run-drag absolute inset-x-0 top-0 h-10" />
+      <div className="absolute top-12 right-8 z-1 max-lg:hidden">
+        <LanguageSwitch />
+      </div>
+      <aside className="relative flex flex-none flex-col px-5 pt-[calc(env(safe-area-inset-top)+3rem)] lg:max-w-150 lg:basis-2/5 lg:overflow-hidden lg:border-r lg:border-border lg:bg-(--surface-1) lg:px-18 lg:pt-12 lg:pb-10">
+        <Watermark />
+        <div className="relative flex h-8 items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <BrandGlyph className="size-5" />
+            <span className="voice-title text-brand">Cairn</span>
+          </div>
+          <div className="lg:hidden">
+            <LanguageSwitch />
+          </div>
         </div>
-        {open !== null && (
-          <p className="m-0 mt-6 text-pretty text-meta text-content-tertiary">
-            {t('不急的话可以')}
-            <Button
-              variant="link"
-              className="inline-flex h-auto min-h-6 p-0 align-baseline text-meta text-foreground underline decoration-content-tertiary underline-offset-4 pointer-coarse:-my-3 pointer-coarse:py-3"
-              onClick={() => {
-                skipSetup();
-                onSkip();
-              }}
-            >
-              {t('先跳过，去主页看看')}
-            </Button>
-            {t('，下次打开 Cairn 时这页还在。')}
+        <div className="relative flex flex-col lg:flex-1 lg:justify-center">
+          <h1 className="m-0 mt-8 voice-greeting text-greeting text-balance lg:mt-0">
+            {t('欢迎使用 Cairn')}
+          </h1>
+          <p className="m-0 mt-3 max-w-105 text-balance break-keep text-content-secondary">
+            {t('Cairn 在这台电脑上跑 Agent，用你自己的模型。配好模型就能开始对话。')}
           </p>
-        )}
+          <Rail open={open} />
+          <Segments open={open} />
+        </div>
+        <SkipLine onSkip={onSkip} className="relative max-lg:hidden" />
+      </aside>
+      <div className="flex flex-1 flex-col px-5 pt-8 pb-[calc(env(safe-area-inset-bottom)+2rem)] lg:items-center lg:justify-center lg:overflow-y-auto lg:p-16">
+        <section
+          key={open}
+          aria-label={open === 'models' ? t('接入模型') : t('确认模型')}
+          className="w-full motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-1 motion-safe:duration-200 lg:min-h-96 lg:max-w-130"
+        >
+          <h2 className="m-0 voice-response text-page">
+            {open === 'models' ? t('接入模型') : t('确认模型')}
+          </h2>
+          {open === 'models' ? (
+            <div className="mt-5">
+              <ModelsBody setup={setup} progress={progress} />
+            </div>
+          ) : (
+            <ConfirmBody setup={setup} />
+          )}
+        </section>
+        <SkipLine onSkip={onSkip} className="mt-auto pt-10 lg:hidden" />
       </div>
     </main>
   );

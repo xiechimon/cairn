@@ -257,9 +257,6 @@ export const EN: Record<string, string> = {
   'Coordinator 还缺模型': 'The Coordinator needs a model',
   '添加一个服务商，Coordinator 用不了 Claude Code 登录':
     'Add a provider; the Coordinator cannot use a Claude Code sign-in',
-  '还差第 1 步：接入模型': 'Step 1 is still open: connect models',
-  '还差第 2 步：确认模型': 'Step 2 is still open: confirm models',
-  '{role}：{model}': '{role}: {model}',
   '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
   'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
   '因为你添加了 Anthropic API key': 'Because you added an Anthropic API key',
@@ -277,15 +274,16 @@ export const EN: Record<string, string> = {
     'Cairn picked these two from the models you connected. Nothing is saved until you confirm, and you can change them in Settings later.',
   还没有能用的模型: 'No usable model yet',
   换一个: 'Change',
-  确认这两个模型: 'Confirm both models',
-  先把模型配好: 'Set up your models first',
-  'Cairn 在这台电脑上跑 Agent，用你自己的模型。做完下面两步就能建第一个项目。':
-    'Cairn runs agents on this computer with your own models. Finish the two steps below to create your first project.',
-  模型配好了: 'Your models are set',
-  '现在可以建第一个项目了。模型以后可以在设置里改。':
-    'You can create your first project now. You can change the models in Settings later.',
   'Claude 订阅、API key 或本地模型': 'A Claude subscription, an API key or a local model',
   '先跳过，去主页看看': 'skip for now and look around',
+  '欢迎使用 Cairn': 'Welcome to Cairn',
+  'Cairn 在这台电脑上跑 Agent，用你自己的模型。配好模型就能开始对话。':
+    'Cairn runs agents on this computer with your own models. Set them up and you can start chatting.',
+  接一个服务商就够: 'One provider is enough',
+  '选 Coordinator 和新任务用哪个模型': 'Pick the models for the Coordinator and new tasks',
+  '开始和 Coordinator 对话': 'Start chatting with the Coordinator',
+  两步做完就直接进入对话: 'Finish both steps and the conversation opens',
+  确认并开始对话: 'Confirm and start chatting',
   '建项目前要先把模型配好，还差第 1 步：接入模型。':
     'Set up your models before creating a project. Step 1 is still open: connect models.',
   '建项目前要先把模型配好，还差第 2 步：确认模型。':
@@ -298,7 +296,6 @@ export const EN: Record<string, string> = {
   接入模型: 'Connect models',
   'Coordinator 和任务都有模型': 'The Coordinator and tasks both have models',
   确认模型: 'Confirm models',
-  新建第一个项目: 'Create your first project',
   不急的话可以: 'No rush: ',
   '，下次打开 Cairn 时这页还在。': '; this page is here the next time you open Cairn.',
   去完成设置: 'Finish setup',
