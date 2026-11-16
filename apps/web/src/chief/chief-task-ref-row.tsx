@@ -56,10 +56,10 @@ export function TaskRefRow({
             aria-hidden="true"
             data-slot="task-ref-elbow"
             viewBox="0 0 12 16"
-            className="pointer-events-none absolute -top-px -left-3.75 h-4 w-3 overflow-visible text-(--task-ref-line)"
+            className="pointer-events-none absolute top-3.25 -left-3.75 h-4 w-3 overflow-visible text-(--task-ref-line)"
           >
             <path
-              d="M1 1.75V9A6 6 0 0 0 7 15H10.75"
+              d="M1 14.25V7A6 6 0 0 1 7 1H10.75"
               fill="none"
               stroke="currentColor"
               strokeWidth="1.5"

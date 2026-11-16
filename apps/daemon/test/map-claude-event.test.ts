@@ -225,6 +225,33 @@ describe('mapClaudeMessage (spec 17 event mapping table, vocabulary locked by 01
     });
   });
 
+  test('a host tool reports its Cairn name, as the pi backend does; another MCP server keeps its prefix', () => {
+    const hostCall = {
+      type: 'assistant',
+      message: {
+        id: 'msg_3',
+        role: 'assistant',
+        content: [
+          { type: 'tool_use', id: 'toolu_2', name: 'mcp__cairn__create_todo', input: {} },
+          { type: 'tool_use', id: 'toolu_3', name: 'mcp__github__search', input: {} },
+        ],
+        model: 'claude-sonnet-4-5',
+        stop_reason: 'tool_use',
+      },
+    } as SDKMessage;
+    const hostResult = {
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'toolu_2', content: '{}', is_error: false }],
+      },
+    } as SDKMessage;
+    const names = feed([hostCall, hostResult])
+      .events.filter((e) => e.type === 'toolcall_end')
+      .map((e) => (e as Extract<StepEvent, { type: 'toolcall_end' }>).call.name);
+    expect(names).toEqual(['create_todo', 'mcp__github__search', 'create_todo']);
+  });
+
   test('failure mode 5: assistant frame ends → message_end role/content projected verbatim', () => {
     const { events } = feed([ASSISTANT_TEXT]);
     const ev = events.find((e) => e.type === 'message_end');

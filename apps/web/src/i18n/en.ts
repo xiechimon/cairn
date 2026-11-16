@@ -2355,6 +2355,7 @@ export const EN: Record<string, string> = {
   '已是最新版本 {version}': 'Up to date ({version})',
   '更新到 {version}': 'Update to {version}',
   '正在更新 {percent}%': 'Updating {percent}%',
+  '正在安装…': 'Installing…',
   '正在重启…': 'Restarting…',
   '更新失败：{message}': 'Update failed: {message}',
   开发版不检查更新: 'Development builds do not check for updates',

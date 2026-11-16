@@ -77,7 +77,7 @@ test('a task the Coordinator created is one reference row below the reply that a
   await expect(stream).not.toContainText('updates:');
   const tileBox = await ref.locator('span.grid').boundingBox();
   const bubbleBox = await reply.getByTestId('chief-reply-bubble').boundingBox();
-  expect(tileBox!.y - (bubbleBox!.y + bubbleBox!.height)).toBe(10);
+  expect(bubbleBox!.y - (tileBox!.y + tileBox!.height)).toBe(10);
   await ref.click();
   await expect(page).toHaveURL(new RegExp(`thread=${TASK.id}`));
 });
@@ -95,8 +95,8 @@ test('a reply that both mentions and created a task shows exactly one reference 
   const stream = page.getByTestId('chief-stream');
   const reply = stream.getByTestId('chief-msg').filter({ hasText: 'in cairn and forwarded your words.' });
   await expect(reply.locator('a[data-slot="task-mention"]')).toHaveCount(1);
-  await expect(reply.locator('.mention-chip--todo')).toHaveCount(0);
-  await expect(reply.locator('svg[data-glyph]')).toHaveCount(1);
+  await expect(reply.locator('.mention-chip--todo')).toHaveCount(1);
+  await expect(reply.locator('svg[data-glyph]')).toHaveCount(2);
   await expect(reply.getByTestId('chief-task-refs')).toHaveCount(1);
   await expect(reply.getByTestId('chief-task-ref')).toHaveCount(1);
   await expect(stream.getByTestId('chief-task-ref')).toHaveCount(1);

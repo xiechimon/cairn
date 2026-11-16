@@ -9,7 +9,7 @@ import { reportStatusWord } from '../board/status-words.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, TypingDots } from '../components/chat/live-row.js';
-import { STATUS_REF_CLS, StatusLine } from '../components/chat/status-line.js';
+import { StatusLine } from '../components/chat/status-line.js';
 import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
@@ -17,12 +17,7 @@ import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
-import {
-  TaskMentionAsLinkContext,
-  TaskMentionLink,
-  type TodoGlance,
-  TodoGlanceContext,
-} from '../detail/segments.js';
+import { Segments as DocSegments, type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefSegment, ChiefStreamItem } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
@@ -138,18 +133,25 @@ function TodoSegmentLink({ seq }: { seq: number }) {
   return known === undefined ? (
     <span>{t('任务')}</span>
   ) : (
-    <TaskMentionLink todoId={known[0]} phase={known[1].phase}>
-      {known[1].title ?? t('任务')}
-    </TaskMentionLink>
+    <TaskChip todoId={known[0]} label={`#${seq}`} />
+  );
+}
+
+function TaskChip({ todoId, label }: { todoId: string; label: string }) {
+  return (
+    <DocSegments
+      codeClassName="chat-code"
+      segments={[{ text: label, style: 'mention', mentionKind: 'todo', mentionId: todoId }]}
+    />
   );
 }
 
 function TaskRefRows({ refs }: { refs: readonly TaskRef[] }) {
   if (refs.length === 0) return null;
   return (
-    <div className="mt-1.5 flex flex-col" data-testid="chief-task-refs">
+    <div className="mb-1.5 flex flex-col" data-testid="chief-task-refs">
       {refs.map((ref, index) => (
-        <TaskRefWithChildren key={ref.todoId} taskRef={ref} last={index === refs.length - 1} />
+        <TaskRefWithChildren key={ref.todoId} taskRef={ref} first={index === 0} />
       ))}
     </div>
   );
@@ -169,16 +171,19 @@ function BubbleReports({ todoIds }: { todoIds: readonly string[] }) {
 const TOP_X = 18.75;
 const NESTED_X = 42.75;
 const ROW_MID = 14;
+const ROW_H = 28;
 const BEND = 6;
 
-function TreeGuideSvg({
-  rails,
-  branch,
-}: {
-  rails: readonly number[];
-  branch?: { x: number; last: boolean; to: number };
-}) {
-  const through = branch !== undefined && !branch.last ? [...rails, branch.x] : rails;
+interface GuideBranch {
+  x: number;
+  end: boolean;
+  to: number;
+  rise?: boolean;
+}
+
+function TreeGuideSvg({ rails, branch }: { rails: readonly number[]; branch?: GuideBranch }) {
+  const through = branch !== undefined && !branch.end ? [...rails, branch.x] : rails;
+  const into = branch?.rise === true ? ROW_MID + BEND : ROW_MID - BEND;
   return (
     <svg
       aria-hidden="true"
@@ -195,7 +200,7 @@ function TreeGuideSvg({
         <path
           data-slot="task-ref-elbow"
           strokeLinecap="round"
-          d={`${branch.last ? `M${branch.x} 0V${ROW_MID - BEND}` : `M${branch.x} ${ROW_MID - BEND}`}A${BEND} ${BEND} 0 0 0 ${branch.x + BEND} ${ROW_MID}H${branch.to}`}
+          d={`${branch.end ? `M${branch.x} ${branch.rise === true ? ROW_H : 0}V${into}` : `M${branch.x} ${into}`}A${BEND} ${BEND} 0 0 ${branch.rise === true ? 1 : 0} ${branch.x + BEND} ${ROW_MID}H${branch.to}`}
         />
       )}
     </svg>
@@ -208,7 +213,7 @@ function GuidedRow({
   children,
 }: {
   rails: readonly number[];
-  branch?: { x: number; last: boolean; to: number };
+  branch?: GuideBranch;
   children: ReactNode;
 }) {
   return (
@@ -224,20 +229,23 @@ function GuidedRow({
 function TaskRefWithChildren({
   taskRef,
   elbow = true,
-  last = true,
+  first = true,
   reportsBelow = false,
 }: {
   taskRef: TaskRef;
   elbow?: boolean;
-  last?: boolean;
+  first?: boolean;
   reportsBelow?: boolean;
 }) {
   const glances = useContext(TodoGlanceContext);
   const children = childRefsOf(taskRef.todoId, glances ?? NO_GLANCES);
-  const rails = elbow && !last ? [TOP_X] : [];
+  const rails = elbow ? [TOP_X] : [];
   return (
     <>
-      <GuidedRow rails={[]} {...(elbow ? { branch: { x: TOP_X, last, to: 28 } } : {})}>
+      <GuidedRow
+        rails={[]}
+        {...(elbow ? { branch: { x: TOP_X, end: first, to: 28, rise: true } } : {})}
+      >
         <TaskRefRow taskRef={taskRef} elbow={elbow} guide={false} />
       </GuidedRow>
       {reportsBelow && (
@@ -249,7 +257,7 @@ function TaskRefWithChildren({
         const lastChild = index === children.length - 1;
         return (
           <Fragment key={child.todoId}>
-            <GuidedRow rails={rails} branch={{ x: NESTED_X, last: lastChild, to: 52 }}>
+            <GuidedRow rails={rails} branch={{ x: NESTED_X, end: lastChild, to: 52 }}>
               <TaskRefRow taskRef={child} nested guide={false} />
             </GuidedRow>
             {reportsBelow && (
@@ -381,10 +389,7 @@ function TaskStartedRow({
   }
   return (
     <CoordinatorSaid testId="chief-task-created">
-      {t('已建任务')}{' '}
-      <ThreadLink todoId={todoId} className={STATUS_REF_CLS}>
-        {title ?? t('任务')}
-      </ThreadLink>
+      {t('已建任务')} <TaskChip todoId={todoId} label={title ?? t('任务')} />
     </CoordinatorSaid>
   );
 }
@@ -394,10 +399,7 @@ function HandoffRow({ todoId }: { todoId: string }) {
   const glance = useContext(TodoGlanceContext)?.get(todoId);
   return (
     <CoordinatorSaid testId="chief-handoff">
-      {t('已转给任务')}{' '}
-      <ThreadLink todoId={todoId} className={STATUS_REF_CLS} data-phase={glance?.phase}>
-        {glance?.title ?? t('任务')}
-      </ThreadLink>
+      {t('已转给任务')} <TaskChip todoId={todoId} label={glance?.title ?? t('任务')} />
     </CoordinatorSaid>
   );
 }
@@ -456,9 +458,7 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
           {todos.map((todo, n) => (
             <span key={todo.id}>
               {n === 0 ? ' ' : '、'}
-              <ThreadLink todoId={todo.id} className={STATUS_REF_CLS}>
-                {todo.title}
-              </ThreadLink>
+              <TaskChip todoId={todo.id} label={todo.title} />
             </span>
           ))}
         </>
@@ -568,9 +568,7 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
         <ul className="my-2 flex list-none flex-col gap-0.5 p-0">
           {shown.map((todo) => (
             <li key={todo.id}>
-              <ThreadLink todoId={todo.id} className={STATUS_REF_CLS}>
-                {todo.title}
-              </ThreadLink>
+              <TaskChip todoId={todo.id} label={todo.title} />
               {todo.state === 'moved' && (
                 <span className="text-content-tertiary"> · {t('已改到其他执行机')}</span>
               )}
@@ -858,6 +856,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         data-run={runAttr(joinsPrev, joinsNext)}
       >
         <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
+          <TaskRefRows refs={taskRefs} />
           <div
             className={BUBBLE_WRAP_CLS}
             data-testid="chief-reply"
@@ -865,24 +864,22 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
           >
             {item.markdown != null ? (
-              <TaskMentionAsLinkContext.Provider value>
-                <ChatMarkdown
-                  text={item.markdown}
-                  bubbles
-                  bubbleFooter={<BubbleReports todoIds={reports} />}
-                  bubbleTools={(group, n) =>
-                    robotTools(
-                      'right',
-                      group.source,
-                      n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools',
-                    )
-                  }
-                  highlight={(group) =>
-                    sourceHighlighted &&
-                    (group.source.includes(quoted) || quoted.includes(group.source))
-                  }
-                />
-              </TaskMentionAsLinkContext.Provider>
+              <ChatMarkdown
+                text={item.markdown}
+                bubbles
+                bubbleFooter={<BubbleReports todoIds={reports} />}
+                bubbleTools={(group, n) =>
+                  robotTools(
+                    'right',
+                    group.source,
+                    n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools',
+                  )
+                }
+                highlight={(group) =>
+                  sourceHighlighted &&
+                  (group.source.includes(quoted) || quoted.includes(group.source))
+                }
+              />
             ) : (
               <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
                 <div
@@ -912,7 +909,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             )}
           </div>
           {item.typing === true && <TypingDots className="mt-1" />}
-          <TaskRefRows refs={taskRefs} />
           {robotTools('below-start', whole, 'chief-msg-tools-touch', false)}
         </MessageContent>
       </Message>

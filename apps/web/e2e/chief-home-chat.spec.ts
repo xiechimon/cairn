@@ -110,7 +110,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
       'data-phase',
       'building',
     );
-    await expect(stream.locator('.mention-chip--todo')).toHaveCount(0);
+    await expect(stream.locator('a[data-slot="task-mention"]').first()).toHaveClass(/mention-chip--todo/);
     const handoff = stream.getByTestId('chief-handoff');
     await expect(handoff).toContainText('已转给任务');
     await expect(handoff).toContainText('修复看板拖拽后计数不刷新');
@@ -124,9 +124,9 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
       fill: getComputedStyle(el).backgroundColor,
       left: el.getBoundingClientRect().left,
       rule: getComputedStyle(el, '::before').content,
-      chips: el.querySelectorAll('.mention-chip').length,
+      chips: el.querySelectorAll('.mention-chip--todo').length,
     }));
-    expect(handoffLine).toEqual({ ...replyLook, rule: 'none', chips: 0 });
+    expect(handoffLine).toEqual({ ...replyLook, rule: 'none', chips: 1 });
     await expect(handoff.getByRole('link', { name: '修复看板拖拽后计数不刷新' })).toHaveAttribute('data-phase', 'building');
     await expect(stream.getByTestId('chief-turn-tools')).toHaveCount(0);
     await expectNoReplySteps(page, stream.getByTestId('chief-msg').filter({ hasText: '已经补给它了' }));
