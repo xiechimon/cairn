@@ -426,7 +426,7 @@
           "apps/web/src/chief/research-report.tsx"
         ],
         "server": [
-          "apps/server/drizzle/0173_retire_daily_reports.sql"
+          "apps/server/drizzle/0177_retire_daily_reports.sql"
         ]
       },
       "reach": [

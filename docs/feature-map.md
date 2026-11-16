@@ -33,7 +33,7 @@
 | [Coordinator chat](#coordinator-chat) | 1 | shipped | yes | yes | yes |  |
 | [Coordinator context and compaction](#coordinator-context) | 1 | shipped | yes | n/a | yes |  |
 | [Coordinator dispatch](#coordinator-dispatch) | 1 | shipped | yes | n/a | yes |  |
-| [Daily report and retro](#daily-report) | 1 | shipped | yes | yes | gap | B2 |
+| [Read-only report history](#daily-report) | 1 | shipped | yes | yes | gap | B2 |
 | [Engine run in a task thread](#engine-view) | 1 | partial | yes | yes | yes |  |
 | [Eval-gated harness changes](#eval-gated-harness) | 1 | partial | yes | n/a | yes |  |
 | [Harness dispatch](#harness-dispatch) | 1 | shipped | yes | n/a | yes |  |
@@ -90,13 +90,13 @@
 
 Batches are ordered by how central their features are. One agent session researches and designs one batch.
 
-### B2 · What reaches ian: needs-you, questions, daily report, push
+### B2 · What reaches the user: needs-you, questions, push
 
-The attention surfaces of the phase 1 graduation criteria: the needs-you tray, question cards and their lifecycle, the 08:00 report and retro proposals, and phone push. Research Ikaga, Duet, Codex CLI and t3code first; design the tray and card states and the delivery and dedupe rules.
+The attention surfaces of the phase 1 graduation criteria: the needs-you tray, question cards and their lifecycle, and phone push. Research Ikaga, Duet, Codex CLI and t3code first; design the tray and card states and the delivery and dedupe rules.
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Daily report and retro](#daily-report) | 1 | Backend design: no design for report content, timing, quiet rules and retro proposal storage |
+| [Read-only report history](#daily-report) | 1 | Backend design: Retired: historical tables and records are retained; only active report-linked steps are stopped. |
 | [Task references and needs-you](#needs-you) | 1 | Backend design: no design for which records enter the tray, their order and when they leave |
 | [Phone push](#push-notifications) | 1 | Frontend design: the notify banner, device switch and push copy have no design<br>Backend design: no design for subscriptions, presence suppression, receipts and the three push states |
 | [Question cards](#questions) | 1 | Research: the Codex CLI and t3code question patterns were never written up<br>Backend design: no design for the question lifecycle: parking, late answers, cancel and resume |
@@ -233,11 +233,11 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### daily-report
 
-**Daily report and retro** (shipped). The Coordinator posts an 08:00 report as a one-sentence message with a document card; the user decides its numbered retro suggestions by telling the Coordinator.
+**Read-only report history** (shipped). Existing report messages remain readable; daily generation, retries, push and suggestion decisions are retired.
 
 - Research: [docs/research/duet-proactive-coordinator.md](research/duet-proactive-coordinator.md)
 - Frontend design: [apps/web/DESIGN-RULES.md](../apps/web/DESIGN-RULES.md)
-- Backend design: **gap**: no design for report content, timing, quiet rules and retro proposal storage
+- Backend design: **gap**: Retired: historical tables and records are retained; only active report-linked steps are stopped.
 
 ### engine-view
 
