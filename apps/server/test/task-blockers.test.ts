@@ -312,6 +312,7 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
       retarget(id, machineId);
       const [session] = sessions(id);
       H.s.db.update(step).set({ kind }).where(eq(step.id, session!.id)).run();
+      if (kind === 'merge') finish(id, 'done');
       applyQuotaWaitStep(toolDeps(), sessions(id)[0]!, {
         kind: 'quota',
         providerId: 'stub-gw',
@@ -405,6 +406,7 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
         .set({ kind })
         .where(eq(step.id, sessions(id)[0]!.id))
         .run();
+      if (kind === 'merge') finish(id, 'done');
       let resume = () => {};
       const prepared = new Promise<void>((resolve) => {
         resume = resolve;
@@ -473,6 +475,7 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
         .set({ kind, holdReason: null, holdUntil: null })
         .where(eq(step.id, pending.id))
         .run();
+      if (kind === 'merge') finish(id, 'done');
       const claim = () =>
         claimStep(
           {

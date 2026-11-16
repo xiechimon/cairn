@@ -273,6 +273,8 @@ describe('model fallback chain (#1493)', () => {
         })
         .where(eq(stepTable.id, pending.id))
         .run();
+      if (kind === 'merge')
+        w.s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable.id, w.todoId)).run();
       const c = await claim(w);
       expect(c.stepId).toBe(pending.id);
       await done(w, c.stepId, quotaDone('relay-a'));
@@ -403,7 +405,7 @@ describe('model fallback chain (#1493)', () => {
     const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
     expect(buildRow.errorMessage).toBeNull();
     const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
-    expect(todoRow.phase).toBe('review');
+    expect(todoRow.phase).toBe('done');
   });
 
   test('a rate-limited first model continues on the fallback model and succeeds', async () => {

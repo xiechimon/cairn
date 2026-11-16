@@ -123,6 +123,7 @@ function newBuild(s: TestServer, projectId: string): { buildId: string } {
       spec: '',
       phase: 'queued',
       phaseAt: seq,
+      latestBuildId: buildId,
     })
     .run();
   s.db
@@ -286,6 +287,7 @@ describe('the account hold after a switch', () => {
       claudeSubscriptionId: first,
     });
     const stepId = addStep(s, buildId, { kind: 'merge' });
+    s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable.latestBuildId, buildId)).run();
     enableOnly(s, second);
     const claimed = await claimAs(s, machineId);
     expect(claimed?.step.id).toBe(stepId);
