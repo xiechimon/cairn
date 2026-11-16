@@ -23,11 +23,11 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 Work lands on `main` directly. There is no pull request, merge queue or PR-body format. Production safety lives in the deploy: `scripts/ops/deploy-watch.sh` deploys only main commits whose `check`, `pack-smoke` and `e2e-gate` runs are green, with a migration rehearsal, a backup and rollback.
 
 1. Work in your own worktree on a branch from the latest `origin/main`.
-2. Commit your work. Tidy noisy intermediate commits into a few clear ones while they are still unpushed.
-3. `git fetch origin main` and rebase your unpushed commits onto `origin/main`; resolve conflicts.
+2. Commit any uncommitted changes. Tidy noisy intermediate commits into a few clear ones while they are still unpushed.
+3. `git fetch origin main` and rebase onto the latest `origin/main`; resolve conflicts. If the rebase floods add/add conflicts in unrelated files, the clone is shallow: run `git rebase --abort`, `git fetch --quiet --unshallow origin main`, then rebase again.
 4. Verify once: `pnpm prepush`, `pnpm exec vitest run --changed origin/main`, `pnpm --filter @cairn/web e2e:affected`, and `/security-review` when a security surface changed. The full suites run in CI after the push.
 5. Push without force: `git push origin HEAD:main`.
-6. If the push is rejected because `main` moved, fetch, rebase again, re-run only the checks the incoming commits affect, and push again.
+6. If the push is rejected because `origin/main` is ahead, fetch, rebase and push again. Do not repeat step 4 after a later fetch, rebase or rejected push unless conflict resolution or other local edits changed files after it passed.
 7. A conflict that changes behavior: resolve it, then stop and ask ian before pushing.
 8. Watch CI on the commit you pushed. If it goes red, fixing it is your next task; if you cannot fix it quickly, revert your commit. While main is red, do not push on top of the broken area.
 9. A failing test is not yours only after it fails on `origin/main` without your change.
