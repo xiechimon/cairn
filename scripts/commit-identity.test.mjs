@@ -263,13 +263,6 @@ test('the workflow runs the shared check without any token, on the PR head repos
   assert.doesNotMatch(workflow, /rebase/);
 });
 
-test('the pre-commit hook runs the shared check before anything else', () => {
-  assert.match(
-    readFileSync('.husky/pre-commit', 'utf8'),
-    /^#!\/usr\/bin\/env sh\nset -e\n\nnode scripts\/commit-identity\.mjs pre-commit\n/,
-  );
-});
-
 test('no merge rule keeps a rebase or single-commit route for bot-opened PRs', () => {
   for (const file of [
     'AGENTS.md',

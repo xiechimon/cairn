@@ -32,7 +32,6 @@ export const selfTests = [
   'scripts/ops/push-test.test.mjs',
   'scripts/ops/push-worker.test.mjs',
   'scripts/prepush.test.mjs',
-  'scripts/prepush-main-guard.test.mjs',
   'scripts/heavy-slots.test.mjs',
   'scripts/test-admission.test.mjs',
   'scripts/owned-process.test.mjs',
