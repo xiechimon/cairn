@@ -276,15 +276,15 @@ test('a secret the server redacted never shows up on the page', async ({ page })
   expect(await page.content()).not.toContain(FAKE_TOKEN);
 });
 
-test('with no computer yet the panel says so, and a first event brings the feed in', async ({
+test('with no computer yet the panel shows no feed, and a first event brings the feed in', async ({
   page,
 }) => {
   const feed: Feed = { computers: [], commands: [] };
   const panel = await open(page, feed);
-  await expect(panel.getByTestId('computer-none')).toContainText('Coordinator 还没有自己的电脑');
+  await expect(panel.getByTestId('computer-state')).toHaveCount(0);
 
   await emit(page, { type: 'computer.command', command: command(1) });
-  await expect(panel.getByTestId('computer-none')).toBeVisible();
+  await expect(panel.getByTestId('computer-state')).toHaveCount(0);
   await expect(entries(panel)).toHaveCount(0);
 
   feed.computers = [computer()];
@@ -552,13 +552,13 @@ test('with a machine listed the panel still shows its card and the screen placeh
   await expect(card.getByRole('heading', { name: '能力' })).toHaveCount(0);
 });
 
-test('with no machines the list is only the add row and the hint', async ({ page }) => {
+test('with no machines the list is only the add row', async ({ page }) => {
   const panel = await open(page, { computers: [], commands: [] }, []);
   await expect(panel.getByRole('heading', { name: '你的电脑' })).toBeVisible();
   await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(1);
   await expect(panel.getByTestId('machine-list-row')).toHaveCount(0);
   await expect(panel.getByTestId('machines-add').getByRole('link', { name: '添加电脑' })).toBeVisible();
-  await expect(panel).toContainText('没有其他电脑时，任务都在 Coordinator 这台电脑上跑。');
+  await expect(panel).not.toContainText('没有其他电脑时');
 });
 
 test('an offline Coordinator machine reads offline in the chip and the card, with no running count', async ({

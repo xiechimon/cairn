@@ -12,7 +12,7 @@ import { useComputerControl } from '../api/use-computer-control.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { ListCard } from '../components/list-card.js';
 import { MachineIcon, MachineName } from '../components/machine-label.js';
-import { QueryBoundary, type QueryLike, queryPhase } from '../components/query-state.js';
+import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { Button } from '../components/ui/button.js';
 import { Spinner } from '../components/ui/spinner.js';
@@ -286,7 +286,6 @@ export function MachinesPanel({
   const computers = computersQ.data ?? [];
   const host = coordinatorMachine(machines);
   const ordered = host === null ? machines : [host, ...machines.filter((m) => m !== host)];
-  const machinesPhase = queryPhase(query, machines.length === 0);
   const computerFor = (machine: MachineRow): ComputerRecord | null =>
     computers.find((computer) => computer.machine.id === machine.id) ?? null;
   const [checkedAt, setCheckedAt] = useState(() => Date.now());
@@ -357,11 +356,6 @@ export function MachinesPanel({
             render={<Link to={settingsHref('machines')} />}
           />
         </div>
-        {ordered.length <= 1 && machinesPhase !== 'loading' && machinesPhase !== 'error' && (
-          <p className="m-0 px-2.5 pt-3 text-meta text-content-tertiary">
-            {t('没有其他电脑时，任务都在 Coordinator 这台电脑上跑。')}
-          </p>
-        )}
         {host !== null && (
           <div className="mt-7">
             <CoordinatorComputer />

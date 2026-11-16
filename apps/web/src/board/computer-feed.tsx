@@ -262,11 +262,7 @@ function ComputerSection() {
       loadingLabel={t('正在加载 Coordinator 的电脑')}
       errorTitle={t('Coordinator 的电脑没能加载')}
       skeletonRows={1}
-      empty={
-        <p data-testid="computer-none" className="m-0 px-1 text-meta text-content-tertiary">
-          {t('Coordinator 还没有自己的电脑。第一次需要时会自动开一台。')}
-        </p>
-      }
+      empty={null}
     >
       {computer !== undefined && (
         <ListCard className="flex-none">

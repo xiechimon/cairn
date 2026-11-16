@@ -88,11 +88,6 @@ test('the chip name carries the Coordinator machine and its state', async ({ pag
   await expect(chip(page)).toHaveAccessibleName('电脑 · xmonsMac · 在线 · 2/8 在跑 · 1 台在线 · 1 台离线（omarchy）');
 });
 
-test('with one computer the panel says work runs on the Coordinator machine', async ({ page }) => {
-  await page.goto('/app?scenario=home-c-empty&pane=machines');
-  await expect(panel(page)).toContainText('没有其他电脑时，任务都在 Coordinator 这台电脑上跑。');
-});
-
 test('at phone width the chip stays an icon and the title stays for screen readers', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(HOME);

@@ -175,8 +175,6 @@ export const EN: Record<string, string> = {
   '还没有命令。Coordinator 在这台电脑上跑的命令会出现在这里。':
     'No commands yet. Commands the Coordinator runs on this computer show up here.',
   'Coordinator 的电脑': "Coordinator's computer",
-  'Coordinator 还没有自己的电脑。第一次需要时会自动开一台。':
-    'The Coordinator has no computer of its own yet. One opens the first time it needs one.',
   电脑离线: 'Computer offline',
   'Coordinator 在这台': 'Coordinator runs here',
   全屏查看: 'View full screen',
@@ -203,8 +201,6 @@ export const EN: Record<string, string> = {
   还没有连上电脑: 'No computer connected yet',
   '你在控制 · 还剩 {n} 分钟': 'You are in control · {n} min left',
   浏览器: 'Browser',
-  '没有其他电脑时，任务都在 Coordinator 这台电脑上跑。':
-    'With no other computer, work runs on the Coordinator’s computer.',
   添加电脑: 'Add computer',
   你的电脑: 'Your computers',
   '{time} 检查过': 'Checked {time}',
