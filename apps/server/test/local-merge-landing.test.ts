@@ -300,7 +300,7 @@ test.each(['merged', 'held', 'recheck', 'checks-failed'] as const)(
   },
 );
 
-test('abandoned completed-task merge retries the same pinned command; superseded work stops', async () => {
+test('abandoned completed-task merge keeps its pinned command claimed without replay; superseded work stops', async () => {
   const f = fixture('autonomous');
   await requestMerge(f.deps, 'build');
   const row = f.merge();
@@ -310,13 +310,8 @@ test('abandoned completed-task merge retries the same pinned command; superseded
     .where(eq(step.id, row.id))
     .run();
   sweepAbandonedBuildSteps(f.deps);
-  expect(f.merge()).toMatchObject({ status: 'pending', prompt: row.prompt });
+  expect(f.merge()).toMatchObject({ status: 'claimed', prompt: row.prompt, claimCount: 0 });
   f.s.db.update(todo).set({ latestBuildId: 'newer' }).run();
-  f.s.db
-    .update(step)
-    .set({ status: 'claimed', claimedAt: Date.now() - 200_000 })
-    .where(eq(step.id, row.id))
-    .run();
   sweepAbandonedBuildSteps(f.deps);
   expect(f.merge().status).toBe('stopped');
 });
