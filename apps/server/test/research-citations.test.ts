@@ -587,6 +587,22 @@ describe('research citation handoff', () => {
     ]);
   });
 
+  test('a reference that backs no claim may carry an empty claim unless it is supported', async () => {
+    const reference = 'https://example.com/search-result';
+    const { s, opened } = await world(true, `${source}\nSearch: ${reference}`);
+    const checker = openCitationCheck(s.svc, opened.buildId)!;
+    const bare = { ...supported, url: reference, claim: '', verdict: 'unsupported', quote: '' };
+    land(s, checker.buildId, receipt([supported, bare]), 'gpt-6.1-sol');
+    expect(checkedResearchReport(s.db, opened.buildId)?.claims).toHaveLength(2);
+    land(
+      s,
+      checker.buildId,
+      receipt([supported, { ...bare, verdict: 'supported', quote: 'x' }]),
+      'gpt-6.1-sol',
+    );
+    expect(checkedResearchReport(s.db, opened.buildId)).toBeNull();
+  });
+
   test('a replacement report cannot reuse the previous attachment audit', async () => {
     const { s, opened } = await world();
     const checker = openCitationCheck(s.svc, opened.buildId)!;
