@@ -1,6 +1,17 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
 const SUBAGENT_TASK_TYPE = 'local_agent';
+const FINISHED_MAX = 10;
+const DESCRIPTION_MAX = 200;
+const SUMMARY_MAX = 2000;
+const OUTPUT_FILE_MAX = 500;
+
+export interface FinishedSubagent {
+  description: string;
+  status: string;
+  outputFile: string;
+  summary: string;
+}
 
 interface TaskMessage {
   type?: string;
@@ -16,11 +27,18 @@ interface TaskMessage {
   tasks?: { task_id?: string; task_type?: string; description?: string; ambient?: boolean }[];
 }
 
+function clip(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}…[truncated]` : text;
+}
+
 export class BackgroundSubagents {
   private readonly descriptions = new Map<string, string>();
   private readonly foreground = new Set<string>();
-  private readonly live = new Set<string>();
-  private finished: string[] = [];
+  private readonly awaitingResult = new Set<string>();
+  private readonly settled = new Set<string>();
+  private live = new Set<string>();
+  private finished: FinishedSubagent[] = [];
+  private omitted = 0;
 
   note(msg: SDKMessage): void {
     const m = msg as TaskMessage;
@@ -35,44 +53,72 @@ export class BackgroundSubagents {
     return [...this.live].map((id) => this.descriptions.get(id) ?? id);
   }
 
-  takeFinished(): string[] {
-    return this.finished.splice(0);
+  get awaitingResults(): boolean {
+    return this.awaitingResult.size > 0;
+  }
+
+  takeFinished(): { finished: FinishedSubagent[]; omitted: number } {
+    const taken = { finished: this.finished, omitted: this.omitted };
+    this.finished = [];
+    this.omitted = 0;
+    this.awaitingResult.clear();
+    return taken;
   }
 
   private noteStarted(m: TaskMessage): void {
     if (m.task_id === undefined || m.task_type !== SUBAGENT_TASK_TYPE) return;
-    this.descriptions.set(m.task_id, m.description ?? m.task_id);
+    this.descriptions.set(m.task_id, clip(m.description ?? m.task_id, DESCRIPTION_MAX));
     if (m.is_backgrounded === true) this.live.add(m.task_id);
     else this.foreground.add(m.task_id);
   }
 
   private noteUpdated(m: TaskMessage): void {
     if (m.task_id === undefined || !this.foreground.has(m.task_id)) return;
-    if (m.patch?.description !== undefined) this.descriptions.set(m.task_id, m.patch.description);
+    if (m.patch?.description !== undefined)
+      this.descriptions.set(m.task_id, clip(m.patch.description, DESCRIPTION_MAX));
     if (m.patch?.is_backgrounded !== true) return;
     this.foreground.delete(m.task_id);
     this.live.add(m.task_id);
   }
 
   private noteLevel(m: TaskMessage): void {
+    const next = new Set<string>();
     for (const task of m.tasks ?? []) {
       if (task.task_id === undefined || task.task_type !== SUBAGENT_TASK_TYPE) continue;
-      if (task.ambient === true || this.foreground.has(task.task_id)) continue;
+      if (task.ambient === true || this.settled.has(task.task_id)) continue;
       if (!this.descriptions.has(task.task_id))
-        this.descriptions.set(task.task_id, task.description ?? task.task_id);
-      this.live.add(task.task_id);
+        this.descriptions.set(
+          task.task_id,
+          clip(task.description ?? task.task_id, DESCRIPTION_MAX),
+        );
+      this.foreground.delete(task.task_id);
+      next.add(task.task_id);
     }
+    for (const id of this.live) if (!next.has(id)) this.awaitingResult.add(id);
+    this.live = next;
   }
 
   private noteSettled(m: TaskMessage): void {
-    if (m.task_id === undefined) return;
-    this.foreground.delete(m.task_id);
-    const description = this.descriptions.get(m.task_id);
-    if (description === undefined && !this.live.has(m.task_id)) return;
-    this.live.delete(m.task_id);
-    this.descriptions.delete(m.task_id);
-    this.finished.push(
-      `- ${description ?? m.task_id}: ${m.status ?? 'settled'}. Output file: ${m.output_file ?? 'none'}. Summary: ${m.summary ?? 'none'}`,
-    );
+    const id = m.task_id;
+    if (id === undefined) return;
+    if (this.foreground.delete(id)) {
+      this.descriptions.delete(id);
+      return;
+    }
+    if (!this.live.has(id) && !this.awaitingResult.has(id)) return;
+    this.live.delete(id);
+    this.awaitingResult.delete(id);
+    this.settled.add(id);
+    if (this.finished.length < FINISHED_MAX) {
+      this.finished.push({
+        description: this.descriptions.get(id) ?? id,
+        status: clip(m.status ?? 'settled', DESCRIPTION_MAX),
+        outputFile: clip(m.output_file ?? '', OUTPUT_FILE_MAX),
+        summary: clip(m.summary ?? '', SUMMARY_MAX),
+      });
+    } else {
+      this.omitted += 1;
+    }
+    this.descriptions.delete(id);
   }
 }

@@ -133,7 +133,9 @@ test('a turn that ends while a background subagent runs waits for it and continu
     cli.emit(assistant('Waiting for the survey, then I will write the report.'));
     cli.emit(result);
     await tick();
+    cli.emit({ ...assistant('subagent reading files'), parent_tool_use_id: 'toolu_agent' });
     cli.emit(live(['bash-1', 'local_bash']));
+    await tick();
     cli.emit(notified('agent-1', 'found 12 scripts'));
     await cli.nextPrompt();
     cli.emit(assistant('Report written.'));
@@ -170,6 +172,29 @@ test('continuations stop at the cap and the session finishes with a subagent sti
   expect(prompts).toHaveLength(4);
   expect(events.filter((event) => event.type === 'done')).toHaveLength(1);
   expect(events.at(-1)?.type).toBe('done');
+});
+
+test('an error while waiting ends the session with that error and no held success', async () => {
+  const prompts = fakeCli(async (cli) => {
+    await cli.nextPrompt();
+    cli.emit(started('agent-1', 'local_agent', 'survey'));
+    cli.emit(assistant('Waiting.'));
+    cli.emit(result);
+    await tick();
+    cli.emit({
+      type: 'result',
+      subtype: 'error_max_turns',
+      is_error: true,
+      errors: ['reached max turns'],
+      session_id: 's1',
+    });
+  });
+
+  const events = await run();
+
+  expect(prompts).toHaveLength(1);
+  const terminal = events.filter((event) => ['done', 'error', 'message_stop'].includes(event.type));
+  expect(terminal.map((event) => event.type)).toEqual(['error']);
 });
 
 test('a subagent that never finishes releases the turn after the wait limit', async () => {
