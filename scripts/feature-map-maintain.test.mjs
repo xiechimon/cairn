@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
@@ -16,17 +16,6 @@ import {
   runMaintain,
 } from './feature-map-maintain.mjs';
 import { makeTestTempDir } from './test-tmpdir.mjs';
-
-test('daily workflow files an issue with github.token and no refresh secret', () => {
-  const yaml = readFileSync(
-    new URL('../.github/workflows/feature-map-daily-check.yml', import.meta.url),
-    'utf8',
-  );
-  assert.match(yaml, /issues:\s*write/);
-  assert.match(yaml, /feature-map-maintain\.mjs --file-issue/);
-  assert.match(yaml, /GH_TOKEN: \$\{\{ github\.token \}\}/);
-  assert.doesNotMatch(yaml, /FEATURE_MAP_REFRESH_TOKEN/);
-});
 
 test('parseArgs accepts the maintain flags', () => {
   assert.deepEqual(parseArgs(['--file-issue', '--dry-run']), {

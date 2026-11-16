@@ -25,14 +25,14 @@ How Cairn keeps its feature map current. The model is poteto's feature map: mate
 
 `scripts/prepush.mjs` counts a document the registry cites as one a check reads, so a docs-only PR that deletes or renames a cited note still runs the gates.
 
-## Daily Actions loop
+## Maintain check
 
-Workflow: `.github/workflows/feature-map-daily-check.yml` (cron `17 18 * * *`, also `workflow_dispatch`). It runs `node scripts/feature-map-maintain.mjs --file-issue`:
+No workflow runs this on a schedule. Run `node scripts/feature-map-maintain.mjs` by hand, or with `--file-issue` to open the deduped issue:
 
 1. **feature-map**: the same `generate-feature-map.mjs --check`, as a net for anything that reached main without the gates.
 2. **verify-features-index**: every `features/*.md` except `README.md` is linked from `features/README.md`, and every link target exists.
 
-On failure the job exits non-zero and opens or comments one deduped issue titled `chore: feature-map maintain failed` (labels `documentation`, `batch:next`, `by:cairn`, marker `<!-- feature-map-maintain -->`). A passing run closes that issue as completed with a link to the run, so the issue is open only while the check is red; the next failure opens a new one. Issue filing and closing need `permissions.issues: write` and `github.token` only.
+On failure it exits non-zero and, with `--file-issue`, opens or comments one deduped issue titled `chore: feature-map maintain failed` (labels `documentation`, `batch:next`, `by:cairn`, marker `<!-- feature-map-maintain -->`). A passing run closes that issue as completed with a link to the run, so the issue is open only while the check is red; the next failure opens a new one. Issue filing and closing need `permissions.issues: write` and `github.token` only.
 
 ## Live maintain routine
 

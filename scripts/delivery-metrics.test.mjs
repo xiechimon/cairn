@@ -533,17 +533,6 @@ test('CLI runs on an empty fixture', () => {
   assert.match(result.stdout, /Merged PRs \| 0 \(0 autonomous, 0 human\)/);
 });
 
-test('the weekly workflow runs delivery metrics and posts the report', () => {
-  const workflow = readFileSync(
-    resolve(import.meta.dirname, '../.github/workflows/gardener-weekly.yml'),
-    'utf8',
-  );
-  assert.match(workflow, /delivery-metrics\.mjs/);
-  assert.match(workflow, /--out docs\/metrics/);
-  assert.match(workflow, /--comment/);
-  assert.match(workflow, /issues: write/);
-});
-
 test('ci runs the delivery metrics self-test beside the gardener sweep', () => {
   const ci = readFileSync(resolve(import.meta.dirname, '../.github/workflows/ci.yml'), 'utf8');
   assert.match(ci, /scripts\/delivery-metrics\.test\.mjs/);
