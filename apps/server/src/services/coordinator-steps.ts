@@ -11,6 +11,7 @@ import {
   claudeSubscription,
   coordinatorInput,
   step,
+  stepUsage,
   tokenUsage,
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
@@ -205,91 +206,121 @@ export function recordStepUsage(
 ): void {
   const { db } = deps;
   const usageTeamId = stepTeamId(deps, stepRow);
-  for (const u of usage) {
-    const prior = db
-      .select()
-      .from(tokenUsage)
-      .where(and(eq(tokenUsage.buildId, stepRow.buildId), eq(tokenUsage.model, u.model)))
-      .get();
-    const tokens = {
-      input: (prior?.input ?? 0) + u.input,
-      output: (prior?.output ?? 0) + u.output,
-      cacheRead: (prior?.cacheRead ?? 0) + u.cacheRead,
-      cacheWrite: (prior?.cacheWrite ?? 0) + u.cacheWrite,
-    };
-    const rates = ratesForModel(db, usageTeamId, u.model);
-    const reported = u.cost;
-    const cost = rates
-      ? costFromRates(tokens, rates)
-      : reported !== undefined &&
-          (reported.input !== 0 ||
-            reported.output !== 0 ||
-            reported.cacheRead !== 0 ||
-            reported.cacheWrite !== 0 ||
-            reported.total !== 0)
-        ? {
-            costInput: (prior?.costInput ?? 0) + reported.input,
-            costOutput: (prior?.costOutput ?? 0) + reported.output,
-            costCacheRead: (prior?.costCacheRead ?? 0) + reported.cacheRead,
-            costCacheWrite: (prior?.costCacheWrite ?? 0) + reported.cacheWrite,
-            costTotal: (prior?.costTotal ?? 0) + reported.total,
-          }
-        : null;
-    db.insert(tokenUsage)
-      .values({
-        buildId: stepRow.buildId,
-        model: u.model,
-        ...tokens,
-        costInput: cost?.costInput ?? null,
-        costOutput: cost?.costOutput ?? null,
-        costCacheRead: cost?.costCacheRead ?? null,
-        costCacheWrite: cost?.costCacheWrite ?? null,
-        costTotal: cost?.costTotal ?? null,
-      })
-      .onConflictDoUpdate({
-        target: [tokenUsage.buildId, tokenUsage.model],
-        set: cost === null ? tokens : { ...tokens, ...cost },
-      })
-      .run();
-    if (
-      coordinatorRunsOnPi() &&
-      stepRow.kind === 'chief' &&
-      isChiefConversation(stepRow.buildId) &&
-      !isChiefDigestStep(stepRow)
-    ) {
-      db.insert(chiefTurnUsage)
+  const mirrorsTurnUsage =
+    coordinatorRunsOnPi() &&
+    stepRow.kind === 'chief' &&
+    isChiefConversation(stepRow.buildId) &&
+    !isChiefDigestStep(stepRow);
+  db.transaction((tx) => {
+    for (const u of usage) {
+      const prior = db
+        .select()
+        .from(tokenUsage)
+        .where(and(eq(tokenUsage.buildId, stepRow.buildId), eq(tokenUsage.model, u.model)))
+        .get();
+      const tokens = {
+        input: (prior?.input ?? 0) + u.input,
+        output: (prior?.output ?? 0) + u.output,
+        cacheRead: (prior?.cacheRead ?? 0) + u.cacheRead,
+        cacheWrite: (prior?.cacheWrite ?? 0) + u.cacheWrite,
+      };
+      const rates = ratesForModel(db, usageTeamId, u.model);
+      const reported = u.cost;
+      const cost = rates
+        ? costFromRates(tokens, rates)
+        : reported !== undefined &&
+            (reported.input !== 0 ||
+              reported.output !== 0 ||
+              reported.cacheRead !== 0 ||
+              reported.cacheWrite !== 0 ||
+              reported.total !== 0)
+          ? {
+              costInput: (prior?.costInput ?? 0) + reported.input,
+              costOutput: (prior?.costOutput ?? 0) + reported.output,
+              costCacheRead: (prior?.costCacheRead ?? 0) + reported.cacheRead,
+              costCacheWrite: (prior?.costCacheWrite ?? 0) + reported.cacheWrite,
+              costTotal: (prior?.costTotal ?? 0) + reported.total,
+            }
+          : null;
+      tx.insert(tokenUsage)
         .values({
-          stepId: stepRow.id,
-          threadId: stepRow.buildId,
+          buildId: stepRow.buildId,
           model: u.model,
-          input: u.input,
-          output: u.output,
-          cacheRead: u.cacheRead,
-          cacheWrite: u.cacheWrite,
-          ttftMs: u.ttftMs ?? null,
-          contextTokens: u.contextTokens ?? null,
-          contextWindow: u.contextWindow ?? null,
-          compactAt: u.compactAt ?? null,
-          createdAt: nowMs(),
+          ...tokens,
+          costInput: cost?.costInput ?? null,
+          costOutput: cost?.costOutput ?? null,
+          costCacheRead: cost?.costCacheRead ?? null,
+          costCacheWrite: cost?.costCacheWrite ?? null,
+          costTotal: cost?.costTotal ?? null,
         })
         .onConflictDoUpdate({
-          target: [chiefTurnUsage.stepId, chiefTurnUsage.model],
-          set: {
-            input: sql`${chiefTurnUsage.input} + ${u.input}`,
-            output: sql`${chiefTurnUsage.output} + ${u.output}`,
-            cacheRead: sql`${chiefTurnUsage.cacheRead} + ${u.cacheRead}`,
-            cacheWrite: sql`${chiefTurnUsage.cacheWrite} + ${u.cacheWrite}`,
-            ttftMs: sql`coalesce(${chiefTurnUsage.ttftMs}, ${u.ttftMs ?? null})`,
-            ...(u.contextTokens !== undefined
-              ? {
-                  contextTokens: u.contextTokens,
-                  contextWindow: u.contextWindow ?? null,
-                  compactAt: u.compactAt ?? null,
-                }
-              : {}),
-          },
+          target: [tokenUsage.buildId, tokenUsage.model],
+          set: cost === null ? tokens : { ...tokens, ...cost },
         })
         .run();
+      if (mirrorsTurnUsage) {
+        tx.insert(chiefTurnUsage)
+          .values({
+            stepId: stepRow.id,
+            threadId: stepRow.buildId,
+            model: u.model,
+            input: u.input,
+            output: u.output,
+            cacheRead: u.cacheRead,
+            cacheWrite: u.cacheWrite,
+            ttftMs: u.ttftMs ?? null,
+            contextTokens: u.contextTokens ?? null,
+            contextWindow: u.contextWindow ?? null,
+            compactAt: u.compactAt ?? null,
+            createdAt: nowMs(),
+          })
+          .onConflictDoUpdate({
+            target: [chiefTurnUsage.stepId, chiefTurnUsage.model],
+            set: {
+              input: sql`${chiefTurnUsage.input} + ${u.input}`,
+              output: sql`${chiefTurnUsage.output} + ${u.output}`,
+              cacheRead: sql`${chiefTurnUsage.cacheRead} + ${u.cacheRead}`,
+              cacheWrite: sql`${chiefTurnUsage.cacheWrite} + ${u.cacheWrite}`,
+              ttftMs: sql`coalesce(${chiefTurnUsage.ttftMs}, ${u.ttftMs ?? null})`,
+              ...(u.contextTokens !== undefined
+                ? {
+                    contextTokens: u.contextTokens,
+                    contextWindow: u.contextWindow ?? null,
+                    compactAt: u.compactAt ?? null,
+                  }
+                : {}),
+            },
+          })
+          .run();
+      }
+      if (usageTeamId !== null) {
+        const mirrored = mirrorsTurnUsage ? u.input + u.output + u.cacheRead + u.cacheWrite : 0;
+        tx.insert(stepUsage)
+          .values({
+            stepId: stepRow.id,
+            model: u.model,
+            teamId: usageTeamId,
+            buildId: stepRow.buildId,
+            kind: stepRow.kind,
+            input: u.input,
+            output: u.output,
+            cacheRead: u.cacheRead,
+            cacheWrite: u.cacheWrite,
+            mirroredTokens: mirrored,
+            createdAt: nowMs(),
+          })
+          .onConflictDoUpdate({
+            target: [stepUsage.stepId, stepUsage.model],
+            set: {
+              input: sql`${stepUsage.input} + ${u.input}`,
+              output: sql`${stepUsage.output} + ${u.output}`,
+              cacheRead: sql`${stepUsage.cacheRead} + ${u.cacheRead}`,
+              cacheWrite: sql`${stepUsage.cacheWrite} + ${u.cacheWrite}`,
+              mirroredTokens: sql`${stepUsage.mirroredTokens} + ${mirrored}`,
+            },
+          })
+          .run();
+      }
     }
-  }
+  });
 }
