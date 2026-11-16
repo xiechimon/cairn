@@ -1,9 +1,5 @@
 import type { GithubRepoRef } from '@cairn/shared';
-import {
-  ACTIVE_STEP_STATUSES,
-  conversationBranch,
-  MERGE_ANNOUNCEMENT,
-} from '@cairn/shared';
+import { ACTIVE_STEP_STATUSES, conversationBranch, MERGE_ANNOUNCEMENT } from '@cairn/shared';
 import { and, eq, inArray, notInArray } from 'drizzle-orm';
 import { type build, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
