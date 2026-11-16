@@ -112,17 +112,48 @@ test('the change control opens the model picker, and confirming saves the model 
   expect(world.patches[0]?.body).toEqual({ provider: 'p1', modelId: 'claude-sonnet-5-5' });
 });
 
-test('without a provider, step 1 offers only Add provider, which opens the picker in place', async ({ page }) => {
+test('without a provider, step 1 lists the providers on the page, and Claude Pro / Max opens its sign-in', async ({ page }) => {
   await open(page, { ...fresh(), bound: false });
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
   await expect(page.getByTestId('first-run-setup')).not.toContainText('本机 Claude Code');
   await expect(page.getByTestId('first-run-setup').getByRole('switch')).toHaveCount(0);
-  await page.getByTestId('first-run-add-provider').click();
-  const picker = page.getByRole('dialog', { name: '添加模型服务' });
-  await expect(picker).toBeVisible();
+  const picker = page.getByTestId('first-run-add-provider');
+  await expect(picker.getByRole('textbox', { name: '搜索服务商...' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page).toHaveURL(/\/app(\?|$)/);
   await picker.locator('[data-preset-id="claude-subscription"]').click();
   await expect(page.getByRole('dialog', { name: '添加 Claude 订阅' })).toBeVisible();
+});
+
+test('the provider list starts below the language switch', async ({ page }) => {
+  await open(page, { ...fresh(), bound: false });
+  const search = page.getByTestId('first-run-add-provider').getByRole('textbox', { name: '搜索服务商...' });
+  const language = page.locator('[data-testid="first-run-locale-en"]:visible');
+  const searchBox = await search.boundingBox();
+  const languageBox = await language.boundingBox();
+  expect(searchBox).not.toBeNull();
+  expect(languageBox).not.toBeNull();
+  expect((languageBox?.y ?? 0) + (languageBox?.height ?? 0)).toBeLessThanOrEqual(searchBox?.y ?? 0);
+});
+
+test('a vendor opens its form in place, and Cancel goes back to the list', async ({ page }) => {
+  await open(page, { ...fresh(), bound: false });
+  const picker = page.getByTestId('first-run-add-provider');
+  await picker.locator('[data-preset-id="anthropic"]').click();
+  await expect(picker.getByLabel('API 密钥')).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await picker.getByRole('button', { name: '取消' }).click();
+  await expect(picker.locator('[data-preset-id="anthropic"]')).toBeVisible();
+});
+
+test('the welcome side draws the ink spiral as far as the open step', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page, { ...fresh(), bound: false });
+  const spiral = page.getByTestId('first-run-setup').locator('[data-slot="ink-spiral"]');
+  await expect(spiral).toBeVisible();
+  await expect(spiral).toHaveAttribute('data-drawn', '0.33');
+  await page.setViewportSize({ width: 1440, height: 700 });
+  await expect(spiral).toBeHidden();
 });
 
 test('the language switch on the setup page changes the page language', async ({ page }) => {

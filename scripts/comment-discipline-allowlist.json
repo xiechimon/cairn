@@ -748,5 +748,10 @@
     "path": "apps/server/src/legacy/agent-layer/schema.ts",
     "line": "// @ts-nocheck",
     "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
+  },
+  {
+    "path": "apps/web/src/resources/create-provider-dialog.tsx",
+    "line": "            {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}",
+    "reason": "Same Base UI checkbox quirk note, re-indented when the provider picker gained an inline mode"
   }
 ]

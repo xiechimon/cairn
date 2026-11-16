@@ -95,6 +95,8 @@ export function AddProviderFlow({
   connectError,
   onConnectError,
   onSubscriptionCreated,
+  inline = false,
+  testId,
 }: {
   teamId: string | undefined;
   live: boolean;
@@ -103,6 +105,8 @@ export function AddProviderFlow({
   connectError: string | null;
   onConnectError: (message: string | null) => void;
   onSubscriptionCreated?: (created: ClaudeSubscription) => void;
+  inline?: boolean;
+  testId?: string;
 }) {
   const { t } = useI18n();
   const mutations = useApiMutations(teamId);
@@ -112,8 +116,9 @@ export function AddProviderFlow({
   const [CreateProviderDialog, setCreateProviderDialog] = useState<
     typeof CreateProviderDialogModule | null
   >(null);
+  const pickerOpen = inline || view === 'picker';
   const xai = useDeviceLogin({
-    active: view === 'picker',
+    active: pickerOpen,
     poll: mutations.pollXaiDevice,
     onComplete: () => onViewChange('closed'),
     messages: {
@@ -124,7 +129,7 @@ export function AddProviderFlow({
     },
   });
   const codex = useDeviceLogin({
-    active: view === 'picker',
+    active: pickerOpen,
     poll: mutations.pollCodexDevice,
     onComplete: () => onViewChange('closed'),
     messages: {
@@ -134,7 +139,6 @@ export function AddProviderFlow({
       failed: t('OpenAI Codex 登录失败，请重试。'),
     },
   });
-  const pickerOpen = view === 'picker';
 
   useEffect(() => {
     let mounted = true;
@@ -151,6 +155,8 @@ export function AddProviderFlow({
       {CreateProviderDialog !== null ? (
         <CreateProviderDialog
           open={pickerOpen}
+          inline={inline}
+          testId={testId}
           onClose={() => {
             onViewChange('closed');
             onConnectError(null);

@@ -46,12 +46,14 @@ import {
   withoutFileTarget,
 } from './file-pane.js';
 import { FilePreviewPanel } from './file-preview-panel.js';
+import { HomeSpiral, type SpiralProject } from './home-spiral.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { NarrowTopControls, useNarrowChrome } from './narrow-chrome.js';
 import { composeRequest } from './open-composer.js';
 import { PhoneTabs } from './phone-tabs.js';
 import { splitProjectsByArchive } from './project-archive.js';
+import { waitingProjectIds } from './sidebar-projects.js';
 import { TasksPanel } from './tasks-panel.js';
 import {
   needsYouBadge,
@@ -109,6 +111,7 @@ interface HomeCProps {
   tasks: TasksView;
   tasksQuery?: QueryLike;
   archived?: ArchivedProjectState | null;
+  fixtureProjects?: readonly SpiralProject[];
 }
 
 export function conversationBoundaryKey(input: {
@@ -178,6 +181,7 @@ export function HomeC({
   tasks,
   tasksQuery,
   archived = null,
+  fixtureProjects,
 }: HomeCProps) {
   const { t } = useI18n();
   const { user, live, teamId, teamsQuery } = useLiveData();
@@ -316,6 +320,7 @@ export function HomeC({
     [todos],
   );
   const scopedTasks = useMemo(() => scopeTasks(tasks, projectId), [tasks, projectId]);
+  const waitingIds = useMemo(() => waitingProjectIds(tasks), [tasks]);
   const badge = needsYouBadge(scopedTasks.entries, scopedTasks.questions);
   const [questionTarget, setQuestionTarget] = useState<QuestionTarget | null>(null);
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
@@ -574,6 +579,9 @@ export function HomeC({
         >
           {paneButtons}
           {!narrow && <ChiefStatusMark chief={{ ...chiefData, stream }} />}
+          {!narrow && fallbackOnly && projectId === null && archived === null && (
+            <HomeSpiral projects={fixtureProjects ?? activeProjects} waiting={waitingIds} />
+          )}
           {banner != null && (
             <div
               data-home-banner=""

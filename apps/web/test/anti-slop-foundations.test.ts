@@ -51,6 +51,11 @@ describe('V16 no texture or gradient surfaces', () => {
     expect(appCss).not.toMatch(/feTurbulence|radial-gradient|conic-gradient/);
   });
 
+  test('ink grain lives only on the brand spiral illustration', () => {
+    expect(offenders(/feTurbulence/)).toEqual(['components/ink-spiral.tsx']);
+    expect(offenders(/<InkSpiral\b/).sort()).toEqual(['board/first-run-setup.tsx', 'board/home-spiral.tsx']);
+  });
+
   test('the user bubble is one flat token fill', () => {
     const bubble =
       sourceFiles.find(({ path }) => path === 'components/chat/user-message-bubble.tsx')?.text ?? '';

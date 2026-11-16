@@ -6,7 +6,7 @@ import {
   type SessionDefault,
 } from '@cairn/shared';
 import { cn } from 'cn';
-import { Check, KeyRound, MessageSquare, Plus } from 'lucide-react';
+import { Check, KeyRound, MessageSquare } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useChief, useMachines, useModelSources, useProjects, useProviders } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
@@ -14,6 +14,7 @@ import { useModelRouting } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
+import { InkSpiral, type SpiralHang } from '../components/ink-spiral.js';
 import { SegmentedRadio } from '../components/segmented.js';
 import { SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
@@ -23,7 +24,6 @@ import type { ModelOption } from '../fixtures/records.js';
 import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { BRAND_GLYPH } from '../lib/brand-mark.js';
 import { AddProviderFlow, type AddProviderView } from '../resources/add-provider-flow.js';
 import { ModelPicker } from '../resources/routing-settings-page.js';
 import { safeSessionStorage } from '../safe-storage.js';
@@ -87,7 +87,7 @@ export function useFirstRunSetup() {
 
 type Setup = ReturnType<typeof useFirstRunSetup>;
 
-const LG_PAD = 'lg:pl-14';
+const NO_HANGS: readonly SpiralHang[] = [];
 
 function StepMark({ n, state, className }: { n: number; state: StepState; className?: string }) {
   const { t } = useI18n();
@@ -172,32 +172,26 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
           '订阅已保存，这台电脑装好 Claude\u00a0Code 后会自动用上。现在先添加一个服务商，Coordinator 就能开始工作。',
         )
       : t('Claude 订阅、API key 或本地模型');
-  return (
-    <>
+  if (hasProvider) {
+    return (
       <SettingsCard>
         <SourceRow
           icon={<KeyRound className="size-5" />}
           title={t('服务商')}
           status={status}
           usedBy={t('Coordinator 和任务都能用')}
-          action={
-            hasProvider ? undefined : (
-              <div className={cn('mt-5', LG_PAD)}>
-                <Button
-                  size="lg"
-                  className="px-4 pointer-coarse:h-11 max-lg:h-11 max-lg:w-full"
-                  data-testid="first-run-add-provider"
-                  onClick={() => setAddView('picker')}
-                >
-                  <Plus />
-                  {t('添加服务商')}
-                </Button>
-              </div>
-            )
-          }
         />
       </SettingsCard>
+    );
+  }
+  return (
+    <>
+      {subscriptionSaved && !setup.claudeCodeFound && (
+        <p className="m-0 mb-4 text-pretty break-keep text-meta text-content-secondary">{status}</p>
+      )}
       <AddProviderFlow
+        inline
+        testId="first-run-add-provider"
         teamId={setup.teamId}
         live={live}
         view={addView}
@@ -398,30 +392,6 @@ function ConfirmBody({ setup }: { setup: Setup }) {
   );
 }
 
-function Watermark() {
-  const { box, scale, offset, d } = BRAND_GLYPH.large;
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox={`0 0 ${box} ${box}`}
-      className="pointer-events-none absolute -top-50 -right-48 size-120 text-(--tree-line) max-lg:hidden"
-    >
-      <g
-        transform={`translate(${box / 2} ${box / 2}) scale(${scale}) translate(${offset[0]} ${offset[1]})`}
-      >
-        <path
-          d={d}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.75}
-          strokeLinecap="round"
-          vectorEffect="non-scaling-stroke"
-        />
-      </g>
-    </svg>
-  );
-}
-
 function LanguageSwitch() {
   const { locale, setLocale, t } = useI18n();
   return (
@@ -566,7 +536,12 @@ export function FirstRunSetup({ setup, onSkip }: { setup: Setup; onSkip: () => v
         <LanguageSwitch />
       </div>
       <aside className="relative flex flex-none flex-col px-5 pt-[calc(env(safe-area-inset-top)+3rem)] lg:max-w-150 lg:basis-2/5 lg:overflow-hidden lg:border-r lg:border-border lg:bg-(--surface-1) lg:px-18 lg:pt-12 lg:pb-10">
-        <Watermark />
+        <InkSpiral
+          hangs={NO_HANGS}
+          drawn={open === 'models' ? 1 / 3 : 2 / 3}
+          size={180}
+          className="absolute right-12 bottom-24 max-lg:hidden [@media(max-height:760px)]:hidden"
+        />
         <div className="relative flex h-8 items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <BrandGlyph className="size-5" />
@@ -588,17 +563,17 @@ export function FirstRunSetup({ setup, onSkip }: { setup: Setup; onSkip: () => v
         </div>
         <SkipLine onSkip={onSkip} className="relative max-lg:hidden" />
       </aside>
-      <div className="flex flex-1 flex-col px-5 pt-8 pb-[calc(env(safe-area-inset-bottom)+2rem)] lg:items-center lg:justify-center lg:overflow-y-auto lg:px-16 lg:pt-20 lg:pb-15">
+      <div className="flex flex-1 flex-col px-5 pt-8 pb-[calc(env(safe-area-inset-bottom)+2rem)] lg:items-center lg:overflow-y-auto lg:px-16 lg:pt-28 lg:pb-15">
         <section
           key={open}
           aria-label={open === 'models' ? t('接入模型') : t('确认模型')}
-          className="w-full motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-1 motion-safe:duration-200 lg:max-w-130"
+          className="w-full motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-1 motion-safe:duration-200 lg:my-auto lg:max-w-130"
         >
-          <h2 className="m-0 voice-response text-page">
+          <h2 className="m-0 voice-response text-page lg:sr-only">
             {open === 'models' ? t('接入模型') : t('确认模型')}
           </h2>
           {open === 'models' ? (
-            <div className="mt-5">
+            <div className="mt-5 lg:mt-0">
               <ModelsBody setup={setup} progress={progress} />
             </div>
           ) : (
