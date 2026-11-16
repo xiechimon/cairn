@@ -3,7 +3,6 @@ import { applyFlush, flushPrompt } from '../src/coordinator/memory-flush.js';
 import { agentMemory, memoryCandidate, project } from '../src/db/schema.js';
 import { executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import { injectMemoryDocuments } from '../src/services/memory.js';
-import { memoryPassDue } from '../src/services/memory-consolidation.js';
 import {
   appendMemoryIndex,
   executeMemoryDocumentTool,
@@ -158,9 +157,8 @@ test('section 4 flush appends to a persisted index rather than creating legacy f
   expect(after.baseVersion).not.toBe(before.baseVersion);
 });
 
-test('section 4 tidy schedules only indexes beyond the load bound', async () => {
+test('an over-bound index write succeeds with a normal-turn tidy reminder', async () => {
   const index = await read('Coordinator');
-  expect(memoryPassDue(H.s.db, H.chiefId, H.teamId, AGENT_ID, Date.now())).toBe(false);
   const result = (await relay('update_memory', {
     scope: 'team',
     file: 'MEMORY.md',
@@ -168,7 +166,10 @@ test('section 4 tidy schedules only indexes beyond the load bound', async () => 
     baseVersion: index.baseVersion,
   })) as Document & { reminder: string };
   expect(result.reminder).toContain('memories');
-  expect(memoryPassDue(H.s.db, H.chiefId, H.teamId, AGENT_ID, Date.now())).toBe(true);
+  expect(result.reminder).toContain('normal turn');
+  expect(result.reminder).toContain('update_memory');
+  expect(result.reminder).toContain('delete_memory');
+  expect((await read('Coordinator')).content).toBe('line\n'.repeat(205));
 });
 
 test.each(paths)('injected baseVersion updates the index through %s', async (path) => {

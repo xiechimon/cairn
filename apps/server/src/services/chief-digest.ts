@@ -55,13 +55,6 @@ import {
 import { coordinatorServerContextEnabled } from './coordinator-context.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import {
-  applyMemoryPass,
-  MEMORY_PASS_MARK,
-  memoryPassDue,
-  memoryPassSection,
-  withMemoryPass,
-} from './memory-consolidation.js';
 import { rememberMemoryFile } from './memory-documents.js';
 import type { VapidKeys } from './push.js';
 import { coordinatorMemoryOwner, coordinatorProfile } from './routing-rules.js';
@@ -277,16 +270,11 @@ function digestMeta(threadId: string, last: CoordinatorLine, reason: FoldCandida
 export function queueDigestStep(
   deps: DigestDeps,
   chiefRow: typeof chief.$inferSelect,
-  basePrompt: string,
+  prompt: string,
   now: number,
 ): string {
   const { db } = deps;
   const digestThreadId = chiefDigestThreadId(chiefRow.id);
-  const agentId = coordinatorMemoryOwner(db, chiefRow.teamId);
-  const prompt =
-    agentId !== undefined && memoryPassDue(db, chiefRow.id, chiefRow.teamId, agentId, now)
-      ? withMemoryPass(basePrompt, memoryPassSection(db, chiefRow.id, chiefRow.teamId, agentId))
-      : basePrompt;
   db.insert(chiefThread)
     .values({
       id: digestThreadId,
@@ -607,23 +595,6 @@ export function finishChiefDigest(
     if (report !== undefined) settleReportRun(deps, report, retroFound, now, effects);
   });
   for (const effect of effects) effect();
-  if (succeeded && prompt.includes(MEMORY_PASS_MARK)) {
-    const owner = db
-      .select({ teamId: chiefThread.teamId })
-      .from(chiefThread)
-      .where(eq(chiefThread.id, stepRow.buildId))
-      .get();
-    const agentId = owner === undefined ? undefined : coordinatorMemoryOwner(db, owner.teamId);
-    const memory =
-      parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
-        ? (parsed as { memory?: unknown }).memory
-        : undefined;
-    if (owner !== undefined && agentId !== undefined && memory !== undefined) {
-      const result = applyMemoryPass(db, { teamId: owner.teamId, agentId }, memory, now);
-      if (result.skipped > 0)
-        db.update(step).set({ status: 'failed' }).where(eq(step.id, stepRow.id)).run();
-    }
-  }
   if (!ok) return;
   const until = Number(meta[2]);
   const rememberAs =
