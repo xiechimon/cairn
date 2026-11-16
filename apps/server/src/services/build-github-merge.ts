@@ -26,6 +26,7 @@ import {
   STEP_KIND_TEXT,
   stepKindInFlight,
 } from './builds.js';
+import { quickLaneRefusal } from './coordinator-request.js';
 import { assertCorrectionDone } from './correction.js';
 import { projectOfTodo } from './git.js';
 import { readGithubAutonomyPause } from './github-autonomy-brake.js';
@@ -70,6 +71,8 @@ function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; faile
     );
   }
   assertCorrectionDone(deps.db, todoRow);
+  const laneRefusal = quickLaneRefusal(deps.db, todoRow);
+  if (laneRefusal !== null) throw new HttpError(409, laneRefusal);
   return { todoRow, failed };
 }
 
