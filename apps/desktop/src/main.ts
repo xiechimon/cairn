@@ -29,7 +29,8 @@ const READY_TIMEOUT_MS = 60_000;
 const READY_POLL_MS = 250;
 const STOP_TIMEOUT_MS = 10_000;
 const UPDATE_FIRST_CHECK_MS = 10_000;
-const UPDATE_CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
+const UPDATE_CHECK_EVERY_MS = 60 * 60 * 1000;
+const UPDATE_CHECK_ON_FOCUS_AFTER_MS = 10 * 60 * 1000;
 
 interface RunningServer {
   process: UtilityProcess;
@@ -211,16 +212,24 @@ function serveUpdates(origin: string): void {
       window.webContents.send('desktop-update:state', state);
     }
   });
+  let lastCheckedAt = 0;
+  const check = (): Promise<void> => {
+    lastCheckedAt = Date.now();
+    return updater.check();
+  };
   const fromOwnPage = (event: IpcMainInvokeEvent): boolean => event.senderFrame?.origin === origin;
   ipcMain.handle('desktop-update:state', (event) => (fromOwnPage(event) ? updater.state() : null));
-  ipcMain.handle('desktop-update:check', (event) =>
-    fromOwnPage(event) ? updater.check() : undefined,
-  );
+  ipcMain.handle('desktop-update:check', (event) => (fromOwnPage(event) ? check() : undefined));
   ipcMain.handle('desktop-update:install', (event) =>
     fromOwnPage(event) ? updater.install() : undefined,
   );
-  setTimeout(() => void updater.check(), UPDATE_FIRST_CHECK_MS);
-  setInterval(() => void updater.check(), UPDATE_CHECK_EVERY_MS);
+  setTimeout(() => void check(), UPDATE_FIRST_CHECK_MS);
+  setInterval(() => void check(), UPDATE_CHECK_EVERY_MS);
+  app.on('browser-window-focus', () => {
+    if (lastCheckedAt !== 0 && Date.now() - lastCheckedAt >= UPDATE_CHECK_ON_FOCUS_AFTER_MS) {
+      void check();
+    }
+  });
 }
 
 async function boot(): Promise<void> {
