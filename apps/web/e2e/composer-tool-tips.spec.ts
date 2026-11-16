@@ -26,3 +26,14 @@ test('chief composer tools name themselves on hover', async ({ page }) => {
   await page.goto(CHIEF);
   await expectTip(page, page.locator('[data-testid="composer-plus"]:visible'), '更多');
 });
+
+test('a tooltip waits for a settled hover instead of appearing at once', async ({ page }) => {
+  await page.clock.install();
+  await page.goto(CHIEF);
+  const tip = page.locator('[data-slot="tooltip-content"]');
+  await page.locator('[data-testid="composer-plus"]:visible').hover();
+  await page.clock.runFor(300);
+  await expect(tip).toHaveCount(0);
+  await page.clock.runFor(400);
+  await expect(tip).toHaveText('更多');
+});
