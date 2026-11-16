@@ -407,7 +407,7 @@ function Watermark() {
           d={d}
           fill="none"
           stroke="currentColor"
-          strokeWidth={1}
+          strokeWidth={1.75}
           strokeLinecap="round"
           vectorEffect="non-scaling-stroke"
         />
