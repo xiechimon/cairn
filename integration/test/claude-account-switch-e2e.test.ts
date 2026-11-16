@@ -274,12 +274,21 @@ describe('after the owner switches the enabled Claude account', () => {
       .filter((st) => st.kind === 'chief')
       .at(-1);
     expect(turn).toMatchObject({ claudeSubscriptionId: accountB });
-    const chiefRun = runs().at(-1) as RunLine;
-    expect(chiefRun).toMatchObject({ resume: null, tokenSha: sha(TOKEN_B) });
-    expect(chiefRun.sessionId).not.toBe(threadSessionOnA);
+    const threadSession = server.db
+      .select()
+      .from(chiefThread)
+      .where(eq(chiefThread.id, threadId))
+      .get()?.sessionId;
+    expect(threadSession).not.toBe(threadSessionOnA);
+    expect(runs()).toContainEqual({
+      resume: null,
+      newSession: threadSession,
+      sessionId: threadSession,
+      tokenSha: sha(TOKEN_B),
+    });
     expect(
-      server.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get()?.sessionId,
-    ).toBe(chiefRun.sessionId);
+      runs().filter((line) => line.resume === threadSessionOnA && line.tokenSha === sha(TOKEN_B)),
+    ).toEqual([]);
   }, 300_000);
 
   test('an automatic continuation of a session that ran on A is held as account-switched, and resumes with A once A is enabled again', async () => {
@@ -300,13 +309,14 @@ describe('after the owner switches the enabled Claude account', () => {
           .every((st) => st.id === held.id || (st.status !== 'pending' && st.status !== 'claimed')),
       120_000,
     );
-    const before = runs().length;
+    const planSession = stepsOf(heldBuild.buildId).find((st) => st.kind === 'plan')?.sessionId;
+    expect(planSession).toBeTruthy();
     await new Promise((resolveWait) => setTimeout(resolveWait, 6_000));
     expect(stepsOf(heldBuild.buildId).find((st) => st.id === held.id)).toMatchObject({
       status: 'pending',
       machineId: null,
     });
-    expect(runs()).toHaveLength(before);
+    expect(runs().filter((line) => line.resume === planSession)).toEqual([]);
     const listed = await api(server.url, 'GET', `/api/builds/${heldBuild.buildId}/steps`);
     const shown = (listed.body as { id: string; queue?: { blocked?: { kind: string } } }[]).find(
       (st) => st.id === held.id,
@@ -318,10 +328,9 @@ describe('after the owner switches the enabled Claude account', () => {
       () => stepsOf(heldBuild.buildId).some((st) => st.id === held.id && st.status === 'done'),
       120_000,
     );
-    const planSession = stepsOf(heldBuild.buildId).find((st) => st.kind === 'plan')?.sessionId;
-    const resumed = runs()[before] as RunLine;
-    expect(runs()).toHaveLength(before + 1);
-    expect(resumed).toMatchObject({ resume: planSession, tokenSha: sha(TOKEN_A) });
+    const resumes = runs().filter((line) => line.resume === planSession);
+    expect(resumes).toHaveLength(1);
+    expect(resumes[0]).toMatchObject({ tokenSha: sha(TOKEN_A) });
     expect(stepsOf(heldBuild.buildId).find((st) => st.id === held.id)).toMatchObject({
       claudeSubscriptionId: accountA,
     });
