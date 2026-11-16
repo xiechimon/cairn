@@ -1399,25 +1399,37 @@ export function toModelOptions(sources: ModelSource[]): ModelOption[] {
   return options;
 }
 
-const LOCAL_NETWORK_BLOCKED_RE = /NECP|EHOSTUNREACH/;
-
 const MODEL_UNREACHABLE_RE =
   /Connection error|NECP|ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ENETUNREACH|ETIMEDOUT|fetch failed/i;
 
-export function turnErrorCopy(turnError: string): { title: string; hint: string } {
-  if (LOCAL_NETWORK_BLOCKED_RE.test(turnError))
-    return {
-      title: '连不上模型服务',
-      hint: '这台 Mac 还没允许 Cairn 访问本地网络。打开「系统设置 → 隐私与安全性 → 本地网络」，打开 Cairn，然后点重试。',
-    };
+const MODEL_KEY_REJECTED_RE =
+  /\b401\b|(invalid|incorrect).{0,20}api key|unauthorized|authentication_error/i;
+
+export interface TurnErrorCopy {
+  title: string;
+  hint: string;
+  fix: string;
+}
+
+export function turnErrorCopy(turnError: string, onMac: boolean): TurnErrorCopy {
   if (MODEL_UNREACHABLE_RE.test(turnError))
     return {
       title: '连不上模型服务',
-      hint: '可能是模型服务里的地址填错了、模型服务没有开，或者这台电脑还没允许 Cairn 访问本地网络。处理好后点重试。',
+      hint: onMac
+        ? '可能是地址填错了、网络或代理不通，或者本地模型没有开。模型在这台 Mac 或局域网里的话，还要在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。'
+        : '可能是地址填错了、网络或代理不通，或者本地模型没有开。',
+      fix: '打开模型服务设置',
+    };
+  if (MODEL_KEY_REJECTED_RE.test(turnError))
+    return {
+      title: '模型服务不接受这个 API key',
+      hint: 'API key 填错了或已经失效。',
+      fix: '重新填写 API key',
     };
   return {
     title: '这一轮没有完成',
-    hint: '模型这次没有给出回复。点重试再发一次；一直这样的话，检查一下模型服务。',
+    hint: '模型服务这次出错了。稍后重试；一直出错的话，检查模型服务设置。',
+    fix: '打开模型服务设置',
   };
 }
 

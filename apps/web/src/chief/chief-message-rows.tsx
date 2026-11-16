@@ -13,7 +13,7 @@ import { LiveRow, TypingDots } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
 import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { Button } from '../components/ui/button.js';
-import { Marker, MarkerContent } from '../components/ui/marker.js';
+import { Marker, MarkerContent, MarkerIcon } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
@@ -99,8 +99,10 @@ const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = `w-full max-w-full font-sans ${CHAT_BODY_CLS}`;
-const MARKER_ERROR_CLS = 'my-2.5 gap-1.5 text-meta text-(--destructive)';
-const MARKER_RETRY_CLS = 'my-2.5 items-start gap-1.5 text-meta';
+const MARKER_ERROR_CLS = 'my-3 gap-2 text-meta text-(--destructive)';
+const MARKER_RETRY_CLS = 'my-3 items-start gap-2 text-meta';
+const ERROR_ACTION_CLS = 'pointer-coarse:h-11';
+const ON_MAC = typeof navigator !== 'undefined' && /Macintosh/.test(navigator.userAgent);
 const SAID_CLS = `${REPLY_BUBBLE_CLS} min-w-0 font-sans ${CHAT_BODY_CLS} text-(--foreground) [overflow-wrap:anywhere]`;
 
 function CoordinatorSaid({ testId, children }: { testId: string; children: ReactNode }) {
@@ -620,33 +622,45 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'thread-report' || item.kind === 'thread-message' || item.kind === 'report-ack')
     return null;
   if (item.kind === 'error') {
-    const copy = turnErrorCopy(item.text);
+    const copy = turnErrorCopy(item.text, ON_MAC);
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
         {onRetry === undefined ? (
           <Marker role="alert" className={MARKER_ERROR_CLS} title={item.text}>
-            <CircleAlert aria-hidden="true" className="flex-none" />
-            <MarkerContent data-testid="chief-turn-error">{t(copy.title)}</MarkerContent>
+            <MarkerIcon>
+              <CircleAlert />
+            </MarkerIcon>
+            <MarkerContent data-testid="chief-turn-error" className="text-content-secondary">
+              {t(copy.title)}
+            </MarkerContent>
           </Marker>
         ) : (
           <Marker role="alert" className={MARKER_RETRY_CLS} title={item.text}>
-            <CircleAlert aria-hidden="true" className="mt-0.5 flex-none text-(--destructive)" />
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <MarkerIcon className="flex h-lh items-center text-(--destructive)">
+              <CircleAlert />
+            </MarkerIcon>
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
               <MarkerContent data-testid="chief-turn-error" className="text-(--destructive)">
                 {t(copy.title)}
               </MarkerContent>
-              <span className="text-content-secondary">{t(copy.hint)}</span>
-              <span className="mt-1.5 flex flex-wrap gap-2">
+              <span className="text-pretty break-keep text-content-secondary">{t(copy.hint)}</span>
+              <span className="mt-2 flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"
+                  className={ERROR_ACTION_CLS}
+                  render={<Link to={settingsHref('providers')} />}
+                >
+                  {t(copy.fix)}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={ERROR_ACTION_CLS}
                   data-testid="chief-turn-retry"
                   onClick={onRetry}
                 >
                   {t('重试')}
-                </Button>
-                <Button variant="ghost" size="sm" render={<Link to={settingsHref('providers')} />}>
-                  {t('检查模型服务')}
                 </Button>
               </span>
             </span>

@@ -1425,13 +1425,16 @@ export const EN: Record<string, string> = {
   // —— #631 总管对话失败闭环（sonner toast + 线程失败行）——
   这一轮没有完成: 'This turn did not finish',
   连不上模型服务: "Can't reach the model provider",
-  '这台 Mac 还没允许 Cairn 访问本地网络。打开「系统设置 → 隐私与安全性 → 本地网络」，打开 Cairn，然后点重试。':
-    "This Mac hasn't allowed Cairn on the local network yet. Open System Settings → Privacy & Security → Local Network, turn on Cairn, then retry.",
-  '可能是模型服务里的地址填错了、模型服务没有开，或者这台电脑还没允许 Cairn 访问本地网络。处理好后点重试。':
-    "The address in Providers may be wrong, the model service may not be running, or this computer hasn't allowed Cairn on the local network yet. Fix it, then retry.",
-  检查模型服务: 'Check providers',
-  '模型这次没有给出回复。点重试再发一次；一直这样的话，检查一下模型服务。':
-    "The model didn't reply this time. Retry to send it again; if it keeps happening, check Providers.",
+  '可能是地址填错了、网络或代理不通，或者本地模型没有开。':
+    "The address may be wrong, the network or proxy may be blocking it, or the local model isn't running.",
+  '可能是地址填错了、网络或代理不通，或者本地模型没有开。模型在这台 Mac 或局域网里的话，还要在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。':
+    "The address may be wrong, the network or proxy may be blocking it, or the local model isn't running. If the model is on this Mac or your local network, also turn on Cairn in System Settings → Privacy & Security → Local Network.",
+  '模型服务不接受这个 API key': "The model provider didn't accept this API key",
+  'API key 填错了或已经失效。': 'The API key is wrong or has expired.',
+  '模型服务这次出错了。稍后重试；一直出错的话，检查模型服务设置。':
+    'The model provider returned an error this time. Try again later; if it keeps failing, check the provider settings.',
+  '重新填写 API key': 'Re-enter the API key',
+  打开模型服务设置: 'Open provider settings',
   '撤回失败，Coordinator 可能已经开始处理这条了。':
     'Could not withdraw: the Coordinator may already be working on it.',
   '插话失败，请重试。': 'Could not steer. Try again.',
