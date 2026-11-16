@@ -43,6 +43,7 @@
     "@earendil-works/pi-telemetry": "1.5.0",
     "@earendil-works/pi-tui": "1.5.0",
     "@modelcontextprotocol/sdk": "1.30.0",
+    "cloakbrowser": "0.7.2",
     "commander": "15.0.0",
     "e2b": "2.63.0",
     "pino": "10.3.1",

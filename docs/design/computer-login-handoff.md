@@ -22,6 +22,10 @@ Owner decision (2026-11-15, superseding the session persistence line above):
 - Sites such as BOSS Zhipin (zhipin.com) tear down any page driven over CDP, so on takeover the daemon closes the agent browser and opens a plain Chromium without a debugging port on the same desktop, at the agent's last http(s) page. Giving control back stops it, and the agent's next browser call starts the agent browser again.
 - Both browsers share one Chromium profile per desktop at `.cairn/browser-profile`, so a login the owner makes is the agent's login too. `--restore` is gone; an old saved session is imported into the profile once. The agent's shell refuses `browser-profile` paths as it does `.agent-browser/`.
 
+## Cloak engine supplement (2026-11-16)
+
+The approved [CloakBrowser adapter design](cloakbrowser-computer.md) replaces system Chromium selection, not this handoff. Automation, the no-debugging owner process and the generated Cairn Dock launcher share the Cloak binary and the existing profile's strict fingerprint identity. Preparation requires a license file; failure removes browser capability without removing desktop or files. Owner transfer checks driver close and profile-lock release; the next agent call observes graceful manual-unit exit and lock release. Owner and Dock use one manual starter and visible-window readiness check. The final launcher refuses an agent-owned live profile rather than forwarding a human window into a debugging session. Native Chrome `--restore-last-session` preserves session cookies; it is not the removed agent-browser `--restore` state-file path. Desktop residency and production-profile cutover remain outside this change; target-site recognition effects require separate acceptance.
+
 ## Goal
 
 When a page in the Coordinator browser needs a login or a human check, the agent stops driving it. The owner gets a card in the conversation and a push that opens it. While the owner holds control, the agent issues no browser action and no screen capture. When the owner gives control back, the agent continues from a fresh snapshot. Passwords, one-time codes and cookies never reach the model.

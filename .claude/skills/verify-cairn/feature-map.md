@@ -27,7 +27,7 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 
 **The agent's computer** (partial, centrality 1). The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.
 
-States: No computer; command feed empty, streaming, or settled; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere.
+States: No computer; command feed empty, streaming, or settled; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere. Cloak browser prepared, missing credentials, failed acquisition, invalid profile identity, and shared-profile agent/owner/Dock handoff with no debugging port during owner control.
 
 Reach:
 
@@ -38,10 +38,10 @@ Reach:
 - Web routes: none
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `chief-takeover`, `chief-takeover-failed`, `chief-takeover-give-back`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-take`, `chief-takeover-time-left`, `computer-command`, `computer-command-exit`, `computer-command-output`, `computer-command-text`, `computer-command-time`, `computer-control-bar`, `computer-feed`, `computer-feed-empty`, `computer-state`, `machine-card`, `machine-edit`, `machine-list-row`, `machine-screen`, `machine-screen-chrome`, `machine-screen-enlarged`, `machine-screen-exit`, `machine-screen-expand`, `machine-status-dot`, `machines-add`, `machines-button`, `machines-recheck`
-- Research: [docs/research/coordinator-computer.md](../../../docs/research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](../../../docs/research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](../../../docs/research/user-computer-model-2026-11-08.md) (not on main)
+- Research: [docs/research/coordinator-computer.md](../../../docs/research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](../../../docs/research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](../../../docs/research/user-computer-model-2026-11-08.md) (not on main), [docs/research/resident-cloakbrowser-2026-11-16.md](../../../docs/research/resident-cloakbrowser-2026-11-16.md)
 - Frontend design: **gap**: the computer feed, screen view and control handover have no design
-- Backend design: **gap**: no design for computer access grants, the browser preference, the guard and the screen channel
-- Evidence: `apps/web/e2e/machines-computer-feed.spec.ts`, `apps/web/test/machine-capabilities.test.ts`, `apps/server/test/computer-screen-routes.test.ts`, `apps/server/test/computer-feed-routes.test.ts`, `apps/daemon/test/computer-guard.test.ts`, `apps/daemon/test/computer-browser.test.ts`, `apps/daemon/test/machine-boot.test.ts`, `apps/daemon/test/computer-host-desktop.test.ts`
+- Backend design: [docs/design/computer-login-handoff.md](../../../docs/design/computer-login-handoff.md), [docs/design/cloakbrowser-computer.md](../../../docs/design/cloakbrowser-computer.md)
+- Evidence: `apps/web/e2e/machines-computer-feed.spec.ts`, `apps/web/test/machine-capabilities.test.ts`, `apps/server/test/computer-screen-routes.test.ts`, `apps/server/test/computer-feed-routes.test.ts`, `apps/daemon/test/computer-guard.test.ts`, `apps/daemon/test/computer-browser.test.ts`, `apps/daemon/test/machine-boot.test.ts`, `apps/daemon/test/computer-host-desktop.test.ts`, `apps/daemon/test/computer-cloak-browser.test.ts`
 
 ### coordinator-chat
 

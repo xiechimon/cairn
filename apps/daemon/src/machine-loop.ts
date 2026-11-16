@@ -238,7 +238,15 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         })
       : undefined;
   const hostDesktops = desktops?.missingPrograms().length === 0 ? desktops : undefined;
-  if (hostDesktops) ensurePrivateDir(computerInputLocks);
+  if (hostDesktops) {
+    ensurePrivateDir(computerInputLocks);
+    await hostDesktops.prepareBrowser().then(
+      (version) => logger.machine(`CloakBrowser prepared build ${version}`),
+      (error: unknown) => {
+        logger.machine(error instanceof Error ? error.message : 'CloakBrowser preparation failed');
+      },
+    );
+  }
   const orbComputer = opts.orbComputer ?? hostDesktops;
   const agentReach = new AgentReachProbe();
   const hostPermissionsProbe = opts.hostPermissionsProbe ?? new HostPermissionsProbe();

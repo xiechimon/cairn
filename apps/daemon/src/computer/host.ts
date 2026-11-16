@@ -14,6 +14,7 @@ import {
 } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { AGENT_BROWSER_BINARY } from './browser.js';
 import { awaitWithSignal } from './cancellation.js';
 import { spawnContainedCommand } from './contained-spawn.js';
 import { COMPUTER_MARKER_ENV, ProcessTree } from './process-tree.js';
@@ -70,6 +71,7 @@ export interface HostComputerOptions {
   killGraceMs?: number;
   streamDrainMs?: number;
   maxFileBytes?: number;
+  browserEnvironment?: () => Promise<Record<string, string>>;
 }
 
 export function hostCommandEnvironment(
@@ -150,7 +152,7 @@ export class HostComputerProvider implements ComputerProvider {
   private readonly maxFileBytes: number;
   private readonly running = new Set<{ stop: () => Promise<void> }>();
 
-  constructor(options: HostComputerOptions = {}) {
+  constructor(private readonly options: HostComputerOptions = {}) {
     this.home = path.resolve(options.home ?? homedir());
     this.env = options.env ?? process.env;
     this.killGraceMs = options.killGraceMs ?? HOST_KILL_GRACE_MS;
@@ -237,6 +239,7 @@ export class HostComputerProvider implements ComputerProvider {
     };
     this.running.add(pending);
     let cwd: string;
+    let browserEnv: Record<string, string> = {};
     try {
       signal.throwIfAborted();
       cwd = await this.resolveInHome(request.cwd, 'cwd', signal);
@@ -245,6 +248,8 @@ export class HostComputerProvider implements ComputerProvider {
         signal,
       );
       if (!info?.isDirectory()) throw new ComputerRefusal('cwd is not an existing directory');
+      if (request.argv[0] === AGENT_BROWSER_BINARY && this.options.browserEnvironment)
+        browserEnv = await awaitWithSignal(this.options.browserEnvironment(), signal);
     } catch (error) {
       if (signal.aborted) return stoppedBeforeSpawn();
       clearTimeout(deadlineTimer);
@@ -262,6 +267,7 @@ export class HostComputerProvider implements ComputerProvider {
     const marker = randomBytes(12).toString('hex');
     const env = {
       ...hostCommandEnvironment(this.env, request.env),
+      ...browserEnv,
       [COMPUTER_MARKER_ENV]: marker,
     };
     let child: ReturnType<typeof spawnContainedCommand>;

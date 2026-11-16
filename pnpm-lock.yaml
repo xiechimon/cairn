@@ -289,6 +289,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 1.30.0
         version: 1.30.0(supports-color@10.2.2)(zod@4.6.5)
+      cloakbrowser:
+        specifier: 0.7.2
+        version: 0.7.2(playwright-core@1.63.0)
       commander:
         specifier: 15.0.0
         version: 15.0.0
@@ -3739,6 +3742,25 @@ packages:
   cliui@9.0.1:
     resolution: {integrity: sha512-k7ndgKhwoQveBL+/1tqGJYNz097I7WOvwbmmU2AR5+magtbjPWQTS1C5vzGkBC8Ym8UWRzfKUzUUqFLypY4Q+w==}
     engines: {node: '>=20'}
+
+  cloakbrowser@0.7.2:
+    resolution: {integrity: sha512-arAD+uZzfj8+xwraLEPUzz9DfsMA7vV7HD+WtgtVoDfQXnmSlKqDWp2dUCnBKrK5nNS32DWfQX1TEuWaKIKdfw==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    hasBin: true
+    peerDependencies:
+      mmdb-lib: '>=2.0.0'
+      playwright-core: '>=1.53.0 <1.65.0'
+      puppeteer-core: '>=21.0.0'
+      socks-proxy-agent: '>=10.0.0'
+    peerDependenciesMeta:
+      mmdb-lib:
+        optional: true
+      playwright-core:
+        optional: true
+      puppeteer-core:
+        optional: true
+      socks-proxy-agent:
+        optional: true
 
   clone-response@1.0.3:
     resolution: {integrity: sha512-ROoL94jJH2dUVML2Y/5PEDNaSHgeOdSDicUyS7izcF63G6sTc/FTjLub4b8Il9S8S0beOfYt0TaA5qvFK+w0wA==}
@@ -10143,6 +10165,12 @@ snapshots:
       string-width: 7.2.0
       strip-ansi: 7.2.0
       wrap-ansi: 9.0.2
+
+  cloakbrowser@0.7.2(playwright-core@1.63.0):
+    dependencies:
+      tar: 7.5.22
+    optionalDependencies:
+      playwright-core: 1.63.0
 
   clone-response@1.0.3:
     dependencies:

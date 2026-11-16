@@ -989,7 +989,7 @@
       "id": "agent-computer",
       "name": "The agent's computer",
       "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser availability follows machine capability and existing grants without a web preference control.",
-      "states": "No computer; command feed empty, streaming, or settled; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere.",
+      "states": "No computer; command feed empty, streaming, or settled; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; browser enabled, disabled, unsupported (no capabilities.browser), preference retained while capability is gone, offline machine, and machine-mismatch when the chief computer is pinned elsewhere. Cloak browser prepared, missing credentials, failed acquisition, invalid profile identity, and shared-profile agent/owner/Dock handoff with no debugging port during owner control.",
       "centrality": 1,
       "status": "partial",
       "code": {
@@ -1029,14 +1029,16 @@
       "research": [
         "docs/research/coordinator-computer.md",
         "docs/research/agent-small-computer-2026-11-08.md",
-        "docs/research/user-computer-model-2026-11-08.md"
+        "docs/research/user-computer-model-2026-11-08.md",
+        "docs/research/resident-cloakbrowser-2026-11-16.md"
       ],
       "frontendDesign": {
         "gap": "the computer feed, screen view and control handover have no design"
       },
-      "backendDesign": {
-        "gap": "no design for computer access grants, the browser preference, the guard and the screen channel"
-      },
+      "backendDesign": [
+        "docs/design/computer-login-handoff.md",
+        "docs/design/cloakbrowser-computer.md"
+      ],
       "evidence": [
         "apps/web/e2e/machines-computer-feed.spec.ts",
         "apps/web/test/machine-capabilities.test.ts",
@@ -1045,7 +1047,8 @@
         "apps/daemon/test/computer-guard.test.ts",
         "apps/daemon/test/computer-browser.test.ts",
         "apps/daemon/test/machine-boot.test.ts",
-        "apps/daemon/test/computer-host-desktop.test.ts"
+        "apps/daemon/test/computer-host-desktop.test.ts",
+        "apps/daemon/test/computer-cloak-browser.test.ts"
       ],
       "batch": "B4"
     },
