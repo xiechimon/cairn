@@ -17,6 +17,7 @@ export type DesktopUpdateState =
   | { status: 'available'; version: string }
   | { status: 'downloading'; version: string; percent: number }
   | { status: 'installing'; version: string }
+  | { status: 'restarting'; version: string }
   | { status: 'error'; message: string };
 
 export interface DesktopUpdate {

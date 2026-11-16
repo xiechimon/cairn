@@ -56,13 +56,19 @@ export function DesktopUpdateButton({
       </Button>
     );
   }
-  if (state.status === 'downloading' || state.status === 'installing') {
+  if (
+    state.status === 'downloading' ||
+    state.status === 'installing' ||
+    state.status === 'restarting'
+  ) {
     return (
       <Button data-testid="desktop-update" variant="secondary" className={PILL} disabled>
         {icon}
         {state.status === 'downloading'
           ? t('正在更新 {percent}%', { percent: state.percent })
-          : t('正在重启…')}
+          : state.status === 'installing'
+            ? t('正在安装…')
+            : t('正在重启…')}
       </Button>
     );
   }
