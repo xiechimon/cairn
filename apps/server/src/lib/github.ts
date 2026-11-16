@@ -528,6 +528,17 @@ export async function githubUserIdentity(
   return { login: data.login, id: data.id, name: typeof data.name === 'string' ? data.name : null };
 }
 
+export async function githubUserHasInstallation(
+  fetchImpl: FetchLike,
+  token: string,
+): Promise<boolean> {
+  const data = (await readJson(fetchImpl, `${githubApiBaseUrl()}/user/installations?per_page=1`, {
+    ...API_HEADERS,
+    authorization: `Bearer ${token}`,
+  })) as { total_count?: unknown };
+  return typeof data.total_count === 'number' && data.total_count > 0;
+}
+
 export async function githubUserLogin(fetchImpl: FetchLike, token: string): Promise<string> {
   return (await githubUserIdentity(fetchImpl, token)).login;
 }

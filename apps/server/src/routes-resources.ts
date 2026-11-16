@@ -19,6 +19,7 @@ import {
   SKILL_ENTRY_FILE,
   setSecretBodySchema,
   skillRecordSchema,
+  startGithubConnectorDeviceBodySchema,
   startMcpConnectorOAuthBodySchema,
   THINKING_LEVELS,
   testProviderBodySchema,
@@ -67,6 +68,13 @@ import {
   machineRunningCount,
   toMachineRecord,
 } from './services/machines.js';
+import {
+  cancelGithubConnectorDevice,
+  githubConnectorAvailability,
+  githubConnectorInstalled,
+  pollGithubConnectorDevice,
+  startGithubConnectorDevice,
+} from './services/mcp-github-connector.js';
 import {
   checkMcpConnector,
   createMcpConnector,
@@ -576,6 +584,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     fetch: ctx.mcpFetch ?? globalThis.fetch,
     oauthFetch: ctx.mcpFetch ?? publicOAuthFetch,
     oauthState: ctx.mcpOAuthState,
+    ...(ctx.mcpGithubApp !== undefined ? { githubApp: ctx.mcpGithubApp } : {}),
   });
 
   const oauthDeps = (): OAuthDeps => ({
@@ -800,6 +809,55 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         body,
       }),
     );
+  });
+
+  app.get('/api/teams/:id/mcp-connectors/github', (c) => {
+    requireTeam(ctx, c.req.param('id'));
+    return c.json(githubConnectorAvailability(mcpDeps()));
+  });
+
+  app.post('/api/teams/:id/mcp-connectors/github/device', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const body = parseWith(startGithubConnectorDeviceBodySchema, (await jsonBody(c)) ?? {}, 'body');
+    return c.json(
+      await startGithubConnectorDevice(mcpDeps(), {
+        teamId,
+        userId: ctx.user.id,
+        connectorId: body.connectorId,
+      }),
+    );
+  });
+
+  app.post('/api/teams/:id/mcp-connectors/github/device/:attempt', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(
+      await pollGithubConnectorDevice(mcpDeps(), {
+        teamId,
+        userId: ctx.user.id,
+        attemptId: c.req.param('attempt'),
+      }),
+    );
+  });
+
+  app.delete('/api/teams/:id/mcp-connectors/github/device/:attempt', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    cancelGithubConnectorDevice(mcpDeps(), {
+      teamId,
+      userId: ctx.user.id,
+      attemptId: c.req.param('attempt'),
+    });
+    return c.body(null, 204);
+  });
+
+  app.post('/api/teams/:id/mcp-connectors/:cid/github/installations', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json({
+      installed: await githubConnectorInstalled(mcpDeps(), teamId, c.req.param('cid')),
+    });
   });
 
   app.post('/api/teams/:id/mcp-connectors/:cid/check', async (c) => {

@@ -430,6 +430,7 @@ const connector = (
 ): McpConnectorRecord => ({
   id,
   teamId: TEAM_ID,
+  account: null,
   statusReason: null,
   toolCount: null,
   checkedAt: r7(13, 10),
