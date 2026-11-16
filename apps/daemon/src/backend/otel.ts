@@ -1,7 +1,7 @@
 import {
-  type Attributes,
   chatAttributes,
   executeToolAttributes,
+  LANGFUSE_ATTR,
   langfuseEnvironmentAttributes,
   observationAttributes,
   otelEnvironment,
@@ -112,7 +112,6 @@ function jsonText(value: unknown): string {
 
 export class PiStepSpanSink {
   private readonly spans: CairnSpan[] = [];
-  private input: Attributes = {};
   private readonly openTools = new Map<string, OpenToolSpan>();
 
   constructor(
@@ -126,10 +125,6 @@ export class PiStepSpanSink {
     return { traceId: this.ctx.traceId, spanId: this.ctx.stepSpanId };
   }
 
-  request(messages: unknown): void {
-    this.input = observationAttributes({ input: this.redact?.(messages) ?? messages });
-  }
-
   chat(
     at: number,
     turn: {
@@ -140,7 +135,10 @@ export class PiStepSpanSink {
       rawFinishReason?: string;
       usage?: TokenCounts;
       costUsd?: number;
+      input?: unknown;
       output?: unknown;
+      endAt?: number;
+      firstTokenAt?: number;
     },
   ): void {
     const model = turn.model ?? this.fallback.model ?? '';
@@ -149,16 +147,20 @@ export class PiStepSpanSink {
       name: `chat ${model}`.trim(),
       kind: 'client',
       startMs: at,
-      endMs: at,
+      endMs: Math.max(at, turn.endAt ?? at),
       attributes: {
         ...chatAttributes(turn, this.fallback),
-        ...this.input,
-        ...observationAttributes({ output: this.redact?.(turn.output) ?? turn.output }),
+        ...observationAttributes({
+          input: this.redact?.(turn.input) ?? turn.input,
+          output: this.redact?.(turn.output) ?? turn.output,
+        }),
+        ...(turn.firstTokenAt === undefined
+          ? {}
+          : { [LANGFUSE_ATTR.completionStartTime]: new Date(turn.firstTokenAt).toISOString() }),
         ...langfuseEnvironmentAttributes(this.ctx.environment),
       },
       ...(turn.finishReason === 'error' ? { error: 'error' } : {}),
     });
-    this.input = {};
   }
 
   toolStart(id: string, at: number, name: string, args: unknown): void {
@@ -189,10 +191,12 @@ export class PiStepSpanSink {
     });
   }
 
-  async flush(): Promise<void> {
+  async flush(final = true): Promise<void> {
     const now = Date.now();
-    for (const id of [...this.openTools.keys()]) {
-      this.toolEnd(id, now, undefined, false);
+    if (final) {
+      for (const id of [...this.openTools.keys()]) {
+        this.toolEnd(id, now, undefined, false);
+      }
     }
     if (this.spans.length === 0) return;
     try {

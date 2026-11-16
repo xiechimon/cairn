@@ -19,6 +19,8 @@ import type {
 import {
   classifyStepFailure,
   ENV_VARS,
+  LANGFUSE_ATTR,
+  observationAttributes,
   THINKING_LEVELS,
   contextTokensOf as usageContextTokens,
 } from '@cairn/shared';
@@ -45,6 +47,7 @@ import {
   SessionManager,
   SettingsManager,
 } from '@earendil-works/pi-coding-agent';
+import { credentialRedactor } from '../credential-output.js';
 import { gateToolCallHandler, type PermissionRule } from './command-gate.js';
 import { compactionCeilingFetch } from './compaction-ceiling.js';
 import { SessionNotResumableError } from './errors.js';
@@ -518,33 +521,6 @@ function noteFirstToken(state: MapState, event: AgentSessionEventLike): void {
 }
 
 export function recordPiSpanEvent(sink: PiStepSpanSink, event: AgentSessionEventLike): void {
-  if (event.type === 'message_end') {
-    const msg = event.message;
-    if (
-      msg != null &&
-      msg.role === 'assistant' &&
-      msg.provider !== undefined &&
-      msg.model !== undefined &&
-      msg.usage !== undefined
-    ) {
-      sink.chat(Date.now(), {
-        provider: msg.provider,
-        model: msg.model,
-        ...(msg.responseModel !== undefined ? { responseModel: msg.responseModel } : {}),
-        ...(msg.stopReason !== undefined ? { finishReason: msg.stopReason } : {}),
-        ...(msg.rawStopReason !== undefined ? { rawFinishReason: msg.rawStopReason } : {}),
-        usage: {
-          input: msg.usage.input,
-          output: msg.usage.output,
-          cacheRead: msg.usage.cacheRead,
-          cacheWrite: msg.usage.cacheWrite,
-        },
-        costUsd: msg.usage.cost?.total,
-        output: { role: msg.role, content: msg.content },
-      });
-    }
-    return;
-  }
   if (event.type === 'message_update') {
     const toolCall = event.assistantMessageEvent?.toolCall;
     if (event.assistantMessageEvent?.type === 'toolcall_end' && toolCall != null) {
@@ -964,23 +940,51 @@ export class PiBackend implements AgentBackend {
     const ceilingFetch = compactionCeilingFetch(diagnosedFetch, (line) => {
       this.opts.onCompactionLog?.(line);
     });
+    const redact = credentialRedactor(opts.provider.apiKey);
     const spans =
       opts.telemetry !== undefined
         ? new PiStepSpanSink(
             opts.telemetry,
             { provider: opts.provider.providerId, model: opts.modelId },
             this.opts.onOtelLog,
+            redact,
           )
         : undefined;
     const streamSimple = runtime.streamSimple.bind(runtime);
     runtime.streamSimple = (requestModel, context, options) => {
-      spans?.request(
-        context.messages.map((message) => ({
-          role: message.role,
-          content: message.role === 'system' ? getSystemMessageText(message) : message.content,
-        })),
-      );
-      return streamSimple(requestModel, context, { ...options, fetch: ceilingFetch });
+      const at = Date.now();
+      const summary = options?.cacheRetention === 'none';
+      const input =
+        spans === undefined || summary
+          ? undefined
+          : observationAttributes({
+              input: redact(
+                context.messages.map((message) => ({
+                  role: message.role,
+                  content:
+                    message.role === 'system' ? getSystemMessageText(message) : message.content,
+                })),
+              ),
+            })[LANGFUSE_ATTR.input];
+      const stream = streamSimple(requestModel, context, { ...options, fetch: ceilingFetch });
+      if (spans !== undefined && requestModel.api !== 'pi-virtual') {
+        void stream.result().then((message) => {
+          spans.chat(at, {
+            provider: message.provider,
+            model: message.model,
+            responseModel: message.responseModel,
+            finishReason: message.stopReason,
+            rawFinishReason: message.rawStopReason,
+            usage: message.usage,
+            costUsd: message.usage.cost?.total,
+            endAt: Date.now(),
+            input,
+            output: summary ? undefined : { role: message.role, content: message.content },
+          });
+          void spans.flush(false);
+        });
+      }
+      return stream;
     };
     const diagnose = (message: string): string =>
       enrichProviderError(message, providerResponses.current, {

@@ -188,7 +188,7 @@ Inspect the root interval and outcome, model/provider, finish reason, token/cach
 
 Coordinator chat spans with equal start/end times do not measure provider latency. Trust generation duration or TTFT only when that deployed version captures the actual request interval or first streamed delta; neither terminal-message timing nor the first browser update measures first-token arrival. Missing SDK diagnostics cannot reconstruct a lost WebSocket close code or cause. Missing spans can also mean export was disabled, the backend has no instrumentation, the process died before export, or a best-effort export failed. Confirm configuration and server/daemon logs before concluding that no model call happened.
 
-Pi task sessions export chat and tool spans when the daemon has OTel configured; their current chat spans are point events, with no trustworthy duration or TTFT. Claude Code's replacement path exports tool spans only, not individual model generations, usage or TTFT. ACP sessions have no equivalent child-span exporter. Codex through Pi follows Pi coverage; a Codex ACP adapter follows ACP coverage. Research is an ordinary task/build using its selected backend, not a separate model exporter. A step or build root proves orchestration coverage only.
+Pi task sessions export each `streamSimple` call's request/result, model, usage and real interval, including compaction calls; summary calls omit input/output. Claude Code uses the local native-telemetry bridge described below for generations and the SDK stream for tool spans. Neither route substitutes cumulative session usage for per-call usage. ACP sessions have no equivalent per-inference exporter: Gemini ACP and configured Claude/Codex ACP adapters remain executable, but stable ACP exposes no standard model-call boundary, request/response or token consumption. Its context `used` value is occupancy, not consumption. No generation is fabricated to fill that gap. Codex through Pi follows Pi coverage; a Codex ACP adapter follows ACP coverage. Research is an ordinary task/build using its selected backend, not a separate model exporter. A step or build root proves orchestration coverage only.
 
 For a missing page reply, inspect the browser's Network stream/reconnect and Console, then correlate the step/thread and timestamps with the server journal and read-only `step`, `chief_message` and input-receipt records. Check whether the model answered, the server persisted/mirrored it, and the browser received/rendered it separately. Langfuse is optional, best-effort evidence, not the source of truth. Do not change live Langfuse, retention, credentials or server configuration to debug without the owner's approval.
 
@@ -245,35 +245,62 @@ LANGFUSE_LLM_HTTPS_PROXY=http://egress-relay:3128
 
 Hosts with direct access leave both empty. `EGRESS_UPSTREAM` (default `127.0.0.1:7890`) and `EGRESS_ALLOW` (default `api.anthropic.com:443`) adjust the relay. A refused target appears in `docker compose logs egress-relay` as `egress relay refused: <host:port>`. The relays run as root with every capability dropped except `DAC_READ_SEARCH`, so they can read the mounted script even when the checkout was written with umask 077, as the deployed checkout is. Bring the stack up from the deployed checkout so the mount survives worktree cleanup: `docker compose -f ~/Code/AgentProjects/cairn-exec/ops/langfuse/docker-compose.yml --env-file ~/Code/AgentProjects/cairn/ops/langfuse/.env up -d`.
 
-## Claude Code runtime tool traces (#2269)
+## Claude Code runtime generations and tool traces
 
 Configure `CAIRN_OTEL_ENDPOINT` and `CAIRN_OTEL_HEADERS` on the daemon to export
-Claude Code tool spans. The daemon converts streamed tool calls and results to
+Claude Code generation and tool spans. The daemon converts streamed tool calls and results to
 OTLP/HTTP JSON and applies both its exact subscription-credential redactor and
 the shared `redactSecrets` patterns before posting. Trace and parent span ids
 remain tied to the build and step.
 
-Direct Claude CLI telemetry is disabled in both the subprocess environment and
-the SDK flag settings. Inherited and per-session `OTEL_*`, `CAIRN_OTEL_*`,
+Direct external Claude CLI telemetry is disabled. When export is configured,
+the daemon opens a per-session random-path HTTP collector on loopback and pins
+native logs and traces to it in both subprocess environment and SDK flag settings.
+Native `claude_code.llm_request` spans provide real intervals, model and
+input/output/cache usage; opt-in body events correlate by request and body ids.
+The daemon selects only prompt/messages/tool schemas and assistant content,
+redacts credentials and shared secret patterns, bounds content with the existing
+serializer, and emits one generation per native span id through Cairn's OTel SDK.
+Reordered batches and repeated terminal events do not duplicate generations.
+Compaction, summary and memory calls export metadata without their input/output.
+Missing or malformed bodies leave metadata-only generations; missing native
+spans never become guessed generations from SDK partial frames or turn totals.
+
+Inherited and per-session `OTEL_*`, `CAIRN_OTEL_*`,
 `ANT_OTEL_*` and beta tracing (`ENABLE_BETA_TRACING_DETAILED`,
 `BETA_TRACING_ENDPOINT`) configuration is removed from the subprocess
-environment. The CLI's beta tracing exporter ignores
+environment before the owned loopback configuration is applied. Both general
+and signal-specific endpoints, headers, protocols and compression are pinned.
+The CLI's separate beta tracing exporter ignores
 `CLAUDE_CODE_ENABLE_TELEMETRY`, so the flag settings also pin
 `BETA_TRACING_ENDPOINT` to an empty value; flag settings outrank user and project
 settings. Managed policy settings still outrank flag settings, so a machine
-administrator can re-enable CLI export. Exporter credentials stay in the daemon. CLI-native
-chat spans, metrics, logs and enhanced telemetry are disabled; only streamed
-tool spans use this replacement path. Export is best effort and does not delay
-session completion.
+administrator can re-enable CLI export. Exporter credentials stay in the daemon;
+raw native logs are neither forwarded nor persisted by this bridge. Metrics and
+the separate detailed beta exporter stay off. Without an OTel context or if the
+loopback listener cannot open, the previous disabled-export environment remains
+in effect and execution continues. This is best-effort observability, never an
+executor availability requirement.
+
+The native interface was exercised with CLI 2.1.325. Older CLIs or managed
+policy can leave a coverage gap without making the executor unusable. Capture
+is bounded to 8 MiB per HTTP batch, 2 MiB native content, 128 pending entries per
+correlation map and 4096 remembered span ids. Abrupt process loss, oversized
+batches and buffer overflow can lose telemetry; incomplete calls cannot have
+usage invented after the fact. See the [approved design and coverage matrix](../research/model-generation-coverage-2026-11-16.md).
 
 The regression in `apps/daemon/test/claude-otel-export.test.ts` runs the real SDK
 against a fake CLI process and an ephemeral HTTP collector. The fake executes a
 child tool that prints a synthetic secret. The test checks the actual exported
 body, including completion, CLI failure, abrupt exit, credential patterns,
 settings overrides (including beta tracing set in user settings) and collector
-failure. With the unchanged main backend, the
-same fixture exports the synthetic secret in clear text. This verifies the SDK,
-daemon mapping and HTTP boundary; it does not exercise a real model or Langfuse.
+failure. Additional native-event fixtures reproduce the missing-generation bug
+on the old backend and cover multiple calls around a tool, reordered native
+batches, returned model identity, cache accounting, deduplication and summary
+privacy. This verifies the SDK, daemon mapping and HTTP boundary; it does not
+exercise a real provider or Langfuse. A separate local acceptance probe ran the
+actual CLI and SDK against a synthetic Anthropic HTTP server: two calls became
+two generations with model, usage and sanitized input/output.
 
 Redaction retains the existing pattern limits: arbitrary unrelated or encoded
 secrets are not guaranteed to match. Abrupt daemon termination can lose pending

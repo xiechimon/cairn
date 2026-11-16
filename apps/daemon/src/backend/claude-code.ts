@@ -47,6 +47,7 @@ import {
 import { credentialRedactor } from '../credential-output.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { BackgroundSubagents, type FinishedSubagent } from './claude-background-subagents.js';
+import { type ClaudeTelemetryCapture, captureClaudeTelemetry } from './claude-telemetry.js';
 import { SessionNotResumableError } from './errors.js';
 import { hostToolContent } from './host-tool-content.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
@@ -542,6 +543,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
       onClaudeRateLimit?: (notice: ClaudeRateLimitNotice) => void;
     },
     private readonly spans?: PiStepSpanSink,
+    private readonly telemetryCapture?: ClaudeTelemetryCapture,
   ) {
     this.q = q;
     this.sessionId = opts.sessionId;
@@ -618,6 +620,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
         'The Claude Code session ended before the background subagents finished.',
       );
       this.finish();
+      await this.telemetryCapture?.close();
       await this.spans?.flush();
     }
   }
@@ -1349,18 +1352,35 @@ export class ClaudeCodeBackend implements AgentBackend {
     });
     const input = new AsyncQueue<SDKUserMessage>();
     if (opts.prompt !== undefined) input.push(buildUserMessage(opts.prompt, opts.promptImages));
-    const q = query({ prompt: input.iterable(), options: sdkOptions });
+    const redact = credentialRedactor(
+      sessionEnv?.CLAUDE_CODE_OAUTH_TOKEN ?? sdkOptions.env?.CLAUDE_CODE_OAUTH_TOKEN,
+      sdkOptions.env?.ANTHROPIC_API_KEY,
+      sdkOptions.env?.ANTHROPIC_AUTH_TOKEN,
+    );
     const spans =
       opts.telemetry !== undefined
         ? new PiStepSpanSink(
             opts.telemetry,
             { provider: opts.provider.providerId, model: opts.modelId },
             undefined,
-            credentialRedactor(
-              sessionEnv?.CLAUDE_CODE_OAUTH_TOKEN ?? sdkOptions.env?.CLAUDE_CODE_OAUTH_TOKEN,
-            ),
+            redact,
           )
         : undefined;
+    const capture = spans === undefined ? undefined : await captureClaudeTelemetry(spans, redact);
+    if (capture !== undefined) {
+      sdkOptions.env = { ...sdkOptions.env, ...capture.env };
+      sdkOptions.settings = {
+        ...(typeof sdkOptions.settings === 'object' ? sdkOptions.settings : {}),
+        env: { ...claudeCliEnv({}), ...capture.env },
+      };
+    }
+    let q: Query;
+    try {
+      q = query({ prompt: input.iterable(), options: sdkOptions });
+    } catch (error) {
+      await capture?.close();
+      throw error;
+    }
     return new ClaudeSessionHandle(
       q,
       {
@@ -1374,6 +1394,7 @@ export class ClaudeCodeBackend implements AgentBackend {
           : {}),
       },
       spans,
+      capture,
     );
   }
 }
