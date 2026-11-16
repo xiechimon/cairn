@@ -55,7 +55,7 @@ Each rule has an id. Name the ids you checked when you report the change. The Ch
 | V8 | Spacing is on the 4px grid. | G `ui-debt-gate`; M computed margins and paddings are multiples of 4 |
 | V25 | Text keeps the platform's default font smoothing: no `-webkit-font-smoothing`, `-moz-osx-font-smoothing` or Tailwind `antialiased`/`subpixel-antialiased` anywhere. On macOS `antialiased` turns off stem darkening and every glyph reads thinner than in native apps (solidity pass, owner 2026-11-11). | G `test/font-smoothing.test.ts` |
 | V9 | Icons are lucide from the project icon set; never invent an icon name, check that the import exists. Stroke and size are V14. | G `pnpm typecheck` |
-| V21 | No hover shadows or elevation; a hover background covers the whole row, or a whole standalone control, never a band over part of a row or card. | G `ui-drift-gate` G8; M `e2e/paper-hover-bands.spec.ts` |
+| V21 | No hover shadows or elevation; a hover background covers the whole row, or a whole standalone control, never a band over part of a row or card. | G `ui-drift-gate` G8 |
 | V10 | Pages compose existing pieces (`EmptyState`, `SettingsHeader`, `SettingsCard`, `FormStack`, `DialogShell`, `SegmentedTabs`, `ThreadRow`, `SidePanel`) before building their own. | G `ui-page-style-gate`, `ui-drift-gate` |
 
 Anti-slop rules (audit `docs/research/ui-ux-audit-2026-11-06.md`, section on AI slop; batch 1 landed the foundations). Baselines come from `apps/web/.audit-slop.mjs` on the seeded verify stack (2 projects; the 7-project stack adds 5 projects), measured at `5f672eab9` (before) and on this change (after). Where a rule is marked M and a `G` gate is named, the gate already fails; the other M rows await the CI look-and-feel job and run non-blocking first (section 5).
