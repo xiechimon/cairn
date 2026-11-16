@@ -8,6 +8,7 @@ import {
   machineEnrollResponseSchema,
   machineEnrollStartResponseSchema,
 } from '@cairn/shared';
+import { type OtelEnv, withOtelEnv } from './otel-config.js';
 
 const PRIVATE_DIR_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
@@ -20,6 +21,7 @@ export interface RunnerOptions {
   home: string;
   origin: string;
   ownerToken: string;
+  otelEnv: OtelEnv;
   isQuitting: () => boolean;
 }
 
@@ -62,15 +64,18 @@ function writeMachineJson(home: string, machine: MachineJson): void {
 }
 
 function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    ELECTRON_RUN_AS_NODE: '1',
-    [ENV_VARS.home]: options.home,
-    [ENV_VARS.server]: options.origin,
-    [ENV_VARS.skillsDir]: join(options.home, 'skills'),
-    [ENV_VARS.mcpConfig]: join(options.home, 'mcp.json'),
-    CLAUDE_CONFIG_DIR: join(options.home, 'claude'),
-  };
+  const env = withOtelEnv(
+    {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1',
+      [ENV_VARS.home]: options.home,
+      [ENV_VARS.server]: options.origin,
+      [ENV_VARS.skillsDir]: join(options.home, 'skills'),
+      [ENV_VARS.mcpConfig]: join(options.home, 'mcp.json'),
+      CLAUDE_CONFIG_DIR: join(options.home, 'claude'),
+    },
+    options.otelEnv,
+  );
   delete env[ENV_VARS.token];
   delete env[ENV_VARS.auth];
   return env;

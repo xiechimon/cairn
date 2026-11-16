@@ -347,6 +347,10 @@ LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT=http://10.0.0.12:9090
 
 `NEXTAUTH_URL` must equal the origin you open in the browser, otherwise the login callback breaks. Do not bind `0.0.0.0` to the public internet; do not use Langfuse Cloud. After rebinding, run `docker compose up -d` to recreate the port mappings for web / minio.
 
+## Exporting from the Mac desktop app
+
+The packaged Mac app reads its export settings from `~/Library/Application Support/@cairn/desktop/otel.env` (mode `0600`, the same three `CAIRN_OTEL_*` keys; see `apps/desktop/README.md`). Langfuse stays bound to loopback on omarchy; Tailscale Serve publishes it to the tailnet only, so the Mac's endpoint is `https://<omarchy tailnet name>:8443/api/public/otel` with the same ingestion header as the server. Leave `CAIRN_OTEL_ENVIRONMENT` unset or `mac` so Mac traces filter apart from the deployment's. Check reachability with `curl https://<omarchy tailnet name>:8443/api/public/health`. Without Tailscale, an SSH local forward of port 3000 kept up by launchd works too; the research note `docs/research/desktop-otel-export-2026-11-16.md` compares the options.
+
 ## Backup
 
 Langfuse's data is scattered across three places, and missing one piece breaks the rest: Postgres (users, projects, keys), ClickHouse (trace / observation / score), MinIO (event payloads and media). Redis is only a queue and can be skipped. The official compose ships no backup; locally we use volume snapshots.

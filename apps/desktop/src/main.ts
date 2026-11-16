@@ -26,6 +26,7 @@ import {
 import { appMenuTemplate } from './app-menu.js';
 import { createKeepAwake } from './keep-awake.js';
 import { readLocalProviders, scanLocalProviders } from './local-providers.js';
+import { desktopOtelEnv, type OtelEnv, withOtelEnv } from './otel-config.js';
 import { type LocalRunner, startLocalRunner } from './runner.js';
 import { trayMenuTemplate } from './tray-menu.js';
 import { createUpdater, removeLeftoverUpdates } from './updater.js';
@@ -82,13 +83,11 @@ async function serverPort(): Promise<number> {
   return port;
 }
 
-function startServer(port: number): RunningServer {
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    HOST: LOOPBACK,
-    PORT: String(port),
-    [ENV_VARS.home]: cairnHome(),
-  };
+function startServer(port: number, otelEnv: OtelEnv): RunningServer {
+  const env = withOtelEnv(
+    { ...process.env, HOST: LOOPBACK, PORT: String(port), [ENV_VARS.home]: cairnHome() },
+    otelEnv,
+  );
   delete env[ENV_VARS.token];
   delete env[ENV_VARS.auth];
   const child = utilityProcess.fork(join(bundledRoot('server'), 'dist', 'index.mjs'), [], {
@@ -317,7 +316,8 @@ function serveUpdates(origin: string): void {
 
 async function boot(): Promise<void> {
   try {
-    server = startServer(await serverPort());
+    const otelEnv = desktopOtelEnv(join(app.getPath('userData'), 'otel.env'), console.error);
+    server = startServer(await serverPort(), otelEnv);
     await waitUntilServing(server);
     const ownerToken = readOwnerToken();
     signOwnPagesIn(server.origin, ownerToken);
@@ -327,6 +327,7 @@ async function boot(): Promise<void> {
       home: join(app.getPath('userData'), 'runner'),
       origin: server.origin,
       ownerToken,
+      otelEnv,
       isQuitting: () => quitting,
     }).then(
       (started) => {
