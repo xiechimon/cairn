@@ -20,14 +20,19 @@ test('scope menu: all machines first, one option per machine, offline and Orb ma
   await expect(scopeSelect(page)).toContainText('所有执行机');
   await expect(scopeSelect(page).locator('svg.lucide-server')).toBeVisible();
   await scopeSelect(page).click();
-  await expect(page.getByRole('option')).toHaveText([
+  const names = [
     '所有执行机',
     'xmonsMac-3574.local',
     'build-box',
     'build-box-orb',
     'old-laptop · 离线',
     'new-box',
-  ], { useInnerText: true });
+  ];
+  const options = page.getByRole('option');
+  await expect(options).toHaveCount(names.length);
+  for (const [index, name] of names.entries()) {
+    await expect(options.nth(index)).toHaveAccessibleName(name);
+  }
   await expect(page.getByRole('option').first().locator('svg.lucide-server')).toBeVisible();
   const machineOptions = page
     .getByRole('option')

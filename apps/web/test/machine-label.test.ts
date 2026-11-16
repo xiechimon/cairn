@@ -21,7 +21,8 @@ describe('machine OS identity', () => {
     ['linux', undefined, 'Linux'],
   ] as const)('renders %s / %s as %s', (osPlatform, osDistribution, label) => {
     const html = render({ osPlatform, osDistribution });
-    expect(html).toContain(`role="img" aria-label="${label}"`);
+    expect(html).toContain(`data-slot="machine-os-icon" aria-hidden="true" title="${label}"`);
+    expect(html).not.toContain('aria-label=');
     expect(html).toContain('runner');
   });
 
@@ -38,7 +39,7 @@ describe('machine OS identity', () => {
     const html = renderToStaticMarkup(createElement(MachineName, { machine, all: [machine, { id: 'other-5678', name: machine.name }] }));
     expect(html).toContain('Arch &lt;runner&gt;');
     expect(html).toContain('#1234');
-    expect(html).toContain('aria-label="Linux"');
+    expect(html).toContain('title="Linux"');
   });
 
   test('id-only references resolve current metadata, never guess by name or replace explicit metadata', () => {
@@ -50,8 +51,8 @@ describe('machine OS identity', () => {
       [{ id: 'arch-1', name: 'runner', capabilities: { osPlatform: 'linux', osDistribution: 'ubuntu' } }, 'Ubuntu'],
     ] as const) {
       const html = renderToStaticMarkup(createElement(MachineIdentityContext.Provider, { value: machines, children: createElement(MachineName, { machine }) }));
-      if (expected === null) expect(html).not.toContain('aria-label=');
-      else expect(html).toContain(`aria-label="${expected}"`);
+      if (expected === null) expect(html).not.toContain('title=');
+      else expect(html).toContain(`title="${expected}"`);
     }
   });
 });
