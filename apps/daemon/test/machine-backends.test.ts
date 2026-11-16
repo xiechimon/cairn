@@ -9,6 +9,7 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
 
   test('failure mode 1: claude-code step → executed by the claude backend, zero pi sessions + exactly one lazy line', async () => {
     const api = new FakeMachineApi();
+    api.claudeSubscriptionToken = 'backends-subscription-token';
     const { backend: pi, created: piCreated } = fakeBackend([{ type: 'done', usage: [] }]);
     const { backend: claude, created: claudeCreated } = fakeBackend([{ type: 'done', usage: [] }]);
     const { handle, lines } = await boot({ api, backend: pi, claudeCodeBackend: claude });
@@ -43,7 +44,6 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
 
   test('failure mode 4: runtime step without a subscription token fails before the step, even with a local login', async () => {
     const api = new FakeMachineApi();
-    api.claudeSubscriptionToken = undefined;
     const { backend: pi, created: piCreated } = fakeBackend([]);
     const { backend: claude, created: claudeCreated } = fakeBackend([]);
     const { handle, lines } = await boot({
@@ -72,6 +72,7 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
 
   test('failure mode 3: mixed step flow (claude step + pi step) → each to its own backend, still exactly one lazy line', async () => {
     const api = new FakeMachineApi();
+    api.claudeSubscriptionToken = 'backends-subscription-token';
     const { backend: pi, created: piCreated } = fakeBackend([{ type: 'done', usage: [] }]);
     const { backend: claude, created: claudeCreated } = fakeBackend([{ type: 'done', usage: [] }]);
     const { handle, lines } = await boot({ api, backend: pi, claudeCodeBackend: claude });

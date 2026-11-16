@@ -70,7 +70,7 @@ export class FakeMachineApi implements MachineApi {
   doneBodies: { stepId: string; body: MachineDoneBody }[] = [];
   uploads: { url: string; body: TranscriptUpload }[] = [];
   toolCalls: { stepId: string; call: ToolCallRecord }[] = [];
-  claudeSubscriptionToken: string | undefined = 'harness-subscription-token';
+  claudeSubscriptionToken: string | undefined;
   recoverSteps: {
     id: string;
     buildId: string;

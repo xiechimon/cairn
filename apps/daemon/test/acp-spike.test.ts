@@ -65,6 +65,7 @@ describe('ACP spike with a real scripted stdio child', () => {
             : '',
         );
         const api = new FakeMachineApi();
+        if (harness === 'claude-code') api.claudeSubscriptionToken = 'acp-subscription-token';
         const { handle } = await boot({
           api,
           backend: fakeBackend(events).backend,
