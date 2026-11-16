@@ -653,14 +653,12 @@ export async function executeChiefTool(
         if (body.platform !== undefined) {
           setTodoPlatform(db, requireTeamTodo(db, created.id, ctx.teamId), body.platform);
         }
-        if (body.projectId === undefined) {
-          addChiefWatch(deps, {
-            teamId: ctx.teamId,
-            todo: created,
-            projectName: projectRow.name,
-            threadId: ctx.threadId,
-          });
-        }
+        addChiefWatch(deps, {
+          teamId: ctx.teamId,
+          todo: created,
+          projectName: projectRow.name,
+          threadId: ctx.threadId,
+        });
         return created;
       });
       const buildId = startThreadBuild(svc, requireTeamTodo(db, record.id, ctx.teamId), {

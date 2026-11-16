@@ -1115,6 +1115,11 @@ function reportLineOf(deps: ChiefDeps, todoRecord: TodoRecord): string | null {
   return line === undefined || line === null || line === '' ? null : line;
 }
 
+const MIRRORED_REPORT_PHASES: ReadonlySet<ThreadReportContent['phase']> = new Set([
+  'needs-you',
+  'done',
+]);
+
 function insertThreadReport(
   deps: ChiefDeps,
   threadId: string,
@@ -1146,10 +1151,12 @@ function insertThreadReport(
   });
   const watching = getChiefThread(deps, threadId);
   const reports = [reportIn(threadId, content)];
-  if (watching?.projectId != null) {
+  if (watching?.projectId != null && MIRRORED_REPORT_PHASES.has(phase)) {
     const chiefRow = deps.db.select().from(chief).where(eq(chief.id, watching.chiefId)).get();
     if (chiefRow !== undefined) {
-      reports.push(reportIn(coordinatorThreadRow(deps, chiefRow).id, mirror));
+      reports.push(
+        reportIn(coordinatorThreadRow(deps, chiefRow).id, { ...mirror, fromThreadId: threadId }),
+      );
     }
   }
   deps.db.transaction(() => {
