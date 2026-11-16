@@ -571,3 +571,78 @@ export function pauseTeamForTest(db: Db, teamId: string): void {
 export function teamPausedForTest(db: Db, teamId: string): boolean {
   return teamAutonomyPaused(db, teamId);
 }
+
+export async function enrollConnectorRunner(
+  s: TestServer,
+  name: string,
+  connectors: boolean,
+): Promise<{ machineId: string; token: string }> {
+  const apiKey = await issueApiKey(s);
+  const res = await s.app.request('/api/machine/enroll', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      teamId: s.team.id,
+      name,
+      cliVersion: '0.3.0',
+      capabilities: { mcpServers: [], skills: [], ...(connectors ? { mcpConnectors: true } : {}) },
+    }),
+  });
+  const body = (await res.json()) as { machineId: string; token: string };
+  s.db
+    .update(machineTable)
+    .set({ online: true, enabledRuntimes: ['pi'], latestCliVersion: '0.3.0' })
+    .where(eq(machineTable.id, body.machineId))
+    .run();
+  return body;
+}
+
+let connectorStepSeq = 7_400;
+
+export function queueConnectorStep(s: TestServer, projectId: string, machineId: string): string {
+  connectorStepSeq += 1;
+  const seq = connectorStepSeq;
+  const suffix = Math.random().toString(36).slice(2, 8);
+  const todoId = `todo-mcpw-${suffix}`;
+  const buildId = `build-mcpw-${suffix}`;
+  const stepId = `step-mcpw-${suffix}`;
+  s.db
+    .insert(todoTable)
+    .values({
+      id: todoId,
+      teamId: s.team.id,
+      projectId,
+      seqNum: seq,
+      title: `connector task ${suffix}`,
+      spec: 'probe',
+      phase: 'queued',
+      phaseAt: seq,
+      routeOverride: { machineId },
+    })
+    .run();
+  s.db
+    .insert(buildTable)
+    .values({
+      id: buildId,
+      todoId,
+      withPlan: false,
+      planDocId: null,
+      triggerSource: 'user',
+      createdAt: seq,
+    })
+    .run();
+  s.db
+    .insert(stepTable)
+    .values({
+      id: stepId,
+      buildId,
+      kind: 'build',
+      machineId: null,
+      status: 'pending',
+      prompt: null,
+      freshSession: false,
+      createdAt: seq + 1,
+    })
+    .run();
+  return stepId;
+}

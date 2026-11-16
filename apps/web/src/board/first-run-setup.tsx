@@ -190,8 +190,8 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
           t('还没有在线的执行机。在要跑任务的电脑上装好 CLI，运行 `cairn start` 并批准它。'),
         )
       ) : setup.machines.length === 0 ? (
-        <span className="inline-flex items-center gap-2">
-          <Spinner className="size-3.5" aria-label={t('启动中')} />
+        <span className="flex items-start gap-2">
+          <Spinner className="mt-0.5 size-3.5 flex-none" aria-label={t('启动中')} />
           {t('本机执行机正在启动，启动后会检查这台电脑上的 Claude Code')}
         </span>
       ) : (
