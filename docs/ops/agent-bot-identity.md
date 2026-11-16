@@ -2,7 +2,7 @@
 
 Authorized agent work on this host commits as `xiechimon` and uses the owner's existing `gh` login for GitHub access. Use ordinary `git commit` and `git push origin HEAD:main`, following `AGENTS.md`. Do not mint an App installation token for development.
 
-Use the owner's registered noreply identity, `xiechimon <157263579+xiechimon@users.noreply.github.com>`. New host commits use owner author and committer identities. `commit-author` checks the allowlist in CI on branches of this repository. Cloud sessions may continue using `Claude <noreply@anthropic.com>`. Forks cannot claim these identities.
+Use the owner's registered noreply identity, `xiechimon <157263579+xiechimon@users.noreply.github.com>`. New host commits use owner author and committer identities. The allowlist lives in `packages/shared/commit-identity.json`; no CI check enforces it. Cloud sessions may continue using `Claude <noreply@anthropic.com>`.
 
 ## Existing worktrees and commands
 

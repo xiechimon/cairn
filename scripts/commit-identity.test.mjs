@@ -6,7 +6,6 @@ import test from 'node:test';
 import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
 const script = resolve('scripts/commit-identity.mjs');
-const workflow = readFileSync('.github/workflows/commit-author.yml', 'utf8');
 
 const bot = {
   name: 'cairnwright[bot]',
@@ -247,20 +246,6 @@ test('pre-push: merging main into an agent branch does not re-judge commits main
   installHook(r, 'pre-push');
   const pushed = r.git(['push', '-q', 'origin', 'HEAD:refs/heads/feature'], bot, bot, agentEnv);
   assert.equal(pushed.status, 0, pushed.stderr);
-});
-
-test('the workflow runs the shared check without any token, on the PR head repository', () => {
-  assert.match(workflow, /run: node scripts\/commit-identity\.mjs ci/);
-  assert.match(
-    workflow,
-    /HEAD_REPO: \$\{\{ github\.event\.pull_request\.head\.repo\.full_name \}\}/,
-  );
-  assert.doesNotMatch(workflow, /GITHUB_TOKEN/);
-  assert.match(workflow, /actions\/setup-node@[0-9a-f]{40} # v/);
-  assert.match(workflow, /node-version: 24/);
-  assert.match(workflow, /persist-credentials: false/);
-  assert.match(workflow, /permissions:\n {2}contents: read/);
-  assert.doesNotMatch(workflow, /rebase/);
 });
 
 test('no merge rule keeps a rebase or single-commit route for bot-opened PRs', () => {
