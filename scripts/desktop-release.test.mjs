@@ -62,3 +62,66 @@ test('automatic Mac releases require shipped source changes; manual releases can
   assert.deepEqual(workflow.on.push.branches, ['main']);
   assert.deepEqual(workflow.on.schedule, [{ cron: '17 * * * *' }]);
 });
+
+test('publishing pins the built commit before creating a release even after main advances', (t) => {
+  const workflow = parse(
+    readFileSync(new URL('../.github/workflows/desktop-release.yml', import.meta.url), 'utf8'),
+  );
+  const script = workflow.jobs.release.steps.find(
+    (step) => step.name === 'Publish the release',
+  ).run;
+  const root = makeTestTempDir('desktop-publish-');
+  t.after(() => releaseTestTempDir(root));
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+  const remote = join(root, 'remote.git');
+  git('init', '--bare', '--quiet', remote);
+  git('init', '--quiet', '--initial-branch=main');
+  git('config', 'user.name', 'Release Test');
+  git('config', 'user.email', 'release@example.com');
+  git('remote', 'add', 'origin', remote);
+  mkdirSync(join(root, '.github/workflows'), { recursive: true });
+  writeFileSync(join(root, '.github/workflows/build.yml'), 'initial workflow');
+  git('add', '.github/workflows/build.yml');
+  git('commit', '--quiet', '-m', 'Built commit');
+  const built = git('rev-parse', 'HEAD');
+  writeFileSync(join(root, '.github/workflows/build.yml'), 'newer workflow');
+  git('add', '.github/workflows/build.yml');
+  git('commit', '--quiet', '-m', 'Main advances during build');
+  git('push', '--quiet', 'origin', 'main');
+
+  const bin = join(root, 'bin');
+  mkdirSync(bin);
+  writeFileSync(
+    join(bin, 'gh'),
+    '#!/bin/sh\nset -eu\ngit ls-remote --exit-code origin "refs/tags/$3" >/dev/null\nprintf "%s\\n" "$@" >> "$PUBLISH_ARGUMENTS"\n',
+    { mode: 0o755 },
+  );
+  const published = join(root, 'published');
+  const publish = (version) =>
+    spawnSync('bash', ['-e', '-o', 'pipefail', '-c', script], {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_SHA: built,
+        VERSION: version,
+        PATH: `${bin}:${process.env.PATH}`,
+        PUBLISH_ARGUMENTS: published,
+      },
+    });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = publish('0.1.2');
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(git('ls-remote', 'origin', 'refs/tags/desktop-v0.1.2').split(/\s/)[0], built);
+    assert.match(readFileSync(published, 'utf8'), /desktop-v0\.1\.2/);
+  }
+
+  git('push', '--quiet', 'origin', 'HEAD:refs/tags/desktop-v0.1.3');
+  writeFileSync(published, '');
+  assert.notEqual(publish('0.1.3').status, 0);
+  assert.equal(readFileSync(published, 'utf8'), '');
+  assert.equal(
+    git('ls-remote', 'origin', 'refs/tags/desktop-v0.1.3').split(/\s/)[0],
+    git('rev-parse', 'HEAD'),
+  );
+});

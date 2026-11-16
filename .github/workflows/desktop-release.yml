@@ -120,8 +120,9 @@ jobs:
       - name: Publish the release
         working-directory: apps/desktop/release
         run: |
+          git push origin "$GITHUB_SHA:refs/tags/desktop-v$VERSION"
           gh release create "desktop-v$VERSION" \
-            --target "$GITHUB_SHA" \
+            --verify-tag \
             --latest \
             --title "Cairn for Mac $VERSION" \
             --notes "Built from $GITHUB_SHA. Signed with Cairn's own certificate, not an Apple one: the first launch needs right-click, Open." \
