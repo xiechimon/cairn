@@ -842,6 +842,7 @@ export const EN: Record<string, string> = {
   基本信息: 'Basic info',
   标签: 'Tags',
   'Cairn 托管': 'Cairn hosted',
+  '没有仓库，可让 Coordinator 连接': 'No repository yet; the Coordinator can connect one',
   目标分支: 'Target branch',
   '{branch}（默认）': '{branch} (default)',
   默认分支: 'Default branch',

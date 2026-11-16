@@ -117,4 +117,5 @@ test('settings: a project without a repository has no Repository tab; ?tab=repo 
   await expect(page.getByRole('tab', { name: '记忆', exact: true })).toBeVisible();
   await expect(page.getByRole('tab', { name: '仓库', exact: true })).toHaveCount(0);
   await expect(page.getByText('目标分支', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('没有仓库，可让 Coordinator 连接')).toBeVisible();
 });

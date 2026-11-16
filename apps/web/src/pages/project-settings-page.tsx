@@ -105,7 +105,9 @@ export function ProjectSettingsPage() {
         ? t('GitHub 仓库')
         : repoKind === 'local'
           ? t('本地文件夹')
-          : undefined;
+          : project !== undefined
+            ? t('没有仓库，可让 Coordinator 连接')
+            : undefined;
   if (missing) {
     return (
       <RouteDialog title={t('项目设置')} size="page">
@@ -168,9 +170,11 @@ export function ProjectSettingsPage() {
             );
           }}
         />
-        <div className="flex">
-          <TabGroup tabs={tabs} tab={shownTab} onTab={setTab} />
-        </div>
+        {live && wireProject === undefined ? null : (
+          <div className="flex">
+            <TabGroup tabs={tabs} tab={shownTab} onTab={setTab} />
+          </div>
+        )}
         {live && wireProject === undefined ? (
           projectsQ.isError ? (
             <ProjectsFailed
