@@ -1,4 +1,3 @@
-import type { MachineOsPlatform } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { Ellipsis } from 'lucide-react';
@@ -6,7 +5,7 @@ import { useState } from 'react';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
-import { MachineName, machineLabel } from '../components/machine-label.js';
+import { MachineName, machineOsIdentity } from '../components/machine-label.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { SETTINGS_SELECT_TRIGGER_CLS, SettingsSelectTrigger } from '../components/settings-list.js';
 import { AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
@@ -20,13 +19,6 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
-
-const OS_NAMES: Record<MachineOsPlatform, string | undefined> = {
-  linux: 'Linux',
-  darwin: 'macOS',
-  windows: 'Windows',
-  other: undefined,
-};
 
 export function MachineRowView({
   machine,
@@ -113,8 +105,7 @@ export function MachineRowView({
     }
   };
 
-  const osPlatform = machine.capabilities?.osPlatform;
-  const osName = osPlatform === undefined ? undefined : OS_NAMES[osPlatform];
+  const osName = machineOsIdentity(machine)?.label;
   return (
     <div
       data-testid="machine-item"
@@ -241,12 +232,23 @@ export function MachineRowView({
             className={`machine-evacuate-select ${SETTINGS_SELECT_TRIGGER_CLS}`}
           >
             <SelectValue>
-              {pickedTarget === undefined ? t('迁移到…') : machineLabel(pickedTarget, machines)}
+              {pickedTarget === undefined ? (
+                t('迁移到…')
+              ) : (
+                <MachineName machine={pickedTarget} all={machines} compact />
+              )}
             </SelectValue>
           </SettingsSelectTrigger>
-          <SelectContent aria-label={t('迁移到')}>
+          <SelectContent
+            aria-label={t('迁移到')}
+            className="w-max min-w-0 max-w-(--available-width)"
+          >
             {others.map((m) => (
-              <SelectItem key={m.id} className="machine-evacuate-row" value={m.id ?? ''}>
+              <SelectItem
+                key={m.id}
+                className="machine-evacuate-row h-auto! min-h-8 py-1! [&>:first-child]:min-w-0 [&>:first-child]:shrink [&>:first-child]:whitespace-normal [&>:first-child]:[overflow-wrap:anywhere]"
+                value={m.id ?? ''}
+              >
                 <MachineName machine={m} all={machines} />
                 {m.online === false ? `（${t('离线')}）` : ''}
               </SelectItem>
@@ -257,7 +259,7 @@ export function MachineRowView({
       <DeleteConfirm
         open={confirmOpen}
         title={t('确定删除这台执行机？此操作不可撤销。')}
-        summary={machine.name}
+        summary={<MachineName machine={machine} all={machines} />}
         ariaLabel={t('删除执行机')}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => void remove()}

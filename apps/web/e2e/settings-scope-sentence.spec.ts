@@ -14,7 +14,7 @@ test('model services open with a scope sentence and keep the scope in the URL', 
   await page.getByRole('option', { name: /build-box/ }).first().click();
   await expect(page).toHaveURL(/scope=/);
   await expect(scope(page)).toContainText('build-box');
-  await expect(scope(page).locator('svg.lucide-monitor')).toBeVisible();
+  await expect(scope(page).getByRole('img', { name: 'Linux', exact: true })).toBeVisible();
   await expect(settings(page).getByTestId('settings-checked')).toContainText('已检查');
   await scope(page).click();
   await page.getByRole('option', { name: '所有执行机', exact: true }).click();

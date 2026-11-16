@@ -5,6 +5,7 @@ import { computerFeedStore, mergeComputerFeed } from '../api/computer-feed.js';
 import { useComputerCommands, useComputers } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ListCard } from '../components/list-card.js';
+import { MachineName } from '../components/machine-label.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { StatusGlyph } from '../components/status-glyph.js';
 import { Badge } from '../components/ui/badge.js';
@@ -233,7 +234,9 @@ function ComputerHead({ computer }: { computer: ComputerRecord }) {
         <span className="truncate text-ui font-medium text-foreground">
           {t('Coordinator 的电脑')}
         </span>
-        <span className="truncate text-meta text-content-tertiary">{computer.machine.name}</span>
+        <span className="truncate text-meta text-content-tertiary">
+          <MachineName machine={computer.machine} compact />
+        </span>
       </span>
       <Badge
         data-testid="computer-state"

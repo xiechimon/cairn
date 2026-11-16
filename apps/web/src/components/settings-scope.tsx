@@ -1,9 +1,9 @@
-import { Monitor, Server } from 'lucide-react';
+import { Server } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { MachineName, machineLabel } from './machine-label.js';
+import { MachineName } from './machine-label.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select.js';
 
 export const TEAM_SCOPE = 'team';
@@ -52,8 +52,14 @@ export function SettingsScopeSentence({
             className="min-w-0 text-ui text-foreground"
           >
             <SelectValue>
-              {current === undefined ? <Server aria-hidden /> : <Monitor aria-hidden />}
-              {current === undefined ? t('所有执行机') : machineLabel(current, machines)}
+              {current === undefined ? (
+                <>
+                  <Server aria-hidden />
+                  {t('所有执行机')}
+                </>
+              ) : (
+                <MachineName machine={current} all={machines} compact />
+              )}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
@@ -71,7 +77,6 @@ export function SettingsScopeSentence({
                   value={m.id}
                   className="h-auto! min-h-8 py-1! [&>:first-child]:min-w-0 [&>:first-child]:shrink [&>:first-child]:whitespace-normal [&>:first-child]:[overflow-wrap:anywhere]"
                 >
-                  <Monitor aria-hidden />
                   <MachineName machine={m} all={machines} />
                   {m.online === false && (
                     <span className="text-content-tertiary">{` · ${t('离线')}`}</span>

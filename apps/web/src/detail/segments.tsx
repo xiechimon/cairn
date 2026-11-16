@@ -2,6 +2,7 @@ import { cn } from 'cn';
 import { createContext, Fragment, type ReactNode, useContext } from 'react';
 import { Link } from 'react-router';
 import { useThreadHref } from '../board/thread-link.js';
+import { MachineName } from '../components/machine-label.js';
 import { type GlyphKind, StatusGlyph } from '../components/status-glyph.js';
 import type { DocSegment, Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -141,7 +142,13 @@ function MentionChip({ seg }: { seg: DocSegment }) {
       <span className="max-w-48 truncate">{label}</span>
     </Link>
   ) : (
-    <span className={chipClass}>{label}</span>
+    <span className={chipClass}>
+      {seg.mentionKind === 'machine' ? (
+        <MachineName machine={{ id: seg.mentionId, name: label }} compact />
+      ) : (
+        label
+      )}
+    </span>
   );
 }
 
