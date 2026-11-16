@@ -264,7 +264,6 @@ export async function launchConfined(options: {
       '--property=ExitType=cgroup',
       '--property=Slice=app.slice',
       '--property=Delegate=no',
-      '--property=ProtectControlGroups=yes',
       'bwrap',
       ...mounts,
       '--',
