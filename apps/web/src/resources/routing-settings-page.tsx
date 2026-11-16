@@ -256,7 +256,12 @@ function RuleRow({
       id={`route-${use}`}
       data-testid={rule === null ? `routing-rule-new-${use}` : `routing-rule-${use}`}
     >
-      <SettingsRow label={label} hint={hint} className="flex-wrap gap-y-2 py-2.5">
+      <SettingsRow
+        label={label}
+        hint={hint}
+        className="flex-wrap gap-y-2 py-2.5 max-sm:[&>span:first-child]:max-w-none"
+        hintClassName="text-pretty break-keep"
+      >
         <div className="flex items-center justify-end gap-1.5 max-sm:w-full max-sm:justify-start">
           <Select
             value={level}

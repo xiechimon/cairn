@@ -2327,6 +2327,8 @@ export const EN: Record<string, string> = {
   '删除 {model}': 'Remove {model}',
   常用模型: 'Top models',
   '你常用的模型，最多 {max} 个。': 'Your models, up to {max}.',
+  '还没有常用模型。先在「模型服务」里接入服务商，再回来添加。':
+    'No top models yet. Connect one under Providers first, then add models here.',
   '还没有常用模型。点「添加模型」从已连接的服务商里挑。':
     'No top models yet. Use Add model to pick from your connected providers.',
   '恢复成推荐的模型和顺序。': 'Go back to the suggested models and their order.',
