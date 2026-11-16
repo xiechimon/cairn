@@ -1,13 +1,13 @@
 ---
 title: Your first task
-description: Create a project, say one thing, and follow it until the change waits for your review.
+description: Create a project, say one thing, and follow it until the task is done.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
 Before you start, the setup hint under the home page's message box should be gone, which means setup is done: you [connected a model](/docs/models/) and [a Runner](/docs/runner/), and the Coordinator has a model to use, by default the first provider you added. If the hint is still there, click it and it takes you to the missing step.
 
-This walk uses a local repository and goes from a request to a change waiting for your review, in a few minutes.
+This walk uses a local repository and goes from a request to a finished task, in a few minutes.
 
 ## 1. Create a project
 
@@ -47,14 +47,12 @@ While it runs, the thread may stop to ask you something:
 If the task stays `Queued` with a note that the task sandbox is not ready, that Linux Runner is not its own systemd user unit, or bubblewrap (`bwrap`) is not installed. Fix that, then run `cairn restart` on the machine; see [Keep it running on Linux](/docs/runner/#keep-it-running-on-linux).
 </Aside>
 
-## 4. Review the change
+## 4. When it is done
 
-When the work is done, the task turns `Ready for review`. The task shows a card such as `Changed 1 file`; open it to read the diff. The thread commits on its own branch and never edits your main branch directly.
+When the work succeeds, the task turns `Done`. The thread commits on its own branch and never edits your main branch directly.
 
 - To ask for more: say so in `Reply to this task`.
-- When you are happy: choose `Complete` in the task's `…` menu.
-
-A merge goes through the merge gate first, which counts only review verdicts bound to the current patch. Anything that cannot be undone waits for your yes.
+- To merge: say so in the conversation.
 
 ## Next
 
