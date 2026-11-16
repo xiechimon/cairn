@@ -259,25 +259,9 @@ export const EN: Record<string, string> = {
     'Add a provider; the Coordinator cannot use a Claude Code sign-in',
   '还差第 1 步：接入模型': 'Step 1 is still open: connect models',
   '还差第 2 步：确认模型': 'Step 2 is still open: confirm models',
-  启动中: 'Starting',
-  '本机执行机正在启动，启动后会检查这台电脑上的 Claude Code':
-    'The local Runner is starting; it checks Claude Code on this computer once it is up',
-  '本机执行机没有启动，查不到 Claude Code。退出 Cairn 再打开一次。':
-    'The local Runner did not start, so Claude Code cannot be checked. Quit Cairn and open it again.',
-  已在这台电脑上登录: 'Signed in on this computer',
   '{role}：{model}': '{role}: {model}',
-  '没找到已登录的 Claude Code。在终端运行 `claude` 登录后，这里会自己更新。':
-    'No signed-in Claude Code found. Run `claude` in a terminal and sign in; this updates by itself.',
-  '{machine} 上没有检测到 Claude Code。装好后运行 `cairn restart`，这里会自己更新。':
-    'Claude Code is not detected on {machine}. Install it, then run `cairn restart`; this updates by itself.',
-  '还没有在线的执行机。在要跑任务的电脑上装好 CLI，运行 `cairn start` 并批准它。':
-    'No Runner is online yet. On the computer that should run tasks, install the CLI, run `cairn start` and approve it.',
-  '本机 Claude Code': 'Claude Code on this computer',
-  只给任务用: 'Tasks only',
   '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
   'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
-  '任务已经能跑了。Coordinator 用不了 Claude Code 登录，还需要一个服务商。':
-    'Tasks can run now. The Coordinator cannot use a Claude Code sign-in and still needs a provider.',
   '因为你添加了 Anthropic API key': 'Because you added an Anthropic API key',
   '因为这是最早添加、Coordinator 能直接用的服务商':
     'Because it is the earliest added provider the Coordinator can use',
