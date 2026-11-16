@@ -61,7 +61,7 @@ test('a new team sees an empty state instead of a blank grid', async ({ page }) 
   await expect(page.getByTestId('usage-heatmap')).toHaveCount(0);
 });
 
-test('Activity stays reachable from search after its footer button became Usage', async ({
+test('the sidebar footer offers Usage and neither it nor search offers Activity', async ({
   page,
 }) => {
   await page.goto('/app');
@@ -70,7 +70,6 @@ test('Activity stays reachable from search after its footer button became Usage'
   await expect(footer.getByTestId('sidebar-activity')).toHaveCount(0);
   const search = page.getByRole('dialog', { name: 'Search' });
   await pressAndExpect(page, 'Meta+k', search);
-  await search.getByRole('button', { name: 'Activity', exact: true }).click();
-  await expect(page).toHaveURL(/\/app\/activity/);
-  await expect(page.getByRole('dialog', { name: 'Activity' })).toBeVisible();
+  await expect(search.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
+  await expect(search.getByRole('button', { name: 'Activity', exact: true })).toHaveCount(0);
 });
