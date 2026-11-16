@@ -607,7 +607,6 @@ export const EN: Record<string, string> = {
   在这台设备上接收推送: 'Push on this device',
   '需要你决定时立即推送，其余进展并入每日两次简报，锁屏也能收到':
     'Push immediately when a decision is needed; everything else lands in the twice-daily digest — even on the lock screen',
-  不再显示: 'Do not show again',
   // #1031: the switch is a preference; when it's on but the browser permission
   // is denied, the row explains why nothing will actually fire.
   '浏览器已拒绝通知权限，需到站点设置重新允许':
