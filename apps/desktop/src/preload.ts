@@ -1,7 +1,12 @@
-import type { DesktopUpdateState } from '@cairn/shared';
+import type { DesktopUpdateState, LocalProvider, LocalProviderImport } from '@cairn/shared';
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('cairnDesktop', {
+  localProviders: {
+    scan: (): Promise<LocalProvider[]> => ipcRenderer.invoke('local-providers:scan'),
+    read: (providerIds: string[]): Promise<LocalProviderImport[]> =>
+      ipcRenderer.invoke('local-providers:read', providerIds),
+  },
   update: {
     state: (): Promise<DesktopUpdateState> => ipcRenderer.invoke('desktop-update:state'),
     check: (): Promise<void> => ipcRenderer.invoke('desktop-update:check'),

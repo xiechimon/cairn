@@ -25,6 +25,7 @@ import {
 } from 'electron';
 import { appMenuTemplate } from './app-menu.js';
 import { createKeepAwake } from './keep-awake.js';
+import { readLocalProviders, scanLocalProviders } from './local-providers.js';
 import { type LocalRunner, startLocalRunner } from './runner.js';
 import { trayMenuTemplate } from './tray-menu.js';
 import { createUpdater, removeLeftoverUpdates } from './updater.js';
@@ -298,6 +299,12 @@ function serveUpdates(origin: string): void {
   ipcMain.handle('desktop-update:check', (event) => (fromOwnPage(event) ? check() : undefined));
   ipcMain.handle('desktop-update:install', (event) =>
     fromOwnPage(event) ? updater.install() : undefined,
+  );
+  ipcMain.handle('local-providers:scan', (event) =>
+    fromOwnPage(event) ? scanLocalProviders() : [],
+  );
+  ipcMain.handle('local-providers:read', (event, providerIds: unknown) =>
+    fromOwnPage(event) ? readLocalProviders(providerIds) : [],
   );
   setTimeout(() => void check(), UPDATE_FIRST_CHECK_MS);
   setInterval(() => void check(), UPDATE_CHECK_EVERY_MS);
