@@ -14,11 +14,12 @@ afterEach(async () => {
   for (const close of cleanup.splice(0).reverse()) await close();
 });
 
-async function fixture() {
+async function fixture(opts: { withholdMcpConnectors?: boolean; token?: unknown } = {}) {
   const home = testTempDir('relay-');
   const socketPath = join(home, 'step.sock');
   const forwarded = vi.fn(async (method: string, args: unknown[]): Promise<unknown> => {
     if (method === 'skillFile') return Buffer.from('skill');
+    if (method === 'token' && opts.token !== undefined) return opts.token;
     if (method === 'uploadUrls')
       return { uploads: [{ url: 'https://upload.test/step', headers: {}, method: 'PUT' }] };
     return { method, args };
@@ -38,6 +39,7 @@ async function fixture() {
     stepId: 'step',
     machineId: 'host',
     upstream,
+    ...(opts.withholdMcpConnectors ? { withholdMcpConnectors: true } : {}),
   });
   await server.listen();
   const client = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
@@ -424,4 +426,33 @@ test('caps pre-auth connections at four and releases capacity after disconnect',
     await server.close();
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('a remote sandbox relay withholds connector endpoints and keeps everything else', async () => {
+  const token = {
+    provider: null,
+    secrets: { API: 'v' },
+    git: null,
+    mcpConnectors: [
+      {
+        slug: 'linear',
+        transport: 'http',
+        url: 'https://mcp.linear.app/mcp',
+        headers: { Authorization: 'Bearer secret-at' },
+      },
+    ],
+    withheldMcp: ['notion'],
+  };
+  const remote = await fixture({ withholdMcpConnectors: true, token });
+  const stripped = await remote.client.call('token', ['step']);
+  expect(stripped).toEqual({
+    provider: null,
+    secrets: { API: 'v' },
+    git: null,
+    withheldMcp: ['notion', 'linear'],
+  });
+  expect(JSON.stringify(stripped)).not.toContain('secret-at');
+
+  const local = await fixture({ token });
+  expect(await local.client.call('token', ['step'])).toEqual(token);
 });

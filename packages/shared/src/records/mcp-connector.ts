@@ -128,6 +128,28 @@ export function mcpCatalogEntry(id: string): McpCatalogEntry | undefined {
   return MCP_CATALOG.find((entry) => entry.id === id);
 }
 
+const OPTION_HEADER_NAMES = new Set(
+  MCP_CATALOG.flatMap((entry) =>
+    entry.options.filter((o) => o.kind === 'header').map((o) => o.name.toLowerCase()),
+  ),
+);
+
+const MIN_REDACTED_LENGTH = 8;
+
+export function mcpConnectorSecretValues(headers: Record<string, string> | undefined): string[] {
+  const values = new Set<string>();
+  for (const [name, value] of Object.entries(headers ?? {})) {
+    if (OPTION_HEADER_NAMES.has(name.toLowerCase())) continue;
+    const credential = /^\S+\s+(\S+)$/.exec(value)?.[1];
+    for (const secret of [value, credential]) {
+      if (secret === undefined || secret.length < MIN_REDACTED_LENGTH) continue;
+      values.add(JSON.stringify(secret).slice(1, -1));
+      values.add(secret);
+    }
+  }
+  return [...values];
+}
+
 export const MCP_RESERVED_SLUGS: readonly string[] = ['cairn'];
 
 export const mcpConnectorSlugSchema = z
