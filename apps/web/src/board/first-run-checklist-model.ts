@@ -88,6 +88,7 @@ export function setupShown(input: {
   if (input.projects === undefined) return undefined;
   if (input.projects > 0) return false;
   if (input.progress === undefined) return undefined;
+  if (setupOpenStep(input.progress) === null) return false;
   return input.requested || !input.skipped;
 }
 

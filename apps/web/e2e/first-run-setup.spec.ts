@@ -83,20 +83,20 @@ async function open(page: Page, world: World, path = '/app') {
 
 const fresh = (): World => ({ projects: [], bound: true, rules: [], patches: [] });
 
-test('a team with no projects lands on the setup page, and confirming saves both rules', async ({ page }) => {
+test('a team with no projects lands on the setup page, and confirming saves both rules and opens the conversation', async ({ page }) => {
   const world = fresh();
   await open(page, world);
   const setup = page.getByTestId('first-run-setup');
   await expect(setup).toBeVisible();
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'done');
   await expect(page.getByTestId('first-run-step-2')).toHaveAttribute('data-state', 'now');
-  await expect(setup).toContainText('还差第 2 步：确认模型');
   await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('最早添加');
   await expect(page.getByTestId('first-run-pick-session')).toContainText('Claude Code');
   await page.getByTestId('first-run-confirm').click();
   await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
   expect(world.patches[0]?.body).toEqual({ provider: 'p1', modelId: 'claude-opus-5-5' });
-  await expect(setup.getByRole('link', { name: '新建第一个项目' })).toBeVisible();
+  await expect(setup).toHaveCount(0);
+  await expect(page.getByTestId('home-c')).toBeVisible();
 });
 
 test('the change control opens the model picker, and confirming saves the model picked there', async ({ page }) => {
@@ -118,13 +118,19 @@ test('without a provider, step 1 offers only Add provider, which opens the picke
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
   await expect(page.getByTestId('first-run-setup')).not.toContainText('本机 Claude Code');
   await expect(page.getByTestId('first-run-setup').getByRole('switch')).toHaveCount(0);
-  await expect(page.getByTestId('first-run-setup')).toContainText('还差第 1 步');
   await page.getByTestId('first-run-add-provider').click();
   const picker = page.getByRole('dialog', { name: '添加模型服务' });
   await expect(picker).toBeVisible();
   await expect(page).toHaveURL(/\/app(\?|$)/);
   await picker.locator('[data-preset-id="claude-subscription"]').click();
   await expect(page.getByRole('dialog', { name: '添加 Claude 订阅' })).toBeVisible();
+});
+
+test('the language switch on the setup page changes the page language', async ({ page }) => {
+  await open(page, fresh());
+  await page.getByRole('radio', { name: 'English' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Welcome to Cairn');
+  await expect(page.getByTestId('first-run-confirm')).toHaveText('Confirm and start chatting');
 });
 
 test('the new-project dialog says which step is missing until setup is done', async ({ page }) => {
@@ -160,5 +166,5 @@ test('a saved Claude subscription with Claude Code found is the Coordinator pick
 test('a saved subscription without Claude Code on this computer says what is missing', async ({ page }) => {
   await open(page, { ...fresh(), bound: false, subscription: true });
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
-  await expect(page.getByTestId('first-run-step-1')).toContainText('订阅已保存。这台电脑还没找到 Claude Code');
+  await expect(page.getByTestId('first-run-setup')).toContainText('订阅已保存。这台电脑还没找到 Claude Code');
 });

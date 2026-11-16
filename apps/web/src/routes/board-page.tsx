@@ -218,6 +218,19 @@ export function BoardPage() {
     projectLookup !== 'loading' &&
     projectLookup !== 'failed' &&
     !(projectLookup === 'unknown' && homeProjectId !== null);
+  if (showSetup) {
+    return (
+      <FirstRunSetup
+        setup={setup}
+        onSkip={() => {
+          setSkipped(true);
+          const params = new URLSearchParams(searchParams);
+          params.delete(SETUP_PARAM);
+          setSearchParams(params, { replace: true });
+        }}
+      />
+    );
+  }
   return (
     <div className="board-shell flex h-full overflow-hidden bg-(--surface-1)" data-route="board">
       <AppSidebar
@@ -263,16 +276,6 @@ export function BoardPage() {
                 }}
               />
             </div>
-          ) : showSetup ? (
-            <FirstRunSetup
-              setup={setup}
-              onSkip={() => {
-                setSkipped(true);
-                const params = new URLSearchParams(searchParams);
-                params.delete(SETUP_PARAM);
-                setSearchParams(params, { replace: true });
-              }}
-            />
           ) : (
             <HomeC
               surface={chief}
