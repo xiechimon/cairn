@@ -33,7 +33,9 @@ jobs:
           fi
           changed=$(git diff --name-only "$last" "$GITHUB_SHA" -- \
             apps/web apps/server apps/daemon apps/desktop packages/shared \
-            package.json pnpm-lock.yaml pnpm-workspace.yaml)
+            package.json pnpm-lock.yaml pnpm-workspace.yaml \
+            ':(exclude)apps/*/test/*' ':(exclude)packages/*/test/*' ':(exclude)apps/web/e2e/*' \
+            ':(exclude)*.md')
           if [ -z "$changed" ]; then
             echo "nothing the app ships changed since $last"
             echo "release=false" >> "$GITHUB_OUTPUT"
