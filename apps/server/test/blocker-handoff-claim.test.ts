@@ -424,7 +424,7 @@ describe('#1624 child-card claim carries blocker-card deliveries', () => {
     expect(w.mock.requests).toEqual([]);
   });
 
-  test('S11 review / verify / merge steps do not carry it', async () => {
+  test('S11 an explicit merge of delivered work does not carry it', async () => {
     const w = await setupWorld({ github: false });
     const a = await seedDoneBlocker(w, { title: '前置', head: HEAD_B });
     const childId = await startChild(w, '后置', [a]);
@@ -438,6 +438,7 @@ describe('#1624 child-card claim carries blocker-card deliveries', () => {
         ),
       )
       .run();
+    w.s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable.id, childId)).run();
     const got = await claim(w);
     expect(got.step.kind).toBe('merge');
     expect(got.todo?.blockerHandoff).toBeUndefined();

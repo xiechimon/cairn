@@ -16,7 +16,12 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { sweepAbandonedBuildSteps } from '../src/services/build-abandoned-sweep.js';
-import { applyStoppedStep, enqueueStep, prepareStopForDone } from '../src/services/builds.js';
+import {
+  applyStoppedStep,
+  enqueueStep,
+  prepareStopForDone,
+  sendBuildSteer,
+} from '../src/services/builds.js';
 import { type ChiefToolDeps, transitionTodos } from '../src/services/chief-tools.js';
 import { claimStep, finishStep } from '../src/services/machines.js';
 import { RETRY_PARKED_MARK } from '../src/services/retry-parking.js';
@@ -645,17 +650,28 @@ describe('the phase reserved for after a stop lives on the build row', () => {
     expect(reservedPhase(w)).toBeNull();
 
     const after = restarted(dbPath);
-    const continuation = enqueueStep(after.svc, w.buildId, 'build', w.teamId);
-    after.db
-      .update(stepTable)
-      .set({ status: 'claimed', machineId: w.machineId, lastHeartbeatAt: Date.now() })
-      .where(eq(stepTable.id, continuation.id))
-      .run();
-    await finishStep(machineDepsOf(after), w.machineId, continuation.id, {
+    await sendBuildSteer(
+      after.svc,
+      w.buildId,
+      { content: 'Continue after the crash' },
+      { afterTurn: true, human: true },
+    );
+    expect(todoPhase(w)).toBe('queued');
+    expect(reservedPhase(w, after.db)).toBeNull();
+    const continuation = await claimStep(
+      machineDepsOf(after),
+      w.machineId,
+      w.teamId,
+      10,
+      'http://localhost',
+    );
+    expect(continuation?.step.kind).toBe('build');
+    expect(todoPhase(w)).toBe('building');
+    await finishStep(machineDepsOf(after), w.machineId, continuation!.step.id, {
       status: 'success',
       hasChanges: true,
     });
-    expect(todoPhase(w)).not.toBe('done');
+    expect(todoPhase(w)).toBe('done');
     expect(reservedPhase(w, after.db)).toBeNull();
   });
 
