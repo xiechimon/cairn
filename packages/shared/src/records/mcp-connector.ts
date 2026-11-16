@@ -143,8 +143,8 @@ export function mcpConnectorSecretValues(headers: Record<string, string> | undef
     const credential = /^\S+\s+(\S+)$/.exec(value)?.[1];
     for (const secret of [value, credential]) {
       if (secret === undefined || secret.length < MIN_REDACTED_LENGTH) continue;
-      values.add(secret);
       values.add(JSON.stringify(secret).slice(1, -1));
+      values.add(secret);
     }
   }
   return [...values];
