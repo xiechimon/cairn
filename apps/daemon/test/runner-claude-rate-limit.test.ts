@@ -49,7 +49,12 @@ class FakeClient implements MachineApi {
     return '{}';
   }
   async token() {
-    return { provider: null, secrets: {}, git: null };
+    return {
+      provider: null,
+      secrets: {},
+      git: null,
+      claudeSubscriptionToken: 'rate-limit-subscription-token',
+    };
   }
   async skillsManifest() {
     return { selection: 'whitelist' as const, skills: [] };
@@ -167,11 +172,6 @@ async function run(notices: (opts: SessionOpts) => void) {
     workspacesDir: join(home, 'workspaces'),
     mcpConfigPath: join(home, 'claude.json'),
     heartbeatIntervalMs: 60_000,
-    claudeCodeAuthProbe: async () => ({
-      state: 'logged-in' as const,
-      method: 'oauth',
-      provider: 'anthropic',
-    }),
   };
   await runStep(deps, claimed, {});
   return client;

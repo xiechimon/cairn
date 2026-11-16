@@ -149,7 +149,7 @@ describe('getModelSources (service layer, aggregated per machine)', () => {
     s.dispose();
   });
 
-  test('F7 (#1050): bin/auth passed through verbatim -- server does not synthesize or guess', async () => {
+  test('F7 (#1050): bin passes through verbatim and the Runner login stays out of the sources', async () => {
     const s = bootServer();
     const token = await enroll(s, 'exec-bin');
     await presence(token, s, {
@@ -163,7 +163,7 @@ describe('getModelSources (service layer, aggregated per machine)', () => {
     expect(modelSourcesEnvelopeSchema.safeParse(env).success).toBe(true);
     const cc = env.sources.find((src) => src.runtime === 'claude-code');
     expect(cc?.bin).toEqual({ path: '/home/u/.local/bin/claude', version: '2.1.289' });
-    expect(cc?.auth).toEqual({ state: 'not-logged-in', provider: 'firstParty' });
+    expect(cc?.auth).toBeUndefined();
     s.dispose();
   });
 

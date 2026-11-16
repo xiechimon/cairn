@@ -4,7 +4,6 @@ import type { Db } from '../db/client.js';
 import { type build, type machine, step, team } from '../db/schema.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import {
-  claudeCodeLoginBlocked,
   type MachineIneligibility,
   machineEligibility,
   machineRunningCount,
@@ -36,13 +35,8 @@ export function workerIneligibility(
     catalog,
     localProject: facts.localProject,
     claudeRateBlocked: claudeRateBlock(machineRow.claudeRateLimits ?? [], now) !== null,
-    claudeLoginBlocked:
-      claudeCode &&
-      claudeCodeLoginBlocked(
-        machineRow.claudeCodeReport,
-        hasActiveClaudeSubscription({ db }, machineRow.teamId),
-        now,
-      ),
+    claudeSubscriptionMissing:
+      claudeCode && !hasActiveClaudeSubscription({ db }, machineRow.teamId),
   });
   return ineligible;
 }

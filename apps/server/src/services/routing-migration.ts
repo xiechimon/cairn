@@ -4,6 +4,7 @@ import type { Db } from '../db/client.js';
 import { routingRule, team, workPolicy } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
+import { claudeCodeUsable } from './dispatch-eligibility.js';
 import { listClaudeCodeSources } from './providers.js';
 
 export const DEFAULT_SESSION_PROVIDER = 'claude-code';
@@ -46,10 +47,8 @@ function insertPolicy(db: Db, teamId: string, use: 'session' | 'review', tools: 
 }
 
 function usableCoordinatorModel(db: Db, teamId: string): string | null {
-  const usable = listClaudeCodeSources(db, teamId).filter(
-    (source) => source.installed && source.auth?.state === 'logged-in',
-  );
-  if (usable.length === 0) return null;
+  if (!claudeCodeUsable(db, teamId)) return null;
+  const usable = listClaudeCodeSources(db, teamId).filter((source) => source.installed);
   const offered = usable.flatMap((source) => source.models.map((model) => model.id));
   if (offered.length === 0 || offered.includes(DEFAULT_SESSION_MODEL)) return DEFAULT_SESSION_MODEL;
   return offered[0] ?? DEFAULT_SESSION_MODEL;

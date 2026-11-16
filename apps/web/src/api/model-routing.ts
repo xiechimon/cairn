@@ -51,8 +51,6 @@ const GRAPH_USES: readonly RouteUse[] = [
 
 const CLAUDE_CODE_TARGET = 'claude-code';
 
-const MACHINE_PREFIX = 'machine:';
-
 export interface RoutingTargetRow {
   id: string;
   name: string;
@@ -94,25 +92,6 @@ export function routingTargets({
     ...quotaOf(accountLeft(account, 'five_hour'), accountLeft(account, 'seven_day')),
     unavailable: account.state === 'expired',
   }));
-  const machineClaude = (routing?.connections ?? []).filter(
-    (c) => c.id.startsWith(MACHINE_PREFIX) && c.vendor === 'anthropic' && !c.id.endsWith(':codex'),
-  );
-  if (rows.length === 0 && machineClaude.length > 0) {
-    const windows = routing?.quota.find((q) =>
-      machineClaude.some((c) => c.id === q.connectionId),
-    )?.windows;
-    rows.push({
-      id: CLAUDE_CODE_TARGET,
-      name: 'Claude Code',
-      runtime: 'claude-code',
-      plan: null,
-      ...quotaOf(
-        leftOf(windows?.find((w) => w.window === '5h')?.usedPercent),
-        leftOf(windows?.find((w) => w.window === 'week')?.usedPercent),
-      ),
-      unavailable: machineClaude.every((c) => c.available === false),
-    });
-  }
   for (const record of providers) {
     const connections = (routing?.connections ?? []).filter((c) => c.id === record.id);
     rows.push({

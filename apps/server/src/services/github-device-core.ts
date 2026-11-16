@@ -146,7 +146,11 @@ export async function refreshGithubDeviceToken(
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
   });
-  if (body.error === 'bad_refresh_token' || body.error === 'expired_token') {
+  if (
+    body.error === 'bad_refresh_token' ||
+    body.error === 'expired_token' ||
+    body.error === 'incorrect_client_credentials'
+  ) {
     throw new HttpError(401, 'GitHub authorization expired; reconnect GitHub');
   }
   if (body.error !== undefined)

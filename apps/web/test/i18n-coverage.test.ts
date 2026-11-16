@@ -131,7 +131,10 @@ describe('EN dict liveness', () => {
       .concat(sourceFiles(join(SRC, 'api')).map((f) => readFileSync(f, 'utf8')))
       .join('\n');
     const dead = Object.keys(EN).filter(
-      (key) => !COMPUTED_KEYS.has(key) && !corpus.includes(key),
+      (key) =>
+        !COMPUTED_KEYS.has(key) &&
+        !corpus.includes(key) &&
+        !corpus.includes(key.replaceAll('\u00a0', '\\u00a0')),
     );
     expect(dead).toEqual([]);
   });

@@ -1,4 +1,4 @@
-import type { ClaimedStep } from '@cairn/shared';
+import type { ClaimedStep, ClaudeCodeReport } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -31,6 +31,7 @@ import {
 } from '../src/services/routing-rules.js';
 import {
   bootServer,
+  insertClaudeSubscription,
   insertMachine,
   issueApiKey,
   postProject,
@@ -519,10 +520,19 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     }
   }
 
-  function claudeRunner(s: TestServer, online = true): string {
+  function claudeRunner(
+    s: TestServer,
+    online = true,
+    auth: ClaudeCodeReport['auth'] = undefined,
+  ): string {
     const id = insertMachine(s, {
       enabledRuntimes: ['pi', 'claude-code'],
-      claudeCodeReport: { installed: true, hostname: 'h', models: [] },
+      claudeCodeReport: {
+        installed: true,
+        hostname: 'h',
+        models: [],
+        ...(auth !== undefined ? { auth } : {}),
+      },
     });
     s.db.update(machineTable).set({ online }).where(eq(machineTable.id, id)).run();
     return id;
@@ -581,10 +591,12 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     setCoordinatorServerContextEnabled(false);
   });
 
-  test('with no stored Session rule, a Runner with Claude Code gives the routed default even while offline', () => {
+  test('with no stored Session rule, a Claude subscription and a Runner with Claude Code give the routed default even while offline', () => {
     const s = bare();
     claudeRunner(s, false);
     addProvider(s, 'vani', { models: ['m1'] });
+    expect(session(s)).toMatchObject({ provider: 'vani', modelId: 'm1' });
+    insertClaudeSubscription(s);
     expect(session(s)).toMatchObject({
       id: 'default-session',
       provider: 'claude-code',
@@ -592,14 +604,27 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     });
   });
 
-  test('a Codex login counts only when it exists; an absent one falls through to the provider', () => {
+  test('a Runner Codex login is no model source: the Session default stays on the provider', () => {
     const s = bare();
-    piOnlyRunner(s, 'absent');
+    piOnlyRunner(s, 'ok');
     addProvider(s, 'deepseek', { key: false, models: ['m0'], createdAt: 1 });
     addProvider(s, 'vani', { models: ['m1', 'm2'], createdAt: 2 });
     expect(session(s)).toMatchObject({ provider: 'vani', modelId: 'm1' });
-    piOnlyRunner(s, 'ok');
-    expect(session(s)).toMatchObject({ provider: 'claude-code' });
+  });
+
+  test('a Runner signed in to Claude Code without a stored subscription is no Session or Coordinator default', () => {
+    const s = bare();
+    claudeRunner(s, true, { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' });
+    const settings = () => listRoutingSettings(s.db, s.team.id, true);
+    expect(settings().sessionDefault).toEqual({ reason: 'none', provider: null, modelId: null });
+    expect(settings().coordinatorDefault).toEqual({
+      reason: 'none',
+      provider: null,
+      modelId: null,
+    });
+    insertClaudeSubscription(s);
+    expect(settings().sessionDefault).toMatchObject({ reason: 'claude-code' });
+    expect(settings().coordinatorDefault).toMatchObject({ reason: 'claude-code' });
   });
 
   test('the provider default takes a Claude model on a provider, and nothing runnable means no rule', () => {
@@ -610,7 +635,7 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     expect(session(s)).toMatchObject({ provider: 'claude-proxy', modelId: 'claude-sonnet-5-5' });
   });
 
-  test('a stored stock seed falls back to the provider only when no Claude Code or Codex exists at all', () => {
+  test('a stored stock seed falls back to the provider until a subscription and Claude Code both exist', () => {
     const s = bare();
     seedRoute(s, 'session', { provider: 'claude-code', modelId: 'claude-sonnet-5-5' });
     addProvider(s, 'vani', { models: ['m1'] });
@@ -621,6 +646,11 @@ describe('rules store provider ids, with a read-time default for Session', () =>
       modelId: 'm1',
     });
     claudeRunner(s, false);
+    expect(profileForStep(s.db, todoRow, 'build')).toMatchObject({
+      provider: 'vani',
+      modelId: 'm1',
+    });
+    insertClaudeSubscription(s);
     expect(profileForStep(s.db, todoRow, 'build')).toMatchObject({
       provider: 'claude-code',
       modelId: 'claude-sonnet-5-5',
@@ -635,8 +665,10 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     addProvider(s, 'vani', { models: ['m1'] });
     expect(sessionDefault()).toEqual({ reason: 'provider', provider: 'vani', modelId: 'm1' });
     piOnlyRunner(s, 'ok');
-    expect(sessionDefault()).toMatchObject({ reason: 'codex-login', provider: 'claude-code' });
+    expect(sessionDefault()).toEqual({ reason: 'provider', provider: 'vani', modelId: 'm1' });
     claudeRunner(s, false);
+    expect(sessionDefault()).toEqual({ reason: 'provider', provider: 'vani', modelId: 'm1' });
+    insertClaudeSubscription(s);
     expect(sessionDefault()).toMatchObject({ reason: 'claude-code', provider: 'claude-code' });
     seedRoute(s, 'session', { provider: 'vani', modelId: 'm1' });
     expect(sessionDefault()).toBeUndefined();

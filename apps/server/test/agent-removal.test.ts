@@ -7,6 +7,7 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdi
 import { openDbWithHandle } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { hashCredential } from '../src/lib/hash.js';
+import { createClaudeSubscription } from '../src/services/claude-subscriptions.js';
 import { listMemoryEntries } from '../src/services/memory.js';
 import { seedDefaultRouting } from '../src/services/routing-migration.js';
 import {
@@ -244,6 +245,10 @@ function rows(sqlite: Database.Database, sql: string): Record<string, unknown>[]
 function serverOn(world: LegacyWorld) {
   const opened = openDbWithHandle(world.dbPath);
   const s = bootServer({ db: opened.db, claimHoldMs: 20 });
+  createClaudeSubscription({ db: s.db, box: s.secretBox }, 't1', {
+    label: 'Team subscription',
+    token: 'legacy-team-subscription-token',
+  });
   return { s, opened };
 }
 

@@ -2,6 +2,7 @@ import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
   type AgentBackend,
+  CLAUDE_CODE_AUTH_FAILURE_MARKER,
   type ProviderConfig,
 } from '@cairn/shared';
 import { describe, expect, it } from 'vitest';
@@ -12,20 +13,17 @@ const base = {
   agentTools: undefined,
   runtimeId: null,
   hasSubscriptionToken: false,
-  authProbe: undefined,
-  machineName: () => 'box',
-  log: () => {},
 };
 
 describe('agentStepRefusal', () => {
   it('refuses a merge step whose agent lacks the merge and push tools', async () => {
-    const refusal = await agentStepRefusal({ ...base, stepKind: 'merge', agentTools: [] });
+    const refusal = agentStepRefusal({ ...base, stepKind: 'merge', agentTools: [] });
     expect(refusal).toContain(AGENT_TOOL_MERGE);
     expect(refusal).toContain(AGENT_TOOL_PUSH);
   });
 
   it('lets a merge step through when the agent holds both tools', async () => {
-    const refusal = await agentStepRefusal({
+    const refusal = agentStepRefusal({
       ...base,
       stepKind: 'merge',
       agentTools: [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH],
@@ -33,40 +31,20 @@ describe('agentStepRefusal', () => {
     expect(refusal).toBeNull();
   });
 
-  it('refuses a claude-code step when the machine is not logged in', async () => {
-    const refusal = await agentStepRefusal({
-      ...base,
-      runtimeId: 'claude-code',
-      authProbe: async () => ({ state: 'not-logged-in', provider: 'claude' }),
-    });
-    expect(refusal).toContain('box');
+  it('refuses a claude-code step that has no subscription token', () => {
+    const refusal = agentStepRefusal({ ...base, runtimeId: 'claude-code' });
+    expect(refusal).toContain(CLAUDE_CODE_AUTH_FAILURE_MARKER);
+    expect(refusal).toContain('claude setup-token');
   });
 
-  it('skips the login probe when a subscription token was delivered', async () => {
-    let probed = false;
-    const refusal = await agentStepRefusal({
-      ...base,
-      runtimeId: 'claude-code',
-      hasSubscriptionToken: true,
-      authProbe: async () => {
-        probed = true;
-        return { state: 'not-logged-in', provider: 'claude' };
-      },
-    });
-    expect(refusal).toBeNull();
-    expect(probed).toBe(false);
+  it('lets a claude-code step with a subscription token through', () => {
+    expect(
+      agentStepRefusal({ ...base, runtimeId: 'claude-code', hasSubscriptionToken: true }),
+    ).toBeNull();
   });
 
-  it('continues and logs when the login probe is inconclusive', async () => {
-    const lines: string[] = [];
-    const refusal = await agentStepRefusal({
-      ...base,
-      runtimeId: 'claude-code',
-      authProbe: async () => ({ state: 'unknown', reason: 'timeout' }),
-      log: (line) => lines.push(line),
-    });
-    expect(refusal).toBeNull();
-    expect(lines).toEqual(['claude-code auth probe inconclusive: timeout (continuing)']);
+  it('lets a pi step through without a subscription token', () => {
+    expect(agentStepRefusal({ ...base, runtimeId: null })).toBeNull();
   });
 });
 

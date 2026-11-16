@@ -29,7 +29,7 @@ function input(over: {
     catalog: [],
     localProject: false,
     claudeRateBlocked: false,
-    claudeLoginBlocked: false,
+    claudeSubscriptionMissing: false,
     ...over.rest,
   };
 }
@@ -176,8 +176,8 @@ describe('D71 machineEligibility: hard constraints for a worker step on a machin
     ).toBeNull();
   });
 
-  test('a machine whose Claude login is blocked does not take a claude-code step', () => {
-    expect(machineEligibility(input({ rest: { claudeLoginBlocked: true } }))?.kind).toBe(
+  test('a team without a usable Claude subscription does not take a claude-code step', () => {
+    expect(machineEligibility(input({ rest: { claudeSubscriptionMissing: true } }))?.kind).toBe(
       'claude-login',
     );
   });

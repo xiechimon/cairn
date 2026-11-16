@@ -6,7 +6,7 @@ import {
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  claudeCodeAuthFailureMessage,
+  claudeCodeSubscriptionMissingMessage,
   claudeCodeTeamSubscriptionAuthFailureMessage,
 } from '../../daemon/src/claude-code-auth.js';
 import {
@@ -692,7 +692,7 @@ describe('needs you (#1800)', () => {
   });
 
   test.each([
-    ['machine login', claudeCodeAuthFailureMessage('daemon-test')],
+    ['subscription missing', claudeCodeSubscriptionMissingMessage()],
     ['team subscription', claudeCodeTeamSubscriptionAuthFailureMessage('credential rejected')],
     ['raw CLI', 'Failed to authenticate: OAuth token revoked'],
     ['ordinary failure', 'build failed: test assertion failed'],

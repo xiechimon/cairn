@@ -672,11 +672,19 @@ describe('thinking-level capability read surface (XMON-16 / #499 B3 ruling A)', 
   });
 
   it('capability read-surface envelope accepts only in-vocabulary tiers (out-of-vocabulary always rejected)', () => {
-    expect(capabilitiesResponseSchema.parse({ thinkingLevels: ['off', 'max'] })).toEqual({
+    expect(
+      capabilitiesResponseSchema.parse({ thinkingLevels: ['off', 'max'], githubOAuth: false }),
+    ).toEqual({
       thinkingLevels: ['off', 'max'],
+      githubOAuth: false,
     });
-    expect(capabilitiesResponseSchema.safeParse({ thinkingLevels: ['ultra'] }).success).toBe(false);
-    expect(capabilitiesResponseSchema.safeParse({ thinkingLevels: [] }).success).toBe(true);
+    expect(
+      capabilitiesResponseSchema.safeParse({ thinkingLevels: ['ultra'], githubOAuth: false })
+        .success,
+    ).toBe(false);
+    expect(
+      capabilitiesResponseSchema.safeParse({ thinkingLevels: [], githubOAuth: false }).success,
+    ).toBe(true);
   });
 });
 

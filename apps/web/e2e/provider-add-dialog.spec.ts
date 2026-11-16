@@ -56,17 +56,14 @@ test('search filters by display name and id, case-insensitive; empty query resto
   await expect(dialog.locator('[data-preset-id]')).toHaveCount(38);
 });
 
-test('OAuth badge rides the wired rows (github-copilot, codex device login); xai none', async ({
+test('rows carry no badge; the wired sign-ins (GitHub Copilot, Codex device login) are offered', async ({
   page,
 }) => {
   const dialog = await openPicker(page);
-  await expect(dialog.getByText('OAuth', { exact: true })).toHaveCount(2);
-  await expect(
-    dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' }).getByText('OAuth', { exact: true }),
-  ).toHaveCount(1);
+  await expect(dialog.getByText('OAuth', { exact: true })).toHaveCount(0);
+  await expect(dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' })).toHaveCount(1);
 
   const codex = dialog.locator('[data-preset-id]', { hasText: 'OpenAI Codex' });
-  await expect(codex.getByText('OAuth', { exact: true })).toHaveCount(1);
   await expect(codex).toBeEnabled();
   await expect(dialog.getByText('暂未开通')).toHaveCount(0);
   const xai = dialog.locator('[data-preset-id="xai"]');
@@ -75,7 +72,6 @@ test('OAuth badge rides the wired rows (github-copilot, codex device login); xai
   await expect(dialog.locator('[data-preset-id="google-vertex"]').getByText('VertexAI')).toHaveCount(
     0,
   );
-  await expect(xai.getByText('OAuth', { exact: true })).toHaveCount(0);
 
   await expect(dialog.getByText('SuperGrok')).toHaveCount(0);
 });

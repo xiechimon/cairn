@@ -25,7 +25,6 @@ async function open(page: Page, world: World, path = '/app') {
         return json({
           edges: [],
           connections: [
-            { id: 'machine:m1', vendor: 'anthropic', kind: 'subscription', models: [], available: true },
             ...(world.subscription
               ? [{ id: 's1', vendor: 'anthropic', kind: 'subscription', models: [], available: true }]
               : []),
@@ -91,7 +90,7 @@ test('a team with no projects lands on the setup page, and confirming saves both
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'done');
   await expect(page.getByTestId('first-run-step-2')).toHaveAttribute('data-state', 'now');
   await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('最早添加');
-  await expect(page.getByTestId('first-run-pick-session')).toContainText('Claude Code');
+  await expect(page.getByTestId('first-run-pick-session')).toContainText('Claude 订阅');
   await page.getByTestId('first-run-confirm').click();
   await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
   expect(world.patches[0]?.body).toEqual({ provider: 'p1', modelId: 'claude-opus-5-5' });
@@ -158,7 +157,7 @@ test('a saved Claude subscription with Claude Code found is the Coordinator pick
   await open(page, world);
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'done');
   await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('Claude Sonnet 5.5');
-  await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('因为你登录了 Claude 订阅');
+  await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('因为你添加了 Claude 订阅');
   await page.getByTestId('first-run-confirm').click();
   await expect.poll(() => world.patches.map((p) => p.use)).toEqual(['coordinator', 'session']);
   expect(world.patches[0]?.body).toEqual({ provider: 'claude-code', modelId: 'claude-sonnet-5-5' });

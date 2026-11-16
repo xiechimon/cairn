@@ -2,7 +2,7 @@ import type { ClaudeSubscription } from '@cairn/shared';
 import { type UseMutationResult, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useCreateClaudeSubscription } from '../api/claude-subscriptions.js';
-import { useApiMutations } from '../api/hooks.js';
+import { useApiMutations, useCapabilities } from '../api/hooks.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
@@ -108,6 +108,7 @@ export function AddProviderFlow({
   const mutations = useApiMutations(teamId);
   const client = useQueryClient();
   const createSubscription = useCreateClaudeSubscription(teamId);
+  const capabilities = useCapabilities(live);
   const [CreateProviderDialog, setCreateProviderDialog] = useState<
     typeof CreateProviderDialogModule | null
   >(null);
@@ -185,6 +186,7 @@ export function AddProviderFlow({
                 }
               : undefined
           }
+          oauthSignIn={live ? capabilities.data?.githubOAuth === true : true}
           connectPending={mutations.startProviderOAuth.isPending}
           connectError={connectError}
           onPickClaudeSubscription={

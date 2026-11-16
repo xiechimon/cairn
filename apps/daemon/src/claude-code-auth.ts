@@ -130,16 +130,11 @@ export function readDefaultClaudeOauthExpiresAt(): number | null {
   }
 }
 
-export function claudeCodeAuthFailureMessage(machineName: string, cliMessage?: string): string {
+export function claudeCodeSubscriptionMissingMessage(): string {
   return [
     `${CLAUDE_CODE_AUTH_FAILURE_MARKER} `,
-    `claude-code 步骤无法在 Runner「${machineName}」上执行：该 Runner 没有可用的 Claude Code 凭据`,
-    '（预检 `claude auth status` = 未登录）。',
-    '补法（在该 Runner 上做，任选其一）：① 运行 `claude` 完成 /login；',
-    '② 在 ~/.claude/settings.json 的 env 里配 ANTHROPIC_API_KEY 或 ANTHROPIC_AUTH_TOKEN；',
-    '③ 配 apiKeyHelper 输出密钥。',
-    '凭据不跨机——每台要跑 claude-code 的 Runner 各自配（cairn 不传登录态）。',
-    ...(cliMessage ? [`CLI 原因：${cliMessage}`] : []),
+    'claude-code 步骤没有启动：团队还没有可用的 Claude 订阅。执行机自己的 Claude 登录不会被使用。',
+    '补法：在终端运行 `claude setup-token`，把 token 添加到 cairn 的「设置 → 模型服务」。',
   ].join('');
 }
 

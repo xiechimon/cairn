@@ -604,6 +604,14 @@ export function useEnableTailscaleAccess() {
   });
 }
 
+export function useApproveMachineEnrollment(teamId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => api.post('/api/machine/enroll/confirm', { code }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['machines', teamId] }),
+  });
+}
+
 export function useRemoteMutations() {
   const queryClient = useQueryClient();
   return {

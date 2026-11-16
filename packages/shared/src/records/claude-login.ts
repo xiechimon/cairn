@@ -1,8 +1,7 @@
 import { z } from 'zod';
 
 export const CLAUDE_LOGIN_STATES = ['ok', 'expiring', 'expired', 'unknown'] as const;
-export const CLAUDE_LOGIN_DAY_MS = 24 * 60 * 60 * 1000;
-export const CLAUDE_LOGIN_WARN_WITHIN_MS = 3 * CLAUDE_LOGIN_DAY_MS;
+const CLAUDE_LOGIN_WARN_WITHIN_MS = 3 * 24 * 60 * 60 * 1000;
 
 export const claudeLoginSchema = z.object({
   state: z.enum(CLAUDE_LOGIN_STATES),
@@ -11,10 +10,6 @@ export const claudeLoginSchema = z.object({
 export type ClaudeLogin = z.infer<typeof claudeLoginSchema>;
 
 export type ClaudeAuthProbeState = 'logged-in' | 'not-logged-in' | 'unknown';
-
-export type ClaudeLoginNotice = { kind: 'expired' } | { kind: 'expiring'; days: number | null };
-
-type LoginFact = { state: string; expiresAt?: number } | null | undefined;
 
 export function classifyClaudeCodeLogin(
   authState: ClaudeAuthProbeState,
@@ -31,24 +26,4 @@ export function classifyClaudeCodeLogin(
   }
   if (authState === 'logged-in') return { state: 'ok' };
   return { state: 'unknown' };
-}
-
-export function claudeLoginBlocksClaim(login: LoginFact, nowMs: number): boolean {
-  if (login == null || login.state === 'unknown') return false;
-  if (login.state === 'expired') return true;
-  return typeof login.expiresAt === 'number' && login.expiresAt <= nowMs;
-}
-
-export function claudeLoginNotice(login: LoginFact, nowMs: number): ClaudeLoginNotice | null {
-  if (login == null || login.state === 'unknown') return null;
-  if (typeof login.expiresAt === 'number') {
-    if (nowMs >= login.expiresAt) return { kind: 'expired' };
-    const remaining = login.expiresAt - nowMs;
-    if (remaining > CLAUDE_LOGIN_WARN_WITHIN_MS) return null;
-    if (remaining < CLAUDE_LOGIN_DAY_MS) return { kind: 'expiring', days: null };
-    return { kind: 'expiring', days: Math.ceil(remaining / CLAUDE_LOGIN_DAY_MS) };
-  }
-  if (login.state === 'expired') return { kind: 'expired' };
-  if (login.state === 'expiring') return { kind: 'expiring', days: null };
-  return null;
 }

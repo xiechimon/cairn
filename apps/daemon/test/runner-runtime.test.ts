@@ -13,7 +13,6 @@ import type {
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
-import type { ClaudeCodeAuthProbe } from '../src/claude-code-auth.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
@@ -181,11 +180,7 @@ function recordingBackend(
   return { backend, sessions, resumed };
 }
 
-const LOGGED_IN_PROBE = async (): Promise<ClaudeCodeAuthProbe> => ({
-  state: 'logged-in',
-  method: 'oauth_token',
-  provider: 'firstParty',
-});
+const STEP_SUBSCRIPTION_TOKEN = 'step-subscription-token';
 
 async function setup(
   claimed: ClaimedStep,
@@ -195,7 +190,7 @@ async function setup(
     echoToken?: boolean;
     sessionFile?: string;
     failDone?: boolean;
-    probe?: () => Promise<ClaudeCodeAuthProbe>;
+    withoutSubscription?: boolean;
     machineName?: string;
     runEnv?: Record<string, string>;
   } = {},
@@ -203,7 +198,12 @@ async function setup(
   const home = testTempDir('cairn-runner-runtime-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
-  const client = new FakeClient(opts.tokenProvider ?? null, opts.subscriptionToken);
+  const client = new FakeClient(
+    opts.tokenProvider ?? null,
+    opts.withoutSubscription === true
+      ? undefined
+      : (opts.subscriptionToken ?? STEP_SUBSCRIPTION_TOKEN),
+  );
   client.failDone = opts.failDone ?? false;
   const journal = new StepJournal(paths.outboxDir);
   const { backend, sessions, resumed } = recordingBackend(
@@ -211,8 +211,6 @@ async function setup(
     opts.sessionFile,
   );
   const resolved: (string | null | undefined)[] = [];
-  const probeCalls: number[] = [];
-  const probe = opts.probe ?? LOGGED_IN_PROBE;
   const deps = {
     client,
     journal,
@@ -226,13 +224,9 @@ async function setup(
     mcpConfigPath: join(home, 'claude.json'),
     heartbeatIntervalMs: 60_000,
     machineName: opts.machineName ?? 'daemon-test',
-    claudeCodeAuthProbe: () => {
-      probeCalls.push(1);
-      return probe();
-    },
   };
   await runStep(deps, claimed, opts.runEnv !== undefined ? { env: opts.runEnv } : {});
-  return { client, lines, sessions, resumed, resolved, paths, probeCalls, journal, deps };
+  return { client, lines, sessions, resumed, resolved, paths, journal, deps };
 }
 
 describe('runner runtime identity branch (spec 17 A3/A4)', () => {
@@ -304,42 +298,25 @@ describe('runner runtime identity branch (spec 17 A3/A4)', () => {
   });
 });
 
-describe('runner runtime-step credential preflight (#867 T6 cross-machine credential preflight)', () => {
-  test('failure mode 10: preflight logged out → fails before the step, wording names machine + credential kind + remedy', async () => {
-    const { client, sessions, probeCalls } = await setup(
+describe('runner Claude Code subscription preflight', () => {
+  test('a Claude Code step without a subscription token fails before the session starts', async () => {
+    const { client, sessions } = await setup(
       claimedStep({ provider: 'claude-code', modelId: 'claude-sonnet-4-5' }),
-      {
-        machineName: 'daemon-mea',
-        probe: async () => ({ state: 'not-logged-in', provider: 'firstParty' }),
-      },
+      { withoutSubscription: true },
     );
-    expect(probeCalls).toHaveLength(1);
     expect(sessions).toHaveLength(0);
     expect(client.doneBodies[0]?.body.status).toBe('failed');
     const msg = client.doneBodies[0]?.body.errorMessage ?? '';
-    expect(msg).toContain('daemon-mea');
-    expect(msg).toContain('ANTHROPIC_API_KEY');
-    expect(msg).toContain('/login');
+    expect(msg).toContain('claude setup-token');
+    expect(msg).toContain('设置 → 模型服务');
   });
 
-  test('failure mode 11: preflight inconclusive (CLI missing/timeout) → does not block the step, lands a diagnostic line', async () => {
-    const { client, lines, sessions, probeCalls } = await setup(
-      claimedStep({ provider: 'claude-code', modelId: 'claude-sonnet-4-5' }),
-      { probe: async () => ({ state: 'unknown', reason: 'spawn claude ENOENT' }) },
-    );
-    expect(probeCalls).toHaveLength(1);
-    expect(sessions).toHaveLength(1);
-    expect(client.doneBodies[0]?.body.status).toBe('success');
-    expect(lines.some((l) => l.includes('auth probe inconclusive') && l.includes('ENOENT'))).toBe(
-      true,
-    );
-  });
-
-  test('failure mode 12: pi step → zero preflight calls (the zero-credential channel belongs to the runtime identity only)', async () => {
-    const { client, probeCalls } = await setup(
+  test('a pi step runs without a subscription token', async () => {
+    const { client, sessions } = await setup(
       claimedStep({ provider: 'stub-gw', modelId: 'stub-model' }),
+      { withoutSubscription: true },
     );
-    expect(probeCalls).toHaveLength(0);
+    expect(sessions).toHaveLength(1);
     expect(client.doneBodies[0]?.body.status).toBe('success');
   });
 });
@@ -376,7 +353,7 @@ describe('runner runtime-step session continuation (spec 17 A7)', () => {
     const home = testTempDir('cairn-runner-runtime-');
     const paths = statePaths(home, join(home, 'workspaces'));
     const { logger } = captureLogger();
-    const client = new FakeClient(null);
+    const client = new FakeClient(null, STEP_SUBSCRIPTION_TOKEN);
     const journal = new StepJournal(paths.outboxDir);
     const { backend, sessions, resumed } = recordingBackend();
     await runStep(
@@ -389,7 +366,6 @@ describe('runner runtime-step session continuation (spec 17 A7)', () => {
         workspacesDir: join(home, 'workspaces'),
         mcpConfigPath: join(home, 'claude.json'),
         heartbeatIntervalMs: 60_000,
-        claudeCodeAuthProbe: LOGGED_IN_PROBE,
       },
       claimed,
     );
@@ -456,14 +432,12 @@ describe('runner runtime-step tool surface (spec 17 A10 / after #647 T4 wiring)'
 
 describe('subscription credential isolation', () => {
   const token = 'private-subscription-token-for-step';
-  test('Claude Code receives per-step token and bypasses machine login; pi does not receive it', async () => {
+  test('Claude Code receives the per-step token; pi does not receive it', async () => {
     const claude = await setup(claimedStep({ provider: 'claude-code', modelId: 'sonnet' }), {
       subscriptionToken: token,
-      probe: async () => ({ state: 'not-logged-in', provider: 'firstParty' }),
     });
     expect(claude.sessions[0]?.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe(token);
     expect(claude.sessions[0]?.env?.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBe('1');
-    expect(claude.probeCalls).toHaveLength(0);
     const pi = await setup(claimedStep({ provider: 'stub-gw', modelId: 'stub-model' }), {
       subscriptionToken: token,
     });
@@ -475,7 +449,6 @@ describe('subscription credential isolation', () => {
   test('an Orb step gets the token without the subprocess scrub, which cannot run under nspawn', async () => {
     const orb = await setup(claimedStep({ provider: 'claude-code', modelId: 'sonnet' }), {
       subscriptionToken: token,
-      probe: async () => ({ state: 'not-logged-in', provider: 'firstParty' }),
       runEnv: { CAIRN_ORB: '1' },
     });
     expect(orb.sessions[0]?.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe(token);

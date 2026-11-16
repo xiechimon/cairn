@@ -6,6 +6,7 @@ import { seedDefaultRouting } from '../src/services/routing-migration.js';
 import { profileForStep } from '../src/services/routing-rules.js';
 import {
   bootServer,
+  insertClaudeSubscription,
   insertMachine,
   postProject,
   subscriptionClaudeReport,
@@ -19,6 +20,7 @@ afterEach(() => {
 
 test('a fresh install with a Claude Code Runner: the session merges without setup and gets only the default tools', async () => {
   const s = bootServer();
+  insertClaudeSubscription(s);
   servers.push(s);
   seedDefaultRouting(s.db);
   insertMachine(s, { claudeCodeReport: subscriptionClaudeReport });

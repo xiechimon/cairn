@@ -1,9 +1,11 @@
+import { randomBytes } from 'node:crypto';
 import type { ToolCallRecord } from '@cairn/shared';
 import {
   claudeRateLimitReportSchema,
   computerCallIdSchema,
   DELIVERABLE_GRANT_MAX_BODY_BYTES,
   enrollDisplayName,
+  MACHINE_ENROLL_TTL_MS,
   machineActivityBodySchema,
   machineAgentTodoBodySchema,
   machineAskBodySchema,
@@ -27,6 +29,7 @@ import {
   machineTranscriptDeltaBodySchema,
   machineTranscriptRowBodySchema,
   machineUploadUrlsBodySchema,
+  normalizeEnrollCode,
   PLAN_FILE_NAME,
   SESSION_FILE_NAME,
   transcriptUploadSchema,
@@ -161,6 +164,16 @@ const CLOSED_ORBS_MAX_BODY_BYTES = 64 * 1024;
 const COMPUTER_FRAMES_MAX_BODY_BYTES = 24 * 1024 * 1024;
 const DONE_MAX_BODY_BYTES = 16 * 1024 * 1024;
 
+const ENROLL_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function newEnrollCode(taken: ReadonlySet<string>): string {
+  for (;;) {
+    const bytes = randomBytes(8);
+    const code = [...bytes].map((b) => ENROLL_CODE_ALPHABET[b & 31]).join('');
+    if (!taken.has(code)) return code;
+  }
+}
+
 function enrollOrigin(c: Context): string {
   const configured = process.env.CAIRN_WEB_ORIGIN?.trim();
   if (configured !== undefined && configured !== '') {
@@ -255,13 +268,12 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     return c.json(result);
   });
 
-  const ENROLL_TTL_MS = 600_000;
   const ENROLL_CAP = 100;
   app.post('/api/machine/enroll/start', async (c) => {
     const body = parseWith(machineEnrollStartBodySchema, await jsonBody(c), 'body');
     const now = Date.now();
     for (const [id, e] of ctx.enrollments) {
-      if (now - e.createdAt > ENROLL_TTL_MS) ctx.enrollments.delete(id);
+      if (now - e.createdAt > MACHINE_ENROLL_TTL_MS) ctx.enrollments.delete(id);
     }
     while (ctx.enrollments.size >= ENROLL_CAP) {
       const oldest = ctx.enrollments.keys().next().value;
@@ -269,21 +281,24 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       ctx.enrollments.delete(oldest);
     }
     const enrollId = newRecordId();
+    const code = newEnrollCode(new Set([...ctx.enrollments.values()].map((e) => e.code)));
     ctx.enrollments.set(enrollId, {
       teamId: body.teamId ?? ctx.team.id,
       name: body.name,
+      code,
       createdAt: now,
     });
     return c.json({
       enrollId,
       url: `${enrollOrigin(c)}/app/machines/authorize?enroll=${enrollId}`,
+      code: `${code.slice(0, 4)}-${code.slice(4)}`,
     });
   });
 
   app.post('/api/machine/enroll/poll', async (c) => {
     const body = parseWith(machineEnrollPollBodySchema, await jsonBody(c), 'body');
     const pending = ctx.enrollments.get(body.enrollId);
-    if (!pending || Date.now() - pending.createdAt > ENROLL_TTL_MS) {
+    if (!pending || Date.now() - pending.createdAt > MACHINE_ENROLL_TTL_MS) {
       return c.json({ status: 'expired' });
     }
     if (pending.machine) return c.json({ status: 'authorized', machine: pending.machine });
@@ -293,8 +308,11 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/machine/enroll/confirm', async (c) => {
     const body = parseWith(machineEnrollConfirmBodySchema, await jsonBody(c), 'body');
-    const entry = ctx.enrollments.get(body.enrollId);
-    if (!entry || Date.now() - entry.createdAt > ENROLL_TTL_MS) {
+    const entry =
+      'enrollId' in body
+        ? ctx.enrollments.get(body.enrollId)
+        : [...ctx.enrollments.values()].find((e) => e.code === normalizeEnrollCode(body.code));
+    if (!entry || Date.now() - entry.createdAt > MACHINE_ENROLL_TTL_MS) {
       throw new HttpError(404, 'enrollment unknown or expired');
     }
     if (entry.machine) throw new HttpError(409, 'enrollment already authorized');

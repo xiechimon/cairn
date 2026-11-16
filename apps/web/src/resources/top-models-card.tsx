@@ -84,9 +84,17 @@ function providerChipMark(provider: string): Mark {
   return Server;
 }
 
-export function suggestedTopModels(options: readonly ModelOption[]): TopModel[] {
+export function suggestedTopModels(
+  options: readonly ModelOption[],
+  claudeSubscribed: boolean,
+): TopModel[] {
   return SUGGESTED.flatMap(({ modelId, thinkingLevel }) => {
-    const option = options.find((o) => o.modelId === modelId && o.liveness !== 'dead');
+    const option = options.find(
+      (o) =>
+        o.modelId === modelId &&
+        o.liveness !== 'dead' &&
+        (claudeSubscribed || o.runtime !== 'claude-code'),
+    );
     return option === undefined ? [] : [{ provider: option.provider, modelId, thinkingLevel }];
   });
 }

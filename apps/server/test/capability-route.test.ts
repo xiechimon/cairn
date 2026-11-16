@@ -1,11 +1,12 @@
 import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema, DEFAULT_CLAUDE_CODE_MODELS } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   claudeSubscription,
   machine as machineTable,
+  provider,
   routingRule,
   step,
   stepRoute,
@@ -13,10 +14,12 @@ import {
 } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { createClaudeSubscription } from '../src/services/claude-subscriptions.js';
+import { createProvider } from '../src/services/providers.js';
 import { profileForStep } from '../src/services/routing-rules.js';
 import { decideStepRoute, recordStepRoute, routedModelRunsOn } from '../src/services/step-route.js';
 import {
   bootServer,
+  insertClaudeSubscription,
   issueApiKey,
   pinSessionRoute,
   postProject,
@@ -39,16 +42,56 @@ interface World {
   projectId: string;
 }
 
+function equipCodexProvider(w: World, present: boolean): void {
+  const existing = w.s.db
+    .select()
+    .from(provider)
+    .where(and(eq(provider.teamId, w.s.team.id), eq(provider.providerId, 'openai-codex')))
+    .get();
+  if (present && existing === undefined) {
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.s.team.id,
+        body: {
+          providerId: 'openai-codex',
+          label: 'ChatGPT',
+          baseUrl: 'https://chatgpt.com/backend-api',
+          api: 'openai-responses',
+          apiKey: 'codex-device-token',
+          models: [{ id: 'gpt-6.1-sol', name: 'gpt-6.1-sol' }],
+        },
+        createdBy: w.s.user.id,
+      },
+    );
+  }
+  if (!present && existing !== undefined) {
+    w.s.db.delete(provider).where(eq(provider.id, existing.id)).run();
+  }
+}
+
+function equipSubscription(w: World): void {
+  const stored = w.s.db
+    .select()
+    .from(claudeSubscription)
+    .where(eq(claudeSubscription.teamId, w.s.team.id))
+    .get();
+  if (stored === undefined) insertClaudeSubscription(w.s);
+}
+
 function equipMachine(
   w: World,
   options: {
     claude: boolean;
     codex: boolean;
+    subscription?: boolean;
     weeklyUtilization?: number;
     weeklyResetsAt?: number;
     fiveHourRejected?: boolean;
   },
 ): void {
+  if (options.subscription ?? options.claude) equipSubscription(w);
+  equipCodexProvider(w, options.codex);
   w.s.db
     .update(machineTable)
     .set({
@@ -92,11 +135,7 @@ function equipMachine(
             ]
           : []),
       ],
-      capabilities: {
-        mcpServers: [],
-        skills: [],
-        ...(options.codex ? { codexLogin: { state: 'ok', expiresAt: nowMs() + HOUR_MS } } : {}),
-      },
+      capabilities: { mcpServers: [], skills: [] },
     })
     .where(eq(machineTable.id, w.machineId))
     .run();
@@ -199,11 +238,7 @@ describe('one path decides what a dispatched step runs on', () => {
   test('quota exhausted on Codex: hard work routes to Opus and records the rejection', async () => {
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: true, weeklyUtilization: 0.1 });
-    w.s.db
-      .update(machineTable)
-      .set({ capabilities: { mcpServers: [], skills: [] } })
-      .where(eq(machineTable.id, w.machineId))
-      .run();
+    equipCodexProvider(w, false);
     const hard = await buildTodo(w, `difficulty:hard ${'migrate the queue '.repeat(10)}`);
     expect(profileForStep(w.s.db, hard, 'build')).toMatchObject({ modelId: 'claude-opus-5-5' });
   });
@@ -226,7 +261,7 @@ describe('one path decides what a dispatched step runs on', () => {
 describe('the router agrees with what dispatch can execute', () => {
   test('a team subscription makes a machine with an expired local login usable', async () => {
     const w = await setupWorld();
-    equipMachine(w, { claude: true, codex: true });
+    equipMachine(w, { claude: true, codex: true, subscription: false });
     const row = w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!;
     w.s.db
       .update(machineTable)
@@ -240,18 +275,7 @@ describe('the router agrees with what dispatch can execute', () => {
       .run();
     const todoRow = await buildTodo(w, 'rename one label');
     expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ provider: 'openai-codex' });
-    w.s.db
-      .insert(claudeSubscription)
-      .values({
-        id: 'sub-1',
-        teamId: w.s.team.id,
-        label: 'team',
-        tokenCipher: 'cipher',
-        expiresAt: null,
-        enabledAt: nowMs(),
-        createdAt: nowMs(),
-      })
-      .run();
+    equipSubscription(w);
     expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({
       provider: 'claude-code',
       modelId: 'claude-haiku-5-5',
@@ -314,7 +338,7 @@ describe('the router agrees with what dispatch can execute', () => {
 });
 
 describe('a routed model only runs on a machine that can host it', () => {
-  test('Codex needs a valid Codex login on the claiming machine', async () => {
+  test("Codex needs the team's openai-codex provider row, not a Runner login", async () => {
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: false });
     w.s.db
@@ -330,7 +354,7 @@ describe('a routed model only runs on a machine that can host it', () => {
     expect(routedModelRunsOn(w.s.db, row(), codex)).toBe(true);
   });
 
-  test('a hard step is not claimed by a machine without the Codex login the router relied on', async () => {
+  test('Codex runs on any online machine once the team has the openai-codex row, never on an offline one', async () => {
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: true });
     const other = 'claude-only-box';
@@ -347,7 +371,11 @@ describe('a routed model only runs on a machine that can host it', () => {
       .run();
     w.s.db
       .update(machineTable)
-      .set({ enabledRuntimes: ['claude-code', 'pi'], capabilities: { mcpServers: [], skills: [] } })
+      .set({
+        online: false,
+        enabledRuntimes: ['claude-code', 'pi'],
+        capabilities: { mcpServers: [], skills: [] },
+      })
       .where(eq(machineTable.id, other))
       .run();
     pinSessionRoute(w.s, w.machineId);
@@ -356,10 +384,12 @@ describe('a routed model only runs on a machine that can host it', () => {
       provider: 'openai-codex',
       routed: true,
     });
-    const otherRow = w.s.db.select().from(machineTable).where(eq(machineTable.id, other)).get()!;
-    expect(
-      routedModelRunsOn(w.s.db, otherRow, { provider: 'openai-codex', modelId: 'gpt-6.1-sol' }),
-    ).toBe(false);
+    const otherRow = () =>
+      w.s.db.select().from(machineTable).where(eq(machineTable.id, other)).get()!;
+    const codex = { provider: 'openai-codex', modelId: 'gpt-6.1-sol' };
+    expect(routedModelRunsOn(w.s.db, otherRow(), codex)).toBe(false);
+    w.s.db.update(machineTable).set({ online: true }).where(eq(machineTable.id, other)).run();
+    expect(routedModelRunsOn(w.s.db, otherRow(), codex)).toBe(true);
   });
 });
 
@@ -373,9 +403,9 @@ describe('claim validation and recording follow the router rules', () => {
     ).toBe(false);
   });
 
-  test('a machine whose own claude is not logged in runs routed Claude steps only when a subscription token is stored', async () => {
+  test('a machine runs routed Claude steps only when a subscription token is stored, whatever its own login', async () => {
     const w = await setupWorld();
-    equipMachine(w, { claude: true, codex: false });
+    equipMachine(w, { claude: true, codex: false, subscription: false });
     w.s.db
       .update(machineTable)
       .set({
@@ -383,7 +413,7 @@ describe('claim validation and recording follow the router rules', () => {
           installed: true,
           hostname: 'route-box',
           models: [{ id: 'claude-sonnet-5-5', name: 'claude-sonnet-5-5' }],
-          auth: { state: 'not-logged-in', provider: 'firstParty' },
+          auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
         },
       })
       .where(eq(machineTable.id, w.machineId))
@@ -401,9 +431,9 @@ describe('claim validation and recording follow the router rules', () => {
 
   test.each([
     ['logged in', { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' }, true],
-    ['logged out', { state: 'not-logged-in', provider: 'firstParty' }, false],
+    ['logged out', { state: 'not-logged-in', provider: 'firstParty' }, true],
   ] as const)(
-    'a machine reporting the built-in Claude model list (no settings.json) is routable unpinned only when %s',
+    'a machine reporting the built-in Claude model list (no settings.json) is routable unpinned with a subscription when %s',
     async (_label, auth, usable) => {
       const w = await setupWorld();
       equipMachine(w, { claude: true, codex: false });
@@ -518,9 +548,9 @@ describe('the router respects where the step can actually run', () => {
     });
   });
 
-  test('a required MCP server only the Claude machine has rules out Codex machines', async () => {
+  test('a required MCP server keeps the step on the machine that has it', async () => {
     const w = await setupWorld();
-    equipMachine(w, { claude: true, codex: true });
+    equipMachine(w, { claude: true, codex: false });
     w.s.db
       .update(machineTable)
       .set({

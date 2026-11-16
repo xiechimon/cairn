@@ -93,6 +93,7 @@ const INFERRED_ROUTES = [
   'POST /api/teams/{id}/chief/threads',
   'POST /api/conversations/{id}/messages',
   'POST /api/teams/{id}/chief/threads/{tid}/rewind',
+  'POST /api/teams/{id}/chief/threads/{tid}/retry-greeting/{stepId}',
   'POST /api/teams/{id}/chief/threads/{tid}/questions/{requestId}/answer',
   'POST /api/teams/{id}/chief/threads/{tid}/questions/{requestId}/cancel',
   'POST /api/teams/{id}/chief/retro-proposals/{pid}/{decision}',

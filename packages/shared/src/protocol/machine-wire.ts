@@ -46,6 +46,8 @@ export type MachineEnrollBody = z.infer<typeof machineEnrollBodySchema>;
 export const machineEnrollResponseSchema = machineJsonSchema;
 export type MachineEnrollResponse = z.infer<typeof machineEnrollResponseSchema>;
 
+export const MACHINE_ENROLL_TTL_MS = 600_000;
+
 export const machineEnrollStartBodySchema = z.object({
   teamId: recordId.optional(),
   name: z.string().optional(),
@@ -53,6 +55,7 @@ export const machineEnrollStartBodySchema = z.object({
 export const machineEnrollStartResponseSchema = z.object({
   enrollId: z.string(),
   url: z.string(),
+  code: z.string().optional(),
 });
 
 export const machineEnrollPollBodySchema = z.object({ enrollId: z.string() });
@@ -69,7 +72,14 @@ export function enrollDisplayName(name: string | undefined): string | undefined 
   return name;
 }
 
-export const machineEnrollConfirmBodySchema = z.object({ enrollId: z.string() });
+export const machineEnrollConfirmBodySchema = z.union([
+  z.object({ enrollId: z.string() }),
+  z.object({ code: z.string().max(32) }),
+]);
+
+export function normalizeEnrollCode(code: string): string {
+  return code.toUpperCase().replace(/[\s-]/g, '');
+}
 
 export const machineMeResponseSchema = machineRecordSchema;
 

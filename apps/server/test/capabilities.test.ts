@@ -11,7 +11,14 @@ describe('GET /api/capabilities (capabilities read surface)', () => {
     expect(capabilitiesResponseSchema.safeParse(body).success).toBe(true);
     expect(body).toEqual({
       thinkingLevels: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+      githubOAuth: false,
     });
+  });
+
+  test('githubOAuth is true only when the server has a GitHub OAuth client', async () => {
+    const s = bootServer({ oauthClient: { clientId: 'id', clientSecret: 'secret' } });
+    const res = await req(s.app, 'GET', '/api/capabilities');
+    expect(await res.json()).toMatchObject({ githubOAuth: true });
   });
 
   test('team-independent read surface: answers without a team param too (capabilities are engine facts, not forked per team)', async () => {

@@ -93,7 +93,7 @@ test('unknown scope and item fall back to the team tab and its first row', async
   );
 });
 
-test('machine tab: Claude Code reports version, sign-in state and slots, with no runtime switch', async ({
+test('machine tab: Claude Code reports version and slots, runs on the team subscription, with no runtime switch', async ({
   page,
 }) => {
   await page.goto(FLEET);
@@ -102,8 +102,8 @@ test('machine tab: Claude Code reports version, sign-in state and slots, with no
   await expect(scopeSelect(page).locator('[data-slot="machine-os-icon"]')).toBeVisible();
   const cc = instance(page, 'claude-code');
   await expect(cc).toContainText('v2.1.316');
-  await expect(cc).toContainText('未登录');
-  await expect(cc).toHaveAttribute('data-tone', 'warn');
+  await expect(cc).toContainText('用团队的 Claude 订阅');
+  await expect(cc).not.toContainText('未登录');
   await expect(page.getByTestId('provider-list').getByRole('switch')).toHaveCount(0);
   await expect(editor(page)).toContainText('/home/u/.local/bin/claude');
   const slots = editor(page).getByTestId('provider-model');
@@ -244,8 +244,8 @@ const REMOTE = 'Kd8fG2hJ4mN9pQ1rStUvWx3';
 const LOCAL = 'TlZ2sSD4EJCxjNJqVhdo_';
 
 for (const [scenario, scope, status] of [
-  ['10', REMOTE, '已登录'],
-  ['10-cc-loggedout', REMOTE, '未登录'],
+  ['10', REMOTE, '用团队的 Claude 订阅'],
+  ['10-cc-loggedout', REMOTE, '用团队的 Claude 订阅'],
   ['10-cc-bin-gone', REMOTE, '未安装'],
   ['10-cc-missing', LOCAL, '未安装'],
   ['10-cc-noconfig', LOCAL, '已安装，未配置模型槽'],

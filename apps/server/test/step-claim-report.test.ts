@@ -68,6 +68,7 @@ function makeWorld(opts: WorldOpts = {}) {
       title: 'p1473',
       phase: 'building',
       phaseAt: base,
+      latestBuildId: 'build-1473',
       seqNum: 1,
     })
     .run();

@@ -13,6 +13,7 @@ const POLL_INTERVAL_MS = 2_000;
 const pendingSchema = z.object({
   enrollId: z.string().min(1),
   url: z.string().min(1),
+  code: z.string().optional(),
   expiresAt: z.number(),
   serverUrl: z.string().optional(),
   name: z.string().optional(),
@@ -81,6 +82,7 @@ export async function enrollThroughBrowser(
     pending = {
       enrollId: started.enrollId,
       url: started.url,
+      ...(started.code !== undefined ? { code: started.code } : {}),
       expiresAt: io.now() + ENROLL_TTL_MS,
       serverUrl,
       name,
@@ -93,6 +95,9 @@ export async function enrollThroughBrowser(
     io.log(
       `Waiting for approval of the pending enrollment: ${pending.url}${machineNameSuffix(name)}`,
     );
+  }
+  if (pending.code !== undefined) {
+    io.log(`Or type approval code ${pending.code} in Add Runner on the Cairn desktop.`);
   }
   for (;;) {
     if (io.stop?.aborted === true) throw new Error('enrollment stopped before approval');
