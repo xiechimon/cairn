@@ -2,7 +2,7 @@ import { cn } from 'cn';
 import type { ReactNode } from 'react';
 
 export const STATUS_LINE_CLS =
-  'chat-note flex min-h-6 min-w-0 items-center gap-2 text-left font-sans text-meta text-(--text-tertiary)';
+  'flex min-h-6 min-w-0 items-center gap-2 text-left font-sans text-meta text-(--text-tertiary)';
 
 export function StatusLine({
   children,

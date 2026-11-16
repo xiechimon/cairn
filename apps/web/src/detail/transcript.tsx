@@ -258,7 +258,7 @@ function Row({
       return (
         <div
           data-testid="schedule-wake-marker"
-          className="chat-scheduled mt-3.5 flex items-center gap-1.5 text-meta text-(--text-tertiary)"
+          className="mt-3.5 flex items-center gap-1.5 text-meta text-(--text-tertiary)"
         >
           <Clock width={13} height={13} />
           {t('由定时发起')}
