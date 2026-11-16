@@ -111,7 +111,9 @@ export function ApiKeysPage() {
             {listed.map((key) => (
               <div key={key.id} className={SETTINGS_ROW_CLS}>
                 <span className="flex min-w-0 flex-col">
-                  <span className="truncate text-ui text-foreground">{key.name ?? key.masked}</span>
+                  <span className="truncate font-mono text-ui text-foreground">
+                    {key.name ?? key.masked}
+                  </span>
                   {key.name != null && (
                     <span className="truncate font-mono text-meta text-content-tertiary">
                       {key.masked}
