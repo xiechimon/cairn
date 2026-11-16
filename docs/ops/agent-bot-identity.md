@@ -26,6 +26,10 @@ The intended shared Device Flow App is the existing `cairnwright` registration, 
 
 Private-key removal requires a precise inventory and separate approval after all consumers, including running steps and infrequent jobs, have stopped using it. Keeping the App registration does not authorize retaining a bot publishing path. Neither this development change nor its installation changes port 8787, product dispatch, server environment or running services.
 
+## Code Owners
+
+`.github/CODEOWNERS` names `@xiechimon` as owner of `integration/eval/**`, `.claude/hillclimb/**` and the CODEOWNERS file itself. Commits go straight to `main`, so it is not enforced as a review; the rule that no change may edit what judges it lives in `AGENTS.md`.
+
 ## GitHub create traffic
 
 Keep the existing creation throttle for issue, PR and issue-comment creation, using user `gh` directly:
