@@ -173,7 +173,6 @@ const ALL_SPECS = [
   'a11y-axe.spec.ts',
   'board-shell.spec.ts',
   'card-chip.spec.ts',
-  'gallery-snapshots.spec.ts',
   'live-server-boot.spec.ts',
   'paper-card-row.spec.ts',
   'texture-grain.spec.ts',
@@ -318,16 +317,9 @@ test('the dependency files share one comparison and never fall into the shared-s
   assert.deepEqual(result.selection, ['token-gate.spec.ts']);
 });
 
-test('a snapshot baseline selects only the spec that owns it', () => {
-  const result = select(['apps/web/e2e/gallery-snapshots.spec.ts-snapshots/row-dark-linux.png']);
-  assert.equal(result.full, false);
-  assert.deepEqual(result.selection, ['gallery-snapshots.spec.ts']);
-});
-
 test('the design doc the gallery imports selects the design specs; the component doc selects none', () => {
   assert.deepEqual(select(['apps/web/DESIGN.md']).selection, [
     'a11y-axe.spec.ts',
-    'gallery-snapshots.spec.ts',
     'texture-grain.spec.ts',
   ]);
   assert.deepEqual(select(['apps/web/COMPONENTS.md']).selection, []);
@@ -503,7 +495,6 @@ test('ci shards e2e-affected by the matrix size and runs the CSS gate once', () 
     const block = job.split(`- name: ${step}\n`)[1].split('\n      - ')[0];
     assert.match(block, /if: \$\{\{ !cancelled\(\) && matrix\.shard == 1 \}\}/, step);
   }
-  assert.match(job, /name: gallery-snapshots-affected-\$\{\{ matrix\.shard \}\}/);
 });
 
 for (const path of ['apps/web/src/routes/account-page.tsx', 'apps/web/e2e/live-server.ts']) {

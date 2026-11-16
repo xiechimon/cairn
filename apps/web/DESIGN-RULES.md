@@ -4,7 +4,7 @@ Short, checkable rules for any change under `apps/web/src`. `DESIGN.md` is the f
 
 Each rule has an id. Name the ids you checked when you report the change. The Check column says how a violation is found:
 
-- `M` a measurement an assertion can make (candidate for the look-and-feel job in section 5).
+- `M` a measurement an assertion can make.
 - `G` an existing gate or test, named.
 - `H` a human or self-review against the reference screenshots; no assertion can decide it.
 

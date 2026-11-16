@@ -74,9 +74,25 @@ test('the script reads ancestry from git and exits non-zero only on a rewrite of
   assert.equal(run(line('HEAD', other, 'refs/heads/main', remote)).status, 1);
 });
 
-test('the pre-push hook runs the guard before the prepush gates', () => {
-  const hook = readFileSync(join(root, '.husky/pre-push'), 'utf8');
-  const guard = hook.indexOf('node scripts/prepush-main-guard.mjs');
-  assert.notEqual(guard, -1);
-  assert.ok(guard < hook.indexOf('pnpm prepush'));
+test('the real pre-push hook guards main without rerunning verification', (t) => {
+  const repo = makeTestTempDir('prepush-hook-');
+  t.after(() => releaseTestTempDir(repo));
+  const git = (...args) =>
+    execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', ...args], {
+      cwd: repo,
+      encoding: 'utf8',
+    }).trim();
+  git('init', '-q');
+  git('commit', '-q', '--allow-empty', '-m', 'base');
+  const base = git('rev-parse', 'HEAD');
+  git('commit', '-q', '--allow-empty', '-m', 'next');
+  const next = git('rev-parse', 'HEAD');
+  const hook = readFileSync(join(root, '.husky/pre-push'), 'utf8').replace(
+    'node scripts/prepush-main-guard.mjs',
+    `${JSON.stringify(process.execPath)} ${JSON.stringify(join(root, 'scripts/prepush-main-guard.mjs'))}`,
+  );
+  const run = (input) => spawnSync('sh', ['-c', hook], { cwd: repo, input, encoding: 'utf8' });
+  assert.equal(run(line('HEAD', next, 'refs/heads/main', base)).status, 0);
+  assert.equal(run(line('HEAD', base, 'refs/heads/main', next)).status, 1);
+  assert.equal(run(line('(delete)', zero, 'refs/heads/main', next)).status, 1);
 });

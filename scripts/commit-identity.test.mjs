@@ -263,14 +263,10 @@ test('the workflow runs the shared check without any token, on the PR head repos
   assert.doesNotMatch(workflow, /rebase/);
 });
 
-test('the hooks run the shared check before anything else', () => {
+test('the pre-commit hook runs the shared check before anything else', () => {
   assert.match(
     readFileSync('.husky/pre-commit', 'utf8'),
     /^#!\/usr\/bin\/env sh\nset -e\n\nnode scripts\/commit-identity\.mjs pre-commit\n/,
-  );
-  assert.match(
-    readFileSync('.husky/pre-push', 'utf8'),
-    /node scripts\/commit-identity\.mjs pre-push/,
   );
 });
 
