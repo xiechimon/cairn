@@ -3425,6 +3425,39 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       },
       "type": "array",
     },
+    "mcpConnectors": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "headers": {
+            "additionalProperties": {
+              "type": "string",
+            },
+            "propertyNames": {
+              "type": "string",
+            },
+            "type": "object",
+          },
+          "slug": {
+            "type": "string",
+          },
+          "transport": {
+            "const": "http",
+            "type": "string",
+          },
+          "url": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "slug",
+          "transport",
+          "url",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "provider": {
       "anyOf": [
         {
@@ -3568,6 +3601,12 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         "type": "string",
       },
       "type": "object",
+    },
+    "withheldMcp": {
+      "items": {
+        "type": "string",
+      },
+      "type": "array",
     },
     "withheldSecrets": {
       "items": {
@@ -10766,6 +10805,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                 "screenRecording",
               ],
               "type": "object",
+            },
+            "mcpConnectors": {
+              "const": true,
+              "type": "boolean",
             },
             "mcpServers": {
               "items": {

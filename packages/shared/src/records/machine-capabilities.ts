@@ -107,6 +107,7 @@ export const machineCapabilitiesSchema = z.object({
   ownComputer: z.literal(true).optional(),
   browser: z.literal(true).optional(),
   secretGateway: z.literal(true).optional(),
+  mcpConnectors: z.literal(true).optional(),
   codexLogin: codexLoginSchema.optional(),
   confinement: confinementReportSchema.optional(),
   confinementCause: confinementCauseSchema.optional(),
@@ -147,6 +148,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(rec.ownComputer === true ? { ownComputer: true as const } : {}),
     ...(rec.browser === true ? { browser: true as const } : {}),
     ...(rec.secretGateway === true ? { secretGateway: true as const } : {}),
+    ...(rec.mcpConnectors === true ? { mcpConnectors: true as const } : {}),
   };
 }
 

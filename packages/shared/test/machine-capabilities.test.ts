@@ -354,6 +354,7 @@ describe('computer capabilities (D75)', () => {
         computer: true,
         ownComputer: true,
         browser: true,
+        mcpConnectors: true,
       }),
     ).toEqual({
       mcpServers: [],
@@ -361,6 +362,7 @@ describe('computer capabilities (D75)', () => {
       computer: true,
       ownComputer: true,
       browser: true,
+      mcpConnectors: true,
     });
   });
 
@@ -372,6 +374,7 @@ describe('computer capabilities (D75)', () => {
         computer: 'yes',
         ownComputer: 1,
         browser: 'yes',
+        mcpConnectors: 'yes',
       }),
     ).toEqual({ mcpServers: [], skills: [] });
     expect(parseReportedCapabilities({ mcpServers: [], skills: [], computer: false })).toEqual({

@@ -414,6 +414,14 @@ export const httpSecretGrantSchema = z.object({
 });
 export type HttpSecretGrant = z.infer<typeof httpSecretGrantSchema>;
 
+export const mcpConnectorEndpointSchema = z.object({
+  slug: z.string(),
+  transport: z.literal('http'),
+  url: z.string(),
+  headers: z.record(z.string(), z.string()).optional(),
+});
+export type McpConnectorEndpoint = z.infer<typeof mcpConnectorEndpointSchema>;
+
 export const machineTokenResponseSchema = z.object({
   commitIdentity: z.object({ name: z.string(), email: z.string() }).nullable().optional(),
   coAuthor: z
@@ -425,6 +433,8 @@ export const machineTokenResponseSchema = z.object({
   secrets: z.record(z.string(), z.string()),
   httpSecrets: z.array(httpSecretGrantSchema).optional(),
   withheldSecrets: z.array(z.string()).optional(),
+  mcpConnectors: z.array(mcpConnectorEndpointSchema).optional(),
+  withheldMcp: z.array(z.string()).optional(),
   git: z
     .object({
       username: z.string(),

@@ -62,6 +62,14 @@ export function notInConfigLine(slug: string): string {
   return `${slug}: ${MCP_NOT_IN_CONFIG_CANON}`;
 }
 
+export function withheldConnectorLine(slug: string): string {
+  return `${slug}: reconnect it in settings — its tools are unavailable this turn`;
+}
+
+export function shadowedLocalLine(slug: string, configPath: string): string {
+  return `${slug}: using the connector; the entry in ${configPath} is ignored`;
+}
+
 export function connectFailedLine(slug: string, reason: string): string {
   return `${slug}: ${MCP_CONNECT_FAILED_CANON}: ${reason}`;
 }
