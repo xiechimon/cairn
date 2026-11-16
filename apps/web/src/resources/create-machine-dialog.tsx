@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
+import { toastSuccess } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import { isLoopbackOrigin } from '../lib/pairing-origin.js';
 
@@ -10,6 +11,37 @@ const CMD_CLS =
   'flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2 dark:bg-input/30';
 
 const CMD_CODE_CLS = 'font-mono text-meta text-foreground [overflow-wrap:anywhere]';
+
+export const INSTALL_COMMAND = `npm install -g ${PUBLISHED_PACKAGES.cli.name}@latest`;
+
+export function startCommand(serverOrigin: string): string {
+  return `${PUBLISHED_PACKAGES.cli.command} start --server ${serverOrigin}`;
+}
+
+export function CopyCommand({ command }: { command: string }) {
+  const { t } = useI18n();
+  const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
+  return (
+    <div className={CMD_CLS}>
+      <code className={CMD_CODE_CLS}>{command}</code>
+      {clipboard && (
+        <Button
+          variant="outline"
+          size="xs"
+          className="shrink-0 px-2.5 pointer-coarse:h-11 pointer-coarse:px-3.5"
+          onClick={() =>
+            void clipboard.writeText(command).then(
+              () => toastSuccess(t('已复制')),
+              () => {},
+            )
+          }
+        >
+          {t('复制')}
+        </Button>
+      )}
+    </div>
+  );
+}
 
 const INLINE_ACTION_CLS = 'self-start text-ui';
 
@@ -33,20 +65,10 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
   useEffect(() => {
     if (apiKeyOpen) apiKeyRef.current?.scrollIntoView({ block: 'nearest' });
   }, [apiKeyOpen]);
-  const installCmd = `npm install -g ${PUBLISHED_PACKAGES.cli.name}@latest`;
+  const installCmd = INSTALL_COMMAND;
   const serverOrigin = window.location.origin;
-  const startCmd = `${PUBLISHED_PACKAGES.cli.command} start --server ${serverOrigin}`;
+  const startCmd = startCommand(serverOrigin);
   const apiKeyCmd = `${startCmd} --api-key <key> --team ${teamId ?? '<teamId>'}`;
-  const copyButton = (cmd: string) => (
-    <Button
-      variant="outline"
-      size="xs"
-      className="shrink-0 px-2.5"
-      onClick={() => void navigator.clipboard?.writeText(cmd)}
-    >
-      {t('复制')}
-    </Button>
-  );
   return (
     <DialogShell
       title={t('添加执行机')}
@@ -73,7 +95,12 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
             {t(
               '当前地址只适用于这台电脑。添加另一台电脑前，请用 Tailscale 地址打开 Cairn，再复制命令。',
             )}{' '}
-            <Link to={{ pathname: '/app/settings/remote', search }}>{t('远程访问')}</Link>
+            <Link
+              className="whitespace-nowrap text-foreground underline underline-offset-2"
+              to={{ pathname: '/app/settings/remote', search }}
+            >
+              {t('远程访问')}
+            </Link>
           </p>
         )}
         <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
@@ -81,20 +108,14 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
             <span className={STEP_NUM_CLS}>1</span>
             <div className={STEP_BODY_CLS}>
               <span className="text-ui font-medium text-foreground">{t('安装 CLI')}</span>
-              <div className={CMD_CLS}>
-                <code className={CMD_CODE_CLS}>{installCmd}</code>
-                {copyButton(installCmd)}
-              </div>
+              <CopyCommand command={installCmd} />
             </div>
           </li>
           <li className={STEP_CLS}>
             <span className={STEP_NUM_CLS}>2</span>
             <div className={STEP_BODY_CLS}>
               <span className="text-ui font-medium text-foreground">{t('在执行机上运行')}</span>
-              <div className={CMD_CLS}>
-                <code className={CMD_CODE_CLS}>{startCmd}</code>
-                {copyButton(startCmd)}
-              </div>
+              <CopyCommand command={startCmd} />
               <p className="m-0 text-meta text-content-tertiary">
                 {t(
                   '在待接入的执行机上执行以下命令。浏览器将打开登录页，授权团队 {team} 后执行机即可上线。此后它在后台常驻运行，无需保持终端开启。',
@@ -114,10 +135,7 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
         </Button>
         {apiKeyOpen && (
           <div ref={apiKeyRef} className="flex flex-col gap-2">
-            <div className={CMD_CLS}>
-              <code className={CMD_CODE_CLS}>{apiKeyCmd}</code>
-              {copyButton(apiKeyCmd)}
-            </div>
+            <CopyCommand command={apiKeyCmd} />
             <Link className={INLINE_ACTION_CLS} to={{ pathname: '/app/api-keys', search }}>
               {t('获取 API key →')}
             </Link>

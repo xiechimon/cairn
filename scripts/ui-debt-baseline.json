@@ -1,19 +1,19 @@
 {
   "frozenFrom": {
-    "sha": "ce57534c189f383b6d5b94ba660a787bfe101221",
-    "date": "2026-11-04"
+    "sha": "47564be43c7bab1e065d510836178ae1e83360ea",
+    "date": "2026-11-16"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
   "perFaceCss": {},
   "rawControls": {
     "total": 2,
     "files": {
-      "chief/chief-conversation.tsx": 1,
+      "chief/composer-surface.tsx": 1,
       "overlay/search-panel.tsx": 1
     }
   },
   "arbitraryValues": {
-    "textTotal": 4,
+    "textTotal": 3,
     "spacingTotal": 7,
     "files": {
       "components/chat/live-row.tsx": {
@@ -41,7 +41,7 @@
         "spacing": 2
       },
       "routes/machine-authorize-page.tsx": {
-        "text": 1,
+        "text": 0,
         "spacing": 1
       }
     }
