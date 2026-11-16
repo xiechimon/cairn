@@ -69,7 +69,6 @@ async function mergeWorld() {
     .values({
       id: 'delivery',
       buildId: 'build',
-      teamId: s.team.id,
       kind: 'session',
       status: 'done',
       checkpointCommit: commit,
