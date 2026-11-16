@@ -26,7 +26,6 @@ import {
   stopUnclaimedGateSteps,
 } from './build-stop.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import type { HarnessEvalDispatchPort } from './harness-eval-coordinator.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { planAutoApproveAt, planAwaitsAutoConfirm } from './plan-auto-confirm.js';
@@ -77,12 +76,6 @@ export interface BuildDeps {
   attachmentsDir?: string;
   gitOps?: typeof systemGitOps;
   mergeVerdict?: (buildId: string) => Promise<MergeReadiness | null>;
-  harnessEval?: {
-    dispatch: HarnessEvalDispatchPort;
-    attemptTimeoutMs?: number;
-    now?: () => number;
-    dispatchAuthorized?: boolean;
-  };
 }
 
 type BuildRow = typeof build.$inferSelect;

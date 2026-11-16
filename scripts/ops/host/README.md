@@ -8,7 +8,7 @@ Copies of the scripts that drive the lanes on the omarchy host. `tools/` mirrors
 
 **Drift.** `scripts/ops/host-tools-verify.sh` (read-only, exit 1 on any difference, like `chezmoi verify`) prints `ok`, `DIFF`, `MISSING` or `EXTRA` for every managed file and for every host file under `~/.cairn/tools` that the repo does not own (`app-token/package*.json`, `node_modules`, `agent-desktop/`, `.bak` files and logs are ignored). `host-tools-verify.sh --adopt <host path>...` moves a named DIFF file to `<file>.drift-<sha>-<UTC timestamp>` (refused if that name exists) and installs the repo copy, so a reviewed decision to take main's version needs one command. Run it from `~/Code/AgentProjects/cairn-exec` after a deploy; the deploy itself only reports files it kept.
 
-Not copied: `~/.cairn/tools/app-token/package.json`, its lockfile and `node_modules` (the host installs `@octokit/auth-app` there), `agent-desktop/` (a versioned binary of a separate product, not a cairn host script), `review-gate/` (retired; the host unit `cairn-review-gate.service` is disabled and the directory was deleted 2026-11-06, and the Codex gate that replaced it was removed 2026-11-12), `backup/record-backup-status.sh` (identical to `scripts/ops/record-backup-status.sh`), `.bak` files, logs and state. `tools/eval-env.sh` reads the relay settings from the host's pi config and holds no value itself.
+Not copied: `~/.cairn/tools/app-token/package.json`, its lockfile and `node_modules` (the host installs `@octokit/auth-app` there), `agent-desktop/` (a versioned binary of a separate product, not a cairn host script), `review-gate/` (retired; the host unit `cairn-review-gate.service` is disabled and the directory was deleted 2026-11-06, and the Codex gate that replaced it was removed 2026-11-12), `backup/record-backup-status.sh` (identical to `scripts/ops/record-backup-status.sh`), `.bak` files, logs and state.
 
 Host inventory (measured 2026-11-06): the managed roots are current (`.installed-sha` matches `main`), `~/lanes` mirrors `lanes/**` exactly, and `~/lanes/cairn` plus `~/.cairn/tools/cairn` are product checkouts, not host tools. The only host files outside `tools/**` and `lanes/**` are the exclusions above; the retired `review-gate/` directory and its disabled unit were deleted.
 
@@ -17,7 +17,6 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 | Script | Run by | Purpose |
 |---|---|---|
 | `tools/backup/db-backup.sh` | `cairn-db-backup.service` | Wraps `scripts/ops/backup-server-db.sh`, syncs attachments, pushes both to the rsync remote |
-| `tools/eval-env.sh` | sourced by `cairn-eval-weekly`, `cairn-learn-eval`, `cairn-memory-regression`, `cairn-review-eval` | Exports the eval relay URL and key without printing them |
 | `tools/app-token/as-bot.sh` | legacy callers below | Runs an approved command with the owner's identity and user gh credential helper; never mints a token. New agent work uses ordinary git/gh |
 | `tools/app-token/bot-identity.mjs` | legacy `as-bot.sh` | Prints the owner's name, noreply email and optional co-author trailer from `commit-identity.json` |
 | `tools/app-token/token.mjs` | no longer called by `as-bot.sh` | Legacy minter retained only until its remaining consumers are retired and private-key removal is separately approved |
@@ -42,7 +41,6 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 | `tools/merge-order/{lanes-retry,queue,stale-prs}.sh` | `main-watch.sh` | Retry lanes with no commit, update queued PR branches, flag stale PRs; `lanes-retry.sh` also dispatches the `pending` list |
 | `tools/merge-order/deps-open.mjs` | called by `dispatch-issue.sh`, `lanes-retry.sh`, `merge-pr.sh` | Exits non-zero and names open dependencies of an issue |
 | `tools/weekly/evidence-prune.sh` | `cairn-evidence-prune.service` | Weekly evidence prune PR (ADR 0022) |
-| `tools/weekly/{eval-weekly,learn-eval,memory-regression}.sh`, `baseline-record.mts` | `cairn-eval-weekly`, `cairn-learn-eval`, `cairn-memory-regression` | Weekly evals; `eval-weekly.sh` here is the older host copy of `scripts/ops/eval-weekly.sh` |
 | `lanes/dispatch-issue.sh` | called by the governor, `main-watch` and `merge-order` scripts | Starts a lane worker for an issue after the gates below |
 | `lanes/{build-prompt,run-worker,test-build-prompt}.sh` | `dispatch-issue.sh` | Render the worker prompt, run the worker, test the prompt renderer |
 | `lanes/{sign-commits,rebase-main,finish-branch,regen-migration}.sh` | `driver.sh`, `aged-prs.sh`, by hand | `sign-commits` is a compatibility no-op that preserves authors; remaining lane helpers rebase, push and regenerate migrations |

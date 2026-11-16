@@ -117,7 +117,7 @@ const TYPE = [
   {
     name: 'Card title',
     cls: 'text-card-title font-semibold',
-    sample: 'Wire weekly review packs into eval-weekly.sh',
+    sample: 'Wire weekly review packs into the digest job',
     token: '--type-card-title',
     weight: 600,
   },

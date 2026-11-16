@@ -37,7 +37,6 @@
       "apps/desktop/package.json",
       "apps/desktop/tsconfig.json",
       "integration/test/**/*.ts",
-      "integration/eval/**/*.mts",
       "integration/*.ts",
       "integration/package.json",
       "vitest.config.ts",

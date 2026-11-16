@@ -33,31 +33,6 @@ export type StubResponseSource =
   | readonly StubResponse[]
   | ((request: StubRequest, index: number) => StubResponse);
 
-const EXECUTOR_PLAN_MARKER = 'Implementation plan (written by the planner model)';
-
-export function handoffStubResponses(
-  planner: readonly StubResponse[],
-  executor: readonly StubResponse[],
-): StubResponseSource {
-  let plannerTurns = 0;
-  let executorTurns = 0;
-  return (request) => {
-    const executorPhase = JSON.stringify(request.messages).includes(EXECUTOR_PLAN_MARKER);
-    if (!executorPhase) {
-      const rsp = planner[Math.min(plannerTurns, Math.max(planner.length - 1, 0))] ?? {
-        content: 'ok',
-      };
-      plannerTurns += 1;
-      return rsp;
-    }
-    const rsp = executor[Math.min(executorTurns, Math.max(executor.length - 1, 0))] ?? {
-      content: 'ok',
-    };
-    executorTurns += 1;
-    return rsp;
-  };
-}
-
 export async function startStubLlm(
   responses: StubResponseSource,
   opts: { onConsumed?: () => void } = {},

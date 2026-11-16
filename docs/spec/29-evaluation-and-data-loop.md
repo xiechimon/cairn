@@ -2,6 +2,8 @@
 
 > Status: **drafting landed** (2026-10-25, ticket #1510). Source: the 2026-10-22 plan (claude.ai artifact `4cjTdsVFN6ZP8TccM3ZWcE`), with the 2026-10-23 observability supplement (artifact `NrfYjm1yd3CJLKWR5DmKHA`) and the 2026-10-24 E1 criteria additions from RAVEN's research (#1605, #1606). Scope decision (2026-10-22): "training" means optimizing the harness only — prompts, skills, tool descriptions, context assembly, routing; never model weights.
 >
+> Removed (owner decision, 2026-11-16): the in-repo eval directory `integration/eval/`, the `.claude/hillclimb/` flows, the harness-regression merge gate, the weekly eval jobs and failure-replay candidate generation were deleted. Sections below that name them are history. What remains is trajectory capture and export (E0, the pack schema, outcome and attribution fields) and the Langfuse observability line (§3).
+>
 > Related: ADR 0021 D4 (protected paths, amended for the eval surface by ADR 0025), ADR 0022 (evidence pruning — nothing here depends on merged evidence staying on main), `docs/research/eval-methods.md` (methodology survey). Tickets: §4 ledger.
 
 ## 0 · Goal and end state
@@ -14,7 +16,7 @@ End state, machine-checkable:
 2. Every merged build leaves a complete trajectory pack (schema in `packages/shared/src/trajectory-pack.ts`); outcome fields (`merged`, `revertedWithin7d`, `fixedByLaterPr`) are backfilled from real repository history (#1515).
 3. Rejections and rollbacks automatically become candidate bench questions; a human confirms before anything enters `integration/eval/` (#1516).
 4. pacman-bench (#1517–#1519) scores the harness on real merged-PR tasks; CI runs its holdout slice on every harness-touching PR and blocks regressions beyond the confidence interval.
-5. The eval ruler (`integration/eval/**`, `.claude/hillclimb/**`, the trajectory exporter source) is in D4 category ⑥ (ADR 0025): no auto-merge can edit its own ruler.
+5. The eval ruler (the trajectory exporter source, its outcome fields and the pack schema) is in D4 category ⑥ (ADR 0025): no auto-merge can edit its own ruler.
 
 ## 1 · Phases
 
@@ -71,7 +73,7 @@ E3 on a schedule with human sampling: the system proposes harness changes contin
 
 | Failure mode | Guardrail |
 |---|---|
-| An agent edits the judge, the bench, or the exporter to pass | D4 category ⑥ (ADR 0025): `integration/eval/**`, `.claude/hillclimb/**`, and the trajectory exporter source always route to a human; the harness-regression gate (#1578) binds results to the exact patch |
+| An agent edits the judge, the bench, or the exporter to pass | D4 category ⑥ (ADR 0025): the trajectory exporter source and the pack schema always route to a human |
 | Overfitting to the training split | optimize/holdout split fixed by issue number (#1517); sealed set readable once per run, enforced on disk (#1605); only holdout gains count (#1579) |
 | Infra flake counted as score | validity gate re-runs and drops infra failures (#1605); zero-token and `step != done` interception (chief-dispatch) |
 | The judge gets exploited | code judges over model judges; the grader is designed around "can it be bypassed", not "does it judge correctly" (eval-methods S0.6); judge source is protected (ADR 0025) |
@@ -103,7 +105,7 @@ Consequences already absorbed by other tickets: #1515's weekly summary is replac
 | E1 | #1605 | Adoption judge: validity / trigger / paired-z gates + read-once sealed set | merged (PR #1636) |
 | E1 | #1606 | Pack failure-attribution fields | merged (PR #1660) |
 | E1-1 | #1515 | 7-day outcome backfill | closed; the weekly summary it carried is replaced by Langfuse score dashboards (§3) |
-| E1-2 | #1516 | Failure-replay candidate generation from rejections/rollbacks | landed (`pnpm traj:failure-replay`); confirmation via Langfuse annotation queue; bank at `integration/eval/failure-replay/` |
+| E1-2 | #1516 | Failure-replay candidate generation from rejections/rollbacks | removed 2026-11-16 with `integration/eval/` |
 | E2-1 | #1517 | pacman-bench v0: 30 tasks from merged PRs (Harbor format since 2026-10-25) | open; shelved 2026-11-12 (see E2) |
 | E2-2 | #1518 | Isolated runner (Harbor since 2026-10-25) | open; shelved 2026-11-12 (see E2) |
 | E2-3 | #1519 | Bench holdout slice as a CI regression gate | open; shelved 2026-11-12 (see E2) |

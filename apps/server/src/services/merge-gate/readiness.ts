@@ -1,10 +1,7 @@
 import type { EvidenceStore, Phase } from '@cairn/shared';
 import {
-  CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER,
   type CompareFile,
   GATE_LIMITS,
-  type HarnessRegressionResult,
-  harnessRegressionResultSchema,
   MERGE_BLOCKERS,
   MERGE_GATE_STATUS_CONTEXT,
   type MergeBlocker,
@@ -16,9 +13,8 @@ import {
 import { CORRECTION_GUARD_MISSING, correctionDoneCheck } from './correction.js';
 import { computePatchDigest } from './digest.js';
 import { qualifyingEvidenceLinks } from './evidence-link.js';
-import { isLiveHarnessAttempt } from './harness-eval-route.js';
 import { codexReviewDetail, isCodexReviewModel } from './model-identity.js';
-import { classifyPaths, touchesHarness } from './paths.js';
+import { classifyPaths } from './paths.js';
 
 export interface GateVerdictView {
   recordingAttached?: boolean;
@@ -112,17 +108,6 @@ export interface GateInputs {
     gateRoundsExhausted: boolean;
   } | null;
   availability: { reviewerPerspectives: string[]; verifier: boolean; decider: boolean };
-  harnessEvalText?: string | null;
-  harnessEval?: {
-    attempt: {
-      state: string;
-      deadlineAt?: number;
-      patchDigest?: string;
-      workerId?: string;
-      id?: string;
-    } | null;
-    now: number;
-  } | null;
 }
 
 const PASSING_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
@@ -427,35 +412,6 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       block('evidence-outside-ticket', ...names(paths.otherTicketEvidence));
     if (paths.executableEvidence.length > 0)
       block('evidence-executable', ...names(paths.executableEvidence));
-    if (D !== null && touchesHarness(compare.files)) {
-      let parsed: HarnessRegressionResult | null = null;
-      if (i.harnessEvalText != null && i.harnessEvalText !== '') {
-        try {
-          const raw: unknown = JSON.parse(i.harnessEvalText);
-          const r = harnessRegressionResultSchema.safeParse(raw);
-          if (r.success) parsed = r.data;
-        } catch {
-          parsed = null;
-        }
-      }
-      if (parsed !== null && parsed.patchDigest === D) {
-        if (parsed.decision_ok < CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER) {
-          block('harness-regression-below-threshold', String(parsed.decision_ok));
-        }
-      } else if (
-        i.harnessEval != null &&
-        isLiveHarnessAttempt(i.harnessEval.attempt, {
-          now: i.harnessEval.now,
-          patchDigest: D,
-        })
-      ) {
-        block('harness-regression-evaluating');
-      } else if (parsed === null) {
-        block('harness-regression-missing');
-      } else {
-        block('harness-regression-stale');
-      }
-    }
   }
 
   if (i.issueNumber === null) block('issue-ref-missing');

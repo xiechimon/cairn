@@ -5,7 +5,6 @@ import { describe, expect, test } from 'vitest';
 
 const REPO_ROOT = join(import.meta.dirname, '../../..');
 const OWNER = '@xiechimon';
-const EVAL_ROOTS = ['integration/eval/', '.claude/hillclimb/'];
 const GITHUB_UNSUPPORTED_PATTERN = /[![\]\\]|^#/;
 const TOKEN_SHAPES = [/gh[pousr]_[A-Za-z0-9]{20,}/, /github_pat_[A-Za-z0-9_]{20,}/];
 
@@ -13,7 +12,6 @@ const read = (path: string) => readFileSync(join(REPO_ROOT, path), 'utf8');
 const tracked = execFileSync('git', ['-C', REPO_ROOT, 'ls-files'], { encoding: 'utf8' })
   .split('\n')
   .filter(Boolean);
-const evalFiles = tracked.filter((p) => EVAL_ROOTS.some((root) => p.startsWith(root)));
 
 interface Rule {
   pattern: string;
@@ -52,12 +50,6 @@ describe('.github/CODEOWNERS', () => {
       const [pattern = '', ...owners] = line.split(/\s+/);
       return [{ pattern, owners, line: index + 1 }];
     });
-
-  test('every tracked file under an evaluation path is owned by @xiechimon', () => {
-    expect(evalFiles.length).toBeGreaterThan(0);
-    const unowned = evalFiles.filter((p) => ownersOf(rules, p)?.join(' ') !== OWNER);
-    expect(unowned).toEqual([]);
-  });
 
   test('every rule uses only GitHub-recognized syntax: one pattern plus at least one @xiechimon', () => {
     expect(rules.length).toBeGreaterThan(0);

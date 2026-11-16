@@ -32,11 +32,6 @@ import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
 import { readGithubAutonomyPause } from './github-autonomy-brake.js';
 import { userTokenOrNull } from './github-connection.js';
-import { createHarnessEvalCoordinator } from './harness-eval-coordinator.js';
-import {
-  DEFAULT_HARNESS_EVAL_ATTEMPT_TIMEOUT_MS,
-  productionHarnessEvalConfig,
-} from './harness-eval-production.js';
 import { correctionDoneCheck } from './merge-gate/correction.js';
 import { computePatchDigest } from './merge-gate/digest.js';
 import { planGateStatusWrite, writeGateStatus } from './merge-gate/gate-status.js';
@@ -138,7 +133,6 @@ export async function evaluateMergeGate(
           opts.now ?? nowMs(),
         )
       : false;
-  const harness = deps.harnessEval ?? productionHarnessEvalConfig();
   const facts = await readGateGithubFacts(
     port,
     {
@@ -148,15 +142,6 @@ export async function evaluateMergeGate(
       ticketRef,
       evidenceStore: buildRow.evidenceStore,
       now: opts.now ?? nowMs(),
-      harnessEval: {
-        coordinator: createHarnessEvalCoordinator({
-          db: deps.db,
-          dispatch: harness.dispatch,
-          now: harness.now ?? nowMs,
-          attemptTimeoutMs: harness.attemptTimeoutMs ?? DEFAULT_HARNESS_EVAL_ATTEMPT_TIMEOUT_MS,
-        }),
-        dispatchAuthorized: harness.dispatchAuthorized !== false,
-      },
     },
     cache,
   );
@@ -334,8 +319,6 @@ export async function evaluateMergeGate(
       verifier,
       decider: coordinatorProfile(deps.db, todoRow.teamId) !== null,
     },
-    harnessEvalText: facts.harnessEvalText,
-    ...(facts.harnessEval !== null ? { harnessEval: facts.harnessEval } : {}),
   });
   const evaluatedAt = opts.now ?? nowMs();
   if (digest?.patchDigest != null && head !== null) {

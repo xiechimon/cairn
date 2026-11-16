@@ -143,11 +143,6 @@ jobs:
       - name: Orb canary scratch runner (#2277)
         run: node --test scripts/ops/orb/canary-stack.test.mjs
 
-      - name: Harbor task conversion, probe and labeler tests
-        run: |
-          cd integration/eval/harbor
-          pipx run pytest test_pr_to_task.py test_control_probe.py test_label_task.py
-
       - name: Prepush self-test
         run: pnpm prepush --self-test
 

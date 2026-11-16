@@ -105,11 +105,11 @@ function writeRegistry(root, registry) {
 
 function makeFixtureRepo(registry = baseRegistry()) {
   const root = makeTestTempDir('fm-gen-');
-  for (const name of ['generate-feature-map.mjs', 'eval-coverage.mjs']) {
-    write(root, `scripts/${name}`, '');
-    copyFileSync(join(SCRIPTS, name), join(root, 'scripts', name));
-  }
-  write(root, 'scripts/eval-capabilities.json', '[]');
+  write(root, 'scripts/generate-feature-map.mjs', '');
+  copyFileSync(
+    join(SCRIPTS, 'generate-feature-map.mjs'),
+    join(root, 'scripts/generate-feature-map.mjs'),
+  );
   write(root, 'apps/web/src/App.tsx', APP_TSX);
   write(
     root,
@@ -177,7 +177,6 @@ test('a complete registry renders a map that --check accepts', () => {
   assert.match(doc, /\[docs\/research\/schedules\.md\]\(research\/schedules\.md\)/);
   assert.match(doc, /nobody compared reference products/);
   assert.match(doc, /### B1 · Shell research/);
-  assert.match(doc, /## Eval coverage/);
   const skill = readFileSync(join(root, SKILL_MAP), 'utf8');
   assert.match(skill, /1\. `open \/app\/schedules`/);
   assert.match(
@@ -366,8 +365,7 @@ test('against a base without a registry, the gap ratchet starts from the head', 
   const root = makeFixtureRepo();
   generated(root);
   git(root, 'init', '-q');
-  write(root, 'scripts/eval-capabilities.json', '[]\n');
-  git(root, 'add', 'scripts/eval-capabilities.json');
+  git(root, 'add', 'scripts/generate-feature-map.mjs');
   git(
     root,
     '-c',
@@ -493,14 +491,6 @@ test('a verify recipe that does not exist fails', () => {
   const registry = baseRegistry();
   registry.features[0].verify = ['.claude/skills/verify-cairn/features/gone.md'];
   checkFails(makeFixtureRepo(registry), /schedules: verify recipe .*gone\.md does not exist/);
-});
-
-test('a hillclimb flow with no capability row still fails the generator', () => {
-  const root = makeFixtureRepo();
-  write(root, '.claude/hillclimb/orphan/cases.json', '{"cases":[]}\n');
-  const result = run(root);
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /hillclimb flow "orphan" has no capability row/);
 });
 
 test('the product plan retires the optional Cloudflare service without retiring core transport', () => {

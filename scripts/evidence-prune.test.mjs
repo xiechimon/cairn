@@ -96,9 +96,9 @@ test('keeps folders that code, CI or scripts reference, matching whole folder na
       'docs/verify/1777/execution.md': 'x',
       'docs/verify/2081/review-preflight.py': 'x',
       'docs/lessons/2081-review.md': 'run docs/verify/2081/review-preflight.py\n',
-      '.claude/hillclimb/README.md': '[run](../../docs/verify/1777/execution.md)\n',
+      '.claude/skills/verify-x/SKILL.md':
+        'node docs/verify/1033/drive.mjs\n[run](../../docs/verify/1777/execution.md)\n',
       '.claude/skills/verify-x/vp-registry.json': '{"script":"docs/verify/1104/drive.mjs"}\n',
-      '.claude/skills/verify-x/SKILL.md': 'node docs/verify/1033/drive.mjs\n',
       '.claude/skills/verify-x/scripts/drive.mjs': "join(REPO, 'docs/verify/1262/row.txt')\n",
       '.claude/skills/verify-x/changelog/a.md': 'docs/verify/900/\n',
       '.github/workflows/ci.yml': 'run: node --test docs/verify/1542/reach.test.mjs\n',

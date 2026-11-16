@@ -17,7 +17,6 @@ export * from './coordinator-identity.js';
 export * from './desktop-shell.js';
 export * from './experience-candidate.js';
 export * from './failure-attribution.js';
-export * from './failure-replay-candidate.js';
 export * from './failure-review.js';
 export * from './genai-conventions.js';
 export * from './git-ops.js';

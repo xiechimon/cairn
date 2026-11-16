@@ -1437,7 +1437,7 @@ test('iOS, docs, integration and CI changes deploy without restarting the daemon
       'README.md': '# Cairn\n',
       'README.zh.md': '# Cairn\n',
       'AGENTS.md': '# rules\n',
-      'integration/eval/coordinator-routing/upload.mts': 'export {};\n',
+      'integration/test/sample.test.ts': 'export {};\n',
       '.github/workflows/ci.yml': 'name: ci\n',
       'marker.txt': 'previous\n',
     },

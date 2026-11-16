@@ -28,7 +28,7 @@ Private-key removal requires a precise inventory and separate approval after all
 
 ## Code Owners
 
-`.github/CODEOWNERS` names `@xiechimon` as owner of `integration/eval/**`, `.claude/hillclimb/**` and the CODEOWNERS file itself. Commits go straight to `main`, so it is not enforced as a review; the rule that no change may edit what judges it lives in `AGENTS.md`.
+`.github/CODEOWNERS` names `@xiechimon` as owner of the CODEOWNERS file itself, `scripts/epic-done.mjs` and `.claude/epics/**`. Commits go straight to `main`, so it is not enforced as a review; the rule that no change may edit what judges it lives in `AGENTS.md`.
 
 ## GitHub create traffic
 

@@ -126,35 +126,6 @@ OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:3000/api/public/otel"
 OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic $(printf '%s' "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" | base64 | tr -d '\n'),x-langfuse-ingestion-version=4"
 ```
 
-## Failure-replay annotation queue (#1516)
-
-Plan rejection, review blocking, and post-merge revert trajectories become
-candidate bench questions (`pnpm traj:failure-replay --generate`). Push the
-matching packs with `pnpm traj:push` first so the deterministic build trace ids
-exist in Langfuse, then enqueue:
-
-```sh
-export CAIRN_LANGFUSE_HOST="http://127.0.0.1:3000"
-export CAIRN_LANGFUSE_PUBLIC_KEY="pk-lf-…"
-export CAIRN_LANGFUSE_SECRET_KEY="sk-lf-…"
-export CAIRN_LANGFUSE_ANNOTATION_QUEUE_ID="<queue-id>"
-pnpm traj:failure-replay --enqueue --in /tmp/failure-replay-candidates.jsonl
-```
-
-Create the queue once in the Langfuse UI (Annotations → New queue) with a
-pass/fail score config. Humans mark items COMPLETED there. Intake then writes
-only confirmed cases into the protected bank:
-
-```sh
-pnpm traj:failure-replay --intake --in /tmp/failure-replay-candidates.jsonl \
-  --bank integration/eval/failure-replay --out /tmp/failure-replay-confirmed.jsonl
-```
-
-Pending candidates never enter `integration/eval/`. The intake PR touches the
-protected eval bank, so a human still marks the confirmed cases, but the PR
-enters the merge queue with every other green PR and merges on its own once
-the required checks pass.
-
 ## Pushing trajectory packs (#1570)
 
 The JSONL trajectory packs produced by `pnpm traj:export` are converted by `pnpm traj:push` into OTLP/HTTP JSON and pushed to the endpoint above. It uses only the public protocol, carries no Langfuse SDK, and exits with an error when `CAIRN_OTEL_ENDPOINT` is not configured; nothing else in Cairn is affected.
@@ -362,76 +333,6 @@ Every failure leaves a `job_executions` row in `ERROR` and no score, which is ho
 | Calls `fetch`, opens a socket, or resolves a name | Fails inside the runner; there is no DNS and no route out |
 
 The evaluator can write only to its 16 MiB `/tmp`. The environment it can read holds the emulator's own values and nothing from this stack.
-
-### The Coordinator routing evaluator
-
-`integration/eval/coordinator-routing/evaluator/routing.ts` is the code evaluator the routing experiments are scored by. It is published to Langfuse unchanged, and only the owner edits the published copy. It compares the runner's decision record (`output`) with the dataset item's `expectedOutput` and returns one boolean score per applicable check:
-
-| Score | Scored when the item expects | `true` when |
-|---|---|---|
-| `routing.decision_ok` | any decision | the observed decision equals the expected `route`, `ask` or `answer` |
-| `routing.projects_ok` | `route` | the observed part projects equal the expected ones as a multiset, in any order |
-| `routing.split_ok` | `route` | the observed part count equals the expected count |
-| `routing.ask_ok` | `ask` | the Coordinator asked, and the asked candidates equal the expected set |
-| `routing.blocked_by_ok` | `route` with a non-empty `blockedBy` | the observed dependency edges equal the expected `[from, to]` part-index pairs |
-
-An item that expects `answer` is scored on `routing.decision_ok` alone, and an item that expects no dependency is never scored on `routing.blocked_by_ok`, so dependency scoring starts when the first dependency case is curated. A missing or malformed expected output or runner output throws, which leaves an `ERROR` execution and no scores; the gate treats that as unscored, not as a pass.
-
-Publish it and attach it to the dataset's experiment runs with an owner key in your shell, then check that the scores appear after the next experiment:
-
-```sh
-curl -sS -u "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" -H 'content-type: application/json' \
-  -d "$(jq -n --rawfile source integration/eval/coordinator-routing/evaluator/routing.ts \
-    '{name: "routing", type: "code", sourceCodeLanguage: "TYPESCRIPT", sourceCode: $source}')" \
-  "$LANGFUSE_HOST/api/public/v2/evaluators"
-
-DATASET_ID=$(curl -sS -u "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" "$LANGFUSE_HOST/api/public/datasets/coordinator-routing" | jq -r .id)
-curl -sS -u "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" -H 'content-type: application/json' \
-  -d "$(jq -n --arg dataset "$DATASET_ID" --arg evaluator "$EVALUATOR_ID" '{
-    name: "coordinator-routing", enabled: true, sampling: 1,
-    filter: [
-      {type: "boolean", column: "isExperimentItemRootSpan", operator: "=", value: true},
-      {type: "stringOptions", column: "datasetId", operator: "any of", value: [$dataset]}
-    ],
-    evaluatorAssignments: [{evaluatorId: $evaluator}]}')" \
-  "$LANGFUSE_HOST/api/public/v2/evaluation-rules"
-```
-
-`EVALUATOR_ID` is the `id` the first call returns. Saving a new version of the evaluator takes effect immediately for every rule that uses it, so a comparison between two runs is only valid when both were scored by the same version. Read the scores back with `GET /api/public/v3/scores`; on this v4 deployment `/api/public/v2/scores` is unavailable.
-
-### Adding curated cases to the routing dataset
-
-List what can become a case, then write the answers you decide on. Work from a copy of the production database, never the live file:
-
-```sh
-sqlite3 -readonly ~/.cairn/server/server.db ".backup /tmp/cand.db"
-cd integration
-pnpm exec tsx eval/coordinator-routing/harvest.mts /tmp/cand.db "$TEAM_ID"
-```
-
-Each line says whether a sealed snapshot is eligible and, when it is not, why. Keep the answers in a file outside the repository, one entry per chosen turn, with project names exactly as the snapshot shows them:
-
-```json
-[
-  {"turnId": "<turn id>", "expectedOutput": {"decision": "route", "parts": [{"project": "<name>"}], "askCandidates": [], "blockedBy": []}},
-  {"turnId": "<turn id>", "expectedOutput": {"decision": "route", "parts": [{"project": "<a>"}, {"project": "<b>"}], "askCandidates": [], "blockedBy": [[1, 0]]}},
-  {"turnId": "<turn id>", "expectedOutput": {"decision": "ask", "parts": [], "askCandidates": ["<option>", "<option>"], "blockedBy": []}},
-  {"turnId": "<turn id>", "expectedOutput": {"decision": "answer", "parts": [], "askCandidates": [], "blockedBy": []}}
-]
-```
-
-The four entries are the four shapes: one project, two projects where part 1 waits for part 0 (`[from, to]` are positions in `parts`, counted from 0), a question to the user whose `askCandidates` are the options it should offer in any order, and a reply that dispatches nothing. `decision` is `route`, `ask` or `answer`; `parts` holds only `project`; an optional `notes` string is not scored. Keep the three decisions roughly balanced and include a few dependency cases, since `routing.blocked_by_ok` is scored only when `blockedBy` is not empty.
-
-`upload.mts` checks every entry against its frozen snapshot and the expected-output schema, and prints a dry run by default. Nothing is sent unless `--apply` is given, and one invalid entry stops the whole file. At most 60 items fit one file, the same limit the runner enforces.
-
-```sh
-pnpm exec tsx eval/coordinator-routing/upload.mts /tmp/cand.db "$TEAM_ID" ~/routing-cases.json
-LANGFUSE_BASE_URL=... LANGFUSE_PUBLIC_KEY=... LANGFUSE_SECRET_KEY=... \
-  pnpm exec tsx eval/coordinator-routing/upload.mts /tmp/cand.db "$TEAM_ID" ~/routing-cases.json --apply
-rm /tmp/cand.db
-```
-
-Items are keyed `cairn-routing-<turn id>`, so uploading the same file again updates them instead of adding copies. The dataset is `routing` unless `--dataset <name>` says otherwise, and it must already exist.
 
 ## Binding to this machine or the LAN
 

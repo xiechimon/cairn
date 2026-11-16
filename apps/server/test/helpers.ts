@@ -36,7 +36,6 @@ import { enqueueStep } from '../src/services/builds.js';
 import { createClaudeSubscription } from '../src/services/claude-subscriptions.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
 import { teamAutonomyPaused } from '../src/services/github-autonomy-brake.js';
-import { productionHarnessEvalConfig } from '../src/services/harness-eval-production.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import { newMcpOAuthState } from '../src/services/mcp-servers.js';
 import type { VapidKeys } from '../src/services/push.js';
@@ -238,7 +237,6 @@ export function bootServer(
         user,
         skillsDir,
         vapidKeys,
-        harnessEval: productionHarnessEvalConfig(),
       },
       dispose,
     };

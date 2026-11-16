@@ -3,7 +3,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
-import { loadRepoEvalCoverage, renderEvalCoverage } from './eval-coverage.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const SKILL_REL = '.claude/skills/verify-cairn';
@@ -590,7 +589,7 @@ function renderSkillMap(registry, facts) {
   return out.join('\n');
 }
 
-function renderDocMap(registry, evalRows) {
+function renderDocMap(registry) {
   const pending = registry.pending ?? {};
   const link = linker('docs', pending);
   const features = sortedFeatures(registry);
@@ -692,8 +691,6 @@ function renderDocMap(registry, evalRows) {
     for (const [rel, where] of rows) out.push(`| \`${rel}\` | ${cell(where)} |`);
   }
   out.push('');
-  out.push(renderEvalCoverage(evalRows, registry.repo).trimEnd());
-  out.push('');
   return out.join('\n');
 }
 
@@ -727,18 +724,6 @@ try {
   fail(`cannot read ${REGISTRY_REL}: ${error.message}`);
 }
 
-let coverage;
-try {
-  coverage = loadRepoEvalCoverage(REPO_ROOT);
-} catch (error) {
-  fail(error instanceof Error ? error.message : String(error));
-}
-if (coverage.unlisted.length > 0) {
-  fail(
-    `hillclimb flow ${coverage.unlisted.map((name) => `"${name}"`).join(', ')} has no capability row`,
-  );
-}
-
 const extractionErrors = [];
 const facts = collect(registry, extractionErrors);
 const errors = [
@@ -749,7 +734,7 @@ if (errors.length > 0) fail(errors);
 
 const outputs = [
   [SKILL_MAP_REL, renderSkillMap(registry, facts)],
-  [DOC_REL, renderDocMap(registry, coverage.rows)],
+  [DOC_REL, renderDocMap(registry)],
 ];
 if (mode === '--check') {
   const stale = outputs.filter(([rel, content]) => !exists(rel) || read(rel) !== content);

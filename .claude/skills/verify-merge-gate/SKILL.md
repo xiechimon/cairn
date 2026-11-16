@@ -105,7 +105,7 @@ The server is single-process with synchronous SQLite writes, so code between two
 - Dirty-worktree and unknown-checkout holds are not modelled; they end an attempt without landing, which no property forbids.
 - Everything is fail-closed: an unreadable input blocks. The model only explores readable inputs, so it cannot show a fail-open path.
 
-Not in scope: scheduler and chief wiring, the CI green-wash loop, `unstable` mergeable-state handling, the `harness-regression-*` blockers, cross-repo and fork PRs, liveness, the daemon's merge step itself, and the force-push case (covered within the bounds by `PushCode`).
+Not in scope: scheduler and chief wiring, the CI green-wash loop, `unstable` mergeable-state handling, cross-repo and fork PRs, liveness, the daemon's merge step itself, and the force-push case (covered within the bounds by `PushCode`).
 
 ## After a code change
 

@@ -11,18 +11,15 @@ interface Vector {
 }
 
 const vectors: Vector[] = JSON.parse(
-  readFileSync(
-    resolve(__dirname, '../../../integration/eval/harbor/public/parity-vectors.json'),
-    'utf8',
-  ),
+  readFileSync(resolve(__dirname, 'fixtures/executor-record-vectors.json'), 'utf8'),
 ).vectors;
 
-describe('executor record parity with the Harbor eval executor', () => {
+describe('executor record', () => {
   test('the shared vectors are present', () => {
     expect(vectors.length).toBeGreaterThanOrEqual(3);
   });
 
-  test.each(vectors)('$name builds the record the eval side records', ({ input, record }) => {
+  test.each(vectors)('$name builds the pinned record', ({ input, record }) => {
     expect(
       buildExecutorRecord({
         backend: input.backend,

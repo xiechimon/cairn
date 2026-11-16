@@ -1,8 +1,6 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { CHIEF_DISPATCH_HARNESS_PATHS, type CompareFile } from '@cairn/shared';
+import type { CompareFile } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { classifyPaths, globToRegExp, touchesHarness } from '../src/services/merge-gate/paths.js';
+import { classifyPaths, globToRegExp } from '../src/services/merge-gate/paths.js';
 
 const f = (filename: string, over: Partial<CompareFile> = {}): CompareFile => ({
   status: 'modified',
@@ -219,12 +217,6 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
   });
 
   const EVAL_SURFACE_PATHS = [
-    'integration/eval/adoption/judge.mts',
-    'integration/eval/adoption/sealed-ledger.mts',
-    'integration/eval/chief-dispatch/grade.mts',
-    'integration/eval/memory-regression/grade.mts',
-    '.claude/hillclimb/chief-dispatch/cases.json',
-    '.claude/hillclimb/memory-regression/_state.json',
     'apps/server/src/trajectory-export.ts',
     'apps/server/src/trajectory-export-cli.ts',
     'apps/server/src/trajectory-outcome.ts',
@@ -240,7 +232,10 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
   });
 
   test('⑥ is case-insensitive like the other protect globs', () => {
-    for (const p of ['Integration/Eval/X.Mts', '.Claude/Hillclimb/X.json']) {
+    for (const p of [
+      'Apps/Server/Src/Trajectory-Export.ts',
+      'Packages/Shared/Src/Trajectory-Pack.ts',
+    ]) {
       expect(classify([f(p)]).protected, p).toEqual([p]);
     }
   });
@@ -251,44 +246,6 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
       'apps/server/src/trajectory.ts',
       'apps/server/src/trajectory-attribution.ts',
       'packages/shared/src/trajectory.ts',
-    ]) {
-      const r = classify([f(p)]);
-      expect(r.protected, p).toEqual([]);
-      expect(r.outsideAutoMerge, p).toEqual([]);
-    }
-  });
-
-  test('⑥ same-named dirs outside the protected surface are not protected but still leave the auto-merge set', () => {
-    for (const p of ['integration/evalx/judge.mts', 'hillclimb/cases.json']) {
-      const r = classify([f(p)]);
-      expect(r.protected, p).toEqual([]);
-      expect(r.outsideAutoMerge, p).toEqual([p]);
-    }
-  });
-
-  const HARNESS_EVAL_DISPATCH_PATHS = [
-    'apps/server/src/services/harness-eval-coordinator.ts',
-    'apps/server/src/services/harness-eval-production.ts',
-    'scripts/harness-eval-worker.mjs',
-    'apps/server/src/services/merge-gate/harness-eval-route.ts',
-    'apps/server/src/services/merge-gate/harness-eval-judge.ts',
-  ];
-  test('⑦ harness eval dispatch tooling is protected and never auto-merge (#1614)', () => {
-    for (const p of HARNESS_EVAL_DISPATCH_PATHS) {
-      const r = classify([f(p)]);
-      expect(r.protected, p).toEqual([p]);
-      expect(r.outsideAutoMerge, p).toEqual([]);
-    }
-  });
-
-  test('⑦ harness-eval-* is case-insensitive; neighbours stay in the auto-merge set', () => {
-    expect(classify([f('Apps/Server/Src/Services/Harness-Eval-Coordinator.ts')]).protected).toEqual(
-      ['Apps/Server/Src/Services/Harness-Eval-Coordinator.ts'],
-    );
-    for (const p of [
-      'apps/server/src/services/harness-evalx.ts',
-      'apps/server/src/services/harness-eval/coordinator.ts',
-      'apps/server/src/services/builds.ts',
     ]) {
       const r = classify([f(p)]);
       expect(r.protected, p).toEqual([]);
@@ -709,31 +666,4 @@ describe('executable extensions: the shell, PowerShell, Windows batch and HTML f
       expect(r.executableEvidence).toEqual(files);
     });
   }
-});
-
-describe('chief-dispatch harness paths', () => {
-  test('_state.json.harness_paths and CHIEF_DISPATCH_HARNESS_PATHS item-for-item in the same order', () => {
-    const st = JSON.parse(
-      readFileSync(
-        join(import.meta.dirname, '../../../.claude/hillclimb/chief-dispatch/_state.json'),
-        'utf8',
-      ),
-    ) as { harness_paths: string[] };
-    expect(st.harness_paths).toEqual([...CHIEF_DISPATCH_HARNESS_PATHS]);
-  });
-
-  test('touchesHarness: true inside the list, false outside', () => {
-    expect(touchesHarness([f('apps/server/src/services/chief.ts')])).toBe(true);
-    expect(touchesHarness([f('packages/shared/src/protocol/chief-tools.ts')])).toBe(true);
-    expect(touchesHarness([f('apps/daemon/src/backend/pi.ts')])).toBe(true);
-    expect(touchesHarness([f('apps/server/src/services/ci-loop.ts')])).toBe(false);
-    expect(
-      touchesHarness([
-        f('apps/web/src/x.ts', {
-          status: 'renamed',
-          previousFilename: 'apps/server/src/services/chief.ts',
-        }),
-      ]),
-    ).toBe(true);
-  });
 });

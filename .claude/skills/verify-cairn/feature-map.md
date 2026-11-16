@@ -82,7 +82,7 @@ Reach:
 - Research: [docs/research/coordinator-compaction-2026-11-07.md](../../../docs/research/coordinator-compaction-2026-11-07.md), [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md), [docs/research/coordinator-context-2026-11-08.md](../../../docs/research/coordinator-context-2026-11-08.md)
 - Frontend design: n/a: compaction is invisible by design; the transcript keeps full history
 - Backend design: [docs/design/coordinator-context-backend.md](../../../docs/design/coordinator-context-backend.md)
-- Evidence: `integration/test/coordinator-context-assemble.test.ts`, `apps/server/test/chief-history.test.ts`, `apps/server/test/coordinator/compaction.test.ts`
+- Evidence: `apps/server/test/chief-history.test.ts`, `apps/server/test/coordinator/compaction.test.ts`
 
 ### coordinator-dispatch
 
@@ -103,7 +103,7 @@ Reach:
 - Research: [docs/research/cairn-dogfood-feasibility-2026-11-06.md](../../../docs/research/cairn-dogfood-feasibility-2026-11-06.md), [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md), [docs/research/r15-agent-responsibility-default.md](../../../docs/research/r15-agent-responsibility-default.md)
 - Frontend design: n/a: dispatch shows as one sub-thread row under the reply that started it inside the Coordinator chat
 - Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md)
-- Evidence: `apps/server/test/chief-dispatch.test.ts`, `integration/test/chief-dispatch-policy-binding.test.ts`, `apps/server/test/agent-removal.test.ts`
+- Evidence: `apps/server/test/chief-dispatch.test.ts`, `apps/server/test/agent-removal.test.ts`
 
 ### daily-report
 
@@ -143,24 +143,6 @@ Reach:
 - Frontend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/references/thread-review](../../../docs/design/references/thread-review)
 - Backend design: [docs/design/durable-threads-and-engines.md](../../../docs/design/durable-threads-and-engines.md), [docs/design/home-redesign-backend-todo.md](../../../docs/design/home-redesign-backend-todo.md)
 - Evidence: `apps/web/e2e/chief-home-engine-run.spec.ts`, `apps/web/test/engine-run.test.ts`
-
-### eval-gated-harness
-
-**Eval-gated harness changes** (partial, centrality 1). A differentiator: a harness change is adopted only when a protected eval judges it better; trajectories export to traces for the self-improvement loop.
-
-States: No product page; results appear as CI checks and command-line reports.
-
-Reach:
-
-1. `settings work-routing`
-
-- Web routes: none
-- Keyboard shortcuts in its code: none
-- Test ids in its code: none
-- Research: [docs/research/eval-methods.md](../../../docs/research/eval-methods.md), [docs/research/trajectory-self-improvement-2026-11-08.md](../../../docs/research/trajectory-self-improvement-2026-11-08.md) (not on main)
-- Frontend design: n/a: runs as CI checks and command-line tools with no product page
-- Backend design: [docs/spec/29-evaluation-and-data-loop.md](../../../docs/spec/29-evaluation-and-data-loop.md), [docs/research/trajectory-self-improvement-2026-11-08.md](../../../docs/research/trajectory-self-improvement-2026-11-08.md) (not on main)
-- Evidence: `apps/server/test/harness-eval-production.test.ts`, `apps/server/test/merge-gate-harness-eval.test.ts`, `apps/server/test/trajectory-export.test.ts`
 
 ### harness-dispatch
 
@@ -458,6 +440,24 @@ Reach:
 - Frontend design: [docs/design/references/thread-review](../../../docs/design/references/thread-review), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
 - Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](../../../docs/spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/design/runtime-memory-out-of-tree.md](../../../docs/design/runtime-memory-out-of-tree.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md)
 - Evidence: `apps/web/e2e/detail-continue-thread.spec.ts`, `apps/web/e2e/detail-archive.spec.ts`, `apps/server/test/snooze.test.ts`, `apps/server/test/archive.test.ts`, `apps/server/test/tasks.test.ts`
+
+### trajectory-export
+
+**Trajectory export** (partial, centrality 1). Build trajectories export as packs and traces for the self-improvement loop.
+
+States: No product page; results appear as command-line reports and traces.
+
+Reach:
+
+1. `settings work-routing`
+
+- Web routes: none
+- Keyboard shortcuts in its code: none
+- Test ids in its code: none
+- Research: [docs/research/eval-methods.md](../../../docs/research/eval-methods.md), [docs/research/trajectory-self-improvement-2026-11-08.md](../../../docs/research/trajectory-self-improvement-2026-11-08.md) (not on main)
+- Frontend design: n/a: runs as command-line tools and trace export with no product page
+- Backend design: [docs/spec/29-evaluation-and-data-loop.md](../../../docs/spec/29-evaluation-and-data-loop.md), [docs/research/trajectory-self-improvement-2026-11-08.md](../../../docs/research/trajectory-self-improvement-2026-11-08.md) (not on main)
+- Evidence: `apps/server/test/trajectory-export.test.ts`
 
 ### desktop-app
 

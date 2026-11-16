@@ -15,7 +15,6 @@ const CODE_PATHS = [
   '.claude/skills/*/scripts/*',
   '.claude/skills/*/vp-registry.json',
   '.claude/skills/*/SKILL.md',
-  '.claude/hillclimb',
   'docs/lessons',
 ];
 const SELF = [':!scripts/evidence-prune.mjs', ':!scripts/evidence-prune.test.mjs'];

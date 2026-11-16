@@ -35,7 +35,6 @@
 | [Coordinator dispatch](#coordinator-dispatch) | 1 | shipped | yes | n/a | yes |  |
 | [Read-only report history](#daily-report) | 1 | shipped | yes | yes | gap | B2 |
 | [Engine run in a task thread](#engine-view) | 1 | partial | yes | yes | yes |  |
-| [Eval-gated harness changes](#eval-gated-harness) | 1 | partial | yes | n/a | yes |  |
 | [Harness dispatch](#harness-dispatch) | 1 | shipped | yes | n/a | yes |  |
 | [Memory](#memory) | 1 | shipped | yes | yes (not on main) | yes |  |
 | [Completed delivery and explicit merge](#merge-gate) | 1 | shipped | yes | yes | yes |  |
@@ -51,6 +50,7 @@
 | [Thread PR panel and auto-fix](#thread-pr-panel) | 1 | shipped | yes | yes | yes |  |
 | [Thread transcript and work trace](#thread-transcript) | 1 | shipped | yes | yes | yes |  |
 | [Threads](#threads) | 1 | shipped | yes | yes | yes |  |
+| [Trajectory export](#trajectory-export) | 1 | partial | yes | n/a | yes |  |
 | [Desktop app](#desktop-app) | 2 | planned | yes (not on main) | gap | gap | B6 |
 | [First run](#first-run) | 2 | shipped | yes (not on main) | yes | gap | B6 |
 | [Machine enrollment](#machine-enrollment) | 2 | shipped | yes | gap | gap | B5 |
@@ -246,14 +246,6 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Frontend design: [docs/design/durable-threads-and-engines.md](design/durable-threads-and-engines.md), [docs/design/references/thread-review](design/references/thread-review)
 - Backend design: [docs/design/durable-threads-and-engines.md](design/durable-threads-and-engines.md), [docs/design/home-redesign-backend-todo.md](design/home-redesign-backend-todo.md)
 
-### eval-gated-harness
-
-**Eval-gated harness changes** (partial). A differentiator: a harness change is adopted only when a protected eval judges it better; trajectories export to traces for the self-improvement loop.
-
-- Research: [docs/research/eval-methods.md](research/eval-methods.md), [docs/research/trajectory-self-improvement-2026-11-08.md](research/trajectory-self-improvement-2026-11-08.md) (not on main)
-- Frontend design: n/a: runs as CI checks and command-line tools with no product page
-- Backend design: [docs/spec/29-evaluation-and-data-loop.md](spec/29-evaluation-and-data-loop.md), [docs/research/trajectory-self-improvement-2026-11-08.md](research/trajectory-self-improvement-2026-11-08.md) (not on main)
-
 ### harness-dispatch
 
 **Harness dispatch** (shipped). Each thread runs on a subscription CLI (Claude Code, Codex, pi) driven by the daemon, mostly through ACP, with the mode fixed at thread start.
@@ -373,6 +365,14 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Research: [docs/research/r12-save-and-start-behavior.md](research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main), [docs/research/duet-proactive-coordinator.md](research/duet-proactive-coordinator.md)
 - Frontend design: [docs/design/references/thread-review](design/references/thread-review), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
 - Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/design/runtime-memory-out-of-tree.md](design/runtime-memory-out-of-tree.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
+
+### trajectory-export
+
+**Trajectory export** (partial). Build trajectories export as packs and traces for the self-improvement loop.
+
+- Research: [docs/research/eval-methods.md](research/eval-methods.md), [docs/research/trajectory-self-improvement-2026-11-08.md](research/trajectory-self-improvement-2026-11-08.md) (not on main)
+- Frontend design: n/a: runs as command-line tools and trace export with no product page
+- Backend design: [docs/spec/29-evaluation-and-data-loop.md](spec/29-evaluation-and-data-loop.md), [docs/research/trajectory-self-improvement-2026-11-08.md](research/trajectory-self-improvement-2026-11-08.md) (not on main)
 
 ### desktop-app
 
@@ -670,29 +670,3 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 | `docs/research/trajectory-self-improvement-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/ui-ux-audit-2026-11-06.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/user-computer-model-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
-
-## Eval coverage
-
-Model-driven capabilities and whether a real-model eval has a score.
-Case counts are the `cases` array in the flow `cases.json`.
-The latest score is the primary metric (the first id in `_state.json` `metrics`,
-otherwise `decision_ok`) over graded rows in the newest variant directory
-(`baseline`, then `v1`, `v2`, ...) that has a `results.jsonl`.
-The date is that file's git commit date.
-Status is `scored`, `built-not-run`, `none`, or `tests only, no eval needed`.
-A directory under `.claude/hillclimb/` that contains `cases.json` and is not named
-by a capability makes the generator fail.
-
-| Capability | Eval flow | Cases | Latest score | Date | Model | Status |
-|---|---|---|---|---|---|---|
-| dispatch | `chief-dispatch` | 64 | 29/30 (96.7%) | 2026-10-26 | `glm-5.3` | scored |
-| memory use | `memory-regression` | 21 |  |  |  | built-not-run |
-| project routing | `project-routing` | 16 |  |  |  | built-not-run |
-| learn from correction | `learn` | 10 |  |  |  | built-not-run |
-| review |  |  |  |  |  | none ([#1779](https://github.com/xiechimon/cairn/issues/1779)) |
-| planning | `plan` | 3 |  |  |  | built-not-run |
-| prior-art planning | `plan-prior-art` | 2 |  |  |  | built-not-run |
-| coding |  |  |  |  |  | none |
-| machine claim |  |  |  |  |  | tests only, no eval needed |
-| intake |  |  |  |  |  | tests only, no eval needed |
-| merge gate rules |  |  |  |  |  | tests only, no eval needed |

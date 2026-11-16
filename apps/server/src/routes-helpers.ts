@@ -22,7 +22,6 @@ import { notFound } from './lib/errors.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import type { GithubIssueFaceDeps } from './services/github-issues.js';
-import { productionHarnessEvalConfig } from './services/harness-eval-production.js';
 import { assertDeviceActive } from './services/paired-devices.js';
 import { isPersonalSpace } from './services/personal-space.js';
 
@@ -137,7 +136,6 @@ export function svcOf(ctx: AppContext) {
     attachmentsDir: ctx.attachmentsDir,
     box: ctx.secretBox,
     oauthClient: ctx.oauthClient,
-    harnessEval: productionHarnessEvalConfig(),
     ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
   };
 }

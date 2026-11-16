@@ -40,11 +40,6 @@ await build({
 execFileSync(process.execPath, ['--check', resolve(root, 'dist/index.mjs')], { stdio: 'inherit' });
 
 mkdirSync(resolve(root, 'dist'), { recursive: true });
-copyFileSync(
-  resolve(root, '../../scripts/harness-eval-worker.mjs'),
-  resolve(root, 'dist/harness-eval-worker.mjs'),
-);
-
 const photonRequire = createRequire(
   createRequire(import.meta.url).resolve('@earendil-works/pi-durable/images'),
 );

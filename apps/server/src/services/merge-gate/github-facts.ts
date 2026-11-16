@@ -1,21 +1,12 @@
 import {
-  EVIDENCE_PREFIX,
-  HARNESS_REGRESSION_RESULT_NAME,
   MERGE_GATE_STATUS_CONTEXT,
   RECORDING_EXTENSION,
   RECORDING_MAX_BYTES,
 } from '@cairn/shared/merge-gate';
-import type { HarnessEvalAttempt } from '../harness-eval-coordinator.js';
 import { compareFilesFromResponse } from './digest.js';
 import { qualifyingEvidenceLinks } from './evidence-link.js';
 import type { GateGithubPort, GateRaw, GateRawFailure } from './github-port.js';
 import { RULESETS_NOT_ON_PLAN } from './github-rules.js';
-import { harnessNeedFromInputs } from './harness-eval-judge.js';
-import {
-  type HarnessEvalCoordinatorPort,
-  prepareHarnessEvalRouting,
-} from './harness-eval-route.js';
-import { touchesHarness } from './paths.js';
 import {
   type GateCheckRun,
   type GateCompareCommit,
@@ -38,10 +29,6 @@ export interface GateReadRequest {
   prNumber: number;
   ticketRef: string;
   now: number;
-  harnessEval?: {
-    coordinator: HarnessEvalCoordinatorPort;
-    dispatchAuthorized: boolean;
-  };
 }
 
 export interface GateReadCache {
@@ -100,8 +87,6 @@ export interface GateGithubFacts {
   checks: GateInputs['checks'];
   compare: GateInputs['compare'];
   evidence: GateEvidencePresence[];
-  harnessEvalText: string | null;
-  harnessEval: { attempt: HarnessEvalAttempt | null; now: number } | null;
   baseBehindBy: number | null;
   ownStatus: { state: string; description: string | null } | null | 'unreadable';
   rateLimited: { retryAt: number | null } | null;
@@ -621,8 +606,6 @@ export async function readGateGithubFacts(
     checks: null,
     compare: 'unreadable',
     evidence: [],
-    harnessEvalText: null,
-    harnessEval: null,
     baseBehindBy: null,
     ownStatus: 'unreadable',
     rateLimited: null,
@@ -682,47 +665,6 @@ export async function readGateGithubFacts(
   if (typeof facts.compare !== 'string') {
     if (req.evidenceStore === 'repository' || req.evidenceStore === undefined) {
       facts.evidence = await probeEvidence(r, req, pr, facts.compare);
-    }
-    if (touchesHarness(facts.compare.files)) {
-      const harnessPath = `${EVIDENCE_PREFIX}${req.ticketRef}/${HARNESS_REGRESSION_RESULT_NAME}`;
-      const res = await send(r, () => r.port.contents(harnessPath, head));
-      facts.harnessEvalText = null;
-      if (
-        res !== null &&
-        res.kind === 'ok' &&
-        isObj(res.body) &&
-        res.body.type === 'file' &&
-        typeof res.body.content === 'string' &&
-        res.body.encoding === 'base64'
-      ) {
-        try {
-          facts.harnessEvalText = Buffer.from(
-            res.body.content.replace(/\s/g, ''),
-            'base64',
-          ).toString('utf8');
-        } catch {
-          facts.harnessEvalText = null;
-        }
-      }
-    }
-  }
-  if (req.harnessEval !== undefined && typeof facts.compare !== 'string') {
-    const { need, patchDigest } = harnessNeedFromInputs({
-      compare: facts.compare,
-      harnessEvalText: facts.harnessEvalText,
-    });
-    if (patchDigest !== null) {
-      const routed = await prepareHarnessEvalRouting({
-        coordinator: req.harnessEval.coordinator,
-        repo: `${req.owner}/${req.repo}`,
-        pr: req.prNumber,
-        patchDigest,
-        need,
-        dispatchAuthorized: req.harnessEval.dispatchAuthorized,
-        ticket: req.ticketRef,
-        expectedHead: head,
-      });
-      facts.harnessEval = { attempt: routed.attempt, now: req.now };
     }
   }
   return done();
