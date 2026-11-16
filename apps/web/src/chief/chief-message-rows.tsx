@@ -3,6 +3,7 @@ import { CircleAlert } from 'lucide-react';
 import { type CSSProperties, Fragment, memo, type ReactNode, useContext, useState } from 'react';
 import { Link } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
+import { modelUnreachableHint } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
 import { reportStatusWord } from '../board/status-words.js';
@@ -99,6 +100,7 @@ const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = `w-full max-w-full font-sans ${CHAT_BODY_CLS}`;
 const MARKER_ERROR_CLS = 'my-2.5 gap-1.5 text-meta text-(--destructive)';
+const MARKER_UNREACHABLE_CLS = 'my-2.5 items-start gap-1.5 text-meta';
 const SAID_CLS = `${REPLY_BUBBLE_CLS} min-w-0 font-sans ${CHAT_BODY_CLS} text-(--foreground) [overflow-wrap:anywhere]`;
 
 function CoordinatorSaid({ testId, children }: { testId: string; children: ReactNode }) {
@@ -617,12 +619,37 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'channel-mirror') return <ChannelMirrorRow mirror={item} />;
   if (item.kind === 'thread-report' || item.kind === 'thread-message' || item.kind === 'report-ack')
     return null;
+  const unreachableHint = item.kind === 'error' ? modelUnreachableHint(item.text) : null;
+  if (item.kind === 'error' && onRetry !== undefined && unreachableHint !== null)
+    return (
+      <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
+        <Marker role="alert" className={MARKER_UNREACHABLE_CLS} title={item.text}>
+          <CircleAlert aria-hidden="true" className="mt-0.5 flex-none text-(--destructive)" />
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <MarkerContent data-testid="chief-turn-error" className="text-(--destructive)">
+              {t('连不上模型服务')}
+            </MarkerContent>
+            <span className="text-content-secondary">{t(unreachableHint)}</span>
+            <span className="mt-1.5 flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" data-testid="chief-turn-retry" onClick={onRetry}>
+                {t('重试')}
+              </Button>
+              <Button variant="ghost" size="sm" render={<Link to={settingsHref('providers')} />}>
+                {t('检查模型服务')}
+              </Button>
+            </span>
+          </span>
+        </Marker>
+      </MessageScrollerItem>
+    );
   if (item.kind === 'error')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
         <Marker role="alert" className={MARKER_ERROR_CLS} title={item.text}>
           <CircleAlert aria-hidden="true" className="flex-none" />
-          <MarkerContent data-testid="chief-turn-error">{t('这一轮没有完成')}</MarkerContent>
+          <MarkerContent data-testid="chief-turn-error">
+            {t(unreachableHint !== null ? '连不上模型服务' : '这一轮没有完成')}
+          </MarkerContent>
           {onRetry !== undefined && (
             <Button
               variant="ghost"

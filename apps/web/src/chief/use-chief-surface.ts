@@ -27,7 +27,7 @@ import {
 } from '../api/hooks.js';
 import { liveTextStore } from '../api/live-text.js';
 import { liveThinkingStore } from '../api/live-thinking.js';
-import { chiefTurnErrorOfContent, mapChief } from '../api/mappers.js';
+import { chiefTurnErrorOfContent, mapChief, modelUnreachableHint } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
 import { useConversationStream } from '../api/sse.js';
@@ -220,7 +220,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
         if (row.role === 'user' && clientMessageId !== undefined)
           chiefOutbox.land(clientMessageId, row.id);
         const reason = chiefTurnErrorOfContent(row.content);
-        if (reason === null) return;
+        if (reason === null || modelUnreachableHint(reason) !== null) return;
         toast.error(t('Coordinator 本轮执行失败'), { description: reason });
       },
     }),
