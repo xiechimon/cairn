@@ -10,6 +10,7 @@ import {
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { BRAND, PROVIDER_COMMAND_NOTICE } from '@cairn/shared';
+import { runTokenCommand } from '@cairn/shared/token-command';
 import { Command } from 'commander';
 import { shutdownDaemonOtel } from './backend/otel.js';
 import {
@@ -33,7 +34,6 @@ import {
   spawnSupervisor,
   stopSupervisor,
 } from './supervisor.js';
-import { runTokenCommand } from './token-command.js';
 import { DAEMON_VERSION } from './version.js';
 
 interface StartOptions {
