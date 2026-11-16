@@ -1479,7 +1479,7 @@ function wakeFactText(
     case 'report':
       return `任务 ${ref} 已交付研究报告，验收归你。先用 attachment 读下面 Report 行里 attachment= 的报告，再四选一：有用户该知道的结论，就用 notify_user 发 2–5 行，第一行是结论（报告卡片会自动附在通知下面，不用再写任务链接或标题），然后 complete_todos 收下；报告没有新信息、Report 行是 origin=none，就用 complete_todos 带 silent: true 静默收下，不发通知；需要补充或返工，用 message_thread 让它继续；不再需要，用 close_todos 关掉。这一轮只能读资料和处理这一个任务，别的工具会被拒绝。`;
     case 'settle':
-      return `任务 ${ref} 已合并完成（done）。对话里已记下这条，不用再告诉用户；该任务的关注已自动解除。`;
+      return `任务 ${ref} 已完成（done），不代表分支或 PR 已合并。对话里已记下这条，不用再告诉用户；该任务的关注已自动解除。`;
     case 'failed':
       return `任务 ${ref} 运行失败${errorMessage ? `：${errorMessage}` : ''}。先核实原因（machines 等工具），然后本轮必须落一个动作：用 message_thread 让它重试或换做法，或用 update_todo 调整 blockedBy 后再用 message_thread 重启，让系统按依赖放行，或用 close_todos 关掉。本轮结束时任务若仍是同一个失败，系统会把它交给用户处理。`;
     case 'blocked':
@@ -1711,7 +1711,7 @@ export function buildChiefSystemPrompt(
     '- 插话：你回复途中用户补充的话会直接送进本回合。照插话调整，插话和原请求冲突时以插话为准，并在这次回复里用一句话说明因为插话改了什么。',
     '- 提到任务时只写链接 [#n](todo:<id>)，界面会把它显示成带状态的任务标题，所以链接前后不再写一遍标题。本回合 create_todo 建的任务会显示在你这条回复的上方，回复里不用再说「已建任务 …」，直接讲放在哪、接下来会怎样。写不了链接的地方（比如 ask_user 的标题和选项）直接写任务标题，不写「#n」这样的编号。',
     '- 建议回复：回合结束后服务端会另问一次，预测用户接下来最可能发的 1–3 句短话，有几个自然方向就给几句，不凑数。你自己不必调用 suggest_replies，除非这是新频道的问候、或你已经知道用户此刻最可能发的原话。删除、合并、关闭等不可撤销的确认一律用 ask_user，不用建议回复。',
-    '- 合并：项目默认自动合并（autonomous），但只有通过合并前检查才会合并，受保护的改动还要另一个模型对当前提交做独立评审。你不能合并；项目设成人工合并时，由用户在网页上合并。',
+    '- 合并：代码任务成功后就完成，分支和 PR 保留。只有用户在对话里明确要求合并时才用 merge_builds 合并当前交付；不主动问要不要合并，不自己决定合并，也不因任务完成、CI 通过或其他事件合并。',
     '',
     '### 电脑操作',
     '- 用户要你直接操作电脑（打开网页、点击、填写）时，你自己用 browser_navigate、browser_snapshot、browser_act 做。',

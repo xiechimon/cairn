@@ -38,7 +38,6 @@ import {
 } from './ci-review-reconcile.js';
 import { syncAutonomyPauses } from './github-autonomy-brake.js';
 import { recoverRedAutonomousMain } from './github-recovery.js';
-import { evaluateMergeGate } from './merge-gate-run.js';
 import { CI_FIX_PROMPT_HEAD } from './retry-lessons.js';
 
 export const CI_POLL_INTERVAL_MS = 60_000;
@@ -186,17 +185,6 @@ export function createCiPoller(
     }
     grind.retain(now);
     reviews.retain(reviewCandidates);
-    for (const cand of [...candidates, ...reviewCandidates]) {
-      try {
-        await evaluateMergeGate(deps, cand.buildId);
-      } catch (err) {
-        tally.errors += 1;
-        run.logger?.info(
-          { err: err instanceof Error ? err.message : String(err) },
-          'merge gate evaluation failed (sweep continues)',
-        );
-      }
-    }
     const memoBuilds = new Set([...reviewCandidates, ...candidates].map((c) => c.buildId));
     rows.retain(memoBuilds);
     run.logger?.info(tally, 'ci pr-checks sweep');

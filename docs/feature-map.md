@@ -15,15 +15,15 @@
 
 | Item | Count |
 |---|---|
-| Features | 55 |
-| status shipped | 44 |
+| Features | 56 |
+| status shipped | 45 |
 | status partial | 8 |
 | status planned | 3 |
-| research, frontend design and backend design all present or not applicable | 26 |
-| Research gaps | 12 |
-| Frontend design gaps | 17 |
+| research, frontend design and backend design all present or not applicable | 27 |
+| Research gaps | 13 |
+| Frontend design gaps | 16 |
 | Backend design gaps | 19 |
-| notes cited but not on main | 21 |
+| notes cited but not on main | 20 |
 
 ## Coverage
 
@@ -38,7 +38,7 @@
 | [Eval-gated harness changes](#eval-gated-harness) | 1 | partial | yes | n/a | yes |  |
 | [Harness dispatch](#harness-dispatch) | 1 | shipped | yes | n/a | yes |  |
 | [Memory](#memory) | 1 | shipped | yes | yes (not on main) | yes |  |
-| [Evidence-bound merge gate](#merge-gate) | 1 | shipped | yes | gap | yes | B3 |
+| [Completed delivery and explicit merge](#merge-gate) | 1 | shipped | yes | yes | yes |  |
 | [Task references and needs-you](#needs-you) | 1 | shipped | yes | yes | gap | B2 |
 | [Per-task orb isolation](#orb-isolation) | 1 | partial | yes | gap | yes | B4 |
 | [Plans, approval and review](#plans-and-review) | 1 | shipped | yes | gap | yes | B3 |
@@ -60,6 +60,7 @@
 | [Model providers and subscriptions](#providers) | 2 | shipped | yes | yes | yes |  |
 | [Remote access over the tailnet](#remote-access) | 2 | partial | yes | gap | yes | B5 |
 | [Login and tailnet device auth](#tailnet-login) | 2 | partial | yes (not on main) | gap | yes (not on main) | B5 |
+| [Token usage](#token-usage) | 2 | shipped | gap | yes | yes | B7 |
 | [Account and team](#account-and-team) | 3 | shipped | yes | yes | gap | B10 |
 | [API keys](#api-keys) | 3 | shipped | gap | gap | gap | B10 |
 | [App shell and settings window](#app-shell) | 3 | shipped | yes (not on main) | yes | n/a |  |
@@ -106,7 +107,6 @@ What a user can do to a running thread and how the gate verdict shows: steer, qu
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Evidence-bound merge gate](#merge-gate) | 1 | Frontend design: the gate verdict, merge button and merge-permission states in the thread have no design |
 | [Plans, approval and review](#plans-and-review) | 1 | Frontend design: the plan pane, auto-approve countdown and reject flow have no current design |
 | [Steer, queue and stop](#steer-queue-stop) | 1 | Research: no note on how Amp, Claude Code and Codex steer, queue and interrupt<br>Frontend design: the queued-message list, steer affordance and stop confirmation have no design<br>Backend design: no design for queue ordering, steer delivery to each harness and stop semantics |
 
@@ -146,6 +146,7 @@ Scheduled tasks, the search syntax with the activity view, and the sidebar with 
 
 | Feature | Centrality | Missing |
 |---|---|---|
+| [Token usage](#token-usage) | 2 | Research: no note beyond GitHub's contribution calendar, which the owner named |
 | [Scheduled tasks](#schedules) | 3 | Research: no note on Claude Code scheduled tasks, Amp and the Durable Objects alarm model<br>Frontend design: the Tasks panel Schedules tab and its popover editor have no design note beyond DESIGN.md<br>Backend design: no design for due events, missed runs and continue-thread schedules |
 | [Search and activity](#search-and-activity) | 3 | Research: no note on Amp's search syntax and activity filters<br>Backend design: no design for the search syntax, index and ranking |
 | [Sidebar](#sidebar) | 3 | Backend design: no design for unread and read marks across devices |
@@ -271,11 +272,11 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### merge-gate
 
-**Evidence-bound merge gate** (shipped). A differentiator: a merge lands only on the patch a verdict judged, with protected paths, required checks, review and the brake enforced by the server; per-project merge policy and ship route.
+**Completed delivery and explicit merge** (shipped). Successful code tasks finish with their branch or PR retained. Only an explicit conversational user request initiates a merge, without a mandatory agent review or merge-choice UI.
 
-- Research: [docs/research/2513-tla-statecharts.md](research/2513-tla-statecharts.md), [docs/research/892-gate-usage-measurement.md](research/892-gate-usage-measurement.md), [docs/research/mergify-merge-queue-spike.md](research/mergify-merge-queue-spike.md), [docs/research/review-gate-alternatives.md](research/review-gate-alternatives.md) (not on main)
-- Frontend design: **gap**: the gate verdict, merge button and merge-permission states in the thread have no design
-- Backend design: [docs/research/2513-tla-statecharts.md](research/2513-tla-statecharts.md), [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](spec/23-rework-to-original-branch-and-pr-convergence.md)
+- Research: [docs/research/remove-product-merge-gate-2026-11-16.md](research/remove-product-merge-gate-2026-11-16.md)
+- Frontend design: [docs/design/remove-product-merge-gate.md](design/remove-product-merge-gate.md)
+- Backend design: [docs/design/remove-product-merge-gate.md](design/remove-product-merge-gate.md)
 
 ### needs-you
 
@@ -445,6 +446,14 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Frontend design: **gap**: the sign-in gate and the signed-in-by-tailnet state have no design
 - Backend design: [docs/research/seamless-device-auth-2026-11-08.md](research/seamless-device-auth-2026-11-08.md) (not on main)
 
+### token-usage
+
+**Token usage** (shipped). The Usage dialog from the sidebar footer: tokens per local day as an ink heatmap, Coordinator and tasks apart.
+
+- Research: **gap**: no note beyond GitHub's contribution calendar, which the owner named
+- Frontend design: [docs/design/references/thread-list-sidebar](design/references/thread-list-sidebar)
+- Backend design: [docs/design/step-usage-daily.md](design/step-usage-daily.md)
+
 ### account-and-team
 
 **Account and team** (shipped). The user's account, the team record and the PR attribution settings.
@@ -535,7 +544,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### projects
 
-**Projects** (shipped). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings or the sidebar's archived filter, an archived project opened read-only, and delete.
+**Projects** (shipped). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from the sidebar's archived filter, an archived project opened read-only, and delete.
 
 - Research: [docs/research/project-coordinators.md](research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](design/archived-projects-settings.md)
@@ -653,7 +662,6 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 | `docs/research/desktop-app-stack-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/pi-durable-spike.md` | branch origin/docs/pi-durable-spike |
 | `docs/research/project-coordinators.md` | branch origin/docs/project-coordinators |
-| `docs/research/review-gate-alternatives.md` | branch origin/docs/review-gate-alternatives |
 | `docs/research/seamless-device-auth-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/serif-typography-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/sidebar-coordinator-icon-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |

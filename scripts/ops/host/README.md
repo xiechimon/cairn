@@ -1,5 +1,7 @@
 # Host control scripts
 
+Current development authentication uses the owner's user gh login and ordinary git/gh. The legacy `as-bot.sh` path is a command-policy compatibility entry, not an App-token wrapper. See `docs/ops/agent-bot-identity.md` for active-worktree migration and the separate product/private-key retirement boundary.
+
 Copies of the scripts that drive the lanes on the omarchy host. `tools/` mirrors `~/.cairn/tools/`, `lanes/` mirrors `~/lanes/`, `bin/` mirrors `~/.local/bin/` and `units/` mirrors `~/.config/systemd/user/`. The first commit that added this directory is the host state as it was measured, with only host-specific values in `tools/backup/db-backup.sh` parameterised (`CAIRN_REPO`, `CAIRN_BACKUP_REMOTE`).
 
 **Deploy.** `scripts/ops/deploy-self.sh` installs `tools/**` into `~/.cairn/tools` and `lanes/**` into `~/lanes` from the commit it just deployed, writes the installed SHA to `~/.cairn/tools/.installed-sha`, and keeps a host file that differs from both the previous and the new revision (reported through one `Host tools differ from main` issue). A host edit does not appear here until someone copies it back. A deploy that writes a unit file runs `systemctl --user daemon-reload` and enables a timer only when its file did not exist before; an existing timer keeps its enablement.
@@ -16,9 +18,9 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 |---|---|---|
 | `tools/backup/db-backup.sh` | `cairn-db-backup.service` | Wraps `scripts/ops/backup-server-db.sh`, syncs attachments, pushes both to the rsync remote |
 | `tools/eval-env.sh` | sourced by `cairn-eval-weekly`, `cairn-learn-eval`, `cairn-memory-regression`, `cairn-review-eval` | Exports the eval relay URL and key without printing them |
-| `tools/app-token/as-bot.sh` | every bot caller below, and agent sessions | Runs one `gh` or `git` command with a 1h App installation token in that process only, after `as-bot-policy.mjs` approves it (see below). Git runs as `cairnwright[bot]` for author and committer, and `git commit` adds the `CAIRN_COAUTHOR` trailer |
-| `tools/app-token/bot-identity.mjs` | `as-bot.sh`, `lanes/sign-commits.sh` | Prints the bot name, its noreply email and the owner co-author trailer from `commit-identity.json`, which deploy installs from `packages/shared/` |
-| `tools/app-token/token.mjs` | `as-bot.sh` | Mints the installation token from `~/.cairn/cairn-bot.json`; holds no secret and reads the key from the path in that file |
+| `tools/app-token/as-bot.sh` | legacy callers below | Runs an approved command with the owner's identity and user gh credential helper; never mints a token. New agent work uses ordinary git/gh |
+| `tools/app-token/bot-identity.mjs` | legacy `as-bot.sh` | Prints the owner's name, noreply email and optional co-author trailer from `commit-identity.json` |
+| `tools/app-token/token.mjs` | no longer called by `as-bot.sh` | Legacy minter retained only until its remaining consumers are retired and private-key removal is separately approved |
 | `tools/merge-pr.sh` | called by `overnight/driver.sh`, `rearm-automerge.sh` | Squash-merges a PR with the human login, pinned to the head it read, once the issues it closes have no open dependencies. It reads no check run, review verdict or hold label |
 | `tools/rearm-automerge.sh` | called by `overnight/driver.sh` | Disarms and re-arms auto-merge on bot PRs whose merge state changed |
 | `tools/overnight/driver.sh` | `cairn-overnight.service` | Per-lane loop: rebase, sign, push, open PRs, fix red CI, merge |
@@ -44,7 +46,7 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 | `tools/weekly/{eval-weekly,learn-eval,memory-regression}.sh`, `baseline-record.mts` | `cairn-eval-weekly`, `cairn-learn-eval`, `cairn-memory-regression` | Weekly evals; `eval-weekly.sh` here is the older host copy of `scripts/ops/eval-weekly.sh` |
 | `lanes/dispatch-issue.sh` | called by the governor, `main-watch` and `merge-order` scripts | Starts a lane worker for an issue after the gates below |
 | `lanes/{build-prompt,run-worker,test-build-prompt}.sh` | `dispatch-issue.sh` | Render the worker prompt, run the worker, test the prompt renderer |
-| `lanes/{sign-commits,rebase-main,finish-branch,regen-migration}.sh` | `driver.sh`, `aged-prs.sh`, by hand | Rewrite every lane commit since main to `cairnwright[bot]` with the co-author trailer, rebase, push and regenerate migrations for a lane branch |
+| `lanes/{sign-commits,rebase-main,finish-branch,regen-migration}.sh` | `driver.sh`, `aged-prs.sh`, by hand | `sign-commits` is a compatibility no-op that preserves authors; remaining lane helpers rebase, push and regenerate migrations |
 | `lanes/{deploy-omarchy,wait-rr}.sh` | by hand | Deploy and wait helpers |
 
 ## Documented behavior covered by tests
@@ -57,7 +59,9 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 
 ## as-bot allowlist (#2379)
 
-**The host still runs its own `as-bot.sh`, which has no allowlist.** The repo copy adds `tools/app-token/as-bot-policy.mjs`; `as-bot.sh` runs it before minting a token and exits 126 with `as-bot: refused: <reason>` on a denied command, so a refused command never gets a token. A later deploy must copy `as-bot.sh`, `as-bot-policy.mjs` and `token.mjs` together. `scripts/ops/secret-reach/broker.mjs` (#2189) scopes the token's permissions and has no command allowlist, so nothing there was reusable; the two layers stack.
+`as-bot.sh` runs `tools/app-token/as-bot-policy.mjs` before executing a user-authenticated command and exits 126 with `as-bot: refused: <reason>` on refusal. It never calls a minter. Install the wrapper and owner-identity helper together. The current policy permits ordinary main pushes and rejects force, force-with-lease and deletion; the tests and policy source are authoritative.
+
+The following command inventory predates the direct-main ship change and is retained as a list of legacy callers to migrate, not as permission to restore their old force, deletion or hook-bypass commands.
 
 Allowed: `gh pr view|list|comment|create|close|update-branch`, `gh pr edit` with only `--add-label`/`--remove-label`, `gh pr merge <pr> --disable-auto` (nothing else; the bot never merges), `gh issue view|list|comment|create|edit|pin`, `gh api` reads with one endpoint and only `--method GET`, `--paginate`, `--jq`, `--template`, `--include`, `--silent`, `--slurp`, `--cache` (fields only with an explicit GET), `git fetch origin` with `-q`, `-f`/`--force`, `--prune`, `--no-tags`, `git commit`, `git rebase <upstream>` with `-q` and `-X theirs|ours`, or `git rebase --continue|--abort|--skip`, `git -C <dir> ...`, `git push origin <src>:<branch>` where the branch is not `main`/`master`, optionally with `--force-with-lease`, `--no-verify`, `-u`, `-q`, and `git push origin --delete <branch>` for one branch that is not `main`/`master` or `pr-assets/*` (those hold the images merged PR bodies link), optionally with `-q`.
 

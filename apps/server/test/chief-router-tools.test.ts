@@ -291,12 +291,7 @@ describe('router tools', () => {
         .where(eq(todo.sourceKind, 'research-before-plan'))
         .get();
       if (!research?.latestBuildId) throw new Error('research build missing');
-      const tier = H.s.db
-        .select()
-        .from(message)
-        .where(eq(message.id, `research-tier-${research.latestBuildId}`))
-        .get();
-      expect(tier?.content).toContain('"tier":2');
+      expect(research.spec).toContain('多路研究');
       H.s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, research.id)).run();
       storeInfoReport(
         { db: H.s.db, attachmentsDir: H.s.attachmentsDir },

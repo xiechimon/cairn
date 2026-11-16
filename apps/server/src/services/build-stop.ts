@@ -12,6 +12,7 @@ import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { settleAutonomousMerge } from './autonomous-merge.js';
+import { settleRetiredGateStep } from './build-gate-steps.js';
 import { type BuildDeps, NotFoundError, publishBuild, settleParkedStep } from './builds.js';
 import { publishStepRow } from './quota-wait.js';
 import { finishScheduledStep } from './schedules.js';
@@ -151,6 +152,7 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
+  if (settleRetiredGateStep(deps, stepRow)) return;
   if (settleParkedStep(deps, stepRow, { status: 'stopped' })) return;
   releaseUnissuedMergeAdmission(db, stepRow);
   db.update(step)
@@ -265,6 +267,7 @@ export function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
+  if (settleRetiredGateStep(deps, stepRow)) return;
   if (stepRow.archiveStop !== null) {
     applyStoppedStep(deps, stepId);
     return;
@@ -370,6 +373,13 @@ function prepareStopFor(
     .at(-1);
   if (!active) return { state: 'ready' };
   recordStop(db, buildId, by);
+  if (active.kind === 'review' || active.kind === 'verify') {
+    if (active.status === 'claimed') {
+      db.update(step).set({ archiveStop: 'requested' }).where(eq(step.id, active.id)).run();
+      deps.machineHub?.stopSignal(todoRow.teamId, active.id);
+    } else settleRetiredGateStep(deps, active);
+    return { state: 'ready' };
+  }
   if (active.status === 'pending' || active.status === 'waiting_quota') {
     stopStepKeepPhase(deps, active.id);
     return { state: 'ready' };

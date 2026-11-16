@@ -191,6 +191,7 @@ export function useMentionGroups(): MentionGroups {
       id: m.id,
       label: m.name,
       subtitle: machineSecondary(m, machinesQ.data ?? []) ?? undefined,
+      capabilities: m.capabilities ?? undefined,
     })),
   };
 }

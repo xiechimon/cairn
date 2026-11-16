@@ -842,6 +842,7 @@ export const EN: Record<string, string> = {
   基本信息: 'Basic info',
   标签: 'Tags',
   'Cairn 托管': 'Cairn hosted',
+  '没有仓库，可让 Coordinator 连接': 'No repository yet; the Coordinator can connect one',
   目标分支: 'Target branch',
   '{branch}（默认）': '{branch} (default)',
   默认分支: 'Default branch',
@@ -1082,32 +1083,10 @@ export const EN: Record<string, string> = {
   复制链接: 'Copy link',
   暂停: 'Snooze',
   撤销: 'Undo',
-  完成任务: 'Complete task',
   负责人: 'Owner',
   'Coordinator 用的模型额度已用完': "The Coordinator's model is out of quota",
   'Coordinator 用的模型暂时过载': "The Coordinator's model is overloaded",
-  将改动合并到默认分支: 'Merge the changes into the default branch',
-  // #1313：已上报且文件集为空时完成弹层不提供合并勾选。
-  '本轮没有文件改动，完成不会合并分支。':
-    'This round has no file changes. Completing will not merge the branch.',
-  '信息卡的产出是报告附件，不进合并。':
-    'An info card delivers a report attachment and is never merged.',
-  // XMON-89 合并被拒的可见化：前置缺项行（{tools} = 1~2 个开关名的顿号串；
-  // 开关名本身是 shared AGENT_TOOL_SWITCHES 的 zh 值域词，locate 后仍按 zh
-  // 出现——与权限 tab 的开关行一致，不另开一份 en 词表）＋ 5xx/网络失败的
-  // 固定兜底句（4xx 的 server 原文不翻译：它逐字点名拒因，翻一遍反而对不
-  // 上）。#1236：完成弹层的勾选分流反馈四串（合并委派回执 / 不合并完成回
-  // 执 / 目标缺位报错 / 不合并腿兜底句）＋ failed 卡勾选锁定行。
-  '合并请求未送出，请重试。': 'The merge request was not sent. Try again.',
   '完成请求未送出，请重试。': 'The completion request was not sent. Try again.',
-  '任务数据未就绪，完成请求未送出。请刷新页面后重试。':
-    'Todo data is not ready, so the request was not sent. Refresh the page and try again.',
-  '已发起合并，合并完成后任务进入已完成。':
-    'Merge started. The todo moves to done once the merge completes.',
-  '任务已完成，改动保留在会话分支。':
-    'Todo completed. The changes stay on the conversation branch.',
-  '失败任务只能经合并完成，不能跳过合并。':
-    'A failed todo can only be completed through the merge; merging cannot be skipped.',
   输入: 'Input',
   输出: 'Output',
   花费: 'Cost',
@@ -1424,7 +1403,17 @@ export const EN: Record<string, string> = {
   // 记忆 tab 空态（标题 + 说明）与零命中态：搜不到不等于没存过。
   // —— #631 总管对话失败闭环（sonner toast + 线程失败行）——
   这一轮没有完成: 'This turn did not finish',
-  'Coordinator 本轮执行失败': 'The Coordinator turn failed',
+  连不上模型服务: "Can't reach the model provider",
+  '可能是地址填错了、网络或代理不通，或者本地模型没有开。':
+    "The address may be wrong, the network or proxy may be blocking it, or the local model isn't running.",
+  '可能是地址填错了、网络或代理不通，或者本地模型没有开。模型在这台 Mac 或局域网里的话，还要在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。':
+    "The address may be wrong, the network or proxy may be blocking it, or the local model isn't running. If the model is on this Mac or your local network, also turn on Cairn in System Settings → Privacy & Security → Local Network.",
+  '模型服务不接受这个 API key': "The model provider didn't accept this API key",
+  'API key 填错了或已经失效。': 'The API key is wrong or has expired.',
+  '模型服务这次出错了。稍后重试；一直出错的话，检查模型服务设置。':
+    'The model provider returned an error this time. Try again later; if it keeps failing, check the provider settings.',
+  '重新填写 API key': 'Re-enter the API key',
+  打开模型服务设置: 'Open provider settings',
   '撤回失败，Coordinator 可能已经开始处理这条了。':
     'Could not withdraw: the Coordinator may already be working on it.',
   '插话失败，请重试。': 'Could not steer. Try again.',
@@ -1531,8 +1520,6 @@ export const EN: Record<string, string> = {
   '失败了。可以重试，或在下面回复说明怎么改。':
     'It failed. Retry, or reply below with what to change.',
   取消归档: 'Unarchive',
-  归档于: 'Archived',
-  已归档项目: 'Archived projects',
   筛选项目: 'Filter projects',
   '筛选项目：{value}': 'Filter projects: {value}',
   '已归档的项目和它们的对话会一直保留，直到你删除。': 'Kept until you delete them.',
@@ -1548,10 +1535,7 @@ export const EN: Record<string, string> = {
     'Their conversations, tasks and any work still running are deleted with them. This cannot be undone.',
   '{n} 个项目没能删除，已留在列表里。':
     '{n#1 project|# projects} could not be deleted and stay in the list.',
-  '在侧栏项目菜单里归档的项目会出现在这里。':
-    'Projects you archive from the sidebar project menu appear here.',
   '取消归档失败，请重试。': 'Could not unarchive the project. Try again.',
-  '取消归档中…': 'Unarchiving…',
   '批准失败，请重试。': 'Could not approve. Try again.',
   // —— #638 全站静默 mutation 失败面接线（toast 标题句；server 原因进
   // description 透传不译，#631 同律。已有面内 canon 位的面——merge 拒绝行 /
@@ -1712,8 +1696,8 @@ export const EN: Record<string, string> = {
   新任务用这个模型和思考强度开始: 'New tasks start with this model and thinking level',
   每日报告和对话摘要: 'Daily reports and conversation summaries',
   上下文快满时压缩对话: 'Compacts a conversation when the context is nearly full',
-  '在这里改常用模型，以及新任务和 Coordinator 用哪个模型、思考多深，改动马上生效。其他后台用途（评审、引文检查等）用哪个模型，在模型路由的图里能看到。':
-    'Edit your top models, and which model new tasks and the Coordinator use and how hard they think; changes apply right away. See which model other background uses (review, citation check and so on) use in the Model routing graph.',
+  '在这里改常用模型，以及新任务和 Coordinator 用哪个模型、思考多深，改动马上生效。评审等其他用途的模型，在模型路由的图里能看到。':
+    'Edit your top models, and which model new tasks and the Coordinator use and how hard they think; changes apply right away. See models for review and other uses in the Model routing graph.',
   '先给 Coordinator 选模型，它才能回答你的消息。':
     'Pick a model for the Coordinator so it can answer your messages.',
   '「{name}」验证通过': '{name} verified',
@@ -1814,7 +1798,6 @@ export const EN: Record<string, string> = {
     '{n#1 routing rule|# routing rules} failed validation and stayed put',
   '把固定在这台执行机上的路由规则一起迁到另一台执行机。':
     'Move the routing rules pinned to this Runner to another Runner.',
-  引文检查: 'Citation check',
   首选执行机: 'Preferred Runner',
   不固定: 'Any machine',
   '当前默认：Claude Code（因为有执行机装了 Claude Code）':
@@ -2111,13 +2094,7 @@ export const EN: Record<string, string> = {
   待你审阅: 'Ready for review',
   待你回答: 'Needs input',
   已解决: 'Resolved',
-  'PR #{n} 有 {f} 项检查没过': 'PR #{n} has {f} failing checks',
-  'PR #{n} 检查还在跑': 'Checks are still running on PR #{n}',
-  'PR #{n} 检查 {p}/{t} 通过': 'PR #{n}: all checks passed ({p}/{t})',
   'PR #{n} 已合并': 'PR #{n} merged',
-  改动写好了: 'The changes are ready',
-  '到 PR 卡合并': 'Merge on the PR card',
-  到任务里看改动: 'Review the changes in the task',
   计划写好了: 'The plan is written',
   到任务里批准计划: 'Approve the plan in the task',
   在问你一个问题: 'Asked you a question',
@@ -2339,6 +2316,8 @@ export const EN: Record<string, string> = {
   '删除 {model}': 'Remove {model}',
   常用模型: 'Top models',
   '你常用的模型，最多 {max} 个。': 'Your models, up to {max}.',
+  '还没有常用模型。先在「模型服务」里接入服务商，再回来添加。':
+    'No top models yet. Connect one under Providers first, then add models here.',
   '还没有常用模型。点「添加模型」从已连接的服务商里挑。':
     'No top models yet. Use Add model to pick from your connected providers.',
   '恢复成推荐的模型和顺序。': 'Go back to the suggested models and their order.',
@@ -2356,4 +2335,11 @@ export const EN: Record<string, string> = {
     'Move Cairn to Applications to update it automatically',
   'Cairn 所在的文件夹不可写，无法自动更新':
     "Cairn's folder is read-only, so it cannot update itself",
+  没有用量: 'No usage',
+  '近 30 天，含缓存读取': 'Last 30 days, cache reads included',
+  还没有用量: 'No usage yet',
+  '和 Coordinator 说第一句话后，这里会按天显示用了多少 token。':
+    'After your first message to the Coordinator, this shows how many tokens each day used.',
+  少: 'Less',
+  多: 'More',
 };

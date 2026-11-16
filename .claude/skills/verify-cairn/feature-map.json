@@ -20,8 +20,7 @@
     "docs/research/coordinator-computer.md": "branch origin/docs/coordinator-computer",
     "docs/research/project-coordinators.md": "branch origin/docs/project-coordinators",
     "docs/research/agent-machine-routing.md": "branch origin/claude/elegant-jones-a3e2a9",
-    "docs/research/pi-durable-spike.md": "branch origin/docs/pi-durable-spike",
-    "docs/research/review-gate-alternatives.md": "branch origin/docs/review-gate-alternatives"
+    "docs/research/pi-durable-spike.md": "branch origin/docs/pi-durable-spike"
   },
   "batches": [
     {
@@ -771,15 +770,15 @@
     },
     {
       "id": "merge-gate",
-      "name": "Evidence-bound merge gate",
-      "summary": "A differentiator: a merge lands only on the patch a verdict judged, with protected paths, required checks, review and the brake enforced by the server; per-project merge policy and ship route.",
-      "states": "The gate shows why a merge is allowed or blocked; merge permission missing, merge in progress, merged.",
+      "name": "Completed delivery and explicit merge",
+      "summary": "Successful code tasks finish with their branch or PR retained. Only an explicit conversational user request initiates a merge, without a mandatory agent review or merge-choice UI.",
+      "states": "Delivered code is completed without a merge dialog. Explicit merge requests can succeed or be refused for permissions, a changed delivery or target, duplicate operations, or a dirty workspace.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/detail/merge-gate.ts",
-          "apps/web/src/detail/accept-dialog.tsx"
+          "apps/web/src/board/thread-actions.tsx",
+          "apps/web/src/board/thread-panel-model.ts"
         ],
         "server": [
           "apps/server/src/services/merge-gate",
@@ -803,31 +802,23 @@
       },
       "reach": [
         "open /app/todo/<id of a thread listed by the todos API>",
-        "click testid:thread-pr-panel",
-        "click testid:accept-dialog-pr"
-      ],
-      "verify": [
-        ".claude/skills/verify-cairn/features/review-700.md"
+        "click testid:thread-pr-panel"
       ],
       "research": [
-        "docs/research/2513-tla-statecharts.md",
-        "docs/research/892-gate-usage-measurement.md",
-        "docs/research/mergify-merge-queue-spike.md",
-        "docs/research/review-gate-alternatives.md"
+        "docs/research/remove-product-merge-gate-2026-11-16.md"
       ],
-      "frontendDesign": {
-        "gap": "the gate verdict, merge button and merge-permission states in the thread have no design"
-      },
+      "frontendDesign": [
+        "docs/design/remove-product-merge-gate.md"
+      ],
       "backendDesign": [
-        "docs/research/2513-tla-statecharts.md",
-        "docs/spec/23-rework-to-original-branch-and-pr-convergence.md"
+        "docs/design/remove-product-merge-gate.md"
       ],
       "evidence": [
-        "apps/server/test/merge-gate-readiness.test.ts",
-        "apps/server/test/merge-gate-verdict-binding.test.ts",
-        "integration/test/gate-e2e.test.ts"
-      ],
-      "batch": "B3"
+        "apps/server/test/pr-merge-api.test.ts",
+        "apps/server/test/local-merge-landing.test.ts",
+        "apps/web/e2e/info-card-report.spec.ts",
+        "integration/test/g2t2-local-lifecycle.test.ts"
+      ]
     },
     {
       "id": "plans-and-review",
@@ -1205,7 +1196,7 @@
         "server": [
           "apps/server/src/services/research-trigger.ts",
           "apps/server/src/services/research-before-plan.ts",
-          "apps/server/src/services/research-citations.ts"
+          "apps/server/src/services/research-stuck.ts"
         ],
         "daemon": [
           "apps/daemon/src/backend/web-search.ts"
@@ -1582,7 +1573,7 @@
     {
       "id": "projects",
       "name": "Projects",
-      "summary": "Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings or the sidebar's archived filter, an archived project opened read-only, and delete.",
+      "summary": "Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from the sidebar's archived filter, an archived project opened read-only, and delete.",
       "states": "A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived or deleted.",
       "centrality": 3,
       "status": "shipped",
@@ -1590,8 +1581,7 @@
         "web": [
           "apps/web/src/pages/project-new-page.tsx",
           "apps/web/src/pages/project-redirect.tsx",
-          "apps/web/src/pages/project-settings-page.tsx",
-          "apps/web/src/settings/archived-projects-section.tsx"
+          "apps/web/src/pages/project-settings-page.tsx"
         ],
         "server": [
           "apps/server/src/routes-projects.ts",
@@ -1603,8 +1593,7 @@
           "/app/project/new",
           "/app/project/:id",
           "/app/project/:id/tasks",
-          "/app/project/:id/settings",
-          "settings:projects"
+          "/app/project/:id/settings"
         ],
         "server": [
           "/api/projects",
@@ -1622,8 +1611,7 @@
         "open /app/project/new",
         "click testid:github-picker",
         "open /app/project/<id of a project listed by the projects API>/settings",
-        "click testid:project-instructions-input",
-        "settings projects"
+        "click testid:project-instructions-input"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/project-new-form.md",
@@ -1646,8 +1634,7 @@
       "evidence": [
         "apps/web/e2e/project-new-repo.spec.ts",
         "apps/web/e2e/project-settings-autonomy.spec.ts",
-        "apps/server/test/project-delete.test.ts",
-        "apps/web/e2e/settings-archived-projects.spec.ts"
+        "apps/server/test/project-delete.test.ts"
       ]
     },
     {
@@ -1768,8 +1755,7 @@
           "/app/activity"
         ],
         "server": [
-          "/api/search",
-          "/api/teams/:id/usage/daily"
+          "/api/search"
         ]
       },
       "reach": [
@@ -1795,6 +1781,52 @@
         "apps/web/e2e/activity-page.spec.ts",
         "apps/web/e2e/search-syntax-palette.spec.ts",
         "apps/server/test/search-syntax.test.ts"
+      ],
+      "batch": "B7"
+    },
+    {
+      "id": "token-usage",
+      "name": "Token usage",
+      "summary": "The Usage dialog from the sidebar footer: tokens per local day as an ink heatmap, Coordinator and tasks apart.",
+      "states": "Loading, failed with retry, empty for a new team, and the heatmap with a 30-day total and a readout for the hovered or selected day; light and dark, desktop dialog and phone.",
+      "centrality": 2,
+      "status": "shipped",
+      "code": {
+        "web": [
+          "apps/web/src/routes/usage-page.tsx",
+          "apps/web/src/usage",
+          "apps/web/src/api/usage-daily.ts"
+        ],
+        "server": [
+          "apps/server/src/services/usage-daily.ts"
+        ]
+      },
+      "routes": {
+        "web": [
+          "/app/usage"
+        ],
+        "server": [
+          "/api/teams/:id/usage/daily"
+        ]
+      },
+      "reach": [
+        "open /app",
+        "click testid:sidebar-usage"
+      ],
+      "verify": [],
+      "research": {
+        "gap": "no note beyond GitHub's contribution calendar, which the owner named"
+      },
+      "frontendDesign": [
+        "docs/design/references/thread-list-sidebar"
+      ],
+      "backendDesign": [
+        "docs/design/step-usage-daily.md"
+      ],
+      "evidence": [
+        "apps/web/e2e/usage-page.spec.ts",
+        "apps/web/test/usage-model.test.ts",
+        "apps/server/test/step-usage-daily.test.ts"
       ],
       "batch": "B7"
     },

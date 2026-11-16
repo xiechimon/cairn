@@ -17,7 +17,6 @@ import {
   isChiefConversationId,
   isMailSecretName,
   isWaitingPhase,
-  MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
   SECRET_NAME_PATTERN,
   SECRET_NAME_RULE,
@@ -48,6 +47,7 @@ import {
   applyBuildStepAction,
   assertNamedMachineForNewTask,
   cancelBuild,
+  requestMerge,
   stopActiveStepsAfterExit,
 } from './builds.js';
 import {
@@ -960,7 +960,12 @@ export async function executeChiefTool(
     }
     case 'merge_builds': {
       const buildIds = strArr(params, 'buildIds');
-      return json({ rejected: true, buildIds, reason: MERGE_HUMAN_ONLY_COPY });
+      if (parseChiefTrigger(ctx.turnPrompt ?? null) !== 'user')
+        throw new HttpError(403, 'A user instruction is required to merge; events cannot merge');
+      for (const buildId of buildIds) requireTeamBuild(db, buildId, ctx.teamId);
+      for (const buildId of buildIds)
+        await requestMerge(buildDeps(deps), buildId, deps.user.displayName);
+      return json({ merged: buildIds });
     }
 
     case 'ask_user': {
@@ -1162,8 +1167,7 @@ export function transitionTodos(
       !coordinatorAcceptsReview(ownershipOf(deps.db, owned))
     ) {
       skipped.push(id);
-      reasons[id] =
-        '待确认/审核关口的 done 落地必须由人过闸（发起合并，或用户在看板确认）。把卡停在当前关口，用 notify_user 唤醒用户处理。';
+      reasons[id] = '计划批准和报告验收保留用户的决定；不要把等待用户的任务直接标为完成。';
       continue;
     }
     try {

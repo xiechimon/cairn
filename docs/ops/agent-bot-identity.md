@@ -1,120 +1,39 @@
-# The agent pushes and opens PRs as the GitHub App cairnwright
+# Host development uses the owner's GitHub login
 
-Issue #1666. Goal: pushes and PRs made on behalf of dispatched work no longer use ian's (xiechimon's) identity, so that after enabling "Require review from Code Owners" ian can approve PRs opened by the App. This document records facts only.
+Authorized agent work on this host commits as `xiechimon` and uses the owner's existing `gh` login for GitHub access. Use ordinary `git commit` and `git push origin HEAD:main`, following `AGENTS.md`. Do not mint an App installation token for development.
 
-## The App and the bot user
+Use the owner's registered noreply identity, `xiechimon <157263579+xiechimon@users.noreply.github.com>`. Author and committer must both be owner identities. The repository's pre-commit check accepts them in agent sessions; `commit-author` already accepts them on branches of this repository. Cloud sessions may continue using `Claude <noreply@anthropic.com>`. Forks cannot claim these identities.
 
-- App: `cairnwright`. The original name `cairn-bot` was taken by an existing GitHub account; `cairn-bot-xmon` was used first, and it was renamed to `cairnwright` on 2026-10-25.
-- App ID `5462173`, installation ID `174994433`.
-- Installed only on the single repository `xiechimon/cairn`.
-- Permissions: Contents, Pull requests, Issues, Workflows read/write; Metadata read-only. No webhook.
-- Bot user: `cairnwright[bot]`, id `347615582` (`gh api /users/cairnwright%5Bbot%5D --jq .id`, with `[` `]` written as `%5B` `%5D`).
-- Noreply email: `347615582+cairnwright[bot]@users.noreply.github.com`.
+## Existing worktrees and commands
 
-## Private key
+Before making another commit in an older active worktree, fetch and integrate current `origin/main`, then run `pnpm exec husky` and check that `.husky/_/pre-push` exists. Its pre-commit script and shared identity checker must also be current. Coordinate conflicts with the worktree's owner; do not overwrite another session's changes. The owner updates only active trees, not abandoned ones.
 
-- File: `~/.cairn/cairnwright.private-key.pem`, mode 600.
-- Read only inside processes on this machine: never copied, never committed to the repo, never printed, never handed to an agent.
+Existing `cairnwright[bot]` commits remain accepted during migration. Preserve their authors and unpublished work rather than rewriting history. An old commit can still display the bot as its author even when a user pushes it: commit authorship and push authentication are different facts.
 
-## The token-swapping tool
+The installed `~/.cairn/tools/app-token/as-bot.sh` path remains temporarily for older callers. After installation of this revision it retains the command allowlist, but uses the owner's noreply identity and local user `gh` credentials. It does not call `token.mjs`, read a private key, mint a token, or add an automatic self co-author trailer. It clears inherited `GH_TOKEN`/`GITHUB_TOKEN` and the GitHub authorization extraheader, and selects `gh auth git-credential` with the owner's normal `~/.config/gh` directory. Explicit `CAIRN_COAUTHOR` trailers are still honored.
 
-Lives outside the repo at `~/.cairn/tools/app-token/`; the repo gains no dependency.
+`bot-identity.mjs` is also a compatibility filename: its first two lines now identify the owner. `lanes/sign-commits.sh` is a compatibility no-op and never rewrites commits. New callers use ordinary git/gh, not these paths.
 
-- `token.mjs`: written with GitHub's official `@octokit/auth-app` (v8). Reads `~/.cairn/cairn-bot.json` (fields `appSlug`, `appId`, `installationId`, `privateKeyPath`) and exchanges for a one-hour installation token.
-- `as-bot.sh <command>`: calls `token.mjs` to swap a token, places it only in that command's process environment, and then `exec`s the command:
-  - `GH_TOKEN`: for `gh`.
-  - git's http extraheader: injected through the `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_n` / `GIT_CONFIG_VALUE_n` environment variables, never through command-line arguments. `credential.helper` is also cleared so pushes do not go through `gh auth git-credential`.
-  - git author and committer: `GIT_AUTHOR_*`, `GIT_COMMITTER_*` set to `cairnwright[bot]` and the noreply email above, read from `packages/shared/commit-identity.json`.
-  - `CAIRN_COAUTHOR`: defaults to `Co-authored-by: xiechimon <157263579+xiechimon@users.noreply.github.com>`, which `as-bot.sh git commit` adds as a trailer; set it to an empty string for autonomous work nobody instructed.
-- gh's global default account is still xiechimon; neither `gh auth login` nor `gh auth switch` has been run.
+The compatibility allowlist retains the ship protections: ordinary fast-forward pushes to main are allowed; force, force-with-lease and delete pushes remain refused. The real pre-push hook checks main ancestry and deletion without rerunning the full validation suite. GitHub's remote branch protection remains independent.
 
-Usage:
+Already running processes may retain their original environment. Do not kill them or take away their credentials. Notify their owning threads to finish naturally and update their own worktrees before their next commit or push.
 
-```sh
-~/.cairn/tools/app-token/as-bot.sh git commit -m "<scope>(<ticket>): <subject>"
-~/.cairn/tools/app-token/as-bot.sh git push origin HEAD:<branch>
-node scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh pr create --repo xiechimon/cairn --head <branch> ...
-```
+## Product migration and App settings
 
-## Measured
+This host change does not migrate the server, daemon, product publication credentials or GitHub MCP connections. Those belong to the owner-identity v2 and MCP workstreams. Do not inject the owner's host credentials into a product agent or use them as a product fallback.
 
-On 2026-10-25 the App pushed a test branch and opened PRs (#1670 under the old name, #1672 under the new one): the PR author shows `app/cairnwright` (`is_bot=true`) and the commit author is `cairnwright[bot]`. Both test PRs have been closed and the branches deleted.
+The intended shared Device Flow App is the existing `cairnwright` registration, after its bot/private-key consumers have been retired and its settings have been verified. Do not delete that registration. Keep the temporary `Cairn xiechimon` registration until the final switch has passed verification and its deletion is separately approved.
 
-## What was switched
+Private-key removal requires a precise inventory and separate approval after all consumers, including running steps and infrequent jobs, have stopped using it. Keeping the App registration does not authorize retaining a bot publishing path. Neither this development change nor its installation changes port 8787, product dispatch, server environment or running services.
 
-Now going through `as-bot.sh` (the dispatching side):
+## GitHub create traffic
 
-- Pushing.
-- Opening PRs (`gh pr create`) when a PR is used at all; work normally ships straight to `main` (`AGENTS.md`, "Ship").
-
-Agent sessions on this host (Claude Code, Codex, pi) commit and push through `as-bot.sh` as well. The repository's pre-commit hook rejects a commit made in an agent session (`agentEnv` in `packages/shared/commit-identity.json`) unless both its author and committer are `cairnwright[bot]`, and the pre-push hook rejects an agent pushing any commit not authored by `cairnwright[bot]`.
-
-Claude Code cloud sessions are the exception (ian, 2026-11-10). The private key never leaves this host, so a cloud container cannot mint an App token. A cloud session commits with plain git as `Claude <noreply@anthropic.com>`, the identity its container is configured with, and pushes with the session's own repository credential. `cloudAgents` in `packages/shared/commit-identity.json` lists that identity: the pre-commit hook accepts an agent commit whose author and committer are both the App or both a cloud identity, the pre-push hook accepts commits a cloud identity authored, and `commit-author` accepts them on a branch of this repository when the committer is a cloud identity, the App, ian, GitHub or Mergify. A fork cannot carry the identity. Cloud sessions committed this way before the allowlist (11 commits on 2026-10-21).
-
-Other scripts that write to the remote should likewise prefix their commands with `as-bot.sh` when they need the App identity: `scripts/cleanup-merged-branches.sh` (`git push origin --delete`, `gh pr list`).
-
-Not switched:
-
-- `scripts/dispatch-agent.mjs`: only `spawn`s the commands given to it; it never commits, pushes, or opens PRs.
-- `scripts/dispatch-dedupe.mjs`: read-only duplicate checks via `gh pr list --repo xiechimon/cairn` and `git ls-remote --heads origin`, using xiechimon's gh login.
-- `~/.local/bin/ai-route` (symlinked to `~/.agents/automation/ai-route/ai-route.py`): only spawns `codex app-server`, pi, and grok child processes; no git commit, git push, or gh calls.
-- `GITHUB_TOKEN` in CI: belongs to none of these identities.
-
-Approving and label changes — operations that need a human identity — still use xiechimon's gh login and never go through the App token.
-
-## Commit identity
-
-There is one software identity on this host: `cairnwright[bot]`; a Claude Code cloud session commits as the cloud identity described above. Every other commit made by software — cairn steps, the Coordinator, host scripts and agent sessions — is authored and committed by it with plain git, and pushed like any other commit, with the repository's hooks. Only commits ian types himself carry his identity. When ian instructed the work, the commit carries `Co-authored-by: xiechimon <157263579+xiechimon@users.noreply.github.com>`; product steps honour the team's `coAuthorTrailer` setting, and autonomous or scheduled work carries no human trailer.
-
-Where the identity is decided: the server reads the App identity from `CAIRN_GITHUB_APP_SLUG` and `CAIRN_GITHUB_APP_BOT_ID` (`docs/configuration.md`) and hands it to the daemon in the step token; no token is minted for it, so an unconfigured or failing App token socket does not change the author. Before a step push, the daemon rewrites every unpublished commit of the step to that identity and adds the trailer (`attributeStepCommits`); the push credential never changes the author. Recovery branches commit as the App identity. Host scripts read it from `packages/shared/commit-identity.json` (`bot-identity.mjs`), and `lanes/sign-commits.sh` rewrites lane commits since main the same way. A cairn server with no App identity configured commits as `localCommitIdentity` (`<name> <cairn@localhost>`), and commits an agent made keep their author. This repository's hooks and `commit-author` reject that identity, and the pre-commit message names the two server settings: a cairn server working on this repository must set them. This host sets them in `~/.config/cairn/server.env` (`cairnwright`, `347615582`).
-
-Commits are not signed: no path creates commits through the GitHub API, so there is no temporary ref, no second upload and no token-dependent author.
-
-`commit-author` (`.github/workflows/commit-author.yml`, `scripts/commit-identity.mjs ci`) is an allowlist over `BASE_SHA..HEAD` for PRs and `BEFORE_SHA..HEAD` for main pushes (`HEAD^!` when the previous SHA is missing or all zeros). A commit passes when it is authored by `cairnwright[bot]`, ian or a cloud session identity and committed by the App, ian, a cloud session identity, GitHub or Mergify, on a branch of this repository (`HEAD_REPO` equals the repository; a fork cannot carry either identity, because only the App and ian can push here); or when it is a Mergify queue merge. Anything else fails, including the retired regular user `Cairnwright`, synthetic identities and either identity claimed from a fork.
-
-Commits land on `main` as pushed, so their author is the identity that made them. After pushing, check the `commit-author` result on that commit with the rest of CI.
-
-The regular GitHub user `cairnwright` is no longer used by anything; whether to keep or delete it is ian's decision.
-
-## Token constraints
-
-- One-hour expiry; exchanged fresh each time, never cached.
-- Never written to a file, never committed to the repo, never logged, never put into PR or issue text; this document contains no token value.
-- Neither the token nor the `.pem` is handed to an agent process: token swapping and pushing are done by the dispatching side through the command prefix.
-
-## Code Owners
-
-`.github/CODEOWNERS` names `@xiechimon` as owner of `integration/eval/**`, `.claude/hillclimb/**` and the CODEOWNERS file itself. Commits go straight to `main`, so it is not enforced as a review; the rule that no change may edit what judges it lives in `AGENTS.md`.
-
-## Create traffic throttle
-
-Run bot issue, PR, and issue-comment creation through the repository wrapper:
+Keep the existing creation throttle for issue, PR and issue-comment creation, using user `gh` directly:
 
 ```sh
-node scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh issue create --repo xiechimon/cairn --title Example --body-file /tmp/issue.md
-node scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh pr create --repo xiechimon/cairn --head branch --body-file /tmp/pr.md
-node scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh issue comment 123 --repo xiechimon/cairn --body-file /tmp/comment.md
+node scripts/lib/github-create-gate.mjs gh issue create --repo xiechimon/cairn --title Example --body-file /tmp/issue.md
+node scripts/lib/github-create-gate.mjs gh pr create --repo xiechimon/cairn --head branch --body-file /tmp/pr.md
+node scripts/lib/github-create-gate.mjs gh issue comment 123 --repo xiechimon/cairn --body-file /tmp/comment.md
 ```
 
-The server issue creation path and this wrapper reserve attempts in the same
-`~/.cairn/github-create/state.json` sliding window. Set `CAIRN_HOME` identically
-for both processes when overriding the home directory. Defaults are 3000 ms
-between attempts and 300 attempts per rolling hour. Configure
-`CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS` and `CAIRN_GITHUB_CREATE_HOURLY_CAP`
-consistently across callers. Delays log their reason and duration. Failed attempts
-also consume slots so errors cannot produce an unthrottled burst.
-
-Only explicit rate-limit responses retry, at most three times after the initial
-attempt, with increasing waits. REST honors Retry-After seconds or dates and
-x-ratelimit-reset; the CLI honors Retry-After when gh includes it in stderr,
-otherwise secondary limits wait at least a minute. Network failures and ordinary
-permission failures are returned without replaying a potentially successful create.
-Keep reads, updates, commit statuses, pushes, and merges outside this wrapper.
-The external token wrapper is not modified by this repository; dispatchers must
-use this prefix for create commands. Acquire happens before token exchange.
-
-State writes use a lock directory and atomic rename. A process killed during a
-state transaction can leave the lock behind; acquisition fails closed after
-30 seconds rather than bypassing the cap. Inspect and remove an abandoned lock
-only after confirming no process is using it. Invalid state fails closed as well.
-Clock rollback retains future reservations and delays creation conservatively.
+The wrapper and server share `~/.cairn/github-create/state.json`; keep `CAIRN_HOME` and rate-limit settings consistent. Reads, updates, statuses, pushes and merges stay outside the create wrapper. Authentication changes do not authorize any new external write.

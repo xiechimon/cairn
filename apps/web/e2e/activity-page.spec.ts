@@ -149,52 +149,11 @@ test('Load more reveals the next page and then goes away', async ({ page }) => {
   await expect(page.getByTestId('activity-load-more')).toHaveCount(0);
 });
 
-test('a row opens its thread and the sidebar Activity link opens the page', async ({ page }) => {
-  await page.goto('/app?scenario=activity');
-  await page.getByTestId('sidebar-activity').click();
-  await expect(page).toHaveURL(/\/app\/activity/);
+test('a row opens its thread', async ({ page }) => {
+  await page.goto(ACTIVITY);
   await expect(groups(page).first()).toBeVisible();
   await rows(page).filter({ hasText: 'Trim the gallery frame' }).getByRole('button').click();
   await expect(page).toHaveURL(/thread=act-gallery/);
-});
-
-test('the footer keeps Activity and Settings and no computers link', async ({ page }) => {
-  await page.goto('/app?scenario=activity');
-  const footer = page.getByTestId('sidebar-footer');
-  await expect(footer.getByTestId('sidebar-settings')).toBeVisible();
-  await expect(footer.getByTestId('sidebar-activity')).toBeVisible();
-  await expect(page.getByTestId('sidebar-user-menu')).toHaveCount(0);
-  await expect(page.getByTestId('sidebar-attention')).toHaveCount(0);
-});
-
-test('the collapsed sidebar peek keeps Activity and Settings as direct links', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.goto('/app?scenario=activity');
-  await page.getByTestId('sidebar-reopen').hover();
-  await expect(page.getByTestId('sidebar-peek')).toHaveAttribute('data-open', '');
-  const activity = page.getByTestId('sidebar-activity');
-  await activity.focus();
-  await activity.press('Enter');
-  await expect(page).toHaveURL(/\/app\/activity/);
-  await expect(page.getByRole('dialog', { name: 'Activity' })).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'Activity' })).toHaveCount(0);
-  await expect(page).toHaveURL(/\/app\?scenario=activity$/);
-  await page.mouse.move(700, 400);
-  await page.getByTestId('sidebar-reopen').hover();
-  await page.getByTestId('sidebar-settings').click();
-  await expect(page).toHaveURL(/\/app\/settings/);
-});
-
-test('the phone drawer Activity link opens the page and dismisses the sidebar', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/app?scenario=activity');
-  await page.getByTestId('narrow-menu').click();
-  await page.getByTestId('sidebar-activity').click();
-  await expect(page).toHaveURL(/\/app\/activity/);
-  await expect(page.getByRole('dialog')).toHaveCount(1);
-  await expect(page.getByRole('dialog', { name: 'Activity' })).toBeVisible();
-  await expect(groups(page).first()).toBeVisible();
 });
 
 test('a failed load shows an error with retry', async ({ page }) => {

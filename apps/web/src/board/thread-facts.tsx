@@ -3,6 +3,7 @@ import { Check } from 'lucide-react';
 import { useProjects } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useReportRoute } from '../chief/report-route.js';
+import { MachineName, type NamedMachine } from '../components/machine-label.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { threadProgress } from './thread-panel-model.js';
@@ -21,11 +22,11 @@ const STEP_TEXT = {
 
 export function ThreadFacts({
   todo,
-  machineName,
+  machine,
   prOpen,
 }: {
   todo: TodoRecord;
-  machineName: string | null;
+  machine: NamedMachine | null;
   prOpen: boolean;
 }) {
   const { t } = useI18n();
@@ -35,7 +36,7 @@ export function ThreadFacts({
   const progress = threadProgress(todo, prOpen);
   const facts = [
     ...(project !== undefined ? [['project', t('项目'), project]] : []),
-    ...(machineName !== null ? [['machine', t('机器'), machineName]] : []),
+    ...(machine !== null ? [['machine', t('机器'), machine.name]] : []),
     ...(route !== null ? [['route', t('结果回到'), route]] : []),
   ];
   if (facts.length === 0 && progress === null) return null;
@@ -46,7 +47,13 @@ export function ThreadFacts({
           {facts.map(([slot, label, value]) => (
             <div key={slot} data-slot={`thread-fact-${slot}`} className="flex min-w-0 gap-1.5">
               <dt className="flex-none text-content-tertiary">{label}</dt>
-              <dd className="m-0 min-w-0 truncate text-foreground">{value}</dd>
+              <dd className="m-0 min-w-0 truncate text-foreground">
+                {slot === 'machine' && machine !== null ? (
+                  <MachineName machine={machine} compact />
+                ) : (
+                  value
+                )}
+              </dd>
             </div>
           ))}
         </dl>

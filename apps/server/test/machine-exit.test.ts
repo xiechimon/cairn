@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { machine as machineTable, routingRule } from '../src/db/schema.js';
 import { bootServer, insertMachine, req, seedRoute } from './helpers.js';
@@ -24,10 +24,12 @@ describe('machine lifecycle exit (#1259)', () => {
     const mid = insertMachine(s);
     const sessionId = seedRoute(s, 'session', { provider: 'stub-gw', machineId: mid });
     const reviewId = seedRoute(s, 'review', { provider: 'stub-gw', machineId: mid });
+    s.db.run(sql`INSERT INTO routing_rule (id, teamId, use, provider, modelId, machineId, createdAt, updatedAt)
+      VALUES ('retired-checker', ${s.team.id}, 'citation_check', 'stub-gw', 'stub-model', ${mid}, 1, 1)`);
     const res = await req(s.app, 'DELETE', `/api/machines/${mid}`);
     expect(res.status).toBe(204);
     expect(s.db.select().from(machineTable).where(eq(machineTable.id, mid)).get()).toBeUndefined();
-    for (const id of [sessionId, reviewId]) {
+    for (const id of [sessionId, reviewId, 'retired-checker']) {
       expect(s.db.select().from(routingRule).where(eq(routingRule.id, id)).get()?.machineId).toBe(
         null,
       );
@@ -48,6 +50,13 @@ describe('machine lifecycle exit (#1259)', () => {
     const dst = insertMachine(s, { name: 'dst', claudeCodeReport: REPORT });
     const sessionId = seedRoute(s, 'session', { provider: 'stub-gw', machineId: src });
     const reviewId = seedRoute(s, 'review', { provider: 'stub-gw', machineId: src });
+    s.db.run(sql`INSERT INTO routing_rule (id, teamId, use, provider, modelId, machineId, createdAt, updatedAt)
+      VALUES ('retired-checker', ${s.team.id}, 'citation_check', 'stub-gw', 'stub-model', ${src}, 1, 1)`);
+    const retired = s.db
+      .select()
+      .from(routingRule)
+      .where(eq(routingRule.id, 'retired-checker'))
+      .get();
     const res = await req(s.app, 'POST', `/api/machines/${src}/evacuate`, {
       targetMachineId: dst,
     });
@@ -55,6 +64,9 @@ describe('machine lifecycle exit (#1259)', () => {
     const body = (await res.json()) as { moved: string[]; rejected: unknown[] };
     expect(body.moved.sort()).toEqual([sessionId, reviewId].sort());
     expect(body.rejected).toEqual([]);
+    expect(
+      s.db.select().from(routingRule).where(eq(routingRule.id, 'retired-checker')).get(),
+    ).toEqual(retired);
     expect(
       s.db.select().from(routingRule).where(eq(routingRule.id, sessionId)).get()!.machineId,
     ).toBe(dst);

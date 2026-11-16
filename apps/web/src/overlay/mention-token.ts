@@ -1,3 +1,4 @@
+import type { MachineCapabilities } from '@cairn/shared';
 import { fuzzyFilter } from './completion.js';
 
 export type MentionKind = 'todo' | 'skill' | 'agent' | 'project' | 'machine';
@@ -7,6 +8,7 @@ export interface MentionGroupEntry {
   label: string;
   subtitle?: string;
   seq?: number;
+  capabilities?: MachineCapabilities;
 }
 
 export type MentionGroups = Record<MentionKind, MentionGroupEntry[]>;
@@ -23,12 +25,10 @@ export interface InlineCompletionRow {
   subtitle?: string;
   fileType?: 'blob' | 'tree';
   seq?: number;
+  capabilities?: MachineCapabilities;
 }
 
-export type InlineRosterGroups = Record<
-  MentionKind,
-  { id: string; label: string; subtitle?: string; seq?: number }[]
->;
+export type InlineRosterGroups = MentionGroups;
 
 export function buildInlineRows(
   query: string,
@@ -75,6 +75,7 @@ export function buildInlineRows(
         id: m.id,
         label: m.label,
         ...(m.subtitle !== undefined ? { subtitle: m.subtitle } : {}),
+        ...(m.capabilities !== undefined ? { capabilities: m.capabilities } : {}),
       }),
     ),
     ...(files ?? []).map(

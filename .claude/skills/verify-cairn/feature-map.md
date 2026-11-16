@@ -12,7 +12,6 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 |---|---|---|
 | `account` | `设置` (Settings) › `账号` (Account) | [Account and team](#account-and-team) |
 | `appearance` | `设置` (Settings) › `外观` (Appearance) | [Appearance and visual system](#appearance) |
-| `projects` | `设置` (Settings) › `项目` | [Projects](#projects) |
 | `providers` | `设置` (Settings) › `模型` (Model) › `模型服务` (Providers) | [Model providers and subscriptions](#providers) |
 | `work-routing` | `设置` (Settings) › `模型` (Model) › `模型选择` (Model selector) | [Model and work routing](#routing) |
 | `routing` | `设置` (Settings) › `模型` (Model) › `模型路由` (Model routing) | [Model and work routing](#routing) |
@@ -204,24 +203,22 @@ Reach:
 
 ### merge-gate
 
-**Evidence-bound merge gate** (shipped, centrality 1). A differentiator: a merge lands only on the patch a verdict judged, with protected paths, required checks, review and the brake enforced by the server; per-project merge policy and ship route.
+**Completed delivery and explicit merge** (shipped, centrality 1). Successful code tasks finish with their branch or PR retained. Only an explicit conversational user request initiates a merge, without a mandatory agent review or merge-choice UI.
 
-States: The gate shows why a merge is allowed or blocked; merge permission missing, merge in progress, merged.
+States: Delivered code is completed without a merge dialog. Explicit merge requests can succeed or be refused for permissions, a changed delivery or target, duplicate operations, or a dirty workspace.
 
 Reach:
 
 1. `open /app/todo/<id of a thread listed by the todos API>`
 2. `click testid:thread-pr-panel`
-3. `click testid:accept-dialog-pr`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `accept-dialog-pr`
-- Verify recipes: [.claude/skills/verify-cairn/features/review-700.md](features/review-700.md)
-- Research: [docs/research/2513-tla-statecharts.md](../../../docs/research/2513-tla-statecharts.md), [docs/research/892-gate-usage-measurement.md](../../../docs/research/892-gate-usage-measurement.md), [docs/research/mergify-merge-queue-spike.md](../../../docs/research/mergify-merge-queue-spike.md), [docs/research/review-gate-alternatives.md](../../../docs/research/review-gate-alternatives.md) (not on main)
-- Frontend design: **gap**: the gate verdict, merge button and merge-permission states in the thread have no design
-- Backend design: [docs/research/2513-tla-statecharts.md](../../../docs/research/2513-tla-statecharts.md), [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](../../../docs/spec/23-rework-to-original-branch-and-pr-convergence.md)
-- Evidence: `apps/server/test/merge-gate-readiness.test.ts`, `apps/server/test/merge-gate-verdict-binding.test.ts`, `integration/test/gate-e2e.test.ts`
+- Test ids in its code: `side-chat-action`
+- Research: [docs/research/remove-product-merge-gate-2026-11-16.md](../../../docs/research/remove-product-merge-gate-2026-11-16.md)
+- Frontend design: [docs/design/remove-product-merge-gate.md](../../../docs/design/remove-product-merge-gate.md)
+- Backend design: [docs/design/remove-product-merge-gate.md](../../../docs/design/remove-product-merge-gate.md)
+- Evidence: `apps/server/test/pr-merge-api.test.ts`, `apps/server/test/local-merge-landing.test.ts`, `apps/web/e2e/info-card-report.spec.ts`, `integration/test/g2t2-local-lifecycle.test.ts`
 
 ### needs-you
 
@@ -455,7 +452,7 @@ Reach:
 
 - Web routes: `/app/todo/:id`
 - Keyboard shortcuts in its code: `A`, `B`, `C`, `P`, `R`
-- Test ids in its code: `accept-dialog-pr`, `agent-text`, `agent-todo`, `automation-completed`, `chief-reply-bubble`, `composer-card`, `composer-placeholder`, `composer-plus`, `composer-toolbar`, `diff-fold`, `diff-full`, `doc-body`, `doc-pane`, `edit-error`, `fail-raw-error`, `info-report`, `left`, `live-row`, `md-checkbox`, `md-code`, `md-code-block`, `md-code-copy`, `md-code-dialog-body`, `md-code-dialog-copy`, `md-code-done`, `md-code-expand`, `md-code-lang`, `md-item-bullet`, `md-item-ordered`, `md-item-task`, `md-list-bullet`, `md-list-ordered`, `md-list-task`, `md-quote`, `md-table`, `md-task`, `md-task-children`, `md-tasks`, `msg-actions`, `msg-stamp`, `msg-tools`, `msg-tools-touch`, `right`, `schedule-wake-marker`, `scheduled-turn`, `side-chat-action`, `skill-line`, `skills-summary`, `source-issue-drift`, `source-issue-echo`, `source-issue-pending`, `source-issue-retry`, `source-orchestration`, `source-orchestration-link`, `step-prompt-raw`, `thinking-body`, `tool-output`, `transcript-col`, `transcript-note`, `transcript-question`, `transcript-step-prompt`, `transcript-time-divider`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-earlier`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`
+- Test ids in its code: `agent-text`, `agent-todo`, `automation-completed`, `chief-reply-bubble`, `composer-card`, `composer-placeholder`, `composer-plus`, `composer-toolbar`, `diff-fold`, `diff-full`, `doc-body`, `doc-pane`, `edit-error`, `fail-raw-error`, `info-report`, `left`, `live-row`, `md-checkbox`, `md-code`, `md-code-block`, `md-code-copy`, `md-code-dialog-body`, `md-code-dialog-copy`, `md-code-done`, `md-code-expand`, `md-code-lang`, `md-item-bullet`, `md-item-ordered`, `md-item-task`, `md-list-bullet`, `md-list-ordered`, `md-list-task`, `md-quote`, `md-table`, `md-task`, `md-task-children`, `md-tasks`, `msg-actions`, `msg-stamp`, `msg-tools`, `msg-tools-touch`, `right`, `schedule-wake-marker`, `scheduled-turn`, `side-chat-action`, `skill-line`, `skills-summary`, `source-issue-drift`, `source-issue-echo`, `source-issue-pending`, `source-issue-retry`, `source-orchestration`, `source-orchestration-link`, `step-prompt-raw`, `thinking-body`, `tool-output`, `transcript-col`, `transcript-note`, `transcript-question`, `transcript-step-prompt`, `transcript-time-divider`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-earlier`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`
 - Verify recipes: [.claude/skills/verify-cairn/features/board-new-task.md](features/board-new-task.md), [.claude/skills/verify-cairn/features/agent-detail.md](features/agent-detail.md)
 - Research: [docs/research/r12-save-and-start-behavior.md](../../../docs/research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/research/duet-proactive-coordinator.md](../../../docs/research/duet-proactive-coordinator.md)
 - Frontend design: [docs/design/references/thread-review](../../../docs/design/references/thread-review), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
@@ -632,6 +629,25 @@ Reach:
 - Backend design: [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main)
 - Evidence: `apps/web/e2e/token-gate.spec.ts`, `apps/server/test/token-auth.test.ts`, `apps/server/test/tailnet-listener.test.ts`
 
+### token-usage
+
+**Token usage** (shipped, centrality 2). The Usage dialog from the sidebar footer: tokens per local day as an ink heatmap, Coordinator and tasks apart.
+
+States: Loading, failed with retry, empty for a new team, and the heatmap with a 30-day total and a readout for the hovered or selected day; light and dark, desktop dialog and phone.
+
+Reach:
+
+1. `open /app`
+2. `click testid:sidebar-usage`
+
+- Web routes: `/app/usage`
+- Keyboard shortcuts in its code: none
+- Test ids in its code: `usage-empty`, `usage-error`, `usage-heatmap`, `usage-readout`, `usage-recent-total`
+- Research: **gap**: no note beyond GitHub's contribution calendar, which the owner named
+- Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar)
+- Backend design: [docs/design/step-usage-daily.md](../../../docs/design/step-usage-daily.md)
+- Evidence: `apps/web/e2e/usage-page.spec.ts`, `apps/web/test/usage-model.test.ts`, `apps/server/test/step-usage-daily.test.ts`
+
 ### account-and-team
 
 **Account and team** (shipped, centrality 3). The user's account, the team record and the PR attribution settings.
@@ -686,7 +702,7 @@ Reach:
 
 - Web routes: `/app/settings/:section?`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `settings-backdrop`, `settings-body`, `settings-content`, `settings-head`, `settings-title`
+- Test ids in its code: `settings-backdrop`, `settings-body`, `settings-content`, `settings-head`, `settings-title`
 - Verify recipes: [.claude/skills/verify-cairn/features/hotkeys.md](features/hotkeys.md), [.claude/skills/verify-cairn/features/persona-verify.md](features/persona-verify.md)
 - Research: [docs/research/ai-frontend-quality-2026-11-06.md](../../../docs/research/ai-frontend-quality-2026-11-06.md) (not on main), [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/settings](../../../docs/design/references/settings)
@@ -851,7 +867,7 @@ Reach:
 
 ### projects
 
-**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from Settings or the sidebar's archived filter, an archived project opened read-only, and delete.
+**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from the sidebar's archived filter, an archived project opened read-only, and delete.
 
 States: A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived or deleted.
 
@@ -861,17 +877,15 @@ Reach:
 2. `click testid:github-picker`
 3. `open /app/project/<id of a project listed by the projects API>/settings`
 4. `click testid:project-instructions-input`
-5. `settings projects`
 
 - Web routes: `/app/project/:id`, `/app/project/:id/settings`, `/app/project/:id/tasks`, `/app/project/new`
-- Settings: `设置` (Settings) › `项目`
 - Keyboard shortcuts in its code: `G`, `L`
-- Test ids in its code: `archived-project-unarchive`, `archived-projects-empty`, `github-picker`, `project-new-blocked`, `project-settings-missing`
+- Test ids in its code: `github-picker`, `project-new-blocked`, `project-settings-missing`
 - Verify recipes: [.claude/skills/verify-cairn/features/project-new-form.md](features/project-new-form.md), [.claude/skills/verify-cairn/features/github-oauth-picker.md](features/github-oauth-picker.md), [.claude/skills/verify-cairn/features/local-repo-api.md](features/local-repo-api.md)
 - Research: [docs/research/project-coordinators.md](../../../docs/research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
 - Backend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
-- Evidence: `apps/web/e2e/project-new-repo.spec.ts`, `apps/web/e2e/project-settings-autonomy.spec.ts`, `apps/server/test/project-delete.test.ts`, `apps/web/e2e/settings-archived-projects.spec.ts`
+- Evidence: `apps/web/e2e/project-new-repo.spec.ts`, `apps/web/e2e/project-settings-autonomy.spec.ts`, `apps/server/test/project-delete.test.ts`
 
 ### quota-wait
 
@@ -1009,7 +1023,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: `A`, `D`, `M`, `N`, `R`, `S`, `U`
-- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-activity`, `sidebar-archived-delete-all`, `sidebar-archived-empty`, `sidebar-archived-note`, `sidebar-archived-page`, `sidebar-footer`, `sidebar-footer-brand`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `team-row`
+- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-archived-delete-all`, `sidebar-archived-empty`, `sidebar-archived-note`, `sidebar-archived-page`, `sidebar-footer`, `sidebar-footer-brand`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `sidebar-usage`, `team-row`
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
 - Backend design: **gap**: no design for unread and read marks across devices

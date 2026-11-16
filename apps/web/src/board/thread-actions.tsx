@@ -14,13 +14,11 @@ import { Spinner } from '../components/ui/spinner.js';
 import { toastError } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
-import { substantiveChangesOf } from '../detail/empty-commit.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { MoreMenu } from '../overlay/more-menu.js';
-import { AcceptTaskDialog } from './accept-task-dialog.js';
 import { toastArchived } from './archive-toast.js';
 import { RouteOverrideDialog } from './route-override-dialog.js';
 import { MoveToProjectSub } from './task-move-menu.js';
@@ -80,9 +78,9 @@ export function useThreadActions({
   const orchestrateStart = useOrchestrateStart();
   const chiefThreadsQ = useChiefThreads(teamId, live);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dialog, setDialog] = useState<
-    'accept' | 'delete' | 'stop' | 'route-override' | 'rename' | null
-  >(null);
+  const [dialog, setDialog] = useState<'delete' | 'stop' | 'route-override' | 'rename' | null>(
+    null,
+  );
   const { buildId, running } = chat;
   const phase = todo.phase;
   const archived = todo.archivedAt != null;
@@ -117,10 +115,12 @@ export function useThreadActions({
         },
       );
     });
-  const openAccept = () => {
-    setMenuOpen(false);
-    setDialog('accept');
-  };
+  const complete = guard(() => {
+    mutations.patchTodo.mutate(
+      { id: todo.id, body: { phase: 'done' } },
+      { onError: (error) => toastError(t('完成请求未送出，请重试。'), error) },
+    );
+  });
   const closeTask = guard(() => {
     setMenuOpen(false);
     mutations.patchTodo.mutate(
@@ -218,8 +218,7 @@ export function useThreadActions({
       </div>
     );
 
-  const canComplete =
-    phase === 'review' || phase === 'confirm' || (phase === 'failed' && chat.buildLegDone);
+  const canComplete = phase === 'review' || phase === 'confirm';
   const menu = (
     <>
       <MoreMenu
@@ -248,7 +247,7 @@ export function useThreadActions({
           setMenuOpen(false);
           setDialog('delete');
         }}
-        onComplete={phase === 'confirm' ? approve : openAccept}
+        onComplete={phase === 'confirm' ? approve : complete}
         canComplete={!archived && canComplete}
         onCloseTask={closeTask}
         canClose={!archived && (phase === 'todo' || phase === 'failed' || phase === 'queued')}
@@ -312,15 +311,6 @@ export function useThreadActions({
         queued={phase === 'queued'}
         onClose={() => setDialog(null)}
         onConfirm={stop}
-      />
-      <AcceptTaskDialog
-        todo={todo}
-        buildId={buildId}
-        open={dialog === 'accept'}
-        onClose={() => setDialog(null)}
-        substantiveChanges={substantiveChangesOf(chat.changes.reported, chat.changes.settled)}
-        mergeLocked={phase === 'failed'}
-        infoOutput={chat.infoOutput}
       />
       <RouteOverrideDialog
         open={dialog === 'route-override'}

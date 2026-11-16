@@ -296,7 +296,9 @@ export function TopModelsCard({
           data-testid="top-models-empty"
           className="m-0 border-t border-border px-4 py-3 text-meta text-content-tertiary"
         >
-          {t('还没有常用模型。点「添加模型」从已连接的服务商里挑。')}
+          {unique.length === 0
+            ? t('还没有常用模型。先在「模型服务」里接入服务商，再回来添加。')
+            : t('还没有常用模型。点「添加模型」从已连接的服务商里挑。')}
         </p>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>

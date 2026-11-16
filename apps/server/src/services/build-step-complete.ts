@@ -13,7 +13,7 @@ import { and, eq, ne } from 'drizzle-orm';
 import { build, plan as planTable, step, stopPending, todo } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
-import { settleReviewStep, settleVerifyStep } from './build-gate-steps.js';
+import { settleRetiredGateStep } from './build-gate-steps.js';
 import type { VerdictReport } from './build-gate-verdict.js';
 import {
   applyStoppedStep,
@@ -30,7 +30,6 @@ import {
   enqueueStep,
   finishTodoDone,
   githubPrOf,
-  maybeEnqueueIndependentReview,
   NotFoundError,
   publishBuild,
   settleParkedStep,
@@ -134,6 +133,7 @@ export function completeStep(
 ): void {
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
+  if (settleRetiredGateStep(deps, stepRow, outcome)) return;
   deps.db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
   if (stepRow.archiveStop !== null) {
     applyStoppedStep(deps, stepId);
@@ -304,28 +304,9 @@ export function completeStep(
     return;
   }
   if (isBuildStepKind(stepRow.kind)) {
-    const deliveredGithubPr = githubPrOf(deps, todoRow, buildRow.prNumber) !== null;
-    if (!deliveredGithubPr) {
-      setTodoPhase(deps, todoRow.id, 'review', {
-        hasChanges: outcome.hasChanges ?? true,
-      });
-      return;
-    }
-    if (todoRow.phase === 'building' || canTransitionPhase(todoRow.phase, 'building')) {
-      setTodoPhase(deps, todoRow.id, 'building', {
-        hasChanges: outcome.hasChanges ?? true,
-      });
-    }
-    const freshTodo = deps.db.select().from(todo).where(eq(todo.id, todoRow.id)).get();
-    if (freshTodo) maybeEnqueueIndependentReview(deps, freshTodo, stepRow.buildId);
-    return;
-  }
-  if (stepRow.kind === 'review') {
-    settleReviewStep(deps, stepRow, todoRow, buildRow, outcome);
-    return;
-  }
-  if (stepRow.kind === 'verify') {
-    settleVerifyStep(deps, stepRow, buildRow, outcome);
+    finishTodoDone(deps, todoRow.id, buildRow.id, {
+      hasChanges: outcome.hasChanges ?? true,
+    });
     return;
   }
   const pr = githubPrOf(deps, todoRow, buildRow.prNumber);
@@ -334,7 +315,7 @@ export function completeStep(
     insertMessageRow(deps, buildRow.id, {
       id: newRecordId(),
       role: 'system',
-      content: `合并步跑完了；本任务以 PR #${pr.prNumber} 在 GitHub 上合并为准，cairn 对账读到它合并后收尾。它若还开着：在审核关口点「合并」由 cairn 经 GitHub 合并，或直接在 GitHub 上合并。`,
+      content: `合并步跑完了；本任务以 PR #${pr.prNumber} 在 GitHub 上的状态为准，cairn 对账读到它合并后记录结果。`,
       createdAt: nowMs(),
     });
     return;

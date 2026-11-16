@@ -44,8 +44,7 @@ test('rows are one quiet line; a row waiting on the owner adds what waits, and e
   await expect(waiting).toHaveCount(3);
   for (const row of await waiting.all()) {
     await expect(row.locator('[data-slot="task-row-what"]')).toBeVisible();
-    await expect(row).toHaveAccessibleDescription(/ → /);
-    await expect(row).not.toContainText('已就绪，等你审阅');
+    await expect(row).not.toHaveAccessibleDescription(/合并/);
     expect(await row.evaluate((el) => el.getBoundingClientRect().height)).toBeLessThanOrEqual(60);
   }
   const question = panel(page)
@@ -58,7 +57,7 @@ test('rows are one quiet line; a row waiting on the owner adds what waits, and e
   ).toHaveAccessibleDescription(/到任务里批准计划/);
   await expect(
     panel(page).locator('[data-slot="task-row"]').filter({ hasText: 'Fold finished turns' }),
-  ).toHaveAccessibleDescription(/待审阅 · 改动写好了 → 到任务里看改动/);
+  ).toHaveAccessibleDescription(/待审阅 · 已就绪，等你审阅。/);
   const working = panel(page).locator('[data-section="working"] [data-slot="task-row"]');
   await expect(working.locator('[data-slot="task-row-what"]')).toHaveCount(0);
   await expect(working.first()).toHaveAccessibleDescription(/^进行中 · /);
@@ -822,7 +821,7 @@ test('one mark holds the left edge: the checkbox when the row has one, its ring 
   await expect(failed.locator('[data-glyph]')).toHaveCount(1);
   const title = review.locator('[data-slot="task-row-title"]');
   expect(await title.evaluate((el) => el.getBoundingClientRect().height)).toBe(20);
-  await expect(review.locator('[data-slot="task-row-what"]')).toHaveText('改动写好了');
+  await expect(review.locator('[data-slot="task-row-what"]')).toHaveText('已就绪，等你审阅。');
 });
 
 test('a research report waiting on the owner is already in Made, marked as waiting', async ({

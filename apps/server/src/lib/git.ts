@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import type {
   GitCgiRequest,
   GitCgiResponse,
@@ -144,6 +146,194 @@ export async function lsFilesRecursive(dir: string, commit: string): Promise<Git
   });
   if (r.code !== 0) return [];
   return parseLsTreeLines(r.stdout);
+}
+
+export interface GitTreeChange {
+  path: string;
+  status: string;
+  mode: string;
+  sha: string;
+  size: number | null;
+}
+
+export interface GitBlobEntry {
+  mode: string;
+  sha: string;
+  size: number | null;
+}
+
+export interface GitFileVersion {
+  commit: string;
+  at: number;
+  subject: string;
+}
+
+const FULL_SHA = /^[0-9a-f]{40,64}$/;
+const SERVER_COMMIT_ENV: NodeJS.ProcessEnv = {
+  GIT_AUTHOR_NAME: 'cairn-git',
+  GIT_AUTHOR_EMAIL: 'git@localhost',
+  GIT_COMMITTER_NAME: 'cairn-git',
+  GIT_COMMITTER_EMAIL: 'git@localhost',
+};
+
+function requireFullSha(...shas: string[]): void {
+  for (const sha of shas) if (!FULL_SHA.test(sha)) throw new Error(`unsafe commit: ${sha}`);
+}
+
+async function objectSizes(dir: string, shas: string[]): Promise<Map<string, number>> {
+  const sizes = new Map<string, number>();
+  if (shas.length === 0) return sizes;
+  const r = await runGit(['cat-file', '--batch-check=%(objectname) %(objecttype) %(objectsize)'], {
+    cwd: dir,
+    stdin: Buffer.from(`${shas.join('\n')}\n`),
+    timeoutMs: 30_000,
+  });
+  if (r.code !== 0) throw new Error(`git cat-file failed: ${r.stderr}`);
+  for (const line of r.stdout.toString('utf8').split('\n')) {
+    const [sha, type, size] = line.split(' ');
+    if (sha !== undefined && type === 'blob' && size !== undefined) sizes.set(sha, Number(size));
+  }
+  return sizes;
+}
+
+export async function diffTreeChanges(
+  dir: string,
+  base: string,
+  head: string,
+): Promise<GitTreeChange[]> {
+  requireFullSha(base, head);
+  const r = await runGit(['diff-tree', '-r', '-z', '--no-renames', base, head], {
+    cwd: dir,
+    timeoutMs: 30_000,
+  });
+  if (r.code !== 0) throw new Error(`git diff-tree failed: ${r.stderr}`);
+  const parts = r.stdout.toString('utf8').split('\0');
+  const raw: Omit<GitTreeChange, 'size'>[] = [];
+  for (let i = 0; i + 1 < parts.length && parts[i] !== ''; i += 2) {
+    const [, mode, , sha, status] = (parts[i] ?? '').slice(1).split(' ');
+    const path = parts[i + 1];
+    if (mode === undefined || sha === undefined || status === undefined || !path) {
+      throw new Error('Unreadable git diff-tree output');
+    }
+    raw.push({ path, status, mode, sha });
+  }
+  const sizes = await objectSizes(
+    dir,
+    raw.filter((c) => c.status !== 'D').map((c) => c.sha),
+  );
+  return raw.map((c) => ({ ...c, size: sizes.get(c.sha) ?? null }));
+}
+
+export async function commitTree(
+  dir: string,
+  treeish: string,
+  parent: string,
+  message: string,
+): Promise<string> {
+  requireFullSha(parent);
+  const r = await runGit(['commit-tree', treeish, '-p', parent, '-m', message], {
+    cwd: dir,
+    env: SERVER_COMMIT_ENV,
+    timeoutMs: META_TIMEOUT_MS,
+  });
+  const sha = r.stdout.toString('utf8').trim();
+  if (r.code !== 0 || !FULL_SHA.test(sha)) throw new Error(`git commit-tree failed: ${r.stderr}`);
+  return sha;
+}
+
+export async function swapBranchRef(
+  dir: string,
+  branch: string,
+  next: string,
+  expected: string,
+): Promise<boolean> {
+  requireFullSha(next, expected);
+  if (!/^[\w./-]+$/.test(branch)) throw new Error(`unsafe branch: ${branch}`);
+  const r = await runGit(['update-ref', `refs/heads/${branch}`, next, expected], {
+    cwd: dir,
+    timeoutMs: META_TIMEOUT_MS,
+  });
+  return r.code === 0;
+}
+
+export async function blobEntryAt(
+  dir: string,
+  commit: string,
+  path: string,
+): Promise<GitBlobEntry | null> {
+  requireFullSha(commit);
+  if (!isSafeRepoPath(path)) throw new Error(`unsafe path: ${path}`);
+  const r = await runGit(['--literal-pathspecs', 'ls-tree', '-l', '-z', commit, '--', path], {
+    cwd: dir,
+    timeoutMs: META_TIMEOUT_MS,
+  });
+  if (r.code !== 0) return null;
+  for (const record of r.stdout.toString('utf8').split('\0')) {
+    const tab = record.indexOf('\t');
+    if (tab < 0 || record.slice(tab + 1) !== path) continue;
+    const [mode, type, sha, size] = record.slice(0, tab).split(/\s+/);
+    if (type === 'tree' || mode === undefined || sha === undefined) return null;
+    return { mode, sha, size: size === undefined || size === '-' ? null : Number(size) };
+  }
+  return null;
+}
+
+export async function treeWithBlob(
+  dir: string,
+  commit: string,
+  path: string,
+  entry: GitBlobEntry,
+): Promise<string> {
+  requireFullSha(commit, entry.sha);
+  if (!isSafeRepoPath(path) || !/^\d{6}$/.test(entry.mode)) throw new Error(`unsafe path: ${path}`);
+  const index = join(dir, `cairn-index-${randomUUID()}`);
+  const opts = { cwd: dir, env: { GIT_INDEX_FILE: index }, timeoutMs: 30_000 };
+  try {
+    const read = await runGit(['read-tree', commit], opts);
+    if (read.code !== 0) throw new Error(`git read-tree failed: ${read.stderr}`);
+    const add = await runGit(
+      ['update-index', '--add', '--cacheinfo', `${entry.mode},${entry.sha},${path}`],
+      opts,
+    );
+    if (add.code !== 0) throw new Error(`git update-index failed: ${add.stderr}`);
+    const write = await runGit(['write-tree'], opts);
+    const tree = write.stdout.toString('utf8').trim();
+    if (write.code !== 0 || !FULL_SHA.test(tree)) {
+      throw new Error(`git write-tree failed: ${write.stderr}`);
+    }
+    return tree;
+  } finally {
+    rmSync(index, { force: true });
+  }
+}
+
+export async function fileHistory(
+  dir: string,
+  branch: string,
+  path: string,
+): Promise<GitFileVersion[]> {
+  if (!isSafeRepoPath(path) || !/^[\w./-]+$/.test(branch)) throw new Error(`unsafe path: ${path}`);
+  const r = await runGit(
+    [
+      '--literal-pathspecs',
+      'log',
+      '-z',
+      '--format=%H%x1f%ct%x1f%s',
+      `refs/heads/${branch}`,
+      '--',
+      path,
+    ],
+    { cwd: dir, timeoutMs: 30_000 },
+  );
+  if (r.code !== 0) return [];
+  return r.stdout
+    .toString('utf8')
+    .split('\0')
+    .filter((record) => record !== '')
+    .map((record) => {
+      const [commit = '', at = '0', subject = ''] = record.split('\x1f');
+      return { commit, at: Number(at) * 1000, subject };
+    });
 }
 
 export const systemGitOps: GitOps = {

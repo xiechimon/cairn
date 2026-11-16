@@ -14,6 +14,7 @@ import {
   patchMcpConnectorBodySchema,
   patchProviderBodySchema,
   patchScheduleBodySchema,
+  ROUTE_USES,
   redactSecrets,
   renameClaudeSubscriptionSchema,
   SKILL_ENTRY_FILE,
@@ -303,7 +304,12 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       .where(and(eq(machine.id, body.targetMachineId), eq(machine.teamId, src.teamId)))
       .get();
     if (!dst) throw notFound(`machine ${body.targetMachineId}`);
-    const holders = ctx.db.select().from(routingRule).where(eq(routingRule.machineId, id)).all();
+    const holders = ctx.db
+      .select()
+      .from(routingRule)
+      .where(eq(routingRule.machineId, id))
+      .all()
+      .filter((rule) => ROUTE_USES.includes(rule.use));
     const moved: string[] = [];
     const rejected: { agentId: string; reason: string }[] = [];
     for (const rule of holders) {

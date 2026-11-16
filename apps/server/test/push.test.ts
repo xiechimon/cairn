@@ -822,7 +822,7 @@ describe('phase pushes reach only needs-human events (#1784); 410 prunes', () =>
     }
   });
 
-  test('an autonomous build review sends and queues nothing', async () => {
+  test('a delivered build notifies the person even with a legacy autonomous policy', async () => {
     const fake = await fakePushServer();
     const s = bootServer({ pushEndpointHosts: TEST_PUSH_HOSTS });
     try {
@@ -830,8 +830,7 @@ describe('phase pushes reach only needs-human events (#1784); 410 prunes', () =>
       const todo = await makeTodo(s, 'autonomous');
       s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, todo.id)).run();
       setTodoPhase(s.svc, todo.id, 'review');
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      expect(fake.requests).toHaveLength(0);
+      await expect.poll(() => fake.requests.length, { timeout: 1500 }).toBe(1);
       expect(digestRows(s)).toHaveLength(0);
     } finally {
       fake.close();

@@ -1,9 +1,8 @@
-import { MERGE_HUMAN_ONLY_COPY } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { build as buildTable, step as stepTable, todo as todoTable } from '../src/db/schema.js';
 import { AGENT_ID, H, ownerTodo, registerChiefHarness, relay } from './chief-harness.js';
-import { req } from './helpers.js';
+import { postProject, req } from './helpers.js';
 
 registerChiefHarness();
 
@@ -75,41 +74,42 @@ describe('Coordinator platform need', () => {
   });
 });
 
-describe('merge_builds machine entry hard-refused (#1256)', () => {
-  test('chief calls merge_builds -> refusal JSON, text names the human exit, no merge step landed', async () => {
-    const todoRec = (await relay('create_todo', ownerTodo('合并只由人触发'))) as { id: string };
-    const now = Date.now();
-    H.s.db
-      .insert(buildTable)
-      .values({
-        id: 'build-merge-reject',
-        todoId: todoRec.id,
-        withPlan: false,
-        triggerSource: 'user',
-        createdAt: now,
-      })
-      .run();
-    H.s.db
-      .update(todoTable)
-      .set({ phase: 'review', phaseAt: now })
-      .where(eq(todoTable.id, todoRec.id))
-      .run();
-
-    const out = (await relay('merge_builds', { buildIds: ['build-merge-reject'] })) as {
-      rejected: boolean;
-      buildIds: string[];
-      reason: string;
+describe('merge_builds follows explicit user requests', () => {
+  test('a completed hosted delivery stays done while its merge is queued exactly once', async () => {
+    const projectId = await postProject(H.s.app, 'hosted-delivery', { repoKind: 'hosted' });
+    const delivered = (await relay('create_todo', ownerTodo('交付代码', projectId))) as {
+      id: string;
+      buildId: string;
     };
-    expect(out.rejected).toBe(true);
-    expect(out.buildIds).toEqual(['build-merge-reject']);
-    expect(out.reason).toBe(MERGE_HUMAN_ONLY_COPY);
-    expect(out.reason).toContain('完成');
-    const steps = H.s.db
-      .select()
-      .from(stepTable)
-      .where(eq(stepTable.buildId, 'build-merge-reject'))
-      .all();
-    expect(steps).toHaveLength(0);
+    H.s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable.id, delivered.id)).run();
+    H.s.db
+      .update(stepTable)
+      .set({ status: 'done', checkpointCommit: 'a'.repeat(40) })
+      .where(eq(stepTable.buildId, delivered.buildId))
+      .run();
+    const params = { buildIds: [delivered.buildId] };
+    await expect(
+      relay('merge_builds', params, {
+        turnPrompt: '[wake:settle] provenance=watch:test\nTask completed',
+      }),
+    ).rejects.toThrow('events cannot merge');
+    expect(await relay('merge_builds', params, { turnPrompt: 'Merge this delivery' })).toEqual({
+      merged: [delivered.buildId],
+    });
+    expect(H.s.db.select().from(todoTable).where(eq(todoTable.id, delivered.id)).get()?.phase).toBe(
+      'done',
+    );
+    await expect(
+      relay('merge_builds', params, { turnPrompt: 'Merge this delivery' }),
+    ).rejects.toThrow('合并步');
+    expect(
+      H.s.db
+        .select()
+        .from(stepTable)
+        .where(eq(stepTable.buildId, delivered.buildId))
+        .all()
+        .filter((row) => row.kind === 'merge'),
+    ).toHaveLength(1);
   });
 });
 

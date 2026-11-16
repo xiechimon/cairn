@@ -6,7 +6,6 @@ import { hostFixture } from './host-fixture.mjs';
 
 const appTokenDir = resolve('scripts/ops/host/tools/app-token');
 const HEAD = 'c'.repeat(40);
-const COAUTHOR = 'Co-authored-by: xiechimon <157263579+xiechimon@users.noreply.github.com>';
 
 const botFiles = {
   '.cairn/tools/app-token/as-bot.sh': readFileSync(join(appTokenDir, 'as-bot.sh'), 'utf8'),
@@ -109,7 +108,7 @@ test('merge-pr.sh merges any PR without reading a check run', (t) => {
   }
 });
 
-test('evidence-prune.sh commits through the bot and arms a pinned squash auto-merge as the human login', (t) => {
+test('evidence-prune.sh uses the user compatibility entry and arms a pinned squash auto-merge', (t) => {
   const stamp = new Date().toISOString().slice(0, 10).replaceAll('-', '');
   const fixture = hostFixture(t, {
     hostFiles: {
@@ -126,7 +125,7 @@ test('evidence-prune.sh commits through the bot and arms a pinned squash auto-me
   assert.equal(result.status, 0, result.stderr);
   const commit = result.calls.find((call) => call[0] === 'git' && call[1] === 'commit');
   assert.ok(commit, 'git commit reached git directly');
-  assert.ok(commit.includes(COAUTHOR));
+  assert.equal(commit.includes('--trailer'), false);
   assert.equal(
     result.calls.some((call) => call[0] === 'bash'),
     false,

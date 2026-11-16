@@ -65,7 +65,6 @@ import { createPrWatch, PR_WATCH_INTERVAL_MS } from './pr-watch.js';
 import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
 import { sweepPendingPushAlerts } from './push-alerts.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
-import { planResearchCitationChecks } from './research-citations.js';
 import { releaseResearchReworkHolds } from './research-stuck.js';
 import { sweepOfflineRunners } from './runner-offline.js';
 import {
@@ -511,7 +510,6 @@ export function createScheduler(
     fireDueChiefWakes(deps, now);
     try {
       releaseResearchReworkHolds(deps, now);
-      planResearchCitationChecks(deps);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       if (reason !== lastResearchFailure) {

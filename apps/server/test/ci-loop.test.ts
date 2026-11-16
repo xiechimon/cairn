@@ -2,11 +2,10 @@ import { rm } from 'node:fs/promises';
 import {
   conversationBranch,
   type Phase,
-  parseVerifyPromptMeta,
   RESEARCH_STUCK_SOURCE_KIND,
   type StepPromptOrigin,
 } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
@@ -17,7 +16,6 @@ import {
   project as projectTable,
   step as stepTable,
   todo as todoTable,
-  tokenUsage as tokenUsageTable,
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { completeStep } from '../src/services/builds.js';
@@ -35,12 +33,10 @@ import { DONE_ROW, prClosedUnmergedRow } from '../src/services/delivery-rows.js'
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
 import { finishStep } from '../src/services/machine-finish-step.js';
-import { openCitationCheck } from '../src/services/research-citations.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import {
   bootServer,
   insertMachine,
-  seedRoute,
   seedSessionRoute,
   type TestServer,
   withVerification,
@@ -911,7 +907,6 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
 
   function addResearchRoutes(w: PrWorld) {
     seedSessionRoute(w.s);
-    seedRoute(w.s, 'citation_check', { provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
   }
 
   test('an earlier red CI round still appends a fix step and does not open research', async () => {
@@ -987,7 +982,7 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
     ).toBeDefined();
   });
 
-  test('the last CI retry quotes a checked research report inside the fix prompt', async () => {
+  test('the last CI retry quotes the original research report inside the fix prompt', async () => {
     const w = makePrWorld({
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
       fixRounds: CI_FIX_ROUNDS_MAX - 1,
@@ -1012,38 +1007,6 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
         report: `${claim}\nhttps://example.com/cursors`,
       },
     );
-    w.s.db
-      .insert(tokenUsageTable)
-      .values({ buildId: researchBuildId, model: 'claude-sonnet-5-5', input: 1, output: 1 })
-      .run();
-    const check = openCitationCheck(w.s.svc, researchBuildId);
-    expect(check).not.toBeNull();
-    if (!check) return;
-    storeInfoReport(
-      { db: w.s.db, attachmentsDir: w.s.attachmentsDir },
-      {
-        buildId: check.buildId,
-        teamId: w.teamId,
-        createdBy: w.s.user.id,
-        report: `\`\`\`json\n${JSON.stringify({
-          claims: [
-            {
-              url: 'https://example.com/cursors',
-              claim,
-              verdict: 'supported',
-              reason: 'Fixture reference supports this claim.',
-              quote: 'Fixture reference.',
-              fetchedAt: '2026-11-04',
-              quality: 'primary',
-            },
-          ],
-        })}\n\`\`\``,
-      },
-    );
-    w.s.db
-      .insert(tokenUsageTable)
-      .values({ buildId: check.buildId, model: 'gpt-6.1-sol', input: 1, output: 1 })
-      .run();
     await w.poller.sweep();
     const prompt = w.fixRoundSteps().at(-1)?.prompt ?? '';
     expect(w.fixRoundSteps()).toHaveLength(CI_FIX_ROUNDS_MAX);
@@ -1174,7 +1137,7 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
     expect(w.todoRow().hasChanges).toBe(true);
   });
 
-  test('green queues one verify step bound to the delivered head; a CI fix round is verified again on its own head', async () => {
+  test('green hands delivery to the user without queuing review or verification, including after a CI fix', async () => {
     const w = makePrWorld({
       checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
     });
@@ -1197,19 +1160,10 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
       .where(eq(stepTable.buildId, w.buildId))
       .run();
     await w.poller.sweep();
-    const verifies = () => w.allSteps().filter((row) => row.kind === 'verify');
-    expect(w.todoRow().phase).toBe('building');
-    expect(verifies()).toHaveLength(1);
-    expect(parseVerifyPromptMeta(verifies()[0]?.prompt ?? null)?.expectedHeadSha).toBe(delivered);
-
-    w.s.db
-      .update(stepTable)
-      .set({ status: 'done', finishedAt: w.base + 1 })
-      .where(eq(stepTable.id, verifies()[0]?.id ?? ''))
-      .run();
-    await w.poller.sweep();
+    const gates = () =>
+      w.allSteps().filter((row) => row.kind === 'verify' || row.kind === 'review');
     expect(w.todoRow().phase).toBe('review');
-    expect(verifies()).toHaveLength(1);
+    expect(gates()).toHaveLength(0);
     w.s.db
       .insert(stepTable)
       .values({
@@ -1228,22 +1182,11 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
       { githubFetch: w.mock.fetch },
     );
     await restarted.sweep();
-    expect(w.todoRow().phase).toBe('building');
-    expect(verifies()).toHaveLength(2);
-    expect(verifies().map((row) => parseVerifyPromptMeta(row.prompt)?.expectedHeadSha)).toEqual(
-      expect.arrayContaining([delivered, fixed]),
-    );
-    w.s.db
-      .update(stepTable)
-      .set({ status: 'done', createdAt: w.base + 3_500, finishedAt: w.base + 4_000 })
-      .where(and(eq(stepTable.kind, 'verify'), eq(stepTable.status, 'pending')))
-      .run();
-    await restarted.sweep();
     expect(w.todoRow().phase).toBe('review');
-    expect(verifies()).toHaveLength(2);
+    expect(gates()).toHaveLength(0);
   });
 
-  test('a queued independent review keeps the task out of review until it finishes', async () => {
+  test('a legacy queued review no longer holds delivery', async () => {
     const w = makePrWorld({
       checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
     });
@@ -1256,13 +1199,6 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
         status: 'pending',
         createdAt: w.base,
       })
-      .run();
-    await w.poller.sweep();
-    expect(w.todoRow().phase).toBe('building');
-    w.s.db
-      .update(stepTable)
-      .set({ status: 'done', finishedAt: w.base + 1 })
-      .where(eq(stepTable.id, `step-review-${w.buildId}`))
       .run();
     await w.poller.sweep();
     expect(w.todoRow().phase).toBe('review');
@@ -1279,7 +1215,7 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
     expect(checksReads()).toBe(before);
   });
 
-  test('completeStep: execution step done + PR delivered (prNumber present) -> stays building; no PR -> needs_input with the not-delivered question (task stall class 2)', () => {
+  test('completeStep: a delivered PR goes to user review; a missing PR still asks the delivery question', () => {
     const withPr = makePrWorld({ checks: [] });
     const stepId = `step-run-${Math.random().toString(36).slice(2, 8)}`;
     withPr.s.db
@@ -1294,7 +1230,7 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
       })
       .run();
     completeStep(withPr.s.svc, stepId, { hasChanges: true });
-    expect(withPr.todoRow().phase).toBe('building');
+    expect(withPr.todoRow().phase).toBe('review');
     expect(withPr.todoRow().hasChanges).toBe(true);
 
     const noPr = makePrWorld({ checks: [] });
@@ -1622,13 +1558,12 @@ describe('#1829 closing push and agent-opened PR recovery', () => {
       expect(
         w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()?.prUrl,
       ).toBe(`https://github.com/octo/demo/pull/${w.prNumber}`);
-      expect(w.todoRow().phase).toBe('building');
+      expect(w.todoRow().phase).toBe('review');
       await createCiPoller(
         { ...w.s.svc, box: w.s.secretBox, githubFetch },
         { githubFetch },
       ).sweep();
-      expect(w.fixRoundSteps()).toHaveLength(1);
-      expect(w.fixRoundSteps()[0]?.prompt).toContain('lint');
+      expect(w.fixRoundSteps()).toHaveLength(0);
     },
   );
 });

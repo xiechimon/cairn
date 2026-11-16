@@ -39,14 +39,12 @@ export const ROUTE_USE_LABELS: Record<RouteUse, string> = {
   review: '评审',
   digest: '摘要',
   compaction: '压缩',
-  citation_check: '引文检查',
 };
 
 const GRAPH_USES: readonly RouteUse[] = [
   'coordinator',
   'session',
   'review',
-  'citation_check',
   'digest',
   'compaction',
 ];

@@ -2,7 +2,7 @@
 
 Status: revised 2026-11-02 after the owner's decisions (plan decision D63, which builds on the thread model of D60). Code facts are checked against `origin/main` at `456edfe36`. This document stands alone; it does not depend on any earlier plan version.
 
-Daily dependency-release and external-development research was retired on 2026-11-16. Existing database records remain historical data; intake drafts cannot create tasks. The remaining plan concerns task-scoped research, not a recurring intake.
+Daily dependency-release, external-development research and automatic citation checking were retired on 2026-11-16. Existing database records remain historical data; intake drafts cannot create tasks. Task-scoped research delivers its original report as quoted, untrusted data without a checker or parked-checker retry. The citation-check decisions and spike results below describe the former design, not current behavior.
 
 Labels used throughout:
 - **[verified]**: read in the source (code on `origin/main`, a web page, a PR) during this session.

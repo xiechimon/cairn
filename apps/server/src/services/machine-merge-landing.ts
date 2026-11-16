@@ -16,7 +16,13 @@ export function mergeCardLeftReview(deps: MachineDeps, stepRow: typeof step.$inf
   const todoRow = buildRow
     ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
     : undefined;
-  return todoRow?.phase === 'closed' || todoRow?.phase === 'todo';
+  return (
+    todoRow === undefined ||
+    todoRow.archivedAt !== null ||
+    todoRow.latestBuildId !== stepRow.buildId ||
+    todoRow.phase === 'closed' ||
+    todoRow.phase === 'todo'
+  );
 }
 
 export async function applyMergeLanding(

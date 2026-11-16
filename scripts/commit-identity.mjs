@@ -85,7 +85,7 @@ function prePush() {
       remoteSha && !ZERO.test(remoteSha)
         ? [`${remoteSha}..${localSha}`, '--not', '--remotes']
         : [localSha, '--not', '--remotes'];
-    const violation = pushViolation(policy, commitsOf(range), process.env);
+    const violation = pushViolation(policy, commitsOf(range));
     if (violation) {
       console.error(`commit identity: ${violation}`);
       return 1;

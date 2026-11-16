@@ -10,58 +10,44 @@ import {
 import { eq } from 'drizzle-orm';
 import { build, step, stopPending, todo } from '../db/schema.js';
 import { conflict } from '../lib/errors.js';
+import { systemGitOps } from '../lib/git.js';
 import { nowMs } from '../lib/ids.js';
 import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
-import { type BuildDeps, completeStep, enqueueStep } from './builds.js';
+import { type BuildDeps, completeStep, enqueueStep, lastPushedCheckpoint } from './builds.js';
 import { triggerChiefWakes } from './chief.js';
+import { projectOfTodo } from './git.js';
 import { softwareCommitIdentity } from './github-autonomous-token.js';
 import { humanWorkIdentity } from './github-work-attribution.js';
-import { localGateFacts } from './local-merge-facts.js';
 import type { MachineDeps } from './machine-deps.js';
 import { publishStepStatus, upsertMessage } from './machine-deps.js';
-import type { mergeReadiness } from './merge-gate/readiness.js';
+import { computePatchDigest } from './merge-gate/digest.js';
 import { notifyTodo } from './notifications.js';
+import { projectMergeConfigOf } from './projects.js';
 import { readTeamAttributionSettings } from './team-attribution-settings.js';
-import { getTodo, setTodoPhase } from './todos.js';
+import { getTodo } from './todos.js';
 
 export async function enqueueLocalMerge(
   deps: BuildDeps,
   buildId: string,
   defaultBranch: string,
-  approved = false,
-  restoreFailed = false,
-): Promise<{ enqueued: boolean; readiness: ReturnType<typeof mergeReadiness> | null }> {
-  const facts = await localGateFacts(
-    deps,
-    buildId,
-    defaultBranch,
-    restoreFailed
-      ? (inputs) => ({ ...inputs, build: { ...inputs.build, phase: 'review' } })
-      : undefined,
-  );
-  if (facts === null) throw conflict('Local merge requires a local project');
-  const { readiness, judgedBase, judgedDigest } = facts;
-  const brake = readiness.blockers.find(
-    (b) => b.code === 'autonomy-paused' || b.code === 'daily-cap',
-  );
-  if (brake) throw conflict(`${brake.code}: autonomous local merging is blocked`);
-  const inputs = facts.inputs;
-  const config = { mergePolicy: inputs.policy.mergePolicy, localChecks: facts.requiredChecks };
-  const lands = config.mergePolicy === 'autonomous' || (approved && config.mergePolicy === 'human');
-  const blocking =
-    config.mergePolicy === 'human'
-      ? readiness.blockers.filter((b) => b.code !== 'policy-human')
-      : readiness.blockers;
-  if (!lands || blocking.length > 0 || !readiness.headSha || !readiness.patchDigest)
-    return { enqueued: false, readiness };
+): Promise<{ enqueued: true }> {
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   const todoRow = buildRow
     ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
     : undefined;
   if (!buildRow || !todoRow) throw conflict('Local merge requires a build and its todo');
-  const required = inputs.checks?.required ?? [];
-  if (JSON.stringify(required) !== JSON.stringify(config.localChecks) || required.length === 0)
-    throw conflict('Local required checks differ from the judged configuration');
+  const projectRow = projectOfTodo(deps.db, todoRow);
+  if (projectRow?.repoKind !== 'local' || projectRow.localPath === null)
+    throw conflict('Local merge requires a local project');
+  const git = deps.gitOps ?? systemGitOps;
+  const judgedBase = await git.resolveCommit(projectRow.localPath, `refs/heads/${defaultBranch}`);
+  const judgedHead = lastPushedCheckpoint(deps, buildId, { mergeSteps: false });
+  if (judgedBase === null || judgedHead === null)
+    throw conflict('Local merge requires the base and delivered commit');
+  const files = await git.localCompareFiles(projectRow.localPath, judgedBase, judgedHead);
+  const patchDigest = computePatchDigest(files).patchDigest;
+  if (patchDigest === null) throw conflict('Local merge requires a readable delivered patch');
+  const required = [...projectMergeConfigOf(projectRow).localChecks];
   const source = todoRow.sourceRef ? parseGithubIssueSourceRef(todoRow.sourceRef) : null;
   const coAuthor = readTeamAttributionSettings(deps.db, todoRow.teamId).coAuthorTrailer
     ? humanWorkIdentity(deps.db, todoRow, buildRow.triggerSource)
@@ -71,8 +57,8 @@ export async function enqueueLocalMerge(
     buildId,
     defaultBranch,
     judgedBase,
-    judgedHead: readiness.headSha,
-    judgedPatchDigest: readiness.patchDigest,
+    judgedHead,
+    judgedPatchDigest: patchDigest,
     workBranch: conversationBranch(buildId),
     localChecks: required,
     message: withCoAuthor(
@@ -84,8 +70,23 @@ export async function enqueueLocalMerge(
     identity: softwareCommitIdentity(deps) ?? localCommitIdentity(deps.user.displayName),
   });
   deps.db.transaction(() => {
-    claimAutonomousMerge(deps.db, buildId);
-    if (restoreFailed) setTodoPhase(deps, todoRow.id, 'review');
+    const current = deps.db.select().from(todo).where(eq(todo.id, todoRow.id)).get();
+    if (
+      current?.latestBuildId !== buildId ||
+      current.archivedAt !== null ||
+      !['done', 'review', 'failed'].includes(current.phase) ||
+      current.projectId !== todoRow.projectId
+    )
+      throw conflict('Local merge delivery changed while preparing the command');
+    const currentProject = projectOfTodo(deps.db, current);
+    if (
+      currentProject?.repoKind !== 'local' ||
+      currentProject.localPath !== projectRow.localPath ||
+      currentProject.baseBranch !== projectRow.baseBranch ||
+      JSON.stringify(projectMergeConfigOf(currentProject).localChecks) !== JSON.stringify(required)
+    )
+      throw conflict('Local merge target changed while preparing the command');
+    claimAutonomousMerge(deps.db, buildId, true);
     enqueueStep(
       deps,
       buildId,
@@ -94,11 +95,12 @@ export async function enqueueLocalMerge(
       JSON.stringify({
         kind: 'local-merge',
         command,
-        judgedDigest,
       }),
+      false,
+      true,
     );
   });
-  return { enqueued: true, readiness };
+  return { enqueued: true };
 }
 
 export function applyLocalMergeReport(

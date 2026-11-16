@@ -53,27 +53,27 @@ const pr = (
 });
 
 describe('a needs-you row says what is waiting and where to act', () => {
-  test('a review with a green PR names the PR, its checks and the PR card', () => {
+  test('a report awaiting acceptance does not suggest merging its linked PR', () => {
     const copy = taskRowCopy(entry(1, 'review', 'ready_for_review'), pr({}));
     expect(copy).toMatchObject({
       word: '待审阅',
-      what: { key: 'PR #{n} 检查 {p}/{t} 通过', params: { n: 3558, p: 41, t: 41 } },
-      where: '到 PR 卡合并',
+      what: { key: '已就绪，等你审阅。' },
+      where: null,
       waiting: true,
     });
   });
 
-  test('a review whose PR has failing checks says how many failed', () => {
+  test('linked PR failures do not change report acceptance copy', () => {
     const copy = taskRowCopy(
       entry(1, 'review', 'ready_for_review'),
       pr({ checks: { passed: 37, failed: 1, total: 38 } }),
     );
-    expect(copy.what).toEqual({ key: 'PR #{n} 有 {f} 项检查没过', params: { n: 3558, f: 1 } });
+    expect(copy.what).toEqual({ key: '已就绪，等你审阅。' });
   });
 
 
-  test('a review without a PR points at the changes in the task', () => {
-    expect(taskRowCopy(entry(1, 'review', 'ready_for_review')).where).toBe('到任务里看改动');
+  test('a report without a PR has no merge direction', () => {
+    expect(taskRowCopy(entry(1, 'review', 'ready_for_review')).where).toBeNull();
   });
 
   test('a plan waiting for approval says so and where to approve it', () => {
@@ -92,15 +92,15 @@ describe('a needs-you row says what is waiting and where to act', () => {
     expect(questionRowCopy()).toMatchObject({ waiting: true, where: '在对话里回答' });
   });
 
-  test('no row says the old "ready, waiting for your review" line', () => {
+  test('no waiting row asks the user to decide whether to merge', () => {
     const copies = [
       taskRowCopy(entry(1, 'review', 'ready_for_review')),
       taskRowCopy(entry(2, 'confirm', 'needs_input')),
       taskRowCopy(entry(3, 'needs_input', 'needs_input')),
     ];
     for (const copy of copies) {
-      expect(copy.what.key).not.toContain('等你审阅');
-      expect(copy.where).not.toBeNull();
+      expect(copy.what.key).not.toContain('合并');
+      expect(copy.where ?? '').not.toContain('合并');
     }
   });
 });

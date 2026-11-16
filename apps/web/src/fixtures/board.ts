@@ -1,4 +1,5 @@
 import { FIXED_TAGS } from '@cairn/shared';
+import { localDay } from '../usage/usage-model.js';
 import {
   at,
   darkFreshProbe,
@@ -15,12 +16,14 @@ import {
   TEAM_ID,
 } from './core.js';
 import type { FixtureSet, TodoRecord } from './records.js';
+import { usageFixtureDays } from './usage.js';
 
 export const boardDefault: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
   schedules: [],
   project: projectContent,
+  dailyUsage: usageFixtureDays(localDay(r7(13, 14), 'UTC')),
 };
 
 export const boardProjectPicker: FixtureSet = {
@@ -329,7 +332,6 @@ export const boardChiefProbes: FixtureSet = {
     { ...legacyDone, phaseAt: CHIEF_NOW - 3 * DAY_MS - 2 * 60_000 },
   ],
   now: CHIEF_NOW,
-  usageNav: true,
 };
 
 export const boardDarkFresh: FixtureSet = {

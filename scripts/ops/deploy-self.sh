@@ -21,16 +21,18 @@ usage: deploy-self.sh <40-hex sha on origin/main> | --recover
 Deploys one green main commit to this host's cairn checkout and user units, with rollback.
   1. refuses a SHA not on origin/main, without every required check green, or whose
      pnpm-workspace.yaml allows a new install script (exit 2)
-  2. respects $CAIRN_DEPLOY_STATE/hold; daemon changes pause claims with a durable lease
-     and drain within CAIRN_DEPLOY_STEP_WAIT_SECONDS (exit 75 on timeout), always resuming;
-     server-only changes pause claims the same way and wait up to
-     CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS for claimed steps, then restart the server anyway;
-     every deploy also waits that long for open Coordinator computer calls other than
-     request_takeover, which resumes across a restart
+  2. respects $CAIRN_DEPLOY_STATE/hold
   3. rehearses the target's migrations on an online copy of the live DB in a scratch worktree
   4. checks out the target, installs with --frozen-lockfile, builds the daemon and web assets
-  5. stops daemon and server, snapshots the DB, starts server then daemon, health-checks both
-  6. on a failed health check restores the snapshot and the previous checkout (exit 1;
+  5. restarts the daemon only when the daemon bundle, its package.json or pnpm-lock.yaml differs
+     from the build it replaced; then claims pause with a durable lease and drain within
+     CAIRN_DEPLOY_STEP_WAIT_SECONDS (exit 75 on timeout), always resuming. Otherwise only the
+     server restarts: claims pause the same way and claimed steps get up to
+     CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS before the server restarts anyway. Every deploy also
+     waits that long for open Coordinator computer calls other than request_takeover, which
+     resumes across a restart
+  6. stops daemon and server, snapshots the DB, starts server then daemon, health-checks both
+  7. on a failed health check restores the snapshot and the previous checkout (exit 1;
      exit 3 when the rollback itself is unhealthy)
 An interrupted deploy leaves $CAIRN_DEPLOY_STATE/in-progress; the next run (or --recover) health-checks
 the target and finishes it or rolls it back before doing anything else.
@@ -319,16 +321,15 @@ assert_hold() {
   [ ! -e "$STATE/hold" ] || busy "hold: $(head -n1 "$STATE/hold")"
 }
 
-classify_runtime() {
-  local path
-  RUNTIME=server
-  while IFS= read -r path; do
-    case "$path" in
-      *package.json | pnpm-lock.yaml | pnpm-workspace.yaml) RUNTIME=daemon ;;
-      apps/server/* | apps/web/* | apps/ios/* | integration/* | docs/* | .github/* | README.md | README.zh.md | AGENTS.md | CLAUDE.md | CONTEXT.md | packages/shared/src/tables.ts | packages/shared/test/vocabulary.test.ts | packages/shared/test/__snapshots__/snapshot.test.ts.snap | .claude/skills/verify-cairn/feature-map.json | .claude/skills/verify-cairn/feature-map.md | scripts/ops/deploy-self.sh | scripts/ops/deploy-watch.sh | scripts/ops/deploy-self.test.mjs | scripts/ops/bootstrap-deploy.sh) ;;
-      *) RUNTIME=daemon ;;
-    esac
-  done < <(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET")
+daemon_artifact() {
+  local rel
+  for rel in apps/daemon/dist/cli.mjs apps/daemon/package.json pnpm-lock.yaml; do
+    if [ -f "$CHECKOUT/$rel" ]; then
+      printf '%s %s\n' "$rel" "$(sha256sum <"$CHECKOUT/$rel" | cut -d' ' -f1)"
+    else
+      printf '%s missing\n' "$rel"
+    fi
+  done | sha256sum | cut -d' ' -f1
 }
 
 
@@ -560,7 +561,7 @@ rehearse_migrations() {
 switch_code() {
   git -C "$CHECKOUT" checkout -q --detach "$1" &&
     (cd "$CHECKOUT" && pnpm install --frozen-lockfile --reporter=silent) &&
-    { [ "$RUNTIME" = server ] || (cd "$CHECKOUT" && pnpm -C apps/daemon build); } &&
+    (cd "$CHECKOUT" && pnpm -C apps/daemon build) &&
     (cd "$CHECKOUT" && pnpm -C apps/web build)
 }
 
@@ -942,11 +943,7 @@ if [ "$PREVIOUS" = "$TARGET" ]; then
 fi
 assert_deployable
 assert_hold
-classify_runtime
-if [ "$RUNTIME" = daemon ]; then
-  LEASE_PROBE_STATUS="$(lease_request)" || true
-  [ "$LEASE_PROBE_STATUS" = 200 ] || refuse_lease_status "$LEASE_PROBE_STATUS"
-fi
+RUNNING_DAEMON="$(daemon_artifact)"
 
 log "rehearsing migrations of $TARGET"
 if ! rehearse_migrations; then
@@ -964,6 +961,13 @@ if ! switch_code "$TARGET"; then
   echo "install or build failed for $TARGET; running services untouched" >&2
   exit 1
 fi
+RUNTIME=server
+if [ "$(daemon_artifact)" != "$RUNNING_DAEMON" ]; then
+  RUNTIME=daemon
+  LEASE_PROBE_STATUS="$(lease_request)" || true
+  [ "$LEASE_PROBE_STATUS" = 200 ] || refuse_lease_status "$LEASE_PROBE_STATUS"
+fi
+if [ "$RUNTIME" = daemon ]; then log "daemon build changed; the daemon and the server will restart"; else log "daemon build unchanged; only the server will restart"; fi
 
 assert_hold
 drain_steps

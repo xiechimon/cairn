@@ -113,12 +113,11 @@ export interface ThreadProgress {
   tone: 'wait' | 'run' | 'idle';
 }
 
-const CODE_STEPS = ['计划', '改代码', '检查', '合并'] as const;
 const INFO_STEPS = ['调研', '交报告'] as const;
 
 export function threadProgress(
   todo: Pick<TodoRecord, 'phase' | 'output'>,
-  prOpen: boolean,
+  _prOpen: boolean,
 ): ThreadProgress | null {
   const { phase } = todo;
   if (phase === 'failed' || phase === 'closed') return null;
@@ -130,15 +129,5 @@ export function threadProgress(
   if (todo.output === 'info') {
     return { steps: INFO_STEPS, at: phase === 'done' ? 2 : phase === 'review' ? 1 : 0, tone };
   }
-  const at =
-    phase === 'done'
-      ? 4
-      : phase === 'review'
-        ? 3
-        : phase === 'building' && prOpen
-          ? 2
-          : phase === 'building' || phase === 'needs_input'
-            ? 1
-            : 0;
-  return { steps: CODE_STEPS, at, tone };
+  return null;
 }
