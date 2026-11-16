@@ -46,24 +46,6 @@ export function policyBotIdentity(policy: CommitIdentityPolicy): GitIdentity {
   return { name: policy.bot.login, email: githubNoreplyEmail(policy.bot) };
 }
 
-export function coAuthorTrailer(identity: GitIdentity): string {
-  if (/[\r\n\0<>]/.test(identity.name + identity.email))
-    throw new Error('Invalid co-author identity');
-  return `Co-authored-by: ${identity.name} <${identity.email}>`;
-}
-
-export function withCoAuthor(message: string, coAuthor: GitIdentity | null): string {
-  if (coAuthor === null) return message;
-  const trailer = coAuthorTrailer(coAuthor);
-  const lines = message.trimEnd().split('\n');
-  if (lines.some((line) => line.trim().toLowerCase() === trailer.toLowerCase())) return message;
-  const lastBreak = lines.lastIndexOf('');
-  const lastParagraph = lines.slice(lastBreak + 1);
-  const endsInTrailers =
-    lastBreak > 0 && lastParagraph.some((line) => /^[A-Za-z][A-Za-z0-9-]*: \S/.test(line));
-  return `${lines.join('\n')}${endsInTrailers ? '\n' : '\n\n'}${trailer}`;
-}
-
 const sameIdentity = (a: GitIdentity, b: GitIdentity) =>
   a.name === b.name && a.email.toLowerCase() === b.email.toLowerCase();
 

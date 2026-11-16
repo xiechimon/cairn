@@ -6,7 +6,6 @@ import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { stopUnclaimedGateSteps } from './build-stop.js';
 import type { BuildDeps } from './builds.js';
 import { DONE_ROW } from './delivery-rows.js';
-import { markFirstPrPromptDue } from './first-pr-report.js';
 import { assertPhaseTransition } from './phase.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -73,5 +72,4 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
     createdAt: nowMs(),
   });
   emitRuntimeBuildSpan(deps.db, buildId, 'done');
-  markFirstPrPromptDue(deps.db, buildId);
 }

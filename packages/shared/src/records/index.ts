@@ -33,7 +33,6 @@ export * from './claude-rate-limit.js';
 export * from './common.js';
 export * from './deploy-status.js';
 export * from './document-diff.js';
-export * from './first-pr-report.js';
 export * from './github.js';
 export * from './github-label.js';
 export * from './harness-profile.js';

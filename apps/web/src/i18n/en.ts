@@ -607,22 +607,6 @@ export const EN: Record<string, string> = {
   在这台设备上接收推送: 'Push on this device',
   '需要你决定时立即推送，其余进展并入每日两次简报，锁屏也能收到':
     'Push immediately when a decision is needed; everything else lands in the twice-daily digest — even on the lock screen',
-  '首个 PR': 'First PR',
-  人工共同作者署名: 'Human co-author trailers',
-  '团队设置，默认开启。在人工发起的任务提交中添加共同作者署名。':
-    'Team setting, on by default. Credit the human who instructed the work in commit trailers.',
-  邀请任务发起人审阅: 'Request instructor review',
-  '团队设置，默认关闭。在 PR 上邀请人工发起人审阅。':
-    'Team setting, off by default. Request PR review from the human who instructed the work.',
-  '首个 PR 社区提示': 'First-PR community prompt',
-  '团队设置，默认关闭。首个 PR 完成后显示分享链接，由你决定是否在 GitHub 发布。':
-    'Team setting, off by default. Show a sharing link after the first PR succeeds; you decide whether to post on GitHub.',
-  '首个 PR 已合并': 'Your first PR merged',
-  '可以在 GitHub Discussions 发一条帖子，说明第一支 PR 用了多久':
-    'You can post in GitHub Discussions to say how long the first PR took',
-  '第一支 PR 用了 {days} 天。可以在 GitHub Discussions 发一条帖子':
-    'Your first PR took {days## day|# days}. You can post about it in GitHub Discussions',
-  '分享到 Discussions': 'Share on Discussions',
   不再显示: 'Do not show again',
   // #1031: the switch is a preference; when it's on but the browser permission
   // is denied, the row explains why nothing will actually fire.
@@ -2095,8 +2079,6 @@ export const EN: Record<string, string> = {
     'On this Runner, make sure it is online and awake, then run `{command}` to start it again. It turns online here by itself.',
   '额度空了，等额度恢复后自动续跑。': 'Out of quota. It resumes by itself when quota returns.',
   '被限流，等恢复后自动续跑。': 'Rate limited. It resumes by itself when the limit lifts.',
-  '第一支 PR 当天就合并了。可以在 GitHub Discussions 发一条帖子':
-    'The first PR merged on day one. You can post about it in GitHub Discussions',
   查看: 'View',
   '{count} 处 Claude 登录已过期': '{count} Claude logins have expired',
   '{count} 处 Claude 登录即将过期': '{count} Claude logins are about to expire',

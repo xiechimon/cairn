@@ -211,7 +211,6 @@ const RESOURCES = [
   'registry-focus-ring',
   'skill-import',
   'task-panel',
-  'first-pr-report',
 ];
 export const SHARED_SURFACE_ONLY = [
   'cds-motion',

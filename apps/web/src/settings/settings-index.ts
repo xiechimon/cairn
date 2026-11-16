@@ -14,9 +14,6 @@ export const SETTINGS_ROW_INDEX: SettingsRowEntry[] = [
     label: '在这台设备上接收推送',
     keywords: ['notification', 'push', 'device'],
   },
-  { section: 'account', label: '人工共同作者署名', keywords: ['co-author', 'commit'] },
-  { section: 'account', label: '邀请任务发起人审阅', keywords: ['review', 'pr'] },
-  { section: 'account', label: '首个 PR 社区提示', keywords: ['pr', 'share'] },
   {
     section: 'appearance',
     label: '颜色主题',

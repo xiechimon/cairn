@@ -73,7 +73,6 @@ export interface CommitIdentity {
 export interface PushPublication {
   base: string | null;
   identity: CommitIdentity | null;
-  coAuthor: CommitIdentity | null;
 }
 
 export interface WorktreePrepareInput {

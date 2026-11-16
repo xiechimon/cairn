@@ -3,18 +3,16 @@ import type {
   ClaimedStep,
   CommitIdentity,
   GitCredentialSource,
-  GitIdentity,
   PreparedWorkspace,
   WorktreeOps,
 } from '@cairn/shared';
-import { AGENT_TOOL_PUSH, BRAND, gitCredentialRowContent, withCoAuthor } from '@cairn/shared';
+import { AGENT_TOOL_PUSH, BRAND, gitCredentialRowContent } from '@cairn/shared';
 
 export interface ClosingGitInput {
   git: WorktreeOps;
   ws: PreparedWorkspace;
   claimed: ClaimedStep;
   stepId: string;
-  coAuthor: GitIdentity | null;
   identity: CommitIdentity;
   mergeCredential: BoundGitCredentials | null;
   headAtStart: string | null;
@@ -53,11 +51,7 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
       );
     }
     const commitMessage = `${claimed.step.kind}: ${claimed.todo?.title ?? claimed.conversationId}`;
-    const committed = await git.commitAll(
-      ws.cwd,
-      withCoAuthor(commitMessage, input.coAuthor),
-      input.identity,
-    );
+    const committed = await git.commitAll(ws.cwd, commitMessage, input.identity);
     if (committed.setupDrift.length > 0) {
       note(
         `setup-drift-${stepId}`,
