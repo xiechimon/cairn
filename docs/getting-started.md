@@ -2,6 +2,12 @@
 
 Cairn is one server you browse plus a daemon on every machine that runs builds. The server alone is enough to look around; a daemon is what lets agents work on your own machines.
 
+## Cairn for Mac
+
+On a Mac, the desktop app is the whole install. Download it from the [latest release](https://github.com/xiechimon/cairn/releases/latest) (`-arm64.dmg` for Apple silicon, `-x64.dmg` for Intel), drag it to Applications and open it. The app is not notarized yet, so macOS blocks the first launch: open System Settings, then Privacy & Security, and click **Open Anyway** next to Cairn; on macOS 14 and earlier, right-click Cairn in Applications and choose Open instead.
+
+The app runs the server and a Runner on this Mac, approves that Runner and signs you in as the owner. Tasks run with Claude Code: install it and run `claude` once in Terminal to sign in. The app finds `claude` on your `PATH` or in its usual install folders. The rest of this page is for Linux, Windows and extra Runners.
+
 ## Run the server
 
 Requirements: Node.js 22 or 24 (LTS lines ship prebuilt `better-sqlite3` binaries; other versions may fall back to source compilation and need a build toolchain).
@@ -20,17 +26,27 @@ curl -s -X POST -H "Authorization: Bearer $(cairn token | head -1)" http://127.0
 
 Open the returned code in the browser pairing page. Another device uses the same one-time code from Remote access. `cairn token` prints the owner token for this machine only. To reach the server from another machine, put Tailscale Serve or another route in front of loopback; the route does not sign the browser in. `CAIRN_AUTH=off` disables auth and works only on a loopback bind.
 
+A browser signed in with a pairing code is a paired device, not the owner, so on macOS and Windows, and in any browser on another machine, it cannot yet add providers, secrets or API keys, manage pairing, or approve the server's own machine as a Runner ([#5201](https://github.com/xiechimon/cairn/issues/5201)). Do those with the owner token for now. For example, to approve the Runner that `cairn start --server` printed a link for, take the `enroll=` value from that link:
+
+```sh
+curl -s -X POST -H "Authorization: Bearer $(cairn token | head -1)" -H "Content-Type: application/json" \
+  -d '{"enrollId":"<enroll value>"}' http://127.0.0.1:8787/api/machine/enroll/confirm
+```
+
+Cairn for Mac signs in as the owner and needs none of this.
+
 ## Run builds on your own machines
 
 The UI is fully usable without a daemon; register a machine when you want agents to actually run builds on it. On each machine that executes builds:
 
 ```sh
 npm i -g @xiechimon/cairn-cli
-# One-time enrollment: create an API key in the web UI (/app/api-keys, plaintext shown once), then
-cairn start --api-key <cairn_...> --team <teamId>
-# Daily use (credentials persisted in ~/.cairn/machine.json):
-cairn start        # also: stop / restart / logs -f / status
+cairn start --server http://127.0.0.1:8787
 ```
+
+The first start prints a link. Open it in the browser where you use Cairn and approve the machine; the daemon then connects by itself and keeps its credentials in `~/.cairn/machine.json`. When the Runner is on another machine, use the address that reaches your server instead. Later, `cairn start` alone is enough; there are also `cairn stop`, `restart`, `logs -f` and `status`.
+
+On a machine without a browser, create an API key in the web UI (API keys in Settings; the key is shown once) and enroll with `cairn start --api-key <cairn_...> --team <teamId>` instead.
 
 Both packages install a `cairn` bin: installing both globally on the same machine means whichever came last wins the name. The clean split is running the server where you browse and `cairn-cli` where agents build.
 
@@ -72,7 +88,7 @@ The watch-mode dev stack, one process each: `pnpm dev:web`, `pnpm dev:server`, `
 
 On Linux, tasks run in a sandbox that needs the daemon to be its own systemd user unit. `cairn start` and `cairn restart` run it as a transient user unit, `cairn-daemon-<id>.service`, and print its name. When `systemd-run --user` fails they print a warning and start a plain background process instead; that daemon shows Online but cannot start the sandbox.
 
-The sandbox also needs bubblewrap 0.10 or newer, which can overlay your home directory, and permission to create user namespaces. Ubuntu 25.04 and later, Debian 13 and Arch meet both after `sudo apt install bubblewrap` or `sudo pacman -S bubblewrap`. Ubuntu 24.04 ships bubblewrap 0.9 and Debian 12 ships 0.8, so a Runner there stays "Task sandbox not ready" and cannot take tasks. On Ubuntu 23.10 and later, AppArmor blocks user namespaces for programs without a profile; Ubuntu 25.04 and later ship a profile for `bwrap`. The Runner page shows why its sandbox is not ready.
+The sandbox also needs bubblewrap 0.11 or newer, which can overlay your home directory, and permission to create user namespaces. Ubuntu 25.04 and later, Debian 13 and Arch meet both after `sudo apt install bubblewrap` or `sudo pacman -S bubblewrap`. Ubuntu 24.04 ships bubblewrap 0.9 and Debian 12 ships 0.8; see [Sandbox on Ubuntu 24.04 and Debian 12](#sandbox-on-ubuntu-2404-and-debian-12). The Runner page shows why its sandbox is not ready.
 
 A transient unit ends when you log out or reboot. To keep the daemon running, enroll the machine as in [Run builds on your own machines](#run-builds-on-your-own-machines), stop it with `cairn stop` and create `~/.config/systemd/user/cairn-daemon.service`, using `command -v cairn` and `command -v node` for the two paths:
 
@@ -93,6 +109,42 @@ WantedBy=default.target
 systemctl --user daemon-reload
 systemctl --user enable --now cairn-daemon.service
 ```
+
+## Sandbox on Ubuntu 24.04 and Debian 12
+
+Their bubblewrap is older than 0.11, so the Runner page says `bwrap` is too old. Build 0.11.1 from source. It installs to `/usr/local/bin/bwrap` and leaves the packaged `/usr/bin/bwrap` alone:
+
+```sh
+sudo apt install build-essential meson ninja-build pkg-config libcap-dev curl xz-utils
+curl -LO https://github.com/containers/bubblewrap/releases/download/v0.11.1/bubblewrap-0.11.1.tar.xz
+tar xf bubblewrap-0.11.1.tar.xz
+cd bubblewrap-0.11.1
+meson setup _build
+ninja -C _build
+sudo meson install -C _build
+command -v bwrap
+```
+
+The last command must print `/usr/local/bin/bwrap`. The Runner uses the `bwrap` found on the `PATH` it was started with, so if you started it from a shell where `command -v bwrap` did not print `/usr/local/bin/bwrap`, run `cairn restart` from a shell where it does.
+
+On Ubuntu, AppArmor then stops the new `bwrap` from creating user namespaces, and the Runner page says the system does not let `bwrap` create them. Allow it with a profile for that one program:
+
+```sh
+sudo tee /etc/apparmor.d/bwrap-local > /dev/null <<'EOF'
+abi <abi/4.0>,
+include <tunables/global>
+
+profile bwrap-local /usr/local/bin/bwrap flags=(unconfined) {
+  userns,
+  include if exists <local/bwrap-local>
+}
+EOF
+sudo apparmor_parser -r /etc/apparmor.d/bwrap-local
+```
+
+Debian 12 allows user namespaces unless `sysctl kernel.unprivileged_userns_clone` prints 0; in that case run `echo kernel.unprivileged_userns_clone=1 | sudo tee /etc/sysctl.d/90-userns.conf` and then `sudo sysctl --system`.
+
+The Runner checks its sandbox again every minute and starts taking tasks once the check passes, without a restart.
 
 ## Next steps
 

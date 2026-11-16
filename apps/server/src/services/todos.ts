@@ -654,7 +654,7 @@ export function updateAutonomousTodo(
     const editor = opts.textWriter;
     if (row.request !== null && editor !== undefined && typeof editor === 'object') {
       sets.request = {
-        ...row.request,
+        ...(sets.request ?? row.request),
         segments: [
           {
             source: { kind: 'edit', userId: editor.ownerEdit, at: nowMs(), span: 'whole' },
@@ -760,7 +760,7 @@ export function updateAutonomousTodo(
 
 interface ProjectMove {
   sets: Pick<TodoRow, 'projectId' | 'orderIndex'> &
-    Partial<Pick<TodoRow, 'sourceKind' | 'sourceRef'>>;
+    Partial<Pick<TodoRow, 'sourceKind' | 'sourceRef' | 'request'>>;
   closeIssueRef: string | null;
   targetName: string;
 }
@@ -792,6 +792,10 @@ function planProjectMove(deps: TodoDeps, row: TodoRow, projectId: string): Proje
     sets.sourceRef = null;
   } else if (row.sourceKind === null && targetOpensIssues) {
     sets.sourceKind = 'github-issue-self';
+  }
+  if (row.request !== null) {
+    const { lane: _lane, projectBasis: _basis, ...ordinary } = row.request;
+    sets.request = ordinary;
   }
   return {
     sets,

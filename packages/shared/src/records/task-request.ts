@@ -62,6 +62,20 @@ export const taskSegmentSchema = z.object({
 });
 export type TaskSegment = z.infer<typeof taskSegmentSchema>;
 
+export const TASK_REQUEST_LANES = ['quick'] as const;
+
+export const projectBasisSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('channel'), threadId: z.string().min(1) }),
+  z.object({ kind: z.literal('composer'), messageId: z.string().min(1) }),
+  z.object({
+    kind: z.literal('owner-named'),
+    segment: z.number().int().min(0),
+    name: z.string().min(2),
+  }),
+  z.object({ kind: z.literal('owner-answer'), segment: z.number().int().min(0) }),
+]);
+export type ProjectBasis = z.infer<typeof projectBasisSchema>;
+
 export const taskRequestSchema = z.object({
   segments: z.array(taskSegmentSchema).min(1),
   siblings: z.array(z.string().min(1)),
@@ -69,6 +83,8 @@ export const taskRequestSchema = z.object({
   titleSource: z.enum(['owner', 'third-party', 'worker', 'coordinator']),
   titleSourceRef: z.string().nullable(),
   research: z.object({ reason: z.string().trim().min(1).max(200) }).optional(),
+  lane: z.enum(TASK_REQUEST_LANES).optional(),
+  projectBasis: projectBasisSchema.optional(),
 });
 export type TaskRequest = z.infer<typeof taskRequestSchema>;
 

@@ -151,7 +151,8 @@ describe('a Coordinator rule that selects Claude Code runs the turn on the Runne
     expect(envelope.status).toBe(200);
     expect((envelope.body as { context: unknown }).context).toMatchObject({
       tokens: 15,
-      contextWindow: expect.any(Number),
+      contextWindow: 200_000,
+      compactAt: 167_000,
     });
 
     const second = await api(server.url, 'POST', `/api/conversations/${threadId}/messages`, {

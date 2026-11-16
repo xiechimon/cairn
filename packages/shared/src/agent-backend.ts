@@ -41,6 +41,8 @@ export const modelUsageSchema = z.object({
   cost: modelCostSchema.optional(),
   ttftMs: z.number().int().nonnegative().optional(),
   contextTokens: z.number().int().nonnegative().optional(),
+  contextWindow: z.number().int().positive().optional(),
+  compactAt: z.number().int().positive().optional(),
 });
 export type ModelUsage = z.infer<typeof modelUsageSchema>;
 

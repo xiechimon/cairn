@@ -33,6 +33,7 @@ test('a reply that created a task gets one reference row above its bubble, and t
   await expect(ref.locator('svg[data-glyph="progress"]')).toHaveCount(1);
   await expect(ref).not.toContainText('In progress');
   await expect(ref).toHaveAccessibleName(/Read the cairn repo ?, Running/);
+  await expect(ref.locator('[data-slot="task-ref-route"]')).toHaveText('reports to this channel');
   const mention = stream.locator('a[data-slot="task-mention"]');
   await expect(mention).toHaveText('Read the cairn repo');
   await expect(mention).toHaveClass(/mention-chip--todo/);
