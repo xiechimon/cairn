@@ -94,8 +94,13 @@ export async function provisionHostedRepo(
     }
     throw error;
   }
-  await systemGitOps.initBareRepo(dir);
-  await systemGitOps.seedInitialCommit(dir, `init ${repoName}`);
+  try {
+    await systemGitOps.initBareRepo(dir);
+    await systemGitOps.seedInitialCommit(dir, `init ${repoName}`);
+  } catch (error) {
+    rmSync(dir, { recursive: true, force: true });
+    throw error;
+  }
   return dir;
 }
 

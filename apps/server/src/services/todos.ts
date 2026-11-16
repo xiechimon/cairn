@@ -69,6 +69,7 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodo } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { ownershipOf, reconcileOwners, sectionOf } from './owner.js';
+import { isPersonalSpace } from './personal-space.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
 import type { VapidKeys } from './push.js';
 import { profileForStep } from './routing-rules.js';
@@ -767,7 +768,9 @@ interface ProjectMove {
 
 function planProjectMove(deps: TodoDeps, row: TodoRow, projectId: string): ProjectMove {
   const target = projectOfTodo(deps.db, { projectId, teamId: row.teamId });
-  if (target === undefined) throw new HttpError(404, `project ${projectId}`);
+  if (target === undefined || isPersonalSpace(target)) {
+    throw new HttpError(404, `project ${projectId}`);
+  }
   if (!canMoveTodoProject(row)) {
     throw new HttpError(
       409,

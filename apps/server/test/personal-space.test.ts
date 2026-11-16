@@ -4,10 +4,10 @@ import { join } from 'node:path';
 import type { ProjectRecord } from '@cairn/shared';
 import { serve } from '@hono/node-server';
 import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { project, step, user } from '../src/db/schema.js';
-import { runGit } from '../src/lib/git.js';
+import { project, step, todo, user } from '../src/db/schema.js';
+import { runGit, systemGitOps } from '../src/lib/git.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { issueStepGitCredential } from '../src/services/credentials.js';
 import { repoDirFor } from '../src/services/git.js';
@@ -162,6 +162,36 @@ describe('personal space row and repository (docs/design/personal-space.md S1)',
     }
     const row = s.db.select().from(project).where(eq(project.id, space.id)).get()!;
     expect(row).toMatchObject({ name: PERSONAL_SPACE_NAME, githubRepo: null });
+  });
+
+  test('a task cannot be moved into a space', async () => {
+    const space = await ensurePersonalSpace(repoCtx(), s.team.id, s.user.id);
+    const projectId = await postProject(s.app, 'board');
+    const created = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
+      title: 'Weekly notes',
+      spec: '',
+    });
+    expect(created.status).toBe(201);
+    const todoId = ((await created.json()) as { id: string }).id;
+    expect(s.db.select().from(todo).where(eq(todo.id, todoId)).get()?.projectId).toBe(projectId);
+    const moved = await req(s.app, 'PATCH', `/api/todos/${todoId}`, { projectId: space.id });
+    expect(moved.status).toBe(404);
+    expect(s.db.select().from(todo).where(eq(todo.projectId, space.id)).all()).toEqual([]);
+  });
+
+  test('a repository whose init fails is removed', async () => {
+    s.db.insert(user).values({ id: 'init-fails', displayName: 'Init' }).run();
+    const init = vi
+      .spyOn(systemGitOps, 'initBareRepo')
+      .mockRejectedValueOnce(new Error('disk full'));
+    try {
+      await expect(ensurePersonalSpace(repoCtx(), s.team.id, 'init-fails')).rejects.toThrow(
+        'disk full',
+      );
+    } finally {
+      init.mockRestore();
+    }
+    expect(existsSync(repoDirFor(s.reposDir, s.team.id, 'space-init-fails'))).toBe(false);
   });
 
   test('a leftover repository directory is never reused for a new space', async () => {
