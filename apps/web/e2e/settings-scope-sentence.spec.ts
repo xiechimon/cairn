@@ -7,7 +7,7 @@ const settings = (page: Page) => page.getByRole('dialog', { name: '设置' });
 const scope = (page: Page) => settings(page).getByRole('combobox', { name: '设置作用于' });
 
 test('model services open with a scope sentence and keep the scope in the URL', async ({ page }) => {
-  await page.goto('/app/settings/providers?scenario=providers-fleet');
+  await page.goto('/app/settings/routing?scenario=providers-fleet');
   await expect(settings(page).getByTestId('settings-scope')).toContainText('设置作用于');
   await expect(scope(page)).toContainText('所有执行机');
   await scope(page).click();
@@ -26,7 +26,7 @@ test('English scope copy names all machines and keeps the model selector in the 
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
-  await page.goto('/app/settings/providers?scenario=providers-fleet');
+  await page.goto('/app/settings/routing?scenario=providers-fleet');
   const selector = page.getByRole('combobox', { name: 'Settings apply to' });
   await expect(selector).toContainText('All Runners');
   await selector.click();
@@ -105,7 +105,7 @@ test('scope menu wraps long machine names without clipping or overlapping adjace
       return undefined;
     },
   );
-  await page.goto('/app/settings/providers');
+  await page.goto('/app/settings/routing');
   await scope(page).click();
   const menu = page.locator('[data-slot=select-content]');
   await expect(menu).toBeVisible();

@@ -192,7 +192,7 @@ try {
         : `spec 11 A5：preset 仅在 dialog 内出现——页面泄漏 ${leaked.join(', ')}`,
   );
 
-  await page.click(`${SHELL} [data-testid="resource-new"]`).catch(() => {});
+  await page.click(`${SHELL} [data-testid="routing-add-provider"]`).catch(() => {});
   const dlgOk = await softVisible(page, DLG);
   check(
     'new-opens-dialog',
@@ -330,7 +330,7 @@ try {
     : false;
   check('keyform-closes', closedOk === true, closedOk ? '关闭钮关窗（#68 family law，aria-label 载体）' : '关窗失败/dialog 未开');
 
-  await page.click(`${SHELL} [data-testid="resource-new"]`).catch(() => {});
+  await page.click(`${SHELL} [data-testid="routing-add-provider"]`).catch(() => {});
   const xaiReopen = await softVisible(page, DLG);
   const xaiRowSel = `${ROW}[data-preset-id="xai"]`;
   let xaiLabelOk = false;
@@ -352,7 +352,7 @@ try {
     await softHidden(page, DLG);
   }
 
-  await page.click(`${SHELL} [data-testid="resource-new"]`).catch(() => {});
+  await page.click(`${SHELL} [data-testid="routing-add-provider"]`).catch(() => {});
   const reopened = await softVisible(page, DLG);
   const entrySel = `${DLG} button:text-is("自定义端点")`;
   const entryOk = reopened && (await softVisible(page, entrySel));

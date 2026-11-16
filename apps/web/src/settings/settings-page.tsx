@@ -1,6 +1,5 @@
 import {
   KeyRound,
-  Layers,
   type LucideIcon,
   Monitor,
   Moon,
@@ -51,7 +50,6 @@ import { EmbeddedShell, PageShell } from '../pages/shell.js';
 import { MachinesPage } from '../resources/machines-page.js';
 import { McpServersPage } from '../resources/mcp-servers-page.js';
 import { ModelRoutingPage } from '../resources/model-routing-page.js';
-import { ProvidersPage } from '../resources/providers-page.js';
 import { RoutingSettingsPage } from '../resources/routing-settings-page.js';
 import { SecretsPage } from '../resources/secrets-page.js';
 import { SkillsPage } from '../resources/skills-page.js';
@@ -125,7 +123,6 @@ const GROUPS: Group[] = [
   {
     heading: '模型',
     sections: [
-      { id: 'providers', label: '模型服务', Icon: Layers, element: () => <ProvidersPage /> },
       {
         id: 'work-routing',
         label: '模型选择',
@@ -137,7 +134,16 @@ const GROUPS: Group[] = [
         id: 'routing',
         label: '模型路由',
         Icon: Waypoints,
-        keywords: ['routing', '订阅', 'subscription', '用量', 'quota'],
+        keywords: [
+          'routing',
+          '服务商',
+
+          'provider',
+          '订阅',
+          'subscription',
+          '用量',
+          'quota',
+        ],
         element: () => <ModelRoutingPage />,
       },
     ],
@@ -242,14 +248,15 @@ export function SettingsDialog({
   onClose: () => void;
 }) {
   const { t } = useI18n();
-  const { search } = useLocation();
+  const { search, hash, state } = useLocation();
   const navigate = useNavigate();
   const tabs = useMediaQuery(SETTINGS_TABS_QUERY);
   const [matchLabel, setMatchLabel] = useState<string | null>(null);
   const [toolbarSlot, setToolbarSlot] = useState<HTMLElement | null>(null);
   const machineNote = useMachineNote();
   const titleId = useId();
-  const section = SECTIONS.find((s) => s.id === sectionParam) ?? null;
+  const movedTo = sectionParam === 'providers' ? 'routing' : null;
+  const section = SECTIONS.find((s) => s.id === (movedTo ?? sectionParam)) ?? null;
   const shown = section ?? SECTIONS[0];
   const opener = useRef<HTMLElement | null>(
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
@@ -288,6 +295,10 @@ export function SettingsDialog({
   );
   useTypeToFocus(searchNow, layerAbove);
   const hrefFor = (id: string): To => ({ pathname: `${SETTINGS_HREF}/${id}`, search });
+  useEffect(() => {
+    if (movedTo !== null)
+      navigate({ pathname: `${SETTINGS_HREF}/${movedTo}`, search, hash }, { replace: true, state });
+  }, [movedTo, navigate, search, hash, state]);
   const groups: SettingsNavGroup[] = GROUPS.map((group) => ({
     heading: group.heading === null ? null : t(group.heading),
     items: group.sections.map((s) => ({

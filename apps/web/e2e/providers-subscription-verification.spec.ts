@@ -62,7 +62,7 @@ async function open(page: Page, verify: { current: Verify }, subscriptions?: unk
     }
     return undefined;
   });
-  await page.goto('/app/settings/providers');
+  await page.goto('/app/settings/routing');
 }
 
 async function shot(page: Page, name: string) {

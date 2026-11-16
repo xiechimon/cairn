@@ -11,14 +11,14 @@ Cairn brings no model of its own and resells no compute. Threads and the Coordin
 |---|---|
 | Claude Code, signed in | On a Runner. Cairn picks it up by itself. |
 | Codex CLI, signed in | On a Runner. Cairn picks it up by itself. |
-| A Claude subscription token | `Settings` → `Providers` → `Add provider` → `Claude` |
-| An API key from a provider | `Settings` → `Providers` → `Add provider` → the provider |
-| Any OpenAI- or Anthropic-compatible endpoint | `Settings` → `Providers` → `Add provider` → `Custom endpoint` |
+| A Claude subscription token | `Settings` → `Model routing` → `Add provider` → `Claude` |
+| An API key from a provider | `Settings` → `Model routing` → `Add provider` → the provider |
+| Any OpenAI- or Anthropic-compatible endpoint | `Settings` → `Model routing` → `Add provider` → `Custom endpoint` |
 
 <Tabs syncKey="model-source">
 <TabItem label="Claude Code">
 
-Install [Claude Code](https://claude.com/product/claude-code) on the Runner machine and sign in there with `claude`, as the same user that runs `cairn`. The Runner reports it to the server; it appears under `Providers` as `Claude Code` on that Runner, with a status such as `Signed in`.
+Install [Claude Code](https://claude.com/product/claude-code) on the Runner machine and sign in there with `claude`, as the same user that runs `cairn`. The Runner reports it to the server; it appears under `Model routing` as `Claude Code` on that Runner, with a status such as `Signed in`.
 
 Its models come from the slots in that machine's `~/.claude/settings.json` (`env.ANTHROPIC_*_MODEL`). While a Runner with Claude Code is online, new work defaults to Claude Code.
 
@@ -36,12 +36,12 @@ On any machine where Claude Code is signed in, run:
 claude setup-token
 ```
 
-Then in Cairn open `Settings` → `Providers` → `Add provider`, pick `Claude` under `Subscription sign-in`, and paste the token. You can also enter the date it expires.
+Then in Cairn open `Settings` → `Model routing` → `Add provider`, pick `Claude` under `Subscription sign-in`, and paste the token. You can also enter the date it expires.
 
 </TabItem>
 <TabItem label="API key">
 
-Open `Settings` → `Providers` → `Add provider`. The list is grouped into model vendors (Anthropic, OpenAI, Google, xAI, DeepSeek, Mistral, Moonshot, Kimi For Coding, MiniMax, Qwen, Z.ai and more), cloud platforms (Amazon Bedrock, Google Vertex AI, Cloudflare Workers AI), inference platforms (Groq, Cerebras, Fireworks, Together and more) and gateways (OpenRouter, Vercel AI Gateway, Cloudflare AI Gateway, OpenCode). Pick one and paste the key. xAI also offers a `Sign in with SuperGrok or X Premium` button.
+Open `Settings` → `Model routing` → `Add provider`. The list is grouped into model vendors (Anthropic, OpenAI, Google, xAI, DeepSeek, Mistral, Moonshot, Kimi For Coding, MiniMax, Qwen, Z.ai and more), cloud platforms (Amazon Bedrock, Google Vertex AI, Cloudflare Workers AI), inference platforms (Groq, Cerebras, Fireworks, Together and more) and gateways (OpenRouter, Vercel AI Gateway, Cloudflare AI Gateway, OpenCode). Pick one and paste the key. xAI also offers a `Sign in with SuperGrok or X Premium` button.
 
 The key is stored encrypted on your server and cannot be viewed again after saving. `Test connection` sends one minimal request without showing the key.
 

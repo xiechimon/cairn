@@ -115,7 +115,7 @@ export function ComposerSetupHint({ step: { next, models } }: { step: ComposerSe
     },
   };
   const { icon, label, hint } = copy[next];
-  const href = settingsHref(next === 'models' ? 'providers' : 'machines');
+  const href = settingsHref(next === 'models' ? 'routing' : 'machines');
   return (
     <>
       <Button

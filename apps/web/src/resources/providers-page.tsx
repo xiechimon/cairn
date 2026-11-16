@@ -1,6 +1,6 @@
 import type { ModelSource, ProviderRecord } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { Cpu, Plus } from 'lucide-react';
+import { Cpu } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { accountStatusOf, type Verification } from '../api/account-verification.js';
@@ -36,9 +36,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { PageShell } from '../pages/shell.js';
 import { AddProviderFlow, type AddProviderView } from './add-provider-flow.js';
-import { PROVIDERS_HREF } from './hrefs.js';
 import {
   ClaudeCodeEditor,
   claudeCodeStatus,
@@ -209,7 +207,7 @@ function machineEntries(
   ];
 }
 
-export function ProvidersPage() {
+export function ProvidersSection() {
   const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
@@ -372,13 +370,8 @@ export function ProvidersPage() {
   const selected = entries.find((e) => e.item.id === itemParam) ?? entries[0];
 
   return (
-    <PageShell
-      route={PROVIDERS_HREF}
-      title={t('模型服务')}
-      selected={PROVIDERS_HREF}
-      fixture={fixture}
-    >
-      <div className="mx-auto flex w-full max-w-240 flex-col gap-3 pt-4 pb-16">
+    <>
+      <div className="flex min-w-0 flex-col gap-3">
         <SettingsScopeSentence
           machines={machines}
           scope={scope}
@@ -410,23 +403,6 @@ export function ProvidersPage() {
           </p>
         )}
         <ProviderPanel
-          header={
-            <div className="flex items-center gap-1">
-              <h2 className="m-0 text-card-title font-semibold text-foreground">{t('服务商')}</h2>
-              {machine === undefined && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('添加服务商')}
-                  title={t('添加服务商')}
-                  data-testid="resource-new"
-                  onClick={() => setAddView('picker')}
-                >
-                  <Plus aria-hidden strokeWidth={1.75} />
-                </Button>
-              )}
-            </div>
-          }
           items={entries.map((e) => e.item)}
           selectedId={selected?.item.id ?? null}
           onSelect={(id) => setParams({ item: id })}
@@ -446,11 +422,9 @@ export function ProvidersPage() {
                 <EmptyState
                   testId="providers-empty"
                   icon={Cpu}
+                  className="[&_p]:break-keep"
                   title={t('尚未添加服务商')}
                   description={t('添加 API key、订阅或自定义端点后，它们的模型会出现在这里。')}
-                  {...(machine === undefined
-                    ? { action: { label: t('添加服务商'), onClick: () => setAddView('picker') } }
-                    : {})}
                 />
               }
             >
@@ -499,6 +473,6 @@ export function ProvidersPage() {
       >
         <p className="m-0">{t('移除后，后续步骤不再使用这个订阅。')}</p>
       </AlertDialogShell>
-    </PageShell>
+    </>
   );
 }

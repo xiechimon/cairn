@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { ListCard, ListRow } from '../components/list-card.js';
 import { NoticeBanner } from '../components/notice-banner.js';
-import { QuotaRow } from '../components/settings/quota-row.js';
 import {
   RoutingGraph,
   type RoutingSourceGroup,
@@ -288,17 +287,13 @@ export function RoutingSection() {
       lede="Each use on the left names its model; a curve runs to the provider that serves it. Hovering a node lights its wires. A rule whose provider is unavailable is a dashed rust wire."
     >
       <Specimen
-        id="routing-nodes-and-quota-bar"
+        id="routing-nodes"
         title="Routing graph"
         stage="canvas"
         code={`<RoutingGraph groups={[{ label: 'Agents', nodes: [{ id: 'coordinator', name: 'Coordinator', tag: 'Claude Opus 5.5', target: 'claude' }] }]} targets={[{ id: 'claude', name: 'Claude subscription', runtime: 'Claude Code' }]} />`}
       >
         <div className="flex w-full max-w-170 flex-col gap-4">
           <RoutingGraph groups={ROUTING_GROUPS} targets={ROUTING_TARGETS} />
-          <div className="flex w-56 flex-col gap-0.5">
-            <QuotaRow name="Claude subscription" label="5h" left={68} />
-            <QuotaRow name="Claude subscription" label="Week" left={12} />
-          </div>
         </div>
       </Specimen>
     </Section>

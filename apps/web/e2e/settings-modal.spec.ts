@@ -21,7 +21,7 @@ test('settings open over the page they were opened from, which stays mounted', a
 });
 
 test('direct settings URLs open the modal on top of the home', async ({ page }) => {
-  await page.goto(`/app/settings/providers?${FLEET}`);
+  await page.goto(`/app/settings/routing?${FLEET}`);
   await expect(settings(page)).toBeVisible();
   await expect(page.locator('[inert] [data-testid="chief-composer-input"]')).toHaveCount(1);
   await settings(page).getByRole('button', { name: '关闭设置' }).click();
@@ -46,7 +46,7 @@ test('browser back closes the modal even after switching sections', async ({ pag
   await page.getByTestId('sidebar-reopen').click();
   await page.mouse.move(700, 400);
   await page.getByTestId('sidebar-settings').click();
-  await settings(page).locator('[data-settings-section="providers"]').click();
+  await settings(page).locator('[data-settings-section="routing"]').click();
   await settings(page).locator('[data-settings-section="machines"]').click();
   await page.goBack();
   await expect(settings(page)).toHaveCount(0);

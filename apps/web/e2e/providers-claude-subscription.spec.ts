@@ -31,9 +31,9 @@ test(`connects, verifies and deletes a subscription on the providers page (${loc
     }
   });
   await page.goto('/app/resources/providers');
-  await expect(page).toHaveURL(/\/app\/settings\/providers/);
+  await expect(page).toHaveURL(/\/app\/settings\/routing/);
 
-  await page.getByTestId('resource-new').click();
+  await page.getByTestId('routing-add-provider').click();
   const claudeRow = page.locator('[data-preset-id="claude-subscription"]');
   await expect(claudeRow).toContainText(locale === 'zh' ? 'Claude 订阅' : 'Claude subscription');
   const search = page.getByLabel(locale === 'zh' ? '搜索服务商...' : 'Search providers...');

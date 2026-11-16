@@ -37,7 +37,7 @@ export function LegacyModelRoutingRedirect() {
   return (
     <Navigate
       to={{
-        pathname: settingsHref(routing ? 'routing' : 'providers'),
+        pathname: settingsHref('routing'),
         search: routing
           ? withoutParams(search, LEGACY_ACCOUNT_PARAMS)
           : legacyAccountsSearch(search),

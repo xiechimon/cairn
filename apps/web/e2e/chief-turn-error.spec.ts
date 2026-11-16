@@ -118,9 +118,9 @@ test('a turn that could not reach the model says why in plain words, links to pr
   await expect(alert).toContainText('地址填错了');
   await expect(alert).not.toContainText('系统设置');
   await expect(page.getByTestId('chief-stream')).not.toContainText('Connection error.');
-  await expect(alert.getByRole('link', { name: '打开模型服务设置' })).toHaveAttribute(
+  await expect(alert.getByRole('link', { name: '打开模型路由设置' })).toHaveAttribute(
     'href',
-    /\/app\/settings\/providers/,
+    /\/app\/settings\/routing/,
   );
   await alert.getByTestId('chief-turn-retry').click();
   await expect.poll(() => sent).toEqual(['你好']);

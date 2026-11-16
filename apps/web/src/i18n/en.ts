@@ -62,10 +62,10 @@ export const EN: Record<string, string> = {
     'The Coordinator and tasks both use this subscription, so you need no API key. The token is stored encrypted and cannot be viewed after saving.',
   '保存失败，请检查填写内容后重试。':
     'Could not save the connection. Check the fields and try again.',
-  '{name}：已过期，Coordinator 和任务都暂时用不了。在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型服务」。':
-    '{name}: expired, so the Coordinator and tasks cannot run for now. Run `claude setup-token` in a terminal and add the new token under Settings → Model services.',
-  '{name}：将在 {days} 天后过期。到期前在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型服务」。':
-    '{name}: expires in {days## day|# days}. Before then, run `claude setup-token` in a terminal and add the new token under Settings → Model services.',
+  '{name}：已过期，Coordinator 和任务都暂时用不了。在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型路由」。':
+    '{name}: expired, so the Coordinator and tasks cannot run for now. Run `claude setup-token` in a terminal and add the new token under Settings → Model routing.',
+  '{name}：将在 {days} 天后过期。到期前在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型路由」。':
+    '{name}: expires in {days## day|# days}. Before then, run `claude setup-token` in a terminal and add the new token under Settings → Model routing.',
   Archived: 'Archived',
   Agent: 'Agent',
 
@@ -299,7 +299,6 @@ export const EN: Record<string, string> = {
   密钥: 'Secrets',
   执行机: 'Runners',
   机器: 'Machine',
-  模型服务: 'Providers',
   用量: 'Usage',
   收起侧边栏: 'Collapse sidebar',
   展开侧边栏: 'Expand sidebar',
@@ -978,8 +977,8 @@ export const EN: Record<string, string> = {
     'Queued: a local project only runs on the Runner that holds it, so this Runner cannot run it ({ahead} ahead)',
   '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）':
     'Queued: Claude is rate limited on the Runner; this continues once the limit lifts ({ahead} ahead)',
-  '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型服务（前面 {ahead} 个）':
-    'Queued: the team has no usable Claude subscription. Run claude setup-token in a terminal and add the token under Model services ({ahead} ahead)',
+  '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由（前面 {ahead} 个）':
+    'Queued: the team has no usable Claude subscription. Run claude setup-token in a terminal and add the token under Model routing ({ahead} ahead)',
   '排队中：{machine} 的任务沙箱没就绪，接不了任务（前面 {ahead} 个）':
     'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks ({ahead} ahead)',
   '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）':
@@ -1373,10 +1372,10 @@ export const EN: Record<string, string> = {
     "The address may be wrong, the network or proxy may be blocking it, or the local model isn't running. If the model is on this Mac or your local network, also turn on Cairn in System Settings → Privacy & Security → Local Network.",
   '模型服务不接受这个 API key': "The model provider didn't accept this API key",
   'API key 填错了或已经失效。': 'The API key is wrong or has expired.',
-  '模型服务这次出错了。稍后重试；一直出错的话，检查模型服务设置。':
-    'The model provider returned an error this time. Try again later; if it keeps failing, check the provider settings.',
+  '模型服务这次出错了。稍后重试；一直出错的话，检查模型路由设置。':
+    'The model provider returned an error this time. Try again later; if it keeps failing, check the model routing settings.',
   '重新填写 API key': 'Re-enter the API key',
-  打开模型服务设置: 'Open provider settings',
+  打开模型路由设置: 'Open model routing settings',
   '撤回失败，Coordinator 可能已经开始处理这条了。':
     'Could not withdraw: the Coordinator may already be working on it.',
   '插话失败，请重试。': 'Could not steer. Try again.',
@@ -1638,9 +1637,6 @@ export const EN: Record<string, string> = {
   'Coordinator 和其他 Agent': 'Coordinator and other agents',
   '所有 Claude 模型': 'All Claude models',
   '{model} · 默认': '{model} · default',
-  执行机上的登录: 'Login on a Runner',
-  '还没有路由。添加服务商，再在「模型选择」里给 Coordinator 选模型，这里会画出它走哪个服务商。':
-    'No routing yet. Add a provider, then pick the Coordinator model in Model selector, and this shows which provider it runs on.',
   '{runtime} · 不可用': '{runtime} · unavailable',
   '{use} 的模型': '{use} model',
   '{use} 的思考强度': '{use} thinking level',
@@ -2271,8 +2267,8 @@ export const EN: Record<string, string> = {
   '删除 {model}': 'Remove {model}',
   常用模型: 'Top models',
   '你常用的模型，最多 {max} 个。': 'Your models, up to {max}.',
-  '还没有常用模型。先在「模型服务」里接入服务商，再回来添加。':
-    'No top models yet. Connect one under Providers first, then add models here.',
+  '还没有常用模型。先在「模型路由」里接入服务商，再回来添加。':
+    'No top models yet. Connect one under Model routing first, then add models here.',
   '还没有常用模型。点「添加模型」从已连接的服务商里挑。':
     'No top models yet. Use Add model to pick from your connected providers.',
   '恢复成推荐的模型和顺序。': 'Go back to the suggested models and their order.',

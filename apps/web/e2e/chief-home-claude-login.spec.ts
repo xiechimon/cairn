@@ -81,6 +81,6 @@ test('home warns for expiring and expired Claude subscriptions above Needs you',
   await expect(banner).toContainText('1 处已过期，1 处即将过期');
   await expect(banner.getByRole('link', { name: '查看' })).toHaveAttribute(
     'href',
-    '/app/resources/providers',
+    '/app/settings/routing',
   );
 });

@@ -308,7 +308,7 @@ export function TopModelsCard({
           className="m-0 border-t border-border px-4 py-3 text-meta text-content-tertiary"
         >
           {unique.length === 0
-            ? t('还没有常用模型。先在「模型服务」里接入服务商，再回来添加。')
+            ? t('还没有常用模型。先在「模型路由」里接入服务商，再回来添加。')
             : t('还没有常用模型。点「添加模型」从已连接的服务商里挑。')}
         </p>
       ) : (

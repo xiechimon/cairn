@@ -47,7 +47,7 @@ export function CheckedButton({
       variant="ghost"
       size="xs"
       data-testid="settings-checked"
-      className="gap-1.5 text-content-tertiary"
+      className="-mr-2 gap-1.5 text-content-tertiary"
       onClick={onRefresh}
     >
       {icon}

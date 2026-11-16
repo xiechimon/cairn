@@ -16,7 +16,6 @@ test('the breadcrumb is the only page title: no second heading repeats it', asyn
 
 test('other sections keep one heading for the page, the breadcrumb', async ({ page }) => {
   for (const [section, label] of [
-    ['providers', '模型服务'],
     ['routing', '模型路由'],
     ['work-routing', '模型选择'],
     ['skills', '技能'],
@@ -155,7 +154,7 @@ test('Esc during IME composition leaves the search query and focus alone', async
 });
 
 test('typing inside another settings field does not steal focus', async ({ page }) => {
-  await page.goto('/app/settings/providers?scenario=providers-fleet');
+  await page.goto('/app/settings/routing?scenario=providers-fleet');
   const name = settings(page).getByLabel('名称');
   await name.fill('');
   await page.keyboard.type('a/b');

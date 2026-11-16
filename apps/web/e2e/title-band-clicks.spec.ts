@@ -47,7 +47,6 @@ for (const [route, scenario] of [
 for (const [route, scenario] of [
   ['/app/resources/skills', '06'],
   ['/app/resources/secrets', 'secrets-list'],
-  ['/app/resources/providers', '10'],
 ] as const) {
   test(`resources \`新建\` owns its hit area — ${route}`, async ({ page }) => {
     await page.goto(`${route}?scenario=${scenario}`);

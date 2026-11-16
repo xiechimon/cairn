@@ -36,7 +36,7 @@ test('three expired subscriptions stay one banner, expired Runner logins add not
   await expect(banner.getByTestId('claude-login-warning')).toHaveCount(0);
   await expect(banner.getByRole('link', { name: '查看' })).toHaveAttribute(
     'href',
-    '/app/resources/providers',
+    '/app/settings/routing',
   );
   const composer = home.getByTestId('chief-composer-input');
   await expect(composer).toBeVisible();

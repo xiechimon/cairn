@@ -1228,7 +1228,7 @@
       "routes": {
         "web": [
           "/app/resources/providers",
-          "settings:providers"
+          "settings:routing"
         ],
         "server": [
           "/api/teams/:id/providers**",
@@ -1239,8 +1239,8 @@
         ]
       },
       "reach": [
-        "settings providers",
-        "click testid:resource-new",
+        "settings routing",
+        "click testid:routing-add-provider",
         "click testid:subscription-verify"
       ],
       "verify": [

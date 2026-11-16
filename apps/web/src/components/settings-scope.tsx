@@ -41,7 +41,7 @@ export function SettingsScopeSentence({
   return (
     <div
       data-testid="settings-scope"
-      className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-1 text-meta text-content-tertiary"
+      className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 text-meta text-content-tertiary"
     >
       <div className="flex min-w-0 items-center gap-2">
         <span id="settings-scope-label">{t('设置作用于')}</span>

@@ -114,7 +114,7 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
   'local-path': '排队中：本地项目只在它所在的执行机上跑，{machine} 跑不了（前面 {ahead} 个）',
   'claude-rate-limited': '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
   'claude-logged-out':
-    '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型服务（前面 {ahead} 个）',
+    '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由（前面 {ahead} 个）',
   'account-switched':
     '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始（前面 {ahead} 个）',
   'coordinator-provider-missing': 'Coordinator 规则用的服务商「{name}」还没添加',
@@ -128,7 +128,7 @@ const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], st
   'local-path': '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了（前面 {ahead} 个）',
   'claude-rate-limited': '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
   'claude-logged-out':
-    '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型服务（前面 {ahead} 个）',
+    '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由（前面 {ahead} 个）',
 };
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
@@ -1418,7 +1418,7 @@ export function turnErrorCopy(turnError: string, onMac: boolean): TurnErrorCopy 
       hint: onMac
         ? '可能是地址填错了、网络或代理不通，或者本地模型没有开。模型在这台 Mac 或局域网里的话，还要在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。'
         : '可能是地址填错了、网络或代理不通，或者本地模型没有开。',
-      fix: '打开模型服务设置',
+      fix: '打开模型路由设置',
     };
   if (MODEL_KEY_REJECTED_RE.test(turnError))
     return {
@@ -1428,8 +1428,8 @@ export function turnErrorCopy(turnError: string, onMac: boolean): TurnErrorCopy 
     };
   return {
     title: '这一轮没有完成',
-    hint: '模型服务这次出错了。稍后重试；一直出错的话，检查模型服务设置。',
-    fix: '打开模型服务设置',
+    hint: '模型服务这次出错了。稍后重试；一直出错的话，检查模型路由设置。',
+    fix: '打开模型路由设置',
   };
 }
 

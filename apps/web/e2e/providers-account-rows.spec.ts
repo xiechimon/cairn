@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { mockLive } from './chief-home-mock';
 
-const URL = '/app/settings/providers?scenario=model-routing';
+const URL = '/app/settings/routing?scenario=model-routing';
 const STATUS_WORDS = ['可用', '验证中', '验证失败', '冷却', '额度用尽', '已过期'];
 
 for (const width of [1440, 375]) {
@@ -49,7 +49,7 @@ test('an account nobody has used says so once, and still has a quota line of its
     if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
     return undefined;
   });
-  await page.goto('/app/settings/providers');
+  await page.goto('/app/settings/routing');
   const row = page.getByTestId('provider-instance');
   await expect(row).toHaveCount(1);
   await expect(row).toContainText('订阅 · 可用');

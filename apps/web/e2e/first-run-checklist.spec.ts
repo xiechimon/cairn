@@ -72,7 +72,7 @@ test('a fresh install shows one chip for the first missing step and no card', as
   await expect(chip(page)).toHaveCount(1);
   await expect(chip(page)).toHaveAttribute('data-step', 'models');
   await expect(chip(page)).toHaveText('接入模型来源');
-  await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/providers/);
+  await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/routing/);
   await expect(hint(page)).toContainText('Claude 订阅');
   await expect(page.getByTestId('first-run-checklist')).toHaveCount(0);
   await expect(page.getByTestId('chief-gate')).toHaveCount(0);
@@ -93,7 +93,7 @@ test('a model source the Coordinator cannot use still asks for a provider', asyn
   await open(page, { ...fresh(), providers: [{ id: 'p1', name: 'gw' }], machines: [ONLINE] });
   await expect(chip(page)).toHaveAttribute('data-step', 'models');
   await expect(chip(page)).toHaveText('Coordinator 还缺模型');
-  await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/providers/);
+  await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/routing/);
   await expect(hint(page)).toContainText('Coordinator 能用的服务商');
 });
 

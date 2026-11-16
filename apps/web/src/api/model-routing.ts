@@ -55,24 +55,8 @@ export interface RoutingTargetRow {
   id: string;
   name: string;
   runtime: 'claude-code' | 'pi';
-  plan: string | null;
-  quota?: { fiveHour: number | null; week: number | null };
   unavailable: boolean;
   record?: ProviderRecord;
-}
-
-function leftOf(usedPercent: number | null | undefined): number | null {
-  if (usedPercent == null || !Number.isFinite(usedPercent)) return null;
-  return Math.max(0, Math.round(100 - usedPercent));
-}
-
-function accountLeft(account: SubscriptionAccount, name: string): number | null {
-  const window = account.windows.find((w) => w.name === name);
-  return window === undefined ? null : leftOf(window.utilization * 100);
-}
-
-function quotaOf(fiveHour: number | null, week: number | null) {
-  return fiveHour !== null || week !== null ? { quota: { fiveHour, week } } : {};
 }
 
 export function routingTargets({
@@ -88,8 +72,6 @@ export function routingTargets({
     id: `subscription:${account.id}`,
     name: account.label,
     runtime: 'claude-code',
-    plan: account.plan,
-    ...quotaOf(accountLeft(account, 'five_hour'), accountLeft(account, 'seven_day')),
     unavailable: account.state === 'expired',
   }));
   for (const record of providers) {
@@ -98,7 +80,6 @@ export function routingTargets({
       id: `provider:${record.id}`,
       name: record.label,
       runtime: 'pi',
-      plan: null,
       unavailable: connections.length > 0 && connections.every((c) => c.available === false),
       record,
     });

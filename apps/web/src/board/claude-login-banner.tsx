@@ -6,7 +6,7 @@ import { subscriptionLoginWarning } from '../claude-login-warning.js';
 import { NoticeBanner, withCodeSpans } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
-import { PROVIDERS_HREF } from '../resources/hrefs.js';
+import { settingsHref } from '../settings/settings-href.js';
 
 export interface ClaudeLoginWarning {
   key: string;
@@ -76,7 +76,12 @@ export function ClaudeLoginBanner({ warnings }: { warnings: readonly ClaudeLogin
       title={title}
       body={<span data-testid="claude-login-summary">{body}</span>}
       actions={
-        <Button variant="outline" size="sm" className="px-3" render={<Link to={PROVIDERS_HREF} />}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="px-3"
+          render={<Link to={settingsHref('routing')} />}
+        >
           {t('查看')}
         </Button>
       }

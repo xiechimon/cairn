@@ -476,11 +476,11 @@ const COORDINATOR_FIXES: Partial<
   Record<StepQueueBlocked['kind'], { label: string; href: string }[]>
 > = {
   'coordinator-provider-missing': [
-    { label: '添加服务商', href: settingsHref('providers') },
+    { label: '添加服务商', href: settingsHref('routing') },
     { label: '改 Coordinator 规则', href: COORDINATOR_ROUTING_HREF },
   ],
   'coordinator-provider-no-key': [
-    { label: '填写 API key', href: settingsHref('providers') },
+    { label: '填写 API key', href: settingsHref('routing') },
     { label: '换 Coordinator 模型', href: COORDINATOR_ROUTING_HREF },
   ],
 };
@@ -650,7 +650,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                   variant="outline"
                   size="sm"
                   className={ERROR_ACTION_CLS}
-                  render={<Link to={settingsHref('providers')} />}
+                  render={<Link to={settingsHref('routing')} />}
                 >
                   {t(copy.fix)}
                 </Button>

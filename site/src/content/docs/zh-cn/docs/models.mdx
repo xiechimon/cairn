@@ -11,14 +11,14 @@ Cairn 自己不带模型，也不转售算力。thread 和 Coordinator 都跑在
 |---|---|
 | 已登录的 Claude Code | 装在 Runner 上，Cairn 自己会识别 |
 | 已登录的 Codex CLI | 装在 Runner 上，Cairn 自己会识别 |
-| Claude 订阅令牌 | `设置` → `模型服务` → `添加服务商` → `Claude` |
-| 某个服务商的 API key | `设置` → `模型服务` → `添加服务商` → 对应服务商 |
-| 任何兼容 OpenAI 或 Anthropic 的端点 | `设置` → `模型服务` → `添加服务商` → `自定义端点` |
+| Claude 订阅令牌 | `设置` → `模型路由` → `添加服务商` → `Claude` |
+| 某个服务商的 API key | `设置` → `模型路由` → `添加服务商` → 对应服务商 |
+| 任何兼容 OpenAI 或 Anthropic 的端点 | `设置` → `模型路由` → `添加服务商` → `自定义端点` |
 
 <Tabs syncKey="model-source">
 <TabItem label="Claude Code">
 
-在 Runner 那台机器上装好 [Claude Code](https://claude.com/product/claude-code)，用跑 `cairn` 的同一个用户执行 `claude` 登录。Runner 会把它上报给服务端；在 `模型服务` 里它显示为那台 Runner 上的 `Claude Code`，状态比如 `已登录`。
+在 Runner 那台机器上装好 [Claude Code](https://claude.com/product/claude-code)，用跑 `cairn` 的同一个用户执行 `claude` 登录。Runner 会把它上报给服务端；在 `模型路由` 里它显示为那台 Runner 上的 `Claude Code`，状态比如 `已登录`。
 
 它的模型来自那台机器 `~/.claude/settings.json` 里的模型槽（`env.ANTHROPIC_*_MODEL`）。只要有一台装了 Claude Code 的 Runner 在线，新的活默认就用 Claude Code。
 
@@ -36,12 +36,12 @@ Cairn 自己不带模型，也不转售算力。thread 和 Coordinator 都跑在
 claude setup-token
 ```
 
-然后在 Cairn 里打开 `设置` → `模型服务` → `添加服务商`，在 `订阅登录` 下选 `Claude`，粘贴令牌。也可以顺手填上它的过期日期。
+然后在 Cairn 里打开 `设置` → `模型路由` → `添加服务商`，在 `订阅登录` 下选 `Claude`，粘贴令牌。也可以顺手填上它的过期日期。
 
 </TabItem>
 <TabItem label="API key">
 
-打开 `设置` → `模型服务` → `添加服务商`。列表分组：模型厂商（Anthropic、OpenAI、Google、xAI、DeepSeek、Mistral、Moonshot、Kimi For Coding、MiniMax、Qwen、Z.ai 等）、云平台（Amazon Bedrock、Google Vertex AI、Cloudflare Workers AI）、推理平台（Groq、Cerebras、Fireworks、Together 等）、网关与聚合（OpenRouter、Vercel AI Gateway、Cloudflare AI Gateway、OpenCode）。选一个，粘贴 key。xAI 还可以用 `Sign in with SuperGrok or X Premium` 按钮登录。
+打开 `设置` → `模型路由` → `添加服务商`。列表分组：模型厂商（Anthropic、OpenAI、Google、xAI、DeepSeek、Mistral、Moonshot、Kimi For Coding、MiniMax、Qwen、Z.ai 等）、云平台（Amazon Bedrock、Google Vertex AI、Cloudflare Workers AI）、推理平台（Groq、Cerebras、Fireworks、Together 等）、网关与聚合（OpenRouter、Vercel AI Gateway、Cloudflare AI Gateway、OpenCode）。选一个，粘贴 key。xAI 还可以用 `Sign in with SuperGrok or X Premium` 按钮登录。
 
 key 加密存在你的服务端，保存后不能再查看。`测试连接` 会发一个最小请求，不会显示密钥。
 

@@ -68,7 +68,7 @@ const PAGE_ROUTES = withBoundary([
   { path: MACHINES_HREF, element: <SettingsRedirect section="machines" /> },
   { path: `${MACHINES_HREF}/:id`, element: <MachineDetailRedirect /> },
   { path: '/app/machines/authorize', element: <MachineAuthorizePage /> },
-  { path: PROVIDERS_HREF, element: <SettingsRedirect section="providers" /> },
+  { path: PROVIDERS_HREF, element: <SettingsRedirect section="routing" /> },
   { path: MODEL_ROUTING_HREF, element: <LegacyModelRoutingRedirect /> },
   { path: ROUTING_SETTINGS_HREF, element: <SettingsRedirect section="work-routing" /> },
   { path: `${SETTINGS_HREF}/:section?`, element: null },

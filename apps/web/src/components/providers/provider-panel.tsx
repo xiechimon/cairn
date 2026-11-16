@@ -103,6 +103,12 @@ export function ProviderPanel({
   empty?: ReactNode;
   children: ReactNode;
 }) {
+  if (items.length === 0)
+    return (
+      <div data-testid="provider-editor" className="flex min-w-0 flex-col py-8">
+        {empty}
+      </div>
+    );
   return (
     <SettingsPanel header={header}>
       <div className="flex min-w-0 flex-col @3xl:grid @3xl:grid-cols-[17rem_minmax(0,1fr)]">
@@ -120,7 +126,7 @@ export function ProviderPanel({
           ))}
         </div>
         <div data-testid="provider-editor" className="flex min-w-0 flex-col gap-6 p-4">
-          {items.length === 0 ? empty : children}
+          {children}
         </div>
       </div>
     </SettingsPanel>

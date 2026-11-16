@@ -45,7 +45,7 @@ test('archived projects live in the sidebar only: settings has no Projects secti
 });
 
 test('Escape inside a text field is the field\'s; the window stays open', async ({ page }) => {
-  await page.goto(`/app/settings/providers?${FLEET}`);
+  await page.goto(`/app/settings/routing?${FLEET}`);
   const name = settings(page).getByLabel('名称');
   await name.fill('draft');
   await name.press('Escape');
@@ -71,7 +71,7 @@ test('section and scope changes keep the page settings will return to', async ({
   await page.getByTestId('sidebar-reopen').click();
   await page.mouse.move(700, 400);
   await page.getByTestId('sidebar-settings').click();
-  await navItem(page, 'providers').click();
+  await navItem(page, 'routing').click();
   await settings(page).getByRole('combobox', { name: '设置作用于' }).click();
   await page.getByRole('option', { name: /build-box-orb/ }).click();
   await page.keyboard.press('Escape');
@@ -83,8 +83,8 @@ test('sections switch in place, keep their own params, and close goes back to wh
 }) => {
   await page.goto(`/app?${FLEET}`);
   await page.getByTestId('sidebar-settings').click();
-  await navItem(page, 'providers').click();
-  await expect(page).toHaveURL(/\/app\/settings\/providers\?scenario=providers-fleet/);
+  await navItem(page, 'routing').click();
+  await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=providers-fleet/);
   await expect(settings(page).getByTestId('provider-instance')).toHaveCount(3);
   await navItem(page, 'machines').click();
   await expect(navItem(page, 'machines')).toHaveAttribute('aria-current', 'page');
@@ -95,7 +95,8 @@ test('sections switch in place, keep their own params, and close goes back to wh
 
 test('old resource URLs land on their settings section with the query intact', async ({ page }) => {
   const cases = [
-    ['/app/resources/providers', 'providers'],
+    ['/app/resources/providers', 'routing'],
+    ['/app/settings/providers', 'routing'],
     ['/app/resources/routing-settings', 'work-routing'],
     ['/app/resources/machines', 'machines'],
     ['/app/resources/skills', 'skills'],
@@ -171,8 +172,8 @@ test('phone: a scrollable tab strip switches sections inside a full-screen modal
   await page.goto(`/app/settings?${FLEET}`);
   await expect(navItem(page, 'account')).toHaveAttribute('aria-current', 'page');
   await expect(page.getByTestId('settings-content')).toBeVisible();
-  await navItem(page, 'providers').click();
-  await expect(navItem(page, 'providers')).toHaveAttribute('aria-current', 'page');
+  await navItem(page, 'routing').click();
+  await expect(navItem(page, 'routing')).toHaveAttribute('aria-current', 'page');
   await expect(settings(page).getByTestId('provider-instance').first()).toBeVisible();
   const strip = page.getByTestId('settings-tabs');
   const scrolls = await strip.evaluate((el) => el.scrollWidth > el.clientWidth);

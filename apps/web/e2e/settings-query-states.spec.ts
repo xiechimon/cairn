@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 const PANES = [
   { section: 'machines', endpoint: 'machines', empty: '[data-testid="resource-empty"]', ok: [] },
-  { section: 'providers', endpoint: 'providers', empty: '[data-testid="providers-empty"]', ok: { providers: [] } },
+  { section: 'routing', endpoint: 'providers', empty: '[data-testid="providers-empty"]', ok: { providers: [] } },
   {
     section: 'routing',
     endpoint: 'model-routing',
@@ -13,6 +13,12 @@ const PANES = [
   { section: 'secrets', endpoint: 'secrets', empty: '[data-testid="resource-empty"]', ok: [] },
   { section: 'api-keys', endpoint: 'api-keys', empty: '[data-testid="keys-empty"]', ok: [] },
 ] as const;
+
+const ROUTING_PAGE_OK: Record<string, unknown> = {
+  'model-routing': { edges: [], connections: [], quota: [] },
+  providers: { providers: [] },
+  'claude-subscriptions': [],
+};
 
 async function stub(page: Page, endpoint: string, state: { fail: boolean; ok: unknown }) {
   await page.route('**/api/**', (route, request) => {
@@ -27,6 +33,10 @@ async function stub(page: Page, endpoint: string, state: { fail: boolean; ok: un
   await page.route('**/api/user/me', (route) =>
     route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } }),
   );
+  for (const [other, json] of Object.entries(ROUTING_PAGE_OK)) {
+    if (other !== endpoint)
+      await page.route(`**/api/teams/team-1/${other}`, (route) => route.fulfill({ json }));
+  }
   await page.route(`**/api/teams/team-1/${endpoint}`, (route) =>
     state.fail
       ? route.fulfill({ status: 500, json: { error: 'boom' } })
@@ -35,16 +45,11 @@ async function stub(page: Page, endpoint: string, state: { fail: boolean; ok: un
 }
 
 for (const pane of PANES) {
-  test(`${pane.section}: a failed list fetch shows the error with a retry, never the empty state`, async ({
+  test(`${pane.section} ${pane.endpoint}: a failed list fetch shows the error with a retry, never the empty state`, async ({
     page,
   }) => {
     const state = { fail: true, ok: pane.ok as unknown };
     await stub(page, pane.endpoint, state);
-    if (pane.section === 'providers') {
-      await page.route('**/api/teams/team-1/claude-subscriptions', (route) =>
-        route.fulfill({ json: [] }),
-      );
-    }
     await page.goto(`/app/settings/${pane.section}`);
     const settings = page.getByRole('dialog', { name: '设置' });
     await expect(settings.getByTestId('query-error')).toBeVisible();
@@ -98,7 +103,7 @@ test('providers: a failed Claude subscriptions fetch still lists the API provide
   await page.route('**/api/teams/team-1/model-sources', (route) =>
     route.fulfill({ json: { sources: [] } }),
   );
-  await page.goto('/app/settings/providers');
+  await page.goto('/app/settings/routing');
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByTestId('provider-instance')).toContainText('Codex main');
   await expect(settings.getByTestId('provider-instance')).toContainText('订阅');
@@ -121,7 +126,7 @@ test('providers: a failed API providers fetch next to a loaded subscription stil
   await page.route('**/api/teams/team-1/model-sources', (route) =>
     route.fulfill({ json: { sources: [] } }),
   );
-  await page.goto('/app/settings/providers');
+  await page.goto('/app/settings/routing');
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByTestId('provider-instance')).toContainText('Fresh');
   await expect(settings.getByTestId('providers-partial-error')).toContainText('模型服务没能加载');
@@ -141,7 +146,7 @@ test('providers: a team whose only data is a failed subscriptions fetch sees an 
   await page.route('**/api/teams/team-1/model-sources', (route) =>
     route.fulfill({ json: { sources: [] } }),
   );
-  await page.goto('/app/settings/providers');
+  await page.goto('/app/settings/routing');
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByTestId('query-error')).toBeVisible();
   await expect(settings.getByTestId('providers-empty')).toHaveCount(0);
@@ -170,7 +175,7 @@ test('providers: a failed team providers fetch does not hide the machine scope e
   await page.route('**/api/teams/team-1/model-sources', (route) =>
     route.fulfill({ json: { sources: [] } }),
   );
-  await page.goto('/app/settings/providers');
+  await page.goto('/app/settings/routing');
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByTestId('query-error')).toBeVisible();
   await settings.getByRole('combobox', { name: '设置作用于' }).click();

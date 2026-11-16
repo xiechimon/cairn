@@ -67,14 +67,13 @@ describe('routing targets and the rule graph', () => {
     },
   ];
 
-  test('subscriptions, then providers, with quota as what is left and unreachable ones marked', () => {
+  test('subscriptions, then providers, with unreachable ones marked', () => {
     expect(targets.map((target) => [target.id, target.runtime, target.unavailable])).toEqual([
       ['subscription:old', 'claude-code', true],
       ['subscription:main', 'claude-code', false],
       ['provider:rec-codex', 'pi', false],
       ['provider:rec-relay', 'pi', true],
     ]);
-    expect(targets[1]?.quota).toEqual({ fiveHour: 75, week: null });
   });
 
   test('a rule wires to its provider by slug, Claude Code to the live subscription, and a missing provider breaks', () => {

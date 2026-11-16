@@ -23,7 +23,7 @@ describe('subscription brief warning', () => {
     expect(expired).not.toContain('Claude 订阅已过期');
     expect(expired).toContain('Coordinator 和任务都暂时用不了');
     expect(expired).toContain('claude setup-token');
-    expect(expired).toContain('设置 → 模型服务');
+    expect(expired).toContain('设置 → 模型路由');
   });
   test('does not warn about a stored subscription that is not the enabled one', () => {
     expect(

@@ -56,7 +56,7 @@ for (const path of [
   test(`settings ${path}: skeleton and no conclusion while loading`, async ({ page }) => {
     await delayEveryApi(page);
     await page.goto(path);
-    await expect(page.getByTestId('query-loading')).toBeVisible();
+    await expect(page.getByTestId('query-loading').first()).toBeVisible();
     await expectNoConclusion(page);
   });
 }

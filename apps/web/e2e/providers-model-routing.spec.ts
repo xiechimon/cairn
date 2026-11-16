@@ -4,10 +4,11 @@ import { mockLive } from './chief-home-mock';
 const NOW = Date.now();
 const HOUR = 3_600_000;
 
-test('fixture: subscriptions sit in the provider list and the routing page lists providers above the rule graph', async ({
+test('fixture: the routing page holds the provider list above the rule graph', async ({
   page,
 }) => {
-  await page.goto('/app/settings/providers?scenario=model-routing');
+  await page.goto('/app/settings/routing?scenario=model-routing');
+  await expect(page.getByRole('tab')).toHaveCount(0);
   const rows = page.getByTestId('provider-instance');
   await expect(rows.filter({ hasText: '订阅' })).toHaveCount(3);
   const work = page.locator('[data-instance-id^="subscription:"]', { hasText: '冷却至' });
@@ -20,12 +21,6 @@ test('fixture: subscriptions sit in the provider list and the routing page lists
   await expect(detail.locator('[data-window]')).toHaveCount(0);
   await expect(detail.getByRole('progressbar')).toHaveCount(2);
 
-  await page.goto('/app/settings/routing?scenario=model-routing');
-  await expect(page.getByRole('tab')).toHaveCount(0);
-  await expect(page.getByTestId('subscription-accounts')).toHaveCount(0);
-  const providerRows = page.getByTestId('routing-provider-row');
-  await expect(providerRows).toHaveCount(6);
-  await expect(providerRows.filter({ hasText: '不可用' })).toHaveCount(2);
   const graph = page.getByTestId('routing-section');
   await expect(graph.locator('[data-routing-source]')).toHaveCount(4);
   await expect(graph.locator('[data-routing-target]')).toHaveCount(6);
@@ -35,36 +30,38 @@ test('fixture: subscriptions sit in the provider list and the routing page lists
   await expect(graph.locator('[data-routing-source="coordinator"]')).not.toHaveAttribute('data-broken', '');
 });
 
-test('old subscription links land on the provider list, old routing links on the routing page', async ({
+test('old provider, subscription and routing links all land on the routing page', async ({
   page,
 }) => {
   await page.goto('/app/resources/model-routing?scenario=model-routing');
-  await expect(page).toHaveURL(/\/app\/settings\/providers\?scenario=model-routing$/);
+  await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=model-routing$/);
   await page.goto('/app/resources/model-routing?scenario=model-routing&vendor=grok');
-  await expect(page).toHaveURL(/\/app\/settings\/providers\?scenario=model-routing$/);
+  await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=model-routing$/);
   await page.goto('/app/resources/model-routing?scenario=model-routing&tab=routing');
   await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=model-routing$/);
   await page.goto('/app/settings/routing?scenario=model-routing&vendor=codex');
-  await expect(page).toHaveURL(/\/app\/settings\/providers\?scenario=model-routing$/);
+  await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=model-routing$/);
   await page.goto('/app/resources/model-routing?scenario=model-routing&scope=m1&vendor=claude');
-  await expect(page).toHaveURL(/\/app\/settings\/providers\?scenario=model-routing$/);
+  await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=model-routing$/);
   await page.goto('/app/settings/routing?scenario=model-routing&scope=m1&vendor=claude');
-  await expect(page).toHaveURL(/\/app\/settings\/providers\?scenario=model-routing$/);
+  await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=model-routing$/);
   await page.goto('/app/settings/routing?scenario=model-routing&tab=routing&vendor=codex');
   await expect(page).toHaveURL(/\/app\/settings\/routing\?/);
   await expect(page.getByTestId('routing-section')).toBeVisible();
 });
 
-test('fixture: empty team routing page says there is nothing to route yet', async ({ page }) => {
+test('fixture: with no rules the routing page shows the providers and no rule graph', async ({ page }) => {
   await page.goto('/app/settings/routing?scenario=model-routing-empty');
-  await expect(page.getByTestId('routing-empty')).toBeVisible();
+  await expect(page.getByTestId('provider-instance').first()).toBeVisible();
+  await expect(page.getByTestId('routing-section')).toHaveCount(0);
 });
 
-test('the settings nav lists Providers, Model selector and Model routing', async ({ page }) => {
+test('the settings nav lists Model selector and Model routing, not Providers', async ({ page }) => {
   await page.goto('/app/resources/providers?scenario=10');
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByRole('link', { name: '用量与连接' })).toHaveCount(0);
   await expect(settings.getByRole('link', { name: '规则与策略' })).toHaveCount(0);
+  await expect(settings.getByRole('link', { name: '模型服务', exact: true })).toHaveCount(0);
   await settings.getByRole('link', { name: '模型路由', exact: true }).click();
   await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=10/);
   await expect(page.getByRole('heading', { name: '模型路由', exact: true })).toBeVisible();
