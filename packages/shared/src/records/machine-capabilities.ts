@@ -40,7 +40,13 @@ export type ConfinementReport = z.infer<typeof confinementReportSchema>;
 
 export const confinementCauseSchema = z
   .object({
-    kind: z.enum(['not-own-unit', 'bwrap-missing', 'home-overlay-failed']),
+    kind: z.enum([
+      'not-own-unit',
+      'bwrap-missing',
+      'bwrap-too-old',
+      'userns-denied',
+      'home-overlay-failed',
+    ]),
     mountPoint: z.string().startsWith('/').max(4096).optional(),
   })
   .strict();
@@ -110,7 +116,7 @@ export const machineCapabilitiesSchema = z.object({
   mcpConnectors: z.literal(true).optional(),
   codexLogin: codexLoginSchema.optional(),
   confinement: confinementReportSchema.optional(),
-  confinementCause: confinementCauseSchema.optional(),
+  confinementCause: confinementCauseSchema.optional().catch(undefined),
   agentReach: agentReachReportSchema.optional(),
   hostPermissions: hostPermissionsSchema.optional(),
 });
