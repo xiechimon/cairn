@@ -2,24 +2,24 @@ import SwiftUI
 import UIKit
 
 extension Color {
-    static let canvas = Color(light: 0xECEBE6, dark: 0x151615)
-    static let card = Color(light: 0xE5E4DF, dark: 0x1C1D1C)
-    static let ink = Color(light: 0x1C1D1B, dark: 0xECEBE6)
-    static let inkMuted = Color(light: 0x5D5F5C, dark: 0x8C8B88)
-    static let hairline = Color(light: 0xD5D4CF, dark: 0x2C2D2C)
+    static let canvas = Color(light: 0xFFFFFF, dark: 0x191919)
+    static let card = Color(light: 0xF7F7F7, dark: 0x202020)
+    static let ink = Color(light: 0x0A0A0A, dark: 0xF7F7F7)
+    static let inkMuted = Color(light: 0x6E6E6E, dark: 0x8A8A8A)
+    static let hairline = Color(light: 0xE6E6E6, dark: 0x303030)
     static let userBubble = Color(light: 0xF3EAD6, dark: 0x33290F)
-    static let replyBubble = Color(light: 0xE0DFDA, dark: 0x252625)
-    static let menuHover = Color(light: 0xE0DFDA, dark: 0x2A2B2A)
-    static let taskRefLine = Color(light: 0x9C9C98, dark: 0x676867)
+    static let replyBubble = Color(light: 0xF2F2F2, dark: 0x292929)
+    static let menuHover = Color(light: 0xF2F2F2, dark: 0x2E2E2E)
+    static let taskRefLine = Color(light: 0xA9A9A9, dark: 0x6B6B6B)
     static let countBadge = Color(light: 0x376DD6, dark: 0x376DD6)
     static let running = Color(light: 0x5F8F4F, dark: 0x82B46F)
-    static let failure = Color(light: 0x9C3627, dark: 0xF09A88)
+    static let failure = Color(light: 0xA33A2A, dark: 0xF09A88)
     static let waiting = Color(light: 0x6E4900, dark: 0xF2CF86)
     static let onAccent = Color(light: 0xFFFFFF, dark: 0x0A0A0A)
-    static let inkTertiary = Color(light: 0x4B4D4A, dark: 0x9C9B98)
-    static let composerFill = Color(light: 0xECEBE6, dark: 0x252625)
-    static let composerRing = Color(light: 0xCDCDC8, dark: 0x343534)
-    static let composerButton = Color(light: 0xDEDDD8, dark: 0x353635)
+    static let inkTertiary = Color(light: 0x545454, dark: 0xA3A3A3)
+    static let composerFill = Color(light: 0xFFFFFF, dark: 0x292929)
+    static let composerRing = Color(light: 0xDEDEDE, dark: 0x383838)
+    static let composerButton = Color(light: 0xF0F0F0, dark: 0x393939)
 
     init(light: UInt32, dark: UInt32) {
         self.init(uiColor: UIColor { traits in
