@@ -203,24 +203,22 @@ Reach:
 
 ### merge-gate
 
-**Evidence-bound merge gate** (shipped, centrality 1). A differentiator: a merge lands only on the patch a verdict judged, with protected paths, required checks, review and the brake enforced by the server; per-project merge policy and ship route.
+**Completed delivery and explicit merge** (shipped, centrality 1). Successful code tasks finish with their branch or PR retained. Only an explicit conversational user request initiates a merge, without a mandatory agent review or merge-choice UI.
 
-States: The gate shows why a merge is allowed or blocked; merge permission missing, merge in progress, merged.
+States: Delivered code is completed without a merge dialog. Explicit merge requests can succeed or be refused for permissions, a changed delivery or target, duplicate operations, or a dirty workspace.
 
 Reach:
 
 1. `open /app/todo/<id of a thread listed by the todos API>`
 2. `click testid:thread-pr-panel`
-3. `click testid:accept-dialog-pr`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `accept-dialog-pr`
-- Verify recipes: [.claude/skills/verify-cairn/features/review-700.md](features/review-700.md)
-- Research: [docs/research/2513-tla-statecharts.md](../../../docs/research/2513-tla-statecharts.md), [docs/research/892-gate-usage-measurement.md](../../../docs/research/892-gate-usage-measurement.md), [docs/research/mergify-merge-queue-spike.md](../../../docs/research/mergify-merge-queue-spike.md), [docs/research/review-gate-alternatives.md](../../../docs/research/review-gate-alternatives.md) (not on main)
-- Frontend design: **gap**: the gate verdict, merge button and merge-permission states in the thread have no design
-- Backend design: [docs/research/2513-tla-statecharts.md](../../../docs/research/2513-tla-statecharts.md), [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](../../../docs/spec/23-rework-to-original-branch-and-pr-convergence.md)
-- Evidence: `apps/server/test/merge-gate-readiness.test.ts`, `apps/server/test/merge-gate-verdict-binding.test.ts`, `integration/test/gate-e2e.test.ts`
+- Test ids in its code: `side-chat-action`
+- Research: [docs/research/remove-product-merge-gate-2026-11-16.md](../../../docs/research/remove-product-merge-gate-2026-11-16.md)
+- Frontend design: [docs/design/remove-product-merge-gate.md](../../../docs/design/remove-product-merge-gate.md)
+- Backend design: [docs/design/remove-product-merge-gate.md](../../../docs/design/remove-product-merge-gate.md)
+- Evidence: `apps/server/test/pr-merge-api.test.ts`, `apps/server/test/local-merge-landing.test.ts`, `apps/web/e2e/info-card-report.spec.ts`, `integration/test/g2t2-local-lifecycle.test.ts`
 
 ### needs-you
 
@@ -454,7 +452,7 @@ Reach:
 
 - Web routes: `/app/todo/:id`
 - Keyboard shortcuts in its code: `A`, `B`, `C`, `P`, `R`
-- Test ids in its code: `accept-dialog-pr`, `agent-text`, `agent-todo`, `automation-completed`, `chief-reply-bubble`, `composer-card`, `composer-placeholder`, `composer-plus`, `composer-toolbar`, `diff-fold`, `diff-full`, `doc-body`, `doc-pane`, `edit-error`, `fail-raw-error`, `info-report`, `left`, `live-row`, `md-checkbox`, `md-code`, `md-code-block`, `md-code-copy`, `md-code-dialog-body`, `md-code-dialog-copy`, `md-code-done`, `md-code-expand`, `md-code-lang`, `md-item-bullet`, `md-item-ordered`, `md-item-task`, `md-list-bullet`, `md-list-ordered`, `md-list-task`, `md-quote`, `md-table`, `md-task`, `md-task-children`, `md-tasks`, `msg-actions`, `msg-stamp`, `msg-tools`, `msg-tools-touch`, `right`, `schedule-wake-marker`, `scheduled-turn`, `side-chat-action`, `skill-line`, `skills-summary`, `source-issue-drift`, `source-issue-echo`, `source-issue-pending`, `source-issue-retry`, `source-orchestration`, `source-orchestration-link`, `step-prompt-raw`, `thinking-body`, `tool-output`, `transcript-col`, `transcript-note`, `transcript-question`, `transcript-step-prompt`, `transcript-time-divider`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-earlier`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`
+- Test ids in its code: `agent-text`, `agent-todo`, `automation-completed`, `chief-reply-bubble`, `composer-card`, `composer-placeholder`, `composer-plus`, `composer-toolbar`, `diff-fold`, `diff-full`, `doc-body`, `doc-pane`, `edit-error`, `fail-raw-error`, `info-report`, `left`, `live-row`, `md-checkbox`, `md-code`, `md-code-block`, `md-code-copy`, `md-code-dialog-body`, `md-code-dialog-copy`, `md-code-done`, `md-code-expand`, `md-code-lang`, `md-item-bullet`, `md-item-ordered`, `md-item-task`, `md-list-bullet`, `md-list-ordered`, `md-list-task`, `md-quote`, `md-table`, `md-task`, `md-task-children`, `md-tasks`, `msg-actions`, `msg-stamp`, `msg-tools`, `msg-tools-touch`, `right`, `schedule-wake-marker`, `scheduled-turn`, `side-chat-action`, `skill-line`, `skills-summary`, `source-issue-drift`, `source-issue-echo`, `source-issue-pending`, `source-issue-retry`, `source-orchestration`, `source-orchestration-link`, `step-prompt-raw`, `thinking-body`, `tool-output`, `transcript-col`, `transcript-note`, `transcript-question`, `transcript-step-prompt`, `transcript-time-divider`, `user-bubble`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-earlier`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`
 - Verify recipes: [.claude/skills/verify-cairn/features/board-new-task.md](features/board-new-task.md), [.claude/skills/verify-cairn/features/agent-detail.md](features/agent-detail.md)
 - Research: [docs/research/r12-save-and-start-behavior.md](../../../docs/research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/research/duet-proactive-coordinator.md](../../../docs/research/duet-proactive-coordinator.md)
 - Frontend design: [docs/design/references/thread-review](../../../docs/design/references/thread-review), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)

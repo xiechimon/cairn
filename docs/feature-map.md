@@ -19,11 +19,11 @@
 | status shipped | 45 |
 | status partial | 8 |
 | status planned | 3 |
-| research, frontend design and backend design all present or not applicable | 25 |
+| research, frontend design and backend design all present or not applicable | 26 |
 | Research gaps | 13 |
-| Frontend design gaps | 18 |
+| Frontend design gaps | 17 |
 | Backend design gaps | 19 |
-| notes cited but not on main | 21 |
+| notes cited but not on main | 20 |
 
 ## Coverage
 
@@ -38,7 +38,7 @@
 | [Eval-gated harness changes](#eval-gated-harness) | 1 | partial | yes | n/a | yes |  |
 | [Harness dispatch](#harness-dispatch) | 1 | shipped | yes | n/a | yes |  |
 | [Memory](#memory) | 1 | shipped | yes | yes (not on main) | yes |  |
-| [Evidence-bound merge gate](#merge-gate) | 1 | shipped | yes | gap | yes | B3 |
+| [Completed delivery and explicit merge](#merge-gate) | 1 | shipped | yes | yes | yes |  |
 | [Task references and needs-you](#needs-you) | 1 | shipped | yes | yes | gap | B2 |
 | [Per-task orb isolation](#orb-isolation) | 1 | partial | yes | gap | yes | B4 |
 | [Plans, approval and review](#plans-and-review) | 1 | shipped | yes | gap | yes | B3 |
@@ -107,7 +107,6 @@ What a user can do to a running thread and how the gate verdict shows: steer, qu
 
 | Feature | Centrality | Missing |
 |---|---|---|
-| [Evidence-bound merge gate](#merge-gate) | 1 | Frontend design: the gate verdict, merge button and merge-permission states in the thread have no design |
 | [Plans, approval and review](#plans-and-review) | 1 | Frontend design: the plan pane, auto-approve countdown and reject flow have no current design |
 | [Steer, queue and stop](#steer-queue-stop) | 1 | Research: no note on how Amp, Claude Code and Codex steer, queue and interrupt<br>Frontend design: the queued-message list, steer affordance and stop confirmation have no design<br>Backend design: no design for queue ordering, steer delivery to each harness and stop semantics |
 
@@ -274,11 +273,11 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### merge-gate
 
-**Evidence-bound merge gate** (shipped). A differentiator: a merge lands only on the patch a verdict judged, with protected paths, required checks, review and the brake enforced by the server; per-project merge policy and ship route.
+**Completed delivery and explicit merge** (shipped). Successful code tasks finish with their branch or PR retained. Only an explicit conversational user request initiates a merge, without a mandatory agent review or merge-choice UI.
 
-- Research: [docs/research/2513-tla-statecharts.md](research/2513-tla-statecharts.md), [docs/research/892-gate-usage-measurement.md](research/892-gate-usage-measurement.md), [docs/research/mergify-merge-queue-spike.md](research/mergify-merge-queue-spike.md), [docs/research/review-gate-alternatives.md](research/review-gate-alternatives.md) (not on main)
-- Frontend design: **gap**: the gate verdict, merge button and merge-permission states in the thread have no design
-- Backend design: [docs/research/2513-tla-statecharts.md](research/2513-tla-statecharts.md), [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](spec/23-rework-to-original-branch-and-pr-convergence.md)
+- Research: [docs/research/remove-product-merge-gate-2026-11-16.md](research/remove-product-merge-gate-2026-11-16.md)
+- Frontend design: [docs/design/remove-product-merge-gate.md](design/remove-product-merge-gate.md)
+- Backend design: [docs/design/remove-product-merge-gate.md](design/remove-product-merge-gate.md)
 
 ### needs-you
 
@@ -664,7 +663,6 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 | `docs/research/desktop-app-stack-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/pi-durable-spike.md` | branch origin/docs/pi-durable-spike |
 | `docs/research/project-coordinators.md` | branch origin/docs/project-coordinators |
-| `docs/research/review-gate-alternatives.md` | branch origin/docs/review-gate-alternatives |
 | `docs/research/seamless-device-auth-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/serif-typography-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/sidebar-coordinator-icon-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |

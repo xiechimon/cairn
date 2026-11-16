@@ -20,8 +20,7 @@
     "docs/research/coordinator-computer.md": "branch origin/docs/coordinator-computer",
     "docs/research/project-coordinators.md": "branch origin/docs/project-coordinators",
     "docs/research/agent-machine-routing.md": "branch origin/claude/elegant-jones-a3e2a9",
-    "docs/research/pi-durable-spike.md": "branch origin/docs/pi-durable-spike",
-    "docs/research/review-gate-alternatives.md": "branch origin/docs/review-gate-alternatives"
+    "docs/research/pi-durable-spike.md": "branch origin/docs/pi-durable-spike"
   },
   "batches": [
     {
@@ -771,15 +770,15 @@
     },
     {
       "id": "merge-gate",
-      "name": "Evidence-bound merge gate",
-      "summary": "A differentiator: a merge lands only on the patch a verdict judged, with protected paths, required checks, review and the brake enforced by the server; per-project merge policy and ship route.",
-      "states": "The gate shows why a merge is allowed or blocked; merge permission missing, merge in progress, merged.",
+      "name": "Completed delivery and explicit merge",
+      "summary": "Successful code tasks finish with their branch or PR retained. Only an explicit conversational user request initiates a merge, without a mandatory agent review or merge-choice UI.",
+      "states": "Delivered code is completed without a merge dialog. Explicit merge requests can succeed or be refused for permissions, a changed delivery or target, duplicate operations, or a dirty workspace.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/detail/merge-gate.ts",
-          "apps/web/src/detail/accept-dialog.tsx"
+          "apps/web/src/board/thread-actions.tsx",
+          "apps/web/src/board/thread-panel-model.ts"
         ],
         "server": [
           "apps/server/src/services/merge-gate",
@@ -803,31 +802,23 @@
       },
       "reach": [
         "open /app/todo/<id of a thread listed by the todos API>",
-        "click testid:thread-pr-panel",
-        "click testid:accept-dialog-pr"
-      ],
-      "verify": [
-        ".claude/skills/verify-cairn/features/review-700.md"
+        "click testid:thread-pr-panel"
       ],
       "research": [
-        "docs/research/2513-tla-statecharts.md",
-        "docs/research/892-gate-usage-measurement.md",
-        "docs/research/mergify-merge-queue-spike.md",
-        "docs/research/review-gate-alternatives.md"
+        "docs/research/remove-product-merge-gate-2026-11-16.md"
       ],
-      "frontendDesign": {
-        "gap": "the gate verdict, merge button and merge-permission states in the thread have no design"
-      },
+      "frontendDesign": [
+        "docs/design/remove-product-merge-gate.md"
+      ],
       "backendDesign": [
-        "docs/research/2513-tla-statecharts.md",
-        "docs/spec/23-rework-to-original-branch-and-pr-convergence.md"
+        "docs/design/remove-product-merge-gate.md"
       ],
       "evidence": [
-        "apps/server/test/merge-gate-readiness.test.ts",
-        "apps/server/test/merge-gate-verdict-binding.test.ts",
-        "integration/test/gate-e2e.test.ts"
-      ],
-      "batch": "B3"
+        "apps/server/test/pr-merge-api.test.ts",
+        "apps/server/test/local-merge-landing.test.ts",
+        "apps/web/e2e/info-card-report.spec.ts",
+        "integration/test/g2t2-local-lifecycle.test.ts"
+      ]
     },
     {
       "id": "plans-and-review",
