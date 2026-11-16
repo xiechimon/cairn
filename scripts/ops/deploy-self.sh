@@ -23,6 +23,8 @@ Deploys one green main commit to this host's cairn checkout and user units, with
      is paused, or whose pnpm-workspace.yaml allows a new install script (exit 2)
   2. respects $CAIRN_DEPLOY_STATE/hold; daemon changes pause claims with a durable lease
      and drain within CAIRN_DEPLOY_STEP_WAIT_SECONDS (exit 75 on timeout), always resuming;
+     server-only changes pause claims the same way and wait up to
+     CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS for claimed steps, then restart the server anyway;
      every deploy also waits that long for open Coordinator computer calls other than
      request_takeover, which resumes across a restart
   3. rehearses the target's migrations on an online copy of the live DB in a scratch worktree
@@ -44,6 +46,7 @@ Environment (defaults in brackets):
   CAIRN_REQUIRED_CHECKS [check pack-smoke e2e-gate]  CAIRN_HEALTH_URL [http://127.0.0.1:8787]
   CAIRN_HEALTH_TRIES [60]  CAIRN_HEALTH_INTERVAL [2]  CAIRN_MACHINE_NAME [hostname -s]
   CAIRN_DEPLOY_KEEP_SNAPSHOTS [10]  CAIRN_DEPLOY_STEP_WAIT_SECONDS [1800]
+  CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS [600]
   CAIRN_DEPLOY_NOTIFY [$CAIRN_DEPLOY_STATE/notify.sh]
   CAIRN_DEPLOY_NOTIFY_TIMEOUT [5]
   CAIRN_GH_WRAPPER [~/.cairn/tools/app-token/as-bot.sh]
@@ -67,6 +70,7 @@ KEEP_SNAPSHOTS="${CAIRN_DEPLOY_KEEP_SNAPSHOTS:-10}"
 NOTIFY_HOOK="${CAIRN_DEPLOY_NOTIFY:-$STATE/notify.sh}"
 NOTIFY_TIMEOUT="${CAIRN_DEPLOY_NOTIFY_TIMEOUT:-5}"
 STEP_WAIT_SECONDS="${CAIRN_DEPLOY_STEP_WAIT_SECONDS:-1800}"
+SERVER_STEP_WAIT_SECONDS="${CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS:-600}"
 TOKEN_FILE="${CAIRN_DEPLOY_TOKEN_FILE:-$HOME/.cairn/token}"
 HOST_TOOLS_ROOT="${CAIRN_HOST_TOOLS_ROOT:-$HOME/.cairn/tools}"
 HOST_LANES_ROOT="${CAIRN_HOST_LANES_ROOT:-$HOME/lanes}"
@@ -339,13 +343,18 @@ PYLEASE
 }
 
 wait_for_steps() {
-  local deadline=$(( $(date +%s) + STEP_WAIT_SECONDS )) running
+  local wait_seconds="${1:-$STEP_WAIT_SECONDS}" on_deadline="${2:-starve}" deadline running
+  deadline=$(( $(date +%s) + wait_seconds ))
   while :; do
     [ "$(sqlite3 -readonly "$DB" "select count(*) from deploy_lease where id='server' and owner='$LEASE_OWNER' and status='draining' and expiresAt > $(($(date +%s) * 1000))")" = 1 ] || refuse "deployment lease lost during drain"
     running="$(sqlite3 -readonly "$DB" "select count(*) from step where status='claimed' and machineId is not null")" || refuse "cannot read running steps"
     [[ "$running" =~ ^[0-9]+$ ]] || refuse "invalid running step count"
     [ "$running" != 0 ] || return 0
-    [ "$(date +%s)" -lt "$deadline" ] || busy "starved: steps never idle ($running still running after ${STEP_WAIT_SECONDS}s drain)"
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      [ "$on_deadline" = restart ] || busy "starved: steps never idle ($running still running after ${wait_seconds}s drain)"
+      log "drain deadline passed after ${wait_seconds}s; restarting the server with $running claimed steps still running"
+      return 0
+    fi
     sleep 1
   done
 }
@@ -363,14 +372,29 @@ wait_for_computer_calls() {
 }
 
 drain_steps() {
-  [ "$RUNTIME" = daemon ] || return 0
+  if [ "$RUNTIME" = server ]; then
+    local probe
+    probe="$(lease_request)" || true
+    case "$probe" in
+      200) ;;
+      000 | '' | 404)
+        log "restarting the server without a drain: the deployment lease request answered ${probe:-nothing}"
+        return 0
+        ;;
+      *) refuse_lease_status "$probe" ;;
+    esac
+  fi
   [ -n "$LEASE_OWNER" ] || LEASE_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
   printf '%s\n' "$LEASE_OWNER" >"$STATE/lease-owner"
   local status
   status="$(lease_request -X PUT --data-binary "{\"owner\":\"$LEASE_OWNER\",\"ttlMs\":3600000}")" || true
   [ "$status" = 200 ] || refuse_lease_status "$status"
   assert_lease || refuse "cannot acquire deployment lease: the server returned another owner or an expired lease"
-  wait_for_steps
+  if [ "$RUNTIME" = daemon ]; then
+    wait_for_steps
+  else
+    wait_for_steps "$SERVER_STEP_WAIT_SECONDS" restart
+  fi
 }
 
 WORKSPACE_BUILD_GUARD='
@@ -839,7 +863,8 @@ recover_interrupted() {
     log "restored the $PREVIOUS checkout; running services were not touched"
     return 0
   fi
-  if [ "$RUNTIME" = daemon ] && [ -s "$DB" ]; then
+  if [ -s "$DB" ] && { [ "$RUNTIME" = daemon ] || { [ "$(probe /app)" = 200 ] &&
+    [ "$(sqlite3 -readonly "$DB" "select count(*) from sqlite_master where name='deploy_lease'")" = 1 ]; }; }; then
     local lease_now
     [ -n "$LEASE_OWNER" ] || LEASE_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
     [[ "$LEASE_OWNER" =~ ^[0-9a-f-]{36}$ ]] || refuse "invalid recovery lease owner"
@@ -850,7 +875,11 @@ recover_interrupted() {
       on conflict(id) do update set owner=excluded.owner, status=excluded.status, expiresAt=excluded.expiresAt
       where deploy_lease.owner=excluded.owner or deploy_lease.status='accepting' or deploy_lease.expiresAt <= $lease_now;
       commit;" || refuse "cannot recover deployment lease"
-    wait_for_steps
+    if [ "$RUNTIME" = daemon ]; then
+      wait_for_steps
+    else
+      wait_for_steps "$SERVER_STEP_WAIT_SECONDS" restart
+    fi
   fi
   if [ "$phase" = restoring ] || [ "$phase" = restored ]; then
     stop_or_give_up "$snapshot"
@@ -893,6 +922,7 @@ recover_interrupted() {
 }
 
 [[ "$STEP_WAIT_SECONDS" =~ ^[0-9]+$ ]] && [ "$STEP_WAIT_SECONDS" -le 1800 ] || refuse "drain deadline must be between 0 and 1800 seconds"
+[[ "$SERVER_STEP_WAIT_SECONDS" =~ ^[0-9]+$ ]] && [ "$SERVER_STEP_WAIT_SECONDS" -le 1800 ] || refuse "server drain deadline must be between 0 and 1800 seconds"
 recover_interrupted
 [ "$RECOVER_ONLY" = 0 ] || exit 0
 

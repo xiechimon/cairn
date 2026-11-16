@@ -20,6 +20,8 @@ REPO="${CAIRN_REPO:-xiechimon/cairn}"
 REQUIRED_CHECKS="${CAIRN_REQUIRED_CHECKS:-check pack-smoke e2e-gate}"
 LAG_LIMIT_SECONDS="${CAIRN_DEPLOY_LAG_LIMIT_SECONDS:-7200}"
 SCAN_DEPTH="${CAIRN_DEPLOY_SCAN_DEPTH:-20}"
+QUIET_SECONDS="${CAIRN_DEPLOY_QUIET_SECONDS:-240}"
+MAX_WAIT_SECONDS="${CAIRN_DEPLOY_MAX_WAIT_SECONDS:-1800}"
 DEPLOY_SCRIPT="${CAIRN_DEPLOY_SCRIPT:-$CHECKOUT/scripts/ops/deploy-self.sh}"
 LAG_TITLE="deploy lag: omarchy is behind main"
 
@@ -53,6 +55,30 @@ newest_green_after() {
   done
 }
 
+main_settled() {
+  local deployed="$1" head now seen_head="" seen_at="" behind_at=""
+  head="$(git -C "$CHECKOUT" rev-parse origin/main)"
+  if [ "$head" = "$deployed" ]; then
+    rm -f "$STATE/main-seen"
+    return 0
+  fi
+  now="$(date +%s)"
+  [ ! -s "$STATE/main-seen" ] || read -r seen_head seen_at behind_at <"$STATE/main-seen" || true
+  if ! [[ "$seen_at" =~ ^[1-9][0-9]{0,11}$ && "$behind_at" =~ ^[1-9][0-9]{0,11}$ ]] ||
+    [ "$behind_at" -gt "$seen_at" ] || [ "$seen_at" -gt "$now" ]; then
+    seen_head=""
+    behind_at="$now"
+  fi
+  if [ "$seen_head" != "$head" ]; then
+    seen_at="$now"
+    printf '%s %s %s\n' "$head" "$seen_at" "$behind_at" >"$STATE/main-seen"
+  fi
+  [ $((now - seen_at)) -ge "$QUIET_SECONDS" ] && return 0
+  [ $((now - behind_at)) -ge "$MAX_WAIT_SECONDS" ] && return 0
+  log "waiting for main to settle: $head first seen $((now - seen_at))s ago (quiet ${QUIET_SECONDS}s, behind for $((now - behind_at))s of at most ${MAX_WAIT_SECONDS}s)"
+  return 1
+}
+
 deploy_newest_green() {
   local deployed target
   if [ -e "$STATE/in-progress" ]; then
@@ -62,11 +88,13 @@ deploy_newest_green() {
     [ ! -e "$STATE/in-progress" ] || return 0
   fi
   deployed="$(git -C "$CHECKOUT" rev-parse HEAD)"
+  main_settled "$deployed" || return 0
   target="$(newest_green_after "$deployed")"
   [ -n "$target" ] || return 0
   log "deploying $target"
   local status=0
   CAIRN_DEPLOY_RUNNING_COPY= bash "$DEPLOY_SCRIPT" "$target" >>"$STATE/last-attempt.log" 2>&1 || status=$?
+  [ "$status" != 0 ] || rm -f "$STATE/main-seen"
   echo "$(date -u +%FT%TZ) $target exit $status" >"$STATE/last-attempt"
   log "deploy of $target exited $status"
 }
