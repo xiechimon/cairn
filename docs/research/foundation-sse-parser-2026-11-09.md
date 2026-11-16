@@ -3,7 +3,7 @@
 Date: 2026-11-09
 Status: Research draft only; not implementation acceptance, dependency authorization or a change to PR #3575
 
-Tracking: #3564. Parent coverage ledger: [foundation library replacement](foundation-library-replacement-2026-11-09.md).
+Tracking: #3564. Parent coverage ledger: foundation library replacement (removed from the tree).
 
 ## Scope and evidence convention
 

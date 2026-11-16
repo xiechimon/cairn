@@ -12,7 +12,7 @@ Base: origin/main `8e1d4a53e`. Everything below was read this session unless mar
 | Sweep | `handlers/on_failing_github_actions.py:256` (10 edits max), `:259-278` (fixes only while the base passes), `:434` (stops polling at 120 min); `api.py:405-430` (2 rounds, base green), `:588-590` (bots filtered) | Round caps, base-red skip, ignoring its own comments |
 | Kodiak | `bot/kodiak/evaluation.py:889-925` (`BEHIND` → update-branch), `:942-946` (`DIRTY` blocks), `:1330-1352` (no retry after a merge 500), `queries/__init__.py:1401` (`PUT /pulls/{n}/update-branch`), `refresh_pull_requests.py:122` | Update-branch is a merge, not a rebase; no blind merge retry; polling beside webhooks |
 | Copilot coding agent docs | "Make changes to an existing PR": "only responds to comments from people who have write access" and keeps context per PR | Write-access gate, one session per PR |
-| Mergify | `docs/research/mergify-merge-queue-spike.md`, CLAUDE.md "Merge routes" | Admitted PRs queue themselves |
+| Mergify | the Mergify merge queue spike (removed from the tree), CLAUDE.md "Merge routes" | Admitted PRs queue themselves |
 | GitHub REST docs, Funnel KB 1223, smee.io | Authenticated `304`s are free; 5,000/h per user token; no automatic webhook redelivery; Funnel is public on 443/8443/10000; smee is a dev relay | Intake choice |
 
 ## What cairn already has
