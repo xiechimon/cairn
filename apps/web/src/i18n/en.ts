@@ -1322,8 +1322,6 @@ export const EN: Record<string, string> = {
     'Let this Agent modify skills already in the team skill library.',
   '任务执行时，该 Agent 可在需要密钥的执行步中按需取用团队密钥，每次取用都会留下记录；密钥不预置进 shell 环境。所在执行机需要 cairn CLI 0.1.28 及以上。':
     'When running a task, this Agent can retrieve team secrets on demand in the execution steps that need them; every retrieval is recorded, and secrets are never preloaded into the shell environment. The Runner must have cairn CLI 0.1.28 or newer.',
-  '该 Agent 执行任务时可使用的团队 MCP 服务器，其工具以 mcp__<服务器>__<工具> 的形式出现。':
-    'Team MCP servers this Agent may use while running tasks; their tools appear as mcp__<server>__<tool>.',
   '说明该 Agent 的常驻职责，可多行。该说明会注入它执行的每个任务的系统提示词，也会提供给 Coordinator 用于分派。':
     'Describe the Agent’s ongoing responsibility — multi-line OK. The text is injected into the system prompt of every task it runs and is given to the Coordinator for dispatch.',
   '该 Agent 执行任何任务时自动携带的团队技能，无需在消息中 @ 引用。':

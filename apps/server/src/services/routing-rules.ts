@@ -62,7 +62,6 @@ export interface RouteProfile {
   secrets: string[];
   defaultSkill: string | null;
   skillsAllowlist: string[] | null;
-  mcpServers: string[];
   requiredCapabilities: RequiredCapabilities | null;
   fallbackModels: RoutingRuleRow['fallbackModels'];
   routed: boolean;
@@ -571,7 +570,6 @@ export function routeProfile(
     secrets: policy?.secrets ?? [],
     defaultSkill: policy?.defaultSkill ?? null,
     skillsAllowlist: policy === null ? [] : policy.skillsAllowlist,
-    mcpServers: route.use === 'coordinator' ? (route.mcpServers ?? []) : (policy?.mcpServers ?? []),
     requiredCapabilities: session
       ? withOverride(route.requiredCapabilities, override?.requiredCapabilities)
       : route.requiredCapabilities,
@@ -687,7 +685,6 @@ function toWorkPolicyRecord(row: WorkPolicyRow): WorkPolicyRecord {
     teamId: row.teamId,
     use: row.use,
     tools: row.tools,
-    mcpServers: row.mcpServers,
     skillsAllowlist: row.skillsAllowlist,
     defaultSkill: row.defaultSkill,
     secrets: row.secrets,
@@ -791,7 +788,7 @@ export function upsertRoutingRule(
         machineId: body.machineId ?? null,
         requiredCapabilities: body.requiredCapabilities ?? null,
         tools: null,
-        mcpServers: body.mcpServers ?? null,
+        mcpServers: null,
         skillsAllowlist: null,
         defaultSkill: null,
         secrets: null,
@@ -811,7 +808,6 @@ export function upsertRoutingRule(
   if (body.requiredCapabilities !== undefined) {
     sets.requiredCapabilities = body.requiredCapabilities;
   }
-  if (body.mcpServers !== undefined) sets.mcpServers = body.mcpServers;
   db.update(routingRule).set(sets).where(eq(routingRule.id, existing.id)).run();
   return requireRoutingRule(db, existing.id);
 }
@@ -836,7 +832,7 @@ export function upsertWorkPolicy(
         teamId,
         use,
         tools: filterAgentTools(body.tools ?? []),
-        mcpServers: body.mcpServers ?? [],
+        mcpServers: [],
         skillsAllowlist: body.skillsAllowlist ?? null,
         defaultSkill: body.defaultSkill ?? null,
         secrets: body.secrets ?? [],
@@ -849,7 +845,6 @@ export function upsertWorkPolicy(
   }
   const sets: Partial<WorkPolicyRow> = { updatedAt: now };
   if (body.tools !== undefined) sets.tools = filterAgentTools(body.tools);
-  if (body.mcpServers !== undefined) sets.mcpServers = body.mcpServers;
   if (body.skillsAllowlist !== undefined) sets.skillsAllowlist = body.skillsAllowlist;
   if (body.defaultSkill !== undefined) sets.defaultSkill = body.defaultSkill;
   if (body.secrets !== undefined) sets.secrets = body.secrets;

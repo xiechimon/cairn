@@ -31,7 +31,6 @@ const AGENT: AgentRecord = {
   secrets: [],
   defaultSkill: null,
   skillsAllowlist: null,
-  mcpServers: [],
 };
 
 const ENV: ChiefGetResponse = {

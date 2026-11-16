@@ -324,7 +324,6 @@ interface Comparable {
   machineId: string | null;
   tools: string[];
   secrets: string[];
-  mcpServers: string[];
   skillsAllowlist: string[] | null;
   defaultSkill: string | null;
   requiredCapabilities: unknown;
@@ -339,7 +338,6 @@ function pick(p: Comparable): Comparable {
     machineId: p.machineId,
     tools: p.tools,
     secrets: p.secrets,
-    mcpServers: p.mcpServers,
     skillsAllowlist: p.skillsAllowlist,
     defaultSkill: p.defaultSkill,
     requiredCapabilities: p.requiredCapabilities,
@@ -522,11 +520,6 @@ function compareCell(
       [roleModel.provider, roleModel.modelId, cell.thinking === 'high' ? 'high' : null],
     );
     same(
-      'coordinator mcp',
-      profile.mcpServers,
-      cell.mcp === 'some' ? ['codegraph', 'playwright'] : [],
-    );
-    same(
       'coordinator fallback',
       profile.fallbackModels,
       cell.fallback === 'some' ? [{ provider: 'claude-code', modelId: 'claude-sonnet-5-5' }] : null,
@@ -605,8 +598,8 @@ function compareCell(
     if (!personaRuns) {
       same(
         'permissions come from the selected reviewer',
-        [after.tools, after.mcpServers, after.skillsAllowlist, after.defaultSkill, after.secrets],
-        [[], [], null, null, []],
+        [after.tools, after.skillsAllowlist, after.defaultSkill, after.secrets],
+        [[], null, null, []],
       );
     }
     return;
@@ -643,7 +636,6 @@ function compareCell(
     check(INTENTIONAL_DIFFERENCES.customReviewerPermissions.length > 0, 'unreachable');
     expected = {
       ...expected,
-      mcpServers: cell.mcp === 'some' ? ['codegraph', 'playwright'] : [],
       skillsAllowlist: cell.skills === 'null' ? null : cell.skills === 'some' ? ['skill-a'] : [],
       defaultSkill: cell.defaultSkill === 'some' ? 'skill-a' : null,
     };

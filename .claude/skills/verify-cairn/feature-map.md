@@ -830,9 +830,9 @@ Reach:
 
 ### mcp-servers
 
-**MCP servers** (shipped, centrality 3). The read-only list of MCP servers configured on each machine.
+**MCP servers** (shipped, centrality 3). Connect remote MCP servers from a catalog or by URL and see the local servers each machine configures; every task and review uses what is connected.
 
-States: An empty state or a read-only list of servers per machine.
+States: Catalog cards connected, needing sign-in, or failing; add-server dialog; manage dialog; local servers per machine, or empty.
 
 Reach:
 

@@ -66,7 +66,6 @@ export const patchRoutingRuleBodySchema = z
     fallbackModels: z.array(modelRefSchema).max(FALLBACK_MODELS_MAX).nullable().optional(),
     machineId: recordId.nullable().optional(),
     requiredCapabilities: requiredCapabilitiesSchema.nullable().optional(),
-    mcpServers: z.array(z.string()).nullable().optional(),
     expectedUpdatedAt: epochMs.optional(),
   })
   .refine((body) => Object.keys(body).length > 0, { message: 'empty patch' });
