@@ -95,4 +95,4 @@ Why nothing counts twice: for a key `(buildId, model)`, `token_usage` is the sum
 
 ## Not in scope
 
-The usage page and sidebar entry (waits for the owner's look sign-off), per-user Coordinator splits, cost per day, making ACP backends report usage, and the `localMidnight` DST bug in the daily report window (`reportWindow` in `chief-report.ts`), filed as #5250.
+The usage page and sidebar entry (waits for the owner's look sign-off), per-user Coordinator splits, cost per day, making ACP backends report usage, and the `localMidnight` DST bug in the daily report window, which goes away with the daily report (owner 2026-11-16; #5250 closed as not planned).
