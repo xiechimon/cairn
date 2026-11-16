@@ -167,7 +167,7 @@ export async function writeCloakLauncher(
     [
       '#!/bin/bash',
       'set -euo pipefail',
-      'unset CLOAKBROWSER_LICENSE_KEY WAYLAND_DISPLAY WAYLAND_SOCKET',
+      'unset CLOAKBROWSER_LICENSE_KEY WAYLAND_DISPLAY WAYLAND_SOCKET __GLX_VENDOR_LIBRARY_NAME',
       `lock=${shellQuote(join(profile, 'SingletonLock'))}`,
       'if [[ -L $lock ]]; then',
       '  owner=$(readlink "$lock")',

@@ -170,6 +170,25 @@ test('generated Dock launcher runs the fake engine with file-only credentials an
   expect(env.CLOAKBROWSER_LICENSE_FILE).toBe(join(root, 'license.key'));
 });
 
+test('manual launcher ignores the host GLX vendor override inherited from systemd', async () => {
+  const { root, sdk, engine } = setup();
+  const binary = join(root, 'fake engine');
+  const receipt = join(root, 'graphics-vendor');
+  writeFileSync(
+    binary,
+    `#!/bin/bash\nprintf '%s' "\${__GLX_VENDOR_LIBRARY_NAME-unset}" > '${receipt}'\n`,
+  );
+  chmodSync(binary, 0o700);
+  vi.mocked(sdk.binaryInfo).mockReturnValue({ installed: true, binaryPath: binary, version: '1' });
+  await engine.prepare();
+  await writeCloakLauncher(root, join(root, 'profile'), engine);
+  const result = spawnSync(join(root, 'cloak-browser'), [], {
+    env: { PATH: process.env.PATH, __GLX_VENDOR_LIBRARY_NAME: 'host-only-graphics-vendor' },
+  });
+  expect(result.status).toBe(0);
+  expect(readFileSync(receipt, 'utf8')).toBe('unset');
+});
+
 test('launch cannot download before preparation and a deleted key refuses cached launch', async () => {
   const { root, file, engine, sdk } = setup();
   await expect(engine.launch(join(root, 'profile'))).rejects.toThrow('prepared');
