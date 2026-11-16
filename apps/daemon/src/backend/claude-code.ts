@@ -38,7 +38,7 @@ import type {
   StepEvent,
   ToolCallRecord,
 } from '@cairn/shared';
-import { AGENT_TODO_MAX_ITEMS, CLAUDE_TODO_STATUS_STATES } from '@cairn/shared';
+import { AGENT_TODO_MAX_ITEMS, CLAUDE_TODO_STATUS_STATES, contextTokensOf } from '@cairn/shared';
 import { z } from 'zod';
 import {
   claudeCodeAuthFailureMessage,
@@ -100,6 +100,7 @@ export interface ClaudeMapState {
   runningTools: Set<string>;
   interrupted: boolean;
   usage: AgentTokenUsage;
+  lastContext?: { model: string; tokens: number };
   sessionId: string | null;
   rateLimits: ClaudeRateLimitNotice[];
   modelId?: string;
@@ -218,8 +219,32 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
       return [];
     }
     case 'assistant': {
-      const content = (msg as { message?: { role?: string; content?: unknown[] } }).message
-        ?.content;
+      const assistant = msg as {
+        parent_tool_use_id?: string | null;
+        message?: {
+          role?: string;
+          content?: unknown[];
+          model?: string;
+          usage?: {
+            input_tokens?: number;
+            output_tokens?: number;
+            cache_read_input_tokens?: number;
+            cache_creation_input_tokens?: number;
+          };
+        };
+      };
+      const content = assistant.message?.content;
+      const callModel = assistant.message?.model;
+      const callUsage = assistant.message?.usage;
+      if (assistant.parent_tool_use_id == null && callModel !== undefined && callUsage) {
+        const tokens = contextTokensOf({
+          input: callUsage.input_tokens,
+          output: callUsage.output_tokens,
+          cacheRead: callUsage.cache_read_input_tokens,
+          cacheWrite: callUsage.cache_creation_input_tokens,
+        });
+        if (tokens > 0) state.lastContext = { model: callModel, tokens };
+      }
       if ((msg as { error?: unknown }).error === 'authentication_failed') {
         state.authFailed = true;
       }
@@ -304,7 +329,18 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
       if (typeof sessionId === 'string' && state.sessionId === null) {
         state.sessionId = sessionId;
       }
-      const rows = toUsageRows(msg as Parameters<typeof toUsageRows>[0], state.modelId);
+      const usageRows = toUsageRows(msg as Parameters<typeof toUsageRows>[0], state.modelId);
+      const context = state.lastContext;
+      const contextRow =
+        context === undefined
+          ? undefined
+          : (usageRows.find((row) => row.model === `${USAGE_MODEL_PREFIX}/${context.model}`) ??
+            (usageRows.length === 1 ? usageRows[0] : undefined));
+      const rows = usageRows.map((row) =>
+        row === contextRow && context !== undefined
+          ? { ...row, contextTokens: context.tokens }
+          : row,
+      );
       state.usage = rows;
       const isError = (msg as { is_error?: boolean }).is_error === true;
       if (subtype === 'success' && !isError) {
