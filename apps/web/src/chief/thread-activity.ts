@@ -1,3 +1,4 @@
+import type { ThreadReportContent } from '@cairn/shared';
 import type { TodoGlance } from '../detail/segments.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 
@@ -13,8 +14,17 @@ export interface ThreadActivity {
   title: string;
 }
 
+export interface ChannelMirror {
+  kind: 'channel-mirror';
+  id: string;
+  todoId: string;
+  title: string;
+  phase: ThreadReportContent['phase'];
+  fromThreadId: string;
+}
+
 export interface GroupedRow {
-  item: ChiefStreamItem | ThreadActivity;
+  item: ChiefStreamItem | ThreadActivity | ChannelMirror;
   i: number;
 }
 
@@ -34,6 +44,7 @@ export function subThreadRowIds(
   const kept = new Set<string>();
   for (const item of stream) {
     if (item.kind !== 'thread-report' && item.kind !== 'thread-message') continue;
+    if (item.kind === 'thread-report' && item.fromThreadId !== undefined) continue;
     if (item.kind === 'thread-report' && delivered.has(`${item.todoId}\0${item.buildId}`)) continue;
     const parentId = glances.get(item.todoId)?.parentId;
     if (shown.has(item.todoId) || (parentId !== undefined && shown.has(parentId))) continue;
@@ -51,6 +62,12 @@ export function groupThreadEvents(
     const { item } = row;
     if (item.kind === 'report-ack') return [];
     if (item.kind !== 'thread-report' && item.kind !== 'thread-message') return [row];
+    if (item.kind === 'thread-report' && item.fromThreadId !== undefined) {
+      const { id, todoId, title, phase, fromThreadId } = item;
+      return [
+        { item: { kind: 'channel-mirror', id, todoId, title, phase, fromThreadId }, i: row.i },
+      ];
+    }
     if (!kept.has(item.id)) return [];
     return [
       {
