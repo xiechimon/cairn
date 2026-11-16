@@ -1,4 +1,5 @@
 import {
+  buildReviewStepPrompt,
   buildVerifyStepPrompt,
   claimedStepSchema,
   GATE_LIMITS,
@@ -191,7 +192,7 @@ async function setup(opts: { githubFetch?: FetchLike } = {}) {
     })
     .run();
   seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model' });
-  seedRoute(s, 'review', { provider: 'stub-gw', modelId: 'stub-model' });
+  const reviewerId = seedRoute(s, 'review', { provider: 'stub-gw', modelId: 'stub-model' });
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: readyMachine({ teamId: s.team.id, name: 'gate-mbp', cliVersion: '0.1.0' }),
@@ -207,6 +208,7 @@ async function setup(opts: { githubFetch?: FetchLike } = {}) {
   return {
     s,
     machineToken,
+    reviewerId,
     todoId,
     projectId,
     async startBuild(withPlan = false) {
@@ -267,10 +269,22 @@ async function reachReviewGate(w: World): Promise<string> {
 }
 
 async function claimReview(w: World, buildId: string): Promise<string> {
-  const reviewRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
-    body: { action: 'review' },
-  });
-  expect(reviewRes.status).toBe(202);
+  w.s.db
+    .insert(stepTable)
+    .values({
+      id: `legacy-review-${buildId}`,
+      buildId,
+      kind: 'review',
+      status: 'pending',
+      prompt: buildReviewStepPrompt({
+        agentId: w.reviewerId,
+        gate: 'review',
+        planText: '',
+        expectedHeadSha: HEAD,
+      }),
+      createdAt: Date.now(),
+    })
+    .run();
   const claimed = await w.claim();
   expect(claimed.kind).toBe('review');
   return claimed.stepId;
@@ -300,28 +314,28 @@ async function reachVerify(w: World): Promise<string> {
   return buildId;
 }
 
-describe('#1404 S5a verdict binding', () => {
-  test('the review gate dispatch meta carries expectedHeadSha; extraction failure lands as extraction_failed and reads back', async () => {
+describe('#1404 historical verdict binding', () => {
+  test('a completed delivery rejects new reviews but retains a legacy extraction failure and its head', async () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w);
     const reviewRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
       body: { action: 'review' },
     });
-    expect(reviewRes.status).toBe(202);
+    expect(reviewRes.status).toBe(409);
+    expect(w.stepsOf(buildId).some((r) => r.kind === 'review')).toBe(false);
+    const stepId = await claimReview(w, buildId);
     const reviewStep = w.stepsOf(buildId).find((r) => r.kind === 'review');
     expect(reviewStep).toBeDefined();
     const meta = parseReviewPromptMeta(reviewStep?.prompt ?? null);
     expect(meta?.expectedHeadSha).toBe(HEAD);
 
-    const claimed = await w.claim();
-    expect(claimed.kind).toBe('review');
-    await w.done(claimed.stepId, {
+    await w.done(stepId, {
       status: 'success',
       findingsError: 'no verdict JSON found in the review step output',
     });
 
-    const row = w.verdictOf(claimed.stepId);
+    const row = w.verdictOf(stepId);
     expect(row).toBeDefined();
     expect(row?.outcome).toBe('extraction_failed');
     expect(row?.outcome).not.toBe('pass');
@@ -329,6 +343,9 @@ describe('#1404 S5a verdict binding', () => {
     expect(row?.headSha).toBe(HEAD);
     expect(row?.kind).toBe('review');
     expect(row?.buildId).toBe(buildId);
+    expect(w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()?.phase).toBe(
+      'done',
+    );
   });
 
   test('verify extraction failure lands as extraction_failed, expectedHeadSha reads back from the database', async () => {
@@ -361,15 +378,12 @@ describe('#1404 S5a verdict binding', () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w);
-    await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
-      body: { action: 'review' },
-    });
-    const claimed = await w.claim();
-    await w.done(claimed.stepId, {
+    const stepId = await claimReview(w, buildId);
+    await w.done(stepId, {
       status: 'success',
       findings: PASS_FINDINGS,
     });
-    const row = w.verdictOf(claimed.stepId);
+    const row = w.verdictOf(stepId);
     expect(row?.outcome).toBe('pass');
     expect(row?.expectedHeadSha).toBe(HEAD);
     expect(row?.headSha).toBe(HEAD);
@@ -409,13 +423,14 @@ describe('#1404 S5a verdict binding', () => {
     expect(w.verdictOf(claimed.stepId)).toBeUndefined();
   });
 
-  test('when the latest checkpoint is not a lowercase SHA, dispatch still binds the previous delivery SHA', async () => {
+  test('a later invalid checkpoint does not replace a legacy report’s expected head', async () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w);
     const buildStep = w.stepsOf(buildId).find((r) => r.kind === 'session' && r.status === 'done');
     expect(buildStep?.checkpointCommit).toBe(HEAD);
     expect(buildStep?.finishedAt).toEqual(expect.any(Number));
+    const stepId = await claimReview(w, buildId);
     const later = (buildStep?.finishedAt ?? 0) + 1_000;
     w.s.db
       .insert(stepTable)
@@ -429,11 +444,9 @@ describe('#1404 S5a verdict binding', () => {
         finishedAt: later,
       })
       .run();
-    const stepId = await claimReview(w, buildId);
-    const meta = parseReviewPromptMeta(
-      w.stepsOf(buildId).find((r) => r.id === stepId)?.prompt ?? null,
-    );
-    expect(meta?.expectedHeadSha).toBe(HEAD);
+    await w.done(stepId, { status: 'success', findings: PASS_FINDINGS });
+    expect(w.verdictOf(stepId)?.expectedHeadSha).toBe(HEAD);
+    expect(w.verdictOf(stepId)?.headSha).toBe(HEAD);
   });
 
   test('a review blocking verdict lands as block; with no reported commit it still binds expectedHeadSha', async () => {
