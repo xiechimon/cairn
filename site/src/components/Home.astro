@@ -83,6 +83,7 @@ const stepSize: Record<string, [number, number]> = {
 
     <main>
       <section class="hero wrap">
+        <div class="hero-text">
         <p class="eyebrow">
           {t.eyebrow.map((item) => <span>{item}</span>)}
         </p>
@@ -101,6 +102,33 @@ const stepSize: Record<string, [number, number]> = {
             </button>
           </div>
         </div>
+        </div>
+        <nav class="hero-spiral" aria-label={t.how.title}>
+          <svg viewBox="-105 -105 210 210" aria-hidden="true">
+            <defs>
+              <filter id="ink" x="-10%" y="-10%" width="120%" height="120%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="7" result="warp"></feTurbulence>
+                <feDisplacementMap in="SourceGraphic" in2="warp" scale="1.6" xChannelSelector="R" yChannelSelector="G" result="rough"></feDisplacementMap>
+                <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="1" seed="2" result="grain"></feTurbulence>
+                <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -3.2 2.55" result="holes"></feColorMatrix>
+                <feComposite in="rough" in2="holes" operator="in"></feComposite>
+              </filter>
+            </defs>
+            <g filter="url(#ink)">
+              <path class="spiral" pathLength="1" d="M-7 0 A7 7 0 0 1 7 0 A22 22 0 0 1 -37 0 A37 37 0 0 1 37 0 A52 52 0 0 1 -67 0 A67 67 0 0 1 67 0 A82 82 0 0 1 47.816 52.709"></path>
+              <line class="leader" x1="-60.74" y1="40.21" x2="-71.59" y2="47.38"></line>
+              <line class="leader" x1="-25.23" y1="-71.71" x2="-29.54" y2="-83.97"></line>
+              <line class="leader" x1="75.64" y1="-7.48" x2="88.57" y2="-8.75"></line>
+            </g>
+          </svg>
+          {
+            t.how.steps.map((step, index) => (
+              <a class={`hang hang-${index}`} href="#how">
+                {step.title}
+              </a>
+            ))
+          }
+        </nav>
       </section>
 
       <figure class="hero-shot wrap" id="hero-shot">
@@ -537,6 +565,112 @@ const stepSize: Record<string, [number, number]> = {
   .copy.done .i-check {
     display: block;
     color: var(--running);
+  }
+
+  .hero-spiral {
+    display: none;
+  }
+  @media (min-width: 1100px) {
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 460px;
+      align-items: center;
+      gap: 120px;
+      text-align: left;
+    }
+    .hero .eyebrow,
+    .hero .actions {
+      justify-content: flex-start;
+    }
+    .hero h1,
+    .hero .lede {
+      margin-left: 0;
+    }
+    .hero-spiral {
+      position: relative;
+      display: block;
+      width: 340px;
+      height: 340px;
+    }
+  }
+  .hero h1 {
+    filter: url(#ink);
+  }
+  .hero-spiral svg {
+    width: 340px;
+    height: 340px;
+    overflow: visible;
+    color: var(--ink-2);
+  }
+  .hero-spiral .spiral {
+    stroke-width: 9;
+    stroke-dasharray: 1 1;
+    animation: spiral-draw 1.6s cubic-bezier(0.45, 0.05, 0.3, 1) both;
+  }
+  .hero-spiral .leader {
+    stroke-width: 0.9;
+    animation: hang-in 240ms ease-out both;
+  }
+  .hero-spiral .leader:nth-of-type(1) {
+    animation-delay: 520ms;
+  }
+  .hero-spiral .leader:nth-of-type(2) {
+    animation-delay: 710ms;
+  }
+  .hero-spiral .leader:nth-of-type(3) {
+    animation-delay: 900ms;
+  }
+  .hang {
+    position: absolute;
+    padding: 2px 4px;
+    border-radius: var(--radius-control);
+    color: var(--ink-2);
+    font-size: 14px;
+    white-space: nowrap;
+    text-decoration: none;
+    animation: hang-in 240ms ease-out both;
+  }
+  .hang:hover {
+    color: var(--ink);
+    background: var(--hover);
+  }
+  .hang-0 {
+    left: 48.7px;
+    top: 250.3px;
+    transform: translate(-100%, -50%);
+    animation-delay: 520ms;
+  }
+  .hang-1 {
+    left: 120.0px;
+    top: 27.9px;
+    transform: translate(-100%, -50%);
+    animation-delay: 710ms;
+  }
+  .hang-2 {
+    left: 319.8px;
+    top: 155.2px;
+    transform: translate(0, -50%);
+    animation-delay: 900ms;
+  }
+  @keyframes spiral-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes hang-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-spiral .spiral,
+    .hero-spiral .leader,
+    .hang {
+      animation: none;
+    }
   }
 
   .hero-shot {
