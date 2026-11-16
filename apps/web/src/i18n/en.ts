@@ -257,8 +257,8 @@ export const EN: Record<string, string> = {
   换一个: 'Change',
   'Claude 订阅、API key 或本地模型': 'A Claude subscription, an API key or a local model',
   '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
-  '订阅已保存。这台电脑还没找到 Claude Code，装好它之后会自动用上。':
-    'Subscription saved. Claude Code was not found on this computer; it will be used once you install it.',
+  '订阅已保存，这台电脑装好 Claude\u00a0Code 后会自动用上。现在先添加一个服务商，Coordinator 就能开始工作。':
+    'Subscription saved. It will be used once Claude Code is installed on this computer. Add a provider now so the Coordinator can start.',
   '因为你登录了 Claude 订阅，Coordinator 直接用它':
     'Because you signed in with a Claude subscription, the Coordinator uses it directly',
   '先跳过，去主页看看': 'skip for now and look around',

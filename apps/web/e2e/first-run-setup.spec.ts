@@ -167,5 +167,5 @@ test('a saved Claude subscription with Claude Code found is the Coordinator pick
 test('a saved subscription without Claude Code on this computer says what is missing', async ({ page }) => {
   await open(page, { ...fresh(), bound: false, subscription: true });
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
-  await expect(page.getByTestId('first-run-setup')).toContainText('订阅已保存。这台电脑还没找到 Claude Code');
+  await expect(page.getByTestId('first-run-setup')).toContainText('现在先添加一个服务商，Coordinator 就能开始工作');
 });
