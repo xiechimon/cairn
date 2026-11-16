@@ -326,9 +326,11 @@ test.describe('on a touch screen', () => {
     const header = groupHeaders(page).filter({ hasText: 'Side' });
     await expect(header).toBeVisible();
     await expect(page.getByRole('button', { name: 'cairn 的菜单' })).toBeVisible();
-    await page.evaluate(() =>
-      Promise.all(document.getAnimations().map((animation) => animation.finished)),
-    );
+    await page
+      .getByRole('dialog')
+      .evaluate((el) =>
+        Promise.all(el.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+      );
     const boxes = await page.locator('aside.board-sidebar').evaluate((aside) => {
       const rect = (node: Element | null) => {
         const box = node!.getBoundingClientRect();
