@@ -47,9 +47,10 @@ import type {
 import { checkResourceAllowed } from '@modelcontextprotocol/sdk/shared/auth-utils.js';
 import { ErrorCode, ListToolsResultSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { and, asc, eq, sql } from 'drizzle-orm';
-import { Agent, fetch as undiciFetch } from 'undici';
+import { Agent, EnvHttpProxyAgent, fetch as undiciFetch } from 'undici';
 import type { Db } from '../db/client.js';
 import { machine, mcpConnector } from '../db/schema.js';
+import { envProxyOf } from '../lib/env-proxy.js';
 import { conflict, HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 
@@ -548,13 +549,28 @@ function publicLookup(
   });
 }
 
-const publicAgent = new Agent({ connect: { lookup: publicLookup } });
+const requirePublicHost = (hostname: string) =>
+  new Promise<void>((resolve, reject) =>
+    publicLookup(hostname.replace(/^\[|\]$/g, ''), { all: true }, (err) =>
+      err ? reject(err) : resolve(),
+    ),
+  );
 
-export const publicOAuthFetch = ((input: string | URL, init?: RequestInit) =>
-  undiciFetch(input, {
-    ...(init as Parameters<typeof undiciFetch>[1]),
-    dispatcher: publicAgent,
-  })) as unknown as typeof fetch;
+export function createPublicOAuthFetch(env: NodeJS.ProcessEnv): typeof fetch {
+  const proxy = envProxyOf(env);
+  const connect = { lookup: publicLookup };
+  const dispatcher =
+    proxy === null ? new Agent({ connect }) : new EnvHttpProxyAgent({ ...proxy, connect });
+  return (async (input: string | URL, init?: RequestInit) => {
+    if (proxy !== null) await requirePublicHost(new URL(input).hostname);
+    return undiciFetch(input, {
+      ...(init as Parameters<typeof undiciFetch>[1]),
+      dispatcher,
+    });
+  }) as unknown as typeof fetch;
+}
+
+export const publicOAuthFetch = createPublicOAuthFetch(process.env);
 
 function guardedOAuthFetch(deps: McpConnectorDeps): typeof fetch {
   return (input, init) => {

@@ -23,6 +23,7 @@ import { coordinatorStoreDir, startCoordinator } from './coordinator/index.js';
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
 import { createAccessVerifier } from './lib/cloudflare-access.js';
+import { installEnvProxy } from './lib/env-proxy.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environment-id.js';
 import { createServerLogger } from './lib/logger.js';
 import { loopbackOwnerFor } from './lib/loopback-owner.js';
@@ -70,6 +71,15 @@ const logger = createServerLogger(logSecrets, {
     ? {}
     : { transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' } } }),
 });
+
+const envProxy = installEnvProxy();
+if (envProxy.ignored)
+  logger.warn('a proxy environment variable is not an http(s) URL and is ignored');
+if (envProxy.proxy !== null)
+  logger.info(
+    { proxy: envProxy.proxy },
+    'outbound requests go through the proxy from the environment',
+  );
 
 const refusal = authStartupRefusal(loadedConfig);
 if (refusal !== null) {
