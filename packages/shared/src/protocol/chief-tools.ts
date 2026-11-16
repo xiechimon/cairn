@@ -7,7 +7,11 @@ import {
   QUICK_REPLY_MAX_CHARS,
   SUGGEST_REPLIES_TOOL_NAME,
 } from '../records/quick-replies.js';
-import { TASK_REQUEST_DIFFICULTIES, TASK_REQUEST_PRIORITIES } from '../records/task-request.js';
+import {
+  TASK_REQUEST_DIFFICULTIES,
+  TASK_REQUEST_LANES,
+  TASK_REQUEST_PRIORITIES,
+} from '../records/task-request.js';
 import { todoOutputSchema } from '../records/todo.js';
 import { COMPUTER_IMAGES_MAX, computerImageSchema } from './computer.js';
 
@@ -211,6 +215,7 @@ export const coordinatorCreateTodoParamsSchema = z
       .strict()
       .optional(),
     platform: runnerOsSchema.optional(),
+    lane: z.enum(TASK_REQUEST_LANES).optional(),
   })
   .strict()
   .refine((params) => params.messageIds === undefined || params.sourceTodoId === undefined, {

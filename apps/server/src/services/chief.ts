@@ -1075,7 +1075,33 @@ export function addChiefWatch(
     reason?: string;
   },
 ): void {
-  const chiefRow = ensureChief(deps, input.teamId);
+  appendChiefWatch(deps, ensureChief(deps, input.teamId), input);
+}
+
+export function rewatchCreatingThread(deps: ChiefDeps, record: TodoRecord): void {
+  if (record.sourceKind !== 'orchestration' || record.sourceRef === null) return;
+  const threadId = parseOrchestrationSourceRef(record.sourceRef)?.threadId;
+  const threadRow = threadId === undefined ? undefined : getChiefThread(deps, threadId);
+  if (threadId === undefined || threadRow === undefined || threadRow.archivedAt !== null) return;
+  const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
+  const projectRow = deps.db
+    .select({ name: project.name })
+    .from(project)
+    .where(eq(project.id, record.projectId))
+    .get();
+  if (chiefRow === undefined || projectRow === undefined) return;
+  appendChiefWatch(deps, chiefRow, {
+    todo: record,
+    projectName: projectRow.name,
+    threadId,
+  });
+}
+
+function appendChiefWatch(
+  deps: ChiefDeps,
+  chiefRow: ChiefRow,
+  input: { todo: TodoRecord; projectName: string; threadId: string; reason?: string },
+): void {
   if (chiefRow.watches.some((w) => w.todoId === input.todo.id)) return;
   const threadRow = getChiefThread(deps, input.threadId);
   const watch: ChiefWatch = {
