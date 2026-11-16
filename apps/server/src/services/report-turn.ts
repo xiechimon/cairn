@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { REPORT_ACK_KIND, type ReportAckContent } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefMessage, chiefThread, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -140,18 +140,20 @@ export function requireCurrentReportTurn(db: Db, prompt: string | null, name: st
   }
 }
 
-function reportHash(threadId: string, ref: ReportRef): string {
+type ReportKey = Pick<ReportRef, 'todoId' | 'buildId' | 'attachmentId'>;
+
+function reportHash(threadId: string, ref: ReportKey): string {
   return createHash('sha256')
     .update(`${threadId}\0${ref.todoId}\0${ref.buildId}\0${ref.attachmentId}`)
     .digest('hex')
     .slice(0, 24);
 }
 
-export function reportNoticeId(threadId: string, ref: ReportRef): string {
+export function reportNoticeId(threadId: string, ref: ReportKey): string {
   return `report-notice-${reportHash(threadId, ref)}`;
 }
 
-function reportAckId(threadId: string, ref: ReportRef): string {
+function reportAckId(threadId: string, ref: ReportKey): string {
   return `report-silent-${reportHash(threadId, ref)}`;
 }
 
@@ -161,6 +163,28 @@ export function reportAcknowledged(db: Db, threadId: string, ref: ReportRef): bo
       .select({ id: chiefMessage.id })
       .from(chiefMessage)
       .where(eq(chiefMessage.id, reportAckId(threadId, ref)))
+      .get() !== undefined
+  );
+}
+
+export function reportAnsweredIn(
+  db: Db,
+  threadId: string,
+  record: { id: string; latestBuildId: string | null },
+): boolean {
+  if (record.latestBuildId === null) return false;
+  const attachmentId = db
+    .select({ id: build.reportAttachmentId })
+    .from(build)
+    .where(eq(build.id, record.latestBuildId))
+    .get()?.id;
+  if (!attachmentId) return false;
+  const ref = { todoId: record.id, buildId: record.latestBuildId, attachmentId };
+  return (
+    db
+      .select({ id: chiefMessage.id })
+      .from(chiefMessage)
+      .where(inArray(chiefMessage.id, [reportNoticeId(threadId, ref), reportAckId(threadId, ref)]))
       .get() !== undefined
   );
 }

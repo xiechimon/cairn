@@ -57,6 +57,7 @@ import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-sub
 import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
+import { coordinatorToolDefs } from './coordinator-tool-defs.js';
 import { readDeployLease } from './deploy-lease.js';
 import {
   capabilityGatePasses,
@@ -93,7 +94,6 @@ import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import {
-  chiefRemoteTools,
   coordinatorMemoryOwner,
   coordinatorProfile,
   memoryOpsAreTeamScoped,
@@ -342,7 +342,7 @@ function chiefClaimPayload(
       trigger,
       ...(history !== null ? { history } : {}),
     },
-    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : mailTurn ? [] : chiefRemoteTools())],
+    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : mailTurn ? [] : coordinatorToolDefs())],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
     ...(locked ? { remoteToolsOnly: true as const } : {}),
   };

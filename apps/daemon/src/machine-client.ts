@@ -357,13 +357,18 @@ export class MachineClient implements MachineApi {
     stepId: string,
     name: string,
     params: Record<string, unknown>,
-    opts: { replaySafe?: boolean; signal?: AbortSignal } = {},
+    opts: {
+      replaySafe?: boolean;
+      signal?: AbortSignal;
+      toolCallId?: string;
+      timeoutMs?: number;
+    } = {},
   ): Promise<string> {
     const replaySafe = opts.replaySafe ?? false;
     const delays = replaySafe ? [...REMOTE_TOOL_RETRY_DELAYS_MS] : [];
     let lastErr: unknown;
     for (let attempt = 0; attempt <= delays.length; attempt++) {
-      const timeout = AbortSignal.timeout(REMOTE_TOOL_TIMEOUT_MS);
+      const timeout = AbortSignal.timeout(opts.timeoutMs ?? REMOTE_TOOL_TIMEOUT_MS);
       const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
       try {
         const res = await this.fetchImpl(this.url(`/api/machine/tool/${stepId}`), {
@@ -374,7 +379,11 @@ export class MachineClient implements MachineApi {
               ? { authorization: `Bearer ${this.opts.getToken?.()}` }
               : {}),
           },
-          body: JSON.stringify({ name, params }),
+          body: JSON.stringify({
+            name,
+            params,
+            ...(opts.toolCallId !== undefined ? { toolCallId: opts.toolCallId } : {}),
+          }),
           signal,
         });
         const body = (await res.json().catch(() => null)) as {

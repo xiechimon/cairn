@@ -230,7 +230,10 @@ if [ "$2 $3" = "start cairn-server.service" ]; then
     [ ! -s "${fake}/column-on-broken-start" ] || sqlite3 "${db}" "update step set note = '$(cat "${fake}/column-on-broken-start")'"
   else touch "${fake}/up"; sqlite3 "${db}" "update machine set lastSeenAt = (cast(strftime('%s','now') as integer) + 5) * 1000"; fi
 fi
-[ "$2 $3" = "stop cairn-server.service" ] && rm -f "${fake}/up"
+if [ "$2 $3" = "stop cairn-server.service" ]; then
+  rm -f "${fake}/up"
+  sqlite3 "${db}" "select (select count(*) from step where status='claimed') || ' claimed, lease ' || coalesce((select status from deploy_lease where id='server'), 'none')" >> "${fake}/server-stop.log"
+fi
 if [ "$2 $3" = "start cairn-daemon.service" ]; then
   sqlite3 "${db}" "update machine set lastSeenAt = (cast(strftime('%s','now') as integer) + 5) * 1000"
 fi
@@ -304,12 +307,27 @@ else printf 000; fi`,
     CAIRN_HEALTH_TRIES: '3',
     CAIRN_HEALTH_INTERVAL: '0',
     CAIRN_DEPLOY_STEP_WAIT_SECONDS: '0',
+    CAIRN_DEPLOY_QUIET_SECONDS: '0',
   };
   const run = (script, args, extra = {}) =>
     spawnSync('/bin/bash', [script, ...args], { encoding: 'utf8', env: { ...env, ...extra } });
   const log = (name) =>
     existsSync(join(fake, name)) ? readFileSync(join(fake, name), 'utf8') : '';
-  return { dir, work, checkout, data, db, state, backups, fake, previous, run, log, tokenFile };
+  return {
+    dir,
+    work,
+    checkout,
+    data,
+    db,
+    state,
+    backups,
+    fake,
+    bin,
+    previous,
+    run,
+    log,
+    tokenFile,
+  };
 }
 
 function pushTarget(f, message = 'target', options) {
@@ -949,6 +967,64 @@ test('watch skips a newest main commit whose ci run was cancelled and deploys th
   assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), newest);
 });
 
+test('watch waits for main to settle and ships back-to-back merges as one deploy', () => {
+  const f = fixture();
+  const env = { CAIRN_DEPLOY_SCRIPT: DEPLOY, CAIRN_DEPLOY_QUIET_SECONDS: '240' };
+  pushTarget(f, 'first merge');
+  const first = f.run(WATCH, [], env);
+  assert.equal(first.status, 0, first.stderr);
+  assert.match(first.stdout, /waiting for main to settle/);
+  const second = pushTarget(f, 'second merge');
+  assert.equal(f.run(WATCH, [], env).status, 0);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), f.previous);
+  assert.equal(f.log('systemctl.log'), '');
+  const [head] = readFileSync(join(f.state, 'main-seen'), 'utf8').trim().split(' ');
+  assert.equal(head, second);
+  const settled = Math.floor(Date.now() / 1000) - 300;
+  writeFileSync(join(f.state, 'main-seen'), `${second} ${settled} ${settled}\n`);
+  const deployed = f.run(WATCH, [], env);
+  assert.equal(deployed.status, 0, deployed.stderr);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), second);
+  assert.equal(f.log('systemctl.log').match(/stop cairn-server/g).length, 1);
+  assert.equal(existsSync(join(f.state, 'main-seen')), false);
+});
+
+test('watch deploys a main that never settles once it has waited the maximum', () => {
+  const f = fixture();
+  const env = { CAIRN_DEPLOY_SCRIPT: DEPLOY, CAIRN_DEPLOY_QUIET_SECONDS: '240' };
+  pushTarget(f, 'older merge');
+  const behind = Math.floor(Date.now() / 1000) - 1900;
+  mkdirSync(f.state, { recursive: true });
+  writeFileSync(join(f.state, 'main-seen'), `${'0'.repeat(40)} ${behind} ${behind}\n`);
+  const newest = pushTarget(f, 'merge a moment ago');
+  const result = f.run(WATCH, [], env);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), newest);
+});
+
+test('watch resets a corrupt or future main-seen record instead of failing or waiting forever', () => {
+  for (const record of [
+    'garbage',
+    `${'0'.repeat(40)} 08 09`,
+    `${'0'.repeat(40)} 99999999999 99999999999`,
+  ]) {
+    const f = fixture();
+    const env = { CAIRN_DEPLOY_SCRIPT: DEPLOY, CAIRN_DEPLOY_QUIET_SECONDS: '240' };
+    const head = pushTarget(f, 'merge');
+    mkdirSync(f.state, { recursive: true });
+    writeFileSync(join(f.state, 'main-seen'), `${record}\n`);
+    const result = f.run(WATCH, [], env);
+    assert.equal(result.status, 0, `${record}\n${result.stderr}`);
+    assert.match(result.stdout, /waiting for main to settle: \S+ first seen 0s ago/);
+    const [seenHead, seenAt, behindAt] = readFileSync(join(f.state, 'main-seen'), 'utf8')
+      .trim()
+      .split(' ');
+    const now = Math.floor(Date.now() / 1000);
+    assert.equal(seenHead, head);
+    assert.ok(Math.abs(Number(seenAt) - now) < 30 && Math.abs(Number(behindAt) - now) < 30, record);
+  }
+});
+
 test('watch raises one lag alarm per main head after two hours and closes it once caught up', () => {
   const f = fixture();
   const old = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
@@ -1178,6 +1254,69 @@ test('server-only deploys under continuous active work without stopping either d
   assert.equal(sqlite(f.db, "select status from step where id='s0'"), 'claimed');
 });
 
+test('a server-only deploy pauses claims and waits for a claimed step or Coordinator turn before stopping the server', () => {
+  const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
+  fakeTool(
+    f.bin,
+    'sleep',
+    `sqlite3 "${f.db}" "select status from deploy_lease where id='server'" >> "${f.fake}/drain.log"
+sqlite3 "${f.db}" "update step set status='done' where id='s0'"`,
+  );
+  const target = pushTarget(f, 'server', {
+    files: { 'apps/server/src/probe.ts': 'export {};\n', 'marker.txt': 'previous\n' },
+  });
+  const result = f.run(DEPLOY, [target], { CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS: '60' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(f.log('drain.log'), /^draining\n/);
+  assert.equal(f.log('server-stop.log'), '0 claimed, lease draining\n');
+  assert.doesNotMatch(f.log('systemctl.log'), /(?:stop|start) cairn-daemon/);
+  assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
+  assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), target);
+});
+
+test('a server-only deploy restarts the server once the drain deadline passes', () => {
+  const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
+  const target = pushTarget(f, 'server', {
+    files: { 'apps/server/src/probe.ts': 'export {};\n', 'marker.txt': 'previous\n' },
+  });
+  const result = f.run(DEPLOY, [target], { CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS: '0' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(
+    result.stdout,
+    /drain deadline passed after 0s; restarting the server with 1 claimed steps/,
+  );
+  assert.equal(f.log('server-stop.log'), '1 claimed, lease draining\n');
+  assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
+  assert.equal(sqlite(f.db, "select status from step where id='s0'"), 'claimed');
+});
+
+test('a server-only deploy to a server that does not answer the lease request restarts it without a drain', () => {
+  const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
+  writeFileSync(join(f.fake, 'lease-timeout'), '');
+  const target = pushTarget(f, 'server', {
+    files: { 'apps/server/src/probe.ts': 'export {};\n', 'marker.txt': 'previous\n' },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(
+    result.stdout,
+    /restarting the server without a drain: the deployment lease request answered 000/,
+  );
+  assert.equal(f.log('server-stop.log'), '1 claimed, lease none\n');
+});
+
+test('a server-only deploy refuses when the server rejects the owner token', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'lease-owner-token'), 'other-secret');
+  const target = pushTarget(f, 'server', {
+    files: { 'apps/server/src/probe.ts': 'export {};\n', 'marker.txt': 'previous\n' },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(result.stderr, /server rejected the deployment lease request \(HTTP 401\)/);
+  assert.equal(f.log('server-stop.log'), '');
+});
+
 test('iOS, docs, integration and CI changes deploy without restarting the daemon', () => {
   const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
   writeFileSync(join(f.fake, 'lease-unsupported'), '');
@@ -1298,6 +1437,39 @@ test('every recovery tick drains again after the previous refusal resumed claims
     assert.ok(existsSync(join(f.state, 'in-progress')));
     assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
     assert.equal(existsSync(join(f.state, 'lease-owner')), false);
+  }
+});
+
+test('recovering a server-only deploy drains a running server first and skips the drain when it is down or has no lease table', () => {
+  for (const [up, legacy] of [
+    [true, false],
+    [false, false],
+    [true, true],
+  ]) {
+    const f = fixture({ claimed: 1, heartbeatAgeMs: 0 });
+    if (legacy) sqlite(f.db, 'drop table deploy_lease');
+    const target = pushTarget(f);
+    git(f.checkout, 'fetch', '-q', 'origin', 'main');
+    git(f.checkout, 'checkout', '-q', '--detach', target);
+    mkdirSync(f.state, { recursive: true });
+    mkdirSync(f.backups, { recursive: true });
+    const snapshot = join(f.backups, 'stopped-server.db');
+    sqlite(f.db, `vacuum into '${snapshot}'`);
+    if (up) writeFileSync(join(f.fake, 'up'), '');
+    fakeTool(f.bin, 'sleep', `sqlite3 "${f.db}" "update step set status='done' where id='s0'"`);
+    writeFileSync(
+      join(f.state, 'in-progress'),
+      `phase=restored\ntarget=${target}\nprevious=${f.previous}\nsnapshot=${snapshot}\nruntime=server\n`,
+    );
+    const result = f.run(DEPLOY, ['--recover'], { CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS: '60' });
+    assert.equal(result.status, 1, result.stderr);
+    assert.doesNotMatch(f.log('systemctl.log'), /(?:stop|start) cairn-daemon/);
+    if (legacy) continue;
+    assert.equal(
+      f.log('server-stop.log'),
+      up ? '0 claimed, lease draining\n' : '1 claimed, lease none\n',
+    );
+    assert.notEqual(sqlite(f.db, "select status from deploy_lease where id='server'"), 'draining');
   }
 });
 

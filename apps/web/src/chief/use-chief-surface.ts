@@ -51,7 +51,13 @@ import {
   globalCoordinatorThread,
 } from './coordinator-load.js';
 import { needsMachineName } from './needs-machine-name.js';
-import { chiefOutbox, type OutboxEntry, type UnsentSends, unlandedItems } from './outbox.js';
+import {
+  chiefOutbox,
+  keepSentKeys,
+  type OutboxEntry,
+  type UnsentSends,
+  unlandedItems,
+} from './outbox.js';
 import {
   questionActionThread,
   questionDraftKey,
@@ -270,9 +276,10 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   const liveChiefWithUnsent = useMemo(() => {
     if (liveChief === null) return null;
     const unlanded = unlandedItems(outbox, activeThreadId, knownChiefIds, globalThreadId);
-    return unlanded.length === 0
-      ? liveChief
-      : { ...liveChief, stream: [...(liveChief.stream ?? []), ...unlanded] };
+    return {
+      ...liveChief,
+      stream: [...keepSentKeys(liveChief.stream ?? [], chiefOutbox), ...unlanded],
+    };
   }, [liveChief, outbox, activeThreadId, knownChiefIds, globalThreadId]);
   const { fetchNextPage, isFetchingNextPage, isFetchNextPageError } = chiefMessagesQ;
   const loadEarlier = useCallback(() => {

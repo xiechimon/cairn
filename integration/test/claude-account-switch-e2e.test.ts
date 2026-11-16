@@ -267,11 +267,14 @@ describe('after the owner switches the enabled Claude account', () => {
     expect(next.status).toBeLessThan(300);
     await waitFor(
       () =>
-        stepsOf(threadId).filter((st) => st.kind === 'chief' && st.status === 'done').length === 2,
+        stepsOf(threadId).some(
+          (st) =>
+            st.kind === 'chief' && st.status === 'done' && st.claudeSubscriptionId === accountB,
+        ),
       120_000,
     );
     const turn = stepsOf(threadId)
-      .filter((st) => st.kind === 'chief')
+      .filter((st) => st.kind === 'chief' && st.status === 'done')
       .at(-1);
     expect(turn).toMatchObject({ claudeSubscriptionId: accountB });
     const threadSession = server.db

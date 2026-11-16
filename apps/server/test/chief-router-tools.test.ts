@@ -130,12 +130,15 @@ describe('router tool vocabulary', () => {
       ...CHIEF_ROUTER_TOOL_NAMES,
       ...CHIEF_REPLY_TOOLS.map((t) => t.name),
       ...COMPUTER_REMOTE_TOOLS.map((t) => t.name),
+      'archive_project',
+      'unarchive_project',
     ]);
     expect(Object.keys(chiefToolDefHashes())).toHaveLength(
       CHIEF_TOOL_COUNT +
         CHIEF_ROUTER_TOOL_NAMES.length +
         CHIEF_REPLY_TOOLS.length +
-        COMPUTER_REMOTE_TOOLS.length,
+        COMPUTER_REMOTE_TOOLS.length +
+        2,
     );
   });
 });

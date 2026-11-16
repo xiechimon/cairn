@@ -70,13 +70,20 @@ jobs:
         working-directory: apps/desktop
         run: pnpm smoke
 
+      - name: Write the update manifest
+        if: steps.changed.outputs.release == 'true'
+        working-directory: apps/desktop
+        run: node scripts/release-manifest.mjs "$VERSION" release
+
       - name: Publish the release
         if: steps.changed.outputs.release == 'true'
         working-directory: apps/desktop/release
         run: |
           gh release create "desktop-v$VERSION" \
             --target "$GITHUB_SHA" \
+            --latest \
             --title "Cairn for Mac $VERSION" \
             --notes "Built from $GITHUB_SHA. Ad-hoc signed: the first launch needs right-click, Open." \
             Cairn-"$VERSION"-arm64.dmg Cairn-"$VERSION"-x64.dmg \
-            Cairn-"$VERSION"-arm64.zip Cairn-"$VERSION"-x64.zip
+            Cairn-"$VERSION"-arm64.zip Cairn-"$VERSION"-x64.zip \
+            desktop-latest.json

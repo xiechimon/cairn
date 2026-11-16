@@ -19,9 +19,11 @@ import {
   build,
   chief,
   chiefThread,
+  message,
   project,
   schedule,
   secret,
+  steerPending,
   step,
   stopPending,
   tag,
@@ -163,6 +165,36 @@ function projectRunningWork(db: ProjectReader, projectId: string): string[] {
   return rows.map((row) => row.line);
 }
 
+export const RESEARCH_PROJECT_NAME = '调研';
+
+export function researchProjectId(teamId: string): string {
+  return `research-${teamId}`;
+}
+
+export function ensureResearchProject(db: Pick<Db, 'insert' | 'select'>, teamId: string) {
+  const id = researchProjectId(teamId);
+  db.insert(project)
+    .values({ id, name: RESEARCH_PROJECT_NAME, teamId })
+    .onConflictDoNothing({ target: project.id })
+    .run();
+  const row = db.select().from(project).where(eq(project.id, id)).get();
+  if (
+    row === undefined ||
+    row.teamId !== teamId ||
+    row.repoKind !== null ||
+    row.githubRepo !== null ||
+    row.localPath !== null ||
+    row.archivedAt !== null
+  ) {
+    throw new HttpError(
+      409,
+      'the research project is unavailable (archived or holds a repository); ask the owner which project this belongs to',
+      'research-project-unavailable',
+    );
+  }
+  return row;
+}
+
 export function deleteProject(
   deps: ProjectDeps,
   id: string,
@@ -197,7 +229,9 @@ export function deleteProject(
         : [];
     if (buildIds.length > 0) {
       tx.delete(stopPending).where(inArray(stopPending.conversationId, buildIds)).run();
+      tx.delete(steerPending).where(inArray(steerPending.conversationId, buildIds)).run();
       tx.delete(step).where(inArray(step.buildId, buildIds)).run();
+      tx.delete(message).where(inArray(message.conversationId, buildIds)).run();
     }
     retireTodoDeliverables(deps.db, todoIds);
     tx.delete(schedule).where(eq(schedule.projectId, id)).run();

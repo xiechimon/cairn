@@ -194,7 +194,7 @@ function requireUnboundMessages(db: Db, ctx: RequestCtx, segments: readonly Task
 export function createRequestTodo(
   deps: TodoDeps,
   ctx: RequestCtx,
-  params: CoordinatorCreateTodoParams,
+  params: CoordinatorCreateTodoParams & { projectId: string },
   provenance: { createdBy: string | null; ownerId: string },
 ): TodoRecord & { uncovered?: string[] } {
   parseWith(categoryFreeTaskInputSchema, params, 'params');

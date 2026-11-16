@@ -34,6 +34,7 @@ import {
   mailSharedTranscript,
   newChiefThreadId,
   orchestratedTodoIdOf,
+  parseOrchestrationSourceRef,
   REPORT_FENCE_OPEN,
   redactSecrets,
   SUGGEST_REPLIES_TOOL_NAME,
@@ -101,8 +102,10 @@ import { injectMemoryDocuments } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import { ownershipOf, rescheduleOwnershipHandoff } from './owner.js';
 import { PICKED_PROJECT_OPEN, stepScopeProjectId } from './picked-project.js';
+import { researchProjectId } from './projects.js';
 import {
   type ReportRef,
+  reportAnsweredIn,
   reportLine,
   reportProvenance,
   reportRefCurrent,
@@ -1159,6 +1162,26 @@ function isWatched(chiefs: ChiefRow[], todoId: string): boolean {
   return chiefs.some((chiefRow) => chiefRow.watches.some((w) => w.todoId === todoId));
 }
 
+function researchAsker(record: TodoRecord): string | null {
+  if (
+    record.projectId !== researchProjectId(record.teamId) ||
+    record.sourceKind !== 'orchestration' ||
+    record.sourceRef === null
+  )
+    return null;
+  return parseOrchestrationSourceRef(record.sourceRef)?.threadId ?? null;
+}
+
+function isLiveThread(deps: ChiefDeps, threadId: string): boolean {
+  return getChiefThread(deps, threadId)?.archivedAt === null;
+}
+
+function unwatchedReportThread(deps: ChiefDeps, record: TodoRecord): string | null {
+  const asker = researchAsker(record);
+  if (asker === null) return coordinatorThreadRow(deps, ensureChief(deps, record.teamId)).id;
+  return isLiveThread(deps, asker) ? asker : null;
+}
+
 export function postThreadReport(
   deps: ChiefDeps,
   todoRecord: TodoRecord,
@@ -1168,8 +1191,8 @@ export function postThreadReport(
   const options = line !== undefined ? { line } : {};
   const chiefs = deps.db.select().from(chief).where(eq(chief.teamId, todoRecord.teamId)).all();
   if (!isWatched(chiefs, todoRecord.id)) {
-    const coordinator = coordinatorThreadRow(deps, ensureChief(deps, todoRecord.teamId));
-    insertThreadReport(deps, coordinator.id, todoRecord, phase, options);
+    const target = unwatchedReportThread(deps, todoRecord);
+    if (target !== null) insertThreadReport(deps, target, todoRecord, phase, options);
     return;
   }
   for (const chiefRow of chiefs) {
@@ -1190,13 +1213,17 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
   }
   const chiefs = deps.db.select().from(chief).where(eq(chief.teamId, todoRecord.teamId)).all();
   if (!isWatched(chiefs, todoRecord.id)) {
-    const coordinator = coordinatorThreadRow(deps, ensureChief(deps, todoRecord.teamId));
-    insertThreadReport(deps, coordinator.id, todoRecord, to);
+    const target = unwatchedReportThread(deps, todoRecord);
+    if (target !== null) insertThreadReport(deps, target, todoRecord, to);
     return;
   }
   for (const chiefRow of chiefs) {
     for (const watch of chiefRow.watches.filter((w) => w.todoId === todoRecord.id)) {
       if (!getChiefThread(deps, watch.threadId)) continue;
+      if (reportAnsweredIn(deps.db, watch.threadId, todoRecord)) {
+        insertThreadReport(deps, watch.threadId, todoRecord, to);
+        continue;
+      }
       const wakeStepId = newRecordId();
       insertThreadReport(deps, watch.threadId, todoRecord, to, { wakeStepId });
       enqueueChiefStep(deps, watch.threadId, {
@@ -1240,11 +1267,10 @@ function reportRefOfTodo(deps: ChiefDeps, record: TodoRecord): ReportRef | 'orig
     .all()
     .flatMap((chiefRow) => chiefRow.watches.filter((w) => w.todoId === record.id))
     .map((w) => w.threadId);
-  const origin = watched.find((id) => {
-    const thread = getChiefThread(deps, id);
-    return thread?.archivedAt === null;
-  });
-  if (origin === undefined && watched.length > 0) return 'origin-gone';
+  const asker = researchAsker(record);
+  const asked = asker === null || watched.includes(asker) ? watched : [...watched, asker];
+  const origin = asked.find((id) => isLiveThread(deps, id));
+  if (origin === undefined && asked.length > 0) return 'origin-gone';
   return {
     todoId: record.id,
     buildId: record.latestBuildId,
@@ -1638,7 +1664,7 @@ export function buildChiefSystemPrompt(
     '',
     '### 项目归属',
     '- 运行平台：只有活必须在某个系统上构建或运行时才给 create_todo 传 platform：iOS/macOS App、Xcode、SwiftUI 传 macos，Windows 原生程序或安装包传 windows。其余不传，任务在默认执行机上跑。传了以后任务只在那个系统的执行机上跑，没有就等着，不会换到别的系统。',
-    '- create_todo 前先定 projectId。',
+    '- create_todo 前先定 projectId。只查资料、不改代码、也不属于任何项目的事（比如「帮我查一下 X 怎么用」），不传 projectId、传 output:"info"：任务进「调研」项目，报告回到这个对话；回复一句「已派人去查 [#n](todo:<id>)，查完把结论贴在这里」。要改代码的活一定要定项目，按下面几条来。',
     '- 用户消息以「【输入框选定项目：X（id: …）】」开头时，本回合新建的任务都放 X，不再调查也不问，回复里说「放在 X（你选的）」。',
     '- 用户点名项目就用它。没点名时先查再定：对照下面项目列表的名称和说明，必要时用 docs 读候选项目的文件、用 todos 看各项目已有的任务，按证据选一个，回复里说「放在 X，因为 Y」。',
     '- 查完仍然分不出时才 ask_user：问题里只列仍然分不出的候选，不列已排除的项目，选项最后加一个「都不是」，本回合不建任务。',

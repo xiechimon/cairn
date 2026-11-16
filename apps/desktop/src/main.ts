@@ -11,6 +11,8 @@ import {
   app,
   BrowserWindow,
   dialog,
+  type IpcMainInvokeEvent,
+  ipcMain,
   Menu,
   nativeImage,
   session,
@@ -19,11 +21,14 @@ import {
   type UtilityProcess,
   utilityProcess,
 } from 'electron';
+import { createUpdater } from './updater.js';
 
 const LOOPBACK = '127.0.0.1';
 const READY_TIMEOUT_MS = 60_000;
 const READY_POLL_MS = 250;
 const STOP_TIMEOUT_MS = 10_000;
+const UPDATE_FIRST_CHECK_MS = 10_000;
+const UPDATE_CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 
 interface RunningServer {
   process: UtilityProcess;
@@ -141,7 +146,12 @@ function openWindow(origin: string): BrowserWindow {
     title: 'Cairn',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 18, y: 18 },
-    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
+    webPreferences: {
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      preload: join(app.getAppPath(), 'dist', 'preload.cjs'),
+    },
   });
   window.webContents.setUserAgent(
     `${window.webContents.getUserAgent()} ${DESKTOP_SHELL_USER_AGENT}`,
@@ -193,12 +203,31 @@ function showTray(origin: string): Tray {
   return created;
 }
 
+function serveUpdates(origin: string): void {
+  const updater = createUpdater((state) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send('desktop-update:state', state);
+    }
+  });
+  const fromOwnPage = (event: IpcMainInvokeEvent): boolean => event.senderFrame?.origin === origin;
+  ipcMain.handle('desktop-update:state', (event) => (fromOwnPage(event) ? updater.state() : null));
+  ipcMain.handle('desktop-update:check', (event) =>
+    fromOwnPage(event) ? updater.check() : undefined,
+  );
+  ipcMain.handle('desktop-update:install', (event) =>
+    fromOwnPage(event) ? updater.install() : undefined,
+  );
+  setTimeout(() => void updater.check(), UPDATE_FIRST_CHECK_MS);
+  setInterval(() => void updater.check(), UPDATE_CHECK_EVERY_MS);
+}
+
 async function boot(): Promise<void> {
   try {
     server = startServer(await freeLoopbackPort());
     await waitUntilServing(server);
     signOwnPagesIn(server.origin, readOwnerToken());
     tray = showTray(server.origin);
+    serveUpdates(server.origin);
     openWindow(server.origin);
   } catch (error) {
     quitting = true;

@@ -34,11 +34,13 @@
     "@opentelemetry/resources": "3.1.0",
     "@opentelemetry/sdk-trace": "3.1.0",
     "@opentelemetry/semantic-conventions": "1.45.0",
+    "semver": "7.7.4",
     "yaml": "2.9.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "26.6.2",
+    "@types/semver": "7.7.1",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
