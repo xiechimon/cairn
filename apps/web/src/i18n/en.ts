@@ -699,11 +699,11 @@ export const EN: Record<string, string> = {
   '导入会把技能复制到 Cairn 自己的目录，原目录不会被改动。':
     'Importing copies the skill into Cairn’s own directory; the original is left unchanged.',
   尚无密钥: 'No secrets yet',
-  '团队密钥按 Agent 授权，在需要它的执行步中下发，不预置进任务 shell 环境。值只写不读：保存后只能覆盖或删除，无法再次查看。':
-    'Team secrets are granted per Agent and released to the build steps that need them — never pre-set into the task shell environment. Values are write-only: once saved they can be overwritten or deleted, never viewed again.',
+  '密钥只交给你授权的 Agent，保存后无法查看。':
+    'Secrets go only to the Agents you allow and cannot be viewed once saved.',
   添加密钥: 'Add secret',
-  '也可以让 Coordinator 添加：它会开一张安全输入卡填写值，值不会进入对话。':
-    'The Coordinator can add them too: it opens a secure input card for the value, which never enters the conversation.',
+  '也可以让 Coordinator 添加，值不会进入对话。':
+    'The Coordinator can add them too; the value never enters the conversation.',
   个文件: 'file(s)',
   描述: 'Description',
 
@@ -2059,10 +2059,12 @@ export const EN: Record<string, string> = {
   配对二维码: 'Pairing QR code',
   '手机将连接到 {origin}': 'Your phone will connect to {origin}',
   '生成配对码失败，请重试。': 'Could not create a pairing code. Try again.',
-  这台电脑暂时没有手机可用的线路: 'This computer has no route your phone can use yet',
+  手机还连不上这台电脑: 'Your phone cannot reach this computer yet',
   '请先登录 Tailscale：{url}': 'Sign in to Tailscale first: {url}',
-  '设置 CAIRN_TSNET=1 后重启，即可用 Tailscale 连接手机。':
-    'Set CAIRN_TSNET=1 and restart to reach this computer from your phone over Tailscale.',
+  '打开 Tailscale，手机在外面也能连上这台电脑。':
+    'Turn on Tailscale and your phone can reach this computer from anywhere.',
+  '打开方法：设置 `CAIRN_TSNET=1` 后重启 Cairn。':
+    'To turn it on, set `CAIRN_TSNET=1` and restart Cairn.',
   Tailscale: 'Tailscale',
   局域网: 'Local network',
   '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请设置 CAIRN_TSNET=1 后重启，或用局域网或 Tailscale 地址打开本页。':

@@ -25,6 +25,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { type PairingCandidate, pairingCandidates } from '../lib/pairing-origin.js';
 import { PageShell } from '../pages/shell.js';
+import { TextWithCode } from '../resources/machine-detail-pane.js';
 import { ResourceList, ResourceRow, RowDesc, RowText, RowTitle } from '../resources/parts.js';
 
 export const REMOTE_ACCESS_ROUTE = 'remote-access';
@@ -159,11 +160,16 @@ export function RemoteAccessPage() {
           testId="remote-routes-empty"
           className="mt-6"
           icon={Smartphone}
-          title={t('这台电脑暂时没有手机可用的线路')}
+          title={t('手机还连不上这台电脑')}
           description={
             awaitingTailnetLogin && tailnet?.authUrl
               ? t('请先登录 Tailscale：{url}', { url: tailnet.authUrl })
-              : t('设置 CAIRN_TSNET=1 后重启，即可用 Tailscale 连接手机。')
+              : t('打开 Tailscale，手机在外面也能连上这台电脑。')
+          }
+          hint={
+            awaitingTailnetLogin && tailnet?.authUrl
+              ? undefined
+              : { text: <TextWithCode text={t('打开方法：设置 `CAIRN_TSNET=1` 后重启 Cairn。')} /> }
           }
         />
       ) : (

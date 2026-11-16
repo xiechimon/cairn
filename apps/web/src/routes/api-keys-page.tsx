@@ -1,4 +1,5 @@
 import { cn } from 'cn';
+import { KeyRound } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiKeys, useApiMutations, useTodos } from '../api/hooks.js';
@@ -11,9 +12,9 @@ import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { toastError } from '../components/ui/toaster.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { Key } from '../icons/index.js';
 import { PageShell } from '../pages/shell.js';
 import { ApiKeyCreateDialog } from './api-key-create-dialog.js';
 
@@ -63,10 +64,10 @@ export function ApiKeysPage() {
           <EmptyState
             testId="keys-empty"
             className="mt-6"
-            icon={Key}
+            icon={KeyRound}
             title={t('尚无 API 密钥')}
             description={t('API 密钥用于从命令行接入执行机，也让 MCP 客户端能访问你的工作台。')}
-            action={{ label: t('新建密钥'), onClick: live ? () => setCreateOpen(true) : undefined }}
+            action={{ label: t('新建密钥'), onClick: () => setCreateOpen(true) }}
           />
         }
       >
@@ -125,14 +126,18 @@ export function ApiKeysPage() {
       <ApiKeyCreateDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onCreate={(body) =>
+        onCreate={(body) => {
+          if (!live) {
+            blockDemoWrite();
+            return;
+          }
           mutations.createApiKey.mutate(body, {
             onSuccess: (res) => {
               if (typeof res.plaintext === 'string') setPlaintext(res.plaintext);
             },
             onError: (error) => toastError(t('新建 API 密钥失败，请重试。'), error),
-          })
-        }
+          });
+        }}
       />
     </PageShell>
   );
