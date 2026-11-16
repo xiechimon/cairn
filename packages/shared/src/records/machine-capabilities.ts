@@ -105,6 +105,12 @@ export type HostPermissions = z.infer<typeof hostPermissionsSchema>;
 
 export const machineCapabilitiesSchema = z.object({
   osPlatform: machineOsPlatformSchema.optional(),
+  osDistribution: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9._-]+$/)
+    .optional(),
   mcpServers: z.array(z.string()),
   skills: z.array(z.string()),
   hardware: machineHardwareSchema.optional(),
@@ -133,6 +139,9 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     .safeParse({ mcpServers: rec.mcpServers, skills: rec.skills });
   if (!base.success) return undefined;
   const osPlatform = machineOsPlatformSchema.safeParse(rec.osPlatform);
+  const osDistribution = machineCapabilitiesSchema.shape.osDistribution.safeParse(
+    rec.osDistribution,
+  );
   const confinement = confinementReportSchema.safeParse(rec.confinement);
   const confinementCause = confinementCauseSchema.safeParse(rec.confinementCause);
   const hardware = machineHardwareSchema.safeParse(rec.hardware);
@@ -143,6 +152,9 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   return {
     ...base.data,
     ...(osPlatform.success ? { osPlatform: osPlatform.data } : {}),
+    ...(osDistribution.success && osDistribution.data !== undefined
+      ? { osDistribution: osDistribution.data }
+      : {}),
     ...(confinement.success ? { confinement: confinement.data } : {}),
     ...(confinementCause.success ? { confinementCause: confinementCause.data } : {}),
     ...(codexLogin.success ? { codexLogin: codexLogin.data } : {}),
