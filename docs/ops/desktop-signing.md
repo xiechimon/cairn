@@ -20,7 +20,7 @@ Every Mac release is signed with one self-signed code-signing certificate that C
 
 The repository ignores `*.pem` and `*.key`, which is why the public certificate is committed as `.crt`. Never commit anything from `~/.config/cairn/desktop-signing/`.
 
-Pull requests never see the key. `desktop-mac.yml` creates a throwaway certificate on the runner, signs with it and runs the same check. `desktop-release.yml` imports the release PKCS#12 into a temporary keychain (`apps/desktop/scripts/import-signing-identity.sh`), signs through `apps/desktop/scripts/sign-mac.cjs`, checks both update zips with `apps/desktop/scripts/check-signature.mjs` before publishing, and deletes the keychain at the end.
+Pull requests never see the key. `desktop-mac.yml` creates a throwaway certificate on the runner, signs with it and runs the same check. `desktop-release.yml` imports the release PKCS#12 into a temporary keychain (`apps/desktop/scripts/import-signing-identity.sh`), signs through `apps/desktop/scripts/sign-mac.cjs`, checks both update zips with `apps/desktop/scripts/check-signature.mjs` before publishing, and deletes the keychain at the end. The trust boundary is that whole job: every later step in it can use the unlocked keychain, and `security import` takes the PKCS#12 password as a process argument on the runner. So the job runs only code from `main`, and the decoded PKCS#12 and password files are removed when the import step exits, whether it succeeds or not.
 
 ## Backup
 
@@ -41,7 +41,16 @@ gpg -d desktop-signing-<date>.tar.gpg | tar -C ~/.config/cairn -x
 ## Losing it or leaking it
 
 - **Lost key, no backup:** make a new certificate and rotate (below). Installed apps keep updating, because the updater checks only the zip's SHA-256. After that update, each user grants Accessibility and Screen Recording again, once.
-- **Leaked key:** anyone holding it can sign a binary that macOS treats as Cairn for those grants. Rotate at once and delete the two old secrets; users grant again once.
+- **Leaked key:** anyone holding it can sign a binary that macOS treats as Cairn for those grants. The key alone cannot push an update: the updater installs only a zip whose SHA-256 matches the manifest in this repository's latest GitHub release. An attacker still has to get the binary onto the Mac and run it. Rotating does **not** revoke the old identity: there is no revocation for a self-signed certificate, and a Mac keeps its old grants until they are removed on that Mac. Follow the compromise steps below.
+
+## Compromise
+
+1. Rotate (below) and delete the two old secrets, then publish a release signed with the new certificate.
+2. Tell users that the old Cairn certificate leaked and what to do on each Mac:
+   1. Update Cairn from the GitHub release page, not from a file someone sent them.
+   2. In `System Settings > Privacy & Security`, remove Cairn from Accessibility and Screen Recording with the minus button. `tccutil reset Accessibility io.github.xiechimon.cairn` and `tccutil reset ScreenCapture io.github.xiechimon.cairn` do the same from a terminal.
+   3. Open the new Cairn and grant both again, only to it.
+3. Until a Mac has done step 2, a binary signed with the leaked key still gets that Mac's Cairn grants. Say so in the notice.
 
 ## Rotating
 

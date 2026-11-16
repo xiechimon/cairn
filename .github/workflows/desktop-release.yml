@@ -83,11 +83,11 @@ jobs:
           P12_PASSWORD: ${{ secrets.MAC_SIGNING_P12_PASSWORD }}
         run: |
           umask 077
+          trap 'rm -f "$RUNNER_TEMP/signing.p12" "$RUNNER_TEMP/signing.password"' EXIT
           printf '%s' "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/signing.p12"
           printf '%s' "$P12_PASSWORD" > "$RUNNER_TEMP/signing.password"
           apps/desktop/scripts/import-signing-identity.sh "$RUNNER_TEMP/signing.p12" \
             "$RUNNER_TEMP/signing.password" apps/desktop/signing/cairn-mac-self-signed.crt
-          rm -f "$RUNNER_TEMP/signing.p12" "$RUNNER_TEMP/signing.password"
 
       - name: Package arm64 and x64
         env:
@@ -130,6 +130,7 @@ jobs:
       - name: Remove the signing keychain
         if: always()
         run: |
-          if [ -n "${CAIRN_MAC_SIGN_KEYCHAIN:-}" ]; then
-            security delete-keychain "$CAIRN_MAC_SIGN_KEYCHAIN"
+          keychain="$RUNNER_TEMP/cairn-signing.keychain-db"
+          if [ -e "$keychain" ]; then
+            security delete-keychain "$keychain"
           fi

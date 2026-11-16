@@ -3,6 +3,8 @@ import { X509Certificate } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
+export const CAIRN_BUNDLE_ID = 'io.github.xiechimon.cairn';
+
 export function designatedRequirement(codesignOutput) {
   const line = codesignOutput.split('\n').find((row) => row.startsWith('designated => '));
   return line === undefined ? null : line.slice('designated => '.length).trim();
@@ -37,12 +39,18 @@ function check(app, certPath) {
     'raw',
     `${app}/Contents/Info.plist`,
   ]).output.trim();
+  if (bundleId !== CAIRN_BUNDLE_ID) {
+    console.error(
+      `${app} has bundle identifier ${bundleId}, not ${CAIRN_BUNDLE_ID}; macOS would treat it as another app`,
+    );
+    return false;
+  }
   const requirement = designatedRequirement(run('codesign', ['-d', '-r-', app]).output);
   const fingerprint = certificateFingerprint(readFileSync(certPath, 'utf8'));
   console.log(`${app}: designated => ${requirement}`);
-  if (signedBy(requirement, bundleId, fingerprint)) return true;
+  if (signedBy(requirement, CAIRN_BUNDLE_ID, fingerprint)) return true;
   console.error(
-    `${app} is not signed by the certificate ${fingerprint} for ${bundleId}; macOS would drop its permissions on the next update`,
+    `${app} is not signed by the certificate ${fingerprint} for ${CAIRN_BUNDLE_ID}; macOS would drop its permissions on the next update`,
   );
   return false;
 }
