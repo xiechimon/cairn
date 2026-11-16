@@ -1,7 +1,7 @@
 import { MCP_TOOL_REGISTRY } from '@cairn/shared';
 import { useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
-import { Button } from '../components/ui/button.js';
+import { SegmentedRadio } from '../components/segmented.js';
 import { Checkbox } from '../components/ui/checkbox.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
@@ -20,7 +20,7 @@ const TOOL_LABELS: Record<(typeof MCP_TOOL_REGISTRY)[number]['grant'], string> =
   Attachment: '附件',
   Skills: '技能',
   Machines: '执行机',
-  Issues: 'Issue',
+  Issues: 'issue',
   'Pull Requests': 'PR',
   'Workflow Runs': '工作流运行',
   'Threads Waiting on Me': '等我处理的线程',
@@ -55,6 +55,47 @@ export interface ApiKeyCreateBody {
   toolGrants: { read: string[]; write: string[] };
 }
 
+type KeyAccess = Omit<ApiKeyCreateBody, 'name'>;
+
+export const API_KEY_PRESETS = {
+  machine: {
+    gitAccess: false,
+    mcpAccess: false,
+    machineAccess: true,
+    toolGrants: { read: [], write: [] },
+  },
+  read: {
+    gitAccess: false,
+    mcpAccess: true,
+    machineAccess: false,
+    toolGrants: { read: [...READ_GRANTS], write: [] },
+  },
+  all: {
+    gitAccess: true,
+    mcpAccess: true,
+    machineAccess: true,
+    toolGrants: { read: [...READ_GRANTS], write: [...WRITE_GRANTS] },
+  },
+} satisfies Record<string, KeyAccess>;
+
+type Usage = keyof typeof API_KEY_PRESETS | 'custom';
+
+const USAGES: readonly Usage[] = ['machine', 'read', 'all', 'custom'];
+
+const USAGE_LABELS: Record<Usage, string> = {
+  machine: '执行机',
+  read: '只读',
+  all: '全部',
+  custom: '自定义',
+};
+
+const USAGE_HINTS: Record<Usage, string> = {
+  machine: '只能用来在命令行注册执行机，别的都做不了。',
+  read: '让 MCP 客户端查看工作台里的所有内容，不能改动。',
+  all: 'MCP 客户端能看能改，也能推拉仓库、注册执行机。',
+  custom: '自己挑这把密钥能做的事。',
+};
+
 interface ApiKeyCreateDialogProps {
   open: boolean;
   onClose: () => void;
@@ -64,45 +105,50 @@ interface ApiKeyCreateDialogProps {
 export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDialogProps) {
   const { t } = useI18n();
   const [name, setName] = useState('');
-  const [gitAccess, setGitAccess] = useState(false);
-  const [mcpAccess, setMcpAccess] = useState(false);
-  const [machineAccess, setMachineAccess] = useState(true);
-  const [read, setRead] = useState<Set<string>>(new Set());
-  const [write, setWrite] = useState<Set<string>>(new Set());
+  const [usage, setUsage] = useState<Usage>('machine');
+  const [access, setAccess] = useState<KeyAccess>(API_KEY_PRESETS.machine);
 
-  const toggle = (set: Set<string>, tool: string): Set<string> => {
-    const next = new Set(set);
-    if (next.has(tool)) next.delete(tool);
-    else next.add(tool);
-    return next;
+  const chooseUsage = (next: Usage) => {
+    setUsage(next);
+    if (next !== 'custom') setAccess(API_KEY_PRESETS[next]);
   };
-  const grantAll = () => {
-    setRead(new Set(READ_GRANTS));
-    setWrite(new Set(WRITE_GRANTS));
-    setGitAccess(true);
-    setMcpAccess(true);
-    setMachineAccess(true);
-  };
-  const clearAll = () => {
-    setRead(new Set());
-    setWrite(new Set());
-    setGitAccess(false);
-    setMcpAccess(false);
-    setMachineAccess(false);
-  };
+  const toggleTool = (kind: 'read' | 'write', grant: string) =>
+    setAccess((current) => {
+      const picked = current.toolGrants[kind];
+      return {
+        ...current,
+        toolGrants: {
+          ...current.toolGrants,
+          [kind]: picked.includes(grant)
+            ? picked.filter((item) => item !== grant)
+            : [...picked, grant],
+        },
+      };
+    });
+  const setSwitch = (key: 'machineAccess' | 'gitAccess' | 'mcpAccess', checked: boolean) =>
+    setAccess((current) => {
+      const nothingPicked =
+        current.toolGrants.read.length === 0 && current.toolGrants.write.length === 0;
+      return key === 'mcpAccess' && checked && nothingPicked
+        ? { ...current, mcpAccess: true, toolGrants: API_KEY_PRESETS.read.toolGrants }
+        : { ...current, [key]: checked };
+    });
   const submit = () => {
     onCreate({
       name: name.trim() === '' ? null : name.trim(),
-      gitAccess,
-      mcpAccess,
-      machineAccess,
+      ...access,
       toolGrants: {
-        read: [...read].filter((grant) => READ_GRANTS.includes(grant)),
-        write: [...write].filter((grant) => WRITE_GRANTS.includes(grant)),
+        read: READ_GRANTS.filter((grant) => access.toolGrants.read.includes(grant)),
+        write: WRITE_GRANTS.filter((grant) => access.toolGrants.write.includes(grant)),
       },
     });
     onClose();
   };
+  const switches = [
+    { id: 'machine', key: 'machineAccess', label: t('注册执行机（命令行接入）') },
+    { id: 'git', key: 'gitAccess', label: t('Git 读写（托管仓库推送与拉取）') },
+    { id: 'mcp', key: 'mcpAccess', label: t('MCP 访问') },
+  ] as const;
 
   return (
     <DialogShell
@@ -128,70 +174,66 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
             placeholder={t('如：笔记本、CI 机器')}
           />
         </FormField>
-        <div className="flex flex-col">
-          <label htmlFor="apikey-git-access" className={OPTION_ROW_CLS}>
-            <Checkbox id="apikey-git-access" checked={gitAccess} onCheckedChange={setGitAccess} />
-            {t('Git 读写（托管仓库推送与拉取）')}
-          </label>
-          <label htmlFor="apikey-mcp-access" className={OPTION_ROW_CLS}>
-            <Checkbox id="apikey-mcp-access" checked={mcpAccess} onCheckedChange={setMcpAccess} />
-            {t('MCP 访问（MCP 客户端接入）')}
-          </label>
-          <label htmlFor="apikey-machine-access" className={OPTION_ROW_CLS}>
-            <Checkbox
-              id="apikey-machine-access"
-              checked={machineAccess}
-              onCheckedChange={setMachineAccess}
-            />
-            {t('注册执行机（命令行接入）')}
-          </label>
+        <div className="flex flex-col gap-2">
+          <span className="text-ui font-medium text-foreground">{t('用途')}</span>
+          <SegmentedRadio
+            label={t('用途')}
+            value={usage}
+            onChange={chooseUsage}
+            options={USAGES.map((option) => ({ value: option, label: t(USAGE_LABELS[option]) }))}
+            className="grid h-auto w-full grid-cols-4 dark:[--seg-active:color-mix(in_oklch,var(--popover),white_10%)] [&_button]:w-full [&_button]:px-2 pointer-coarse:[&_button]:h-11"
+          />
+          <p
+            data-testid="apikey-usage-hint"
+            className="m-0 text-meta text-balance text-content-secondary"
+          >
+            {t(USAGE_HINTS[usage])}
+          </p>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-ui font-medium text-foreground">{t('工具权限')}</span>
-          <span className="-mr-2 flex gap-2">
-            <Button variant="ghost" size="xs" className="pointer-coarse:h-11" onClick={grantAll}>
-              {t('授予全部')}
-            </Button>
-            <Button variant="ghost" size="xs" className="pointer-coarse:h-11" onClick={clearAll}>
-              {t('清空')}
-            </Button>
-          </span>
-        </div>
-        <div className="flex flex-col gap-2 rounded-md border border-border bg-card px-3 py-2 dark:bg-input/30">
-          {(
-            [
-              {
-                heading: t('读取'),
-                tools: READ_TOOLS,
-                picked: read,
-                setPicked: setRead,
-              },
-              {
-                heading: t('写入'),
-                tools: WRITE_TOOLS,
-                picked: write,
-                setPicked: setWrite,
-              },
-            ] as const
-          ).map(({ heading, tools, picked, setPicked }) => (
-            <fieldset key={heading} className="min-w-0">
-              <legend className="py-1 text-meta text-content-tertiary">{heading}</legend>
-              <div className="grid grid-cols-2 gap-x-3">
-                {tools.map(({ grant, name: id }) => (
-                  <label key={grant} htmlFor={`apikey-tool-${id}`} className={OPTION_ROW_CLS}>
-                    <Checkbox
-                      id={`apikey-tool-${id}`}
-                      className="scroll-my-2"
-                      checked={picked.has(grant)}
-                      onCheckedChange={() => setPicked((set) => toggle(set, grant))}
-                    />
-                    <span className="min-w-0 truncate">{t(TOOL_LABELS[grant])}</span>
-                  </label>
+        {usage === 'custom' && (
+          <>
+            <div className="flex flex-col">
+              {switches.map(({ id, key, label }) => (
+                <label key={id} htmlFor={`apikey-${id}-access`} className={OPTION_ROW_CLS}>
+                  <Checkbox
+                    id={`apikey-${id}-access`}
+                    checked={access[key]}
+                    onCheckedChange={(checked) => setSwitch(key, checked)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+            {access.mcpAccess && (
+              <div className="flex flex-col gap-2 rounded-md border border-border bg-card px-3 py-2 dark:bg-input/30">
+                <span className="text-ui font-medium text-foreground">{t('MCP 工具')}</span>
+                {(
+                  [
+                    { kind: 'read', heading: t('读取'), tools: READ_TOOLS },
+                    { kind: 'write', heading: t('写入'), tools: WRITE_TOOLS },
+                  ] as const
+                ).map(({ kind, heading, tools }) => (
+                  <fieldset key={kind} className="min-w-0">
+                    <legend className="py-1 text-meta text-content-tertiary">{heading}</legend>
+                    <div className="grid grid-cols-2 gap-x-3">
+                      {tools.map(({ grant, name: id }) => (
+                        <label key={grant} htmlFor={`apikey-tool-${id}`} className={OPTION_ROW_CLS}>
+                          <Checkbox
+                            id={`apikey-tool-${id}`}
+                            className="scroll-my-2"
+                            checked={access.toolGrants[kind].includes(grant)}
+                            onCheckedChange={() => toggleTool(kind, grant)}
+                          />
+                          <span className="min-w-0 truncate">{t(TOOL_LABELS[grant])}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
                 ))}
               </div>
-            </fieldset>
-          ))}
-        </div>
+            )}
+          </>
+        )}
       </FormStack>
     </DialogShell>
   );

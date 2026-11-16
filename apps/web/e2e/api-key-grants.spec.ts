@@ -22,7 +22,8 @@ test('the existing key flow submits MCP grant labels for Coordinator Thread entr
   await page.goto('/app/api-keys');
   await page.getByRole('button', { name: '新建密钥', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '新建密钥' });
-  await dialog.getByRole('checkbox', { name: /^MCP 访问/ }).check();
+  await dialog.getByRole('radio', { name: '自定义', exact: true }).click();
+  await dialog.getByRole('checkbox', { name: 'MCP 访问', exact: true }).check();
   const labels: Record<string, string> = {
     Projects: '项目',
     'Read Thread': '查看线程',
@@ -31,7 +32,7 @@ test('the existing key flow submits MCP grant labels for Coordinator Thread entr
     'Start Thread': '新建线程',
     'Reply Thread': '回复线程',
   };
-  const read = ['Projects', 'Read Thread', 'Threads Waiting on Me', 'Thread Pull Requests'];
+  const read = ['Projects', 'Threads Waiting on Me', 'Read Thread', 'Thread Pull Requests'];
   const write = ['Start Thread', 'Reply Thread'];
   const readGroup = dialog.getByRole('group', { name: '读取', exact: true });
   const writeGroup = dialog.getByRole('group', { name: '写入', exact: true });
@@ -56,18 +57,22 @@ test('the existing key flow submits MCP grant labels for Coordinator Thread entr
   await dialog.getByRole('button', { name: '创建', exact: true }).click();
   expect((await submitted).postDataJSON()).toMatchObject({
     mcpAccess: true,
-    toolGrants: { read, write },
+    toolGrants: {
+      read: MCP_TOOL_REGISTRY.filter((tool) => tool.kind === 'read').map((tool) => tool.grant),
+      write,
+    },
   });
   await expect(dialog).not.toBeVisible();
   await expect(page.getByText('cairn_example', { exact: true })).toBeVisible();
 });
 
-test('grant all submits each tool only in its registry kind column', async ({ page }) => {
+test('a new key defaults to connecting a runner and nothing else', async ({ page }) => {
   await stubLiveApiKeys(page);
   await page.goto('/app/api-keys');
   await page.getByRole('button', { name: '新建密钥' }).first().click();
   const dialog = page.getByRole('dialog', { name: '新建密钥' });
-  await dialog.getByRole('button', { name: '授予全部', exact: true }).click();
+  await expect(dialog.getByRole('radio', { name: '执行机', exact: true })).toBeChecked();
+  await expect(dialog.getByRole('checkbox')).toHaveCount(0);
   const submitted = page.waitForRequest(
     (request) =>
       request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/api-keys'),
@@ -76,8 +81,48 @@ test('grant all submits each tool only in its registry kind column', async ({ pa
     route.fulfill({ status: 201, json: { plaintext: 'cairn_example' } }),
   );
   await dialog.getByRole('button', { name: '创建', exact: true }).click();
-  expect((await submitted).postDataJSON().toolGrants).toEqual({
-    read: MCP_TOOL_REGISTRY.filter((tool) => tool.kind === 'read').map((tool) => tool.grant),
-    write: MCP_TOOL_REGISTRY.filter((tool) => tool.kind === 'write').map((tool) => tool.grant),
+  expect((await submitted).postDataJSON()).toMatchObject({
+    gitAccess: false,
+    mcpAccess: false,
+    machineAccess: true,
+    toolGrants: { read: [], write: [] },
+  });
+});
+
+test('turning on MCP with no tools picked starts from the read tools', async ({ page }) => {
+  await stubLiveApiKeys(page);
+  await page.goto('/app/api-keys');
+  await page.getByRole('button', { name: '新建密钥' }).first().click();
+  const dialog = page.getByRole('dialog', { name: '新建密钥' });
+  await dialog.getByRole('radio', { name: '自定义', exact: true }).click();
+  await dialog.getByRole('checkbox', { name: 'MCP 访问', exact: true }).check();
+  const readGroup = dialog.getByRole('group', { name: '读取', exact: true });
+  const writeGroup = dialog.getByRole('group', { name: '写入', exact: true });
+  await expect(readGroup.getByRole('checkbox', { checked: false })).toHaveCount(0);
+  await expect(writeGroup.getByRole('checkbox', { checked: true })).toHaveCount(0);
+});
+
+test('the 全部 preset submits each tool only in its registry kind column', async ({ page }) => {
+  await stubLiveApiKeys(page);
+  await page.goto('/app/api-keys');
+  await page.getByRole('button', { name: '新建密钥' }).first().click();
+  const dialog = page.getByRole('dialog', { name: '新建密钥' });
+  await dialog.getByRole('radio', { name: '全部', exact: true }).click();
+  const submitted = page.waitForRequest(
+    (request) =>
+      request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/api-keys'),
+  );
+  await page.route('**/api/teams/*/api-keys', (route) =>
+    route.fulfill({ status: 201, json: { plaintext: 'cairn_example' } }),
+  );
+  await dialog.getByRole('button', { name: '创建', exact: true }).click();
+  expect((await submitted).postDataJSON()).toMatchObject({
+    gitAccess: true,
+    mcpAccess: true,
+    machineAccess: true,
+    toolGrants: {
+      read: MCP_TOOL_REGISTRY.filter((tool) => tool.kind === 'read').map((tool) => tool.grant),
+      write: MCP_TOOL_REGISTRY.filter((tool) => tool.kind === 'write').map((tool) => tool.grant),
+    },
   });
 });

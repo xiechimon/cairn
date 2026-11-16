@@ -7,6 +7,8 @@ test('api key permission checkboxes keep whole focus rings while the dialog scro
   await stubLiveApiKeys(page);
   await page.goto('/app/api-keys');
   await page.getByRole('button', { name: '新建密钥' }).first().click();
+  await page.getByRole('dialog').getByRole('radio', { name: '只读', exact: true }).click();
+  await page.getByRole('dialog').getByRole('radio', { name: '自定义', exact: true }).click();
   const boxes = page
     .getByRole('dialog')
     .getByRole('group', { name: /^(读取|写入)$/ })

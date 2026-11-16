@@ -1156,12 +1156,19 @@ export const EN: Record<string, string> = {
   '名称（可选）': 'Name (optional)',
   '如：笔记本、CI 机器': 'e.g. laptop, CI runner',
   'Git 读写（托管仓库推送与拉取）': 'Git read/write (push and pull hosted repos)',
-  'MCP 访问（MCP 客户端接入）': 'MCP access (MCP client connections)',
+  'MCP 访问': 'MCP access',
   '注册执行机（命令行接入）': 'Runner enrollment (CLI executor registration)',
-  工具权限: 'Tool grants',
+  'MCP 工具': 'MCP tools',
+  '只能用来在命令行注册执行机，别的都做不了。':
+    'Only registers runners from a command line, nothing else.',
+  '让 MCP 客户端查看工作台里的所有内容，不能改动。':
+    'Lets an MCP client view everything in the workspace, without changing it.',
+  'MCP 客户端能看能改，也能推拉仓库、注册执行机。':
+    'An MCP client can view and change things, push and pull repos, and register runners.',
+  '自己挑这把密钥能做的事。': 'Pick exactly what this key can do.',
   读取: 'Read',
   写入: 'Write',
-  Issue: 'Issues',
+  issue: 'Issues',
   PR: 'Pull requests',
   工作流运行: 'Workflow runs',
   等我处理的线程: 'Threads waiting on me',
@@ -1182,10 +1189,6 @@ export const EN: Record<string, string> = {
   新建线程: 'Start a thread',
   回复线程: 'Reply to a thread',
   中断线程: 'Interrupt a thread',
-  // #636 起 zh「全选」归筛选面板的全选行（en 'Select all'）；本面快捷键换
-  // 「授予全部」避开同形碰撞——zh 源串即 key，两个语义域必须分叉。
-  授予全部: 'Grant all',
-  清空: 'Clear all',
   // wayfinder #173 add-secret dialog family (r2 §242 verbatim fields)
   '名称（环境变量名）': 'Name (environment variable name)',
   '描述（可选）': 'Description (optional)',
