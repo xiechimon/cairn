@@ -23,7 +23,7 @@ Saying "add a `node.txt` that says hello" in the cairn channel today costs a pro
    | Skipped | Kept |
    |---|---|
    | Asking for the project when a basis exists | One question in the main channel when no basis exists and several destinations fit |
-   | `github_overlap` and its numbered result in the reply (owner decision) | The `threads` check for an existing thread on the same request, the verbatim citation and the `409` on rebinding a message |
+   | The duplicate check; the Coordinator no longer runs one (owner decision), the thread checks GitHub and `close_as_duplicate` stops it on a match | The `threads` check for an existing thread on the same request, the verbatim citation and the `409` on rebinding a message |
    | The follow-up `update_todo` title call; the placeholder title cut from the owner's words is final | Work branch, PR, merge gate, CI, protected-path review, merge policy |
    | Tests first, when the owner's words fix the content and the change only adds, edits or removes data or copy | Tests first for any behavior change; a session that cannot tell uses `SESSION_BRIEF` |
 
