@@ -1,9 +1,11 @@
 import { readdirSync, readFileSync, statfsSync, statSync } from 'node:fs';
 import { cpus, freemem, loadavg, totalmem } from 'node:os';
 import { join } from 'node:path';
+import { parseEnv } from 'node:util';
 import {
   type MachineCapabilities,
   type MachineHardware,
+  machineCapabilitiesSchema,
   osPlatformOf,
   parseClaudeMcpEntries,
 } from '@cairn/shared';
@@ -11,6 +13,20 @@ import {
 export interface MachineCapabilitySources {
   mcpConfigPath: string;
   skillsDir: string;
+}
+
+function probeOsDistribution(): string | undefined {
+  if (process.platform !== 'linux') return undefined;
+  for (const path of ['/etc/os-release', '/usr/lib/os-release']) {
+    try {
+      const id = parseEnv(readFileSync(path, 'utf8')).ID;
+      const parsed = machineCapabilitiesSchema.shape.osDistribution.safeParse(id);
+      return parsed.success ? parsed.data : undefined;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return undefined;
+    }
+  }
+  return undefined;
 }
 
 function scanMcpSlugs(mcpConfigPath: string): string[] {
@@ -74,8 +90,10 @@ export function probeMachineHardware(diskPath: string): MachineHardware | undefi
 
 export function probeMachineCapabilities(sources: MachineCapabilitySources): MachineCapabilities {
   const hardware = probeMachineHardware(sources.skillsDir);
+  const osDistribution = probeOsDistribution();
   return {
     osPlatform: osPlatformOf(process.platform),
+    ...(osDistribution !== undefined ? { osDistribution } : {}),
     mcpServers: scanMcpSlugs(sources.mcpConfigPath),
     skills: scanSkillNames(sources.skillsDir),
     ...(hardware !== undefined ? { hardware } : {}),
@@ -112,8 +130,10 @@ export function createMachineCapabilitiesProbe(
       skillsCache = { mtimeMs: Number.NaN, value: scanSkillNames(sources.skillsDir) };
     }
     const hardware = probeMachineHardware(sources.skillsDir);
+    const osDistribution = probeOsDistribution();
     return {
       osPlatform: osPlatformOf(process.platform),
+      ...(osDistribution !== undefined ? { osDistribution } : {}),
       mcpServers: mcpCache.value,
       skills: skillsCache.value,
       ...(hardware !== undefined ? { hardware } : {}),

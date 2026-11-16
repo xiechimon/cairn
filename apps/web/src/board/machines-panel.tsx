@@ -1,6 +1,6 @@
 import type { ComputerRecord } from '@cairn/shared';
 import { cn } from 'cn';
-import { Laptop, Plus, Server } from 'lucide-react';
+import { Laptop, Plus } from 'lucide-react';
 import { type ReactElement, type ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useAuth } from '../api/auth.js';
@@ -11,6 +11,7 @@ import { useLiveData } from '../api/provider.js';
 import { useComputerControl } from '../api/use-computer-control.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { ListCard } from '../components/list-card.js';
+import { MachineIcon, MachineName } from '../components/machine-label.js';
 import { QueryBoundary, type QueryLike, queryPhase } from '../components/query-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { Button } from '../components/ui/button.js';
@@ -51,10 +52,9 @@ function StatusDot({ online, className }: { online: boolean; className?: string 
 }
 
 function MachineGlyph({ machine }: { machine: MachineRow }) {
-  const Icon = machine.kind === 'local' ? Laptop : Server;
   return (
     <span className="relative flex flex-none text-content-secondary">
-      <Icon aria-hidden="true" className="size-5.5" />
+      <MachineIcon machine={machine} className="size-5.5" />
       <StatusDot
         online={machine.online === true}
         className="absolute -right-0.5 -bottom-0.5 ring-2 ring-background"
@@ -208,7 +208,9 @@ function MachineCard({
       <div className="flex min-h-13 items-center gap-5 py-2 pr-2 pl-5">
         <MachineGlyph machine={machine} />
         <span data-testid="machine-list-row" className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-ui text-foreground">{machine.name}</span>
+          <span className="min-w-0 text-ui text-foreground">
+            <MachineName machine={machine} showIcon={false} />
+          </span>
           <span className="truncate text-meta text-content-tertiary">
             {machineMeta(machine, Date.now(), t)}
           </span>

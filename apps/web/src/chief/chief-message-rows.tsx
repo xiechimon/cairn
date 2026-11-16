@@ -11,6 +11,7 @@ import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, TypingDots } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
 import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-message-bubble.js';
+import { MachineName } from '../components/machine-label.js';
 import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
@@ -656,7 +657,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           {item.machineName && (
             <>
               <span className="underline decoration-current/40 underline-offset-3">
-                {item.machineName}
+                <MachineName machine={{ name: item.machineName }} compact />
               </span>
               {t(' 上')}
             </>

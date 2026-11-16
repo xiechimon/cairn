@@ -171,40 +171,66 @@ function stepRow(w: World, stepId: string) {
 describe('#1251 capability report persistence + heartbeat red line', () => {
   test('failure mode 1: enroll carrying capabilities -> column persisted and exposed through the record', async () => {
     const w = await setupWorld();
+    const capabilities = {
+      mcpServers: ['figma'],
+      skills: ['verify-cairn'],
+      osPlatform: 'linux',
+      osDistribution: 'arch',
+    };
     const m = await enrollMachineRest(w, {
       name: 'cap-enroll',
-      capabilities: { mcpServers: ['figma'], skills: ['verify-cairn'] },
+      capabilities,
     });
     const row = w.s.db.select().from(machineTable).where(eq(machineTable.id, m.machineId)).get()!;
-    expect(row.capabilities).toEqual({ mcpServers: ['figma'], skills: ['verify-cairn'] });
+    expect(row.capabilities).toEqual(capabilities);
     const me = await w.s.app.request('/api/machine/me', {
       headers: { authorization: `Bearer ${m.token}` },
     });
     const meBody = (await me.json()) as { capabilities?: unknown };
-    expect(meBody.capabilities).toEqual({ mcpServers: ['figma'], skills: ['verify-cairn'] });
+    expect(meBody.capabilities).toEqual(capabilities);
     const list = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/machines`);
     const listBody = (await list.json()) as { machines?: unknown[] } | unknown[];
     const machines = Array.isArray(listBody) ? listBody : (listBody.machines ?? []);
     const mine = (machines as { id: string; capabilities?: unknown }[]).find(
       (r) => r.id === m.machineId,
     );
-    expect(mine?.capabilities).toEqual({ mcpServers: ['figma'], skills: ['verify-cairn'] });
+    expect(mine?.capabilities).toEqual(capabilities);
   });
 
   test('failure mode 1: presence carrying capabilities -> overwrites the column', async () => {
     const w = await setupWorld();
     const m = await enrollMachineRest(w, {
       name: 'cap-presence',
-      capabilities: { mcpServers: [], skills: [] },
+      capabilities: { mcpServers: [], skills: [], osPlatform: 'linux', osDistribution: 'arch' },
     });
+    const capabilities = {
+      mcpServers: ['ctx'],
+      skills: [],
+      osPlatform: 'linux',
+      osDistribution: 'ubuntu',
+    };
     const res = await presenceAs(w, m.token, {
       cliVersion: '0.1.0',
-      capabilities: { mcpServers: ['ctx'], skills: [] },
+      capabilities,
     });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
     const row = w.s.db.select().from(machineTable).where(eq(machineTable.id, m.machineId)).get()!;
-    expect(row.capabilities).toEqual({ mcpServers: ['ctx'], skills: [] });
+    expect(row.capabilities).toEqual(capabilities);
+    for (const osDistribution of ['Arch Linux', undefined]) {
+      const next = await presenceAs(w, m.token, {
+        capabilities: { ...capabilities, osDistribution },
+      });
+      expect(next.status).toBe(200);
+      const me = await w.s.app.request('/api/machine/me', {
+        headers: { authorization: `Bearer ${m.token}` },
+      });
+      expect(((await me.json()) as { capabilities: unknown }).capabilities).toEqual({
+        mcpServers: ['ctx'],
+        skills: [],
+        osPlatform: 'linux',
+      });
+    }
   });
 
   test('failure mode 2: presence capabilities bad shape -> 200 {ok:true}, old value kept (heartbeat red line)', async () => {
